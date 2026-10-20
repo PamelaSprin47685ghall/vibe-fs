@@ -4,7 +4,7 @@
 
 ## 1. 认领
 
-- Owner：`eng-cut17d-goose`（现任；接手 `eng-cut17c-goose` 未推的子范围② WIP）。此前 `eng-cut17c-goose` 接手 `eng-cut17b-goose` 未推的本地提交。`eng-cut16d-goose` 认领（`9242aecbc`），完成库侧 `tenure` 规则并发布 0.27.0（`c3cd45e` + `c51f35e`）后中断；`eng-cut17b-goose` 接手同一工作树 `wt/CUT-06-main` / `wt/CUT-06-wxl`（分支 `cut/CUT-17`）。
+- Owner：`eng-cut17e-goose`（现任；接手中断的 `eng-cut17d-goose`，其子范围②–④均已落地，无遗留 WIP）。`eng-cut17d-goose` 接手 `eng-cut17c-goose` 未推的子范围② WIP。此前 `eng-cut17c-goose` 接手 `eng-cut17b-goose` 未推的本地提交。`eng-cut16d-goose` 认领（`9242aecbc`），完成库侧 `tenure` 规则并发布 0.27.0（`c3cd45e` + `c51f35e`）后中断；`eng-cut17b-goose` 接手同一工作树 `wt/CUT-06-main` / `wt/CUT-06-wxl`（分支 `cut/CUT-17`）。
 - 写集合：`src/Wanxiangshu/Mission/Planning/TenureIsolation.{fs,fsi}`；`src/Wanxiangshu/Participant/Provider/Projection/{Planner,Renderer,Surface}.fs`；wanxiangli `src/projection/`。
 
 ## 2. 处置
@@ -16,6 +16,7 @@
 | 意图规划（基底去重与冲突、插入键冲突、锚点/key 规范序） | `ProjectionPlanner.plan` 内联 `reduceBase`/`reduceInsertions`/`insertionSortKey` | **抽出** → `wanxiangli/projection.plan`（子范围②） |
 | 布局（基底替换、锚点拼接、append、宿主 id/物理标记对齐） | `ProjectionRenderer` 内联 `spliceBefore`/`applyInsertions` | **抽出** → `wanxiangli/projection.layout`（子范围③） |
 | 退休 attempt 的请求归属（Relayed 切点后请求是否仍属旧 attempt） | `RelayNarrativeTransform.staleRetirement` 内联 `cutToolIndex`/`afterCut`/`requestBelongsToSuccessor`/接纳根判定 | **抽出** → `wanxiangli/projection.retired`（子范围④） |
+| provider 投影的规范字节（Wire 含 callId、Semantic 去 id；五种历史转义；单条消息字节供追加律） | `ProviderProjection.renderWire`/`renderSemantic`/`messageBytes` 手写 JSON（封印摘要、截止摘要、派生宿主 id 的原文） | **抽出** → `wanxiangli/projection.wire`/`wireMessage`/`semantic`（子范围⑤） |
 | 消息解码、XTrace 首次观测游标、重锚事实写入、保留消息写回 | `PlanningSurface`、`PluginTransforms.isolatePlanTenure` | 留主仓（宿主 codec / Trace / journal） |
 
 ## 3. 子范围①：任期过滤（eng-cut17b-goose）
@@ -56,3 +57,13 @@
 - F：宿主只解 journal 证据、标切点、交库裁决；`isStaleRetiredAttempt`/`apply` 签名与调用者（`PluginTransforms`、`Mission.Work.ProjectionSurface`）不变。
 - G：删除 `messageRoleIsUser`、`cutToolIndex`、`afterCut`、`requestBelongsToSuccessor` 与内联判定。
 - H：90 文件 392 条 verdict base/candidate 逐条相同；宿主负控 E/F 各抓到 2 个用例；规则级双算 60000 次 0 分歧、三种变异均被抓到。见[证据](../evidence/CUT-17/README.md)。
+
+## 7. 子范围⑤：provider 投影的规范字节（eng-cut17e-goose）
+
+- B 契约：`Projection().wire(view)` / `wireMessage(message)` / `semantic(view)` → string；视图 `{ provider?, model?, variant?, tools, system, messages: { role, parts }[] }`，部件 `text|reasoning|tool-call|tool-result|media`；线格式 tool-call/tool-result 必须带 callId，语义部件带 callId 即拒绝；字段顺序与五种转义（`\\` `"` `\n` `\r` `\t`，其余字符原样）固定；见库 `src/projection/AGENTS.md` AXIOM 5、LEMMA 8–9、`index.d.ts`，库测试 005。
+- C 反例：Semantic 与 Wire 混用（语义带 callId / 线格式缺 callId）、缺省与 null 渲染漂移、改用标准 JSON 转义（会改变已存封印摘要）、字段顺序漂移、非字符串/未知 kind/稀疏/accessor → 库 005；主仓 provider-projection 004（“canonical wire rendering freezes the generic row shape”）。主线行为本来正确，以两种负控变异体被双算抓到作证。
+- D：库 `cf517e7`（实现 + 测试 + 文档）、`9334267`（release 0.41.0）。
+- E：本刀不改 gitlink、lockfile：落地前 master 已由 CUT-11 前进到 `d0318dc`（0.42.0），其祖先含 `9334267`（0.41.0）。
+- F：`ProviderProjection.renderWire`/`renderSemantic` 签名与全部调用者（`ProjectionSurface.sealDigest`/`renderWire`/`renderSemantic`、`ProjectionRenderer.cutoffDigest`、`ProjectionMessageEdit` 派生宿主 id、`Context/Trace`、追加律 `isAppendOnlyPrefix` 的逐条字节）不变；宿主只把已类型化的部件降成普通视图交库。
+- G：删除宿主自有的 `quote`/`optional`/`jsonArray`/`field`/`jsonObject`/`wirePartJson`/`semanticPartJson` 与内联 `messageBytes` JSON。
+- H：501 条 verdict base/candidate 逐条相同；另 23 个触及封印/截止/语义轨迹的文件 426 pass / 0 fail；双算 54000 次 0 分歧；负控 G/H 分别 6252/10461 次分歧。见[证据](../evidence/CUT-17/README.md)。

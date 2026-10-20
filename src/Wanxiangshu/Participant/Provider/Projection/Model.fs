@@ -119,105 +119,85 @@ module ProviderProjection =
 
     // ── canonical rendering ─────────────────────────────────────────────────
     //
-    // Hand-built rather than reflected. A serializer's field order and optional
-    // handling can change with a library upgrade, and both projections depend on
-    // stable output: the Wire digest becomes a durable seal, and the Semantic
-    // string becomes a fixture key. A version bump must not invalidate either.
+    // The canonical bytes (field order, the five historical escapes, null for an
+    // absent option) are owned by `wanxiangli/projection` `wire`/`wireMessage`/
+    // `semantic` (CUT-17). The Wire digest is a durable seal and the Semantic
+    // string a fixture key, so the format is fixed there, hand-built, and must not
+    // follow a serializer upgrade. This module only lowers its typed parts to the
+    // plain view the owner reads.
 
-    let private quote (text: string) =
-        let escaped =
-            text
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\n", "\\n")
-                .Replace("\r", "\\r")
-                .Replace("\t", "\\t")
+    [<AllowNullLiteral>]
+    type private ProjectionBytes =
+        abstract wire: projection: obj -> string
+        abstract wireMessage: message: obj -> string
+        abstract semantic: projection: obj -> string
 
-        "\"" + escaped + "\""
+    [<Import("Projection", "wanxiangli/projection")>]
+    let private createProjection: unit -> ProjectionBytes = jsNative
 
-    let private optional (value: string option) =
-        match value with
-        | Some text -> quote text
-        | None -> "null"
+    let private bytesOwner = createProjection ()
 
-    let private jsonArray (items: string list) = "[" + String.Join(",", items) + "]"
-
-    let private field name value = quote name + ":" + value
-
-    let private jsonObject (fields: string list) = "{" + String.Join(",", fields) + "}"
-
-    let private wirePartJson (part: WirePart) =
+    let private wirePartView (part: WirePart) : obj =
         match part with
-        | WireText text -> jsonObject [ field "kind" (quote "text"); field "text" (quote text) ]
-        | WireReasoning text -> jsonObject [ field "kind" (quote "reasoning"); field "text" (quote text) ]
+        | WireText text -> createObj [ "kind" ==> "text"; "text" ==> text ]
+        | WireReasoning text -> createObj [ "kind" ==> "reasoning"; "text" ==> text ]
         | WireToolCall(callId, name, args) ->
-            jsonObject
-                [ field "kind" (quote "tool-call")
-                  field "callId" (quote (ToolCallId.value callId))
-                  field "name" (quote name)
-                  field "args" (quote args) ]
+            createObj
+                [ "kind" ==> "tool-call"
+                  "callId" ==> ToolCallId.value callId
+                  "name" ==> name
+                  "args" ==> args ]
         | WireToolResult(callId, result) ->
-            jsonObject
-                [ field "kind" (quote "tool-result")
-                  field "callId" (quote (ToolCallId.value callId))
-                  field "result" (quote result) ]
+            createObj [ "kind" ==> "tool-result"; "callId" ==> ToolCallId.value callId; "result" ==> result ]
         | WireMedia(mediaType, digest) ->
-            jsonObject
-                [ field "kind" (quote "media")
-                  field "mediaType" (optional mediaType)
-                  field "contentDigest" (quote digest) ]
+            createObj [ "kind" ==> "media"; "mediaType" ==> Option.toObj mediaType; "contentDigest" ==> digest ]
 
-    let private semanticPartJson (part: SemanticPart) =
+    let private semanticPartView (part: SemanticPart) : obj =
         match part with
-        | SemanticText text -> jsonObject [ field "kind" (quote "text"); field "text" (quote text) ]
-        | SemanticReasoning text -> jsonObject [ field "kind" (quote "reasoning"); field "text" (quote text) ]
-        | SemanticToolCall(name, args) ->
-            jsonObject
-                [ field "kind" (quote "tool-call")
-                  field "name" (quote name)
-                  field "args" (quote args) ]
-        | SemanticToolResult result -> jsonObject [ field "kind" (quote "tool-result"); field "result" (quote result) ]
+        | SemanticText text -> createObj [ "kind" ==> "text"; "text" ==> text ]
+        | SemanticReasoning text -> createObj [ "kind" ==> "reasoning"; "text" ==> text ]
+        | SemanticToolCall(name, args) -> createObj [ "kind" ==> "tool-call"; "name" ==> name; "args" ==> args ]
+        | SemanticToolResult result -> createObj [ "kind" ==> "tool-result"; "result" ==> result ]
         | SemanticMedia(mediaType, digest) ->
-            jsonObject
-                [ field "kind" (quote "media")
-                  field "mediaType" (optional mediaType)
-                  field "contentDigest" (quote digest) ]
+            createObj [ "kind" ==> "media"; "mediaType" ==> Option.toObj mediaType; "contentDigest" ==> digest ]
+
+    let private messageView (role: string) (parts: obj list) : obj =
+        createObj [ "role" ==> role; "parts" ==> List.toArray parts ]
+
+    let private wireMessageView (message: WireMessage) =
+        messageView message.Role (message.Parts |> List.map wirePartView)
+
+    let private projectionView provider model variant (tools: string list) (system: string list) (messages: obj list) =
+        createObj
+            [ "provider" ==> Option.toObj provider
+              "model" ==> Option.toObj model
+              "variant" ==> Option.toObj variant
+              "tools" ==> List.toArray tools
+              "system" ==> List.toArray system
+              "messages" ==> List.toArray messages ]
 
     /// Byte-exact rendering of what was sent.
     let renderWire (wire: ProviderWireProjection) : string =
-        jsonObject
-            [ field "provider" (optional wire.ProviderId)
-              field "model" (optional wire.ModelId)
-              field "variant" (optional wire.Variant)
-              field "tools" (jsonArray (wire.Tools |> List.map quote))
-              field "system" (jsonArray (wire.System |> List.map quote))
-              field
-                  "messages"
-                  (jsonArray (
-                      wire.Messages
-                      |> List.map (fun message ->
-                          jsonObject
-                              [ field "role" (quote message.Role)
-                                field "parts" (jsonArray (message.Parts |> List.map wirePartJson)) ])
-                  )) ]
+        projectionView
+            wire.ProviderId
+            wire.ModelId
+            wire.Variant
+            wire.Tools
+            wire.System
+            (wire.Messages |> List.map wireMessageView)
+        |> bytesOwner.wire
 
     /// Cross-session rendering of what the exchange meant.
     let renderSemantic (semantic: ProviderSemanticProjection) : string =
-        jsonObject
-            [ field "provider" (optional semantic.ProviderId)
-              field "model" (optional semantic.ModelId)
-              field "variant" (optional semantic.Variant)
-              field "tools" (jsonArray (semantic.Tools |> List.map quote))
-              field "system" (jsonArray (semantic.System |> List.map quote))
-              field
-                  "messages"
-                  (jsonArray (
-                      semantic.Messages
-                      |> List.map (fun message ->
-                          jsonObject
-                              [ field "role" (quote message.Role)
-                                field "parts" (jsonArray (message.Parts |> List.map semanticPartJson)) ])
-                  )) ]
+        projectionView
+            semantic.ProviderId
+            semantic.ModelId
+            semantic.Variant
+            semantic.Tools
+            semantic.System
+            (semantic.Messages
+             |> List.map (fun message -> messageView message.Role (message.Parts |> List.map semanticPartView)))
+        |> bytesOwner.semantic
 
     // ── the questions each projection answers ───────────────────────────────
 
@@ -227,9 +207,7 @@ module ProviderProjection =
     let private prefixOwner: obj = createNew prefixOwnerCtor ()
 
     let private messageBytes (message: WireMessage) =
-        jsonObject
-            [ field "role" (quote message.Role)
-              field "parts" (jsonArray (message.Parts |> List.map wirePartJson)) ]
+        bytesOwner.wireMessage (wireMessageView message)
 
     let private appendLawView (wire: ProviderWireProjection) : obj =
         createObj
