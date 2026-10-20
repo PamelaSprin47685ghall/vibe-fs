@@ -4,7 +4,7 @@
 
 ## 1. 状态与范围
 
-- **owner**：eng-cut19c-goose（2026-10-20 接手 eng-cut19b-goose 中断后的工作树 `cut/CUT-19b`：库提交 3585c4f/66fd900 已在 wanxiangli main，主仓提交与本卡记录由 19c rebase、复验后落地；此前 eng-cut19b-goose 接手；原 owner eng-cut19-goose 已退出：其工作树 `cut/CUT-19` 干净、与 master 同步、无运行进程，交接提交 1c90ecf69）。原认领 993e93683。reviewer：未配非作者 reviewer（本轮全自治，见 §8）。
+- **owner**：eng-cut19d-goose（2026-10-21 接手 eng-cut19c-goose：其使用的工作树 `cut/CUT-19b`（主仓，HEAD 04713f727）与 `cut/CUT-19c`（库，HEAD 7a2ccf6）干净、提交均已在主线、无运行进程；没有未推送的工作）。此前 eng-cut19c-goose 于 2026-10-20 接手 eng-cut19b-goose 中断后的工作树 `cut/CUT-19b`：库提交 3585c4f/66fd900 已在 wanxiangli main，主仓提交与本卡记录由 19c rebase、复验后落地；此前 eng-cut19b-goose 接手；原 owner eng-cut19-goose 已退出：其工作树 `cut/CUT-19` 干净、与 master 同步、无运行进程，交接提交 1c90ecf69）。原认领 993e93683。reviewer：未配非作者 reviewer（本轮全自治，见 §8）。
 - **本轮闭合的职责**：多 writer 事实流的**结构归并**（durable-convergence-001/002/003 与 011 的 retained 父边界）。唯一实现从主仓 `EventKWayMerge.fs` 迁到 `wanxiangli/convergence`（`KWayMerge`）。
 - **本卡整体未完成**：段文件原子追加与滚动（`ProcessEventLog`）、retention 截止与整 writer 过期、跨进程锁、物化缓存、`IntegratorEngine` 业务折叠与 cut-tail、`validateLocalHistory` 与 `wanxiangli/events.validate` 的同义校验收敛，都仍在主仓，归本卡后续子范围。故看板列为 `DOING`，不是 `DONE`。
 
@@ -134,7 +134,7 @@
 3. Journal 侧多 writer 接线与 Git/Hook 同步、旧 Store/Journal 退出（CARDS 的“退出”条件：数据格式、恢复、同步、关闭各有 owner，最后一个旧消费者退出后才删旧实现）。
 4. 跨进程锁与原子追加是真实宿主 I/O，预计明确保留在主仓（需在关闭本卡时写入保留理由）。
 
-本卡的“退出”条件远未满足，故不标 DONE；原 owner 已退出不改变这一点。
+（2026-10-21 更新）以上 2–4 已按 README §6 末段拆为显式子卡或登记保留，见 §16；本卡按缩小后的范围关闭。
 
 ## 15. 子范围⑤：段命名与分组律交给 `wanxiangli/segments`（按 §13 数据计划）
 
@@ -150,3 +150,27 @@
 - **验证**（同一工作树，rebase 到 master 04efd06ca，gitlink 7a2ccf6 / 0.23.0，重建库 dist 与主仓 build ok，fantomas --check 通过；落地前再 rebase 到 e4ff18704，gitlink 取 master 的 d2a9f3b / 0.23.1（含 0.23.0），重建后 35 文件同为 252 / 0，日志 `seg-cand-run2.log`）：durable-events + durable-convergence 35 文件 **252 pass / 0 fail** / 14 skip / 10 todo（上一刀 250 + 本刀 2 个反例）；另 21 个触及事件目录 / RetentionSurface 的文件 294 pass / 3 fail：managed-session-lifecycle-018（unknown-stop 得到 `CompletedAwaitingJoin`）与 -022 两例（`Promise resolution is still pending`），在 base dist 上以同样消息失败（`logs-cut19c/msl-base.log`），与本刀无关。日志 `logs-cut19c/seg-cand-run.log`、`seg-wide.log`、`shadow.json`。
 - **回退**：只改名字的计算，不迁移、不改写任何已有文件；`git revert` 主仓提交即回旧律（库 0.23.0 可保留）。
 - **未做**：全量 `scripts/verify.mjs` 与 integration tier。
+
+## 16. 关闭：缩小后的完成范围、明确保留与子卡（eng-cut19d-goose，2026-10-21）
+
+按 README §6 末段“接线若尚有必要旧路径，应明确缩小已完成职责或登记子卡；不能在 DONE 后暗留原职责”，本卡以如下范围记 `DONE`。
+
+**已完成且旧 owner 已退出**（每段旧算法已删，主仓只剩类型投影 facade，均有 base 红/候选绿或正控证据，见 §4–§15）：
+
+| 子范围 | 库 owner | 主仓剩余 |
+|---|---|---|
+| ① 结构 k-way 归并 | `wanxiangli/convergence` | `EventKWayMerge` facade |
+| ② 整条 writer UTC 日保留 | `wanxiangli/retention` | `ProcessEventLog.{utcDayOf,isWriterActiveAt}` 调用库 |
+| ③ 已落盘行闭包 | `wanxiangli/events.checkClosure` | `checkStoredClosure` 投影 + 两处错误形状 |
+| ④ 尾行活动判定 | `wanxiangli/retention.lastActivity` | 只剩倒序逐行读取 |
+| ⑤ 段命名与分组律 | `wanxiangli/segments` | 目录列举与文件 I/O |
+
+**明确保留（RETAINED，宿主 I/O，不记为抽取成功）**：跨进程存储锁 `acquireStoreLock/withStoreLock`、原子追加与滚动的物理写（`appendEncoded`、`durabilityBarrier`/fsync、rename、`utimesSync`）、进程内解码前缀缓存（dev/ino/长度键，是宿主文件身份）、事件目录的读写与删除。理由：都是真实宿主文件系统能力（README §2“宿主代码只承接真实宿主能力”），没有可移植的决策内容；把它们搬进库只会让库直接做 I/O 而不减少主仓理解面。继续维护者：主仓 `Persistence/EventStore` 的 owner。边界：这些函数不得再含命名、分组、共存、保留、闭包或归并的判定——那些判定已在库里，回填即为回归。
+
+**拆出的子卡（看板已登记，各有自己的前置与 owner）**：
+
+- **CUT-19-a**（DOING，eng-cut19d-goose）：段共存的字节裁决与 writer 流成帧律。现状两份手写同一裁决——读取侧 `coexistingFormsOf` 与整理侧 `reconcileCoexistingForms` 各自做“旧式是段系列的字节前缀 / 段系列是旧式的字节前缀 / 行续接（双方都是完整规范 NDJSON 且 EventId 不相交）/ 分歧”，外加 `decodeWriterText` 的成帧（非空文本必须以 LF 结尾、内行不得为空、逐行规范解码）。目标：裁决与成帧进 `wanxiangli/segments`，主仓只读字节、按裁决执行删除/追加。
+- **CUT-19-b**（READY）：`IntegratorEngine` 的规则隔离与 cut-tail 载荷律——(rule, FaultScope) 隔离账、隔离期间跳过该规则、`ProjectionCutTail` 载荷 `{rule, failed_event_id, reason, reset_json}` 的编解码、仅当失败事件已在 Current 中时应用 reset 并清除隔离。规则本体（各业务折叠）随各事实族卡；进程级唯一一次全量重放预算、`PrepareLive` 的乐观提交与 Current 的持有留主仓组合者。
+- **CUT-19-c**（BACKLOG，前置 CUT-11/12/27/29/31）：CARDS 的退出条件“最后一个旧消费者退出后才能删旧 Store/Journal 相关实现”。`Persistence/Journal` 约 3.5k 行，主仓 188 处 `open Wanxiangshu.Persistence.Journal`；每个事实族由其 owner 卡完成后逐批退出。另需判定 `GitTypes`/`StoreRef`/`PublishError`/`RootOid` 的去向：亲眼核对 master 636f8d847，它们只被 `EventStore/{GitTypes,Model,Surface}` 引用（在线 Git 投影已删，`Surface` 为 JS 证明面），生产无 Git 同步调用者。
+
+**本卡关闭时的验证依据**：⑤ 落地时的最后一次复验（§15，rebase 到 e4ff18704，gitlink d2a9f3b / 0.23.1，durable-events + durable-convergence 35 文件 252 pass / 0 fail / 14 skip / 10 todo）。本次关闭只改看板与本卡文字，不改代码，故没有新增运行；未做全量 `scripts/verify.mjs` 与 integration tier，仍如实列为未做。
