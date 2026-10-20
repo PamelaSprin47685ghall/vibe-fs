@@ -1122,57 +1122,68 @@ module JsToolsBindings =
         (delegationHost: JsDelegationHost option)
         (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
+        // Which members are installed is the library member directory
+        // (wanxiangli/programming `membersFor`), the same one the public and
+        // runtime base classes and the schema member list read; `dag` is pure
+        // base-class sugar over fork + join and has no host member.
+        let directory = JsCapability.memberNamesFor capabilities ""
+        let present (memberName: string) = Array.contains memberName directory
+
         let members =
-            [ if Set.contains JsCapability.Read capabilities then
+            [ if present "cat" then
                   makeCatMember root readSnapshots explicitReads
+              if present "stat" then
                   makeStatMember root
+              if present "whereAll" then
                   makeWhereAllMember ()
+              if present "where" then
                   makeWhereMember parkState
 
-              if Set.contains JsCapability.Glob capabilities then
+              if present "ls" then
                   makeLsMember root
 
-              if Set.contains JsCapability.Grep capabilities then
+              if present "rg" then
                   makeRgMember root
 
-              if Set.contains JsCapability.Write capabilities then
+              if present "write" then
                   makeWriteMember root staging readSnapshots ledger
+              if present "mkdir" then
                   makeMkdirMember root
 
-              if Set.contains JsCapability.Remove capabilities then
+              if present "rm" then
                   makeRmMember root staging readSnapshots ledger
 
-              if Set.contains JsCapability.Move capabilities then
+              if present "mv" then
                   makeMvMember root staging readSnapshots ledger
 
-              if Set.contains JsCapability.Exec capabilities then
+              if present "call" then
                   makeCallMember callHost parkState
 
-              if Set.contains JsCapability.Commission capabilities then
+              if present "commission" then
                   makeDelegateMember delegationHost "commission"
 
-              if Set.contains JsCapability.Fork capabilities then
+              if present "fork" then
                   makeDelegateMember delegationHost "fork"
 
-              if Set.contains JsCapability.Resume capabilities then
+              if present "resume" then
                   makeDelegateMember delegationHost "resume"
 
-              if Set.contains JsCapability.DevOps capabilities then
+              if present "devops" then
                   makeDelegateMember delegationHost "devops"
 
-              if Set.contains JsCapability.Join capabilities then
+              if present "join" then
                   makeJoinMember delegationHost
 
-              if Set.contains JsCapability.Fission capabilities then
+              if present "fission" then
                   makeFissionMember delegationHost
 
-              if Set.contains JsCapability.Horizon capabilities then
+              if present "horizon" then
                   makeHorizonMember delegationHost
 
-              if Set.contains JsCapability.Advisor capabilities then
+              if present "advisor" then
                   makeAdvisorMember delegationHost
 
-              if Set.contains JsCapability.Ask capabilities then
+              if present "ask" then
                   makeAskMember parkState askInvoke
 
               match parkState with

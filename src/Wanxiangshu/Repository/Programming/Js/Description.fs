@@ -262,6 +262,14 @@ module JsCanonicalDescription =
 
     let has (capabilities: Set<JsCapability>) (capability: JsCapability) = Set.contains capability capabilities
 
+    /// Whether the library member directory (wanxiangli/programming
+    /// `membersFor`) projects `memberName` for this capability set. The public
+    /// and runtime base classes gate every member on this one directory, so the
+    /// shown tutorial, the executed class and the schema member list cannot
+    /// disagree about which members exist (dag = Fork + Join lives only there).
+    let private present (capabilities: Set<JsCapability>) (memberName: string) =
+        Array.contains memberName (JsCapability.memberNamesFor capabilities "")
+
     let private classOpen =
         """
 class JsProgram {"""
@@ -270,7 +278,7 @@ class JsProgram {"""
     /// `Callable` exists exactly when the Exec capability is projected; the
     /// base class hands it to the program as `this.Callable`.
     let private callableOpen (capabilities: Set<JsCapability>) =
-        if has capabilities JsCapability.Exec then
+        if present capabilities "call" then
             "class Callable {}\n\n"
         else
             ""
@@ -287,47 +295,47 @@ class JsProgram {"""
         + fill
             prose.BaseClass
             [ "baseClassCallable",
-              if has capabilities JsCapability.Exec then
+              if present capabilities "call" then
                   prose.BaseClassCallable
               else
                   ""
               "baseClassRead",
-              if has capabilities JsCapability.Read then
+              if present capabilities "cat" then
                   prose.BaseClassRead + "\n" + prose.BaseClassAnchors
               else
                   ""
               "baseClassGlob",
-              if has capabilities JsCapability.Glob then
+              if present capabilities "ls" then
                   prose.BaseClassGlob
               else
                   ""
               "baseClassGrep",
-              if has capabilities JsCapability.Grep then
+              if present capabilities "rg" then
                   prose.BaseClassGrep
               else
                   ""
               "baseClassWrite",
-              if has capabilities JsCapability.Write then
+              if present capabilities "write" then
                   prose.BaseClassWrite
               else
                   ""
               "baseClassRemove",
-              if has capabilities JsCapability.Remove then
+              if present capabilities "rm" then
                   prose.BaseClassRemove
               else
                   ""
               "baseClassMove",
-              if has capabilities JsCapability.Move then
+              if present capabilities "mv" then
                   prose.BaseClassMove
               else
                   ""
               "baseClassExec",
-              if has capabilities JsCapability.Exec then
+              if present capabilities "call" then
                   prose.BaseClassExec
               else
                   ""
               "baseClassFork",
-              if has capabilities JsCapability.Fork then
+              if present capabilities "fork" then
                   prose.BaseClassFork
               else
                   ""
@@ -335,47 +343,47 @@ class JsProgram {"""
               // has no join to compile into, so it is projected only when both
               // capabilities are present.
               "baseClassDag",
-              if has capabilities JsCapability.Fork && has capabilities JsCapability.Join then
+              if present capabilities "dag" then
                   prose.BaseClassDag
               else
                   ""
               "baseClassResume",
-              if has capabilities JsCapability.Resume then
+              if present capabilities "resume" then
                   prose.BaseClassResume
               else
                   ""
               "baseClassCommission",
-              if has capabilities JsCapability.Commission then
+              if present capabilities "commission" then
                   prose.BaseClassCommission
               else
                   ""
               "baseClassDevOps",
-              if has capabilities JsCapability.DevOps then
+              if present capabilities "devops" then
                   prose.BaseClassDevOps
               else
                   ""
               "baseClassJoin",
-              if has capabilities JsCapability.Join then
+              if present capabilities "join" then
                   prose.BaseClassJoin
               else
                   ""
               "baseClassFission",
-              if has capabilities JsCapability.Fission then
+              if present capabilities "fission" then
                   prose.BaseClassFission
               else
                   ""
               "baseClassHorizon",
-              if has capabilities JsCapability.Horizon then
+              if present capabilities "horizon" then
                   prose.BaseClassHorizon
               else
                   ""
               "baseClassAdvisor",
-              if has capabilities JsCapability.Advisor then
+              if present capabilities "advisor" then
                   prose.BaseClassAdvisor
               else
                   ""
               "baseClassAsk",
-              if has capabilities JsCapability.Ask then
+              if present capabilities "ask" then
                   prose.BaseClassAsk
               else
                   ""
@@ -385,11 +393,11 @@ class JsProgram {"""
         String.concat
             "\n"
             [ "class ReviewOnly {"
-              if has capabilities JsCapability.Read then
+              if present capabilities "cat" then
                   reviewCalls prose.BaseClassRead
-              if has capabilities JsCapability.Glob then
+              if present capabilities "ls" then
                   reviewCalls prose.BaseClassGlob
-              if has capabilities JsCapability.Grep then
+              if present capabilities "rg" then
                   reviewCalls prose.BaseClassGrep
               "}\n" ]
 
@@ -451,7 +459,7 @@ class JsProgram {"""
     /// the member reads through; `guardOf` builds the refusal that precedes
     /// the read when the namespace cannot serve the member.
     let private runtimeFileMethods (capabilities: Set<JsCapability>) (memberNamespace: string) (guardOf: string -> string) =
-        [ if has capabilities JsCapability.Read then
+        [ if present capabilities "cat" then
               fill
                   """  async cat(path) {
 {{guard}}    const result = await {{namespace}}.cat(path);
@@ -467,7 +475,7 @@ class JsProgram {"""
     return result.stat;
   }"""
                   [ "rethrow_host", rethrowHost; "namespace", memberNamespace; "guard", guardOf "stat" ]
-          if has capabilities JsCapability.Glob then
+          if present capabilities "ls" then
               fill
                   """  async ls(path) {
 {{guard}}    const result = await {{namespace}}.ls(path);
@@ -475,7 +483,7 @@ class JsProgram {"""
     return result.entries;
   }"""
                   [ "rethrow_host", rethrowHost; "namespace", memberNamespace; "guard", guardOf "ls" ]
-          if has capabilities JsCapability.Grep then
+          if present capabilities "rg" then
               fill
                   """  async rg(argv) {
 {{guard}}    const result = await {{namespace}}.rg(argv);
@@ -493,11 +501,11 @@ class JsProgram {"""
                   "  constructor(api) { this._api = api; this.reviewOnly = new ReviewOnly(api.reviewOnly); }"
               else
                   "  constructor(api) { this._api = api; }"
-              if has capabilities JsCapability.Exec then
+              if present capabilities "call" then
                   "  Callable = Callable;"
               if not reviewOnly then
                   yield! runtimeFileMethods capabilities "this._api" (fun _ -> "")
-              if has capabilities JsCapability.Read then
+              if present capabilities "cat" then
                   fill
                       """  whereAll(content, needle, from = 0) {
     const result = this._api.whereAll(content, needle, from);
@@ -514,7 +522,7 @@ class JsProgram {"""
     return result && result.span !== undefined ? result.span : result;
   }"""
                       [ "rethrow_host", rethrowHost ]
-              if has capabilities JsCapability.Write then
+              if present capabilities "write" then
                   fill
                       """  write(path, content) {
     const result = this._api.write(path, content);
@@ -529,7 +537,7 @@ class JsProgram {"""
     return { ok: true, path };
   }"""
                       [ "rethrow_host", rethrowHost ]
-              if has capabilities JsCapability.Remove then
+              if present capabilities "rm" then
                   fill
                       """  rm(path) {
     const result = this._api.rm(path);
@@ -537,7 +545,7 @@ class JsProgram {"""
     return { removed: result.removed };
   }"""
                       [ "rethrow_host", rethrowHost ]
-              if has capabilities JsCapability.Move then
+              if present capabilities "mv" then
                   fill
                       """  mv(from, to) {
     const result = this._api.mv(from, to);
@@ -545,13 +553,13 @@ class JsProgram {"""
     return { moved: result.moved, destination: result.destination };
   }"""
                       [ "rethrow_host", rethrowHost ]
-              if has capabilities JsCapability.Exec then
+              if present capabilities "call" then
                   fill
                       """  async call(callableClass) {
     return await this._api.call(callableClass);
   }"""
                       []
-              if has capabilities JsCapability.Ask then
+              if present capabilities "ask" then
                   fill
                       """  async ask(question) {
     const stack = new Error().stack;
@@ -560,7 +568,7 @@ class JsProgram {"""
     return result;
   }"""
                       [ "rethrow_host", rethrowHost ]
-              if has capabilities JsCapability.Commission then
+              if present capabilities "commission" then
                   fill
                       """  async commission(payload, reportMapping) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
@@ -568,7 +576,7 @@ class JsProgram {"""
     return await this._api.commission(spec, reportMapping);
   }"""
                       [ "name_derivation", deriveNameFromCharge ]
-              if has capabilities JsCapability.Fork then
+              if present capabilities "fork" then
                   fill
                       """  async fork(payload, reportMapping) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
@@ -576,38 +584,38 @@ class JsProgram {"""
     return await this._api.fork(spec, reportMapping);
   }"""
                       [ "name_derivation", deriveNameFromCharge ]
-              if has capabilities JsCapability.Resume then
+              if present capabilities "resume" then
                   fill
                       """  async resume(payload, reportMapping) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
     return await this._api.resume(spec, reportMapping);
   }"""
                       []
-              if has capabilities JsCapability.DevOps then
+              if present capabilities "devops" then
                   fill
                       """  async devops(intent, reportMapping) {
     return await this._api.devops(intent, reportMapping);
   }"""
                       []
-              if has capabilities JsCapability.Join then
+              if present capabilities "join" then
                   fill
                       """  async join() {
     return await this._api.join();
   }"""
                       []
-              if has capabilities JsCapability.Horizon then
+              if present capabilities "horizon" then
                   fill
                       """  async horizon() {
     return await this._api.horizon();
   }"""
                       []
-              if has capabilities JsCapability.Advisor then
+              if present capabilities "advisor" then
                   fill
                       """  async advisor(intent, reportMapping) {
     return await this._api.advisor(intent, reportMapping);
   }"""
                       []
-              if has capabilities JsCapability.Fission then
+              if present capabilities "fission" then
                   fill
                       """  async fission(payload) {
     return await this._api.fission(payload);
@@ -615,7 +623,7 @@ class JsProgram {"""
                       []
               // dag is sugar over fork waves plus one join: the body calls
               // this.join(), so it is emitted only when Join is projected too.
-              if has capabilities JsCapability.Fork && has capabilities JsCapability.Join then
+              if present capabilities "dag" then
                   fill
                       """  async dag(spec, reportMapping) {
     const nodes = (spec && spec.nodes) || [];

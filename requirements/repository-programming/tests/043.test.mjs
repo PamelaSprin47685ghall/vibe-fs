@@ -134,15 +134,11 @@ test('WHAT[repository-programming-043] ToolsBindings binds the rm/mv members beh
   assert.match(bindings, /let private makeMvMember/)
   assert.match(bindings, /"mv"\s*\n\s*==> fun \(fromPath: string\) \(toPath: string\) ->/)
 
-  // capability 门禁挂载：运行时按 Remove/Move 投影成员。
-  assert.match(
-    bindings,
-    /if Set\.contains JsCapability\.Remove capabilities then\s*\n\s*makeRmMember root staging readSnapshots ledger/,
-  )
-  assert.match(
-    bindings,
-    /if Set\.contains JsCapability\.Move capabilities then\s*\n\s*makeMvMember root staging readSnapshots ledger/,
-  )
+  // capability 门禁挂载：运行时按库成员目录（wanxiangli/programming membersFor，
+  // Remove → rm、Move → mv）挂载成员，与公开/运行时基类读同一份目录。
+  assert.match(bindings, /let directory = JsCapability\.memberNamesFor capabilities ""/)
+  assert.match(bindings, /if present "rm" then\s*\n\s*makeRmMember root staging readSnapshots ledger/)
+  assert.match(bindings, /if present "mv" then\s*\n\s*makeMvMember root staging readSnapshots ledger/)
 
   // 底层文件系统效果归 MutationFs 原语，成员绑定不二次定义原语本身。
   assert.match(bindings, /JsMutationFs\.removePath full/)
