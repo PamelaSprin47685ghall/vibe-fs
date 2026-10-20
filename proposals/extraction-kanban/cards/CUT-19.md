@@ -129,9 +129,24 @@
 
 ## 14. 本卡剩余（仍归本卡，看板保持 DOING）
 
-1. §13 的段命名与分组律（按计划，先影子双算）。
+1. ~~§13 的段命名与分组律~~：已完成，见 §15。
 2. `IntegratorEngine` 业务折叠的故障隔离与 cut-tail 重放（`integrateOne`/`applyCut`/全量重放预算）。
 3. Journal 侧多 writer 接线与 Git/Hook 同步、旧 Store/Journal 退出（CARDS 的“退出”条件：数据格式、恢复、同步、关闭各有 owner，最后一个旧消费者退出后才删旧实现）。
 4. 跨进程锁与原子追加是真实宿主 I/O，预计明确保留在主仓（需在关闭本卡时写入保留理由）。
 
 本卡的“退出”条件远未满足，故不标 DONE；原 owner 已退出不改变这一点。
+
+## 15. 子范围⑤：段命名与分组律交给 `wanxiangli/segments`（按 §13 数据计划）
+
+- **职责**（durable-events-005/014）：`<WriterId>-dddd.ndjson` 段名（恰好四位 ASCII 数字，序号 0..9999）、旧式 `<WriterId>.ndjson`、新 writerId 的三条约束、某 writer 的段系列、目录名单 → writer 分组（序号从 0000 起连续才并组，否则按完整 stem 降为旧式）、一组文件的形态（只有段 / 只有旧式 / 共存 / 多旧式）。只算名字；目录列举、字节读写、共存的字节裁决（字节前缀 / 行续接）、锁、fsync 都留在主仓。
+- **库**：新模块 `wanxiangli/segments` / `WriterSegments`（`5295e3d`，随 `7a2ccf6` 发布为 0.23.0）。库测试 `segments/tests/005`、`014` 共 7 例，含按冻结读取律独立写成的参考实现在固定种子 400 组随机名单上的逐项对照及名单逆序不变。变异：把 ASCII 判定换回 `Char.IsDigit`、去掉序号上界 → 7 例中 6 例红。`convergence-package` 干净安装消费覆盖 `groupWriterFiles`/`streamLayout`（Node + Bun，tsc strict）。库发布前定向集 95/95。
+- **主仓**：`ProcessEventLog` 删去 `isSegmentFileName`/`endsWithSegmentSuffix`/`stemOfFileName`/`parseSegmentTail`/`parseSegmentStem`/`contiguousSegmentGroups`/`legacyGroupsOf`/`writerFileNames` 与手写段名拼接，`segmentFileOf`/`legacyFileOf`/`ordinalOfSegmentFileName`/`safeWriterId`/`seriesFilesOf`/`writerFileGroups`/`logicalStreamFiles` 改为调用库（错误消息形状不变）。旧式行续接改为先拼出全部目标名、再写任何字节。
+- **反例（base 红，候选绿）**，`requirements/durable-events/tests/005.test.mjs` 末段：
+  1. 「a file whose -dddd tail uses non-ASCII digits is a legacy writer, not a crash of the whole store」：旧律用 `Char.IsDigit`（Unicode Nd）认段名再用 `Int32.Parse` 取序号，事件目录里一个 `imported-٠٠٠٠.ndjson` 让 `create` 抛 `The input string ٠٠٠٠ was not in a correct format.`，**所有 writer** 的历史都装不上。候选把它读成旧式 writer `imported-٠٠٠٠`，两条事件都可读。
+  2. 「continuing legacy lines past segment 9999 refuses before any byte moves instead of splitting the writer」：旧的行续接把序号 10000 拼成 `w-10000.ndjson`（不是段名，读回是另一个 writer），再删掉旧式文件。base 探针：整理返回 `{ok:true}`，目录多出 `w-10000.ndjson`、`w-10001.ndjson`，`retainedWriterIdsAt` 从 `['w']` 变成 `['w','w-10000','w-10001']`——一个 writer 的流被拆成三个。候选在写任何字节前以 `segment ordinal exhausted the four-digit space` 拒绝，目录与旧式文件逐字节不变，仍是一个 writer。
+  - 日志：`/workspace/vfs-cut/wt/logs-cut19c/seg-base-red.log`（base dist 为本卡上一刀落地后的构建副本）。
+- **影子双算**（§13 计划，`evidence/CUT-19/shadow-segment-groups.mjs`）：同一目录名单（空夹具文件，临时目录，不碰真实 `.git/wanxiangshu`）分别交 base 与候选的 `writerPhysicalMetadata`，比较 writerId 与文件名。固定种子 2000 轮：纯 ASCII 名单 1715 轮全部逐项相等；含非 ASCII 数字名的 285 轮中 19 轮相等（怪名不是 `.ndjson`）、266 轮 base 抛错而候选正常分组；**不相等 0，候选抛错 0**。
+- **行为差异（如实记录）**：①非 ASCII 数字尾的名字从“整库装载失败”变为旧式 writer；`w-٠٠٠٠` 这类 writerId 现在允许创建（其段名 `w-٠٠٠٠-0000.ndjson` 与旧式名都不会与别的 writer 同形）。②序号越界从“拆出新 writer”变为拒绝；`writeSegmentSeries` 与追加滚动本来就先算名、旧实现在追加滚动处已有同样的上界检查。③形态判定按“是否是本 writer 自己的段”而非“是否形似段名”区分旧式文件：只在 writerId 本身以 `-dddd` 结尾时才可能不同（这种 id 不能新建，只来自降级 stem），此时多出一次共存字节校验而不是直接并读。④名为 `.ndjson` 的文件（空 writer）在整理时拒绝命名，旧实现会把它改名成另一个 writer `-0000`。⑤库抛出的是 Fable 异常对象（不是 JS `Error` 实例，与 retention 一致），按消息识别。
+- **验证**（同一工作树，rebase 到 master 04efd06ca，gitlink 7a2ccf6 / 0.23.0，重建库 dist 与主仓 build ok，fantomas --check 通过；落地前再 rebase 到 e4ff18704，gitlink 取 master 的 d2a9f3b / 0.23.1（含 0.23.0），重建后 35 文件同为 252 / 0，日志 `seg-cand-run2.log`）：durable-events + durable-convergence 35 文件 **252 pass / 0 fail** / 14 skip / 10 todo（上一刀 250 + 本刀 2 个反例）；另 21 个触及事件目录 / RetentionSurface 的文件 294 pass / 3 fail：managed-session-lifecycle-018（unknown-stop 得到 `CompletedAwaitingJoin`）与 -022 两例（`Promise resolution is still pending`），在 base dist 上以同样消息失败（`logs-cut19c/msl-base.log`），与本刀无关。日志 `logs-cut19c/seg-cand-run.log`、`seg-wide.log`、`shadow.json`。
+- **回退**：只改名字的计算，不迁移、不改写任何已有文件；`git revert` 主仓提交即回旧律（库 0.23.0 可保留）。
+- **未做**：全量 `scripts/verify.mjs` 与 integration tier。
