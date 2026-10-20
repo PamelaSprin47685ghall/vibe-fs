@@ -107,3 +107,10 @@ node scripts/check.mjs
 - 反例/负控（`evidence/CUT-34/sdk-boundary-negative.mjs`，`.txt`）：真实树 0 违规；在业务文件 `Mission/Work/Contract.fs` 上分别植入 SDK 导入、`input?client`、`client.session`、`client?session?list` 四种越界，各报 1 条违规；正控：门禁正则在真实适配文件 `OpenCodePort.fs`、`SessionSnapshotPort.fs` 上确实命中（排除适配区才不报）。
 - 全量静态检查 `node scripts/check.mjs`：base（未改）与 candidate 输出逐行相同（两边都因既有的 test 层 `deep-dist-import`/`du-shape` 报告返回 1，与本刀无关）。
 - 未覆盖（如实记录）：退出条件后半句“内核不导入本层”——`Composition/Turn`、`Interaction/Dispatch`、`Execution/{Delegation,Session}`、`Context/{Prefix,Trace,Companion}` 等仍 `open Wanxiangshu.OpenCode` 以使用 `ProviderWireDecode`/`ProviderWireCapture`/`HostMessageProjection` 等宿主 codec；其中大半属于 CUT-11/12/25 写集合，待这些卡 DONE 后逐一收窄，本刀不动。
+
+### 子范围②：内核→适配层引用只减不增（棘轮门禁，eng-cut17f-goose）
+
+- 改动：`architecture.mjs` 新增 ⑧ `adapter-import-ratchet`。“内核文件”＝适配区（`OpenCode/`、`Host/`）、组合根 `Composition/`（卡 §5 的 C）、业务域内的 `*/OpenCode/` 适配子目录与纯 JS 边界 `*Surface.fs` 以外的生产 `.fs`。内核文件引用 `Wanxiangshu.OpenCode`（`open` 或限定名，注释除外）必须在 `scripts/checks/opencode-import-baseline.json` 上；基线条目不再引用时也报错，要求同刀删掉条目，棘轮只能收紧。
+- 基线（master 现状，31 个文件）：`Change/Host/Types`、`Context/{Companion/Host,Companion/Transform,Prefix/Wire,Trace/Capture,Trace/TerminalReporter}`、`Execution/Delegation/*`（17 个，含 `Fork/Host/*`）、`Execution/Session/Attachment/CompanionLeaseRuntime`、`Interaction/Dispatch/*`（5）、`Interaction/Repair/*`（2）、`Mission/Manager/Workflow`、`Participant/Provider/Attempt/Fallback/Workflow`。这是后续 CUT-11/12/25/34 收窄的待办清单，不是验收。
+- 负控（同一 `sdk-boundary-negative.mjs`）：新文件 `open`（N5）、限定名引用（N6）各报 1 条；注释里的引用不报（N7）；基线文件 `Context/Prefix/Wire.fs` 去掉引用而基线未删 → 报 1 条（N8）。
+- 全量 `node scripts/check.mjs` 输出与子范围①落地后逐行相同（既有 test 层报告，返回码 1 不变）。

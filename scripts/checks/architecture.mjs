@@ -18,6 +18,17 @@ const HOST_ADAPTER_DIRS = ['Codec', 'Host', 'Signals', 'Plugin']
   .map((dir) => `${PRODUCTION_ROOT}/OpenCode/${dir}/`)
   .concat([`${PRODUCTION_ROOT}/Host/`])
 const HOST_SDK_IMPORT = /@opencode-ai\//
+const OPENCODE_IMPORT_BASELINE = 'scripts/checks/opencode-import-baseline.json'
+const isKernelFile = (file) =>
+  !HOST_ADAPTER_DIRS.some((dir) => file.startsWith(dir)) &&
+  !file.startsWith(`${PRODUCTION_ROOT}/OpenCode/`) &&
+  !file.startsWith(`${PRODUCTION_ROOT}/Composition/`) &&
+  !file.includes('/OpenCode/') &&
+  !file.endsWith('Surface.fs')
+const referencesOpenCode = (text) =>
+  text.split('\n').some((line) => !/^\s*\/\//.test(line) && /\bWanxiangshu\.OpenCode\b/.test(line))
+export const readOpenCodeImportBaseline = () =>
+  existsSync(OPENCODE_IMPORT_BASELINE) ? JSON.parse(readFileSync(OPENCODE_IMPORT_BASELINE, 'utf8')).files : []
 const HOST_SDK_CLIENT = /\?client\b|\bclient\s*(?:\?|\.(?:session|event|app|config|tui|find|file|project|path)\b)/
 
 const norm = (path) => path.replace(/\\/g, '/')
@@ -114,6 +125,28 @@ export function scanArchitecture(productionFiles, read) {
     }
     if (HOST_SDK_CLIENT.test(text)) {
       fail('host-sdk-boundary', `${file}: touches the OpenCode SDK client outside the adapter area`)
+    }
+  }
+
+  // ⑧ Kernel-to-adapter imports only shrink (CUT-34): outside the adapter area, the composition
+  // root (Composition/), domain-local OpenCode/ adapter folders and plain-JS *Surface.fs boundaries,
+  // a production file may reference `Wanxiangshu.OpenCode` only if it is on the recorded baseline;
+  // a baseline entry that no longer references it must be removed so the ratchet never loosens.
+  {
+    const baseline = new Set(readOpenCodeImportBaseline())
+    const seen = new Set()
+    for (const file of productionFs) {
+      if (!isKernelFile(file)) continue
+      if (!referencesOpenCode(read(file))) continue
+      seen.add(file)
+      if (!baseline.has(file)) {
+        fail('adapter-import-ratchet', `${file}: kernel code newly references Wanxiangshu.OpenCode (adapter layer)`)
+      }
+    }
+    for (const file of baseline) {
+      if (!seen.has(file)) {
+        fail('adapter-import-ratchet', `${file}: no longer references Wanxiangshu.OpenCode; drop it from ${OPENCODE_IMPORT_BASELINE}`)
+      }
     }
   }
 
