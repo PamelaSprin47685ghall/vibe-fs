@@ -70,3 +70,7 @@ membrane 驱动已抽入 `wanxiangli/sandbox`（库提交 `50f5e4c`，发布 `0.
 另：`await` 后同步死循环由 afterEvaluate 驱动排水在 `runInContext` timeout 下终止，证据仍是 006 末条与库 `SPEC[sandbox-002]`（子进程）。
 
 未做：能力面 / generator / Plan 接线（依赖 CUT-08 DONE）、教程/描述/schema 同源。
+
+## 旧 wrapProgram 退出（2026-10-21，eng-cut25b-goose）
+
+主仓 `JsSandbox.wrapProgram`（仍拼装 `__wrap`/`api`/`__deadlineRef` 的旧字符串，并在 `.fsi` 公开）已无调用方；包装体由 `wanxiangli/sandbox` 拥有。删除 `.fs`/`.fsi` 定义，避免再被误用。`006`/`006-cut25-escapes` 回归仍全绿。

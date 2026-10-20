@@ -32,8 +32,6 @@ module JsSandbox =
     /// the await point so native try/finally runs (PLAN S2 step 6 / algorithm F).
     val abandonedSentinel: string
 
-    val wrapProgram: baseClassSource: string -> modelSource: string -> string
-
     val runSurface:
         baseClassSource: string ->
         modelSource: string ->

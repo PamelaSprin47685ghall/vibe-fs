@@ -106,72 +106,10 @@ module JsSandbox =
     /// prefix, not a message-text sniff.
     let abandonedSentinel = "__jsAbandoned"
 
-    /// Wrap base class + model source into an async IIFE that evaluates to a
-    /// JSON string. The api is proxied so every member call re-checks the
-    /// mutable injected deadline reference: synchronous segments are bounded by
-    /// the vm timeout, async segments by the proxy (JS-054.1). The deadline is
-    /// read from the vm-global `__deadlineRef.current` at each call, so a
-    /// caller may reset it between calls without re-wrapping the program.
-    ///
-    /// Park lifecycle: the api's `park(payload)` member (built by
-    /// ToolsBindings) sets `__parkState.ParkRequested`, fires the park signal
-    /// the workflow races against, and returns a deferred Promise the program
-    /// awaits. The wrapper itself is a plain async IIFE: it stays pending while
-    /// the program is suspended at `await this.park`, and resolves with the final
-    /// result when the program finishes (or with a failure/timeout sentinel).
-    /// `unpark` resolves the deferred with the injected value, letting the
-    /// program continue as if the await returned that value.
-    ///
-    /// The abandon path rejects the program promise with an `__jsAbandoned`
-    /// marker so native try/finally blocks run as a finalizer (PLAN S2 step 6).
-    let wrapProgram (baseClassSource: string) (modelSource: string) : string =
-        "(async () => {\n"
-        + baseClassSource
-        + "\n"
-        + modelSource
-        + "\n"
-        + "const __wrap = (target) => new Proxy(target, {\n"
-        + "  get(target, prop) {\n"
-        + "    const value = target[prop];\n"
-        + "    if (typeof value === 'function') {\n"
-        + "      return (...args) => {\n"
-        + "        if (Date.now() > __deadlineRef.current) {\n"
-        + "          const err = new Error('program exceeded its deadline');\n"
-        + "          err.__jsFailure = { code: 'PROGRAM_TIMEOUT', reason: 'program exceeded its deadline' };\n"
-        + "          throw err;\n"
-        + "        }\n"
-        + "        return value(...args);\n"
-        + "      };\n"
-        + "    }\n"
-        + "    if (value && typeof value === 'object') return __wrap(value);\n"
-        + "    return value;\n"
-        + "  }\n"
-        + "});\n"
-        + "const __api = __wrap(api);\n"
-        + "let __result;\n"
-        + "try { __result = await new Js(__api).run(); }\n"
-        + "catch (__e) {\n"
-        + "  if (__e && __e.__jsFailure && typeof __e.__jsFailure.code === 'string') {\n"
-        + "    return JSON.stringify({\n"
-        + "      __jsHostFailed: true,\n"
-        + "      code: __e.__jsFailure.code,\n"
-        + "      reason: String(__e.__jsFailure.reason || __e.__jsFailure.code)\n"
-        + "    });\n"
-        + "  }\n"
-        + "  if (__e && __e.__jsAbandoned) {\n"
-        + "    return JSON.stringify({ __jsAbandoned: true });\n"
-        + "  }\n"
-        + "  if (__e && __e.__jsDelivered) {\n"
-        + "    return JSON.stringify({ __jsDelivered: true, view: __e.__jsDelivered.view });\n"
-        + "  }\n"
-        + "  return JSON.stringify({ __jsProgramFailed: true, message: String((__e && __e.message) || __e) });\n"
-        + "}\n"
-        + "try {\n"
-        + "  const __json = JSON.stringify(__result);\n"
-        + "  return typeof __json === 'string' ? __json : JSON.stringify({ __jsInvalidReturn: true });\n"
-        + "}\n"
-        + "catch (__e2) { return JSON.stringify({ __jsInvalidReturn: true }); }\n"
-        + "})()"
+    // The async IIFE that wraps base class + model source (sentinel encoding
+    // of failures / park / delivered / invalid return) is owned by
+    // wanxiangli/sandbox. The host no longer builds or exposes that string;
+    // launchMembraned hands the two source strings to Sandbox().run.
 
     /// Classify a synchronous vm error: SyntaxError → INVALID_PROGRAM;
     /// vm timeout → PROGRAM_TIMEOUT; anything else → PROGRAM_FAILED.
