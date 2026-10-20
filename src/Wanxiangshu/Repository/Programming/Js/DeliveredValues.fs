@@ -170,8 +170,24 @@ module JsDeliveredValues =
     let tryTakeRenderedWith (sessionId: string) (assistant: string option) : string option =
         handoff sessionId (cacheRequest ()) assistant
 
-    /// The delivery handoff: the cell must carry the fence of this exact
-    /// provider run. An old terminal cannot consume a newer delivery.
+    /// The harness/fallback handoff: the cell must carry the fence of this
+    /// exact provider run. An old terminal cannot consume a newer delivery.
+    ///
+    /// This matches the provider run only — it is NOT the full fence (the
+    /// tool call id is not compared) — so this reader is a harness/fallback
+    /// channel for the process-live cell when no durable witness exists, and
+    /// it is NOT delivery evidence. The real delivery evidence is the durable
+    /// witness (`TaskDeliveryJournal.tryFindByFence*`, which filters on the
+    /// logical run and the delivery task as well); a consumer must read that
+    /// witness first and only fall back here.
+    ///
+    /// Known and accepted degradation: within one run another call could in
+    /// principle take this cell first. That is harmless because the cell is
+    /// not evidence — taking it does not change settlement correctness.
+    /// The owner's `claim` matches the provider run alone as well (its
+    /// request modes are `peek`, `cache` and `run`), so a full-fence claim
+    /// has to wait until a consumer holds a tool call id; this entry
+    /// migrates there then.
     let tryTakeRenderedFor
         (sessionId: string)
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)

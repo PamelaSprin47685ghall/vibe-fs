@@ -47,8 +47,10 @@ module JsDeliveredValues =
     /// Render the staged view of a render cache cell. Presentation only:
     /// nothing taken here proves a delivery (clauses 1 and 3).
     val tryTakeRenderedWith: sessionId: string -> assistant: string option -> string option
-    /// The delivery handoff: the cell must carry the fence of this exact
-    /// provider run.
+    /// The harness/fallback handoff: the cell must carry the fence of this
+    /// exact provider run. It matches the provider run only, not the full
+    /// fence, so it is a fallback channel and never delivery evidence — the
+    /// durable witness is the evidence.
     val tryTakeRenderedFor:
         sessionId: string ->
         providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
