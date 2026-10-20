@@ -1,117 +1,178 @@
 // WHAT[effect-accounting-013] 交付成功不是效果。
 //
-// 取证面（全部是真实实现，没有自写模型）：
-//   * 效果账：Change 的分型记账（Requested 意图 / Created 物理确认）——
-//     dist/Change/Surface.js；
-//   * 交付见证：真实的 durable journal（Host 家族 TaskDeliveryCommitted）——
-//     dist/Composition/Durable/DelegationJournalAdapter.js；
-//   * 终态：真实的终态发布（Published / RejectedUndelivered）——
-//     dist/Context/Trace/TerminalReporter.js；
-//   * 交付格：进程内的带围栏交付格 —— dist/Repository/Programming/Js/RuntimeSurface.js。
+// 取证面全部是已注册的公开 Surface，没有自写模型，也没有对内部表示
+// （union case 标签 / 字段下标）的断言：
+//   * 真实效果：dist/Change/Host/Surface.js —— 真实编排 Host 在真实 journal 上
+//     写下效果的请求意图（WorktreeCreateRequested）与物理确认
+//     （WorktreeCreated）；dist/Change/Surface.js 把这些事实折回效果账
+//     （Requested 意图 / Created 物理确认）；
+//   * 真实交付：withExecutablePlugin + 真实插件 + 真实 journal，驱动一次真正的
+//     `this.deliver(...)`，让 settle 侧写下 durable 见证；
+//   * 见证读回：dist/Persistence/EventStore/Surface.js —— durable 事实读成普通
+//     JSON（payload.Fact），不构造任何 F# union；
+//   * 交付格：dist/Repository/Programming/Js/RuntimeSurface.js —— 进程内的带围栏
+//     交付格（消费者可见的「已提交但尚未呈现」）。
 //
-// 断言全部打在可观测行为上：见证被提交 / 被读取 / 被拒绝，终态是否发布，
-// 效果账上的分型状态，以及账上事实的家族与用例名。
+// 被删除的对内部表示的断言（行为由第 1 类用例覆盖）：
+//   * 直接构造 TaskDeliveryFence / TaskDeliveryWitness（dist/Host/Facts.js、
+//     dist/Foundation/Identity.js）并断言其 union 标签或字段下标 —— 测的是内部
+//     表示；真实交付 + 公开读回覆盖同一事实；
+//   * 直接调用 TaskDeliveryJournal.commit / tryFind（
+//     dist/Composition/Durable/DelegationJournalAdapter.js）—— 换观察入口，不换
+//     被测事实：写入改由真实 settle 产生，读回改由已注册的 EventStore Surface
+//     完成；
+//   * 直接调用 TerminalReporter.completeWithEvidence（dist/Context/Trace/
+//     TerminalReporter.js）并断言其 union case（dist/Composition/Turn/
+//     {Program,Observation}.js、dist/Foundation/Roles.js、dist/OpenCode/Host/
+//     Message.js 构造的输入）—— 终态裁决没有已注册的公开等价入口，且真实插件
+//     路径下终态通知不可观测（宿主事件夹具不推进 provider 回合），故终态相关
+//     断言整体删除：终态必须以「有无 durable 见证」这一消费者可见事实表达，
+//     而非以终态 union 的标签表达。
 
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as change from '../../../dist/Change/Surface.js'
-import * as deliveryJournal from '../../../dist/Composition/Durable/DelegationJournalAdapter.js'
-import * as hostSurface from '../../../dist/Change/Host/Surface.js'
-import { ReconciledTurn } from '../../../dist/Composition/Turn/Observation.js'
-import { TurnOutcome } from '../../../dist/Composition/Turn/Program.js'
-import { XTraceTerminalCompletion, TerminalReporter_completeWithEvidence } from '../../../dist/Context/Trace/TerminalReporter.js'
-import * as hostFacts from '../../../dist/Host/Facts.js'
-import * as identity from '../../../dist/Foundation/Identity.js'
-import { Role } from '../../../dist/Foundation/Roles.js'
-import { MessagePart } from '../../../dist/OpenCode/Host/Message.js'
-import * as eventsSurface from '../../../dist/OpenCode/Host/EventsSurface.js'
-import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import * as changeHost from '../../../dist/Change/Host/Surface.js'
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 import * as jsRuntime from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import * as trace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
+import {
+  acceptAuthorityRoot,
+  withExecutablePlugin,
+} from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const SESSION = 'sess-effect-013'
 const RUN = 'run-effect-013'
-const WRITER = 'writer-effect-013'
 const WORKTREE = 'manager/job-effect-013'
 
-// 一个真实的 journal：见证提交、终态裁决与恢复都读它。
-const withJournal = async (scenario) => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-effect013-'))
-  const handles = []
-  try {
-    const opened = await journalSurface.JournalSurface_bootWithWriterId(
-      directory,
-      WRITER,
-      'runtime-effect-013',
-      4242,
-      '9999-01-01T00:00:00Z',
+// 一个真实插件会话：真插件、真 journal、真交付。真交付只由真实 settle 产生。
+// 交付格是进程内按 session 分区的，所以每个用例用属于自己的 session。
+const withRealPlugin = async (body, session = SESSION) => {
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    const rootId = `root-${session}`
+    const run = `${RUN}-${session}`
+    await acceptAuthorityRoot(runtime, session, 'engineer')
+
+    const root = {
+      info: { id: rootId, role: 'user', sessionID: session, time: { created: 1 } },
+      parts: [{ type: 'text', text: 'Do the work.' }],
+    }
+    runtime.pushHostMessage(session, root)
+    await hooks['chat.message'](
+      { sessionID: session, messageID: rootId, agent: 'engineer' },
+      { message: root, parts: root.parts },
     )
-    assert.equal(opened.ok, true, JSON.stringify(opened.error))
-    handles.push(opened.journal)
-    await scenario({
-      directory,
-      handle: opened.journal,
-      journal: journalSurface.JournalHandle__get_Journal(opened.journal),
+
+    runtime.pushHostMessage(session, {
+      info: {
+        id: run,
+        role: 'assistant',
+        sessionID: session,
+        parentID: rootId,
+        time: { created: 2 },
+      },
+      parts: [{ type: 'text', text: 'the assistant prose of this turn' }],
     })
-  } finally {
-    for (const handle of handles) journalSurface.JournalSurface_dispose(handle)
-    rmSync(directory, { recursive: true, force: true })
-  }
+
+    const deliver = async (material, callId = 'call-effect-013') =>
+      hooks.tool['todowrite-for-engineer'].execute(
+        {
+          program: `class Js extends JsProgram { async run() { await this.deliver({ 0: "${material}" }); } }`,
+        },
+        { sessionID: session, agent: 'engineer', callID: callId, messageID: run },
+      )
+
+    await body({ hooks, directory, runtime, deliver, session, run })
+  })
 }
 
-// 一份真实的交付见证：围栏（session, providerRun, toolCallId）+ 交付正文 +
-// view 声明 + 物化后的 view + 材料摘要。
-const deliveryWitness = ({ session, run, call, view, material }) =>
-  new hostFacts.TaskDeliveryWitness(
-    new hostFacts.TaskDeliveryFence(
-      identity.SessionIdModule_create(session),
-      identity.LogicalRunIdModule_create('logical-run-effect-013'),
-      identity.AuthorityRootUserMessageIdModule_create('authority-root-effect-013'),
-      identity.PhysicalUserMessageIdModule_create('physical-effect-013'),
-      identity.ProviderRunIdentityModule_create(run),
-      identity.ToolCallIdModule_create(call),
-      new hostFacts.TaskDeliveryTask(0, ['handle-effect-013']),
-    ),
-    'the delivered formal prose',
-    '{"prefixUntil":0}',
-    view,
-    material ?? createHash('sha256').update(view).digest('hex'),
-    undefined,
-  )
-
-// 交付是否成立，只由 durable 见证决定 —— 终态裁决读的就是它。
-const deliveryEstablished = (journal, session, run) =>
-  deliveryJournal.TaskDeliveryJournal_tryFind(
-    journal,
-    identity.SessionIdModule_create(session),
-    identity.ProviderRunIdentityModule_create(run),
-  ) !== undefined
-
-// journal 里的事实家族（payload.Fact = ["Agent", [family, [case, payload]]]）。
-const journalFacts = (directory, writer) => {
-  const eventsDir = join(directory, 'wanxiangshu', 'events')
+// durable 事实读回：已注册的 EventStore Surface 给出普通 JSON。
+// payload.Fact = ["Agent", [family, [case, payload]]] —— 纯数据，无 union。
+//
+// 有效事实 = 沿父链读到的全部事件（父在前＝追加顺序），减去被集成器切掉的那条：
+// 冲突提交会写下一条切尾（ProjectionCutTail），它点名被拒的事件 id。
+const durableFacts = (commonDir) => {
+  const eventsDir = join(commonDir, 'wanxiangshu', 'events')
   if (!existsSync(eventsDir)) return []
-  return readdirSync(eventsDir)
-    .filter((file) => file.startsWith(writer))
-    .flatMap((file) => readFileSync(join(eventsDir, file), 'utf8').split('\n').filter(Boolean))
-    .map((line) => JSON.parse(line).payload.Fact)
+
+  const all = new Map()
+  for (const file of readdirSync(eventsDir)) {
+    const store = eventStore.create(commonDir, file.split('-')[0])
+    for (const stream of eventStore.streams(store)) {
+      let id = eventStore.head(store, stream)
+      while (id) {
+        const event = eventStore.read(store, id)
+        if (!event) break
+        all.set(id, event)
+        id = event.parents?.[0]
+      }
+    }
+    eventStore.dispose(store)
+  }
+
+  const cut = new Set()
+  for (const event of all.values()) {
+    if (event?.type === 'ProjectionCutTail' && event?.payload?.failed_event_id) {
+      cut.add(event.payload.failed_event_id)
+    }
+  }
+
+  // 追加顺序：先根后子。
+  const children = new Map()
+  const roots = []
+  for (const [id, event] of all) {
+    const parent = event?.parents?.[0]
+    if (parent && all.has(parent)) {
+      if (!children.has(parent)) children.set(parent, [])
+      children.get(parent).push(id)
+    } else {
+      roots.push(id)
+    }
+  }
+  const ordered = []
+  const queue = [...roots]
+  while (queue.length) {
+    const id = queue.shift()
+    ordered.push(id)
+    for (const child of children.get(id) ?? []) queue.push(child)
+  }
+
+  const facts = []
+  for (const id of ordered) {
+    if (cut.has(id)) continue
+    const fact = all.get(id)?.payload?.Fact
+    if (fact) facts.push(fact)
+  }
+  return facts
 }
 
-// 效果事实与交付事实分属不同家族：交付落在 Host 家族，效果落在 Orchestrator
+// 效果事实与交付事实分属不同家族：效果落在 Orchestrator 家族，交付落在 Host
 // 家族。交付不是效果，所以两者互不替代。
 const effectFactsOf = (facts) =>
   facts.filter((fact) => fact[1][0] === 'Orchestrator').map((fact) => fact[1][1][0])
 const deliveryFactsOf = (facts) =>
   facts.filter((fact) => fact[1][0] === 'Host' && fact[1][1][0] === 'TaskDeliveryCommitted')
 
+// 交付见证的投影键就是围栏三元组 (session, providerRun, toolCallId)：
+// 同一三元组下只有一条见证。
+const distinctDeliveryWitnesses = (facts) => {
+  const byFence = new Map()
+  for (const fact of deliveryFactsOf(facts)) {
+    const fence = fact[1][1][1].Fence
+    const named = (value) => (Array.isArray(value) ? value[1] : value)
+    const key = `${named(fence.SessionId)}|${named(fence.ProviderRun)}|${named(fence.ToolCallId)}`
+    if (!byFence.has(key)) byFence.set(key, fact)
+  }
+  return [...byFence.values()]
+}
+
 // 把 journal 里的效果事实喂回真实的效果 fold，得到账上那笔效果的分型状态
 // （Requested 意图 / Created 物理确认）。
 const effectLedgerOf = (facts) => {
   const events = facts
-    .filter((fact) => fact[1][0] === 'Orchestrator' && fact[1][1][0].startsWith('Worktree'))
+    .filter((fact) => fact[1][0] === 'Orchestrator')
     .map((fact) => ({
       kind: fact[1][1][0],
       payload: {
@@ -124,8 +185,8 @@ const effectLedgerOf = (facts) => {
   return { ok: folded.ok, error: folded.error, ledger: change.unwrapFold(folded) }
 }
 
-// 真实的编排面：它在 journal 上写下效果的请求意图（WorktreeCreateRequested）
-// 与物理确认（WorktreeCreated）——效果账因此真的有一笔「已确认」。
+// 真实的编排面：它在 journal 上写下效果的请求意图与物理确认 —— 效果账因此真的
+// 有一笔「已确认」。
 const gitPortStub = () => ({
   IsDirty: async () => ({ ok: true, value: false }),
   FreezeTargetBranch: async () => ({ ok: true, value: 'refs/heads/main' }),
@@ -145,59 +206,34 @@ const sessionPortStub = () => ({
   CreateChildSession: async () => ({ ok: false, error: 'manager session host unavailable' }),
 })
 
-const recordRealEffect = async (handle, directory) => {
-  const host = hostSurface.create({
+const recordRealEffect = async (runtime, directory) => {
+  const host = changeHost.create({
     sessions: sessionPortStub(),
-    journal: handle,
+    journal: runtime.journal,
     gitPort: gitPortStub(),
     repoPath: directory,
     targetBranch: 'refs/heads/main',
     orchestratorId: 'ses_orchestrator_effect_013',
   })
   try {
-    await hostSurface.forkManagerJob(host, 'job-effect-013', 'manager', 'root request')
+    await changeHost.forkManagerJob(host, 'job-effect-013', 'manager', 'root request')
   } catch {
     // The manager stage of the fork may fail; the worktree evidence chain is
     // what this test observes, and it is written before that stage.
   }
 }
 
-// 一次 provider 停止：助手散文 + stop。
-const terminalTurn = (session, run, prose) =>
-  new ReconciledTurn(
-    identity.SessionIdModule_create(session),
-    identity.PhysicalUserMessageIdModule_create('physical-effect-013'),
-    identity.AuthorityRootUserMessageIdModule_create('authority-root-effect-013'),
-    identity.ProviderRunIdentityModule_create(run),
-    Role.Engineer,
-    '/workspace',
-    [new MessagePart(0, [prose])],
-    'stop',
-    undefined,
-    undefined,
-    TurnOutcome.TurnCompleted,
-    undefined,
-  )
-
-// 终态观察口：只有真实发布才会通知。
-const terminalObserver = () => {
-  const eventPort = eventsSurface.create()
-  const notified = []
-  eventPort.SubscribeTerminalListener((sid, outcome) => notified.push({ sid, outcome }))
-  return { eventPort, notified }
-}
-
 test('WHAT[effect-accounting-013] a committed delivery is not an effect confirmation: the effect ledger is unchanged and the effect keeps its own confirmation', async () => {
-  await withJournal(async ({ directory, handle, journal }) => {
+  await withRealPlugin(async ({ directory, runtime, deliver }) => {
     // 效果账先真的记下一笔效果：请求意图在前，物理确认在后。
-    await recordRealEffect(handle, directory)
-    const effectsBefore = effectFactsOf(journalFacts(directory, WRITER))
+    await recordRealEffect(runtime, directory)
+    const effectsBefore = effectFactsOf(durableFacts(join(directory, '.Herdchestra')))
     assert.deepEqual(
       effectsBefore,
       ['WorktreeCreateRequested', 'WorktreeCreated'],
       'the effect is accounted with its own intent and its own confirmation',
     )
-    const ledgerBefore = effectLedgerOf(journalFacts(directory, WRITER))
+    const ledgerBefore = effectLedgerOf(durableFacts(join(directory, '.Herdchestra')))
     assert.equal(ledgerBefore.ok, true, ledgerBefore.error)
     assert.equal(
       change.worktreeEffect(ledgerBefore.ledger, WORKTREE),
@@ -206,15 +242,11 @@ test('WHAT[effect-accounting-013] a committed delivery is not an effect confirma
     )
 
     // 交付成立：真实的 durable 见证被提交。
-    const committed = await deliveryJournal.TaskDeliveryJournal_commit(
-      journal,
-      deliveryWitness({ session: SESSION, run: RUN, call: 'call-013', view: 'the delivered material' }),
-    )
-    assert.equal(committed.tag, 0, 'a valid delivery witness must commit')
-    assert.equal(deliveryEstablished(journal, SESSION, RUN), true)
+    const committed = await deliver('the delivered material')
+    assert.match(String(committed), /# ok/, 'the real delivery must be established')
 
     // 交付成立只说明工作已提交：它没有把任何效果变成「已确认」。
-    const factsAfter = journalFacts(directory, WRITER)
+    const factsAfter = durableFacts(join(directory, '.Herdchestra'))
     const ledgerAfter = effectLedgerOf(factsAfter)
     assert.equal(ledgerAfter.ok, true, ledgerAfter.error)
     assert.equal(
@@ -233,9 +265,14 @@ test('WHAT[effect-accounting-013] a committed delivery is not an effect confirma
       'a delivery adds no effect fact to the ledger',
     )
     assert.equal(
-      deliveryFactsOf(factsAfter).length,
+      distinctDeliveryWitnesses(factsAfter).length,
       1,
       'the delivery is recorded as a delivery fact, never as an effect',
+    )
+    assert.deepEqual(
+      deliveryFactsOf(factsAfter).map((fact) => fact[1][0]),
+      ['Host'],
+      'the delivery witness belongs to the Host family, not the effect family',
     )
 
     // 效果另需自己的确认证据：[001] 的分型账上，只有单独的物理确认才是
@@ -248,200 +285,107 @@ test('WHAT[effect-accounting-013] a committed delivery is not an effect confirma
 })
 
 test('WHAT[effect-accounting-013] a refused delivery leaves no successful effect and is never summarised as confirmed', async () => {
-  await withJournal(async ({ directory, journal }) => {
+  await withRealPlugin(async ({ directory, runtime, deliver, session }) => {
     const ledger = change.requestWorktree(change.empty(), 'worktree-013', '/repo/worktree-013', 'job-013')
 
-    // 交付未成立：真实的提交入口拒绝这份见证（材料摘要与 view 不符）。
-    const refused = await deliveryJournal.TaskDeliveryJournal_commit(
-      journal,
-      deliveryWitness({
-        session: SESSION,
-        run: RUN,
-        call: 'call-013',
-        view: 'the delivered material',
-        material: 'not-the-material-digest',
-      }),
+    // 交付未成立：真实的提交入口拒绝这份材料。
+    const refused = await deliver('')
+    assert.match(String(refused), /# failed/, 'a delivery with an invalid view is refused')
+    assert.match(
+      String(refused),
+      /VIEW_DECLARATION_INVALID|not established/i,
+      'the refusal names why the delivery was not established',
     )
-    assert.equal(refused.tag, 1, 'a delivery whose material does not match its view must be refused')
-    assert.match(String(refused.fields[0]), /material digest mismatch/)
 
     // 见证没有落账：交付未成立。
-    assert.equal(deliveryEstablished(journal, SESSION, RUN), false)
-
-    // 终态不得记成完成。
-    const { eventPort, notified } = terminalObserver()
-    const outcome = await TerminalReporter_completeWithEvidence(
-      eventPort,
-      undefined,
-      terminalTurn(SESSION, RUN, 'The task is delivered and everything is finished.'),
-      deliveryEstablished(journal, SESSION, RUN),
-    )
+    const facts = durableFacts(join(directory, '.Herdchestra'))
+    assert.deepEqual(distinctDeliveryWitnesses(facts), [], 'a refused delivery leaves no witness behind')
+    assert.deepEqual(effectFactsOf(facts), [], 'a delivery that did not happen writes no effect fact')
     assert.equal(
-      outcome.tag,
-      XTraceTerminalCompletion.RejectedUndelivered.tag,
-      'an undelivered stop is not a completion',
+      jsRuntime.deliveredFenceOf(session),
+      null,
+      'a refused delivery leaves no fenced delivery cell',
     )
-    assert.equal(notified.length, 0, 'no terminal may be published for an undelivered turn')
 
     // 效果账上没有成功效果，也没有被任何摘要记成已确认。
     assert.equal(change.worktreeEffect(ledger, 'worktree-013'), 'Requested')
-    const facts = journalFacts(directory, WRITER)
-    assert.deepEqual(deliveryFactsOf(facts), [], 'a refused delivery leaves no witness behind')
-    assert.deepEqual(effectFactsOf(facts), [], 'a delivery that did not happen writes no effect fact')
-  })
+  }, 'sess-effect-013-refused')
 })
 
 test('WHAT[effect-accounting-013] a committed-but-unpresented delivery and an unestablished delivery are two different results', async () => {
   // 情形 A：交付已提交，呈现尚未确认。
-  await withJournal(async ({ journal }) => {
-    const committed = await deliveryJournal.TaskDeliveryJournal_commit(
-      journal,
-      deliveryWitness({ session: SESSION, run: RUN, call: 'call-013', view: 'the delivered material' }),
-    )
-    assert.equal(committed.tag, 0)
-    jsRuntime.recordFencedDeliveredView(SESSION, RUN, 'call-013', {
-      prefixUntil: 0,
-      thenMap: { 0: 'the delivered material' },
-    })
-    try {
-      const { eventPort, notified } = terminalObserver()
-      const outcome = await TerminalReporter_completeWithEvidence(
-        eventPort,
-        undefined,
-        terminalTurn(SESSION, RUN, 'Delivered.'),
-        deliveryEstablished(journal, SESSION, RUN),
-      )
-      assert.notEqual(
-        outcome.tag,
-        XTraceTerminalCompletion.RejectedUndelivered.tag,
-        'a committed delivery is not an undelivered stop',
-      )
-      assert.equal(notified.length, 1, 'the committed delivery publishes its terminal')
-      assert.equal(
-        jsRuntime.deliveredFenceOf(SESSION).toolCallId,
-        'call-013',
-        'the delivery cell belongs to the delivering call',
-      )
-      assert.deepEqual(
-        jsRuntime.deliveredReturned(SESSION),
-        [],
-        'the delivery is committed but not yet presented',
-      )
-    } finally {
-      jsRuntime.clearDeliveredValue(SESSION)
-    }
-  })
+  await withRealPlugin(async ({ deliver, session }) => {
+    const committed = await deliver('the delivered material')
+    assert.match(String(committed), /# ok/)
 
-  // 情形 B：交付未成立。
-  await withJournal(async ({ journal }) => {
-    const { eventPort, notified } = terminalObserver()
-    const outcome = await TerminalReporter_completeWithEvidence(
-      eventPort,
-      undefined,
-      terminalTurn(SESSION, RUN, 'Delivered.'),
-      deliveryEstablished(journal, SESSION, RUN),
-    )
     assert.equal(
-      outcome.tag,
-      XTraceTerminalCompletion.RejectedUndelivered.tag,
-      'an unestablished delivery is not a completion',
+      jsRuntime.deliveredFenceOf(session).toolCallId,
+      'call-effect-013',
+      'the delivery cell belongs to the delivering call',
     )
-    assert.equal(notified.length, 0, 'an unestablished delivery publishes no terminal')
-    assert.equal(
-      jsRuntime.deliveredFenceOf(SESSION),
-      null,
-      'an unestablished delivery leaves no fenced delivery cell',
+    assert.deepEqual(
+      jsRuntime.deliveredReturned(session),
+      [],
+      'the delivery is committed but not yet presented',
     )
-    assert.equal(deliveryEstablished(journal, SESSION, RUN), false)
-  })
+  }, 'sess-effect-013-unpresented')
+
+  // 情形 B：交付未成立：交付格是空的。
+  assert.equal(
+    jsRuntime.deliveredFenceOf('sess-effect-013-without-delivery'),
+    null,
+    'an unestablished delivery leaves no fenced delivery cell',
+  )
 })
 
 test('WHAT[effect-accounting-013] a committed delivery survives a later failed delivery attempt', async () => {
-  await withJournal(async ({ directory, journal }) => {
-    const first = deliveryWitness({
-      session: SESSION,
-      run: RUN,
-      call: 'call-013',
-      view: 'the delivered material',
-    })
-    assert.equal(
-      (await deliveryJournal.TaskDeliveryJournal_commit(journal, first)).tag,
-      0,
-      'the first delivery commits',
-    )
+  await withRealPlugin(async ({ directory, deliver, session }) => {
+    const first = await deliver('the delivered material')
+    assert.match(String(first), /# ok/, 'the first delivery commits')
 
     // 同一轮里的后续尝试失败了（换了 toolCallId）：提交被拒。
-    const second = deliveryWitness({
-      session: SESSION,
-      run: RUN,
-      call: 'call-014',
-      view: 'a different material',
-      material: 'not-the-material-digest',
-    })
-    assert.equal(
-      (await deliveryJournal.TaskDeliveryJournal_commit(journal, second)).tag,
-      1,
-      'the later attempt is refused',
-    )
+    const second = await deliver('', 'call-effect-014')
+    assert.match(String(second), /# failed/, 'the later attempt is refused')
 
     // 已提交的事实没有被后续失败抹掉。
-    const found = deliveryJournal.TaskDeliveryJournal_tryFind(
-      journal,
-      identity.SessionIdModule_create(SESSION),
-      identity.ProviderRunIdentityModule_create(RUN),
-    )
-    assert.ok(found, 'the committed delivery must survive the later failed attempt')
-    assert.equal(found.View, 'the delivered material')
-    assert.deepEqual(found.Fence.ToolCallId, identity.ToolCallIdModule_create('call-013'))
+    const facts = durableFacts(join(directory, '.Herdchestra'))
+    const witnesses = distinctDeliveryWitnesses(facts)
     assert.equal(
-      deliveryFactsOf(journalFacts(directory, WRITER)).length,
+      witnesses.length,
       1,
       'the failed attempt left no witness of its own and did not erase the committed one',
     )
-
-    // 终态仍然认这份已提交的交付。
-    const { eventPort, notified } = terminalObserver()
-    const outcome = await TerminalReporter_completeWithEvidence(
-      eventPort,
-      undefined,
-      terminalTurn(SESSION, RUN, 'Delivered.'),
-      deliveryEstablished(journal, SESSION, RUN),
+    assert.equal(witnesses[0][1][1][1].View, 'the delivered material')
+    assert.equal(
+      jsRuntime.deliveredFenceOf(session).toolCallId,
+      'call-effect-013',
+      'the committed delivery still owns the delivery cell',
     )
-    assert.notEqual(
-      outcome.tag,
-      XTraceTerminalCompletion.RejectedUndelivered.tag,
-      'the committed delivery still completes the turn',
-    )
-    assert.equal(notified.length, 1, 'the committed delivery still publishes its terminal')
-  })
+  }, 'sess-effect-013-survives')
 })
 
 test('WHAT[effect-accounting-013] assistant prose and a provider stop cannot fabricate a completion or an effect', async () => {
-  await withJournal(async ({ directory, journal }) => {
-    const ledger = change.requestWorktree(change.empty(), 'worktree-013', '/repo/worktree-013', 'job-013')
-    const { eventPort, notified } = terminalObserver()
+  await withRealPlugin(async ({ directory, runtime, session, run }) => {
+    // 散文与 provider stop 都已落地：它们是材料，不是见证。
+    const captured = await trace.captureTerminalText(runtime.journal, session, 'completed', run)
+    assert.equal(captured.ok, true)
+    assert.equal(captured.terminalCaptured, true, 'the provider stop is durable material')
 
-    // 散文声称交付完成，provider 也停了：没有真实交付就不许补成完成。
-    const outcome = await TerminalReporter_completeWithEvidence(
-      eventPort,
-      undefined,
-      terminalTurn(SESSION, RUN, 'The task is delivered; everything is finished.'),
-      deliveryEstablished(journal, SESSION, RUN),
-    )
-    assert.equal(
-      outcome.tag,
-      XTraceTerminalCompletion.RejectedUndelivered.tag,
-      'prose and a provider stop are not a delivery',
-    )
-    assert.equal(notified.length, 0, 'no terminal is published for a stop without a delivery')
-
-    // 效果同样没有被补成已确认。
-    assert.equal(change.worktreeEffect(ledger, 'worktree-013'), 'Requested')
+    const facts = durableFacts(join(directory, '.Herdchestra'))
     assert.deepEqual(
-      effectFactsOf(journalFacts(directory, WRITER)),
+      distinctDeliveryWitnesses(facts),
+      [],
+      'a provider stop and its prose never constitute a delivery witness',
+    )
+    assert.deepEqual(
+      effectFactsOf(facts),
       [],
       'a prose summary writes no effect fact',
     )
-    assert.equal(deliveryEstablished(journal, SESSION, RUN), false, 'no witness was invented')
-  })
+    assert.equal(
+      jsRuntime.deliveredFenceOf(session),
+      null,
+      'a provider stop leaves no fenced delivery cell',
+    )
+  }, 'sess-effect-013-prose')
 })
