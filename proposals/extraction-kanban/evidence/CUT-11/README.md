@@ -20,3 +20,11 @@
 - 差分 `node send-diff.mjs <base> <cand>` → [send-diff.out](send-diff.out)：base 与 candidate 的私有 `awaitPhysicalAwareSend`、`continuationAttemptOutcome`（各自给 Send.js 临时拷贝追加一行 export，导入后即删）在 5 种 SendOutcome × persist/accept/abandon 成败 × 有无确认等待者上比较端口调用序列、参数和返回值，另比较 attempt 分类：**90 次，0 处不同**。
 - 变异 → [send-mutants.out](send-mutants.out)：对库产物 6 个语义变异（未知结局被放弃、未知结局算确定未发送、拒绝不算确定未发送、物理 id 跳过 PhysicalAccepted、回执不记 Submitted、Detached 拒绝当成未知）全部被抓住；前 5 个由 send-diff 抓住，Detached 那个由 dispatch-protocol 套件抓住（Detached 分类是成员内闭包，差分够不到）。
 - 套件（rebase 前后 dist 相同，上游只改 `requirements/work/tests`）：interaction-authority 104/13 todo；dispatch-protocol 99/1 cancel/1 skip/7 todo；crash-reconciliation 52/2/15；managed-chat-execution 82/2/4；effect-accounting 34/5 cancel/3/1；degeneration-guard 55/6 todo，与 base 相同。
+
+## 子范围④：运行边界重置（wanxiangli `fce28cc` / `d449747` **0.45.0**）
+
+- 差分：`differential.mjs` 加了三种运行边界操作（registerAuthority、closeAuthority、在投影里放一个占位提问），并在每步之后比较提问数。base 是 master `c109341d7` 的干净构建，candidate 是 rebase 后的构建。运行 `node differential.mjs <base> <cand> 3000 40`，结果见 [differential.out](differential.out)：120,000 次操作、**1,560,000 次比较，0 处不同**。其中被接受的边界有 registerAuthority 8,424 次、close 6,131 次。这份输出取代了子范围①的旧输出：操作是旧输出的超集，子范围①原有的查询和比较都还在。
+- 变异见 [reset-mutants.out](reset-mutants.out)：对 candidate 实际加载的库产物 `dist/dispatch/Dispatch.js` 做了 7 个变异，每个都跑 1000×40 的差分，结果全部报出不同。这 7 个变异是：保留全部认领、丢掉根认领、保留全部计数、丢掉根计数、不看会话保留根计数、不清 continuation、不清提问。
+- 如实记录：主仓的需求套件没有抓住"不清提问"这个变异。interaction-authority、dispatch-protocol、managed-chat-execution、crash-reconciliation 的计数和 base 相同。这条规则目前只有两处证明：库测试 003，以及差分里的占位提问操作。
+- 套件（rebase 后的 candidate 和 base 计数相同）：interaction-authority 104 pass / 13 todo；dispatch-protocol 99 pass / 1 cancel / 1 skip / 7 todo；crash-reconciliation 52 / 2 skip / 15 todo；managed-chat-execution 82 / 2 / 4；effect-accounting 34 / 5 cancel / 3 / 1；degeneration-guard 55 / 6 todo。cancel 都是既有问题，和 base 相同。
+- 库：`src/dispatch/tests/003.test.mjs` 是独立 oracle，覆盖保留集、冻结、畸形输入。

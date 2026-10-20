@@ -2,16 +2,23 @@
  "sequences": 3000,
  "steps": 40,
  "ops": 120000,
- "compared": 1200000,
+ "compared": 1560000,
  "differences": 0,
  "opMix": {
-  "submit": 24210,
-  "abandon": 23886,
-  "register": 47871,
-  "accept": 24033
+  "accept": 15082,
+  "close": 15205,
+  "question": 14992,
+  "register": 29799,
+  "registerAuthority": 14889,
+  "abandon": 15117,
+  "submit": 14916
+ },
+ "acceptedBoundaries": {
+  "registerAuthority": 8424,
+  "close": 6131
  },
  "finalShape": {
-  "pending": 4,
+  "pending": 0,
   "occasions": 2,
   "landings": 2
  }

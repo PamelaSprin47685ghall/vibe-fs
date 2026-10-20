@@ -292,6 +292,42 @@ module PromptAuthorityRun =
                             AcceptedDispatches = Map.remove occasion state.AcceptedDispatches })
                 projection
 
+    /// Run boundary (a new root or an exact closure): `wanxiangli/dispatch`
+    /// reset decides which dispatch resources survive. Run-scoped claims,
+    /// counters, continuation map and questions end with the run; root claims
+    /// without a logical run and this session's root counters stay, so a root
+    /// PromptKey never repeats.
+    let private resetRunResources (sessionId: SessionId) (projection: PromptAuthority.PromptAuthorityProjection) =
+        let keepClaims, keepCounters, clearContinuations, clearQuestions =
+            DispatchLaw.reset
+                (SessionId.value sessionId)
+                (projection.PendingClaims
+                 |> Map.toList
+                 |> List.map (fun (key, claim) ->
+                     PromptKey.value key, claim.LogicalRunId |> Option.map LogicalRunId.value))
+                (projection.ClaimSequences
+                 |> Map.toList
+                 |> List.map (fun (scope, counter) ->
+                     scope, SessionId.value counter.SessionId, counter.LogicalRunId |> Option.map LogicalRunId.value))
+
+        { projection with
+            PendingClaims =
+                projection.PendingClaims
+                |> Map.filter (fun key _ -> keepClaims.Contains(PromptKey.value key))
+            ClaimSequences =
+                projection.ClaimSequences
+                |> Map.filter (fun scope _ -> keepCounters.Contains scope)
+            AcceptedContinuationIds =
+                if clearContinuations then
+                    Map.empty
+                else
+                    projection.AcceptedContinuationIds
+            UserQuestions =
+                if clearQuestions then
+                    Map.empty
+                else
+                    projection.UserQuestions }
+
     /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
     ///
     /// Recorded on the claim rather than discarded. PROMPT-011 has to tell "the Host
@@ -340,15 +376,9 @@ module PromptAuthorityRun =
             match projection.ActiveLogicalRun with
             | Some _ -> projection
             | None ->
-                { projection with
+                { resetRunResources canonical.SessionId projection with
                     LastAuthorityProfile = Some canonical
-                    ActiveLogicalRun = Some canonical
-                    UserQuestions = Map.empty
-                    PendingClaims =
-                        projection.PendingClaims
-                        |> Map.filter (fun _ claim -> claim.LogicalRunId.IsNone)
-                    AcceptedContinuationIds = Map.empty
-                    ClaimSequences = PromptAuthority.rootClaimSequences canonical.SessionId projection })
+                    ActiveLogicalRun = Some canonical })
 
     /// Apply the library's closure decision to the projection. Only `close`
     /// changes state; a repeated closure is idempotent.
@@ -384,14 +414,8 @@ module PromptAuthorityRun =
         : Result<PromptAuthority.PromptAuthorityProjection, string> =
         let closeRun (active: PromptAuthority.AuthorityExecutionProfile) =
             Ok
-                { projection with
-                    ActiveLogicalRun = None
-                    UserQuestions = Map.empty
-                    PendingClaims =
-                        projection.PendingClaims
-                        |> Map.filter (fun _ claim -> claim.LogicalRunId.IsNone)
-                    AcceptedContinuationIds = Map.empty
-                    ClaimSequences = PromptAuthority.rootClaimSequences active.SessionId projection }
+                { resetRunResources active.SessionId projection with
+                    ActiveLogicalRun = None }
 
         settleClosure
             closeRun

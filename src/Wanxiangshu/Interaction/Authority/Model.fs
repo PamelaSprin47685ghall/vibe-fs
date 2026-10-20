@@ -25,6 +25,7 @@ module DispatchLaw =
         abstract occasionAdmitted: input: obj -> bool
         abstract recover: input: obj -> obj
         abstract answer: sent: string -> obj
+        abstract reset: input: obj -> obj
 
     [<Import("Dispatch", "wanxiangli/dispatch")>]
     let private dispatchClass: obj = jsNative
@@ -115,6 +116,34 @@ module DispatchLaw =
     let answer (sent: string) : string * bool * string =
         let verdict = law.answer sent
         unbox<string> verdict?ledger, unbox<bool> verdict?definitelyNotSent, unbox<string> verdict?detached
+
+    /// Run-boundary reset: (claim keys kept, counter scopes kept, clear
+    /// continuations, clear questions). claims: (key, logical run);
+    /// counters: (scope, session, logical run).
+    let reset
+        (sessionId: string)
+        (claims: (string * string option) list)
+        (counters: (string * string * string option) list)
+        : Set<string> * Set<string> * bool * bool =
+        let verdict =
+            law.reset (
+                createObj
+                    [ "sessionId" ==> sessionId
+                      "claims"
+                      ==> (claims
+                           |> List.map (fun (key, run) -> createObj [ "key" ==> key; "logicalRunId" ==> orNull run ])
+                           |> List.toArray)
+                      "counters"
+                      ==> (counters
+                           |> List.map (fun (scope, session, run) ->
+                               createObj [ "scope" ==> scope; "sessionId" ==> session; "logicalRunId" ==> orNull run ])
+                           |> List.toArray) ]
+            )
+
+        Set.ofArray (unbox<string array> verdict?keepClaims),
+        Set.ofArray (unbox<string array> verdict?keepCounters),
+        unbox<bool> verdict?clearContinuations,
+        unbox<bool> verdict?clearQuestions
 
     /// messages: (role, PromptKey carrier, physical id), oldest first.
     /// Ok physical = proven; Error hasReceipt = still pending.
@@ -517,12 +546,6 @@ module PromptAuthority =
             (logicalRunId |> Option.map LogicalRunId.value)
             (originLabel origin)
             payloadDigest
-
-    /// Root claims have no LogicalRunId until physical acceptance. Their
-    /// sequence scope belongs to the session, so closing a run cannot reset it.
-    let rootClaimSequences (sessionId: SessionId) (projection: PromptAuthorityProjection) =
-        projection.ClaimSequences
-        |> Map.filter (fun _ counter -> counter.SessionId = sessionId && counter.LogicalRunId.IsNone)
 
     let private consumedClaims (scope: string) (projection: PromptAuthorityProjection) =
         Map.tryFind scope projection.ClaimSequences

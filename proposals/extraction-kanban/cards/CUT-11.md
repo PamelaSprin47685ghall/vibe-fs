@@ -4,7 +4,7 @@
 
 ## 1. 当前状态与前置核对
 
-- **当前列状态**：`DOING`（eng-cut09e-goose，2026-10-21 认领）。子范围①已合入。
+- **当前列状态**：`DOING`（eng-cut09f-goose 接手 eng-cut09e-goose，2026-10-21 认领）。子范围①②④已合入。
 - **前置**：CUT-09 `DONE`；CUT-10 在收尾（eng-cut10e-goose）。子范围①只碰认领账规则（`Interaction/Authority/{Model,Run}.fs` 的认领段、`Interaction/Dispatch/Recovery.fs`），不触及路由与容量写集合。
 
 ## 2. 子范围①：派发认领账规则 → `wanxiangli/dispatch`（0.40.0）
@@ -31,6 +31,14 @@
 
 宿主保留：持久化、`Runtime.Abandon` 单写者、确认等待者、Host 调用与 Detached 的进程级审计。代价：Send.fs/Model.fs 净增 44 行（标签与 typed 还原）。证据见 evidence README 子范围②。
 
+## 2c. 子范围④：运行边界的投影重置 → `wanxiangli/dispatch` `reset`（0.45.0）
+
+| 规则 | 需求 | 旧 owner（已删） | 现在 |
+|---|---|---|---|
+| 新根登记或精确关闭时：有 LogicalRunId 的待决认领、运行作用域计数、continuation 映射与提问随运行结束；无运行的根认领与本会话的根计数保留（根 PromptKey 永不重复） | dispatch-protocol [006]，CUT-09 §6 移交 | Run.fs `registerAuthority` 与 `closeAuthority` 两份相同的手写重置、Model.fs `rootClaimSequences` | `reset` 返回保留集与清除标志；Run.fs `resetRunResources` 只按结论过滤 typed 投影 |
+
+库：wanxiangli `fce28cc`，发布 `d449747` **0.45.0**，`src/dispatch/tests/003.test.mjs` 独立 oracle。代价：三个文件净增 50 行（标签往返与 .fsi 签名）。证据见 evidence README 子范围④。
+
 ## 3. 验收（§9）
 
 证据见 [evidence/CUT-11](../evidence/CUT-11/README.md)。
@@ -46,4 +54,4 @@
 
 - ② 已合入（见 §2b）。发送链的其余部分（gate nudge 单 flight、Detached 入栈后立即返回）是宿主异步编排，不再有可抽的纯裁决。
 - ③ Work.operation 与 dispatch claim 的关联：同一发送行为只能有一个认领 owner，两类事实明确关联而不合并成一张账。
-- ④ 旧 claim 写入口退出与投影重置（清 run-scoped claims、continuation 映射、序列号），后者 CUT-09 §6 移交至此。
+- ④ 已合入（见 §2c）：投影重置只剩库一个 owner。旧 claim 写入口：`registerClaim`/`submitClaim`/`acceptClaim`/`abandonClaim` 已只按库的编辑标签改投影（子范围①），没有第二条写路径。

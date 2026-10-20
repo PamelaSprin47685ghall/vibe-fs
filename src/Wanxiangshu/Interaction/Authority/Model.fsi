@@ -39,6 +39,12 @@ module DispatchLaw =
 
     val answer: sent: string -> string * bool * string
 
+    val reset:
+        sessionId: string ->
+        claims: (string * string option) list ->
+        counters: (string * string * string option) list ->
+            Set<string> * Set<string> * bool * bool
+
     val recover:
         promptKey: string ->
         hasReceipt: bool ->
@@ -184,9 +190,6 @@ module PromptAuthority =
             string
 
     val nextClaimSequence: scope: string -> projection: PromptAuthorityProjection -> int
-
-    val rootClaimSequences:
-        sessionId: SessionId -> projection: PromptAuthorityProjection -> Map<string, ClaimSequenceCounter>
 
     val derivePromptKey:
         sha256: (string -> string) ->

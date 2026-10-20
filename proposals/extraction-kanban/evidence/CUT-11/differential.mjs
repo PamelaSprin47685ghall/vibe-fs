@@ -1,4 +1,4 @@
-// CUT-11 differential: the host claim ledger (base dist: hand-written scope/key/sequence,
+// CUT-11 differential (sub-scopes 1 and 4: ledger law and run-boundary reset): the host claim ledger (base dist: hand-written scope/key/sequence,
 // settlement edits and occasion admission) vs the candidate dist (wanxiangli/dispatch behind
 // typed projections). Same seeded random op sequences on both; after every op the whole
 // projection and every query are compared. Pure functions; no effects.
@@ -43,6 +43,7 @@ const norm = (v) => JSON.parse(JSON.stringify(v ?? null))
 const attempt = (f) => { try { return { value: norm(f()) } } catch (e) { return { threw: String(e?.message ?? e) } } }
 
 let compared = 0, ops = 0
+const boundaries = {}
 const tally = {}, diffs = []
 const check = (label, f) => {
   const b = attempt(() => f(base, wb, pb)), c = attempt(() => f(cand, wc, pc))
@@ -55,7 +56,7 @@ const digests = ['d1', 'd2', 'gate\u001fprun-1', 'q1\u001fprun-1\u001frepair']
 for (let s = 0; s < SEQUENCES; s++) {
   pb = base.model.empty; pc = cand.model.empty
   for (let step = 0; step < STEPS; step++) {
-    const op = rnd(5), key = keys[rnd(keys.length)], prof = rnd(4), oi = rnd(10), dg = digests[rnd(digests.length)], phys = `p${rnd(6)}`, rc = `accepted-${rnd(3)}`
+    const op = rnd(8), key = keys[rnd(keys.length)], prof = rnd(4), oi = rnd(10), dg = digests[rnd(digests.length)], phys = `p${rnd(6)}`, rc = `accepted-${rnd(3)}`
     const mk = (m, w) => {
       const p = w.profiles[prof]
       const claim = m.run.claimContinuation(w.K(key), m.model.AuthorityExecutionProfile__get_SessionId(p), w.C(rnd2), p, dg)
@@ -64,13 +65,22 @@ for (let s = 0; s < SEQUENCES; s++) {
       return Object.assign(Object.create(Object.getPrototypeOf(claim)), claim, { Origin: w.origins[oi === 9 ? 1 : oi], LogicalRunId: oi === 9 ? undefined : claim.LogicalRunId, AuthorityRootUserMessageId: oi === 9 ? undefined : claim.AuthorityRootUserMessageId })
     }
     const rnd2 = rnd(6)
-    const name = ['register', 'submit', 'accept', 'abandon', 'register'][op]
+    const name = ['register', 'submit', 'accept', 'abandon', 'register', 'registerAuthority', 'close', 'question'][op]
     tally[name] = (tally[name] ?? 0) + 1
     const apply = (m, w, p) => {
       if (name === 'register') return m.run.registerClaim(mk(m, w), p)
       if (name === 'submit') return m.run.submitClaim(w.K(key), w.T(rc), p)
       if (name === 'accept') return m.run.acceptClaim(w.K(key), w.P(phys), p)
-      return m.run.abandonClaim(w.K(key), p)
+      if (name === 'abandon') return m.run.abandonClaim(w.K(key), p)
+      // an open user question (opaque placeholder value): only the run-boundary reset may clear it
+      if (name === 'question') return Object.assign(Object.create(Object.getPrototypeOf(p)), p, { UserQuestions: m.map.add(`tc-${rnd2}`, { open: key }, p.UserQuestions) })
+      // run boundaries: a new root or an exact closure resets the run-scoped dispatch resources
+      const pf = w.profiles[prof]
+      const r = name === 'registerAuthority'
+        ? m.run.registerAuthority(pf, p)
+        : m.run.closeAuthority(m.model.AuthorityExecutionProfile__get_LogicalRunId(pf), m.model.AuthorityExecutionProfile__get_AuthorityRootUserMessageId(pf), p)
+      if (r.tag === 0 && m === base) boundaries[name] = (boundaries[name] ?? 0) + 1
+      return r.tag === 0 ? r.fields[0] : p
     }
     const nb = attempt(() => (pb = apply(base, wb, pb))), nc = attempt(() => (pc = apply(cand, wc, pc)))
     ops++; compared++
@@ -89,6 +99,7 @@ for (let s = 0; s < SEQUENCES; s++) {
         const sid = m.model.AuthorityExecutionProfile__get_SessionId(pf), run = m.model.AuthorityExecutionProfile__get_LogicalRunId(pf)
         return { admitted: m.model.gateNudgeAlreadyAdmitted(sid, run, w.C(ck), 'gate', w.PR('prun-1'), p), physical: m.model.gateNudgeAcceptedPhysical(sid, w.C(ck), 'gate', w.PR('prun-1'), p) }
       })
+      check('questions', (m, w, p) => [...p.UserQuestions].length)
       check('repair', (m, w, p) => {
         const pf = w.profiles[pi]
         return m.model.repairAlreadyClaimed(m.model.AuthorityExecutionProfile__get_SessionId(pf), m.model.AuthorityExecutionProfile__get_LogicalRunId(pf), w.Q('q1'), w.PR('prun-1'), 'repair', p)
@@ -96,7 +107,7 @@ for (let s = 0; s < SEQUENCES; s++) {
     }
   }
 }
-const stats = { sequences: SEQUENCES, steps: STEPS, ops, compared, differences: diffs.length, opMix: tally,
+const stats = { sequences: SEQUENCES, steps: STEPS, ops, compared, differences: diffs.length, opMix: tally, acceptedBoundaries: boundaries,
   finalShape: { pending: [...pb.PendingClaims].length, occasions: [...pb.AcceptedDispatches].length, landings: [...pb.PhysicalLandings].length } }
 console.log(JSON.stringify(stats, null, 1))
 if (diffs.length) { console.log(JSON.stringify(diffs.slice(0, 3), null, 1)); process.exit(1) }
