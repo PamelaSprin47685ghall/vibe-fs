@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Foundation
 
+open Fable.Core
+
 /// DSL-class: Vocabulary — the fixed tool-permission catalog keyed by Role.
 [<RequireQualifiedAccess>]
 type ToolPermission =
@@ -50,117 +52,27 @@ type ManagerCapabilityFacts =
         CleanupBlockerDigest: string option
     }
 
+/// Typed F# projection of `wanxiangli/capability` (CUT-08). The role ×
+/// permission matrix and the Manager lifecycle gate are decided by the library;
+/// this module only maps permission labels onto `ToolPermission`.
 [<RequireQualifiedAccess>]
 module OfficeCapability =
 
-    let managerReviewReadOnlyPermissions: ToolPermission Set =
-        set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
+    /// The slice of the stateless `wanxiangli/capability` object this module reads.
+    type private CapabilityLibrary =
+        abstract permissions: role: string -> string array
+        abstract managerReviewReadOnlyPermissions: unit -> string array
+        abstract managerFinishPermissions: unit -> string array
+        abstract permissionsForManagerFacts: facts: obj -> string array
 
-    /// capability-enforcement-025: the final incumbent's
-    /// read/cleanup/close-out surface. It keeps reading, horizon, join and the
-    /// deliver finality, and drops every new-work capability (fork, resume,
-    /// review).
-    let managerFinishPermissions: ToolPermission Set =
-        set
-            [ ToolPermission.Read
-              ToolPermission.Glob
-              ToolPermission.Grep
-              ToolPermission.Horizon
-              ToolPermission.Join
-              ToolPermission.Finality ]
+    [<Import("Capability", "wanxiangli/capability")>]
+    let private capabilityClass: obj = jsNative
 
-    let permissions (role: Role) : ToolPermission Set =
-        match role with
-        // The advisor is a reviewer, not an actor: it reads the supplied view and
-        // answers in prose, so its office carries no tool at all.
-        | Role.Advisor -> Set.empty
-        | Role.Manager ->
-            set
-                [ ToolPermission.Fork
-                  ToolPermission.Resume
-                  ToolPermission.Join
-                  ToolPermission.Horizon
-                  ToolPermission.Advisor
-                  ToolPermission.ReviewAssessment
-                  ToolPermission.Finality
-                  ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep ]
-        | Role.Orchestrator ->
-            set
-                [ ToolPermission.Fork
-                  ToolPermission.Join
-                  ToolPermission.Horizon
-                  ToolPermission.Advisor ]
-        | Role.Engineer ->
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Write
-                  ToolPermission.Edit
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Move
-                  ToolPermission.Remove
-                  ToolPermission.BashHoneypot
-                  ToolPermission.Fetch
-                  ToolPermission.Fission
-                  ToolPermission.Advisor ]
-        | Role.Coder -> Set.empty
-        | Role.Inspector -> Set.empty
-        | Role.Browser -> Set.empty
-        | Role.Inquiry -> Set.empty
-        | Role.DevOps ->
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Write
-                  ToolPermission.Edit
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Move
-                  ToolPermission.Remove
-                  ToolPermission.Exec
-                  ToolPermission.Join
-                  ToolPermission.Horizon
-                  ToolPermission.Advisor ]
-        | Role.Distiller -> Set.empty
-        | Role.Plan ->
-            // devops 委派调查，ask 只提问用户；两者不是同一项能力。
-            set
-                [ ToolPermission.JsPlan
-                  ToolPermission.Ask
-                  ToolPermission.DevOpsConsultation
-                  ToolPermission.Review
-                  ToolPermission.Deliver ]
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : CapabilityLibrary = jsNative
 
-    let isAllowed (role: Role) (permission: ToolPermission) : bool =
-        if Roles.all |> List.contains role then
-            permissions role |> Set.contains permission
-        else
-            false
-
-    /// Manager gate over exact lifecycle facts. No phase enum crosses this
-    /// boundary: retired/no-active grants nothing, a cleanup blocker confines
-    /// to the Join+Finality finish window, the final incumbent keeps the
-    /// read/cleanup/close-out surface but loses every new-work capability, and
-    /// all other active facts keep the full Manager set.
-    let permissionsForManagerFacts (facts: ManagerCapabilityFacts) : ToolPermission Set =
-        if not facts.HasActiveIncumbency then
-            Set.empty
-        // A confirmation without a review is an illegal fact: the two-stage
-        // deliver only confirms after the review is durable. Fail closed.
-        elif facts.HasConfirmation && not facts.HasAssessment then
-            Set.empty
-        elif facts.CleanupBlockerDigest.IsSome then
-            set [ ToolPermission.Join; ToolPermission.Finality ]
-        elif facts.IsFinalIncumbent then
-            managerFinishPermissions
-        elif facts.HasAssessment then
-            Set.difference (permissions Role.Manager) managerReviewReadOnlyPermissions
-        else
-            permissions Role.Manager
-
-    let isAllowedForManagerFacts (facts: ManagerCapabilityFacts) (permission: ToolPermission) : bool =
-        permissionsForManagerFacts facts |> Set.contains permission
+    // Stateless library object; one shared instance.
+    let private library: CapabilityLibrary = construct capabilityClass
 
     /// Stable JS-native label for one permission.
     let permissionLabel (permission: ToolPermission) : string =
@@ -218,3 +130,38 @@ module OfficeCapability =
         | "DevOpsConsultation" -> Some ToolPermission.DevOpsConsultation
         | "Advisor" -> Some ToolPermission.Advisor
         | _ -> None
+
+    let private permissionSet (labels: string array) : ToolPermission Set =
+        labels
+        |> Array.map (fun label ->
+            match permissionOfLabel label with
+            | Some permission -> permission
+            | None -> failwithf "wanxiangli/capability returned an unknown permission %s" label)
+        |> Set.ofArray
+
+    let managerReviewReadOnlyPermissions: ToolPermission Set =
+        library.managerReviewReadOnlyPermissions () |> permissionSet
+
+    /// capability-enforcement-025: the final incumbent's read/cleanup/close-out surface.
+    let managerFinishPermissions: ToolPermission Set =
+        library.managerFinishPermissions () |> permissionSet
+
+    let permissions (role: Role) : ToolPermission Set =
+        library.permissions (Roles.roleLabel role) |> permissionSet
+
+    let isAllowed (role: Role) (permission: ToolPermission) : bool =
+        permissions role |> Set.contains permission
+
+    /// Manager gate over exact lifecycle facts; the decision is the library's.
+    let permissionsForManagerFacts (facts: ManagerCapabilityFacts) : ToolPermission Set =
+        box
+            {| hasActiveIncumbency = facts.HasActiveIncumbency
+               hasAssessment = facts.HasAssessment
+               hasConfirmation = facts.HasConfirmation
+               isFinalIncumbent = facts.IsFinalIncumbent
+               hasCleanupBlocker = facts.CleanupBlockerDigest.IsSome |}
+        |> library.permissionsForManagerFacts
+        |> permissionSet
+
+    let isAllowedForManagerFacts (facts: ManagerCapabilityFacts) (permission: ToolPermission) : bool =
+        permissionsForManagerFacts facts |> Set.contains permission

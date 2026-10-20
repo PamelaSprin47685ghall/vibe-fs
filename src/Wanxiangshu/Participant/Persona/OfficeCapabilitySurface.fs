@@ -12,25 +12,15 @@ module OfficeCapabilitySurface =
     [<Emit("$0 == null")>]
     let private isNullish (value: obj) : bool = jsNative
 
-    let private officeName role =
-        match role with
-        | Role.Engineer -> "engineer"
-        | Role.Coder -> "coder"
-        | Role.Inspector -> "inspector"
-        | Role.DevOps -> "devops"
-        | Role.Browser -> "browser"
-        | Role.Inquiry -> "inquiry"
-        | _ -> failwith "OfficeCapabilitySurface: catalog contains a non-forkable role"
-
     /// office-capability-007 / ARCH-017: the canonical manager fork office consequence set.
     let managerForkableOffices () : string array =
-        ManagedAgentCatalog.managerForkableRoles |> List.map officeName |> List.toArray
+        ManagedAgentCatalog.managerForkableRoles |> List.map Roles.roleLabel |> List.toArray
 
-    /// Sorted permission labels for a role. Unknown role fails closed.
+    /// Sorted permission labels for a role. Unknown role fails closed; historical
+    /// roles hold no office in `wanxiangli/capability` and so return none.
     let permissions (roleLabel: string) : string array =
         match Roles.tryParseRole roleLabel with
-        | None
-        | Some(Role.Coder | Role.Inspector | Role.Browser | Role.Inquiry | Role.Distiller) -> [||]
+        | None -> [||]
         | Some role ->
             OfficeCapability.permissions role
             |> Set.toList

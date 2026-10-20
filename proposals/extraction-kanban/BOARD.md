@@ -40,7 +40,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-05 | 双语资源与包内定位 | 表达 | DONE | CUT-00 | — | 2026-10-15 主线提交 2f98049e5：wanxiangli 0.7.0 resources 模块合入，库侧 8 测试 + 主仓 provider-language 25 项回归全绿，证据链见 cards/CUT-05.md §10 |
 | CUT-06 | WorkRecord 取材与视图 | 上下文 | DONE | CUT-03 | eng-cut06-goose | 2026-10-20：三段式 WorkRecord 已由仓主于 master 6eef89d1e 退役（REMOVED，非本卡抽取）；现行继任者「交付视图格」（会话视图、调用围栏、已交还游标）抽入 wanxiangli/delivery（库 1206e57 / 0.9.0 发布 2564387），主仓 JsDeliveredValues 改为组合者，旧 Dictionary owner 删除；相关回归 base/candidate 逐用例一致（含 master 既有失败），新旧双算 7×4000 步一致；证据链见 cards/CUT-06.md |
 | CUT-07 | 参与者身份与执行绑定分离 | 权威 | DONE | CUT-00 | eng-cut07b-goose（接手 eng-cut07-goose） | 2026-10-20 wanxiangli 54dcc34 / 0.11.0 identity；主仓切换合入 master，旧 owner 退出；Origin/IdentitySeed 接线移交 CUT-09，ExecutionBinding 接线移交 CUT-10/12；证据 cards/CUT-07.md §11 |
-| CUT-08 | 能力事实与双侧门禁 | 权威 | DOING | CUT-07 | eng-cut07b-goose（接手 eng-cut07-goose） | 2026-10-20 认领：能力矩阵与 Manager 事实门禁抽入 wanxiangli/capability，主仓 Foundation/OfficeCapability 改为投影 |
+| CUT-08 | 能力事实与双侧门禁 | 权威 | DOING | CUT-07 | eng-cut07b-goose（接手 eng-cut07-goose） | 2026-10-21 第 1 段合入：矩阵与 Manager 事实门禁归 wanxiangli/capability（71958aa / 0.18.0），主仓 Foundation/OfficeCapability 改为投影；工具面/门禁一致与同义表删除进行中；见 cards/CUT-08.md |
 | CUT-09 | 来源、逻辑根与关闭权威 | 权威 | BACKLOG | CUT-07 | — | — |
 | CUT-10 | 模型路由与精确容量许可 | 执行 | BACKLOG | CUT-07 | — | — |
 | CUT-11 | 派发认领与外部效果记账 | 执行 | BACKLOG | CUT-09, CUT-10 | — | — |
