@@ -384,36 +384,38 @@ module ProcessEventLog =
                 segmentCapState.Override <- previous
         }
 
-    let private segmentFileOf (writerId: string) (ordinal: int) =
-        writerId + "-" + (sprintf "%04d" ordinal) + ".ndjson"
+    /// durable-events-005/014: writer segment naming and grouping has one
+    /// owner, wanxiangli/segments (CUT-19): `<WriterId>-dddd.ndjson` with
+    /// exactly four ASCII digits, ordinals 0..9999, contiguous-series
+    /// grouping and the legacy/segment layout verdict. This log only lists
+    /// the directory and moves bytes.
+    [<Import("WriterSegments", "wanxiangli/segments")>]
+    let private segmentsClass: obj = jsNative
 
-    let private legacyFileOf (writerId: string) = writerId + ".ndjson"
+    let private segmentLaw: obj = constructRetention segmentsClass
 
-    let private endsWithSegmentSuffix (writerId: string) =
-        writerId.Length >= 5
-        && writerId.[writerId.Length - 5] = '-'
-        && writerId.Substring(writerId.Length - 4) |> Seq.forall Char.IsDigit
+    /// Throws instead of spelling a five-digit name that would read back as
+    /// another writer.
+    let private segmentFileOf (writerId: string) (ordinal: int) : string =
+        unbox<string> (segmentLaw?segmentFileName (writerId, ordinal))
 
-    /// durable-events-005: a writer file name is a segment name when it ends
-    /// with a hyphen, exactly four digits, and the .ndjson suffix.
-    let private isSegmentFileName (name: string) =
-        name.Length >= 12
-        && name.EndsWith(".ndjson", StringComparison.Ordinal)
-        && name.[name.Length - 12] = '-'
-        && name.Substring(name.Length - 11, 4) |> Seq.forall Char.IsDigit
+    let private legacyFileOf (writerId: string) : string =
+        unbox<string> (segmentLaw?legacyFileName writerId)
 
-    let private ordinalOfSegmentFileName (name: string) =
-        Int32.Parse(name.Substring(name.Length - 11, 4))
+    let private ordinalOfSegmentFileName (name: string) : int =
+        let parsed: obj = segmentLaw?parseSegmentFileName name
+
+        if isNull parsed then
+            invalidArg "name" (sprintf "not a segment file name: %s" name)
+        else
+            unbox<int> parsed?ordinal
 
     let private safeWriterId (writerId: string) =
-        if String.IsNullOrWhiteSpace writerId then
-            invalidArg "writerId" "WriterId is required"
-        elif writerId.IndexOfAny([| '/'; '\\' |]) >= 0 || writerId = "." || writerId = ".." then
-            invalidArg "writerId" "WriterId must be one path segment"
-        elif endsWithSegmentSuffix writerId then
-            invalidArg "writerId" "WriterId must not end with a hyphen and four digits"
-        else
-            writerId
+        match unbox<string> (segmentLaw?writerIdFault writerId) with
+        | null -> writerId
+        | "required" -> invalidArg "writerId" "WriterId is required"
+        | "pathSegment" -> invalidArg "writerId" "WriterId must be one path segment"
+        | _ -> invalidArg "writerId" "WriterId must not end with a hyphen and four digits"
 
     let createWithSegmentCap (commonDir: string) (writerId: string) (segmentCap: int) : ProcessEventLog =
         if String.IsNullOrWhiteSpace commonDir then
@@ -486,12 +488,7 @@ module ProcessEventLog =
         if not (existsSync directory) then
             []
         else
-            readdirSync directory
-            |> Array.filter (fun name ->
-                isSegmentFileName name
-                && name.StartsWith(writerId + "-", StringComparison.Ordinal)
-                && name.Length = writerId.Length + 12)
-            |> Array.sort
+            unbox<string array> (segmentLaw?seriesOf (writerId, readdirSync directory))
             |> Array.toList
 
     let private fallbackTargetOf (commonDir: string) (writerId: string) : string =
@@ -914,86 +911,27 @@ module ProcessEventLog =
         else
             unbox<float> verdict
 
-    let private writerFileNames commonDir =
+    /// durable-events-005/014: one writer's physical files grouped by
+    /// WriterId (wanxiangli/segments `groupWriterFiles`). A tail `-dddd` name
+    /// joins its prefix's segment series only when the ordinals are
+    /// contiguous from 0000; otherwise the file is a legacy suffixless single
+    /// file under its full stem. A legacy file and its segment series may
+    /// coexist only as an interrupted reorganization or import intermediate.
+    type private WriterFileGroup =
+        { WriterId: string
+          FileNames: string list }
+
+    let private writerFileGroups (commonDir: string) : WriterFileGroup list =
         let directory = eventsDirectory commonDir
 
         if not (existsSync directory) then
             []
         else
-            readdirSync directory
-            |> Array.filter (fun name -> name.EndsWith(".ndjson", StringComparison.Ordinal))
-            |> Array.sort
+            unbox<obj array> (segmentLaw?groupWriterFiles (readdirSync directory))
             |> Array.toList
-
-    /// durable-events-005/014: one writer's physical files grouped by
-    /// WriterId. A tail `-dddd` name joins its prefix's segment series only
-    /// when the ordinals are contiguous from 0000; otherwise the file is a
-    /// legacy suffixless single file under its full stem. A legacy file and
-    /// its segment series may coexist only as an interrupted reorganization
-    /// or import intermediate.
-    type private WriterFileGroup =
-        { WriterId: string
-          FileNames: string list }
-
-    let private stemOfFileName (name: string) =
-        name.Substring(0, name.Length - ".ndjson".Length)
-
-    let private parseSegmentTail (stem: string) : (string * int) option =
-        let splitAt = stem.Length - 5
-        let tail = stem.Substring(splitAt)
-
-        if tail.[0] = '-' && tail.Substring(1) |> Seq.forall Char.IsDigit then
-            Some(stem.Substring(0, splitAt), Int32.Parse(tail.Substring(1)))
-        else
-            None
-
-    let private parseSegmentStem (stem: string) : (string * int) option =
-        if stem.Length >= 6 then parseSegmentTail stem else None
-
-    let private contiguousSegmentGroups (names: string list) =
-        names
-        |> List.choose (fun name ->
-            parseSegmentStem (stemOfFileName name)
-            |> Option.map (fun (writerId, ordinal) -> writerId, ordinal, name))
-        |> List.groupBy (fun (writerId, _, _) -> writerId)
-        |> List.map (fun (writerId, entries) ->
-            let ordinals = entries |> List.map (fun (_, ordinal, _) -> ordinal) |> Set.ofList
-            let highest = Set.maxElement ordinals
-
-            let contiguous =
-                [ 0..highest ] |> List.forall (fun ordinal -> Set.contains ordinal ordinals)
-
-            writerId, entries, contiguous)
-        |> List.filter (fun (_, _, contiguous) -> contiguous)
-        |> List.map (fun (writerId, entries, _) ->
-            { WriterId = writerId
-              FileNames = entries |> List.map (fun (_, _, name) -> name) })
-
-    let private legacyGroupsOf (names: string list) (segmentWriters: Set<string>) =
-        names
-        |> List.filter (fun name ->
-            match parseSegmentStem (stemOfFileName name) with
-            | None -> true
-            | Some(writerId, _) -> not (Set.contains writerId segmentWriters))
-        |> List.map (fun name ->
-            { WriterId = stemOfFileName name
-              FileNames = [ name ] })
-
-    let private writerFileGroups (commonDir: string) : WriterFileGroup list =
-        let names = writerFileNames commonDir
-        let segments = contiguousSegmentGroups names
-
-        let segmentWriters =
-            segments |> List.map (fun group -> group.WriterId) |> Set.ofList
-
-        let legacy = legacyGroupsOf names segmentWriters
-
-        (segments @ legacy)
-        |> List.groupBy (fun group -> group.WriterId)
-        |> List.map (fun (writerId, parts) ->
-            { WriterId = writerId
-              FileNames = parts |> List.collect (fun part -> part.FileNames) |> List.sort })
-        |> List.sortBy (fun group -> group.WriterId)
+            |> List.map (fun group ->
+                { WriterId = unbox<string> group?writerId
+                  FileNames = unbox<string array> group?fileNames |> Array.toList })
 
     let writerPhysicalMetadata (commonDir: string) : WriterPhysicalMetadata list =
         writerFileGroups commonDir
@@ -1086,17 +1024,19 @@ module ProcessEventLog =
             Error(sprintf "writer files diverged: %s" writerId)
 
     let private logicalStreamFiles (commonDir: string) (group: WriterFileGroup) : Result<string list, string> =
-        let directory = eventsDirectory commonDir
+        let layout: obj =
+            segmentLaw?streamLayout (
+                createObj [ "writerId" ==> group.WriterId; "fileNames" ==> List.toArray group.FileNames ]
+            )
 
-        let legacy =
-            group.FileNames |> List.filter (fun name -> not (isSegmentFileName name))
+        let segmentNames () =
+            unbox<string array> layout?segments |> Array.toList
 
-        let segments = group.FileNames |> List.filter isSegmentFileName |> List.sort
-
-        match legacy, segments with
-        | [], files -> Ok files
-        | [ legacyFile ], [] -> Ok [ legacyFile ]
-        | [ legacyFile ], _ -> coexistingFormsOf directory group.WriterId legacyFile segments
+        match unbox<string> layout?kind with
+        | "segments" -> Ok(segmentNames ())
+        | "legacy" -> Ok [ unbox<string> layout?legacy ]
+        | "coexisting" ->
+            coexistingFormsOf (eventsDirectory commonDir) group.WriterId (unbox<string> layout?legacy) (segmentNames ())
         | _ -> Error(sprintf "multiple legacy files for one writer: %s" group.WriterId)
 
     /// durable-events-005: split canonical text into segment-sized chunks at
@@ -1265,15 +1205,8 @@ module ProcessEventLog =
         | 0 -> tailName
         | _ -> segmentFileOf writerId (ordinalOfSegmentFileName tailName + index)
 
-    let private appendLegacyPiece
-        (directory: string)
-        (writerId: string)
-        (tailName: string)
-        (index: int)
-        (piece: string)
-        : unit =
+    let private appendLegacyPiece (directory: string) (fileName: string) (piece: string) : unit =
         if piece.Length > 0 then
-            let fileName = fileNameForPiece tailName writerId index
             let path = join2 directory fileName
             AppendAllText path piece "utf8"
             durabilityBarrier path
@@ -1292,8 +1225,13 @@ module ProcessEventLog =
             let tailName, headroom = seriesTailOf directory writerId segments
             let pieces = splitTextIntoSegmentsWithHeadroom text (segmentCapBytes ()) headroom
 
-            pieces
-            |> List.iteri (fun index piece -> appendLegacyPiece directory writerId tailName index piece)
+            // Every target name is spelled before any byte lands: an ordinal
+            // past 9999 refuses here, not after part of the legacy lines moved.
+            let names =
+                pieces |> List.mapi (fun index _ -> fileNameForPiece tailName writerId index)
+
+            List.zip names pieces
+            |> List.iter (fun (fileName, piece) -> appendLegacyPiece directory fileName piece)
 
             unlinkSync legacyFile
             Ok()

@@ -538,3 +538,69 @@ test('WHAT[durable-events-005] rolling_a_new_segment_preserves_sealed_local_byte
   })
 })
 }
+
+{
+// CUT-19 §15: the segment naming law has one owner (wanxiangli/segments). Two counterexamples
+// that are red on the hand-written law it replaced.
+const { default: assert } = await import('node:assert/strict')
+const { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
+const eventStore = await import('../../../dist/Persistence/EventStore/Surface.js')
+const retention = await import('../../../dist/Persistence/EventStore/RetentionSurface.js')
+
+const hexId = (n) => n.toString(16).padStart(40, '0')
+const event = (n) => ({ id: hexId(n), stream: 'proof/segment-name', type: 'JobRequested', parents: [], payload: { n }, payloadRefs: [] })
+const canonicalLine = (value) => JSON.stringify({
+  event_id: value.id, event_type: value.type, parents: [...value.parents].sort(),
+  payload: value.payload, payload_refs: [...value.payloadRefs].sort(), stream_id: value.stream,
+}) + '\n'
+const withEvents = async (fn) => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-segname-'))
+  const commonDir = join(root, '.Herdchestra')
+  const events = join(commonDir, 'wanxiangshu', 'events')
+  mkdirSync(events, { recursive: true })
+  try { await fn(commonDir, events) } finally { rmSync(root, { recursive: true, force: true }) }
+}
+
+test('WHAT[durable-events-005] a file whose -dddd tail uses non-ASCII digits is a legacy writer, not a crash of the whole store', async () => {
+  // Char.IsDigit accepted Arabic-Indic digits as a segment tail, then Int32.Parse threw on them:
+  // one such name anywhere in the events directory made every writer's history unloadable.
+  await withEvents(async (commonDir, events) => {
+    writeFileSync(join(events, 'own-0000.ndjson'), canonicalLine(event(1)))
+    writeFileSync(join(events, 'imported-٠٠٠٠.ndjson'), canonicalLine(event(2)))
+    const store = eventStore.create(commonDir, 'own')
+    try {
+      assert.notEqual(eventStore.read(store, hexId(1)), null)
+      assert.notEqual(eventStore.read(store, hexId(2)), null, 'the oddly named file is read as its own legacy writer')
+    } finally {
+      eventStore.dispose(store)
+    }
+    assert.deepEqual([...retention.retainedWriterIdsAt(commonDir, Date.now())].sort(), ['imported-٠٠٠٠', 'own'])
+  })
+})
+
+test('WHAT[durable-events-005] continuing legacy lines past segment 9999 refuses before any byte moves instead of splitting the writer', async () => {
+  // The old continuation spelled ordinal 10000 as w-10000.ndjson, which reads back as a different
+  // writer "w-10000", and then deleted the legacy file: one writer's stream became two.
+  await withEvents(async (commonDir, events) => {
+    for (let ordinal = 0; ordinal <= 9999; ordinal += 1) {
+      writeFileSync(join(events, `w-${String(ordinal).padStart(4, '0')}.ndjson`), canonicalLine(event(ordinal + 1)))
+    }
+    const legacy = canonicalLine(event(20001)) + canonicalLine(event(20002))
+    writeFileSync(join(events, 'w.ndjson'), legacy)
+    const before = readdirSync(events).sort()
+    let refusal = null
+    let outcome
+    try { outcome = await retention.reorganizeWithSegmentCap(commonDir, 1) } catch (error) { refusal = error }
+    const after = readdirSync(events).sort()
+    assert.equal(after.includes('w-10000.ndjson'), false, 'no five-digit name that reads back as another writer')
+    // Fable exceptions are not JS Error instances; the refusal is identified by its message.
+    assert.notEqual(refusal, null, `the reorganization refuses (it returned ${JSON.stringify(outcome)})`)
+    assert.match(String(refusal.message), /four-digit/)
+    assert.deepEqual(after, before, 'nothing moved')
+    assert.equal(readFileSync(join(events, 'w.ndjson'), 'utf8'), legacy, 'legacy lines stay intact')
+    assert.deepEqual([...retention.retainedWriterIdsAt(commonDir, Date.now())], ['w'], 'still one writer')
+  })
+})
+}
