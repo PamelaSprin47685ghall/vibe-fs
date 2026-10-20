@@ -1580,6 +1580,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                     (set
                         [ JsCapability.Read
                           JsCapability.Glob
+                          JsCapability.Grep
                           JsCapability.Fork
                           JsCapability.Join
                           JsCapability.Horizon

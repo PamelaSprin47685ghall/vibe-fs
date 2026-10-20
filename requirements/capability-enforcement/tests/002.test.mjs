@@ -136,9 +136,8 @@ test('WHAT[capability-enforcement-002] AGENT_006_role_tool_matrix_reaches_the_ho
   }
 })
 test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_the_host_schema_matrix', () => {
-  // Edit and Grep remain office permissions but project no separate JS capability
-  // (string replacement uses Read + Write; content search uses Read + Glob).
-  const DIRECT_PERMISSION_ONLY = new Set(['Edit', 'Grep'])
+  // Edit uses the existing Read + Write projection.
+  const DIRECT_PERMISSION_ONLY = new Set(['Edit'])
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',

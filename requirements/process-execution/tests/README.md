@@ -7,7 +7,7 @@
 - 008 真实 PTY mailbox 保持顺序并排空；尚未证明 Agent pulse 与 PTY 的完整双通道装配。
 - 009 真实输出计量、转 spool 和文件往返；补清理由缓冲清空测试留下的 spool。010 实际命令验证标准流与非零退出。
 - 011 验证 `js.run` 的不完整 Runnable 规约与非法命令描述用会产生文件副作用的真实命令，确认在执行前拒绝、未 spawn；另验证宿主 context codec 的只读快照。直接调用工具规约仍不证明插件角色准入。
-- 012 保留真实请求/PTY契约的独立 Fable 正负编译，并拒绝从纯契约访问 JsRunLoop。旧 GitGateway 专属消费者随其 owner 退役，不能复活该路径代证其他消费者。
+- 012 保留真实请求/PTY契约的独立 Fable 正负编译，并拒绝从纯契约访问 JsCallLoop。旧 GitGateway 专属消费者随其 owner 退役，不能复活该路径代证其他消费者。
 - 013—015 通过新 js.run 和实际注册工具检查模型计数、双语原文、总编码预算、minimum−1 零启动及 minimum 下的原生事实；onExit/watch 的直接返回也有反例。当前验收进度见[SM-04迁移门禁](../../../proposals/extraction-kanban/UPSTREAM-SEMANTIC-MERGE-2026-10-19.md)，不以纯留尾函数代证完整 wire。
 - 016 保留FIFO、排队及交接取消、失败释放和后继运行；launcher保留显式EndEvidence，不把抛错变非零退出。
 - 017 验证 Host 原生 `run`/四个 PTY 工具及其资源确实不存在，并证明 `js.run` 接受多分钟 `maxDuration` 且无人工 10 秒上限地完成快速命令；这是退役边界与时限回归，不证明完整 Long Stroke。

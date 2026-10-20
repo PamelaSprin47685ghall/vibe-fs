@@ -44,3 +44,9 @@
 - `m6-related-node22-01.log`：最低Node串行78文件611pass/1fail/8TODO，78/78排空且回收accepted=true。全编程旧断言修正、原物理集、历史身份009/010、Trace002、Attachment021、冻结前缀008、context-compression010/011、WorkRecord001、只读墓碑及发行入口约束均实际执行。唯一普通失败是rg取消夹具3秒启动窗口；8旧TODO完整保留，不接受为通过。
 - `m4-cancel-independent-node22.log`仍在3秒窗口失败；`m4-cancel-observed-node22.log`使用已有有限物理等待后1/0，4363ms完成，实际进入见证后取消并确认PID死亡。预取消与活动取消分为独立插件实例；正式补验待。并未调整Host期限、5秒默认静默或实际关闭断言。
 - `m6-build-02.log`：gen33。`m6-focused-node22-02.log`：最低Node正式80/0，10/10排空、回收accepted=true，有限物理等待已正式验收；公开合同修正、插件接线与真实搜索可用。各组选集重叠，不累加为完整发行通过。
+- `m6-release-01*.log`：实际发行入口格式/静态/干净gen34通过，171表面/826模块；单元distribution007触发5000ms静默，260/870文件完成，无权威总计，回收accepted=true；未进入集成/e2e/package，发行不通过。
+- `m6-contract-node22-03.log`：四处能力断言和005错误码补齐后40/1/2旧TODO，新增Grep使Manager只读示例被旧白名单排除；精准补Grep后`m6-build-04.log`为gen36，`m6-contract-node22-04.log`正式41/0/2旧TODO，4/4排空、回收accepted=true。未增加Write/Exec权限，旧TODO未接受。
+
+## 最终记录
+
+计划与代码冻结后，最终构建、发行入口、跨运行时物理/包消费、提交及普通推送分别写入同目录`delivery.json`；原始日志继续保存。该JSON是最后包状态与剩余边界的记录。原始日志的空白与失败不清洗；源码与需求改动另跑diff检查。

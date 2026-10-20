@@ -20,7 +20,7 @@ test('WHAT[process-execution-005] js.call rejects non-positive or non-finite max
     });`,
       )
       assert.equal(caseName(outcome), 'Failed', `maxDuration=${rawExpr} must fail`)
-      assert.match(render(outcome), /RUNNABLE_SPEC_INCOMPLETE/, `maxDuration=${rawExpr}`)
+      assert.match(render(outcome), /CALLABLE_SPEC_INCOMPLETE/, `maxDuration=${rawExpr}`)
     }
   } finally {
     cleanup()
