@@ -65,6 +65,7 @@ module JsDescriptionAssets =
           BaseClassMove = template lang JsCanonicalDescription.Path.BaseClassMove
           BaseClassExec = template lang JsCanonicalDescription.Path.BaseClassExec
           BaseClassFork = template lang JsCanonicalDescription.Path.BaseClassFork
+          BaseClassDag = template lang JsCanonicalDescription.Path.BaseClassDag
           BaseClassResume = template lang JsCanonicalDescription.Path.BaseClassResume
           BaseClassCommission = template lang JsCanonicalDescription.Path.BaseClassCommission
           BaseClassDevOps = template lang JsCanonicalDescription.Path.BaseClassDevOps

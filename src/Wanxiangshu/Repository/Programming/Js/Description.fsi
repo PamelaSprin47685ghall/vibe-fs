@@ -137,6 +137,9 @@ module JsCanonicalDescription =
         val BaseClassFork: string = "tool/js-program/base-class-fork"
 
         [<Literal>]
+        val BaseClassDag: string = "tool/js-program/base-class-dag"
+
+        [<Literal>]
         val BaseClassResume: string = "tool/js-program/base-class-resume"
 
         [<Literal>]
@@ -212,6 +215,7 @@ module JsCanonicalDescription =
           BaseClassMove: string
           BaseClassExec: string
           BaseClassFork: string
+          BaseClassDag: string
           BaseClassResume: string
           BaseClassCommission: string
           BaseClassDevOps: string

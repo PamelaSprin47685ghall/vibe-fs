@@ -156,6 +156,16 @@ module JsFragmentRegistry =
         { Capability = JsCapability.Fork
           MemberName = "dag" }
 
+    /// The capabilities a member needs beyond its own. `dag` is pure sugar
+    /// over fork waves plus one join, so it needs Join as well as Fork: a
+    /// surface without Join has no join to compile the waves into, and a
+    /// member listed without a method body is a lie.
+    let additionalCapabilities (fragment: JsCapabilityFragment) : JsCapability list =
+        if fragment = dag then
+            [ JsCapability.Join ]
+        else
+            []
+
     let join: JsCapabilityFragment =
         { Capability = JsCapability.Join
           MemberName = "join" }
@@ -211,3 +221,11 @@ module JsFragmentRegistry =
 
     let byCapability: Map<JsCapability, JsCapabilityFragment list> =
         all |> List.groupBy _.Capability |> Map.ofList
+
+    /// Whether a member may be projected into a surface: its own capability
+    /// plus every extra capability it needs. The base class and the member
+    /// list read this one rule, so a member never appears without a body.
+    let isProjected (capabilities: Set<JsCapability>) (fragment: JsCapabilityFragment) : bool =
+        Set.contains fragment.Capability capabilities
+        && additionalCapabilities fragment
+           |> List.forall (fun capability -> Set.contains capability capabilities)

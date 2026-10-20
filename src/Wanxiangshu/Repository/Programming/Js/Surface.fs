@@ -22,7 +22,7 @@ module JsToolGenerator =
         JsFragmentRegistry.all
         |> List.filter (fun fragment ->
             fragment.Capability <> JsCapability.Park
-            && Set.contains fragment.Capability capabilities)
+            && JsFragmentRegistry.isProjected capabilities fragment)
 
     let toolNameFor (roleName: string) : string =
         "todowrite-for-" + roleName.ToLowerInvariant()

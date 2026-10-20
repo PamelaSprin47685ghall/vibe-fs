@@ -144,6 +144,12 @@ module JsCanonicalDescription =
         [<Literal>]
         let BaseClassFork = "tool/js-program/base-class-fork"
 
+        /// `dag` is pure sugar over fork waves plus one join, so it needs the
+        /// Join capability as well as Fork; it carries its own resource so the
+        /// public base class can project the two members independently.
+        [<Literal>]
+        let BaseClassDag = "tool/js-program/base-class-dag"
+
         [<Literal>]
         let BaseClassResume = "tool/js-program/base-class-resume"
 
@@ -224,6 +230,7 @@ module JsCanonicalDescription =
           BaseClassMove: string
           BaseClassExec: string
           BaseClassFork: string
+          BaseClassDag: string
           BaseClassResume: string
           BaseClassCommission: string
           BaseClassDevOps: string
@@ -322,6 +329,14 @@ class JsProgram {"""
               "baseClassFork",
               if has capabilities JsCapability.Fork then
                   prose.BaseClassFork
+              else
+                  ""
+              // dag is sugar over fork waves plus one join: without Join it
+              // has no join to compile into, so it is projected only when both
+              // capabilities are present.
+              "baseClassDag",
+              if has capabilities JsCapability.Fork && has capabilities JsCapability.Join then
+                  prose.BaseClassDag
               else
                   ""
               "baseClassResume",
@@ -598,7 +613,9 @@ class JsProgram {"""
     return await this._api.fission(payload);
   }"""
                       []
-              if has capabilities JsCapability.Fork then
+              // dag is sugar over fork waves plus one join: the body calls
+              // this.join(), so it is emitted only when Join is projected too.
+              if has capabilities JsCapability.Fork && has capabilities JsCapability.Join then
                   fill
                       """  async dag(spec, reportMapping) {
     const nodes = (spec && spec.nodes) || [];
@@ -752,7 +769,12 @@ class JsProgram {"""
                   String.concat
                       "\n\n"
                       ([ "class ReviewOnly {"; "  constructor(api) { this._api = api; }" ]
-                       @ runtimeFileMethods capabilities "this._api.reviewOnly" missingMemberGuard
+                       // The constructor already receives the review namespace
+                       // itself (api.reviewOnly), so the members read through
+                       // it directly. The guard checks the same expression it
+                       // guards: a namespace that cannot serve the member
+                       // refuses with the REVIEW_ONLY envelope.
+                       @ runtimeFileMethods capabilities "this._api" missingMemberGuard
                        @ [ "}" ])
                   + "\n\n"
               else
