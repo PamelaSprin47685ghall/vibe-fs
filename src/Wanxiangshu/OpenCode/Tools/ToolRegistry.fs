@@ -48,9 +48,6 @@ module ToolRegistry =
         let DeniedAblation = "tool/registry/denied-ablation"
 
         [<Literal>]
-        let DeniedStrength = "tool/registry/denied-strength"
-
-        [<Literal>]
         let DeniedUnestablished = "tool/registry/denied-unestablished"
 
         [<Literal>]

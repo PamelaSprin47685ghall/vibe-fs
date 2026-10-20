@@ -26,9 +26,6 @@ module ToolRegistry =
         val DeniedRole: string = "tool/registry/denied-role"
 
         [<Literal>]
-        val DeniedStrength: string = "tool/registry/denied-strength"
-
-        [<Literal>]
         val DeniedUnestablished: string = "tool/registry/denied-unestablished"
 
         [<Literal>]
