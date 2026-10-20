@@ -60,7 +60,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-22 | attention、concern 与邮箱归属 | 权威 | BACKLOG | CUT-09 | — | — |
 | CUT-23 | Git 工作树、委任与集成 | 仓库 | BACKLOG | CUT-12, CUT-13 | — | — |
 | CUT-24 | 文件读取、锚点与原子编辑 | 仓库 | DONE | CUT-00 | eng-cut24 | 2026-10-15 主线提交 2f98049e5：wanxiangli fs 模块合入 0.7.0（38 测试绿），repository-programming 158 项回归全绿，证据链见 cards/CUT-24.md §10 |
-| CUT-25 | 受限 JS 编程面与执行组合 | 仓库 | DOING | CUT-02, CUT-08, CUT-24 | eng-cut25b-goose（接手 eng-cut25-goose；其工作树 cut/CUT-25g 干净、HEAD e4ff18704 已在 master） | 2026-10-21 eng-cut25-goose：逃逸已堵（0a186821c）；wanxiangli/sandbox 0.23.1 已接；能力面/generator/Plan 接线仍待 |
+| CUT-25 | 受限 JS 编程面与执行组合 | 仓库 | DOING | CUT-02, CUT-08, CUT-24 | eng-cut25b-goose | 2026-10-21 eng-cut25b-goose：0.23.2 堵 WeakMap 原型篡改逃逸（红证 membrane-0.23.1-red）；await-loop 已证；能力面/generator/Plan 仍待 CUT-08 |
 | CUT-26 | 需求发现与材料溯源 | 仓库 | DONE | CUT-00 | eng-cut26 | 2026-10-15 主线提交 2f98049e5：wanxiangli grounding 模块合入 0.7.0（13 测试绿）；主仓 requirement-grounding 残留 002/007 两项为 GAP.md 既有登记缺口（GAP-085，非本卡回归），证据链见 cards/CUT-26.md §10 |
 | CUT-27 | Casebook / 知识复用去向 | 产品裁决 | READY | CUT-06, CUT-19, CUT-24 | — | 2026-10-20 eng-cut19-goose 裁决：保留产品功能并分步抽取（不删除、不整体 RETAINED）；子范围①Index 纯投影可认领，②Fetch 差异决策、③实质访问判定依次，见 cards/CUT-27.md |
 | CUT-28 | Fission 多 lane 执行 | 执行 | BACKLOG | CUT-03, CUT-10, CUT-12, CUT-13 | — | — |

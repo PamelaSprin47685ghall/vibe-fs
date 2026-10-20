@@ -60,3 +60,13 @@ JsSandbox / ToolsBindings / RuntimeSurface 在 6859577a7 与本次提交的 base
 
 membrane 驱动已抽入 `wanxiangli/sandbox`（库提交 `50f5e4c`，发布 `0.23.1` / `d2a9f3b`）。主仓 `JsSandbox` 组合 `Sandbox().run`；ParkState / sentinel 解码 / 能力投影仍在主仓。库测试 `src/sandbox/tests` 含 naive base-red 与 membrane 绿证。
 
+
+## 固有方法篡改逃逸（2026-10-21，eng-cut25b-goose）
+
+0.23.1 membrane 与模型程序同 realm，`wrap`/`unwrap` 调用 `WeakMap.prototype.has`/`.set` 时把宿主对象当参数传进去；模型改写这两个方法后能观察到宿主值，再经 `constructor.constructor` 拿到 `process`。证据：`evidence/CUT-25/membrane-0.23.1-red-intrinsics.json`（红）、`membrane-0.23.2-green-intrinsics.json`（绿）。
+
+修复在库 `bd67c08` / 发布 `0.23.2`（`7b06b93`）：安装时捕获 WeakMap/Reflect 方法，经捕获的 `Reflect.apply` 调用；参数拷贝不用 `Array.prototype.slice`/`map`。库测试 `SPEC[sandbox-003]`；主仓回归 `006-cut25-escapes.test.mjs` 两条 WeakMap 用例。
+
+另：`await` 后同步死循环由 afterEvaluate 驱动排水在 `runInContext` timeout 下终止，证据仍是 006 末条与库 `SPEC[sandbox-002]`（子进程）。
+
+未做：能力面 / generator / Plan 接线（依赖 CUT-08 DONE）、教程/描述/schema 同源。

@@ -89,3 +89,43 @@ test('WHAT[repository-programming-006] pending async work and post-await computa
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 10000 })
   assert.equal(r.status, 0, r.stderr || r.stdout || 'child failed')
 })
+
+test('WHAT[repository-programming-006] CUT25_escape_via_patched_WeakMap_has_is_denied', async () => {
+  const program = `class Js extends JsProgram {
+  async run() {
+    const isProc = (p) => !!(p && typeof p.pid === 'number' && typeof p.getBuiltinModule === 'function');
+    let leaked = false;
+    const original = WeakMap.prototype.has;
+    WeakMap.prototype.has = function (key) {
+      try { const p = key && key.constructor && key.constructor.constructor('return process')(); if (isProc(p)) leaked = true; } catch (_) {}
+      return original.call(this, key);
+    };
+    try { await this.ls('.'); } finally { WeakMap.prototype.has = original; }
+    return { leaked };
+  }
+}`
+  const result = await runWrapped(program, { ls: async () => ['a.txt'] })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  const value = typeof result.value === 'string' ? JSON.parse(result.value) : result.value
+  assert.equal(value.leaked, false, 'patched WeakMap.prototype.has must not observe a host value')
+})
+
+test('WHAT[repository-programming-006] CUT25_escape_via_patched_WeakMap_set_is_denied', async () => {
+  const program = `class Js extends JsProgram {
+  async run() {
+    const isProc = (p) => !!(p && typeof p.pid === 'number' && typeof p.getBuiltinModule === 'function');
+    let leaked = false;
+    const original = WeakMap.prototype.set;
+    WeakMap.prototype.set = function (key, value) {
+      try { const p = key && key.constructor && key.constructor.constructor('return process')(); if (isProc(p)) leaked = true; } catch (_) {}
+      return original.call(this, key, value);
+    };
+    try { await this.ls('.'); } finally { WeakMap.prototype.set = original; }
+    return { leaked };
+  }
+}`
+  const result = await runWrapped(program, { ls: async () => ['a.txt'] })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  const value = typeof result.value === 'string' ? JSON.parse(result.value) : result.value
+  assert.equal(value.leaked, false, 'patched WeakMap.prototype.set must not observe a host value')
+})
