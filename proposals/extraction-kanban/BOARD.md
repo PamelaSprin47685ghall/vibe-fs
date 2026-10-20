@@ -41,7 +41,9 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-06 | WorkRecord 取材与视图 | 上下文 | DONE | CUT-03 | eng-cut06-goose | 2026-10-20：三段式 WorkRecord 已由仓主于 master 6eef89d1e 退役（REMOVED，非本卡抽取）；现行继任者「交付视图格」（会话视图、调用围栏、已交还游标）抽入 wanxiangli/delivery（库 1206e57 / 0.9.0 发布 2564387），主仓 JsDeliveredValues 改为组合者，旧 Dictionary owner 删除；相关回归 base/candidate 逐用例一致（含 master 既有失败），新旧双算 7×4000 步一致；证据链见 cards/CUT-06.md |
 | CUT-07 | 参与者身份与执行绑定分离 | 权威 | DONE | CUT-00 | eng-cut07b-goose（接手 eng-cut07-goose） | 2026-10-20 wanxiangli 54dcc34 / 0.11.0 identity；主仓切换合入 master，旧 owner 退出；Origin/IdentitySeed 接线移交 CUT-09，ExecutionBinding 接线移交 CUT-10/12；证据 cards/CUT-07.md §11 |
 | CUT-08 | 能力事实与双侧门禁 | 权威 | DONE | CUT-07 | eng-cut08c-goose（接手 eng-cut07b-goose） | 2026-10-21 完成（范围按 cards/CUT-08.md §6 收窄）：矩阵与 Manager 事实门禁（wanxiangli 0.18.0）、能力↔工具名唯一映射（0.20.0）、实用工具 skill/assume 准入（0.22.0，修复 Distiller 请求工具表与准入分叉）都只剩库一个 owner，schema 投影/请求工具表/执行准入读同一份；宿主手写角色表已删。编程面准入归 CUT-25，fork 系 spec 准入归 CUT-13，描述语义评审留 GAP-078 |
-| CUT-09 | 来源、逻辑根与关闭权威 | 权威 | DOING | CUT-07 | eng-cut09b-goose（接手 eng-cut08c-goose） | 2026-10-21 认领。D-01 裁定：保持现行 UnknownOrigin 失败关闭（WHAT [005][007][009]），不采纳库草稿"缺标记回退 human"。子范围①：来源解析优先级与逻辑根注册/精确关闭的纯决议抽入 wanxiangli/authority；投影记录、事实编解码、Ledger/Fold 的 durable 写入口留主仓。写集合 `Interaction/Authority/{Run,Origin}.fs(.fsi)`；wanxiangli `src/authority/` |
+| CUT-09 | 来源、逻辑根与关闭权威 | 权威 | DONE | CUT-07 | eng-cut09c-goose（接手 eng-cut09b-goose、eng-cut08c-goose） | 2026-10-21 完成（范围按 cards/CUT-09.md §6 收窄）：逻辑根注册、精确关闭（显式/子工作/持久重放）与来源解析优先级只剩 wanxiangli/authority 0.28.0 一个 owner；Run.fs 与 Fold.fs 的两份手写裁决已删。D-01：UnknownOrigin 失败关闭不变。差分 24,684 次 0 处不同，5 个变异全抓住。入口准入决策拆 CUT-09-a，018 关闭见证拆 CUT-09-b |
+| CUT-09-a | 入口准入决策（ChatAdmission/Intent）的纯裁决 | 权威 | BACKLOG | CUT-09 | — | 2026-10-21 从 CUT-09 拆出：显式 participant 授予 HumanRoot、UnknownOriginWhileActive、claim 来源可准入性、缺物理 id 拒绝；见 cards/CUT-09.md §6 |
+| CUT-09-b | interaction-authority-018 关闭见证精确匹配 | 权威 | BACKLOG | CUT-09, CUT-11 | — | 2026-10-21 从 CUT-09 拆出：五类 ExpectedClosureKind 与 source witness 精确匹配，宿主需先补齐事实；见 cards/CUT-09.md §6 |
 | CUT-10 | 模型路由与精确容量许可 | 执行 | DOING | CUT-07 | eng-cut10-goose | 2026-10-21 认领：子范围①调度器 ABI（协议版本、导出形状、target 解码、同步调用、理论容量查询）抽入 wanxiangli/routing；②容量账本与 provider-step 许可随后。写集合 `OpenCode/Host/ModelRouting.fs(.fsi)` 的 ABI 段、`OpenCode/Host/ModelCapacity/*`；wanxiangli `src/routing/` |
 | CUT-11 | 派发认领与外部效果记账 | 执行 | BACKLOG | CUT-09, CUT-10 | — | — |
 | CUT-12 | 会话关联与执行事实 | 执行 | BACKLOG | CUT-04, CUT-11 | — | — |
@@ -123,7 +125,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | `src/Wanxiangshu/Repository/Programming/Js/DeliveredValues.fs(.fsi)`；wanxiangli `src/workrecord/`→`src/delivery/` | `CUT-06` | `eng-cut06-goose` | `993e93683` / wxl `a8b89a4` | `CUT-06 交付视图格接线合入 master 并更新卡片证据`（2026-10-20 wanxiangli 2564387 / 0.9.0，主仓接线合入） | `已释放` |
 | `src/Wanxiangshu/Execution/Session/{LoopDetector,LoopDetectorSurface}.fs(.fsi)`；wanxiangli `src/degeneration/` | `CUT-30` | `eng-cut06-goose` | `fa08a6100` / wxl `5edd3c7` | `CUT-30 检测算法接线合入 master 并更新卡片证据` | `已释放` |
 | `src/Wanxiangshu/Ablation/Manifest.fs(.fsi)`；wanxiangli `src/ablation/` | `CUT-37` | `eng-cut06b-goose`（接手 eng-cut06-goose） | `6859577a7` / wxl `6013c9a` | `CUT-37 消融 DAG 定律接线合入 master 并更新卡片证据`（2026-10-20 wanxiangli 6013c9a / 0.17.0） | `已释放` |
-| `src/Wanxiangshu/Interaction/Authority/{Run,Origin}.fs(.fsi)`；wanxiangli `src/authority/` | `CUT-09` | `eng-cut09b-goose` | `e93429c61` | `CUT-09 子范围①接线合入 master 并更新卡片证据` | `持有` |
+| `src/Wanxiangshu/Interaction/Authority/{Run,Origin}.fs(.fsi)`；wanxiangli `src/authority/` | `CUT-09` | `eng-cut09c-goose`（接手 eng-cut09b-goose） | `13944a5db` / wxl `351e3c5` | `CUT-09 子范围①接线合入 master 并更新卡片证据`（2026-10-21 已合入） | `已释放` |
 
 ## 两仓集成队列
 

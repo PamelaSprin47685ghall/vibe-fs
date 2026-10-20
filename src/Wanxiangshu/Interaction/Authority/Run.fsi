@@ -63,6 +63,14 @@ module PromptAuthorityRun =
         projection: PromptAuthority.PromptAuthorityProjection ->
             Result<PromptAuthority.PromptAuthorityProjection, string>
 
+    /// Durable replay of `AuthorityLogicalRunClosed`: `Ok None` when there is no
+    /// active run, the closed projection when it names the active run, an error otherwise.
+    val replayLogicalRunClosed:
+        logicalRunId: LogicalRunId ->
+        authorityRoot: AuthorityRootUserMessageId ->
+        projection: PromptAuthority.PromptAuthorityProjection ->
+            Result<PromptAuthority.PromptAuthorityProjection option, string>
+
     val registerClaim:
         claim: PromptAuthority.PromptClaim ->
         projection: PromptAuthority.PromptAuthorityProjection ->

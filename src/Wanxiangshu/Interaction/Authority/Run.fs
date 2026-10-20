@@ -1,8 +1,133 @@
 namespace Wanxiangshu.Interaction.Authority
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+
+/// Typed projection of the stateless `wanxiangli/authority` decision law (CUT-09):
+/// logical-root registration, exact closure and origin precedence. The
+/// projection record, fact codec and durable writes stay here.
+module internal AuthorityLaw =
+
+    type private Law =
+        abstract register: active: obj * requested: obj -> string
+        abstract close: active: obj * last: obj * logicalRunId: string * rootId: string -> string
+
+        abstract closeChildWork:
+            active: obj * activeIsManager: bool * last: obj * logicalRunId: string * rootId: string -> string
+
+        abstract resolveOrigin: input: obj -> obj
+
+    [<Import("Authority", "wanxiangli/authority")>]
+    let private authorityClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : Law = jsNative
+
+    let private law: Law = construct authorityClass
+
+    [<Emit("JSON.stringify($0)")>]
+    let private canonicalJson (value: obj) : string = jsNative
+
+    let private kindLabel (kind: PromptRootAuthorityKind) =
+        match kind with
+        | HumanRoot -> "HumanRoot"
+        | AgentOwnerRoot -> "AgentOwnerRoot"
+
+    let private kindOfLabel (label: string) =
+        match label with
+        | "HumanRoot" -> HumanRoot
+        | "AgentOwnerRoot" -> AgentOwnerRoot
+        | other -> failwithf "wanxiangli/authority returned an unknown root kind %s" other
+
+    /// The library compares roots by exact identifiers; the identity seed enters
+    /// as its canonical JSON (the lossless `toInput` view), so two seeds are the
+    /// same key exactly when they are the same seed.
+    let private root (profile: PromptAuthority.AuthorityExecutionProfile) : obj =
+        createObj
+            [ "sessionId" ==> SessionId.value profile.SessionId
+              "logicalRunId" ==> LogicalRunId.value profile.LogicalRunId
+              "rootId" ==> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+              "kind" ==> kindLabel profile.AuthorityKind
+              "seed" ==> canonicalJson (box (PromptIdentitySeed.toInput profile.IdentitySeed)) ]
+
+    let private optionalRoot (profile: PromptAuthority.AuthorityExecutionProfile option) : obj =
+        match profile with
+        | Some value -> root value
+        | None -> null
+
+    let register active requested =
+        law.register (optionalRoot active, root requested)
+
+    let close active last (logicalRunId: LogicalRunId) (authorityRoot: AuthorityRootUserMessageId) =
+        law.close (
+            optionalRoot active,
+            optionalRoot last,
+            LogicalRunId.value logicalRunId,
+            AuthorityRootUserMessageId.value authorityRoot
+        )
+
+    let closeChildWork
+        (active: PromptAuthority.AuthorityExecutionProfile option)
+        last
+        (logicalRunId: LogicalRunId)
+        (authorityRoot: AuthorityRootUserMessageId)
+        =
+        let activeIsManager =
+            active |> Option.exists (fun profile -> profile.CanonicalRole = Role.Manager)
+
+        law.closeChildWork (
+            optionalRoot active,
+            activeIsManager,
+            optionalRoot last,
+            LogicalRunId.value logicalRunId,
+            AuthorityRootUserMessageId.value authorityRoot
+        )
+
+    let private originView (origin: PromptOrigin) : obj =
+        match origin with
+        | PromptOrigin.AuthorityRoot kind -> createObj [ "kind" ==> "AuthorityRoot"; "root" ==> kindLabel kind ]
+        | PromptOrigin.Continuation _ ->
+            createObj
+                [ "kind" ==> "Continuation"
+                  "continuation" ==> PromptAuthority.originLabel origin ]
+        | PromptOrigin.HostInternal -> createObj [ "kind" ==> "HostInternal" ]
+        | PromptOrigin.UnknownOrigin -> createObj [ "kind" ==> "UnknownOrigin" ]
+
+    let private continuationOfLabel (label: string) : PromptOrigin =
+        PromptAuthority.tryParseContinuationKind label
+        |> Option.map PromptOrigin.Continuation
+        |> Option.defaultWith (fun () -> failwithf "wanxiangli/authority returned an unknown continuation %s" label)
+
+    let private originOfView (view: obj) : PromptOrigin =
+        match unbox<string> view?kind with
+        | "AuthorityRoot" -> PromptOrigin.AuthorityRoot(kindOfLabel (unbox<string> view?root))
+        | "Continuation" -> continuationOfLabel (unbox<string> view?continuation)
+        | "HostInternal" -> PromptOrigin.HostInternal
+        | "UnknownOrigin" -> PromptOrigin.UnknownOrigin
+        | other -> failwithf "wanxiangli/authority returned an unknown origin %s" other
+
+    let resolveOrigin
+        (acceptedContinuation: PromptContinuationKind option)
+        (claimOrigin: PromptOrigin option)
+        (hasPromptKey: bool)
+        (hostCompaction: bool)
+        (activeKind: PromptRootAuthorityKind option)
+        : PromptOrigin =
+        law.resolveOrigin (
+            createObj
+                [ "acceptedContinuation"
+                  ==> (acceptedContinuation
+                       |> Option.map (fun kind -> PromptAuthority.originLabel (PromptOrigin.Continuation kind))
+                       |> Option.toObj)
+                  "claimOrigin" ==> (claimOrigin |> Option.map originView |> Option.toObj)
+                  "hasPromptKey" ==> hasPromptKey
+                  "hostCompaction" ==> hostCompaction
+                  "activeKind" ==> (activeKind |> Option.map kindLabel |> Option.toObj) ]
+        )
+        |> originOfView
 
 /// Pure authority-run lifecycle transitions. Types and identity rules live in
 /// PromptAuthority; this module owns claim / run / projection transitions only.
@@ -118,23 +243,17 @@ module PromptAuthorityRun =
                 (LogicalRunId.value active.LogicalRunId)
                 (LogicalRunId.value requested.LogicalRunId)
 
-    let private isExactDurableRootReplay
-        (active: PromptAuthority.AuthorityExecutionProfile)
-        (requested: PromptAuthority.AuthorityExecutionProfile)
-        =
-        active.SessionId = requested.SessionId
-        && active.AuthorityRootUserMessageId = requested.AuthorityRootUserMessageId
-        && active.AuthorityKind = requested.AuthorityKind
-        && active.IdentitySeed = requested.IdentitySeed
-
     let resolveAuthorityProfile
         (requested: PromptAuthority.AuthorityExecutionProfile)
         (projection: PromptAuthority.PromptAuthorityProjection)
         : Result<PromptAuthority.AuthorityExecutionProfile, AuthorityRegistrationRejection> =
-        match projection.ActiveLogicalRun with
-        | Some active when active = requested || isExactDurableRootReplay active requested -> Ok active
-        | Some active -> Error(ActiveRunIdentityConflict(active, requested))
-        | None -> Ok requested
+        // An exact duplicate root, or a durable replay of the same physical
+        // root, keeps the active run; anything else conflicts (wanxiangli/authority).
+        match projection.ActiveLogicalRun, AuthorityLaw.register projection.ActiveLogicalRun requested with
+        | None, "admit" -> Ok requested
+        | Some active, "replay" -> Ok active
+        | Some active, "conflict" -> Error(ActiveRunIdentityConflict(active, requested))
+        | _, decision -> failwithf "wanxiangli/authority returned an inconsistent registration %s" decision
 
     let registerAuthority
         (profile: PromptAuthority.AuthorityExecutionProfile)
@@ -155,6 +274,30 @@ module PromptAuthorityRun =
                     AcceptedContinuationIds = Map.empty
                     ClaimSequences = PromptAuthority.rootClaimSequences canonical.SessionId projection })
 
+    /// Apply the library's closure decision to the projection. Only `close`
+    /// changes state; a repeated closure is idempotent.
+    let private settleClosure
+        (closeRun:
+            PromptAuthority.AuthorityExecutionProfile -> Result<PromptAuthority.PromptAuthorityProjection, string>)
+        (decision: string)
+        (logicalRunId: LogicalRunId)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : Result<PromptAuthority.PromptAuthorityProjection, string> =
+        match decision, projection.ActiveLogicalRun with
+        | "close", Some active -> closeRun active
+        | "already-closed", None -> Ok projection
+        | "mismatch", Some active ->
+            Error(
+                sprintf
+                    "logical-run close mismatch: active=%s requested=%s"
+                    (LogicalRunId.value active.LogicalRunId)
+                    (LogicalRunId.value logicalRunId)
+            )
+        | "no-authority", None ->
+            Error(sprintf "logical-run close has no matching authority: %s" (LogicalRunId.value logicalRunId))
+        | "not-child-work", Some _ -> Error "child-work closure requires a non-Manager AgentOwnerRoot authority"
+        | _ -> failwithf "wanxiangli/authority returned an inconsistent closure %s" decision
+
     /// Close exactly the active Logical Run named by durable terminal evidence.
     /// Run-scoped continuation resources are discarded; LastAuthorityProfile is
     /// intentionally retained as history but may never substitute for ActiveLogicalRun.
@@ -163,12 +306,7 @@ module PromptAuthorityRun =
         (authorityRoot: AuthorityRootUserMessageId)
         (projection: PromptAuthority.PromptAuthorityProjection)
         : Result<PromptAuthority.PromptAuthorityProjection, string> =
-        let sameRun (profile: PromptAuthority.AuthorityExecutionProfile) =
-            profile.LogicalRunId = logicalRunId
-            && profile.AuthorityRootUserMessageId = authorityRoot
-
-        match projection.ActiveLogicalRun with
-        | Some active when sameRun active ->
+        let closeRun (active: PromptAuthority.AuthorityExecutionProfile) =
             Ok
                 { projection with
                     ActiveLogicalRun = None
@@ -178,29 +316,46 @@ module PromptAuthorityRun =
                         |> Map.filter (fun _ claim -> claim.LogicalRunId.IsNone)
                     AcceptedContinuationIds = Map.empty
                     ClaimSequences = PromptAuthority.rootClaimSequences active.SessionId projection }
-        | None when projection.LastAuthorityProfile |> Option.exists sameRun -> Ok projection
-        | Some active ->
-            Error(
-                sprintf
-                    "logical-run close mismatch: active=%s requested=%s"
-                    (LogicalRunId.value active.LogicalRunId)
-                    (LogicalRunId.value logicalRunId)
-            )
-        | None -> Error(sprintf "logical-run close has no matching authority: %s" (LogicalRunId.value logicalRunId))
+
+        settleClosure
+            closeRun
+            (AuthorityLaw.close projection.ActiveLogicalRun projection.LastAuthorityProfile logicalRunId authorityRoot)
+            logicalRunId
+            projection
 
     let closeCompletedAgentOwnerChildWork
         (logicalRunId: LogicalRunId)
         (authorityRoot: AuthorityRootUserMessageId)
         (projection: PromptAuthority.PromptAuthorityProjection)
         : Result<PromptAuthority.PromptAuthorityProjection, string> =
-        match projection.ActiveLogicalRun with
-        | Some active when
-            active.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-            && active.CanonicalRole <> Role.Manager
-            ->
-            closeAuthority logicalRunId authorityRoot projection
-        | Some _ -> Error "child-work closure requires a non-Manager AgentOwnerRoot authority"
-        | None -> closeAuthority logicalRunId authorityRoot projection
+        match
+            AuthorityLaw.closeChildWork
+                projection.ActiveLogicalRun
+                projection.LastAuthorityProfile
+                logicalRunId
+                authorityRoot
+        with
+        | "not-child-work" when projection.ActiveLogicalRun.IsSome ->
+            Error "child-work closure requires a non-Manager AgentOwnerRoot authority"
+        | _ -> closeAuthority logicalRunId authorityRoot projection
+
+    /// Durable replay of `AuthorityLogicalRunClosed`. The verdict is the same
+    /// exact-run law as `closeAuthority` (wanxiangli/authority); a replayed
+    /// closure with no active run changes nothing, whether or not it names the
+    /// last root, and a closure naming another run is rejected.
+    let replayLogicalRunClosed
+        (logicalRunId: LogicalRunId)
+        (authorityRoot: AuthorityRootUserMessageId)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : Result<PromptAuthority.PromptAuthorityProjection option, string> =
+        match
+            AuthorityLaw.close projection.ActiveLogicalRun projection.LastAuthorityProfile logicalRunId authorityRoot,
+            projection.ActiveLogicalRun
+        with
+        | "close", Some _ -> closeAuthority logicalRunId authorityRoot projection |> Result.map Some
+        | ("already-closed" | "no-authority"), None -> Ok None
+        | "mismatch", Some _ -> Error "AuthorityLogicalRunClosed conflicts with the active logical run"
+        | decision, _ -> failwithf "wanxiangli/authority returned an inconsistent closure %s" decision
 
     /// Register a claim and consume its ClaimSequence.
     ///
@@ -292,23 +447,6 @@ module PromptAuthorityRun =
                         (PromptAuthority.acceptedDispatchKey claim.SessionId claim.PayloadDigest)
                         projection.AcceptedDispatches }
 
-    /// Resolve every origin other than an already-accepted continuation. The
-    /// tuple makes the precedence visible while keeping unknown input fail-closed.
-    let private resolveUnacceptedOrigin
-        (promptKey: PromptKey option)
-        (hostCompaction: bool)
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        : PromptAuthority.PromptOrigin =
-        let pending =
-            promptKey |> Option.bind (fun key -> Map.tryFind key projection.PendingClaims)
-
-        match pending, promptKey, projection.ActiveLogicalRun, hostCompaction with
-        | Some claim, _, _, _ -> claim.Origin
-        | None, _, _, true -> PromptAuthority.PromptOrigin.HostInternal
-        | None, Some _, Some profile, _ when profile.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
-            PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-        | _ -> PromptAuthority.PromptOrigin.UnknownOrigin
-
     /// PROMPT-009 resolution order, evaluated top to bottom:
     ///
     ///   accepted physical message id
@@ -326,6 +464,14 @@ module PromptAuthorityRun =
         (hostCompaction: bool)
         (projection: PromptAuthority.PromptAuthorityProjection)
         : PromptAuthority.PromptOrigin =
-        match Map.tryFind physicalMessageId projection.AcceptedContinuationIds with
-        | Some continuation -> PromptAuthority.PromptOrigin.Continuation continuation
-        | None -> resolveUnacceptedOrigin promptKey hostCompaction projection
+        let pendingOrigin =
+            promptKey
+            |> Option.bind (fun key -> Map.tryFind key projection.PendingClaims)
+            |> Option.map (fun claim -> claim.Origin)
+
+        AuthorityLaw.resolveOrigin
+            (Map.tryFind physicalMessageId projection.AcceptedContinuationIds)
+            pendingOrigin
+            promptKey.IsSome
+            hostCompaction
+            (projection.ActiveLogicalRun |> Option.map (fun profile -> profile.AuthorityKind))

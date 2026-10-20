@@ -121,21 +121,14 @@ module PromptFactFold =
         let currentAuthority =
             authorityOf payload.SessionId |> Option.defaultValue PromptAuthorityLedger.empty
 
-        match currentAuthority.ActiveLogicalRun with
-        | None -> Ok []
-        | Some active when
-            active.LogicalRunId = payload.LogicalRunId
-            && active.AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-            ->
-            PromptAuthorityRun.closeAuthority payload.LogicalRunId payload.AuthorityRootUserMessageId currentAuthority
-            |> Result.map (fun closed ->
-                [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, closed) ])
-            |> Result.mapError PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected
-        | Some _ ->
-            Error(
-                PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected
-                    "AuthorityLogicalRunClosed conflicts with the active logical run"
-            )
+        PromptAuthorityRun.replayLogicalRunClosed
+            payload.LogicalRunId
+            payload.AuthorityRootUserMessageId
+            currentAuthority
+        |> Result.map (function
+            | Some closed -> [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, closed) ]
+            | None -> [])
+        |> Result.mapError PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected
 
     let private appendQuestionAsked
         (current: PromptAuthority.PromptAuthorityProjection)
