@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Repository.Investigation.WarmStart
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
 /// AGENT-032 neutral repository-orientation DTO. Infrastructure-owned Semble hits
@@ -25,65 +27,83 @@ type RepositoryWarmStartSearch =
 [<RequireQualifiedAccess>]
 module RepositoryWarmStartPrompt =
 
+    /// The `wanxiangli/warm-start` owner (CUT-29 ①) of the warm-start law:
+    /// keyword normalization, per-keyword ranking, ordinal merge, stable
+    /// de-duplication, the total cap and whole-entry byte budgeting. This host
+    /// keeps only the TOML rendering and its byte measure.
+    type private WarmStartLawLibrary =
+        abstract maxKeywords: int
+        abstract topKPerKeyword: int
+        abstract maxHintsTotal: int
+        abstract maxWarmStartBytes: int
+        abstract isDirectConsumer: role: string -> bool
+        abstract normalizeKeywords: raw: string -> string array
+        abstract rankHits: ordinal: int * hits: obj array -> obj array
+        abstract select: searches: obj array -> obj
+        abstract fit: count: int * initialOmitted: int * measure: Func<int, int, int> * budget: int -> obj
+
+    [<Import("WarmStartLaw", "wanxiangli/warm-start")>]
+    let private warmStartLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : WarmStartLawLibrary = jsNative
+
+    [<Emit("$0[$1]")>]
+    let private field (value: obj) (name: string) : obj = jsNative
+
+    let private law = construct warmStartLawClass
+
     let ChargeEnvelope = "lifecycle/warm-start/charge-envelope"
     let Appendix = "lifecycle/warm-start/appendix"
 
-    let MaxKeywords = 8
-    let TopKPerKeyword = 4
-    let MaxHintsTotal = 24
-    let MaxWarmStartBytes = 64 * 1024
+    let MaxKeywords = law.maxKeywords
+    let TopKPerKeyword = law.topKPerKeyword
+    let MaxHintsTotal = law.maxHintsTotal
+    let MaxWarmStartBytes = law.maxWarmStartBytes
 
-    let isDirectConsumer (role: Role) =
-        match role with
-        | Role.Engineer
-        | Role.DevOps -> true
-        | _ -> false
-
-    /// Newline normalization + trim + blank removal + stable exact dedupe.
-    /// Exact means case-sensitive by design.
-    let private collectKeywordItem acc seen index (items: string array) =
-        let item = items.[index].Trim()
-
-        if item = "" || Set.contains item seen then
-            acc, seen
-        else
-            item :: acc, Set.add item seen
-
-    let private collectKeywords (items: string array) =
-        let rec loop acc seen index =
-            if index >= items.Length || List.length acc >= MaxKeywords then
-                List.rev acc
-            else
-                let nextAcc, nextSeen = collectKeywordItem acc seen index items
-                loop nextAcc nextSeen (index + 1)
-
-        loop [] Set.empty 0
+    let isDirectConsumer (role: Role) = law.isDirectConsumer (Roles.roleLabel role)
 
     let normalizeKeywords (raw: string) : string list =
-        if String.IsNullOrWhiteSpace raw then
-            []
-        else
-            raw
-            |> LlmFacing.normalizeNewlines
-            |> fun normalized -> normalized.Split '\n'
-            |> collectKeywords
+        law.normalizeKeywords raw |> List.ofArray
 
-    let private hintIdentity (hint: RepositoryWarmStartHint) =
-        hint.FilePath, hint.StartLine, hint.EndLine, hint.Content
+    /// The law ranks hits by reference; the host stamps its neutral DTO.
+    let rankHits (ordinal: int) (hits: 'hit list) (toHint: int -> int -> 'hit -> RepositoryWarmStartHint) =
+        law.rankHits (ordinal, hits |> List.map box |> Array.ofList)
+        |> Array.map (fun ranked ->
+            toHint
+                (unbox<int> (field ranked "keywordOrdinal"))
+                (unbox<int> (field ranked "localRank"))
+                (unbox<'hit> (field ranked "hit")))
+        |> List.ofArray
 
-    let stableDedupeHints (hints: RepositoryWarmStartHint list) : RepositoryWarmStartHint list =
-        hints
-        |> List.fold
-            (fun (acc, seen) head ->
-                let key = hintIdentity head
+    let private identityView (hint: RepositoryWarmStartHint) : obj =
+        createObj
+            [ "filePath" ==> hint.FilePath
+              "startLine" ==> hint.StartLine
+              "endLine" ==> hint.EndLine
+              "content" ==> hint.Content
+              "hint" ==> hint ]
 
-                if Set.contains key seen then
-                    acc, seen
-                else
-                    head :: acc, Set.add key seen)
-            ([], Set.empty)
-        |> fst
-        |> List.rev
+    let private searchView (search: RepositoryWarmStartSearch) : obj =
+        createObj
+            [ "ordinal" ==> search.Ordinal
+              "hints" ==> (search.Hints |> List.map identityView |> Array.ofList)
+              "search" ==> search ]
+
+    let private selected (searches: RepositoryWarmStartSearch list) =
+        let selection = law.select (searches |> List.map searchView |> Array.ofList)
+
+        let ordered =
+            unbox<obj array> (field selection "searches")
+            |> Array.map (fun view -> unbox<RepositoryWarmStartSearch> (field view "search"))
+            |> List.ofArray
+
+        let hints =
+            unbox<obj array> (field selection "hints")
+            |> Array.map (fun view -> unbox<RepositoryWarmStartHint> (field view "hint"))
+            |> List.ofArray
+
+        ordered, hints, unbox<int> (field selection "omitted")
 
     let private renderSearch (search: RepositoryWarmStartSearch) =
         LlmFacing.Data.tableArray
@@ -119,41 +139,33 @@ module RepositoryWarmStartPrompt =
         LlmFacing.instructions instructions
         |> LlmFacing.withData (bodyBlocks searches hints omitted)
 
-    let rec private fitToBudget build fallback kept omitted =
-        let candidate = build kept omitted
+    /// Whole entries only: the law picks how many hints fit the byte budget as
+    /// measured on this host's rendering; when even none fit, `fallback`.
+    let private fitted build fallback (hints: RepositoryWarmStartHint list) initialOmitted =
+        let measure =
+            Func<int, int, int>(fun kept omitted ->
+                build (List.truncate kept hints) omitted |> LlmFacing.render |> LlmFacing.byteCount)
 
-        if candidate |> LlmFacing.render |> LlmFacing.byteCount <= MaxWarmStartBytes then
-            candidate
+        let verdict =
+            law.fit (List.length hints, initialOmitted, measure, MaxWarmStartBytes)
+
+        if isNull verdict then
+            fallback
         else
-            trimOverBudget build fallback kept omitted
-
-    and private trimOverBudget build fallback kept omitted =
-        match List.rev kept with
-        | [] -> fallback
-        | _ :: restRev -> fitToBudget build fallback (List.rev restRev) (omitted + 1)
-
-    let private orderedHintsAndOmitted searches =
-        let orderedHints =
-            searches
-            |> List.collect (fun search -> search.Hints)
-            |> stableDedupeHints
-            |> List.truncate MaxHintsTotal
-
-        let originalCount = searches |> List.sumBy (fun search -> List.length search.Hints)
-        orderedHints, max 0 (originalCount - List.length orderedHints)
+            build (List.truncate (unbox<int> (field verdict "kept")) hints) (unbox<int> (field verdict "omitted"))
 
     let buildDocument
         (instructions: string list)
         (fallbackInstruction: string)
         (searches: RepositoryWarmStartSearch list)
         : LlmFacing.Document =
-        let orderedHints, initialOmitted = orderedHintsAndOmitted searches
+        let ordered, hints, omitted = selected searches
 
-        fitToBudget
-            (fun kept omitted -> document instructions searches kept omitted)
+        fitted
+            (fun kept omitted -> document instructions ordered kept omitted)
             (LlmFacing.instruction fallbackInstruction)
-            orderedHints
-            initialOmitted
+            hints
+            omitted
 
     /// Render while preserving whole TOML entries. If the authority header alone
     /// exceeds the warm-start byte budget, fail open to the raw charge rather than
@@ -168,13 +180,13 @@ module RepositoryWarmStartPrompt =
         (baseDocument: LlmFacing.Document)
         (searches: RepositoryWarmStartSearch list)
         : LlmFacing.Document =
-        let orderedHints, initialOmitted = orderedHintsAndOmitted searches
+        let ordered, hints, omitted = selected searches
 
         let appendix =
-            fitToBudget
-                (fun kept omitted -> document appendixInstructions searches kept omitted)
+            fitted
+                (fun kept omitted -> document appendixInstructions ordered kept omitted)
                 LlmFacing.empty
-                orderedHints
-                initialOmitted
+                hints
+                omitted
 
         LlmFacing.combine [ baseDocument; appendix ]
