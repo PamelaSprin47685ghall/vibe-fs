@@ -1,4 +1,4 @@
-// The programming-surface base class. Every capability is reached through this.*: no module to import, no extra namespace.
+// The programming-surface base class. Access the listed members and namespaces through this; no module import is needed.
 // This file is pseudocode — a method body only states what the host does; the host owns the real implementation.
 {{baseClassCallable}}
 

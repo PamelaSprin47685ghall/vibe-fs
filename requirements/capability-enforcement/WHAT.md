@@ -106,9 +106,13 @@ DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, 
 - `fork`：仅允许 Manager 创建新的独立 Engineer 子会话；严禁 fork DevOps 或 fork 其他角色。
 - `resume`：用于 Manager 续做既有固定 DevOps 道路；同一道路同时至多允许一个活跃的 DevOps 工作单元。DevOps 忙时明确拒绝新的 assignment，不将新任务伪装为 nudge，亦不得通过新建操作员绕过忙碌状态。
 
-## [025] Manager 评审专用只读工具固定可见与当前事实收口
+## [025] Manager 程序入口常开，仓库访问仅限 Review
 
-Manager 评审专用只读工具（`todowrite-for-manager`）在模型 Schema 中固定可见；运行时由当前事实收口准入门禁：已接纳评审且仍有 findings、退任冻结或存在清理阻塞时拒绝执行。已接纳空集 findings 的末任 Manager 保留只读收尾能力，可读、清理并收口，但不得开新工作。已退役的直接文件工具（`read`/`grep`/`glob` 等）不进入 Host 工具目录且由默认 `* = deny` 与角色门禁拒绝；`todowrite-for-engineer`/`todowrite-for-devops` 对 Manager 的跨角色绕路调用始终拒绝。工具名到既有语义权限的映射必须维护在唯一目录中，禁止按后缀或启发式规则推测授权。
+`todowrite-for-manager` 对已确立身份的 Manager 固定可见，不因评审阶段、末任或清理窗口而整票拒绝。它仍遵守身份、取消、等待及存储等独立边界。仓库访问仅经 `this.reviewOnly.cat/stat/ls/rg` 暴露，无顶层别名；每次操作在 Host 访问仓库前核验当前任期仍活跃、评审尚未接纳、无清理阻塞且未冻结。末任不例外；保存对象或方法引用、挂起恢复与插件重开均不得复用过期授权。拒绝使用稳定机器码 `REVIEW_ONLY`，且不读取目标文件、不启动 rg。
+
+`where/whereAll` 只处理已有文本，保持顶层；普通计算、view 声明和生命周期成员不受 Review 阶段整票限制。委托、收拢、交付等操作仍各守自身权限。其他角色保持原有直接成员和既定权限，共用底层文件实现，不另设 Manager 文件引擎。基类、描述与示例使用同一命名空间，评审前后保持同一工具定义。
+
+已退役的直接文件工具不进入 Host 目录；Manager 不得借用 `todowrite-for-engineer/devops` 绕过能力边界。
 
 ## [026] Review 接纳前禁止向固定 DevOps 派工
 

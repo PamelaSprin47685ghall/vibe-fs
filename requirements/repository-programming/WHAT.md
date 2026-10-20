@@ -136,7 +136,7 @@ ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联
 
 直接文件系统宿主工具（`read`/`write`/`edit`/`glob`/`grep`/`patch`）及独立插件 `mv`/`rm` `ToolSpec` 已整体退役；`Read`/`Write`/`Edit`/`Glob`/`Grep`/`Move`/`Remove` 权限不再投影独立宿主工具名，而是统一通过生成的 `todowrite-for-engineer` 与 `todowrite-for-devops` 投影 `cat`/`where`/`whereAll`/`write`/`mkdir`/`ls`/`stat`/`mv`/`rm` 成员，共享路径边界、UTF-8 校验、符号链接防护和 As-Is 逐笔落盘写语义（每笔写即原子落盘、跨笔不回滚、失败保留已落盘改动）。
 
-Manager 的 `todowrite-for-manager` 只读文件能力为 Read/Glob，并持有委托原语 Fork/Join；能力过滤同样到达真实 API；评审及当前事实准入遵循 capability-enforcement-025，不因生成工具而取得修改或执行权。
+Manager 的 `todowrite-for-manager` 程序入口始终按角色准入；仓库访问仅经 `this.reviewOnly.cat/stat/ls/rg`，由 Host 逐次检查当前 Review 窗口，无顶层别名。`where/whereAll` 为纯文本操作，保持顶层；委托及生命周期成员各守权限。生成描述、示例、成员目录与真实 API 同步命名空间，规则遵循 capability-enforcement-025；不因此取得修改或执行权。
 
 ## [028] programPromise 暴露与 deadline 可重置
 

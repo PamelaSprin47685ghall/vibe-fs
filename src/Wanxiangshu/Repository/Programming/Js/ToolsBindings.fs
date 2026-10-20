@@ -36,7 +36,7 @@ module JsToolsBindings =
     [<Emit("$0 === undefined || $0 === null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
-    let private failureObj (failure: JsFailure) : obj =
+    let internal failureObj (failure: JsFailure) : obj =
         createObj
             [ "ok" ==> false
               "code" ==> JsFailure.code failure
@@ -1040,6 +1040,13 @@ module JsToolsBindings =
     /// returns its receipt text; `join()` waits for this session's children.
     /// Without an installed delegation host the members refuse with
     /// DELEGATION_UNAVAILABLE instead of pretending.
+    let private makeCommissionMember (host: JsDelegationHost option) =
+        "commission"
+        ==> fun (payload: obj) ->
+            match host with
+            | Some delegation -> box (delegation.Fork payload)
+            | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+
     let private makeForkMember (host: JsDelegationHost option) =
         "fork"
         ==> fun (payload: obj) ->
@@ -1122,6 +1129,9 @@ module JsToolsBindings =
               if Set.contains JsCapability.Exec capabilities then
                   makeCallMember callHost parkState
 
+              if Set.contains JsCapability.Commission capabilities then
+                  makeCommissionMember delegationHost
+
               if Set.contains JsCapability.Fork capabilities then
                   makeForkMember delegationHost
 
@@ -1200,3 +1210,18 @@ module JsToolsBindings =
             callHost
             delegationHost
             askInvoke
+
+module JsReviewOnly =
+    let scopeReviewOnly (check: unit -> Task<bool>) (api: obj) : obj =
+        let guarded name =
+            let invoke: obj = api?(name)
+            name ==> fun (argument: obj) ->
+                task {
+                    let! allowed = check ()
+                    if not allowed then return JsToolsBindings.failureObj JsFailure.ReviewOnly
+                    else return! unbox<Task<obj>> (emitJsExpr (invoke, argument) "Promise.resolve($0($1))")
+                }
+        let review = [ "cat"; "stat"; "ls"; "rg" ] |> List.map guarded |> createObj
+        for name in [ "cat"; "stat"; "ls"; "rg" ] do emitJsExpr (api, name) "delete $0[$1]" |> ignore
+        api?reviewOnly <- review
+        api

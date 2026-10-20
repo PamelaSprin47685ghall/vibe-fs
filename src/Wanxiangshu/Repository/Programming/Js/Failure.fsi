@@ -52,6 +52,7 @@ type JsFailure =
     | ResultTooLarge of string option
     | InvalidReturnValue
     | ReadOnlyMutationRejected
+    | ReviewOnly
     | FileChanged of string
     | TransactionPrepareFailed
     | TransactionCommitFailed

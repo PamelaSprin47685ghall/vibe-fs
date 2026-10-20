@@ -32,6 +32,9 @@ module JsCanonicalDescription =
         val ReadRules: string = "tool/js-program/rules-read"
 
         [<Literal>]
+        val ReviewOnlyRules: string = "tool/js-program/review-only"
+
+        [<Literal>]
         val Recipes: string = "tool/js-program/recipes"
 
         [<Literal>]
@@ -110,6 +113,9 @@ module JsCanonicalDescription =
         val BaseClassRead: string = "tool/js-program/base-class-read"
 
         [<Literal>]
+        val BaseClassAnchors: string = "tool/js-program/base-class-anchors"
+
+        [<Literal>]
         val BaseClassGlob: string = "tool/js-program/base-class-glob"
 
         [<Literal>]
@@ -160,6 +166,7 @@ module JsCanonicalDescription =
 
           VerbCreate: string
           ReadRules: string
+          ReviewOnlyRules: string
           Recipes: string
 
           WriteRules: string
@@ -185,6 +192,7 @@ module JsCanonicalDescription =
           BaseClass: string
           BaseClassCallable: string
           BaseClassRead: string
+          BaseClassAnchors: string
           BaseClassGlob: string
           BaseClassGrep: string
           BaseClassWrite: string
@@ -202,6 +210,7 @@ module JsCanonicalDescription =
     val has: capabilities: Set<JsCapability> -> capability: JsCapability -> bool
     val publicBaseClass: prose: Prose -> capabilities: Set<JsCapability> -> string
     val runtimeBaseClass: prose: Prose -> capabilities: Set<JsCapability> -> string
+    val runtimeBaseClassForRole: roleName: string -> prose: Prose -> capabilities: Set<JsCapability> -> string
     val contract: prose: Prose -> toolName: string -> capabilities: Set<JsCapability> -> string
     val rules: prose: Prose -> capabilities: Set<JsCapability> -> string
     val ultraExample: prose: Prose -> roleName: string -> capabilities: Set<JsCapability> -> JsExample option

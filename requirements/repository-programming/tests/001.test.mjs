@@ -107,7 +107,7 @@ test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_ca
   assert.equal(isNone(orchestrator), false, 'Orchestrator gets the delegation-only surface')
   assert.deepEqual(
     orchestrator.members.map((fragment) => fragment.memberName),
-    ['fork', 'dag', 'join', 'horizon', 'advisor'],
+    ['commission', 'join', 'horizon', 'advisor'],
   )
 })
 
@@ -122,7 +122,8 @@ test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_pe
       const expected = fsPerms
         .flatMap((name) => MEMBERS_BY_PERMISSION[name])
         .sort((left, right) => MEMBER_ORDER.indexOf(left) - MEMBER_ORDER.indexOf(right))
-      assert.deepEqual(memberNames(result), expected, `${role} member set`)
+      const scoped = expected.map(name => role.toLowerCase() === 'manager' && ['cat', 'stat', 'ls', 'rg'].includes(name) ? 'reviewOnly.' + name : name)
+      assert.deepEqual(memberNames(result), scoped, `${role} member set`)
     }
   }
 })

@@ -79,6 +79,23 @@ module AnchorSurface =
                     { PrefixUntil = int (unbox<float> prefix)
                       ThenMap = pairs |> List.sortBy fst })
 
+    let parseReportMapping (mapping: obj) : Result<AnchorViewDeclaration, JsFailure> =
+        parseDeclaration (createObj [ "prefixUntil" ==> 0; "thenMap" ==> mapping ])
+
+    let reportMaterial (sessionId: string) (mapping: obj) : Result<(int * string) list, JsFailure> =
+        parseReportMapping mapping
+        |> Result.map (fun declaration ->
+            let numberOf = AnchorLedger.numberMessage sessionId
+            let messages =
+                AnchorLedger.context sessionId
+                |> List.map (fun (id, text) ->
+                    { AnchorView.AnchorMessage.Id = id
+                      AnchorView.AnchorMessage.Text = text
+                      AnchorView.AnchorMessage.Raw = null })
+            let entries, _ =
+                AnchorView.generate numberOf (fun _ -> 0) (AnchorLedger.replacements sessionId) declaration messages
+            AnchorView.material numberOf entries)
+
     let private declarationValue (declaration: AnchorViewDeclaration) =
         createObj
             [ "prefixUntil" ==> declaration.PrefixUntil

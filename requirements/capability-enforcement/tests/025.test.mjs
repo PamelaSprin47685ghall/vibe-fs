@@ -209,296 +209,212 @@ test('WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_i
   assert.match(en, /do not start new work/)
 })
 
-test('WHAT[capability-enforcement-025] P11_plugin_reopen_evaluates_durable_incumbency_facts_without_resetting_assessment', async () => {
-  await withRestartablePlugin(async (start, _directory, { stop, withRuntime }) => {
-    const sessionAccepted = 'ses-p11-accepted'
-    const sessionUnaccepted = 'ses-p11-unaccepted'
+const execute = async (hooks, sessionID, body, callID = 'call-review') => parseToml(String(
+  await hooks.tool['todowrite-for-manager'].execute(
+    typeof body === 'string' ? { program: 'class Js extends JsProgram { async run() { ' + body + ' } }' } : body,
+    { sessionID, agent: 'manager', callID, messageID: 'msg-' + callID },
+  ),
+))
 
-    const firstPlugin = await start()
+const seed = async (runtime, sessionID, directory) => {
+  await acceptAuthorityRoot(runtime, sessionID, 'manager')
+  await openIncumbency(runtime, sessionID)
+  writeFileSync(join(directory, 'evidence.txt'), 'review evidence', 'utf8')
+}
 
-    await withRuntime(async (runtime) => {
-      await acceptAuthorityRoot(runtime, sessionAccepted, 'manager')
-      await acceptAuthorityRoot(runtime, sessionUnaccepted, 'manager')
-      // sessionAccepted: 活跃任期且已接纳评审
-      await openIncumbency(runtime, sessionAccepted)
-      await injectAcceptedAssessment(runtime, sessionAccepted)
+const reads = [
+  "return await this.reviewOnly.cat('evidence.txt');",
+  "return await this.reviewOnly.stat('evidence.txt');",
+  "return await this.reviewOnly.ls('.');",
+  "return await this.reviewOnly.rg(['review', 'evidence.txt']);",
+]
 
-      // sessionUnaccepted: 活跃任期但未接纳评审
-      await openIncumbency(runtime, sessionUnaccepted)
+test('WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed', async () => {
+  await withRestartablePlugin(async (start, directory, { stop, withRuntime }) => {
+    const sessionID = 'ses-reopen-review'
+    const first = await start()
+    await withRuntime(async runtime => {
+      await seed(runtime, sessionID, directory)
+      await injectAcceptedAssessment(runtime, sessionID)
     })
-
-    // 同进程关闭并重开插件，读取同一份持久事实；不声称杀进程或 Host compaction。
-    await stop(firstPlugin)
-    const restartedPlugin = await start()
-
-    // 重启后验证已接纳评审的 session：todowrite-for-manager 专用只读工具仍严格拒绝，不重置评审
-    const acceptedBeforeOutput = {
-      args: { program: "class Js extends JsProgram { async run() { return await this.cat('src/Model.fs'); } }", contract: 'do-not-use-except-for-review' },
-    }
-    await assert.rejects(
-      async () => {
-        await restartedPlugin['tool.execute.before'](
-          { tool: 'todowrite-for-manager', sessionID: sessionAccepted, callID: 'call-p11-acc' },
-          acceptedBeforeOutput,
-        )
-      },
-      /not permitted under current manager capability facts/i,
-      'todowrite-for-manager must remain denied after restart when assessment was already accepted',
-    )
-
-    // 重启后未接纳评审的 session 仍准入，after 恢复原始参数。
-    const unacceptedBeforeOutput = {
-      args: { program: "class Js extends JsProgram { async run() { return await this.cat('src/Model.fs'); } }", contract: 'do-not-use-except-for-review' },
-    }
-    const originalArgs = unacceptedBeforeOutput.args
-    const expectedArgs = { ...originalArgs }
-    await restartedPlugin['tool.execute.before'](
-      { tool: 'todowrite-for-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc' },
-      unacceptedBeforeOutput,
-    )
-    assert.equal(unacceptedBeforeOutput.args, originalArgs)
-    assert.deepEqual(originalArgs, { program: expectedArgs.program })
-    await restartedPlugin['tool.execute.after'](
-      { tool: 'todowrite-for-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc', args: originalArgs },
-      { title: 'todowrite-for-manager', output: '', metadata: {} },
-    )
-    assert.deepEqual(originalArgs, expectedArgs, 'after reopening, after must restore the public contract hint')
-    assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
-
-    await stop(restartedPlugin)
+    await stop(first)
+    const reopened = await start()
+    assert.equal((await execute(reopened, sessionID, 'return 7;')).data, 7)
+    for (const body of reads) assert.equal((await execute(reopened, sessionID, body)).code, 'REVIEW_ONLY')
+    await stop(reopened)
   })
 })
 
-test('WHAT[capability-enforcement-025] P12_current_fact_classifier_distinguishes_accepted_and_unaccepted_assessment', () => {
-  // 两个不同任期状态的 facts 独立评估：
-  // 任期 1：活跃但已接纳评审
-  const incumbency1Facts = managerFacts(true, true, false, undefined)
-  // 任期 2：合法新任期，活跃且未接纳评审
-  const incumbency2Facts = managerFacts(true, false, false, undefined)
-
-  // 任期 1 专用只读能力被封禁
-  assert.equal(isAllowedForManagerFacts(incumbency1Facts, 'Read'), false)
-  assert.equal(isAllowedForManagerFacts(incumbency1Facts, 'Glob'), false)
-  assert.equal(isAllowedForManagerFacts(incumbency1Facts, 'Grep'), false)
-
-  // 任期 2（新任期）不继承任期 1 的已评审限制，专用只读能力正常开启
-  assert.equal(isAllowedForManagerFacts(incumbency2Facts, 'Read'), true)
-  assert.equal(isAllowedForManagerFacts(incumbency2Facts, 'Glob'), true)
-  assert.equal(isAllowedForManagerFacts(incumbency2Facts, 'Grep'), true)
-
-  // 两个任期的调用授权互不借用，也不把旧 assessment 错封新任期
-})
-
-test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_is_rejected_at_execution', async () => {
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const sessionID = 'ses-p13'
-    const callID = 'call-p13'
-    // 权威确立与任期建立：先确立 Manager 权威根，再打开 AuditPending 任期
-    await acceptAuthorityRoot(runtime, sessionID, 'manager')
-    await openIncumbency(runtime, sessionID)
-
-    const beforeOutput = {
-      args: {
-        program: "class Js extends JsProgram { async run() { return await this.cat('src/App.fs'); } }",
-        contract: 'do-not-use-except-for-review',
-      },
+test('WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review', async () => {
+  await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
+    const sessionID = 'ses-each-operation'
+    await seed(runtime, sessionID, directory)
+    for (const [index, body] of reads.entries()) {
+      const result = await execute(hooks, sessionID, body, 'positive-' + index)
+      assert.equal(result.code, undefined, JSON.stringify(result))
+      assert.ok(Object.hasOwn(result, 'data'))
     }
-
-    const originalArgs = beforeOutput.args
-    const expectedArgs = { ...originalArgs }
-
-    // Step 1: before hook 检查通过并放行，隐藏执行视图的提示字段。
-    await hooks['tool.execute.before'](
-      { tool: 'todowrite-for-manager', sessionID, callID },
-      beforeOutput,
-    )
-    assert.equal(beforeOutput.args, originalArgs)
-    assert.deepEqual(originalArgs, { program: expectedArgs.program })
-
-    // Step 2: 在执行前注入已接纳评审事实（AcceptedAssessment）
+    assert.equal((await execute(hooks, sessionID, reads[0])).data, 'review evidence')
+    const input = { args: { program: 'class Js extends JsProgram { async run() { return 7; } }' } }
+    await hooks['tool.execute.before']({ tool: MANAGER_REVIEW_TOOL, sessionID, callID: 'before-review' }, input)
+    await hooks['tool.execute.after']({ tool: MANAGER_REVIEW_TOOL, sessionID, callID: 'before-review', args: input.args }, { output: '', metadata: {} })
     await injectAcceptedAssessment(runtime, sessionID)
-
-    // Step 3: 真实运行入口重新检查当前事实；文件读取次数还未在此观察。
-    const execResult = await hooks.tool['todowrite-for-manager'].execute(
-      beforeOutput.args,
-      { sessionID, agent: 'manager' },
-    )
-    assert.match(
-      String(execResult),
-      /当前不可用|not available right now|denied-task-state/i,
-      'ToolRegistry gate must reject execution due to accepted assessment facts',
-    )
-    assert.doesNotMatch(
-      String(execResult),
-      /权威确立之前|authority is established/i,
-      'Rejection must not be due to unestablished authority',
-    )
-    assert.equal(beforeOutput.args, originalArgs)
-    assert.deepEqual(originalArgs, { program: expectedArgs.program })
-    await hooks['tool.execute.after'](
-      { tool: 'todowrite-for-manager', sessionID, callID, args: originalArgs },
-      { title: 'todowrite-for-manager', output: execResult, metadata: {} },
-    )
-    assert.deepEqual(originalArgs, expectedArgs, 'after execution denial, after must restore the original public arguments')
-    assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
+    await hooks['tool.execute.before']({ tool: MANAGER_REVIEW_TOOL, sessionID, callID: 'after-review' }, input)
+    assert.equal((await execute(hooks, sessionID, 'return 7;')).data, 7)
+    for (const body of reads) assert.equal((await execute(hooks, sessionID, body)).code, 'REVIEW_ONLY')
+    const pure = await execute(hooks, sessionID, "return this.whereAll('a b', 'b');")
+    assert.deepEqual(pure.data, [[2, 3]])
+    const scope = await execute(hooks, sessionID, "return { cat: typeof this.cat, raw: typeof this._api.cat, stat: typeof this.stat, ls: typeof this.ls, rg: typeof this.rg, review: typeof this.reviewOnly.cat };")
+    assert.deepEqual(scope.data, { cat: 'undefined', raw: 'undefined', stat: 'undefined', ls: 'undefined', rg: 'undefined', review: 'function' })
+    for (const name of ['cat', 'stat', 'ls', 'rg']) {
+      assert.equal((await execute(hooks, sessionID, 'return await this.' + name + "('evidence.txt');")).code, 'PROGRAM_FAILED')
+    }
   })
 })
 
-test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_hook_while_subsequent_calls_are_denied', async () => {
-  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    const sessionID = 'ses-p14'
-    const call1ID = 'call-p14-1'
-    const call2ID = 'call-p14-2'
-    await acceptAuthorityRoot(runtime, sessionID, 'manager')
-    await openIncumbency(runtime, sessionID)
-    mkdirSync(join(directory, 'src'), { recursive: true })
-    writeFileSync(join(directory, 'src/App.fs'), 'review evidence', 'utf8')
-
-    // Call 1 启动并在 Review 接纳前获得最终准入与执行
-    const call1Output = {
-      args: {
-        program: "class Js extends JsProgram { async run() { const text = await this.cat('src/App.fs'); return { text }; } }",
-        contract: 'do-not-use-except-for-review',
-      },
+test('WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park', async () => {
+  await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
+    const sessionID = 'ses-park-review'
+    await seed(runtime, sessionID, directory)
+    for (const [index, saved] of [
+      'const saved = this.reviewOnly; const read = () => saved.cat("evidence.txt");',
+      'const read = this.reviewOnly.cat.bind(this.reviewOnly, "evidence.txt");',
+      'const raw = this._api.reviewOnly.cat; const read = async () => { const result = await raw("evidence.txt"); if (!result.ok) return result.code; return result.text; };',
+    ].entries()) {
+      const paused = await execute(hooks, sessionID, saved + ' await this.park({ ready: true }); return await read();', 'park-' + index)
+      assert.ok(paused.handle)
+      if (index === 0) await injectAcceptedAssessment(runtime, sessionID)
+      const result = await execute(hooks, sessionID, { unpark: { handle: paused.handle, value: null } }, 'resume-' + index)
+      if (index === 2) assert.equal(result.data, 'REVIEW_ONLY')
+      else assert.equal(result.code, 'REVIEW_ONLY')
     }
-    const originalArgs = call1Output.args
-    const expectedArgs = { ...originalArgs }
-    await hooks['tool.execute.before'](
-      { tool: 'todowrite-for-manager', sessionID, callID: call1ID },
-      call1Output,
-    )
-    const call1ExecResult = await hooks.tool['todowrite-for-manager'].execute(
-      call1Output.args,
-      { sessionID, agent: 'manager', callID: call1ID, messageID: 'msg-p14' },
-    )
-    assert.deepEqual(parseToml(String(call1ExecResult)).data, { text: 'review evidence' })
-    assert.equal(
-      call1Output.args.contract,
-      undefined,
-      'the execution view keeps contract hidden until after',
-    )
-
-    // 在 Call 1 获准后，系统接纳 Review
-    await injectAcceptedAssessment(runtime, sessionID)
-
-    // Call 1 的后置回调须恢复原始参数，不受稍后的评审接纳影响。
-    await hooks['tool.execute.after'](
-      { tool: 'todowrite-for-manager', sessionID, callID: call1ID, args: call1Output.args },
-      { title: 'todowrite-for-manager', output: call1ExecResult, metadata: {} },
-    )
-    assert.equal(
-      call1Output.args.contract,
-      'do-not-use-except-for-review',
-      'the after callback must preserve the restored contract',
-    )
-    assert.equal(call1Output.args, originalArgs)
-    assert.deepEqual(originalArgs, expectedArgs)
-    assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
-
-    // 后续新调用（Call 2）发起，在入口即被拒绝
-    const call2Output = {
-      args: {
-        program: "class Js extends JsProgram { async run() { return await this.cat('src/App.fs'); } }",
-        contract: 'do-not-use-except-for-review',
-      },
-    }
-    await assert.rejects(
-      async () => {
-        await hooks['tool.execute.before'](
-          { tool: 'todowrite-for-manager', sessionID, callID: call2ID },
-          call2Output,
-        )
-      },
-      /not permitted under current manager capability facts/i,
-      'Subsequent call must be rejected after review acceptance',
-    )
-  })
-})
-test('WHAT[capability-enforcement-025] an admitted call reads the file and before-hook denial preserves arguments and journal revision', async () => {
-  const { mkdirSync, realpathSync, writeFileSync } = await import('node:fs')
-  const { join } = await import('node:path')
-  const { parse: parseToml } = await import('smol-toml')
-  const revisionSurface = await import('../../../dist/Persistence/Journal/RevisionSurface.js')
-  const workspaceEventStoreSurface = await import('../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js')
-  const journalSurface = await import('../../../dist/Persistence/Journal/Surface.js')
-  const lifecycleSurface = await import('../../../dist/Mission/Lifecycle/Surface.js')
-  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    const sessionID = 'ses-p15'
-    await acceptAuthorityRoot(runtime, sessionID, 'manager')
-    await openIncumbency(runtime, sessionID)
-    mkdirSync(join(directory, 'src'), { recursive: true })
-    writeFileSync(join(directory, 'src/App.fs'), 'review evidence', 'utf8')
-
-    const program = "class Js extends JsProgram { async run() { const text = await this.cat('src/App.fs'); return { text }; } }"
-    const tool = hooks.tool['todowrite-for-manager']
-
-    // The counter observes this registered tool body. The lifecycle store
-    // observes the durable Reviewed fact the capability gate reads, so a
-    // denial caused by the accepted review is distinguishable from a no-op.
-    let executions = 0
-    const originalExecute = tool.execute.bind(tool)
-    tool.execute = (...callArgs) => {
-      executions += 1
-      return originalExecute(...callArgs)
-    }
-    const revisionOf = () => revisionSurface.revision(runtime.journal)
-    const lifecycleStore = async () => workspaceEventStoreSurface.acquire(await journalSurface.JournalSurface_initializeStateRoot(directory))
-    const reviewOf = async () => lifecycleSurface.workView(await lifecycleStore(), sessionID).reviewed
-
-    // Positive control: before review acceptance the same program drives the
-    // full call chain (before → execute → after). The executed result carries
-    // the file's bytes, and the counter must observe this registered body.
-    const admittedOutput = { args: { program, contract: 'do-not-use-except-for-review' } }
-    await hooks['tool.execute.before'](
-      { tool: 'todowrite-for-manager', sessionID, callID: 'call-p15-control' },
-      admittedOutput,
-    )
-    const controlResult = await tool.execute(
-      admittedOutput.args,
-      { sessionID, agent: 'manager', callID: 'call-p15-control', messageID: 'msg-p15-control' },
-    )
-    assert.deepEqual(
-      parseToml(String(controlResult)).data,
-      { text: 'review evidence' },
-      'positive control: the admitted call really reads the file through the full chain',
-    )
-    await hooks['tool.execute.after'](
-      { tool: 'todowrite-for-manager', sessionID, callID: 'call-p15-control', args: admittedOutput.args },
-      { title: 'todowrite-for-manager', output: controlResult, metadata: {} },
-    )
-    assert.equal(executions, 1, 'positive control: exactly one registered tool call was observed')
-
-    // This scenario exercises the rejecting before hook, not the full Host
-    // invocation. The lifecycle observation is validated by a known commit:
-    // accepting the assessment records a durable Reviewed fact, so it must
-    // be observable here — otherwise "unchanged" in the denial scenario
-    // would be vacuous.
-    assert.equal(await reviewOf(), '', 'observation check: no review is recorded before acceptance')
-    await injectAcceptedAssessment(runtime, sessionID)
-    assert.equal(await reviewOf(), 'Stayed', 'observation check: accepting the assessment records the Reviewed fact')
-    const deniedOutput = { args: { program, contract: 'do-not-use-except-for-review' } }
-    const argsSnapshot = JSON.stringify(deniedOutput.args)
-    const executionsBeforeDenial = executions
-    const reviewBeforeDenial = await reviewOf()
-    const revisionBeforeDenial = revisionOf()
-
-    await assert.rejects(
-      async () => {
-        await hooks['tool.execute.before'](
-          { tool: 'todowrite-for-manager', sessionID, callID: 'call-p15-denied' },
-          deniedOutput,
-        )
-      },
-      /not permitted under current manager capability facts/i,
-    )
-
-    assert.equal(executions, executionsBeforeDenial, 'the rejecting before hook does not call the wrapped tool body')
-    assert.equal(JSON.stringify(deniedOutput.args), argsSnapshot, 'denial does not mutate the caller arguments')
-    assert.equal(await reviewOf(), reviewBeforeDenial, 'the rejecting before hook leaves the observed lifecycle review unchanged')
-    assert.equal(revisionOf(), revisionBeforeDenial, 'the rejecting before hook leaves the observed journal revision unchanged')
   })
 })
 
-test.todo('WHAT[capability-enforcement-025] denial performs zero physical reads and write attempts through the production invocation (GAP-075: investigation 2026-10-03 — the production chain ToolRegistry → JsToolSpec → ToolWorkflow keeps read snapshots internal, and the production ToolRegistry wiring passes no file-access observer, so a generic physical-read observer does not exist. Needed: a read-path observation port on JsToolSpec/ToolWorkflow (or an equivalent production entry) that the test fixture can subscribe to; the execute counter and journal revision in the passing test above remain the closest available proxies)')
+test('WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception', async () => {
+  await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
+    const sessionID = 'ses-final-review'
+    await seed(runtime, sessionID, directory)
+    await injectAcceptedAssessment(runtime, sessionID, 'inc-' + sessionID, 'Promoted')
+    assert.equal((await execute(hooks, sessionID, 'return 7;')).data, 7)
+    for (const body of [
+      "return await this.reviewOnly.cat('../outside');",
+      "return await this.reviewOnly.stat('missing');",
+      "return await this.reviewOnly.ls('missing');",
+      "return await this.reviewOnly.rg(['--invalid-option', 'missing']);",
+    ]) assert.equal((await execute(hooks, sessionID, body)).code, 'REVIEW_ONLY')
+    const paused = await execute(hooks, sessionID, 'await this.park({ done: true }); return 9;')
+    assert.ok(paused.handle)
+    assert.equal((await execute(hooks, sessionID, { unpark: { handle: paused.handle, value: null } })).data, 9)
+  })
+})
 
-test.todo('WHAT[capability-enforcement-025] an in-flight admitted read finishes across review acceptance (GAP-075: requires a controlled causal barrier driving real overlap; the sequential fixture cannot prove concurrency)')
+test('WHAT[capability-enforcement-025] identity and cross-role denial remain independent of Review', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _ids, runtime) => {
+    await acceptAuthorityRoot(runtime, 'ses-no-life', 'manager')
+    assert.equal((await execute(hooks, 'ses-no-life', 'return 7;')).data, 7)
+    assert.equal((await execute(hooks, 'ses-no-life', reads[0])).code, 'REVIEW_ONLY')
+    const unknown = await execute(hooks, 'ses-unknown', 'return 7;')
+    assert.equal(Object.hasOwn(unknown, 'data'), false)
+    const wrongRole = await hooks.tool['todowrite-for-devops'].execute(
+      { program: 'class Js extends JsProgram { async run() { return 7; } }' },
+      { sessionID: 'ses-no-life', agent: 'manager' },
+    )
+    assert.doesNotMatch(String(wrongRole), /data = 7/)
+  })
+})
+
+test('WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg', async () => {
+  const { default: fs } = await import('node:fs')
+  const { default: processes } = await import('node:child_process')
+  const { syncBuiltinESMExports } = await import('node:module')
+  await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
+    const sessionID = 'ses-physical-review'
+    await seed(runtime, sessionID, directory)
+    const target = join(directory, 'review-target')
+    mkdirSync(target)
+    writeFileSync(join(target, 'evidence.txt'), 'review evidence')
+    let touches = 0
+    let rgSpawns = 0
+    const names = ['readFileSync', 'statSync', 'lstatSync', 'realpathSync', 'readdirSync', 'existsSync']
+    const saved = new Map(names.map(name => [name, fs[name]]))
+    const spawn = processes.spawn
+    try {
+      for (const name of names) fs[name] = function (...args) {
+        if (String(args[0]).includes('review-target')) touches += 1
+        return saved.get(name).apply(this, args)
+      }
+      processes.spawn = function (...args) {
+        if (args[0] === 'rg') rgSpawns += 1
+        return spawn.apply(this, args)
+      }
+      syncBuiltinESMExports()
+      const operations = [
+        "return await this.reviewOnly.cat('review-target/evidence.txt');",
+        "return await this.reviewOnly.stat('review-target/evidence.txt');",
+        "return await this.reviewOnly.ls('review-target');",
+        "return await this.reviewOnly.rg(['review', 'review-target']);",
+      ]
+      for (const operation of operations) {
+        const before = touches
+        const result = await execute(hooks, sessionID, operation)
+        assert.equal(result.code, undefined, JSON.stringify(result))
+        assert.ok(touches > before, 'positive control must reach the physical target adapter')
+      }
+      assert.equal(rgSpawns, 1, 'positive control must spawn one real rg')
+      await injectAcceptedAssessment(runtime, sessionID)
+      touches = 0
+      rgSpawns = 0
+      for (const operation of operations) assert.equal((await execute(hooks, sessionID, operation)).code, 'REVIEW_ONLY')
+      assert.equal(touches, 0, 'refused calls must not touch the physical target')
+      assert.equal(rgSpawns, 0, 'refused rg must not start a child process')
+    } finally {
+      for (const [name, original] of saved) fs[name] = original
+      processes.spawn = spawn
+      syncBuiltinESMExports()
+    }
+  })
+})
+
+test('WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused', { timeout: 5000 }, async () => {
+  const { default: processes } = await import('node:child_process')
+  const { syncBuiltinESMExports } = await import('node:module')
+  await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
+    const sessionID = 'ses-inflight-review'
+    await seed(runtime, sessionID, directory)
+    const closed = Promise.withResolvers()
+    const released = Promise.withResolvers()
+    const spawn = processes.spawn
+    let spawns = 0
+    try {
+      processes.spawn = function (...args) {
+        const child = spawn.apply(this, args)
+        if (args[0] !== 'rg') return child
+        spawns += 1
+        const on = child.on
+        child.on = function (event, observe) {
+          if (event !== 'close') return on.call(this, event, observe)
+          return on.call(this, event, (...values) => {
+            closed.resolve()
+            released.promise.then(() => observe(...values))
+          })
+        }
+        return child
+      }
+      syncBuiltinESMExports()
+      const pending = execute(hooks, sessionID, reads[3], 'inflight-rg')
+      await closed.promise
+      await injectAcceptedAssessment(runtime, sessionID)
+      released.resolve()
+      const admitted = await pending
+      assert.equal(admitted.code, undefined, JSON.stringify(admitted))
+      assert.equal(admitted.data.exitCode, 0)
+      assert.equal((await execute(hooks, sessionID, reads[3], 'late-rg')).code, 'REVIEW_ONLY')
+      assert.equal(spawns, 1)
+    } finally {
+      released.resolve()
+      processes.spawn = spawn
+      syncBuiltinESMExports()
+    }
+  })
+})

@@ -34,7 +34,7 @@ test('WHAT[repository-programming-041] ToolRegistry.create carries jsLifecyclePe
   assert.match(registry, /\(jsLifecyclePersistence: IJsLifecyclePersistence option\)/)
   assert.match(
     registry,
-    /JsToolSpec\.create\s*\n\s*factory\s*\n\s*surface\s*\n\s*\(defaultArg workspaceDirectory ""\)\s*\n\s*jsTransactionPersistence\s*\n\s*jsLifecyclePersistence/
+    /createSpec\s*\n\s*factory\s*\n\s*surface\s*\n\s*\(defaultArg workspaceDirectory ""\)\s*\n\s*jsTransactionPersistence\s*\n\s*jsLifecyclePersistence/
   )
 })
 

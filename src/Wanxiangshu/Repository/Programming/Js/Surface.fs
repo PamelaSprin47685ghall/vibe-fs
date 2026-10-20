@@ -27,13 +27,29 @@ module JsToolGenerator =
     let toolNameFor (roleName: string) : string =
         "todowrite-for-" + roleName.ToLowerInvariant()
 
+    let private membersForRole (roleName: string) capabilities =
+        membersFor capabilities
+        |> List.map (fun fragment ->
+            if
+                roleName.Trim().ToLowerInvariant() = "manager"
+                && List.contains fragment.MemberName [ "cat"; "stat"; "ls"; "rg" ]
+            then
+                { fragment with
+                    MemberName = "reviewOnly." + fragment.MemberName }
+            else
+                fragment)
+
     let private tryProject (roleName: string) (capabilities: Set<ToolPermission>) =
-        let jsCapabilities = JsCapability.ofToolCapabilities capabilities
+        let projected = JsCapability.ofToolCapabilities capabilities
+        let jsCapabilities =
+            if roleName.Trim().ToLowerInvariant() = "orchestrator" && Set.contains JsCapability.Fork projected then
+                projected |> Set.remove JsCapability.Fork |> Set.add JsCapability.Commission
+            else projected
 
         if Set.isEmpty jsCapabilities then
             None
         else
-            Some(toolNameFor roleName, jsCapabilities, membersFor jsCapabilities)
+            Some(toolNameFor roleName, jsCapabilities, membersForRole roleName jsCapabilities)
 
     let renderBaseClass (prose: JsCanonicalDescription.Prose) (capabilities: Set<JsCapability>) : string =
         JsCanonicalDescription.runtimeBaseClass prose capabilities
@@ -70,7 +86,7 @@ module JsToolGenerator =
                   Capabilities = jsCapabilities
                   Members = members
                   Description = renderDescription prose roleName jsCapabilities
-                  BaseClassSource = renderBaseClass prose jsCapabilities
+                  BaseClassSource = JsCanonicalDescription.runtimeBaseClassForRole roleName prose jsCapabilities
                   Examples = renderExamples prose roleName jsCapabilities }
 
     /// Generated-name gate: a js-* tool call is accepted iff its name is the

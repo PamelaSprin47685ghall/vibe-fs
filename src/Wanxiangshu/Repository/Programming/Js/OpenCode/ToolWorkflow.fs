@@ -108,7 +108,7 @@ module JsToolsData =
         with _ ->
             Error JsFailure.InvalidReturnValue
 
-        /// `this.deliver(view)` ends the program by handing over a view
+    /// `this.deliver(view)` ends the program by handing over a view
     /// declaration; the sandbox reports it as this sentinel instead of a
     /// return value.
     let private deliveredPrefix = "{\"__jsDelivered\":"
@@ -304,7 +304,7 @@ module JsToolWorkflow =
         else
             parseRawView json |> Result.bind decodeViewDeclaration
 
-        /// Algorithm G1: the deliver hard gate. A program cannot deliver while
+    /// Algorithm G1: the deliver hard gate. A program cannot deliver while
     /// its own session still has unresolved parked sites; an unrelated
     /// session's park never blocks this delivery. On success the delivered
     /// sentinel JSON is captured in `deliveredJson` so the cell write can
@@ -324,8 +324,9 @@ module JsToolWorkflow =
                 let handles = System.String.Join(", ", parkedHandles)
 
                 Error(
-                    JsFailure.ProgramFailed
-                        (sprintf "delivery is blocked while this session has unresolved parked handles: %s" handles)
+                    JsFailure.ProgramFailed(
+                        sprintf "delivery is blocked while this session has unresolved parked handles: %s" handles
+                    )
                 )
             else
                 match deliveredView json with
@@ -717,7 +718,9 @@ module JsToolWorkflow =
             | Ok value ->
                 let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
                 let! ledgerOutcome = settleLedger ledger
-                let settled = settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
+
+                let settled =
+                    settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
 
                 // The delivered cell is written only after the tool settled
                 // successfully: a failed observation or ledger must not leave
@@ -734,6 +737,7 @@ module JsToolWorkflow =
     /// The generated-surface api factory: bindings own the file members and
     /// the host loop.
     let private bindingsApiFactory
+        (reviewCheck: (unit -> Task<bool>) option)
         (sessionId: string)
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -754,8 +758,13 @@ module JsToolWorkflow =
             (Some callHost)
             (JsDelegationBridge.hostFor sessionId)
             (JsDelegationBridge.askFor sessionId)
+        |> fun api ->
+            reviewCheck
+            |> Option.map (fun check -> JsReviewOnly.scopeReviewOnly check api)
+            |> Option.defaultValue api
 
     let private runProgramWithPark
+        (reviewCheck: (unit -> Task<bool>) option)
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
         (capabilities: Set<JsCapability>)
@@ -782,7 +791,7 @@ module JsToolWorkflow =
             persistence
             lifecyclePersistence
             fileAccessObservation
-            (fun buffers parkState -> bindingsApiFactory sessionId capabilities root buffers parkState)
+            (fun buffers parkState -> bindingsApiFactory reviewCheck sessionId capabilities root buffers parkState)
 
 
     /// Resume a parked site (algorithm E). `handle` must exist; the deferred
@@ -967,10 +976,7 @@ module JsToolWorkflow =
         else
             ToolWorkflowInvocation.Invalid
 
-    let private resolveParkedSite
-        (sessionId: string)
-        (handle: string)
-        : Result<JsParkedSites.JsParkedSite, JsFailure> =
+    let private resolveParkedSite (sessionId: string) (handle: string) : Result<JsParkedSites.JsParkedSite, JsFailure> =
         match JsParkedSites.tryFind handle with
         | None -> Error(JsFailure.HandleUnknown handle)
         | Some site when site.SessionId <> sessionId ->
@@ -997,7 +1003,8 @@ module JsToolWorkflow =
     /// them. `lifecyclePersistence` records Parked/Unparked/Abandoned audit
     /// traces (best-effort; a failed audit never fails the tool call); Reaped
     /// is recorded by the session-close path (PluginSessionScope).
-    let execute
+    let executeWithReviewCheck
+        (reviewCheck: (unit -> Task<bool>) option)
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
         (capabilities: Set<JsCapability>)
@@ -1016,6 +1023,7 @@ module JsToolWorkflow =
             | ToolWorkflowInvocation.Program programSource ->
                 return!
                     runProgramWithPark
+                        reviewCheck
                         sessionId
                         fence
                         capabilities
@@ -1041,6 +1049,35 @@ module JsToolWorkflow =
             | ToolWorkflowInvocation.Invalid ->
                 return Failed(JsFailure.InvalidArgument "no program, unpark, or abandon input", [], [], [], [])
         }
+
+    let execute
+        sessionId
+        fence
+        capabilities
+        root
+        baseClassSource
+        (input: obj)
+        deadlineMs
+        deadlineEpochMs
+        outputBoundBytes
+        persistence
+        lifecyclePersistence
+        fileAccessObservation
+        =
+        executeWithReviewCheck
+            None
+            sessionId
+            fence
+            capabilities
+            root
+            baseClassSource
+            input
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
 
 /// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML
 /// (the only rendering owner; ARCH-010). Success is `# ok` plus data/fs;

@@ -1,4 +1,5 @@
 namespace Wanxiangshu.Repository.Programming.Js
+
 open Wanxiangshu.Foundation
 
 
@@ -37,6 +38,9 @@ module JsCanonicalDescription =
 
         [<Literal>]
         let ReadRules = "tool/js-program/rules-read"
+
+        [<Literal>]
+        let ReviewOnlyRules = "tool/js-program/review-only"
 
         [<Literal>]
         let Recipes = "tool/js-program/recipes"
@@ -106,36 +110,55 @@ module JsCanonicalDescription =
 
         [<Literal>]
         let ParkedPayload = "tool/js-program/parked-payload"
+
         [<Literal>]
         let BaseClass = "tool/js-program/base-class"
+
         [<Literal>]
         let BaseClassCallable = "tool/js-program/base-class-callable"
+
         [<Literal>]
         let BaseClassRead = "tool/js-program/base-class-read"
+
+        [<Literal>]
+        let BaseClassAnchors = "tool/js-program/base-class-anchors"
+
         [<Literal>]
         let BaseClassGlob = "tool/js-program/base-class-glob"
+
         [<Literal>]
         let BaseClassGrep = "tool/js-program/base-class-grep"
+
         [<Literal>]
         let BaseClassWrite = "tool/js-program/base-class-write"
+
         [<Literal>]
         let BaseClassRemove = "tool/js-program/base-class-remove"
+
         [<Literal>]
         let BaseClassMove = "tool/js-program/base-class-move"
+
         [<Literal>]
         let BaseClassExec = "tool/js-program/base-class-exec"
+
         [<Literal>]
         let BaseClassFork = "tool/js-program/base-class-fork"
+
         [<Literal>]
         let BaseClassJoin = "tool/js-program/base-class-join"
+
         [<Literal>]
         let BaseClassFission = "tool/js-program/base-class-fission"
+
         [<Literal>]
         let BaseClassHorizon = "tool/js-program/base-class-horizon"
+
         [<Literal>]
         let BaseClassAdvisor = "tool/js-program/base-class-advisor"
+
         [<Literal>]
         let BaseClassAsk = "tool/js-program/base-class-ask"
+
         [<Literal>]
         let BaseClassLifecycle = "tool/js-program/base-class-lifecycle"
 
@@ -151,6 +174,7 @@ module JsCanonicalDescription =
 
           VerbCreate: string
           ReadRules: string
+          ReviewOnlyRules: string
           Recipes: string
 
           WriteRules: string
@@ -176,6 +200,7 @@ module JsCanonicalDescription =
           BaseClass: string
           BaseClassCallable: string
           BaseClassRead: string
+          BaseClassAnchors: string
           BaseClassGlob: string
           BaseClassGrep: string
           BaseClassWrite: string
@@ -222,27 +247,119 @@ class JsProgram {"""
         else
             ""
 
+    let private reviewCalls (text: string) =
+        text
+            .Replace("this.cat(", "this.reviewOnly.cat(")
+            .Replace("this.stat(", "this.reviewOnly.stat(")
+            .Replace("this.ls(", "this.reviewOnly.ls(")
+            .Replace("this.rg(", "this.reviewOnly.rg(")
+
     let publicBaseClass (prose: Prose) (capabilities: Set<JsCapability>) : string =
-        "const PLAN_PATH = \"plan.md\";\n" +
-        fill
+        "const PLAN_PATH = \"plan.md\";\n"
+        + fill
             prose.BaseClass
-            [
-              "baseClassCallable", if has capabilities JsCapability.Exec then prose.BaseClassCallable else ""
-              "baseClassRead", if has capabilities JsCapability.Read then prose.BaseClassRead else ""
-              "baseClassGlob", if has capabilities JsCapability.Glob then prose.BaseClassGlob else ""
-              "baseClassGrep", if has capabilities JsCapability.Grep then prose.BaseClassGrep else ""
-              "baseClassWrite", if has capabilities JsCapability.Write then prose.BaseClassWrite else ""
-              "baseClassRemove", if has capabilities JsCapability.Remove then prose.BaseClassRemove else ""
-              "baseClassMove", if has capabilities JsCapability.Move then prose.BaseClassMove else ""
-              "baseClassExec", if has capabilities JsCapability.Exec then prose.BaseClassExec else ""
-              "baseClassFork", if has capabilities JsCapability.Fork then prose.BaseClassFork else ""
-              "baseClassJoin", if has capabilities JsCapability.Join then prose.BaseClassJoin else ""
-              "baseClassFission", if has capabilities JsCapability.Fission then prose.BaseClassFission else ""
-              "baseClassHorizon", if has capabilities JsCapability.Horizon then prose.BaseClassHorizon else ""
-              "baseClassAdvisor", if has capabilities JsCapability.Advisor then prose.BaseClassAdvisor else ""
-              "baseClassAsk", if has capabilities JsCapability.Ask then prose.BaseClassAsk else ""
-              "baseClassLifecycle", prose.BaseClassLifecycle
-            ]
+            [ "baseClassCallable",
+              if has capabilities JsCapability.Exec then
+                  prose.BaseClassCallable
+              else
+                  ""
+              "baseClassRead",
+              if has capabilities JsCapability.Read then
+                  prose.BaseClassRead + "\n" + prose.BaseClassAnchors
+              else
+                  ""
+              "baseClassGlob",
+              if has capabilities JsCapability.Glob then
+                  prose.BaseClassGlob
+              else
+                  ""
+              "baseClassGrep",
+              if has capabilities JsCapability.Grep then
+                  prose.BaseClassGrep
+              else
+                  ""
+              "baseClassWrite",
+              if has capabilities JsCapability.Write then
+                  prose.BaseClassWrite
+              else
+                  ""
+              "baseClassRemove",
+              if has capabilities JsCapability.Remove then
+                  prose.BaseClassRemove
+              else
+                  ""
+              "baseClassMove",
+              if has capabilities JsCapability.Move then
+                  prose.BaseClassMove
+              else
+                  ""
+              "baseClassExec",
+              if has capabilities JsCapability.Exec then
+                  prose.BaseClassExec
+              else
+                  ""
+              "baseClassFork",
+              if has capabilities JsCapability.Fork then
+                  prose.BaseClassFork
+              else
+                  ""
+              "baseClassJoin",
+              if has capabilities JsCapability.Join then
+                  prose.BaseClassJoin
+              else
+                  ""
+              "baseClassFission",
+              if has capabilities JsCapability.Fission then
+                  prose.BaseClassFission
+              else
+                  ""
+              "baseClassHorizon",
+              if has capabilities JsCapability.Horizon then
+                  prose.BaseClassHorizon
+              else
+                  ""
+              "baseClassAdvisor",
+              if has capabilities JsCapability.Advisor then
+                  prose.BaseClassAdvisor
+              else
+                  ""
+              "baseClassAsk",
+              if has capabilities JsCapability.Ask then
+                  prose.BaseClassAsk
+              else
+                  ""
+              "baseClassLifecycle", prose.BaseClassLifecycle ]
+
+    let private publicReviewClass prose capabilities =
+        String.concat
+            "\n"
+            [ "class ReviewOnly {"
+              if has capabilities JsCapability.Read then
+                  reviewCalls prose.BaseClassRead
+              if has capabilities JsCapability.Glob then
+                  reviewCalls prose.BaseClassGlob
+              if has capabilities JsCapability.Grep then
+                  reviewCalls prose.BaseClassGrep
+              "}\n" ]
+
+    let private publicBaseClassForRole prose (roleName: string) capabilities =
+        let scoped =
+            { prose with
+                BaseClassRead = ""
+                BaseClassGlob = ""
+                BaseClassGrep = ""
+                BaseClassLifecycle = "  reviewOnly = new ReviewOnly();\n" + prose.BaseClassLifecycle }
+
+        if roleName.Trim().ToLowerInvariant() = "manager" then
+            publicReviewClass prose capabilities + publicBaseClass scoped capabilities
+        else
+            publicBaseClass prose capabilities
+
+    let private exampleSourceForRole (roleName: string) source =
+        if roleName.Trim().ToLowerInvariant() = "manager" then
+            reviewCalls source
+        else
+            source
 
     let private rethrowHost =
         """if (result && result.ok === false) {
@@ -251,31 +368,54 @@ class JsProgram {"""
       throw err;
     }"""
 
-    let runtimeBaseClass (prose: Prose) (capabilities: Set<JsCapability>) : string =
-        "const PLAN_PATH = \"plan.md\";\n" +
-        let methods =
-            [ """
-    constructor(api) { this._api = api; }"""
-                  .TrimStart()
-              if has capabilities JsCapability.Exec then
-                  "  Callable = Callable;"
-              if has capabilities JsCapability.Read then
-                  fill
-                      """  async cat(path) {
+    let private runtimeFileMethods (capabilities: Set<JsCapability>) =
+        [ if has capabilities JsCapability.Read then
+              fill
+                  """  async cat(path) {
     const result = await this._api.cat(path);
     {{rethrow_host}}
     return result.text;
   }"""
-                      [ "rethrow_host", rethrowHost ]
+                  [ "rethrow_host", rethrowHost ]
 
-                  fill
-                      """  async stat(path) {
+              fill
+                  """  async stat(path) {
     const result = await this._api.stat(path);
     {{rethrow_host}}
     return result.stat;
   }"""
-                      [ "rethrow_host", rethrowHost ]
+                  [ "rethrow_host", rethrowHost ]
+          if has capabilities JsCapability.Glob then
+              fill
+                  """  async ls(path) {
+    const result = await this._api.ls(path);
+    {{rethrow_host}}
+    return result.entries;
+  }"""
+                  [ "rethrow_host", rethrowHost ]
+          if has capabilities JsCapability.Grep then
+              fill
+                  """  async rg(argv) {
+    const result = await this._api.rg(argv);
+    {{rethrow_host}}
+    return result.paths !== undefined
+      ? { exitCode: result.exitCode, paths: result.paths }
+      : { exitCode: result.exitCode, messages: result.messages };
+  }"""
+                  [ "rethrow_host", rethrowHost ] ]
 
+    let private runtimeBaseClassCore reviewOnly (prose: Prose) (capabilities: Set<JsCapability>) : string =
+        "const PLAN_PATH = \"plan.md\";\n"
+        + let methods =
+            [ if reviewOnly then
+                  "  constructor(api) { this._api = api; this.reviewOnly = new ReviewOnly(api.reviewOnly); }"
+              else
+                  "  constructor(api) { this._api = api; }"
+              if has capabilities JsCapability.Exec then
+                  "  Callable = Callable;"
+              if not reviewOnly then
+                  yield! runtimeFileMethods capabilities
+              if has capabilities JsCapability.Read then
                   fill
                       """  whereAll(content, needle, from = 0) {
     const result = this._api.whereAll(content, needle, from);
@@ -290,24 +430,6 @@ class JsProgram {"""
     const result = await this._api.where(content, needle, from, stack);
     {{rethrow_host}}
     return result && result.span !== undefined ? result.span : result;
-  }"""
-                      [ "rethrow_host", rethrowHost ]
-              if has capabilities JsCapability.Glob then
-                  fill
-                      """  async ls(path) {
-    const result = await this._api.ls(path);
-    {{rethrow_host}}
-    return result.entries;
-  }"""
-                      [ "rethrow_host", rethrowHost ]
-              if has capabilities JsCapability.Grep then
-                  fill
-                      """  async rg(argv) {
-    const result = await this._api.rg(argv);
-    {{rethrow_host}}
-    return result.paths !== undefined
-      ? { exitCode: result.exitCode, paths: result.paths }
-      : { exitCode: result.exitCode, messages: result.messages };
   }"""
                       [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Write then
@@ -356,6 +478,13 @@ class JsProgram {"""
     return result;
   }"""
                       [ "rethrow_host", rethrowHost ]
+              if has capabilities JsCapability.Commission then
+                  fill
+                      """  async commission(payload) {
+    const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
+    return await this._api.commission(spec);
+  }"""
+                      []
               if has capabilities JsCapability.Fork then
                   fill
                       """  async fork(payload) {
@@ -519,9 +648,27 @@ class JsProgram {"""
     throw err;
   }"""
                   []
-              runStub prose ]
+              runStub prose ] in
 
-        String.concat "\n\n" ((callableOpen capabilities + classOpen) :: methods @ [ "}" ])
+          let reviewClass =
+              if reviewOnly then
+                  String.concat
+                      "\n\n"
+                      ([ "class ReviewOnly {"; "  constructor(api) { this._api = api; }" ]
+                       @ runtimeFileMethods capabilities
+                       @ [ "}" ])
+                  + "\n\n"
+              else
+                  "" in
+
+          reviewClass
+          + String.concat "\n\n" ((callableOpen capabilities + classOpen) :: methods @ [ "}" ])
+
+    let runtimeBaseClass prose capabilities =
+        runtimeBaseClassCore false prose capabilities
+
+    let runtimeBaseClassForRole (roleName: string) prose capabilities =
+        runtimeBaseClassCore (roleName.Trim().ToLowerInvariant() = "manager") prose capabilities
 
     let contract (prose: Prose) (toolName: string) (capabilities: Set<JsCapability>) =
         let verbs =
@@ -538,10 +685,13 @@ class JsProgram {"""
             |> String.concat ", "
 
         let parallelTemplate =
-            if has capabilities JsCapability.Write then prose.ContractParallelEdits
-            else prose.ContractParallelReads
+            if has capabilities JsCapability.Write then
+                prose.ContractParallelEdits
+            else
+                prose.ContractParallelReads
 
-        fill prose.Contract
+        fill
+            prose.Contract
             [ "toolName", toolName
               "verbs", verbs
               "parallelLine", fill parallelTemplate [ "toolName", toolName ] ]
@@ -592,7 +742,9 @@ class JsProgram {"""
         candidate
         |> Option.bind (fun (requires, source) ->
             if Set.isSubset requires capabilities then
-                Some { Requires = requires; Source = source }
+                Some
+                    { Requires = requires
+                      Source = exampleSourceForRole roleName source }
             else
                 None)
 
@@ -610,9 +762,14 @@ class JsProgram {"""
 
         let blocks =
             [ prose.Header
+              if roleName.Trim().ToLowerInvariant() = "manager" then
+                  prose.ReviewOnlyRules
               contract prose toolName capabilities
               "```js\n" + baseClass + "\n```"
-              rules prose capabilities
+              (if roleName.Trim().ToLowerInvariant() = "manager" then
+                   reviewCalls (rules prose capabilities)
+               else
+                   rules prose capabilities)
               prose.Park
               prose.Deliver
               prose.MechanicalSemantic
@@ -622,4 +779,4 @@ class JsProgram {"""
         String.concat "\n\n" blocks
 
     let render (prose: Prose) (roleName: string) (toolName: string) (capabilities: Set<JsCapability>) : string =
-        renderFor prose roleName toolName capabilities (publicBaseClass prose capabilities)
+        renderFor prose roleName toolName capabilities (publicBaseClassForRole prose roleName capabilities)

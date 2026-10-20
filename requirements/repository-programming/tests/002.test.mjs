@@ -93,16 +93,19 @@ const MEMBER_ORDER = [
   'fork', 'dag', 'join', 'fission', 'horizon', 'advisor',
 ]
 
-const expectedMembers = (permissionNames) =>
+const expectedMembers = (permissionNames, role = 'engineer') =>
   permissionNames
     .flatMap((name) => MEMBERS_BY_PERMISSION[name] ?? [])
     .sort((left, right) => MEMBER_ORDER.indexOf(left) - MEMBER_ORDER.indexOf(right))
+    .map(name => role === 'manager' && ['cat', 'stat', 'ls', 'rg'].includes(name) ? 'reviewOnly.' + name : name)
+    .filter(name => !(role === 'orchestrator' && name === 'dag'))
+    .map(name => role === 'orchestrator' && name === 'fork' ? 'commission' : name)
 
 // Sugar members are compiled inside the base class itself instead of
 // Sugar members are compiled inside the base class itself instead of
 // delegating to `_api` (dag builds fork waves plus one join), so their base-class
 // layer is the public method they declare.
-const SUGAR_MEMBERS = ['dag']
+const SUGAR_MEMBERS = ['dag', 'commission', 'resume', 'devops']
 
 
 const layersOf = (s) =>
@@ -110,8 +113,8 @@ const layersOf = (s) =>
     s.members.map((fragment) => [
       fragment.memberName,
       {
-        binding: fragment.memberName,
-        inBaseClass: s.baseClassSource.includes(`this._api.${fragment.memberName}`),
+        binding: fragment.memberName.split('.').at(-1),
+        inBaseClass: s.baseClassSource.includes(`this._api.${fragment.memberName.split('.').at(-1)}`) || s.baseClassSource.includes(`async ${fragment.memberName}(`),
         inDescription: s.description.includes(fragment.memberName),
         inExamples: s.examples.some((example) => example.includes(fragment.memberName)),
       },
@@ -129,7 +132,7 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
     assert.equal(layer.inDescription, true, `${member} in description`)
-    assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${member} binding`)
+    assert.equal(layer.binding, BINDING_BY_MEMBER[member.split('.').at(-1)], `${member} binding`)
   }
   assert.match(result.description, /cat\(path\)/)
   assert.match(result.description, /where\(content, needle, from = 0\)/)
@@ -242,7 +245,7 @@ test('WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_ev
     const permissions = rolePermissions(role.toLowerCase())
     const result = surface(role, permissions)
     assert.equal(isSome(result), true, `${role} gets a js-* surface`)
-    assert.deepEqual(memberNames(result), expectedMembers(permissions), `${role} member set`)
+    assert.deepEqual(memberNames(result), expectedMembers(permissions, role), `${role} member set`)
     assert.equal(
       memberBinding(role, permissions, 'horizon'),
       'horizon',
@@ -253,7 +256,7 @@ test('WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_ev
     assert.equal(layers.horizon.binding, 'horizon', `${role}: horizon binding key`)
     assert.match(result.description, /async horizon\(\)/, `${role}: horizon pseudocode signature`)
     for (const [member, layer] of Object.entries(layers)) {
-            const baseClassMarker = SUGAR_MEMBERS.includes(member)
+      const baseClassMarker = SUGAR_MEMBERS.includes(member)
         ? `async ${member}(`
         : `this._api.${layer.binding}`
       assert.equal(
@@ -262,14 +265,14 @@ test('WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_ev
         `${role}: ${member} in base class`,
       )
       assert.equal(layer.inDescription, true, `${role}: ${member} in description`)
-      assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${role}: ${member} binding`)
+      assert.equal(layer.binding, BINDING_BY_MEMBER[member.split('.').at(-1)], `${role}: ${member} binding`)
     }
   }
 
   // The permission is the sole source of the member: Fork/Join without Horizon
   // project fork/dag/join but never horizon.
   assert.equal(memberBinding('Engineer', caps(ToolPermission.Fork, ToolPermission.Join), 'horizon'), undefined)
-  assert.deepEqual(expectedMembers(['Fork', 'Join', 'Horizon']), ['fork', 'dag', 'join', 'horizon'])
+  assert.deepEqual(expectedMembers(['Commission', 'Join', 'Horizon']), ['commission', 'join', 'horizon'])
 })
 
 test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_every_holding_role', () => {
@@ -280,7 +283,7 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
     const permissions = rolePermissions(role.toLowerCase())
     const result = surface(role, permissions)
     assert.equal(isSome(result), true, `${role} gets a js-* surface`)
-    assert.deepEqual(memberNames(result), expectedMembers(permissions), `${role} member set`)
+    assert.deepEqual(memberNames(result), expectedMembers(permissions, role), `${role} member set`)
     assert.equal(
       memberBinding(role, permissions, 'advisor'),
       'advisor',
@@ -291,7 +294,7 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
     assert.equal(layers.advisor.binding, 'advisor', `${role}: advisor binding key`)
     assert.match(result.description, /async advisor\(intent, view\)/, `${role}: advisor pseudocode signature`)
     for (const [member, layer] of Object.entries(layers)) {
-            const baseClassMarker = SUGAR_MEMBERS.includes(member)
+      const baseClassMarker = SUGAR_MEMBERS.includes(member)
         ? `async ${member}(`
         : `this._api.${layer.binding}`
       assert.equal(
@@ -300,7 +303,7 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
         `${role}: ${member} in base class`,
       )
       assert.equal(layer.inDescription, true, `${role}: ${member} in description`)
-      assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${role}: ${member} binding`)
+      assert.equal(layer.binding, BINDING_BY_MEMBER[member.split('.').at(-1)], `${role}: ${member} binding`)
     }
   }
 

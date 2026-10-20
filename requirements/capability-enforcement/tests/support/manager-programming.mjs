@@ -33,9 +33,18 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   const surface = generateRole('manager', 'en')
   assert.ok(surface, 'Manager must generate JS surface')
   assert.equal(surface.toolName, 'todowrite-for-manager')
+  const names = surface.members.map(member => member.memberName)
+  for (const name of ['cat', 'stat', 'ls', 'rg']) {
+    assert.ok(names.includes('reviewOnly.' + name))
+    assert.equal(names.includes(name), false)
+  }
+  assert.ok(names.includes('whereAll'))
+  assert.match(surface.description, /this\.reviewOnly/)
+  for (const example of surface.examples) assert.doesNotMatch(example, /this\.(cat|stat|ls|rg)\(/)
+
   assert.deepEqual(
     surface.capabilities.sort(),
-    ['Advisor', 'Fork', 'Glob', 'Grep', 'Horizon', 'Join', 'Read'],
+    ['Advisor', 'Fork', 'Glob', 'Grep', 'Horizon', 'Join', 'Read', 'Resume'],
     'Manager capabilities must be {Read, Glob, Grep} plus the delegation primitives {Fork, Join, Horizon, Advisor}',
   )
 
@@ -60,7 +69,7 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   }
 })
 
-test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_methods', () => {
+test('WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mutation_methods', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j02-'))
   try {
     const binding = roleApi('manager', dir)
@@ -124,7 +133,7 @@ test('WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_ed
   }
 })
 
-test('WHAT[capability-enforcement-025] J04_read_only_execution_returns_success_without_file_effects', async () => {
+test('WHAT[capability-enforcement-025] J04_shared_read_execution_returns_success_without_file_effects', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j04-'))
   try {
     const targetFile = join(dir, 'file.txt')
@@ -133,7 +142,7 @@ test('WHAT[capability-enforcement-025] J04_read_only_execution_returns_success_w
     // 正常读取作为拒绝用例的正向控制，不能只证明空程序成功。
     const outcome = await run(
       dir,
-      'manager',
+      'engineer',
       'en',
       `class Js extends JsProgram { async run() { const text = await this.cat('file.txt'); return { text }; } }`,
       2000,
@@ -359,7 +368,7 @@ test('WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_se
   }
 })
 
-test('WHAT[capability-enforcement-025] J11_observation_records_only_successful_distinct_reads', async () => {
+test('WHAT[capability-enforcement-025] J11_shared_adapter_observation_records_only_successful_distinct_reads', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j11-'))
   try {
     writeFileSync(join(dir, 'read1.txt'), 'content1', 'utf8')
@@ -383,7 +392,7 @@ test('WHAT[capability-enforcement-025] J11_observation_records_only_successful_d
 
     const outcome = await runObserved(
       dir,
-      'manager',
+      'engineer',
       'en',
       program,
       2000,

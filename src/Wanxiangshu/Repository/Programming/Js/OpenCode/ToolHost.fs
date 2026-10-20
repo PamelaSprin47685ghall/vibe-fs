@@ -31,6 +31,7 @@ module JsDescriptionAssets =
 
           VerbCreate = text lang JsCanonicalDescription.Path.VerbCreate
           ReadRules = template lang JsCanonicalDescription.Path.ReadRules
+          ReviewOnlyRules = text lang JsCanonicalDescription.Path.ReviewOnlyRules
           Recipes = text lang JsCanonicalDescription.Path.Recipes
 
           WriteRules = text lang JsCanonicalDescription.Path.WriteRules
@@ -56,6 +57,7 @@ module JsDescriptionAssets =
           BaseClass = template lang JsCanonicalDescription.Path.BaseClass
           BaseClassCallable = template lang JsCanonicalDescription.Path.BaseClassCallable
           BaseClassRead = template lang JsCanonicalDescription.Path.BaseClassRead
+          BaseClassAnchors = template lang JsCanonicalDescription.Path.BaseClassAnchors
           BaseClassGlob = template lang JsCanonicalDescription.Path.BaseClassGlob
           BaseClassGrep = template lang JsCanonicalDescription.Path.BaseClassGrep
           BaseClassWrite = template lang JsCanonicalDescription.Path.BaseClassWrite
@@ -149,7 +151,8 @@ module JsToolSpec =
     /// durable transaction facts (JS-012) when the caller has an EventStore.
     /// `modelSourceProvider` supplies the model program (the tool arguments);
     /// the first version reads it from the Host arguments payload.
-    let create
+    let private createCore
+        (reviewCheck: (HostToolContext -> Task<bool>) option)
         (factory: HostToolFactory)
         (surface: JsSurface)
         (workspaceRoot: string)
@@ -158,6 +161,11 @@ module JsToolSpec =
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
         (rootOf: string -> string)
         : ToolSpec =
+        let reviewCheck =
+            match reviewCheck with
+            | None when surface.RoleName.Trim().ToLowerInvariant() = "manager" -> Some(fun _ -> Task.FromResult false)
+            | configured -> configured
+
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 
         /// Build the three-state input object from the Host arguments:
@@ -192,15 +200,11 @@ module JsToolSpec =
             ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
         // One view contract: the prefix is protected; the map states keep or summary.
-        let viewSchema =
-            ToolHostCodec.objectSchemaOf
-                [ "prefixUntil", ToolHostCodec.numberSchema factory
-                  "thenMap",
-                  ToolHostCodec.recordSchemaOf
-                      (ToolHostCodec.stringSchema factory)
-                      (ToolHostCodec.nullableStringSchema factory)
-                      (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
-                      factory ]
+        let mappingSchema =
+            ToolHostCodec.recordSchemaOf
+                (ToolHostCodec.stringSchema factory)
+                (ToolHostCodec.nullableStringSchema factory)
+                (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
                 factory
 
         { Name = surface.ToolName
@@ -212,7 +216,8 @@ module JsToolSpec =
                   factory
               "unpark", unparkSchema
               "abandon", abandonSchema
-              "view", viewSchema ]
+              "prefixUntil", ToolHostCodec.numberSchema factory
+              "thenMap", mappingSchema ]
           Admission = admissionFor surface.RoleName
           Execute =
             fun args ctx ->
@@ -221,14 +226,16 @@ module JsToolSpec =
 
                     let hasProgram = not (isNull (input?program))
 
+                    let declaration =
+                        if isUndefined (args.Raw?prefixUntil) && isUndefined (args.Raw?thenMap) then null
+                        else createObj [ "prefixUntil" ==> args.Raw?prefixUntil; "thenMap" ==> args.Raw?thenMap ]
                     let viewFailure =
-                        match
-                            Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView
-                                ctx.SessionId
-                                (args.Raw?view)
-                        with
-                        | Ok() -> None
-                        | Error failure -> Some failure
+                        if not (isUndefined (args.Raw?view)) then
+                            Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
+                        else
+                            match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId declaration with
+                            | Ok() -> None
+                            | Error failure -> Some failure
 
                     match viewFailure with
                     | Some failure ->
@@ -252,7 +259,8 @@ module JsToolSpec =
                         let root = rootOf ctx.SessionId
 
                         let! outcome =
-                            JsToolWorkflow.execute
+                            JsToolWorkflow.executeWithReviewCheck
+                                (reviewCheck |> Option.map (fun check -> fun () -> check ctx))
                                 ctx.SessionId
                                 (match ctx.ProviderRunId, ctx.ToolCallId with
                                  | Some providerRun, Some toolCallId -> Some(providerRun, toolCallId)
@@ -270,6 +278,29 @@ module JsToolSpec =
 
                         return JsToolsResult.render outcome
                 } }
+
+    let create factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation rootOf =
+        createCore None factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation rootOf
+
+    let createWithReviewCheck
+        check
+        factory
+        surface
+        workspaceRoot
+        persistence
+        lifecyclePersistence
+        fileAccessObservation
+        rootOf
+        =
+        createCore
+            (Some check)
+            factory
+            surface
+            workspaceRoot
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+            rootOf
 
     /// Build a ToolSpec with dedicated ToolAdmission.
     let createWithAdmission

@@ -34,7 +34,7 @@ module JsToolsBindings =
     val makeAskMember:
         parkState: Wanxiangshu.Process.JsSandbox.ParkState option ->
         ask: (string -> Task<Result<unit, string>>) option ->
-        (string * obj)
+            (string * obj)
 
     val createApi:
         capabilities: Set<JsCapability> ->
@@ -63,3 +63,6 @@ module JsToolsBindings =
         delegationHost: JsDelegationHost option ->
         askInvoke: (string -> Task<Result<unit, string>>) option ->
             obj
+
+module JsReviewOnly =
+    val scopeReviewOnly: check: (unit -> Task<bool>) -> api: obj -> obj

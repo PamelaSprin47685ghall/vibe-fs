@@ -307,38 +307,7 @@ module PluginHooks =
                         return Some registration
                     }
 
-            let getManagerCapabilityFacts (sessionId: string) : Task<ManagerCapabilityFacts> =
-                match toolRegistration with
-                | Some registration -> registration.Runtime.ManagerCapabilityFactsFor sessionId
-                | None -> Task.FromResult ToolRuntimeScope.emptyManagerFacts
-
             let toolDefinition (_toolInput: obj) (_toolOutput: obj) = ()
-
-
-            let reviewToolPermitted toolName (facts: ManagerCapabilityFacts) =
-                match ManagerReviewTools.requiredPermissions toolName with
-                | Some required ->
-                    let allowed = OfficeCapability.permissionsForManagerFacts facts
-                    Set.isSubset required allowed && not (Set.isEmpty allowed)
-                | None -> false
-
-            let isReviewPermitted toolName (facts: ManagerCapabilityFacts) =
-                if toolName = "todowrite-for-manager" && facts.HasActiveIncumbency then
-                    OfficeCapability.isAllowedForManagerFacts facts ToolPermission.Read
-                else
-                    reviewToolPermitted toolName facts
-
-            let assertReviewPermitted toolName sessionId =
-                task {
-                    let! facts = getManagerCapabilityFacts sessionId
-
-                    if not (isReviewPermitted toolName facts) then
-                        invalidOp (
-                            sprintf
-                                "Manager review tool '%s' is not permitted under current manager capability facts"
-                                toolName
-                        )
-                }
 
             let toolField (toolInput: obj) (name: string) =
                 if isNull toolInput || isNull toolInput?(name) then
@@ -572,14 +541,10 @@ module PluginHooks =
             let checkManagerReviewPermissions toolName toolInput =
                 task {
                     let sessionId = toolField toolInput "sessionID"
-
                     let blockedNative =
                         toolName = "todowrite-for-engineer" || toolName = "todowrite-for-devops"
-
                     if roleFor (SessionId.create sessionId) = Some Role.Manager && blockedNative then
                         invalidOp (sprintf "Manager tool '%s' is refused on the review gate" toolName)
-                    elif ManagerReviewTools.isReviewTool toolName then
-                        do! assertReviewPermitted toolName sessionId
                 }
 
             let hideReviewArguments owner toolName args =

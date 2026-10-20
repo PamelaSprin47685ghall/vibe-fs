@@ -251,8 +251,7 @@ module ToolRegistry =
             Task.FromResult(
                 ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId) "tool/ask-waiting" Map.empty
             )
-        elif role = Role.Manager then
-            managerFactsStage gate spec managerPermission args ctx
+        elif role = Role.Manager && spec.Name <> "todowrite-for-manager" then managerFactsStage gate spec managerPermission args ctx
         else
             spec.Execute args ctx
 
@@ -612,8 +611,27 @@ module ToolRegistry =
         let generatedJsSpecFor (role: Role) =
             JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse
             |> Option.map (fun surface ->
+                let reviewAllowed (ctx: HostToolContext) : Task<bool> =
+                    task {
+                        let! facts = runtime.ManagerCapabilityFactsFor ctx.SessionId
+                        let! frozen = runtime.IsRetirementFrozen ctx.SessionId
+
+                        return
+                            facts.HasActiveIncumbency
+                            && not facts.HasAssessment
+                            && not facts.HasConfirmation
+                            && facts.CleanupBlockerDigest.IsNone
+                            && not frozen
+                    }
+
                 let spec =
-                    JsToolSpec.create
+                    let createSpec =
+                        if role = Role.Manager then
+                            JsToolSpec.createWithReviewCheck reviewAllowed
+                        else
+                            JsToolSpec.create
+
+                    createSpec
                         factory
                         surface
                         (defaultArg workspaceDirectory "")

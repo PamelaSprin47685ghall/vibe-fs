@@ -57,6 +57,7 @@ type JsFailure =
     | ResultTooLarge of string option
     | InvalidReturnValue
     | ReadOnlyMutationRejected
+    | ReviewOnly
     | FileChanged of string
     | TransactionPrepareFailed
     | TransactionCommitFailed
@@ -127,6 +128,7 @@ module JsFailure =
         | JsFailure.ResultTooLarge _ -> "RESULT_TOO_LARGE"
         | JsFailure.InvalidReturnValue -> "INVALID_RETURN_VALUE"
         | JsFailure.ReadOnlyMutationRejected -> "READ_ONLY_MUTATION_REJECTED"
+        | JsFailure.ReviewOnly -> "REVIEW_ONLY"
         | JsFailure.FileChanged _ -> "FILE_CHANGED"
         | JsFailure.TransactionPrepareFailed -> "TRANSACTION_PREPARE_FAILED"
         | JsFailure.TransactionCommitFailed -> "TRANSACTION_COMMIT_FAILED"
@@ -188,6 +190,7 @@ module JsFailure =
         | JsFailure.ResultTooLarge _ -> "result exceeds the output bound"
         | JsFailure.InvalidReturnValue -> "run() return value is not JSON-compatible"
         | JsFailure.ReadOnlyMutationRejected -> "mutations are rejected on read-only surface"
+        | JsFailure.ReviewOnly -> "This repository operation is available only during the current unaccepted review."
         | JsFailure.FileChanged path -> "target changed since the read snapshot; no implicit retry: " + path
         | JsFailure.TransactionPrepareFailed -> "transaction prepare failed"
         | JsFailure.TransactionCommitFailed -> "transaction commit failed"
@@ -268,6 +271,7 @@ module JsFailure =
         | "RESULT_TOO_LARGE" -> JsFailure.ResultTooLarge None
         | "INVALID_RETURN_VALUE" -> JsFailure.InvalidReturnValue
         | "READ_ONLY_MUTATION_REJECTED" -> JsFailure.ReadOnlyMutationRejected
+        | "REVIEW_ONLY" -> JsFailure.ReviewOnly
         | "FILE_CHANGED" -> JsFailure.FileChanged(after "target changed since the read snapshot; no implicit retry: ")
         | "TRANSACTION_PREPARE_FAILED" -> JsFailure.TransactionPrepareFailed
         | "TRANSACTION_COMMIT_FAILED" -> JsFailure.TransactionCommitFailed

@@ -82,6 +82,22 @@ module JsToolWorkflow =
         fileAccessObservation: FileAccessObservation option ->
             Task<JsToolOutcome>
 
+    val executeWithReviewCheck:
+        reviewCheck: (unit -> Task<bool>) option ->
+        sessionId: string ->
+        fence: (Wanxiangshu.Foundation.Identity.ProviderRunIdentity * Wanxiangshu.Foundation.Identity.ToolCallId) option ->
+        capabilities: Set<JsCapability> ->
+        root: string ->
+        baseClassSource: string ->
+        input: obj ->
+        deadlineMs: int ->
+        deadlineEpochMs: int64 ->
+        outputBoundBytes: int ->
+        persistence: IJsTransactionPersistence option ->
+        lifecyclePersistence: IJsLifecyclePersistence option ->
+        fileAccessObservation: FileAccessObservation option ->
+            Task<JsToolOutcome>
+
     /// Run a program whose api is caller-supplied while the park lifecycle,
     /// race and outcome stay workflow-owned (the plan tenure sandbox).
     val runWithParkApi:

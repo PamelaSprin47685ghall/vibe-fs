@@ -230,7 +230,7 @@ test('WHAT[capability-enforcement-006] AUTOINJ_active_empty_skill_call_is_denied
     const real = transformed.messages.find((message) => message.info?.id === 'asst-real-skill')
     assert.ok(real)
     assert.deepEqual(real.parts[0].state.input, { name: 'pdfs' })
-    assert.equal(real.parts[0].state.output, 'real skill output')
+    assert.match(real.parts[0].state.output, /^\[ANCHOR: \d+\]\u0000\ufeffreal skill output$/)
   })
 })
 test('WHAT[capability-enforcement-006] AUTOINJ_tryInject_rewrites_active_call_without_synthetic_injection', async () => {

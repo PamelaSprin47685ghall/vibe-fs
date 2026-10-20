@@ -20,6 +20,9 @@ type JsCapability =
     /// Delegation primitives: create a child work (`fork`) and wait for the
     /// caller's children (`join`).
     | Fork
+    | Resume
+    | Commission
+    | DevOps
     | Join
     /// Same-identity multi-lane execution (`this.fission`).
     | Fission
@@ -50,6 +53,8 @@ module JsCapability =
         | ToolPermission.Remove -> Some JsCapability.Remove
         | ToolPermission.Exec -> Some JsCapability.Exec
         | ToolPermission.Fork -> Some JsCapability.Fork
+        | ToolPermission.Resume -> Some JsCapability.Resume
+        | ToolPermission.DevOpsConsultation -> Some JsCapability.DevOps
         | ToolPermission.Join -> Some JsCapability.Join
         | ToolPermission.Fission -> Some JsCapability.Fission
         | ToolPermission.Horizon -> Some JsCapability.Horizon
@@ -135,6 +140,18 @@ module JsFragmentRegistry =
         { Capability = JsCapability.Fork
           MemberName = "fork" }
 
+    let resume: JsCapabilityFragment =
+        { Capability = JsCapability.Resume
+          MemberName = "resume" }
+
+    let commission: JsCapabilityFragment =
+        { Capability = JsCapability.Commission
+          MemberName = "commission" }
+
+    let devops: JsCapabilityFragment =
+        { Capability = JsCapability.DevOps
+          MemberName = "devops" }
+
     let dag: JsCapabilityFragment =
         { Capability = JsCapability.Fork
           MemberName = "dag" }
@@ -181,6 +198,9 @@ module JsFragmentRegistry =
           where
           call
           fork
+          resume
+          commission
+          devops
           dag
           join
           fission
