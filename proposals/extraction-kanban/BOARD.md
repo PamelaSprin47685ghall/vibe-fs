@@ -59,7 +59,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-24 | 文件读取、锚点与原子编辑 | 仓库 | DONE | CUT-00 | eng-cut24 | 2026-10-15 主线提交 2f98049e5：wanxiangli fs 模块合入 0.7.0（38 测试绿），repository-programming 158 项回归全绿，证据链见 cards/CUT-24.md §10 |
 | CUT-25 | 受限 JS 编程面与执行组合 | 仓库 | BACKLOG | CUT-02, CUT-08, CUT-24 | — | — |
 | CUT-26 | 需求发现与材料溯源 | 仓库 | DONE | CUT-00 | eng-cut26 | 2026-10-15 主线提交 2f98049e5：wanxiangli grounding 模块合入 0.7.0（13 测试绿）；主仓 requirement-grounding 残留 002/007 两项为 GAP.md 既有登记缺口（GAP-085，非本卡回归），证据链见 cards/CUT-26.md §10 |
-| CUT-27 | Casebook / 知识复用去向 | 产品裁决 | DECISION | CUT-06, CUT-19, CUT-24 | — | — |
+| CUT-27 | Casebook / 知识复用去向 | 产品裁决 | READY | CUT-06, CUT-19, CUT-24 | — | 2026-10-20 eng-cut19-goose 裁决：保留产品功能并分步抽取（不删除、不整体 RETAINED）；子范围①Index 纯投影可认领，②Fetch 差异决策、③实质访问判定依次，见 cards/CUT-27.md |
 | CUT-28 | Fission 多 lane 执行 | 执行 | BACKLOG | CUT-03, CUT-10, CUT-12, CUT-13 | — | — |
 | CUT-29 | Strength / 投机调查去向 | 产品裁决 | DECISION | CUT-06, CUT-10, CUT-13, CUT-19 | — | — |
 | CUT-30 | Rulebook、指导与退化观察去向 | 产品裁决 | DONE | CUT-03, CUT-05, CUT-16, CUT-19 | eng-cut06-goose | 2026-10-20 裁决并完成：Rulebook/Enforcer、Blogger 诊断、guidance-delivery、behavior-diagnosis 已由仓主于 6eef89d1e 删除（REMOVED）；degeneration-guard 检测算法已抽入 wanxiangli/degeneration 0.12.0（a0f0de9），LoopDetector 改为组合者，语料/包络派生与分词、LoopSensor 中断/续发留主仓；差分逐位相等，见 cards/CUT-30.md |
