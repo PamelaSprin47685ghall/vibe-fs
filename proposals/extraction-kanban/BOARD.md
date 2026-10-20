@@ -47,7 +47,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-12 | 会话关联与执行事实 | 执行 | BACKLOG | CUT-04, CUT-11 | — | — |
 | CUT-13 | 委派、复用与结果认领 | 执行 | BACKLOG | CUT-06, CUT-12 | — | — |
 | CUT-14 | 失败预算、恢复决议与结算 | 执行 | BACKLOG | CUT-10, CUT-11, CUT-12 | — | — |
-| CUT-15 | 前缀世代与候选提交 | 上下文 | BACKLOG | CUT-03 | — | — |
+| CUT-15 | 前缀世代与候选提交 | 上下文 | DOING | CUT-03 | eng-cut15-goose | — |
 | CUT-16 | 压缩覆盖与 checkpoint | 上下文 | BACKLOG | CUT-03, CUT-06, CUT-15 | — | — |
 | CUT-17 | 请求投影与信息边界 | 表达 | BACKLOG | CUT-05, CUT-06, CUT-08, CUT-15, CUT-16 | — | — |
 | CUT-18 | 规范事实编码与校验 | 存储 | DONE | CUT-00 | eng-cut18 | 2026-10-15 主线提交 2f98049e5：wanxiangli events 模块合入 0.7.0，库侧 34 测试 + durable-events 244 项回归全绿，证据链见 cards/CUT-18.md §10 |
