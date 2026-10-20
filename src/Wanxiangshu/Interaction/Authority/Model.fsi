@@ -5,6 +5,44 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 
+/// Typed projection of the `wanxiangli/dispatch` claim-ledger law (CUT-11).
+[<RequireQualifiedAccess>]
+module DispatchLaw =
+    val recoveryTailWindow: int
+
+    val claimScope:
+        sessionId: string -> logicalRunId: string option -> origin: string -> payloadDigest: string -> string
+
+    val promptKeyMaterial:
+        sessionId: string ->
+        logicalRunId: string option ->
+        authorityRoot: string option ->
+        origin: string ->
+        payloadDigest: string ->
+        claimSequence: int ->
+            string
+
+    val nextClaimSequence: consumed: int option -> int
+    val alreadyClaimed: consumed: int option -> bool
+
+    [<RequireQualifiedAccess>]
+    type Edit =
+        | RecordReceipt
+        | DropPending
+        | LandOccasion
+        | LandExact
+        | RecordContinuation
+        | ClearOccasion
+
+    val settle: event: string -> pending: bool -> continuation: bool -> Edit list
+    val occasionAdmitted: pendingSameOccasion: bool -> landedOrigin: string option -> origin: string -> bool
+
+    val recover:
+        promptKey: string ->
+        hasReceipt: bool ->
+        messages: (string * string option * string) list ->
+            Result<string, bool>
+
 [<RequireQualifiedAccess>]
 module PromptAuthority =
     type RootAuthorityKind = PromptRootAuthorityKind
@@ -93,11 +131,13 @@ module PromptAuthority =
           Count: int }
 
     type UserQuestion =
-        { Request: UserQuestionAskedPayload
-          Answer: PhysicalUserMessageId option
-          /// LC-015: 提问登记时已准入的所有物理输入（含引发提问的那条）。
-          /// 这些输入不能在提问后作为"新答复"解锁提问。
-          PriorPhysicalInputs: Set<PhysicalUserMessageId> }
+        {
+            Request: UserQuestionAskedPayload
+            Answer: PhysicalUserMessageId option
+            /// LC-015: 提问登记时已准入的所有物理输入（含引发提问的那条）。
+            /// 这些输入不能在提问后作为"新答复"解锁提问。
+            PriorPhysicalInputs: Set<PhysicalUserMessageId>
+        }
 
     type PromptAuthorityProjection =
         { LastAuthorityProfile: AuthorityExecutionProfile option

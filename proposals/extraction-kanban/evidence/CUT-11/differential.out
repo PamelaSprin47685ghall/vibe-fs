@@ -1,0 +1,18 @@
+{
+ "sequences": 3000,
+ "steps": 40,
+ "ops": 120000,
+ "compared": 1200000,
+ "differences": 0,
+ "opMix": {
+  "submit": 24210,
+  "abandon": 23886,
+  "register": 47871,
+  "accept": 24033
+ },
+ "finalShape": {
+  "pending": 4,
+  "occasions": 2,
+  "landings": 2
+ }
+}

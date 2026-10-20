@@ -1,10 +1,128 @@
 namespace Wanxiangshu.Interaction.Authority
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+
+/// Typed projection of the stateless `wanxiangli/dispatch` claim-ledger law
+/// (CUT-11): claim scope and PromptKey material, ClaimSequence consumption, the
+/// four-state settlement edits, exact-occasion admission and the bounded
+/// recovery proof. The projection record, sha256 and the journal stay here.
+[<RequireQualifiedAccess>]
+module DispatchLaw =
+
+    type private Law =
+        abstract recoveryTailWindow: int
+        abstract claimScope: input: obj -> string
+        abstract promptKeyMaterial: input: obj -> string
+        abstract nextClaimSequence: consumed: obj -> int
+        abstract alreadyClaimed: consumed: obj -> bool
+        abstract settle: input: obj -> string array
+        abstract occasionAdmitted: input: obj -> bool
+        abstract recover: input: obj -> obj
+
+    [<Import("Dispatch", "wanxiangli/dispatch")>]
+    let private dispatchClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : Law = jsNative
+
+    let private law: Law = construct dispatchClass
+
+    let private orNull (value: string option) : obj =
+        match value with
+        | Some text -> box text
+        | None -> null
+
+    let private count (consumed: int option) : obj =
+        match consumed with
+        | Some value -> box value
+        | None -> null
+
+    let recoveryTailWindow = law.recoveryTailWindow
+
+    let claimScope (sessionId: string) (logicalRunId: string option) (origin: string) (payloadDigest: string) =
+        law.claimScope (
+            createObj
+                [ "sessionId" ==> sessionId
+                  "logicalRunId" ==> orNull logicalRunId
+                  "origin" ==> origin
+                  "payloadDigest" ==> payloadDigest ]
+        )
+
+    let promptKeyMaterial
+        (sessionId: string)
+        (logicalRunId: string option)
+        (authorityRoot: string option)
+        (origin: string)
+        (payloadDigest: string)
+        (claimSequence: int)
+        =
+        law.promptKeyMaterial (
+            createObj
+                [ "sessionId" ==> sessionId
+                  "logicalRunId" ==> orNull logicalRunId
+                  "authorityRoot" ==> orNull authorityRoot
+                  "origin" ==> origin
+                  "payloadDigest" ==> payloadDigest
+                  "claimSequence" ==> claimSequence ]
+        )
+
+    let nextClaimSequence (consumed: int option) = law.nextClaimSequence (count consumed)
+    let alreadyClaimed (consumed: int option) = law.alreadyClaimed (count consumed)
+
+    [<RequireQualifiedAccess>]
+    type Edit =
+        | RecordReceipt
+        | DropPending
+        | LandOccasion
+        | LandExact
+        | RecordContinuation
+        | ClearOccasion
+
+    let private edit (label: string) =
+        match label with
+        | "RecordReceipt" -> Edit.RecordReceipt
+        | "DropPending" -> Edit.DropPending
+        | "LandOccasion" -> Edit.LandOccasion
+        | "LandExact" -> Edit.LandExact
+        | "RecordContinuation" -> Edit.RecordContinuation
+        | "ClearOccasion" -> Edit.ClearOccasion
+        | other -> failwithf "wanxiangli/dispatch returned an unknown ledger edit %s" other
+
+    /// event: "Submit" | "Accept" | "Abandon".
+    let settle (event: string) (pending: bool) (continuation: bool) : Edit list =
+        law.settle (createObj [ "event" ==> event; "pending" ==> pending; "continuation" ==> continuation ])
+        |> Array.map edit
+        |> Array.toList
+
+    let occasionAdmitted (pendingSameOccasion: bool) (landedOrigin: string option) (origin: string) =
+        law.occasionAdmitted (
+            createObj
+                [ "pendingSameOccasion" ==> pendingSameOccasion
+                  "landedOrigin" ==> orNull landedOrigin
+                  "origin" ==> origin ]
+        )
+
+    /// messages: (role, PromptKey carrier, physical id), oldest first.
+    /// Ok physical = proven; Error hasReceipt = still pending.
+    let recover (promptKey: string) (hasReceipt: bool) (messages: (string * string option * string) list) =
+        let wire =
+            messages
+            |> List.map (fun (role, key, id) -> createObj [ "role" ==> role; "promptKey" ==> orNull key; "id" ==> id ])
+            |> List.toArray
+
+        let verdict =
+            law.recover (createObj [ "promptKey" ==> promptKey; "hasReceipt" ==> hasReceipt; "messages" ==> wire ])
+
+        match unbox<string> verdict?kind with
+        | "Proven" -> Ok(unbox<string> verdict?physicalUserMessageId)
+        | "StillPending" -> Error(unbox<bool> verdict?hasReceipt)
+        | other -> failwithf "wanxiangli/dispatch returned an unknown recovery verdict %s" other
 
 [<RequireQualifiedAccess>]
 module PromptAuthority =
@@ -208,11 +326,13 @@ module PromptAuthority =
     /// DSL-state-combination: domain — the two optional authority profiles
     /// represent durable before/active evidence; they are not stage latches.
     type UserQuestion =
-        { Request: UserQuestionAskedPayload
-          Answer: PhysicalUserMessageId option
-          /// LC-015: 提问登记时已准入的所有物理输入（含引发提问的那条）。
-          /// 这些输入不能在提问后作为"新答复"解锁提问。
-          PriorPhysicalInputs: Set<PhysicalUserMessageId> }
+        {
+            Request: UserQuestionAskedPayload
+            Answer: PhysicalUserMessageId option
+            /// LC-015: 提问登记时已准入的所有物理输入（含引发提问的那条）。
+            /// 这些输入不能在提问后作为"新答复"解锁提问。
+            PriorPhysicalInputs: Set<PhysicalUserMessageId>
+        }
 
     type PromptAuthorityProjection =
         {
@@ -369,43 +489,26 @@ module PromptAuthority =
     // a different key for the same logical dispatch and conclude nothing was
     // sent.
 
-    /// Absent identities participate in the digest as an explicit marker rather
-    /// than an empty string, so "no Logical Run yet" cannot collide with "a run
-    /// whose id happens to be blank".
-    let private digestField (value: string option) =
-        match value with
-        | Some text -> text
-        | None -> "\u0000absent"
+    /// PROMPT-011 recovery bounds, owned by `wanxiangli/dispatch`: a Host
+    /// session's history is unbounded while a pending claim is minutes old at
+    /// most, and PROMPT-011 forbids resending either way.
+    ///
+    /// Plain `let`, not `[<Literal>]`: the value stays assertable from a layer 1 test.
+    let RecoveryTailWindow = DispatchLaw.recoveryTailWindow
 
-    /// PROMPT-011 recovery bounds.
-    ///
-    /// The tail window exists because a Host session's history is unbounded while
-    /// a pending claim is minutes old at most. Scanning further would not find a
-    /// message that is genuinely absent, and PROMPT-011 forbids resending either
-    /// way — so a wider window buys nothing and costs an unbounded read.
-    ///
-    /// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,
-    /// leaving the clause value unassertable from a layer 1 test.
-    let RecoveryTailWindow = 50
-
-    /// The scope a ClaimSequence counts within.
-    ///
-    /// PROMPT-011 names (SessionId, LogicalRunId, Origin, PayloadDigest). Two
-    /// dispatches agreeing on all four are the same logical act repeated, which
-    /// is exactly when a distinct sequence number is needed.
+    /// The scope a ClaimSequence counts within: (SessionId, LogicalRunId,
+    /// Origin, PayloadDigest), as `wanxiangli/dispatch` spells it.
     let claimScopeDigest
         (sessionId: SessionId)
         (logicalRunId: LogicalRunId option)
         (origin: PromptOrigin)
         (payloadDigest: string)
         =
-        String.Join(
-            "\u001f",
-            [| SessionId.value sessionId
-               digestField (logicalRunId |> Option.map LogicalRunId.value)
-               originLabel origin
-               payloadDigest |]
-        )
+        DispatchLaw.claimScope
+            (SessionId.value sessionId)
+            (logicalRunId |> Option.map LogicalRunId.value)
+            (originLabel origin)
+            payloadDigest
 
     /// Root claims have no LogicalRunId until physical acceptance. Their
     /// sequence scope belongs to the session, so closing a run cannot reset it.
@@ -413,15 +516,17 @@ module PromptAuthority =
         projection.ClaimSequences
         |> Map.filter (fun _ counter -> counter.SessionId = sessionId && counter.LogicalRunId.IsNone)
 
+    let private consumedClaims (scope: string) (projection: PromptAuthorityProjection) =
+        Map.tryFind scope projection.ClaimSequences
+        |> Option.map (fun counter -> counter.Count)
+
     /// The ClaimSequence this scope's next claim would carry.
     let nextClaimSequence (scope: string) (projection: PromptAuthorityProjection) =
-        (Map.tryFind scope projection.ClaimSequences
-         |> Option.map (fun counter -> counter.Count)
-         |> Option.defaultValue 0)
-        + 1
+        DispatchLaw.nextClaimSequence (consumedClaims scope projection)
 
-    /// PROMPT-011's key. Deterministic in every input, so the same logical
-    /// dispatch derives the same key on any process that folds the same journal.
+    /// PROMPT-011's key: sha256 of the library's deterministic material, so the
+    /// same logical dispatch derives the same key on any process that folds the
+    /// same journal.
     let derivePromptKey
         (sha256: string -> string)
         (sessionId: SessionId)
@@ -431,20 +536,15 @@ module PromptAuthority =
         (payloadDigest: string)
         (claimSequence: int)
         : PromptKey =
-        PromptKey.create (
-            sha256 (
-                String.Join(
-                    "\u001f",
-                    [| SessionId.value sessionId
-                       digestField (logicalRunId |> Option.map LogicalRunId.value)
-                       digestField (authorityRoot |> Option.map AuthorityRootUserMessageId.value)
-                       originLabel origin
-                       payloadDigest
-                       string claimSequence |]
-                )
-            )
-        )
-
+        DispatchLaw.promptKeyMaterial
+            (SessionId.value sessionId)
+            (logicalRunId |> Option.map LogicalRunId.value)
+            (authorityRoot |> Option.map AuthorityRootUserMessageId.value)
+            (originLabel origin)
+            payloadDigest
+            claimSequence
+        |> sha256
+        |> PromptKey.create
 
     /// Request + terminal-scoped repair identity. Both axes matter: terminal identity
     /// makes same-terminal re-entry idempotent.
@@ -486,12 +586,12 @@ module PromptAuthority =
                 && claim.Origin = origin
                 && claim.PayloadDigest = payloadDigest)
 
-        let accepted =
+        let landedOrigin =
             projection.AcceptedDispatches
             |> Map.tryFind (acceptedDispatchKey sessionId payloadDigest)
-            |> Option.exists (fun dispatch -> dispatch.Origin = origin)
+            |> Option.map (fun dispatch -> originLabel dispatch.Origin)
 
-        pending || accepted
+        DispatchLaw.occasionAdmitted pending landedOrigin (originLabel origin)
 
     let gateNudgeAlreadyAdmitted
         (sessionId: SessionId)
@@ -547,7 +647,7 @@ module PromptAuthority =
                 (PromptOrigin.Continuation ContinuationKind.InteractionRepair)
                 (repairPayloadDigest requestId terminalProviderRun repairKind)
 
-        nextClaimSequence scope projection > 1
+        DispatchLaw.alreadyClaimed (consumedClaims scope projection)
 
     /// AGENT-001: Canonical role shares one system prompt, so the prompt
     /// identity is a function of CanonicalRole alone.

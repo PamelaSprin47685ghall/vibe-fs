@@ -212,6 +212,86 @@ module PromptAuthorityRun =
           Receipt = None
           ClaimedAtRuntimeStartCount = 0 }
 
+    /// Apply the ledger edits `wanxiangli/dispatch` settles for one claim event
+    /// (CUT-11). A key that is not pending (already landed, abandoned or never
+    /// claimed) gets no edits: a landing never regresses and a duplicate receipt
+    /// never dispatches again.
+    let private settleClaim
+        (event: string)
+        (key: PromptKey)
+        (receipt: TransportReceipt option)
+        (physicalMessageId: PhysicalUserMessageId option)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        =
+        let pending = Map.tryFind key projection.PendingClaims
+
+        let continuation =
+            match pending with
+            | Some { Origin = PromptAuthority.PromptOrigin.Continuation _ } -> true
+            | _ -> false
+
+        let landed (claim: PromptAuthority.PromptClaim) : PromptAuthority.AcceptedDispatch =
+            { PromptKey = claim.PromptKey
+              SessionId = claim.SessionId
+              Origin = claim.Origin
+              IdentitySeed = claim.IdentitySeed
+              PayloadDigest = claim.PayloadDigest
+              PhysicalUserMessageId =
+                physicalMessageId
+                |> Option.defaultWith (fun () -> failwith "wanxiangli/dispatch landed a claim without a physical id") }
+
+        let required what (value: 'T option) =
+            value
+            |> Option.defaultWith (fun () -> failwithf "wanxiangli/dispatch asked for %s that the event lacks" what)
+
+        match pending with
+        | None ->
+            DispatchLaw.settle event false false
+            |> List.iter (fun _ -> failwith "wanxiangli/dispatch edited a claim that is not pending")
+
+            projection
+        | Some claim ->
+            let occasion =
+                PromptAuthority.acceptedDispatchKey claim.SessionId claim.PayloadDigest
+
+            DispatchLaw.settle event true continuation
+            |> List.fold
+                (fun (state: PromptAuthority.PromptAuthorityProjection) edit ->
+                    match edit with
+                    | DispatchLaw.Edit.RecordReceipt ->
+                        { state with
+                            PendingClaims =
+                                Map.add
+                                    key
+                                    { claim with
+                                        Receipt = Some(required "a receipt" receipt) }
+                                    state.PendingClaims }
+                    | DispatchLaw.Edit.DropPending ->
+                        { state with
+                            PendingClaims = Map.remove key state.PendingClaims }
+                    | DispatchLaw.Edit.LandOccasion ->
+                        { state with
+                            AcceptedDispatches = Map.add occasion (landed claim) state.AcceptedDispatches }
+                    | DispatchLaw.Edit.LandExact ->
+                        let physical = required "a physical id" physicalMessageId
+
+                        { state with
+                            PhysicalLandings = Map.add physical (landed claim) state.PhysicalLandings }
+                    | DispatchLaw.Edit.RecordContinuation ->
+                        match claim.Origin with
+                        | PromptAuthority.PromptOrigin.Continuation kind ->
+                            { state with
+                                AcceptedContinuationIds =
+                                    Map.add
+                                        (required "a physical id" physicalMessageId)
+                                        kind
+                                        state.AcceptedContinuationIds }
+                        | _ -> failwith "wanxiangli/dispatch recorded a continuation for a non-continuation claim"
+                    | DispatchLaw.Edit.ClearOccasion ->
+                        { state with
+                            AcceptedDispatches = Map.remove occasion state.AcceptedDispatches })
+                projection
+
     /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
     ///
     /// Recorded on the claim rather than discarded. PROMPT-011 has to tell "the Host
@@ -222,11 +302,7 @@ module PromptAuthorityRun =
         (receipt: TransportReceipt)
         (projection: PromptAuthority.PromptAuthorityProjection)
         =
-        match Map.tryFind key projection.PendingClaims with
-        | None -> projection
-        | Some claim ->
-            { projection with
-                PendingClaims = Map.add key { claim with Receipt = Some receipt } projection.PendingClaims }
+        settleClaim "Submit" key (Some receipt) None projection
 
     /// An exact duplicate root is idempotent. A fresh root is admitted only
     /// after the prior logical run has released the active binding.
@@ -377,59 +453,19 @@ module PromptAuthorityRun =
                       Count = PromptAuthority.nextClaimSequence scope projection }
                     projection.ClaimSequences }
 
-    let private acceptedContinuationEvidence
-        (physicalMessageId: PhysicalUserMessageId)
-        (origin: PromptAuthority.PromptOrigin)
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        =
-        match origin with
-        | PromptAuthority.PromptOrigin.Continuation continuation ->
-            { projection with
-                AcceptedContinuationIds = Map.add physicalMessageId continuation projection.AcceptedContinuationIds }
-        | PromptAuthority.PromptOrigin.AuthorityRoot _
-        | PromptAuthority.PromptOrigin.HostInternal
-        | PromptAuthority.PromptOrigin.UnknownOrigin -> projection
-
     /// PROMPT-005 `PhysicalAccepted`: a real Host message id resolved a claim.
     ///
     /// The landing is kept as typed `AcceptedDispatch` evidence keyed by
     /// (session, payload digest) — business layers ask `dispatchStatusFor`
     /// instead of scanning the Journal. Only continuations additionally enter
-    /// `AcceptedContinuationIds`: an Authority Root claim resolving does not
-    /// belong in a continuation map, and recording the root a continuation
-    /// belonged to is deliberately gone — that map existed solely to let
-    /// ReviewWitness guess confirmation from a shared root, which REVIEW-003
-    /// forbids. Review confirmation now requires the provider input seal
-    /// (REVIEW-010), so no substitute lookup is provided here.
+    /// `AcceptedContinuationIds`; REVIEW-003 forbids using that map as review
+    /// confirmation. Which edits apply is `wanxiangli/dispatch` settle.
     let acceptClaim
         (key: PromptKey)
         (physicalMessageId: PhysicalUserMessageId)
         (projection: PromptAuthority.PromptAuthorityProjection)
         =
-        match Map.tryFind key projection.PendingClaims with
-        | None -> projection
-        | Some claim ->
-            let withoutClaim = Map.remove key projection.PendingClaims
-
-            let landed: PromptAuthority.AcceptedDispatch =
-                { PromptKey = claim.PromptKey
-                  SessionId = claim.SessionId
-                  Origin = claim.Origin
-                  IdentitySeed = claim.IdentitySeed
-                  PayloadDigest = claim.PayloadDigest
-                  PhysicalUserMessageId = physicalMessageId }
-
-            let withEvidence =
-                { projection with
-                    PendingClaims = withoutClaim
-                    AcceptedDispatches =
-                        Map.add
-                            (PromptAuthority.acceptedDispatchKey claim.SessionId claim.PayloadDigest)
-                            landed
-                            projection.AcceptedDispatches
-                    PhysicalLandings = Map.add physicalMessageId landed projection.PhysicalLandings }
-
-            acceptedContinuationEvidence physicalMessageId claim.Origin withEvidence
+        settleClaim "Accept" key None (Some physicalMessageId) projection
 
     /// PROMPT-005 `Abandoned`. Must not change the Active Logical Run.
     ///
@@ -437,15 +473,7 @@ module PromptAuthorityRun =
     /// occasion slot, so a later reentry may claim the same logical dispatch
     /// again. The exact physical landings are facts and stay untouched.
     let abandonClaim (key: PromptKey) (projection: PromptAuthority.PromptAuthorityProjection) =
-        match Map.tryFind key projection.PendingClaims with
-        | None -> projection
-        | Some claim ->
-            { projection with
-                PendingClaims = Map.remove key projection.PendingClaims
-                AcceptedDispatches =
-                    Map.remove
-                        (PromptAuthority.acceptedDispatchKey claim.SessionId claim.PayloadDigest)
-                        projection.AcceptedDispatches }
+        settleClaim "Abandon" key None None projection
 
     /// PROMPT-009 resolution order, evaluated top to bottom:
     ///

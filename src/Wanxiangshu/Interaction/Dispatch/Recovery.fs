@@ -36,28 +36,6 @@ module PromptRecovery =
           PromptKey: PromptKey
           Outcome: ClaimOutcome }
 
-    /// Step 1+2: the newest `RecoveryTailWindow` messages, searched for this key.
-    ///
-    /// `role=user` only. The PromptKey travels on the prompt this plugin sent, so a
-    /// match on any other role would mean the Host echoed our metadata somewhere it
-    /// does not belong — and treating that as physical acceptance would promote a
-    /// non-user message to an Authority Root.
-    let private findPhysical (key: PromptKey) (messages: SessionMessage list) =
-        let window =
-            let count = List.length messages
-
-            if count <= PromptAuthority.RecoveryTailWindow then
-                messages
-            else
-                messages |> List.skip (count - PromptAuthority.RecoveryTailWindow)
-
-        window
-        |> List.tryPick (fun message ->
-            if message.Role = "user" && message.PromptKey = Some(PromptKey.value key) then
-                Some(PhysicalUserMessageId.create message.Id)
-            else
-                None)
-
     let private acceptClaimOrigin
         (runtime: PromptDispatcher.Runtime)
         (claim: PromptAuthority.PromptClaim)
@@ -89,16 +67,28 @@ module PromptRecovery =
             | Error reason -> return report (Unreadable reason)
         }
 
+    /// Steps 1-5 as `wanxiangli/dispatch` recover decides them: only a
+    /// `role=user` message carrying exactly this PromptKey among the newest
+    /// `RecoveryTailWindow` messages proves the landing (any other role would
+    /// mean the Host echoed our metadata where it does not belong). Without proof
+    /// the claim stays pending, with or without a receipt; nothing is resent.
     let private reconcileMessages
         (runtime: PromptDispatcher.Runtime)
         (claim: PromptAuthority.PromptClaim)
         sessionId
-        messages
+        (messages: SessionMessage list)
         report
         =
-        match findPhysical claim.PromptKey messages with
-        | Some physical -> reconcileWithPhysical runtime claim sessionId physical report
-        | None -> Task.FromResult(report (StillPending claim.Receipt.IsSome))
+        let verdict =
+            DispatchLaw.recover
+                (PromptKey.value claim.PromptKey)
+                claim.Receipt.IsSome
+                (messages
+                 |> List.map (fun message -> message.Role, message.PromptKey, message.Id))
+
+        match verdict with
+        | Ok physical -> reconcileWithPhysical runtime claim sessionId (PhysicalUserMessageId.create physical) report
+        | Error hasReceipt -> Task.FromResult(report (StillPending hasReceipt))
 
     /// Resolve one pending claim.
     ///
