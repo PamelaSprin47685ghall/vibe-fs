@@ -104,12 +104,19 @@ module internal SyncDelegateInternals =
         (turn: ReconciledTurn)
         : bool =
         let assistant = CompletedTurnClassifier.partsSessionText turn.Parts
+
         let resolved =
             JsDeliveredValues.tryTakeRenderedWith
                 (SessionId.value turn.SessionId)
-                (if System.String.IsNullOrWhiteSpace assistant then None else Some assistant)
+                (if System.String.IsNullOrWhiteSpace assistant then
+                     None
+                 else
+                     Some assistant)
             |> Option.orElseWith (fun () ->
-                if System.String.IsNullOrWhiteSpace assistant then None else Some assistant)
+                if System.String.IsNullOrWhiteSpace assistant then
+                    None
+                else
+                    Some assistant)
 
         match resolved with
         | Some record when not (System.String.IsNullOrWhiteSpace record) ->

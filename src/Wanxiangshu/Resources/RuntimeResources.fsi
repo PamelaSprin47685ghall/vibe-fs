@@ -3,13 +3,15 @@ namespace Wanxiangshu.Resources
 open Wanxiangshu.Participant.Provider
 
 type RuntimeResources =
-    { Prompts: PromptCatalog
-      ProviderLanguageRootsReady: bool
-      /// Per-language prompt catalogs, resolved once at install. The installed
-      /// `Prompts` view stays the English seed the system transform repairs;
-      /// Host-config projection reads the bound language from here.
-      EnglishPrompts: PromptCatalog
-      SimplifiedChinesePrompts: PromptCatalog }
+    {
+        Prompts: PromptCatalog
+        ProviderLanguageRootsReady: bool
+        /// Per-language prompt catalogs, resolved once at install. The installed
+        /// `Prompts` view stays the English seed the system transform repairs;
+        /// Host-config projection reads the bound language from here.
+        EnglishPrompts: PromptCatalog
+        SimplifiedChinesePrompts: PromptCatalog
+    }
 
 module RuntimeResources =
     val install: resources: RuntimeResources -> unit

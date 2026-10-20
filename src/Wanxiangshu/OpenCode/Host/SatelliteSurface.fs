@@ -79,7 +79,11 @@ module SatelliteSurface =
           Agent = "companion"
           Title = "Companion"
           Directory = None
-          RestoredSessionId = if linked then Some(SessionId.create "companion-1") else None
+          RestoredSessionId =
+            if linked then
+                Some(SessionId.create "companion-1")
+            else
+                None
           Link = port.Link
           Close = port.Close }
 

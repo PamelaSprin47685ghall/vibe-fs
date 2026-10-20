@@ -39,6 +39,7 @@ module PlanWorkOpenWiring =
             | None -> return Error "workspace directory is unavailable"
             | Some workspace ->
                 let! root = queryWorktreeRoot workspace
+
                 if System.String.IsNullOrWhiteSpace root then
                     return Error "Git did not identify a worktree root"
                 else
@@ -52,6 +53,7 @@ module PlanWorkOpenWiring =
         : Task<unit> =
         task {
             let! resolved = resolveWorktreeRoot workspaceDirectory
+
             match resolved with
             | Ok root ->
                 // Root is the worktree the session was opened in. The state

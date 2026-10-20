@@ -6,14 +6,10 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
 
 type AgentJournalCompanionPort(journal: AgentJournal) =
-    let loadSession (session: Wanxiangshu.Composition.Durable.SessionAgentProjection) : Task<Result<CompanionMemory option, string>> =
-        task {
-            return
-                Ok(
-                    Some
-                        { XTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty }
-                )
-        }
+    let loadSession
+        (session: Wanxiangshu.Composition.Durable.SessionAgentProjection)
+        : Task<Result<CompanionMemory option, string>> =
+        task { return Ok(Some { XTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty }) }
 
     interface ICompanionDurablePort with
         member _.Load(sessionId: SessionId) : Task<Result<CompanionMemory option, string>> =

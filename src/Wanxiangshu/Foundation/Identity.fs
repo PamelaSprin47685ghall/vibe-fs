@@ -89,7 +89,7 @@ module Identity =
     /// same attempt equal" an askable but meaningless question.
     type ProviderRunIdentity = private ProviderRunIdentity of string
 
-    
+
 
     /// One tool invocation inside a provider run. `ToolContext.callID`.
     ///
@@ -279,7 +279,7 @@ module Identity =
         let create (value: string) = ProviderRunIdentity value
         let value (ProviderRunIdentity v) = v
 
-    
+
 
     module ToolCallId =
         let create (value: string) = ToolCallId value

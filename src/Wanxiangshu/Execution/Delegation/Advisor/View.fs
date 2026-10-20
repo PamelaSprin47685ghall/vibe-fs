@@ -27,7 +27,6 @@ type AdvisorViewPlan =
 /// The prompt is this seat's own view. Foundation's `SyntheticToml` owns the bytes (ARCH-010):
 /// the authored `# ` comment header, one blank line, then one `[[new_work_to_record]]` table per
 /// record, with the record text under the field `record`. That table name is this view's schema.
-
 ///
 /// Selection is by anchor alone: an anchor is kept when it is below the declaration's `PrefixUntil`
 /// and was not delivered yet, and a `ThenRemove` pair replaces that anchor's text with its summary.
@@ -56,9 +55,7 @@ module AdvisorView =
         removals |> Map.tryFind message.Anchor |> Option.defaultValue message.Text
 
     let private recordBlock (text: string) =
-        SyntheticToml.tableArrayEntry
-            recordTable
-            [ SyntheticToml.field recordField (SyntheticToml.renderString text) ]
+        SyntheticToml.tableArrayEntry recordTable [ SyntheticToml.field recordField (SyntheticToml.renderString text) ]
 
     /// advisor-[003]: the delta — anchors below `PrefixUntil` that were not delivered yet.
     let private delta (delivered: Set<int>) (request: AdvisorViewRequest) =

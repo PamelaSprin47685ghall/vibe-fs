@@ -99,7 +99,10 @@ type ToolRuntimeScope =
 
     static member emptyManagerFacts: ManagerCapabilityFacts
     member ManagerCapabilityFactsFor: sessionId: string -> Task<ManagerCapabilityFacts>
-    member LifecycleWorkFor: sessionId: string -> Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option>
+
+    member LifecycleWorkFor:
+        sessionId: string -> Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option>
+
     member TryFreezeRetirement: sessionId: string * incumbentId: string -> bool
     member UnfreezeRetirement: sessionId: string -> unit
     member IsRetirementFrozen: sessionId: string -> Task<bool>

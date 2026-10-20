@@ -84,14 +84,7 @@ module CompanionTransform =
         : Task<unit> =
         task {
             let _ =
-                ensureCompanion
-                    companions
-                    gate
-                    satellites
-                    sessionPort
-                    journal
-                    workspaceDirectory
-                    sessionId
+                ensureCompanion companions gate satellites sessionPort journal workspaceDirectory sessionId
 
             replaceMessagesInPlace rawOutObj rawMessages
         }
@@ -157,10 +150,7 @@ module CompanionTransform =
                 else
                     unbox<string> inObj?sessionID
 
-            if
-                not (String.IsNullOrWhiteSpace sessionId)
-                && not (isNull rawOutObj?messages)
-            then
+            if not (String.IsNullOrWhiteSpace sessionId) && not (isNull rawOutObj?messages) then
                 return!
                     processSession
                         companions
@@ -186,14 +176,5 @@ module CompanionTransform =
         (outObj: obj)
         : Task<unit> =
         task {
-            do!
-                handleCompanionTransform
-                    companions
-                    gate
-                    satellites
-                    sessionPort
-                    journal
-                    workspaceDirectory
-                    inObj
-                    outObj
+            do! handleCompanionTransform companions gate satellites sessionPort journal workspaceDirectory inObj outObj
         }

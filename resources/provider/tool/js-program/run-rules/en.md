@@ -93,7 +93,7 @@ slice misses.
 
 Observe before ruling. `watch` should read the ctx deltas, keep what matters on
 instance fields (`this.lastSize`, `this.stalled`), and then decide. A `watch` that
-returns `true` without looking at anything is a watchdog that is not watching — the
+returns `return true` without looking at anything is a watchdog that is not watching — the
 Host will not stop you, but nothing is being supervised. A `next` or `watch` that
 throws fails the whole program.
 

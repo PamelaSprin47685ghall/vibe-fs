@@ -32,6 +32,7 @@ module SessionAssociationProjection =
     val executionClassOf: kind: ManagedSessionKind -> SessionExecutionClass
     val tryMainSessionOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
     val tryOwnerOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
+
     val linkSatellite:
         kind: SatelliteKind ->
         mainSessionId: SessionId ->
@@ -64,6 +65,3 @@ module SessionOwnershipClassification =
 module SyncDelegateAssociationHints =
     val dedicatedExecutionClass: SessionExecutionClass
     val dedicatedOwnership: owner: SessionId -> role: SyncDelegateRole -> SessionOwnership
-
-
-

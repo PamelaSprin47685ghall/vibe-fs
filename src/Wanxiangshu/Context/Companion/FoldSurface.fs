@@ -164,8 +164,7 @@ module ContextFoldSurface =
     let private companionToJs (companion: CompanionProjection option) =
         match companion with
         | None -> null
-        | Some _ ->
-            box {| sessionPresent = true |}
+        | Some _ -> box {| sessionPresent = true |}
 
     let private xTraceToJs (xTrace: XTraceProjectionState option) =
         match xTrace with
@@ -292,8 +291,7 @@ module ContextFoldSurface =
                PrefixEpoch =
                 match session.PrefixEpoch with
                 | None -> null
-                | Some epoch ->
-                    box {| EpochId = PrefixEpochId.value epoch.EpochId |}
+                | Some epoch -> box {| EpochId = PrefixEpochId.value epoch.EpochId |}
                Handles = session.Handles |> Option.map handlesToJs |> Option.toObj
                ProviderFailures = session.ProviderFailures |> Option.map providerFailuresToJs |> Option.toObj
                PromptAuthority = session.PromptAuthority |> Option.map promptAuthorityToJs |> Option.toObj

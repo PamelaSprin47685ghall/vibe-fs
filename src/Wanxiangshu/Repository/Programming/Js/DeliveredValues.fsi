@@ -6,9 +6,7 @@ namespace Wanxiangshu.Repository.Programming.Js
 /// returned). An ordinary `return` leaves the cell untouched. The returned
 /// cursor is keyed by anchor number, not by prose text.
 module JsDeliveredValues =
-    type ReturnedPiece =
-        { Key: string
-          Text: string }
+    type ReturnedPiece = { Key: string; Text: string }
 
     val record: sessionId: string -> value: obj -> unit
     val recordView: sessionId: string -> value: obj -> view: obj option -> unit

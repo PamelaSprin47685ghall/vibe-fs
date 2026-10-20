@@ -16,8 +16,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         |> Option.defaultValue XTraceProjection.empty
 
     member _.Memory: CompanionMemory =
-        lock lockObj (fun () ->
-            { XTrace = xTraceProjection })
+        lock lockObj (fun () -> { XTrace = xTraceProjection })
 
     /// COMPANION-007: refresh the in-memory XTrace mirror after the transform
     /// boundary captured new parts. Without this the chunker keeps mapping the

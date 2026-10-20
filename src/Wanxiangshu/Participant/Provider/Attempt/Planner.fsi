@@ -5,8 +5,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attempt
 open Wanxiangshu.Interaction.Authority
 
-type AttemptPlan =
-    { Profile: AttemptExecutionProfile }
+type AttemptPlan = { Profile: AttemptExecutionProfile }
 
 type PendingAttemptPlan =
     { Authority: PromptAuthority.AuthorityExecutionProfile
@@ -31,6 +30,7 @@ module AttemptPlanner =
             Result<PendingAttemptPlan, string>
 
     val bindProviderRun: providerRun: ProviderRunIdentity -> pending: PendingAttemptPlan -> AttemptPlan
+
     val plan:
         authority: PromptAuthority.AuthorityExecutionProfile ->
         physicalUserMessageId: PhysicalUserMessageId ->

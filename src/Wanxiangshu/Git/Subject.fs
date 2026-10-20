@@ -16,7 +16,8 @@ module GitSubject =
     let private execFileJs (fileName: string) (arguments: string array) (options: obj) (callback: obj) : unit = jsNative
 
     [<Emit("""new Promise(function(resolve, reject) { $0($1, $2, $3, function(error, stdout) { if (error) reject(error); else resolve(stdout); }); })""")>]
-    let private execFileAsync (exec: obj) (fileName: string) (arguments: string array) (options: obj) : Task<string> = jsNative
+    let private execFileAsync (exec: obj) (fileName: string) (arguments: string array) (options: obj) : Task<string> =
+        jsNative
 
     let private utf8 = createObj [ "encoding", box "utf8" ]
 
@@ -67,8 +68,10 @@ module GitSubject =
     let tryRevParseHeadTree (directory: string) : Task<string option> =
         task {
             try
-                let! output = execFileAsync execFileJs Executable [| "-C"; directory; "rev-parse"; "HEAD^{tree}" |] quietUtf8
-                return Some (output.Trim())
+                let! output =
+                    execFileAsync execFileJs Executable [| "-C"; directory; "rev-parse"; "HEAD^{tree}" |] quietUtf8
+
+                return Some(output.Trim())
             with _ ->
                 return None
         }

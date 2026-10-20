@@ -17,7 +17,7 @@ module Identity =
     type RepairRequestId = private RepairRequestId of string
     type TransportReceipt = private TransportReceipt of string
     type ProviderRunIdentity = private ProviderRunIdentity of string
-    
+
     type ToolCallId = private ToolCallId of string
     type HostToolPartId = private HostToolPartId of string
     type HostMessagePartId = private HostMessagePartId of string
@@ -111,7 +111,7 @@ module Identity =
         val create: value: string -> ProviderRunIdentity
         val value: id: ProviderRunIdentity -> string
 
-    
+
 
     module ToolCallId =
         val create: value: string -> ToolCallId

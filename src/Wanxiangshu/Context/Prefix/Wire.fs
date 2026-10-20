@@ -19,9 +19,7 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Participant.Provider.Projection
 
-type XWireReconciliationDecision =
-    { Cleared: bool
-      KeptPlan: bool }
+type XWireReconciliationDecision = { Cleared: bool; KeptPlan: bool }
 
 type AttemptPlanCapability =
     { TryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option
@@ -32,25 +30,14 @@ type AttemptPlanCapability =
 
 module XWire =
 
-    let reconciliationDecision
-        (hasPlan: bool)
-        (outcome: AttemptOutcome option)
-        : XWireReconciliationDecision =
+    let reconciliationDecision (hasPlan: bool) (outcome: AttemptOutcome option) : XWireReconciliationDecision =
         match hasPlan, outcome with
-        | false, _ ->
-            { Cleared = false
-              KeptPlan = false }
-        | true, Some AttemptOutcome.Completed ->
-            { Cleared = true
-              KeptPlan = false }
+        | false, _ -> { Cleared = false; KeptPlan = false }
+        | true, Some AttemptOutcome.Completed -> { Cleared = true; KeptPlan = false }
         | true, Some AttemptOutcome.CompletedInvalid
         | true, Some AttemptOutcome.Failed
-        | true, Some AttemptOutcome.Aborted ->
-            { Cleared = true
-              KeptPlan = false }
-        | true, None ->
-            { Cleared = false
-              KeptPlan = true }
+        | true, Some AttemptOutcome.Aborted -> { Cleared = true; KeptPlan = false }
+        | true, None -> { Cleared = false; KeptPlan = true }
 
     let private sessionIdOfOutput (output: obj) : SessionId option =
         ProviderWireDecode.projectionSessionIdFromMessages output
@@ -248,6 +235,7 @@ module XWire =
                         physical
                         (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt)
                         ProviderRequestKind.WorkMain
+
                 return requireAdmittedPendingPlan attempts sessionId physical pendingPlan
             }
 

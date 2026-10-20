@@ -269,8 +269,7 @@ module FissionProjection =
         | Some _, None, _ ->
             let next =
                 { group with
-                    LaneWork =
-                        Map.add payload.LaneIndex (payload.ViewRef, payload.ViewDigest) group.LaneWork
+                    LaneWork = Map.add payload.LaneIndex (payload.ViewRef, payload.ViewDigest) group.LaneWork
                     LaneProviderRuns = Map.add payload.LaneIndex payload.ProviderRun group.LaneProviderRuns }
 
             Ok(replaceGroup state payload.GroupId next)

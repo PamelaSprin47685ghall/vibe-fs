@@ -126,8 +126,7 @@ module CausalWaitBridge =
     let private writeSnapshotUnsafe (workspace: string) (snapshot: DiagnosticWaitSnapshot) : Task<unit> =
         task {
             try
-                let! stateRoot =
-                    Wanxiangshu.Persistence.Journal.RuntimePath.initializeStateRoot workspace
+                let! stateRoot = Wanxiangshu.Persistence.Journal.RuntimePath.initializeStateRoot workspace
 
                 let diagnosticsDir = pathJoin (stateRoot, "diagnostics")
                 mkdirSync (diagnosticsDir, {| recursive = true |})
@@ -146,4 +145,5 @@ module CausalWaitBridge =
 
     let target (workspace: string) : IWaitDiagnosticSink =
         { new IWaitDiagnosticSink with
-            member _.Publish(snapshot) = writeSnapshot workspace snapshot |> ignore }
+            member _.Publish(snapshot) =
+                writeSnapshot workspace snapshot |> ignore }

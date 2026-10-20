@@ -18,7 +18,8 @@ module ProviderSystemTransform =
     let private updateMatchingConstraintLine
         (currentSystem: string array)
         (isConstraintLine: string -> bool)
-        (nextConstraint: string) =
+        (nextConstraint: string)
+        =
         let replaceIfMatching index text =
             match isConstraintLine text with
             | true -> currentSystem.[index] <- nextConstraint
@@ -70,8 +71,7 @@ module ProviderSystemTransform =
         | Role.Inquiry
         | Role.Distiller -> None
 
-    let private localizedRolePrompt lang role =
-        PromptResources.systemForRole lang role
+    let private localizedRolePrompt lang role = PromptResources.systemForRole lang role
 
     let private replaceOwnedSegment (oldPrompt: string) (nextPrompt: string) (system: string array) =
         let expected = canonical oldPrompt
@@ -92,11 +92,7 @@ module ProviderSystemTransform =
             None
 
     let private activeRoles =
-        [ Role.Manager
-          Role.Orchestrator
-          Role.Engineer
-          Role.DevOps
-          Role.Plan ]
+        [ Role.Manager; Role.Orchestrator; Role.Engineer; Role.DevOps; Role.Plan ]
 
     let private chooseBookkeeperPrompt expectedEn expectedZh nextPrompt (text: string) =
         let c = canonical text
@@ -219,4 +215,3 @@ module ProviderSystemTransform =
                 | None -> ()
                 | Some(sessionText, system) -> do! transformSystem role planStage sessionText system
             }
-

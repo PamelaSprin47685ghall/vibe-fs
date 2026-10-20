@@ -194,7 +194,9 @@ module XWireSurface =
     ///   keptPlan:  true when the plan is kept across a non-terminal reread.
     let reconcile (input: obj) : obj =
         let hasPlan = not (isNullish input?hasPlan) && (input?hasPlan |> unbox<bool>)
-        let decision = XWire.reconciliationDecision hasPlan (attemptOutcomeOfJs input?outcome)
+
+        let decision =
+            XWire.reconciliationDecision hasPlan (attemptOutcomeOfJs input?outcome)
 
         box
             {| cleared = decision.Cleared

@@ -51,7 +51,7 @@ module Surface =
     let private requestKindOf value =
         match requiredText "requestKind" value with
         | "work-main" -> ProviderRequestKind.WorkMain
-                | "interaction-repair" -> ProviderRequestKind.InteractionRepair
+        | "interaction-repair" -> ProviderRequestKind.InteractionRepair
         | kind -> invalidArg "requestKind" $"unknown provider request kind '{kind}'"
 
 

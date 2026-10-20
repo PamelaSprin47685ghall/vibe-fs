@@ -135,9 +135,9 @@ module ProviderRecoveryWorkflow =
             )
         with
         | ProviderRecoveryStep.RetrySameProvider ->
-            ModelRouting.retainFailedTargetForRetry turn.SessionId turn.ProviderRun |> ignore
-        | ProviderRecoveryStep.BlacklistProviderThenRetry ->
-            ModelRouting.condemnFailedTarget turn.ProviderRun |> ignore
+            ModelRouting.retainFailedTargetForRetry turn.SessionId turn.ProviderRun
+            |> ignore
+        | ProviderRecoveryStep.BlacklistProviderThenRetry -> ModelRouting.condemnFailedTarget turn.ProviderRun |> ignore
 
     let private continueSameProvider
         (sessionPort: ISessionHostPort)

@@ -21,4 +21,3 @@ module ProviderRequestKind =
         match kind with
         | ProviderRequestKind.WorkMain -> true
         | ProviderRequestKind.InteractionRepair -> false
-

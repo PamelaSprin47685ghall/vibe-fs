@@ -19,4 +19,3 @@ module AssociationSurface =
     val dedicatedExecutionClass: string
     val dedicatedOwnership: owner: string -> role: string -> obj
     val dedicatedAttachment: role: string -> string
-    

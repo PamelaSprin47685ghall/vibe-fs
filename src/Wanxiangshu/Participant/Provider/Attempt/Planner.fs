@@ -18,10 +18,7 @@ open Wanxiangshu.Foundation.Identity
 /// choice: CTX-010 makes the probe part of the immutable profile, so a caller that
 /// received them separately could send a request whose projection
 /// differed from its message list.
-type AttemptPlan =
-    {
-        Profile: AttemptExecutionProfile
-    }
+type AttemptPlan = { Profile: AttemptExecutionProfile }
 
 /// Pre-inference half of an AttemptPlan.
 ///
@@ -70,11 +67,7 @@ module AttemptPlanner =
             accepted.AuthorityKind
             accepted.IdentitySeed
         |> Result.map (fun authority ->
-            freezePreInference
-                authority
-                accepted.PhysicalUserMessageId
-                accepted.Origin
-                requestKind)
+            freezePreInference authority accepted.PhysicalUserMessageId accepted.Origin requestKind)
 
     /// Binds the immutable pre-inference decision to the
     /// exact assistant run for the already-frozen physical request.

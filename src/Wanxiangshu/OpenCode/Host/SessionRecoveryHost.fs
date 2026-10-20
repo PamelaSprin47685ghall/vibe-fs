@@ -547,4 +547,3 @@ type SessionRecoveryHost
     /// "ignored" as the observable decision of this signal.
     member _.SettleProviderStartBoundaryRejected(key: ChatExecutionKey, reason: string) : Task<string> =
         settleProviderStartBoundaryRejected key reason
-

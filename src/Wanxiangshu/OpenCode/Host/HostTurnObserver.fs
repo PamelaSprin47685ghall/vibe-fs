@@ -226,12 +226,4 @@ module HostTurnObserver =
         (scope: PluginRuntimeScope)
         (context: ReconciledTurnContext)
         : Task =
-        observeBusinessTurn
-            observeTurnWorkflow
-            sessionPort
-            rootWorkspace
-            eventPort
-            journal
-            scope
-            context
-
+        observeBusinessTurn observeTurnWorkflow sessionPort rootWorkspace eventPort journal scope context

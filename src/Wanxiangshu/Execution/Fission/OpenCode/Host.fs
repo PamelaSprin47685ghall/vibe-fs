@@ -928,15 +928,11 @@ module FissionHost =
         (turn: ReconciledTurn)
         =
         task {
-            match Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered (SessionId.value turn.SessionId) with
+            match
+                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered (SessionId.value turn.SessionId)
+            with
             | None ->
-                do!
-                    failGroup
-                        sessionPort
-                        eventPort
-                        durable
-                        group
-                        "Fission lane completed without a delivered view"
+                do! failGroup sessionPort eventPort durable group "Fission lane completed without a delivered view"
 
                 return true
             | Some delivered ->

@@ -16,7 +16,7 @@ type AttachmentKind =
     | SyncEngineer
     /// work-028: the plan ask delegation's fixed DevOps attachment identity.
     | SyncDevOps
-        | Bookkeeper of transactionId: string
+    | Bookkeeper of transactionId: string
 
 
 [<RequireQualifiedAccess>]

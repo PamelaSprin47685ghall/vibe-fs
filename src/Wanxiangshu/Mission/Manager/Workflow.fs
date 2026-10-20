@@ -27,13 +27,14 @@ module ManagerWorkflow =
     [<Literal>]
     let private finishPath = "runtime/manager-finish"
 
-    let private lifecycleWork (directory: string option) (sessionId: string) = task {
-        match directory with
-        | Some workspace ->
-            let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
-            return Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
-        | None -> return None
-    }
+    let private lifecycleWork (directory: string option) (sessionId: string) =
+        task {
+            match directory with
+            | Some workspace ->
+                let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+                return Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
+            | None -> return None
+        }
 
     /// The iteration ordinal as the provider reads it: "1" for the first
     /// Manager on this road, then one more per durable opening. A road with no
@@ -41,12 +42,14 @@ module ManagerWorkflow =
     let private iterationOrdinalText (directory: string option) (sessionId: SessionId) =
         task {
             let! workOpt = lifecycleWork directory (SessionId.value sessionId)
+
             let ordinal =
                 workOpt
                 |> Option.map (fun work ->
                     let retired = work.RoundCount
                     max 1 (retired + if work.ActiveId.IsSome then 1 else 0))
                 |> Option.defaultValue 1
+
             return string ordinal
         }
 
@@ -59,6 +62,7 @@ module ManagerWorkflow =
         =
         task {
             let! workOpt = lifecycleWork directory (SessionId.value sessionId)
+
             return
                 workOpt
                 |> Option.exists (fun work -> List.contains (ProviderRunIdentity.value providerRun) work.RetiredRuns)
@@ -81,6 +85,7 @@ module ManagerWorkflow =
     let private resourceForCurrentAction (directory: string option) (sessionId: SessionId) =
         task {
             let! workOpt = lifecycleWork directory (SessionId.value sessionId)
+
             return
                 match workOpt with
                 | None -> None
@@ -111,9 +116,7 @@ module ManagerWorkflow =
     let private closeoutSubstitutions (turn: ReconciledTurn) =
         task {
             let! workOpt = lifecycleWork turn.Directory (SessionId.value turn.SessionId)
-            let confirmed =
-                workOpt
-                |> Option.exists (fun work -> work.Confirmed)
+            let confirmed = workOpt |> Option.exists (fun work -> work.Confirmed)
             return Map [ "closeout", finishCloseoutText confirmed ]
         }
 
@@ -263,8 +266,7 @@ module ManagerWorkflow =
         : Task<unit> =
         task {
             match sessionIdTextOpt, workspaceDirectory, observedHead with
-            | Some sessionId, Some root, Some head ->
-                do! openManagerWorkAtHead sessionId root head
+            | Some sessionId, Some root, Some head -> do! openManagerWorkAtHead sessionId root head
             | _ -> return ()
         }
 
@@ -279,11 +281,9 @@ module ManagerWorkflow =
         =
         task {
             let! ordinal = iterationOrdinalText workspaceDirectory sessionId
+
             let loopPromptText =
-                ProviderProse.documentFor
-                    sessionId
-                    "runtime/manager-assess"
-                    (Map [ "ordinal", ordinal ])
+                ProviderProse.documentFor sessionId "runtime/manager-assess" (Map [ "ordinal", ordinal ])
 
             let terminalRun = ProviderRunIdentity.create terminalProviderRunId
 
@@ -378,8 +378,7 @@ module ManagerWorkflow =
         (context: ReconciledTurnContext)
         : Task =
         task {
-            let! retired =
-                isRetiredObservation context.Turn.Directory context.Turn.SessionId context.Turn.ProviderRun
+            let! retired = isRetiredObservation context.Turn.Directory context.Turn.SessionId context.Turn.ProviderRun
 
             match retired, journal, context.Failure, context.Turn.Outcome, context.Quiescence with
             | true, _, _, _, _ -> return ()
@@ -405,14 +404,9 @@ module ManagerWorkflow =
         (context: ReconciledTurnContext)
         : Task =
         task {
-            let! retired =
-                isRetiredObservation context.Turn.Directory context.Turn.SessionId context.Turn.ProviderRun
+            let! retired = isRetiredObservation context.Turn.Directory context.Turn.SessionId context.Turn.ProviderRun
 
-            match
-                retired,
-                context.Failure,
-                context.Turn.Outcome
-            with
+            match retired, context.Failure, context.Turn.Outcome with
             | true, _, _ -> return ()
             | false, Some _, _ -> return! observeOrdinary context
             | false, None, ReconcileProgram.TurnInProgress -> return ()

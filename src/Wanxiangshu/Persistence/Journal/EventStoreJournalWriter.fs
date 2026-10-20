@@ -151,10 +151,8 @@ module JournalPayloadClosure =
             | Fact.Agent(AgentFact.Companion(CompanionFactCases.XTracePartAppended p)) -> pair p.TextRef p.TextDigest
             | Fact.Agent(AgentFact.Companion(CompanionFactCases.TerminalOutputCaptured p)) ->
                 pair p.TextRef p.TextDigest
-            | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionAdmitted p)) ->
-                pair p.OwnerViewRef p.OwnerViewDigest
-            | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionLaneMaterialized p)) ->
-                pair p.ViewRef p.ViewDigest
+            | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionAdmitted p)) -> pair p.OwnerViewRef p.OwnerViewDigest
+            | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionLaneMaterialized p)) -> pair p.ViewRef p.ViewDigest
             | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionCompletionCaptured p)) ->
                 pair p.PayloadRef p.PayloadDigest
             | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionTakeoverClaimed p)) ->

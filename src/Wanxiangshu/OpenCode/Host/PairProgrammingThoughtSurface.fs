@@ -60,10 +60,7 @@ module PairProgrammingThoughtSurface =
 
     let private projectionFlagsOf (projection: AgentProjectionSet) (session: SessionId) : obj =
         match AgentProjection.tryFind session projection with
-        | None ->
-            box
-                {| guidelines = false
-                   xTrace = false |}
+        | None -> box {| guidelines = false; xTrace = false |}
         | Some value ->
             box
                 {| guidelines = value.Guidelines.IsSome
