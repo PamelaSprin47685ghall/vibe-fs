@@ -1264,26 +1264,55 @@ module ToolRegistry =
             | Error err -> Task.FromResult(Error err)
             | Ok fenced -> captureFencedFrontier journal sessionId fenced
 
-        let fenceAndCapture journal sessionId snapshotPort owningMessageId owningCallId =
-            task {
-                let! exchange = readOwningExchange snapshotPort sessionId owningMessageId owningCallId
-                return! captureOrPropagate journal sessionId exchange
-            }
+        /// The physical input this delivery answers, bound at delivery time.
+        ///
+        /// The owning assistant message's parent is the physical input only
+        /// when that parent is a user message; otherwise the session's current
+        /// physical message answers. Both are read here — while the fenced
+        /// owning exchange is in hand — and never re-read at registration
+        /// time: a registration that re-reads the ambient physical input
+        /// would aim this delivery's stop at a later new input.
+        let boundPhysicalFor
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (messages: SessionMessage list)
+            (owningMessageId: string)
+            : PhysicalUserMessageId option =
+            let parentBound =
+                messages
+                |> List.tryFind (fun message ->
+                    message.Id = owningMessageId && message.Role = "assistant")
+                |> Option.bind (fun message -> physicalUserMessageOf messages message None)
+
+            parentBound
+            |> Option.orElseWith (fun () ->
+                runtime.CurrentPhysicalUserMessage ctx.SessionId
+                |> Option.map PhysicalUserMessageId.create)
 
         let resolveDeliverRetirementCursor
             (runtime: ToolRuntimeScope)
             (ctx: HostToolContext)
-            : Task<Result<int64, string>> =
+            : Task<Result<int64 * PhysicalUserMessageId option, string>> =
             task {
                 match deliverPorts runtime, deliverOwnership ctx with
                 | Ok(snapshotPort, journal), Ok(owningMessageId, owningCallId) ->
-                    return!
-                        fenceAndCapture
-                            journal
-                            (SessionId.create ctx.SessionId)
+                    let! exchange =
+                        readOwningExchange
                             snapshotPort
+                            (SessionId.create ctx.SessionId)
                             owningMessageId
                             owningCallId
+
+                    let boundPhysical =
+                        exchange
+                        |> Result.map (fun messages ->
+                            boundPhysicalFor runtime ctx messages owningMessageId)
+                        |> Result.defaultValue None
+
+                    let! cursor =
+                        captureOrPropagate journal (SessionId.create ctx.SessionId) exchange
+
+                    return cursor |> Result.map (fun value -> value, boundPhysical)
                 | Error err, _ -> return Error err
                 | _, Error err -> return Error err
             }
@@ -1302,14 +1331,30 @@ module ToolRegistry =
             | Ok res -> renderDeliverReceipt res
             | Error err -> sprintf "deliver failed: %s" err
 
-        let registerPostS3IfEntered
+        /// 条款 3/4/6: 交付已成立是提交面事实, 登记精确 attempt 围栏与交付当时
+        /// 绑定的物理输入。登记时刻绝不重读会话的当前物理输入——那正是把本次
+        /// 交付的停止瞄准后来新输入的窗口。绑定不出来的交付不登记: 无法证明
+        /// 成立就不是已成立。
+        let registerEstablishedDelivery
             (runtime: ToolRuntimeScope)
             (ctx: HostToolContext)
+            (boundPhysical: PhysicalUserMessageId option)
             (outcome: Result<DeliverResult, string>)
             =
-            match outcome, ctx.ProviderRunId, ctx.ToolCallId with
-            | Ok res, Some runId, Some callId when res.RetirementOutcome = "PostS3" ->
-                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId)
+            let established =
+                match outcome with
+                | Ok res ->
+                    res.RetirementOutcome = "PostS3" || res.RetirementOutcome = "Delivered"
+                | Error _ -> false
+
+            match established, boundPhysical, ctx.ProviderRunId, ctx.ToolCallId with
+            | true, Some physical, Some runId, Some callId ->
+                runtime.RegisterEstablishedDelivery(
+                    SessionId.create ctx.SessionId,
+                    runId,
+                    callId,
+                    physicalUserMessageId = physical
+                )
             | _ -> ()
 
         let deliverCursor
@@ -1333,7 +1378,7 @@ module ToolRegistry =
 
                 match! resolveDeliverRetirementCursor runtime ctx with
                 | Error err -> return sprintf "deliver failed: %s" err
-                | Ok retirementCursor ->
+                | Ok(retirementCursor, boundPhysical) ->
                     let! outcome =
                         PlanTools.enterPostS3OrRelay
                             gitCommonDir
@@ -1345,7 +1390,7 @@ module ToolRegistry =
                             retirementBlockers
                             retirementCursor
 
-                    registerPostS3IfEntered runtime ctx outcome
+                    registerEstablishedDelivery runtime ctx boundPhysical outcome
 
                     return renderDeliverOutcome outcome
             }
@@ -1370,7 +1415,7 @@ module ToolRegistry =
 
                 match! resolveDeliverRetirementCursor runtime ctx with
                 | Error err -> return sprintf "deliver failed: %s" err
-                | Ok retirementCursor ->
+                | Ok(retirementCursor, boundPhysical) ->
                     let! outcome =
                         PlanTools.startPostS3Execution
                             gitCommonDir
@@ -1383,6 +1428,8 @@ module ToolRegistry =
                             (deliverPrompt runtime)
                             (deliverDiscard runtime)
                             retirementCursor
+
+                    registerEstablishedDelivery runtime ctx boundPhysical outcome
 
                     return renderDeliverOutcome outcome
             }

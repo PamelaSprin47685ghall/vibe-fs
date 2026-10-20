@@ -1329,11 +1329,6 @@ type ToolRuntimeScope
         DeliveryAttemptLedger.hasEstablished sid
         || DeliveryAttemptLedger.hasDurableEstablished journal sid
 
-    /// LC-018: 登记 post-S3 交付已成立，保存当时的 current physical；旧 deliver
-    /// 完成事件不得停止新执行——物理输入已变时裁决不再命中该围栏。
-    member this.RegisterPostS3Interrupt(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) =
-        this.RegisterEstablishedDelivery(sessionId, providerRun, callId)
-
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member _.RunStarted = onStarted
 

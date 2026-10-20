@@ -467,6 +467,28 @@ dotnet tool run fantomas src/Wanxiangshu
 - `WXS_TIER_INTEGRATION=1 node --test requirements/obligation-ledger/tests/002.test.mjs` → `tests 2 / pass 2 / fail 0`（含真实 OpenCode Host canary「installed OpenCode Host runs todowrite-for-engineer with view and commits ViewCheckpointCommitted per session」）。
 - `node --test requirements/work/tests/020.test.mjs` → `tests 8 / pass 8 / fail 0`（含「a flat prefixUntil/thenMap declaration commits the durable ViewCheckpointCommitted, and a call without or with an invalid declaration commits none」）。
 
+#### 十·二·二 C2 闭合：post-S3 交付登记「已成立」（绑定物理输入）
+
+**缺陷**：`ToolRegistry.fs` 的 post-S3 交付路径没有登记「交付已成立」（提交面事实），因此 transform 钩子的交付裁决（`PluginTransforms.fs:678`，`tryFindEstablished sessionId physical`）永远不命中，该交付不会被 transform 停住。上一版登记（`registerPostS3IfEntered` → `RegisterPostS3Interrupt`）还有第二个缺陷：它**不带物理输入**，`RegisterEstablishedDelivery` 于是回落到 `currentPhysicalUserMessage`（**登记时刻重读**会话当前物理输入）——那正是把本次交付的停止瞄准后来新输入的窗口。
+
+**改法**（唯一编辑文件：`src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs`；另删同文件族的死别名 `ToolRuntimeScope.fs` / `.fsi`）：
+
+| 位置 | 改动 |
+|---|---|
+| `ToolRegistry.fs:1267-1296` | 新增 `boundPhysicalFor`：在**围栏内的自有 exchange 还在手上时**读出本次交付应答的物理输入（自有 assistant 消息的父消息是 user 消息时取父消息，否则取会话当前物理输入） |
+| `ToolRegistry.fs:1298-1324` | `resolveDeliverRetirementCursor` 改为同时返回 `(retirementCursor, boundPhysical)`；围栏读取与 XTrace 捕获仍用同一份 fenced exchange |
+| `ToolRegistry.fs:1334-1358` | `registerPostS3IfEntered` → `registerEstablishedDelivery`：登记**交付当时绑定**的物理输入（`physicalUserMessageId = physical`），登记时刻**不再重读** `CurrentPhysicalUserMessage`；绑定不出来的交付**不登记**（无法证明成立就不是已成立） |
+| `ToolRegistry.fs:1391`、`:1430` | `deliverCursor` 与 `deliverPostS3` **两处**都调用它（此前 `deliverPostS3` 完全没有登记） |
+| `ToolRuntimeScope.fs` / `.fsi` | 删除 `RegisterPostS3Interrupt` 别名（唯一调用方已改；该别名正是那个「回落到登记时刻重读物理输入」的入口） |
+
+**实测**（临时探针只放 `/tmp`，已删除；`requirements/` 树下无残留）：
+
+- post-S3 交付后 `DeliveryAttemptLedger.hasEstablished(session)` → **true**；`tryFindEstablished(session, phys('user-plan-root'))` → **HIT**（改前为 `null`、且记录的 `Physical` 为 `undefined`）；`tryFindEstablished(session, undefined)` → **null**；`tryFindEstablished(session, phys('user-new-input'))` → **null** ⇒ 物理输入已变则不再命中，**新输入不会被旧交付误停**。
+- `node scripts/build.mjs` → `[build] build ok (generation 89)`；`js-surface-manifest: OK — 151 registered surfaces`；`js-module-linkage: OK — 725 emitted modules linked and loaded`。
+- `node scripts/checks/fsharp-control-pyramid.mjs` → 与 HEAD 基线逐条 diff：**净增 0**（首版曾净增 1 处 `match → match`，已把登记判定摊平为单层 `match` 后归零）。
+- `WXS_TIER_INTEGRATION=1 node --test requirements/work/tests/026.test.mjs` → `tests 2 / pass 1 / fail 1`。**仍红**，但红的**性质变了**：红点仍在 `026.test.mjs:124`（`assert.deepEqual(runtime.abortedIds, [sessionID], 'post-S3 deliver must interrupt the conversation')`）——该断言挂在**工具事件边界**（`hooks.event` 的 `message.part.updated`）上，而现行契约（`requirements/work/WHAT.md` [026] 与 [003]）规定**中断发生在 transform 钩子的交付裁决**，工具事件钩子只登记「呈现」面事实（`PluginHooks.fs:520-545` `settlePostS3Deliver` 只调 `RecordDeliveryPresented`）。把 `026` 的断言迁到 transform 裁决边界是**下一轮**的工作（B10/work-049 一并处理）。本轮只闭合 C2（登记「已成立」+ 绑定物理输入），未动断言。
+- 回归：`WXS_TIER_INTEGRATION=1 node --test requirements/work/tests/020/022/023/024/025.test.mjs` → `tests 25 / pass 25 / fail 0`；`WXS_TIER_INTEGRATION=1 node --test requirements/obligation-ledger/tests/002.test.mjs` → `tests 2 / pass 2 / fail 0`（含真实 OpenCode Host canary）。
+
 ### 十·三 R3 套件实测
 
 | 套件 | pass | fail | 判定 |
@@ -524,7 +546,7 @@ dotnet tool run fantomas src/Wanxiangshu
 - **B9** `PluginTransforms.fs` + `NarrativeTransform.fs` 五项 —— 未核。
 - **B10** `requirements/work/tests/011.test.mjs:233` 的 `test.todo` **仍是 todo**；`requirements/work/tests/049.test.mjs` 的中断断言仍需核（空断言）—— 未修。
 - **C1** Plan 路径无 settlement —— 未核。
-- **C2** post-S3 交付未登记「已成立」 —— 未核（`work-026` 的红与此相关，但该红在基线同样存在）。
+- **C2** post-S3 交付未登记「已成立」 —— **已闭合**（2026-10-21，见「十·二·二」）。`deliverPostS3` 与 `deliverCursor` 现在都登记「已成立」，且登记携带**交付当时绑定**的物理输入（登记时刻不再重读 `CurrentPhysicalUserMessage`）；删除了那个回落到登记时刻重读的 `RegisterPostS3Interrupt` 别名。`work-026` 仍红，但红点已不是登记缺失，而是该用例的断言还挂在工具事件边界上（现行契约把中断放在 transform 裁决边界）——迁移属 B10/work-049 下一轮。
 - **C3** `Execution/Fission/OpenCode/Host.fs` lane 交付死代码与跨会话搬运 —— 未核。
 - **C4** `requirements/repository-programming/tests/README.md` 条目与新参数名同步 —— 未核。
 - **D1** 仍调用退役宿主工具的用例迁移 —— 未做（`work-021`/`work-024`/`intra-participant-parallelism-018` 即属此类）。

@@ -108,12 +108,10 @@ type ToolRuntimeScope =
     member InterruptForUserQuestion:
         sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> Task<Result<unit, string>>
 
-    /// LC-018: registers the post-S3 delivery as established with the current
-    /// physical user message; the adjudication never targets a later input.
-    member RegisterPostS3Interrupt: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit
-
     /// The delivery of this attempt is established (commit face). The physical
-    /// interrupt is not issued here: the transform hook adjudicates it.
+    /// interrupt is not issued here: the transform hook adjudicates it. The
+    /// physical user message is the one bound at delivery time — passing it
+    /// explicitly keeps a later new input from becoming this delivery's aim.
     member RegisterEstablishedDelivery: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId * ?physicalUserMessageId: PhysicalUserMessageId -> unit
 
     /// The Host accepted this delivery's tool result (presentation face).
