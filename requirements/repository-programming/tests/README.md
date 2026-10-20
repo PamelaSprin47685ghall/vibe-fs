@@ -25,6 +25,8 @@
 - 055 真实运行 vm 并行边界：Promise.all 并行读写、allSettled 兄弟失败不撤销已落盘写、十六路 cat 批处理。
 - 056 委托原语端到端：fork/join/fission 返回数据信封（缺名派生、拒绝信封不抛、无宿主 DELEGATION_UNAVAILABLE）、`dag` 波次推进与依赖记录传递、节点失败 park 后注入 `"skip"` 收尾。
 - 057 真实运行 ls 的 ignore 语义（逐级 `.gitignore`、否定模式、嵌套规则、根 `.git/info/exclude`）与 glob/grep 退役后的组合写法（walk + `cat` + `whereAll`）。
+- 059 真实运行 `this.deliver` 的视图记录与增量去重：交付的 reportMapping 记为一份 `prefixUntil: 0` 声明并结束程序、后续语句不执行；交付格按会话隔离，并以 `(providerRun, toolCallId)` 围栏限定消费者——别的 run 取不走也窥不到该格；已交付内容只返回一次（重复身份不再返回），普通 return 不填交付格；永久压缩不因后续受保护交接而回退，锚点消失后隐式 0 仍可覆盖开头区间。
+- 063 真实运行顶层上下文整理参数的扁平形态：`prefixUntil` 与 `thenMap` 两个扁平顶层参数被接受并捕获为待消费视图；残留 `view` 包装对象以 `VIEW_DECLARATION_INVALID` 拒绝且 reason 点名改用扁平参数；两者都不给则不设任何声明；`prefixUntil` 为负数或小数、`thenMap` 的值非字符串或空白、键为负数编号等非法形状同样以 `VIEW_DECLARATION_INVALID` 拒绝且不留下任何视图。
 - 064 真实运行调用面三态互斥：同时给出两个状态以 `INVALID_ARGUMENT` 拒绝且 reason 点名冲突字段，程序不跑、不消费被点名的 handle、不留待下一请求消费的视图声明；单状态调用（program / unpark / abandon）各自照常生效，无状态调用报缺少 program。
 
 2026-10-18 交付验证：`node scripts/build.mjs` 构建成功（169 surfaces、813 模块链接闭合），本包 001-059 全套 278 例 0 败 0 跳 7 todo（045-058 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema、js.call 单进程/多进程循环、wget 断点续传剧本、view 声明捕获、deliver 显式终值、vm 并行边界、委托原语信封与 dag park、ls 的 ignore 语义与 walk/search 组合、file/edit/rewrite 退役后的组合替代，以及 js.call 的交互 send 形态）。直连文件工具已整体退役（GAP-235）：005/007/010/016 的旧实现回归删除，020 改走 js `mv`/`rm` 成员，026 改走 `runObserved`。全量 unit 套件同版本 **865 文件 5113 例 0 败**（GAP-231 ~ GAP-237 CLOSED）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护相关 TODO 随退役收窄；未闭合范围见 GAP-088。
