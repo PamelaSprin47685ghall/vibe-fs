@@ -582,40 +582,20 @@ module ProcessEventLog =
         | Ok "" -> Ok PhysicalAppendCompletion.NoAppend
         | Ok text -> appendEncoded log text
 
-    let private decodeWriterLine (label: string) (line: string) : Result<EventEnvelope, StorageInvalid> =
-        if String.IsNullOrEmpty line then
-            Error(StorageInvalid.NonCanonical(sprintf "writer file contains empty interior line: %s" label))
-        else
-            CanonicalEventCodec.tryDecode (line + "\n")
-
-    let private decodeWriterLines (label: string) (lines: string[]) : Result<EventEnvelope list, StorageInvalid> =
-        // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with writer history length.
-        let mutable acc: EventEnvelope list = []
-        let mutable failure: StorageInvalid option = None
-        // DSL-MUTABLE: algorithm-scratch — writer-line cursor
-        let mutable index = 0
-
-        let advance () =
-            match decodeWriterLine label lines.[index] with
-            | Ok envelope ->
-                acc <- envelope :: acc
-                index <- index + 1
-            | Error invalid -> failure <- Some invalid
-
-        while index < lines.Length - 1 && failure.IsNone do
-            advance ()
-
-        match failure with
-        | Some invalid -> Error invalid
-        | None -> Ok(List.rev acc)
-
+    /// durable-events-005/014: writer stream framing (non-empty text ends in LF, no
+    /// empty interior line) and per-line canonical decode are wanxiangli/segments
+    /// `decodeStream` (CUT-19-a); this keeps only the StorageInvalid projection.
     let decodeWriterText (label: string) (text: string) : Result<EventEnvelope list, StorageInvalid> =
-        if String.IsNullOrEmpty text then
-            Ok []
-        elif not (text.EndsWith("\n", StringComparison.Ordinal)) then
-            Error(StorageInvalid.NonCanonical(sprintf "writer file has incomplete trailing line: %s" label))
+        let outcome: obj = segmentLaw?decodeStream (label, text)
+
+        if unbox<bool> outcome?ok then
+            Ok(
+                unbox<obj array> outcome?events
+                |> Array.map CanonicalEventCodec.ofLibraryEvent
+                |> Array.toList
+            )
         else
-            decodeWriterLines label (text.Split('\n'))
+            Error(CanonicalEventCodec.invalidOfLibraryError outcome?error)
 
     let decodeWriterBytes (label: string) (bytes: byte[]) : Result<EventEnvelope list, StorageInvalid> =
         CanonicalEventCodec.tryDecodeUtf8Text bytes
@@ -947,52 +927,12 @@ module ProcessEventLog =
         let seconds = activityMs / 1000.0
         utimesSync path seconds seconds
 
-    let private prefixMatches (prefix: byte[]) (full: byte[]) : bool =
-        // DSL-MUTABLE: algorithm-scratch — early-exit prefix scan.
-        let mutable same = true
-        let mutable index = 0
-
-        while same && index < prefix.Length do
-            same <- prefix.[index] = full.[index]
-            index <- index + 1
-
-        same
-
-    let private isPrefixOf (prefix: byte[]) (full: byte[]) =
-        if prefix.Length > full.Length then
-            false
-        else
-            prefixMatches prefix full
-
-    let private eventIdsOfDecoded (text: string) : Set<string> option =
-        match decodeWriterText "coexistence" text with
-        | Error _ -> None
-        | Ok events ->
-            Some(
-                events
-                |> List.map (fun envelope -> EventId.value envelope.EventId)
-                |> Set.ofList
-            )
-
-    /// durable-events-005: the event-id set of one physical form, or None
-    /// when the bytes are not complete canonical NDJSON (invalid UTF-8, a
-    /// half line, or a non-canonical line).
-    let private eventIdsOf (bytes: byte[]) : Set<string> option =
-        match CanonicalEventCodec.tryDecodeUtf8Text bytes with
-        | Error _ -> None
-        | Ok text -> eventIdsOfDecoded text
-
-    /// durable-events-005: the line-continuation form of coexistence — an
-    /// old process kept appending canonical lines to the legacy name after
-    /// the segment series landed (a version-transition race). Those lines
-    /// are genuine durable facts: every legacy line is complete canonical
-    /// NDJSON and no legacy event id overlaps the series. Overlapping ids,
-    /// half lines, or non-canonical bytes stay divergent.
-    let private isLineContinuation (legacyBytes: byte[]) (segmentBytes: byte[]) : bool =
-        match eventIdsOf legacyBytes, eventIdsOf segmentBytes with
-        | Some legacyIds, Some segmentIds ->
-            legacyIds |> Set.forall (fun eventId -> not (Set.contains eventId segmentIds))
-        | _ -> false
+    /// durable-events-005: the one coexistence verdict over the bytes of a
+    /// legacy file and its segment series (wanxiangli/segments `coexistence`,
+    /// CUT-19-a): the read layer and the reorganization both act on it, so they
+    /// can never disagree about which form is the stream.
+    let private coexistenceOf (legacyBytes: byte[]) (segmentBytes: byte[]) : string =
+        unbox<string> (segmentLaw?coexistence (legacyBytes, segmentBytes))
 
     /// durable-events-005: the authoritative file list of one writer's
     /// logical stream. A coexisting legacy file and segment series is only a
@@ -1014,14 +954,11 @@ module ProcessEventLog =
             |> List.map (fun name -> readBytesFileSync (join2 directory name))
             |> Array.concat
 
-        if isPrefixOf legacyBytes segmentBytes then
-            Ok segments
-        elif isPrefixOf segmentBytes legacyBytes then
-            Ok [ legacyFile ]
-        elif isLineContinuation legacyBytes segmentBytes then
-            Ok(segments @ [ legacyFile ])
-        else
-            Error(sprintf "writer files diverged: %s" writerId)
+        match coexistenceOf legacyBytes segmentBytes with
+        | "series" -> Ok segments
+        | "legacy" -> Ok [ legacyFile ]
+        | "continuation" -> Ok(segments @ [ legacyFile ])
+        | _ -> Error(sprintf "writer files diverged: %s" writerId)
 
     let private logicalStreamFiles (commonDir: string) (group: WriterFileGroup) : Result<string list, string> =
         let layout: obj =
@@ -1250,17 +1187,15 @@ module ProcessEventLog =
             |> List.map (fun name -> readBytesFileSync (join2 directory name))
             |> Array.concat
 
-        if isPrefixOf legacyBytes segmentBytes then
+        match coexistenceOf legacyBytes segmentBytes with
+        | "series" ->
             // The segment series extends (or equals) the legacy bytes:
             // the series is authoritative; drop the legacy file.
             unlinkSync legacyFile
             Ok()
-        elif isPrefixOf segmentBytes legacyBytes then
-            dropSeriesAndReassign commonDir writerId legacyFile segments
-        elif isLineContinuation legacyBytes segmentBytes then
-            appendLegacyLinesToSeries commonDir writerId legacyFile
-        else
-            Error(sprintf "writer files diverged: %s" writerId)
+        | "legacy" -> dropSeriesAndReassign commonDir writerId legacyFile segments
+        | "continuation" -> appendLegacyLinesToSeries commonDir writerId legacyFile
+        | _ -> Error(sprintf "writer files diverged: %s" writerId)
 
     let internal convergeWriterFiles (commonDir: string) (writerId: string) : Result<unit, string> =
         let directory = eventsDirectory commonDir

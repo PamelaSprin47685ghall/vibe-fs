@@ -11,6 +11,8 @@ type StoredLineFault =
 module CanonicalEventCodec =
     /// wanxiangli/events `EventInput` object for one envelope (library boundary only).
     val toLibraryEvent: envelope: EventEnvelope -> obj
+    /// EventEnvelope of a wanxiangli/events `EventOutput` (library boundary only).
+    val ofLibraryEvent: value: obj -> EventEnvelope
     /// StorageInvalid for a wanxiangli `CodecError`-shaped value (library boundary only).
     val invalidOfLibraryError: error: obj -> StorageInvalid
     val encode: envelope: EventEnvelope -> string

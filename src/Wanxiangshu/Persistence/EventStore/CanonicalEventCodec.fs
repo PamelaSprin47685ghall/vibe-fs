@@ -58,7 +58,7 @@ module CanonicalEventCodec =
             |> unbox<(string * byte[]) array>
             |> Array.fold (fun acc (key, bytes) -> Map.add (PayloadRef.create key) bytes acc) Map.empty
 
-    let private eventOfJs (value: obj) : EventEnvelope =
+    let ofLibraryEvent (value: obj) : EventEnvelope =
         { EventId = EventId.create (unbox<string> value?id)
           StreamId = EventStreamId.create (unbox<string> value?stream)
           EventType = unbox<string> value?``type``
@@ -105,7 +105,7 @@ module CanonicalEventCodec =
             codec?mergeByIdentity (events |> List.map toLibraryEvent |> Array.ofList)
 
         if unbox<bool> outcome?ok then
-            Ok((unbox<obj array> outcome?events) |> Array.toList |> List.map eventOfJs)
+            Ok((unbox<obj array> outcome?events) |> Array.toList |> List.map ofLibraryEvent)
         else
             Error(invalidOfLibraryError outcome?error)
 
@@ -114,7 +114,7 @@ module CanonicalEventCodec =
         let outcome: obj = codec?tryDecode text
 
         if unbox<bool> outcome?ok then
-            Ok(eventOfJs outcome?event)
+            Ok(ofLibraryEvent outcome?event)
         else
             Error(invalidOfLibraryError outcome?error)
 
@@ -130,7 +130,7 @@ module CanonicalEventCodec =
         let outcome: obj = codec?tryDecodeUtf8 bytes
 
         if unbox<bool> outcome?ok then
-            Ok(eventOfJs outcome?event)
+            Ok(ofLibraryEvent outcome?event)
         else
             Error(invalidOfLibraryError outcome?error)
 
