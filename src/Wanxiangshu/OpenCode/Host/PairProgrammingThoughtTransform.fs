@@ -1389,10 +1389,12 @@ module PairProgrammingThoughtTransform =
     /// already recorded are permanent and outlive the declaration that made them.
     let private markAnchor (sessionId: string) (raw: obj) =
         match anchorMessageId raw with
+        | _ when not (isNull raw?info) && tryUnboxString raw?info?source = Some "anchor-summary" -> raw
         | None -> raw
         | Some messageId ->
             let marker =
-                sprintf "[ANCHOR: %d] " (AnchorLedger.numberMessage sessionId messageId)
+                sprintf "[ANCHOR: %d]" (AnchorLedger.numberMessage sessionId messageId)
+                + cursorGuidanceSeparator
 
             let cloned = emitJsExpr raw "Object.assign({}, $0)"
             let parts = rawParts raw
@@ -1446,7 +1448,7 @@ module PairProgrammingThoughtTransform =
         let projected =
             entries
             |> List.map (function
-                | AnchorView.Kept message -> markAnchor sessionId message.Raw
+                | AnchorView.Kept message -> message.Raw
                 | AnchorView.Summarized(message, summary) -> summarizedMessage message.Raw summary
                 | AnchorView.OpeningSummary summary -> openingSummary summary)
 
@@ -1483,7 +1485,7 @@ module PairProgrammingThoughtTransform =
          else
              Some(String.concat "\n" block))
 
-    let applyAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
+    let private selectAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
         numberHostMessages sessionId messages
 
         applyDeclaredAnchorView
@@ -1491,6 +1493,10 @@ module PairProgrammingThoughtTransform =
             messages
             (AnchorLedger.takeView sessionId)
             (AnchorLedger.replacements sessionId)
+
+    let applyAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
+        let projected, report = selectAnchorView sessionId messages
+        projected |> List.map (markAnchor sessionId), report
 
     let private markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored =
         // crash-reconciliation-018: the restart guidance is delivered
@@ -1519,7 +1525,13 @@ module PairProgrammingThoughtTransform =
             match injectResult with
             | Ok(newMessages, anchored) ->
                 markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored
-                HostMessageProjection.replaceMessagesInPlace outObj newMessages
+
+                let marked =
+                    match projectionSessionIdOpt with
+                    | Some sessionId -> newMessages |> List.map (markAnchor sessionId)
+                    | None -> newMessages
+
+                HostMessageProjection.replaceMessagesInPlace outObj marked
             | Error reason -> do! failClosedInject terminateSession projectionSessionIdOpt reason
         }
 
@@ -1550,7 +1562,7 @@ module PairProgrammingThoughtTransform =
 
             let messages, anchorBlock =
                 match projectionSessionIdOpt with
-                | Some sessionId -> applyAnchorView sessionId messages
+                | Some sessionId -> selectAnchorView sessionId messages
                 | None -> messages, None
 
             let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty

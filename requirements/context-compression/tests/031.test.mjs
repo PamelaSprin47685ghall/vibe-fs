@@ -176,10 +176,10 @@ test('WHAT[context-compression-031] inline anchors mark user and tool results on
   const raw = [user, prose, call, result]
   const snapshot = structuredClone(raw)
   const first = pair.applyAnchorView(session, raw)
-  assert.equal(first.messages[0].parts[0].text, '[ANCHOR: 1] question')
+  assert.equal(first.messages[0].parts[0].text, '[ANCHOR: 1]\0\uFEFFquestion')
   assert.deepEqual(first.messages[1], prose)
   assert.deepEqual(first.messages[2], call)
-  assert.equal(first.messages[3].parts[0].state.output, '[ANCHOR: 2] result')
+  assert.equal(first.messages[3].parts[0].state.output, '[ANCHOR: 2]\0\uFEFFresult')
   assert.equal(first.messages[3].parts.length, 1, 'no assistant prose carrier for a tool result')
   assert.deepEqual(anchors(session).map(row => row.anchor), [1, 2])
   assert.deepEqual(raw, snapshot, 'the projection must not mutate source messages')

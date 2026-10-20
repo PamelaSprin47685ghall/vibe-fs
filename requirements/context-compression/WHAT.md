@@ -72,6 +72,6 @@ prefixUntil 同时是价格边界与本轮修改保护边界：编号小于它�
 
 声明只供下一请求消费一次；累积压缩状态不随声明消费而消失。无声明时保持既有视图，不自行解压。摘要在真实区间位置呈现，区间内其余内容整体折叠；0 的摘要呈现于开头，0 仍是开头代表。视图是纯投影，输入由宿主提供，advisor 与交付路径复用同一投影规则。
 
-应用回执包含声明、保留/摘要/折叠计数、累计替换编号与 token 经济 total / used / cached。used 是本次实际内容的 token 数（含摘要），cached 是本轮保护范围内现有呈现的 token 数（包括历史摘要），total 是投影前消息的 token 数；计量用 gpt-tokenizer o200k_base。锚点直接呈现在所属 user 消息及 tool result 内容的开头，不在尾部另列消息 ID 映射。编号与标记字节在同一进程内稳定；新增消息、消费声明或改变 prefixUntil 不得重写未被显式替换的历史标记。标记只属于请求投影，不写回原始 Host 消息；0 始终隐含存在。
+应用回执包含声明、保留/摘要/折叠计数、累计替换编号与 token 经济 total / used / cached。used 是本次实际内容的 token 数（含摘要），cached 是本轮保护范围内现有呈现的 token 数（包括历史摘要），total 是投影前消息的 token 数；计量用 gpt-tokenizer o200k_base。锚点以 `[ANCHOR: N]` 后紧接实际 NUL（U+0000）和 BOM（U+FEFF）的格式直接呈现在所属 user 消息及 tool result 内容的开头，不在尾部另列消息 ID 映射。编号与标记字节在同一进程内稳定；新增消息、消费声明或改变 prefixUntil 不得重写未被显式替换的历史标记。标记只属于请求投影，不写回原始 Host 消息；0 始终隐含存在。
 
 Pair Hint 另披露 provider 实际计费的缓存命中、未命中 token 数及其声明的 context limit（[001]）。这些都是 datum，不授予宿主预测溢出或自动压缩的权力。

@@ -82,21 +82,21 @@ module PairProgrammingThoughtTransform =
 
     val applyAnchorView: sessionId: string -> messages: obj list -> obj list * string option
 
-val maybeInjectGuideline:
-    journal: AgentJournal option ->
-    projectionSessionIdOpt: string option ->
-    sessionStartedAt: DateTimeOffset option ->
-    clock: IClockPort ->
-    terminateSession: (SessionId -> string -> Task<Result<unit, string>>) ->
-    language: ProviderLanguage ->
-    restartGuidance: string option ->
-    markRestartGuidanceDelivered: (unit -> unit) ->
-    outObj: obj ->
-        Task
+    val maybeInjectGuideline:
+        journal: AgentJournal option ->
+        projectionSessionIdOpt: string option ->
+        sessionStartedAt: DateTimeOffset option ->
+        clock: IClockPort ->
+        terminateSession: (SessionId -> string -> Task<Result<unit, string>>) ->
+        language: ProviderLanguage ->
+        restartGuidance: string option ->
+        markRestartGuidanceDelivered: (unit -> unit) ->
+        outObj: obj ->
+            Task
 
-val tryInject:
-    journal: AgentJournal option ->
-    sessionId: string option ->
-    markerText: string ->
-    rawMessages: obj list ->
-        Task<Result<obj list, string>>
+    val tryInject:
+        journal: AgentJournal option ->
+        sessionId: string option ->
+        markerText: string ->
+        rawMessages: obj list ->
+            Task<Result<obj list, string>>
