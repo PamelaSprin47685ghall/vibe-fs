@@ -68,7 +68,17 @@ module JsToolHostSurface =
                         let map = sessionDirectoryMap sessionDirectories
                         JsToolSpec.rootForSession map workspaceRoot
 
-                JsToolSpec.create factory surface workspaceRoot persistence lifecyclePersistence None rootOf
+                // This surface carries no host attribution: the delivery witness
+                // of a call is settled by the host's own tool registration.
+                JsToolSpec.create
+                    factory
+                    surface
+                    workspaceRoot
+                    persistence
+                    lifecyclePersistence
+                    None
+                    rootOf
+                    (fun _ -> Task.FromResult None)
 
             let registered = ToolHostCodec.register factory spec
             box (JsRegisteredToolHandle(spec, registered))

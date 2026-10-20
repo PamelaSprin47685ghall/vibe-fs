@@ -13,6 +13,13 @@ module PluginTransforms =
           Current: XTraceProjectionState option
           Receipt: XTraceCaptureReceipt option }
 
+    /// 交付裁决（条款 4）：Continue = 仍需继续；Stop = 无需继续，本次请求在
+    /// transform 钩子处被中断。
+    [<RequireQualifiedAccess>]
+    type DeliveryAdjudication =
+        | ContinueDelivery
+        | StopDelivery of DeliveryAttemptLedger.Fence
+
     type NormalTransformCapabilities =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
@@ -26,7 +33,14 @@ module PluginTransforms =
               string option -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
-          SanitizeMessages: obj -> unit }
+          SanitizeMessages: obj -> unit
+          AdjudicateDelivery: string option -> obj -> Task<DeliveryAdjudication>
+          StopAfterDelivery:
+              string option
+                  -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option
+                  -> DeliveryAttemptLedger.Fence
+                  -> obj
+                  -> Task<unit> }
 
     type TransformBranchCapabilities = { RegisterOwned: string -> unit }
 

@@ -191,6 +191,18 @@ module SyncDelegateSurface =
           SessionId: SessionId
           Options: OpenCodeChildOptions }
 
+    /// One session-control call this harness's Host boundary received: the
+    /// abort or the interrupt, the session it aimed at, the provider run it
+    /// fenced, and the outcome it returned. The record is observability
+    /// only — it never decides anything.
+    type private SessionControlCall =
+        { SessionId: string
+          ProviderRun: string
+          Kind: string
+          Refused: bool
+          Reason: string option
+          Outcome: Task<Result<unit, string>> }
+
     type private Harness
         (
             journal: AgentJournal,
@@ -274,6 +286,13 @@ module SyncDelegateSurface =
         let recordedSiblings = ResizeArray<RecordedCreation>()
         let recordedChildren = ResizeArray<RecordedCreation>()
         let isHostRecording = observationMode = Some "host-recording"
+
+        // DSL-MUTABLE: resource — every abort/interrupt this Host boundary received
+        let sessionControlCalls = ResizeArray<SessionControlCall>()
+        // DSL-MUTABLE: resource — the provider run this harness last observed per session
+        let currentProviderRuns = Dictionary<string, string>()
+        // DSL-MUTABLE: resource — the injected refusal for session-control calls
+        let mutable sessionControlRefusal: string option = None
 
         let prompted =
             TaskCompletionSource<SessionId>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -385,6 +404,32 @@ module SyncDelegateSurface =
                 keysOf (SessionId.value sessionId)
                 |> fun values -> values.Add(PromptKey.create promptKey)
 
+        /// One session-control call: the abort or the interrupt, the session it
+        /// aimed at and the provider run it fenced. The refusal is injected by
+        /// the test; without one the Host boundary accepts the call.
+        let recordSessionControl kind (sessionId: SessionId) : Task<Result<unit, string>> =
+            let key = SessionId.value sessionId
+
+            let providerRun =
+                match currentProviderRuns.TryGetValue key with
+                | true, run -> run
+                | false, _ -> ""
+
+            let outcome: Task<Result<unit, string>> =
+                match sessionControlRefusal with
+                | Some reason -> Task.FromResult(Error reason)
+                | None -> Task.FromResult(Ok())
+
+            sessionControlCalls.Add
+                { SessionId = key
+                  ProviderRun = providerRun
+                  Kind = kind
+                  Refused = sessionControlRefusal.IsSome
+                  Reason = sessionControlRefusal
+                  Outcome = outcome }
+
+            outcome
+
         member _.ListedFamilies = listedFamilies.ToArray()
         member _.CreateRequests = createRequests.ToArray()
         member _.IsHostRecording = isHostRecording
@@ -392,6 +437,22 @@ module SyncDelegateSurface =
         member _.RecordedSiblings = recordedSiblings.ToArray()
         member _.RecordedChildren = recordedChildren.ToArray()
         member _.RecordedPromptCount = recordedPrompts.Count
+        member _.SessionControlCalls = sessionControlCalls |> Seq.toList
+
+        /// The provider run this harness last observed for a session: the
+        /// fence a session-control call for that session carries.
+        member _.NoteProviderRun(sessionId: SessionId, providerRun: string) =
+            if not (String.IsNullOrWhiteSpace providerRun) then
+                currentProviderRuns[SessionId.value sessionId] <- providerRun
+
+        /// Inject a refusal for the session-control calls this Host boundary
+        /// receives. An empty reason clears it.
+        member _.RefuseSessionControl(reason: string) =
+            sessionControlRefusal <-
+                if String.IsNullOrWhiteSpace reason then
+                    None
+                else
+                    Some reason
 
         member _.ParentFor(child: SessionId) =
             match parents.TryGetValue child with
@@ -496,8 +557,13 @@ module SyncDelegateSurface =
                 acceptancesOf (SessionId.value sessionId) |> fun values -> values.Add acceptance
                 acceptance.Task
 
-            member _.AbortSession _ = Task.FromResult(Ok())
-            member _.InterruptAttempt _ = Task.FromResult(Ok())
+            // D5: the abort and the interrupt are recorded with the session
+            // they aimed at and the provider run they fenced, so a landing
+            // test can assert that the interrupt was issued (and observed)
+            // before the stale attempt's lease was released. A refusal can be
+            // injected to exercise the degraded path.
+            member _.AbortSession sessionId = recordSessionControl "AbortSession" sessionId
+            member _.InterruptAttempt sessionId = recordSessionControl "InterruptAttempt" sessionId
             member _.IsManagedChild _ = true
             member _.AbortChildren _ = Task.FromResult()
 
@@ -1023,6 +1089,53 @@ module SyncDelegateSurface =
         | Some running -> running
         | None -> raise (InvalidOperationException "no guard interrupt exists for the exact provider run")
 
+    /// D5: the session-control calls this harness's Host boundary received —
+    /// every abort and every interrupt, with the session it aimed at, the
+    /// provider run it fenced and the outcome it returned. Observability
+    /// only: the record never decides anything.
+    let sessionControlSnapshot (value: obj) : obj =
+        let harness = unbox<Harness> value
+
+        box
+            {| calls =
+               harness.Sessions.SessionControlCalls
+               |> List.map (fun call ->
+                   box
+                       {| sessionId = call.SessionId
+                          providerRun = call.ProviderRun
+                          kind = call.Kind
+                          refused = call.Refused
+                          reason = call.Reason |> Option.defaultValue null |}) |}
+
+    /// D5: inject a refusal for the session-control calls this harness's Host
+    /// boundary receives, so the degraded path (a refused interrupt that does
+    /// not fail the delegation) can be exercised. An empty reason clears the
+    /// injection.
+    let refuseSessionControl (value: obj) (reason: string) : unit =
+        let harness = unbox<Harness> value
+        harness.Sessions.RefuseSessionControl reason
+
+    /// D5: await the session-control call this harness issued for the exact
+    /// session and provider run — the interrupt the delegate child received
+    /// after its delivery. It awaits the very task the Host boundary
+    /// answered, so the caller observes the interrupt's own settlement.
+    let awaitDeliveryInterrupt (value: obj) (session: string) (providerRun: string) : Task =
+        let harness = unbox<Harness> value
+
+        match
+            harness.Sessions.SessionControlCalls
+            |> List.filter (fun call ->
+                call.SessionId = session && call.ProviderRun = providerRun)
+            |> List.tryLast
+        with
+        | Some call -> call.Outcome :> Task
+        | None ->
+            raise (
+                InvalidOperationException(
+                    "no session control call exists for the exact session and provider run"
+                )
+            )
+
     let private createForObservation (directory: string) (observationMode: string option) : Task<obj> =
         match ownerAdmissionFor "managed-child-reconciliation" "manager" with
         | Ok admission -> createWithAdmissions directory observationMode RetryHarnessMode.Scripted [ admission ]
@@ -1522,6 +1635,8 @@ module SyncDelegateSurface =
         : Task<bool> =
         let harness = unbox<Harness> value
 
+        harness.Sessions.NoteProviderRun(SessionId.create session, providerRun)
+
         let turn =
             exactTerminalTurn
                 session
@@ -1661,6 +1776,8 @@ module SyncDelegateSurface =
             else
                 [| MessagePart.Text answer |]
 
+        harness.Sessions.NoteProviderRun(child, runId)
+
         handleTurn
             harness
             child
@@ -1790,10 +1907,19 @@ module SyncDelegateSurface =
                     with
                     | Some physical, Some root ->
                         let parts =
-                            if outcomeName = "TurnCompleted" && not (String.IsNullOrWhiteSpace answer) then
+                            // A completed turn and an interrupted turn both
+                            // carry the text the child produced: the delivery
+                            // that was already made is settled from the same
+                            // material in either case.
+                            if
+                                (outcomeName = "TurnCompleted" || outcomeName = "TurnAborted")
+                                && not (String.IsNullOrWhiteSpace answer)
+                            then
                                 [| MessagePart.Text answer |]
                             else
                                 [||]
+
+                        harness.Sessions.NoteProviderRun(child, runId)
 
                         // A reconciled failure carries the confirmed typed witness;
                         // the injected retry decorator owns what happens next.

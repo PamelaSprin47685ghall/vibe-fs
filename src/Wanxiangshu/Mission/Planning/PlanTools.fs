@@ -215,6 +215,66 @@ module PlanTools =
     let private blockedMessage (blockers: string array) =
         sprintf "Blocked by %d live resource(s): %s" (Array.length blockers) (String.concat "; " blockers)
 
+    /// WHAT[work-025]: a relay is a hand-off the model has to read as one. The
+    /// kernel's relay record names both tenures — the retired one and the
+    /// successor it opened in the same durable write — so the receipt states
+    /// the hand-off instead of a bare result name. A delivery has no successor:
+    /// its tenure ends and the caller decides what happens next; the
+    /// interruption itself is the transform hook's call, not this receipt's.
+    let private relayedMessage (retiredIncumbencyId: string) (successorId: string) =
+        sprintf
+            "Relayed: this delivery did not obtain the delivery right, so this tenure %s is retired and the successor tenure %s is already open. Do not continue work on this retired tenure; the next step belongs to the successor tenure, which reviews first as its own method requires."
+            retiredIncumbencyId
+            successorId
+
+    let private deliveredMessage =
+        "Delivered: the delivery is committed and this tenure is retired; control returns to the caller."
+
+    /// The execution was accepted, but live resources still hold the Plan
+    /// tenure. The execution is not undone by that blockage, so the receipt is
+    /// not a failure: it names what is still owed and how the same operation
+    /// settles once it is.
+    let private acceptedButBlockedMessage (blockers: string array) (operationId: string) =
+        sprintf
+            "The execution was accepted, but the Plan retirement is still blocked by %d live resource(s): %s. Clear those resources, then retry the same operation %s, or observe that operation."
+            (Array.length blockers)
+            (String.concat "; " blockers)
+            operationId
+
+    /// The successor tenure a relay opened, read from the kernel's own relay
+    /// record: the kernel writes the retirement and the successor opening in
+    /// one transaction, so the receipt names both tenures.
+    let private relaySuccessorOf (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) =
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "successorId"
+
+    /// The tenure a recorded retirement retired, read from the kernel's own
+    /// retirement record.
+    let private retiredIncumbencyOf (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) =
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "incumbencyId"
+
+    /// The successor tenure a recorded relay opened, read from the durable
+    /// retirement chain: the kernel opens the successor in the same
+    /// transaction as the retirement, so the tenure the next retirement
+    /// closes is this relay's successor, and a relay whose successor is still
+    /// open leaves that tenure active.
+    let private recordedRelaySuccessorOf
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        (retired: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement)
+        : string =
+        let rec after
+            (remaining: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement list)
+            (found: bool)
+            =
+            match remaining with
+            | [] -> if found then work.ActiveId |> Option.defaultValue "" else ""
+            | retirement :: rest ->
+                if found then
+                    retirement.IncumbencyId
+                else
+                    after rest (retirement.RetirementId = retired.RetirementId)
+
+        after work.Retirements false
+
     let private settledDelivery
         (resolved: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
         (digest: string)

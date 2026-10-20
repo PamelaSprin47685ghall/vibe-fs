@@ -22,7 +22,13 @@ module ToolRegistrySurface =
     val capabilityToolNames: roleLabel: string -> requestKindLabel: string -> string array
 
     val runJsPlan:
-        gitCommonDir: string -> root: string -> workId: string -> program: string -> System.Threading.Tasks.Task<string>
+        gitCommonDir: string ->
+        root: string ->
+        workId: string ->
+        program: string ->
+        messageId: string ->
+        callId: string ->
+            System.Threading.Tasks.Task<string>
 
     val jsPlanDescription: language: string -> string
 

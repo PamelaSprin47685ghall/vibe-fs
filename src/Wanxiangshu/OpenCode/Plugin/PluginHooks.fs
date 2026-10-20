@@ -401,10 +401,24 @@ module PluginHooks =
                     Some(SessionId.value sessionId, ToolCallId.create callId, status)
                 | _ -> None
 
-            let requireUserQuestionInterrupted (result: Result<unit, string>) =
-                match result with
-                | Ok() -> ()
-                | Error reason -> invalidOp ("ask was sent, but its attempt interrupt failed: " + reason)
+            /// 条款 6：中断未确认是呈现面的失败，不是事实面的失败。提问已经
+            /// 提交（durable pending 仍在等待事实），宿主也已接受工具结果；
+            /// 中断失败只记诊断——不崩、不抹掉已提交的事实，也不把已成立的
+            /// 交付呈现为失败。
+            let reportUserQuestionInterruptUnconfirmed (sessionId: string) (reason: string) =
+                Diagnostic.emit
+                    "ask-interrupt-not-confirmed"
+                    [ "session_id", sessionId
+                      "provider_error", reason
+                      "result", "interrupt-not-confirmed" ]
+
+            /// 条款 6：缺精确 provider run 身份时没有 attempt 围栏，就不该
+            /// 中断（不得误停新输入或后任），只记诊断，不崩。
+            let reportUserQuestionMissingProviderRun (sessionId: string) =
+                Diagnostic.emit
+                    "ask-observation-missing-provider-run"
+                    [ "session_id", sessionId
+                      "result", "unbound" ]
 
             let settleUserQuestion rawInput =
                 task {
@@ -429,38 +443,37 @@ module PluginHooks =
                                 callId
                             )
 
-                        requireUserQuestionInterrupted result
+                        match result with
+                        | Ok() -> ()
+                        | Error reason -> reportUserQuestionInterruptUnconfirmed sessionId reason
                     | Some(sessionId, _, "completed", None), Some registration when
                         registration.Runtime.IsWaitingForUser sessionId
                         ->
-                        invalidOp
-                            "ask result is missing the exact provider message identity; no attempt was interrupted"
+                        reportUserQuestionMissingProviderRun sessionId
                     | _ -> ()
                 }
 
-            let requirePostS3Interrupted (result: Result<unit, string>) =
-                match result with
-                | Ok() -> ()
-                | Error reason ->
-                    invalidOp ("post-S3 deliver was recorded, but its attempt interrupt failed: " + reason)
-
+            /// 条款 4/6：事件钩子只做观测登记——宿主已接受本次调用 + 精确
+            /// attempt 的交付工具结果（呈现面）。提交面事实由交付发生的那一次
+            /// 登记写入（它携带交付当时的物理输入），事件钩子不再新造物理围栏，
+            /// 新输入因此不会被旧交付停止。物理中断由 transform 钩子的交付
+            /// 裁决执行；交付已提交不因中断未确认而呈现为失败。
             let settlePostS3Deliver rawInput =
                 task {
                     match toolTerminalObservation "deliver" rawInput, toolRegistration with
                     | Some(sessionId, callId, "completed", Some providerRun), Some registration ->
-                        let! result =
-                            registration.Runtime.InterruptForPostS3Deliver(
-                                SessionId.create sessionId,
-                                providerRun,
-                                callId
-                            )
-
-                        requirePostS3Interrupted result
+                        registration.Runtime.RecordDeliveryPresented(
+                            SessionId.create sessionId,
+                            providerRun,
+                            callId
+                        )
                     | Some(sessionId, _, "completed", None), Some registration when
-                        registration.Runtime.HasPendingPostS3Interrupt sessionId
+                        registration.Runtime.HasEstablishedDelivery sessionId
                         ->
-                        invalidOp
-                            "post-S3 deliver result is missing the exact provider message identity; no attempt was interrupted"
+                        Diagnostic.emit
+                            "post-s3-deliver-observation-missing-provider-run"
+                            [ "session_id", sessionId
+                              "result", "unbound" ]
                     | _ -> ()
                 }
 

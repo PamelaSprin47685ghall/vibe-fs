@@ -12,6 +12,7 @@ test('WHAT[host-boundary-019] the ordinary transform runs the full static stage 
     'relay',
     'tenure-isolation',
     'capture',
+    'adjudicate-delivery',
     'refresh-companion',
     'companion',
     'prefix',

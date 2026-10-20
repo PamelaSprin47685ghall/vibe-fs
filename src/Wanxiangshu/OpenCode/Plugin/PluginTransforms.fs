@@ -113,6 +113,13 @@ module PluginTransforms =
           Current: XTraceProjectionState option
           Receipt: XTraceCaptureReceipt option }
 
+    /// 交付裁决（条款 4）：Continue = 仍需继续，本次请求照常放行；
+    /// Stop = 无需继续，本次请求在 transform 钩子处被中断。
+    [<RequireQualifiedAccess>]
+    type DeliveryAdjudication =
+        | ContinueDelivery
+        | StopDelivery of DeliveryAttemptLedger.Fence
+
     type NormalTransformCapabilities =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
@@ -125,7 +132,14 @@ module PluginTransforms =
           FreezeProviderAttemptPlan: string option -> PhysicalUserMessageId option -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
-          SanitizeMessages: obj -> unit }
+          SanitizeMessages: obj -> unit
+          AdjudicateDelivery: string option -> obj -> Task<DeliveryAdjudication>
+          StopAfterDelivery:
+              string option
+                  -> PhysicalUserMessageId option
+                  -> DeliveryAttemptLedger.Fence
+                  -> obj
+                  -> Task<unit> }
 
     type TransformBranchCapabilities = { RegisterOwned: string -> unit }
 
@@ -640,6 +654,79 @@ module PluginTransforms =
                 |> Option.isSome
             | _ -> false
 
+        /// 条款 3：本次 attempt 是否存在一次已成立的交付。判据只认真实交付
+        /// 事实——交付登记时的物理输入必须仍是当前请求的物理输入，物理输入
+        /// 已变就不再命中（不得误停新输入或后任）。view 声明、助手正文与
+        /// provider stop 都不构成完成证据。
+        ///
+        /// 判据以 durable 交付见证为准，进程内台账只是快速路径：台账命中直接
+        /// 用（快）；台账不命中必须回查 durable 见证——进程重启后台账为空，
+        /// 只认台账会把「已成立的交付」误判成「没交付过」，宿主就会继续发本
+        /// 应停止的请求。
+        ///
+        /// 两个来源都查不到见证时本次请求照常放行：这不是「没交付过」的断言，
+        /// 只是「无法证明成立」——条款 3 只认真实交付事实，无法证明成立就不能
+        /// 当作已完成，所以这里既不停本次请求，也不把交付呈现为已完成。
+        let adjudicateDelivery (sessionText: string) (outObj: obj) : DeliveryAdjudication =
+            let physical =
+                outObj
+                |> ProviderWireDecode.messagesFromTransformOutput
+                |> ProviderWireCapture.lastUserMessageId
+
+            let sessionId = SessionId.create sessionText
+
+            match DeliveryAttemptLedger.tryFindEstablished sessionId physical with
+            | Some(fence, _) -> DeliveryAdjudication.StopDelivery fence
+            | None ->
+                match
+                    DeliveryAttemptLedger.tryFindDurableEstablished
+                        journal
+                        sessionId
+                        physical
+                with
+                | Some fence -> DeliveryAdjudication.StopDelivery fence
+                | None -> DeliveryAdjudication.ContinueDelivery
+
+        let deliveryInterruptResultName (outcome: Result<unit, string>) =
+            match outcome with
+            | Ok() -> "ok"
+            | Error _ -> "failed"
+
+        /// 条款 4/6：发出本次 attempt 的中断。「已发出」与「已观察到结算结果」
+        /// 是两个分别登记的事实：请求发出不是成功，宿主拒绝了这次中断也不是
+        /// 交付失败。中断未确认时已提交的交付仍然成立。
+        let issueDeliveryInterrupt
+            (exactSessionId: SessionId)
+            (sessionText: string)
+            (fence: DeliveryAttemptLedger.Fence)
+            : Task =
+            task {
+                let facts = DeliveryAttemptLedger.interruptFacts fence
+
+                match facts.Issued with
+                | true -> ()
+                | false ->
+                    let interrupt =
+                        task {
+                            try
+                                let! outcome = sessionPort.InterruptAttempt exactSessionId
+                                return outcome
+                            with ex ->
+                                return Error ex.Message
+                        }
+
+                    DeliveryAttemptLedger.recordInterruptIssued fence (interrupt :> Task)
+
+                    let! outcome = interrupt
+
+                    DeliveryAttemptLedger.recordInterruptObserved fence outcome
+
+                    Diagnostic.emit
+                        "delivery-interrupt-observed"
+                        [ "session_id", sessionText
+                          "result", deliveryInterruptResultName outcome ]
+            }
+
         { BeginPhysicalProviderAttempt =
             fun sessionId output ->
                 task {
@@ -689,12 +776,6 @@ module PluginTransforms =
                     // admitted into ChatExecutions belong to this active iteration.
                     let acceptedSuccessorRequest =
                         acceptedSuccessorRequestFor sidOpt physicalUserMessageId
-
-                    let handleInterruptionError (error: string) : unit =
-                        if error.Contains "MANAGED-SESSION-016" then
-                            ()
-                        else
-                            invalidOp ("MANAGER-LOOP-004: retired attempt interrupt failed: " + error)
 
                     let! lifecycle =
                         match sidOpt with
@@ -819,7 +900,45 @@ module PluginTransforms =
                         let replaced = SyncDelegateBatching.applyReplacedResults currentMessages
                         HostMessageProjection.replaceMessagesInPlace outObj replaced
                 }
-          SanitizeMessages = fun outObj -> HostMessageProjection.sanitizeOutputMessages outObj }
+          SanitizeMessages = fun outObj -> HostMessageProjection.sanitizeOutputMessages outObj
+
+          // 条款 3：裁决只认真实交付事实——本次 attempt 存在一次已成立的
+          // 交付，且登记时的物理输入仍是当前物理输入。view 声明、助手正文与
+          // provider stop 都不构成完成证据。
+          AdjudicateDelivery =
+            fun projectionSessionIdOpt outObj ->
+                task {
+                    match projectionSessionIdOpt with
+                    | Some sessionText when not (String.IsNullOrWhiteSpace sessionText) ->
+                        return adjudicateDelivery sessionText outObj
+                    | _ -> return DeliveryAdjudication.ContinueDelivery
+                }
+
+          // 条款 4/6：无需继续时在 transform 钩子处 interrupt。三件套照退休
+          // attempt 的现成做法：抑制下一次 provider step、发出本次 attempt 的
+          // 中断、清空本次请求的消息（LLM 因此看不到 deliver 回复）。
+          // 「已发出」与「已观察到结算结果」分别登记；中断未确认不推翻已提交
+          // 的交付，也不把交付呈现为失败。
+          StopAfterDelivery =
+            fun projectionSessionIdOpt physicalUserMessageId fence outObj ->
+                task {
+                    match projectionSessionIdOpt with
+                    | Some sessionText when not (String.IsNullOrWhiteSpace sessionText) ->
+                        let exactSessionId = SessionId.create sessionText
+
+                        // 1) 抑制下一次 provider step：LLM 不会再收到包含 deliver
+                        //    回复的下一次请求。
+                        physicalUserMessageId
+                        |> Option.iter (fun physical ->
+                            ModelRouting.suppressProviderStep exactSessionId physical)
+
+                        // 2) 发出本次 attempt 的中断。
+                        do! issueDeliveryInterrupt exactSessionId sessionText fence
+
+                        // 3) 清空消息：本次请求没有内容，LLM 看不到 deliver 回复。
+                        RelayNarrativeTransform.clearRequestMessages outObj
+                    | _ -> ()
+                } }
 
     let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
         let scope = boot.Scope
@@ -913,8 +1032,8 @@ module PluginTransforms =
                                   return Some frame
                           } }
                   // 4. Tenure isolation (baton handover). Isolates message set for
-                  // active tenures (currently Plan); strips prior assistant/tool messages,
-                  // and reanchors prefix on fresh handover.
+                  // active tenures (currently Plan); reanchors the prefix epoch and
+                  // validates stable message identity. It does not rewrite the message set.
                   { Name = "tenure-isolation"
                     Run =
                       fun frame ->
@@ -933,6 +1052,30 @@ module PluginTransforms =
                                   Some
                                       { frame with
                                           TracedXTrace = capture.Current }
+                          } }
+                  // 7. 交付裁决（条款 4）。投影裁剪之后、放行本次请求之前：
+                  // 本次 attempt 存在一次已成立的交付时，本次请求不再放行——
+                  // 抑制下一次 provider step、发出本次 attempt 的中断、清空
+                  // 消息，LLM 因此看不到 deliver 回复。放在 XTrace 捕获之后
+                  // 是为了让交付那一轮的证据先落进轨迹；放在 attempt 计划冻结
+                  // 之前是不让一个被抑制的请求留下「已开始」的 provider 事实。
+                  { Name = "delivery-adjudication"
+                    Run =
+                      fun frame ->
+                          task {
+                              let! disposition = caps.AdjudicateDelivery frame.SessionId frame.OutObj
+
+                              match disposition with
+                              | DeliveryAdjudication.ContinueDelivery -> return Some frame
+                              | DeliveryAdjudication.StopDelivery fence ->
+                                  do!
+                                      caps.StopAfterDelivery
+                                          frame.SessionId
+                                          frame.PhysicalUserMessageId
+                                          fence
+                                          frame.OutObj
+
+                                  return None
                           } }
                   // 8. CompanionHost.RefreshXTrace
                   { Name = "refresh-companion-xtrace"

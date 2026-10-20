@@ -6,31 +6,39 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
-/// Process-live delivered-view cell, keyed by session. The cell holds the
-/// view declaration `this.deliver(view)` handed over, or material restored
-/// from a durable delivery witness after a restart. A separate returned
-/// cursor records each representative together with its rendered material,
-/// so identical deliveries are not repeated and changed summaries remain
-/// visible. Restart drops both; the durable witness is written when the
-/// call settles.
+/// Process-live delivered-view cell, keyed by session. The table holds two
+/// tiers, and only one of them is evidence of a delivery:
+///
+/// * A **delivered cell** carries the fence of the exact tool invocation that
+///   produced it (`ProviderRun`, `ToolCallId`). Only this tier can be read as
+///   "the task delivered": the host owns that judgement, and it is bound to
+///   this call and this run (clause 3).
+/// * A **render cache cell** carries no fence. It only stages a view so it can
+///   be rendered and presented — a handoff to a parent, a peek at the latest
+///   view. It never proves a delivery and never completes a task by itself
+///   (clauses 1 and 3).
+///
+/// A separate returned cursor records each representative together with its
+/// rendered material, so identical deliveries are not repeated and changed
+/// summaries remain visible. Restart drops both; crash recovery reads the
+/// durable delivery witness, never a ready-made string (clause 1).
 module JsDeliveredValues =
 
     /// The exact tool invocation that produced this cell. A terminal from an
     /// older provider run cannot consume a newer run's delivery, and vice
-    /// versa. `None` exists only for the test/dev harness and restored
-    /// material whose call fence is no longer live.
+    /// versa. `None` marks a render cache cell: a staged view with no call
+    /// fence, which is presentation only and never delivery evidence.
     type DeliveryFence =
         { ProviderRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity
           ToolCallId: Wanxiangshu.Foundation.Identity.ToolCallId }
 
     type private DeliveredCell =
         { View: obj option
-          Material: string option
           Fence: DeliveryFence option }
 
     type ReturnedPiece = { Key: string; Text: string }
 
-    // DSL-MUTABLE: resource — sessionId → delivered view or restored material
+    // DSL-MUTABLE: resource — sessionId → fenced delivery or staged view
     let private delivered = Dictionary<string, DeliveredCell>()
 
     // DSL-MUTABLE: resource — sessionId → identities already handed back
@@ -54,12 +62,19 @@ module JsDeliveredValues =
         keys |> List.iter (fun key -> set.Add key |> ignore)
 
     /// `view` is the validated view declaration handed over by
-    /// `this.deliver(view)`. The live delivery path always starts here.
+    /// `this.deliver(view)`. Without a call fence this cell is a render
+    /// cache: it can be presented, but it is not evidence of a delivery and
+    /// cannot stand in for one (clauses 1 and 3).
     let recordView (sessionId: string) (view: obj option) : unit =
-        delivered.[sessionId] <- { View = view; Material = None; Fence = None }
+        // A render cache never replaces a fenced delivery: downgrading the
+        // cell would erase the call that owns the delivery evidence.
+        match delivered.TryGetValue sessionId with
+        | true, cell when cell.Fence.IsSome -> ()
+        | _ -> delivered.[sessionId] <- { View = view; Fence = None }
 
     /// Record a delivery with the exact call fence that produced it. The
-    /// settled tool call owns this cell; another run cannot take it.
+    /// settled tool call owns this cell; another run cannot take it. Only a
+    /// fenced cell is delivery evidence (clause 3).
     let recordFencedView
         (sessionId: string)
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
@@ -68,31 +83,32 @@ module JsDeliveredValues =
         : unit =
         delivered.[sessionId] <-
             { View = view
-              Material = None
               Fence = Some { ProviderRun = providerRun; ToolCallId = toolCallId } }
 
-    /// Restore the cell from a durable delivery witness's material (crash
-    /// recovery) or from a harness that stands in for a real delivery. This
-    /// is the only entry that accepts ready-made material.
-    let restoreMaterial (sessionId: string) (text: string) : unit =
-        if not (String.IsNullOrWhiteSpace text) then
-            delivered.[sessionId] <- { View = None; Material = Some text; Fence = None }
-
-    let private cellMaterial (cell: DeliveredCell) : obj =
-        match cell.Material with
-        | Some material -> box material
-        | None -> cell.View |> Option.map box |> Option.defaultValue null
-
+    /// Consume the delivered view of this session. Only a fenced cell is a
+    /// delivery; a render cache cell is left in place for presentation.
     let take (sessionId: string) : obj =
         match delivered.TryGetValue sessionId with
-        | true, cell ->
+        | true, cell when cell.Fence.IsSome ->
             delivered.Remove sessionId |> ignore
-            cellMaterial cell
-        | false, _ -> null
+            cell.View |> Option.map box |> Option.defaultValue null
+        | _ -> null
 
+    /// The delivered view of this session — delivery evidence only. A cell
+    /// without the fence of the call that produced it is a render cache and
+    /// proves nothing here: the presence of a view, of prose, or of the call
+    /// itself never establishes a delivery (clause 3).
     let peek (sessionId: string) : obj =
         match delivered.TryGetValue sessionId with
-        | true, cell -> cellMaterial cell
+        | true, cell when cell.Fence.IsSome ->
+            cell.View |> Option.map box |> Option.defaultValue null
+        | _ -> null
+
+    /// The staged view of this session, whether it is a delivery or a render
+    /// cache. Presentation only: this reader never judges a delivery.
+    let peekCached (sessionId: string) : obj =
+        match delivered.TryGetValue sessionId with
+        | true, cell -> cell.View |> Option.map box |> Option.defaultValue null
         | false, _ -> null
 
     let private renderNonBlank (text: string) : string option =
@@ -197,20 +213,18 @@ module JsDeliveredValues =
         (advance: bool)
         (assistant: string option)
         : string option =
-        match cell.Material with
-        | Some material ->
-            // Restored material is already the complete handoff.
-            renderNonBlank material
-        | None ->
-            let pieces =
-                select sessionId cell.View (alreadyReturned sessionId)
-                |> fun selected -> withAssistant sessionId cell.View selected assistant
+        let pieces =
+            select sessionId cell.View (alreadyReturned sessionId)
+            |> fun selected -> withAssistant sessionId cell.View selected assistant
 
-            if advance then
-                markReturned sessionId (pieces |> List.map _.Key)
+        if advance then
+            markReturned sessionId (pieces |> List.map _.Key)
 
-            renderPieces pieces
+        renderPieces pieces
 
+    /// Render the staged view of a render cache cell. This is presentation:
+    /// the cell carries no call fence, so nothing taken here proves a
+    /// delivery (clauses 1 and 3).
     let tryTakeRenderedWith (sessionId: string) (assistant: string option) : string option =
         match delivered.TryGetValue sessionId with
         | false, _ -> None
@@ -220,7 +234,9 @@ module JsDeliveredValues =
         | true, _ -> None
 
     /// Take the cell only when it belongs to this exact provider run. An old
-    /// terminal that arrives after a newer delivery cannot consume it.
+    /// terminal that arrives after a newer delivery cannot consume it. This
+    /// is the delivery handoff: the cell carries the fence of the call that
+    /// produced it.
     let tryTakeRenderedFor
         (sessionId: string)
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
@@ -238,7 +254,9 @@ module JsDeliveredValues =
     let tryTakeRendered (sessionId: string) : string option = tryTakeRenderedWith sessionId None
 
     /// Snapshot of the handoff. Does not consume the cell and does not advance
-    /// the returned cursor — showing the latest delivery is not itself a return.
+    /// the returned cursor — showing the latest delivery is not itself a
+    /// return. Presentation only: the snapshot may come from a render cache
+    /// cell and never judges a delivery.
     let tryPeekRendered (sessionId: string) : string option =
         match delivered.TryGetValue sessionId with
         | false, _ -> None
@@ -250,7 +268,8 @@ module JsDeliveredValues =
         | false, _ -> None
         | true, cell -> handoff sessionId cell false assistant
 
-    /// The raw view declaration of the current cell, without consuming it.
+    /// The raw view declaration of the current cell — a delivery or a render
+    /// cache — without consuming it. Presentation only.
     let peekView (sessionId: string) : obj option =
         match delivered.TryGetValue sessionId with
         | true, cell -> cell.View

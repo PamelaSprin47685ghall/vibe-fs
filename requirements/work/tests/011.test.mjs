@@ -14,7 +14,7 @@ import { withExecutablePlugin, acceptAuthorityRoot, injectAcceptedAssessment, li
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 
-test('WHAT[work-011] Promoted deliver waits for its terminal attempt interrupt before returning and dispatches no successor', async () => {
+test('WHAT[work-011] a Delivered deliver records the established delivery, and the next transform suppresses the request, interrupts the attempt and dispatches no successor', async () => {
   await withReview(async ({execute, hooks, runtime, session}) => {
     assert.match(await execute(scores('PERFECT')), /recorded = true/)
     const retirement = {
@@ -29,50 +29,35 @@ test('WHAT[work-011] Promoted deliver waits for its terminal attempt interrupt b
     assert.match(confirmation, /confirmation_required = true/)
     assert.match(confirmation, /finished = false/)
     assert.deepEqual(runtime.abortedIds, [])
-    // 无继任者的终态必须先等 Host 中断回执，不能把成功文字当作停止保证。
-    const interruptStarted = Promise.withResolvers()
-    const interruptAck = Promise.withResolvers()
-    const abort = runtime.client.session.abort
-    runtime.client.session.abort = async args => {
-      await abort(args)
-      interruptStarted.resolve()
-      await interruptAck.promise
-      return {}
-    }
-    let returned = false
-    const delivery = hooks.tool.deliver.execute({}, retire).then(result => {
-      returned = true
-      return result
-    })
-    try {
-      const first = await Promise.race([
-        interruptStarted.promise.then(() => 'interrupt'),
-        delivery.then(() => 'returned'),
-      ])
-      assert.equal(first, 'interrupt', 'deliver must interrupt before returning')
-      assert.equal(returned, false, 'deliver must wait for the Host interrupt acknowledgement')
-      const work = await lifecycleWorkView(runtime, session)
-      assert.equal(work.delivered, true, 'interrupt follows durable delivery')
-      assert.equal(work.active, false, 'a final delivery has no successor tenure')
-      assert.deepEqual(runtime.abortedIds, [session])
-    } finally {
-      interruptAck.resolve()
-    }
-    await delivery
+    // 交付已成立是提交面事实：退休落盘即登记精确 attempt 围栏。物理中断
+    // 不再发生在工具内部——停止由 transform 钩子的交付裁决执行。
+    const delivery = await hooks.tool.deliver.execute({}, retire)
+    assert.match(delivery, /Finished\. Do not continue work\./)
+    assert.deepEqual(runtime.abortedIds, [], 'the deliver tool does not interrupt the attempt')
+    const committed = await lifecycleWorkView(runtime, session)
+    assert.equal(committed.delivered, true, 'the delivery is committed')
+    assert.equal(committed.active, false, 'a final delivery has no successor tenure')
     assert.equal(runtime.prompts.length, 0)
+
+    // 下一次请求按已成立的交付裁决：不再放行给 provider（LLM 看不到 deliver
+    // 回复）、中断本次 attempt，且不派发任何后继。
     const output = {messages: [
       {info: {id: 'user-root', role: 'user', sessionID: session, model: {providerID: 'provider', modelID: 'manager-model'}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]},
       {info: {id: 'review-run', role: 'assistant', parentID: 'user-root', time: {created: 2, completed: 2}}, parts: [{type: 'text', text: 'review closed'}]},
       {info: {id: 'retirement-run', role: 'assistant', parentID: 'user-root', time: {created: 3}}, parts: [{type: 'text', text: 'Old closing tail'}]},
     ]}
     await hooks['experimental.chat.messages.transform']({sessionID: session}, output)
-    // 后续 transform 不能再对同一终态发第二次会话中断。
-    assert.deepEqual(runtime.abortedIds.filter(id => id === session), [session])
+    assert.deepEqual(output.messages, [], 'the request carries no content: the model never sees the deliver reply')
+    assert.deepEqual(runtime.abortedIds, [session], 'the transform interrupts the current attempt')
+    assert.equal(runtime.prompts.length, 0, 'the interrupted attempt dispatches no successor')
+    const stopped = await lifecycleWorkView(runtime, session)
+    assert.equal(stopped.delivered, true, 'the established delivery survives the stop')
+    assert.equal(stopped.active, false, 'a final delivery has no successor tenure')
   })
 })
 
 for (const failure of ['rejected', 'thrown']) {
-  test(`WHAT[work-011] a ${failure} Host interrupt cannot be reported as successful final delivery`, async () => {
+  test(`WHAT[work-011] a ${failure} Host interrupt leaves the committed delivery established and is not reported as a failed delivery`, async () => {
     await withReview(async ({execute, hooks, runtime, session}) => {
       await execute(scores('PERFECT'))
       runtime.pushHostMessage(session, {
@@ -83,20 +68,39 @@ for (const failure of ['rejected', 'thrown']) {
         sessionID: session, agent: 'manager', messageID: 'confirmation-run', callID: 'confirmation-call',
       })
       const reason = `terminal-interrupt-${failure}`
+      let interruptAttempts = 0
       runtime.client.session.abort = async () => {
+        interruptAttempts += 1
         if (failure === 'thrown') throw new Error(reason)
         return {error: reason}
       }
-      await assert.rejects(
-        hooks.tool.deliver.execute({}, {
-          sessionID: session, agent: 'manager', messageID: 'final-run', callID: 'final-call',
-        }),
-        new RegExp(reason),
-      )
+      // 「已提交」与「中断未确认」是两个分别取证的事实：交付落盘不因后来的
+      // 中断失败而消失，工具本身也不再因中断失败而失败。
+      const delivery = await hooks.tool.deliver.execute({}, {
+        sessionID: session, agent: 'manager', messageID: 'final-run', callID: 'final-call',
+      })
+      assert.match(delivery, /Finished\. Do not continue work\./)
       const work = await lifecycleWorkView(runtime, session)
       assert.equal(work.delivered, true, 'a failed physical interrupt must not undo committed delivery')
       assert.equal(work.active, false, 'interrupt failure must not create a successor')
       assert.equal(runtime.prompts.length, 0)
+
+      // 中断在 transform 钩子处发出：发出被登记，未被确认也被登记；两者都
+      // 不把已提交的交付呈现为失败，本次请求仍被抑制。
+      const output = {messages: [
+        {info: {id: 'user-root', role: 'user', sessionID: session, model: {providerID: 'provider', modelID: 'manager-model'}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]},
+        {info: {id: 'final-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}}, parts: [{type: 'text', text: 'final delivery'}]},
+      ]}
+      await assert.doesNotReject(
+        () => hooks['experimental.chat.messages.transform']({sessionID: session}, output),
+        'an unconfirmed interrupt must not present the committed delivery as a failure',
+      )
+      assert.equal(interruptAttempts, 1, 'the interrupt was issued once for this attempt')
+      assert.deepEqual(output.messages, [], 'the request is still suppressed when the interrupt is not confirmed')
+      const after = await lifecycleWorkView(runtime, session)
+      assert.equal(after.delivered, true, 'the delivery stays established when the interrupt is not confirmed')
+      assert.equal(after.active, false, 'an unconfirmed interrupt must not create a successor')
+      assert.equal(runtime.prompts.length, 0, 'no successor is dispatched')
     }, {session: `final-interrupt-${failure}`})
   })
 }
@@ -365,10 +369,15 @@ test('WHAT[work-011] Stayed deliver enqueues the successor manager-assess prompt
       return res
     })
     const result = await deliverPromise
-    assert.match(result, /Finished\. Do not continue work\./)
+    // 条款 5：交接回执必须说明「已接力 + 后继要做什么」，因此本用例不断言
+    // 回执措辞，只断言交接事实成立、本任不再继续。
+    assert.doesNotMatch(result, /confirmation_required = true/, 'the second deliver hands the work over instead of confirming again')
     assert.equal(promptsAtReturn, 1, 'successor prompt must already be enqueued when deliver resolves')
     const promptText = runtime.prompts[0]?.body?.parts?.find(p => p?.type === 'text')?.text ?? ''
     assert.match(promptText, /(你是接手此任务的第 2 个 Manager|You are the 2 Manager taking over this mission)/)
+    const handedOver = await lifecycleWorkView(runtime, session)
+    assert.equal(handedOver.active, true, 'the hand-off opened the successor tenure: this tenure does not continue')
+    assert.equal(handedOver.delivered, false, 'a hand-off is not a final delivery')
   }, {session: 'review-manager-atomic-enqueue'})
 })
 

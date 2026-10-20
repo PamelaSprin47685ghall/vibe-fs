@@ -894,18 +894,24 @@ module FissionHost =
             let tracePort = TerminalTracePort.forJournal durable |> Some
 
             let deliveryWitness =
-                TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun
-                |> Option.exists (fun witness ->
-                    witness.Fence.AuthorityRoot = turn.AuthorityRootUserMessageId
-                    && witness.Fence.PhysicalUserMessageId = turn.PhysicalUserMessageId)
+                // 围栏感知读取：同一 (SessionId, ProviderRun) 下可能并存多条见证
+                // （同轮重试换了 toolCallId），粗粒度读取会把证据整体丢掉。
+                // 这里只知道 (AuthorityRoot, PhysicalUserMessageId)，
+                // 交给围栏子集入口按围栏字段筛选，材料不一致时仍然拒绝。
+                TaskDeliveryJournal.tryFindByFenceFields
+                    durable
+                    turn.SessionId
+                    turn.ProviderRun
+                    None
+                    (Some turn.AuthorityRootUserMessageId)
+                    (Some turn.PhysicalUserMessageId)
+                |> Option.isSome
 
             match! TerminalReporter.completeWithEvidence eventPort tracePort ownerTurn deliveryWitness with
             | XTraceTerminalCompletion.Published published when
                 published.SessionId = result.SessionId
                 && published.ProviderRun = result.ProviderRun
                 ->
-                FissionAdmission.releaseOwner group.OwnerSessionId
-                FissionRuntime.clearOwner group.OwnerSessionId
                 return Ok true
             | XTraceTerminalCompletion.Published _ ->
                 return Error "Fission takeover terminal reporter changed the physical owner or provider run"
@@ -919,30 +925,18 @@ module FissionHost =
                 return Error "Fission takeover completed without a delivery witness"
         }
 
+    /// Publish the owner terminal before the group is recorded as converged.
+    ///
+    /// The durable group terminal is single-shot: once FissionConverged is
+    /// folded, the group refuses FissionFailed (TerminalAlreadySet). Appending
+    /// the convergence fact first would therefore make a rejected owner
+    /// terminal unfailable — the lanes would stay alive, the owner would never
+    /// be notified and the owner admission reservation would stay held.
+    /// Publishing first keeps the failure path available: a rejected
+    /// publication appends no FissionConverged fact, so the group is still open
+    /// and can be failed, its lanes aborted, the owner notified and the owner
+    /// reservation released.
     let private publishConvergedTakeover
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        (group: FissionGroupProjection)
-        (turn: ReconciledTurn)
-        (result: AgentRunResult)
-        (role: Role)
-        (convergence: Result<unit, string>)
-        =
-        task {
-            let! outcome =
-                match convergence with
-                | Error error -> Task.FromResult(Error error)
-                | Ok() -> publishOwnerTakeover eventPort durable group turn result role
-
-            match outcome with
-            | Ok published -> return published
-            | Error error ->
-                do! failGroup sessionPort eventPort durable group error
-                return true
-        }
-
-    let private persistAndPublishTakeover
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
@@ -953,9 +947,27 @@ module FissionHost =
         (role: Role)
         =
         task {
-            let! convergence = appendConvergedFromTakeover durable group takeover turn
+            let! published = publishOwnerTakeover eventPort durable group turn result role
 
-            return! publishConvergedTakeover sessionPort eventPort durable group turn result role convergence
+            match published with
+            | Error error ->
+                // The owner terminal was not published, so no convergence fact
+                // exists and the group is still open: the failure path can
+                // still fail it, abort the lanes, notify the owner and release
+                // the owner reservation.
+                do! failGroup sessionPort eventPort durable group error
+                return true
+            | Ok _ ->
+                let! convergence = appendConvergedFromTakeover durable group takeover turn
+
+                match convergence with
+                | Ok() ->
+                    FissionAdmission.releaseOwner group.OwnerSessionId
+                    FissionRuntime.clearOwner group.OwnerSessionId
+                    return true
+                | Error error ->
+                    do! failGroup sessionPort eventPort durable group error
+                    return true
         }
 
     let private completeTakeover
@@ -972,7 +984,7 @@ module FissionHost =
                 do! failGroup sessionPort eventPort durable group error
                 return true
             | Ok(result, role) ->
-                return! persistAndPublishTakeover sessionPort eventPort durable group takeover turn result role
+                return! publishConvergedTakeover sessionPort eventPort durable group takeover turn result role
         }
 
     let private appendLaneMaterialized
@@ -1256,7 +1268,7 @@ module FissionHost =
 
             match
                 Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered laneSessionKey,
-                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek ownerSessionKey
+                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peekCached ownerSessionKey
             with
             | Some material, null ->
                 Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordView

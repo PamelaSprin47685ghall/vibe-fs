@@ -46,7 +46,7 @@ test('WHAT[work-031] plan role, stages, and tool resources exist in paired Engli
   }
 
   // Retired plan tools must not keep loadable tool resources
-  for (const retired of ['tool/resume', 'tool/handoff']) {
+  for (const retired of ['tool/resume', 'tool/handoff', 'tool/devops']) {
     const enFile = path.join(resourcesDir, retired, 'en.md')
     const zhFile = path.join(resourcesDir, retired, 'zh-CN.md')
     assert.ok(!fs.existsSync(enFile), `${retired}/en.md must not exist: the tool is retired from the plan surface`)
@@ -99,9 +99,51 @@ test('WHAT[work-031] plan prompts state that S1/S2 review gaps are entry-bar gap
   assert.doesNotMatch(promotedEn, /will be presented on the next request/i)
   assert.doesNotMatch(promotedZh, /将在下一次请求时呈现/)
 
-  // S3 deliver enters post-S3 state, permanently disables nudges, interrupts like ask, and allows repeated S4 starts on user command
-  assert.match(roleEn, /`post-S3`[\s\S]*permanently disables nudges[\s\S]*interrupts the conversation[\s\S]*repeatedly request starting `S4`/i)
-  assert.match(roleZh, /`post-S3`[\s\S]*永久关闭[\s\S]*中断[\s\S]*反复要求启动 `S4`/)
+  // S3 deliver enters the post-S3 state, stops nudging the retired run, interrupts like ask, and allows repeated S4 starts on user command.
+  // The sentence carrying this clause is rewritten across prompt revisions, so the assertions
+  // below check the semantics inside the post-S3 clauses instead of pinning one English or
+  // Chinese wording: the retired run is no longer nudged, the conversation is interrupted like
+  // ask, and the user may repeatedly request starting `S4`.
+  const postS3Paragraphs = (text) => text.split(/\n{2,}/).filter((p) => p.includes('`post-S3`'))
+
+  const assertPostS3Semantics = (text, label, wording) => {
+    const paragraphs = postS3Paragraphs(text)
+    assert.ok(paragraphs.length > 0, `${label}: must describe the post-S3 state`)
+    const statesInPostS3 = (re) => paragraphs.some((p) => re.test(p))
+    assert.ok(
+      statesInPostS3(wording.noNudge),
+      `${label}: the post-S3 clause must state that the retired run is no longer nudged`,
+    )
+    assert.ok(
+      statesInPostS3(wording.interruptsLikeAsk),
+      `${label}: the post-S3 clause must state that it interrupts the conversation like ask`,
+    )
+    assert.ok(
+      statesInPostS3(wording.repeatedS4Start),
+      `${label}: the post-S3 clause must state that the user may repeatedly request starting \`S4\``,
+    )
+  }
+
+  const englishPostS3Wording = {
+    noNudge: /neither nudged nor revived|no longer nudged|permanently disables? nudges?|not nudged|never nudged/i,
+    interruptsLikeAsk: /interrupts?[^.\n]{0,120}\bask\b/i,
+    repeatedS4Start: /repeatedly (?:request|ask|command)[^.\n]{0,80}`S4`/i,
+  }
+
+  const chinesePostS3Wording = {
+    noNudge: /不再被催促|不再催促|永久关闭[^。]{0,20}催促|不受催促|不再被自动催促/,
+    interruptsLikeAsk: /像\s*`?ask`?\s*一样中断|中断[^。]{0,30}(?:当前)?对话/,
+    repeatedS4Start: /反复[^。]{0,30}启动 `S4`/,
+  }
+
+  assertPostS3Semantics(roleEn, 'role/plan/en.md', englishPostS3Wording)
+  assertPostS3Semantics(roleZh, 'role/plan/zh-CN.md', chinesePostS3Wording)
+  assertPostS3Semantics(s3En, 'planning/s3/en.md', englishPostS3Wording)
+  assertPostS3Semantics(s3Zh, 'planning/s3/zh-CN.md', chinesePostS3Wording)
+  assertPostS3Semantics(deliverEn, 'tool/deliver/en.md', englishPostS3Wording)
+  assertPostS3Semantics(deliverZh, 'tool/deliver/zh-CN.md', chinesePostS3Wording)
+
+  // The repeated user-requested `S4` start is also pinned verbatim in the stage and tool prompts
   assert.match(s3En, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)
   assert.match(s3Zh, /`post-S3`[\s\S]*反复要求启动 `S4`/)
   assert.match(deliverEn, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)

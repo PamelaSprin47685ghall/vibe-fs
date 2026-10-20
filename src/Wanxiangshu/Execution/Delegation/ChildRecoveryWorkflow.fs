@@ -137,11 +137,18 @@ module ChildRecoveryWorkflow =
                 match ports.DurableJournal with
                 | None -> false
                 | Some journal ->
-                    TaskDelivery.tryFind
+                    // 围栏感知读取：同一 (SessionId, ProviderRun) 下可能并存多条
+                    // 见证（同轮重试换了 toolCallId），粗粒度读取会把证据整体丢掉，
+                    // 误判成"没有见证"。这里只知道 AuthorityRoot，
+                    // 交给围栏子集入口按围栏字段精取，材料不一致时仍然拒绝。
+                    TaskDelivery.tryFindByFenceFields
                         ports.ChildSession
                         providerRun
+                        None
+                        (Some authorityRoot)
+                        None
                         (AgentJournal.snapshot journal).AgentProjections.Deliveries
-                    |> Option.exists (fun witness -> witness.Fence.AuthorityRoot = authorityRoot)
+                    |> Option.isSome
 
             if not witnessed then
                 ChildSnapshotEvidence.Unreadable "restart terminal has no durable delivery witness"

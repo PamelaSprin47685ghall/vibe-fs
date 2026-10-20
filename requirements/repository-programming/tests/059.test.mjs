@@ -22,12 +22,12 @@ const seed = (id, texts) => {
 }
 test.beforeEach(() => clearAll())
 
-test('WHAT[repository-programming-059] this.deliver records its view declaration and does not run later statements', async () => {
+test('WHAT[repository-programming-059] this.deliver records its report mapping as a prefixUntil=0 declaration and does not run later statements', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-view-deliver-'))
   const id = 'native-deliver'
   try {
     clearDeliveredValue(id)
-    const result = await run(dir, 'await this.deliver({ prefixUntil: 0, thenMap: { 0: "indexed" } }); throw new Error("unreachable");', id)
+    const result = await run(dir, 'await this.deliver({ 0: "indexed" }); throw new Error("unreachable");', id)
     assert.equal(caseName(result), 'Succeeded')
     assert.deepEqual(deliveredViewOf(id), { prefixUntil: 0, thenMap: { 0: 'indexed' } })
   } finally { clearDeliveredValue(id); rmSync(dir, { recursive: true, force: true }) }

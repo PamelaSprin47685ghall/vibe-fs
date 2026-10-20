@@ -16,6 +16,10 @@
 
 park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.fs，并发上限 8），由工具编排层 ToolWorkflow 与 session 回收层 PluginSessionScope 共享引用，进程内存活：同进程后续调用仍见其挂起。超出上限的 park 以 `CONCURRENCY_LIMIT` 拒绝，无排队；abandon 释放现场后新 park 可入。现场携带 session owner，会话终结据此 reap。
 
+## 调用面三态互斥（WHAT[repository-programming-064]）
+
+一次编程调用只携带 `program` / `unpark` / `abandon` 之一，三个参数在调用面上都是可选的，模型只发其中之一。同时给出两个及以上（例如同时给 `program` 与 `abandon`）以 `INVALID_ARGUMENT` 拒绝，reason 点名冲突的字段名，且是零效果：程序不跑、不恢复、不放弃、不产生文件效果，也不留待下一请求消费的视图声明，更不消费被点名的 handle——现场原样留在现场表里，等模型用单状态调用处置。一个状态都不给是缺状态，报缺少 program 的错误（`missing 'program' argument`），与“两个状态”的拒绝是两件事。
+
 ## 泄漏兜底三件套（WHAT[repository-programming-031]）
 
 交付硬门禁接在 deliverSpec 执行链，plan/manager 分派之前：存在未处理 parked handle 时拒绝交付并列出全部 handle（资源 `tool/js-program/parked-deliver-blocked`）。每回合提醒经由 PairHint 的 composeMarkerDocument 并入（资源 `tool/js-program/parked-hint`），无载体回合不注入。会话终结在 ClearSession 清理链强制 reap 该 session 名下全部现场，durable 记 Reaped。两个资源均为 zh-CN.md/en.md 成对双语、占位符一致且含 `{{handles}}`；三个调用点只调用 JsParkedSites，不定义现场表。

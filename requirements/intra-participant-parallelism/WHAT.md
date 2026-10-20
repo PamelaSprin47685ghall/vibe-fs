@@ -10,7 +10,7 @@ Fission 只增加同一 logical participant 的并发 execution presents。各 l
 
 ## [003] Fresh sibling replacement
 
-调用者须为有物理 Host parent 的 subsession。每条 lane 新建独立 Host session，parentID 与原 caller 的 parentID 相同；初始任务由该 lane 输入组成，caller 已有已交付视图时附带 caller 当时的已交付视图，不成为新委托主体。caller 尚未交付视图不构成准入阻碍，lane 以自身输入启动。
+调用者须为有物理 Host parent 的 subsession。每条 lane 新建独立 Host session，parentID 与原 caller 的 parentID 相同；初始任务由该 lane 输入组成，并无条件附带 caller 顶层整理后的当前会话上下文。fission 是同一身份的换执行道，衣钵无条件继承：lane 继承的是本对话的现状，不是旧的交付记录视图——旧交付记录是上一次交付的产物，不是本对话的现状。lane 不成为新委托主体。caller 无可用会话上下文不构成准入阻碍，lane 以自身输入启动。
 
 ## [004] All-or-none admission
 
@@ -70,4 +70,10 @@ V1 按 canonical index 从 lane 0 到 N−1 环行，以 keyed union 合并；�
 
 准入须同时满足：已证明 CanonicalRole=Engineer、本次授权含 Fission、subsession 来源、无 active group，以及其余现有准入条件。运行时入口与 ToolRegistry 都须拒绝不满足条件的调用，不能只隐藏 schema。
 
-角色名、Persona 别名、参数、自称身份和附带已交回的 view 均不授予能力。所有非 Engineer 身份（含 Manager 各任期、Orchestrator、DevOps、Bookkeeper 及未知或内部辅助身份）、Engineer 根会话、已有 active group 的 lane、Sphinx 内部只读 Engineer 均拒绝。历史 Manager Fission 只供读取和重放，不重建 lane、恢复执行或扩权。
+角色名、Persona 别名、参数、自称身份、附带的会话上下文和附带已交回的 view 均不授予能力。所有非 Engineer 身份（含 Manager 各任期、Orchestrator、DevOps、Bookkeeper 及未知或内部辅助身份）、Engineer 根会话、已有 active group 的 lane、Sphinx 内部只读 Engineer 均拒绝。历史 Manager Fission 只供读取和重放，不重建 lane、恢复执行或扩权。
+
+## [018] 衣钵继承与成员签名
+
+fission 是同一 logical participant 换一条执行道，不是委派：每条 lane 无条件继承本对话的衣钵，其上下文来源是顶层整理后的当前会话上下文，不是旧的交付记录视图。旧交付记录是上一次交付的产物，不代表本对话的现状，不得作为 lane 的上下文来源；当前会话上下文为空也不构成准入阻碍。
+
+成员签名上 `this.fission(payload)` 只有 payload 一个形参，不带 reportMapping：拉取或换道动作不承载委派材料。带 reportMapping 的是委派成员 `fork`、`resume`、`commission`、`devops`、`advisor`、`dag`；`join` 与 `horizon` 同 fission 一样不带。

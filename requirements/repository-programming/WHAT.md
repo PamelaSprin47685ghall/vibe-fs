@@ -8,7 +8,7 @@
 
 每项文件系统 capability 在公开基类、工具描述、canonical examples 与运行时门禁中一致投影；缺失能力在四层均不可用，伪造调用也须拒绝。一项能力可生成固定顺序的同权成员族，不产生第二份授权。
 
-主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Grep → `rg`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `call`，Fork → `fork`/`dag`，Join → `join`，Fission → `fission`，Horizon → `horizon`，Advisor → `advisor`；canonical 成员序为 `write, rm, mv, cat, ls, rg, stat, mkdir, whereAll, where, call, fork, dag, join, fission, horizon, advisor`（生命周期成员 `park` 在基类与运行时绑定中携带，不进入 `members` 列表）。`ToolPermission.Edit` 不再投影任何 `JsCapability`；旧成员 `glob` 与 `file`/`edit`/`rewrite` 均已从仓库生成编程面彻底退役。Plan 使用共享成员和 `PLAN_PATH` 单文件闸门。`grep(needle, pattern)` 已退役，Grep 现在只投影 `rg(argv)`。
+主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Grep → `rg`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `call`，Fork → `fork`/`dag`，Resume → `resume`，Commission → `commission`，DevOps → `devops`，Join → `join`，Fission → `fission`，Horizon → `horizon`，Advisor → `advisor`；canonical 成员序为 `write, rm, mv, cat, ls, rg, stat, mkdir, whereAll, where, call, fork, resume, commission, devops, dag, join, fission, horizon, advisor`（生命周期成员 `park` 在基类与运行时绑定中携带，不进入 `members` 列表）。委派成员 `fork`/`resume`/`commission`/`devops`/`dag`/`join`/`fission`/`horizon`/`advisor` 一律走编程面 `this.xxx`，宿主不为 `fork`/`resume`/`commission`/`devops` 注册独立工具。`ToolPermission.Edit` 不再投影任何 `JsCapability`；旧成员 `glob` 与 `file`/`edit`/`rewrite` 均已从仓库生成编程面彻底退役。Plan 使用共享成员和 `PLAN_PATH` 单文件闸门。`grep(needle, pattern)` 已退役，Grep 现在只投影 `rg(argv)`。
 
 ## [003] 确定性生成
 
@@ -162,11 +162,11 @@ Manager 的 `todowrite-for-manager` 程序入口始终按角色准入；仓库�
 
 ## [032] unpark 恢复
 
-以 `{ unpark: { handle, value } }` 调用恢复挂起程序：恢复后的程序继续运行到完成，返回继续结果（Succeeded，无 handle）；挂起点的 await 表达式求值为注入值。未知 handle 报 `HANDLE_UNKNOWN`。恢复后的程序再次 park 时返回新的 parked 载荷与新 handle。
+以 `{ unpark: { handle, value } }` 调用恢复挂起程序：恢复后的程序继续运行到完成，返回继续结果（Succeeded，无 handle）；挂起点的 await 表达式求值为注入值。未知 handle 报 `HANDLE_UNKNOWN`。恢复后的程序再次 park 时返回新的 parked 载荷与新 handle。调用面一次只携带 program/unpark/abandon 之一，同时给出两个及以上按 `INVALID_ARGUMENT` 拒绝（见 [064]）。
 
 ## [033] handle 恰好消费一次
 
-一个 handle 只被消费一次：第一次 unpark 恢复程序，第二次对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。abandon 同样消费 handle：abandon 之后对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。对未知 handle 的 abandon 也报 `HANDLE_UNKNOWN`。
+一个 handle 只被消费一次：第一次 unpark 恢复程序，第二次对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。abandon 同样消费 handle：abandon 之后对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。对未知 handle 的 abandon 也报 `HANDLE_UNKNOWN`。被状态冲突拒绝的调用不消费 handle：现场原样留在现场表里（见 [064]）。
 
 ## [034] abandon 与程序侧 finalizer
 
@@ -274,21 +274,25 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 
 双语资源 `tool/js-program/run-rules` 与 `tool/js-program/ultra-devops`（wget 批量下载 Ultra Example）成对；示例覆盖断点续传、停滞/过慢检测、退出码分派与逐文件 park 汇报。测试以本地限速 Range 服务器真实驱动 `wget -c`：中断后恢复、部分文件保留、逐文件 park/unpark、404 退出码 8 分派给 `onExit`。教学与示例不以无观察的恒真 `watch`（裸 `return true`）为示范：`watch` 的教学形态是先读 ctx 增量与实例状态再作裁决；宿主不拦恒真，但教学不示范它。ultra-devops 示例覆盖 where 歧义 park → unpark 恢复的完整路径：故意触发一次真实歧义（清单中目标名出现两次），读 `{ needle, candidates, nearest }` 诊断、unpark 注入选中 span、程序从原 await 继续——不以 happy path 为唯一示范。
 
-## [053] view 视图声明捕获
+## [053] 顶层上下文整理参数与报告材料形状
 
-每个生成编程工具接受可选 `view` 对象，提供时严格使用 `{ prefixUntil, thenMap }`，两字段都必填。prefixUntil 是非负整数锚点编号；thenMap 是编号到非空摘要或 null 的映射。完整规则由 context-compression [031] 唯一规定：存活锚点划分最新区间，摘要整段替换并永久生效，真实锚点替换后消失，0 隐含且永存。
+顶层上下文整理声明由**两个扁平顶层参数**承载：`prefixUntil` 是非负整数锚点编号（number），`thenMap` 是编号到非空摘要或 null 的映射（record）。生成编程工具的调用面接受这两个可选参数：两者都不给，本次不设声明、保持既有视图；只给其一，或给出残缺的形状，按非法形状处理。**旧的 `view` 包装对象已退役**：调用面残留 `view` 参数直接以 `VIEW_DECLARATION_INVALID` 拒绝（reason 点明改用扁平的 prefixUntil 与 thenMap），不执行程序、不留下部分效果。完整规则由 context-compression [031] 唯一规定：存活锚点划分最新区间，摘要整段替换并永久生效，真实锚点替换后消失，0 隐含且永存。
 
-提示词要求 thenMap 覆盖所有保护范围外的可见锚点，null 表示保留；漏项按 null 保留，不抛错。本轮 map 对小于 prefixUntil 的编号静默忽略，历史压缩不因此逆转。形状非法以 VIEW_DECLARATION_INVALID 拒绝，不执行程序、不留下部分效果。不保留旧字段或兼容别名。声明在工具调用时捕获，供下一请求消费一次；替换状态持续存在。双语教学资源为 tool/js-program/view-declaration-extra。
+提示词要求 thenMap 覆盖所有保护范围外的可见锚点，null 表示保留；漏项按 null 保留，不抛错。本轮 map 对小于 prefixUntil 的编号静默忽略，历史压缩不因此逆转。形状非法以 VIEW_DECLARATION_INVALID 拒绝，不保留旧字段或兼容别名。声明在工具调用时捕获，供下一请求消费一次；替换状态持续存在。捕获阶段只校验不写入：声明只在调用成功结算后提交，失败的调用不提交声明，也不覆盖此前已提交的声明；失败调用不留下任何可呈现的记录，已合法提交的声明不得被后续失败抹掉。
 
-## [054] deliver 的 view-only 交付
+成员层的报告材料是另一个形状：`reportMapping` 是 `Record<string, null|string>`（键是非负整数锚点编号字符串，值只能是 null 或非空摘要字符串），**没有 prefixUntil**，也不接受任何其他字段；语义等价于一份 `{ prefixUntil: 0, thenMap: reportMapping }` 的声明（context-compression [032]），因此没有受保护的前缀段、锚点 0 本身可被替换，映射里未出现的锚点按保留处理。reportMapping 必填：缺失或非法（缺字段、非法编号、非对象映射、非法值或空白摘要）→ 数据信封拒绝 `{ ok: false, code: "VIEW_DECLARATION_INVALID", reason }`；空对象 `{}` 是合法映射（等价于不做任何替换性投影）。两层形态不得混用：顶层是 prefixUntil + thenMap 的扁平参数对，成员是单份 reportMapping 记录。规则源唯一，委派路径、advisor 路径与交付路径只引用本条与 context-compression [032]，不各自复制一份形状与拒绝语义的表述。双语教学资源为 tool/js-program/view-declaration-extra。
 
-`deliver(view)` 是生命周期成员，任何生成面无条件携带（与 park 同级）。deliver 是 view-only：先输出散文，再以 `deliver(view)` 结束程序，`view` 指向本次工作的全部材料（含末条 assistant 散文）；栈展开、不再执行后续语句，子工作返回给调用方的内容由该 `view` 决定并渲染成 TOML。不接受旧的 value 终值形态，也不接受双参数形态：`deliver(value, view?)` 与 `deliver(value)` 已撤销，传入额外参数或非 view 对象以 `VIEW_DECLARATION_INVALID` 拒绝；`view` 形状非法时同样以 `VIEW_DECLARATION_INVALID` 失败。跨次调用遵循增量去重规则：本次工作之前已经返回过的内容，即使本次 `view` 中包含，也不再重复返回。程序捕获内部交付哨兵后可以继续存活，此后的 return 值才是结果——捕获即知情取消。subagent 程序必须以 `js.deliver` 显式交付：普通 `return` 保持交付格为空，子工作不写完成、join 不关闭（`js.dag` 据此以 `node-undelivered` 挂起），不把未交付结算成终态。描述与双语资源 `tool/js-program/deliver` 陈述同一契约。
+## [054] deliver 的 reportMapping 交付
+
+`deliver(reportMapping)` 是生命周期成员，任何生成面无条件携带（与 park 同级）。deliver 是 view-only：先输出散文，再以 `deliver(reportMapping)` 结束程序，reportMapping 指向本次工作的全部材料（含末条 assistant 散文）；栈展开、不再执行后续语句，子工作返回给调用方的内容由该 reportMapping 决定并渲染成 TOML。
+
+deliver 的参数从完整 view 声明**降为 reportMapping**：形态是 `Record<string, null|string>`（无 prefixUntil），宿主按 `{ prefixUntil: 0, thenMap: reportMapping }` 解释，语义不变——投影调用方当前可见区间，null 与漏项保留原文，摘要替换该锚点的最新完整区间。不接受旧的 value 终值形态，也不接受双参数形态：`deliver(value, view?)` 与 `deliver(value)` 已撤销；`view` 包装对象形态（`deliver(view)`）同样撤销。传入额外参数或非 reportMapping 对象以 `VIEW_DECLARATION_INVALID` 拒绝；reportMapping 缺失或形状非法时同样以 `VIEW_DECLARATION_INVALID` 失败。跨次调用遵循增量去重规则：本次工作之前已经返回过的内容，即使本次 reportMapping 中包含，也不再重复返回。程序捕获内部交付哨兵后可以继续存活，此后的 return 值才是结果——捕获即知情取消。subagent 程序必须以 `js.deliver` 显式交付：普通 `return` 保持交付格为空，子工作不写完成、join 不关闭（`js.dag` 据此以 `node-undelivered` 挂起），不把未交付结算成终态。描述与双语资源 `tool/js-program/deliver` 陈述同一契约。
 
 ## [055] vm 并行边界
 
 同一程序内 `Promise.all` / `Promise.allSettled` 直接表达 IO 并行，不需要新原语：vm 单线程事件循环天然把每次 api 调用串行化，宿主不加锁、不排队、不互斥。独立分支的效果各自 as-is 落盘；一个分支失败不清除兄弟分支已落地的改动。同一文件的写竞态由程序作者自负（Unix 哲学），宿主只保单笔写原子与写前校验。
 
-## [056] 委托原语：fork / join / fission / dag
+## [056] 委托原语：fork / resume / commission / devops / dag / join / fission / horizon / advisor
 
 **所有 js.* 成员的返回值都是数据，绝不返回渲染后的 prose**（宿主在工具结果与 parked 载荷边界统一把值渲染给模型）。委托成员统一用信封：
 
@@ -296,16 +300,21 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 { ok: true, ... } / { ok: false, code: "<stable kebab code>" }
 ```
 
-- `fork(payload)`：`payload` 是字符串（任务）或 `{ charge, name?, calling?, keywords? }`；缺 `name` 时由 charge 派生（派生名冲突报 `name-already-belongs`）。成功返回 `{ ok, name, agentId, outcome }`，`outcome ∈ created | nudged | commissioned`。拒绝码：`name-required`/`charge-required`/`unknown-calling`/`calling-conflict`/`name-already-belongs`/`warm-start-unavailable`/`context-unavailable`/`not-a-delegation-role`/`placement-failed`/`dispatch-uncertain`。
-- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, view }], byName }`；只有经 `js.deliver(view)` 有效交付的成员才 `completed` 并进入 join 记录；`status ∈ completed | failed | abandoned`。未交付的成员不写完成、不进入终态记录，join 不关闭，成员保持活跃；父方可以继续等待或重派。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
+- `fork(payload, reportMapping)`：`payload` 是字符串（任务）或 `{ charge, name?, calling?, keywords? }`；缺 `name` 时由 charge 派生（派生名冲突报 `name-already-belongs`）。成功返回 `{ ok, name, agentId, outcome }`，`outcome ∈ created | nudged | commissioned`。拒绝码：`name-required`/`charge-required`/`unknown-calling`/`calling-conflict`/`name-already-belongs`/`warm-start-unavailable`/`context-unavailable`/`not-a-delegation-role`/`placement-failed`/`dispatch-uncertain`。
+- `resume(payload, reportMapping)`：续做既有道路，`payload` 必带 `name` 并携带本次 `charge`；复用该 participant 的完整历史与 binding，不重选绑定；目标正忙时 charge 作为忙碌提示追加到既有工作，不新建任务（`outcome` 为 `nudged`）。传 `calling` 一律拒绝。拒绝码：`name-required`/`charge-required`/`calling-not-allowed`/`warm-start-unavailable`/`context-unavailable`/`assessment-pending-for-devops`/`dispatch-closed`/`placement-failed`/`dispatch-uncertain`。
+- `commission(payload, reportMapping)`：委任既有角色的道路，`payload` 与 fork 同形（`{ charge, name?, calling? }`）；`calling` 省略时按角色推导，显式给出与推导不一致即拒绝。成功返回 `{ ok, name, agentId, outcome }`。拒绝码：`name-required`/`charge-required`/`unknown-calling`/`name-already-belongs`/`context-unavailable`/`placement-failed`/`dispatch-uncertain`。
+- `devops(intent, reportMapping)`：请求本调用 session 绑定的固定 DevOps 席位做一次工作；`intent` 是本次交给 DevOps 的意图文本（不像 fork/resume 那样承载 charge）。DevOps 绑定未就绪或已关闭时以 `assessment-pending-for-devops` 拒绝。
+- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, view }], byName }`；只有经 `this.deliver(reportMapping)` 有效交付的成员才 `completed` 并进入 join 记录，记录里的 `view` 是该成员交付的材料；`status ∈ completed | failed | abandoned`。未交付的成员不写完成、不进入终态记录，join 不关闭，成员保持活跃；父方可以继续等待或重派。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
 - `fission({ charge, lanes })`：同身份多 lane 的任务分片执行（宿主负责 lane 绑定与收拢），返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组 lane。拒绝码：`fission-unavailable`/`lane-start-failed`/`not-ready`/`context-unavailable`/`invalid-prompt`。
-- `dag({ nodes: [{ id, charge, deps?, lanes? }] })`：纯声明糖，由基类编译成波次 `fork` + 一次 `join`；下游节点的 prompt 带上依赖记录。成功返回 `{ ok, results: { [id]: record }, skipped: [id...] }`。**节点失败 → `park`**（与 `where` 同一条恢复通道），payload 为 `{ dag, node, code, deps, done, pending }`；注入值语义：`"retry"` 重跑、`"skip"` 跳过（下游看到 null）、其他值直接作为该节点结果、`{ abort: reason }` 使程序失败。
+- `dag(spec, reportMapping)`：`spec` 是 `{ nodes: [{ id, charge, deps?, lanes? }] }`；纯声明糖，由基类编译成波次 `fork` + 一次 `join`；**一份 reportMapping 发给所有节点，节点不得覆盖或另设自己的映射**；下游节点的 prompt 带上依赖记录。成功返回 `{ ok, results: { [id]: record }, skipped: [id...] }`。**节点失败 → `park`**（与 `where` 同一条恢复通道），payload 为 `{ dag, node, code, deps, done, pending }`；注入值语义：`"retry"` 重跑、`"skip"` 跳过（下游看到 null）、其他值直接作为该节点结果、`{ abort: reason }` 使程序失败。
 - `horizon()`：返回在场名册的数据信封 `{ ok, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`；`status ∈ returned | still-away | did-not-return`，`workState ∈ latest | none | unavailable`，`record` 是最新帧正文原文（无则为 `""`）；四个校准数 `turnsUsed`/`turnsLeft`/`timeUsedMs`/`timeLeftMs` 只在委任者 estimate 与子会话起点两者都可读时给出，否则全为 `0`，不猜测。拒绝码：`horizon-unavailable`。
-- `advisor(intent, view)`：请求本调用 session 自己的顾问专席——`view` 是 Anchor view 声明 `{ prefixUntil, thenMap }`，返回的数据信封是 `{ ok, advice }` 或 `{ ok: false, code: "advisor-unavailable", reason }`。顾问读到的请求是彼此独立的 prompt，绝不拼成一段：顾问自己的 law、按 advisor 自有 TOML 视图形状渲染的 view（`# ` 注释表头 + `[[new_work_to_record]]` 数据表），以及自成一条 user prompt 的 `intent`；follow-up 只交付相对已交付部分的 view 增量，其后追加新的 intent。拒绝码：`advisor-unavailable`。
+- `advisor(intent, reportMapping)`：请求本调用 session 自己的顾问专席——`reportMapping` 是报告材料（`Record<string, null|string>`，无 prefixUntil；宿主按 `{ prefixUntil: 0, thenMap: reportMapping }` 投影成顾问读到的视图），返回的数据信封是 `{ ok, advice }` 或 `{ ok: false, code: "advisor-unavailable", reason }`。顾问读到的请求是彼此独立的 prompt，绝不拼成一段：顾问自己的 law、按 advisor 自有 TOML 视图形状渲染的 view（`# ` 注释表头 + `[[new_work_to_record]]` 数据表），以及自成一条 user prompt 的 `intent`；follow-up 只交付相对已交付部分的 view 增量，其后追加新的 intent。拒绝码：`advisor-unavailable`。
 
-实现边界：delegation shard 提供结构化入口（`ForkTool.executeReceipt`/`JoinTool.executeReceipt`/`FissionTool.executeReceipt`，返回数据与上述稳定码；宿主 `fork`/`join`/`fission` 工具的 prose 输出保持不变）；接线层在每次编程调用期间安装进程内委托宿主驱动这些入口，调用结束清除；未安装宿主时成员以 `{ ok:false, code:"DELEGATION_UNAVAILABLE" }` 拒绝，不静默降级。
+委派成员分两层参数形态：**派遣面成员必带 reportMapping**——`this.fork(payload, reportMapping)`、`this.resume(payload, reportMapping)`、`this.commission(payload, reportMapping)`、`this.devops(intent, reportMapping)`、`this.dag(spec, reportMapping)`、`this.advisor(intent, reportMapping)`。reportMapping 的形态是 `Record<string, null|string>`（无 prefixUntil），语义等价一份 `{ prefixUntil: 0, thenMap: reportMapping }` 的声明（[053]）；缺失或非法时，该次成员调用以数据信封 `{ ok: false, code: "VIEW_DECLARATION_INVALID", reason }` 拒绝，不抵达委派宿主、不留下部分效果，程序继续运行。**拉取面成员不带 reportMapping**——`this.fission(payload)`、`this.join()`、`this.horizon()`：它们是同身份换道或拉取动作，不强加报告材料。
 
-委托面按能力投影：Orchestrator 没有文件权限但持有 Fork/Join，因此获得仅含委托（fork/join/dag/park）的编程面；`hasFsCapability`/`jsToolSpec.admissionFor` 同步把 Fork/Join/Fission 计入编程面授权，四层一致。
+实现边界：delegation shard 提供结构化入口（`ForkTool.executeReceipt`/`JoinTool.executeReceipt`/`FissionTool.executeReceipt`，返回数据与上述稳定码；宿主 `join`/`horizon`/`fission` 工具的 prose 输出保持不变，`fork`/`resume`/`commission`/`devops` 已无宿主工具注册，一律经编程面成员调用）；接线层在每次编程调用期间安装进程内委托宿主驱动这些入口，调用结束清除；未安装宿主时成员以 `{ ok:false, code:"DELEGATION_UNAVAILABLE" }` 拒绝，不静默降级。
+
+委托面按能力投影：Manager 持有 Fork/Resume/Join/Horizon/Advisor 权限，因而获得 `fork`/`dag`/`resume`/`join`/`horizon`/`advisor` 成员；Plan 的 DevOpsConsultation 权限投影出 `devops` 成员；Orchestrator 没有文件权限，其 Fork 权限投影为 `commission`（同一委派执行入口），因而是纯委派编程面。`hasFsCapability`/`jsToolSpec.admissionFor` 同步把 Fork/Resume/DevOps/Join/Fission 计入编程面授权，四层一致。
 
 ## [057] ls 的 ignore 语义与搜索面
 
@@ -319,10 +328,18 @@ Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`
 
 ## [059] this.deliver 的视图记录与增量去重
 
-程序经 `this.deliver(view)` 结束时，宿主保存交付 view，普通 return 不填交付格。宿主先用当前调用者上下文、已有压缩历史和同一声明规则生成完整 view，再按宿主记录的已返回身份去重并渲染成 TOML；不能只回传 thenMap 中的摘要而漏掉 null 保留或受保护的内容。prefixUntil 不承担交付筛选。后续重复包含的身份不再返回，交付格可 take 或 peek，peek 不推进返回记录。
+程序经 `this.deliver(reportMapping)` 结束时，宿主保存交付的 reportMapping，普通 return 不填交付格。宿主先用当前调用者上下文、已有压缩历史和同一投影规则生成完整视图（等价于按 `{ prefixUntil: 0, thenMap: reportMapping }` 投影），再按宿主记录的已返回身份去重并渲染成 TOML；不能只回传 reportMapping 中的摘要而漏掉 null 保留或受保护的内容。交付筛选不由 prefixUntil 承担（reportMapping 没有 prefixUntil，锚点 0 本身可被替换）。后续重复包含的身份不再返回，交付格可 take 或 peek，peek 不推进返回记录。
 
-deliver 只接受 view：`view` 使用 [053] 的同一形状校验，非法以 VIEW_DECLARATION_INVALID 拒绝；旧的 value 终值与双参数形态不是合法调用。交付格与返回记录为进程内状态，重启即丢；交付事实在工具结算时另记。
+deliver 只接受 reportMapping：`reportMapping` 使用 [053] 的同一形状校验（`Record<string, null|string>`，无 prefixUntil），缺失或非法以 VIEW_DECLARATION_INVALID 拒绝；旧的 value 终值、双参数形态与 `view` 包装对象形态都不是合法调用。交付格与返回记录为进程内状态，重启即丢；交付事实在工具结算时另记。
 
 ## [060] "js" 机器词汇的终局
 
 模型视野之外的名字一律保留 `js` 前缀，不做改名：durable 流名（`js-tools/transactions`、`js-tools/lifecycle-audit`）、资源目录（`js-program`、`js-plan`、`js-bookkeeper`）、`RuntimeBindingKey`（`js.cat`、`js.where`、`js.park` …）与包装器内部哨兵（`__jsParked`/`__jsDelivered`/`__jsAbandoned`/`__jsFailure`）。理由：这些名字是 durable 身份与机器对机器契约（流名改名等于数据迁移，哨兵改名等于重放保真风险），而模型看到的是 `todowrite-for-ROLE` 工具名与成员名——模型面与机器面本就应当分离。此裁决与第 28 轮改名（门面级命名即教学）不冲突：改的是模型面，不动机器面。
+
+## [064] 调用面三态互斥：program / unpark / abandon
+
+一次编程调用只携带一个状态：`{ program }`、`{ unpark: { handle, value } }`、`{ abandon: { handle } }` 三者互斥。三个参数在调用面上都是可选的，模型只发其中之一（[049]）。
+
+同时给出两个及以上（例如 `{ program, abandon }`）按 `INVALID_ARGUMENT` 拒绝，reason 点名冲突的字段名。拒绝是零效果：程序不执行、不恢复、不放弃，不产生任何文件效果，也不留待下一请求消费的视图声明；被点名的 handle 不被消费——现场原样留在现场表里，等模型用单状态调用处置（[030]、[032]、[033]、[039]）。
+
+一个状态都不给是缺状态，不是状态冲突：报缺少 program 的错误（`missing 'program' argument`），不执行任何程序。

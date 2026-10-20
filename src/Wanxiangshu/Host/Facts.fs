@@ -60,14 +60,62 @@ module TaskDelivery =
         elif sha256 witness.View <> witness.MaterialDigest then Error "delivery material digest mismatch"
         else Ok ()
 
-    let tryFind sessionId providerRun (witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness>) =
+    /// 折叠侧按 (SessionId, ProviderRun, ToolCallId) 三元组存见证，所以同一
+    /// (SessionId, ProviderRun) 下并存多条见证是正常状态（同轮重试换了 toolCallId）。
+    let private underRun (sessionId: SessionId) (providerRun: ProviderRunIdentity) (witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness>) =
         witnesses
         |> Map.toList
         |> List.choose (fun ((session, run, _), witness) ->
             if session = sessionId && run = providerRun then Some witness else None)
+
+    /// 交付材料一致（同一份交付物）。散文属于各次尝试，不参与一致判定。
+    let private sameMaterial (a: TaskDeliveryWitness) (b: TaskDeliveryWitness) =
+        a.MaterialDigest = b.MaterialDigest && a.View = b.View
+
+    /// 精确围栏读取：先按 (SessionId, ProviderRun, ToolCallId) 精确命中；
+    /// 三元组命中而围栏其余字段不一致时拒绝（与折叠侧同键异材料的拒绝一致）。
+    /// 未命中时按 (SessionId, ProviderRun) 取全部见证并按完整围栏筛选。
+    let tryFindByFence (fence: TaskDeliveryFence) (witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness>) =
+        match Map.tryFind (key fence) witnesses with
+        | Some witness when witness.Fence = fence -> Some witness
+        | Some _ -> None
+        | None ->
+            underRun fence.SessionId fence.ProviderRun witnesses
+            |> List.filter (fun witness -> witness.Fence = fence)
+            |> function
+                | [ witness ] -> Some witness
+                | _ -> None
+
+    /// 围栏子集读取：调用方只掌握部分围栏字段时使用。
+    /// 命中一条即返回；命中多条且交付材料一致时返回其中一条；
+    /// 材料不一致时拒绝（不同围栏的材料不一致不得被随意挑一条）。
+    let tryFindByFenceFields
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId option)
+        (authorityRoot: AuthorityRootUserMessageId option)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        (witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness>)
+        =
+        let matches (witness: TaskDeliveryWitness) =
+            let fence = witness.Fence
+            (toolCallId.IsNone || fence.ToolCallId = toolCallId.Value)
+            && (authorityRoot.IsNone || fence.AuthorityRoot = authorityRoot.Value)
+            && (physicalUserMessageId.IsNone || fence.PhysicalUserMessageId = physicalUserMessageId.Value)
+
+        underRun sessionId providerRun witnesses
+        |> List.filter matches
         |> function
+            | [] -> None
             | [ witness ] -> Some witness
-            | _ -> None
+            | many ->
+                let first = List.head many
+                if List.forall (sameMaterial first) many then Some first else None
+
+    /// 粗粒度读取：不再因为同一 (SessionId, ProviderRun) 下"不止一条"就整体丢弃证据。
+    /// 需要指定某一次调用时用 tryFindByFence。
+    let tryFind sessionId providerRun (witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness>) =
+        tryFindByFenceFields sessionId providerRun None None None witnesses
 
 type HostFactCases =
     | TaskDeliveryCommitted of TaskDeliveryWitness

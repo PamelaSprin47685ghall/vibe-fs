@@ -163,6 +163,9 @@ module JsCanonicalDescription =
         [<Literal>]
         val BaseClassLifecycle: string = "tool/js-program/base-class-lifecycle"
 
+        [<Literal>]
+        val JsPlan: string = "tool/js-plan"
+
     type Prose =
         { Header: string
 
@@ -217,7 +220,9 @@ module JsCanonicalDescription =
           BaseClassHorizon: string
           BaseClassAdvisor: string
           BaseClassAsk: string
-          BaseClassLifecycle: string }
+          BaseClassLifecycle: string
+
+          JsPlan: string }
 
     val has: capabilities: Set<JsCapability> -> capability: JsCapability -> bool
     val publicBaseClass: prose: Prose -> capabilities: Set<JsCapability> -> string

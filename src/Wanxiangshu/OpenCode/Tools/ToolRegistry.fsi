@@ -53,6 +53,7 @@ module ToolRegistry =
         root: string ->
         sessionId: string ->
         program: string ->
+        fence: (ProviderRunIdentity * ToolCallId) option ->
             Task<string>
 
     val create:

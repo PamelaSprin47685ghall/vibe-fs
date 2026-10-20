@@ -313,7 +313,7 @@ const TOOL_NAMES = [
   'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator',
 ]
 const PLUGIN_TOOL_NAMES = [
-  'ask', 'todowrite-for-plan',
+  'todowrite-for-plan',
   'join', 'horizon', 'fission', 'review', 'deliver',
   'bash-honeypot', 'assume',
   'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator',

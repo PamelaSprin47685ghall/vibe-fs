@@ -33,6 +33,20 @@ module SyncDelegateSurface =
     val observeGuardDelta: value: obj -> raw: obj -> unit
     val awaitGuardInterrupt: value: obj -> session: string -> providerRun: string -> Task
 
+    /// The session-control calls this harness's Host boundary received: every
+    /// abort and interrupt, with the session it aimed at, the provider run it
+    /// fenced and the outcome it returned. Observability only.
+    val sessionControlSnapshot: value: obj -> obj
+
+    /// Inject a refusal for the session-control calls this harness's Host
+    /// boundary receives. An empty reason clears the injection.
+    val refuseSessionControl: value: obj -> reason: string -> unit
+
+    /// Await the session-control call this harness issued for the exact
+    /// session and provider run — the interrupt the delegate child received
+    /// after its delivery.
+    val awaitDeliveryInterrupt: value: obj -> session: string -> providerRun: string -> Task
+
     val observeExactGuardAbort:
         value: obj -> session: string -> physical: string -> authorityRoot: string -> providerRun: string -> Task
 

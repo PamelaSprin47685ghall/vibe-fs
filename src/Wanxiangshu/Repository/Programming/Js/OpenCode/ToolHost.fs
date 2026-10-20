@@ -73,7 +73,8 @@ module JsDescriptionAssets =
           BaseClassHorizon = template lang JsCanonicalDescription.Path.BaseClassHorizon
           BaseClassAdvisor = template lang JsCanonicalDescription.Path.BaseClassAdvisor
           BaseClassAsk = template lang JsCanonicalDescription.Path.BaseClassAsk
-          BaseClassLifecycle = template lang JsCanonicalDescription.Path.BaseClassLifecycle }
+          BaseClassLifecycle = template lang JsCanonicalDescription.Path.BaseClassLifecycle
+          JsPlan = text lang JsCanonicalDescription.Path.JsPlan }
 
     let argProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.ArgProgram
@@ -126,6 +127,11 @@ module JsToolSpec =
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
+    /// A Host argument is present when its key holds a value; null and
+    /// undefined are absences.
+    [<Emit("$0 !== null && $0 !== undefined")>]
+    let private isPresent (value: obj) : bool = jsNative
+
     /// The directory one session's js-* surface executes in.
     ///
     /// The Host creates a Manager and her forked children rooted at the directory
@@ -163,6 +169,7 @@ module JsToolSpec =
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
         (rootOf: string -> string)
+        (settlementOf: HostToolContext -> Task<DeliverySettlement option>)
         : ToolSpec =
         let reviewCheck =
             match reviewCheck with
@@ -173,38 +180,58 @@ module JsToolSpec =
 
         /// Build the three-state input object from the Host arguments:
         /// `{ program } | { unpark: { handle, value } } | { abandon: { handle } }`.
+        ///
+        /// Every present state is copied into the input object: a call that
+        /// carries two of them is a contradiction the workflow refuses
+        /// visibly, never a state this builder silently drops.
         let inputOf (args: HostToolArguments) : obj =
             let program = readProgram args
 
-            let unpark = if isNull (args.Raw?unpark) then null else args.Raw?unpark
+            let unpark = if isPresent (args.Raw?unpark) then Some(args.Raw?unpark) else None
 
-            let abandon = if isNull (args.Raw?abandon) then null else args.Raw?abandon
+            let abandon = if isPresent (args.Raw?abandon) then Some(args.Raw?abandon) else None
 
-            match program, unpark, abandon with
-            | Some source, _, _ -> createObj [ "program" ==> source ]
-            | None, unparkValue, _ when not (isNull unparkValue) ->
-                createObj
-                    [ "unpark"
-                      ==> createObj [ "handle" ==> string (unparkValue?handle); "value" ==> unparkValue?value ] ]
-            | None, _, abandonValue when not (isNull abandonValue) ->
-                createObj [ "abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ] ]
-            | _ -> createObj []
+            let programEntry =
+                match program with
+                | Some source -> Some("program" ==> box source)
+                | None -> None
+
+            let unparkEntry =
+                match unpark with
+                | Some unparkValue ->
+                    Some(
+                        "unpark"
+                        ==> createObj [ "handle" ==> string (unparkValue?handle); "value" ==> unparkValue?value ]
+                    )
+                | None -> None
+
+            let abandonEntry =
+                match abandon with
+                | Some abandonValue ->
+                    Some("abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ])
+                | None -> None
+
+            [ programEntry; unparkEntry; abandonEntry ]
+            |> List.choose id
+            |> createObj
 
         // The unpark/abandon arguments are nested objects; the Host schema
         // describes them as plain objects with string handle fields. The value
-        // field of unpark is free-form (the injected resume value).
+        // field of unpark is free-form (the injected resume value). Both are
+        // optional: a call carries exactly one of program / unpark / abandon,
+        // so no single one of them may be required by the schema.
         let unparkSchema =
-            ToolHostCodec.objectSchemaOf
+            ToolHostCodec.optionalObjectSchema
                 [ "handle", ToolHostCodec.stringSchema factory
                   "value", ToolHostCodec.anySchema factory ]
                 factory
 
         let abandonSchema =
-            ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
+            ToolHostCodec.optionalObjectSchema [ "handle", ToolHostCodec.stringSchema factory ] factory
 
         // One view contract: the prefix is protected; the map states keep or summary.
         let mappingSchema =
-            ToolHostCodec.recordSchemaOf
+            ToolHostCodec.optionalRecordSchemaOf
                 (ToolHostCodec.stringSchema factory)
                 (ToolHostCodec.nullableStringSchema factory)
                 (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
@@ -214,12 +241,12 @@ module JsToolSpec =
           Description = surface.Description
           Arguments =
             [ "program",
-              ToolHostCodec.stringSchemaDescribed
+              ToolHostCodec.optionalStringSchemaDescribed
                   (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
                   factory
               "unpark", unparkSchema
               "abandon", abandonSchema
-              "prefixUntil", ToolHostCodec.numberSchema factory
+              "prefixUntil", ToolHostCodec.optionalNumberSchema factory
               "thenMap", mappingSchema ]
           Admission = admissionFor surface.RoleName
           Execute =
@@ -227,63 +254,168 @@ module JsToolSpec =
                 task {
                     let input = inputOf args
 
-                    let hasProgram = not (isNull (input?program))
-
-                    let declaration =
-                        if isUndefined (args.Raw?prefixUntil) && isUndefined (args.Raw?thenMap) then null
-                        else createObj [ "prefixUntil" ==> args.Raw?prefixUntil; "thenMap" ==> args.Raw?thenMap ]
-                    let viewFailure =
-                        if not (isUndefined (args.Raw?view)) then
-                            Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
-                        else
-                            match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId declaration with
-                            | Ok() -> None
-                            | Error failure -> Some failure
-
-                    match viewFailure with
-                    | Some failure ->
-                        return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-                    | None when not hasProgram && isNull (input?unpark) && isNull (input?abandon) ->
+                    // The three states are mutually exclusive: a call carries
+                    // exactly one of program / unpark / abandon. A conflicting
+                    // call is refused before the view declaration is captured
+                    // and before anything runs.
+                    match JsToolWorkflow.conflictingInputReason input with
+                    | Some reason ->
                         return
-                            ToolHostCodec.tomlObject
-                                [ "error",
-                                  ToolHostCodec.TString(
-                                      JsDescriptionAssets.missingProgram (
-                                          ProviderLanguageBinding.readGlobalPreference ()
-                                      )
-                                  ) ]
+                            JsToolsResult.render (
+                                JsToolWorkflow.JsToolOutcome.Failed(
+                                    JsFailure.InvalidArgument reason,
+                                    [],
+                                    [],
+                                    [],
+                                    []
+                                )
+                            )
                     | None ->
-                        // 10 s sandbox deadline; 1 MiB output bound (JS-054).
-                        let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
+                        let hasProgram = isPresent (input?program)
 
-                        // The session's own directory wins over the plugin workspace:
-                        // a road's deliverable belongs in the worktree that session was
-                        // created in, not in the target's checkout.
-                        let root = rootOf ctx.SessionId
+                        let noState =
+                            not hasProgram
+                            && not (isPresent (input?unpark))
+                            && not (isPresent (input?abandon))
 
-                        let! outcome =
-                            JsToolWorkflow.executeWithReviewCheck
-                                (reviewCheck |> Option.map (fun check -> fun () -> check ctx))
-                                ctx.SessionId
-                                (match ctx.ProviderRunId, ctx.ToolCallId with
-                                 | Some providerRun, Some toolCallId -> Some(providerRun, toolCallId)
-                                 | _ -> None)
-                                surface.Capabilities
-                                root
-                                surface.BaseClassSource
-                                input
-                                10000
-                                deadlineEpochMs
-                                (1 <<< 20)
-                                persistence
-                                lifecyclePersistence
-                                (fileAccessObservation |> Option.map (fun observe -> observe ctx))
+                        let declaration =
+                            if isUndefined (args.Raw?prefixUntil) && isUndefined (args.Raw?thenMap) then null
+                            else
+                                createObj [ "prefixUntil" ==> args.Raw?prefixUntil; "thenMap" ==> args.Raw?thenMap ]
 
-                        return JsToolsResult.render outcome
+                        let setView = Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView
+
+                        // Clause 6: a failed call must not leave a presentable
+                        // view declaration behind. The declaration is validated
+                        // here — an invalid one is still refused before anything
+                        // runs — but it is committed to the pending view only
+                        // after the program settled, so a program that threw, exited
+                        // non-zero or never settled leaves the pending view empty.
+                        let viewFailure =
+                            if not (isUndefined (args.Raw?view)) then
+                                Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
+                            elif not (isPresent declaration) then
+                                None
+                            else
+                                match
+                                    Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse
+                                        declaration
+                                with
+                                | Ok _ -> None
+                                | Error failure -> Some failure
+
+                        match viewFailure with
+                        | Some failure ->
+                            return
+                                JsToolsResult.render (
+                                    JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])
+                                )
+                        | None when noState ->
+                            return
+                                ToolHostCodec.tomlObject
+                                    [ "error",
+                                      ToolHostCodec.TString(
+                                          JsDescriptionAssets.missingProgram (
+                                              ProviderLanguageBinding.readGlobalPreference ()
+                                          )
+                                      ) ]
+                        | None ->
+                            // 10 s sandbox deadline; 1 MiB output bound (JS-054).
+                            let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
+
+                            // The session's own directory wins over the plugin workspace:
+                            // a road's deliverable belongs in the worktree that session was
+                            // created in, not in the target's checkout.
+                            let root = rootOf ctx.SessionId
+
+                            let fence =
+                                match ctx.ProviderRunId, ctx.ToolCallId with
+                                | Some providerRun, Some toolCallId -> Some(providerRun, toolCallId)
+                                | _ -> None
+
+                            // A delivery witness belongs to a fenced call: without the
+                            // call fence there is nothing that can own the witness.
+                            // A fence-less call therefore never carries a settlement.
+                            let! settlement =
+                                match fence with
+                                | None -> Task.FromResult None
+                                | Some _ -> settlementOf ctx
+
+                            let! outcome =
+                                match settlement with
+                                | Some settlement ->
+                                    JsToolWorkflow.executeWithReviewCheckAndDelivery
+                                        (reviewCheck |> Option.map (fun check -> fun () -> check ctx))
+                                        (Some settlement)
+                                        ctx.SessionId
+                                        fence
+                                        surface.Capabilities
+                                        root
+                                        surface.BaseClassSource
+                                        input
+                                        10000
+                                        deadlineEpochMs
+                                        (1 <<< 20)
+                                        persistence
+                                        lifecyclePersistence
+                                        (fileAccessObservation |> Option.map (fun observe -> observe ctx))
+                                | None ->
+                                    JsToolWorkflow.executeWithReviewCheck
+                                        (reviewCheck |> Option.map (fun check -> fun () -> check ctx))
+                                        ctx.SessionId
+                                        fence
+                                        surface.Capabilities
+                                        root
+                                        surface.BaseClassSource
+                                        input
+                                        10000
+                                        deadlineEpochMs
+                                        (1 <<< 20)
+                                        persistence
+                                        lifecyclePersistence
+                                        (fileAccessObservation |> Option.map (fun observe -> observe ctx))
+
+                            // Commit the declaration only now: the pending view is
+                            // what the next request projects, and a failed program
+                            // must not be able to present anything.
+                            let commitFailure =
+                                match outcome with
+                                | JsToolWorkflow.JsToolOutcome.Failed _ -> None
+                                | JsToolWorkflow.JsToolOutcome.Succeeded _
+                                | JsToolWorkflow.JsToolOutcome.Parked _ ->
+                                    match setView ctx.SessionId declaration with
+                                    | Ok() -> None
+                                    | Error failure -> Some failure
+
+                            match commitFailure with
+                            | Some failure ->
+                                return
+                                    JsToolsResult.render (
+                                        JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])
+                                    )
+                            | None -> return JsToolsResult.render outcome
                 } }
 
-    let create factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation rootOf =
-        createCore None factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation rootOf
+    let create
+        factory
+        surface
+        workspaceRoot
+        persistence
+        lifecyclePersistence
+        fileAccessObservation
+        rootOf
+        settlementOf
+        =
+        createCore
+            None
+            factory
+            surface
+            workspaceRoot
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+            rootOf
+            settlementOf
 
     let createWithReviewCheck
         check
@@ -294,6 +426,7 @@ module JsToolSpec =
         lifecyclePersistence
         fileAccessObservation
         rootOf
+        settlementOf
         =
         createCore
             (Some check)
@@ -304,6 +437,7 @@ module JsToolSpec =
             lifecyclePersistence
             fileAccessObservation
             rootOf
+            settlementOf
 
     /// Build a ToolSpec with dedicated ToolAdmission.
     let createWithAdmission
@@ -315,8 +449,17 @@ module JsToolSpec =
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
         (rootOf: string -> string)
+        (settlementOf: HostToolContext -> Task<DeliverySettlement option>)
         : ToolSpec =
         let spec =
-            create factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation rootOf
+            create
+                factory
+                surface
+                workspaceRoot
+                persistence
+                lifecyclePersistence
+                fileAccessObservation
+                rootOf
+                settlementOf
 
         { spec with Admission = admission }

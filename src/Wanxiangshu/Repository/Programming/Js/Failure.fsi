@@ -74,6 +74,10 @@ type JsFailure =
     | AskRefused of string
     | DelegationUnavailable
     | ViewDeclarationInvalid of string
+    /// The delivery of this call did not happen: the durable witness was not
+    /// committed, the call has no fence to own the witness, or the delivery
+    /// material could not be materialized. The payload says which one.
+    | DeliveryNotEstablished of string
 
 module JsFailure =
     val code: failure: JsFailure -> string

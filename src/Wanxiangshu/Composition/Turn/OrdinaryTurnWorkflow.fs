@@ -65,6 +65,34 @@ module OrdinaryTurnWorkflow =
                         || List.contains (ProviderRunIdentity.value turn.ProviderRun) work.RetiredRuns)
         }
 
+    /// Delivery evidence for one turn (deliver clause 3). A turn counts as
+    /// delivered only when a durable witness exists for this session and this
+    /// provider run, and its fence names this authority term. The witness is
+    /// read through the fence-aware entry: siblings of the same run with a
+    /// different delivery material are not picked at random, and a fence that
+    /// does not name this term is not this turn's evidence. The witness
+    /// itself carries the view declaration, the pre-call prose and the
+    /// materialized view, so a view declaration, a prose body, a tool call or
+    /// a provider stop can never stand in for it.
+    /// The process-live cell is a material cache, not proof: it can show what
+    /// was handed over, not that it was handed over. Material readers keep
+    /// taking the cell for rendering; this decision point never takes it as
+    /// evidence, so a turn without a durable witness is not a delivered turn.
+    let private hasDeliveryEvidence (journal: AgentJournal option) (turn: ReconciledTurn) : bool =
+        match journal with
+        | Some durable ->
+            let witnesses = (AgentJournal.snapshot durable).AgentProjections.Deliveries
+
+            TaskDelivery.tryFindByFenceFields
+                turn.SessionId
+                turn.ProviderRun
+                None
+                (Some turn.AuthorityRootUserMessageId)
+                (Some turn.PhysicalUserMessageId)
+                witnesses
+            |> Option.isSome
+        | None -> false
+
     let private classifyManagerOrPlanTurn (context: ReconciledTurnContext) : LongWorkGate =
         let turn = context.Turn
 
@@ -103,13 +131,8 @@ module OrdinaryTurnWorkflow =
                 return Wait
             else
                 let! settled = isTurnWorkSettled turn
-                let hasDelivered =
-                    Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value turn.SessionId) <> null
-                    || (journal
-                        |> Option.bind (fun durable ->
-                            TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun)
-                        |> Option.isSome)
-                if settled || hasDelivered then
+
+                if settled || hasDeliveryEvidence journal turn then
                     return Wait
                 else
                     return classifyManagerOrPlanTurn context
@@ -511,20 +534,11 @@ module OrdinaryTurnWorkflow =
                 let completeAgent () =
                     let tracePort = journal |> Option.map TerminalTracePort.forJournal
 
-                    let deliveryWitness =
-                        match journal with
-                        | Some durable ->
-                            TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun
-                            |> Option.exists (fun witness ->
-                                witness.Fence.AuthorityRoot = turn.AuthorityRootUserMessageId
-                                && witness.Fence.PhysicalUserMessageId = turn.PhysicalUserMessageId)
-                        | None ->
-                            // No journal means a test/dev harness; the process-live
-                            // cell is the only evidence available there.
-                            Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value turn.SessionId)
-                            <> null
-
-                    TerminalReporter.completeWithEvidence eventPort tracePort turn deliveryWitness
+                    TerminalReporter.completeWithEvidence
+                        eventPort
+                        tracePort
+                        turn
+                        (hasDeliveryEvidence journal turn)
 
                 return!
                     handleOutcome

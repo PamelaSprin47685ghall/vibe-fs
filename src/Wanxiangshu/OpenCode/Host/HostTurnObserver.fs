@@ -113,9 +113,24 @@ module HostTurnObserver =
         (providerRun: ProviderRunIdentity)
         : Task =
         task {
-            match scope.LoopSensor.ActiveInterruptTask(sessionId, providerRun) with
-            | None -> return ()
-            | Some owned -> do! owned
+            // DEG-OWN: the guard's own interrupt task, addressed by exact run
+            // (unchanged).
+            let guardTask = scope.LoopSensor.ActiveInterruptTask(sessionId, providerRun)
+
+            // 条款 4：「已发出」不等于「已观察到」。交付自己发起的那次中断
+            // 也是本观察者自有任务，同样按精确 run 取；两者都未发出时不等待
+            // （没有中断不得变成阻塞）。
+            let deliveryTask = DeliveryAttemptLedger.activeInterruptTask sessionId providerRun
+
+            match guardTask, deliveryTask with
+            | None, None -> return ()
+            | Some owned, None -> do! owned
+            | None, Some owned -> do! owned
+            | Some guard, Some delivery ->
+                // 同一处等待：任一自有中断任务结算即返回；结算的那个仍被
+                // await（异常不被吞掉），未结算的那个由其发起方各自结算。
+                let! settled = Task.WhenAny([| guard; delivery |])
+                do! settled
         }
 
     let private observeApplicationTurn

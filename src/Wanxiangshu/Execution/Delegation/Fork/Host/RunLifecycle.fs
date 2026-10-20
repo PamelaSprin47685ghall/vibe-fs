@@ -40,6 +40,15 @@ module HostForkRunLifecycle =
     [<Emit("console.error($0, $1)")>]
     let private logError (prefix: string) (message: string) : unit = jsNative
 
+    /// The delivered view of one terminal, resolved on demand.
+    ///
+    /// The resolution is deferred on purpose. A terminal that does not
+    /// address this run must never spend the live run's material, so the
+    /// view is read only after the ownership guards have passed — not when
+    /// the terminal arrives. The resolution never throws: a faulting read is
+    /// an empty view (EXEC-006).
+    type ViewResolution = unit -> Task<string option>
+
     [<RequireQualifiedAccess>]
     type AgentOwnerDispatchOutcome =
         | Accepted of physicalUserMessageId: PhysicalUserMessageId * authorityRoot: AuthorityRootUserMessageId
@@ -233,6 +242,22 @@ module HostForkRunLifecycle =
         | Some record -> Some record
         | None -> observed
 
+    /// Peek the delivered cell of this run without consuming it.
+    ///
+    /// The cell is fenced: only a delivery of this exact provider run is
+    /// evidence for this terminal, and a render cache (no call fence) is
+    /// presentation only. The peek advances no cursor and removes nothing,
+    /// so repeated reads of one terminal yield the same view.
+    let private peekDeliveredView
+        (run: PendingHostRun)
+        (result: AgentRunResult)
+        (prose: string option)
+        =
+        match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
+        | Some fence when fence.ProviderRun = result.ProviderRun ->
+            JsDeliveredValues.tryPeekRenderedWith (SessionId.value run.ChildId) prose
+        | _ -> None
+
     let private completedOutcomeView
         (childViewForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (run: PendingHostRun)
@@ -247,11 +272,11 @@ module HostForkRunLifecycle =
                 else
                     Some result.TerminalText
 
-            let delivered =
-                JsDeliveredValues.tryTakeRenderedFor
-                    (SessionId.value run.ChildId)
-                    result.ProviderRun
-                    prose
+            // D2: the cell is peeked, never taken. Two entries (the terminal
+            // subscription and the runtime's Complete) read the same child
+            // terminal; a consuming read would leave the second reader
+            // without the material and strand the run.
+            let delivered = peekDeliveredView run result prose
 
             return chooseView delivered observed
         }
@@ -264,6 +289,27 @@ module HostForkRunLifecycle =
         match outcome with
         | TerminalOutcome.Completed result -> completedOutcomeView childViewForRun run result
         | _ -> Task.FromResult None
+
+    /// The view of one terminal, resolved only when it is asked for.
+    ///
+    /// The read is deferred so that a terminal which does not address this
+    /// run never touches the run's material. A faulting read is an empty
+    /// view: it is bounded auxiliary evidence and never a reason to lose a
+    /// terminal the child already proved.
+    let safeViewResolution
+        (childViewForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
+        (run: PendingHostRun)
+        (outcome: TerminalOutcome)
+        : ViewResolution =
+        fun () ->
+            task {
+                try
+                    return! viewForOutcome childViewForRun run outcome
+                with error ->
+                    logError "FORK-VIEW" (sprintf "run %s view read faulted: %s" run.AgentId error.Message)
+
+                    return None
+            }
 
     /// Idle existing child / first prompt for an AgentOwnerRoot work unit.
     ///
@@ -529,9 +575,8 @@ module HostForkRunLifecycle =
         (sessions: ISessionHostPort)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
-        (view: string option)
+        (view: ViewResolution option)
         : Task =
-        let completedView = view
         let runId = "run-" + run.AgentId
         let childId = run.ChildId
         let handle = HandleController.agentHandle run.AgentId
@@ -548,38 +593,90 @@ module HostForkRunLifecycle =
             // here would fail the run before the last effort. Observation only.
             Task.FromResult(())
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
-        | Completed _ when completedView.IsNone || completedView.Value = "" ->
-            // LC-004: An asynchronous child that completed its physical turn without
-            // delivering a view has not delivered its obligation. Do not settle or
-            // close the run; observation only, the child continues.
-            Task.FromResult(())
         | Completed result ->
             task {
-                let agentOutcome =
-                    AgentCompletion.completed
-                        run.AgentId
-                        childId
-                        runId
-                        run.Role
-                        result.AuthorityRootUserMessageId
-                        result.ProviderRun
-                        (completedView |> Option.defaultValue "")
-                        result.Directory
+                // D6: a durable completion must be backed by a durable
+                // delivery witness. Without a fence-matched witness nothing
+                // proves that this run delivered anything, so the run stays
+                // open (LC-004) instead of writing a HandleCompleted that
+                // nobody witnessed. The journal-less harness path has no
+                // witness to ask for and keeps working.
+                let witnessed =
+                    match journal with
+                    | None -> true
+                    | Some durable ->
+                        TaskDeliveryJournal.tryFindByFenceFields
+                            durable
+                            childId
+                            result.ProviderRun
+                            None
+                            (Some result.AuthorityRootUserMessageId)
+                            None
+                        |> Option.isSome
 
-                let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+                if not witnessed then
+                    return ()
+                else
+                    // D1: the view is resolved only now. The terminal has
+                    // been proven to address this run, so its material may
+                    // be read and — once the outcome is admissible — spent.
+                    let! resolved =
+                        match view with
+                        | Some resolution -> resolution ()
+                        | None -> Task.FromResult None
 
-                do!
-                    deliverProvenCompletion
-                        gate
-                        pendingRuns
-                        journal
-                        parentId
-                        run
-                        (TerminalEvidence.completed run.AgentId handle childId body)
-                        agentOutcome
+                    match resolved with
+                    | Some completedView when not (System.String.IsNullOrWhiteSpace completedView) ->
+                        let prose =
+                            if System.String.IsNullOrWhiteSpace result.TerminalText then
+                                None
+                            else
+                                Some result.TerminalText
+
+                        // D2: the delivered cell is consumed exactly once, and
+                        // only for an admissible outcome. A take that finds
+                        // nothing (another reader already consumed the cell)
+                        // falls back to the peeked view, which is idempotent.
+                        let taken =
+                            JsDeliveredValues.tryTakeRenderedFor
+                                (SessionId.value run.ChildId)
+                                result.ProviderRun
+                                prose
+
+                        let finalView =
+                            match taken with
+                            | Some consumed -> consumed
+                            | None -> completedView
+
+                        let agentOutcome =
+                            AgentCompletion.completed
+                                run.AgentId
+                                childId
+                                runId
+                                run.Role
+                                result.AuthorityRootUserMessageId
+                                result.ProviderRun
+                                finalView
+                                result.Directory
+
+                        let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+                        do!
+                            deliverProvenCompletion
+                                gate
+                                pendingRuns
+                                journal
+                                parentId
+                                run
+                                (TerminalEvidence.completed run.AgentId handle childId body)
+                                agentOutcome
+                    | _ ->
+                        // LC-004: An asynchronous child that completed its physical turn without
+                        // delivering a view has not delivered its obligation. Do not settle or
+                        // close the run; observation only, the child continues.
+                        return ()
             }
             :> Task
-        | Failed stop when not (stopBelongsToRun run stop) -> Task.FromResult(())
         | Failed stop when
             stop.Reason = "MISSING_FINAL_REPORT"
             || stop.Reason.Contains("MISSING_FINAL_REPORT")
@@ -669,19 +766,15 @@ module HostForkRunLifecycle =
         let deliverTerminal (outcome: TerminalOutcome) =
             trackOwnedWork (fun () ->
                 task {
-                    // EXEC-006: a view read is bounded auxiliary
-                    // evidence. Its failure is an empty view, never
-                    // a reason to lose a proven terminal that already
-                    // happened on the child.
-                    let! view =
-                        task {
-                            try
-                                return! viewForOutcome childViewForRun run outcome
-                            with error ->
-                                logError "FORK-VIEW" (sprintf "run %s view read faulted: %s" run.AgentId error.Message)
-
-                                return None
-                        }
+                    // D1: the view is not read when the terminal arrives.
+                    // The resolution is handed to the lifecycle owner, which
+                    // reads it only after the terminal has been proven to
+                    // address this run — a foreign or replayed terminal must
+                    // not spend the live run's material. EXEC-006: a view
+                    // read is bounded auxiliary evidence, so its failure is
+                    // an empty view, never a reason to lose a proven
+                    // terminal that already happened on the child.
+                    let view = Some(safeViewResolution childViewForRun run outcome)
 
                     try
                         do! complete gate pendingRuns journal parentId sessions run outcome view

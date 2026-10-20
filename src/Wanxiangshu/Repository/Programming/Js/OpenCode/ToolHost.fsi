@@ -39,6 +39,7 @@ module JsToolSpec =
         lifecyclePersistence: IJsLifecyclePersistence option ->
         fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
         rootOf: (string -> string) ->
+        settlementOf: (HostToolContext -> Task<DeliverySettlement option>) ->
             ToolSpec
 
     val createWithReviewCheck:
@@ -50,6 +51,7 @@ module JsToolSpec =
         lifecyclePersistence: IJsLifecyclePersistence option ->
         fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
         rootOf: (string -> string) ->
+        settlementOf: (HostToolContext -> Task<DeliverySettlement option>) ->
             ToolSpec
 
     val createWithAdmission:
@@ -61,4 +63,5 @@ module JsToolSpec =
         lifecyclePersistence: IJsLifecyclePersistence option ->
         fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
         rootOf: (string -> string) ->
+        settlementOf: (HostToolContext -> Task<DeliverySettlement option>) ->
             ToolSpec

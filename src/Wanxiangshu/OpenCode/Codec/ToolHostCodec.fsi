@@ -86,9 +86,17 @@ module ToolHostCodec =
     val optionalStringArraySchema: factory: HostToolFactory -> HostSchema
     val stringArraySchema: factory: HostToolFactory -> HostSchema
     val objectSchemaOf: fields: (string * HostSchema) list -> factory: HostToolFactory -> HostSchema
+
+    /// Optional object schema: the caller may omit the whole object.
+    val optionalObjectSchema: fields: (string * HostSchema) list -> factory: HostToolFactory -> HostSchema
+
     val arraySchemaOf: item: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
 
     val recordSchemaOf:
+        key: HostSchema -> value: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
+
+    /// Optional open key→value map (zod `record`); the description carries the key shape.
+    val optionalRecordSchemaOf:
         key: HostSchema -> value: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
 
     val register: factory: HostToolFactory -> spec: ToolSpec -> obj

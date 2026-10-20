@@ -204,6 +204,11 @@ module RelayNarrativeTransform =
         =
         task { return dispositionAfterProjection work }
 
+    /// 条款 4：本次请求不再放行时清空消息——请求因此没有内容，LLM 看不到
+    /// deliver 回复。退休 attempt 与交付裁决共用这一个动作。
+    let clearRequestMessages (outObj: obj) =
+        HostMessageProjection.replaceMessagesInPlace outObj []
+
     let private project
         journal
         (interruptAttempt: SessionId -> Task<unit>)
@@ -224,7 +229,7 @@ module RelayNarrativeTransform =
             match stale with
             | Some _ ->
                 do! interruptAttempt sessionId
-                HostMessageProjection.replaceMessagesInPlace outObj []
+                clearRequestMessages outObj
                 return RelayProjectionDisposition.RetiredAttemptStopped
             | None -> return! projectActive journal sessionId lifecycle outObj
         }

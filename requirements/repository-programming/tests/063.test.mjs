@@ -15,31 +15,22 @@ const sandbox = () => {
 }
 
 // 顶层工具的宿主 schema 形状：prefixUntil 是 number，thenMap 是 record。
+// 每个 builder 都能标记 optional，与真实宿主 schema 一致。
+const schemaOf = (state) => ({
+  ...state,
+  optional: () => schemaOf({ ...state, optional: true }),
+  nullable: () => schemaOf({ ...state, nullable: true }),
+  describe: (text) => schemaOf({ ...state, description: text }),
+})
 const toolModule = () => {
   const tool = (definition) => definition
   tool.schema = {
-    string: () => ({
-      type: 'string',
-      nullable: () => ({ type: 'string', nullable: true }),
-      describe: (description) => ({ type: 'string', description }),
-    }),
-    any: () => ({
-      type: 'any',
-      optional: () => ({ type: 'any', optional: true }),
-    }),
-    number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
-    array: (item) => ({
-      type: 'array',
-      item,
-      describe: (description) => ({ type: 'array', item, description }),
-    }),
-    record: (key, value) => ({
-      type: 'record',
-      key,
-      value,
-      describe: (description) => ({ type: 'record', key, value, description }),
-    }),
-    object: (shape) => ({ type: 'object', shape }),
+    string: () => schemaOf({ type: 'string' }),
+    any: () => schemaOf({ type: 'any' }),
+    number: () => schemaOf({ type: 'number' }),
+    array: (item) => schemaOf({ type: 'array', item }),
+    record: (key, value) => schemaOf({ type: 'record', key, value }),
+    object: (shape) => schemaOf({ type: 'object', shape }),
   }
   return { tool }
 }

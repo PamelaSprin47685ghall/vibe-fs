@@ -104,6 +104,8 @@ charge 只承载任务本身。背景只作背景：不把其中未竟工作转�
 
 同步调用等待自己完成，只返回本次 `this.deliver` 交回的 view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自 `this.deliver` 交付格的 view；未交付的子工作不写完成、join 不关闭，保持可见的未解除义务——父方可以继续等待或重派，原子工作保持活跃，不把 undelivered 结算成终态。S1/S2/S3/S4 接力不再主动清除上下文。
 
+同一条规则跨两个委派通道一致：异步 fork/resume 通道与同步 SyncDelegate 通道里，被委托方「完成但未交付」（本次工作没有 `this.deliver` 交付格）都不是终态——不写完成、不结算失败；work unit 保持活跃并留下可见的未解除义务，父方这次等待不被该次完成关闭，可以继续等待或重派。
+
 ## [025] Completion 以因果身份认领
 
 terminal 只有属于该 work unit 实际接受的 Authority Root/provider execution，才可完成或失败它。completion cell 单次赋值：首个因果有效的 proven terminal 可 claim，恢复 continuation 不可 claim，晚到 terminal 幂等忽略。

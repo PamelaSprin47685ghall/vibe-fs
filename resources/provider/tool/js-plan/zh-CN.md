@@ -7,3 +7,5 @@
 程序内 `await this.ask(question)` 向用户提问并暂停：本次工具调用返回 parked 载荷并中断 attempt；用户答复后用 `{ unpark: { handle, value } }` 恢复，await 的值就是注入值。只有 S1 阶段可以提问；其他阶段以 `ASK_REFUSED` 拒绝。
 
 调用还可带可选的扁平整理参数：`prefixUntil: number` 与 `thenMap: record<number, string|null>`。一旦提供，两者都必填，遵循统一的锚点区间规则。用 `thenMap` 的摘要与 null 表态保留交接所需内容；声明会记录交接 checkpoint。`prefixUntil` 只保护本轮前缀，不恢复已压缩内容，也不是交付边界。这两个参数平铺在调用顶层，不再包在包装对象里；它们与委派成员自己携带的 `reportMapping` 不是同一种形状：那份记录只有「锚点编号 → `null` 或摘要字符串」，既没有 `prefixUntil`，也没有 `thenMap`。
+
+计划程序以 `await this.deliver(reportMapping)` 收尾——映射形状与交给 DevOps 成员的相同：锚点编号 → `null`（保留）或摘要字符串（替换），不带 `prefixUntil`。调用之前，先在助手正文写好计划的散文：规划了什么、证据是什么、还有什么未决、继任者需要什么。报告映射必须指向这次计划欠调用方的全部材料——包括这份散文和它依赖的上下文。不要把散文复制进 deliver 参数，也不要留到调用之后再写：调用之后没有以后。

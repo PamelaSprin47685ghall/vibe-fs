@@ -1003,8 +1003,6 @@ Execution/Fission/Surface.fsi
 Execution/Fission/Surface.fs
 OpenCode/Host/FissionHostSurface.fsi
 OpenCode/Host/FissionHostSurface.fs
-OpenCode/Host/HostTurnObserver.fsi
-OpenCode/Host/HostTurnObserver.fs
 OpenCode/Host/HostCompactionObserver.fsi
 OpenCode/Host/HostCompactionObserver.fs
 Execution/Delegation/SyncDelegate/OpenCode/Observation.fsi
@@ -1136,6 +1134,8 @@ Change/Host/Host.fsi
 Change/Host/Host.fs
 OpenCode/Tools/ToolRuntimeScope.fsi
 OpenCode/Tools/ToolRuntimeScope.fs
+OpenCode/Host/HostTurnObserver.fsi
+OpenCode/Host/HostTurnObserver.fs
 Execution/Delegation/Fork/OpenCode/JoinTool.fsi
 Execution/Delegation/Fork/OpenCode/JoinTool.fs
 
@@ -1177,6 +1177,8 @@ Mission/Work/ProjectionSurface.fsi
 Mission/Work/ProjectionSurface.fs
 OpenCode/Host/WorkspaceSharedJournal.fsi
 OpenCode/Host/WorkspaceSharedJournal.fs
+OpenCode/Host/DeliveryWitnessWriter.fsi
+OpenCode/Host/DeliveryWitnessWriter.fs
 Repository/Programming/Js/GeneratorSurface.fsi
 Repository/Programming/Js/GeneratorSurface.fs
 Repository/Programming/Js/RuntimeSurface.fsi

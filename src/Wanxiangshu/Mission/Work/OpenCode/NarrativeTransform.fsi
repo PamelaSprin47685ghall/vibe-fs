@@ -28,3 +28,6 @@ module RelayNarrativeTransform =
         lifecycle: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option ->
         outObj: obj ->
             Task<RelayProjectionDisposition>
+
+    /// 条款 4：本次请求不再放行时清空消息——LLM 看不到 deliver 回复。
+    val clearRequestMessages: outObj: obj -> unit

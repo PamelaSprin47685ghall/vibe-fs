@@ -408,6 +408,15 @@ module ToolRegistry =
     [<Emit("(() => { const out = {}; for (const k of Object.keys($0)) out[k] = $0[k]; out[$1] = $2; return out; })()")>]
     let private withField (source: obj) (key: string) (value: obj) : obj = jsNative
 
+    /// A delegate payload is built inside the JS sandbox realm, so its
+    /// prototype is that realm's `Object.prototype` — never the host's. The
+    /// host's plain-record check compares realms, so the payload is copied
+    /// here into a host-realm plain record: own enumerable data properties
+    /// only (accessors and non-enumerable properties are skipped). The copy
+    /// is a snapshot; the program may still mutate its own object afterwards.
+    [<Emit("(() => { const out = {}; const src = $0; if (src === null || src === undefined || typeof src !== 'object') return out; for (const key of Object.keys(src)) { const descriptor = Object.getOwnPropertyDescriptor(src, key); if (descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')) { out[key] = descriptor.value; } } return out; })()")>]
+    let private plainRecordCopy (source: obj) : obj = jsNative
+
     /// The report material a delegate receives: the caller's report mapping
     /// rendered as `<anchor>: <text>` lines, one per entry, newline-joined.
     /// No entries means no material at all.
@@ -423,7 +432,9 @@ module ToolRegistry =
                     Some(String.concat "\n" lines))
 
     /// The delegate payload keeps every field the program sent and gains the
-    /// report material under `commissioner_record`.
+    /// report material under `commissioner_record`. The payload is normalized
+    /// into a host-realm record first, so a payload built in the sandbox
+    /// realm is not dropped by the host's plain-record check.
     let private payloadWithRecord (payload: obj) (record: string option) : obj =
         let raw =
             if isStringValue payload then
@@ -431,7 +442,7 @@ module ToolRegistry =
             elif isNullish payload then
                 createObj []
             else
-                payload
+                plainRecordCopy payload
 
         match record with
         | None -> raw
@@ -439,19 +450,27 @@ module ToolRegistry =
 
     /// The devops intent travels as the program's own text: a plain string
     /// payload is the intent itself, an object payload carries it under
-    /// `intent`.
-    let private devopsIntentText (payload: obj) : string =
+    /// `intent`. The object form is read from the normalized host-realm
+    /// record, so the intent of a sandbox-built payload is not lost.
+    let private devopsIntentText (payload: obj) (normalizedPayload: obj) : string =
         if isStringValue payload then
             unbox<string> payload
         else
-            (ToolHostCodec.argumentsOfRaw payload).Text "intent"
+            (ToolHostCodec.argumentsOfRaw normalizedPayload).Text "intent"
 
+    /// The Plan programming surface runs under one exact call: the provider
+    /// run that asked for it and the tool call that carries it. A delivery
+    /// the program makes is evidence only when it carries that fence, so the
+    /// fence travels with the execution and is handed to the workflow as-is.
+    /// Without a fence the delivery lands as a render cache — presentable,
+    /// but never a delivery.
     let runPlanProgram
         (prose: JsCanonicalDescription.Prose)
         (gitCommonDir: string)
         (root: string)
         (sessionId: string)
         (program: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
         : Task<string> =
         task {
             // Plan is unified: uses the standard JsToolWorkflow.execute with
@@ -472,7 +491,7 @@ module ToolRegistry =
             let! outcome =
                 JsToolWorkflow.execute
                     sessionId
-                    None
+                    fence
                     capabilities
                     planRoot
                     baseClass
@@ -676,6 +695,185 @@ module ToolRegistry =
                 | None -> return ""
             }
 
+        /// The assistant message that owns this call: the provider run IS that
+        /// message id. The call's prose and the physical message it answers
+        /// are both read from this one message.
+        let owningAssistantMessage
+            (messages: SessionMessage list)
+            (providerRun: ProviderRunIdentity)
+            : SessionMessage option =
+            let providerRunId = ProviderRunIdentity.value providerRun
+
+            messages
+            |> List.tryFind (fun message -> message.Id = providerRunId && message.Role = "assistant")
+
+        /// The formal prose of the assistant message that owns the call: the
+        /// text parts of that one message, joined by newlines. A call whose
+        /// assistant message carries no prose has no formal text, and a
+        /// witness without prose is no witness.
+        let formalTextOf (message: SessionMessage) : string option =
+            let text =
+                message.Parts
+                |> Array.choose (function
+                    | MessagePart.Text text -> Some text
+                    | _ -> None)
+                |> String.concat "\n"
+
+            if String.IsNullOrWhiteSpace text then None else Some text
+
+        /// The physical user message this call answers.
+        ///
+        /// The parent of the assistant message is the run's physical input
+        /// only when that parent is a user message: inside one run the next
+        /// assistant message hangs under the tool result, not under the user.
+        /// A parent that is not a user message is not a physical input, so the
+        /// session's current physical message answers instead.
+        let physicalUserMessageOf
+            (messages: SessionMessage list)
+            (message: SessionMessage)
+            (currentPhysical: string option)
+            : PhysicalUserMessageId option =
+            let parentIsUserMessage =
+                match message.ParentId with
+                | Some parent when not (String.IsNullOrWhiteSpace parent) ->
+                    messages
+                    |> List.exists (fun candidate -> candidate.Id = parent && candidate.Role = "user")
+                | _ -> false
+
+            if parentIsUserMessage then
+                message.ParentId |> Option.map PhysicalUserMessageId.create
+            else
+                currentPhysical |> Option.map PhysicalUserMessageId.create
+
+        /// The task a delivery serves.
+        ///
+        /// A lifecycle work names the tenure the delivery closes: the
+        /// retirement that carries this very call's fence is the durable fact
+        /// of that tenure, so the tenure and the retirement id come from one
+        /// fact. A delegated child names its own handle — the agent handle the
+        /// delegation bound to that child session. Everything else is this very
+        /// invocation, named by the tool call that carries it.
+        let deliveryTaskOf
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (providerRun: ProviderRunIdentity)
+            (toolCallId: ToolCallId)
+            (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option)
+            : DeliveryTaskReference * string option =
+            let providerRunId = ProviderRunIdentity.value providerRun
+            let toolCallIdText = ToolCallId.value toolCallId
+
+            let lifecycleTask =
+                work
+                |> Option.bind (fun work ->
+                    work.Retirements
+                    |> List.tryFind (fun retirement ->
+                        retirement.Fence.ProviderRunId = providerRunId
+                        && retirement.Fence.ToolCallId = toolCallIdText)
+                    |> Option.map (fun retirement ->
+                        DeliveryTaskReference.Lifecycle(
+                            SessionId.value sessionId,
+                            retirement.IncumbencyId
+                        ),
+                        Some retirement.RetirementId))
+
+            let childHandle =
+                (AgentJournal.snapshot durable).AgentProjections.HandleByChildSession
+                |> Map.tryFind sessionId
+                |> Option.bind (fun record ->
+                    let agentHandle =
+                        HandleId.tryAgent record.Handle
+                        |> Option.map AgentHandleId.value
+                        |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
+
+                    match agentHandle with
+                    | Some handle -> Some handle
+                    | None ->
+                        if String.IsNullOrWhiteSpace record.TargetAgent then
+                            None
+                        else
+                            Some record.TargetAgent)
+
+            match lifecycleTask, childHandle with
+            | Some task, _ -> task
+            | None, Some handle -> DeliveryTaskReference.ChildWork handle, None
+            | None, None -> DeliveryTaskReference.Invocation toolCallIdText, None
+
+        /// The delivery settlement of one js-* call: the host's attribution of
+        /// the call and the durable place its witness goes.
+        ///
+        /// Every field is read from the source the read side reads. A field
+        /// that cannot be read leaves the call without a settlement: no
+        /// witness is invented, and the call keeps its ordinary behaviour.
+        let settlementOf (ctx: HostToolContext) : Task<DeliverySettlement option> =
+            match journal, runtime.Snapshot, ctx.ProviderRunId, ctx.ToolCallId with
+            | Some durable, Some snapshotPort, Some providerRun, Some toolCallId ->
+                let sessionId = SessionId.create ctx.SessionId
+
+                let activeProfile =
+                    Wanxiangshu.Interaction.Authority.PromptAuthorityProjectionQueries.activeProfile
+                        sessionId
+                        (AgentJournal.snapshot durable).AgentProjections
+
+                match activeProfile with
+                | None -> Task.FromResult None
+                | Some profile ->
+                    let logicalRunId = profile.LogicalRunId
+                    let authorityRoot = profile.AuthorityRootUserMessageId
+
+                    if String.IsNullOrWhiteSpace(LogicalRunId.value logicalRunId)
+                       || String.IsNullOrWhiteSpace(AuthorityRootUserMessageId.value authorityRoot) then
+                        Task.FromResult None
+                    else
+                        task {
+                            let! loaded = snapshotPort.GetMessages sessionId
+
+                            match loaded with
+                            | Error _ -> return None
+                            | Ok messages ->
+                                match owningAssistantMessage messages providerRun with
+                                | None -> return None
+                                | Some message ->
+                                    match formalTextOf message with
+                                    | None -> return None
+                                    | Some formalText ->
+                                        let physical =
+                                            physicalUserMessageOf
+                                                messages
+                                                message
+                                                (currentPhysicalUserMessage ctx.SessionId)
+
+                                        match physical with
+                                        | None -> return None
+                                        | Some physical ->
+                                            // The lifecycle work is read only for a
+                                            // call that already has its attribution:
+                                            // the work journal is a durable read and
+                                            // must not be paid for calls that never
+                                            // get a witness.
+                                            let! work = runtime.LifecycleWorkFor ctx.SessionId
+
+                                            let deliveryTask, retirementId =
+                                                deliveryTaskOf
+                                                    durable
+                                                    sessionId
+                                                    providerRun
+                                                    toolCallId
+                                                    work
+
+                                            return
+                                                Some
+                                                    { Attribution =
+                                                        { LogicalRunId = logicalRunId
+                                                          AuthorityRoot = authorityRoot
+                                                          PhysicalUserMessageId = physical
+                                                          Task = deliveryTask
+                                                          RetirementId = retirementId
+                                                          FormalText = formalText }
+                                                      Writer = DeliveryWitnessWriter.create durable }
+                        }
+            | _ -> Task.FromResult None
+
         let generatedJsSpecFor (role: Role) =
             JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse
             |> Option.map (fun surface ->
@@ -707,6 +905,7 @@ module ToolRegistry =
                         jsLifecyclePersistence
                         None
                         jsRootOf
+                        settlementOf
 
                 { spec with
                     Execute =
@@ -791,7 +990,8 @@ module ToolRegistry =
                                                                 "devops-failed"
                                                                 "devops failed: git common directory is missing"
                                                     else
-                                                        let intentText = devopsIntentText payload
+                                                        let raw = payloadWithRecord payload record
+                                                        let intentText = devopsIntentText payload raw
 
                                                         let intent =
                                                             match record with
@@ -848,11 +1048,21 @@ module ToolRegistry =
                                   Fission =
                                     fun payload ->
                                         task {
+                                            // The fission payload is built inside the JS sandbox
+                                            // realm, so its prototype is that realm's
+                                            // `Object.prototype` — the host's plain-record check
+                                            // compares realms and would drop every field. The
+                                            // payload is copied into a host-realm plain record
+                                            // first, so `charge`, `lanes` and `prompts` survive.
+                                            // Fission is not a delegation: it carries no report
+                                            // material, so nothing is appended to the copy.
+                                            let raw = plainRecordCopy payload
+
                                             let! receipt =
                                                 FissionTool.executeReceipt
                                                     runtime
                                                     ctx
-                                                    (ToolHostCodec.argumentsOfRaw payload)
+                                                    (ToolHostCodec.argumentsOfRaw raw)
 
                                             return
                                                 match receipt with
@@ -891,7 +1101,28 @@ module ToolRegistry =
 
                             task {
                                 try
-                                    return! spec.Execute args ctx
+                                    let! outcome = spec.Execute args ctx
+
+                                    // The commit-side fact of a delivery: the live cell
+                                    // carries this call's exact fence, so THIS call
+                                    // established the delivery and the ledger may
+                                    // record it. A cell of another fence, or no cell
+                                    // at all, is no delivery of this call.
+                                    match ctx.ProviderRunId, ctx.ToolCallId with
+                                    | Some providerRun, Some toolCallId ->
+                                        match JsDeliveredValues.peekFence ctx.SessionId with
+                                        | Some fence
+                                            when fence.ProviderRun = providerRun
+                                                 && fence.ToolCallId = toolCallId ->
+                                            runtime.RegisterEstablishedDelivery(
+                                                SessionId.create ctx.SessionId,
+                                                providerRun,
+                                                toolCallId
+                                            )
+                                        | _ -> ()
+                                    | _ -> ()
+
+                                    return outcome
                                 finally
                                     JsDelegationBridge.clear ctx.SessionId
                             } })

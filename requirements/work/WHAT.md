@@ -84,12 +84,12 @@ S1/S2/S3/S4 的接力机制不再主动清除上下文；上下文的保留与�
 
 ## [011] 两段 deliver 的接力与终态停止
 
-S4 第一次调用只确认。第二次调用依持久退休结果分流：Relayed 在返回前排队同一会话的后继提示；Delivered 没有继任者，必须在返回前完成当前 attempt 的中断。
+S4 第一次调用只确认。第二次调用依持久退休结果分流：Relayed 在返回前排队同一会话的后继提示；Delivered 没有继任者，其停止不由 deliver 工具内部完成，而发生在 transform 钩子：抑制下一次 provider step、清空本次请求的消息、发出本次 attempt 的中断。
 
-- 允许后果：已评且第一次确认落地后，第二次 Relayed 调用在工具返回前先把同一会话的后继提示（`runtime/manager-assess`）排入队列，不中止会话。若下一次 transform 仍是旧任残余尝试，则停止该已退休尝试。同一会话只启动一个后继。后继 transform 保留经 `view` 机制管理的上下文、用户原文与后继提示（接力不主动清除上下文），不再中止一次。用户新 prompt 之后，后继 Manager 工具不再因退休冻结被拒。后任已有新根时，裁剪之后的唤醒被清空，不中止会话，也不因拒绝中断而崩溃。
-- 终态后果：Delivered 先落盘退休事实，再通过既有 journal owner 关闭相应 Manager/HumanRoot logical run，然后等待 `InterruptAttempt` 的 Host 回执，最后才返回“已结束”。这只停止已完成工作的当前 attempt，不删除会话或级联取消子资源；后续真实用户输入继续受新回合保护。
-- 禁止后果：不得把第一次确认收成退休。不得向 Relayed 接力发出终态 interrupt，也不得在后继已派发后再发一次旧任期的会话中止。不得把旧物理历史从后继消息集里剥掉。
-- 失败后果：终态中断被拒绝或抛错时，工具必须呈现失败，不能忽略失败后返回“已结束”；已提交的 Delivered 不回滚，也不因此开继任任期。在途 Host 中断未完成精确的 provider-step 释放与物理中断之前，不得派发后继。
+- 允许后果：已评且第一次确认落地后，第二次 Relayed 调用在工具返回前先把同一会话的后继提示（`runtime/manager-assess`）排入队列，不中止会话。若下一次 transform 仍是旧任残余尝试，则停止该已退休尝试。同一会话只启动一个后继。后继 transform 保留经 `view` 机制管理的上下文、用户原文与后继提示（接力不主动清除上下文），不再中止一次。用户新 prompt 之后，后继 Manager 工具不再因退休冻结被拒。后任已有新根时，裁剪之后的唤醒被清空，不中止会话，也不因拒绝中断而崩溃。继任提示在返回前已入队；接力路径不发终态中断，只有 Delivered 路径发出中断。
+- 终态后果：Delivered 先落盘退休事实，再通过既有 journal owner 关闭相应 Manager/HumanRoot logical run。deliver 工具本身不再物理中断、也不再等待 `InterruptAttempt` 的 Host 回执才返回，它只登记“交付已成立”的事实。停止发生在 transform 钩子：抑制下一次 provider step、发出本次 attempt 的中断、清空本次请求的消息（LLM 因此看不到 deliver 回复）。这只停止已完成工作的当前 attempt，不删除会话或级联取消子资源；后续真实用户输入继续受新回合保护。「中断已发出」与「已观察到中断成功」是两个分别取证的事实：发出请求不等于成功，宿主拒绝了这次中断也不是交付失败。
+- 禁止后果：不得把第一次确认收成退休。不得向 Relayed 接力发出终态 interrupt，也不得在后继已派发后再发一次旧任期的会话中止。不得把旧物理历史从后继消息集里剥掉。不得在 deliver 工具内部物理中断或等待 Host 回执才返回。不得把中断未确认当作交付失败。
+- 失败后果：终态中断未发出或未被宿主确认时，必须如实登记「已发出 / 已观察」两事实，但已提交的 Delivered 仍然成立：不回滚、不因此开继任任期，也不得把已提交的交付呈现为失败。在途 Host 中断未完成精确的 provider-step 释放与物理中断之前，不得派发后继。
 
 ## [012] 开立与评审的内核判定
 
@@ -167,7 +167,7 @@ S4 第一次调用只确认。第二次调用依持久退休结果分流：Relay
 
 当调度器识别到 CanonicalRole 为 `Plan`（Wire 标识为 `plan`）时，系统投影其专属权限与工具集。
 
-- 允许后果：Plan 的工作工具为 `todowrite-for-plan`、`devops`、`review`、`deliver`。`todowrite-for-plan` 与 `devops` 只向 Plan 开放；向用户提问走编程面成员 `this.ask`（[049]/[050]），仅 S1 阶段可用，不注册独立宿主工具，Manager 与其他角色禁用提问，且 `ask` 不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
+- 允许后果：Plan 的工作工具权限集为 `todowrite-for-plan`、`devops`、`review`、`deliver`：宿主注册的只有 `todowrite-for-plan`、`review`、`deliver`，`devops` 以编程面成员 `this.devops(intent, reportMapping)` 存活，在 Plan 的编程面由 `todowrite-for-plan` 承载，不再注册独立宿主工具（见 [028] 与 [030]）。`todowrite-for-plan` 只向 Plan 开放；向用户提问走编程面成员 `this.ask`（[049]/[050]），仅 S1 阶段可用，不注册独立宿主工具，Manager 与其他角色禁用提问，且 `ask` 不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
 - 禁止后果：Plan 角色禁止获得代码仓库与执行工具的权限，包括但不限于 `read`、`glob`、`grep`、`edit`、`write`、`mv`、`rm`、`run`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`fork`、`fission`、`commission`。严禁向 Plan 开放任何真实 shell 或命令执行通道。`resume` 与 `handoff` 不再属于 Plan 的工具面；`ask` 不注册独立宿主工具，独立 `ask` 工具调用不是公开调用面。
 - 失败后果：任何越权工具调用必须在 `ToolRegistry` 执行门禁被直接拦截（fail-closed），返回强类型拒绝错误，零副作用。
 
@@ -205,11 +205,11 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 工具调用进入执行前，动作门必须基于当前任期、授权与工作状态进行单一判定。
 
 - 允许后果：
-  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `todowrite-for-plan`、`devops`、`review`、`deliver`；向用户提问走编程面 `this.ask`（仅 S1，[049]/[050]），需当前 Plan 权威与精确调用身份，Manager 禁用提问；
+  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `todowrite-for-plan`、`review`、`deliver`；DevOps 调查经编程面成员 `this.devops(intent, reportMapping)` 发起，其准入与拒绝依 [028]；向用户提问走编程面 `this.ask`（仅 S1，[049]/[050]），需当前 Plan 权威与精确调用身份，Manager 禁用提问；
   2. 每一任期在调用 `review` 工具之前，`todowrite-for-plan` 工具是严格只读的（仅允许读操作 `read`）；若在此之前尝试写入（`edit`、`rewrite` 等修改操作），动作门与执行层均强制拦截拒绝，并向模型报错说明必须先完成 `review`。当前任期成功调用 `review` 工具之后方解锁写权限；接力（无权 deliver）开启的新任期在其成功调用 `review` 之前重新锁定为只读；
-  3. 工作处于 `delivered`（`post-S3` 态）时，`todowrite-for-plan` 仅允许 `read`，`devops` 与 `review` 拒绝；当用户在 `post-S3` 态下输入命令要求执行交付时，允许调用 `deliver` 启动 `S4` 执行会话（且用户可反复要求启动 `S4`）；
+  3. 工作处于 `delivered`（`post-S3` 态）时，`todowrite-for-plan` 仅允许 `read`，`this.devops` 与 `review` 拒绝；当用户在 `post-S3` 态下输入命令要求执行交付时，允许调用 `deliver` 启动 `S4` 执行会话（且用户可反复要求启动 `S4`）；
   4. `review` 为硬门：本任已有 `Reviewed` 事实时拒绝再次调用（每任恰好一次，见 [038]）；
-  5. `devops` 在同一 work 已有一个未决委派时拒绝新委派（见 [028]）；`ask` 正在等待用户时，不准再启动其他工作工具；
+  5. `this.devops` 在同一 work 已有一个未决委派时拒绝新委派（见 [028]）；`ask` 正在等待用户时，不准再启动其他工作工具；
   6. `deliver` 要求无活跃 blocker（递归 live 资源）；行为按授权分支：持权走交付（[026]），无权走接力（[025]）。
 - 禁止后果：stage 不作为动作门：各 stage 的工具许可判定一致，阶段推进完全由 review 硬门承担。禁止在未决 devops 委派悬空时开启新的外部动作。`handoff` 与 `resume` 不在 Plan 许可矩阵中。禁止在当前任期完成 review 之前向底稿 `P` 写入任何改动。
 - 失败后果：凡不满足许可矩阵条件的调用，一律返回强类型 typed 错误，并保持原状态不变。
@@ -232,7 +232,7 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 当跑者调用 `deliver` 且本任已获授权（`Authorized = true`）时，系统将规划收束进 `post-S3` 态；随后在 `post-S3` 态下由用户命令触发 `deliver` 启动 `S4` 执行。
 
-- 允许后果：`S3` 持权任期调用 `deliver` 时，系统核查当前任期无活跃 blocker、确认 `P` 非空后，将工作结算为 `Delivered`（进入 `post-S3` 态），并在 Host 确认该 `deliver` 工具结果完成时像 `ask` 一样调用 `InterruptAttempt` 中断当前对话等待用户，不直接启动 `S4` 执行会话。post-S3 交付只关闭旧运行的 nudge：旧 post-S3 不催，旧运行退休不复活，也不再对新义务催促旧运行；新的真实用户输入继续规划时经 [037] 重开新任期并恢复催促（nudge）；用户只要求执行产物（启动 S4）时不重开规划，也不对已退休的规划运行催促。
+- 允许后果：`S3` 持权任期调用 `deliver` 时，系统核查当前任期无活跃 blocker、确认 `P` 非空后，将工作结算为 `Delivered`（进入 `post-S3` 态），并在 transform 钩子处停止当前 attempt：抑制下一次 provider step、清空本次请求的消息、发出本次 attempt 的中断（deliver 工具只登记“交付已成立”的事实，不再物理中断、也不再等待 Host 回执才返回），不直接启动 `S4` 执行会话。「中断已发出」与「已观察到中断成功」是两个分别取证的事实；中断未确认不推翻已提交的交付，也不把已提交的交付呈现为失败。post-S3 交付只关闭旧运行的 nudge：旧 post-S3 不催，旧运行退休不复活，也不再对新义务催促旧运行；新的真实用户输入继续规划时经 [037] 重开新任期并恢复催促（nudge）；用户只要求执行产物（启动 S4）时不重开规划，也不对已退休的规划运行催促。
 - 允许后果：处于 `post-S3` 态时，若用户输入命令要求执行 `deliver`，模型调用 `deliver` 即读取 `P` 的非空原文并启动无 parent 的 `S4`（Manager）执行会话；用户可以反复要求启动 `S4`。底层预留路径在 `Committed + DeliveryRequested` 时同样遵守先绑定 `execSessionId` 再发送 `P` 全文的持久边界：确切承接才提交 `ResolveDelivery(Accepted, execSessionId, digest, path)`；确切启动前拒绝才提交 `NotStarted`；`AcceptanceUnknown`、创建回执丢失或异常结果保持 pending，不写 NotStarted、不再次启动。
 - 禁止后果：`P` 为空或不存在时严禁进入 `post-S3` 态或启动 `S4`。无授权时严禁走本路径（走 [025] 接力）。`execSessionId` 严禁进入 provider 可见面。严禁以 post-S3 交付为由对退休后新开任期继续免除 nudge；旧运行退休不复活，nudge 只指向活跃义务。
 - 失败后果：预留前的文件读取/校验失败为零写入；预留提交失败为零启动。预留后的明确 NotStarted 可以追加拒绝事实，当前任期继续活跃；结果未知则保留 `DeliveryRequested` 作为未完成义务。任何路径都不得用“启动函数抛异常”本身证明外部效果没有发生。
@@ -247,10 +247,10 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 ## [028] devops 契约（同步委派固定 DevOps）
 
-当 Plan 跑者调用 `devops(intent)` 时，系统把调查意图同步委派给本 work 绑定的固定 DevOps。原工具名 `ask` 不再是本能力的别名。
+当 Plan 跑者经编程面成员 `this.devops(intent, reportMapping)` 调用时，系统把调查意图同步委派给本 work 绑定的固定 DevOps。原工具名 `ask` 不再是本能力的别名。
 
 - 允许后果：系统查询本规划任务绑定的唯一固定 DevOps 实例；若未绑定则由运行时 single-flight 创建并持久化 `DevOpsBound` 绑定事实。将 `intent` 作为调查目标投递给该 DevOps 做只读调查（含真实 bash 执行，只读约束由 office 提示词承担，不做运行时门）。等待本次调用的完成事实，确认收敛后把 DevOps 经 `js.deliver` 交回的增量去重 TOML 视图完整交回 Planner。
-- 禁止后果：模型在调用参数中只传 `intent`，不得传递 DevOps 的 id、role、model 等底层拓扑标识。系统严禁对 DevOps 的返回结果做二次模型摘要，必须完整交付。同一规划任务同时至多运行一个未决 devops 委派；已有未决委派时再次调用必须返回强类型拒绝。返回材料不得携带底层 id（SessionId/AgentId/PtyId）。
+- 禁止后果：模型在调用参数中传 `intent` 与必带的 `reportMapping`（形态 `Record<string, null|string>`，无 `prefixUntil`），不得传递 DevOps 的 id、role、model 等底层拓扑标识。系统严禁对 DevOps 的返回结果做二次模型摘要，必须完整交付。同一规划任务同时至多运行一个未决 devops 委派；已有未决委派时再次调用必须返回强类型拒绝。返回材料不得携带底层 id（SessionId/AgentId/PtyId）。
 - 失败后果：若固定 DevOps 处于忙碌状态或响应失败，返回强类型错误，不静默丢弃，不新建替代操作员。
 
 ## [029] P 路径推导与编程面工具
@@ -267,8 +267,8 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 系统启动时，必须显式注册 Plan 相关的工具与参数规范。
 
-- 允许后果：在 `ToolRegistry` 中登记 `todowrite-for-plan`（JS 编程面）、`devops`、`review`、`deliver`（编排面）。静态工具名单显式登记这四个名称；向用户提问走编程面成员 `this.ask`（仅 S1，[049]/[050]），不注册独立宿主工具。`devops` 参数为 `intent`，能力映射不得混用。`review` 与 Manager 共用同一 ToolSpec（见 [038]）。
-- 禁止后果：严禁使用前缀匹配、通配符或模糊规则对工具进行分类或准入。未显式登记的工具不得进入 Plan 的工具列表。`handoff` 与 `resume` 不得作为 Plan 工具登记或注册。
+- 允许后果：在 `ToolRegistry` 中登记 `todowrite-for-plan`（JS 编程面）、`review`、`deliver`（编排面）。静态工具名单显式登记这三个名称；向用户提问走编程面成员 `this.ask`（仅 S1，[049]/[050]），不注册独立宿主工具。`devops` 已从宿主注册工具中退役，只以编程面成员 `this.devops(intent, reportMapping)` 存活，在 Plan 的编程面由 `todowrite-for-plan` 承载，参数为 `intent` 与必带的 `reportMapping`（形态 `Record<string, null|string>`，无 `prefixUntil`），缺失或非法时以 `{ ok: false, code: "VIEW_DECLARATION_INVALID" }` 拒绝；能力映射不得混用。`review` 与 Manager 共用同一 ToolSpec（见 [038]）。
+- 禁止后果：严禁使用前缀匹配、通配符或模糊规则对工具进行分类或准入。未显式登记的工具不得进入 Plan 的工具列表。`handoff` 与 `resume` 不得作为 Plan 工具登记或注册；已退役的 `devops` 同样不得回到宿主注册工具面。
 - 失败后果：若工具名称或分类缺失，系统在启动静态校验或工具构建期必须报错阻断。
 
 ## [031] 阶段资源、语言对等与真注入
@@ -293,7 +293,7 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
 Plan 的阶段与任期机制不得污染其他角色；[027] 明确规定的长程连续性除外。
 
 - 允许后果：Orchestrator、Engineer、DevOps 的既有角色合同不变。所有实际执行角色依 [027] 承担长程连续性义务并经 `deliver` 形成有效交接或完成；internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛。Manager 禁止静默停止且禁用 `ask`，`review` 的业务判断不变。
-- 禁止后果：非 Plan 角色严禁获取 `todowrite-for-plan`、`devops` 或 `ask`。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
+- 禁止后果：非 Plan 角色严禁获取 `todowrite-for-plan` 或 `ask`；宿主注册工具面已无 `devops` 这一名称，DevOps 调查只以编程面成员 `this.devops(intent, reportMapping)` 形态承载（`reportMapping` 必填），不构成任何角色的宿主工具面。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 
 ## [033] wanxiangli record、SQLite 持久化与投影

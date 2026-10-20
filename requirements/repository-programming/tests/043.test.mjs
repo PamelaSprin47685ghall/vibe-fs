@@ -26,6 +26,15 @@ const resourcePath = (name) => ({
 // provider-language-006/007：占位符集合按 {{name}} 形态提取比较。
 const placeholders = (text) => [...text.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort()
 
+// 生命周期成员：deliver 与 park 同级，随每个生成面携带，不按 capability 投影。
+const LIFECYCLE_MEMBERS = ['deliver', 'park']
+
+// capability 成员的 canonical 序（WHAT[repository-programming-002]）。
+const CANONICAL_MEMBERS = [
+  'write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call',
+  'fork', 'resume', 'commission', 'devops', 'dag', 'join', 'fission', 'horizon', 'advisor', 'ask',
+]
+
 test('WHAT[repository-programming-043] rm and mv ship paired bilingual resources with identical placeholder sets and no unreplaced residue', () => {
   for (const name of ['rm', 'mv']) {
     const { zh, en } = resourcePath(name)
@@ -67,14 +76,14 @@ test('WHAT[repository-programming-043] both languages state the mv contract elem
   assert.ok(en.includes('mv(from, to)'), 'en must state the mv(from, to) signature')
   // POSIX 语义：POSIX mv、支持覆盖。
   assert.ok(zh.includes('POSIX mv'), 'zh-CN must state the POSIX mv semantics')
-  assert.ok(zh.includes('覆盖'), 'zh-CN must state overwrite is allowed')
+  assert.ok(zh.includes('覆盖'), 'zh-CN must state that overwrite is allowed')
   assert.ok(en.includes('POSIX mv'), 'en must state the POSIX mv semantics')
-  assert.ok(en.includes('overwrite'), 'en must state overwrite is allowed')
+  assert.ok(en.includes('overwrite'), 'en must state that overwrite is allowed')
   // EXDEV：跨设备移动报错并回滚，不留两侧并存的中间态。
   assert.ok(zh.includes('EXDEV'), 'zh-CN must state the EXDEV refusal')
-  assert.ok(zh.includes('中间态'), 'zh-CN must state no two-sided intermediate state survives')
+  assert.ok(zh.includes('中间态'), 'zh-CN must state that no two-sided intermediate state survives')
   assert.ok(en.includes('EXDEV'), 'en must state the EXDEV refusal')
-  assert.ok(en.includes('never leaving both sides present'), 'en must state no two-sided intermediate state survives')
+  assert.ok(en.includes('never leaving both sides present'), 'en must state that no two-sided intermediate state survives')
 })
 
 test('WHAT[repository-programming-043] JsFragmentRegistry carries the rm/mv fragments with this.rm and this.mv runtime binding keys', () => {
@@ -93,13 +102,26 @@ test('WHAT[repository-programming-043] JsFragmentRegistry carries the rm/mv frag
     /let mv: JsCapabilityFragment =\s*\n\s*\{ Capability = JsCapability\.Move\s+MemberName = "mv"/,
   )
   assert.match(capability, /MemberName = "mv" }/, 'the mv fragment must name the member mv')
+})
 
-  // 两个 fragment 进入确定性投影的 canonical 成员序。
+test('WHAT[repository-programming-043] the member registry holds the delegation members and the lifecycle members deliver and park', () => {
+  const capability = read(join(SOURCE_ROOT, 'Repository/Programming/Js/Capability.fs'))
+
   const allBlock = capability.match(/let all: JsCapabilityFragment list =\s*\[([\s\S]*?)\]/)
   assert.ok(allBlock, 'the fragment registry must declare the canonical member list')
+  const names = allBlock[1].split(/\s+/).filter(Boolean)
+
+  // deliver 与 park 同为生命周期成员，在 registry 中并存：两者都随每个生成面
+  // 携带，不由 capability 投影。
+  assert.ok(names.includes('deliver'), 'deliver is a registry member')
+  assert.ok(names.includes('park'), 'park is a registry member')
+  assert.match(capability, /MemberName = "deliver"/, 'the deliver fragment must name the member deliver')
+  assert.match(capability, /MemberName = "park"/, 'the park fragment must name the member park')
+
+  // capability 成员保持 canonical 序：生命周期成员不插在其中。
   assert.deepEqual(
-    allBlock[1].split(/\s+/).filter(Boolean),
-    ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call', 'fork', 'dag', 'join', 'fission', 'horizon', 'advisor', 'ask', 'park'],
+    names.filter((name) => !LIFECYCLE_MEMBERS.includes(name)),
+    CANONICAL_MEMBERS,
   )
 })
 

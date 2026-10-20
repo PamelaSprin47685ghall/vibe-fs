@@ -59,3 +59,7 @@ Engineer Fission 的各 lane 产生 keyed 溯源部件，按确定性规则汇�
 ## [012] 独立 Invocation 范围与 Resume 边界
 
 同一物理 Session 的每次 invocation 均有明确、隔离的 `[InvocationStartCursor..InvocationEndCursor)`。Casebook 按该区间取材，不得跨 resume 边界混合独立工作。返回载荷不从本区间另物化一套记录。
+
+## [013] 交付见证是可重放的语义事实
+
+交付见证是「工作已提交」这一已发生事实的可重放证据，不是叙述。它由 (session, providerRun, toolCallId) 三元组与围栏（任务、逻辑运行、任期、本次调用）共同标识，并连同交付正文、view 声明与物化后的 view 一并留存；围栏任一字段不同即为另一条见证，同一三元组重放幂等而材料冲突拒绝。见证只由真实的交付提交产生：助手散文、view 声明文本与 provider stop 只提供材料，本身都不构成见证。缺失见证的终态只是未交付，不得写成完成，也不得由事后叙述补造。

@@ -284,3 +284,141 @@ dotnet tool run fantomas src/Wanxiangshu                 # 格式化（阶段末
 - 验证结论绑定代码状态：并行改动落地后，先前绿轮不作数，**最终 build + 测试必须重跑**。
 - 提交前确认没有残留临时文件、调试打印、未跟踪生成物（`debug/` 是另一会话的，别带）。
 - park 现场必须当场 unpark/abandon 闭环。
+
+---
+
+# 九、第二个会话（deliver 语义会话）停电前盘点 · 2026-10-20 21:2x
+
+本节由**第二个会话**（读 `debug/AGENTS.md` 的 DevOps 转储、按 `task.md` 六条交付合同排查的一会话）追加。上文八节是委派迁移会话的盘点；本节记本会话的结论、已落盘改动、**未做完的剩余任务**与续接命令。两会话共用同一工作树，改动互相交叠。
+
+## 九·一 本会话的起因与结论
+
+- 起因：`debug/AGENTS.md`（DevOps 会话转储）暴露两类万象术缺陷：① user-facing 的 devops 调 `deliver` 后**没有 interrupt**，控制权没回到用户；② 一个 park 现场（park-1）**反复 abandon 也清不掉**，因而交付被泄漏兜底门禁一直拒绝。
+- 根因（读码确认，非转述）：
+  - ① `ToolHost.fs` 的 `inputOf` 与 `ToolWorkflow.fs` 的 `parseWorkflowInvocation` **按优先级静默丢弃**三态入参（program > unpark > abandon），且 Host schema 把 `program` 标成必填 → 模型**结构上无法**单独发 `abandon`；park 现场因此永远不被消费，交付门禁常闭。
+  - ② 交付见证（`TaskDeliveryWitness`）**全仓零生产者**（`TaskDeliveryJournal.commit` 无调用方）；`OrdinaryTurnWorkflow.longWorkGate` 又把「存在交付」当作「已终态」而 `Wait` → **任何交付过的会话都发不出终态**；编程面 `this.deliver` 的中断原本根本不在宿主侧发生。
+- 契约依据：`task.md` 六条（deliver 只接受 view／先散文后 deliver／宿主决定是否继续／无需继续时在 transform 钩子 interrupt／仍需继续时在 deliver 返回值说明／提交·呈现·中断分开取证）。**注意**：`task.md` 写的是 `deliver(view)`，而仓库现行规范（`requirements/repository-programming/WHAT.md` [053]/[054]/[059]）已改为 `deliver(reportMapping)` + 顶层扁平 `prefixUntil`/`thenMap`；**以仓库现行规范为准**，`task.md` 的「只接受 view」语义被 [054] 的「reportMapping 降级」实现所承接。
+
+## 九·二 本会话已落盘的改动（工作树，未提交）
+
+### 1. 编程面三态互斥（park 现场可闭环）
+
+- `Repository/Programming/Js/OpenCode/ToolHost.fs`：`inputOf` 改为**忠实投影**（program/unpark/abandon 各出现即拷入，不再有优先级丢弃）；`Execute` 在**捕获视图声明与执行程序之前**先分类，冲突输入 → `INVALID_ARGUMENT`（reason 点名冲突字段，零副作用）；schema 全部改为可选（`optionalStringSchemaDescribed` / 新增 `optionalObjectSchema` / `optionalRecordSchemaOf`）。
+- `Repository/Programming/Js/OpenCode/ToolWorkflow.fs`（+`.fsi`）：`parseWorkflowInvocation` 改为**计数式**（恰好一个态；0 个 → 既有 missing-program 文案；2~3 个 → `Invalid reason`）；新增公开 `conflictingInputReason : obj -> string option` 供宿主层复用同一句 reason；删除无调用方的 `resumeParked`/`abandonParked`。
+- `OpenCode/Codec/ToolHostCodec.fs`（+`.fsi`）：新增 `optionalObjectSchema` / `optionalRecordSchemaOf`。
+- 资源：`resources/provider/tool/js-program/park/*` 之外未新增；WHAT 新增 `requirements/repository-programming/WHAT.md` [064]「调用面三态互斥」+ README 段落。
+- 测试：`requirements/repository-programming/tests/049.test.mjs` 重写（参数名单 `['program','unpark','abandon','prefixUntil','thenMap']`、三者皆可选、假 schema 支持 `optional()`）、新增 `064.test.mjs`（冲突调用可见失败、探针文件未落盘、handle 未被消费、三态各自单独可用）、`005/016/063` 的假 schema 补 `optional()`。
+
+### 2. 交付语义与交付回执（`deliver` 合同）
+
+- `Repository/Programming/Js/Description.fs`：`deliver(reportMapping)` 在**成员边界**拒绝多参（`arguments.length > 1`）与缺参，返回 `{ok:false, code:"VIEW_DECLARATION_INVALID", reason}` 数据信封，程序不失败也不交付。
+- `Mission/Work/OpenCode/DeliverTool.fs`（+`.fsi`）：
+  - **确认围栏重放**：`enterDeliver` 增加「已落盘 ConfirmationCommitted 围栏」分支，排在 active tenure 之前 → 任期接力或交付之后重放同一 fence，返回**已记录的确认**而不是 `assessment_required` / `BindingUnavailable`；
+  - **关闭失败不再吞掉中断**：`appendAuthorityLogicalRunClosed` 的异常被捕获，仍先 `RegisterEstablishedDelivery`（arm）再抛出 → 已提交退休不被抹掉，中断不被跳过；
+  - 删除死代码：`Path.NoRetirementProjection` 字面量、`requireSome`、硬编码空 `pending`（`deferred` 永不可达）、`confirmationResult(prepared)` / `refreshAfterFreeze(context)` 参数；资源 `resources/provider/tool/deliver/finish-not-recorded/{en,zh-CN}.md` 删除；`confirmation/{en,zh-CN}.md` 改写为只承诺「第一次记确认、第二次才结束」；
+  - 退休结果带 **outcome**（`Relayed` / `Delivered`），不再两态同一句话。
+- `Repository/Programming/Js/DeliveredValues.fs`：`recordView`（无围栏渲染缓存）**不再覆盖**带围栏的交付格——降级会抹掉拥有该交付的那次调用。
+- 测试与资源迁移：`requirements/repository-programming/tests/054|059`、`requirements/concern-routing/tests/003`、`resources/provider/role/{devops,engineer}`、`resources/provider/work/{devops-continue,engineer-continue}`：全部改为 `deliver(reportMapping)` 口径；`deliver(undefined)` 期望码改为 `VIEW_DECLARATION_INVALID`。
+
+### 3. 交付见证（有生产者）与停止位置（transform 钩子）
+
+本会话补齐的部分（另一会话同期落地了 `OpenCode/Host/DeliveryWitnessWriter.fs` 新 shard，`ToolRegistry.fs:873` 已是唯一写入器，二者不重复）：
+
+- `OpenCode/Tools/ToolRegistry.fs`：`settlementOf ctx` 装配交付归属（active profile 的 LogicalRunId/AuthorityRoot、快照里该 provider run 的 assistant 消息 `ParentId` 作物理围栏、`Text` 段作调用前散文、handle/invocation 作任务引用）+ 见证写入器；生成面 Execute 成功后按**精确围栏** `runtime.RegisterEstablishedDelivery`。
+- `Repository/Programming/Js/OpenCode/ToolHostSurface.fs`：非宿主测试面传 `settlementOf = None`。
+- `Composition/Turn/OrdinaryTurnWorkflow.fs`：`hasDeliveryEvidence` 只认真实见证（有 journal 时只认 durable witness；无 journal 时只认带围栏的 cell），不再用「存在交付」把会话永久静音。
+- `OpenCode/Tools/ToolRuntimeScope.fs` + `OpenCode/Host/HostTurnObserver.fs`：`DeliveryAttemptLedger` 进程内台账（已成立／已呈现／中断已发出／中断已观察到 分别取证），turn 观察者按精确 run 取自有中断任务。
+- `OpenCode/Plugin/PluginTransforms.fs`：新增 **delivery-adjudication** stage（条款 4）：本次 attempt 存在已成立交付且物理输入未变时，抑制下一次 provider step → 发出本次 attempt 的中断 → 清空本次请求消息，LLM 因此看不到 deliver 回复；`RelayNarrativeTransform.clearRequestMessages` 抽出共用动作；删除重复的 `handleInterruptionError` 死定义；stage-4 注释改为与代码一致（不重写消息集）。
+
+### 4. 交付消费方（fork / fission / sync delegate）
+
+- `Execution/Delegation/Fork/Host/RunLifecycle.fs` + `Runtime.fs`：视图读取改为**非破坏性 peek**（围栏必须命中本 run），**所有权守卫先于取用**（外来/重放终态不花掉活运行��材料），写入 `HandleCompleted` 前**要求围栏匹配的 durable 见证**（无 journal 的 harness 路径保持可用），视图读取故障在 `Runtime.Complete` 侧独立隔离（不再把已证明的终态变成 Failed）。
+- `Execution/Fission/OpenCode/Host.fs`：**先发布 owner 终态、再写 `FissionConverged`**；发布失败不写 Converged，失败路径得以 abort lane、通知 owner、释放 owner 预留与运行态。
+- `Execution/Delegation/SyncDelegate/Runtime.fs`（+`Surface.fs`）：委派子会话被交付中断后终态可能是 `TurnAborted` → 新增该分支，**有已提交交付即按成功结算**；消费改为**先读 durable 见证**、进程内 cell 兜底；中断**先于**物理租约释放；harness 记录 `(sessionId, providerRun, kind, refused, reason)` 并可注入拒绝，新增 `awaitDeliveryInterrupt` 等观察缝。
+
+## 九·三 本会话的验证状态（绑定当前代码）
+
+- **全量 build 结果（停电前跑完，日志 `/tmp/build-handoff.log`）**：F# 侧**编译通过**（`[owner-compile] OK: Wanxiangshu.Impact.fsproj`，1310 项），`js-surface-manifest: OK`；**卡在 JS 链接门禁**：`js-module-linkage: FAILED — 15 violation(s)`，15 条全是同一条根因——
+  `OpenCode/Host/HostTurnObserver.js: fable_modules/fable-library-js.5.13.0/Task.js is missing named export 'whenAny'`
+  （其余 14 条是 `HostTurnObserver` / `PluginHooks` / `PluginTransforms` / `PluginHostWiring` / `SyncDelegate.Surface` / `SpikePlugin` / `Sphinx.V2.Hosts.OpenCode.Surface` 等**传递依赖**它的模块加载失败）。
+  根因：新写的 `Task.WhenAny([| guard; delivery |])`（`HostTurnObserver.fs` 等待「守卫中断」与「交付中断」任一结算）在 Fable 5.13 的 `fable-library-js` 里**没有 `whenAny` 导出**。仓库既有先例：`ToolWorkflow.fs` 的注释写明「Fable has no Task.WhenAny; Promise.race is the established pattern (Await.fs / FinalityController)」。
+  **修法**：改成 `emitJsExpr (a, b) "Promise.race([$0,$1])"` 形态（与 `SyncDelegate/Surface.fs` 的 `NodeTiming.timerTask` + `Promise.race` 同款），不要引入 `Task.WhenAny`。
+- 停电前**全量 unit 基线**（`node requirements/verification-system/tests/run.mjs`，57 条失败，退出码 1）集中在三类：
+  1. **迁移遗留的红**：测试仍调用已退役的宿主工具（`hooks.tool.devops` / `fork` / `resume`）或旧的 `deliver(view)` 形状 → `TypeError: Cannot read properties of undefined (reading 'execute')`、断言 `deliver(value)`；涉及 `capability-enforcement-009/026`、`delegation-023/025`、`knowledge-reuse-010`、`managed-session-lifecycle-004/014/022`、`intra-participant-parallelism-003/010`。
+  2. **交付语义相关**：`context-compression-031`（`view` 参数退役后的 schema 断言）、`concern-routing-003`（deliver 资源措辞，本会话已改）、`repository-programming-054/059`（本会话已改）。
+  3. **门禁/词法类**：`delegation-029`（`ChildRecoveryWorkflow.fs` 不得直接引用 `AgentJournal` 的词法审计）、`js-semantic-surface-002`（边界门禁）。
+- 本会话**未跑**任何测试套件（子代理一律不跑门禁）；本会话改动的定向用例也**未执行**。
+
+## 九·四 剩余任务（续接后按此顺序做；每条都给出位置与验收）
+
+### A. 编译与门禁（阻塞其余一切）
+
+- **A1** `node scripts/build.mjs` 必须 `build ok`。若红：按错误所在 shard 用 `node scripts/compile-owner.mjs <shard>.fsproj` 定向定位（不是项目门禁）。**注意**：`Description.fs` 的生成面改动由一个被中途叫停的代理落地，编译后要复核 `deliver`/`resume`/`commission`/`dag` 四段是否自洽。
+- **A2** `dotnet tool run fantomas src/Wanxiangshu`（阶段末一次，不要让代理各跑）。
+- **A3** `npm run check`（architecture / subsystems / language-parity / ablation-manifest / tool-referential-integrity / js-surface-manifest / clean-break-symbols）。两个已知风险点见八·五 R4（新 shard 层向、`tool-map.json` 与 `StaticTools.knownToolNames` 双射）。
+
+### B. 交付面剩余缺陷（本会话审计已定位、**未修**）
+
+- **B1** `Repository/Programming/Js/Description.fs`：`resume`/`commission` **不派生命名**（`fork` 派生了，`resume`/`commission` 没有）→ 文档里「单参 charge」调用会被 `name-required` 拒。修法照抄 fork 的 slug 派生。验收：`this.resume("继续审计", {1:null})` 不再 `name-required`。
+- **B2** 同文件：`dag` 门控仍是 **Fork 即可**，但方法体调用 `this.join()`（Join 才有）→ 生成面可能引用不存在的成员。修法：dag 需要 Fork ∧ Join。
+- **B3** `Repository/Programming/Js/Capability.fs`：成员注册表**缺 deliver 分片** → `deliver` 不在 `surface.members` / `memberBinding`，四层目录描述不到它。
+- **B4** 同文件/同生成面：Manager 运行时基类读 `api.reviewOnly`，而非宿主执行路径没有该字段 → TypeError 而不是数据信封。修法：Manager 面恒挂 ReviewOnly 包装，或 `api.reviewOnly` 缺失时返回 `{ok:false,code:"REVIEW_ONLY"}`。
+- **B5** `Repository/Programming/Js/DeliveredValues.fs`：`tryTakeRenderedFor` 只比 `ProviderRun`，**不比 `ToolCallId`** → 同一 provider run 内的另一笔调用可取走本调用的交付物。修法：加按完整围栏取用的入口，fork/sync 侧改用它。
+- **B6** `Host/Facts.fs`：`tryFindByFenceFields` **不比较 `LogicalRunId` 与 `Task`** → 别的逻辑运行/别的任务的见证可以满足门禁。修法：围栏子集读取补这两个过滤位。
+- **B7** `Mission/Work/OpenCode/DeliverTool.fs`：`receipt.Status = "Observed"` 被当作 durable outcome 接纳（`durableOutcome`）→ 「无新事实的观察」可能走成 Delivered 并触发中断。修法：只认 `Committed`/`Replayed`。
+- **B8** `Mission/Work/OpenCode/DeliverTool.fs`：S4 终态中断**未按当前物理输入设围栏**（`ask` 路径有先后两次核对，S4 没有）→ 交付与新用户输入之间存在误停窗口。
+- **B9** `OpenCode/Plugin/PluginTransforms.fs` + `Mission/Work/OpenCode/NarrativeTransform.fs`（叙述审计遗留）：
+  - 退休 attempt 的「中断」回调现在接的是 `ManagerWorkflow.continueAfterRetiredAttempt`——它**顺带派发后继提示**，与「停止」不是一件事；应拆开（停止与接力分别取证）。
+  - `physicalUserMessageId` 取不到时直接 `invalidOp`，把「停止」变成「钩子失败」；应跳过步抑制但仍尝试中断。
+  - `staleRetirement` 只认 `Outcome = "Relayed"`；**终态 `Delivered`（无继任者）**的残留请求不算 stale → 会在无权威的任期上继续跑。
+  - `relayedCut` 取**第一条** Relayed，而 `afterCut`/`cutPresent` 用**最后一条** cut → 多轮接力时围栏错位。
+  - `acceptedSuccessorRequestFor` 只判「存在 ChatExecution」（含终态、任意逻辑运行）→ 继任判据是竞态而非事实；应要求当前逻辑运行下的**活跃接纳**。
+- **B10** `requirements/work/tests/011.test.mjs:229` 的 `test.todo`（在途中断未完成前不得派发后继）**仍是 todo**；`requirements/work/tests/049.test.mjs` 的中断断言是**空断言**（钩子键写的是 `message.part.updated`，插件注册的是 `event`）→ 两条都要转成真断言。
+
+### C. 交付面剩余缺陷（另一会话已识别、仍未闭合）
+
+- **C1** Plan 路径**没有 settlement**（`ToolRegistry.runPlanProgram` → `JsToolWorkflow.execute` 无围栏归属）→ Plan 的 `this.deliver` 不产生 durable 见证，只有进程内交付格。
+- **C2** post-S3 交付**未登记「已成立」**（只有 S4 Delivered 登记）→ 新契约下该交付不会被 transform 停住。
+- **C3** `Execution/Fission/OpenCode/Host.fs:574-760` 的宿主侧 lane 交付是**死代码**（`deliverOneLane` 无调用方）；lane→owner 的**跨会话搬运**搬的是**声明**而非材料（锚点空间不跨会话），搬运还会留下同一交付两份可见。
+- **C4** `requirements/repository-programming/tests/README.md` 等证据页的条目与新参数名不同步（049 参数名单）。
+
+### D. 测试面剩余（迁移遗留）
+
+- **D1** 仍调用退役宿主工具的用例迁移到编程面成员：`capability-enforcement-009/026`、`delegation-023/025`、`knowledge-reuse-010`、`managed-session-lifecycle-004/014/022`、`intra-participant-parallelism-003/010`。
+- **D2** `delegation-029` 的词法审计（`ChildRecoveryWorkflow.fs` 不得直接引用 `AgentJournal`）与 `js-semantic-surface-002` 边界门禁需按新依赖边复核。
+- **D3** **补本会话缺陷的回归用例**（目前一条未写）：
+  - 三态冲突可见失败 + handle 未被消费（已写：`repository-programming/064`）；
+  - 交付 → 见证落盘 → transform 停住该 attempt（**未写**，这是条款 3/4 的核心闭环）；
+  - 提交/呈现/中断三件事分别取证（**未写**）；
+  - fork 侧重复读取同一终态不掏空交付格（**未写**）；
+  - sync delegate 被中断后仍以交付视图结算调用（**未写**）。
+
+## 九·五 续接命令
+
+```bash
+# 1) 编译（先看上一次日志尾部：/tmp/build-handoff.log）
+node scripts/build.mjs
+node scripts/compile-owner.mjs <shard>.fsproj      # 定向编译某 shard
+
+# 2) 目标套件
+node --test requirements/repository-programming/tests/064.test.mjs
+node --test requirements/repository-programming/tests/{054,059}.test.mjs
+node --test requirements/work/tests/{011,026,027,032,033,049}.test.mjs
+node --test requirements/delegation/tests/{023,025}.test.mjs
+node --test requirements/capability-enforcement/tests/{009,026}.test.mjs
+
+# 3) 全量
+node requirements/verification-system/tests/run.mjs   # unit（停电前基线：57 红）
+npm run check
+dotnet tool run fantomas src/Wanxiangshu
+```
+
+## 九·六 本会话的教训（写给下一个会话）
+
+1. **模型看到的工具 schema 会决定它能表达什么**。`program` 被标成必填，模型就永远无法单独发 `abandon`——「模型没按对方式调用」常常是宿主契约逼出来的，不是模型错。
+2. **静默丢弃比报错更贵**：三态入参的「优先级」写法让每一次 abandon 都变成一次普通 program 运行，现场永远不清，交付门禁常闭，症状看起来完全不像参数解析问题。
+3. **交付格/见证/呈现是三件事**，用同一个布尔量（`hasDelivered`）判断必然互相污染：见证是完成证据，格子是材料缓存，呈现是给调用方的回执。
+4. **「发出中断」≠「中断已生效」**：user-facing 会话上的 `InterruptAttempt` 会被 `MANAGED-SESSION-016` 拒绝；把拒绝吞掉再宣布「已停止」，等于什么都没停。本会话的落法是：`已发出` 与 `已观察到` 分别登记，停止动作放在 transform 钩子（清空消息 + 抑制下一次 step + 中断本次 attempt），让 LLM 看不到 deliver 回复。
+5. **交付发生在宿主回合之下**：调用前散文、逻辑运行、物理用户消息、任务归属在 settle 点都看不见，必须由宿主回合层注入；编不出来就别硬编（`DeliveryAttribution` 缺字段即视为「未成立」）。
+6. 验证结论必须绑定代码状态：并行会话落地后，先前绿轮不作数；**最终 build + 测试必须重跑**。
+7. 派子代理时明确「只改指定文件、不跑 build/测试/格式化」，并要求回报 `file:line` 级证据；否则代理会在同一工作树里互相覆盖（本会话两次遇到 `Description.fs` / `DeliverTool.fs` 被并行会话改写）。

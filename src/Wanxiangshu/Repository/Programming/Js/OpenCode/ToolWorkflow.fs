@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Process
 
@@ -141,6 +142,56 @@ module JsToolsData =
             jsGet payload "payload"
         with _ ->
             null
+
+/// The task a delivery serves. The durable witness names the same three
+/// references; this layer states them in its own vocabulary because it runs
+/// below the host turn and cannot reach the host's witness type.
+[<RequireQualifiedAccess>]
+type DeliveryTaskReference =
+    | ChildWork of handle: string
+    | Invocation of invocationId: string
+    | Lifecycle of workId: string * incumbencyId: string
+
+/// The host's attribution of one tool call: the task the call serves, the
+/// logical run and the authority it belongs to, and the prose the model
+/// wrote before the call. The settle point cannot derive any of it — it runs
+/// below the host turn, where only the call fence is visible.
+type DeliveryAttribution =
+    { LogicalRunId: LogicalRunId
+      AuthorityRoot: AuthorityRootUserMessageId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      Task: DeliveryTaskReference
+      RetirementId: string option
+      FormalText: string }
+
+/// The delivery witness of one settled call. The host writer maps it onto
+/// the durable witness fact — adding the material digest — and commits it;
+/// this layer never touches the journal itself.
+type DeliveryWitness =
+    { SessionId: SessionId
+      LogicalRunId: LogicalRunId
+      AuthorityRoot: AuthorityRootUserMessageId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      ProviderRun: ProviderRunIdentity
+      ToolCallId: ToolCallId
+      Task: DeliveryTaskReference
+      FormalText: string
+      ViewDeclaration: string
+      View: string
+      RetirementId: string option }
+
+/// The narrow durable capability the settle point uses to record a delivery
+/// witness. A refused commit means the delivery is not established: the
+/// caller must learn that instead of reading a success nobody can prove.
+type IDeliveryWitnessWriter =
+    abstract CommitDeliveryWitness: witness: DeliveryWitness -> Task<Result<unit, string>>
+
+/// What the settle point needs to attribute a delivery and to make its
+/// evidence durable. A call without a settlement has no durable store behind
+/// it (test/dev harness): the process-live cell is then the only evidence.
+type DeliverySettlement =
+    { Attribution: DeliveryAttribution
+      Writer: IDeliveryWitnessWriter }
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
 /// sandbox execution, staging, preflight, durable prepare, commit and the
@@ -335,22 +386,163 @@ module JsToolWorkflow =
                     deliveredJson.Value <- Some json
                     parsed
 
-    /// The delivered view declaration, written into the session cell only
-    /// after the tool's observation and ledger settled successfully — a
-    /// failed tool must not leave a cell that can pass as a delivery.
-    let private recordDeliveredViewAfterSettlement
+    /// Clear only what this call produced (deliver clause 6). A delivery
+    /// another call of the same session made is evidence and stays: a later
+    /// failure in that session must not erase it.
+    let private clearOwnDelivery
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
+        : unit =
+        match fence with
+        | None ->
+            // Without a call fence the cell cannot be attributed to this
+            // call, so nothing may be cleared on its behalf.
+            ()
+        | Some(providerRun, toolCallId) ->
+            match JsDeliveredValues.peekFence sessionId with
+            | Some cellFence when cellFence.ProviderRun = providerRun && cellFence.ToolCallId = toolCallId ->
+                JsDeliveredValues.clear sessionId
+            | _ -> ()
+
+    /// The declared view as text: the exact declaration the program handed
+    /// over, so the witness states the view and not a paraphrase of it.
+    let private declarationText (view: obj) : string =
+        JS.JSON.stringify view
+
+    /// The materialized view of a delivered declaration: the entries its view
+    /// selects, rendered as text. This is the material the witness digests
+    /// and the crash-recovery path hands back.
+    let private materializedView (sessionId: string) (view: obj) : string =
+        JsDeliveredValues.select sessionId (Some view) Set.empty
+        |> List.map (fun piece -> piece.Text)
+        |> String.concat "\n"
+
+    /// The delivery witness of a settled call: the fence of the delivering
+    /// call, the host's attribution of that call, and the view it handed
+    /// over. Every field comes from one of those three sources — nothing
+    /// here is invented, and what the settle point cannot know is missing
+    /// rather than filled in.
+    let private deliveryWitness
+        (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
+        (attribution: DeliveryAttribution)
+        (view: obj)
+        : Result<DeliveryWitness, JsFailure> =
+        match fence with
+        | None ->
+            Error(
+                JsFailure.DeliveryNotEstablished(
+                    "the delivering call has no fence to own the witness"
+                )
+            )
+        | Some(providerRun, toolCallId) ->
+            let declaration = declarationText view
+            let material = materializedView sessionId view
+
+            let incomplete =
+                System.String.IsNullOrWhiteSpace attribution.FormalText
+                || System.String.IsNullOrWhiteSpace declaration
+                || System.String.IsNullOrWhiteSpace material
+
+            if incomplete then
+                Error(
+                    JsFailure.DeliveryNotEstablished(
+                        "the attributed prose or the materialized view is empty"
+                    )
+                )
+            else
+                Ok
+                    { SessionId = SessionId.create sessionId
+                      LogicalRunId = attribution.LogicalRunId
+                      AuthorityRoot = attribution.AuthorityRoot
+                      PhysicalUserMessageId = attribution.PhysicalUserMessageId
+                      ProviderRun = providerRun
+                      ToolCallId = toolCallId
+                      Task = attribution.Task
+                      FormalText = attribution.FormalText
+                      ViewDeclaration = declaration
+                      View = material
+                      RetirementId = attribution.RetirementId }
+
+    /// Register a committed delivery as an established delivery of this exact
+    /// attempt, so the transform hook's delivery adjudication can stop it.
+    ///
+    /// The fence is the committed witness's own fence (session, provider run,
+    /// tool call) — the exact attempt that delivered. A call without a fence
+    /// owns no witness and is never registered, so it can never be stopped.
+    /// The physical input is the physical user message the host attributed
+    /// the call to: it keeps the record from aiming at a later physical
+    /// input.
+    let private registerEstablishedDelivery (witness: DeliveryWitness) : unit =
+        DeliveryAttemptLedger.recordEstablished
+            ({ SessionId = witness.SessionId
+               ProviderRun = witness.ProviderRun
+               CallId = witness.ToolCallId }: DeliveryAttemptLedger.Fence)
+            (Some witness.PhysicalUserMessageId)
+
+    /// The delivery settlement of one settled call (deliver clauses 3 and 6).
+    ///
+    /// The delivered view is materialized first, then the durable witness is
+    /// committed, and only a committed delivery records the process-live
+    /// cell. A witness that cannot be committed means the delivery did not
+    /// happen: the caller sees the failure and no success evidence is left
+    /// behind. A call without a settlement has no durable store behind it
+    /// (test/dev harness): the process-live cell is then its only evidence.
+    ///
+    /// A committed delivery is also a submission fact: the attempt ledger
+    /// records it, so the transform hook's delivery adjudication can stop
+    /// this attempt.
+    let private settleDeliveredView
+        (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
+        (settlement: DeliverySettlement option)
         (json: string)
-        =
-        if JsToolsData.isDelivered json then
+        : Task<Result<unit, JsFailure>> =
+        task {
             match deliveredView json with
-            | Ok view ->
-                match fence with
-                | Some(providerRun, toolCallId) ->
-                    JsDeliveredValues.recordFencedView sessionId providerRun toolCallId view
-                | None -> JsDeliveredValues.recordView sessionId view
-            | Error _ -> ()
+            | Error failure -> return Error failure
+            | Ok None ->
+                return Error(JsFailure.ViewDeclarationInvalid "the delivered view declaration is empty")
+            | Ok (Some view) ->
+                let record () =
+                    match fence with
+                    | Some(providerRun, toolCallId) ->
+                        JsDeliveredValues.recordFencedView sessionId providerRun toolCallId (Some view)
+                    | None -> JsDeliveredValues.recordView sessionId (Some view)
+
+                match settlement with
+                | None ->
+                    record ()
+
+                    // No durable store behind this call: there is no host
+                    // attribution, hence no physical input to fence a ledger
+                    // record with, so nothing is registered. The delivery
+                    // itself still stands on its own process-live cell.
+
+                    return Ok()
+                | Some attributed ->
+                    match deliveryWitness sessionId fence attributed.Attribution view with
+                    | Error failure -> return Error failure
+                    | Ok witness ->
+                        let! committed = attributed.Writer.CommitDeliveryWitness witness
+
+                        match committed with
+                        | Ok() ->
+                            registerEstablishedDelivery witness
+
+                            record ()
+
+                            return Ok()
+                        | Error reason ->
+                            return
+                                Error(
+                                    JsFailure.DeliveryNotEstablished(
+                                        "the durable delivery witness was not committed ("
+                                        + reason
+                                        + ")"
+                                    )
+                                )
+        }
 
 
     let private decodeRunResult
@@ -584,6 +776,7 @@ module JsToolWorkflow =
     let private runProgramCore
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
+        (settlement: DeliverySettlement option)
         (capabilities: Set<JsCapability>)
         (root: string)
         (baseClassSource: string)
@@ -688,7 +881,9 @@ module JsToolWorkflow =
                 // (H1) so no append task is left unsettled. The program
                 // failure keeps the reported code; landed writes stay as-is.
                 let! _ = settleLedger ledger
-                JsDeliveredValues.clear sessionId
+                // Only this call's own delivery evidence may go: a delivery
+                // another call of this session made stays (clause 6).
+                clearOwnDelivery sessionId fence
                 return Failed(failure, rewritten, created, removed, moved)
             | Ok parkedValue when isParkedSentinel parkedValue ->
                 // The program parked. Register the site under a fresh handle.
@@ -713,7 +908,9 @@ module JsToolWorkflow =
                         removed
                         moved
             | Ok _ when (checkReadOnlyMutation hasMutationCapability mutations).IsSome ->
-                JsDeliveredValues.clear sessionId
+                // The refused change is not a delivery, but the delivery
+                // another call of this session made is still evidence.
+                clearOwnDelivery sessionId fence
                 return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
             | Ok value ->
                 let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
@@ -726,12 +923,26 @@ module JsToolWorkflow =
                 // successfully: a failed observation or ledger must not leave
                 // a cell that could pass as a delivery.
                 match settled with
-                | Succeeded _ ->
-                    deliveredJson.Value
-                    |> Option.iter (fun json -> recordDeliveredViewAfterSettlement sessionId fence json)
-                | _ -> JsDeliveredValues.clear sessionId
+                | Succeeded(value, rewritten, created, removed, moved) ->
+                    match deliveredJson.Value with
+                    | None ->
+                        // An ordinary return is not a delivery (clause 1) and
+                        // leaves no delivery evidence of its own.
+                        return Succeeded(value, rewritten, created, removed, moved)
+                    | Some json ->
+                        let! deliveryOutcome = settleDeliveredView sessionId fence settlement json
 
-                return settled
+                        match deliveryOutcome with
+                        | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
+                        | Error failure ->
+                            // The delivery did not establish: it presents as
+                            // not established and leaves no success evidence
+                            // behind (clause 6).
+                            clearOwnDelivery sessionId fence
+                            return Failed(failure, rewritten, created, removed, moved)
+                | _ ->
+                    clearOwnDelivery sessionId fence
+                    return settled
         }
 
     /// The generated-surface api factory: bindings own the file members and
@@ -767,6 +978,7 @@ module JsToolWorkflow =
         (reviewCheck: (unit -> Task<bool>) option)
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
+        (settlement: DeliverySettlement option)
         (capabilities: Set<JsCapability>)
         (root: string)
         (baseClassSource: string)
@@ -781,6 +993,7 @@ module JsToolWorkflow =
         runProgramCore
             sessionId
             fence
+            settlement
             capabilities
             root
             baseClassSource
@@ -801,6 +1014,7 @@ module JsToolWorkflow =
     let private unparkSite
         (site: JsParkedSites.JsParkedSite)
         (fence: (ProviderRunIdentity * ToolCallId) option)
+        (settlement: DeliverySettlement option)
         (value: obj)
         (baseClassSource: string)
         (deadlineMs: int)
@@ -850,7 +1064,9 @@ module JsToolWorkflow =
             match outcome with
             | Error failure ->
                 let! _ = settleLedger site.Ledger
-                JsDeliveredValues.clear site.SessionId
+                // Only this call's own delivery evidence may go: a delivery
+                // another call of this session made stays (clause 6).
+                clearOwnDelivery site.SessionId fence
                 return Failed(failure, [], [], [], [])
             | Ok parkedValue when isParkedSentinel parkedValue ->
                 // The resumed program parked again: a new handle and a new
@@ -872,12 +1088,23 @@ module JsToolWorkflow =
                 let settled = settleResumedExecutionOutcome ledgerOutcome value
 
                 match settled with
-                | Succeeded _ ->
-                    deliveredJson.Value
-                    |> Option.iter (fun json -> recordDeliveredViewAfterSettlement site.SessionId fence json)
-                | _ -> JsDeliveredValues.clear site.SessionId
+                | Succeeded(value, rewritten, created, removed, moved) ->
+                    match deliveredJson.Value with
+                    | None ->
+                        // An ordinary return is not a delivery (clause 1) and
+                        // leaves no delivery evidence of its own.
+                        return Succeeded(value, rewritten, created, removed, moved)
+                    | Some json ->
+                        let! deliveryOutcome = settleDeliveredView site.SessionId fence settlement json
 
-                return settled
+                        match deliveryOutcome with
+                        | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
+                        | Error failure ->
+                            clearOwnDelivery site.SessionId fence
+                            return Failed(failure, rewritten, created, removed, moved)
+                | _ ->
+                    clearOwnDelivery site.SessionId fence
+                    return settled
         }
 
     /// Abandon a parked site (algorithm F): reject the deferred promise with
@@ -926,6 +1153,7 @@ module JsToolWorkflow =
         runProgramCore
             sessionId
             None
+            None
             Set.empty
             ""
             baseClassSource
@@ -938,43 +1166,54 @@ module JsToolWorkflow =
             None
             (fun _ parkState -> makeApi parkState)
 
-    /// Resume a parked site from any owning surface (generated or plan).
-    let resumeParked
-        (handle: string)
-        (value: obj)
-        (baseClassSource: string)
-        (deadlineMs: int)
-        (outputBoundBytes: int)
-        : Task<JsToolOutcome> =
-        match JsParkedSites.tryFind handle with
-        | None -> Task.FromResult(Failed(JsFailure.HandleUnknown handle, [], [], [], []))
-        | Some site -> unparkSite site None value baseClassSource deadlineMs outputBoundBytes
-
-    /// Abandon a parked site from any owning surface.
-    let abandonParked (handle: string) (deadlineMs: int) (outputBoundBytes: int) : Task<JsToolOutcome> =
-        match JsParkedSites.tryFind handle with
-        | None -> Task.FromResult(Failed(JsFailure.HandleUnknown handle, [], [], [], []))
-        | Some site -> abandonSite site deadlineMs outputBoundBytes
-
     [<RequireQualifiedAccess>]
     type private ToolWorkflowInvocation =
         | Program of source: string
         | Unpark of handle: string * value: obj
         | Abandon of handle: string
-        | Invalid
+        | Invalid of reason: string
+
+    [<Emit("$0 !== null && $0 !== undefined")>]
+    let private isPresent (value: obj) : bool = jsNative
+
+    /// The states a js-* input carries, in protocol order. A state is present
+    /// when its key holds a value; null and undefined are absences.
+    let private inputStates (input: obj) : (string * obj) list =
+        if isNull input then
+            []
+        else
+            [ if isPresent (input?program) then ("program", input?program)
+              if isPresent (input?unpark) then ("unpark", input?unpark)
+              if isPresent (input?abandon) then ("abandon", input?abandon) ]
+
+    /// Why a js-* input is contradictory: it carries more than one of
+    /// program / unpark / abandon. The reason names the conflicting states.
+    let private conflictReason (states: (string * obj) list) : string =
+        let names = states |> List.map fst |> String.concat ", "
+
+        "program, unpark and abandon are mutually exclusive: a call carries exactly one of them (got "
+        + names
+        + ")"
+
+    /// Why a js-* input is contradictory: it carries more than one of
+    /// program / unpark / abandon. `None` when the input carries at most one
+    /// state, so a caller can refuse a conflicting call before anything runs.
+    let conflictingInputReason (input: obj) : string option =
+        let states = inputStates input
+
+        if List.length states > 1 then
+            Some(conflictReason states)
+        else
+            None
 
     let private parseWorkflowInvocation (input: obj) : ToolWorkflowInvocation =
-        if isNull input then
-            ToolWorkflowInvocation.Invalid
-        elif not (isNull input?program) then
-            ToolWorkflowInvocation.Program(string input?program)
-        elif not (isNull input?unpark) then
-            let unpark = input?unpark
-            ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value)
-        elif not (isNull input?abandon) then
-            ToolWorkflowInvocation.Abandon(string ((input?abandon)?handle))
-        else
-            ToolWorkflowInvocation.Invalid
+        match inputStates input with
+        | [] -> ToolWorkflowInvocation.Invalid "no program, unpark, or abandon input"
+        | [ ("program", source) ] -> ToolWorkflowInvocation.Program(string source)
+        | [ ("unpark", unpark) ] -> ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value)
+        | [ ("abandon", abandon) ] -> ToolWorkflowInvocation.Abandon(string (abandon?handle))
+        | states ->
+            ToolWorkflowInvocation.Invalid(conflictReason states)
 
     let private resolveParkedSite (sessionId: string) (handle: string) : Result<JsParkedSites.JsParkedSite, JsFailure> =
         match JsParkedSites.tryFind handle with
@@ -1003,8 +1242,14 @@ module JsToolWorkflow =
     /// them. `lifecyclePersistence` records Parked/Unparked/Abandoned audit
     /// traces (best-effort; a failed audit never fails the tool call); Reaped
     /// is recorded by the session-close path (PluginSessionScope).
-    let executeWithReviewCheck
+    /// `settlement` carries the host's attribution of this call and the
+    /// durable place its delivery witness goes: a delivery that settles with
+    /// a settlement commits its witness before it presents itself as
+    /// delivered, and a delivery that cannot commit one presents as not
+    /// established (clauses 3 and 6).
+    let executeWithReviewCheckAndDelivery
         (reviewCheck: (unit -> Task<bool>) option)
+        (settlement: DeliverySettlement option)
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
         (capabilities: Set<JsCapability>)
@@ -1026,6 +1271,7 @@ module JsToolWorkflow =
                         reviewCheck
                         sessionId
                         fence
+                        settlement
                         capabilities
                         root
                         baseClassSource
@@ -1040,15 +1286,81 @@ module JsToolWorkflow =
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
-                        unparkSite site fence value baseClassSource deadlineMs outputBoundBytes)
+                        unparkSite site fence settlement value baseClassSource deadlineMs outputBoundBytes)
             | ToolWorkflowInvocation.Abandon handle ->
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Abandoned handle sessionId
                         abandonSite site deadlineMs outputBoundBytes)
-            | ToolWorkflowInvocation.Invalid ->
-                return Failed(JsFailure.InvalidArgument "no program, unpark, or abandon input", [], [], [], [])
+            | ToolWorkflowInvocation.Invalid reason ->
+                return Failed(JsFailure.InvalidArgument reason, [], [], [], [])
         }
+
+    /// The same invocation without a review check and without a delivery
+    /// settlement: no durable store stands behind the delivery, so the
+    /// process-live cell is its only evidence.
+    let executeWithReviewCheck
+        reviewCheck
+        sessionId
+        fence
+        capabilities
+        root
+        baseClassSource
+        (input: obj)
+        deadlineMs
+        deadlineEpochMs
+        outputBoundBytes
+        persistence
+        lifecyclePersistence
+        fileAccessObservation
+        =
+        executeWithReviewCheckAndDelivery
+            reviewCheck
+            None
+            sessionId
+            fence
+            capabilities
+            root
+            baseClassSource
+            input
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+
+    /// One js-* invocation whose delivery commits a durable witness.
+    let executeWithDelivery
+        settlement
+        sessionId
+        fence
+        capabilities
+        root
+        baseClassSource
+        (input: obj)
+        deadlineMs
+        deadlineEpochMs
+        outputBoundBytes
+        persistence
+        lifecyclePersistence
+        fileAccessObservation
+        =
+        executeWithReviewCheckAndDelivery
+            None
+            settlement
+            sessionId
+            fence
+            capabilities
+            root
+            baseClassSource
+            input
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
 
     let execute
         sessionId

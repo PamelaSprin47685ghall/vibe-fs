@@ -52,7 +52,7 @@ test('WHAT[repository-programming-060] LC-007: failure during ledger settlement 
       {
         program: program(`
     this.write('effect.txt', 'mutated-data');
-    await this.deliver({ prefixUntil: 0, thenMap: { 0: "should-not-persist-view" } });
+    await this.deliver({ 0: "should-not-persist-view" });
     return { done: true };
 `),
       },
@@ -102,7 +102,7 @@ test('WHAT[repository-programming-060] LC-007: commit phase append failure also 
       {
         program: program(`
     this.write('target.txt', 'after');
-    await this.deliver({ prefixUntil: 0, thenMap: { 0: "fenced-report" } });
+    await this.deliver({ 0: "fenced-report" });
     return { done: true };
 `),
       },

@@ -21,6 +21,9 @@ test('WHAT[work-030] StaticTools explicitly registers all three plan tools and e
   assert.ok(!names.includes('commission'))
   assert.ok(!names.includes('handoff'))
 
+  // The host devops tool is retired: it is no longer a registered tool.
+  assert.ok(!names.includes('devops'))
+
   // Admission is by exact registered name: the plan tools are the only
   // plan-admitted entries beyond the shared base permissions.
   const planRules = ToolSurface.rolePermissionRules('plan')
@@ -31,7 +34,7 @@ test('WHAT[work-030] StaticTools explicitly registers all three plan tools and e
 
 test('WHAT[work-030] tool registration does not allow prefix or wildcard matching for plan tools', () => {
   const planRules = ToolSurface.rolePermissionRules('plan')
-  const invalidAttempts = ['js-plan-fake', 'plan*', 'ask_question', 'devops_extra', 'review_next', 'deliver_final']
+  const invalidAttempts = ['js-plan-fake', 'plan*', 'ask_question', 'devops', 'devops_extra', 'review_next', 'deliver_final']
   for (const attempt of invalidAttempts) {
     assert.equal(Object.hasOwn(planRules, attempt), false, `"${attempt}" must not be a plan-admitted name`)
   }

@@ -121,8 +121,6 @@ module JsRuntimeSurface =
 
     let clearDelegationHosts () : unit = JsDelegationBridge.clearAll ()
 
-    /// Test hook: the raw value a program handed over through `this.deliver`.
-
     /// Test hook: record a value with an already-shaped deliver view.
     let recordDeliveredView (sessionId: string) (view: obj) : unit =
         JsDeliveredValues.recordView sessionId (if isNull view then None else Some view)
@@ -165,7 +163,12 @@ module JsRuntimeSurface =
         | Some text -> box text
         | None -> null
 
-    let deliveredValue (sessionId: string) : obj = JsDeliveredValues.peek sessionId
+    /// Test hook: the raw value a program handed over through `this.deliver`,
+    /// as it stands right now — a delivery or a staged render cache. This is
+    /// the staged view: presentation only. The delivery evidence is the
+    /// fenced cell, read by `deliveredFenceOf` and consumed by
+    /// `takeDeliveredHandoffFor`.
+    let deliveredValue (sessionId: string) : obj = JsDeliveredValues.peekCached sessionId
 
     let deliveredViewOf (sessionId: string) : obj =
         match JsDeliveredValues.peekView sessionId with

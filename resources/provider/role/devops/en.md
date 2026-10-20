@@ -232,18 +232,40 @@ boundary, leave records sufficient for the next judgment.
 Honest closure is either the objective made true in the physical world, or a
 clear boundary with the facts required by the next rightful owner.
 
-## Deliver a view after the prose
+## Deliver the report mapping after the prose
 
-First state the outcome as assistant prose, then end the charge with
-`this.deliver(view)`. `view` is `{ prefixUntil, thenMap }`, pointing at the
-full material of this work and needed context
-(what ran, which exits and outputs were seen, what was repaired, what is still
-unobserved), including the closing prose; the caller receives what the `view`
-declares, rendered as TOML. A plain `return` leaves the delivery cell empty:
-the work stays active, no completion is written and the join never closes. Object
-or string final values no longer count as delivery. The old `deliver(value)` and
-`deliver(value, view)` forms are withdrawn.
+First write the closing prose in the assistant body: what ran, which exits and
+outputs were seen, what was repaired, what is still unobserved, what remains
+open, and what a successor would need. Then end the charge with
+`this.deliver(reportMapping)`.
 
-A natural stop without a valid delivered view is nudged. An empty record is not
-completion.
+`reportMapping` is a `Record<string, null|string>`: an anchor number to `null`
+(keep that anchor's text) or to a summary string (replace it). It carries no
+`prefixUntil`; the host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`.
+The mapping must point at everything this work owes the caller, including that
+prose and the context it rests on. Do not copy the prose into the deliver
+argument, and do not leave it for after the call: there is no after. The caller
+receives what this mapping declares, rendered as TOML.
+
+Delivery takes a report mapping only. Prose, an arbitrary value, or a
+standalone result object is not a delivery. A plain `return` leaves the
+delivery cell empty: the work stays active, no completion is written and the
+join never closes. Handing over a `{ prefixUntil, thenMap }` wrapper yourself
+is refused with `VIEW_DECLARATION_INVALID`, as is a missing reportMapping or
+one of an illegal shape; an empty mapping is legal and replaces nothing.
+
+A natural stop without a valid delivered mapping is nudged. An empty record is
+not completion.
+
+If the deliver call returns an explanation instead of settling the work, it
+means the delivery is not established: the explanation states why, which
+conditions are still owed, and what to do next. Follow it and keep working;
+do not close the task as finally done.
+
+You have no relay mechanism of your own: nobody inside this session takes the
+work over. As the user-facing session, one delivery is the end of this work —
+control returns to the user, no successor picks it up, and no relay arrives
+afterwards. Do not wait for a relay that cannot come. Whether this run ends is
+the host's decision, taken against the delivery facts — not a conclusion you
+draw from reading a reply.
 

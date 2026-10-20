@@ -179,6 +179,11 @@ module private PtyHostHelpers =
             terminalByName
             |> Seq.tryPick (fun (KeyValue(name, id)) -> if id = ptyId then Some name else None))
 
+[<RequireQualifiedAccess>]
+module private ForkRuntimeLog =
+    [<Emit("console.error($0, $1)")>]
+    let logError (prefix: string) (message: string) : unit = jsNative
+
 type private PromptAcceptanceState =
     | Open of ResizeArray<IDisposable>
     | Closed
@@ -819,9 +824,35 @@ type HostForkRuntime
                 try
                     do! this.DrainPtysIfDevOps run
 
-                    let! view = viewForOutcome run outcome
+                    // D1: the view is resolved lazily, so a terminal that does
+                    // not address this run never reads its material.
+                    // D4: the view read has its own fault boundary — a
+                    // faulting read is an empty view (bounded auxiliary
+                    // evidence) and must never convert a proven child
+                    // terminal into a failed settlement.
+                    let view : HostForkRunLifecycle.ViewResolution =
+                        fun () ->
+                            task {
+                                try
+                                    return! viewForOutcome run outcome
+                                with error ->
+                                    ForkRuntimeLog.logError
+                                        "FORK-VIEW"
+                                        (sprintf "run %s view read faulted: %s" run.AgentId error.Message)
 
-                    do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome view
+                                    return None
+                            }
+
+                    do!
+                        HostForkRunLifecycle.complete
+                            gate
+                            pendingRuns
+                            journal
+                            parentId
+                            sessions
+                            run
+                            outcome
+                            (Some view)
                 with error ->
                     // A proven terminal must still resolve this run's only
                     // completion promise even when settlement faulted: settle an

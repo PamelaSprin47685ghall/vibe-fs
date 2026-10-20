@@ -371,11 +371,17 @@ module ToolHostCodec =
     [<Emit("$0.schema.object($1)")>]
     let private rawObjectSchemaOf (tool: obj) (fields: obj) : obj = jsNative
 
+    [<Emit("$0.schema.object($1).optional()")>]
+    let private rawOptionalObjectSchemaOf (tool: obj) (fields: obj) : obj = jsNative
+
     [<Emit("$0.schema.array($1).describe($2)")>]
     let private rawArraySchemaOf (tool: obj) (item: obj) (description: string) : obj = jsNative
 
     [<Emit("$0.schema.record($1, $2).describe($3)")>]
     let private rawRecordSchemaOf (tool: obj) (key: obj) (value: obj) (description: string) : obj = jsNative
+
+    [<Emit("$0.schema.record($1, $2).describe($3).optional()")>]
+    let private rawOptionalRecordSchemaOf (tool: obj) (key: obj) (value: obj) (description: string) : obj = jsNative
 
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
@@ -540,12 +546,23 @@ module ToolHostCodec =
 
         HostSchema(rawObjectSchemaOf factory fieldsObj)
 
+    /// Optional object schema: the caller may omit the whole object.
+    let optionalObjectSchema fields (HostToolFactory factory) =
+        let fieldsObj =
+            fields |> List.map (fun (name, HostSchema schema) -> name, schema) |> createObj
+
+        HostSchema(rawOptionalObjectSchemaOf factory fieldsObj)
+
     let arraySchemaOf (HostSchema item) description (HostToolFactory factory) =
         HostSchema(rawArraySchemaOf factory item description)
 
     /// Open key→value map (zod `record`); the description carries the key shape.
     let recordSchemaOf (HostSchema key) (HostSchema value) description (HostToolFactory factory) =
         HostSchema(rawRecordSchemaOf factory key value description)
+
+    /// Optional open key→value map (zod `record`); the description carries the key shape.
+    let optionalRecordSchemaOf (HostSchema key) (HostSchema value) description (HostToolFactory factory) =
+        HostSchema(rawOptionalRecordSchemaOf factory key value description)
 
     let register (HostToolFactory factory) (spec: ToolSpec) =
         let args =

@@ -6,9 +6,9 @@ import { anchors, applyView, clearAll, countTokens, numberMessage, captureView a
 const session = 'view-contract'
 const input = (...texts) => texts.map((text, index) => ({ id: String(index + 1), text }))
 const number = (rows) => { for (const row of rows) if (row.id) numberMessage(session, row.id); return rows }
-const view = (prefixUntil, thenMap) => ({ prefixUntil, thenMap })
+const declaration = (prefixUntil, thenMap) => ({ prefixUntil, thenMap })
 const declare = (prefixUntil, thenMap) => {
-  const result = setView(session, view(prefixUntil, thenMap))
+  const result = setView(session, declaration(prefixUntil, thenMap))
   assert.equal(result.ok, true, 'valid declaration must succeed')
 }
 const render = (rows) => applyView(session, rows).entries.map((entry) => entry.kind === 'kept' ? entry.message.text : entry.summary)
@@ -18,7 +18,7 @@ test('WHAT[context-compression-031] real anchors start at 1, remain stable, and 
   assert.equal(numberMessage(session, 'one'), 1)
   assert.equal(numberMessage(session, 'one'), 1)
   declare(1, { 1: null })
-  assert.deepEqual(takeView(session), view(1, { 1: null }))
+  assert.deepEqual(takeView(session), declaration(1, { 1: null }))
   assert.equal(takeView(session), null)
 })
 
@@ -34,8 +34,8 @@ test('WHAT[context-compression-031] both fields are required and invalid shapes 
     { prefixUntil: 1, thenMap: { 1: 'valid', 2: false } },
     { prefixUntil: 1, thenRemove: {} }, { prefixUntil: 1, thenMap: {}, extra: 'old' },
   ]
-  for (const declaration of bad) {
-    assert.equal(setView(session, declaration).ok, false, JSON.stringify(declaration))
+  for (const invalid of bad) {
+    assert.equal(setView(session, invalid).ok, false, JSON.stringify(invalid))
     assert.equal(takeView(session), null)
     assert.deepEqual(render(rows), ['one', 'two'])
   }
@@ -133,37 +133,86 @@ test('WHAT[context-compression-031] real Host schema admits nullable maps and re
   try {
     const registered = createRegistered({ tool }, 'Engineer', 'en', dir, null, null)
     assert.ok(registered)
-    const schema = argumentSchema(registered, 'view')
-    assert.equal(schema.safeParse(view(1, { 1: null, 2: 'summary' })).success, true)
-    assert.equal(schema.safeParse({ prefixUntil: 1 }).success, false)
-    assert.equal(schema.safeParse({ thenMap: {} }).success, false)
+    // The declaration is two flat top-level arguments; there is no wrapper.
+    const prefixSchema = argumentSchema(registered, 'prefixUntil')
+    const mapSchema = argumentSchema(registered, 'thenMap')
+    assert.ok(prefixSchema, 'prefixUntil is a top-level argument')
+    assert.ok(mapSchema, 'thenMap is a top-level argument')
+    assert.equal(prefixSchema.safeParse(1).success, true)
+    assert.equal(prefixSchema.safeParse('all').success, false)
+    assert.equal(mapSchema.safeParse({ 1: null, 2: 'summary' }).success, true)
+    assert.equal(mapSchema.safeParse({ 1: 7 }).success, false)
+    assert.equal(mapSchema.safeParse([]).success, false)
     numberMessage(session, 'schema-anchor')
     const valid = await execute(registered, {
       program: 'class Js extends JsProgram { async run() { this.write("ran.txt", "yes"); return true; } }',
-      view: view(1, { 1: null }),
+      prefixUntil: 1,
+      thenMap: { 1: null },
     }, { sessionID: session })
     assert.equal(existsSync(join(dir, 'ran.txt')), true, String(valid))
     const refused = await execute(registered, {
       program: 'class Js extends JsProgram { async run() { this.write("must-not-exist.txt", "no"); return true; } }',
-      view: { prefixUntil: 1 },
+      prefixUntil: 1,
     }, { sessionID: session })
     assert.match(String(refused), /VIEW_DECLARATION_INVALID/)
     assert.equal(existsSync(join(dir, 'must-not-exist.txt')), false)
+    const missingPrefix = await execute(registered, {
+      program: 'class Js extends JsProgram { async run() { this.write("must-not-exist-2.txt", "no"); return true; } }',
+      thenMap: { 1: null },
+    }, { sessionID: session })
+    assert.match(String(missingPrefix), /VIEW_DECLARATION_INVALID/)
+    assert.equal(existsSync(join(dir, 'must-not-exist-2.txt')), false)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
 test('WHAT[context-compression-031] generated Host schema accepts null map values and requires both fields', async () => {
   const { z } = await import('zod')
-  const { createRegistered, argumentSchema } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js')
+  const { createRegistered, argumentSchema, execute } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js')
   const tool = definition => definition
   tool.schema = z
   const handle = createRegistered({ tool }, 'Engineer', 'en', process.cwd(), null, null)
-  const schema = argumentSchema(handle, 'view')
-  assert.equal(schema.safeParse({ prefixUntil: 0, thenMap: { 0: null, 1: 'summary' } }).success, true)
-  assert.equal(schema.safeParse({ prefixUntil: 0, thenMap: {} }).success, true)
-  for (const bad of [{ prefixUntil: 0 }, { thenMap: {} }, { prefixUntil: 0, thenMap: { 1: 7 } }, { prefixUntil: 0, thenMap: null }]) {
-    assert.equal(schema.safeParse(bad).success, false, JSON.stringify(bad))
+  const prefixSchema = argumentSchema(handle, 'prefixUntil')
+  const mapSchema = argumentSchema(handle, 'thenMap')
+  assert.equal(prefixSchema.safeParse(0).success, true)
+  assert.equal(prefixSchema.safeParse('0').success, false)
+  assert.equal(mapSchema.safeParse({ 0: null, 1: 'summary' }).success, true)
+  assert.equal(mapSchema.safeParse({}).success, true)
+  for (const bad of [{ 1: 7 }, null, []]) {
+    assert.equal(mapSchema.safeParse(bad).success, false, JSON.stringify(bad))
   }
+  // Both flat fields are required: either half alone is refused.
+  const program = 'class Js extends JsProgram { async run() { return true; } }'
+  const missingMap = await execute(handle, { program, prefixUntil: 0 }, { sessionID: session })
+  assert.match(String(missingMap), /VIEW_DECLARATION_INVALID/)
+  const missingPrefix = await execute(handle, { program, thenMap: {} }, { sessionID: session })
+  assert.match(String(missingPrefix), /VIEW_DECLARATION_INVALID/)
+})
+
+test('WHAT[context-compression-031] a failed program commits no view declaration and keeps the previous one', async () => {
+  const { tool } = await import('@opencode-ai/plugin/tool')
+  const { createRegistered, execute } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js')
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-view-failure-'))
+  const failing = 'class Js extends JsProgram { async run() { throw new Error("boom"); } }'
+  const succeeding = 'class Js extends JsProgram { async run() { return true; } }'
+  try {
+    const registered = createRegistered({ tool }, 'Engineer', 'en', dir, null, null)
+    // A failed call on its own leaves the pending view empty.
+    const alone = 'view-contract-failure-alone'
+    const failed = await execute(registered, { program: failing, prefixUntil: 1, thenMap: { 1: null } }, { sessionID: alone })
+    assert.match(String(failed), /PROGRAM_FAILED/)
+    assert.equal(takeView(alone), null, 'a failed call leaves no presentable declaration')
+    // A failed call does not overwrite the declaration a successful call committed.
+    const kept = 'view-contract-failure-kept'
+    const ok = await execute(registered, { program: succeeding, prefixUntil: 1, thenMap: { 1: null } }, { sessionID: kept })
+    assert.doesNotMatch(String(ok), /PROGRAM_FAILED/)
+    const failedAgain = await execute(registered, { program: failing, prefixUntil: 2, thenMap: { 2: 'later-summary' } }, { sessionID: kept })
+    assert.match(String(failedAgain), /PROGRAM_FAILED/)
+    assert.deepEqual(takeView(kept), declaration(1, { 1: null }), 'the failed call must not overwrite the committed declaration')
+    assert.equal(takeView(kept), null)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
 

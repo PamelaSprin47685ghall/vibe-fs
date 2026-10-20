@@ -20,10 +20,11 @@
 - 050 真实运行 js.call 单进程循环：规格拒绝、前台命令与结构化结局、onExit 退出码派发、check abort 杀死命令、check park 挂起与 unpark 继续、maxDuration 超时。
 - 051 真实运行多进程代数：spawn 后台、waitFor 端口就绪、signal 收割、waitFor 超时与未知后台稳定码、后台崩溃经 backgrounds 观察并 abort。
 - 052 以本地限速 Range 服务器真实驱动 `wget -c`：中断后断点续传、部分文件保留、逐文件 park 汇报、404 退出码 8 分派给 onExit。wget 缺失或网络不可达的环境不适用。
-- 049 同时核对生成工具声明 `program/unpark/abandon/view` 四个参数与 view 自由值描述。
-- 054 真实运行 deliver：显式终值结束程序、哨兵被捕获后程序存活、非 JSON 值以 INVALID_RETURN_VALUE 失败、每个生成面携带 deliver 成员。
+- 049 同时核对生成工具声明 `program/unpark/abandon/prefixUntil/thenMap` 五个参数：三态参数全部可选（一次调用只发其中之一），unpark.value 自由、abandon 只有 handle、prefixUntil 是可选 number、thenMap 是可选 record；旧的 `view` 包装参数已退役。
+- 054 真实运行 deliver：报告映射（无 prefixUntil）结束程序并按 `{ prefixUntil: 0, thenMap: reportMapping }` 解读、空映射合法、映射缺参以 VIEW_DECLARATION_INVALID 拒绝、自己递交 view 包装对象被拒、哨兵被捕获后程序存活、每个生成面携带 deliver 成员。
 - 055 真实运行 vm 并行边界：Promise.all 并行读写、allSettled 兄弟失败不撤销已落盘写、十六路 cat 批处理。
 - 056 委托原语端到端：fork/join/fission 返回数据信封（缺名派生、拒绝信封不抛、无宿主 DELEGATION_UNAVAILABLE）、`dag` 波次推进与依赖记录传递、节点失败 park 后注入 `"skip"` 收尾。
 - 057 真实运行 ls 的 ignore 语义（逐级 `.gitignore`、否定模式、嵌套规则、根 `.git/info/exclude`）与 glob/grep 退役后的组合写法（walk + `cat` + `whereAll`）。
+- 064 真实运行调用面三态互斥：同时给出两个状态以 `INVALID_ARGUMENT` 拒绝且 reason 点名冲突字段，程序不跑、不消费被点名的 handle、不留待下一请求消费的视图声明；单状态调用（program / unpark / abandon）各自照常生效，无状态调用报缺少 program。
 
 2026-10-18 交付验证：`node scripts/build.mjs` 构建成功（169 surfaces、813 模块链接闭合），本包 001-059 全套 278 例 0 败 0 跳 7 todo（045-058 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema、js.call 单进程/多进程循环、wget 断点续传剧本、view 声明捕获、deliver 显式终值、vm 并行边界、委托原语信封与 dag park、ls 的 ignore 语义与 walk/search 组合、file/edit/rewrite 退役后的组合替代，以及 js.call 的交互 send 形态）。直连文件工具已整体退役（GAP-235）：005/007/010/016 的旧实现回归删除，020 改走 js `mv`/`rm` 成员，026 改走 `runObserved`。全量 unit 套件同版本 **865 文件 5113 例 0 败**（GAP-231 ~ GAP-237 CLOSED）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护相关 TODO 随退役收窄；未闭合范围见 GAP-088。

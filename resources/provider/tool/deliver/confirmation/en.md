@@ -1,1 +1,1 @@
-This is the first end-of-work confirmation. Review the review commitments and unconsumed deferred work below; when you are sure no work remains, call deliver again to finish.
+This is the first end-of-work confirmation. It records that you confirmed the end of this work and does not end it. Call deliver again to end the work.

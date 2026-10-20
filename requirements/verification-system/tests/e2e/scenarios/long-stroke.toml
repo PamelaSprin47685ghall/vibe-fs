@@ -30,7 +30,7 @@
 #     ↓
 #   Iteration #4: same authority, fresh IncumbencyOpened → independent re-audit 8×10 → IncumbencyRetired(Accepted) → RebasedCandidateReady → Published
 #     ↓
-#   orch join / deliver(view) / expectSatisfied / oracleLongStroke
+#   orch join / deliver(reportMapping) / expectSatisfied / oracleLongStroke
 #
 # ── §21 adversity checklist (one representative path each) ───────────────────
 #
@@ -315,8 +315,8 @@ tools = ["commission", "join", "deliver"]
   [[turn.step]]
   respond = { type = "text", text = "Long stroke publish completed after conflict resume." }
 
-  # View-only delivery: the Orchestrator states the outcome as assistant prose,
-  # then ends the turn with an explicit deliver(view) so the handoff is settled.
+  # reportMapping delivery: the Orchestrator states the outcome as assistant prose,
+  # then ends the turn with an explicit deliver(reportMapping) so the handoff is settled.
   [[turn.step]]
   respond = { type = "tool-call", tool = "deliver", args = {} }
 
@@ -666,12 +666,12 @@ tools = ["todowrite-for-engineer"]
   respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { return await this.cat('read_probe.txt'); } }" } }
 
   [[turn.step]]
-  # A subagent settles only through an explicit `this.deliver(view)` (repository-programming-054/059):
+  # A subagent settles only through an explicit `this.deliver(reportMapping)` (repository-programming-054/059):
   # the program states its outcome as assistant prose first, then delivers a
-  # `{ prefixUntil, thenMap }` view pointing at the work material. A plain
+  # `reportMapping` pointing at the work material. A plain
   # `return` leaves the delivery cell empty, so the child is not settled as
   # completed and the join stays open.
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "publish_proof.txt is written and verified; delivering the completed proof to the owner.", args = {  program = "class Js extends JsProgram { async run() { this.deliver({ prefixUntil: 0, thenMap: {} }) } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "publish_proof.txt is written and verified; delivering the completed proof to the owner.", args = {  program = "class Js extends JsProgram { async run() { this.deliver({}) } }" } }
 
   # The delivery tool result asks the provider once more; the child closes its turn here.
   [[turn.step]]
@@ -687,9 +687,9 @@ tools = ["todowrite-for-engineer"]
   respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return true; } }" } }
 
   [[turn.step]]
-  # Same view-only rule for the repair child: state the outcome as prose, then
-  # settle with an explicit `this.deliver(view)`.
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "The conflict is resolved; publish_proof.txt now contains exactly the required text, and the repaired file is delivered.", args = {  program = "class Js extends JsProgram { async run() { this.deliver({ prefixUntil: 0, thenMap: {} }) } }" } }
+  # Same reportMapping rule for the repair child: state the outcome as prose, then
+  # settle with an explicit `this.deliver(reportMapping)`.
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "The conflict is resolved; publish_proof.txt now contains exactly the required text, and the repaired file is delivered.", args = {  program = "class Js extends JsProgram { async run() { this.deliver({}) } }" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Conflict file resolved." }

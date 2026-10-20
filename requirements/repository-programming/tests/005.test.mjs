@@ -106,31 +106,24 @@ const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-host-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
+// The fake host schema builders mirror the real ones: every builder can be
+// marked optional, so a registered argument can say "this may be absent" the
+// way the zod-based host schema does.
+const schemaOf = (state) => ({
+  nullable: () => schemaOf({ ...state, nullable: true }),
+  describe: (text) => schemaOf({ ...state, description: text }),
+  optional: () => schemaOf({ ...state, optional: true }),
+  ...state,
+})
 const toolModule = () => {
   const tool = (definition) => definition
   tool.schema = {
-    string: () => ({
-      type: 'string',
-      nullable: () => ({ type: 'string', nullable: true }),
-      describe: (description) => ({ type: 'string', description }),
-    }),
-    any: () => ({
-      type: 'any',
-      optional: () => ({ type: 'any', optional: true }),
-    }),
-    number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
-    array: (item) => ({
-      type: 'array',
-      item,
-      describe: (description) => ({ type: 'array', item, description }),
-    }),
-    record: (key, value) => ({
-      type: 'record',
-      key,
-      value,
-      describe: (description) => ({ type: 'record', key, value, description }),
-    }),
-    object: (shape) => ({ type: 'object', shape }),
+    string: () => schemaOf({ type: 'string' }),
+    any: () => schemaOf({ type: 'any' }),
+    number: () => schemaOf({ type: 'number' }),
+    array: (item) => schemaOf({ type: 'array', item }),
+    record: (key, value) => schemaOf({ type: 'record', key, value }),
+    object: (shape) => schemaOf({ type: 'object', shape }),
   }
   return { tool }
 }

@@ -10,6 +10,9 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
 module HostForkRunLifecycle =
+    /// The delivered view of one terminal, resolved on demand.
+    type ViewResolution = unit -> Task<string option>
+
     [<RequireQualifiedAccess>]
     type AgentOwnerDispatchOutcome =
         | Accepted of physicalUserMessageId: PhysicalUserMessageId * authorityRoot: AuthorityRootUserMessageId
@@ -70,7 +73,7 @@ module HostForkRunLifecycle =
         sessions: ISessionHostPort ->
         run: PendingHostRun ->
         outcome: TerminalOutcome ->
-        view: string option ->
+        view: ViewResolution option ->
             Task
 
     val installRun:

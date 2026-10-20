@@ -96,7 +96,7 @@ test('WHAT[repository-programming-030] another session parking does not block th
     assert.equal(deliveredValue('sess-030-a'), null, 'a blocked deliver never populates the session cell')
 
     // ...while session B's deliver goes through untouched by A's park.
-    const other = await runProgram(dir, `    await this.deliver({ prefixUntil: 0, thenMap: {} });`, 'sess-030-b')
+    const other = await runProgram(dir, `    await this.deliver({});`, 'sess-030-b')
     assert.equal(caseName(other), 'Succeeded')
   } finally {
     clearParkedSites()

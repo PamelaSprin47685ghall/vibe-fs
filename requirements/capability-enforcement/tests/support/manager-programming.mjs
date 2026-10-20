@@ -7,7 +7,7 @@ import { rolePredicate, capabilityToolNames } from '../../../../dist/OpenCode/To
 import { generateRole, permissionLabels } from '../../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 import { allRoleLabels } from '../../../../dist/Foundation/RolesSurface.js'
 import * as runtime from '../../../../dist/Repository/Programming/Js/RuntimeSurface.js'
-import { run, runObserved, caseName, failureCode, rewritten, created, render } from '../../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import { run, runObserved, execute, caseName, failureCode, rewritten, created, render } from '../../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 // 运行时绑定由 owner 面构造：生成器给出角色的权限 label，RuntimeSurface 按 label
 // 组装 api 成员，测试从不手写 capability 集合或 Fable Set。
@@ -27,7 +27,7 @@ test('WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generat
   }
 })
 
-// ── J01-J12 Manager 只读工具的真实 API 层与边界测试套件 ──────────────────────
+// ── J01-J13 Manager 只读工具的真实 API 层与边界测试套件 ──────────────────────
 
 test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only', () => {
   const surface = generateRole('manager', 'en')
@@ -39,13 +39,14 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
     assert.equal(names.includes(name), false)
   }
   assert.ok(names.includes('whereAll'))
+  assert.ok(names.includes('resume'), 'Manager must project the resume delegation member')
   assert.match(surface.description, /this\.reviewOnly/)
   for (const example of surface.examples) assert.doesNotMatch(example, /this\.(cat|stat|ls|rg)\(/)
 
   assert.deepEqual(
     surface.capabilities.sort(),
     ['Advisor', 'Fork', 'Glob', 'Grep', 'Horizon', 'Join', 'Read', 'Resume'],
-    'Manager capabilities must be {Read, Glob, Grep} plus the delegation primitives {Fork, Join, Horizon, Advisor}',
+    'Manager capabilities must be {Read, Glob, Grep} plus the delegation primitives {Fork, Resume, Join, Horizon, Advisor}',
   )
 
   // 四层同构第 1 层：生成的 JsProgram 基类中不声明任何写方法
@@ -55,12 +56,19 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   assert.equal(surface.baseClassSource.includes('rewrite('), false, 'BaseClass must not declare rewrite')
   assert.equal(surface.baseClassSource.includes('glob('), false, 'BaseClass must not declare retired glob')
   assert.equal(surface.baseClassSource.includes('grep('), false, 'BaseClass must not declare retired grep')
-  assert.equal(surface.baseClassSource.includes('fork('), true, 'BaseClass must declare fork')
-  assert.equal(surface.baseClassSource.includes('dag('), true, 'BaseClass must declare dag')
-  assert.equal(surface.baseClassSource.includes('join('), true, 'BaseClass must declare join')
+  // 委派成员一律带 reportMapping（Record<string, null|string>，无 prefixUntil）；
+  // join/horizon 是拉取动作，不带 reportMapping。
+  assert.equal(surface.baseClassSource.includes('this._api.fork(spec, reportMapping)'), true, 'BaseClass fork must forward the report mapping')
+  assert.equal(surface.baseClassSource.includes('this._api.resume(spec, reportMapping)'), true, 'BaseClass resume must forward the report mapping')
+  assert.equal(surface.baseClassSource.includes('this._api.advisor(intent, reportMapping)'), true, 'BaseClass advisor must forward the report mapping')
+  assert.equal(surface.baseClassSource.includes('async dag(spec, reportMapping)'), true, 'BaseClass must declare dag with the report mapping')
+  assert.equal(surface.baseClassSource.includes('this._api.join()'), true, 'BaseClass must declare join without a report mapping')
 
   // 四层同构第 2 层：描述文档不包含写入/修改暗示
   assert.doesNotMatch(surface.description, /edit\(path|rewrite\(path|write\(path,\s*content\)/, 'Description must not advertise write methods')
+  assert.equal(surface.description.includes('fork(payload, reportMapping)'), true, 'Description must show fork(payload, reportMapping)')
+  assert.equal(surface.description.includes('resume(payload, reportMapping)'), true, 'Description must show resume(payload, reportMapping)')
+  assert.equal(surface.description.includes('advisor(intent, reportMapping)'), true, 'Description must show advisor(intent, reportMapping)')
 
   // 四层同构第 3 层：示例代码（ultraExample manager 分支）纯只读，无写入调用
   assert.ok(surface.examples.length > 0, 'Manager surface must include ultraExample')
@@ -82,6 +90,7 @@ test('WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mu
     assert.equal(typeof binding.whereAll, 'function', 'whereAll must be constructed')
     assert.equal(typeof binding.where, 'function', 'where must be constructed')
     assert.equal(typeof binding.fork, 'function', 'fork must be constructed')
+    assert.equal(typeof binding.resume, 'function', 'resume must be constructed')
     assert.equal(typeof binding.join, 'function', 'join must be constructed')
 
     // 已退役的 file/read/glob/grep/edit/rewrite 与未授予的写/执行 API 在 api 中直接不存在（undefined）
@@ -448,6 +457,81 @@ test('WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_amb
     assert.match(rendered, /globalProcess\s*=\s*"undefined"/, 'globalThis.process must be undefined in sandbox')
     assert.match(rendered, /constructorEscape\s*=\s*"(blocked|undefined)"/, 'constructor escape must not yield process')
   } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// 委派成员全部走编程面 this.xxx，每个都必须携带 reportMapping
+// （形态 Record<string, null|string>，无 prefixUntil）。缺省或非法映射
+// 走数据信封拒绝（VIEW_DECLARATION_INVALID），程序继续运行；join/horizon
+// 是拉取动作，不带 reportMapping。
+test('WHAT[capability-enforcement-025] J13_delegation_members_require_a_report_mapping', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-j13-'))
+  const sessionId = `wxs-j13-${Math.random().toString(36).slice(2, 8)}`
+  const observed = []
+  try {
+    runtime.installDelegationHost(
+      sessionId,
+      async (name, payload, reportMapping) => {
+        observed.push({ member: name, payload, reportMapping })
+        return { ok: true, name: 'child-1', agentId: 'agent-1', outcome: 'created' }
+      },
+      async () => {
+        observed.push({ member: 'join' })
+        return { ok: true, records: [], byName: {} }
+      },
+      async () => {
+        observed.push({ member: 'fission' })
+        return { ok: true, groupId: 'group-1' }
+      },
+      async () => {
+        observed.push({ member: 'horizon' })
+        return { ok: true, agents: [] }
+      },
+      async (intent, reportMapping) => {
+        observed.push({ member: 'advisor', intent, reportMapping })
+        return { ok: true, advice: 'host-advice' }
+      },
+    )
+
+    const program = `class Js extends JsProgram {
+      async run() {
+        const missing = await this.fork('index the parser module');
+        const illegal = await this.fork('index the parser module', { 'not-an-anchor': null });
+        const placed = await this.fork('index the parser module', { 1: null });
+        const resumed = await this.resume('continue the audit', { 2: 'audit summary' });
+        const advised = await this.advisor('review this delta', { 1: null });
+        const joined = await this.join();
+        return { missing, illegal, placed, resumed, advised, joined, continued: true };
+      }
+    }`
+
+    const outcome = await execute(dir, 'manager', 'en', sessionId, { program }, 3000, Date.now() + 60_000, 1 << 20, null)
+    assert.equal(caseName(outcome), 'Succeeded', 'a refused report mapping is data, not a failed program')
+
+    const doc = render(outcome)
+    assert.match(doc, /code = "VIEW_DECLARATION_INVALID"/, 'a missing report mapping is refused')
+    assert.match(doc, /continued = true/, 'the program keeps running after the refusal')
+
+    // 缺省/非法映射不抵达委派宿主；带映射的调用按 (name, payload, reportMapping) 三参抵达。
+    assert.deepEqual(
+      observed.map(entry => entry.member),
+      ['fork', 'resume', 'advisor', 'join'],
+      'only the calls that carried a report mapping reach the delegation host',
+    )
+    assert.equal(observed[0].payload.charge, 'index the parser module')
+    // The program runs in its own `node:vm` realm, so the mapping arrives with
+    // that realm's Object.prototype; compare the contents, not the prototype.
+    assert.deepEqual({ ...observed[0].reportMapping }, { 1: null }, 'the report mapping crosses as the mapping itself')
+    assert.equal('prefixUntil' in observed[0].reportMapping, false, 'the report mapping carries no prefixUntil')
+    assert.equal(observed[1].member, 'resume', 'resume travels the same delegation entry')
+    assert.deepEqual({ ...observed[1].reportMapping }, { 2: 'audit summary' })
+    assert.equal(observed[2].intent, 'review this delta', 'advisor travels the same delegation entry')
+    assert.deepEqual({ ...observed[2].reportMapping }, { 1: null })
+    assert.equal(observed[3].member, 'join', 'join is a pull action and carries no report mapping')
+    assert.equal('reportMapping' in observed[3], false)
+  } finally {
+    runtime.clearDelegationHost(sessionId)
     rmSync(dir, { recursive: true, force: true })
   }
 })

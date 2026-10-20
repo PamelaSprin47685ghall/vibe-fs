@@ -157,6 +157,41 @@ module ForkTool =
     let private namedProse language path byname =
         ProviderProse.render language path (Map [ "name", byname ])
 
+    /// A refusal prose path and the stable kebab code it stands for. The prose
+    /// paths render a refusal; the structured fork and resume paths answer
+    /// with the code, so both share this mapping.
+    let private refusalCode (path: string) =
+        if path = Path.Fork.NameRequired then
+            "name-required"
+        elif path = Path.Fork.ChargeRequired then
+            "charge-required"
+        elif path = Path.Fork.AttachSelf then
+            "attach-self"
+        elif path = Path.Fork.AttachUnknown then
+            "attach-unknown"
+        elif path = Path.Fork.PersonUnknown then
+            "person-unknown"
+        elif path = Path.Fork.WarmStartUnavailable then
+            "warm-start-unavailable"
+        elif path = Path.Fork.ChargeContextUnavailable then
+            "context-unavailable"
+        elif path = Path.Fork.CallingConflict then
+            "calling-conflict"
+        elif path = Path.Fork.UnknownCalling then
+            "unknown-calling"
+        elif path = Path.Fork.NameAlreadyBelongs then
+            "name-already-belongs"
+        elif path = Path.Fork.ChargePlacementUncertain then
+            "dispatch-uncertain"
+        elif path = Path.Resume.CallingNotAllowed then
+            "calling-not-allowed"
+        elif path = Path.Resume.AssessmentPendingForDevOps then
+            "assessment-pending-for-devops"
+        elif path = Path.Resume.DispatchClosed then
+            "dispatch-closed"
+        else
+            "placement-failed"
+
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
         Wanxiangshu.Execution.Delegation.SyncDelegate.HostForkProse.forkInstructions sessionId
 
@@ -986,7 +1021,7 @@ module ForkTool =
             return
                 match placement with
                 | Error _ -> Error "placement-failed"
-                | Ok(ForkResult.DispatchUncertain _) -> Error "dispatch-uncertain"
+                | Ok(ForkResult.DispatchUncertain _) -> Error (refusalCode Path.Fork.ChargePlacementUncertain)
                 | Ok(ForkResult.NotFound _) -> Error "placement-failed"
                 | Ok(ForkResult.Created agentId) ->
                     Ok
@@ -1012,7 +1047,7 @@ module ForkTool =
         : Task<Result<ForkReceipt, string>> =
         task {
             match! resolveAttachment scope handles request with
-            | Error _ -> return Error "placement-failed"
+            | Error path -> return Error (refusalCode path)
             | Ok attachment ->
                 return! commitNewManagerForkReceipt scope runtime context request language managed role attachment
         }
@@ -1029,7 +1064,7 @@ module ForkTool =
         let role = managed.Role
 
         if hasKeywords request && not (warmStartAllowed role) then
-            Task.FromResult(Error "warm-start-unavailable")
+            Task.FromResult(Error (refusalCode Path.Fork.WarmStartUnavailable))
         else
             finishNewManagerForkReceipt scope runtime context request language handles managed role
 
@@ -1085,7 +1120,7 @@ module ForkTool =
         language
         : Task<Result<ForkReceipt, string>> =
         match scope.RuntimeFor context with
-        | Error _ -> Task.FromResult(Error "context-unavailable")
+        | Error _ -> Task.FromResult(Error (refusalCode Path.Fork.ChargeContextUnavailable))
         | Ok runtime ->
             let handles = agentHandles scope context
             createManagerForkIfNameFree scope runtime context request language handles
@@ -1098,11 +1133,11 @@ module ForkTool =
 
     let private validateManagerRequestSyntax (request: Request) =
         if String.IsNullOrWhiteSpace request.Name then
-            Error "name-required"
+            Error(refusalCode Path.Fork.NameRequired)
         elif String.IsNullOrWhiteSpace request.Charge then
-            Error "charge-required"
+            Error(refusalCode Path.Fork.ChargeRequired)
         elif isSelfAttachment request then
-            Error "placement-failed"
+            Error(refusalCode Path.Fork.AttachSelf)
         else
             Ok()
 
@@ -1122,7 +1157,7 @@ module ForkTool =
 
             return!
                 match refusal with
-                | Some _ -> Error "placement-failed"
+                | Some path -> Error(refusalCode path)
                 | None -> Ok()
         }
 
@@ -1235,34 +1270,8 @@ module ForkTool =
         match result with
         | ForkResult.Created created -> Ok { Name = request.Name.Trim(); AgentId = created; Outcome = "created" }
         | ForkResult.Nudged nudged -> Ok { Name = request.Name.Trim(); AgentId = nudged; Outcome = "nudged" }
-        | ForkResult.DispatchUncertain _ -> Error "dispatch-uncertain"
+        | ForkResult.DispatchUncertain _ -> Error (refusalCode Path.Fork.ChargePlacementUncertain)
         | ForkResult.NotFound _ -> Error "placement-failed"
-
-    /// The prose resume path answers with a rendered refusal; the structured
-    /// path answers with the stable kebab code that refusal stands for.
-    let private resumeRefusalCode (path: string) =
-        if path = Path.Fork.NameRequired then
-            "name-required"
-        elif path = Path.Fork.ChargeRequired then
-            "charge-required"
-        elif path = Path.Fork.AttachSelf then
-            "attach-self"
-        elif path = Path.Fork.AttachUnknown then
-            "attach-unknown"
-        elif path = Path.Fork.PersonUnknown then
-            "person-unknown"
-        elif path = Path.Fork.WarmStartUnavailable then
-            "warm-start-unavailable"
-        elif path = Path.Fork.ChargeContextUnavailable then
-            "context-unavailable"
-        elif path = Path.Resume.CallingNotAllowed then
-            "calling-not-allowed"
-        elif path = Path.Resume.AssessmentPendingForDevOps then
-            "assessment-pending-for-devops"
-        elif path = Path.Resume.DispatchClosed then
-            "dispatch-closed"
-        else
-            "placement-failed"
 
     let private resumeBusyGuidanceReceipt
         (scope: ToolRuntimeScope)
@@ -1276,7 +1285,7 @@ module ForkTool =
             let! attachment = resolveAttachment scope handles request
 
             match attachment with
-            | Error path -> return Error (resumeRefusalCode path)
+            | Error path -> return Error (refusalCode path)
             | Ok attachment ->
                 let! rendered =
                     prepareForkPromptWithRecord scope runtime profile.CanonicalRole request attachment
@@ -1313,7 +1322,7 @@ module ForkTool =
             let! attachment = resolveAttachment scope handles request
 
             match attachment with
-            | Error path -> return Error (resumeRefusalCode path)
+            | Error path -> return Error (refusalCode path)
             | Ok attachment ->
                 let! placement =
                     taskResult {
@@ -1340,7 +1349,7 @@ module ForkTool =
         agentId
         : Task<Result<ForkReceipt, string>> =
         if hasKeywords request && not (warmStartAllowed role) then
-            Task.FromResult(Error (resumeRefusalCode Path.Fork.WarmStartUnavailable))
+            Task.FromResult(Error (refusalCode Path.Fork.WarmStartUnavailable))
         else
             resumeIdleAttachedReceipt scope runtime context request handles role agentId
 
@@ -1355,10 +1364,10 @@ module ForkTool =
             handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
 
         match existingByname with
-        | None -> Task.FromResult(Error (resumeRefusalCode Path.Fork.PersonUnknown))
+        | None -> Task.FromResult(Error (refusalCode Path.Fork.PersonUnknown))
         | Some handle ->
             match HandleId.tryAgent handle.Handle with
-            | None -> Task.FromResult(Error (resumeRefusalCode Path.Fork.PersonUnknown))
+            | None -> Task.FromResult(Error (refusalCode Path.Fork.PersonUnknown))
             | Some handleId ->
                 let agentId = AgentHandleId.value handleId
 
@@ -1385,12 +1394,12 @@ module ForkTool =
             let! refusal = boundDevOpsDispatchRefusal scope parentSessionId isDevOps
 
             match refusal with
-            | Some path -> return Error (resumeRefusalCode path)
+            | Some path -> return Error (refusalCode path)
             | None ->
                 do! bindWorkDevOpsIfNeeded scope parentSessionId isDevOps
 
                 match scope.RuntimeFor context with
-                | Error _ -> return Error (resumeRefusalCode Path.Fork.ChargeContextUnavailable)
+                | Error _ -> return Error (refusalCode Path.Fork.ChargeContextUnavailable)
                 | Ok runtime ->
                     let handles = agentHandles scope context
                     return! resumeReceiptExistingPerson scope runtime context request handles
@@ -1403,13 +1412,13 @@ module ForkTool =
         : Task<Result<ForkReceipt, string>> =
         task {
             if String.IsNullOrWhiteSpace request.Name then
-                return Error (resumeRefusalCode Path.Fork.NameRequired)
+                return Error (refusalCode Path.Fork.NameRequired)
             elif String.IsNullOrWhiteSpace request.Charge then
-                return Error (resumeRefusalCode Path.Fork.ChargeRequired)
+                return Error (refusalCode Path.Fork.ChargeRequired)
             elif isSelfAttachment request then
-                return Error (resumeRefusalCode Path.Fork.AttachSelf)
+                return Error (refusalCode Path.Fork.AttachSelf)
             elif not (String.IsNullOrWhiteSpace request.Calling) then
-                return Error (resumeRefusalCode Path.Resume.CallingNotAllowed)
+                return Error (refusalCode Path.Resume.CallingNotAllowed)
             else
                 return! executeManagerResumeReceiptAfterGuards scope request context
         }

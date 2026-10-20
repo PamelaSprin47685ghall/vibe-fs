@@ -37,6 +37,20 @@ type TaskDeliveryWitness =
 module TaskDelivery =
     val key: fence: TaskDeliveryFence -> SessionId * ProviderRunIdentity * ToolCallId
     val validate: sha256: (string -> string) -> witness: TaskDeliveryWitness -> Result<unit, string>
+    /// 精确围栏读取：按 (SessionId, ProviderRun, ToolCallId) 精确命中，
+    /// 未命中时按 (SessionId, ProviderRun) 取全部见证并按完整围栏筛选。
+    val tryFindByFence:
+        fence: TaskDeliveryFence ->
+        witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness> -> TaskDeliveryWitness option
+    /// 围栏子集读取：调用方只掌握部分围栏字段时使用；材料不一致时拒绝。
+    val tryFindByFenceFields:
+        sessionId: SessionId ->
+        providerRun: ProviderRunIdentity ->
+        toolCallId: ToolCallId option ->
+        authorityRoot: AuthorityRootUserMessageId option ->
+        physicalUserMessageId: PhysicalUserMessageId option ->
+        witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness> -> TaskDeliveryWitness option
+    /// 粗粒度读取：同一 (SessionId, ProviderRun) 下多条见证不再整体丢弃证据。
     val tryFind:
         sessionId: SessionId -> providerRun: ProviderRunIdentity ->
         witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness> -> TaskDeliveryWitness option

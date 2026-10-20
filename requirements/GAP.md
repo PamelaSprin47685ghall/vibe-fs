@@ -1,6 +1,6 @@
 # GAP 台账
 
-> 2026-10-20 view 契约更新：当前统一形状为 `{ prefixUntil, thenMap }`，两字段必填。历史条目（如 GAP-237）中记载的 `extra` 是旧文档漂移，不是当前参数；当前语义以 `context-compression/WHAT.md` [031] 和 `repository-programming/WHAT.md` [053] 为准。历史验证数据仍只证明当时的状态。
+> 2026-10-20 view 契约更新：view 契约分两层，两层形状不同、不得混用。顶层上下文整理参数是扁平的两个顶层参数 `prefixUntil: number` 与 `thenMap: record<number, string|null>`；两者都不给则不设声明；旧的 `view` 包装对象已退役，残留 `view` 直接以 `VIEW_DECLARATION_INVALID` 拒绝。成员层报告材料／交付载荷是 `reportMapping` = `Record<string, null|string>`（无 `prefixUntil`），语义等价 prefixUntil=0 的声明；缺失或形状非法一律以 `VIEW_DECLARATION_INVALID` 拒绝（`{ ok: false; code: "VIEW_DECLARATION_INVALID", reason }`）；空映射 `{}` 合法。历史条目（如 GAP-237）中记载的 `extra` 是旧文档漂移，不是当前参数；当前语义以 `context-compression/WHAT.md` [031] 和 `repository-programming/WHAT.md` [053] 为准。历史验证数据仍只证明当时的状态。
 
 > 全仓已知 proof gap 的唯一单轨记录台账（按 [requirement-system-018] 规范和测试的印证：覆盖缺口由
 > requirements/GAP.md 记录）。GAP = 某条 WHAT 命题尚无独立可执行 oracle（机器可红

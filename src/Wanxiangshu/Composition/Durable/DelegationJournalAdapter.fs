@@ -32,8 +32,35 @@ module DelegationJournalAdapter =
           Sha256 = HostDigest.sha256Hex }
 
 module TaskDeliveryJournal =
-    let tryFind (journal: AgentJournal) sessionId providerRun =
-        TaskDelivery.tryFind sessionId providerRun (AgentJournal.snapshot journal).AgentProjections.Deliveries
+    /// 精确围栏读取：调用方持有完整围栏时使用，围栏其余字段不一致即拒绝。
+    let tryFindByFence (journal: AgentJournal) (fence: TaskDeliveryFence) =
+        TaskDelivery.tryFindByFence fence (AgentJournal.snapshot journal).AgentProjections.Deliveries
+
+    /// 围栏子集读取：调用方只掌握部分围栏字段时使用；
+    /// 同 (SessionId, ProviderRun) 下多条见证不再整体丢弃证据，材料不一致时仍拒绝。
+    let tryFindByFenceFields
+        (journal: AgentJournal)
+        (sessionId: Wanxiangshu.Foundation.Identity.SessionId)
+        (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
+        (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId option)
+        (authorityRoot: Wanxiangshu.Foundation.Identity.AuthorityRootUserMessageId option)
+        (physicalUserMessageId: Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option)
+        =
+        TaskDelivery.tryFindByFenceFields
+            sessionId
+            providerRun
+            toolCallId
+            authorityRoot
+            physicalUserMessageId
+            (AgentJournal.snapshot journal).AgentProjections.Deliveries
+
+    /// 粗粒度读取：只知道 (SessionId, ProviderRun) 时委托围栏子集读取。
+    let tryFind
+        (journal: AgentJournal)
+        (sessionId: Wanxiangshu.Foundation.Identity.SessionId)
+        (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
+        =
+        tryFindByFenceFields journal sessionId providerRun None None None
 
     let commit (journal: AgentJournal) (witness: TaskDeliveryWitness) =
         task {
