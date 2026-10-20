@@ -44,13 +44,16 @@ const isTitleRequest = (body) => {
   )
 }
 
-const jsViewCall = (id, view) =>
+// The current call surface takes the context-compression declaration as two
+// flat top-level arguments: `prefixUntil` and `thenMap`. The retired `view`
+// wrapper is refused with VIEW_DECLARATION_INVALID.
+const jsViewCall = (id, declaration) =>
   buildToolCallChunks(
     id,
     'todowrite-for-engineer',
     JSON.stringify({
       program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-      ...(view === undefined ? {} : { view }),
+      ...(declaration === undefined ? {} : declaration),
     }),
     1,
   )

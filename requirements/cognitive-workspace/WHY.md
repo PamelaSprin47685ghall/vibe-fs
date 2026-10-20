@@ -6,6 +6,6 @@
 
 - `assume` 只负责“已笃定”的认知承诺点；
 - 编程面 `todowrite-for-<role>` 负责当前待办，插件不改写工具定义与参数；
-- context-compression 只消费携带非空 `view` 声明的成功 checkpoint 与 durable coverage。
+- context-compression 只消费携带有效上下文整理声明（扁平顶层参数 `prefixUntil` + `thenMap`）的成功 checkpoint 与 durable coverage。
 
 旧 Cognition journal 仍须可读，是为了诚实恢复历史，不是为了保留产品能力。兼容读取必须停在 no-op tombstone，不能借迁移之名重新生成 canvas projection。

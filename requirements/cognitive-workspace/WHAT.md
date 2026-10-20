@@ -24,7 +24,7 @@
 
 ## [006] assume 不再形成压缩阶段
 
-`assume` 成功不产生 compression checkpoint。上下文压缩的 checkpoint 只来自成功声明非空 `view` 的编程面调用（`todowrite-for-<role>`），语义遵循 context-compression-028 与 obligation-ledger-001。
+`assume` 成功不产生 compression checkpoint。上下文压缩的 checkpoint 只来自成功声明有效上下文整理声明（扁平顶层参数 `prefixUntil` + `thenMap`）的编程面调用（`todowrite-for-<role>`），语义遵循 context-compression-028 与 obligation-ledger-001。
 
 ## [007] 待办写入不通过 canvas 兼容桥
 

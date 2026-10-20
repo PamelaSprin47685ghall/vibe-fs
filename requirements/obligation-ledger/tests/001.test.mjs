@@ -22,7 +22,7 @@ test('WHAT[obligation-ledger-001] native todowrite is retired from StaticTools, 
   assert.equal('todowrite' in (toolMap.tools ?? {}), false, 'ablation tool-map must not contain native todowrite')
 })
 
-integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a non-empty view object commit ViewCheckpointCommitted', async () => {
+integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a valid flat declaration commit ViewCheckpointCommitted', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'obligation-view-gate'
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
@@ -37,18 +37,19 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a n
             type: 'tool',
             tool: 'todowrite',
             callID: 'retired-native-call',
-            state: { status: 'completed', input: { todos: [{ content: 'x', status: 'pending' }], view: { prefixUntil: 1, thenMap: {} } } },
+            state: { status: 'completed', input: { todos: [{ content: 'x', status: 'pending' }], prefixUntil: 1, thenMap: {} } },
           },
         },
       },
     })
 
-    // 2. todowrite-for-engineer without view, with empty object view, or array view commits nothing.
+    // 2. todowrite-for-engineer without a declaration, or with an incomplete or
+    // invalid flat declaration, commits nothing.
     for (const [callID, input] of [
-      ['call-no-view', { program: 'class Js extends JsProgram { async run() { return 1; } }' }],
-      ['call-empty-view', { program: 'class Js extends JsProgram { async run() { return 1; } }', view: {} }],
-      ['call-null-view', { program: 'class Js extends JsProgram { async run() { return 1; } }', view: null }],
-      ['call-array-view', { program: 'class Js extends JsProgram { async run() { return 1; } }', view: [1] }],
+      ['call-no-declaration', { program: 'class Js extends JsProgram { async run() { return 1; } }' }],
+      ['call-prefix-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixUntil: 1 }],
+      ['call-map-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', thenMap: {} }],
+      ['call-invalid-map', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixUntil: 1, thenMap: { 'not-an-anchor': null } }],
     ]) {
       await hooks.event({
         event: {
@@ -69,10 +70,10 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a n
     assert.deepEqual(
       journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
       [],
-      'neither retired todowrite nor view-less/empty-view programming calls commit a checkpoint',
+      'neither retired todowrite nor declaration-less/invalid programming calls commit a checkpoint',
     )
 
-    // 3. todowrite-for-engineer with a non-empty view object commits the checkpoint.
+    // 3. todowrite-for-engineer with a valid flat declaration commits the checkpoint.
     await hooks.event({
       event: {
         type: 'message.part.updated',
@@ -86,7 +87,8 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a n
               status: 'completed',
               input: {
                 program: 'class Js extends JsProgram { async run() { return 1; } }',
-                view: { prefixUntil: 2, thenMap: { 4: 'keep anchor 2' } },
+                prefixUntil: 2,
+                thenMap: { 4: 'keep anchor 2' },
               },
             },
           },
@@ -97,7 +99,7 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a n
     assert.deepEqual(
       journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
       [{ sessionId: sessionID, checkpoints: [{ callId: 'call-valid-view' }] }],
-      'a completed todowrite-for-* call with a non-empty view commits ViewCheckpointCommitted',
+      'a completed todowrite-for-* call with a valid flat declaration commits ViewCheckpointCommitted',
     )
   })
 })

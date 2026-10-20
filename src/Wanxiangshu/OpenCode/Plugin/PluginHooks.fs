@@ -77,8 +77,11 @@ module PluginHooks =
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
-    [<Emit("$0 !== null && $0 !== undefined && typeof $0 === 'object' && !Array.isArray($0) && Object.keys($0).length > 0")>]
-    let private isNonEmptyObject (value: obj) : bool = jsNative
+    [<Emit("$0 === undefined")>]
+    let private isUndefined (value: obj) : bool = jsNative
+
+    [<Emit("$0 !== null && $0 !== undefined")>]
+    let private isPresent (value: obj) : bool = jsNative
 
     /// obligation-ledger-005 / context-compression-028: the view checkpoint
     /// admission law (one append per exact completed call, in-flight duplicates
@@ -405,7 +408,49 @@ module PluginHooks =
                 let part = if isNull properties then null else properties?part
                 let state = if isNull part then null else part?state
                 let input = if isNull state then null else state?input
-                let view = if isNull input then null else input?view
+
+                // The top-level context-compression declaration is two flat
+                // arguments: `prefixUntil` and `thenMap`. The retired `view`
+                // wrapper is refused by the call surface, so it is never read
+                // here. A call carries a declaration iff it gives either key;
+                // the declaration object is assembled exactly as the call
+                // surface assembles it, so the same validator decides.
+                let declaration =
+                    if isNull input then
+                        None
+                    else
+                        let prefixUntil = input?prefixUntil
+                        let thenMap = input?thenMap
+
+                        if isUndefined prefixUntil && isUndefined thenMap then
+                            None
+                        else
+                            Some(createObj [ "prefixUntil" ==> prefixUntil; "thenMap" ==> thenMap ])
+
+                // A declaration counts only when it is valid: an invalid one
+                // never committed a view, so it must never commit a checkpoint.
+                let declaredView =
+                    // The call surface refuses a call that carries more than one
+                    // of program / unpark / abandon; such a call never ran, so
+                    // it commits no checkpoint either.
+                    let conflictingState =
+                        if isNull input then
+                            false
+                        else
+                            [ if isPresent (input?program) then 1
+                              if isPresent (input?unpark) then 1
+                              if isPresent (input?abandon) then 1 ]
+                            |> List.length > 1
+
+                    if conflictingState then
+                        false
+                    else
+                        match declaration with
+                        | None -> false
+                        | Some raw ->
+                            match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse raw with
+                            | Ok _ -> true
+                            | Error _ -> false
 
                 let sessionId =
                     HostEventEnvelope.trySessionId raw
@@ -423,7 +468,7 @@ module PluginHooks =
                 | "message.part.updated", Some sessionId, Some tool, Some callId, Some status when
                     tool.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
                     && (status = "completed" || status = "error")
-                    && isNonEmptyObject view
+                    && declaredView
                     ->
                     Some(SessionId.value sessionId, ToolCallId.create callId, status)
                 | _ -> None

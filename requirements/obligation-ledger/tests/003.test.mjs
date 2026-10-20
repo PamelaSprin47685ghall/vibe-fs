@@ -41,7 +41,8 @@ integrationTest(
                 status: 'completed',
                 input: {
                   program: 'class Js extends JsProgram { async run() { return {}; } }',
-                  view: { prefixUntil: 1, thenMap: { 2: 'prose that must not be persisted' } },
+                  prefixUntil: 1,
+                  thenMap: { 2: 'prose that must not be persisted' },
                 },
               },
             },

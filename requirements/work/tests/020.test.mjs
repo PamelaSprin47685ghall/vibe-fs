@@ -208,7 +208,8 @@ test('WHAT[work-020] a relaying tenure declaring view: { prefixUntil, thenMap } 
             status: 'completed',
             input: {
               program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-              view: { prefixUntil: 1, thenMap: { 1: handoverProse } },
+              prefixUntil: 1,
+              thenMap: { 1: handoverProse },
             },
             output: 'ok',
           },
@@ -219,7 +220,8 @@ test('WHAT[work-020] a relaying tenure declaring view: { prefixUntil, thenMap } 
     await hooks.tool['todowrite-for-plan'].execute(
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        view: { prefixUntil: 1, thenMap: { 1: handoverProse } },
+        prefixUntil: 1,
+        thenMap: { 1: handoverProse },
       },
       { sessionID, agent: 'plan', callID: 'call-plan-view-1', messageID: 'run-plan-view-1', providerRunID: 'run-plan-view-1' },
     )
@@ -298,5 +300,72 @@ test('WHAT[work-020] a relaying tenure declaring view: { prefixUntil, thenMap } 
     assert.ok(wireIds.includes('run-plan-deliver-1'), 'history outside the view boundary is retained by the relay')
     const serialized = JSON.stringify(successorOut.messages)
     assert.ok(serialized.includes(handoverProse), 'successor request must carry the predecessor declared thenMap summary')
+  })
+})
+
+test('WHAT[work-020] a flat prefixUntil/thenMap declaration commits the durable ViewCheckpointCommitted, and a call without or with an invalid declaration commits none', async () => {
+  clearAll()
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses-plan-view-flat-020'
+    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root-flat')
+
+    const program = 'class Js extends JsProgram { async run() { return { ok: true }; } }'
+
+    const terminalEvent = (callID, input) =>
+      hooks.event({
+        event: {
+          type: 'message.part.updated',
+          properties: {
+            sessionID,
+            part: {
+              id: `part-${callID}`,
+              type: 'tool',
+              tool: 'todowrite-for-plan',
+              callID,
+              state: { status: 'completed', input, output: 'ok' },
+            },
+          },
+        },
+      })
+
+    const checkpoints = () => journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints
+
+    // A call without a declaration carries no context-compression statement.
+    await terminalEvent('call-flat-none', { program })
+    assert.deepEqual(
+      checkpoints(),
+      [],
+      'a call without prefixUntil and thenMap commits no ViewCheckpointCommitted',
+    )
+
+    // An invalid declaration never committed a view, so it commits no checkpoint.
+    await terminalEvent('call-flat-invalid', { program, prefixUntil: 1, thenMap: { 'not-an-anchor': null } })
+    assert.deepEqual(
+      checkpoints(),
+      [],
+      'an invalid flat declaration commits no ViewCheckpointCommitted',
+    )
+
+    // The flat declaration the call surface accepts commits exactly one durable checkpoint.
+    const result = await hooks.tool['todowrite-for-plan'].execute(
+      { program, prefixUntil: 1, thenMap: { 1: 'FLAT_VIEW_020: the anchor carries its summary.' } },
+      { sessionID, agent: 'plan', callID: 'call-flat-valid', messageID: 'run-plan-view-flat-1', providerRunID: 'run-plan-view-flat-1' },
+    )
+    assert.doesNotMatch(
+      String(result),
+      /VIEW_DECLARATION_INVALID/,
+      `the current call surface accepts the flat declaration: ${result}`,
+    )
+
+    await terminalEvent('call-flat-valid', {
+      program,
+      prefixUntil: 1,
+      thenMap: { 1: 'FLAT_VIEW_020: the anchor carries its summary.' },
+    })
+    assert.deepEqual(
+      checkpoints(),
+      [{ sessionId: sessionID, checkpoints: [{ callId: 'call-flat-valid' }] }],
+      'a successful flat declaration commits exactly one durable ViewCheckpointCommitted',
+    )
   })
 })

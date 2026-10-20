@@ -105,7 +105,7 @@ grounding 由 `requirement-system` package 拥有。
 ### 9. Mission / work
 | Package | 一句话 WHY |
 |---|---|
-| [obligation-ledger](obligation-ledger/WHAT.md) | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的非空 `view` 声明；插件不维护第二份待办真相。 |
+| [obligation-ledger](obligation-ledger/WHAT.md) | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的有效上下文整理声明（扁平 `prefixUntil` + `thenMap`）；插件不维护第二份待办真相。 |
 | [work](work/WHAT.md) | Work 与 Plan 共用一套生命周期：S1–S3 一段 deliver，S4 两段 deliver；review 返回 pairs，后继剥除前任 assistant 与 tool。 |
 
 ### 10. Feedback
