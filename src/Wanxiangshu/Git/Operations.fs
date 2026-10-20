@@ -236,19 +236,7 @@ module GitOperations =
         }
 
     let private rebaseInProgress (runner: Command -> Task<int * string * string>) dir =
-        task {
-            // ORCH-003: continue only when rebase-merge/rebase-apply exists.
-            // A bare REBASE_HEAD ref can be stale (no rebase in progress).
-            let! mergeCode, mergePath, _ = runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
-            let! applyCode, applyPath, _ = runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
-
-            let exists code path =
-                code = 0
-                && not (String.IsNullOrWhiteSpace path)
-                && System.IO.Directory.Exists(path.Trim())
-
-            return exists mergeCode mergePath || exists applyCode applyPath
-        }
+        WorktreeCommands.rebaseInProgress runner dir
 
     let createWithRepo repoPath (runner: Command -> Task<int * string * string>) : GitPort =
         { IsDirty = WorktreeCommands.isDirty runner

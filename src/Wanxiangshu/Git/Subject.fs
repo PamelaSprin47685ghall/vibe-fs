@@ -75,3 +75,51 @@ module GitSubject =
             with _ ->
                 return None
         }
+
+module GitPorcelain =
+    type private Messages =
+        abstract worktrees: output: string -> obj array
+        abstract primaryWorktree: outputZ: string -> obj
+        abstract branches: output: string -> string array
+        abstract shortBranch: reference: string -> string
+        abstract isManagerBranch: reference: string -> bool
+        abstract managerBranchOf: jobId: string -> string
+        abstract rebaseStatePaths: merge: obj * apply: obj -> string array
+
+    [<Import("GitPorcelain", "wanxiangli/git-porcelain")>]
+    let private factory: unit -> Messages = jsNative
+
+    let private law: Messages = factory ()
+
+    let worktrees (output: string) : (string * string option) list =
+        law.worktrees output
+        |> Array.map (fun entry ->
+            let branch: obj = entry?branch
+            (unbox<string> entry?path), (if isNull branch then None else Some(unbox<string> branch)))
+        |> Array.toList
+
+    let primaryWorktree (outputZ: string) : Result<string, string> =
+        let result = law.primaryWorktree outputZ
+
+        if unbox<bool> result?ok then
+            Ok(unbox<string> result?path)
+        else
+            Error(unbox<string> result?code)
+
+    let branches (output: string) : string list = law.branches output |> Array.toList
+
+    let shortBranch (reference: string) : string = law.shortBranch reference
+
+    let isManagerBranch (reference: string) : bool = law.isManagerBranch reference
+
+    let managerBranchOf (jobId: string) : string = law.managerBranchOf jobId
+
+    let rebaseStatePaths (merge: int * string) (apply: int * string) : string list =
+        let mergeCode, mergePath = merge
+        let applyCode, applyPath = apply
+
+        law.rebaseStatePaths (
+            createObj [ "code" ==> mergeCode; "path" ==> mergePath ],
+            createObj [ "code" ==> applyCode; "path" ==> applyPath ]
+        )
+        |> Array.toList

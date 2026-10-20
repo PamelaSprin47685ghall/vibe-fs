@@ -59,13 +59,7 @@ module OrchestratorSweep =
     /// against a set of ids — two different string surgeries for one question, and
     /// ORCH-006 makes the identity opaque precisely so it is compared whole.
     let private normalize (identity: WorktreeIdentity) =
-        let value = WorktreeIdentity.value identity
-        let prefix = "refs/heads/"
-
-        if value.StartsWith prefix then
-            WorktreeIdentity.create (value.Substring prefix.Length)
-        else
-            identity
+        WorktreeIdentity.create (GitPorcelain.shortBranch (WorktreeIdentity.value identity))
 
     let private afterRemoveWorktrees (git: GitPort) (isStale: WorktreeIdentity -> bool) : Task<Result<unit, string>> =
         task {
@@ -106,8 +100,7 @@ module OrchestratorSweep =
             // `git worktree remove` would fail with "is a main working tree" —
             // measured on Host 1.18.9: every orchestrator canary died in init.
             let isManagerBranch identity =
-                let value = WorktreeIdentity.value identity
-                value.StartsWith "refs/heads/manager/" || value.StartsWith "manager/"
+                GitPorcelain.isManagerBranch (WorktreeIdentity.value identity)
 
             match! git.ListWorktrees() with
             | Error error -> return Error(sprintf "cannot list worktrees for cleanup: %s" error)

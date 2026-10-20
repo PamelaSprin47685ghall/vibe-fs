@@ -60,17 +60,11 @@ module RuntimePath =
         | true, cached when obj.ReferenceEquals(cached, task) -> roots.Remove key |> ignore
         | _ -> ()
 
-    let private parsePrimaryWorktree (first: string array) =
-        if first |> Array.contains "bare" then
-            invalidArg "workspace" "Runtime persistence requires a working tree, not a bare repository"
-        elif
-            (match Array.tryHead first with
-             | Some field -> not (field.StartsWith("worktree ", StringComparison.Ordinal))
-             | None -> true)
-        then
-            invalidOp "Git did not identify the primary working tree"
-        else
-            (Array.head first).Substring("worktree ".Length) |> canonicalPath |> outsideGit
+    let private parsePrimaryWorktree (listingZ: string) =
+        match GitPorcelain.primaryWorktree listingZ with
+        | Ok path -> path |> canonicalPath |> outsideGit
+        | Error "bare" -> invalidArg "workspace" "Runtime persistence requires a working tree, not a bare repository"
+        | Error _ -> invalidOp "Git did not identify the primary working tree"
 
     let private primaryWorktree (workspace: string) : Task<string> =
         task {
@@ -85,11 +79,7 @@ module RuntimePath =
 
             match listing with
             | None -> return workspace
-            | Some text ->
-                return
-                    text.Split([| '\u0000' |])
-                    |> Array.takeWhile (fun field -> field <> "")
-                    |> parsePrimaryWorktree
+            | Some text -> return parsePrimaryWorktree text
         }
 
     /// Git 只提供只读拓扑：主工作树和 linked worktree 共用主工作树下的状态。

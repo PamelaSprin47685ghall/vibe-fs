@@ -62,3 +62,6 @@ module WorktreeCommands =
         repo: string ->
         identity: WorktreeIdentity ->
             Task<Result<unit, string>>
+
+    /// rebase-merge / rebase-apply exists under `dir` (never a stale REBASE_HEAD).
+    val rebaseInProgress: runner: (Command -> Task<int * string * string>) -> dir: string -> Task<bool>

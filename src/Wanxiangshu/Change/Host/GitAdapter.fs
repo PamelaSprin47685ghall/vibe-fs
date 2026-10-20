@@ -51,22 +51,10 @@ module OrchestratorGit =
           Stdin = None
           PtyOptions = None }
 
-    /// True when an in-progress rebase is present. Prefer rebase-merge / rebase-apply
-    /// over a bare REBASE_HEAD ref: a stale REBASE_HEAD can survive after a failed
-    /// continue and would make `rebase --continue` report "no rebase in progress"
-    /// while HasRebaseHead still returns true (ORCH-003 conflict resume).
+    /// True when an in-progress rebase is present (rebase-merge / rebase-apply,
+    /// never a stale REBASE_HEAD; ORCH-003). One reader: WorktreeCommands.
     let hasRebaseHead (runner: Command -> Task<int * string * string>) (worktree: string) : Task<bool> =
-        task {
-            let! mergeCode, mergePath, _ = runner (command worktree [ "rev-parse"; "--git-path"; "rebase-merge" ])
-            let! applyCode, applyPath, _ = runner (command worktree [ "rev-parse"; "--git-path"; "rebase-apply" ])
-
-            let exists (code: int) (path: string) =
-                code = 0
-                && not (String.IsNullOrWhiteSpace path)
-                && System.IO.Directory.Exists(path.Trim())
-
-            return exists mergeCode mergePath || exists applyCode applyPath
-        }
+        WorktreeCommands.rebaseInProgress runner worktree
 
     /// After a manager terminal: stage everything, then either continue an
     /// in-flight rebase or create the candidate commit.

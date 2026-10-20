@@ -97,7 +97,7 @@ module WorktreeCommands =
     /// `create` — three copies of one naming rule, and `Adopt` re-derived it during
     /// recovery instead of reading the durable record.
     let identityOf (jobId: ManagerJobId) =
-        WorktreeIdentity.create (sprintf "manager/%s" (ManagerJobId.value jobId))
+        WorktreeIdentity.create (GitPorcelain.managerBranchOf (ManagerJobId.value jobId))
 
     let private command cwd args =
         { FileName = "git"
@@ -155,28 +155,6 @@ module WorktreeCommands =
             return outcome code stdout stderr
         }
 
-    let private finishWorktree acc currentPath currentBranch =
-        match currentPath with
-        | Some path -> List.rev ((path, currentBranch) :: acc)
-        | None -> List.rev acc
-
-    let private parseList lines =
-        let rec loop acc currentPath currentBranch rest =
-            match rest with
-            | [] -> finishWorktree acc currentPath currentBranch
-            | "" :: tail ->
-                let next =
-                    currentPath |> Option.map (fun path -> path, currentBranch) |> Option.toList
-
-                loop (List.append next acc) None None tail
-            | (line: string) :: tail when line.StartsWith "worktree " ->
-                loop acc (Some(WorktreePath.create (line.Substring(9).Trim()))) currentBranch tail
-            | (line: string) :: tail when line.StartsWith "branch " ->
-                loop acc currentPath (Some(WorktreeIdentity.create (line.Substring(7).Trim()))) tail
-            | _ :: tail -> loop acc currentPath currentBranch tail
-
-        loop [] None None lines
-
     let list (runner: Command -> Task<int * string * string>) repo () =
         task {
             let! code, stdout, stderr = runner (command (Some repo) [ "worktree"; "list"; "--porcelain" ])
@@ -185,9 +163,9 @@ module WorktreeCommands =
                 return Error(failure stdout stderr)
             else
                 return
-                    stdout.Split([| '\n'; '\r' |], StringSplitOptions.None)
-                    |> Array.toList
-                    |> parseList
+                    GitPorcelain.worktrees stdout
+                    |> List.map (fun (path, branch) ->
+                        WorktreePath.create path, branch |> Option.map WorktreeIdentity.create)
                     |> Ok
         }
 
@@ -198,19 +176,12 @@ module WorktreeCommands =
             if code <> 0 then
                 return Error(failure stdout stderr)
             else
+                // `git branch` marks a branch checked out in ANOTHER worktree with
+                // `+` (an owned job's branch arrives as `+ manager/<job>`); the
+                // marker is stripped by the porcelain law so `isStale` sees the name.
                 return
-                    stdout.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
-                    // `git branch` prefixes a branch checked out in ANOTHER worktree
-                    // with `+` (and the current branch of this repo with `*`). The
-                    // manager worktree keeps its branch checked out, so an owned
-                    // job's branch arrives as `+ manager/<job>` — without stripping
-                    // the marker, `isStale` classifies the job's own branch as
-                    // stale and the sweep tries to delete it (measured: sweep init
-                    // failed with "branch '+ manager/<job>' not found").
-                    |> Array.map (fun value -> value.Trim().TrimStart('*', '+').Trim())
-                    |> Array.filter (String.IsNullOrWhiteSpace >> not)
-                    |> Array.map WorktreeIdentity.create
-                    |> Array.toList
+                    GitPorcelain.branches stdout
+                    |> List.map WorktreeIdentity.create
                     |> Ok
         }
 
@@ -219,4 +190,18 @@ module WorktreeCommands =
             let! code, stdout, stderr = runner (command (Some repo) [ "branch"; "-D"; WorktreeIdentity.value identity ])
 
             return outcome code stdout stderr
+        }
+
+    /// True when an in-progress rebase is present: rebase-merge / rebase-apply
+    /// exists. A bare REBASE_HEAD can survive a failed continue and is not
+    /// evidence (ORCH-003 conflict resume). Which probe output counts is the
+    /// porcelain law; only the directory check is host I/O.
+    let rebaseInProgress (runner: Command -> Task<int * string * string>) (dir: string) : Task<bool> =
+        task {
+            let! mergeCode, mergePath, _ = runner (command (Some dir) [ "rev-parse"; "--git-path"; "rebase-merge" ])
+            let! applyCode, applyPath, _ = runner (command (Some dir) [ "rev-parse"; "--git-path"; "rebase-apply" ])
+
+            return
+                GitPorcelain.rebaseStatePaths (mergeCode, mergePath) (applyCode, applyPath)
+                |> List.exists System.IO.Directory.Exists
         }
