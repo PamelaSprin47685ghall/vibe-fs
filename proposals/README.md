@@ -1,5 +1,9 @@
 # 计划与提案入口
 
+## 最新上游增量合并计划（2026-10-20）
+
+[view、交付与权限合并计划](extraction-kanban/UPSTREAM-VIEW-DELIVERY-MERGE-2026-10-20.md)以自有 `f04553e5a` 和最新上游 `11052493b` 为固定输入，按功能接收新增变化。当前只完成调查与计划，产品合并尚未开始；优先保障常用功能，小的边缘问题留档。状态见[看板](extraction-kanban/BOARD.md#upstream-view-delivery-20261020)。前批已交付的 call/rg/预算继续复用，大范围退役另排；既有发行问题仍由[模块改进计划](extraction-kanban/MODULE-IMPROVEMENT-2026-10-20.md) N1 承接。
+
 ## 上游语义更新整合（2026-10-19）
 
 用户已授权按[整合计划](extraction-kanban/UPSTREAM-SEMANTIC-MERGE-2026-10-19.md)逐包执行，先按[语义处置表](extraction-kanban/UPSTREAM-SEMANTIC-DISPOSITION-2026-10-19.md)保留本地有效保证、接收固定上游新产品模型。每包同步验收证据与剩余边界；Blogger 全退役和历史 GAP 清零不在本批。原拆分卡状态继续由[看板](extraction-kanban/BOARD.md)维护。
