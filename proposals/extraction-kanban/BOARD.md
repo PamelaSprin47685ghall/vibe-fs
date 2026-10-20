@@ -51,7 +51,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-16 | 压缩覆盖与 checkpoint | 上下文 | BACKLOG | CUT-03, CUT-06, CUT-15 | — | — |
 | CUT-17 | 请求投影与信息边界 | 表达 | BACKLOG | CUT-05, CUT-06, CUT-08, CUT-15, CUT-16 | — | — |
 | CUT-18 | 规范事实编码与校验 | 存储 | DONE | CUT-00 | eng-cut18 | 2026-10-15 主线提交 2f98049e5：wanxiangli events 模块合入 0.7.0，库侧 34 测试 + durable-events 244 项回归全绿，证据链见 cards/CUT-18.md §10 |
-| CUT-19 | 多 writer 存储与收敛 | 存储 | BACKLOG | CUT-18 | — | — |
+| CUT-19 | 多 writer 存储与收敛 | 存储 | DOING | CUT-18 | eng-cut19-goose | 2026-10-20 认领首个子范围：KWayMerge / retained union 抽入 wanxiangli/convergence，主仓 EventKWayMerge 接线（wanxiangli main a8b89a4）；证据链见 cards/CUT-19.md |
 | CUT-20 | PTY 与完整输出外存 | 物理 | DOING | CUT-02, CUT-04 | eng-cut20-goose | — |
 | CUT-21 | 显式时间与因果等待 | 物理 | DONE | CUT-00 | — | 2026-10-15 库侧 time/wait 模块随 0.8.0 发布（库 commit 8422617，全量 460 测试绿）；主仓 NodeTiming/Deadline/VirtualTiming/Wait Registry/CompletionMailbox 桥接切至 0.8.0，干净 HEAD worktree 验证 time-capability 24/0、causal-wait 52/0、subsystems OK；主仓共享工作树全量 build 因他人 Interaction 进行中改动阻断（非本卡引入），证据链见 cards/CUT-21.md §10 |
 | CUT-22 | attention、concern 与邮箱归属 | 权威 | BACKLOG | CUT-09 | — | — |
@@ -114,6 +114,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | `src/Wanxiangshu/Process/{Deadline,NodeTiming,VirtualTiming}.fs(.fsi), src/Wanxiangshu/Execution/Session/Wait/{Registry,CompletionMailbox}.fs(.fsi)` | `CUT-21` | `devops`（受委派集成） | `2f98049e5` | `CUT-21 完成 wanxiangli 0.8.0 time/wait 发布与主仓桥接切换`（2026-10-15 库 commit 8422617，干净 HEAD worktree 验证全绿后主线合入） | `已释放` |
 | `src/Wanxiangshu/Foundation/{Roles,RolesSurface}.fs(.fsi), src/Wanxiangshu/Participant/Persona/{Catalog,Identity,ManagedCatalog,Surface}.fs(.fsi), src/Wanxiangshu/Interaction/Authority/{IdentitySeed,Origin}.fs(.fsi); wanxiangli src/identity/*` | `CUT-07` | `eng-cut07-goose` | `48dff9349` / wxl `a8b89a4` | `CUT-07 主仓切换合入 master 并更新卡片证据` | `持有` |
 | `src/Wanxiangshu/Process/{Pty,PtyApi,PtyBackend,PtySession,PtySupervisor,PtyTypes,Spool,ProcessOutput}.fs(.fsi)`；wanxiangli `src/pty/`、`src/spool/` | `CUT-20` | `eng-cut20-goose` | `48dff9349` | `CUT-20 完成 PTY/spool 库实现、主仓接线与旧 owner 退出` | `持有` |
+| `src/Wanxiangshu/Persistence/EventStore/{EventKWayMerge,MergeSurface,IntegratorEngine}.fs(.fsi)`、`Wanxiangshu.Owner.durable-convergence.eventstore-merge-runtime.fsproj`；wanxiangli `src/convergence/` | `CUT-19` | `eng-cut19-goose` | `ca9d710c7` / wxl `a8b89a4` | `CUT-19 KWayMerge 子范围合入 master 并更新卡片证据` | `持有` |
 
 ## 两仓集成队列
 
