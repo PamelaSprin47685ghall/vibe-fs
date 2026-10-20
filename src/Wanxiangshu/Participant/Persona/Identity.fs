@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Participant.Persona
 
-open System
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
@@ -58,10 +59,14 @@ type ParticipantIdentityEvidence =
     private
         { Identity: ParticipantIdentity }
 
+/// Typed F# projection of the participant identity owner in
+/// `wanxiangli/identity` (CUT-07). Name parsing, legacy rejection, persona
+/// resolution and every rehydration rule are decided by the library; evidence
+/// is constructed here only from a library success view.
 [<RequireQualifiedAccess>]
 module ParticipantIdentity =
 
-    let private currentVersion = PersonaCatalogVersion 1
+    let private library = IdentityLibrary.instance
 
     let private versionNumber (PersonaCatalogVersion version) = version
 
@@ -77,44 +82,26 @@ module ParticipantIdentity =
         | ManagedRole role -> Roles.roleLabel role
         | Bookkeeper -> "bookkeeper"
 
-    let private personaV1 kind =
-        match kind with
-        | ManagedRole role -> PersonaCatalog.personaV1 role
-        | Bookkeeper -> PersonaCatalog.bookkeeperPersonaV1 ()
+    let private originLabel origin =
+        match origin with
+        | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+        | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner"
 
-    let private parseKnownCanonicalName
-        (name: string)
-        : Result<PersonaName * ParticipantKind, ParticipantIdentityError> =
-        match name.ToLowerInvariant() with
-        | "bookkeeper" -> Ok(PersonaName "bookkeeper", Bookkeeper)
-        | roleName when (Roles.tryParseRole roleName).IsSome ->
-            let role = (Roles.tryParseRole roleName).Value
-            Ok(PersonaName(Roles.roleLabel role), ManagedRole role)
-        | _ -> Error(ParticipantIdentityError.UnknownParticipantName name)
+    let private originOfLabel (label: obj) =
+        match unbox<string> label with
+        | "InheritedFromOwner" -> PersonaOrigin.InheritedFromOwner
+        | _ -> PersonaOrigin.ResolvedAtRoot
 
-    let private parseCanonicalName (name: string) =
-        if String.IsNullOrWhiteSpace name then
-            Error ParticipantIdentityError.BlankParticipantName
-        elif ManagedAgentCatalog.isLegacyAgentName (name.ToLowerInvariant()) then
-            Error(ParticipantIdentityError.LegacyParticipantName name)
-        elif name <> name.ToLowerInvariant() || name.Contains("-") then
-            Error(ParticipantIdentityError.MalformedParticipantName name)
+    let private roleOfLabel (label: obj) : Role option =
+        if isNull label then
+            None
         else
-            parseKnownCanonicalName name
+            Roles.tryParseHistoricalRole (unbox<string> label)
 
-    let private create
-        (selectedAgent: PersonaName)
-        (kind: ParticipantKind)
-        (persona: string)
-        (version: PersonaCatalogVersion)
-        (origin: PersonaOrigin)
-        : ParticipantIdentityEvidence =
-        { SelectedAgent = selectedAgent
-          Kind = kind
-          Persona = persona
-          PersonaCatalogVersion = version
-          Origin = origin }
-        |> fun identity -> { Identity = identity }
+    let private roleView (role: Role option) : obj =
+        match role with
+        | Some value -> box (Roles.roleLabel value)
+        | None -> null
 
     let private identity (evidence: ParticipantIdentityEvidence) = evidence.Identity
 
@@ -140,116 +127,95 @@ module ParticipantIdentity =
           PersonaCatalogVersion = personaCatalogVersion evidence
           Origin = origin evidence }
 
+    let private inputView (input: ParticipantIdentityInput) : obj =
+        createObj
+            [ "name" ==> input.SelectedAgent
+              "role" ==> roleView input.Role
+              "persona" ==> input.Persona
+              "catalogVersion" ==> input.PersonaCatalogVersion
+              "origin" ==> originLabel input.Origin ]
+
+    let private evidenceView (evidence: ParticipantIdentityEvidence) : obj = evidence |> toInput |> inputView
+
+    let private kindOfLabel (label: obj) : ParticipantKind =
+        if isNull label then
+            Bookkeeper
+        else
+            roleOfLabel label
+            |> Option.map ManagedRole
+            |> Option.defaultWith (fun () ->
+                failwithf "wanxiangli/identity returned an undecodable role %s" (unbox<string> label))
+
+    let private evidenceOfView (view: obj) : ParticipantIdentityEvidence =
+        { Identity =
+            { SelectedAgent = PersonaName(unbox<string> view?name)
+              Kind = kindOfLabel view?role
+              Persona = unbox<string> view?persona
+              PersonaCatalogVersion = PersonaCatalogVersion(unbox<int> view?catalogVersion)
+              Origin = originOfLabel view?origin } }
+
+    let private errorOfView (view: obj) : ParticipantIdentityError =
+        let text (value: obj) = unbox<string> value
+        let number (value: obj) = unbox<int> value
+
+        match unbox<string> view?error with
+        | "BlankParticipantName" -> ParticipantIdentityError.BlankParticipantName
+        | "LegacyParticipantName" -> ParticipantIdentityError.LegacyParticipantName(text view?detail)
+        | "MalformedParticipantName" -> ParticipantIdentityError.MalformedParticipantName(text view?detail)
+        | "UnknownParticipantName" -> ParticipantIdentityError.UnknownParticipantName(text view?detail)
+        | "UnsupportedPersonaCatalogVersion" ->
+            ParticipantIdentityError.UnsupportedPersonaCatalogVersion(number view?detail)
+        | "RoleMismatch" -> ParticipantIdentityError.RoleMismatch(roleOfLabel view?expected, roleOfLabel view?actual)
+        | "BlankPersona" -> ParticipantIdentityError.BlankPersona
+        | "PersonaMismatch" -> ParticipantIdentityError.PersonaMismatch(text view?expected, text view?actual)
+        | "OriginMismatch" ->
+            ParticipantIdentityError.OriginMismatch(originOfLabel view?expected, originOfLabel view?actual)
+        | "OwnerRequired" -> ParticipantIdentityError.OwnerRequired
+        | "OwnerPersonaMismatch" -> ParticipantIdentityError.OwnerPersonaMismatch(text view?expected, text view?actual)
+        | "OwnerCatalogVersionMismatch" ->
+            ParticipantIdentityError.OwnerCatalogVersionMismatch(number view?expected, number view?actual)
+        | other -> failwithf "wanxiangli/identity returned an unexpected identity error %s" other
+
+    let private resultOf (view: obj) : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        if unbox<bool> view?ok = true then
+            Ok(evidenceOfView view?evidence)
+        else
+            Error(errorOfView view)
+
     let resolveAtRoot (canonicalManagedName: string) : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        parseCanonicalName canonicalManagedName
-        |> Result.map (fun (name, kind) ->
-            create name kind (personaV1 kind) currentVersion PersonaOrigin.ResolvedAtRoot)
+        library?resolveAtRoot canonicalManagedName |> resultOf
 
     let inheritFromOwner
         (canonicalManagedName: string)
         (owner: ParticipantIdentityEvidence)
         : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        parseCanonicalName canonicalManagedName
-        |> Result.map (fun (name, kind) ->
-            create name kind (persona owner) (identity owner).PersonaCatalogVersion PersonaOrigin.InheritedFromOwner)
-
-    let private validateRehydrationShape
-        (input: ParticipantIdentityInput)
-        ((name, kind): PersonaName * ParticipantKind)
-        : Result<PersonaName * ParticipantKind, ParticipantIdentityError> =
-        let expectedRole = roleOfKind kind
-        let expectedVersion = versionNumber currentVersion
-
-        if input.PersonaCatalogVersion <> expectedVersion then
-            Error(ParticipantIdentityError.UnsupportedPersonaCatalogVersion input.PersonaCatalogVersion)
-        elif input.Role <> expectedRole then
-            Error(ParticipantIdentityError.RoleMismatch(expectedRole, input.Role))
-        elif String.IsNullOrWhiteSpace input.Persona then
-            Error ParticipantIdentityError.BlankPersona
-        else
-            Ok(name, kind)
-
-    let private rehydrateRoot
-        (input: ParticipantIdentityInput)
-        ((name, kind): PersonaName * ParticipantKind)
-        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        let expectedPersona = personaV1 kind
-
-        if input.Persona <> expectedPersona then
-            Error(ParticipantIdentityError.PersonaMismatch(expectedPersona, input.Persona))
-        else
-            Ok(create name kind input.Persona currentVersion PersonaOrigin.ResolvedAtRoot)
-
-    let private rehydrateInherited
-        (owner: ParticipantIdentityEvidence)
-        (input: ParticipantIdentityInput)
-        ((name, kind): PersonaName * ParticipantKind)
-        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        let expectedOwnerPersona = persona owner
-        let expectedOwnerVersion = personaCatalogVersion owner
-
-        if input.Persona <> expectedOwnerPersona then
-            Error(ParticipantIdentityError.OwnerPersonaMismatch(expectedOwnerPersona, input.Persona))
-        elif input.PersonaCatalogVersion <> expectedOwnerVersion then
-            Error(
-                ParticipantIdentityError.OwnerCatalogVersionMismatch(expectedOwnerVersion, input.PersonaCatalogVersion)
-            )
-        else
-            Ok(create name kind input.Persona (identity owner).PersonaCatalogVersion PersonaOrigin.InheritedFromOwner)
-
-    let private rehydrateByOrigin
-        (ownerOption: ParticipantIdentityEvidence option)
-        (input: ParticipantIdentityInput)
-        (parsed: PersonaName * ParticipantKind)
-        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        match ownerOption, input.Origin with
-        | None, PersonaOrigin.InheritedFromOwner -> Error ParticipantIdentityError.OwnerRequired
-        | Some _, PersonaOrigin.ResolvedAtRoot ->
-            Error(
-                ParticipantIdentityError.OriginMismatch(PersonaOrigin.InheritedFromOwner, PersonaOrigin.ResolvedAtRoot)
-            )
-        | None, PersonaOrigin.ResolvedAtRoot -> rehydrateRoot input parsed
-        | Some owner, PersonaOrigin.InheritedFromOwner -> rehydrateInherited owner input parsed
-
-    let private parseCandidate (input: ParticipantIdentityInput) =
-        match parseCanonicalName input.SelectedAgent with
-        | Ok p -> Ok p
-        | Error(ParticipantIdentityError.LegacyParticipantName name) when
-            input.Origin = PersonaOrigin.InheritedFromOwner
-            ->
-            Roles.tryParseHistoricalRole name
-            |> Option.map (fun role -> Ok(PersonaName name, ManagedRole role))
-            |> Option.defaultValue (Error(ParticipantIdentityError.LegacyParticipantName name))
-        | Error err -> Error err
+        library?inheritFromOwner (canonicalManagedName, evidenceView owner) |> resultOf
 
     let rehydrate
         (ownerOption: ParticipantIdentityEvidence option)
         (input: ParticipantIdentityInput)
         : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        parseCandidate input
-        |> Result.bind (validateRehydrationShape input)
-        |> Result.bind (rehydrateByOrigin ownerOption input)
+        let owner =
+            match ownerOption with
+            | Some evidence -> evidenceView evidence
+            | None -> null
+
+        library?rehydrate (owner, inputView input) |> resultOf
 
     let fromInput (input: ParticipantIdentityInput) : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        parseCandidate input
-        |> Result.bind (validateRehydrationShape input)
-        |> Result.bind (fun ((name, kind) as parsed) ->
-            match input.Origin with
-            | PersonaOrigin.ResolvedAtRoot -> rehydrateRoot input parsed
-            | PersonaOrigin.InheritedFromOwner ->
-                Ok(create name kind input.Persona currentVersion PersonaOrigin.InheritedFromOwner))
+        library?restoreRecorded (inputView input) |> resultOf
 
     let legacyAgentOwnerRootUnprovableMessage =
         "legacy AuthorityRootAccepted v1 AgentOwnerRoot cannot prove participant identity"
 
+    /// Host-side adapter for the legacy AuthorityRootAccepted v1 journal shape.
+    /// A v1 HumanRoot is exactly a V1 root selection, so it is resolved by the
+    /// library; v1 AgentOwnerRoot never carried provable identity evidence.
     let upgradeLegacyV1Root
         (input: LegacyAuthorityRootIdentityV1Input)
         : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
         match input.AuthorityKind with
         | "AgentOwnerRoot" ->
             Error(ParticipantIdentityError.UnprovableLegacyAuthorityIdentity legacyAgentOwnerRootUnprovableMessage)
-        | "HumanRoot" ->
-            parseCanonicalName input.SelectedAgent
-            |> Result.map (fun (name, kind) ->
-                create name kind (personaV1 kind) (PersonaCatalogVersion 1) PersonaOrigin.ResolvedAtRoot)
+        | "HumanRoot" -> resolveAtRoot input.SelectedAgent
         | authorityKind -> Error(ParticipantIdentityError.UnsupportedLegacyAuthorityKind authorityKind)

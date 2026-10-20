@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Participant.Persona
 
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
 /// Sole identity directory for managed agents (AGENT-001…004).
@@ -87,21 +88,12 @@ module ManagedAgentCatalog =
 
     let engineerToolNames: string list = [ Roles.roleLabel Role.Engineer ]
 
+    /// Retired participant names, owned by `wanxiangli/identity` (CUT-07).
     let legacyAgentNames: Set<string> =
-        set
-            [ "coder"
-              "inspector"
-              "browser"
-              "inquiry"
-              "distiller"
-              "build"
-              "student"
-              "teacher"
-              "meditator"
-              "executor" ]
+        (IdentityLibrary.instance?legacyNames (): string array) |> Set.ofArray
 
     let isLegacyAgentName (lower: string) : bool =
-        legacyAgentNames.Contains lower || lower.Contains("_")
+        unbox<bool> (IdentityLibrary.instance?isLegacyName lower)
 
     let formatLegacyNameNotSupported (name: string) : string =
         sprintf "Legacy agent name '%s' is not supported." name
