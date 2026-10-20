@@ -221,16 +221,75 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, humanRequest)
 
-    // Step 4: After human input, fork must NOT be denied
-    const forkSuccessor = await hooks.tool.fork.execute(
-      { calling: 'engineer', name: 'alice', charge: 'implement' },
+    // Step 4: After human input, the dispatch member must NOT be denied.
+    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, reportMapping)`。
+    const forkSuccessor = await hooks.tool['todowrite-for-manager'].execute(
+      {
+        program:
+          'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "alice", charge: "implement" }, { 1: null }); } }',
+      },
       context('call-fork-successor', 'msg-successor'),
     )
-    assert.doesNotMatch(forkSuccessor, /(当前不可用|is not available right now)/, 'fork must be unblocked after human input advances the continuous session')
+    // 断言「不是拒绝」这一可观察事实：调用以成功信封返回，不含拒绝信封。
+    assert.doesNotMatch(forkSuccessor, /ok = false/, 'the dispatch member must be unblocked after human input advances the continuous session')
+    assert.match(forkSuccessor, /ok = true/)
+    assert.match(forkSuccessor, /outcome = "created"/)
   })
 })
 
-test.todo('WHAT[work-011] a controlled in-flight Host interrupt prevents successor dispatch until exact provider-step release and physical interruption complete')
+test('WHAT[work-011] an established delivery interrupts its own attempt exactly once, dispatches no successor, and does not interrupt again for a second request of the same attempt', async () => {
+  // 现场选择：交付已成立（Delivered）的终态。
+  // 现行架构里唯一的后继派发是接力（Relayed）成功后继提示，而终态交付不产生
+  // 任何后继；所以终态现场足以表达「在途中断未完成前不得派发后继」——
+  // 中断已发出而宿主尚未确认时，本次请求仍被抑制，后继仍不派发，且同一
+  // attempt 的第二次请求不重复发中断。
+  await withReview(async ({execute, hooks, runtime, session}) => {
+    assert.match(await execute(scores('PERFECT')), /recorded = true/)
+    const retirement = {
+      info: {id: 'retirement-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}},
+      parts: [{type: 'tool', tool: 'deliver', callID: 'deliver-call', state: {status: 'pending', input: {}}}],
+    }
+    runtime.pushHostMessage(session, retirement)
+    const confirm = {sessionID: session, callID: 'deliver-confirm', messageID: 'retirement-confirm', providerRunID: 'run-confirm', agent: 'manager'}
+    const retire = {sessionID: session, callID: 'deliver-call', messageID: 'retirement-run', providerRunID: 'run-retire', agent: 'manager'}
+    assert.match(await hooks.tool.deliver.execute({}, confirm), /confirmation_required = true/)
+    assert.match(await hooks.tool.deliver.execute({}, retire), /Finished\. Do not continue work\./)
+
+    // 中断次数可数：包裹宿主的 abort，但仍让它登记到 abortedIds。
+    let interruptAttempts = 0
+    const hostAbort = runtime.client.session.abort
+    runtime.client.session.abort = async (args) => {
+      interruptAttempts += 1
+      return hostAbort(args)
+    }
+
+    const request = () => ({messages: [
+      {info: {id: 'user-root', role: 'user', sessionID: session, model: {providerID: 'provider', modelID: 'manager-model'}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]},
+      {info: {id: 'review-run', role: 'assistant', parentID: 'user-root', time: {created: 2, completed: 2}}, parts: [{type: 'text', text: 'review closed'}]},
+      {info: {id: 'retirement-run', role: 'assistant', parentID: 'user-root', time: {created: 3}}, parts: [{type: 'text', text: 'Old closing tail'}]},
+    ]})
+
+    const first = request()
+    await hooks['experimental.chat.messages.transform']({sessionID: session}, first)
+    // (a) 清空本次请求的消息；(b) 中断本次 attempt；(c) 不派发后继。
+    assert.deepEqual(first.messages, [], 'the request carries no content once the delivery is established')
+    assert.deepEqual(runtime.abortedIds, [session], 'the transform interrupts exactly this attempt')
+    assert.equal(interruptAttempts, 1, 'the interrupt is issued once for this attempt')
+    assert.equal(runtime.prompts.length, 0, 'the interrupted attempt dispatches no successor')
+
+    // 同一 attempt 的第二次请求：不重复发中断，也仍不派发后继。
+    const second = request()
+    await hooks['experimental.chat.messages.transform']({sessionID: session}, second)
+    assert.deepEqual(second.messages, [], 'the second request of the same attempt stays suppressed')
+    assert.deepEqual(runtime.abortedIds, [session], 'the same attempt is not interrupted a second time')
+    assert.equal(interruptAttempts, 1, 'no second interrupt is issued for the same attempt')
+    assert.equal(runtime.prompts.length, 0, 'no successor is dispatched while the attempt stays stopped')
+
+    const stopped = await lifecycleWorkView(runtime, session)
+    assert.equal(stopped.delivered, true, 'the established delivery survives the stop')
+    assert.equal(stopped.active, false, 'a final delivery has no successor tenure')
+  }, {session: 'delivery-interrupt-once'})
+})
 
 test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared without session abort and without MANAGER-LOOP-004 crash', async () => {
   await withExecutablePlugin(async (hooks, _directory, _children, runtime) => {
