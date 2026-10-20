@@ -422,3 +422,78 @@ dotnet tool run fantomas src/Wanxiangshu
 5. **交付发生在宿主回合之下**：调用前散文、逻辑运行、物理用户消息、任务归属在 settle 点都看不见，必须由宿主回合层注入；编不出来就别硬编（`DeliveryAttribution` 缺字段即视为「未成立」）。
 6. 验证结论必须绑定代码状态：并行会话落地后，先前绿轮不作数；**最终 build + 测试必须重跑**。
 7. 派子代理时明确「只改指定文件、不跑 build/测试/格式化」，并要求回报 `file:line` 级证据；否则代理会在同一工作树里互相覆盖（本会话两次遇到 `Description.fs` / `DeliverTool.fs` 被并行会话改写）。
+
+## 十 验收状态与剩余（2026-10-21 收口会话实测）
+
+本节由收口会话实测写入，记录**当前代码状态下的真实门禁与套件结果**，以及仍未闭合的剩余项。上文一到九节是历史施工书；本节只陈述事实，不宣称整体任务完结。
+
+### 十·一 已交付并推送（commit 链，旧→新）
+
+| commit | 内容 |
+|---|---|
+| `0b197230a` | `docs(js-program): document the devops return shape as { ok, kind, status, view }` |
+| `e8c44bd8b` | `feat(js-program)!: derive the permission table from one label function and add the deliver member` |
+| `35f9a6f4f` | `feat(context-compression)!: read the checkpoint declaration as flat prefixUntil and thenMap` |
+| `0a742980c` | `feat(delivery): add the logical run and the delivery task to the establishment fence` |
+| `4d80422e8` | `docs(requirements): restate the GAP rows under the current declaration and delivery semantics` |
+| `5232b0eba` | `refactor(delivery): drop the unused full-fence take and state the fallback reader's limits` |
+| `031ffb11d` | `style: format the files this change touched` |
+
+已闭合对应上文条目：**B2**（dag 需 Fork ∧ Join，上游 `3ee7dcdaa`）、**B3**（成员注册表补 deliver 分片）、**B6**（围栏补 `LogicalRunId` 与 `Task` 两位过滤位）、**B7**（`Observed` 不再当 durable outcome，`DeliverTool.fs:396` 已按 work-015 注释处理）。
+
+### 十·二 门禁实测
+
+- `node scripts/build.mjs` → `build ok`；`js-surface-manifest: OK — 151 registered surfaces`；`js-module-linkage: OK — 725 emitted modules linked and loaded`。
+- `dotnet tool run fantomas src/Wanxiangshu` → 全仓 55 个文件需要格式化。本任务只格式化**本任务触碰的 16 个文件**并单独提交（`031ffb11d`），其余 39 个是上游既有欠账，未动。格式化前 15/16 个文件在上游基线已是未格式化状态，**唯一由本任务引入未格式化的是 `OfficeCapabilitySurface.fs`**。
+- `npm run check` → **红**。`check.mjs: FAILED with 167 issue(s) across 2 gate(s)`：
+  - `scripts/checks/fsharp-control-pyramid.mjs`：**100** 处 violation；
+  - `scripts/checks/js-boundary-gate.mjs`：**67** 处 violation。
+  对照本批上游基线 `435eac2d9`（同两门禁 **96 + 67 = 163**），本批**净增 4 处**，全部在 `src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs`（`branch-pyramid` 0→3、`match-pyramid` 3→5），源于本批新增的扁平声明判定（`PluginHooks.fs:425`、`:442`、`:444`、`:451`、`:454`）。其余 163 处为上游既有欠账。
+- `node scripts/checks/language-parity-gate.mjs` → `OK — 266 semantic resource(s)`。
+
+### 十·三 R3 套件实测
+
+| 套件 | pass | fail | 判定 |
+|---|---|---|---|
+| `requirements/advisor/tests/*` | 14 | 0 | 绿 |
+| `requirements/capability-enforcement/tests/*` | 133 | 0 | 绿 |
+| `requirements/capability-enforcement/tests/025` @`WXS_TIER_INTEGRATION=1` | 33 | 0 | 绿 |
+| `requirements/context-compression/tests/*` | 50 | 0 | 绿 |
+| `requirements/semantic-trace/tests/013` | 6 | 0 | 绿 |
+| `requirements/effect-accounting/tests/013` | 5 | 0 | 绿 |
+| `requirements/host-boundary/tests/032` | 17 | 0 | 绿 |
+| `requirements/host-boundary/tests/032` @`WXS_TIER_INTEGRATION=1` | 18 | 0 | 绿 |
+| `requirements/work/tests/*` | 178 | **8** | 红，全部为上游既有红 |
+| `requirements/intra-participant-parallelism/tests/018` | 1 | **1** | 红，上游既有红 |
+
+**9 条红的 exact evidence（均在 pristine `435eac2d9` worktree 上复现出完全相同的失败，非本批引入）：**
+
+| test | file:line | error |
+|---|---|---|
+| `work-009` the second deliver reports the live blocker instead of reporting an end | `requirements/work/tests/009.test.mjs:27` | `TypeError: Cannot read properties of undefined (reading 'execute')` |
+| `work-011` physical prompt after Accepted deliver invalidates certificate… | `requirements/work/tests/011.test.mjs:225` | `TypeError: Cannot read properties of undefined (reading 'execute')` |
+| `work-019` 没有任期时 read、review、fork、resume 在工具执行入口被拒绝 | `requirements/work/tests/019.test.mjs:42` | `TypeError: Cannot read properties of undefined (reading 'execute')` |
+| `work-019` 有任期且评审尚未接纳时…派工和 deliver 在执行入口被拒绝 | `requirements/work/tests/019.test.mjs:70` | `TypeError: Cannot read properties of undefined (reading 'execute')` |
+| `work-019` 评审已接纳且尚未确认时… | `requirements/work/tests/019.test.mjs:31` | `AssertionError: Missing expected rejection.` |
+| `work-021` Plan separates human ask from devops investigation… | `requirements/work/tests/021.test.mjs:59` | `AssertionError: Tool catalog must contain registered devops tool` |
+| `work-024` Plan admits its role tools on every stage… | `requirements/work/tests/024.test.mjs:33` | `AssertionError: plan must admit devops` |
+| `work-026` S3 authorized deliver enters post-S3 state… | `requirements/work/tests/026.test.mjs:124` | `AssertionError: post-S3 deliver must interrupt the conversation` |
+| `intra-participant-parallelism-018` a fission lane inherits the current session context… | `requirements/intra-participant-parallelism/tests/018.test.mjs:139` | `TypeError: Cannot read properties of undefined (reading 'execute')` |
+
+`work-021` / `work-024` 的根因是上游把 `devops` **宿主工具**整体退役（`StaticTools.fs:52-54`：devops 离开目录与 ToolSpec，只以编程面成员 `this.devops` 存活），这些用例仍在断言已退役的宿主工具。其余 7 条同属「用例仍在调用已退役宿主工具/旧契约」。
+
+### 十·四 仍未闭合（需继续核查，非本批范围）
+
+- **B1** `resume`/`commission` 不派生命名 —— 未修。
+- **B4** `api.reviewOnly` 缺失路径 —— `ToolsBindings.fs:1251` 有 `api?reviewOnly <- review`，`Description.fs:280-283` 有 Manager 面改写，**本批未核实现状是否已闭合**。
+- **B5** `tryTakeRenderedFor` 只比 `ProviderRun` 不比 `ToolCallId` —— **仍未修**。本批的处置是**删除**了新增的 `tryTakeRenderedFenced`（它无调用方，且 owner 的 `claim` 只支持 `peek`/`cache`/`run` 三种 mode，`run` 只比 providerRun，见 `wanxiangli/src/delivery/Delivery.fs:154-176`），并把 `tryTakeRenderedFor` 的注释改成实话：它只比 provider run、是 harness/fallback 通道、**不是交付证据**，真正的证据是 durable 见证。按最新 WHAT（`repository-programming` [054]/[059]）核对后，**完整 ToolCallId 围栏消费仍是未闭合项**，保留在本任务书待办。
+- **B8** S4 终态中断未按当前物理输入设围栏 —— 未核。
+- **B9** `PluginTransforms.fs` + `NarrativeTransform.fs` 五项 —— 未核。
+- **B10** `requirements/work/tests/011.test.mjs:233` 的 `test.todo` **仍是 todo**；`requirements/work/tests/049.test.mjs` 的中断断言仍需核（空断言）—— 未修。
+- **C1** Plan 路径无 settlement —— 未核。
+- **C2** post-S3 交付未登记「已成立」 —— 未核（`work-026` 的红与此相关，但该红在基线同样存在）。
+- **C3** `Execution/Fission/OpenCode/Host.fs` lane 交付死代码与跨会话搬运 —— 未核。
+- **C4** `requirements/repository-programming/tests/README.md` 条目与新参数名同步 —— 未核。
+- **D1** 仍调用退役宿主工具的用例迁移 —— 未做（`work-021`/`work-024`/`intra-participant-parallelism-018` 即属此类）。
+- **D2** `delegation-029` 词法审计与 `js-semantic-surface-002` 边界门禁 —— 未核。
+- **D3** 补回归用例 —— 仅第一项（三态冲突 + handle 未被消费，`repository-programming/064`）已写；**其余四项仍未写**：交付→见证落盘→transform 停住该 attempt（条款 3/4 的核心闭环）、提交/呈现/中断三件事分别取证、fork 侧重复读取同一终态不掏空交付格、sync delegate 被中断后仍以交付视图结算调用。
