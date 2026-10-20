@@ -75,15 +75,8 @@ module ProcessSurface =
     val outputView: collector: obj -> obj
 
     val spoolChunkCount: bytes: float -> int
-    val spoolChunkBytes: chunkSize: int -> bytes: obj -> obj
-    val spoolStart: unit -> obj
-    val spoolAppend: spool: obj -> bytes: obj -> unit
-    val spoolPath: spool: obj -> string
-    val spoolBytesWritten: spool: obj -> float
-    val spoolRead: spool: obj -> Task<obj array>
     val spoolDelete: path: string -> unit
     val spoolReadPath: path: string -> Task<obj array>
-    val spoolBytesToTempFile: bytes: obj -> obj
 
     val bytes: text: string -> obj
     val newId: unit -> obj

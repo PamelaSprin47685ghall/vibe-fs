@@ -12,26 +12,16 @@ const {
   outputBuildResult,
   outputView,
   spoolChunkCount,
-  spoolChunkBytes,
-  spoolStart,
-  spoolAppend,
-  spoolPath,
-  spoolBytesWritten,
-  spoolRead,
   spoolReadPath,
   spoolDelete,
 } = await import('../../../dist/Process/Surface.js')
 const text = (value) => new TextEncoder().encode(value)
 const decode = (bytes) => new TextDecoder().decode(Uint8Array.from(bytes))
 const create = (seconds, bytes) => outputCreate(estimate(seconds, bytes, 'medium'))
-const tempSpool = (value) => {
-  const spool = spoolStart()
-  spoolAppend(spool, text(value))
-  return spool
-}
 const readSpool = async (spool) => {
-  const chunks = spool.path ? await spoolReadPath(spool.path) : await spoolRead(spool)
-  return chunks.map(decode).join('')
+  // Chunks split at byte offsets; decode once so a cut multi-byte character survives.
+  const chunks = await spoolReadPath(spool.path)
+  return decode(chunks.flatMap(chunk => Array.from(chunk)))
 }
 
 test('WHAT[process-execution-009] EXEC_011_collector_concatenates_stdout_stderr_utf8', () => {
@@ -83,8 +73,7 @@ test('WHAT[process-execution-009] EXEC_011_collector_spooled_buffers_are_cleared
   const collector = create(10, 2)
   outputAddStdout(collector, text('abcdefg'))
   const view = outputView(collector)
-  assert.equal(view.stdoutChunks, 0)
-  assert.equal(view.stderrChunks, 0)
+  assert.equal(view.bytesHeld, 0, 'once spooled, no output stays in memory')
   spoolDelete(outputBuildResult(collector, 0).spoolPath)
 })
 test('WHAT[process-execution-009] EXEC_011_spool_chunk_count_rounds_up', () => {
@@ -93,28 +82,30 @@ test('WHAT[process-execution-009] EXEC_011_spool_chunk_count_rounds_up', () => {
   assert.equal(spoolChunkCount(204800), 1)
   assert.equal(spoolChunkCount(204801), 2)
 })
-test('WHAT[process-execution-009] EXEC_011_spool_chunk_bytes_splits_at_chunk_size', () => {
-  assert.deepEqual(spoolChunkBytes(3, new Uint8Array(0)), [])
-  assert.deepEqual(spoolChunkBytes(3, undefined), [])
-  assert.deepEqual(spoolChunkBytes(3, new Uint8Array([1, 2, 3, 4, 5])), [
-    [1, 2, 3],
-    [4, 5],
-  ])
+test('WHAT[process-execution-009] EXEC_011_spool_keeps_every_byte_of_a_large_real_stream', async () => {
+  const collector = create(10, 1024)
+  const expected = []
+  for (let i = 0; i < 64; i++) {
+    const chunk = text(`${i}:${'中'.repeat(4000)}\n`)
+    expected.push(chunk)
+    if (i % 5 === 0) outputAddStderr(collector, chunk)
+    else outputAddStdout(collector, chunk)
+    assert.ok(outputView(collector).bytesHeld <= 1024, 'memory stays bounded while output grows')
+  }
+  const outcome = outputBuildResult(collector, 0)
+  assert.equal(outcome.kind, 'Spooled')
+  const all = Buffer.concat(expected)
+  assert.equal(outcome.totalBytes, all.length)
+  assert.equal(await readSpool({ path: outcome.spoolPath }), all.toString('utf8'))
+  spoolDelete(outcome.spoolPath)
 })
-test('WHAT[process-execution-009] EXEC_011_spool_round_trips_bytes_through_temp_file', async () => {
-  const spool = tempSpool('0123456789')
-  assert.equal(spoolBytesWritten(spool), 10)
-  assert.equal(spoolChunkCount(spoolBytesWritten(spool)), 1)
-  assert.equal(await readSpool(spool), '0123456789')
-  spoolDelete(spoolPath(spool))
-})
-test('WHAT[process-execution-009] EXEC_011_spool_append_tracks_bytes_written', async () => {
-  const spool = spoolStart()
-  spoolAppend(spool, text('ab'))
-  spoolAppend(spool, new Uint8Array(0))
-  assert.equal(spoolBytesWritten(spool), 2)
-  assert.equal(await readSpool(spool), 'ab')
-  spoolDelete(spoolPath(spool))
+test('WHAT[process-execution-009] EXEC_011_late_output_after_build_result_is_not_part_of_the_outcome', () => {
+  const collector = create(10, 1000)
+  outputAddStdout(collector, text('done'))
+  assert.equal(outputBuildResult(collector, 0).stdout, 'done')
+  outputAddStdout(collector, text('late'))
+  assert.equal(outputView(collector).bytesObserved, 4)
+  assert.equal(outputBuildResult(collector, 0).stdout, 'done')
 })
 }
 

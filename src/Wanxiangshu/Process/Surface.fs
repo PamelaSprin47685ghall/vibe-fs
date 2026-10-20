@@ -50,9 +50,6 @@ module ProcessSurface =
     type private OutputHandle(collector: ProcessOutput.OutputCollector) =
         member _.Collector = collector
 
-    type private SpoolHandle(spool: Spool.StreamingSpool) =
-        member _.Spool = spool
-
     type private PtyIdHandle(id: PtyId) =
         member _.Id = id
 
@@ -575,47 +572,20 @@ module ProcessSurface =
         ProcessOutput.addStderr (outputOf collector) (bytesOf bytes)
 
     let outputBuildResult (collector: obj) (exitCode: int) : obj =
-        outcomeView (box (ProcessOutput.buildResult (outputOf collector) exitCode))
+        match ProcessOutput.buildResult (outputOf collector) exitCode with
+        | Ok outcome -> outcomeView (box outcome)
+        | Error error -> errorView error
 
     let outputView (collector: obj) : obj =
         let value = outputOf collector
 
         box
-            {| bytesObserved = float value.BytesObserved
-               outputLimit = float value.OutputLimit
-               spooled = value.Spool.IsSome
-               stdoutChunks = value.Stdout.Count
-               stderrChunks = value.Stderr.Count |}
+            {| bytesObserved = float (ProcessOutput.bytesObserved value)
+               outputLimit = float (ProcessOutput.outputLimit value)
+               spooled = ProcessOutput.spooled value
+               bytesHeld = float (ProcessOutput.bytesHeld value) |}
 
     let spoolChunkCount (bytes: float) : int = Spool.chunkCount (int64 bytes)
-
-    let spoolChunkBytes (chunkSize: int) (bytes: obj) : obj =
-        Spool.chunkBytes chunkSize (bytesOf bytes) |> Array.map bytesView |> box
-
-    let spoolStart () : obj =
-        SpoolHandle(Spool.startStreamingSpool ()) :> obj
-
-    let private spoolOf (value: obj) = (value :?> SpoolHandle).Spool
-
-    let spoolAppend (spool: obj) (bytes: obj) : unit =
-        Spool.appendStreamingSpool (spoolOf spool) (bytesOf bytes)
-
-    let spoolPath (spool: obj) : string = (spoolOf spool).Path
-
-    let spoolBytesWritten (spool: obj) : float = float (spoolOf spool).BytesWritten
-
-    let spoolRead (spool: obj) : Task<obj array> =
-        // DSL-MUTABLE: algorithm-scratch — spool chunk accumulator
-        let chunks = ResizeArray<obj>()
-
-        task {
-            do!
-                Spool.readChunks (spoolPath spool) (fun bytes ->
-                    chunks.Add(bytesView bytes)
-                    Task.FromResult<unit>(()))
-
-            return chunks.ToArray()
-        }
 
     let spoolDelete (path: string) : unit = Spool.delete path
 
@@ -1057,14 +1027,6 @@ module ProcessSurface =
 
             return chunks.ToArray()
         }
-
-    let spoolBytesToTempFile (bytes: obj) : obj =
-        let path, count, chunks = Spool.spoolBytesToTempFile (bytesOf bytes)
-
-        box
-            {| path = path
-               bytesWritten = float count
-               chunkCount = chunks |}
 
     let abortParent (parentId: string) : unit = Pty.abortParent parentId
 

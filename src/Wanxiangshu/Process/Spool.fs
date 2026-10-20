@@ -2,18 +2,50 @@ namespace Wanxiangshu.Process
 
 open System
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 
-/// Pure spool facade. File I/O is delegated to NodeProcessHost so this file
-/// contains no JS interop.
+/// Host binding to `wanxiangli/spool`. The library owns memory bounds, the spool
+/// file and its write failures; this module only adapts its messages to F#.
 module Spool =
 
     [<Literal>]
     let ChunkSizeBytes: int = 204800
 
-    /// DSL-state-combination: physical — BytesWritten is a byte-buffer spool counter
-    type StreamingSpool =
-        { Path: string
-          mutable BytesWritten: int64 }
+    [<Import("OutputSpool", "wanxiangli/spool")>]
+    let private OutputSpoolCtor: obj = jsNative
+
+    [<Import("tmpdir", "node:os")>]
+    let private tmpdir () : string = jsNative
+
+    [<Import("unlinkSync", "node:fs")>]
+    let private unlinkSync (path: string) : unit = jsNative
+
+    [<Emit("$0.readChunks($1, $2, $3)")>]
+    let private readChunksJs
+        (_ctor: obj)
+        (_path: string)
+        (_size: int)
+        (_consume: byte array -> Task<unit>)
+        : Task<obj> =
+        jsNative
+
+    [<Emit("new $0($1)")>]
+    let private construct (_ctor: obj) (_options: obj) : obj = jsNative
+
+    [<Emit("((chunks) => { let size = 0; for (const c of chunks) size += c.length; const out = new Uint8Array(size); let at = 0; for (const c of chunks) { out.set(c, at); at += c.length; } return out; })($0)")>]
+    let private concat (_parts: byte array array) : byte array = jsNative
+
+    /// DSL-class: PhysicalHandle — one library OutputSpool; owner wanxiangli/spool, law process-execution-009, proof process-execution-009.
+    [<Sealed>]
+    type OutputSpool(instance: obj) =
+        member _.Instance = instance
+
+    [<RequireQualifiedAccess>]
+    type Finished =
+        | Memory of stdout: byte array * stderr: byte array
+        | File of path: string * bytes: int64
+        | Failed of observed: int64 * written: int64 * operation: string * code: string option * message: string
 
     let chunkCount (bytes: int64) : int =
         if bytes <= 0L then
@@ -21,116 +53,78 @@ module Spool =
         else
             int (((bytes - 1L) / int64 ChunkSizeBytes) + 1L)
 
-    let startStreamingSpool () : StreamingSpool =
-        let path = NodeProcessHost.tempPath ()
-        NodeProcessHost.writeFile path [||]
-        { Path = path; BytesWritten = 0L }
+    let create (memoryBytes: int) : OutputSpool =
+        OutputSpool(
+            construct
+                OutputSpoolCtor
+                (createObj [ "directory" ==> tmpdir (); "memoryBytes" ==> float (max 0 memoryBytes) ])
+        )
 
-    let appendStreamingSpool (spool: StreamingSpool) (bytes: byte[]) : unit =
+    let append (spool: OutputSpool) (channel: string) (bytes: byte array) : unit =
         if not (isNull bytes) && bytes.Length > 0 then
-            NodeProcessHost.appendFile spool.Path bytes
-            spool.BytesWritten <- spool.BytesWritten + int64 bytes.Length
+            spool.Instance?append(channel, bytes) |> ignore
 
-    let readChunksSync (path: string) (consume: byte[] -> unit) : unit =
-        NodeProcessHost.readFileSyncChunks path ChunkSizeBytes consume
+    let private state (spool: OutputSpool) : obj = spool.Instance?inspect()
 
-    let readChunks (path: string) (consume: byte[] -> Task<unit>) : Task<unit> =
-        NodeProcessHost.readFileAsyncChunks path ChunkSizeBytes consume
+    let observed (spool: OutputSpool) : int64 =
+        int64 (unbox<float> (state spool)?observed)
 
-    let chunkBytes (chunkSize: int) (bytes: byte[]) : byte[][] =
-        if isNull bytes || bytes.Length = 0 then
-            [||]
-        else
-            let total = bytes.Length
-            let count = (total + chunkSize - 1) / chunkSize
+    let held (spool: OutputSpool) : int64 = int64 (unbox<float> (state spool)?held)
 
-            Array.init count (fun i ->
-                let offset = i * chunkSize
-                let len = Math.Min(chunkSize, total - offset)
-                let chunk = Array.zeroCreate<byte> len
-                Array.blit bytes offset chunk 0 len
-                chunk)
+    let isFile (spool: OutputSpool) : bool =
+        not (isNull (unbox<obj> (state spool)?path))
 
-    let spoolBytesToTempFile (bytes: byte[]) : string * int64 * int =
-        let spool = startStreamingSpool ()
-        appendStreamingSpool spool bytes
-        spool.Path, spool.BytesWritten, chunkCount spool.BytesWritten
+    let private text (value: obj) =
+        if isNullOrUndefined value then None else Some(string value)
 
-    let private blitWhenPositive (source: byte[]) (sourceIndex: int) (target: byte[]) (targetIndex: int) (count: int) =
-        if count > 0 then
-            Array.blit source sourceIndex target targetIndex count
+    let finish (spool: OutputSpool) : Finished =
+        let result: obj = spool.Instance?finish()
 
-    let retainLatestBytes (limit: int) (current: byte[]) (next: byte[]) =
-        if limit <= 0 then
-            [||]
-        else
-            let nextLength = min limit (current.Length + next.Length)
-            let nextBytes = min next.Length nextLength
-            let currentBytes = nextLength - nextBytes
-            let retained = Array.zeroCreate<byte> nextLength
+        match unbox<string> result?kind with
+        | "Memory" -> Finished.Memory(unbox result?stdout, unbox result?stderr)
+        | "File" -> Finished.File(unbox result?path, int64 (unbox<float> result?bytes))
+        | _ ->
+            let error: obj = result?error
 
-            blitWhenPositive current (current.Length - currentBytes) retained 0 currentBytes
-            blitWhenPositive next (next.Length - nextBytes) retained currentBytes nextBytes
+            Finished.Failed(
+                int64 (unbox<float> result?observed),
+                int64 (unbox<float> result?written),
+                string error?operation,
+                text error?code,
+                string error?message
+            )
 
-            retained
+    let discard (spool: OutputSpool) : unit = spool.Instance?discard() |> ignore
 
-    /// UTF-8 continuation bytes have the 0b10xxxxxx shape; a truncated tail may
-    /// begin inside a multi-byte character and must start at its first byte.
-    let private continuationPrefixLength (bytes: byte[]) : int =
-        // DSL-MUTABLE: algorithm-scratch — UTF-8 continuation scan offset
-        let mutable start = 0
-
-        while start < bytes.Length && (bytes.[start] &&& 0xC0uy) = 0x80uy do
-            start <- start + 1
-
-        start
-
-    let private dropLeadingContinuationBytes (bytes: byte[]) (start: int) : byte[] =
-        if start = 0 then
-            bytes
-        elif start >= bytes.Length then
-            [||]
-        else
-            let len = bytes.Length - start
-            let result = Array.zeroCreate<byte> len
-            Array.blit bytes start result 0 len
-            result
-
-    let alignUtf8Tail (bytes: byte[]) : byte[] =
-        if isNull bytes || bytes.Length = 0 then
-            [||]
-        else
-            dropLeadingContinuationBytes bytes (continuationPrefixLength bytes)
-
-    type TailInput =
-        { Bytes: byte[]
-          Truncated: bool
-          TotalObservedBytes: int64 }
-
-    let readLatestTail (limitBytes: int) (path: string) : Task<TailInput> =
+    let readChunks (path: string) (consume: byte array -> Task<unit>) : Task<unit> =
         task {
-            // DSL-MUTABLE: algorithm-scratch — chunk accumulation buffer
-            let mutable latest = [||]
-            // DSL-MUTABLE: algorithm-scratch — total byte counter for observed chunks
-            let mutable observedBytes = 0L
+            let! result = readChunksJs OutputSpoolCtor path ChunkSizeBytes consume
 
-            do!
-                readChunks path (fun chunk ->
-                    task {
-                        observedBytes <- observedBytes + int64 chunk.Length
-                        latest <- retainLatestBytes limitBytes latest chunk
-                    })
-
-            let aligned =
-                if observedBytes > int64 limitBytes then
-                    alignUtf8Tail latest
-                else
-                    latest
-
-            return
-                { Bytes = aligned
-                  Truncated = observedBytes > int64 limitBytes
-                  TotalObservedBytes = observedBytes }
+            if unbox<string> result?kind <> "Read" then
+                let error: obj = result?error
+                return raise (InvalidOperationException(sprintf "spool read failed: %s" (string error?message)))
         }
 
-    let delete (path: string) : unit = NodeProcessHost.deleteFile path
+    let readAllBytes (path: string) : Task<byte array> =
+        task {
+            // DSL-MUTABLE: algorithm-scratch — chunk accumulator for one complete read
+            let parts = ResizeArray<byte array>()
+
+            do!
+                readChunks path (fun bytes ->
+                    parts.Add bytes
+                    Task.FromResult(()))
+
+            return concat (parts.ToArray())
+        }
+
+    let private unlinkIfNamed (path: string) =
+        if not (String.IsNullOrWhiteSpace path) then
+            unlinkSync path
+
+    /// Removes a finished spool file whose path the caller received in an outcome.
+    let delete (path: string) : unit =
+        try
+            unlinkIfNamed path
+        with _ ->
+            ()

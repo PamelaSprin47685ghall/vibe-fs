@@ -454,3 +454,35 @@ test('WHAT[change-integration-003] publication claim requires every explicit bin
     assert.throws(() => change.recordFact(projection, 'binding-probe', change.fact('PublishClaimed', incomplete)), /Incomplete PublishClaimed payload/, field)
   }
 })
+
+test('WHAT[change-integration-003] real git finalization refuses conflict markers even when the scan output is spooled', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { mkdtempSync, rmSync, writeFileSync, readdirSync } = await import('node:fs')
+  const { execFileSync } = await import('node:child_process')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const hostSurface = await import('../../../dist/Change/Host/Surface.js')
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-change-003-spool-'))
+  const spoolDirectory = mkdtempSync(join(tmpdir(), 'wxs-change-003-spool-files-'))
+  const previousTmp = process.env.TMPDIR
+  try {
+    execFileSync('git', ['init', '-q', repo])
+    execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'base'])
+    // More than 200 KiB of `git grep` matches: the scan output crosses the memory
+    // bound and arrives as a spooled outcome. Before CUT-20 the Git runner turned
+    // that outcome into empty stdout, so the markers were committed.
+    writeFileSync(join(repo, 'conflicted.txt'), Array.from({ length: 6000 }, (_, i) => `<<<<<<< ours ${i}\n`).join(''))
+    process.env.TMPDIR = spoolDirectory
+    const result = await hostSurface.finalizeWorktreeWithGit('manager-spool', repo)
+    assert.equal(result.ok, false)
+    assert.match(result.error, /^conflict markers remain in worktree:\nconflicted\.txt:1:<<<<<<< ours 0/)
+    assert.match(result.error, /conflicted\.txt:6000:<<<<<<< ours 5999$/)
+    assert.equal(execFileSync('git', ['-C', repo, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' }).trim(), '1')
+    assert.deepEqual(readdirSync(spoolDirectory), [], 'the Git runner removes the spool file it consumed')
+  } finally {
+    if (previousTmp === undefined) delete process.env.TMPDIR
+    else process.env.TMPDIR = previousTmp
+    rmSync(repo, { recursive: true, force: true })
+    rmSync(spoolDirectory, { recursive: true, force: true })
+  }
+})

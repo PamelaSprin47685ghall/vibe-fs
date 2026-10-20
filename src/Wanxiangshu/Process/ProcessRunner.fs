@@ -14,7 +14,6 @@ module ProcessRunner =
     open Wanxiangshu.Process.LargeGate
     open Wanxiangshu.Process.ProcessOutput
     open Wanxiangshu.Process.Deadline
-    open Wanxiangshu.Process.Spool
 
     type private HostSpawn =
         Command
@@ -66,9 +65,17 @@ module ProcessRunner =
         (waited: WaitOutcome)
         : Result<ProcessOutcome, ProcessError> =
         if waited.TimedOut then
+            abandon collector
             Error(ProcessError.TimeoutExceeded budget)
         else
-            Ok(buildResult collector waited.ExitCode)
+            buildResult collector waited.ExitCode
+
+    let private pairWithCollector (collector: OutputCollector) (spawnResult: Result<ChildProcess, string>) =
+        match spawnResult with
+        | Ok child -> Ok(child, collector)
+        | Error reason ->
+            abandon collector
+            Error(ProcessError.SpawnFailed reason)
 
     let private spawnHost
         (hostSpawn: HostSpawn)
@@ -82,10 +89,7 @@ module ProcessRunner =
                 let collector = create estimate
                 let! spawnResult = hostSpawn cmd ctx (addStdout collector) (addStderr collector) ct
 
-                return
-                    spawnResult
-                    |> Result.map (fun child -> child, collector)
-                    |> Result.mapError ProcessError.SpawnFailed
+                return pairWithCollector collector spawnResult
             with
             | _ when ct.IsCancellationRequested -> return Error(ProcessError.ProcessCancelled "Cancelled by token")
             | :? OperationCanceledException when ct.IsCancellationRequested ->
@@ -109,9 +113,15 @@ module ProcessRunner =
             // TimeoutExceeded carrying a different duration than the deadline
             // that expired is a lie the operator cannot detect.
             let budget = budgetSpan estimate ctx
-            let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
-            killQuietly child
-            return outcomeAfterWait collector budget waited
+
+            try
+                let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
+                killQuietly child
+                return outcomeAfterWait collector budget waited
+            with ex ->
+                // Cancellation or a wait failure has no outcome to own the spool file.
+                abandon collector
+                return raise ex
         }
 
     let private runAfterGate
@@ -160,6 +170,17 @@ module ProcessRunner =
         (ct: CancellationToken)
         : Task<Result<ProcessOutcome, ProcessError>> =
         runWithHost NodeProcessHost.spawn cmd estimate ctx ct
+
+    let private chunkBytes (chunkSize: int) (bytes: byte[]) : byte[][] =
+        if isNull bytes || bytes.Length = 0 then
+            [||]
+        else
+            let count = (bytes.Length + chunkSize - 1) / chunkSize
+
+            Array.init count (fun i ->
+                let offset = i * chunkSize
+                let len = Math.Min(chunkSize, bytes.Length - offset)
+                Array.sub bytes offset len)
 
     let private emitOutputChunks
         (onStdout: byte[] -> unit)

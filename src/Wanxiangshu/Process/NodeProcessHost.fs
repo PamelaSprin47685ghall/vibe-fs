@@ -9,8 +9,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.AsyncSupport
 
 /// JS-host process adapter. Non-PTY child-process execution delegates to
-/// wanxiangli/process (ProcessSession); spool-file I/O stays here so the rest
-/// of the Process namespace remains free of raw Node interop.
+/// wanxiangli/process (ProcessSession). Output spooling belongs to
+/// wanxiangli/spool through Spool.fs.
 module NodeProcessHost =
 
     [<Import("ProcessSession", "wanxiangli/process")>]
@@ -19,51 +19,11 @@ module NodeProcessHost =
     [<Import("join", "node:path")>]
     let private pathJoin (a: string) (b: string) : string = jsNative
 
-    [<Import("tmpdir", "node:os")>]
-    let private tmpdir () : string = jsNative
-
-    [<Import("writeFileSync", "node:fs")>]
-    let private writeFileSync (path: string) (data: byte[]) : unit = jsNative
-
-    [<Import("appendFileSync", "node:fs")>]
-    let private appendFileSync (path: string) (data: byte[]) : unit = jsNative
-
-    [<Import("openSync", "node:fs")>]
-    let private openSync (path: string) (flags: string) : int = jsNative
-
-    [<Import("readSync", "node:fs")>]
-    let private readSync (fd: int) (buffer: byte[]) (offset: int) (length: int) (position: int) : int = jsNative
-
-    [<Import("closeSync", "node:fs")>]
-    let private closeSync (fd: int) : unit = jsNative
-
-    [<Import("createReadStream", "node:fs")>]
-    let private createReadStream (path: string) (options: obj) : obj = jsNative
-
-    [<Import("unlinkSync", "node:fs")>]
-    let private unlinkSync (path: string) : unit = jsNative
-
-    [<Import("existsSync", "node:fs")>]
-    let private existsSync (path: string) : bool = jsNative
-
     [<Import("statSync", "node:fs")>]
     let private statSync (path: string) : obj = jsNative
 
     [<Import("accessSync", "node:fs")>]
     let private accessSync (path: string) (mode: int) : unit = jsNative
-
-    [<Emit("""
-        (async function(stream, consume) {
-            for await (const input of stream) {
-                const bytes = Buffer.from(input);
-                for (let offset = 0; offset < bytes.length; offset += 204800) {
-                    const end = Math.min(offset + 204800, bytes.length);
-                    await consume(new Uint8Array(bytes.buffer, bytes.byteOffset + offset, end - offset));
-                }
-            }
-        })($0, $1)
-    """)>]
-    let private consumeStreamAsync (stream: obj) (consume: byte[] -> Task<unit>) : Task<unit> = jsNative
 
     [<Emit("""
         ((envEntries) => {
@@ -391,59 +351,3 @@ module NodeProcessHost =
             else
                 return! spawnOrReject cmd ctx onStdout onStderr ct
         }
-
-    let tempPath () : string =
-        pathJoin (tmpdir ()) (sprintf "spool-%s.tmp" (Guid.NewGuid().ToString("N").Substring(0, 8)))
-
-    let writeFile (path: string) (data: byte[]) : unit =
-        if not (isNull data) then
-            writeFileSync path data
-
-    let appendFile (path: string) (data: byte[]) : unit =
-        if not (isNull data) && data.Length > 0 then
-            appendFileSync path data
-
-    let private unlinkIfPresent (path: string) =
-        if not (String.IsNullOrWhiteSpace path) && existsSync path then
-            unlinkSync path
-
-    let deleteFile (path: string) : unit =
-        try
-            unlinkIfPresent path
-        with _ ->
-            ()
-
-    let private applyReadStep (fd: int) (buffer: byte[]) (chunkSize: int) (position: int) (consume: byte[] -> unit) =
-        let count = readSync fd buffer 0 chunkSize position
-
-        if count <= 0 then
-            struct (position, true)
-        else
-            let chunk = Array.zeroCreate<byte> count
-            Array.blit buffer 0 chunk 0 count
-            consume chunk
-            struct (position + count, false)
-
-    let private drainAllChunks (fd: int) (chunkSize: int) (consume: byte[] -> unit) =
-        let buffer = Array.zeroCreate<byte> chunkSize
-        // DSL-MUTABLE: algorithm-scratch — read loop file offset
-        let mutable position = 0
-        // DSL-MUTABLE: algorithm-scratch — read loop done flag
-        let mutable done' = false
-
-        while not done' do
-            let struct (next, finished) = applyReadStep fd buffer chunkSize position consume
-            position <- next
-            done' <- finished
-
-    let readFileSyncChunks (path: string) (chunkSize: int) (consume: byte[] -> unit) : unit =
-        let fd = openSync path "r"
-
-        try
-            drainAllChunks fd chunkSize consume
-        finally
-            closeSync fd
-
-    let readFileAsyncChunks (path: string) (chunkSize: int) (consume: byte[] -> Task<unit>) : Task<unit> =
-        let options = createObj [ "highWaterMark" ==> chunkSize ]
-        createReadStream path options |> fun stream -> consumeStreamAsync stream consume

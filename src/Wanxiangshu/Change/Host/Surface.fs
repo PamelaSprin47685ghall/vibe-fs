@@ -504,6 +504,18 @@ module OrchestratorHostSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
+    /// The same finalization sequence through the production Git runner (real
+    /// `git` via ProcessRunner and the output spool), not a JavaScript port.
+    let finalizeWorktreeWithGit (managerId: string) (worktree: string) : Task<obj> =
+        task {
+            let! result = OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
+
+            return
+                match result with
+                | Ok _ -> box {| ok = true; error = null |}
+                | Error error -> box {| ok = false; error = error |}
+        }
+
     /// Exercise the production candidate-finalization sequence through a plain
     /// JavaScript command port without exposing Command or Result internals.
     let finalizeWorktree (runner: obj) (managerId: string) (worktree: string) : Task<obj> =

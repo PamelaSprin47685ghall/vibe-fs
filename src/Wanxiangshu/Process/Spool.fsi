@@ -2,27 +2,30 @@ namespace Wanxiangshu.Process
 
 open System.Threading.Tasks
 
+/// Host binding to `wanxiangli/spool`. The library owns memory bounds, the spool
+/// file and its write failures; this module only adapts its messages to F#.
 module Spool =
     [<Literal>]
     val ChunkSizeBytes: int = 204800
 
-    type StreamingSpool =
-        { Path: string
-          mutable BytesWritten: int64 }
+    /// One live `OutputSpool` instance from the library.
+    type OutputSpool
 
-    type TailInput =
-        { Bytes: byte array
-          Truncated: bool
-          TotalObservedBytes: int64 }
+    /// Library result of `finish()`, already decoded.
+    [<RequireQualifiedAccess>]
+    type Finished =
+        | Memory of stdout: byte array * stderr: byte array
+        | File of path: string * bytes: int64
+        | Failed of observed: int64 * written: int64 * operation: string * code: string option * message: string
 
     val chunkCount: bytes: int64 -> int
-    val startStreamingSpool: unit -> StreamingSpool
-    val appendStreamingSpool: spool: StreamingSpool -> bytes: byte array -> unit
-    val readChunksSync: path: string -> consume: (byte array -> unit) -> unit
+    val create: memoryBytes: int -> OutputSpool
+    val append: spool: OutputSpool -> channel: string -> bytes: byte array -> unit
+    val observed: spool: OutputSpool -> int64
+    val held: spool: OutputSpool -> int64
+    val isFile: spool: OutputSpool -> bool
+    val finish: spool: OutputSpool -> Finished
+    val discard: spool: OutputSpool -> unit
     val readChunks: path: string -> consume: (byte array -> Task<unit>) -> Task<unit>
-    val chunkBytes: chunkSize: int -> bytes: byte array -> byte array array
-    val spoolBytesToTempFile: bytes: byte array -> string * int64 * int
-    val retainLatestBytes: limit: int -> current: byte array -> next: byte array -> byte array
-    val alignUtf8Tail: bytes: byte array -> byte array
-    val readLatestTail: limitBytes: int -> path: string -> Task<TailInput>
+    val readAllBytes: path: string -> Task<byte array>
     val delete: path: string -> unit

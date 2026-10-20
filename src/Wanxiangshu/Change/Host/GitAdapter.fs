@@ -14,6 +14,19 @@ module OrchestratorGit =
           EstimatedOutput = OutputBytes 65536L
           EstimatedMemory = EstimatedMemory.Medium }
 
+    /// A spooled outcome still carries the complete output. Returning "" for it
+    /// made a large `git grep` for conflict markers or a long unmerged-path list
+    /// look empty. The spool file merges both channels in arrival order, so the
+    /// full text is returned as stdout; the file is removed once read.
+    let private readSpooled (path: string) : Task<string> =
+        task {
+            try
+                let! bytes = Spool.readAllBytes path
+                return Text.Encoding.UTF8.GetString(bytes, 0, bytes.Length)
+            finally
+                Spool.delete path
+        }
+
     let run (cmd: Command) : Task<int * string * string> =
         task {
             let ctx =
@@ -24,7 +37,9 @@ module OrchestratorGit =
 
             match res with
             | Ok(ProcessOutcome.Completed(code, stdout, stderr, _)) -> return (code, stdout, stderr)
-            | Ok(ProcessOutcome.Spooled(code, _, _, _)) -> return (code, "", "output spooled")
+            | Ok(ProcessOutcome.Spooled(code, path, _, _)) ->
+                let! stdout = readSpooled path
+                return (code, stdout, "")
             | Error err -> return (1, "", sprintf "%A" err)
         }
 
