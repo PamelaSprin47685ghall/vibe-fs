@@ -114,3 +114,8 @@ node scripts/check.mjs
 - 基线（master 现状，31 个文件）：`Change/Host/Types`、`Context/{Companion/Host,Companion/Transform,Prefix/Wire,Trace/Capture,Trace/TerminalReporter}`、`Execution/Delegation/*`（17 个，含 `Fork/Host/*`）、`Execution/Session/Attachment/CompanionLeaseRuntime`、`Interaction/Dispatch/*`（5）、`Interaction/Repair/*`（2）、`Mission/Manager/Workflow`、`Participant/Provider/Attempt/Fallback/Workflow`。这是后续 CUT-11/12/25/34 收窄的待办清单，不是验收。
 - 负控（同一 `sdk-boundary-negative.mjs`）：新文件 `open`（N5）、限定名引用（N6）各报 1 条；注释里的引用不报（N7）；基线文件 `Context/Prefix/Wire.fs` 去掉引用而基线未删 → 报 1 条（N8）。
 - 全量 `node scripts/check.mjs` 输出与子范围①落地后逐行相同（既有 test 层报告，返回码 1 不变）。
+
+### 子范围③：删除三处无用的适配层 `open`（棘轮 31 → 28，eng-cut17f-goose）
+
+- `Execution/Delegation/Fork/Host/{Agent,Join}.fs`、`Execution/Delegation/Handle/CompletionCodec.fs` 的 `open Wanxiangshu.OpenCode` 未被使用（文件中没有该命名空间下 255 个类型/模块名的任何引用，也没有限定名引用）。删除后同刀从基线移除三条。
+- 证据：全新构建（generation 40，`js-module-linkage` 725 个模块链接加载 OK）；三个文件的 Fable 产物与删除前（同一源码基线 generation 39）`cmp` 逐字节相同——行为不可能改变。`architecture.mjs` OK。

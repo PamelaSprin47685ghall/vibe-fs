@@ -31,7 +31,6 @@ open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

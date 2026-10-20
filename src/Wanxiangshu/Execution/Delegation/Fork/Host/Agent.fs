@@ -36,7 +36,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.OpenCode
 
 /// Existing-child send must use the session's bound managed agent.
 /// Never invent a managed name from CanonicalRole; never let the caller overwrite the bound agent.
