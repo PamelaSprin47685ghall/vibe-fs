@@ -49,13 +49,24 @@ const handleOf = (doc) => {
 }
 
 const completePart = async (hooks, session, call, run) => {
-  if (typeof hooks['message.part.updated'] !== 'function') return
-  await hooks['message.part.updated']({
-    sessionID: session,
-    tool: 'todowrite-for-plan',
-    callID: call,
-    status: 'completed',
-    messageID: run,
+  // WHAT[049]: the interrupt fires on the Host's confirmation of this very
+  // ask tool result — `message.part.updated` with a completed tool part.
+  // The plugin registers the `event` hook, so the envelope must be the real
+  // Host event shape.
+  await hooks.event({
+    event: {
+      type: 'message.part.updated',
+      properties: {
+        sessionID: session,
+        part: {
+          type: 'tool',
+          tool: 'todowrite-for-plan',
+          callID: call,
+          messageID: run,
+          state: { status: 'completed', input: {} },
+        },
+      },
+    },
   })
 }
 
@@ -72,7 +83,12 @@ test('WHAT[049] ask parks and records the question before the attempt interrupt'
     assert.equal(notices.length, 1)
     const before = runtime.abortedIds.length
     await completePart(hooks, session, 'ask-call', 'ask-run')
-    assert.ok(runtime.abortedIds.length >= before, 'interrupt follows the recorded tool result')
+    assert.equal(
+      runtime.abortedIds.length,
+      before + 1,
+      'the confirmed ask tool result interrupts this attempt exactly once',
+    )
+    assert.equal(runtime.abortedIds.at(-1), session, 'the interrupt targets the asking session')
   })
 })
 
@@ -85,8 +101,9 @@ test('WHAT[049] a repeated completed event does not interrupt twice', async () =
     )
     await completePart(hooks, session, 'repeat-call', 'repeat-run')
     const afterFirst = runtime.abortedIds.length
+    assert.equal(afterFirst, 1, 'the first confirmed terminal event interrupts exactly once')
     await completePart(hooks, session, 'repeat-call', 'repeat-run')
-    assert.equal(runtime.abortedIds.length, afterFirst)
+    assert.equal(runtime.abortedIds.length, afterFirst, 'a repeated terminal event does not interrupt twice')
   })
 })
 

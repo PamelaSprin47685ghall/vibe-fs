@@ -31,6 +31,32 @@ const openWork = async (store, commonDir, workId) => {
   return folded.activeId
 }
 
+// The provider request the transform hook adjudicates. WHAT[work-026]/[011]:
+// the delivery stop happens at the transform hook's delivery-adjudication
+// stage, so the request under test must carry the physical user message the
+// delivery was bound to.
+const providerRequest = (sessionID, userMessageId, assistantMessageId) => ({
+  messages: [
+    {
+      role: 'user',
+      info: { id: userMessageId, sessionID, role: 'user' },
+      parts: [{ type: 'text', text: 'Plan the feature.' }],
+    },
+    {
+      role: 'assistant',
+      info: {
+        id: assistantMessageId,
+        sessionID,
+        role: 'assistant',
+        parentID: userMessageId,
+        providerID: 'provider',
+        modelID: 'plan-model',
+      },
+      parts: [],
+    },
+  ],
+})
+
 test('WHAT[work-026] authorized deliver without retirement evidence fails closed with no spawn', async () => {
   await withWorkspace(async (store, root, commonDir) => {
     const workId = 'work-d3'
@@ -64,7 +90,12 @@ test('WHAT[work-026] S3 authorized deliver enters post-S3 state without starting
       parts: [{ type: 'text', text: 'Plan the feature.' }],
     })
 
-    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, planRoot, sessionID, 0n)
+    // The work is opened with the root production uses: the transform hook
+    // opens the plan work at the git worktree root of the session
+    // (`PlanWorkOpenWiring.ensurePlanWorkOpenedForSession`). Opening it at
+    // any other root makes the transform hook refuse this session with
+    // "existing lifecycle work has a different root".
+    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, directory, sessionID, 0n)
     assert.equal(opened.ok, true, opened.error)
 
     // Advance S1 -> S2 -> S3 -> authorized
@@ -103,25 +134,39 @@ test('WHAT[work-026] S3 authorized deliver enters post-S3 state without starting
     // synthesized Accepted/execution session exists until the user commands
     // the real spawn.
     assert.equal(life.inspected(commonDir, sessionID).PendingDelivery, true, 'a DeliveryRequested is durably pending the execution handoff')
-    assert.deepEqual(runtime.abortedIds, [], 'interrupt happens when Host confirms the deliver tool part completed')
+    // WHAT[work-026]/[011]: the deliver tool registers the "delivery is
+    // established" fact only. The stop happens at the transform hook's
+    // delivery-adjudication stage: the tool must not interrupt by itself.
+    assert.deepEqual(runtime.abortedIds, [], 'the deliver tool does not interrupt; the transform hook does')
 
-    // Host confirms deliver tool part completed -> interrupts conversation like ask
-    await hooks.event({
-      event: {
-        type: 'message.part.updated',
-        properties: {
-          part: {
-            type: 'tool',
-            sessionID,
-            messageID: 'run-s3-deliver',
-            tool: 'deliver',
-            callID: 'call-s3-deliver',
-            state: { status: 'completed', input: {}, output: postS3Reply },
-          },
-        },
-      },
-    })
-    assert.deepEqual(runtime.abortedIds, [sessionID], 'post-S3 deliver must interrupt the conversation')
+    // The provider request of the delivering attempt. The delivery is bound
+    // to the physical input the delivering call answered, so the request
+    // under adjudication must carry that same physical input.
+    const delivering = providerRequest(sessionID, 'user-plan-root', 'run-s3-deliver')
+    await hooks['experimental.chat.messages.transform']({ sessionID }, delivering)
+
+    assert.deepEqual(
+      runtime.abortedIds,
+      [sessionID],
+      'the transform hook interrupts this attempt after an established delivery',
+    )
+    assert.equal(
+      delivering.messages.length,
+      0,
+      'the transform hook clears the request messages so the model does not see the deliver receipt',
+    )
+
+    // A second request on the SAME physical input is still stopped (the
+    // delivery is still the answer to that input), but the interrupt is
+    // issued once: "issued" and "observed" are two separately recorded facts.
+    const repeated = providerRequest(sessionID, 'user-plan-root', 'run-s3-deliver')
+    await hooks['experimental.chat.messages.transform']({ sessionID }, repeated)
+    assert.equal(
+      runtime.abortedIds.length,
+      1,
+      'the interrupt of this attempt is issued once, not once per request',
+    )
+    assert.equal(repeated.messages.length, 0, 'the repeated request on the same physical input is still cleared')
 
     // User commands deliver in post-S3 state -> starts S4 (first time)
     runtime.pushHostMessage(sessionID, {
@@ -180,5 +225,88 @@ test('WHAT[work-026] S3 authorized deliver enters post-S3 state without starting
     assert.equal(createdIds.length, 2, 'a replayed delivering fence must not start an execution session')
     assert.equal(life.inspect(commonDir, sessionID).revision, settled, 'a replayed delivering fence appends nothing')
     assert.equal(life.inspected(commonDir, sessionID).Delivered, true, 'the work stays delivered and the tenure is not reopened')
+  })
+})
+
+test('WHAT[work-026] a new user input after the delivery is not stopped by that delivery', async () => {
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
+    const planRoot = join(commonDir, 'wanxiangshu')
+    const sessionID = 'ses-plan-post-s3-new-input'
+    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
+    runtime.pushHostMessage(sessionID, {
+      info: { id: 'user-plan-root', role: 'user', sessionID, time: { created: 1 } },
+      parts: [{ type: 'text', text: 'Plan the feature.' }],
+    })
+
+    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, directory, sessionID, 0n)
+    assert.equal(opened.ok, true, opened.error)
+
+    for (let stage = 1; stage <= 3; stage += 1) {
+      const activeId = life.inspected(commonDir, sessionID).ActiveId
+      await surface.PlanningSurface.executeReview(commonDir, sessionID, activeId, [], null)
+      if (stage < 3) {
+        await surface.PlanningSurface.executeDeliver(
+          commonDir, planRoot, sessionID, activeId, `run-s${stage}`, `call-s${stage}`, false,
+          { create: async () => 'unexpected', prompt: async () => ({ kind: 'Started' }), discard: async () => {} },
+          0n,
+        )
+      }
+    }
+    surface.PlanningSurface.rewritePlanAtomic(planRoot, sessionID, '# Final S3 Plan\n\nAlgorithm A.\n')
+
+    runtime.pushHostMessage(sessionID, {
+      info: { id: 'run-s3-deliver', role: 'assistant', sessionID, parentID: 'user-plan-root', time: { created: 2 } },
+      parts: [{ type: 'tool', tool: 'deliver', callID: 'call-s3-deliver', state: { status: 'pending', input: {} } }],
+    })
+    await hooks.tool.deliver.execute(
+      {},
+      { sessionID, agent: 'plan', callID: 'call-s3-deliver', messageID: 'run-s3-deliver', providerRunID: 'run-s3-deliver' },
+    )
+
+    // A real new user input arrives AFTER the delivery. It is a different
+    // physical input, so the delivery must not aim its stop at it.
+    const newInput = {
+      id: 'user-new-input',
+      role: 'user',
+      agent: 'plan',
+      sessionID,
+      model: { providerID: 'provider', modelID: 'plan-model' },
+    }
+    runtime.pushHostMessage(sessionID, {
+      info: { ...newInput, time: { created: 3 } },
+      parts: [{ type: 'text', text: 'Now execute the plan.' }],
+    })
+    await hooks['chat.message']({ sessionID, agent: 'plan', messageID: 'user-new-input' }, {
+      message: newInput,
+      parts: [{ type: 'text', text: 'Now execute the plan.' }],
+    })
+    runtime.pushHostMessage(sessionID, {
+      info: {
+        id: 'run-new-input',
+        role: 'assistant',
+        sessionID,
+        parentID: 'user-new-input',
+        providerID: 'provider',
+        modelID: 'plan-model',
+        time: { created: 4 },
+        finish: 'stop',
+      },
+      parts: [],
+    })
+
+    const request = providerRequest(sessionID, 'user-new-input', 'run-new-input')
+    await hooks['experimental.chat.messages.transform']({ sessionID }, request)
+
+    assert.deepEqual(
+      runtime.abortedIds,
+      [],
+      'a new physical input is not stopped by the delivery bound to the previous input',
+    )
+    assert.equal(
+      request.messages.length,
+      2,
+      'the new input request is not cleared by the previous delivery',
+    )
   })
 })
