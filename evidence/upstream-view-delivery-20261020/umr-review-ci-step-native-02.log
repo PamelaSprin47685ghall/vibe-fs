@@ -1,0 +1,126 @@
+TAP version 13
+# Subtest: WHAT[verification-system-005] unused plugin fixtures defer production entry failures until activation
+    # Subtest: WHAT[verification-system-005] import does not activate the rejected plugin entry
+    ok 1 - WHAT[verification-system-005] import does not activate the rejected plugin entry
+      ---
+      duration_ms: 229.89525
+      ...
+    # Subtest: WHAT[verification-system-005] skip does not activate the rejected plugin entry
+    ok 2 - WHAT[verification-system-005] skip does not activate the rejected plugin entry
+      ---
+      duration_ms: 189.334042
+      ...
+    1..2
+ok 1 - WHAT[verification-system-005] unused plugin fixtures defer production entry failures until activation
+  ---
+  duration_ms: 825.740708
+  ...
+# Subtest: WHAT[verification-system-005] activating the fixture still loads and creates the real plugin
+ok 2 - WHAT[verification-system-005] activating the fixture still loads and creates the real plugin
+  ---
+  duration_ms: 602.031
+  ...
+# Subtest: WHAT[verification-system-005] reporter failure during consumption cannot strand the runner after source close
+ok 3 - WHAT[verification-system-005] reporter failure during consumption cannot strand the runner after source close
+  ---
+  duration_ms: 0.737375
+  ...
+# Subtest: WHAT[verification-system-005] reporter failure after source completion is reported and cannot produce a successful drain
+ok 4 - WHAT[verification-system-005] reporter failure after source completion is reported and cannot produce a successful drain
+  ---
+  duration_ms: 0.334125
+  ...
+# Subtest: WHAT[verification-system-005] successful reporter drains every event before reporting completion
+ok 5 - WHAT[verification-system-005] successful reporter drains every event before reporting completion
+  ---
+  duration_ms: 0.454333
+  ...
+# Subtest: WHAT[verification-system-005] the real CI verification step preserves failure and success exit codes
+ok 6 - WHAT[verification-system-005] the real CI verification step preserves failure and success exit codes
+  ---
+  duration_ms: 3258.938458
+  ...
+# Subtest: WHAT[verification-system-005] traversal errors are not masked (cause preserved)
+ok 7 - WHAT[verification-system-005] traversal errors are not masked (cause preserved)
+  ---
+  duration_ms: 0.878083
+  ...
+# Subtest: WHAT[verification-system-005] verify halts and marks subsequent steps not-run when format:check fails
+ok 8 - WHAT[verification-system-005] verify halts and marks subsequent steps not-run when format:check fails
+  ---
+  duration_ms: 87.432833
+  ...
+# Subtest: WHAT[verification-system-005] verify halts and marks subsequent steps not-run when check fails
+ok 9 - WHAT[verification-system-005] verify halts and marks subsequent steps not-run when check fails
+  ---
+  duration_ms: 72.959083
+  ...
+# Subtest: WHAT[verification-system-005] verify halts and marks subsequent steps not-run when build fails
+ok 10 - WHAT[verification-system-005] verify halts and marks subsequent steps not-run when build fails
+  ---
+  duration_ms: 73.192583
+  ...
+# check.mjs: FAILED with 1 issue(s) across 1 gate(s)
+# Gate: /var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/gate-failure-hNwSfF/gate.mjs (1 issue(s))
+#   - [fail] controlled violation
+# check.mjs: fatal error: Cannot find module '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/gate-failure-hNwSfF/missing.mjs' imported from /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/scripts/check.mjs
+# check.mjs: fatal error: controlled failure
+# Subtest: WHAT[verification-system-005] rejected, missing and throwing gates return failure
+ok 11 - WHAT[verification-system-005] rejected, missing and throwing gates return failure
+  ---
+  duration_ms: 3.200333
+  ...
+# Subtest: WHAT[verification-system-005] waitAny fatal cancellation removes every registered waiter
+ok 12 - WHAT[verification-system-005] waitAny fatal cancellation removes every registered waiter
+  ---
+  duration_ms: 0.381458
+  ...
+# Subtest: WHAT[verification-system-005] waitAny rejects an open or malformed alternative set
+ok 13 - WHAT[verification-system-005] waitAny rejects an open or malformed alternative set
+  ---
+  duration_ms: 0.0765
+  ...
+# Subtest: WHAT[verification-system-005] walk throws on a missing root instead of returning an empty array
+ok 14 - WHAT[verification-system-005] walk throws on a missing root instead of returning an empty array
+  ---
+  duration_ms: 0.145459
+  ...
+# Subtest: WHAT[verification-system-005] walk throws on a non-directory root instead of returning [root]
+ok 15 - WHAT[verification-system-005] walk throws on a non-directory root instead of returning [root]
+  ---
+  duration_ms: 0.332917
+  ...
+# Subtest: WHAT[verification-system-005] walk throws on a nested unreadable directory instead of silently skipping it
+ok 16 - WHAT[verification-system-005] walk throws on a nested unreadable directory instead of silently skipping it
+  ---
+  duration_ms: 0.6475
+  ...
+# Subtest: WHAT[verification-system-005] walk rejects a symlink entry instead of following or skipping it
+ok 17 - WHAT[verification-system-005] walk rejects a symlink entry instead of following or skipping it
+  ---
+  duration_ms: 0.502209
+  ...
+# Subtest: WHAT[verification-system-005] walk rejects a symlink root instead of following it
+ok 18 - WHAT[verification-system-005] walk rejects a symlink root instead of following it
+  ---
+  duration_ms: 0.603959
+  ...
+# Subtest: WHAT[verification-system-005] walk returns sorted matching paths on a normal tree
+ok 19 - WHAT[verification-system-005] walk returns sorted matching paths on a normal tree
+  ---
+  duration_ms: 0.892916
+  ...
+# Subtest: WHAT[verification-system-005] walk preserves the SKIP directory set
+ok 20 - WHAT[verification-system-005] walk preserves the SKIP directory set
+  ---
+  duration_ms: 0.858
+  ...
+1..20
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5003.907542

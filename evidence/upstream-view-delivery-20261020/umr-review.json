@@ -215,7 +215,8 @@
     },
     "currentStatic": {
       "status": "passed",
-      "log": "umr-review-static-15.log"
+      "exit": 0,
+      "log": "umr-review-static-final.log"
     },
     "currentFormat": {
       "status": "passed",
@@ -224,8 +225,9 @@
     },
     "currentBuild": {
       "status": "passed",
-      "generation": 90,
-      "log": "umr-review-build-27.log"
+      "exit": 0,
+      "generation": 91,
+      "log": "umr-review-build-28.log"
     },
     "integrationInitial": {
       "generation": 75,
@@ -487,8 +489,47 @@
       "log": "umr-review-ci-f042-failed.log"
     },
     "githubCi": {
-      "state": "AWAITING_PUSH_OF_CI_AND_CHECKPOINT_FIX",
-      "note": "The final PR will link the complete Ubuntu run for the repaired workflow and exact source commit. Prior failures remain recorded separately."
+      "state": "AWAITING_PUSH_OF_CI_STEP_FIX",
+      "note": "The next full Ubuntu run will verify the unchanged production source plus the precise CI self-test selector."
+    },
+    "githubCiBeforeStepFix": {
+      "state": "completed",
+      "sourceCommit": "85274a7e6cdf1a7911a3c2cc702c780fd5f100ab",
+      "runId": 39487308093,
+      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39487308093",
+      "conclusion": "failure",
+      "unit": {
+        "passed": 4378,
+        "failed": 1,
+        "skipped": 194,
+        "todo": 277,
+        "files": 756
+      },
+      "failure": "verification-system-005 selected the first multiline workflow run and executed the newly added ripgrep installation rather than the verification step. All nine rg failures from the prior run are gone.",
+      "log": "umr-review-ci-85274-failed.log"
+    },
+    "ciStepNativeFirst": {
+      "passed": 21,
+      "failed": 1,
+      "log": "umr-review-ci-step-native.log",
+      "failure": "Splitting workflow steps removed the final line terminator; the extraction regex omitted the closing fi. The corrected regex includes an end-of-step line."
+    },
+    "ciStepNative": {
+      "passed": 22,
+      "failed": 0,
+      "log": "umr-review-ci-step-native-02.log",
+      "scope": "Run the exact id: verify shell block with controlled exit 7 and 0; the real verification script remains unchanged."
+    },
+    "ciStepFormal": {
+      "status": "passed",
+      "generation": 91,
+      "passed": 22,
+      "failed": 0,
+      "plannedFiles": 1,
+      "drainedFiles": 1,
+      "reclamationAccepted": true,
+      "wallSeconds": 4.43,
+      "log": "umr-review-ci-step-formal.log"
     }
   },
   "resolved": [
@@ -563,6 +604,10 @@
     {
       "id": "CHECKPOINT-FIXTURE",
       "change": "Match exact tool call results, execute view and no-view operations in one controlled turn, explicitly deliver, and require successful native ToolParts for all three calls before asserting checkpoints."
+    },
+    {
+      "id": "CI-STEP-SELF-TEST",
+      "change": "Select the workflow step by id: verify and include its last line before executing real failure and success exit-code assertions."
     }
   ],
   "remaining": [
@@ -586,11 +631,11 @@
         "conflictedPaths": 56
       },
       "finalTrial": {
-        "head": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
+        "head": "85274a7e6cdf1a7911a3c2cc702c780fd5f100ab",
         "base": "08a350dc52ee4a9f04b6e84679139018aa39ee91",
         "exit": 1,
         "conflictedPaths": 72,
-        "log": "umr-review-upstream-conflicts.log"
+        "log": "umr-review-upstream-conflicts-final.log"
       }
     },
     {
@@ -641,9 +686,9 @@
   "mergeCommit": "f2f30d3fa7fd1fc84685b9c32cb4128f5999a4b3",
   "submoduleCommit": "a12ff4a99d401d9a8e8d9c57cb9a0eb1173a7d1b",
   "candidate": {
-    "generation": 90,
+    "generation": 91,
     "compilerInputDigest": "1014511c090d14b71548f0134e62cff179e86540cd6d4c4058280d36a6ca3597",
-    "generatedInputDigest": "b8bde9ad6f12f773f5c9dcedf40c231ac57b81114f579b23443f91700e28e621",
+    "generatedInputDigest": "1ed1abc1993b1ce2189ac5056163cf2c80c4151f9cc55e603b7066b1d9d78632",
     "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
   },
   "formalAcceptance": false,
@@ -653,7 +698,7 @@
     "generatedInputDigest": "2ca568febaf7a88aff7ab281af40997335cd906168c8e46f03e63e353e271b4b",
     "artifactsInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
   },
-  "sourceCommit": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
+  "sourceCommit": "85274a7e6cdf1a7911a3c2cc702c780fd5f100ab",
   "push": {
     "originMaster": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
     "originPrBranch": "codex/upstream-plan-20261020",
@@ -661,5 +706,6 @@
     "force": false,
     "transport": "existing SSH identity",
     "httpsAttempt": "GitHub rejected the OAuth token because workflow scope was absent; no remote refs changed by that atomic attempt."
-  }
+  },
+  "sourceCommitNote": "The CI self-test selector correction is staged on this source commit; the final GitHub CI receipt will identify the committed candidate."
 }

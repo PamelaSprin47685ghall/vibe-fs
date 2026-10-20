@@ -262,3 +262,5 @@ join 的实际阻断来自夹具重复装载插件；去除额外全局配置后
 gen88 的真实 Long Stroke 已走完五次 Manager 任期、provider 故障恢复、交付与 join、冲突修复和发布，5 pass / 0 fail；发行包 1366 成员及仓外消费通过。完整集成按既有 CI 参数运行后为680 pass / 1 fail / 7 skip / 7 TODO，40/40文件排空；分发通过，harness 291 pass / 0 fail。唯一失败的 checkpoint 旧夹具只回复正文并把任意历史工具结果当作新调用证据。隔离诊断中，它曾报告通过，却只实际执行两个带 view 的调用，没有执行无 view 调用，并产生13次补交付提醒。夹具现在按精确 callID 依次执行带 view、无 view 两次调用，最后显式交付；从真实 Host ToolPart 核对三次成功结果后再验两个会话各自的 checkpoint。旧失败及最终定向复验分别保留。
 
 修复提交 f04201465 的 GitHub CI 已越过历史检出门，但 Ubuntu runner 没有 rg，9项实际搜索验证因此失败。工作流补装 ripgrep 并记录版本，不跳过搜索验证。与已观察新上游08a350dc5的最终预演为72个冲突文件；固定接收点之后的75个提交仍属下一轮，PR保持Draft。后续提交、完整远端CI和最终验收状态以复核收据为准。
+
+85274a7e6 的 Ubuntu 单测消除了全部9项搜索失败，结果为4378 pass / 1 fail / 194 skip / 277 TODO。唯一剩余项是 verification-system [005] 按“第一个多行 run”截取 CI 脚本，错误执行了新增的安装步骤；改按既有 id: verify 定位真实步骤，继续实测失败7和成功0的退出码。生产实现、CI验证脚本、门禁时限及 TODO 策略不变。

@@ -107,7 +107,9 @@ test('WHAT[verification-system-005] successful reporter drains every event befor
 
 test('WHAT[verification-system-005] the real CI verification step preserves failure and success exit codes', () => {
   const workflow = fixtureFs.readFileSync(new URL('../../../.github/workflows/ci.yml', import.meta.url), 'utf8')
-  const block = workflow.match(/        run: \|\n((?:          .*\n)+)/)
+  const step = workflow.split('\n      - ').find((entry) => entry.includes('\n        id: verify\n'))
+  assert.ok(step, 'the CI verification step must have its stable id')
+  const block = step.match(/        run: \|\n((?:          .*(?:\n|$))+)/)
   assert.ok(block, 'the CI verification shell step must exist')
   const script = block[1].split('\n').map((line) => line.slice(10)).join('\n')
   const directory = fixtureFs.mkdtempSync(fixturePath.join(fixtureTmpdir(), 'ci-exit-'))
