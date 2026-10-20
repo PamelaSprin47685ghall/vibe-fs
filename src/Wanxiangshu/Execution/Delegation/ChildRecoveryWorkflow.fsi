@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

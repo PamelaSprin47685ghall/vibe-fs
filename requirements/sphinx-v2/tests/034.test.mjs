@@ -11,6 +11,7 @@ import {
 import {capabilities} from '../../../dist/Sphinx/V2/Hosts/OpenCode/Surface.js'
 import {Host, admittedWithReceipt, withHost, hostRequest} from './host-support.mjs'
 import {retryable, fatal, acceptanceUnknown} from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import {recordDeliveredValue} from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
 const refusalOf = result => {
   assert.equal(isError(result), true, 'expected a refused decode')
@@ -167,6 +168,7 @@ test('WHAT[sphinx-v2-034] a transport receipt remains pending until actual manag
     assert.notEqual(accepted.promptKey, hostRequest().payload.dispatchIntentId)
     assert.equal(await Host.settleHostTerminal(probe, prompt.sessionId, 'foreign-physical', physical.authorityRootUserMessageId, 'foreign-run', 'foreign answer'), false)
     assert.deepEqual(await remainsPending(completion), {kind: 'pending'})
+    recordDeliveredValue(prompt.sessionId, 'actual formal answer')
     assert.equal(await Host.settleHostTerminal(probe, prompt.sessionId, physical.physicalUserMessageId, physical.authorityRootUserMessageId, 'actual-provider-run', 'actual formal answer'), true)
     assert.deepEqual(await completion, {
       ok: true, value: {

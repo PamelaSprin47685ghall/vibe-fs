@@ -11,8 +11,8 @@ type AgentRunResult =
     {
         SessionId: SessionId
         AuthorityRootUserMessageId: AuthorityRootUserMessageId
-        /// The provider run that reached terminal. HOST-011: this is the assistant
-        /// message id, which is also what tool calls in that run observed.
+        /// The provider run that completed or committed the explicit delivery.
+        /// HOST-011: this is the assistant message id observed by its tool calls.
         ProviderRun: ProviderRunIdentity
         Role: Role
         /// The worktree this run executed in, when it has one.
@@ -22,10 +22,8 @@ type AgentRunResult =
         /// did exactly that before passing it on, which means the sentinel was
         /// converted back into an option one layer later anyway.
         Directory: string option
-        /// Terminal output for this run (HOST-005 / COMPANION-003): formal text
-        /// plus host-visible reasoning. Excludes tool raw streams. Becomes the
-        /// XTrace's terminal segment for that run; not also a parallel
-        /// session-wide text.
+        /// Reconciled terminal text, or the sealed view of an explicit delivery.
+        /// The delivery witness keeps its pre-call formal text separately.
         TerminalText: string
         /// This turn's formal assistant text only, without reasoning. Used for
         /// interaction-repair terminal-validity checks (COMPANION-005).

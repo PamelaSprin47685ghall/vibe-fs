@@ -342,7 +342,7 @@ test('WHAT[participant-identity-008] rejects old Predictor authority and mismatc
   authorityCase(current)[1].IdentitySeed[1].SelectedAgent = 'predictor'
   const currentResult = factCodec.decode(JSON.stringify(current))
   assert.equal(currentResult.ok, false)
-  assert.match(currentResult.error, /Role mismatch/)
+  assert.match(currentResult.error, /SelectedAgent is unknown: predictor/)
 
   for (const selected of ['predictor', 'devops', 'bookkeeper']) {
     const legacy = JSON.parse(legacyHumanRootLine(createRoot()))
@@ -351,7 +351,7 @@ test('WHAT[participant-identity-008] rejects old Predictor authority and mismatc
     payload.CanonicalRole = 'engineer'
     const result = factCodec.decode(JSON.stringify(legacy))
     assert.equal(result.ok, false, `${selected} cannot recover Engineer authority from a legacy claim`)
-    assert.match(result.error, /CanonicalRole mismatch/)
+    assert.match(result.error, selected === 'predictor' ? /SelectedAgent is unknown: predictor/ : /CanonicalRole mismatch/)
   }
 
   const validDevOps = JSON.parse(legacyHumanRootLine(createRoot()))

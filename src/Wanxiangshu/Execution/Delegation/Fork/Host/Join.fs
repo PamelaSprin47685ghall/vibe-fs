@@ -51,20 +51,17 @@ module HostForkJoin =
         | Done of Result<JoinWaitOutcome<JoinItem>, ForkError>
         | Retry
 
-    /// host-boundary-021 / EXEC-009 / participant-horizon-011: a durable handle is
-    /// actionable only while THIS process established its agent. A child cancelled
-    /// by its own process stays established (durable Abandoned, consequence not
-    /// yet consumed) even after its runtime is replaced, so that process still
-    /// sees it and join can consume it. After a restart the journal still carries
-    /// the previous process's handles; join must not consume them and the horizon
-    /// roster must not present them. Join admission and HorizonTool share this
-    /// one predicate so the two surfaces cannot disagree.
-    let currentProcessHandle (runtime: HostForkRuntime) (record: HandleRecord) =
+    /// Admitted work remains an obligation after restart. A bare historical
+    /// binding does not establish work or restore a process-local tool resource.
+    let ownerWorkHandle (runtime: HostForkRuntime) (record: HandleRecord) =
         match HandleId.tryAgent record.Handle with
         | None -> false
         | Some handleId ->
             let agentId = AgentHandleId.value handleId
-            runtime.OwnsAgent agentId || runtime.EstablishedByProcess agentId
+
+            record.Work.IsSome
+            || runtime.OwnsAgent agentId
+            || runtime.EstablishedByProcess agentId
 
     let private neverCompleting<'T> () : Task<'T> =
         (TaskCompletionSource<'T>(TaskCreationOptions.RunContinuationsAsynchronously))
@@ -140,7 +137,7 @@ module HostForkJoin =
                     runtime.ParentId
                     cap
                     (runtime.Clock.UtcNow())
-                    (currentProcessHandle runtime)
+                    (ownerWorkHandle runtime)
 
             match drained with
             | Error e -> return Some(Error e)
@@ -305,8 +302,10 @@ module HostForkJoin =
         | None -> false
 
     let private handleIsActiveJoinTarget (runtime: HostForkRuntime) (record: HandleRecord) =
-        currentProcessHandle runtime record
-        && (handleHasJoinableOutcome record || agentHasPendingRun runtime record.Handle)
+        ownerWorkHandle runtime record
+        && (handleHasJoinableOutcome record
+            || (record.Work.IsSome && record.Lifecycle = HandleLifecycle.Active)
+            || agentHasPendingRun runtime record.Handle)
 
     let private journalHasActiveJoinHandles (runtime: HostForkRuntime) (durable: AgentJournal) =
         AgentJournal.handleProjection durable runtime.ParentId
@@ -488,7 +487,7 @@ module HostForkJoin =
         (laneIndex: int)
         (record: HandleRecord)
         =
-        currentProcessHandle runtime record
+        ownerWorkHandle runtime record
         && agentHandleAllowedOnLane durable groupId laneIndex record
 
     let private fissionLaneHasWork

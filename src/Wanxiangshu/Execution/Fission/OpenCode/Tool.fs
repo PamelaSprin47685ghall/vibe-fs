@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Fission.OpenCode
 
+open FsToolkit.ErrorHandling
+
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks
@@ -135,8 +137,8 @@ module FissionTool =
                                PayloadRef = blob.BlobRef
                                PayloadDigest = blob.BlobDigest |})
 
-                match appended with
-                | Error failure ->
+                appended
+                |> Result.teeError (fun failure ->
                     Diagnostic.emit
                         "fission-capture-fact-append-failed"
                         [ "session_id", SessionId.value owner
@@ -145,8 +147,8 @@ module FissionTool =
                               "fission completion captured fact append failed: group=%s completion=%s reason=%s"
                               groupId
                               completionId
-                              failure ]
-                | Ok() -> ()
+                              failure ])
+                |> ignore
 
                 return ()
         }
@@ -221,8 +223,8 @@ module FissionTool =
                 | Ok _ ->
                     let! appended = appendDelivery durable owner None groupId completionId lane.Index
 
-                    match appended with
-                    | Error failure ->
+                    appended
+                    |> Result.teeError (fun failure ->
                         Diagnostic.emit
                             "fission-delivery-fact-append-failed"
                             [ "session_id", SessionId.value owner
@@ -232,8 +234,8 @@ module FissionTool =
                                   groupId
                                   completionId
                                   lane.Index
-                                  failure ]
-                    | Ok() -> ()
+                                  failure ])
+                    |> ignore
 
                     return ()
         }
@@ -253,8 +255,8 @@ module FissionTool =
             if laneClosed then
                 let! appended = appendDelivery durable owner None groupId completionId lane.Index
 
-                match appended with
-                | Error failure ->
+                appended
+                |> Result.teeError (fun failure ->
                     Diagnostic.emit
                         "fission-delivery-fact-append-failed"
                         [ "session_id", SessionId.value owner
@@ -264,8 +266,8 @@ module FissionTool =
                               groupId
                               completionId
                               lane.Index
-                              failure ]
-                | Ok() -> ()
+                              failure ])
+                |> ignore
 
                 return ()
             else

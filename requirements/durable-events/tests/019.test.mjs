@@ -133,8 +133,8 @@ test('WHAT[durable-events-019] every registered business oracle changes its prod
             case: 'TerminalOutputCaptured',
             payload: {
               SessionId: 'canonical-session',
-              TextRef: 'blob-term',
-              TextDigest: 'sha-term',
+              TextRef: payload.blobRef,
+              TextDigest: payload.blobDigest,
               ProviderRun: 'run-term',
             },
           },

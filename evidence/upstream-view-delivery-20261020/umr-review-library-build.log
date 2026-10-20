@@ -1,0 +1,12 @@
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/Wanxiangli.Time.Node.fsproj, FCS time: 701 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs (22,12): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs (25,12): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs (86,28): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time/Temporal.fs, Fable time: 3 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs, Fable time: 38 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTime.fs, Fable time: 5 ms
+[build] time-node: 968 ms

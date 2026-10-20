@@ -197,6 +197,7 @@ module ProcessRunner =
         let host command _ onStdout onStderr _ =
             task {
                 let cancellation = new CancellationTokenSource()
+                // DSL-MUTABLE: resource — retain the injected launcher's observed end.
                 let ending = ref EndEvidence.Unconfirmed
 
                 let child =

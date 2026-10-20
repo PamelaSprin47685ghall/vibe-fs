@@ -3,6 +3,7 @@ namespace Wanxiangshu.Change.Host
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable
@@ -28,7 +29,7 @@ open Wanxiangshu.Process
 /// successor incumbency in the same record, so a Relayed retirement whose
 /// successor is already walking has no fresh signal to give: ManagerWorkflow owns
 /// that hand-off's one physical prompt through the ManagerLoopGate occasion, and
-/// Change's part is to wait on durable change (`awaitDispatchedWait`). Reporting
+/// Change's part is to wait on durable change. Reporting
 /// the consumed retirement again on every read instead drives the program through
 /// `AwaitLoopSignal` → `ContinueLoop` without ever blocking; in the plugin build
 /// that unbounded promise chain starves the Host's event loop, so the road freezes
@@ -293,19 +294,19 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | Some record -> Ok record
         | None -> Error(sprintf "No durable job record for '%s'" (ManagerJobId.value jobId))
 
-    let lifecycleWorkOf
-        (record: ManagerJobProjection)
-        : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
-        let directory = WorktreePath.value record.WorktreePath
-        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.forStateRoot directory
-        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value record.ManagerSessionId)
+    let lifecycleWorkOf (record: ManagerJobProjection) : Task<DurableWorkHost.InspectedWork option> =
+        task {
+            let! stateRoot = RuntimePath.stateRoot (WorktreePath.value record.WorktreePath)
+            return DurableWorkHost.inspected stateRoot (SessionId.value record.ManagerSessionId)
+        }
 
     let loopSignalOfWork = DurableLoopSignal.ofWork
 
-    let requireOpenWork
-        (record: ManagerJobProjection)
-        : Result<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork, string> =
-        lifecycleWorkOf record |> Result.requireSome "Manager session is not open"
+    let requireOpenWork (record: ManagerJobProjection) : Task<Result<DurableWorkHost.InspectedWork, string>> =
+        taskResult {
+            let! work = lifecycleWorkOf record |> TaskResultCE.ofTask
+            return! work |> Result.requireSome "Manager session is not open"
+        }
 
     /// The last committed retirement on this work. The list is projected from
     /// committed IncumbencyRetired facts only; a missing or unnamed retirement
@@ -323,40 +324,58 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | _, Error error -> Error error
         | Some relay, Ok record -> Ok(relay, record)
 
-    let rec awaitLoopSignalFromRelay
-        (jobId: ManagerJobId)
+    let awaitLoopChange (relay: OrchestratorRelayPort) revision changed =
+        task {
+            use cancellation = new System.Threading.CancellationTokenSource()
+            let journalChanged = relay.AwaitChangeFrom revision cancellation.Token
+
+            try
+                do! (emitJsExpr (journalChanged, changed) "Promise.race([$0, $1])": Task<unit>)
+            finally
+                cancellation.Cancel()
+        }
+
+    let observeLoopSignalChange
         (relay: OrchestratorRelayPort)
         (record: ManagerJobProjection)
-        : Task<Result<ManagerLoopSignal, string>> =
-        task {
+        : Task<Result<ManagerLoopSignal option, string>> =
+        taskResult {
+            let changed =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let! stateRoot =
+                RuntimePath.stateRoot (WorktreePath.value record.WorktreePath)
+                |> TaskResultCE.ofTask
+
+            use subscription =
+                DurableWorkHost.subscribeChanges stateRoot (SessionId.value record.ManagerSessionId) (fun () ->
+                    AsyncSupport.trySetResult changed () |> ignore)
+
             let revision =
                 deps.Journal
                 |> Option.map (fun durable -> (AgentJournal.snapshotWithRevision durable) |> snd)
                 |> Option.defaultWith (fun () -> JournalRevision.create 0L)
 
-            let workOpt = lifecycleWorkOf record
+            let workOpt =
+                DurableWorkHost.inspected stateRoot (SessionId.value record.ManagerSessionId)
 
             match workOpt |> Option.bind loopSignalOfWork with
-            | Some signal -> return Ok signal
-            | None -> return! awaitDispatchedWait jobId relay record revision
+            | Some signal -> return Some signal
+            | None ->
+                do! deps.ContinueManagerLoop record.ManagerSessionId (WorktreePath.value record.WorktreePath)
+                do! awaitLoopChange relay revision changed.Task |> TaskResultCE.ofTask
+                return None
         }
 
-    and awaitDispatchedWait jobId relay record revision =
-        task {
-            // ManagerWorkflow owns the sole physical send for the
-            // `ManagerLoopGate.gateKind retirement.Id` occasion; Change only awaits
-            // the durable loop signal admitted through the PromptAuthority gate.
-            match! deps.ContinueManagerLoop record.ManagerSessionId (WorktreePath.value record.WorktreePath) with
-            | Error error -> return Error error
-            | Ok() ->
-                do! relay.AwaitChangeFrom revision
-                return! awaitLoopSignal jobId
-        }
+    let rec awaitLoopSignal (jobId: ManagerJobId) : Task<Result<ManagerLoopSignal, string>> =
+        taskResult {
+            let! relay, record = requireRelayAndJob relayPortOpt jobId "Manager session requires a durable journal"
+            let! signal = observeLoopSignalChange relay record
 
-    and awaitLoopSignal (jobId: ManagerJobId) : Task<Result<ManagerLoopSignal, string>> =
-        match requireRelayAndJob relayPortOpt jobId "Manager session requires a durable journal" with
-        | Error error -> Task.FromResult(Error error)
-        | Ok(relay, record) -> awaitLoopSignalFromRelay jobId relay record
+            match signal with
+            | Some value -> return value
+            | None -> return! awaitLoopSignal jobId
+        }
 
     /// The continuation the road owes after its last committed retirement.
     ///
@@ -379,8 +398,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let! work = requireOpenWork record
             let! retirement = requireCommittedRetirement work
 
-            let commonDir =
-                Wanxiangshu.Persistence.Journal.RuntimePath.forStateRoot (WorktreePath.value record.WorktreePath)
+            let! commonDir =
+                RuntimePath.stateRoot (WorktreePath.value record.WorktreePath)
+                |> TaskResultCE.ofTask
 
             let requestId =
                 "hand-off:" + ManagerJobId.value jobId + ":" + retirement.RetirementId

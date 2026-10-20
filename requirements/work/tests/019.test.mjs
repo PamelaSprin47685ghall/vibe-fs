@@ -24,14 +24,13 @@ const storeOf = async (directory) => workspaceEvents.acquire(await journalSurfac
 
 
 
-// 执行入口门禁：tool.execute.before 只对评审专用工具（todowrite-for-manager）与跨角色
-// 绕路工具（todowrite-for-engineer/todowrite-for-devops）生效；Host 原生工具（read）与 office 工具
-// （fork/resume/review/deliver）的准入/拒绝由 ToolRegistry 执行入口决定。
-const assertBeforeDenied = async (hooks, sessionID, tool, callID) => {
-  await assert.rejects(
-    () => hooks['tool.execute.before']({ tool, sessionID, callID }, { args: {} }),
-    /not permitted under current manager capability facts|refused on the review gate/i,
-  )
+// 程序入口保持可用；每次 reviewOnly 文件访问独立核对当前任期。
+const assertReadDenied = async (hooks, sessionID, callID) => {
+  const tool = 'todowrite-for-manager'
+  const args = { program: 'class Js extends JsProgram { async run() { return await this.reviewOnly.ls(".") } }' }
+  await hooks['tool.execute.before']({ tool, sessionID, callID }, { args })
+  const result = await hooks.tool[tool].execute(args, bound(sessionID, callID))
+  assert.match(String(result), /REVIEW_ONLY/)
 }
 
 test('WHAT[work-019] 没有任期时 read、review、fork、resume 在工具执行入口被拒绝', async () => {
@@ -48,8 +47,7 @@ test('WHAT[work-019] 没有任期时 read、review、fork、resume 在工具执�
     const deliverResult = await hooks.tool.deliver.execute({}, { sessionID, agent: 'manager' })
     assert.match(String(deliverResult), denied)
     assert.equal(createdIds.length, 0)
-    // todowrite-for-manager 评审专用只读工具在 before 门禁即被拒绝（无任期）。
-    await assertBeforeDenied(hooks, sessionID, 'todowrite-for-manager', 'call-js')
+    await assertReadDenied(hooks, sessionID, 'call-js')
   })
 })
 
@@ -92,8 +90,7 @@ test('WHAT[work-019] 评审已接纳且尚未确认时 read 与固定 DevOps 派
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
     await injectAcceptedAssessment(runtime, sessionID)
-    // 评审接纳后：todowrite-for-manager 只读工具被收口拒绝（Read 从 Manager 权限中移除）。
-    await assertBeforeDenied(hooks, sessionID, 'todowrite-for-manager', 'call-js')
+    await assertReadDenied(hooks, sessionID, 'call-js')
     // 固定 DevOps 派工恢复（resume devops 放行）。
     const resumeResult = await hooks.tool.resume.execute({ name: 'devops', charge: 'look' }, { sessionID, agent: 'manager' })
     assert.match(String(resumeResult), /现已接下这项托付|carries this charge now/i)

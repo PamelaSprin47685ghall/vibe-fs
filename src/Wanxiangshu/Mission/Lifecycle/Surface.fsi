@@ -12,6 +12,7 @@ module LifecycleSurface =
         gitCommonDir: string -> workId: string -> requestId: string -> command: obj -> DurableWorkHost.HostReceipt
 
     val inspect: gitCommonDir: string -> workId: string -> obj
+    val subscribeChanges: stateRoot: string -> workId: string -> onChange: (unit -> unit) -> (unit -> unit)
     val inspected: gitCommonDir: string -> workId: string -> DurableWorkHost.InspectedWork option
     val encodeOpening: kind: string -> workId: string -> root: string -> head: int64 -> string
     val readProbe: text: string -> obj

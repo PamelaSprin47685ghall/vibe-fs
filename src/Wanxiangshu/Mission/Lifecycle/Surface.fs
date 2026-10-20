@@ -30,6 +30,10 @@ module LifecycleSurface =
     let inspect (gitCommonDir: string) (workId: string) =
         DurableWorkHost.inspect gitCommonDir workId
 
+    let subscribeChanges stateRoot workId onChange =
+        let subscription = DurableWorkHost.subscribeChanges stateRoot workId onChange
+        fun () -> subscription.Dispose()
+
     let inspected (gitCommonDir: string) (workId: string) =
         DurableWorkHost.inspected gitCommonDir workId
 

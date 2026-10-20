@@ -220,7 +220,7 @@ test('WHAT[durable-events-012] closure_is_empty_for_a_fact_without_blob_fields',
       handle,
       { kind: 'Session', session: 'ses_empty' },
       null,
-      { family: 'Companion', case: 'TerminalOutputCaptured', payload: { SessionId: 'ses_empty', TextRef: 'blob-empty', TextDigest: 'sha-empty', ProviderRun: 'run-empty' } },
+      { family: 'Context', case: 'ContextReanchored', payload: { SessionId: 'ses_empty', PreviousEpochId: '0', NextEpochId: '1', ObservedCompactionRun: 'run-reanchor' } },
     )
     assert.equal(appended.ok, true, JSON.stringify(appended.error))
     assert.deepEqual(payloadRefsFromFile(commonDir, 'closure-empty').at(-1), [])

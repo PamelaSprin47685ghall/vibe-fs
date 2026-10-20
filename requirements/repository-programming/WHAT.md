@@ -331,6 +331,8 @@ Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`
 
 deliver 只接受 view：`view` 使用 [053] 的同一形状校验，非法以 VIEW_DECLARATION_INVALID 拒绝；旧的 value 终值与双参数形态不是合法调用。交付格与返回记录为进程内状态，重启即丢；交付事实在工具结算时另记。
 
+对已准入的子工作，工具成功结算后必须提交精确交付见证：原工作、LogicalRun、AuthorityRoot、实际物理输入与已有 ProviderStarted phase 须一致，交付围栏记录实际工具所属的 assistant step。同一物理输入内后续工具步骤复用已有 phase，不要求其 assistant ID 等于首次 ProviderStarted。正式散文取自执行程序前该调用所属的 assistant 消息，不能混入 reasoning、工具结果或迟到正文。持久化封存声明、完整呈现和摘要后，发布该交付的完成事实，供原工作完成链与 join 消费；不等待另一个 assistant step 的自然结束。提交失败须清空交付格并报告失败。封存不推进返回记录，实际取格时只推进封存材料的身份。
+
 ## [060] "js" 机器词汇的终局
 
 模型使用 `todowrite-for-ROLE` 和 `this` 成员，不提供全局 `js` 或嵌套 `_api.js`。宿主运行绑定键随实际平铺 API 使用 `cat`、`where`、`park` 等成员名；Manager 的文件方法仅位于 `reviewOnly`。持久流名（`js-tools/transactions`、`js-tools/lifecycle-audit`）、资源目录（`js-program`、`js-plan`、`js-bookkeeper`）和内部哨兵（`__jsParked`/`__jsDelivered`/`__jsAbandoned`/`__jsFailure`）保留原名，不做数据迁移。本文存量条款中的 `js.call`、`js.Callable` 指本次统一后的 `this.call`、`this.Callable`，不表示保留旧运行入口。

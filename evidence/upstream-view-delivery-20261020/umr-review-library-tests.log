@@ -1,0 +1,196 @@
+TAP version 13
+# Subtest: SPEC[build-008] installed time and wait declarations match both runtimes and production survives virtual removal
+    # Subtest: actual installed time and wait consumer on node
+    ok 1 - actual installed time and wait consumer on node
+      ---
+      duration_ms: 48.638417
+      ...
+    # Subtest: actual installed time and wait consumer on bun
+    ok 2 - actual installed time and wait consumer on bun
+      ---
+      duration_ms: 101.61
+      ...
+    1..2
+ok 1 - SPEC[build-008] installed time and wait declarations match both runtimes and production survives virtual removal
+  ---
+  duration_ms: 4652.4
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-001] timer delay resolves after the requested milliseconds
+ok 2 - WHAT[TIME-CAPABILITY-001] timer delay resolves after the requested milliseconds
+  ---
+  duration_ms: 32.649333
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-001] cancel leaves the delay permanently pending
+ok 3 - WHAT[TIME-CAPABILITY-001] cancel leaves the delay permanently pending
+  ---
+  duration_ms: 62.878625
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-001] cancel and dispose are idempotent
+ok 4 - WHAT[TIME-CAPABILITY-001] cancel and dispose are idempotent
+  ---
+  duration_ms: 52.448375
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-001] cancelling one handle never steals another waiter
+ok 5 - WHAT[TIME-CAPABILITY-001] cancelling one handle never steals another waiter
+  ---
+  duration_ms: 62.01275
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-001] virtual port: cancelled handle never fires after advancing
+ok 6 - WHAT[TIME-CAPABILITY-001] virtual port: cancelled handle never fires after advancing
+  ---
+  duration_ms: 0.5865
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-002] remaining and expiry come from the typed deadline, not raw comparisons
+ok 7 - WHAT[TIME-CAPABILITY-002] remaining and expiry come from the typed deadline, not raw comparisons
+  ---
+  duration_ms: 1.232417
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-002] remaining never goes negative and expired deadlines wait zero
+ok 8 - WHAT[TIME-CAPABILITY-002] remaining never goes negative and expired deadlines wait zero
+  ---
+  duration_ms: 0.140209
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-002] an extreme budget is clamped instead of overflowing
+ok 9 - WHAT[TIME-CAPABILITY-002] an extreme budget is clamped instead of overflowing
+  ---
+  duration_ms: 0.585125
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-002] next wait is capped at the JS timer ceiling
+ok 10 - WHAT[TIME-CAPABILITY-002] next wait is capped at the JS timer ceiling
+  ---
+  duration_ms: 0.072
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-002] a negative budget is an expired deadline, not an exception
+ok 11 - WHAT[TIME-CAPABILITY-002] a negative budget is an expired deadline, not an exception
+  ---
+  duration_ms: 0.107
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-002] timezone representation does not change the result
+ok 12 - WHAT[TIME-CAPABILITY-002] timezone representation does not change the result
+  ---
+  duration_ms: 0.056208
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-003] a virtual timer does not fire before its due time
+ok 13 - WHAT[TIME-CAPABILITY-003] a virtual timer does not fire before its due time
+  ---
+  duration_ms: 0.960541
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-003] due timers fire in registration order within one advance
+ok 14 - WHAT[TIME-CAPABILITY-003] due timers fire in registration order within one advance
+  ---
+  duration_ms: 1.195292
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-003] the virtual clock advances deterministically and can be set
+ok 15 - WHAT[TIME-CAPABILITY-003] the virtual clock advances deterministically and can be set
+  ---
+  duration_ms: 1.246042
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-003] virtual timer instances are independent
+ok 16 - WHAT[TIME-CAPABILITY-003] virtual timer instances are independent
+  ---
+  duration_ms: 0.094708
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-003] a disposed virtual port no longer fires
+ok 17 - WHAT[TIME-CAPABILITY-003] a disposed virtual port no longer fires
+  ---
+  duration_ms: 0.089
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-004] the emitted module reads no ambient wall clock
+ok 18 - WHAT[TIME-CAPABILITY-004] the emitted module reads no ambient wall clock
+  ---
+  duration_ms: 1.8205
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-004] deadline inputs never request the ambient time, including invalid missing inputs
+ok 19 - WHAT[TIME-CAPABILITY-004] deadline inputs never request the ambient time, including invalid missing inputs
+  ---
+  duration_ms: 1.194209
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-004] the virtual clock ignores real elapsed time
+ok 20 - WHAT[TIME-CAPABILITY-004] the virtual clock ignores real elapsed time
+  ---
+  duration_ms: 54.231875
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-004] the physical clock port is the only declared ambient reader
+ok 21 - WHAT[TIME-CAPABILITY-004] the physical clock port is the only declared ambient reader
+  ---
+  duration_ms: 0.335958
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-005] deadline computation is a pure replay of its inputs
+ok 22 - WHAT[TIME-CAPABILITY-005] deadline computation is a pure replay of its inputs
+  ---
+  duration_ms: 1.161917
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-005] constructing and reading a deadline has no side effects
+ok 23 - WHAT[TIME-CAPABILITY-005] constructing and reading a deadline has no side effects
+  ---
+  duration_ms: 0.154542
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-006] an expired timer delay only settles the wait, it mints no business fact
+ok 24 - WHAT[TIME-CAPABILITY-006] an expired timer delay only settles the wait, it mints no business fact
+  ---
+  duration_ms: 11.647
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-006] raceExit reports which side won without inventing an exit
+ok 25 - WHAT[TIME-CAPABILITY-006] raceExit reports which side won without inventing an exit
+  ---
+  duration_ms: 10.71875
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-006] cancelling an already-settled handle is a harmless no-op
+ok 26 - WHAT[TIME-CAPABILITY-006] cancelling an already-settled handle is a harmless no-op
+  ---
+  duration_ms: 5.475416
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-006] an owned drain keeps Node alive until its long deadline returns false
+ok 27 - WHAT[TIME-CAPABILITY-006] an owned drain keeps Node alive until its long deadline returns false
+  ---
+  duration_ms: 1075.607125
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-006] an owned drain releases its referenced timer on success and rejection
+ok 28 - WHAT[TIME-CAPABILITY-006] an owned drain releases its referenced timer on success and rejection
+  ---
+  duration_ms: 61.548958
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-007] a virtual clock keeps a stable origin until explicitly moved
+ok 29 - WHAT[TIME-CAPABILITY-007] a virtual clock keeps a stable origin until explicitly moved
+  ---
+  duration_ms: 1.113875
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-007] elapsed is derived from the injected clock, not from real time
+ok 30 - WHAT[TIME-CAPABILITY-007] elapsed is derived from the injected clock, not from real time
+  ---
+  duration_ms: 20.574333
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-008] the pure deadline surface carries no physical or virtual factory
+ok 31 - WHAT[TIME-CAPABILITY-008] the pure deadline surface carries no physical or virtual factory
+  ---
+  duration_ms: 0.352916
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-008] physical and virtual clocks have independent owners
+ok 32 - WHAT[TIME-CAPABILITY-008] physical and virtual clocks have independent owners
+  ---
+  duration_ms: 0.1955
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-008] deadline algebra is independent of both adapters
+ok 33 - WHAT[TIME-CAPABILITY-008] deadline algebra is independent of both adapters
+  ---
+  duration_ms: 0.858916
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-008] a physical port instance never observes the virtual clock
+ok 34 - WHAT[TIME-CAPABILITY-008] a physical port instance never observes the virtual clock
+  ---
+  duration_ms: 1.85
+  ...
+# Subtest: WHAT[TIME-CAPABILITY-008] the module imports no sibling library
+ok 35 - WHAT[TIME-CAPABILITY-008] the module imports no sibling library
+  ---
+  duration_ms: 0.5845
+  ...
+1..35
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4722.065709

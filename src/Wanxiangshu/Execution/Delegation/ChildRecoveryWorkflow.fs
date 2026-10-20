@@ -13,7 +13,6 @@ open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Persistence.Journal
 
 /// Direct-CE child recovery (FLOW-001 / P0-1).
 /// Recovery consumes canonical admission and commits only exact scoped completions.
@@ -116,6 +115,33 @@ module ChildRecoveryWorkflow =
         | None -> Task.FromResult DurableHandleEvidence.Unknown
         | Some journal -> readDurableFromJournal ports journal
 
+    let private terminalFromDelivery (ports: Ports) authorityRoot providerRun =
+        let deliveredView =
+            ports.ReadDeliveryView
+            |> Option.bind (fun read -> read ports.ChildSession providerRun authorityRoot)
+
+        match deliveredView with
+        | None -> ChildSnapshotEvidence.Unreadable "restart terminal has no durable delivery witness"
+        | Some view ->
+            let runId = "run-restored-" + ports.AgentId
+
+            let agentOutcome =
+                AgentCompletion.completed
+                    ports.AgentId
+                    ports.ChildSession
+                    runId
+                    ports.Role
+                    authorityRoot
+                    providerRun
+                    view
+                    None
+
+            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+            ChildSnapshotEvidence.Terminal(
+                TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
+            )
+
     let private terminalFromMessages
         (ports: Ports)
         (messages: SessionMessage list)
@@ -131,31 +157,7 @@ module ChildRecoveryWorkflow =
 
             let providerRun = ProviderRunIdentity.create assistant.Id
 
-            let deliveredView =
-                ports.ReadDeliveryView
-                |> Option.bind (fun read -> read ports.ChildSession providerRun authorityRoot)
-
-            match deliveredView with
-            | None -> ChildSnapshotEvidence.Unreadable "restart terminal has no durable delivery witness"
-            | Some view ->
-                let runId = "run-restored-" + ports.AgentId
-
-                let agentOutcome =
-                    AgentCompletion.completed
-                        ports.AgentId
-                        ports.ChildSession
-                        runId
-                        ports.Role
-                        (PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id))
-                        (ProviderRunIdentity.create assistant.Id)
-                        view
-                        None
-
-                let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
-
-                ChildSnapshotEvidence.Terminal(
-                    TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
-                )
+            terminalFromDelivery ports authorityRoot providerRun
 
     let private snapshotFromMessages (ports: Ports) (messages: SessionMessage list) : ChildSnapshotEvidence =
         match lastByRole messages "assistant" with

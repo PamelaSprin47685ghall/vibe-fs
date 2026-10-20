@@ -1,0 +1,71 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.562667
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 6.506875
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:91011) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[MOCK-FATAL] first script mismatch: reason=no-declared-turn session=ses_ea578759dffepgPmU2jUuSYuKL parent=- model="test-model" tools=["assume","deliver","fork","horizon","join","resume","review","skill","todowrite-for-manager","wanxiang_fixture_search"] msgs=2 lastUser="[ANCHOR: 1]\u0000﻿HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager assessment check.\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Question: if you spent the next interval working instea" candidates=["humanroot-loop.0@humanroot-manager/chat/step-0","manager-t1-commitment.0@undefined/chat/step-0","manager-loop.0@manager/chat/step-0","manager-reopened-loop.0@undefined/chat/step-0","continue.0@undefined/chat/step-0","manager-interrupt.0@manager/chat/step-0","manager-current-action.0@undefined/chat/step-0"]
+[MSG-ROLES] system user
+[MSG-TOOL-RESULTS] []
+── fatal script mismatch: no-declared-turn (lane=humanroot-manager|manager kind=chat step=0) ──
+session=ses_ea578759dffepgPmU2jUuSYuKL lastUser="[ANCHOR: 1]\u0000﻿HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager assessment check.\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Question: if you spent the next interval working instea"
+candidates=["humanroot-loop.0@humanroot-manager/chat/step-0","manager-t1-commitment.0@undefined/chat/step-0","manager-loop.0@manager/chat/step-0","manager-reopened-loop.0@undefined/chat/step-0","continue.0@undefined/chat/step-0","manager-interrupt.0@manager/chat/step-0","manager-current-action.0@undefined/chat/step-0"]
+── event tail ──
+#48 18:16:36.739 plugin.added
+#49 18:16:36.739 plugin.added
+#50 18:16:36.739 plugin.added
+#51 18:16:36.739 plugin.added
+#52 18:16:36.739 plugin.added
+#53 18:16:36.739 plugin.added
+#54 18:16:36.739 plugin.added
+#55 18:16:36.743 catalog.updated
+#56 18:16:36.743 plugin.added
+#57 18:16:36.743 plugin.added
+#58 18:16:36.743 plugin.added
+#59 18:16:36.743 plugin.added
+#60 18:16:36.743 plugin.added
+#61 18:16:36.743 plugin.added
+#62 18:16:36.743 plugin.added
+#63 18:16:36.743 plugin.added
+#64 18:16:36.743 reference.updated
+#65 18:16:36.810 integration.updated
+#66 18:16:36.810 catalog.updated
+#67 18:16:36.896 session.status session=ses_ea578759
+── Host stderr tail ──
+
+── Journal fact tail ──
+8d5a892e1fc11283650b19704d3dd0f1c5ec73ac8cb4243157007ac44155c17a:0:XTracePartAppended
+8d5a892e1fc11283650b19704d3dd0f1c5ec73ac8cb4243157007ac44155c17a:1:SessionStartedAtBound
+8d5a892e1fc11283650b19704d3dd0f1c5ec73ac8cb4243157007ac44155c17a:2:AuthorityRootAccepted
+8d5a892e1fc11283650b19704d3dd0f1c5ec73ac8cb4243157007ac44155c17a:3:Accepted
+8d5a892e1fc11283650b19704d3dd0f1c5ec73ac8cb4243157007ac44155c17a:4:ProviderStarted
+8d5a892e1fc11283650b19704d3dd0f1c5ec73ac8cb4243157007ac44155c17a:5:RuntimeStarted
+8d5a892e1fc11283650b19704d3dd0f1c5ec73ac8cb4243157007ac44155c17a:6:PairProgrammingGuidelineAnchored
+8d5a892e1fc11283650b19704d3dd0f1c5ec73ac8cb4243157007ac44155c17a:7:WorkOpened
+8d5a892e1fc11283650b19704d3dd0f1c5ec73ac8cb4243157007ac44155c17a:8:IncumbencyOpened
+  pending blocking humanroot-loop.0 humanroot-loop.0@humanroot-manager/chat/step-0
+  pending blocking humanroot-loop.1 humanroot-loop.1@humanroot-manager/chat/step-1
+  pending blocking humanroot-loop.2 humanroot-loop.2@humanroot-manager/chat/step-2
+  pending blocking title.0 title.0@title/title/step-0
+  pending blocking orch.0 orch.0@orchestrator/chat/step-0
+  pending blocking orch.1 orch.1@orchestrator/chat/step-1
+  pending blocking orch.2 orch.2@orchestrator/chat/step-2
+  pending blocking orch.3 orch.3@orchestrator/chat/step-3
+  pending blocking manager-loop.0 manager-loop.0@manager/chat/step-0
+  pending blocking manager-loop.1 manager-loop.1@manager/chat/step-1
+  pending blocking manager-loop.2 manager-loop.2@manager/chat/step-2
+  pending blocking manager-interrupt.0 manager-interrupt.0@manager/chat/step-0
+  pending blocking engineer.0 engineer.0@engineer/chat/step-0
+  pending blocking engineer.1 engineer.1@engineer/chat/step-1
+  pending blocking engineer.2 engineer.2@engineer/chat/step-2
+  pending blocking engineer.3 engineer.3@engineer/chat/step-3

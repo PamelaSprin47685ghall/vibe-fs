@@ -304,7 +304,7 @@ export function turnOf(body) {
   if (index < 0) return null;
 
   const projected = semanticOf({ messages: [messages[index]] }).messages;
-  return projected.length === 0 ? null : messageText(projected[0]);
+  return projected.length === 0 ? null : messageText(projected[0]).replace(/^\[ANCHOR: (?:0|[1-9]\d*)\]\u0000\uFEFF/u, '');
 }
 
 // ── step ────────────────────────────────────────────────────────────────────

@@ -55,7 +55,7 @@ test('WHAT[durable-events-010] SharedAgentJournal_boots_local_EventStore_and_lea
       acquired.journal,
       { kind: 'Session', session: 'ses_host_es' },
       null,
-      { family: 'Companion', case: 'TerminalOutputCaptured', payload: { SessionId: 'ses_host_es', TextRef: 'blob-term', TextDigest: 'sha-term', ProviderRun: 'run-term' } },
+      { family: 'Context', case: 'ContextReanchored', payload: { SessionId: 'ses_host_es', PreviousEpochId: '0', NextEpochId: '1', ObservedCompactionRun: 'run-reanchor' } },
     ))
     assert.deepEqual(fingerprint(stale), before)
 

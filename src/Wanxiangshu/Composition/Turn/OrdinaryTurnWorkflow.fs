@@ -82,8 +82,25 @@ module OrdinaryTurnWorkflow =
             Continue
         | _ -> Ordinary
 
-    let private classifyManagedTurnGate settled context =
-        if settled then Wait else classifyManagerOrPlanTurn context
+    let private classifyManagedTurnGate settled hasDelivered (context: ReconciledTurnContext) =
+        match settled, hasDelivered, context.Turn.Role with
+        | true, _, _ -> Wait
+        | _, true, Some Role.Manager
+        | _, true, Some Role.Plan -> Wait
+        | _, true, _ -> Ordinary
+        | _ -> classifyManagerOrPlanTurn context
+
+    let private isCompletedChildExchange (journal: AgentJournal option) (turn: ReconciledTurn) =
+        journal
+        |> Option.exists (fun durable ->
+            (AgentJournal.snapshot durable).AgentProjections.Deliveries
+            |> Map.exists (fun _ witness ->
+                witness.Fence.SessionId = turn.SessionId
+                && witness.Fence.AuthorityRoot = turn.AuthorityRootUserMessageId
+                && witness.Fence.PhysicalUserMessageId = turn.PhysicalUserMessageId
+                && (match witness.Fence.Task with
+                    | TaskDeliveryTask.ChildWork _ -> true
+                    | _ -> false)))
 
     let private longWorkGate (journal: AgentJournal option) (context: ReconciledTurnContext) : Task<LongWorkGate> =
         task {
@@ -100,7 +117,10 @@ module OrdinaryTurnWorkflow =
 
             if not hasRole then
                 return Ordinary
-            elif isExplicitWaitOrOldTurn (authority ()) turn then
+            elif
+                isExplicitWaitOrOldTurn (authority ()) turn
+                || isCompletedChildExchange journal turn
+            then
                 return Wait
             else
                 let! settled = isTurnWorkSettled turn
@@ -113,11 +133,19 @@ module OrdinaryTurnWorkflow =
                             TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun)
                         |> Option.isSome)
 
-                if settled || hasDelivered then
-                    return Wait
-                else
-                    return classifyManagerOrPlanTurn context
+                return classifyManagedTurnGate settled hasDelivered context
         }
+
+    let private hasDeliveryWitness (journal: AgentJournal option) (turn: ReconciledTurn) =
+        match journal with
+        | Some durable ->
+            TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun
+            |> Option.exists (fun witness ->
+                witness.Fence.AuthorityRoot = turn.AuthorityRootUserMessageId
+                && witness.Fence.PhysicalUserMessageId = turn.PhysicalUserMessageId)
+        | None ->
+            Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value turn.SessionId)
+            <> null
 
     let private requestKindOfCompleted (port: TurnObservationJournalPort) (turn: ReconciledTurn) =
         let continuationKind =
@@ -522,22 +550,7 @@ module OrdinaryTurnWorkflow =
                 let completeAgent () =
                     let tracePort = journal |> Option.map TerminalTracePort.forJournal
 
-                    let deliveryWitness =
-                        match journal with
-                        | Some durable ->
-                            TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun
-                            |> Option.exists (fun witness ->
-                                witness.Fence.AuthorityRoot = turn.AuthorityRootUserMessageId
-                                && witness.Fence.PhysicalUserMessageId = turn.PhysicalUserMessageId)
-                        | None ->
-                            // No journal means a test/dev harness; the process-live
-                            // cell is the only evidence available there.
-                            Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (
-                                SessionId.value turn.SessionId
-                            )
-                            <> null
-
-                    TerminalReporter.completeWithEvidence eventPort tracePort turn deliveryWitness
+                    TerminalReporter.completeWithEvidence eventPort tracePort turn (hasDeliveryWitness journal turn)
 
                 return!
                     handleOutcome

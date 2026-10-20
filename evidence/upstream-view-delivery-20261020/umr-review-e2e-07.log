@@ -1,0 +1,106 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.550917
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 5.703459
+  ...
+# Subtest: WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+ok 3 - WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+  ---
+  duration_ms: 1.527333
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:4349) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea554aaaeffeLx0inS4Bo5FPEZ
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[SEAL-SYS] equal-content prevLen=104406 nextLen=104406 prevParts=1 nextParts=1
+[SEAL-DIAG] session=ses_ea5549748ffe0k3BHWOmn5UGbg reason=boundary-not-reached prev=[system:bd0919639b67|user:d9f97e905523|assistant:e1475401e4d4|tool:e8ae10c3cfb9|assistant:f336a3e76982|tool:7f837236dd0d] next=[system:bd0919639b67|user:d9f97e905523|assistant:e1475401e4d4|tool:e8ae10c3cfb9|assistant:f336a3e76982|tool:7f837236dd0d|user:f474accac5a0]
+[SEAL-DIFF] len 6 != 7
+[MOCK-FATAL] first script mismatch: reason=seal-boundary-not-reached session=ses_ea5549748ffe0k3BHWOmn5UGbg parent=ses_ea554994fffeDW2r2wvJInk7Si model="test-model" tools=["assume","deliver","fork","horizon","join","resume","review","skill","todowrite-for-manager","wanxiang_fixture_search"] msgs=7 lastUser="[ANCHOR: 14]\u0000﻿# A network failure just interrupted you. Continue the work.\n\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Question: if you spent the next interval working instead of waiting for a comma" candidates=[]
+[MSG-ROLES] system user assistant tool assistant tool user
+[MSG-TOOL-RESULTS] ["[ANCHOR: 11]\u0000﻿# The gaps confirmed by review are now entrusted to you. Repository access through `this.reviewOnly` is now disabled; the `todowrite-for-manager` program entry remains available; do not inspect, search, or process repository code yourself anymore. Arrange source changes and test writin","[ANCHOR: 13]\u0000﻿# Proof Writer carries this charge now.\n\u0000﻿# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Question:"]
+── fatal script mismatch: seal-boundary-not-reached ──
+session=ses_ea5549748ffe0k3BHWOmn5UGbg lastUser="[ANCHOR: 14]\u0000﻿# A network failure just interrupted you. Continue the work.\n\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Question: if you spent the next interval working instead of waiting for a comma"
+candidates=[]
+── event tail ──
+#423 18:55:46.225 session.status session=ses_ea554974
+#424 18:55:46.225 session.idle session=ses_ea554974
+#425 18:55:46.225 message.updated session=ses_ea554974
+#426 18:55:46.225 sync
+#427 18:55:46.225 session.status session=ses_ea554974
+#428 18:55:46.225 session.idle session=ses_ea554974
+#429 18:55:46.292 message.updated session=ses_ea554974
+#430 18:55:46.292 sync
+#431 18:55:46.292 message.part.updated session=ses_ea554974
+#432 18:55:46.292 sync
+#433 18:55:46.292 session.updated session=ses_ea554974
+#434 18:55:46.292 sync
+#435 18:55:46.292 message.part.updated session=ses_ea554946
+#436 18:55:46.292 sync
+#437 18:55:46.297 session.status session=ses_ea554974
+#438 18:55:46.297 message.updated session=ses_ea554974
+#439 18:55:46.297 sync
+#440 18:55:46.297 session.updated session=ses_ea554974
+#441 18:55:46.297 sync
+#442 18:55:46.297 session.diff session=ses_ea554974
+── Host stderr tail ──
+{"operation":"session-attempt-interrupt","session_id":"ses_ea554aaaeffeLx0inS4Bo5FPEZ"}
+
+── Journal fact tail ──
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:0:XTracePartAppended
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:1:PluginPromptClaimed
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:2:XTracePartAppended
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:3:XTracePartAppended
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:4:AuthorityRootAccepted
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:5:XTracePartAppended
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:6:PluginPromptPhysicalAccepted
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:7:SuccessRecorded
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:8:Accepted
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:9:XTracePartAppended
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:10:OpeningPromptCaptured
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:11:XTracePartAppended
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:12:PluginPromptPhysicalAccepted
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:13:PluginPromptClaimed
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:14:ProviderStarted
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:15:UnknownFact
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:16:FailureRecorded
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:17:XTracePartAppended
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:18:WorkOpened
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:19:IncumbencyOpened
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:20:Reviewed
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:21:WorkOpened
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:22:IncumbencyOpened
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:23:Reviewed
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:24:ConfirmationCommitted
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:25:IncumbencyRetired
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:26:IncumbencyOpened
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:27:Reviewed
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:28:ConfirmationCommitted
+99344f2cb5fddac0f521d956c630ec739003721b89249252febcdc5ae7b0ab6f:29:IncumbencyRetired
+  pending blocking orch.2 orch.2@orchestrator/chat/step-2
+  pending blocking orch.3 orch.3@orchestrator/chat/step-3
+  pending blocking manager-interrupt.0 manager-interrupt.0@manager/chat/step-0
+  pending blocking engineer.1 engineer.1@engineer/chat/step-1
+  pending blocking engineer.2 engineer.2@engineer/chat/step-2
+  pending blocking engineer.3 engineer.3@engineer/chat/step-3

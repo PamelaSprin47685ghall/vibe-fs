@@ -63,31 +63,26 @@ export const syntheticDocument = (instructions, body) => SyntheticModule.renderD
 
 /** The instruction prose every forked child receives, as JS-native values. */
 export const forkBaseInstructions = forkInstructions.Base;
-export const forkCommissionerRecordInstruction = forkInstructions.CommissionerRecord;
 export const forkAttachmentInstruction = forkInstructions.Attachment;
 export const forkRequirementsInstruction = forkInstructions.Requirements;
 
 /** Render a forked child's first prompt by field name. */
 export const forkPayload = ({
   assignment,
-  parentRecord,
-  commissionerRecord,
   attachment,
   originalUserRequirements = [],
   payload,
 }) => ForkModule.render('en', {
   Assignment: assignment,
-  CommissionerRecord: commissionerRecord ?? parentRecord ?? null,
   Attachment: attachment ?? null,
   RootRequirements: originalUserRequirements,
   Payload: payload ?? null,
 });
 
-export const forkRelay = (assignment, commissionerRecord, requirements = [], payload) =>
+export const forkRelay = (assignment, attachment, requirements = [], payload) =>
   ForkModule.render('en', {
     Assignment: assignment,
-    CommissionerRecord: commissionerRecord ?? null,
-    Attachment: null,
+    Attachment: attachment ?? null,
     RootRequirements: requirements,
     Payload: payload ?? null,
   });

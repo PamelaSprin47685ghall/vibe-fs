@@ -937,7 +937,7 @@ module JsToolsBindings =
                     paths |> List.traverseResultM (rgPath root) |> Result.map ignore
 
             let framing = if parsed.PathsOnly then "--null" else "--json"
-            return Array.append [| "--no-config"; framing |] args, parsed.PathsOnly
+            return Array.append [| "--no-config"; "--no-require-git"; framing |] args, parsed.PathsOnly
         }
 
     [<Emit("Array.isArray($0) && Array.prototype.every.call($0, value => typeof value === 'string' && !value.includes('\\0'))")>]
@@ -1028,6 +1028,14 @@ module JsToolsBindings =
             | Some delegation -> box (delegation.Advisor intent view)
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
+    let private makeAvailableAskMember parkState askInvoke =
+        match parkState, askInvoke with
+        | Some state, Some invoke -> makeAskMember state invoke
+        | _ ->
+            "ask"
+            ==> fun (_: obj) (_: obj) ->
+                rejectFailure "ASK_REFUSED" "this.ask has no user channel in this execution path"
+
     let private createApiCore
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -1086,12 +1094,7 @@ module JsToolsBindings =
                   makeAdvisorMember delegationHost
 
               if Set.contains JsCapability.Ask capabilities then
-                  match parkState, askInvoke with
-                  | Some state, Some invoke -> makeAskMember state invoke
-                  | _ ->
-                      "ask"
-                      ==> fun (_: obj) (_: obj) ->
-                          rejectFailure "ASK_REFUSED" "this.ask has no user channel in this execution path"
+                  makeAvailableAskMember parkState askInvoke
 
               match parkState with
               | Some state -> makeParkMember state

@@ -505,6 +505,8 @@ export function createJournalObserver({ workDir, readFiles, watchDirectory } = {
 
 // Global cached observer per workDir to share snapshot between waiters and event ceilings
 const sharedObservers = new Map();
+// Keep WAL open between Host operations; release the read connection at teardown.
+const sharedWorkJournals = new Map();
 
 export function getOrCreateSharedObserver(workDir) {
   let obs = sharedObservers.get(workDir);
@@ -515,13 +517,16 @@ export function getOrCreateSharedObserver(workDir) {
   return obs;
 }
 
-export function releaseSharedObserver(workDir) {
+export async function releaseSharedObserver(workDir) {
   const obs = sharedObservers.get(workDir);
-  if (obs) {
-    sharedObservers.delete(workDir);
-    return obs.close();
+  sharedObservers.delete(workDir);
+  try {
+    await obs?.close();
+  } finally {
+    const database = sharedWorkJournals.get(workDir);
+    sharedWorkJournals.delete(workDir);
+    database?.close();
   }
-  return Promise.resolve();
 }
 
 /**
@@ -548,9 +553,12 @@ export function storeTip(workDir) {
 export const workJournalEvents = (workDir, { sessionId = null } = {}) => {
   const file = path.join(workDir, '.Herdchestra', 'wanxiangshu', 'work.sqlite');
   if (!fs.existsSync(file)) return [];
-  let database = null;
   try {
-    database = new (createRequire(import.meta.url)('node:sqlite').DatabaseSync)(file, { readOnly: true });
+    let database = sharedWorkJournals.get(workDir);
+    if (!database) {
+      database = new (createRequire(import.meta.url)('node:sqlite').DatabaseSync)(file, { readOnly: true });
+      sharedWorkJournals.set(workDir, database);
+    }
     const rows = database.prepare('select stream, revision, body from journal_entries').all();
     const scope = typeof sessionId === 'string' && sessionId !== '' ? sessionId : null;
     const events = [];
@@ -570,8 +578,6 @@ export const workJournalEvents = (workDir, { sessionId = null } = {}) => {
         : String(left.stream).localeCompare(String(right.stream)));
   } catch {
     return [];
-  } finally {
-    try { database?.close(); } catch {}
   }
 };
 

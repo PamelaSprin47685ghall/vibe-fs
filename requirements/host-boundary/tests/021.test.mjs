@@ -131,7 +131,7 @@ test('WHAT[host-boundary-021] HOST_021_ordinary_join_does_not_reenlist_old_durab
   const join = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs')
   const joinTool = read('src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs')
 
-  assert.match(join, /currentProcessHandle/)
+  assert.match(join, /ownerWorkHandle/)
   assert.match(join, /drainFromJournalWhere/)
   assert.doesNotMatch(joinTool, /tryMembershipOfLane/)
 })

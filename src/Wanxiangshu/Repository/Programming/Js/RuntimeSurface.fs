@@ -130,6 +130,14 @@ module JsRuntimeSurface =
             (ToolCallId.create toolCallId)
             (if isNull view then None else Some view)
 
+    let sealFencedDeliveredView sessionId providerRun toolCallId formalText =
+        JsDeliveredValues.sealFencedView
+            sessionId
+            (ProviderRunIdentity.create providerRun)
+            (ToolCallId.create toolCallId)
+            (Some formalText)
+        |> Option.toObj
+
     /// Test hook: identities already handed back through a deliver view.
     let deliveredReturned (sessionId: string) : string array =
         JsDeliveredValues.alreadyReturned sessionId |> Set.toArray

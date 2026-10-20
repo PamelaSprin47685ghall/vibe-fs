@@ -1,0 +1,122 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.537292
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 6.039041
+  ...
+# Subtest: WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+ok 3 - WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+  ---
+  duration_ms: 1.813041
+  ...
+# Subtest: WHAT[verification-system-014] interrupted join accepts its leading anchor but rejects quoted history and internal status
+ok 4 - WHAT[verification-system-014] interrupted join accepts its leading anchor but rejects quoted history and internal status
+  ---
+  duration_ms: 0.367666
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:13732) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea5383287ffeUCSmhiW9ZCaii7
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[read-probe] session=ses_ea5381b04ffeJRE9KFksT9bRTN call=call_16 part=prt_15ac7e73a001gnGgmu4dNU3VAJ timeline=[{"dtMs":0,"seq":506,"status":"pending","error":null,"interrupted":null},{"dtMs":0,"seq":508,"status":"running","error":null,"interrupted":null},{"dtMs":32,"seq":529,"status":"completed","error":null,"interrupted":null}] nativeTerminals=[{"seq":435,"sessionID":"ses_ea5381b04ffeJRE9KFksT9bRTN","tool":"todowrite-for-engineer","callID":"call_14","status":"completed","error":null,"interrupted":null},{"seq":529,"sessionID":"ses_ea5381b04ffeJRE9KFksT9bRTN","tool":"todowrite-for-engineer","callID":"call_16","status":"completed","error":null,"interrupted":null},{"seq":567,"sessionID":"ses_ea5381b04ffeJRE9KFksT9bRTN","tool":"todowrite-for-engineer","callID":"call_18","status":"completed","error":null,"interrupted":null},{"seq":956,"sessionID":"ses_ea538115bffe6yoLPlcsFtVCU8","tool":"todowrite-for-engineer","callID":"call_30","status":"completed","error":null,"interrupted":null},{"seq":982,"sessionID":"ses_ea538115bffe6yoLPlcsFtVCU8","tool":"todowrite-for-engineer","callID":"call_32","status":"completed","error":null,"interrupted":null}]
+[manager-surface] ok tools=assume,deliver,fork,horizon,join,resume,review,skill,todowrite-for-manager,wanxiang_fixture_search requests=32
+long-stroke scenario failed: Error: Scenario assertions failed:
+cold boundary never fired: manager-reopened-loop.0 (manager-loop) — the declaration admits a break the run never produced
+    at StrictMockProvider.expectSatisfied (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/strict-mock-provider.js:174:34)
+    at runStep (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/scenario-driver.mjs:499:25)
+    at runFlow (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/scenario-driver.mjs:860:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async runCanary (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/scenario-driver.mjs:945:5)
+    at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/014.test.mjs:209:16)
+    at async Test.run (node:internal/test_runner/test:932:9)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+[GIT-DIAG] workdir=/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/oc-e2e-5VhH4j/workspace
+log:
+* 4f6131e candidate: fpevvk
+* e4e8f2b target: conflicting edit to proof file
+* 6ffe652 init
+branches:
+* main
+worktrees:
+/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/oc-e2e-5VhH4j/workspace  4f6131e [main]
+# Subtest: WHAT[verification-system-014] Long Stroke 真实物理验收环境
+not ok 5 - WHAT[verification-system-014] Long Stroke 真实物理验收环境
+  ---
+  duration_ms: 14164.576917
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/tier-gate.mjs:26:12'
+  failureType: 'testCodeFailure'
+  error: |-
+    Long Stroke canary exited with code 1
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/014.test.mjs:217:10)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 4
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 14175.913041

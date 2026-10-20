@@ -380,6 +380,7 @@ module JsCallLoop =
         let originalStderr = string value?stderr
         let originalReason = if isNull value?reason then "" else string value?reason
         let originalFault = if isNull value?fault then "" else string value?fault
+        // DSL-MUTABLE: algorithm-scratch — binary search bounds for the output capacity.
         let mutable lower = 0
 
         let mutable upper =
@@ -388,6 +389,7 @@ module JsCallLoop =
             + utf8Bytes originalReason
             + utf8Bytes originalFault
 
+        // DSL-MUTABLE: algorithm-scratch — last candidate that fits the output budget.
         let mutable best: obj = null
 
         let candidate capacity =
@@ -953,7 +955,7 @@ module JsCallLoop =
             let children = Dictionary<string, ManagedChild>()
             let stdout = OutputBuffer()
             let stderr = OutputBuffer()
-            // // DSL-MUTABLE: algorithm-scratch — loop step counter shared with
+            // DSL-MUTABLE: algorithm-scratch — loop step counter shared with
             // watchContext (a ref cell: a closure cannot capture a mutable let)
             let stepCell = ref 0
             // DSL-MUTABLE: algorithm-scratch — overall loop state
@@ -963,6 +965,7 @@ module JsCallLoop =
             let mutable outcomeReason: string = null
             let mutable lastExitCode: int option = None
             let mutable lastSignal: string option = None
+            // DSL-MUTABLE: resource — last foreground child observed by this loop.
             let mutable lastForeground: ManagedChild option = None
             // DSL-MUTABLE: algorithm-scratch — failure/outcome slot for this run
             let mutable result: obj = null
@@ -1598,6 +1601,7 @@ module JsCallLoop =
         let admitted =
             scope.Own(fun () ->
                 task {
+                    // DSL-MUTABLE: resource — release the held process permit once.
                     let mutable held = false
 
                     let deadline =
@@ -1752,6 +1756,7 @@ module JsCallLoop =
                 | None -> return raise (TimeoutException "Callable sanity deadline exceeded")
             }
 
+        // DSL-MUTABLE: algorithm-scratch — accumulate this callable's sanity verdict.
         let mutable proofPassed = false
 
         let proveWatch watchVeto =

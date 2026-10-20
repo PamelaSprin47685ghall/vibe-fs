@@ -214,6 +214,13 @@ const withCompletedEngineer = async (action, { beforeCreate } = {}) => {
       })
 
       assistant.parts.push({ id: 'd0p-answer-part', type: 'text', text: answer })
+      assistant.parts.push({ id: 'd0p-delivery-part', type: 'tool', tool: 'todowrite-for-engineer',
+        callID: 'd0p-delivery', state: { status: 'running', input: {} } })
+      const delivered = await hooks.tool['todowrite-for-engineer'].execute({
+        program: `class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: { 0: ${JSON.stringify(answer)} } }) } }`,
+      }, { sessionID: sent.child, agent: 'engineer', messageID: assistant.info.id,
+        providerRunID: assistant.info.id, callID: 'd0p-delivery' })
+      assert.match(delivered, /^# ok\b/m)
       assistant.info.time.completed = 3
       assistant.info.finish = 'stop'
       await hooks.event({ event: { type: 'message.updated', properties: { info: assistant.info } } })

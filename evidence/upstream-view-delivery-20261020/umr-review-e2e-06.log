@@ -1,0 +1,110 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.476125
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 5.618292
+  ...
+# Subtest: WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+ok 3 - WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+  ---
+  duration_ms: 1.516125
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:3468) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea557281fffe6KDj9JnpI8wu8W
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[SEAL-SYS] firstDiffAt=103150 prevLen=104406 nextLen=104410 prevHead=owered by the model named test-model. The exact model ID is test/test-model\nHere is some useful information about the en
+[SEAL-SYS] nextHead=owered by the model named test-model. The exact model ID is opencode/test-model\nHere is some useful information about th
+[SEAL-SYS] prevTail=ication code, or for any project that is not configuring opencode itself.</description>\n    <location>&lt;built-in&gt;</location>\n  </skill>\n</available_skills>
+[SEAL-SYS] nextTail=ication code, or for any project that is not configuring opencode itself.</description>\n    <location>&lt;built-in&gt;</location>\n  </skill>\n</available_skills>
+[SEAL-DIAG] session=ses_ea557132fffeDwCwfjtjsIv1dC reason=undeclared prev=[system:3a018e4f1274|user:d9f97e905523|assistant:e1475401e4d4|tool:e8ae10c3cfb9|assistant:f336a3e76982|tool:7f837236dd0d|user:f474accac5a0] next=[system:f61b2c43386e|user:d9f97e905523|assistant:e1475401e4d4|tool:e8ae10c3cfb9|assistant:f336a3e76982|tool:7f837236dd0d|user:f474accac5a0|user:e3325efa3308]
+[SEAL-DIFF] msg[0] system:3a018e4f1274 != system:f61b2c43386e || len 7 != 8
+[MOCK-FATAL] first script mismatch: reason=seal-undeclared session=ses_ea557132fffeDwCwfjtjsIv1dC parent=ses_ea557158dffeiYcslvvtlYgOzz model="test-model" tools=["assume","deliver","fork","horizon","join","resume","review","skill","todowrite-for-manager","wanxiang_fixture_search"] msgs=8 lastUser="[ANCHOR: 15]\u0000﻿# A network failure just interrupted you. Continue the work.\n\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Question: if you spent the next interval working instead of waiting for a comma" candidates=[]
+[MSG-ROLES] system user assistant tool assistant tool user user
+[MSG-TOOL-RESULTS] ["[ANCHOR: 11]\u0000﻿# The gaps confirmed by review are now entrusted to you. Repository access through `this.reviewOnly` is now disabled; the `todowrite-for-manager` program entry remains available; do not inspect, search, or process repository code yourself anymore. Arrange source changes and test writin","[ANCHOR: 13]\u0000﻿# Proof Writer carries this charge now.\n\u0000﻿# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Question:"]
+── fatal script mismatch: seal-undeclared ──
+session=ses_ea557132fffeDwCwfjtjsIv1dC lastUser="[ANCHOR: 15]\u0000﻿# A network failure just interrupted you. Continue the work.\n\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Question: if you spent the next interval working instead of waiting for a comma"
+candidates=[]
+── event tail ──
+#442 18:53:03.591 session.status session=ses_ea557132
+#443 18:53:03.593 session.error session=ses_ea557132 error={"name":"APIError","data":{"message":"declared provider-error fault (retryable=false)","statusCode":400,"isRetryable":false,"responseHeaders":{"connection":"keep-alive","content-type":"application/json","date":"Tue, 20 Oct 2026 18:53:03 GMT","keep-alive":"timeout=5","transfer-encoding":"chunked"},"responseBody":"{\"type\":\"error\",\"error\":{\"code\":\"invalid_prompt\",\"message\":\"declared provider-error fault (retryable=false)\",\"type\":\"invalid_request_error\"}}","metadata":{"url":"http://127.0.0.1:56456/v1/chat/completions"}}}
+#444 18:53:03.593 session.status session=ses_ea557132
+#445 18:53:03.593 session.idle session=ses_ea557132
+#446 18:53:03.593 message.updated session=ses_ea557132
+#447 18:53:03.593 sync
+#448 18:53:03.593 session.status session=ses_ea557132
+#449 18:53:03.593 session.idle session=ses_ea557132
+#450 18:53:03.642 message.updated session=ses_ea557132
+#451 18:53:03.642 sync
+#452 18:53:03.642 message.part.updated session=ses_ea557132
+#453 18:53:03.642 sync
+#454 18:53:03.642 session.updated session=ses_ea557132
+#455 18:53:03.642 sync
+#456 18:53:03.651 session.status session=ses_ea557132
+#457 18:53:03.651 message.updated session=ses_ea557132
+#458 18:53:03.651 sync
+#459 18:53:03.651 session.updated session=ses_ea557132
+#460 18:53:03.651 sync
+#461 18:53:03.651 session.diff session=ses_ea557132
+── Host stderr tail ──
+{"operation":"session-attempt-interrupt","session_id":"ses_ea557281fffe6KDj9JnpI8wu8W"}
+
+── Journal fact tail ──
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:0:PluginPromptPhysicalAccepted
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:1:ProviderStarted
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:2:OpeningPromptCaptured
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:3:PairProgrammingGuidelineAnchored
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:4:XTracePartAppended
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:5:ProviderStarted
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:6:PluginPromptPhysicalAccepted
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:7:PluginPromptSubmitted
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:8:XTracePartAppended
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:9:XTracePartAppended
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:10:HandleLinked
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:11:PluginPromptClaimed
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:12:PluginPromptPhysicalAccepted
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:13:ProviderStarted
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:14:PluginPromptClaimed
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:15:AuthorityLogicalRunClosed
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:16:UnknownFact
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:17:XTracePartAppended
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:18:WorkOpened
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:19:IncumbencyOpened
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:20:Reviewed
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:21:WorkOpened
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:22:IncumbencyOpened
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:23:Reviewed
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:24:ConfirmationCommitted
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:25:IncumbencyRetired
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:26:IncumbencyOpened
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:27:Reviewed
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:28:ConfirmationCommitted
+e064d6072f6169612e8c9f6a7c7014b58250275fa923993dc7b13ade97810926:29:IncumbencyRetired
+  pending blocking orch.2 orch.2@orchestrator/chat/step-2
+  pending blocking orch.3 orch.3@orchestrator/chat/step-3
+  pending blocking manager-interrupt.0 manager-interrupt.0@manager/chat/step-0
+  pending blocking engineer.1 engineer.1@engineer/chat/step-1
+  pending blocking engineer.2 engineer.2@engineer/chat/step-2
+  pending blocking engineer.3 engineer.3@engineer/chat/step-3

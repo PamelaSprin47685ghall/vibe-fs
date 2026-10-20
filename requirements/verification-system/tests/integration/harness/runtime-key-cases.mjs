@@ -403,6 +403,19 @@ export const runtimeKeyCases = [
   // ── turn is prefix-comparable semantic text ──────────────────────────────
 
   {
+    name: 'verification-system-003 turn removes only the exact leading wire anchor without rewriting the request',
+    fn: () => {
+      const guidance = '\u0000\uFEFF<system>guidance</system>';
+      const body = request([user(`[ANCHOR: 12]\u0000\uFEFFFix the bug${guidance}`)]);
+      const before = JSON.stringify(body);
+      assertEq(turnOf(body), `Fix the bug${guidance}`);
+      assertEq(JSON.stringify(body), before, 'wire evidence must remain unchanged');
+      assertEq(turnOf(request([user('[ANCHOR: 12] Fix the bug')])), '[ANCHOR: 12] Fix the bug');
+      assertEq(turnOf(request([user('Keep [ANCHOR: 12]\u0000\uFEFFliteral')])), 'Keep [ANCHOR: 12]\u0000\uFEFFliteral');
+    },
+  },
+
+  {
     name: 'verification-system-003 a shorter utterance is a string prefix of a longer one',
     fn: () => {
       // The property longest-prefix matching rests on. `renderSemantic` would fail

@@ -29,6 +29,7 @@ import { parse as parseToml } from 'smol-toml';
 import { retiredFieldProblems } from './legacy-fields.js';
 import { turnFragments } from './runtime-key.js';
 import { validateFault } from './delivery-plan.js';
+import { validateBoundary } from './cold-boundary.js';
 import { eventCeilingSetupProblems } from './event-ceiling.js';
 
 // ── the TOML root-key trap ──────────────────────────────────────────────────
@@ -895,6 +896,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     ...assertDeliveriesProblems(raw.flow),
     ...eventCeilingSetupProblems(raw.setup),
     ...malformedFaults(raw),
+    ...(raw.epoch ?? []).flatMap(boundary => validateBoundary({ ...boundary, kind: boundary.reason ?? boundary.kind, step: boundary.step ?? 0 })),
     ...providerErrorProblems(raw),
     ...conflictingFaults(entries, raw),
     ...trajectoryProblems(entries, raw),
@@ -958,5 +960,6 @@ const compileBoundary = (entries, boundary) => {
     lane: entry.lane,
     kind: boundary.reason ?? boundary.kind,
     optional: boundary.optional === true,
+    attempt: boundary.attempt,
   };
 };

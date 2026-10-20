@@ -26,6 +26,7 @@ module JsDeliveredValues =
     type private DeliveredCell =
         { View: obj option
           Material: string option
+          MaterialKeys: string list
           Fence: DeliveryFence option }
 
     type ReturnedPiece = { Key: string; Text: string }
@@ -59,6 +60,7 @@ module JsDeliveredValues =
         delivered.[sessionId] <-
             { View = view
               Material = None
+              MaterialKeys = []
               Fence = None }
 
     /// Record a delivery with the exact call fence that produced it. The
@@ -72,6 +74,7 @@ module JsDeliveredValues =
         delivered.[sessionId] <-
             { View = view
               Material = None
+              MaterialKeys = []
               Fence =
                 Some
                     { ProviderRun = providerRun
@@ -85,6 +88,7 @@ module JsDeliveredValues =
             delivered.[sessionId] <-
                 { View = None
                   Material = Some text
+                  MaterialKeys = []
                   Fence = None }
 
     let restoreFencedMaterial sessionId providerRun toolCallId text =
@@ -92,6 +96,7 @@ module JsDeliveredValues =
             delivered.[sessionId] <-
                 { View = None
                   Material = Some text
+                  MaterialKeys = []
                   Fence =
                     Some
                         { ProviderRun = providerRun
@@ -207,25 +212,50 @@ module JsDeliveredValues =
                 pieces @ [ { Key = key; Text = text } ]
         | _ -> pieces
 
+    let private renderSelectedHandoff sessionId view advance assistant =
+        let pieces =
+            select sessionId view (alreadyReturned sessionId)
+            |> fun selected -> withAssistant sessionId view selected assistant
+
+        if advance then
+            markReturned sessionId (pieces |> List.map _.Key)
+
+        renderPieces pieces
+
+    let sealFencedView sessionId providerRun toolCallId assistant =
+        let fence =
+            { ProviderRun = providerRun
+              ToolCallId = toolCallId }
+
+        match delivered.TryGetValue sessionId with
+        | true, cell when cell.Fence = Some fence && cell.View.IsSome ->
+            let pieces =
+                select sessionId cell.View (alreadyReturned sessionId)
+                |> fun selected -> withAssistant sessionId cell.View selected assistant
+
+            let material = renderPieces pieces
+
+            delivered.[sessionId] <-
+                { cell with
+                    View = None
+                    Material = material
+                    MaterialKeys = pieces |> List.map _.Key }
+
+            material
+        | _ -> None
+
     let private handoff
         (sessionId: string)
         (cell: DeliveredCell)
         (advance: bool)
         (assistant: string option)
         : string option =
-        match cell.Material with
-        | Some material ->
-            // Restored material is already the complete handoff.
+        match cell.Material, advance with
+        | Some material, true ->
+            markReturned sessionId cell.MaterialKeys
             renderNonBlank material
-        | None ->
-            let pieces =
-                select sessionId cell.View (alreadyReturned sessionId)
-                |> fun selected -> withAssistant sessionId cell.View selected assistant
-
-            if advance then
-                markReturned sessionId (pieces |> List.map _.Key)
-
-            renderPieces pieces
+        | Some material, false -> renderNonBlank material
+        | None, _ -> renderSelectedHandoff sessionId cell.View advance assistant
 
     let tryTakeRenderedWith (sessionId: string) (assistant: string option) : string option =
         match delivered.TryGetValue sessionId with
@@ -244,12 +274,10 @@ module JsDeliveredValues =
         : string option =
         match delivered.TryGetValue sessionId with
         | false, _ -> None
-        | true, cell ->
-            match cell.Fence with
-            | Some fence when fence.ProviderRun = providerRun ->
-                delivered.Remove sessionId |> ignore
-                handoff sessionId cell true assistant
-            | _ -> None
+        | true, cell when cell.Fence |> Option.exists (fun fence -> fence.ProviderRun = providerRun) ->
+            delivered.Remove sessionId |> ignore
+            handoff sessionId cell true assistant
+        | true, _ -> None
 
     let tryTakeRendered (sessionId: string) : string option = tryTakeRenderedWith sessionId None
 

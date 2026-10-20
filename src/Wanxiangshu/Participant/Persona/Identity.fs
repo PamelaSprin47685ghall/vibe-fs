@@ -242,14 +242,19 @@ module ParticipantIdentity =
     let legacyAgentOwnerRootUnprovableMessage =
         "legacy AuthorityRootAccepted v1 AgentOwnerRoot cannot prove participant identity"
 
+    let private upgradeLegacyRoot (input: LegacyAuthorityRootIdentityV1Input) (name, kind) =
+        let expectedRole = roleLabelOfKind kind
+
+        if input.CanonicalRole <> expectedRole then
+            Error(ParticipantIdentityError.LegacyRoleMismatch(expectedRole, input.CanonicalRole))
+        else
+            Ok(create name kind (personaV1 kind) (PersonaCatalogVersion 1) PersonaOrigin.ResolvedAtRoot)
+
     let upgradeLegacyV1Root
         (input: LegacyAuthorityRootIdentityV1Input)
         : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
         match input.AuthorityKind with
         | "AgentOwnerRoot" ->
             Error(ParticipantIdentityError.UnprovableLegacyAuthorityIdentity legacyAgentOwnerRootUnprovableMessage)
-        | "HumanRoot" ->
-            parseCanonicalName input.SelectedAgent
-            |> Result.map (fun (name, kind) ->
-                create name kind (personaV1 kind) (PersonaCatalogVersion 1) PersonaOrigin.ResolvedAtRoot)
+        | "HumanRoot" -> parseCanonicalName input.SelectedAgent |> Result.bind (upgradeLegacyRoot input)
         | authorityKind -> Error(ParticipantIdentityError.UnsupportedLegacyAuthorityKind authorityKind)

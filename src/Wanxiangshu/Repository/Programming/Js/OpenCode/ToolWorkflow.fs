@@ -117,22 +117,20 @@ module JsToolsData =
 
     let isDelivered (json: string) = json.StartsWith deliveredPrefix
 
+    let private parseDelivered (json: string) : Result<obj, JsFailure> =
+        try
+            let view = (JS.JSON.parse json)?view
+
+            Result.requireTrue JsFailure.InvalidReturnValue (not (isNull view))
+            |> Result.map (fun () -> view)
+        with _ ->
+            Error JsFailure.InvalidReturnValue
+
     /// One decode for both endings: a delivered program's value is the view
     /// declaration it handed over. The declaration is validated as a view
     /// at the deliver gate; a deliver without a view is not a delivery.
     let parseOutcome (json: string) : Result<obj, JsFailure> =
-        if not (isDelivered json) then
-            parse json
-        else
-            try
-                let view = (JS.JSON.parse json)?view
-
-                if isNull view then
-                    Error JsFailure.InvalidReturnValue
-                else
-                    Ok view
-            with _ ->
-                Error JsFailure.InvalidReturnValue
+        if isDelivered json then parseDelivered json else parse json
 
     /// Extract the payload from a parked sentinel JSON string. The sentinel is
     /// produced by the park signal path; its payload is the value the program
@@ -318,6 +316,18 @@ module JsToolWorkflow =
         else
             parseRawView json |> Result.bind decodeViewDeclaration
 
+    let private requireUnparkedSession sessionId =
+        match JsParkedSites.handlesForSession sessionId with
+        | [] -> Ok()
+        | handles ->
+            Error(
+                JsFailure.ProgramFailed(
+                    sprintf
+                        "delivery is blocked while this session has unresolved parked handles: %s"
+                        (System.String.Join(", ", handles))
+                )
+            )
+
     /// Algorithm G1: the deliver hard gate. A program cannot deliver while
     /// its own session still has unresolved parked sites; an unrelated
     /// session's park never blocks this delivery. On success the delivered
@@ -332,22 +342,17 @@ module JsToolWorkflow =
         if not (JsToolsData.isDelivered json) then
             parsed
         else
-            let parkedHandles = JsParkedSites.handlesForSession sessionId
+            result {
+                do! requireUnparkedSession sessionId
+                let! _ = deliveredView json
+                deliveredJson.Value <- Some json
+                return! parsed
+            }
 
-            if not (List.isEmpty parkedHandles) then
-                let handles = System.String.Join(", ", parkedHandles)
-
-                Error(
-                    JsFailure.ProgramFailed(
-                        sprintf "delivery is blocked while this session has unresolved parked handles: %s" handles
-                    )
-                )
-            else
-                match deliveredView json with
-                | Error failure -> Error failure
-                | Ok _ ->
-                    deliveredJson.Value <- Some json
-                    parsed
+    let private recordDeliveredView sessionId fence view =
+        match fence with
+        | Some(providerRun, toolCallId) -> JsDeliveredValues.recordFencedView sessionId providerRun toolCallId view
+        | None -> JsDeliveredValues.recordView sessionId view
 
     /// The delivered view declaration, written into the session cell only
     /// after the tool's observation and ledger settled successfully — a
@@ -358,13 +363,14 @@ module JsToolWorkflow =
         (json: string)
         =
         if JsToolsData.isDelivered json then
-            match deliveredView json with
-            | Ok view ->
-                match fence with
-                | Some(providerRun, toolCallId) ->
-                    JsDeliveredValues.recordFencedView sessionId providerRun toolCallId view
-                | None -> JsDeliveredValues.recordView sessionId view
-            | Error _ -> ()
+            deliveredView json |> Result.iter (recordDeliveredView sessionId fence)
+
+    let private publishSettledDelivery sessionId fence (deliveredJson: string option ref) outcome =
+        match outcome with
+        | Succeeded _ ->
+            deliveredJson.Value
+            |> Option.iter (recordDeliveredViewAfterSettlement sessionId fence)
+        | _ -> JsDeliveredValues.clear sessionId
 
 
     let private decodeRunResult
@@ -663,6 +669,7 @@ module JsToolWorkflow =
         task {
             let cancellation = new System.Threading.CancellationTokenSource()
             let runHandleReady = TaskCompletionSource<JsSandbox.JsRunHandle>()
+            // DSL-MUTABLE: cancellation — hold the current sandbox abort capability.
             let mutable abortHandle: JsSandbox.JsRunHandle option = None
 
             let detachAbort =
@@ -857,14 +864,7 @@ module JsToolWorkflow =
                 let settled =
                     settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
 
-                // The delivered cell is written only after the tool settled
-                // successfully: a failed observation or ledger must not leave
-                // a cell that could pass as a delivery.
-                match settled with
-                | Succeeded _ ->
-                    deliveredJson.Value
-                    |> Option.iter (fun json -> recordDeliveredViewAfterSettlement sessionId fence json)
-                | _ -> JsDeliveredValues.clear sessionId
+                publishSettledDelivery sessionId fence deliveredJson settled
 
                 return settled
         }
@@ -1018,11 +1018,7 @@ module JsToolWorkflow =
                 let! ledgerOutcome = settleLedger site.Ledger
                 let settled = settleResumedExecutionOutcome ledgerOutcome value
 
-                match settled with
-                | Succeeded _ ->
-                    deliveredJson.Value
-                    |> Option.iter (fun json -> recordDeliveredViewAfterSettlement site.SessionId fence json)
-                | _ -> JsDeliveredValues.clear site.SessionId
+                publishSettledDelivery site.SessionId fence deliveredJson settled
 
                 return settled
         }

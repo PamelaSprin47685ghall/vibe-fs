@@ -29,7 +29,7 @@ import {
 import { WAIT_FACT_WINDOW_MS } from './time-budget.js';
 import { isAppendOnlyPrefix, sealHolds, wireOf } from './provider-wire.js';
 import { awaitSessionSettled } from './session-quiescence.js';
-import { kindOf } from './runtime-key.js';
+import { kindOf, turnOf } from './runtime-key.js';
 import { bindLaneSession } from './lane.mjs';
 
 /** ≤50ms wall guard matching scenario-driver FACT_WAKE_GUARD_MS. */
@@ -41,6 +41,9 @@ const contentText = (content) =>
     : String(content ?? '');
 
 const toolName = (call) => call?.function?.name ?? call?.name;
+
+const isInterruptedJoinResult = (text) =>
+  /^(?:\[ANCHOR: (?:0|[1-9]\d*)\]\u0000\uFEFF)?# Something nearer has arrived\.\n/u.test(text);
 
 /** Unique tool-result texts for a named tool across provider request history (public wire). */
 export function publicToolResults(requests, expectedName) {
@@ -250,7 +253,7 @@ export function assertInterruptedJoin(scenario, label = 'long-stroke') {
  // A later successful join may legitimately carry an LWR that quotes the
  // earlier interrupted result; that historical quotation is not a second
  // interrupted join consequence and must not be classified as one.
-  const interrupted = results.filter((text) => text.startsWith('# Something nearer has arrived.\n'));
+  const interrupted = results.filter(isInterruptedJoinResult);
   assert.ok(
     interrupted.length >= 1,
     `${label}: interrupted join must reach Manager conversation as the public nearer-arrival result`,
@@ -721,7 +724,7 @@ export async function oracleLongStroke(scenario, ctx) {
 
   const managerJoinResults = publicToolResults(scenario.provider?.requests, 'join');
   assert.equal(
-    managerJoinResults.filter((text) => text.startsWith('# Something nearer has arrived.\n')).length,
+    managerJoinResults.filter(isInterruptedJoinResult).length,
     1,
     'long-stroke: provider recovery must not manufacture another interrupted or terminal join result',
   );
@@ -868,7 +871,7 @@ export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
   const successorOrdinals = [];
   for (const request of requests) {
     const users = messageTextsByRole(request, 'user');
-    const appended = users.at(-1) ?? '';
+    const appended = turnOf(request) ?? '';
     if (!appended.startsWith(assessmentResource)) continue;
     const ordinal = /# You are the (\d+) Manager taking over this mission\./.exec(appended)?.[1];
     assert.ok(ordinal, 'manager-loop: successor request must carry the successor ordinal resource');

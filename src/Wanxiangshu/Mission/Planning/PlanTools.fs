@@ -2,6 +2,8 @@ namespace Wanxiangshu.Mission.Planning
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
+open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 
 type DeliverResult =
@@ -825,27 +827,71 @@ module PlanTools =
         (digest: string)
         (path: string)
         : Task<Result<DeliverResult, string>> =
-        task {
-            match! createSession operationId "manager" with
-            | Error reason ->
-                let! _ = refuseDelivery gitCommonDir workId operationId reason |> Task.FromResult
+        taskResult {
+            let! execSessionId =
+                createSession operationId "manager"
+                |> TaskResult.mapError (fun reason ->
+                    refuseDelivery gitCommonDir workId operationId reason |> ignore
+                    reason)
 
-                return Error reason
-            | Ok execSessionId ->
-                match bindObservedExecutionSession gitCommonDir workId operationId execSessionId with
-                | Error reason -> return Error reason
-                | Ok() ->
-                    return!
-                        promptFreshExecution
-                            gitCommonDir
-                            workId
-                            operationId
-                            promptSession
-                            discardSession
-                            content
-                            digest
-                            path
-                            execSessionId
+            do! bindObservedExecutionSession gitCommonDir workId operationId execSessionId
+
+            return!
+                promptFreshExecution
+                    gitCommonDir
+                    workId
+                    operationId
+                    promptSession
+                    discardSession
+                    content
+                    digest
+                    path
+                    execSessionId
+        }
+
+    let private pendingDeliveryOf gitCommonDir workId =
+        result {
+            let! work =
+                lifecycleWorkOf gitCommonDir workId
+                |> Result.requireSome "lifecycle work is missing"
+
+            return!
+                match work.PendingOperationId, work.PendingExecSessionId, work.PendingDigest, work.PendingPath with
+                | Some operationId, None, Some digest, Some path -> Ok(operationId, digest, path)
+                | Some _, Some bound, Some digest, Some path -> Ok("replay:" + bound, digest, path)
+                | _ -> Error "pending delivery evidence is incomplete"
+        }
+
+    let private startReservedExecution
+        gitCommonDir
+        root
+        workId
+        operationId
+        createSession
+        promptSession
+        discardSession
+        digest
+        path
+        =
+        taskResult {
+            let! content, currentDigest, currentPath = readAndValidatePlan root workId
+
+            if currentDigest = digest && currentPath = path then
+                return!
+                    createAndPromptFreshExecution
+                        gitCommonDir
+                        workId
+                        operationId
+                        createSession
+                        promptSession
+                        discardSession
+                        content
+                        digest
+                        path
+            else
+                let reason = "Cannot deliver: plan artifact changed after delivery reservation"
+                refuseDelivery gitCommonDir workId operationId reason |> ignore
+                return! Error reason
         }
 
     /// LC-020: the fresh handoff runs against the pending delivery's own
@@ -861,61 +907,35 @@ module PlanTools =
         (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
         (discardSession: string -> Task<Result<unit, string>>)
         : Task<Result<DeliverResult, string>> =
-        task {
-            if not (Array.isEmpty blockers) then
-                return Error "Cannot deliver: live resources block starting execution"
+        taskResult {
+            do! Result.requireTrue "Cannot deliver: live resources block starting execution" (Array.isEmpty blockers)
+
+            let! operationId, digest, path = pendingDeliveryOf gitCommonDir workId
+
+            if operationId.StartsWith "replay:" then
+                return
+                    { Ok = true
+                      Relayed = false
+                      Delivered = true
+                      RetiredIncumbencyId = ""
+                      RetirementOutcome = "Delivered"
+                      Digest = digest
+                      Path = path
+                      ExecSessionId = operationId.Substring("replay:".Length)
+                      NextIncumbencyId = ""
+                      Message = "Delivered" }
             else
-                let pending =
-                    match lifecycleWorkOf gitCommonDir workId with
-                    | None -> Error "lifecycle work is missing"
-                    | Some work ->
-                        match
-                            work.PendingOperationId, work.PendingExecSessionId, work.PendingDigest, work.PendingPath
-                        with
-                        | Some operationId, None, Some digest, Some path -> Ok(operationId, digest, path)
-                        | Some _, Some bound, Some digest, Some path -> Ok("replay:" + bound, digest, path)
-                        | _ -> Error "pending delivery evidence is incomplete"
-
-                match pending with
-                | Error err -> return Error err
-                | Ok(operationId, digest, path) when operationId.StartsWith "replay:" ->
-                    return
-                        Ok
-                            { Ok = true
-                              Relayed = false
-                              Delivered = true
-                              RetiredIncumbencyId = ""
-                              RetirementOutcome = "Delivered"
-                              Digest = digest
-                              Path = path
-                              ExecSessionId = operationId.Substring("replay:".Length)
-                              NextIncumbencyId = ""
-                              Message = "Delivered" }
-                | Ok(operationId, digest, path) ->
-                    match readAndValidatePlan root workId with
-                    | Error err -> return Error err
-                    | Ok(content, currentDigest, currentPath) when currentDigest = digest && currentPath = path ->
-                        return!
-                            createAndPromptFreshExecution
-                                gitCommonDir
-                                workId
-                                operationId
-                                createSession
-                                promptSession
-                                discardSession
-                                content
-                                digest
-                                path
-                    | Ok _ ->
-                        let! _ =
-                            refuseDelivery
-                                gitCommonDir
-                                workId
-                                operationId
-                                "Cannot deliver: plan artifact changed after delivery reservation"
-                            |> Task.FromResult
-
-                        return Error "Cannot deliver: plan artifact changed after delivery reservation"
+                return!
+                    startReservedExecution
+                        gitCommonDir
+                        root
+                        workId
+                        operationId
+                        createSession
+                        promptSession
+                        discardSession
+                        digest
+                        path
         }
 
     let private reviewAndDeliverReopenedPostS3
@@ -1039,6 +1059,11 @@ module PlanTools =
                         activeId
         }
 
+    let private rememberedExecutionSession key =
+        match executionFences.TryGetValue key with
+        | true, sessionId -> sessionId
+        | false, _ -> key
+
     let private dispatchPostS3Execution
         (gitCommonDir: string)
         (root: string)
@@ -1071,12 +1096,7 @@ module PlanTools =
                 discardSession
         elif executionFences.ContainsKey(providerRunId + ":" + toolCallId) then
             let remembered =
-                let key = executionFences[providerRunId + ":" + toolCallId]
-
-                if executionFences.ContainsKey key then
-                    executionFences[key]
-                else
-                    key
+                rememberedExecutionSession executionFences[providerRunId + ":" + toolCallId]
 
             Task.FromResult(
                 Ok

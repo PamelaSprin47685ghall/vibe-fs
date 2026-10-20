@@ -1,0 +1,150 @@
+TAP version 13
+# Subtest: SPEC[supervision-001] input EOF follows every target write under real output backpressure
+ok 1 - SPEC[supervision-001] input EOF follows every target write under real output backpressure
+  ---
+  duration_ms: 132.336042
+  ...
+# Subtest: SPEC[supervision-001] a target that closes input still owns its later output and native exit
+ok 2 - SPEC[supervision-001] a target that closes input still owns its later output and native exit
+  ---
+  duration_ms: 168.818833
+  ...
+# Subtest: SPEC[supervision-001] both input pipes flush large buffered writes to the actual target
+ok 3 - SPEC[supervision-001] both input pipes flush large buffered writes to the actual target
+  ---
+  duration_ms: 370.347333
+  ...
+# Subtest: SPEC[supervision-001] target options are validated before a worker or target is started
+ok 4 - SPEC[supervision-001] target options are validated before a worker or target is started
+  ---
+  duration_ms: 0.437833
+  ...
+# Subtest: SPEC[supervision-001] startup refers to the actual target and forwards explicit input unchanged
+ok 5 - SPEC[supervision-001] startup refers to the actual target and forwards explicit input unchanged
+  ---
+  duration_ms: 146.1655
+  ...
+# Subtest: SPEC[supervision-001] target ENOENT is never reported as worker startup or exit zero
+ok 6 - SPEC[supervision-001] target ENOENT is never reported as worker startup or exit zero
+  ---
+  duration_ms: 58.33225
+  ...
+# Subtest: SPEC[supervision-001] the final target preserves literal environment keys through both physical launches
+ok 7 - SPEC[supervision-001] the final target preserves literal environment keys through both physical launches
+  ---
+  duration_ms: 93.7845
+  ...
+# Subtest: SPEC[supervision-001] failed startup cleans its control directory and poll without a capture consumer
+ok 8 - SPEC[supervision-001] failed startup cleans its control directory and poll without a capture consumer
+  ---
+  duration_ms: 62.190458
+  ...
+# Subtest: SPEC[supervision-001] input uses real pipes and completed snapshots do not alias state
+ok 9 - SPEC[supervision-001] input uses real pipes and completed snapshots do not alias state
+  ---
+  duration_ms: 95.890583
+  ...
+# Subtest: SPEC[supervision-002] paused supervision propagates backpressure through the real Worker to the target
+ok 10 - SPEC[supervision-002] paused supervision propagates backpressure through the real Worker to the target
+  ---
+  duration_ms: 560.772791
+  ...
+# Subtest: SPEC[supervision-002] a final extent cannot authorize natural group cleanup before Capture receives each channel
+ok 11 - SPEC[supervision-002] a final extent cannot authorize natural group cleanup before Capture receives each channel
+  ---
+  duration_ms: 131.145417
+  ...
+# Subtest: SPEC[supervision-002] zero-output and one-channel target completion do not wait for an absent channel
+ok 12 - SPEC[supervision-002] zero-output and one-channel target completion do not wait for an absent channel
+  ---
+  duration_ms: 159.776292
+  ...
+# Subtest: SPEC[supervision-002] natural exit preserves multi-MiB tails on both streams before group cleanup
+ok 13 - SPEC[supervision-002] natural exit preserves multi-MiB tails on both streams before group cleanup
+  ---
+  duration_ms: 183.493667
+  ...
+# Subtest: SPEC[supervision-003] TERM and KILL reach the same group after target exit while a descendant holds output
+ok 14 - SPEC[supervision-003] TERM and KILL reach the same group after target exit while a descendant holds output
+  ---
+  duration_ms: 195.644917
+  ...
+# Subtest: SPEC[supervision-003] natural completion cleans same-group descendants without inherited output
+ok 15 - SPEC[supervision-003] natural completion cleans same-group descendants without inherited output
+  ---
+  duration_ms: 138.007083
+  ...
+# Subtest: SPEC[supervision-004] legacy output extent is control failure rather than guessed completion
+ok 16 - SPEC[supervision-004] legacy output extent is control failure rather than guessed completion
+  ---
+  duration_ms: 79.5925
+  ...
+# Subtest: SPEC[supervision-004] false output extent is control failure rather than guessed completion
+ok 17 - SPEC[supervision-004] false output extent is control failure rather than guessed completion
+  ---
+  duration_ms: 68.6645
+  ...
+# Subtest: SPEC[supervision-004] negative output extent is control failure rather than guessed completion
+ok 18 - SPEC[supervision-004] negative output extent is control failure rather than guessed completion
+  ---
+  duration_ms: 57.30325
+  ...
+# Subtest: SPEC[supervision-004] fraction output extent is control failure rather than guessed completion
+ok 19 - SPEC[supervision-004] fraction output extent is control failure rather than guessed completion
+  ---
+  duration_ms: 57.916667
+  ...
+# Subtest: SPEC[supervision-004] unsafe output extent is control failure rather than guessed completion
+ok 20 - SPEC[supervision-004] unsafe output extent is control failure rather than guessed completion
+  ---
+  duration_ms: 57.803959
+  ...
+# Subtest: SPEC[supervision-004] string output extent is control failure rather than guessed completion
+ok 21 - SPEC[supervision-004] string output extent is control failure rather than guessed completion
+  ---
+  duration_ms: 62.81575
+  ...
+# Subtest: SPEC[supervision-004] channel extents are checked separately even when their sum is correct
+ok 22 - SPEC[supervision-004] channel extents are checked separately even when their sum is correct
+  ---
+  duration_ms: 114.744583
+  ...
+# Subtest: SPEC[supervision-004] short Capture EOF is incomplete output after exact target exit
+ok 23 - SPEC[supervision-004] short Capture EOF is incomplete output after exact target exit
+  ---
+  duration_ms: 105.218958
+  ...
+# Subtest: SPEC[supervision-004] short Capture EOF is explicit interruption after exact target exit
+ok 24 - SPEC[supervision-004] short Capture EOF is explicit interruption after exact target exit
+  ---
+  duration_ms: 108.415375
+  ...
+# Subtest: SPEC[supervision-004] unexpected worker death preserves unknown target exit
+ok 25 - SPEC[supervision-004] unexpected worker death preserves unknown target exit
+  ---
+  duration_ms: 98.596375
+  ...
+# Subtest: SPEC[supervision-004] lost private control channel is failure and never target exit zero
+ok 26 - SPEC[supervision-004] lost private control channel is failure and never target exit zero
+  ---
+  duration_ms: 58.060292
+  ...
+# Subtest: SPEC[supervision-004] a failed worker exit-fact write kills its live group and keeps the target status unknown
+ok 27 - SPEC[supervision-004] a failed worker exit-fact write kills its live group and keeps the target status unknown
+  ---
+  duration_ms: 99.902291
+  ...
+# Subtest: SPEC[supervision-005] two supervisors keep separate process groups, output and waits
+ok 28 - SPEC[supervision-005] two supervisors keep separate process groups, output and waits
+  ---
+  duration_ms: 147.696709
+  ...
+1..28
+# tests 28
+# suites 0
+# pass 28
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1199.753292

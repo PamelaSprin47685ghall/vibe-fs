@@ -1,0 +1,63 @@
+bun test v1.3.14 (d1632b29)
+
+src/supervision/tests/001.test.mjs:
+(pass) SPEC[supervision-001] input EOF follows every target write under real output backpressure [158.91ms]
+(pass) SPEC[supervision-001] a target that closes input still owns its later output and native exit [162.23ms]
+(pass) SPEC[supervision-001] both input pipes flush large buffered writes to the actual target [333.46ms]
+(pass) SPEC[supervision-001] target options are validated before a worker or target is started [0.56ms]
+(pass) SPEC[supervision-001] startup refers to the actual target and forwards explicit input unchanged [90.14ms]
+(pass) SPEC[supervision-001] target ENOENT is never reported as worker startup or exit zero [34.11ms]
+(pass) SPEC[supervision-001] the final target preserves literal environment keys through both physical launches [63.61ms]
+(pass) SPEC[supervision-001] failed startup cleans its control directory and poll without a capture consumer [36.51ms]
+(pass) SPEC[supervision-001] input uses real pipes and completed snapshots do not alias state [64.26ms]
+
+ 9 pass
+ 0 fail
+Ran 9 tests across 1 file. [982.00ms]
+bun test v1.3.14 (d1632b29)
+
+src/supervision/tests/002.test.mjs:
+(pass) SPEC[supervision-002] paused supervision propagates backpressure through the real Worker to the target [5244.92ms]
+(pass) SPEC[supervision-002] a final extent cannot authorize natural group cleanup before Capture receives each channel [90.58ms]
+(pass) SPEC[supervision-002] zero-output and one-channel target completion do not wait for an absent channel [97.67ms]
+(pass) SPEC[supervision-002] natural exit preserves multi-MiB tails on both streams before group cleanup [301.17ms]
+
+ 4 pass
+ 0 fail
+Ran 4 tests across 1 file. [5.75s]
+bun test v1.3.14 (d1632b29)
+
+src/supervision/tests/003.test.mjs:
+(pass) SPEC[supervision-003] TERM and KILL reach the same group after target exit while a descendant holds output [121.34ms]
+(pass) SPEC[supervision-003] natural completion cleans same-group descendants without inherited output [76.17ms]
+
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [218.00ms]
+bun test v1.3.14 (d1632b29)
+
+src/supervision/tests/004.test.mjs:
+(pass) SPEC[supervision-004] legacy output extent is control failure rather than guessed completion [38.55ms]
+(pass) SPEC[supervision-004] false output extent is control failure rather than guessed completion [36.46ms]
+(pass) SPEC[supervision-004] negative output extent is control failure rather than guessed completion [37.06ms]
+(pass) SPEC[supervision-004] fraction output extent is control failure rather than guessed completion [37.11ms]
+(pass) SPEC[supervision-004] unsafe output extent is control failure rather than guessed completion [37.41ms]
+(pass) SPEC[supervision-004] string output extent is control failure rather than guessed completion [36.96ms]
+(pass) SPEC[supervision-004] channel extents are checked separately even when their sum is correct [66.41ms]
+(pass) SPEC[supervision-004] short Capture EOF is incomplete output after exact target exit [72.13ms]
+(pass) SPEC[supervision-004] short Capture EOF is explicit interruption after exact target exit [66.58ms]
+(pass) SPEC[supervision-004] unexpected worker death preserves unknown target exit [64.12ms]
+(pass) SPEC[supervision-004] lost private control channel is failure and never target exit zero [36.84ms]
+(pass) SPEC[supervision-004] a failed worker exit-fact write kills its live group and keeps the target status unknown [60.27ms]
+
+ 12 pass
+ 0 fail
+Ran 12 tests across 1 file. [607.00ms]
+bun test v1.3.14 (d1632b29)
+
+src/supervision/tests/005.test.mjs:
+(pass) SPEC[supervision-005] two supervisors keep separate process groups, output and waits [92.90ms]
+
+ 1 pass
+ 0 fail
+Ran 1 test across 1 file. [111.00ms]

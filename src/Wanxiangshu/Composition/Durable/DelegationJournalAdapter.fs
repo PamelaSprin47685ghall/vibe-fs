@@ -6,6 +6,10 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Interaction.Authority
+open FsToolkit.ErrorHandling
 
 [<RequireQualifiedAccess>]
 module DelegationJournalAdapter =
@@ -48,4 +52,68 @@ module TaskDeliveryJournal =
                         journal
 
                 return appended |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
+        }
+
+    let commitChild journal sessionId physicalUserMessageId providerRun toolCallId formalText declaration view =
+        taskResult {
+            let projection = (AgentJournal.snapshot journal).AgentProjections
+
+            let! binding =
+                Map.tryFind sessionId projection.HandleByChildSession
+                |> Result.requireSome "delivery requires the child's durable binding"
+
+            let! profile =
+                PromptAuthorityProjectionQueries.activeProfile sessionId projection
+                |> Result.requireSome "delivery requires the active task authority"
+
+            let! parentId, _, _ =
+                PromptAuthority.identitySeedOwner profile.IdentitySeed
+                |> Result.requireSome "delivery requires the original task owner"
+
+            let! work =
+                AgentJournal.handleProjection journal parentId
+                |> HandleProjection.tryAdmittedWork
+                    { Handle = binding.Handle
+                      ChildSessionId = sessionId
+                      AuthorityRoot = profile.AuthorityRootUserMessageId }
+                |> Result.mapError (sprintf "delivery work admission is invalid: %A")
+
+            let! started =
+                projection.ChatExecutions
+                |> ChatExecutionProjection.nonTerminal
+                |> List.choose _.startedEvidence
+                |> List.filter (fun started ->
+                    started.Accepted.SessionId = sessionId
+                    && started.Accepted.PhysicalUserMessageId = physicalUserMessageId)
+                |> function
+                    | [ started ] -> Ok started
+                    | _ -> Error "delivery requires one exact active provider execution"
+
+            let accepted = started.Accepted
+
+            do!
+                Result.requireTrue
+                    "delivery provider does not own the active task"
+                    (accepted.LogicalRunId = AdmittedWork.logicalRunId work
+                     && accepted.LogicalRunId = profile.LogicalRunId
+                     && accepted.AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                     && accepted.IdentitySeed = profile.IdentitySeed)
+
+            let witness =
+                { Fence =
+                    { SessionId = sessionId
+                      LogicalRunId = accepted.LogicalRunId
+                      AuthorityRoot = accepted.AuthorityRootUserMessageId
+                      PhysicalUserMessageId = accepted.PhysicalUserMessageId
+                      ProviderRun = providerRun
+                      ToolCallId = toolCallId
+                      Task = TaskDeliveryTask.ChildWork(HandleId.describe binding.Handle) }
+                  FormalText = formalText
+                  ViewDeclaration = declaration
+                  View = view
+                  MaterialDigest = HostDigest.sha256Hex view
+                  RetirementId = None }
+
+            do! commit journal witness
+            return witness, profile.CanonicalRole
         }

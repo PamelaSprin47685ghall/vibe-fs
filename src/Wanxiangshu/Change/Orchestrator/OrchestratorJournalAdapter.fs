@@ -25,9 +25,9 @@ module OrchestratorJournalAdapter =
 
     let forRelay (journal: AgentJournal) : OrchestratorRelayPort =
         { AwaitChangeFrom =
-            fun revision ->
+            fun revision cancellation ->
                 task {
-                    let! _ = AgentJournal.awaitChangeFrom revision journal
+                    let! _ = AgentJournal.awaitChangeFromOrCancel revision cancellation journal
                     return ()
                 } }
 

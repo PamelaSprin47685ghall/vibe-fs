@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Fission.OpenCode
 
+open FsToolkit.ErrorHandling
+
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
@@ -174,16 +176,14 @@ module FissionHost =
         task {
             match! HandleController.consume durablePort ownerSessionId handle with
             | Ok _ -> return true
+            | Error _ when isHandleRetired durable ownerSessionId handle -> return true
             | Error err ->
-                let retired = isHandleRetired durable ownerSessionId handle
+                Diagnostic.emit
+                    "fission-handle-consume-failed"
+                    [ "session_id", SessionId.value ownerSessionId
+                      "result", sprintf "handle consume failed: %A" err ]
 
-                if not retired then
-                    Diagnostic.emit
-                        "fission-handle-consume-failed"
-                        [ "session_id", SessionId.value ownerSessionId
-                          "result", sprintf "handle consume failed: %A" err ]
-
-                return retired
+                return false
         }
 
     let private tryConsumeCompletedHandle (durablePort: AgentJournalPort) durable ownerSessionId handle =
@@ -652,8 +652,8 @@ module FissionHost =
             | Ok _ ->
                 let! appended = appendDeliveryFact durable groupId now.OwnerSessionId completionId laneIndex
 
-                match appended with
-                | Error failure ->
+                appended
+                |> Result.teeError (fun failure ->
                     Diagnostic.emit
                         "fission-delivery-fact-append-failed"
                         [ "session_id", SessionId.value now.OwnerSessionId
@@ -663,8 +663,8 @@ module FissionHost =
                               groupId
                               completionId
                               laneIndex
-                              failure ]
-                | Ok() -> ()
+                              failure ])
+                |> ignore
 
                 return ()
         }
@@ -685,8 +685,8 @@ module FissionHost =
             task {
                 let! appended = appendDeliveryFact durable groupId now.OwnerSessionId completionId laneIndex
 
-                match appended with
-                | Error failure ->
+                appended
+                |> Result.teeError (fun failure ->
                     Diagnostic.emit
                         "fission-delivery-fact-append-failed"
                         [ "session_id", SessionId.value now.OwnerSessionId
@@ -696,8 +696,8 @@ module FissionHost =
                               groupId
                               completionId
                               laneIndex
-                              failure ]
-                | Ok() -> ()
+                              failure ])
+                |> ignore
 
                 return ()
             }
@@ -764,13 +764,13 @@ module FissionHost =
             for KeyValue(_, laneSessionId) in group.LaneSessions do
                 let! aborted = sessionPort.AbortSession laneSessionId
 
-                match aborted with
-                | Ok() -> ()
-                | Error reason ->
+                aborted
+                |> Result.teeError (fun reason ->
                     Diagnostic.emit
                         "fission-lane-abort-failed"
                         [ "session_id", SessionId.value laneSessionId
-                          "result", sprintf "fission lane abort failed: group=%s reason=%s" group.GroupId reason ]
+                          "result", sprintf "fission lane abort failed: group=%s reason=%s" group.GroupId reason ])
+                |> ignore
         }
 
     let private failOpenGroup
@@ -1111,6 +1111,27 @@ module FissionHost =
                 return! writeLaneWorkAndMaterialize sessionPort eventPort durable group laneIndex turn delivered
         }
 
+    let private reportOutstandingExternalNudge sessionId nudge =
+        match nudge with
+        | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+            Diagnostic.emit
+                "fission-join-nudge-failed"
+                [ "session_id", SessionId.value sessionId
+                  "result", sprintf "fission outstanding external nudge failed: %s" reason ]
+        | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
+            Diagnostic.emit
+                "fission-join-nudge-unsent"
+                [ "session_id", SessionId.value sessionId
+                  "result", "fission outstanding external nudge unsent: not-sent" ]
+        | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
+            Diagnostic.emit
+                "fission-join-nudge-unsent"
+                [ "session_id", SessionId.value sessionId
+                  "result", sprintf "fission outstanding external nudge admission rejected: %A" failure ]
+        | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
+        | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding
+        | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()
+
     let private observeOpenLaneCompletion
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
@@ -1142,25 +1163,7 @@ module FissionHost =
                         turn.ProviderRun
                         turn.Directory
 
-                match nudge with
-                | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                    Diagnostic.emit
-                        "fission-join-nudge-failed"
-                        [ "session_id", SessionId.value turn.SessionId
-                          "result", sprintf "fission outstanding external nudge failed: %s" reason ]
-                | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
-                    Diagnostic.emit
-                        "fission-join-nudge-unsent"
-                        [ "session_id", SessionId.value turn.SessionId
-                          "result", "fission outstanding external nudge unsent: not-sent" ]
-                | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
-                    Diagnostic.emit
-                        "fission-join-nudge-unsent"
-                        [ "session_id", SessionId.value turn.SessionId
-                          "result", sprintf "fission outstanding external nudge admission rejected: %A" failure ]
-                | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
-                | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding
-                | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()
+                reportOutstandingExternalNudge turn.SessionId nudge
 
                 return true
             | false, _, false ->

@@ -8,9 +8,8 @@ open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Execution.Session.Wait
 
 module HostForkJoin =
-    /// host-boundary-021: the current process's ownership cut over durable
-    /// handles. Join admission and the horizon roster both answer through it.
-    val currentProcessHandle: runtime: HostForkRuntime -> record: HandleRecord -> bool
+    /// Retained admitted work and current process handles from the owner's projection.
+    val ownerWorkHandle: runtime: HostForkRuntime -> record: HandleRecord -> bool
 
     val joinAvailable:
         runtime: HostForkRuntime ->

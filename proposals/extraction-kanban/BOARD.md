@@ -18,6 +18,7 @@
 | UM-3 Manager reviewOnly | SOURCE_READY_LIMITED | 原生真实Host逐次授权、零拒绝读取/启动、绑定方法、park与重开通过；保留本地受监管rg；正式监督结果见最终收据 |
 | UM-4 交付见证与真实工作收束 | SOURCE_READY_LIMITED | 结算后入格、精确provider围栏、自然stop不完成、冷回收不补造交付、Advisor实际intent归属已落实；不接半成品reportMapping，最终收据列明持久/进程链证据 |
 | UM-5 同候选验收与源码集成 | RESULTS_IN_RECEIPT | 定向验收、完整发行、普通推master的最终状态均以[收据](../../evidence/upstream-view-delivery-20261020/umr-delivery.json)为准；控制流风格债不改基线掩盖。未切换原运行目录，未部署 |
+| UM-6 合并复核与 PR | RESULTS_IN_REVIEW_RECEIPT | 修复控制流、持久交付、冷续接和资源关闭阻断，迁移退役模型的验证夹具；各轮通过/失败证据、PR及剩余优先级见[复核收据](../../evidence/upstream-view-delivery-20261020/umr-review.json)。固定目标之外的新上游仍有冲突，最终预演与GitHub状态单列，不把本地check通过等同上游CI或可合并 |
 
 用户已明确选择完整对齐上游新模型，包含旧功能退役；此前暂缓大范围退役的处置被替代。UM-2—UM-R—UM-4 作为一致候选进入 master，最终验收和推送结果以收据为准。旧 GAP 不一并清零；超过Int32的便捷数字cursor投影与既有发行门禁另记，64位持久cut仍验证。最终下载测试使用已有临时GNU wget，未增添产品依赖。原运行目录保持原版本。
 

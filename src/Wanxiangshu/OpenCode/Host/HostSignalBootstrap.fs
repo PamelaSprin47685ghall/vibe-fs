@@ -514,15 +514,14 @@ module HostSignalBootstrap =
                 let key = SessionId.value sessionId
                 registerOwned key
 
-                // A host-registered run knows its physical opening message; the
-                // Authority Root is derived from it by PROMPT-002 promotion rather than
-                // read out of a second binding table.
                 let physical = reconciler.TryPhysicalUserMessage sessionId
 
                 reconciler.BindActiveRun
                     { SessionId = sessionId
                       RunId = None
-                      AuthorityRootUserMessageId = physical |> Option.map PhysicalUserMessageId.promoteToAuthorityRoot
+                      AuthorityRootUserMessageId =
+                        HostSessionNudge.tryActiveProfile journal sessionId
+                        |> Option.map _.AuthorityRootUserMessageId
                       PhysicalUserMessageId = physical
                       ContinuationMessageIds = Set.empty
                       Role = Some role

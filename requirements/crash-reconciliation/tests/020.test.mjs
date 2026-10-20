@@ -148,7 +148,7 @@ const durableEvents = async (directory) => {
   })
 }
 
-integrationTest('WHAT[crash-reconciliation-020] actual child settlement persists voids across journal reopen without a completion', async () => {
+integrationTest('WHAT[crash-reconciliation-020] actual child load preserves admitted authority across journal reopen without fabricating terminal facts', async () => {
   await withDurableChildRuns(async ({ handle, directory, commonDir, reopen, dispatch, profiles }) => {
     const before = new Set((await durableEvents(directory)).map(event => event.event_id))
     for (const child of ['engineer', 'devops']) {
@@ -156,42 +156,29 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement persists
     }
     await recovery.settleChildRuns(handle, commonDir)
     for (const child of ['engineer', 'devops']) {
-      assert.equal(dispatch.projectionObservation(handle, child).activeLogicalRun, null)
+      assert.deepEqual(dispatch.projectionObservation(handle, child).activeLogicalRun, profiles.get(child))
     }
     const added = (await durableEvents(directory))
       .filter(event => !before.has(event.event_id))
       .map(event => event.payload.Fact)
-    const settlements = added.filter(fact => fact[0] === 'Agent')
-    assert.equal(settlements.length, 2, 'settlement appends only the two void facts, never a completion')
-    for (const child of ['engineer', 'devops']) {
-      assert.deepEqual(settlements.find(fact => fact[1]?.[1]?.[1]?.Work?.ChildSessionId?.[1] === child), [
-        'Agent', ['Execution', ['ChildWorkVoided', {
-          ParentSessionId: ['SessionId', 'parent'], Work: {
-            Handle: ['Agent', ['AgentHandleId', `work-${child}`]],
-            ChildSessionId: ['SessionId', child],
-            AuthorityRoot: ['AuthorityRootUserMessageId', profiles.get(child).authorityRoot],
-          },
-        }]],
-      ])
-    }
+    assert.deepEqual(added, [], 'resource cleanup neither voids nor completes admitted child work')
     const reopened = await reopen()
     for (const child of ['engineer', 'devops']) {
-      assert.equal(dispatch.projectionObservation(reopened, child).activeLogicalRun, null)
+      assert.deepEqual(dispatch.projectionObservation(reopened, child).activeLogicalRun, profiles.get(child))
     }
     const settled = await durableEvents(directory)
     await recovery.settleChildRuns(reopened, commonDir)
-    assert.deepEqual(await durableEvents(directory), settled, 'settled runs produce no duplicate facts')
+    assert.deepEqual(await durableEvents(directory), settled, 'repeated cleanup does not fabricate facts')
   })
 })
 
-integrationTest('WHAT[crash-reconciliation-020] actual child settlement propagates unknown and unattempted append failures', async () => {
+integrationTest('WHAT[crash-reconciliation-020] child cleanup preserves admitted work when actual writes are unknown or unattempted', async () => {
   await withDurableChildRuns(async ({ handle, directory, commonDir, reopen, dispatch }) => {
     const { renameSync, mkdirSync, readdirSync, rmSync } = await import('node:fs')
     const { join } = await import('node:path')
     const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
     const saved = join(directory, '.Herdchestra', 'wanxiangshu', 'saved-events')
-    // Activate the fresh writer before the fault, so the failed physical append
-    // is the child void itself rather than its preceding RuntimeStarted watermark.
+    // Activate the writer so the fault reaches the requested admission append.
     const admitted = await dispatch.acceptHumanRootSelection(handle, 'current-manager', 'root-current-manager', managerRootSelection)
     assert.equal(admitted.ok, true, JSON.stringify(admitted.error))
     const before = await durableEvents(directory)
@@ -207,7 +194,10 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement propagat
     for (const writer of stashed) renameSync(writer.live, writer.held)
     for (const writer of stashed) mkdirSync(writer.live)
     try {
-      await assert.rejects(() => recovery.settleChildRuns(handle, commonDir), /append outcome unknown/i)
+      await recovery.settleChildRuns(handle, commonDir)
+      const refused = await dispatch.acceptHumanRootSelection(handle, 'refused-manager', 'root-refused-manager', managerRootSelection)
+      assert.equal(refused.ok, false, 'the fault must reach a real attempted append')
+      assert.match(JSON.stringify(refused.error), /append outcome unknown/i)
       assert.deepEqual(['engineer', 'devops'].map(active), initial, 'failed durability cannot close either run')
     } finally {
       for (const writer of stashed) rmSync(writer.live, { recursive: true, force: true })
@@ -215,15 +205,16 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement propagat
       rmSync(saved, { recursive: true, force: true })
     }
     assert.deepEqual(await durableEvents(directory), before, 'the refused append publishes no durable fact')
-    await assert.rejects(() => recovery.settleChildRuns(handle, commonDir), /append not attempted.*writer poisoned/i)
+    const poisoned = await dispatch.acceptHumanRootSelection(handle, 'refused-manager', 'root-refused-manager', managerRootSelection)
+    assert.equal(poisoned.ok, false)
+    assert.match(JSON.stringify(poisoned.error), /append not attempted.*writer poisoned/i)
+    await recovery.settleChildRuns(handle, commonDir)
     assert.deepEqual(['engineer', 'devops'].map(active), initial)
     assert.deepEqual(await durableEvents(directory), before, 'the poisoned writer must not retry physical append')
     const reopened = await reopen()
     assert.deepEqual(['engineer', 'devops'].map(child => dispatch.projectionObservation(reopened, child).activeLogicalRun), initial)
     await recovery.settleChildRuns(reopened, commonDir)
-    for (const child of ['engineer', 'devops']) {
-      assert.equal(dispatch.projectionObservation(reopened, child).activeLogicalRun, null)
-    }
+    assert.deepEqual(['engineer', 'devops'].map(child => dispatch.projectionObservation(reopened, child).activeLogicalRun), initial)
   })
 })
 

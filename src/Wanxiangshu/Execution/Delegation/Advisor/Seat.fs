@@ -171,6 +171,7 @@ module AdvisorSeat =
             let completion =
                 TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
+            // DSL-MUTABLE: subscription — bind terminal observations to this prompt's physical receipt.
             let intentPhysical = ref None
             let pending = ResizeArray<TerminalOutcome>()
             let registrations = ResizeArray<IDisposable>()

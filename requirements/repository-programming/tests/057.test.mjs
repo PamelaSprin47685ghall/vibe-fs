@@ -16,7 +16,7 @@ ${body}
 }`
 
 const runProgram = (dir, body) =>
-  run(dir, 'Engineer', 'en', program(body), 2000, Date.now() + 60_000, 1 << 20, null)
+  run(dir, 'Engineer', 'en', program(body), 2000, BigInt(Date.now() + 60_000), 1 << 20, null)
 
 test('WHAT[repository-programming-057] ls honours .gitignore, negation, nested .gitignore, and root .git/info/exclude', () => {
   const { dir, cleanup } = sandbox()
@@ -84,7 +84,7 @@ test('WHAT[repository-programming-057] rg returns parsed JSON and skips ignored 
   }`,
     )
 
-    assert.equal(caseName(outcome), 'Succeeded')
+    assert.equal(caseName(outcome), 'Succeeded', render(outcome))
     const doc = render(outcome)
     assert.match(doc, /exitCode = 0/)
     assert.equal(doc.includes('dist/bundle.js'), false)

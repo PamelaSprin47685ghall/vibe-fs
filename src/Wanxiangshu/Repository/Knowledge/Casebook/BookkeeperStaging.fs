@@ -47,12 +47,10 @@ module BookkeeperStaging =
         lock gate (fun () ->
             match slots.TryGetValue txId with
             | false, _ -> Error missingTransaction
+            | true, slot when not slot.Touched -> Error "the staged transaction was not written by this completion"
             | true, slot ->
-                if not slot.Touched then
-                    Error "the staged transaction was not written by this completion"
-                else
-                    slots.Remove txId |> ignore
-                    Ok(slot.Question, slot.Answer))
+                slots.Remove txId |> ignore
+                Ok(slot.Question, slot.Answer))
 
     /// LC-029: whether the provider's program actually wrote through the
     /// staged transaction. A terminal with no staged write has not delivered.

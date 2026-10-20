@@ -886,6 +886,7 @@ type ToolRuntimeScopeSurface =
 
             let physicalClose = TaskCompletionSource<unit>()
             let programSettled = TaskCompletionSource<unit>()
+            // DSL-MUTABLE: cancellation — record the owned program's abort callback.
             let mutable cancelled = false
 
             let detach =
@@ -912,6 +913,7 @@ type ToolRuntimeScopeSurface =
                 }
 
             let afterUnknown = scope.RetirementBlockersFor "unknown-pipe" |> List.toArray
+            // DSL-MUTABLE: resource — count attempted starts after scope closure.
             let mutable lateStarts = 0
 
             let lateAdmitted =

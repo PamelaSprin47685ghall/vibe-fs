@@ -299,6 +299,49 @@ module HostForkChildDispatch =
         (agent: string)
         (enrichedPrompt: string option)
         : Task<Result<ForkResult, string>> =
+        let continueDurableWork (profile: PromptAuthority.AuthorityExecutionProfile) =
+            taskResult {
+                let! durable =
+                    journal
+                    |> Result.requireSome "Resuming active work requires a canonical journal"
+
+                let! work =
+                    AgentJournal.handleProjection durable parentId
+                    |> HandleProjection.tryAdmittedWork
+                        { Handle = HandleController.agentHandle agentId
+                          ChildSessionId = childId
+                          AuthorityRoot = profile.AuthorityRootUserMessageId }
+                    |> Result.mapError (sprintf "Cannot resume the admitted work: %A")
+
+                do!
+                    Result.requireTrue
+                        "Resuming active work requires the original logical run and agent"
+                        (AdmittedWork.logicalRunId work = profile.LogicalRunId
+                         && profile.SelectedAgent = agent)
+
+                do! sendBusyNudge agentId childId profile (Option.defaultValue prompt enrichedPrompt)
+
+                let run =
+                    HostForkRunLifecycle.installRun
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        sessions
+                        prepareCompletion
+                        trackOwnedWork
+                        agentId
+                        childId
+                        role
+                        profile.AuthorityRootUserMessageId
+
+                onRunStarted childId role
+
+                match runtime.Fork(agentId, role, agent, runWork = (fun () -> run.Source.Task)) with
+                | ForkResult.NotFound _ -> return! Error "Fork runtime is cancelled"
+                | _ -> return ForkResult.Nudged agentId
+            }
+
         taskResult {
             let activeRun =
                 lock gate (fun () ->
@@ -306,12 +349,20 @@ module HostForkChildDispatch =
                     | true, run -> Some run
                     | false, _ -> None)
 
-            match activeRun, runtime.IsCancelled with
-            | Some _, true -> return! Error "Fork runtime is cancelled"
-            | Some run, false ->
+            let activeProfile =
+                journal
+                |> Option.bind (fun durable ->
+                    PromptAuthorityProjectionQueries.activeProfile
+                        childId
+                        (AgentJournal.snapshot durable).AgentProjections)
+
+            match activeRun, runtime.IsCancelled, activeProfile with
+            | _, true, _ -> return! Error "Fork runtime is cancelled"
+            | Some run, false, _ ->
                 // Active run: BusyAgentNudge continuation (same LogicalRun).
                 return! nudgeBusyChild sendBusyNudge journal run prompt
-            | None, _ ->
+            | None, false, Some profile -> return! continueDurableWork profile
+            | None, false, None ->
                 return!
                     dispatchIdleExistingChild
                         gate

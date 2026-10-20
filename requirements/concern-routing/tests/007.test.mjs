@@ -6,11 +6,14 @@ import test from 'node:test'
 const root = process.cwd()
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-// Superseded by this.fork / this.join / this.deliver / this.ask: durable Fact, ProjectionUpdate, Fold, AgentJournalPortAdapter, and fact-map contain no Concern family.
-test('WHAT[concern-routing-007] durable fact, fold, adapter, and ablation fact-map carry no Concern state', () => {
-  assert.doesNotMatch(read('src/Wanxiangshu/Composition/Durable/Fact.fs'), /\bConcern\b|ConcernFactCases/)
+test('WHAT[concern-routing-007] historical Concern tombstones have no active projection, adapter or fact-map entry', () => {
+  const fact = read('src/Wanxiangshu/Composition/Durable/Fact.fs')
+  assert.match(fact, /type LegacyConcernFact = MailboxSubscribed of LegacyMailboxSubscription/)
+  assert.doesNotMatch(fact, /ConcernFactCases|ConcernProjection/)
   assert.doesNotMatch(read('src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs'), /applyConcern|ConcernProjection|ConcernFactCases/)
-  assert.doesNotMatch(read('src/Wanxiangshu/Composition/Durable/Fold.fs'), /AgentFact\.Concern|applyConcern/)
+  const fold = read('src/Wanxiangshu/Composition/Durable/Fold.fs')
+  assert.match(fold, /AgentFact\.Concern _ -> Ok projection/)
+  assert.doesNotMatch(fold, /applyConcern/)
   assert.doesNotMatch(read('src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs'), /forConcern|ConcernJournalPort/)
 
   const factMap = JSON.parse(read('resources/ablation/fact-map.json'))

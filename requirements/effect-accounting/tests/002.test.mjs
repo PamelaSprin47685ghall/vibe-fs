@@ -16,7 +16,7 @@ const remainsPending = async (run, message) => {
   assert.equal(observed.finished, false, `${message} must not settle the run`)
   assert.equal(observed.pending, true, 'run must stay pending for a later proven terminal')
 
-  await lifecycle.complete(run, { kind: 'Completed', terminalText: 'later proven completion' })
+  await lifecycle.complete(run, { kind: 'Completed', terminalText: 'later proven completion', deliveredView: 'bounded delivered view' })
   assert.equal((await lifecycle.completion(run)).status, 'completed', 'the later proven result must settle the original completion cell')
 }
 
@@ -29,6 +29,8 @@ test('WHAT[effect-accounting-002] EXEC_join_MissingFinalReport_Failed_keeps_run_
 test('WHAT[effect-accounting-002] EXEC_join_empty_Completed_keeps_run_pending_not_failed', async () => {
   const run = makeRun('agent-empty', 'ses_empty_child', 'ses_empty_parent')
   await lifecycle.complete(run, { kind: 'Completed', terminalText: '' })
+  assert.equal(lifecycle.observe(run).pending, true)
+  await lifecycle.complete(run, { kind: 'Completed', terminalText: 'formal text without a delivered view' })
   await remainsPending(run, 'empty Completed')
 })
 
@@ -65,7 +67,7 @@ test('WHAT[effect-accounting-002] EXEC_join_real_Failed_still_claims_run', async
 test('WHAT[effect-accounting-002] EXEC_join_first_proven_terminal_is_single_assignment', async () => {
   const failedFirst = makeRun('agent-failed-first', 'ses_failed_first_child', 'ses_failed_first_parent')
   await lifecycle.complete(failedFirst, { kind: 'Failed', message: 'providers exhausted' })
-  await lifecycle.complete(failedFirst, { kind: 'Completed', terminalText: 'late success' })
+  await lifecycle.complete(failedFirst, { kind: 'Completed', terminalText: 'late success', deliveredView: 'late view' })
   assert.deepEqual(await lifecycle.completion(failedFirst), {
     status: 'failed',
     agentId: 'agent-failed-first',
@@ -74,11 +76,11 @@ test('WHAT[effect-accounting-002] EXEC_join_first_proven_terminal_is_single_assi
   })
 
   const completedFirst = makeRun('agent-completed-first', 'ses_completed_first_child', 'ses_completed_first_parent')
-  await lifecycle.complete(completedFirst, { kind: 'Completed', terminalText: 'owned success' })
+  await lifecycle.complete(completedFirst, { kind: 'Completed', terminalText: 'owned success', deliveredView: 'owned view' })
   await lifecycle.complete(completedFirst, { kind: 'Failed', message: 'late stale failure' })
   assert.deepEqual(await lifecycle.completion(completedFirst), {
     status: 'completed',
     agentId: 'agent-completed-first',
-    view: '',
+    view: 'owned view',
   })
 })

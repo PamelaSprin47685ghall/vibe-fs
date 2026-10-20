@@ -506,6 +506,7 @@ module NodeProcessHost =
             let exitedRef = ref false
             let onClose = markProcessClosed exitedRef onExited
             let failure = ref None
+            // DSL-MUTABLE: resource — retain the physical process start rejection.
             let rejection = ref None
 
             let started =

@@ -31,7 +31,7 @@
  */
 
 import { boundaryFor, sealDecision } from './cold-boundary.js';
-import { deliveryOutcome, emptyDeliveries, faultFor, recordDelivery } from './delivery-plan.js';
+import { deliveriesOf, deliveryOutcome, emptyDeliveries, faultFor, recordDelivery } from './delivery-plan.js';
 import { resolveEntry, runtimeKeyOf, sessionIdOf } from './runtime-key.js';
 import { wireOf } from './provider-wire.js';
 
@@ -206,7 +206,7 @@ export class ScenarioRuntime {
   unfiredBoundaries() {
     return (this.scenario.boundaries ?? []).filter(
       (boundary) =>
-        boundary.kind === 'manager-loop'
+        (boundary.kind === 'manager-loop' || boundary.attempt !== undefined)
         && boundary.optional !== true
         && !this.firedBoundaries.has(boundary.entryId),
     );
@@ -221,7 +221,7 @@ export class ScenarioRuntime {
     const decision = sealDecision({
       previousWire: this.seals.get(sessionId) ?? null,
       body,
-      boundary: boundaryFor(this.scenario.boundaries, entry),
+      boundary: boundaryFor(this.scenario.boundaries, entry, deliveriesOf(this.deliveries, entry) + 1),
       stripAdmitted: this.#crossedTenureBoundary(sessionId),
     });
     if (decision.resealed !== undefined) this.firedBoundaries.add(entry.id);

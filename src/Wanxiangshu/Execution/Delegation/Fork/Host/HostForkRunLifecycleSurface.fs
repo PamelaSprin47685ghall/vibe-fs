@@ -109,13 +109,20 @@ module HostForkRunLifecycleSurface =
     /// Feed one plain terminal observation through the production lifecycle owner.
     let complete (handle: obj) (outcome: obj) : Task =
         let typed = handle :?> HostForkRunLifecycleHandle
+        let deliveredView = text (property outcome "deliveredView")
 
         HostForkRunLifecycle.complete
             typed.Gate
             typed.PendingRuns
             None
             typed.ParentId
-            (fun _ _ -> Task.FromResult None)
+            (fun _ _ ->
+                Task.FromResult(
+                    if String.IsNullOrWhiteSpace deliveredView then
+                        None
+                    else
+                        Some deliveredView
+                ))
             typed.Run
             (terminal typed outcome)
 

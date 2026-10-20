@@ -246,6 +246,29 @@ test('WHAT[change-integration-009] a delivered tenure with no successor holds th
   })
 })
 
+test('WHAT[change-integration-009] lifecycle commits notify only their subscribed work after persistence and release the subscription', async () => {
+  await withRoad(async ({ root, stateRoot, store }) => {
+    const workId = 'ses-loop-notify'
+    const seen = []
+    const release = lifecycle.subscribeChanges(stateRoot, workId, () => {
+      seen.push(lifecycle.inspected(stateRoot, workId))
+    })
+    try {
+      assert.equal((await lifecycle.seedOpen(store, 'S4', 'another-work', root, 0n)).ok, true)
+      assert.equal(seen.length, 0, 'another work must not wake this waiter')
+      assert.equal((await lifecycle.seedOpen(store, 'S4', workId, root, 0n)).ok, true)
+      assert.equal(seen.length, 1)
+      assert.equal(seen[0].Opened, true, 'the callback can read the committed state')
+      assert.equal((await lifecycle.seedOpen(store, 'S4', workId, root, 0n)).ok, true)
+      assert.equal(seen.length, 1, 'a replay is not a fresh commit')
+    } finally {
+      release()
+    }
+    assert.equal((await lifecycle.seedReview(store, workId, 'Promoted')).ok, true)
+    assert.equal(seen.length, 1, 'a released waiter must not receive later commits')
+  })
+})
+
 test('WHAT[change-integration-009] no durable work and an unretired tenure both hold no loop signal', async () => {
   await withRoad(async ({ root, store, signalFor }) => {
     assert.equal((await signalFor('ses-loop-absent')).kind, 'NoWork')

@@ -292,7 +292,7 @@ export const withExecutablePlugin = async (body, options = {}, createHooks = ini
  * persistent Host double. Used for restart recovery contracts that cannot be
  * proved by rebuilding only an in-memory runtime object.
  */
-export const withRestartablePlugin = async (body) => {
+export const withRestartablePlugin = async (body, { events = { listen: () => () => {} } } = {}) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-restart-'))
   const previousHome = process.env.HOME
   const previousUserProfile = process.env.USERPROFILE
@@ -311,7 +311,7 @@ export const withRestartablePlugin = async (body) => {
       const hooks = await initSpikePlugin({
         client,
         directory: workspaceDirectory,
-        events: { listen: () => () => {} },
+        events,
       })
       client.__hooks = hooks
       await configureManagedPlugin(hooks)

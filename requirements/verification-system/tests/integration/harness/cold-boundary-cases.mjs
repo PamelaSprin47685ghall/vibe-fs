@@ -100,6 +100,24 @@ const entry = (id) => ({ id, lane: 'coder' });
 
 export const coldBoundaryCases = [
   {
+    name: 'ARCH-004 inline anchors preserve authority text while retiring only its guidance suffix',
+    fn: () => {
+      const anchored = text => `[ANCHOR: 4]\0\uFEFF${text}`;
+      const before = body('test-model', [SYSTEM, user(anchored('Keep this authority') + GUIDANCE_SUFFIX)]);
+      const after = body('test-model', [SYSTEM, user(anchored('Keep this authority'))]);
+      assertEq(decide(before, after).held, true);
+      const rewritten = body('test-model', [SYSTEM, user(anchored('Changed authority'))]);
+      assertEq(decide(before, rewritten).broken, 'undeclared');
+      assertEq(decide(before, rewritten, at('manager-loop')).broken, 'manager-loop-rewrote-fixed');
+      assertEq(decide(before, { ...rewritten, model: 'test-model-b' }, at('fallback-side')).broken, 'fallback-side-rewrote-messages');
+      const toolBefore = body('test-model', [SYSTEM, user(anchored('Keep this authority')),
+        { role: 'tool', tool_call_id: 'call_1', content: anchored('original result') + GUIDANCE_SUFFIX }]);
+      const toolAfter = body('test-model', [SYSTEM, user(anchored('Keep this authority')),
+        { role: 'tool', tool_call_id: 'call_1', content: anchored('different result') }]);
+      assertEq(decide(toolBefore, toolAfter).broken, 'undeclared');
+    },
+  },
+  {
     name: 'MANAGER-LOOP keeps ordinary user prose that mentions archived records',
     fn: () => {
       const previous = body('test-model', [

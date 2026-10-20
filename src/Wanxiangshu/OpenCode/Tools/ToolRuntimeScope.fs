@@ -241,11 +241,7 @@ type ToolRuntimeScope
                         do! completion
                 }
 
-            let! completed =
-                emitJsExpr
-                    drained
-                    "new Promise(resolve => { const timer = setTimeout(() => resolve(false), 3000); Promise.resolve($0).then(() => { clearTimeout(timer); resolve(true); }); })"
-                : Task<bool>
+            let! completed = NodeTiming.raceExitKeepingAlive drained 3000
 
             let remaining =
                 Array.append
@@ -1208,29 +1204,28 @@ type ToolRuntimeScope
             | _ -> return Ok()
         }
 
-    member private _.RunPostS3InterruptAttempt
+    member private _.SettlePostS3Interrupt(sessionId, key, stopped) =
+        lock gate (fun () ->
+            if Result.isError stopped then
+                postS3SettledInterrupts.Remove key |> ignore
+
+            for stale in
+                postS3PendingInterrupts
+                |> Seq.filter (fun (owner, run, call, _) ->
+                    let (_, keyRun, keyCall) = key
+
+                    owner = sessionId && run = keyRun && call = keyCall)
+                |> Seq.toList do
+                postS3PendingInterrupts.Remove stale |> ignore)
+
+    member private this.RunPostS3InterruptAttempt
         (sessionId: SessionId, key: SessionId * ProviderRunIdentity * ToolCallId)
         : Task<Result<unit, string>> =
         task {
             try
                 let! stopped = sessions.InterruptAttempt sessionId
 
-                lock gate (fun () ->
-                    if Result.isError stopped then
-                        postS3SettledInterrupts.Remove key |> ignore
-
-                    // pending 已在 InterruptForPostS3Deliver 中按物理围栏移出；
-                    // 这里防御性清掉同 (session, run, call) 的任何残留元组。
-                    for stale in
-                        postS3PendingInterrupts
-                        |> Seq.filter (fun (owner, run, call, _) ->
-                            let (_, keyRun, keyCall) = key
-
-                            owner = sessionId && run = keyRun && call = keyCall)
-                        |> Seq.toList do
-                        postS3PendingInterrupts.Remove stale |> ignore
-
-                    ())
+                this.SettlePostS3Interrupt(sessionId, key, stopped)
 
                 return stopped
             with ex ->

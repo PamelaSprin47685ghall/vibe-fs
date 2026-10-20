@@ -1,0 +1,252 @@
+check	UNKNOWN STEP	﻿2026-10-20T14:34:12.7092869Z Current runner version: '2.337.0'
+check	UNKNOWN STEP	2026-10-20T14:34:12.7110942Z ##[group]Runner Image Provisioner
+check	UNKNOWN STEP	2026-10-20T14:34:12.7111749Z Hosted Compute Agent
+check	UNKNOWN STEP	2026-10-20T14:34:12.7112327Z Version: 20261015.610
+check	UNKNOWN STEP	2026-10-20T14:34:12.7112866Z Commit: 267fdb4e8bbec4ab5ea31367f3a00d5c480c7656
+check	UNKNOWN STEP	2026-10-20T14:34:12.7113475Z Build Date: 2026-10-14T17:06:54Z
+check	UNKNOWN STEP	2026-10-20T14:34:12.7114081Z Worker ID: {db602c7e-b071-432f-9b2a-8fcdcfd171b0}
+check	UNKNOWN STEP	2026-10-20T14:34:12.7114962Z Region: westus3
+check	UNKNOWN STEP	2026-10-20T14:34:12.7115413Z Cloud: Azure
+check	UNKNOWN STEP	2026-10-20T14:34:12.7115898Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:12.7117136Z ##[group]Operating System
+check	UNKNOWN STEP	2026-10-20T14:34:12.7117684Z Ubuntu
+check	UNKNOWN STEP	2026-10-20T14:34:12.7118131Z 24.04.5
+check	UNKNOWN STEP	2026-10-20T14:34:12.7118576Z LTS
+check	UNKNOWN STEP	2026-10-20T14:34:12.7119032Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:12.7119485Z ##[group]Runner Image
+check	UNKNOWN STEP	2026-10-20T14:34:12.7120004Z Image: ubuntu-24.04
+check	UNKNOWN STEP	2026-10-20T14:34:12.7120486Z Version: 20261018.339.1
+check	UNKNOWN STEP	2026-10-20T14:34:12.7121805Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261018.339/images/ubuntu/Ubuntu2404-Readme.md
+check	UNKNOWN STEP	2026-10-20T14:34:12.7123111Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261018.339
+check	UNKNOWN STEP	2026-10-20T14:34:12.7123904Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:12.7125545Z ##[group]GITHUB_TOKEN Permissions
+check	UNKNOWN STEP	2026-10-20T14:34:12.7127483Z Contents: read
+check	UNKNOWN STEP	2026-10-20T14:34:12.7127981Z Metadata: read
+check	UNKNOWN STEP	2026-10-20T14:34:12.7128454Z Packages: read
+check	UNKNOWN STEP	2026-10-20T14:34:12.7128948Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:12.7130608Z Secret source: Actions
+check	UNKNOWN STEP	2026-10-20T14:34:12.7131406Z Cache mode: write
+check	UNKNOWN STEP	2026-10-20T14:34:12.7131990Z Prepare workflow directory
+check	UNKNOWN STEP	2026-10-20T14:34:12.8151759Z Prepare all required actions
+check	UNKNOWN STEP	2026-10-20T14:34:12.8211613Z Getting action download info
+check	UNKNOWN STEP	2026-10-20T14:34:13.1553319Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+check	UNKNOWN STEP	2026-10-20T14:34:13.6263602Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+check	UNKNOWN STEP	2026-10-20T14:34:13.7501524Z Download action repository 'actions/setup-dotnet@v4' (SHA:67a3573c9a986a3f9c594539f4ab511d57bb3ce9)
+check	UNKNOWN STEP	2026-10-20T14:34:14.4656083Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+check	UNKNOWN STEP	2026-10-20T14:34:14.6810950Z Complete job name: check
+check	UNKNOWN STEP	2026-10-20T14:34:14.7435426Z ##[group]Run actions/checkout@v4
+check	UNKNOWN STEP	2026-10-20T14:34:14.7436388Z with:
+check	UNKNOWN STEP	2026-10-20T14:34:14.7437024Z   submodules: recursive
+check	UNKNOWN STEP	2026-10-20T14:34:14.7437767Z   repository: dyx13/vibe-fs
+check	UNKNOWN STEP	2026-10-20T14:34:14.7440529Z   token: ***
+check	UNKNOWN STEP	2026-10-20T14:34:14.7441187Z   ssh-strict: true
+check	UNKNOWN STEP	2026-10-20T14:34:14.7441890Z   ssh-user: git
+check	UNKNOWN STEP	2026-10-20T14:34:14.7442540Z   persist-credentials: true
+check	UNKNOWN STEP	2026-10-20T14:34:14.7443245Z   clean: true
+check	UNKNOWN STEP	2026-10-20T14:34:14.7443943Z   sparse-checkout-cone-mode: true
+check	UNKNOWN STEP	2026-10-20T14:34:14.7444930Z   fetch-depth: 1
+check	UNKNOWN STEP	2026-10-20T14:34:14.7445598Z   fetch-tags: false
+check	UNKNOWN STEP	2026-10-20T14:34:14.7446259Z   show-progress: true
+check	UNKNOWN STEP	2026-10-20T14:34:14.7446934Z   lfs: false
+check	UNKNOWN STEP	2026-10-20T14:34:14.7447610Z   set-safe-directory: true
+check	UNKNOWN STEP	2026-10-20T14:34:14.7448310Z   allow-unsafe-pr-checkout: false
+check	UNKNOWN STEP	2026-10-20T14:34:14.7449307Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:14.8309112Z Syncing repository: dyx13/vibe-fs
+check	UNKNOWN STEP	2026-10-20T14:34:14.8311258Z ##[group]Getting Git version info
+check	UNKNOWN STEP	2026-10-20T14:34:14.8312555Z Working directory is '/home/runner/work/vibe-fs/vibe-fs'
+check	UNKNOWN STEP	2026-10-20T14:34:14.8314130Z [command]/usr/bin/git version
+check	UNKNOWN STEP	2026-10-20T14:34:14.8408173Z git version 2.55.0
+check	UNKNOWN STEP	2026-10-20T14:34:14.8426690Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:14.8439204Z Temporarily overriding HOME='/home/runner/work/_temp/2cd8d50a-2d5f-4fbd-9939-de87ce68bd96' before making global git config changes
+check	UNKNOWN STEP	2026-10-20T14:34:14.8441061Z Adding repository directory to the temporary git global config as a safe directory
+check	UNKNOWN STEP	2026-10-20T14:34:14.8443724Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vibe-fs/vibe-fs
+check	UNKNOWN STEP	2026-10-20T14:34:14.8498460Z Deleting the contents of '/home/runner/work/vibe-fs/vibe-fs'
+check	UNKNOWN STEP	2026-10-20T14:34:14.8502083Z ##[group]Initializing the repository
+check	UNKNOWN STEP	2026-10-20T14:34:14.8504852Z [command]/usr/bin/git init /home/runner/work/vibe-fs/vibe-fs
+check	UNKNOWN STEP	2026-10-20T14:34:14.8604453Z hint: Using 'master' as the name for the initial branch. This default branch name
+check	UNKNOWN STEP	2026-10-20T14:34:14.8607031Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+check	UNKNOWN STEP	2026-10-20T14:34:14.8608656Z hint: to use in all of your new repositories, which will suppress this warning,
+check	UNKNOWN STEP	2026-10-20T14:34:14.8609870Z hint: call:
+check	UNKNOWN STEP	2026-10-20T14:34:14.8610737Z hint:
+check	UNKNOWN STEP	2026-10-20T14:34:14.8611821Z hint: 	git config --global init.defaultBranch <name>
+check	UNKNOWN STEP	2026-10-20T14:34:14.8612931Z hint:
+check	UNKNOWN STEP	2026-10-20T14:34:14.8614016Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+check	UNKNOWN STEP	2026-10-20T14:34:14.8615625Z hint: 'development'. The just-created branch can be renamed via this command:
+check	UNKNOWN STEP	2026-10-20T14:34:14.8616448Z hint:
+check	UNKNOWN STEP	2026-10-20T14:34:14.8617232Z hint: 	git branch -m <name>
+check	UNKNOWN STEP	2026-10-20T14:34:14.8618469Z hint:
+check	UNKNOWN STEP	2026-10-20T14:34:14.8619670Z hint: Disable this message with "git config set advice.defaultBranchName false"
+check	UNKNOWN STEP	2026-10-20T14:34:14.8621228Z Initialized empty Git repository in /home/runner/work/vibe-fs/vibe-fs/.git/
+check	UNKNOWN STEP	2026-10-20T14:34:14.8623923Z [command]/usr/bin/git remote add origin https://github.com/dyx13/vibe-fs
+check	UNKNOWN STEP	2026-10-20T14:34:14.8657496Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:14.8659390Z ##[group]Disabling automatic garbage collection
+check	UNKNOWN STEP	2026-10-20T14:34:14.8660653Z [command]/usr/bin/git config --local gc.auto 0
+check	UNKNOWN STEP	2026-10-20T14:34:14.8684882Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:14.8686502Z ##[group]Setting up auth
+check	UNKNOWN STEP	2026-10-20T14:34:14.8690063Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+check	UNKNOWN STEP	2026-10-20T14:34:14.8714196Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+check	UNKNOWN STEP	2026-10-20T14:34:14.9044612Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+check	UNKNOWN STEP	2026-10-20T14:34:14.9066359Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+check	UNKNOWN STEP	2026-10-20T14:34:14.9242217Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+check	UNKNOWN STEP	2026-10-20T14:34:14.9268963Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+check	UNKNOWN STEP	2026-10-20T14:34:14.9428777Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+check	UNKNOWN STEP	2026-10-20T14:34:14.9459991Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:14.9461213Z ##[group]Fetching the repository
+check	UNKNOWN STEP	2026-10-20T14:34:14.9467450Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +0831239737c56a6eb36b96b663ffa46e0cafdfdd:refs/remotes/origin/master
+check	UNKNOWN STEP	2026-10-20T14:34:25.0773140Z From https://github.com/dyx13/vibe-fs
+check	UNKNOWN STEP	2026-10-20T14:34:25.0773968Z  * [new ref]         0831239737c56a6eb36b96b663ffa46e0cafdfdd -> origin/master
+check	UNKNOWN STEP	2026-10-20T14:34:25.0777290Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:25.0777925Z ##[group]Determining the checkout info
+check	UNKNOWN STEP	2026-10-20T14:34:25.0780316Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:25.0787372Z [command]/usr/bin/git sparse-checkout disable
+check	UNKNOWN STEP	2026-10-20T14:34:25.0962327Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+check	UNKNOWN STEP	2026-10-20T14:34:25.1158925Z ##[group]Checking out the ref
+check	UNKNOWN STEP	2026-10-20T14:34:25.1159770Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+check	UNKNOWN STEP	2026-10-20T14:34:26.1262530Z Updating files:  64% (4293/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1297192Z Updating files:  65% (4337/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1328231Z Updating files:  66% (4404/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1364552Z Updating files:  67% (4471/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1388650Z Updating files:  68% (4537/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1402164Z Updating files:  69% (4604/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1416378Z Updating files:  70% (4671/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1428105Z Updating files:  71% (4738/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1441503Z Updating files:  72% (4804/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1458812Z Updating files:  73% (4871/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1473657Z Updating files:  74% (4938/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1517399Z Updating files:  75% (5004/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1550679Z Updating files:  76% (5071/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1568616Z Updating files:  77% (5138/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1591269Z Updating files:  78% (5205/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1613592Z Updating files:  79% (5271/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1642775Z Updating files:  80% (5338/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1668971Z Updating files:  81% (5405/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1687899Z Updating files:  82% (5472/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1718467Z Updating files:  83% (5538/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1745015Z Updating files:  84% (5605/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1767310Z Updating files:  85% (5672/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1795584Z Updating files:  86% (5738/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1821362Z Updating files:  87% (5805/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1840923Z Updating files:  88% (5872/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1865154Z Updating files:  89% (5939/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1888968Z Updating files:  90% (6005/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1914867Z Updating files:  91% (6072/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1934382Z Updating files:  92% (6139/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1958024Z Updating files:  93% (6205/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.1981925Z Updating files:  94% (6272/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.2001339Z Updating files:  95% (6339/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.2016898Z Updating files:  96% (6406/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.2029374Z Updating files:  97% (6472/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.2040658Z Updating files:  98% (6539/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.2065716Z Updating files:  99% (6606/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.2066209Z Updating files: 100% (6672/6672)
+check	UNKNOWN STEP	2026-10-20T14:34:26.2066725Z Updating files: 100% (6672/6672), done.
+check	UNKNOWN STEP	2026-10-20T14:34:26.2587202Z Reset branch 'master'
+check	UNKNOWN STEP	2026-10-20T14:34:26.3081862Z branch 'master' set up to track 'origin/master'.
+check	UNKNOWN STEP	2026-10-20T14:34:26.3148356Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:26.3149410Z ##[group]Setting up auth for fetching submodules
+check	UNKNOWN STEP	2026-10-20T14:34:26.3154563Z [command]/usr/bin/git config --global http.https://github.com/.extraheader AUTHORIZATION: basic ***
+check	UNKNOWN STEP	2026-10-20T14:34:26.4219178Z [command]/usr/bin/git config --global --unset-all url.https://github.com/.insteadOf
+check	UNKNOWN STEP	2026-10-20T14:34:26.4247139Z [command]/usr/bin/git config --global --add url.https://github.com/.insteadOf git@github.com:
+check	UNKNOWN STEP	2026-10-20T14:34:26.4608624Z [command]/usr/bin/git config --global --add url.https://github.com/.insteadOf org-6879776@github.com:
+check	UNKNOWN STEP	2026-10-20T14:34:26.4634807Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:26.4635597Z ##[group]Fetching submodules
+check	UNKNOWN STEP	2026-10-20T14:34:26.4639298Z [command]/usr/bin/git submodule sync --recursive
+check	UNKNOWN STEP	2026-10-20T14:34:26.4815957Z [command]/usr/bin/git -c protocol.version=2 submodule update --init --force --depth=1 --recursive
+check	UNKNOWN STEP	2026-10-20T14:34:26.4989269Z Submodule 'wanxiangli' (https://github.com/dyx13/wanxiangli.git) registered for path 'wanxiangli'
+check	UNKNOWN STEP	2026-10-20T14:34:26.5008498Z Cloning into '/home/runner/work/vibe-fs/vibe-fs/wanxiangli'...
+check	UNKNOWN STEP	2026-10-20T14:34:29.5537496Z From https://github.com/dyx13/wanxiangli
+check	UNKNOWN STEP	2026-10-20T14:34:29.5538270Z  * branch            fc75b85876f61073ec4f256e77729aaf6f63caf3 -> FETCH_HEAD
+check	UNKNOWN STEP	2026-10-20T14:34:29.6149927Z Submodule path 'wanxiangli': checked out 'fc75b85876f61073ec4f256e77729aaf6f63caf3'
+check	UNKNOWN STEP	2026-10-20T14:34:29.6185761Z [command]/usr/bin/git submodule foreach --recursive git config --local gc.auto 0
+check	UNKNOWN STEP	2026-10-20T14:34:29.6340927Z Entering 'wanxiangli'
+check	UNKNOWN STEP	2026-10-20T14:34:29.6383234Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:29.6383918Z ##[group]Persisting credentials for submodules
+check	UNKNOWN STEP	2026-10-20T14:34:29.6396029Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :"
+check	UNKNOWN STEP	2026-10-20T14:34:29.6551668Z Entering 'wanxiangli'
+check	UNKNOWN STEP	2026-10-20T14:34:29.6592103Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url"
+check	UNKNOWN STEP	2026-10-20T14:34:29.6748127Z Entering 'wanxiangli'
+check	UNKNOWN STEP	2026-10-20T14:34:29.6785868Z file:/home/runner/work/vibe-fs/vibe-fs/.git/modules/wanxiangli/config	remote.origin.url
+check	UNKNOWN STEP	2026-10-20T14:34:29.6823371Z [command]/usr/bin/git submodule foreach --recursive git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'
+check	UNKNOWN STEP	2026-10-20T14:34:29.6978497Z Entering 'wanxiangli'
+check	UNKNOWN STEP	2026-10-20T14:34:29.7017110Z [command]/usr/bin/git submodule foreach --recursive git config --local --add 'url.https://github.com/.insteadOf' 'org-6879776@github.com:'
+check	UNKNOWN STEP	2026-10-20T14:34:29.7169244Z Entering 'wanxiangli'
+check	UNKNOWN STEP	2026-10-20T14:34:29.7203815Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:29.7237123Z [command]/usr/bin/git log -1 --format=%H
+check	UNKNOWN STEP	2026-10-20T14:34:29.7256441Z 0831239737c56a6eb36b96b663ffa46e0cafdfdd
+check	UNKNOWN STEP	2026-10-20T14:34:29.7479345Z ##[group]Run actions/setup-node@v4
+check	UNKNOWN STEP	2026-10-20T14:34:29.7479654Z with:
+check	UNKNOWN STEP	2026-10-20T14:34:29.7479887Z   node-version: 22
+check	UNKNOWN STEP	2026-10-20T14:34:29.7480106Z   cache: npm
+check	UNKNOWN STEP	2026-10-20T14:34:29.7480353Z   always-auth: false
+check	UNKNOWN STEP	2026-10-20T14:34:29.7480613Z   check-latest: false
+check	UNKNOWN STEP	2026-10-20T14:34:29.7482593Z   token: ***
+check	UNKNOWN STEP	2026-10-20T14:34:29.7482813Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:29.8687377Z Found in cache @ /opt/hostedtoolcache/node/22.23.3/x64
+check	UNKNOWN STEP	2026-10-20T14:34:29.8690618Z (node:2349) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+check	UNKNOWN STEP	2026-10-20T14:34:29.8691272Z (Use `node --trace-deprecation ...` to show where the warning was created)
+check	UNKNOWN STEP	2026-10-20T14:34:29.8692809Z ##[group]Environment details
+check	UNKNOWN STEP	2026-10-20T14:34:30.2099717Z node: v22.23.3
+check	UNKNOWN STEP	2026-10-20T14:34:30.2100229Z npm: 10.9.9
+check	UNKNOWN STEP	2026-10-20T14:34:30.2100693Z yarn: 1.22.22
+check	UNKNOWN STEP	2026-10-20T14:34:30.2101256Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:30.2151019Z [command]/opt/hostedtoolcache/node/22.23.3/x64/bin/npm config get cache
+check	UNKNOWN STEP	2026-10-20T14:34:30.3055485Z /home/runner/.npm
+check	UNKNOWN STEP	2026-10-20T14:34:30.5324862Z npm cache is not found
+check	UNKNOWN STEP	2026-10-20T14:34:30.5453556Z ##[group]Run actions/setup-dotnet@v4
+check	UNKNOWN STEP	2026-10-20T14:34:30.5453865Z with:
+check	UNKNOWN STEP	2026-10-20T14:34:30.5454148Z   global-json-file: global.json
+check	UNKNOWN STEP	2026-10-20T14:34:30.5454750Z   cache: false
+check	UNKNOWN STEP	2026-10-20T14:34:30.5455012Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:30.6638275Z (node:2392) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+check	UNKNOWN STEP	2026-10-20T14:34:30.6639550Z (Use `node --trace-deprecation ...` to show where the warning was created)
+check	UNKNOWN STEP	2026-10-20T14:34:30.6653652Z [command]/home/runner/work/_actions/actions/setup-dotnet/v4/externals/install-dotnet.sh --skip-non-versioned-files --runtime dotnet --channel LTS
+check	UNKNOWN STEP	2026-10-20T14:34:30.9647321Z dotnet-install: .NET Core Runtime with version '10.0.13' is already installed.
+check	UNKNOWN STEP	2026-10-20T14:34:30.9665919Z [command]/home/runner/work/_actions/actions/setup-dotnet/v4/externals/install-dotnet.sh --skip-non-versioned-files --channel 10.0
+check	UNKNOWN STEP	2026-10-20T14:34:31.1729327Z dotnet-install: .NET Core SDK with version '10.0.402' is already installed.
+check	UNKNOWN STEP	2026-10-20T14:34:31.1901443Z ##[group]Run node scripts/wanxiangli-source.mjs check
+check	UNKNOWN STEP	2026-10-20T14:34:31.1901977Z ^[[36;1mnode scripts/wanxiangli-source.mjs check^[[0m
+check	UNKNOWN STEP	2026-10-20T14:34:31.2023833Z shell: /usr/bin/bash -e {0}
+check	UNKNOWN STEP	2026-10-20T14:34:31.2024165Z env:
+check	UNKNOWN STEP	2026-10-20T14:34:31.2024681Z   DOTNET_ROOT: /usr/share/dotnet
+check	UNKNOWN STEP	2026-10-20T14:34:31.2025017Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:31.2474646Z fatal: not a tree object
+check	UNKNOWN STEP	2026-10-20T14:34:31.2476633Z Command failed: git ls-tree -r -z b436802758c25b5c33e4a99f5349f57c812005b8
+check	UNKNOWN STEP	2026-10-20T14:34:31.2477316Z fatal: not a tree object
+check	UNKNOWN STEP	2026-10-20T14:34:31.2477552Z 
+check	UNKNOWN STEP	2026-10-20T14:34:31.2527749Z ##[error]Process completed with exit code 1.
+check	UNKNOWN STEP	2026-10-20T14:34:31.2626017Z ##[group]Run actions/upload-artifact@v4
+check	UNKNOWN STEP	2026-10-20T14:34:31.2626308Z with:
+check	UNKNOWN STEP	2026-10-20T14:34:31.2626539Z   name: verify-logs
+check	UNKNOWN STEP	2026-10-20T14:34:31.2626845Z   path: .fable-build/verify-logs/
+check	UNKNOWN STEP	2026-10-20T14:34:31.2627111Z   if-no-files-found: warn
+check	UNKNOWN STEP	2026-10-20T14:34:31.2627480Z   compression-level: 6
+check	UNKNOWN STEP	2026-10-20T14:34:31.2627730Z   overwrite: false
+check	UNKNOWN STEP	2026-10-20T14:34:31.2627986Z   include-hidden-files: false
+check	UNKNOWN STEP	2026-10-20T14:34:31.2628281Z env:
+check	UNKNOWN STEP	2026-10-20T14:34:31.2628513Z   DOTNET_ROOT: /usr/share/dotnet
+check	UNKNOWN STEP	2026-10-20T14:34:31.2628780Z ##[endgroup]
+check	UNKNOWN STEP	2026-10-20T14:34:31.4095254Z (node:2594) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+check	UNKNOWN STEP	2026-10-20T14:34:31.4096024Z (Use `node --trace-deprecation ...` to show where the warning was created)
+check	UNKNOWN STEP	2026-10-20T14:34:31.4117116Z ##[warning]No files were found with the provided path: .fable-build/verify-logs/. No artifacts will be uploaded.
+check	UNKNOWN STEP	2026-10-20T14:34:31.4552546Z Post job cleanup.
+check	UNKNOWN STEP	2026-10-20T14:34:31.5257071Z [command]/usr/bin/git version
+check	UNKNOWN STEP	2026-10-20T14:34:31.5285175Z git version 2.55.0
+check	UNKNOWN STEP	2026-10-20T14:34:31.5313098Z Temporarily overriding HOME='/home/runner/work/_temp/01033235-2e49-49a9-9d49-9ea8c65dcaee' before making global git config changes
+check	UNKNOWN STEP	2026-10-20T14:34:31.5314557Z Adding repository directory to the temporary git global config as a safe directory
+check	UNKNOWN STEP	2026-10-20T14:34:31.5317842Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vibe-fs/vibe-fs
+check	UNKNOWN STEP	2026-10-20T14:34:31.5579348Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+check	UNKNOWN STEP	2026-10-20T14:34:31.5609500Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+check	UNKNOWN STEP	2026-10-20T14:34:31.5797744Z Entering 'wanxiangli'
+check	UNKNOWN STEP	2026-10-20T14:34:31.5843937Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+check	UNKNOWN STEP	2026-10-20T14:34:31.5866881Z http.https://github.com/.extraheader
+check	UNKNOWN STEP	2026-10-20T14:34:31.5875198Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+check	UNKNOWN STEP	2026-10-20T14:34:31.6344727Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+check	UNKNOWN STEP	2026-10-20T14:34:31.6515189Z Entering 'wanxiangli'
+check	UNKNOWN STEP	2026-10-20T14:34:31.6536423Z http.https://github.com/.extraheader
+check	UNKNOWN STEP	2026-10-20T14:34:31.6950886Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+check	UNKNOWN STEP	2026-10-20T14:34:31.6976728Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+check	UNKNOWN STEP	2026-10-20T14:34:31.7134000Z Entering 'wanxiangli'
+check	UNKNOWN STEP	2026-10-20T14:34:31.7149125Z file:/home/runner/work/vibe-fs/vibe-fs/.git/modules/wanxiangli/config	remote.origin.url
+check	UNKNOWN STEP	2026-10-20T14:34:31.7172886Z [command]/usr/bin/git config --file /home/runner/work/vibe-fs/vibe-fs/.git/modules/wanxiangli/config --name-only --get-regexp ^includeIf\.gitdir:
+check	UNKNOWN STEP	2026-10-20T14:34:31.7293949Z Cleaning up orphan processes
+check	UNKNOWN STEP	2026-10-20T14:34:31.7497517Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-dotnet@v4, actions/setup-node@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

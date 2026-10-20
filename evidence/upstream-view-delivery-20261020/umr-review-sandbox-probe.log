@@ -1,0 +1,3 @@
+{"name":"globalApi","outcome":"Succeeded","rendered":"# ok\n\n[data]\nhostProcess = \"object\"\nhostBuiltinLoader = \"function\"\n"}
+{"name":"globalContext","outcome":"Succeeded","rendered":"# ok\n\n[data]\nhostProcess = \"object\"\nhostBuiltinLoader = \"function\"\n"}
+{"name":"returnedArray","outcome":"Succeeded","rendered":"# ok\n\n[data]\nhostProcess = \"object\"\nhostBuiltinLoader = \"function\"\n"}

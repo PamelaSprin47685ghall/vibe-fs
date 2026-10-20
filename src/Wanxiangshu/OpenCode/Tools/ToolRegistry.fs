@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation.Advisor
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
@@ -14,6 +15,7 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Mission.Planning
 open Wanxiangshu.Mission.Work.OpenCode
 open Wanxiangshu.Mission.Work
@@ -584,6 +586,104 @@ module ToolRegistry =
             | Ok messages, Ok declaration -> return! advisorSeatAnswer runtime ctx messages declaration intent
         }
 
+    let private programDeliverySource (runtime: ToolRuntimeScope) (ctx: HostToolContext) =
+        taskResult {
+            let! snapshot = runtime.Snapshot |> Result.requireSome "delivery snapshot is unavailable"
+            let! provider = ctx.ProviderRunId |> Result.requireSome "delivery provider identity is missing"
+            let! call = ctx.ToolCallId |> Result.requireSome "delivery tool identity is missing"
+            let! messages = snapshot.GetMessages(SessionId.create ctx.SessionId)
+
+            let! owner =
+                messages
+                |> List.tryFind (fun message ->
+                    message.Id = ProviderRunIdentity.value provider && message.Role = "assistant")
+                |> Result.requireSome "delivery provider message is absent"
+
+            do!
+                Result.requireTrue
+                    "delivery tool call does not belong to the provider message"
+                    (owner.ToolParts |> Array.exists (fun part -> part.ToolCallId = call))
+
+            let! physical =
+                owner.ParentId
+                |> Result.requireSome "delivery provider message has no physical input"
+
+            let text =
+                owner.Parts
+                |> Array.choose (function
+                    | MessagePart.Text text -> Some text
+                    | _ -> None)
+                |> String.concat "\n"
+
+            return PhysicalUserMessageId.create physical, text
+        }
+
+    let private isChildProgramDelivery (runtime: ToolRuntimeScope) (ctx: HostToolContext) =
+        match runtime.Journal, JsDeliveredValues.peekFence ctx.SessionId, ctx.ProviderRunId, ctx.ToolCallId with
+        | Some journal, Some fence, Some provider, Some call when
+            fence.ProviderRun = provider && fence.ToolCallId = call
+            ->
+            (AgentJournal.snapshot journal).AgentProjections.HandleByChildSession
+            |> Map.containsKey (SessionId.create ctx.SessionId)
+        | _ -> false
+
+    let private commitProgramDelivery
+        (runtime: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (source: Result<PhysicalUserMessageId * string, string>)
+        (eventPort: IEventObservationPort option)
+        (directory: string)
+        =
+        taskResult {
+            let! events = eventPort |> Result.requireSome "delivery completion port is unavailable"
+            let! journal = runtime.Journal |> Result.requireSome "delivery journal is unavailable"
+            let! provider = ctx.ProviderRunId |> Result.requireSome "delivery provider identity is missing"
+            let! call = ctx.ToolCallId |> Result.requireSome "delivery tool identity is missing"
+            let! physical, text = source
+
+            let! declaration =
+                JsDeliveredValues.peekView ctx.SessionId
+                |> Result.requireSome "delivery view declaration is missing"
+
+            let! view =
+                JsDeliveredValues.sealFencedView ctx.SessionId provider call (Some text)
+                |> Result.requireSome "delivery view is empty"
+
+            let! witness, role =
+                TaskDeliveryJournal.commitChild
+                    journal
+                    (SessionId.create ctx.SessionId)
+                    physical
+                    provider
+                    call
+                    text
+                    (JS.JSON.stringify declaration)
+                    view
+
+            events.NotifyTerminal
+                witness.Fence.SessionId
+                (TerminalOutcome.Completed
+                    { SessionId = witness.Fence.SessionId
+                      AuthorityRootUserMessageId = witness.Fence.AuthorityRoot
+                      ProviderRun = witness.Fence.ProviderRun
+                      Role = role
+                      Directory = Some directory |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                      TerminalText = witness.View
+                      TurnFormalText = witness.FormalText })
+            |> ignore
+        }
+
+    let private settleProgramDelivery runtime ctx source eventPort directory =
+        task {
+            if isChildProgramDelivery runtime ctx then
+                let! committed = commitProgramDelivery runtime ctx source eventPort directory
+
+                committed
+                |> Result.defaultWith (fun reason ->
+                    JsDeliveredValues.clear ctx.SessionId
+                    invalidOp ("delivery failed: " + reason))
+        }
+
     let create
         (toolModule: obj)
         (sessionPort: ISessionHostPort)
@@ -644,6 +744,14 @@ module ToolRegistry =
                 ?eventPort = eventPort
             )
 
+        let readOutputAfterRecovery sessionId =
+            task {
+                match! runtime.RequireCurrentProcessJoin(SessionId.create sessionId) with
+                | Wanxiangshu.Execution.Session.Recovery.SessionRecovery.FamilyRecovery.FamilyBlocked _ ->
+                    return Error "Current process recovery blocks large output"
+                | _ -> return Ok()
+            }
+
         let jsProcessHost (ctx: HostToolContext) : JsToolWorkflow.ProcessHost =
             { HardLimit = runtime.ProcessHardLimit
               Own = fun start -> runtime.RunOwnedProcess(ctx.SessionId, start)
@@ -653,13 +761,7 @@ module ToolRegistry =
                         if String.IsNullOrWhiteSpace ctx.SessionId then
                             return Error "Output authority requires a session"
                         else
-                            let! recovery = runtime.RequireCurrentProcessJoin(SessionId.create ctx.SessionId)
-
-                            return
-                                match recovery with
-                                | Wanxiangshu.Execution.Session.Recovery.SessionRecovery.FamilyRecovery.FamilyBlocked _ ->
-                                    Error "Current process recovery blocks large output"
-                                | _ -> Ok()
+                            return! readOutputAfterRecovery ctx.SessionId
                     }
               AttachLifetimeAbort = fun cancel drained -> runtime.AttachProcessAbort(ctx.SessionId, cancel, drained)
               AttachAbort = ctx.AttachAbort }
@@ -824,7 +926,10 @@ module ToolRegistry =
                             task {
                                 try
                                     let! currentSpec = specFor ctx
-                                    return! currentSpec.Execute args ctx
+                                    let! source = programDeliverySource runtime ctx
+                                    let! output = currentSpec.Execute args ctx
+                                    do! settleProgramDelivery runtime ctx source eventPort (jsRootOf ctx.SessionId)
+                                    return output
                                 finally
                                     JsDelegationBridge.clear ctx.SessionId
                             } })

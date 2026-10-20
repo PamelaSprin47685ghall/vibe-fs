@@ -89,7 +89,7 @@ module JsSearch =
         task {
             if observed.StopRequested.IsSome && not child.Exited.Value then
                 let grace =
-                    Deadline.ofBudget DateTimeOffset.UtcNow (TimeSpan.FromMilliseconds 1000.0)
+                    Deadline.ofBudget ((NodeTiming.nodeClockPort ()).UtcNow()) (TimeSpan.FromMilliseconds 1000.0)
 
                 let! _ = NodeProcessWait.waitForExit child grace CancellationToken.None
                 ()
@@ -179,7 +179,8 @@ module JsSearch =
                 { WorkingDirectory = Some root
                   HardLimit = TimeSpan.FromMilliseconds budget }
 
-            let deadline = Deadline.ofBudget DateTimeOffset.UtcNow context.HardLimit
+            let deadline =
+                Deadline.ofBudget ((NodeTiming.nodeClockPort ()).UtcNow()) context.HardLimit
 
             try
                 let! started =

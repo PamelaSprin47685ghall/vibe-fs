@@ -10,6 +10,7 @@ import { buildTextChunks, buildToolCallChunks, sendJSON, sendSSE } from '../../.
 import { stopHttpServer } from '../../../verification-system/tests/e2e/support/strict-mock-server.js'
 import { renderInterrupted } from '../../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
 import { coldWorkSnapshot } from '../../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+import { factPayloads } from '../../../verification-system/tests/e2e/support/journal-observer.js'
 
 const root = path.resolve(import.meta.dirname, '../../../..')
 const capacityOne = process.argv.includes('--capacity-one')
@@ -36,6 +37,7 @@ assert.ok([...phases, 'GUIDANCE', 'GUIDANCE_STOP'].includes(phase))
 const guidanceMode = phase === 'GUIDANCE' || phase === 'GUIDANCE_STOP'
 const childStops = phase === 'GUIDANCE_STOP'
 let childDelivered = false
+let childDeliveryPrepared = false
 const observations = []
 const waiters = new Set()
 const releases = new Map()
@@ -163,13 +165,18 @@ const handleProvider = async (request, response) => {
       assert.ok(text.includes('CHILD_PREFIX_CHILD_SUFFIX'))
       if (!childStops) assert.ok(text.includes('CHILD_TOOL_RESULT'))
       publish('child.guided.provider', { sessionID: request.headers['x-wxs-canary-session'], messageID })
-      if (childDelivered) {
+      if (!childDeliveryPrepared) {
+        childDeliveryPrepared = true
+        sendSSE(response, buildToolCallChunks('child-prepare-delivery', 'todowrite-for-engineer', JSON.stringify({
+          program: 'class Js extends JsProgram { async run() { return "DELIVERY_PREPARED"; } }',
+        }), 1))
+      } else if (childDelivered) {
         sendSSE(response, buildTextChunks('child-guided', 'CHILD_WORK_DONE', 1))
       } else {
         childDelivered = true
         const [prose] = buildTextChunks('child-guided', 'CHILD_WORK_DONE', 1)
         sendSSE(response, [prose, ...buildToolCallChunks('child-deliver', 'todowrite-for-engineer', JSON.stringify({
-          program: 'class Js extends JsProgram { async run() { await this.deliver("CHILD_WORK_DONE"); } }',
+          program: 'class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: { 0: "CHILD_WORK_DONE" } }); } }',
           estimated_readonly_rounds: 0,
         }), 1)])
       }
@@ -331,7 +338,11 @@ export default function route(role, running) {
     assert.equal(old.info.error, undefined)
     assert.equal(old.info.finish, childStops ? 'stop' : 'tool-calls')
     assert.ok(old.parts.some(part => part.type === 'text' && part.text === 'CHILD_PREFIX_CHILD_SUFFIX'))
-    const completed = childMessages.find(row => row.info.role === 'assistant' && row.info.parentID === guidance.value.messageID)
+    const deliveries = factPayloads(workspace, 'TaskDeliveryCommitted')
+      .filter(witness => witness.Fence.SessionId[1] === childSessionID)
+    assert.equal(deliveries.length, 1)
+    const completed = childMessages.find(row => row.info.id === deliveries[0].Fence.ProviderRun[1])
+    assert.equal(completed.info.parentID, guidance.value.messageID)
     assert.equal(completed.info.error, undefined)
     assert.ok(completed.parts.some(part => part.type === 'text' && part.text === 'CHILD_WORK_DONE'))
     assert.equal(activeResponseClosedEarly, false)
@@ -342,6 +353,9 @@ export default function route(role, running) {
     const originalRoot = observations.find(({ kind, value }) => kind === 'message.accepted' && value.sessionID === childSessionID && value.origin === 'AgentOwnerRoot')
     assert.equal(works[0].root, originalRoot.value.messageID)
     assert.equal(works[0].lifecycle, 'Retired', 'Manager Join must consume the original completed work')
+    const providerStart = factPayloads(workspace, 'ProviderStarted')
+      .find(start => start.Key.PhysicalUserMessageId[1] === guidance.value.messageID)
+    assert.notEqual(deliveries[0].Fence.ProviderRun[1], providerStart.Evidence.ProviderRun[1])
     results.push({ phase, joinInterrupted: true, childInterrupted: false, childRoots: 1, guidanceInNextRequest: true, answerParent: answer.info.parentID })
   } else {
     await waitFor(({ kind }) => kind === (phase === 'STREAMING' ? 'stream.held' : 'tool.held'))
@@ -381,7 +395,13 @@ export default function route(role, running) {
   process.exitCode = 1
 } finally {
   if (process.env.WXS_USER_INPUT_TRACE) {
-    fs.writeFileSync(process.env.WXS_USER_INPUT_TRACE, JSON.stringify({ observations, results }))
+    fs.writeFileSync(process.env.WXS_USER_INPUT_TRACE, JSON.stringify({
+      observations,
+      results,
+      deliveries: factPayloads(workspace, 'TaskDeliveryCommitted'),
+      providerStarts: factPayloads(workspace, 'ProviderStarted'),
+      terminals: factPayloads(workspace, 'Terminal'),
+    }))
   }
   release('tool')
   if (sessionID) {

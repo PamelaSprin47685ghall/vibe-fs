@@ -31,6 +31,7 @@ module SemanticTraceSurface =
     let completeWithoutDelivery role session authorityRoot providerRun text : Task<obj> =
         task {
             let events = Events.HostEventPort() :> IEventObservationPort
+            // DSL-MUTABLE: resource — count notifications from this proof's subscription.
             let notifications = ref 0
 
             use _subscription =

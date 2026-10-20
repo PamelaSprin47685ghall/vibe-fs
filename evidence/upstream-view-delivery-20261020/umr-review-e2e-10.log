@@ -1,0 +1,115 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.474125
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 6.129709
+  ...
+# Subtest: WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+ok 3 - WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+  ---
+  duration_ms: 1.284209
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:11819) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea53dac1bffetVuqeMaUib17W5
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+long-stroke scenario failed: AssertionError [ERR_ASSERTION]: long-stroke: interrupted join must reach Manager conversation as the public nearer-arrival result
+    at assertInterruptedJoin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/long-stroke-oracles.mjs:254:10)
+    at oracleLongStroke (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/long-stroke-oracles.mjs:624:3)
+    at runStep (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/scenario-driver.mjs:851:13)
+    at runFlow (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/scenario-driver.mjs:860:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async runCanary (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/scenario-driver.mjs:945:5)
+    at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/014.test.mjs:195:16)
+    at async Test.run (node:internal/test_runner/test:932:9)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+[GIT-DIAG] workdir=/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/oc-e2e-iLY94m/workspace
+log:
+* 232a5a8 candidate: il2bfc
+* 6cf30e1 target: conflicting edit to proof file
+* 262f1f3 init
+branches:
+* main
+worktrees:
+/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/oc-e2e-iLY94m/workspace  232a5a8 [main]
+# Subtest: WHAT[verification-system-014] Long Stroke 真实物理验收环境
+not ok 4 - WHAT[verification-system-014] Long Stroke 真实物理验收环境
+  ---
+  duration_ms: 11679.213417
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/tier-gate.mjs:26:12'
+  failureType: 'testCodeFailure'
+  error: |-
+    Long Stroke canary exited with code 1
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/014.test.mjs:203:10)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 3
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11689.36075

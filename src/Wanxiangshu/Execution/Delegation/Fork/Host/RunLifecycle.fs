@@ -559,6 +559,51 @@ module HostForkRunLifecycle =
         else
             Task.FromResult(()) :> Task
 
+    let private deliverPreparedCompletion
+        gate
+        pendingRuns
+        journal
+        parentId
+        (run: PendingHostRun)
+        (result: AgentRunResult)
+        view
+        =
+        task {
+            match view with
+            | None -> ()
+            | Some text when System.String.IsNullOrWhiteSpace text -> ()
+            | Some text ->
+                let runId = "run-" + run.AgentId
+
+                let agentOutcome =
+                    AgentCompletion.completed
+                        run.AgentId
+                        run.ChildId
+                        runId
+                        run.Role
+                        result.AuthorityRootUserMessageId
+                        result.ProviderRun
+                        text
+                        result.Directory
+
+                let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+                do!
+                    deliverProvenCompletion
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        run
+                        (TerminalEvidence.completed
+                            run.AgentId
+                            (HandleController.agentHandle run.AgentId)
+                            run.ChildId
+                            body)
+                        agentOutcome
+        }
+        :> Task
+
     let complete
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -585,36 +630,12 @@ module HostForkRunLifecycle =
             Task.FromResult(())
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->
-            prepareCurrentCompletion gate pendingRuns run (fun () -> prepareCompletion run outcome) (fun view ->
-                task {
-                    match view with
-                    | None -> ()
-                    | Some text when System.String.IsNullOrWhiteSpace text -> ()
-                    | Some text ->
-                        let agentOutcome =
-                            AgentCompletion.completed
-                                run.AgentId
-                                childId
-                                runId
-                                run.Role
-                                result.AuthorityRootUserMessageId
-                                result.ProviderRun
-                                text
-                                result.Directory
-
-                        let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
-
-                        do!
-                            deliverProvenCompletion
-                                gate
-                                pendingRuns
-                                journal
-                                parentId
-                                run
-                                (TerminalEvidence.completed run.AgentId handle childId body)
-                                agentOutcome
-                }
-                :> Task)
+            prepareCurrentCompletion
+                gate
+                pendingRuns
+                run
+                (fun () -> prepareCompletion run outcome)
+                (deliverPreparedCompletion gate pendingRuns journal parentId run result)
         | Failed stop when not (stopBelongsToRun run stop) -> Task.FromResult(())
         | Failed stop when
             stop.Reason = "MISSING_FINAL_REPORT"

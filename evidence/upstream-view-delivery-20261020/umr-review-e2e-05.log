@@ -1,0 +1,132 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.463625
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 5.579834
+  ...
+# Subtest: WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+ok 3 - WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+  ---
+  duration_ms: 1.5155
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:99644) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea5632ce3ffe2az67osLi9eraq
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-FATAL] first script mismatch: reason=no-declared-turn session=ses_ea5631c14ffeuc0Fe5hm6okeXg parent=- model="test-model-b" tools=["assume","commission","horizon","join","skill","todowrite-for-orchestrator","wanxiang_fixture_search"] msgs=10 lastUser="[ANCHOR: 12]\u0000﻿The planning goal is still open. An ordinary stop, an empty reply, a progress summary, or a question in prose is not permission to stop. Continue the current planning stage: inspect the user's original input, the predecessor record and the draft; use `devops` for repository facts, `review` for the stage judgment, and `deliver` for a proved handoff or delivery. If a necessary user dec" candidates=["orch.0@orchestrator/chat/step-0","orch-join-guard.0@undefined/chat/step-0","manager-t1-commitment.0@undefined/chat/step-0","continue.0@undefined/chat/step-0"]
+[MSG-ROLES] system user assistant tool assistant tool assistant tool assistant user
+[MSG-AFTER-USER] []
+[MSG-TOOL-RESULTS] ["[ANCHOR: 9]\u0000﻿# That work could not be opened.\n\u0000﻿# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Question: if you ","[ANCHOR: 10]\u0000﻿# The orchestrator is not ready to join yet.\n\u0000﻿# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another interval of waiting or resource commitment.\n# # Ques","[ANCHOR: 11]\u0000﻿# failed\n\ncode = \"INVALID_RETURN_VALUE\"\nreason = \"run() return value is not JSON-compatible\"\n\u0000﻿# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration beside useful work already accomplished only to price another inte"]
+── fatal script mismatch: no-declared-turn (lane=orchestrator|title kind=chat step=0) ──
+session=ses_ea5631c14ffeuc0Fe5hm6okeXg lastUser="[ANCHOR: 12]\u0000﻿The planning goal is still open. An ordinary stop, an empty reply, a progress summary, or a question in prose is not permission to stop. Continue the current planning stage: inspect the user's original input, the predecessor record and the draft; use `devops` for repository facts, `review` for the stage judgment, and `deliver` for a proved handoff or delivery. If a necessary user dec"
+candidates=["orch.0@orchestrator/chat/step-0","orch-join-guard.0@undefined/chat/step-0","manager-t1-commitment.0@undefined/chat/step-0","continue.0@undefined/chat/step-0"]
+── event tail ──
+#315 18:39:54.336 message.updated session=ses_ea5631c1 finish=stop
+#316 18:39:54.336 sync
+#317 18:39:54.336 session.status session=ses_ea5631c1
+#318 18:39:54.336 session.status session=ses_ea5631c1
+#319 18:39:54.336 session.idle session=ses_ea5631c1
+#320 18:39:54.352 session.updated session=ses_ea5631c1
+#321 18:39:54.352 sync
+#322 18:39:54.352 session.diff session=ses_ea5631c1
+#323 18:39:54.391 message.updated session=ses_ea5631c1
+#324 18:39:54.391 sync
+#325 18:39:54.391 message.part.updated session=ses_ea5631c1
+#326 18:39:54.391 sync
+#327 18:39:54.391 session.updated session=ses_ea5631c1
+#328 18:39:54.391 sync
+#329 18:39:54.399 session.status session=ses_ea5631c1
+#330 18:39:54.399 message.updated session=ses_ea5631c1
+#331 18:39:54.399 sync
+#332 18:39:54.400 session.updated session=ses_ea5631c1
+#333 18:39:54.400 sync
+#334 18:39:54.400 session.diff session=ses_ea5631c1
+── Host stderr tail ──
+error: delivered
+ __jsDelivered: {
+  view: [Object ...],
+  toString: [Function: toString],
+  toLocaleString: [Function: toLocaleString],
+  valueOf: [Function: valueOf],
+  hasOwnProperty: [Function: hasOwnProperty],
+  propertyIsEnumerable: [Function: propertyIsEnumerable],
+  isPrototypeOf: [Function: isPrototypeOf],
+  __defineGetter__: [Function: __defineGetter__],
+  __defineSetter__: [Function: __defineSetter__],
+  __lookupGetter__: [Function: __lookupGetter__],
+  __lookupSetter__: [Function: __lookupSetter__],
+},
+
+      at deliver (evalmachine.<anonymous>:29:17)
+      at run (evalmachine.<anonymous>:39:56)
+      at <anonymous> (evalmachine.<anonymous>:59:41)
+      at evalmachine.<anonymous>:82:3
+      at <anonymous> (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Process/JsSandbox.js:239:29)
+      at TryWith (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/fable_modules/fable-library-js.5.13.0/TaskBuilder.js:38:20)
+      at Run (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/fable_modules/fable-library-js.5.13.0/TaskBuilder.js:64:20)
+      at <anonymous> (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js:746:34)
+      at Run (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/fable_modules/fable-library-js.5.13.0/TaskBuilder.js:64:20)
+      at <anonymous> (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js:1082:48)
+      at Run (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/fable_modules/fable-library-js.5.13.0/TaskBuilder.js:64:20)
+      at <anonymous> (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Repository/Programming/Js/OpenCode/ToolHost.js:181:544)
+      at Run (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/fable_modules/fable-library-js.5.13.0/TaskBuilder.js:64:20)
+      at <anonymous> (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/OpenCode/Tools/ToolRegistry.js:906:64)
+
+── Journal fact tail ──
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:0:Accepted
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:1:ProviderStarted
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:2:PairProgrammingGuidelineAnchored
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:3:XTracePartAppended
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:4:PairProgrammingGuidelineAnchored
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:5:PluginPromptClaimed
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:6:XTracePartAppended
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:7:PairProgrammingGuidelineAnchored
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:8:SuccessRecorded
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:9:PairProgrammingGuidelineAnchored
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:10:XTracePartAppended
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:11:XTracePartAppended
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:12:XTracePartAppended
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:13:XTracePartAppended
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:14:AuthorityRootAccepted
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:15:RuntimeStarted
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:16:PluginPromptSubmitted
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:17:PluginPromptPhysicalAccepted
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:18:ProviderStarted
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:19:PluginPromptClaimed
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:20:PairProgrammingGuidelineAnchored
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:21:WorkOpened
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:22:IncumbencyOpened
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:23:Reviewed
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:24:ConfirmationCommitted
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:25:IncumbencyRetired
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:26:IncumbencyOpened
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:27:Reviewed
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:28:ConfirmationCommitted
+f5cc60e82b3fa844307edc7c9fa29a5f42de5ae79c23cb310b7db3928d05de7d:29:IncumbencyRetired
+  pending blocking manager-loop.0 manager-loop.0@manager/chat/step-0
+  pending blocking manager-loop.1 manager-loop.1@manager/chat/step-1
+  pending blocking manager-loop.2 manager-loop.2@manager/chat/step-2
+  pending blocking manager-interrupt.0 manager-interrupt.0@manager/chat/step-0
+  pending blocking engineer.0 engineer.0@engineer/chat/step-0
+  pending blocking engineer.1 engineer.1@engineer/chat/step-1
+  pending blocking engineer.2 engineer.2@engineer/chat/step-2
+  pending blocking engineer.3 engineer.3@engineer/chat/step-3

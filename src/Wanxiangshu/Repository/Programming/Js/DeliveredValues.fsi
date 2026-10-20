@@ -38,6 +38,13 @@ module JsDeliveredValues =
         text: string ->
             unit
 
+    val sealFencedView:
+        sessionId: string ->
+        providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId ->
+        assistant: string option ->
+            string option
+
     val take: sessionId: string -> obj
     val peek: sessionId: string -> obj
     val select: sessionId: string -> view: obj option -> already: Set<string> -> ReturnedPiece list

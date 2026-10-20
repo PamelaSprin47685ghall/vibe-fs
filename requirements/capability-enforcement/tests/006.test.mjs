@@ -387,7 +387,7 @@ integrationTest('WHAT[capability-enforcement-006] HOST_013_skill_stays_host_owne
     const terminal = transformed.messages.find((message) => message.info?.id === 'r1')
     assert.ok(terminal, 'terminal real tool result survives the transform')
     const output = terminal.parts?.[0]?.state?.output ?? ''
-    assert.ok(output.startsWith('ok1\0\uFEFF'), 'guidance travels as NUL+BOM suffix on the terminal real tool result')
+    assert.match(output, /^\[ANCHOR: \d+\]\0\uFEFFok1\0\uFEFF/, 'the anchored real result retains its NUL+BOM guidance suffix')
     assert.match(output, /#/, 'suffix carries guidance bytes')
   })
 })
@@ -442,7 +442,7 @@ integrationTest('WHAT[capability-enforcement-006] MANAGER_pair_guidance_rides_cu
     const terminal = transformed.messages.find((message) => message.info?.id === 'r1')
     assert.ok(terminal, 'terminal real tool result survives the transform')
     const output = terminal.parts?.[0]?.state?.output ?? ''
-    assert.ok(output.startsWith('ok1\0\uFEFF'), 'guidance travels as NUL+BOM suffix on the terminal real tool result')
+    assert.match(output, /^\[ANCHOR: \d+\]\0\uFEFFok1\0\uFEFF/, 'the anchored real result retains its NUL+BOM guidance suffix')
     assert.match(output, /#/, 'suffix carries guidance bytes')
     assert.equal(hooks.tool[markerToolName], undefined, 'cursor suffix borrows no plugin-registered skill name')
   })

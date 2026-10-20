@@ -193,6 +193,7 @@ test('WHAT[verification-system-017] formal verification cannot inherit a narrowe
   const e2e = releaseSteps.find((s) => s.label === 'e2e')
   const pkg = releaseSteps.find((s) => s.label === 'package')
   assert.ok(e2e && pkg)
+  assert.equal(e2e.env.WXS_TIER_RELEASE, '1', 'the release pipeline must execute the real Long Stroke')
   assert.equal('TESTS_MJS_FILES' in e2e.env, false, 'e2e step env must not contain TESTS_MJS_FILES')
   assert.equal('TESTS_MJS_FILES' in pkg.env, false, 'package step env must not contain TESTS_MJS_FILES')
 })

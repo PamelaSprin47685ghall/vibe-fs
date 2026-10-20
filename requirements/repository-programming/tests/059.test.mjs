@@ -7,7 +7,7 @@ import { execute, caseName } from '../../../dist/Repository/Programming/Js/Workf
 import {
   deliveredValue, clearDeliveredValue, recordDeliveredView, recordFencedDeliveredView, takeDeliveredHandoff,
   takeDeliveredHandoffWith, takeDeliveredHandoffFor, clearDeliveredReturned, deliveredReturned,
-  deliveredViewOf, deliveredFenceOf,
+  deliveredViewOf, deliveredFenceOf, sealFencedDeliveredView,
 } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { applyView, clearAll, numberMessage, setView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 import { verifyPrepareFailure, verifyCommitFailure } from './support/delivery-settlement.mjs'
@@ -105,6 +105,29 @@ test('WHAT[repository-programming-059] handoff returns the assistant prose once 
   assert.equal(deliveredReturned(id).some((key) => key.startsWith('prose:')), true)
   recordFencedDeliveredView(id, 'run-059', 'call-2', declaration(1, {}))
   assert.doesNotMatch(String(takeDeliveredHandoffFor(id, 'run-059', 'assistant prose')), /assistant prose/)
+  clearDeliveredReturned(id)
+})
+
+test('WHAT[repository-programming-059] a sealed view advances only its captured identities when consumed', () => {
+  const id = 'sealed-handoff'
+  clearDeliveredReturned(id)
+  seed(id, ['original material'])
+  recordFencedDeliveredView(id, 'run-sealed', 'call-sealed', declaration(0, {}))
+  assert.equal(sealFencedDeliveredView(id, 'other-run', 'call-sealed', 'wrong prose'), null)
+  const sealed = sealFencedDeliveredView(id, 'run-sealed', 'call-sealed', 'pre-call prose')
+  assert.match(sealed, /original material/)
+  assert.match(sealed, /pre-call prose/)
+  assert.deepEqual(deliveredReturned(id), [])
+  seed(id, ['late replacement'])
+  assert.equal(deliveredValue(id), sealed)
+  assert.equal(takeDeliveredHandoffFor(id, 'run-sealed', 'late prose'), sealed)
+  const returned = deliveredReturned(id)
+  assert.ok(returned.some(key => key.includes('original material')))
+  assert.ok(returned.some(key => key.includes('pre-call prose')))
+  assert.ok(returned.every(key => !key.includes('late')))
+  seed(id, ['original material'])
+  recordFencedDeliveredView(id, 'run-next', 'call-next', declaration(0, {}))
+  assert.equal(takeDeliveredHandoffFor(id, 'run-next', 'pre-call prose'), null)
   clearDeliveredReturned(id)
 })
 

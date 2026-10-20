@@ -26,6 +26,10 @@ module JsRuntimeSurface =
     val recordDeliveredView: sessionId: string -> view: obj -> unit
     /// Test hook: record a delivery carrying the exact call fence that produced it.
     val recordFencedDeliveredView: sessionId: string -> providerRun: string -> toolCallId: string -> view: obj -> unit
+
+    val sealFencedDeliveredView:
+        sessionId: string -> providerRun: string -> toolCallId: string -> formalText: string -> string
+
     val deliveredReturned: sessionId: string -> string array
     val clearDeliveredReturned: sessionId: string -> unit
     val takeDeliveredHandoffWith: sessionId: string -> assistantProse: string option -> obj

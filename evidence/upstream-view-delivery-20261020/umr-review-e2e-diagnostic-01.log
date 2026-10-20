@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.482959
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 6.034
+  ...
+# Subtest: WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+ok 3 - WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+  ---
+  duration_ms: 1.294917
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:97898) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea569d7ceffetbgJT7M4aZSENy
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+WATCHDOG: 'long-stroke' silent for 5001ms (limit 5000ms); 4 blocking progress update(s), last progress: expectation:humanroot-loop.2 lane=long-stroke/humanroot-manager/humanroot-loop/turn-undefined expectation=humanroot-loop.2
+WATCHDOG: background progress 4709ms ago: expectation:manager-reopened-loop.2 lane=long-stroke/undefined/manager-reopened-loop/turn-undefined (3 background update(s), none of them renewals)
+Current waits unavailable: snapshot missing: /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/oc-e2e-8LlfxJ/workspace/.wanxiangshu/diagnostics/causal-waits.json
+
+── watchdog event tail ──
+#208 18:32:36.874 message.part.updated session=ses_ea569d7c
+#209 18:32:36.874 sync
+#210 18:32:36.874 message.part.updated session=ses_ea569d7c
+#211 18:32:36.874 sync
+#212 18:32:36.874 message.part.updated session=ses_ea569d7c finish=tool-calls
+#213 18:32:36.874 sync
+#214 18:32:36.874 message.updated session=ses_ea569d7c finish=tool-calls
+#215 18:32:36.874 sync
+#216 18:32:36.874 message.updated session=ses_ea569d7c finish=tool-calls
+#217 18:32:36.874 sync
+#218 18:32:36.874 session.status session=ses_ea569d7c
+#219 18:32:36.874 message.updated session=ses_ea569d7c
+#220 18:32:36.874 sync
+#221 18:32:36.874 session.status session=ses_ea569d7c
+#222 18:32:36.874 session.idle session=ses_ea569d7c
+#223 18:32:36.874 session.error session=ses_ea569d7c error={"name":"UnknownError","data":{"message":"SQLiteError: database is locked\n    at run (unknown)\n    at run (bun:sqlite:336:21)\n    at execute (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/dist/eventstore/SqliteJournal.js:100:14)\n    at new SqliteJournal (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/dist/eventstore/SqliteJournal.js:118:5)\n    at openJournal (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Mission/Lifecycle/DurableWorkHost.js:201:20)\n    at useJournal (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Mission/Lifecycle/DurableWorkHost.js:212:20)\n    at <anonymous> (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/OpenCode/Plugin/PluginTransforms.js:549:50)\n    at processTicksAndRejections (native:7:39)\n    at Plugin.trigger (/$bunfs/root/chunk-wsfpcbgx.js:1096:13655)\n    at Plugin.trigger (definition) (/$bunfs/root/chunk-t2ggrdhe.js:439:29840)\n    at SessionPrompt.run (/$bunfs/root/chunk-wsfpcbgx.js:1096:15339)\n    at SessionPrompt.run (definition) (/$bunfs/root/chunk-wsfpcbgx.js:1096:10503)\n    at SessionRunState.ensureRunning (/$bunfs/root/chunk-wsfpcbgx.js:1096:15308)\n    at SessionRunState.ensureRunning (definition) (/$bunfs/root/chunk-wsfpcbgx.js:2:8188)\n    at SessionPrompt.loop (/$bunfs/root/chunk-wsfpcbgx.js:1096:10225)\n    at SessionPrompt.loop (definition) (/$bunfs/root/chunk-wsfpcbgx.js:1096:15244)\n    at SessionPrompt.prompt (/$bunfs/root/chunk-sh1wfrq3.js:4:13569)\n    at SessionPrompt.prompt (definition) (/$bunfs/root/chunk-wsfpcbgx.js:1096:9844)"}}
+#224 18:32:36.874 session.error session=ses_ea569d7c error={"name":"UnknownError","data":{"message":"SQLiteError: database is locked\n    at run (unknown)\n    at run (bun:sqlite:336:21)\n    at execute (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/dist/eventstore/SqliteJournal.js:100:14)\n    at new SqliteJournal (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/dist/eventstore/SqliteJournal.js:118:5)\n    at openJournal (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Mission/Lifecycle/DurableWorkHost.js:201:20)\n    at useJournal (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Mission/Lifecycle/DurableWorkHost.js:212:20)\n    at <anonymous> (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/OpenCode/Plugin/PluginTransforms.js:549:50)\n    at processTicksAndRejections (native:7:39)\n    at Plugin.trigger (/$bunfs/root/chunk-wsfpcbgx.js:1096:13655)\n    at Plugin.trigger (definition) (/$bunfs/root/chunk-t2ggrdhe.js:439:29840)\n    at SessionPrompt.run (/$bunfs/root/chunk-wsfpcbgx.js:1096:15339)\n    at SessionPrompt.run (definition) (/$bunfs/root/chunk-wsfpcbgx.js:1096:10503)\n    at SessionRunState.ensureRunning (/$bunfs/root/chunk-wsfpcbgx.js:1096:15308)\n    at SessionRunState.ensureRunning (definition) (/$bunfs/root/chunk-wsfpcbgx.js:2:8188)\n    at SessionPrompt.loop (/$bunfs/root/chunk-wsfpcbgx.js:1096:10225)\n    at SessionPrompt.loop (definition) (/$bunfs/root/chunk-wsfpcbgx.js:1096:15244)\n    at SessionPrompt.prompt (/$bunfs/root/chunk-sh1wfrq3.js:4:13569)\n    at SessionPrompt.prompt (definition) (/$bunfs/root/chunk-wsfpcbgx.js:1096:9844)"}}
+#225 18:32:36.886 session.updated session=ses_ea569d7c
+#226 18:32:36.886 sync
+#227 18:32:36.886 session.diff session=ses_ea569d7c
+── watchdog Host stdout tail ──
+Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.
+opencode server listening on http://127.0.0.1:55490
+
+── watchdog Host stderr tail ──
+
+── watchdog Journal fact tail ──
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:0:PairProgrammingGuidelineAnchored
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:1:ProviderStarted
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:2:PairProgrammingGuidelineAnchored
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:3:AuthorityRootAccepted
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:4:SuccessRecorded
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:5:PluginPromptPhysicalAccepted
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:6:PluginPromptClaimed
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:7:XTracePartAppended
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:8:XTracePartAppended
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:9:XTracePartAppended
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:10:Accepted
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:11:SessionStartedAtBound
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:12:XTracePartAppended
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:13:WorkOpened
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:14:IncumbencyOpened
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:15:Reviewed
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:16:ConfirmationCommitted
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:17:IncumbencyRetired
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:18:IncumbencyOpened
+5aba2fd4556f88388e46713883b02905824635e65552d3df461bf68b11aa9641:19:Reviewed
+── watchdog blocked expectations ──
+  blocking title.0 title.0@title/title/step-0
+  blocking orch.0 orch.0@orchestrator/chat/step-0
+  blocking orch.1 orch.1@orchestrator/chat/step-1
+  blocking orch.2 orch.2@orchestrator/chat/step-2
+  blocking orch.3 orch.3@orchestrator/chat/step-3
+  blocking manager-loop.0 manager-loop.0@manager/chat/step-0
+  blocking manager-loop.1 manager-loop.1@manager/chat/step-1
+  blocking manager-loop.2 manager-loop.2@manager/chat/step-2
+  blocking manager-interrupt.0 manager-interrupt.0@manager/chat/step-0
+  blocking engineer.0 engineer.0@engineer/chat/step-0
+  blocking engineer.1 engineer.1@engineer/chat/step-1
+  blocking engineer.2 engineer.2@engineer/chat/step-2
+  blocking engineer.3 engineer.3@engineer/chat/step-3

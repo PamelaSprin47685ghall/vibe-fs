@@ -244,15 +244,13 @@ flow = [
   { expectSatisfied = true },
 ]
 
-# A Continue retirement opens the next iteration on the same session: system, tools
-# and root authority stay fixed, the predecessor's history is retained in order, and
-# the only admitted in-prefix change is the retired auxiliary guidance suffix
-# (context-compression-019). The successor therefore breaks the raw seal exactly once,
-# when its own assess resource lands at step 0.
+# Manager succession uses the durable tenure boundary observed by the driver.
+# It does not grant a separate step-0 exception to the request prefix.
 [[epoch]]
-turn = "manager-reopened-loop"
+turn = "continue"
 step = 0
-reason = "manager-loop"
+reason = "fallback-side"
+attempt = 2
 
 
 [[turn]]
@@ -303,7 +301,7 @@ user = "Ship publish_proof.txt to the target branch through the long stroke."
 id = "orch"
 lane = "orchestrator"
 user = "Ship publish_proof.txt to the target branch through the long stroke."
-tools = ["commission", "join", "deliver"]
+tools = ["commission", "join", "todowrite-for-orchestrator"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "commission", args = { calling = "lead", name = "Long Stroke Road", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed." } }
@@ -311,14 +309,13 @@ tools = ["commission", "join", "deliver"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
 
-  # Join stays blocked until Manager Published; then this harvest text (required).
+  # Join stays blocked until Manager Published; the Orchestrator then delivers its view.
   [[turn.step]]
-  respond = { type = "text", text = "Long stroke publish completed after conflict resume." }
+  respond = { type = "tool-call", tool = "todowrite-for-orchestrator", prefixText = "Long stroke publish completed after conflict resume.", args = { program = "class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: {} }) } }" } }
 
-  # View-only delivery: the Orchestrator states the outcome as assistant prose,
-  # then ends the turn with an explicit deliver(view) so the handoff is settled.
+  # The final physical stop follows the explicit program delivery.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "deliver", args = {} }
+  respond = { type = "text", text = "Long stroke delivery complete." }
 
 # EXEC-016 / INTERACTION-AUTHORITY-014: conditional protocol declaration only.
 # Ordinary Orchestrator completion receives JoinGuard exactly when a join obligation
@@ -516,7 +513,7 @@ internal = true
 # `runtime/manager-work` face that a session with no lifecycle work receives.
 user = [
   "# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply contains a progress report. Continue the pending task: inspect the remaining goals, review findings and owned resources, then take the next action. Use `deliver` for a proved handoff or completion. For a temporary wait on background work, use `join`. Do not silently stop or claim that work will continue in the background after this conversation ends.",
-  "# The gaps confirmed by review are now entrusted to you. Review-only read tools are now disabled; do not inspect, search, or process repository code yourself anymore. Arrange source changes and test writing through Engineer (note that Engineer has no bash access; git, compile, and test operations cannot be performed). Real command execution, git operations, compilation, and test verification can only be performed by resuming the fixed DevOps (name = `devops`) for authorized execution, direct ordinary repair, and checks against the final changed state.",
+  "# The gaps confirmed by review are now entrusted to you. Repository access through `this.reviewOnly` is now disabled; the `todowrite-for-manager` program entry remains available; do not inspect, search, or process repository code yourself anymore. Arrange source changes and test writing through Engineer (note that Engineer has no bash access; git, compile, and test operations cannot be performed). Real command execution, git operations, compilation, and test verification can only be performed by resuming the fixed DevOps (name = `devops`) for authorized execution, direct ordinary repair, and checks against the final changed state.",
 ]
 # The re-anchored current-action resource carries the review-only read tools DISABLED (its
 # own text says so), so this ladder cannot host a close arc: production refuses every
@@ -671,7 +668,7 @@ tools = ["todowrite-for-engineer"]
   # `{ prefixUntil, thenMap }` view pointing at the work material. A plain
   # `return` leaves the delivery cell empty, so the child is not settled as
   # completed and the join stays open.
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "publish_proof.txt is written and verified; delivering the completed proof to the owner.", args = {  program = "class Js extends JsProgram { async run() { this.deliver({ prefixUntil: 0, thenMap: {} }) } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "publish_proof.txt is written and verified; delivering the completed proof to the owner.", args = {  program = "class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: {} }) } }" } }
 
   # The delivery tool result asks the provider once more; the child closes its turn here.
   [[turn.step]]
@@ -684,12 +681,12 @@ user = "# Resolve the conflicted publish_proof.txt so it contains exactly: Publi
 tools = ["todowrite-for-engineer"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return true; } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return true; } }" } }
 
   [[turn.step]]
   # Same view-only rule for the repair child: state the outcome as prose, then
   # settle with an explicit `this.deliver(view)`.
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "The conflict is resolved; publish_proof.txt now contains exactly the required text, and the repaired file is delivered.", args = {  program = "class Js extends JsProgram { async run() { this.deliver({ prefixUntil: 0, thenMap: {} }) } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "The conflict is resolved; publish_proof.txt now contains exactly the required text, and the repaired file is delivered.", args = {  program = "class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: {} }) } }" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Conflict file resolved." }

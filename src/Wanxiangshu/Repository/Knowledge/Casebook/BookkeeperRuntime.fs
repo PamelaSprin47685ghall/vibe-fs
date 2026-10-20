@@ -254,18 +254,13 @@ module BookkeeperRuntime =
                     BookkeeperStaging.abort txId
                     do! retire sessions childId
                     return Error err
+                | Ok() when not (BookkeeperStaging.touched txId) ->
+                    do! retire sessions childId
+                    return Error "bookkeeper program did not write the staged case"
                 | Ok() ->
-                    // LC-029: the staged transaction starts with the initial
-                    // Q/A, so a terminal that never wrote through it has not
-                    // delivered. Keep waiting instead of passing the original
-                    // values off as this run's commitment.
-                    if BookkeeperStaging.touched txId then
-                        let taken = BookkeeperStaging.take txId
-                        do! retire sessions childId
-                        return taken
-                    else
-                        do! retire sessions childId
-                        return Error "bookkeeper program did not write the staged case"
+                    let taken = BookkeeperStaging.take txId
+                    do! retire sessions childId
+                    return taken
             }
 
         let sendBookkeeperPrompt

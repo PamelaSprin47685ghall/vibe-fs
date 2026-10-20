@@ -172,6 +172,12 @@ module JsToolSpec =
 
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 
+        let executeFor ctx =
+            match scopeApi with
+            | Some scope -> JsToolWorkflow.executeWithApiScope (scope ctx)
+            | None ->
+                JsToolWorkflow.executeWithReviewCheck (reviewCheck |> Option.map (fun check -> fun () -> check ctx))
+
         /// Build the three-state input object from the Host arguments:
         /// `{ program } | { unpark: { handle, value } } | { abandon: { handle } }`.
         let inputOf (args: HostToolArguments) : obj =
@@ -266,15 +272,8 @@ module JsToolSpec =
                         let root = rootOf ctx.SessionId
 
                         let! outcome =
-                            let execute =
-                                match scopeApi with
-                                | Some scope -> JsToolWorkflow.executeWithApiScope (scope ctx)
-                                | None ->
-                                    JsToolWorkflow.executeWithReviewCheck (
-                                        reviewCheck |> Option.map (fun check -> fun () -> check ctx)
-                                    )
-
-                            execute
+                            executeFor
+                                ctx
                                 ctx.SessionId
                                 (match ctx.ProviderRunId, ctx.ToolCallId with
                                  | Some providerRun, Some toolCallId -> Some(providerRun, toolCallId)

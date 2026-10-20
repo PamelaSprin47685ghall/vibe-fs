@@ -166,3 +166,38 @@ test('WHAT[process-execution-010] CUT_02_non_pty_host_uses_one_supervised_proces
   })
 })
 }
+
+{
+const { execFile } = await import('node:child_process')
+const { promisify } = await import('node:util')
+const { existsSync } = await import('node:fs')
+const { fileURLToPath } = await import('node:url')
+const { integrationTest } = await import('../../verification-system/tests/support/tier-gate.mjs')
+
+integrationTest('WHAT[process-execution-010] a compiled Host runs the supervisor worker and keeps its runtime mode out of the target environment', async t => {
+  const binary = fileURLToPath(new URL(`../../../node_modules/opencode-${process.platform}-${process.arch}/bin/opencode`, import.meta.url))
+  if (!existsSync(binary)) {
+    t.skip('The platform OpenCode executable is required for the compiled Host proof')
+    return
+  }
+  const surface = new URL('../../../dist/Process/Surface.js', import.meta.url).href
+  const source = `
+    const p = await import(${JSON.stringify(surface)});
+    delete process.env.BUN_BE_BUN;
+    const result = await p.run(
+      p.command('/bin/sh', ['-c', 'printf "compiled-host:%s" "\${BUN_BE_BUN-unset}"; printf "diagnostic" >&2; exit 7'], process.cwd(), undefined, undefined),
+      p.estimate(10, 4096, 'medium'), p.context(process.cwd(), 30000), p.createCancellationToken(false));
+    console.log(JSON.stringify(result));
+  `
+  const { stdout } = await promisify(execFile)(binary, ['--eval', source], {
+    env: { ...process.env, BUN_BE_BUN: '1' },
+    timeout: 15000,
+  })
+  const outcome = JSON.parse(stdout.trim())
+  assert.equal(outcome.kind, 'Observed')
+  assert.deepEqual(outcome.ending, { kind: 'Exited', exitCode: 7 })
+  assert.equal(outcome.fault, null)
+  assert.equal(outcome.stopRequested, null)
+  assert.deepEqual(outcome.output, { kind: 'InMemory', stdout: 'compiled-host:unset', stderr: 'diagnostic' })
+})
+}

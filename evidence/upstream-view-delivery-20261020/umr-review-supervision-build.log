@@ -1,0 +1,10 @@
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/supervision/Wanxiangli.Supervision.fsproj, FCS time: 815 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/native-process/BunProcess.fs, Fable time: 18 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/supervision/Native.fs, Fable time: 65 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/supervision/Worker.fs, Fable time: 38 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/supervision/SupervisedProcess.fs, Fable time: 72 ms
+[build] supervision: 1232 ms

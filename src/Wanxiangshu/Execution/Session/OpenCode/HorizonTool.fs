@@ -209,7 +209,7 @@ module HorizonTool =
     /// Pty handles carry none and are listed from the runtime's pty table.
     let private rosterEntries (runtime: HostForkRuntime) (handles: AgentLinkageProjection) =
         HandleProjection.horizonVisible handles
-        |> List.filter (HostForkJoin.currentProcessHandle runtime)
+        |> List.filter (HostForkJoin.ownerWorkHandle runtime)
         |> List.choose (fun handle ->
             HandleId.tryAgent handle.Handle
             |> Option.map (fun handleId -> AgentHandleId.value handleId, handle))

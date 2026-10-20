@@ -477,6 +477,17 @@ module ForkTool =
         attachment
         =
         task {
+            let continuingWork =
+                Option.map2
+                    (fun durable childId ->
+                        PromptAuthorityProjectionQueries.activeProfile
+                            childId
+                            (AgentJournal.snapshot durable).AgentProjections)
+                    scope.Journal
+                    (runtime.TryChildSession agentId)
+                |> Option.flatten
+                |> Option.isSome
+
             let! placement =
                 taskResult {
                     do! recordFissionAffinity scope context agentId
@@ -487,6 +498,8 @@ module ForkTool =
                         match result with
                         | ForkResult.DispatchUncertain _ ->
                             consequence (namedProse language Path.Fork.ChargePlacementUncertain (request.Name.Trim()))
+                        | ForkResult.Nudged _ when continuingWork ->
+                            successInstruction (namedProse language Path.Resume.GuidanceSent (request.Name.Trim()))
                         | _ -> successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
                 }
 

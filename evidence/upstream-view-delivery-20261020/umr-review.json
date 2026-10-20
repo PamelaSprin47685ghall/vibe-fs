@@ -1,0 +1,547 @@
+{
+  "state": "VALIDATING_FINAL_CANDIDATE",
+  "startedAt": "2026-10-21",
+  "sourceBase": "0831239737c56a6eb36b96b663ffa46e0cafdfdd",
+  "upstreamTarget": "11052493bedb4edbcbe0c341fa677afd44c486f1",
+  "observedPrBase": "08a350dc52ee4a9f04b6e84679139018aa39ee91",
+  "fixedCandidatePreserved": true,
+  "checks": {
+    "static": {
+      "exit": 0,
+      "log": "umr-review-check-07.log",
+      "baselinesChanged": false,
+      "reportOnlyShardFindings": {
+        "high": 4,
+        "low": 270
+      }
+    },
+    "format": {
+      "exit": 0,
+      "log": "umr-review-format-06.log"
+    },
+    "build": {
+      "exit": 0,
+      "generation": 67,
+      "log": "umr-review-build-10.log"
+    },
+    "targeted": {
+      "exit": 1,
+      "passed": 616,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 24,
+      "plannedFiles": 86,
+      "drainedFiles": 86,
+      "reclamationAccepted": true,
+      "todoWaived": false,
+      "wallSeconds": 117.21,
+      "files": [
+        "requirements/context-compression/tests/031.test.mjs",
+        "requirements/repository-programming/tests/001.test.mjs",
+        "requirements/repository-programming/tests/002.test.mjs",
+        "requirements/repository-programming/tests/030.test.mjs",
+        "requirements/repository-programming/tests/041.test.mjs",
+        "requirements/repository-programming/tests/050.test.mjs",
+        "requirements/repository-programming/tests/051.test.mjs",
+        "requirements/repository-programming/tests/052.test.mjs",
+        "requirements/repository-programming/tests/053.test.mjs",
+        "requirements/repository-programming/tests/054.test.mjs",
+        "requirements/repository-programming/tests/056.test.mjs",
+        "requirements/repository-programming/tests/058.test.mjs",
+        "requirements/repository-programming/tests/059.test.mjs",
+        "requirements/repository-programming/tests/060.test.mjs",
+        "requirements/work/tests/026.test.mjs",
+        "requirements/work/tests/027.test.mjs",
+        "requirements/work/tests/029.test.mjs",
+        "requirements/work/tests/030.test.mjs",
+        "requirements/work/tests/031.test.mjs",
+        "requirements/work/tests/032.test.mjs",
+        "requirements/work/tests/033.test.mjs",
+        "requirements/work/tests/034.test.mjs",
+        "requirements/work/tests/039.test.mjs",
+        "requirements/work/tests/048.test.mjs",
+        "requirements/work/tests/049.test.mjs",
+        "requirements/work/tests/050.test.mjs",
+        "requirements/capability-enforcement/tests/002.test.mjs",
+        "requirements/capability-enforcement/tests/023.test.mjs",
+        "requirements/capability-enforcement/tests/025.test.mjs",
+        "requirements/capability-enforcement/tests/026.test.mjs",
+        "requirements/advisor/tests/002.test.mjs",
+        "requirements/advisor/tests/003.test.mjs",
+        "requirements/advisor/tests/004.test.mjs",
+        "requirements/provider-projection/tests/009.test.mjs",
+        "requirements/semantic-trace/tests/003.test.mjs",
+        "requirements/semantic-trace/tests/006.test.mjs",
+        "requirements/semantic-trace/tests/010.test.mjs",
+        "requirements/delegation/tests/024.test.mjs",
+        "requirements/delegation/tests/025.test.mjs",
+        "requirements/delegation/tests/031.test.mjs",
+        "requirements/intra-participant-parallelism/tests/014.test.mjs",
+        "requirements/intra-participant-parallelism/tests/015.test.mjs",
+        "requirements/crash-reconciliation/tests/018.test.mjs",
+        "requirements/obligation-ledger/tests/004.test.mjs",
+        "requirements/durable-events/tests/015.test.mjs",
+        "requirements/repository-programming/tests/009.test.mjs",
+        "requirements/repository-programming/tests/018.test.mjs",
+        "requirements/work/tests/021.test.mjs",
+        "requirements/obligation-ledger/tests/001.test.mjs",
+        "requirements/prefix-stability/tests/014.test.mjs",
+        "requirements/knowledge-reuse/tests/010.test.mjs",
+        "requirements/delegation/tests/009.test.mjs",
+        "requirements/delegation/tests/028.test.mjs",
+        "requirements/host-boundary/tests/032.test.mjs",
+        "requirements/effect-accounting/tests/008.test.mjs",
+        "requirements/intra-participant-parallelism/tests/001.test.mjs",
+        "requirements/intra-participant-parallelism/tests/002.test.mjs",
+        "requirements/intra-participant-parallelism/tests/003.test.mjs",
+        "requirements/intra-participant-parallelism/tests/004.test.mjs",
+        "requirements/intra-participant-parallelism/tests/005.test.mjs",
+        "requirements/intra-participant-parallelism/tests/006.test.mjs",
+        "requirements/intra-participant-parallelism/tests/007.test.mjs",
+        "requirements/intra-participant-parallelism/tests/008.test.mjs",
+        "requirements/intra-participant-parallelism/tests/009.test.mjs",
+        "requirements/intra-participant-parallelism/tests/010.test.mjs",
+        "requirements/intra-participant-parallelism/tests/011.test.mjs",
+        "requirements/intra-participant-parallelism/tests/012.test.mjs",
+        "requirements/intra-participant-parallelism/tests/013.test.mjs",
+        "requirements/intra-participant-parallelism/tests/017.test.mjs",
+        "requirements/knowledge-reuse/tests/005.test.mjs",
+        "requirements/knowledge-reuse/tests/006.test.mjs",
+        "requirements/knowledge-reuse/tests/011.test.mjs",
+        "requirements/knowledge-reuse/tests/013.test.mjs",
+        "requirements/knowledge-reuse/tests/015.test.mjs",
+        "requirements/knowledge-reuse/tests/016.test.mjs",
+        "requirements/managed-session-lifecycle/tests/008.test.mjs",
+        "requirements/managed-session-lifecycle/tests/018.test.mjs",
+        "requirements/managed-session-lifecycle/tests/020.test.mjs",
+        "requirements/work/tests/017.test.mjs",
+        "requirements/work/tests/018.test.mjs",
+        "requirements/work/tests/020.test.mjs",
+        "requirements/distribution/tests/011.test.mjs",
+        "requirements/delegation/tests/027.test.mjs",
+        "requirements/host-boundary/tests/008.test.mjs",
+        "requirements/execution-model-routing/tests/009.test.mjs",
+        "requirements/managed-chat-execution/tests/005.test.mjs"
+      ],
+      "log": "umr-review-formal-02.log"
+    },
+    "package": {
+      "exit": 0,
+      "generation": 67,
+      "members": 1366,
+      "totalBytes": 11542100,
+      "tarballDigest": "38ff789aca73179447b0d71a8e63e0ec35adc51f789e616df00c8da8dd690cf8",
+      "log": "umr-review-package-02.log",
+      "tarballTracked": false
+    },
+    "ciHistory": {
+      "priorRun": "https://github.com/dyx13/vibe-fs/actions/runs/39440412517",
+      "failure": "Shallow checkout omitted retained-archives historical anchor b436802758c25b5c33e4a99f5349f57c812005b8 before dependency installation.",
+      "change": "Checkout full history and keep recursive submodules and the archive gate.",
+      "probeLog": "umr-review-ci-history.log",
+      "priorLog": "umr-review-prior-ci.log"
+    },
+    "githubCi": {
+      "state": "TO_BE_RECORDED_IN_PR",
+      "note": "The final PR body will link the exact source-branch CI run; local results do not substitute for it."
+    },
+    "sandboxProbe": {
+      "outcome": "REPRODUCED_EXISTING_ESCAPE",
+      "generation": 68,
+      "hostFilesystemOrEnvironmentAccessPerformed": false,
+      "log": "umr-review-sandbox-probe.log",
+      "expressions": [
+        "api.constructor.constructor('return process')()",
+        "globalThis.constructor.constructor('return process')()",
+        "(await this.ls('.')).constructor.constructor('return process')()"
+      ],
+      "observation": "All three expose a host process object and a function-valued builtin loader. Only types were read.",
+      "upstreamEvidenceCommit": "f37a7ba48783217b3151fca23b3ef73200fcc1ad"
+    },
+    "initialFullRelease": {
+      "generation": 68,
+      "passed": 4426,
+      "failed": 34,
+      "skipped": 108,
+      "todo": 277,
+      "plannedFiles": 756,
+      "drainedFiles": 756,
+      "reclamationAccepted": true,
+      "todoWaived": false,
+      "exit": 1,
+      "log": "umr-review-release-01-unit.log"
+    },
+    "secondFullRelease": {
+      "generation": 74,
+      "passed": 4443,
+      "failed": 17,
+      "plannedFiles": 756,
+      "drainedFiles": 756,
+      "reclamationAccepted": true,
+      "todoPolicy": "existing CI WXS_ACCEPT_TODO=1",
+      "exit": 1,
+      "failure": "A drain deadline used an unreferenced timer; one test and its 16 successors were cancelled when Node exited early.",
+      "log": "umr-review-release-02-unit.log"
+    },
+    "repairSelection": {
+      "passed": 264,
+      "failed": 1,
+      "todo": 11,
+      "plannedFiles": 32,
+      "drainedFiles": 32,
+      "exit": 1,
+      "log": "umr-review-repairs-02.log",
+      "note": "Intermediate candidate; the remaining legacy identity mismatch was subsequently fixed."
+    },
+    "library": {
+      "buildExit": 0,
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "log": "umr-review-library-tests.log",
+      "buildLog": "umr-review-library-build.log",
+      "packageConsumersIncluded": true
+    },
+    "fullUnit": {
+      "generation": 75,
+      "exit": 0,
+      "passed": 4460,
+      "failed": 0,
+      "skipped": 108,
+      "todo": 277,
+      "plannedFiles": 756,
+      "drainedFiles": 756,
+      "reclamationAccepted": true,
+      "wallSeconds": 317.92,
+      "todoPolicy": "Existing CI WXS_ACCEPT_TODO=1; no TODO removed or promoted to proof.",
+      "log": "umr-review-release-03-unit.log"
+    },
+    "currentStatic": {
+      "status": "passed",
+      "log": "umr-review-static-14.log",
+      "cacheConfirmationLog": "umr-review-static-final.log"
+    },
+    "currentFormat": {
+      "status": "passed",
+      "log": "umr-review-format-14.log",
+      "cacheConfirmationLog": "umr-review-format-final.log"
+    },
+    "currentBuild": {
+      "status": "passed",
+      "generation": 88,
+      "log": "umr-review-build-25.log"
+    },
+    "integrationInitial": {
+      "generation": 75,
+      "exit": 1,
+      "passed": 665,
+      "failed": 7,
+      "skipped": 7,
+      "todo": 7,
+      "plannedFiles": 39,
+      "drainedFiles": 39,
+      "reclamationAccepted": true,
+      "harness": {
+        "passed": 286,
+        "failed": 2
+      },
+      "distributionExit": 0,
+      "log": "umr-review-release-03-integration.log"
+    },
+    "e2eInitial": {
+      "generation": 75,
+      "exit": 1,
+      "reason": "Strict fixture did not recognize the new leading anchor; raw wire was preserved.",
+      "log": "umr-review-e2e-01.log"
+    },
+    "observer": {
+      "generation": 79,
+      "exit": 0,
+      "passed": 7,
+      "failed": 0,
+      "plannedFiles": 1,
+      "drainedFiles": 1,
+      "reclamationAccepted": true,
+      "log": "umr-review-observer-01.log"
+    },
+    "sqliteObserverDiagnostic": {
+      "iterationsPerSide": 5000,
+      "ephemeralReader": {
+        "readerFailures": 1222,
+        "writerFailures": 161,
+        "firstWriterError": "database is locked"
+      },
+      "retainedReader": {
+        "readerFailures": 0,
+        "writerFailures": 0
+      },
+      "scope": "isolated Node 22.13 read-only observer and Bun writer; storage timeouts and failure semantics unchanged",
+      "priorReviewFailure": "E2E 04 persisted Host review tool error is database is locked; no step-count change needed"
+    },
+    "compiledHostProcessRepair": {
+      "redLog": "umr-review-compiled-host-red.log",
+      "redOutcome": "Unconfirmed end; no output; Process output was discarded",
+      "greenLog": "umr-review-compiled-host-green.log",
+      "greenPassed": 1,
+      "greenFailed": 0,
+      "libraryNode": {
+        "passed": 28,
+        "failed": 0,
+        "log": "umr-review-supervision-node.log"
+      },
+      "libraryBun": {
+        "passed": 28,
+        "failed": 0,
+        "files": 5,
+        "log": "umr-review-supervision-bun.log"
+      },
+      "buildLog": "umr-review-supervision-build.log",
+      "scope": "Bun worker private CLI environment; target environment unchanged; no PTY or whole-tree claim"
+    },
+    "e2eRepairHistory": [
+      {
+        "log": "umr-review-e2e-01.log",
+        "outcome": "leading view anchor mismatch"
+      },
+      {
+        "log": "umr-review-e2e-02.log",
+        "outcome": "successor oracle did not remove leading anchor"
+      },
+      {
+        "log": "umr-review-e2e-03.log",
+        "outcome": "retired standalone Orchestrator deliver fixture"
+      },
+      {
+        "log": "umr-review-e2e-04.log",
+        "outcome": "Host review tool failed with SQLite database is locked; not a step-counter defect"
+      },
+      {
+        "log": "umr-review-e2e-diagnostic-01.log",
+        "outcome": "same SQLite initialization race; diagnostic only"
+      },
+      {
+        "log": "umr-review-e2e-05.log",
+        "outcome": "HumanRoot completed; asynchronous fixture delivery lacked await; commission failed"
+      },
+      {
+        "log": "umr-review-e2e-diagnostic-02.log",
+        "outcome": "commission exposed Process output was discarded under compiled Host; diagnostic only"
+      },
+      {
+        "log": "umr-review-e2e-06.log",
+        "outcome": "commission and child provider started; provider rotation lacked an explicit boundary declaration"
+      },
+      {
+        "log": "umr-review-e2e-07.log",
+        "outcome": "boundary declaration was too early; first recovery request is append-only, rotation occurs on its second delivery"
+      }
+    ],
+    "coldBoundaryCounterexamples": {
+      "passed": 42,
+      "failed": 0,
+      "scope": "direct pure cold-boundary and scenario-runtime cases; full harness acceptance remains separate",
+      "guards": "anchored user/tool bytes retained; rejected delivery does not advance attempt; fallback declaration only at attempt 2; unfired boundary fails"
+    },
+    "e2e08": {
+      "status": "failed",
+      "log": "umr-review-e2e-08.log",
+      "diagnosis": "Engineer committed TaskDeliveryCommitted and HandleWorkCompleted. A later provider step for the same physical input incorrectly received an undelivered-work nudge after the delivery cell was consumed.",
+      "fix": "Ignore the already delivered child exchange only when session, authority root and physical input match the durable ChildWork witness."
+    },
+    "e2e09": {
+      "status": "failed",
+      "log": "umr-review-e2e-09.log",
+      "diagnosis": "Child delivery and join completed. CandidateReady stayed absent after the Manager Delivered retirement. Change read lifecycle state from a runtime-log path instead of the primary state root and waited only for AgentJournal revisions.",
+      "fix": "Use RuntimePath.stateRoot for lifecycle reads and reopening; subscribe to confirmed same-work lifecycle commits before reading, race the journal wait, and dispose both wait registrations after waking."
+    },
+    "deliveryStop": {
+      "status": "passed",
+      "generation": 85,
+      "passed": 7,
+      "failed": 0,
+      "todo": 1,
+      "filesDrained": "2/2",
+      "reclamationAccepted": true,
+      "log": "umr-review-delivery-stop-01.log"
+    },
+    "publishWake": {
+      "status": "passed",
+      "generation": 86,
+      "passed": 56,
+      "failed": 0,
+      "todo": 0,
+      "filesDrained": "5/5",
+      "reclamationAccepted": true,
+      "log": "umr-review-publish-wake-01.log"
+    },
+    "e2e10": {
+      "status": "failed",
+      "log": "umr-review-e2e-10.log",
+      "diagnosis": "The real run published the reconciled candidate. The interrupted-join oracle rejected the formal leading anchor; exact anchor support and quoted-history/internal-status counterexamples were added."
+    },
+    "e2e11": {
+      "status": "failed",
+      "log": "umr-review-e2e-11.log",
+      "diagnosis": "The real run published and all functional oracles passed. Final satisfaction rejected an obsolete manager-reopened-loop.0 boundary which never fired; durable tenure evidence already owns successor projection changes. Removed the extra declaration without changing prefix or authority checks."
+    },
+    "e2eFinal": {
+      "status": "passed",
+      "generation": 88,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "wallSeconds": 14.264767,
+      "log": "umr-review-e2e-12.log",
+      "scope": "Real OpenCode Host, two provider failures, interrupted join, child delivery, five Manager tenures, conflict repair and Published; no process restart in this stroke."
+    }
+  },
+  "resolved": [
+    {
+      "id": "STYLE-34",
+      "change": "Flattened 34 control-flow findings in 16 F# files, preserving gate baselines and acceptance policy."
+    },
+    {
+      "id": "COLD-RESUME",
+      "change": "Resume retains the admitted work, logical run and authority root and installs its live completion waiter; restart does not replay the prompt."
+    },
+    {
+      "id": "CONTINUATION-AUTHORITY",
+      "change": "Host binding obtains the durable authority root independently of the current physical input."
+    },
+    {
+      "id": "DURABLE-DELIVERY",
+      "change": "A successful settled child program commits the exact delivery witness with its physical execution, actual tool step, pre-call prose and sealed view."
+    },
+    {
+      "id": "DELIVERY-COMPLETION",
+      "change": "Successful durable delivery publishes its completion through the existing Host terminal port; parent join consumes the original work even when natural stop belongs to another assistant step."
+    },
+    {
+      "id": "RETURNED-CURSOR",
+      "change": "Sealing freezes material identities without advancing them; actual consumption advances only the captured identities."
+    },
+    {
+      "id": "CI-HISTORY",
+      "change": "Full checkout history restores the retained-archive verification anchor without disabling the gate."
+    },
+    {
+      "id": "FULL-UNIT-FIXTURES",
+      "change": "Retired identities/facts and prose-only completion fixtures now follow the current model; valid payload proofs and all TODOs are retained."
+    },
+    {
+      "id": "RESTART-OBLIGATIONS",
+      "change": "Admitted owner work and unconsumed consequences remain visible after restart; idle DevOps bindings do not block Join."
+    },
+    {
+      "id": "SEARCH-IGNORE",
+      "change": "rg honours .gitignore in ordinary directories; the JS test bridge supplies an actual int64 deadline."
+    },
+    {
+      "id": "LEGACY-IDENTITY",
+      "change": "Legacy human roots reject contradictory SelectedAgent/CanonicalRole evidence; valid DevOps remains DevOps."
+    },
+    {
+      "id": "OWNED-DRAIN-DEADLINE",
+      "change": "The time-node public capability retains Node until an owned close wait settles; the original 3-second limit and unknown-resource blocker remain."
+    },
+    {
+      "id": "COMPILED-HOST-WORKER",
+      "change": "Use the Bun worker CLI environment only for the supervisory worker; a real compiled OpenCode regression proves output, exit status and target environment."
+    },
+    {
+      "id": "DELIVERED-CHILD-LATE-STOP",
+      "change": "A later provider stop on the same delivered child exchange cannot revive its completed work or issue a new nudge."
+    },
+    {
+      "id": "CHANGE-LIFECYCLE-WAKE",
+      "change": "Read and reopen lifecycle state at the primary state root. Subscribe before reading confirmed same-work commits and cancel/dispose the losing journal wait."
+    },
+    {
+      "id": "REAL-HOST-FIXTURES",
+      "change": "Use awaited view delivery, retained read-only SQLite observation, precise anchors, and an exact second-attempt fallback declaration; remove the obsolete step-0 Manager exception."
+    }
+  ],
+  "remaining": [
+    {
+      "id": "JS-SANDBOX-ESCAPE",
+      "priority": "P1",
+      "impact": "Model JavaScript can obtain the host process through global objects or a normal ls return value; the advertised sandbox capability boundary is not a security boundary.",
+      "introducedByThisReview": false,
+      "action": "Keep the PR in draft. General hostile-JS isolation is explicitly outside this fixed merge package; repair it as a dedicated isolation change with real escape, callback, deadline and memory-containment proofs.",
+      "evidence": "umr-review-sandbox-probe.log"
+    },
+    {
+      "id": "UPSTREAM-CONFLICT",
+      "priority": "P1",
+      "impact": "The PR cannot merge directly into the newly advanced upstream master.",
+      "commitsAfterFixedTarget": 75,
+      "conflictedPaths": null,
+      "action": "Keep the agreed fixed candidate. Recompute final PR conflicts against the observed newer base and record them before publication.",
+      "previousTrial": {
+        "base": "f7d112dad75007f9ec2af754b95a8c264c359287",
+        "conflictedPaths": 56
+      }
+    },
+    {
+      "id": "FULL-RELEASE",
+      "priority": "P1",
+      "impact": "Static check and targeted regression do not prove complete release or GitHub CI acceptance.",
+      "action": "Keep complete release acceptance false until every required phase has authoritative passing evidence."
+    },
+    {
+      "id": "GAP-123/133/149/153/158/160",
+      "priority": "P2",
+      "impact": "24 existing TODO proofs in the targeted set remain, including restart normalization, late fork events, independent locality compilation, real Fission convergence, session shutdown and archive boundaries.",
+      "action": "Retain TODOs and current partial evidence; do not use WXS_ACCEPT_TODO to claim formal acceptance."
+    },
+    {
+      "id": "V02",
+      "priority": "P2",
+      "impact": "The fixed upstream's unified delegation protocol is incomplete; existing working Host entries remain and unwired SDK members are hidden.",
+      "action": "Assess the newer upstream implementation in the next integration batch."
+    },
+    {
+      "id": "PLAN-DOC",
+      "priority": "P2",
+      "impact": "WHAT[work-029] still contains old file/edit/rewrite path wording alongside the new cat/write(PLAN_PATH) contract.",
+      "action": "Remove obsolete wording when reconciling the next contract revision; the tested P-only runtime boundary remains."
+    },
+    {
+      "id": "TRACE-INT32",
+      "priority": "P3",
+      "impact": "The convenience numeric cursor truncates above Int32; the exact durable string cursor and cold material read remain available.",
+      "action": "Use the exact string cursor until the convenience interface is corrected."
+    },
+    {
+      "id": "SHARD-EDGES",
+      "priority": "P2",
+      "impact": "The report-only shard audit has four high and 270 low findings; full Fable compilation succeeds but independent owner compilation is not yet proved.",
+      "action": "Resolve with the existing GAP-153 locality work; the report-only policy was not changed."
+    }
+  ],
+  "pr": null,
+  "fullReleaseAccepted": false,
+  "deployment": {
+    "performed": false,
+    "originalWorktreeChanged": false,
+    "originalWorktree": "/Users/yuanxi/Workwork/vibe-fs",
+    "originalCommit": "8db33b3429a70d5cdbea30e393363666b3649573"
+  },
+  "mergeCommit": "f2f30d3fa7fd1fc84685b9c32cb4128f5999a4b3",
+  "submoduleCommit": "a12ff4a99d401d9a8e8d9c57cb9a0eb1173a7d1b",
+  "candidate": {
+    "generation": 88,
+    "compilerInputDigest": "1014511c090d14b71548f0134e62cff179e86540cd6d4c4058280d36a6ca3597",
+    "generatedInputDigest": "b1215734c2246916d21eb4074471444133ae742091b9b9cf5e7d76ac178d6e94",
+    "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
+  },
+  "formalAcceptance": false,
+  "fullUnitCandidate": {
+    "generation": 75,
+    "compilerInputDigest": "2a7dab57ba2a1d4b7ce75fd6dec1d842be2fc91e8192c4a059d72aba219c0c28",
+    "generatedInputDigest": "2ca568febaf7a88aff7ab281af40997335cd906168c8e46f03e63e353e271b4b",
+    "artifactsInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
+  }
+}

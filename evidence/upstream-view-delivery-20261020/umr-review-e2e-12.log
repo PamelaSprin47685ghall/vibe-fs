@@ -1,0 +1,89 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.586209
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 6.182542
+  ...
+# Subtest: WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+ok 3 - WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+  ---
+  duration_ms: 1.431875
+  ...
+# Subtest: WHAT[verification-system-014] interrupted join accepts its leading anchor but rejects quoted history and internal status
+ok 4 - WHAT[verification-system-014] interrupted join accepts its leading anchor but rejects quoted history and internal status
+  ---
+  duration_ms: 0.371834
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:14746) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea5365cb2ffep27KOXTgvANI7i
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[read-probe] session=ses_ea53645dbffeXYYpRrtaoNLRul call=call_16 part=prt_15ac9bc15001ZnLNTA5WygSc5c timeline=[{"dtMs":0,"seq":506,"status":"pending","error":null,"interrupted":null},{"dtMs":0,"seq":508,"status":"running","error":null,"interrupted":null},{"dtMs":33,"seq":529,"status":"completed","error":null,"interrupted":null}] nativeTerminals=[{"seq":435,"sessionID":"ses_ea53645dbffeXYYpRrtaoNLRul","tool":"todowrite-for-engineer","callID":"call_14","status":"completed","error":null,"interrupted":null},{"seq":529,"sessionID":"ses_ea53645dbffeXYYpRrtaoNLRul","tool":"todowrite-for-engineer","callID":"call_16","status":"completed","error":null,"interrupted":null},{"seq":567,"sessionID":"ses_ea53645dbffeXYYpRrtaoNLRul","tool":"todowrite-for-engineer","callID":"call_18","status":"completed","error":null,"interrupted":null},{"seq":956,"sessionID":"ses_ea5363c4effek3ewm5TRX3607c","tool":"todowrite-for-engineer","callID":"call_30","status":"completed","error":null,"interrupted":null},{"seq":982,"sessionID":"ses_ea5363c4effek3ewm5TRX3607c","tool":"todowrite-for-engineer","callID":"call_32","status":"completed","error":null,"interrupted":null}]
+[manager-surface] ok tools=assume,deliver,fork,horizon,join,resume,review,skill,todowrite-for-manager,wanxiang_fixture_search requests=32
+[flow-profile] long-stroke: 45 steps in 7.6s; slowest: waitFact,timeoutMs 1.7s, waitFact,timeoutMs 1.2s, wait=manager-loop.0 0.6s
+[event-ceiling] long-stroke: journal=231/699 sse=1371/3351 (heartbeats excluded)
+Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, audit-low-score→Continue→IncumbencyOpened→Accepted, gitConflictProof→ConflictDetected→RebasedCandidate→Published (no restart).
+# Subtest: WHAT[verification-system-014] Long Stroke 真实物理验收环境
+ok 5 - WHAT[verification-system-014] Long Stroke 真实物理验收环境
+  ---
+  duration_ms: 14253.847417
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 14264.766709

@@ -54,7 +54,7 @@ export const BOUNDARY_KINDS = [
  * scenario was inert. `resolveEntry` has already chosen the declaration; asking again
  * with a weaker comparison could only disagree with it.
  */
-export function boundaryFor(boundaries, entry) {
+export function boundaryFor(boundaries, entry, attempt = 1) {
   if (entry === null || entry === undefined) return null;
 
   const matches = (boundaries ?? []).filter((boundary) => boundary.entryId === entry.id);
@@ -65,7 +65,8 @@ export function boundaryFor(boundaries, entry) {
       `two cold boundaries declared for the same step '${entry.id}': ${matches.map((b) => b.kind).join(', ')}`,
     );
   }
-  return matches[0];
+  const boundary = matches[0];
+  return boundary.attempt === undefined || boundary.attempt === attempt ? boundary : null;
 }
 
 // ── the seal decision ───────────────────────────────────────────────────────
@@ -143,7 +144,8 @@ const GUIDANCE_MARKER = '\0\uFEFF';
 
 const withoutGuidanceValue = (value) => {
   if (typeof value !== 'string') return value;
-  const markerAt = value.indexOf(GUIDANCE_MARKER);
+  const anchor = /^\[ANCHOR: (?:0|[1-9]\d*)\]\u0000\uFEFF/u.exec(value);
+  const markerAt = value.indexOf(GUIDANCE_MARKER, anchor?.[0].length ?? 0);
   return markerAt < 0 ? value : value.slice(0, markerAt);
 };
 
@@ -339,6 +341,9 @@ export function validateBoundary(boundary) {
   }
   if (!Number.isInteger(boundary.step) || boundary.step < 0) {
     problems.push('cold boundary step must be a non-negative integer');
+  }
+  if (boundary.attempt !== undefined && (!Number.isInteger(boundary.attempt) || boundary.attempt < 1)) {
+    problems.push('cold boundary attempt must be a positive integer');
   }
 
   return problems;

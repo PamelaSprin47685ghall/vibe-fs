@@ -1,0 +1,96 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.481292
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 5.732625
+  ...
+# Subtest: WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+ok 3 - WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+  ---
+  duration_ms: 1.515
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:1529) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea55da02bffehcEV3r4FdN3s1c
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+WATCHDOG: 'long-stroke' silent for 5002ms (limit 5000ms); 10 blocking progress update(s), last progress: expectation:orch.3 lane=long-stroke/orchestrator/orch/turn-undefined expectation=orch.3
+WATCHDOG: background progress 4968ms ago: journal-append-while-awaiting:ManagerJobCreated lane=fact:ManagerJobCreated (8 background update(s), none of them renewals)
+Current waits unavailable: snapshot missing: /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/oc-e2e-0jsiIL/workspace/.wanxiangshu/diagnostics/causal-waits.json
+
+── watchdog event tail ──
+#303 18:45:58.115 session.status session=ses_ea55d8f1
+#304 18:45:58.126 message.part.updated session=ses_ea55d8f1
+#305 18:45:58.126 sync
+#306 18:45:58.126 message.part.updated session=ses_ea55d8f1
+#307 18:45:58.126 sync
+#308 18:45:58.126 message.part.delta session=ses_ea55d8f1 msg=msg_15aa272c
+#309 18:45:58.126 message.part.updated session=ses_ea55d8f1
+#310 18:45:58.126 sync
+#311 18:45:58.126 message.part.updated session=ses_ea55d8f1 finish=stop
+#312 18:45:58.126 sync
+#313 18:45:58.126 message.updated session=ses_ea55d8f1 finish=stop
+#314 18:45:58.126 sync
+#315 18:45:58.126 message.updated session=ses_ea55d8f1 finish=stop
+#316 18:45:58.126 sync
+#317 18:45:58.126 session.status session=ses_ea55d8f1
+#318 18:45:58.126 session.status session=ses_ea55d8f1
+#319 18:45:58.126 session.idle session=ses_ea55d8f1
+#320 18:45:58.143 session.updated session=ses_ea55d8f1
+#321 18:45:58.143 sync
+#322 18:45:58.143 session.diff session=ses_ea55d8f1
+── watchdog Host stdout tail ──
+Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.
+opencode server listening on http://127.0.0.1:4096
+
+── watchdog Host stderr tail ──
+{"operation":"session-attempt-interrupt","session_id":"ses_ea55da02bffehcEV3r4FdN3s1c"}
+[commission-diagnostic] Process end: Unconfirmed; stop: undefined; output: not delivered; fault: "Process output was discarded"
+
+── watchdog Journal fact tail ──
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:0:PairProgrammingGuidelineAnchored
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:1:PairProgrammingGuidelineAnchored
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:2:PairProgrammingGuidelineAnchored
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:3:XTracePartAppended
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:4:XTracePartAppended
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:5:XTracePartAppended
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:6:PluginPromptPhysicalAccepted
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:7:XTracePartAppended
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:8:SuccessRecorded
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:9:PluginPromptSubmitted
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:10:AuthorityRootAccepted
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:11:WorkOpened
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:12:IncumbencyOpened
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:13:Reviewed
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:14:ConfirmationCommitted
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:15:IncumbencyRetired
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:16:IncumbencyOpened
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:17:Reviewed
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:18:ConfirmationCommitted
+944489d8450f26830fcdbbc6eb05ae2a6c498aab1f587d54841eee3852606580:19:IncumbencyRetired
+── watchdog blocked expectations ──
+  blocking manager-loop.0 manager-loop.0@manager/chat/step-0
+  blocking manager-loop.1 manager-loop.1@manager/chat/step-1
+  blocking manager-loop.2 manager-loop.2@manager/chat/step-2
+  blocking manager-interrupt.0 manager-interrupt.0@manager/chat/step-0
+  blocking engineer.0 engineer.0@engineer/chat/step-0
+  blocking engineer.1 engineer.1@engineer/chat/step-1
+  blocking engineer.2 engineer.2@engineer/chat/step-2
+  blocking engineer.3 engineer.3@engineer/chat/step-3

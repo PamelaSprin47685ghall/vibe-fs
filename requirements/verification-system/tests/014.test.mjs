@@ -41,6 +41,8 @@ import {
   CUSTOMS,
   HUMANROOT_MANAGER_LOOP_CANARY_PROMPT,
   assertHumanRootManagerLoop,
+  assertManagerLoopAuthorityPreserved,
+  assertInterruptedJoin,
 } from './e2e/support/long-stroke-oracles.mjs'
 import { WAIT_FACT_WINDOW_MS } from './e2e/support/time-budget.js'
 import {
@@ -70,6 +72,9 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   const result = compileScenario(source, { name: 'long-stroke.toml' })
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'))
   const byId = new Map(result.scenario.entries.map((entry) => [entry.id, entry]))
+  assert.deepEqual(byId.get('orch.0')?.tools, ['commission', 'join', 'todowrite-for-orchestrator'])
+  assert.equal(byId.get('orch.2')?.respond?.tool, 'todowrite-for-orchestrator')
+  assert.match(byId.get('orch.2')?.respond?.args?.program ?? '', /this\.deliver\(/)
   const ordinary = byId.get('manager-loop.2')
   assert.deepEqual({ optional: ordinary?.optional, lane: ordinary?.lane, step: ordinary?.step },
     { optional: false, lane: 'manager', step: 2 })
@@ -119,6 +124,37 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-join-guard.')))
   assert.deepEqual({ journal: result.scenario.setup.maxJournalEvents, sse: result.scenario.setup.maxSseEvents },
     { journal: 699, sse: 3351 }, 'the measured scenario ceilings stay fixed during migration')
+})
+
+test('WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes', () => {
+  const request = (texts) => ({
+    sessionID: 'manager-anchor-proof',
+    tools: [{ function: { name: 'review' } }],
+    messages: texts.map(content => ({ role: 'user', content })),
+  })
+  const root = '[ANCHOR: 1]\0\uFEFFOriginal authority\0\uFEFF<system>guidance</system>'
+  const next = '[ANCHOR: 2]\0\uFEFF# You are the 2 Manager taking over this mission.'
+  const requests = [request([root]), request([root, next])]
+  const assertPreserved = () => assertManagerLoopAuthorityPreserved({ provider: { requests } }, 'manager-anchor-proof')
+  assert.doesNotThrow(assertPreserved)
+  requests[1].messages[0].content = root.replace('Original', 'Rewritten')
+  assert.throws(assertPreserved, /preserve the typed authority user prefix/)
+  requests[1].messages[0].content = root
+  requests[1].tools = []
+  assert.throws(assertPreserved, /same normalized system\/tools plan/)
+})
+
+test('WHAT[verification-system-014] interrupted join accepts its leading anchor but rejects quoted history and internal status', () => {
+  const scenario = (text) => ({ provider: { requests: [{ messages: [
+    { role: 'assistant', tool_calls: [{ id: 'join-call', function: { name: 'join' } }] },
+    { role: 'tool', tool_call_id: 'join-call', content: text },
+  ] }] } })
+  const consequence = '# Something nearer has arrived.\n'
+  assert.doesNotThrow(() => assertInterruptedJoin(scenario(consequence)))
+  assert.doesNotThrow(() => assertInterruptedJoin(scenario('[ANCHOR: 12]\0\uFEFF' + consequence)))
+  assert.throws(() => assertInterruptedJoin(scenario('[ANCHOR: 12]\0\uFEFF# Returned history:\n' + consequence)), /public nearer-arrival/)
+  assert.throws(() => assertInterruptedJoin(scenario('[ANCHOR: -1]\0\uFEFF' + consequence)), /public nearer-arrival/)
+  assert.throws(() => assertInterruptedJoin(scenario('[ANCHOR: 12]\0\uFEFF' + consequence + 'status = \"user_message\"')), /must not leak/)
 })
 
 const preFlowCanaries = async (scenario) => {

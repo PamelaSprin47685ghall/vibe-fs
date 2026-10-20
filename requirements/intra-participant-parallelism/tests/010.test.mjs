@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import test from 'node:test'
 import { acceptAuthorityRoot, openIncumbency, withRestartablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { factPayloads, journalFactTail, readJournal } from '../../verification-system/tests/e2e/support/journal-observer.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import * as events from '../../../dist/OpenCode/Host/EventsSurface.js'
+import * as jsRuntime from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
-test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned open Fission groups with FissionFailed so a resumed owner turn completes and delivers to join instead of being swallowed as replaced', async () => {
-  await withRestartablePlugin(async (start, _directory, { stop, withRuntime, createdIds, messages, pushHostMessage }) => {
+test('WHAT[intra-participant-parallelism-010] restart closes the interrupted Fission group and explicit resume continues the original work through delivery and join', async () => {
+  const hostObservers = new Set()
+  const emit = async (hooks, event) => {
+    for (const observe of hostObservers) observe(event)
+    await hooks.event(event)
+  }
+  await withRestartablePlugin(async (start, directory, { stop, withRuntime, client, createdIds, messages, prompts, pushHostMessage }) => {
     const hooks1 = await start()
     const managerSession = 'ses-fission-restart-manager'
     await withRuntime(async (runtime) => {
@@ -25,28 +35,52 @@ test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned op
     )
     assert.match(fissioned, /status\s*=\s*"fissioned"/i)
 
-    // Stop incarnation 1 and boot incarnation 2: load-phase recovery settles
-    // orphaned child runs and orphaned open Fission groups.
+    const originalAuthority = await withRuntime(async runtime =>
+      journalSurface.JournalSurface_snapshot(runtime.journal).sessionProjections[engineerSession].promptAuthority.activeLogicalRun,
+    )
     await stop(hooks1)
+    const sentBeforeRestart = prompts.length
     const hooks2 = await start()
     await hooks2['chat.message'](
       { sessionID: 'restart-observer', messageID: 'restart-observer-user', agent: 'manager' },
       { message: { id: 'restart-observer-user', role: 'user' }, parts: [{ type: 'text', text: 'observe the restarted Host' }] },
     )
-    await withRuntime(async runtime => {
-      const deadline = Date.now() + 4000
-      while (journalSurface.JournalSurface_snapshot(runtime.journal).sessionProjections[engineerSession]?.promptAuthority?.activeLogicalRun) {
-        assert.ok(Date.now() < deadline, 'Host activation must durably settle the interrupted child before resume')
-        await new Promise(resolve => setImmediate(resolve))
-      }
-    })
+    const deadline = Date.now() + 4000
+    while (readJournal(directory, 'FissionFailed').named === 0) {
+      assert.ok(Date.now() < deadline, 'Host activation must close the interrupted Fission group')
+      await new Promise(resolve => setImmediate(resolve))
+    }
+    assert.equal(prompts.length, sentBeforeRestart, 'restart must not replay a prompt')
+    const retainedAuthority = await withRuntime(async runtime =>
+      journalSurface.JournalSurface_snapshot(runtime.journal).sessionProjections[engineerSession].promptAuthority.activeLogicalRun,
+    )
+    assert.deepEqual(retainedAuthority, originalAuthority)
 
-    // Now Manager resumes the same child handle after restart.
+    const continuationAccepted = Promise.withResolvers()
+    const sendPrompt = client.session.promptAsync
+    client.session.promptAsync = async args => {
+      try {
+        return await sendPrompt(args)
+      } finally {
+        continuationAccepted.resolve()
+      }
+    }
+
     const resumed = await hooks2.tool.resume.execute(
-      { name: 'ruling-materials', charge: 're-commissioned after restart: collect materials' },
+      { name: 'ruling-materials', charge: 'continue the existing materials collection after restart' },
       { sessionID: managerSession, agent: 'manager' },
     )
-    assert.match(resumed, /现已接下这项托付|carries this charge now/i)
+    assert.match(resumed, /appended to the existing work|追加.*现有|追加.*原有/i)
+    await continuationAccepted.promise
+    client.session.promptAsync = sendPrompt
+    const resumedAuthority = await withRuntime(async runtime =>
+      journalSurface.JournalSurface_snapshot(runtime.journal).sessionProjections[engineerSession].promptAuthority.activeLogicalRun,
+    )
+    assert.deepEqual(resumedAuthority, originalAuthority)
+    const terminals = []
+    const terminalSubscription = await withRuntime(async runtime =>
+      events.subscribeFuture(runtime.terminalPort, (sessionId, outcome) => terminals.push({ sessionId, ...outcome })),
+    )
 
     const engineerUserMessages = messages.filter(
       m => m.id?.startsWith(`msg-${engineerSession}-`) && m.role === 'user',
@@ -86,32 +120,60 @@ test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned op
       },
     )
 
+    await emit(hooks2, {
+      event: {
+        type: 'message.updated',
+        properties: { info: assistantMsg.info },
+      },
+    })
+
+    const toolContext = {
+      sessionID: engineerSession,
+      agent: 'engineer',
+      messageID: assistantMsg.info.id,
+      providerRunID: assistantMsg.info.id,
+    }
+    writeFileSync(join(directory, 'resume-material.txt'), 'resume-resource-ok')
+    const executed = await hooks2.tool['todowrite-for-engineer'].execute(
+      { program: 'class Js extends JsProgram { async run() { return await this.cat("resume-material.txt") } }' },
+      { ...toolContext, callID: 'read-after-restart' },
+    )
+    assert.match(executed, /^# ok\b/m)
+    assert.match(executed, /resume-resource-ok/)
+
+    assistantMsg.parts = [
+      { id: 'part-pre-delivery-report', type: 'text', text: 'Complete 9-item ruling materials report' },
+      { id: 'part-delivery-call', type: 'tool', callID: 'delivery-after-restart', tool: 'todowrite-for-engineer',
+        state: { status: 'running', input: {} } },
+    ]
     const delivered = await hooks2.tool['todowrite-for-engineer'].execute(
-      { program: "class Js extends JsProgram { async run() { await this.deliver('Complete 9-item ruling materials report') } }" },
-      { sessionID: engineerSession, agent: 'engineer' },
+      { program: 'class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: { 0: "Complete 9-item ruling materials report" } }) } }' },
+      { ...toolContext, callID: 'delivery-after-restart' },
     )
     assert.match(delivered, /^# ok\b/m)
+    assert.equal(readJournal(directory, 'TaskDeliveryCommitted').named, 1)
+    const [delivery] = factPayloads(directory, 'TaskDeliveryCommitted')
+    assert.match(delivery.View, /Complete 9-item ruling materials report/)
+    assert.equal(delivery.FormalText, 'Complete 9-item ruling materials report')
 
-    assistantMsg.info.finish = 'stop'
+    assistantMsg.info.finish = 'tool-calls'
     assistantMsg.info.time.completed = 11
-    assistantMsg.parts = [{ id: 'part-final-report', type: 'text', text: 'Complete 9-item ruling materials report' }]
+    const promptsBeforeStop = prompts.length
+    const finalMessage = {
+      info: { ...assistantMsg.info, id: 'later-provider-stop', finish: 'stop', time: { created: 12, completed: 13 } },
+      parts: [{ id: 'part-final-report', type: 'text', text: 'LATE_FINAL_TEXT_NOT_THE_DELIVERED_VIEW' }],
+    }
+    pushHostMessage(engineerSession, finalMessage)
 
-    await hooks2.event({
+    await emit(hooks2, {
       event: {
         type: 'message.updated',
         properties: {
-          info: {
-            id: assistantMsg.info.id,
-            sessionID: engineerSession,
-            parentID: latestPhysicalId,
-            role: 'assistant',
-            finish: 'stop',
-            time: { created: 10, completed: 11 },
-          },
+          info: finalMessage.info,
         },
       },
     })
-    await hooks2.event({
+    await emit(hooks2, {
       event: {
         type: 'session.status',
         properties: {
@@ -121,12 +183,31 @@ test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned op
       },
     })
 
+    let joinTimer
     const joined = await Promise.race([
       hooks2.tool.join.execute({}, { sessionID: managerSession, agent: 'manager' }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('join hung waiting for resumed fission owner')), 4000)),
-    ])
+      new Promise((_, reject) => {
+        joinTimer = setTimeout(() => reject(new Error(
+          'join hung waiting for resumed fission owner: ' + journalFactTail(directory, 12).join('\n'),
+        )), 4000)
+      }),
+    ]).finally(() => {
+      clearTimeout(joinTimer)
+      events.dispose(terminalSubscription)
+    })
     assert.match(joined, /Complete 9-item ruling materials report/)
-  })
+    assert.doesNotMatch(joined, /LATE_FINAL_TEXT_NOT_THE_DELIVERED_VIEW/)
+    assert.ok(jsRuntime.deliveredReturned(engineerSession).some(key => key.startsWith('prose:')))
+    assert.ok(jsRuntime.deliveredReturned(engineerSession).every(key => !key.includes('LATE_FINAL_TEXT')))
+    assert.equal(terminals.filter(outcome =>
+      outcome.sessionId === engineerSession && outcome.kind === 'Completed',
+    ).length, 1)
+    await stop(hooks2)
+    assert.equal(prompts.length, promptsBeforeStop, 'a later provider step must not revive the delivered exchange')
+  }, { events: { listen(observe) {
+    hostObservers.add(observe)
+    return () => hostObservers.delete(observe)
+  } } })
 })
 
 test.todo('WHAT[intra-participant-parallelism-010] actual durable Fission facts reconstruct group membership and replacement after restart, recording interruption without automatically restarting lanes or guessing similar Host sessions (GAP-158)')

@@ -649,12 +649,10 @@ module PluginHooks =
                                 toolName = "deliver"
                                 || toolName.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
 
+                            let context = ToolHostCodec.decodeContext toolInput
+
                             let replayFence =
-                                ToolHostCodec.decodeContext toolInput
-                                |> fun ctx ->
-                                    match ctx.ProviderRunId, ctx.ToolCallId with
-                                    | Some run, Some call -> Some(run, call)
-                                    | _ -> None
+                                Option.map2 (fun run call -> run, call) context.ProviderRunId context.ToolCallId
 
                             isReplayExemptTool
                             && replayFence = registration.Runtime.WaitingQuestionFenceFor sessionId

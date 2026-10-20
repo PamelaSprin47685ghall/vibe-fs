@@ -19,4 +19,4 @@ type OrchestratorSweepPort =
       RecoveryView: SessionId -> OrchestratorRecoveryView }
 
 type OrchestratorRelayPort =
-    { AwaitChangeFrom: JournalRevision -> Task<unit> }
+    { AwaitChangeFrom: JournalRevision -> System.Threading.CancellationToken -> Task<unit> }

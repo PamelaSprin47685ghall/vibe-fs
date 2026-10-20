@@ -6,6 +6,8 @@ import os from 'node:os';
 import {
   createJournalObserver,
   countFactCase,
+  releaseSharedObserver,
+  workJournalEvents,
 } from './e2e/support/journal-observer.js';
 
 async function withTempRepo(fn) {
@@ -21,6 +23,35 @@ async function withTempRepo(fn) {
     } catch {}
   }
 }
+
+test('WHAT[verification-system-015] the work observer keeps WAL open across Host connections and releases it at teardown', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { SqliteJournal } = await import('wanxiangli/eventstore');
+  await withTempRepo(async ({ dir, stateRoot }) => {
+    const filename = path.join(stateRoot, 'wanxiangshu', 'work.sqlite');
+    assert.deepEqual(workJournalEvents(dir), []);
+    const append = (revision, type) => {
+      const journal = new SqliteJournal(new DatabaseSync(filename));
+      try {
+        assert.equal(journal.append('manager', revision, type, JSON.stringify({ events: [{ type }] })).status, 'Committed');
+        assert.equal(workJournalEvents(dir).length, revision + 1);
+      } finally {
+        journal.close();
+      }
+    };
+    try {
+      append(0, 'WorkOpened');
+      assert.equal(fs.existsSync(`${filename}-wal`), true, 'observation must not close the last WAL connection between Host operations');
+      append(1, 'Reviewed');
+      assert.deepEqual(workJournalEvents(dir, { sessionId: 'manager' }).map(event => event.type), ['WorkOpened', 'Reviewed']);
+      assert.deepEqual(workJournalEvents(dir, { sessionId: 'other' }), []);
+    } finally {
+      await releaseSharedObserver(dir);
+    }
+    new SqliteJournal(new DatabaseSync(filename)).close();
+    assert.equal(fs.existsSync(`${filename}-wal`), false, 'teardown must release the observer connection');
+  });
+});
 
 test('WHAT[verification-system-015] E1: prose decoy does not register as domain fact case', async () => {
   await withTempRepo(async ({ eventsDir }) => {

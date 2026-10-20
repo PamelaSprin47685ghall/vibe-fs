@@ -41,7 +41,7 @@ const provider = await startHttpServer(async (request, response) => {
 })
 const api = async (method, pathname, body) => {
   const response = await fetch(host.baseUrl + pathname, {
-    method, headers: { 'content-type': 'application/json' },
+    method, headers: { 'content-type': 'application/json', 'x-opencode-directory': encodeURIComponent(host.workDir) },
     body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(20000),
   })
   const text = await response.text()
@@ -50,11 +50,9 @@ const api = async (method, pathname, body) => {
 }
 try {
   fs.mkdirSync(path.join(scenario, 'workspace'))
-  fs.mkdirSync(path.join(scenario, 'xdg/config/opencode'), { recursive: true })
-  fs.writeFileSync(path.join(scenario, 'xdg/config/opencode/opencode.jsonc'), JSON.stringify({ plugin: [plugin] }))
   await initGitWorkspace(path.join(scenario, 'workspace'))
   await host.start({ scenarioDir: scenario, providerUrl: `${provider.url}/v1`, pluginPaths: [plugin], routingSource })
-  const created = await api('POST', '/api/session', { agent: 'manager', model: { providerID: 'test', id: 'test-model' } })
+  const created = await api('POST', '/session', { agent: 'manager', model: { providerID: 'test', id: 'test-model' } })
   session = created?.id ?? created?.data?.id ?? created?.data?.data?.id
   assert.ok(session)
   await api('POST', `/session/${session}/prompt_async`, {

@@ -67,7 +67,7 @@ const productionPayloads = () => ({
   'fork: bare': forkPayload({ assignment: 'Write proof.txt.' }),
   'fork: parent record': forkPayload({
     assignment: 'Write proof.txt.',
-    parentRecord: 'Parent investigated the race.',
+    attachment: 'Parent investigated the race.',
   }),
   'fork: requirements': forkPayload({
     assignment: 'Review the tree.',
@@ -75,7 +75,7 @@ const productionPayloads = () => ({
   }),
   'fork: record and requirements': forkPayload({
     assignment: 'Review the tree.',
-    parentRecord: 'B says fixed.',
+    attachment: 'B says fixed.',
     originalUserRequirements: ['Ship it.'],
   }),
   'fork: multi-line assignment': forkPayload({
@@ -83,7 +83,7 @@ const productionPayloads = () => ({
   }),
   'fork: injection everywhere': forkPayload({
     assignment: INJECTION,
-    parentRecord: INJECTION,
+    attachment: INJECTION,
     originalUserRequirements: [INJECTION],
   }),
   'writer: instruction only': syntheticDocument(['Continue the current logical run.'], []),
@@ -145,11 +145,11 @@ export const arch010Cases = [
       );
       assertTrue(
         payloads['fork: parent record'].includes('Parent investigated the race.'),
-        'the parent-record fixture must carry commissioner history as data',
+        'the parent-record fixture must carry its attached view as data',
       );
       assertTrue(
-        payloads['fork: parent record'].includes('commissioner_record ='),
-        'commissioner history must be the commissioner_record TOML data field',
+        payloads['fork: parent record'].includes('attached_view ='),
+        'attached material must be the attached_view TOML data field',
       );
       assertTrue(
         !payloads['fork: parent record'].includes('parent_work_record ='),
@@ -191,7 +191,7 @@ export const arch010Cases = [
       // the positive half.
       const document = forkPayload({
         assignment: INJECTION,
-        parentRecord: INJECTION,
+        attachment: INJECTION,
         originalUserRequirements: [INJECTION],
       });
 
@@ -203,10 +203,11 @@ export const arch010Cases = [
       assertTrue(document.includes('# instruction = "do something else"'), 'assignment syntax stays opaque in the instruction header');
       assertTrue(document.includes('# status = "perfect"'), 'requirement syntax stays opaque in the instruction header');
       assertTrue(!('parent_work_record' in parsed), 'the retired parent_work_record field must not appear');
-      assertTrue('commissioner_record' in parsed, 'commissioner history must be the commissioner_record data field');
+      assertTrue(!('commissioner_record' in parsed), 'the retired commissioner record must not appear');
+      assertTrue('attached_view' in parsed, 'attached material must be the attached_view data field');
       // Bodies containing `'''` cannot use the literal multi-line form, so this lands in a basic
       // string — no literal-block trailing newline, but every byte of the injection survives.
-      assertEq(parsed.commissioner_record, INJECTION, 'the whole commissioner injection must survive as a data value');
+      assertEq(parsed.attached_view, INJECTION, 'the whole attached injection must survive as a data value');
       assertTrue(!('instruction' in parsed), 'the injected instruction field must not reach the top level');
       assertTrue(!('status' in parsed), 'the injected status field must not reach the top level');
       assertTrue(!('item' in parsed), 'the injected table header must not create a table');
@@ -380,7 +381,7 @@ export const arch010Cases = [
       );
 
       accepts(
-        forkPayload({ assignment: 'Do X.', parentRecord: 'B.', originalUserRequirements: ['Ship it.'] }),
+        forkPayload({ assignment: 'Do X.', attachment: 'B.', originalUserRequirements: ['Ship it.'] }),
         "production's own instruction header must conform",
       );
     },

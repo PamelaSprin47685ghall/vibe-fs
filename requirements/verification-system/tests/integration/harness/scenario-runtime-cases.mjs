@@ -77,6 +77,35 @@ attempts = [1, 2]
 `;
 
 export const scenarioRuntimeCases = [
+  {
+    name: 'ARCH-004 a fallback boundary owns one exact delivery and cannot consume rejected attempts',
+    fn: () => {
+      const source = `${TWO_STEPS}
+[[epoch]]
+turn = "mgr"
+step = 0
+reason = "fallback-side"
+attempt = 2
+`;
+      const runtime = runtimeOf(source);
+      const first = request([user('Ship the parser fix.')]);
+      assertEq(deliver(runtime, first).attempt, 1);
+      assertEq(runtime.unfiredBoundaries().length, 1);
+      assertEq(runtime.select(first, contextOf(SESSION)).sealBroken.reason, 'boundary-not-reached');
+      const changed = request([user('Changed authority')], { model: 'test-model-b' });
+      assertTrue(runtime.select(changed, contextOf(SESSION)).unmatched !== undefined);
+      const second = { ...first, model: 'test-model-b' };
+      const accepted = deliver(runtime, second);
+      assertEq(accepted.attempt, 2);
+      assertEq(accepted.resealed, 'fallback-side');
+      assertEq(runtime.unfiredBoundaries().length, 0);
+      assertEq(runtime.select({ ...first, model: 'test-model-c' }, contextOf(SESSION)).sealBroken.reason, 'undeclared');
+      assertEq(deliver(runtime, second).attempt, 3);
+      for (const invalid of ['0', '-1', '"2"']) {
+        assertEq(compileScenario(source.replace('attempt = 2', `attempt = ${invalid}`)).ok, false);
+      }
+    },
+  },
   // ── content is a pure function of the request ──────────────────────────────
 
   {

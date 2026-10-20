@@ -21,6 +21,7 @@ module DurableWorkHost =
     val useWork: gitCommonDir: string -> workId: string -> body: (obj -> 'a) -> 'a
     val useEphemeralWork: workId: string -> records: string array -> body: (obj -> 'a) -> 'a
     val execute: gitCommonDir: string -> workId: string -> requestId: string -> command: obj -> HostReceipt
+    val subscribeChanges: stateRoot: string -> workId: string -> onChange: (unit -> unit) -> System.IDisposable
     val inspect: gitCommonDir: string -> workId: string -> obj
 
     type HostRunFence =

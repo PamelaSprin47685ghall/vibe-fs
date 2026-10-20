@@ -78,10 +78,10 @@ const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
-const CLOSED = {
-  family: 'Companion',
-  case: 'TerminalOutputCaptured',
-  payload: { SessionId: 'ses_es_boot', TextRef: 'blob-boot', TextDigest: 'sha-boot', ProviderRun: 'run-boot' },
+const REANCHORED = {
+  family: 'Context',
+  case: 'ContextReanchored',
+  payload: { SessionId: 'ses_es_boot', PreviousEpochId: '0', NextEpochId: '1', ObservedCompactionRun: 'run-reanchor' },
 }
 const mustOk = (result, label) => {
   assert.equal(result.ok, true, `${label}: ${JSON.stringify(result.error)}`)
@@ -101,7 +101,7 @@ test('WHAT[durable-events-013] restart_replays_prior_writer_files_then_fresh_run
 
     assert.equal(Number(first.localSeq), 1)
     const firstAppend = mustOk(
-      await journal.JournalSurface_appendAgent(first.journal, { kind: 'Session', session: 'ses_es_boot' }, null, CLOSED),
+      await journal.JournalSurface_appendAgent(first.journal, { kind: 'Session', session: 'ses_es_boot' }, null, REANCHORED),
       'first append',
     )
     assert.ok(journal.JournalSurface_hasSession(first.journal, 'ses_es_boot'))
@@ -190,7 +190,8 @@ const withJournal = async (writerId, fn) => {
 }
 const appendFact = (handle, session) =>
   journal.JournalSurface_appendAgent(handle, { kind: 'Session', session }, null, {
-    family: 'Companion', case: 'CompanionBloggerClosed', payload: { SessionId: session },
+    family: 'Context', case: 'ContextReanchored',
+    payload: { SessionId: session, PreviousEpochId: '0', NextEpochId: '1', ObservedCompactionRun: `run-${session}` },
   })
 const revisionOf = (handle) => Number(revisions.revision(handle))
 

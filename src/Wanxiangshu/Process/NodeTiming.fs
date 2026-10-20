@@ -24,6 +24,9 @@ module NodeTiming =
         // reaches Time.raceExit as a single array argument.
         unbox<Task<bool>> (call "raceExit" (box [| box exitTask; box milliseconds |]))
 
+    let raceExitKeepingAlive (exitTask: Task) (milliseconds: int) : Task<bool> =
+        unbox<Task<bool>> (call "raceExitKeepingAlive" (box [| box exitTask; box milliseconds |]))
+
     let nodeTimerPort () : ITimerPort =
         let port = call "nodeTimerPort" (box [||])
 

@@ -550,6 +550,7 @@ module ProcessSurface =
     /// manages its own process lifecycle uses this to construct the handle it
     /// returns to runWithHostLauncher.
     let childCreate (onKill: obj) : obj =
+        // DSL-MUTABLE: resource — retain the externally observed process end.
         let ending = ref EndEvidence.Unconfirmed
         // DSL-MUTABLE: cancellation — child process exit flag.
         let exited = ref false

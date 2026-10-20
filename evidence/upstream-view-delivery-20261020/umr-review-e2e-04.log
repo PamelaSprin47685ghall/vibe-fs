@@ -1,0 +1,104 @@
+TAP version 13
+# Subtest: WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+ok 1 - WHAT[verification-system-014] the Long Stroke entry satisfies the watchdog-feed guard
+  ---
+  duration_ms: 0.475167
+  ...
+# Subtest: WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+ok 2 - WHAT[verification-system-014] the compiled Long Stroke scenario preserves its Manager and consecutive-failure cases
+  ---
+  duration_ms: 6.257791
+  ...
+# Subtest: WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+ok 3 - WHAT[verification-system-014] anchored successor detection still rejects authority or tool-plan changes
+  ---
+  duration_ms: 1.668292
+  ...
+[setupScenario] ready
+[mock-req] POST /v1/chat/completions
+(node:97259) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea56d12e4ffeG99567WqosZMN4
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-FATAL] first script mismatch: reason=no-declared-turn session=ses_ea56d12e4ffeG99567WqosZMN4 parent=- model="test-model" tools=["assume","deliver","fork","horizon","join","resume","review","skill","todowrite-for-manager","wanxiang_fixture_search"] msgs=20 lastUser="[ANCHOR: 5]\u0000﻿# You are the 2 Manager taking over this mission. A predecessor may already have done\n# part of the work, or may already have finished it; investigate the actual workspace before you\n# act on either assumption. The predecessor's work is the object you must assess; the shared workspace is the actual state it left behind: check it directly\n# rather than trusting any inherited claim.\n#\n#" candidates=["manager-join-guard.4@undefined/chat/step-5","manager-current-action.5@undefined/chat/step-5"]
+[MSG-ROLES] system user assistant tool assistant tool assistant tool user assistant assistant tool assistant tool assistant tool assistant tool assistant tool
+[MSG-TOOL-RESULTS] ["[ANCHOR: 7]\u0000﻿# Cannot finish without a review. Call the review tool first: formalize the target state, state the current gap, and submit the findings pairs.\n\nfinished = false\nassessment_required = true\n\u0000﻿# # Wait-cost calibration: this session has existed for about 0 minutes 4 seconds of wall-clock ","[ANCHOR: 8]\u0000﻿# Cannot finish without a review. Call the review tool first: formalize the target state, state the current gap, and submit the findings pairs.\n\nfinished = false\nassessment_required = true\n\u0000﻿# # Wait-cost calibration: this session has existed for about 0 minutes 4 seconds of wall-clock ","[ANCHOR: 9]\u0000﻿# Cannot finish without a review. Call the review tool first: formalize the target state, state the current gap, and submit the findings pairs.\n\nfinished = false\nassessment_required = true\n\u0000﻿# # Wait-cost calibration: this session has existed for about 0 minutes 4 seconds of wall-clock ","[ANCHOR: 10]\u0000﻿# Cannot finish without a review. Call the review tool first: formalize the target state, state the current gap, and submit the findings pairs.\n\nfinished = false\nassessment_required = true\n\u0000﻿# # Wait-cost calibration: this session has existed for about 0 minutes 4 seconds of wall-clock"]
+── fatal script mismatch: no-declared-turn (lane=humanroot-manager|manager kind=chat step=5) ──
+session=ses_ea56d12e4ffeG99567WqosZMN4 lastUser="[ANCHOR: 5]\u0000﻿# You are the 2 Manager taking over this mission. A predecessor may already have done\n# part of the work, or may already have finished it; investigate the actual workspace before you\n# act on either assumption. The predecessor's work is the object you must assess; the shared workspace is the actual state it left behind: check it directly\n# rather than trusting any inherited claim.\n#\n#"
+candidates=["manager-join-guard.4@undefined/chat/step-5","manager-current-action.5@undefined/chat/step-5"]
+── event tail ──
+#246 18:29:05.652 message.part.updated session=ses_ea56d12e
+#247 18:29:05.652 sync
+#248 18:29:05.652 message.part.updated session=ses_ea56d12e
+#249 18:29:05.652 sync
+#250 18:29:05.652 message.part.updated session=ses_ea56d12e
+#251 18:29:05.652 sync
+#252 18:29:05.652 message.part.updated session=ses_ea56d12e
+#253 18:29:05.652 sync
+#254 18:29:05.652 message.part.updated session=ses_ea56d12e finish=tool-calls
+#255 18:29:05.652 sync
+#256 18:29:05.652 message.updated session=ses_ea56d12e finish=tool-calls
+#257 18:29:05.652 sync
+#258 18:29:05.652 message.updated session=ses_ea56d12e finish=tool-calls
+#259 18:29:05.652 sync
+#260 18:29:05.652 session.status session=ses_ea56d12e
+#261 18:29:05.652 message.updated session=ses_ea56d12e
+#262 18:29:05.652 sync
+#263 18:29:05.661 session.updated session=ses_ea56d12e
+#264 18:29:05.661 sync
+#265 18:29:05.661 session.diff session=ses_ea56d12e
+── Host stderr tail ──
+
+── Journal fact tail ──
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:0:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:1:PairProgrammingGuidelineAnchored
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:2:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:3:RuntimeStarted
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:4:PairProgrammingGuidelineAnchored
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:5:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:6:AuthorityRootAccepted
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:7:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:8:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:9:SessionStartedAtBound
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:10:PairProgrammingGuidelineAnchored
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:11:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:12:PairProgrammingGuidelineAnchored
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:13:Accepted
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:14:ProviderStarted
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:15:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:16:PluginPromptPhysicalAccepted
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:17:PairProgrammingGuidelineAnchored
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:18:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:19:Terminal
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:20:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:21:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:22:ProviderStarted
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:23:XTracePartAppended
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:24:WorkOpened
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:25:IncumbencyOpened
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:26:Reviewed
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:27:ConfirmationCommitted
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:28:IncumbencyRetired
+08adb8ac8aa18fe739273f09965e93e0f9a1892dcfff12f1d647f11d333bf25e:29:IncumbencyOpened
+  pending blocking title.0 title.0@title/title/step-0
+  pending blocking orch.0 orch.0@orchestrator/chat/step-0
+  pending blocking orch.1 orch.1@orchestrator/chat/step-1
+  pending blocking orch.2 orch.2@orchestrator/chat/step-2
+  pending blocking orch.3 orch.3@orchestrator/chat/step-3
+  pending blocking manager-loop.0 manager-loop.0@manager/chat/step-0
+  pending blocking manager-loop.1 manager-loop.1@manager/chat/step-1
+  pending blocking manager-loop.2 manager-loop.2@manager/chat/step-2
+  pending blocking manager-interrupt.0 manager-interrupt.0@manager/chat/step-0
+  pending blocking engineer.0 engineer.0@engineer/chat/step-0
+  pending blocking engineer.1 engineer.1@engineer/chat/step-1
+  pending blocking engineer.2 engineer.2@engineer/chat/step-2
+  pending blocking engineer.3 engineer.3@engineer/chat/step-3

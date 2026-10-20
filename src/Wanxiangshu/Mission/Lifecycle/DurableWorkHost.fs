@@ -104,6 +104,15 @@ module DurableWorkHost =
         rejectGitPath path
         path
 
+    let private changes = Event<string * string>()
+
+    let subscribeChanges stateRoot workId onChange =
+        let path = journalPath stateRoot
+
+        changes.Publish.Subscribe(fun (changedPath, changedWork) ->
+            if changedPath = path && changedWork = workId then
+                onChange ())
+
     type HostReceipt =
         { RequestId: string
           Status: string
@@ -218,9 +227,15 @@ module DurableWorkHost =
             opened?close ()
 
     let execute (gitCommonDir: string) (workId: string) (requestId: string) (command: obj) : HostReceipt =
-        useWork gitCommonDir workId (fun work ->
-            let durable = work?execute (requestId, command)
-            observe requestId durable)
+        let receipt =
+            useWork gitCommonDir workId (fun work ->
+                let durable = work?execute (requestId, command)
+                observe requestId durable)
+
+        if receipt.Status = "Committed" then
+            changes.Trigger(journalPath gitCommonDir, workId)
+
+        receipt
 
     let inspect (gitCommonDir: string) (workId: string) : obj =
         useWork gitCommonDir workId (fun work -> work?inspect ())

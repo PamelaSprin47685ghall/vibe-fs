@@ -24,9 +24,9 @@ test('WHAT[durable-events-020] Journal boot creates no writer until the first bu
       assert.equal(Number(booted.localSeq), 1)
       assert.equal(existsSync(writer), false)
       const appended = await journal.JournalSurface_appendAgent(booted.journal, { kind: 'Session', session: 'session-proof' }, null, {
-        family: 'Companion',
-        case: 'TerminalOutputCaptured',
-        payload: { SessionId: 'session-proof', TextRef: 'blob-term', TextDigest: 'sha-term', ProviderRun: 'run-term' },
+        family: 'Context',
+        case: 'ContextReanchored',
+        payload: { SessionId: 'session-proof', PreviousEpochId: '0', NextEpochId: '1', ObservedCompactionRun: 'run-reanchor' },
       })
       assert.equal(appended.ok, true)
       const lines = readFileSync(writer, 'utf8').trimEnd().split('\n').map(JSON.parse)

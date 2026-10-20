@@ -49,7 +49,7 @@ test('WHAT[participant-horizon-011] real cancellation keeps an accepted child an
   })
 })
 
-test('WHAT[participant-horizon-011] a restarted process does not present the previous process abandoned child', async () => {
+test('WHAT[participant-horizon-011] a restarted owner retains the abandoned child until its consequence is consumed', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-horizon-restart-abandoned-'))
   const owner = 'manager-horizon-restart-abandoned'
   const first = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
@@ -66,7 +66,7 @@ test('WHAT[participant-horizon-011] a restarted process does not present the pre
 
   try {
     const horizon = await forkTool.executeHorizon(restarted, owner)
-    assert.doesNotMatch(horizon, /Ada/)
+    assert.match(horizon, /Ada.*did not return/)
   } finally {
     await forkTool.disposeRuntime(restarted)
     rmSync(directory, { recursive: true, force: true })

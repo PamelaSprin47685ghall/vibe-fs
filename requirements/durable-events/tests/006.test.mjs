@@ -320,10 +320,10 @@ const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
-const CLOSED_AGENT = {
-  family: 'Companion',
-  case: 'TerminalOutputCaptured',
-  payload: { SessionId: 'ses_es_writer', TextRef: 'blob-term', TextDigest: 'sha-term', ProviderRun: 'run-term' },
+const REANCHORED = {
+  family: 'Context',
+  case: 'ContextReanchored',
+  payload: { SessionId: 'ses_es_writer', PreviousEpochId: '0', NextEpochId: '1', ObservedCompactionRun: 'run-reanchor' },
 }
 const mustOk = (result, label) => {
   assert.equal(result.ok, true, `${label}: ${JSON.stringify(result.error)}`)
@@ -348,7 +348,7 @@ test('WHAT[durable-events-006] append_adds_one_local_line_and_Current_is_already
         booted.journal,
         { kind: 'Session', session: 'ses_es_writer' },
         null,
-        CLOSED_AGENT,
+        REANCHORED,
       ),
       'append',
     )
