@@ -611,10 +611,8 @@ Process/JsCallLoop.fsi
 Process/JsCallLoop.fs
 Repository/Programming/Js/TransactionStore.fsi
 Repository/Programming/Js/TransactionStore.fs
-Repository/Programming/Js/DeliveredValues.fsi
-Repository/Programming/Js/DeliveredValues.fs
-Repository/Programming/Js/OpenCode/ParkedSites.fsi
-Repository/Programming/Js/OpenCode/ParkedSites.fs
+
+
 Repository/Programming/Js/Anchor/AnchorModel.fsi
 Repository/Programming/Js/Anchor/AnchorModel.fs
 Repository/Programming/Js/Anchor/AnchorLedger.fsi
@@ -623,6 +621,10 @@ Repository/Programming/Js/Anchor/AnchorView.fsi
 Repository/Programming/Js/Anchor/AnchorView.fs
 Repository/Programming/Js/Anchor/AnchorSurface.fsi
 Repository/Programming/Js/Anchor/AnchorSurface.fs
+Repository/Programming/Js/DeliveredValues.fsi
+Repository/Programming/Js/DeliveredValues.fs
+Repository/Programming/Js/OpenCode/ParkedSites.fsi
+Repository/Programming/Js/OpenCode/ParkedSites.fs
 Repository/Programming/Js/DelegationBridge.fsi
 Repository/Programming/Js/DelegationBridge.fs
 Process/PtyTypes.fsi

@@ -1,18 +1,18 @@
 import test from 'node:test'
 
 {
-// Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052]).
+// Host-native `run` tool is retired; `this.call` supersedes it (repository-programming [050]-[052]).
 const { default: assert } = await import('node:assert/strict')
 const { default: test } = await import('node:test')
 const { sandbox, runProgram, caseName, parseData } = await import('./support/executor.mjs')
 
-test('WHAT[process-execution-010] js.call completed command reports exit code and streams via onExit and outcome', async () => {
+test('WHAT[process-execution-010] this.call completed command reports exit code and streams via onExit and outcome', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-010a-')
   try {
     const outcome = await runProgram(
       dir,
       `    let exitedWith = null;
-    const result = await js.call(class extends js.Callable {
+    const result = await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? "printf 'hello-stdout'; printf 'hello-stderr' >&2" : null; }
@@ -33,12 +33,12 @@ test('WHAT[process-execution-010] js.call completed command reports exit code an
   }
 })
 
-test('WHAT[process-execution-010] js.call nonzero exit is reported as data rather than thrown', async () => {
+test('WHAT[process-execution-010] this.call nonzero exit is reported as data rather than thrown', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-010b-')
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? "exit 3" : null; }

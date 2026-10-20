@@ -96,203 +96,45 @@ test('WHAT[work-029] P is read, rewritten atomically with exclusive temp file, a
   }
 })
 
-test('WHAT[work-029] todowrite-for-plan programming surface runs via class Js extends JsProgram and strictly forbids path arguments', async () => {
-  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-prog-test-'))
-  const workId = 'work-jsplan-paths'
-
+test('WHAT[work-029] shared Plan interface permits only PLAN_PATH and rejects retired members', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-surface-'))
+  const workId = 'plan-shared-path'
   try {
-    const initialContent = '# Initial Plan\n- Step 1: Draft\n- Step 2: Review'
-    surface.PlanningSurface.rewritePlanAtomic(tmpRoot, workId, initialContent)
-    const store = await openPlanStore(tmpRoot, workId)
-
-    // 1. Passing a path to this.file('plan.md') MUST fail with PATH_DENIED
-    const fileWithPath = `class Js extends JsProgram {
-      async run() {
-        const f = await this.file('plan.md');
-        return { text: f.text() };
-      }
-    }`
-    const resFileWithPath = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, fileWithPath)
-    assert.match(resFileWithPath, /# failed/)
-    assert.match(resFileWithPath, /code = "PATH_DENIED"/)
-
-    // 2. Passing a path to this.edit('plan.md', ...) MUST fail with PATH_DENIED
-    const editWithPath = `class Js extends JsProgram {
-      async run() {
-        this.edit('plan.md', { find: 'Draft', put: 'Rewrite' });
-        return { ok: true };
-      }
-    }`
-    const resEditWithPath = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, editWithPath)
-    assert.match(resEditWithPath, /# failed/)
-    assert.match(resEditWithPath, /code = "PATH_DENIED"/)
-
-    // 3. Passing a path to this.rewrite('plan.md', ...) MUST fail with PATH_DENIED
-    const rewriteWithPath = `class Js extends JsProgram {
-      async run() {
-        this.rewrite('plan.md', 'new content');
-        return { ok: true };
-      }
-    }`
-    const resRewriteWithPath = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, rewriteWithPath)
-    assert.match(resRewriteWithPath, /# failed/)
-    assert.match(resRewriteWithPath, /code = "PATH_DENIED"/)
+    surface.PlanningSurface.rewritePlanAtomic(root, workId, '# Draft')
+    const store = await openPlanStore(root, workId)
+    const run = body => registry.runJsPlan(store.gitCommonDir, root, workId,
+      `class Js extends JsProgram { async run() { ${body} } }`)
+    assert.match(await run('return { text: await this.cat(PLAN_PATH), retired: [typeof this.file, typeof this.edit, typeof this.rewrite] };'), /# Draft/)
+    assert.match(await run('return { retired: typeof this.file };'), /undefined/)
+    for (const target of ['other.md', '../plan.md', '/etc/passwd', 'plan.md/../other.md']) {
+      assert.match(await run(`return await this.cat(${JSON.stringify(target)});`), /PATH_DENIED/)
+      assert.match(await run(`this.write(${JSON.stringify(target)}, 'changed'); return {};`), /PATH_DENIED/)
+    }
+    const write = "this.write(PLAN_PATH, '# Final'); return { changed: true };"
+    assert.match(await run(write), /PLAN_REVIEW_REQUIRED/)
+    assert.equal(surface.PlanningSurface.readPlan(root, workId).content, '# Draft')
+    assert.equal((await lifecycle.seedReview(store, workId, 'Stayed')).ok, true)
+    assert.match(await run(write), /# ok/)
+    assert.equal(surface.PlanningSurface.readPlan(root, workId).content, '# Final')
+    const relay = await lifecycle.seedDeliver(store, workId, 'shared-plan-run', 'shared-plan-call', 11n)
+    assert.equal(relay.ok, true, relay.error)
+    assert.match(await run(write), /PLAN_REVIEW_REQUIRED/)
+    assert.match(await run('return { text: await this.cat(PLAN_PATH) };'), /# Final/)
   } finally {
-    fs.rmSync(tmpRoot, { recursive: true, force: true })
+    fs.rmSync(root, { recursive: true, force: true })
   }
 })
 
-test('WHAT[work-029] unreviewed tenure permits todowrite-for-plan file reading but blocks edits and rewrites until review; review unlocks writes and relay re-locks', async () => {
-  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-review-gate-test-'))
-  const workId = 'work-jsplan-review-gate'
-
-  try {
-    const initialContent = '# Initial Plan\n- Step 1: Draft\n- Step 2: Review'
-    surface.PlanningSurface.rewritePlanAtomic(tmpRoot, workId, initialContent)
-    const store = await openPlanStore(tmpRoot, workId)
-
-    // 1. In unreviewed tenure: read without path succeeds
-    const readProgram = `class Js extends JsProgram {
-      async run() {
-        const f = await this.file([['step1', 'step1end', 'Step 1']]);
-        return { slice: f.text('step1', '$') };
-      }
-    }`
-    const readRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, readProgram)
-    assert.match(readRes, /# ok/)
-    assert.match(readRes, /Step 1: Draft/)
-
-    // 2. In unreviewed tenure: edit without path fails with PLAN_REVIEW_REQUIRED
-    const editProgram = `class Js extends JsProgram {
-      async run() {
-        this.edit({ find: 'Draft', put: 'Final' });
-        return { edited: true };
-      }
-    }`
-    const editRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, editProgram)
-    assert.match(editRes, /# failed/)
-    assert.match(editRes, /code = "PLAN_REVIEW_REQUIRED"/)
-    assert.match(editRes, /Review is required before modifying the plan artifact/)
-
-    // Verify file content is unchanged on disk
-    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, initialContent)
-
-    // 3. In unreviewed tenure: rewrite without path fails with PLAN_REVIEW_REQUIRED
-    const rewriteProgram = `class Js extends JsProgram {
-      async run() {
-        this.rewrite('# Completely New Plan');
-        return { done: true };
-      }
-    }`
-    const rewriteRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, rewriteProgram)
-    assert.match(rewriteRes, /# failed/)
-    assert.match(rewriteRes, /code = "PLAN_REVIEW_REQUIRED"/)
-    assert.match(rewriteRes, /Review is required before modifying the plan artifact/)
-    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, initialContent)
-
-    // 4. Submit review for current tenure: the accepted review is a unified
-    //    lifecycle Reviewed event (Stayed).
-    const reviewed = await lifecycle.seedReview(store, workId, 'Stayed')
-    assert.equal(reviewed.ok, true)
-
-    // 5. Now tenure inc-1 has been reviewed -> rewrite succeeds!
-    const rewriteAfterReviewRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, rewriteProgram)
-    assert.match(rewriteAfterReviewRes, /# ok/)
-    assert.match(rewriteAfterReviewRes, /plan\.md/)
-    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Completely New Plan')
-
-    // 6. Now edit succeeds as well
-    const editAfterReviewProgram = `class Js extends JsProgram {
-      async run() {
-        this.edit({ find: 'Completely New', put: 'Reviewed' });
-        return { edited: true };
-      }
-    }`
-    const editAfterReviewRes = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, editAfterReviewProgram)
-    assert.match(editAfterReviewRes, /# ok/)
-    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Reviewed Plan')
-
-    // 7. Relay to next tenure: the reviewed (Stayed) tenure relays — one append
-    //    retires inc-1 Relayed and opens the successor inc-2 at S1.
-    const relayed = await lifecycle.seedDeliver(store, workId, 'run-029-relay', 'call-029-relay', 11n)
-    assert.equal(relayed.ok, true, relayed.error)
-
-    // 8. Next tenure inc-2 has NOT yet submitted review -> mutation MUST be blocked again!
-    const writeInInc2 = `class Js extends JsProgram {
-      async run() {
-        this.rewrite('# Attempt In Second Tenure Before Review');
-        return { done: true };
-      }
-    }`
-    const resWriteInInc2 = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, writeInInc2)
-    assert.match(resWriteInInc2, /# failed/)
-    assert.match(resWriteInInc2, /code = "PLAN_REVIEW_REQUIRED"/)
-    assert.match(resWriteInInc2, /Review is required before modifying the plan artifact/)
-    // File remains unchanged
-    assert.equal(surface.PlanningSurface.readPlan(tmpRoot, workId).content, '# Reviewed Plan')
-
-    // 9. Reading in inc-2 succeeds
-    const readInInc2Program = `class Js extends JsProgram {
-      async run() {
-        const f = await this.file([['h1', 'h1end', '# Reviewed Plan']]);
-        return { text: f.text('^', '$') };
-      }
-    }`
-    const readInInc2Res = await registry.runJsPlan(store.gitCommonDir, tmpRoot, workId, readInInc2Program)
-    assert.match(readInInc2Res, /# ok/)
-    assert.match(readInInc2Res, /# Reviewed Plan/)
-  } finally {
-    fs.rmSync(tmpRoot, { recursive: true, force: true })
-  }
-})
-
-test('WHAT[work-029] todowrite-for-plan tool description reuses the shared anchor tutorial with pathless signatures', () => {
+test('WHAT[work-029] localized Plan pseudocode describes the same shared interface', () => {
   for (const language of ['en', 'zh-CN']) {
     const description = registry.jsPlanDescription(language)
-    const text = description.replace(/\s+/g, ' ')
-    assert.equal(text.includes('{{'), false, `${language} description retains a placeholder`)
-    assert.equal((description.match(/class Js extends JsProgram/g) ?? []).length, 1)
+    assert.equal(description.includes('{{'), false)
+    for (const signature of ['PLAN_PATH', 'async cat(path)', 'write(path, content)', 'async ask(question)']) {
+      assert.ok(description.includes(signature), signature)
+    }
+    for (const retired of ['this.file(', 'this.edit(', 'this.rewrite(']) assert.equal(description.includes(retired), false)
     assert.equal(description.includes('_api'), false)
-    assert.equal(description.includes('__jsFailure'), false)
-    assert.doesNotMatch(description, /file\(path/)
-    assert.doesNotMatch(description, /edit\(path/)
-    assert.doesNotMatch(description, /rewrite\(path/)
-    assert.doesNotMatch(description, /this\.edit\("[^"]+",/)
-    assert.doesNotMatch(description, /glob\(/)
-    assert.doesNotMatch(description, /grep\(/)
-  }
-
-  const english = registry.jsPlanDescription('en').replace(/\s+/g, ' ')
-  for (const lesson of [
-    'PATH_DENIED',
-    'review',
-    'file(matches = [])',
-    'edit(changes)',
-    'rewrite(newText)',
-    'ordered anchors',
-    'text(from, to)',
-    'name+N / name-N',
-    'not a line number',
-    'file(matches) + text() + rewrite()',
-    'Near matches are diagnostics, never write authority',
-  ]) {
-    assert.equal(english.includes(lesson), true, `English plan description missing: ${lesson}`)
-  }
-
-  const chinese = registry.jsPlanDescription('zh-CN').replace(/\s+/g, ' ')
-  for (const lesson of [
-    'PATH_DENIED',
-    'review',
-    'file(matches = [])',
-    'edit(changes)',
-    'rewrite(newText)',
-    '有序 anchor',
-    'text(from, to)',
-    'name+N / name-N',
-    '不是行号',
-    'file(matches) + text() + rewrite()',
-    '近似匹配只产生诊断，绝不获得写权限',
-  ]) {
-    assert.equal(chinese.includes(lesson), true, `Chinese plan description missing: ${lesson}`)
+    assert.equal(description.includes('this.ls('), false)
+    assert.equal(description.includes('this.rg('), false)
   }
 })

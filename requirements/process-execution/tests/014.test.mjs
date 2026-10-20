@@ -9,7 +9,7 @@ import {
   renderString,
 } from '../../../dist/Foundation/SyntheticTomlSurface.js'
 
-// Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052]).
+// Host-native `run` tool is retired; `this.call` supersedes it (repository-programming [050]-[052]).
 
 const formatOutcomeDocument = (exitCode, raw) =>
   renderDocument([], [field('exit_code', renderInt(exitCode)), field('output', renderString(raw))])
@@ -21,7 +21,7 @@ test('WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction'
     const cmd = nodeCommand(`process.stdout.write(${JSON.stringify(raw)}); process.exit(7)`)
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
@@ -72,7 +72,7 @@ test('WHAT[process-execution-014] truncated_output_preserves_program_facts_witho
     const outcome = await runProgram(
       dir,
       `    let exited = null;
-    const r = await js.call(class extends js.Callable {
+    const r = await this.call(class extends this.Callable {
       maxDuration = 10000;
       interval = 100;
       next(ctx) {

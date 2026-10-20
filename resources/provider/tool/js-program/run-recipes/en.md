@@ -3,7 +3,7 @@
 ```js
 class Js extends JsProgram {
   async run() {
-    return await js.call(class extends js.Callable {
+    return await this.call(class extends this.Callable {
       maxDuration = 900000; // 15 min engineering bound
       interval = 10000;
       failureReason = null;
@@ -56,7 +56,7 @@ class Js extends JsProgram {
 class Js extends JsProgram {
   async run() {
     let testExitCode = null;
-    const outcome = await js.call(class extends js.Callable {
+    const outcome = await this.call(class extends this.Callable {
       maxDuration = 300000; // 5 min bound for server startup + test suite
       interval = 2000;
 
@@ -101,7 +101,7 @@ class Js extends JsProgram {
 class Js extends JsProgram {
   async run() {
     const answers = [];
-    const outcome = await js.call(class extends js.Callable {
+    const outcome = await this.call(class extends this.Callable {
       maxDuration = 60000;
       interval = 200;
       lines = ["1 + 1", "2 * 21", "exit"];

@@ -20,11 +20,11 @@ test('WHAT[repository-programming-012] JS008_012_bindings_rewrite_persists_immed
   try {
     writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
     const binding = createApi(dir)
-    const result = apiOf(binding).js.write('a.txt', 'new text')
+    const result = apiOf(binding).write('a.txt', 'new text')
     assert.equal(result.ok, true)
     assert.equal(stagedCount(binding), 1)
     assert.deepEqual(stagedKinds(binding), ['Rewrite'])
-    const disk = apiOf(binding).js.cat('a.txt')
+    const disk = apiOf(binding).cat('a.txt')
     assert.equal(disk.text, 'new text')
   } finally {
     cleanup()
@@ -34,9 +34,9 @@ test('WHAT[repository-programming-012] JS009_012_bindings_write_persists_immedia
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
-    const result = apiOf(binding).js.write('new.txt', 'fresh')
+    const result = apiOf(binding).write('new.txt', 'fresh')
     assert.equal(result.ok, true)
-    const disk = apiOf(binding).js.cat('new.txt')
+    const disk = apiOf(binding).cat('new.txt')
     assert.equal(disk.ok, true)
     assert.equal(disk.text, 'fresh')
   } finally {

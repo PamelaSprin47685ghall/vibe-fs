@@ -6,7 +6,7 @@ open Wanxiangshu.Foundation
 type JsCapability =
     | Read
     | Write
-    | Edit
+    
     | Glob
     | Grep
     | Move
@@ -17,6 +17,7 @@ type JsCapability =
     | Fission
     | Horizon
     | Advisor
+    | Ask
     | Park
 
 module JsCapability =
@@ -25,11 +26,7 @@ module JsCapability =
 
 type JsCapabilityFragment =
     { Capability: JsCapability
-      MemberName: string
-      Signature: string
-      Description: string
-      CanonicalExample: string
-      RuntimeBindingKey: string }
+      MemberName: string }
 
 module JsFragmentRegistry =
     val write: JsCapabilityFragment
@@ -49,6 +46,7 @@ module JsFragmentRegistry =
     val fission: JsCapabilityFragment
     val horizon: JsCapabilityFragment
     val advisor: JsCapabilityFragment
+    val ask: JsCapabilityFragment
     val park: JsCapabilityFragment
     val all: JsCapabilityFragment list
     val byCapability: Map<JsCapability, JsCapabilityFragment list>

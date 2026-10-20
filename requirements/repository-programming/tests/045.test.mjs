@@ -20,11 +20,11 @@ test('WHAT[repository-programming-045] cat returns strict UTF-8 content and regi
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha beta', 'utf8')
     const binding = createApi(dir)
-    const result = apiOf(binding).js.cat('a.txt')
+    const result = apiOf(binding).cat('a.txt')
     assert.equal(result.ok, true)
     assert.equal(result.text, 'alpha beta')
 
-    const changed = apiOf(binding).js.write('a.txt', 'changed')
+    const changed = apiOf(binding).write('a.txt', 'changed')
     assert.equal(changed.ok, true, 'the registered snapshot is fresh before the write')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'changed')
   } finally {
@@ -35,7 +35,7 @@ test('WHAT[repository-programming-045] cat returns strict UTF-8 content and regi
 test('WHAT[repository-programming-045] cat reports FILE_NOT_FOUND for a missing path', () => {
   const { dir, cleanup } = sandbox()
   try {
-    const result = apiOf(createApi(dir)).js.cat('missing.txt')
+    const result = apiOf(createApi(dir)).cat('missing.txt')
     assert.equal(result.ok, false)
     assert.equal(result.code, 'FILE_NOT_FOUND')
   } finally {
@@ -48,9 +48,9 @@ test('WHAT[repository-programming-045] cat refuses a snapshot changed after the 
   try {
     writeFileSync(join(dir, 'a.txt'), 'first', 'utf8')
     const binding = createApi(dir)
-    assert.equal(apiOf(binding).js.cat('a.txt').ok, true)
+    assert.equal(apiOf(binding).cat('a.txt').ok, true)
     writeFileSync(join(dir, 'a.txt'), 'third-party', 'utf8')
-    const changed = apiOf(binding).js.write('a.txt', 'attempt')
+    const changed = apiOf(binding).write('a.txt', 'attempt')
     assert.equal(changed.ok, false)
     assert.equal(changed.code, 'FILE_CHANGED')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'third-party')
@@ -65,7 +65,7 @@ test('WHAT[repository-programming-045] ls lists one directory sorted with traili
     mkdirSync(join(dir, 'sub'))
     writeFileSync(join(dir, 'b.txt'), 'b', 'utf8')
     writeFileSync(join(dir, 'a.txt'), 'a', 'utf8')
-    const result = apiOf(createApi(dir)).js.ls('.')
+    const result = apiOf(createApi(dir)).ls('.')
     assert.equal(result.ok, true)
     assert.deepEqual(result.entries, ['a.txt', 'b.txt', 'sub/'])
   } finally {
@@ -77,12 +77,12 @@ test('WHAT[repository-programming-045] stat reports absence without failing and 
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
-    const missing = apiOf(binding).js.stat('missing.txt')
+    const missing = apiOf(binding).stat('missing.txt')
     assert.equal(missing.ok, true)
     assert.equal(missing.stat.exists, false)
 
     writeFileSync(join(dir, 'a.txt'), '12345', 'utf8')
-    const file = apiOf(binding).js.stat('a.txt')
+    const file = apiOf(binding).stat('a.txt')
     assert.equal(file.ok, true)
     assert.equal(file.stat.exists, true)
     assert.equal(file.stat.size, 5)
@@ -90,7 +90,7 @@ test('WHAT[repository-programming-045] stat reports absence without failing and 
     assert.equal(typeof file.stat.mtime, 'string')
 
     mkdirSync(join(dir, 'sub'))
-    const directory = apiOf(binding).js.stat('sub')
+    const directory = apiOf(binding).stat('sub')
     assert.equal(directory.stat.isDir, true)
   } finally {
     cleanup()
@@ -101,15 +101,15 @@ test('WHAT[repository-programming-045] mkdir creates one directory and refuses c
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
-    const created = apiOf(binding).js.mkdir('generated')
+    const created = apiOf(binding).mkdir('generated')
     assert.equal(created.ok, true)
     assert.equal(existsSync(join(dir, 'generated')), true)
 
-    const again = apiOf(binding).js.mkdir('generated')
+    const again = apiOf(binding).mkdir('generated')
     assert.equal(again.ok, false)
     assert.equal(again.code, 'DIRECTORY_EXISTS')
 
-    const orphan = apiOf(binding).js.mkdir('missing-parent/child')
+    const orphan = apiOf(binding).mkdir('missing-parent/child')
     assert.equal(orphan.ok, false)
     assert.equal(orphan.code, 'PARENT_DIRECTORY_MISSING')
   } finally {
@@ -121,8 +121,8 @@ test('WHAT[repository-programming-045] write creates a missing file and mkdir is
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
-    assert.equal(apiOf(binding).js.mkdir('generated').ok, true)
-    const written = apiOf(binding).js.write('generated/version.txt', '1.2.3\n')
+    assert.equal(apiOf(binding).mkdir('generated').ok, true)
+    const written = apiOf(binding).write('generated/version.txt', '1.2.3\n')
     assert.equal(written.ok, true)
     assert.equal(readFileSync(join(dir, 'generated', 'version.txt'), 'utf8'), '1.2.3\n')
     assert.equal(stagedCount(binding), 1)

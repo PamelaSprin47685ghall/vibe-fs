@@ -13,7 +13,7 @@ open Wanxiangshu.Foundation
 /// durable `ViewCheckpointCommitted` window (context-compression-028) records
 /// which view declarations were committed; what history is kept or replaced is
 /// decided by the model's own ANCHOR `view` declaration (prefixUntil /
-/// thenRemove), not by a second copy of the record.
+/// thenMap), not by a second copy of the record.
 ///
 /// Bodies live in blobs (PERSIST-007): the journal line carries cursor, kind,
 /// role, digest and reference; the text is resolved at the read boundary, the
@@ -599,8 +599,7 @@ module XTraceProjection =
             searchable
             |> List.tryFind (fun part -> XTraceCursor.sequence part.Cursor > sequence)
         with
-        | Some part ->
-            part.Cursor
+        | Some part -> part.Cursor
         | None -> cursorAfterSearch searchable
 
     let semanticCursorAfter (cursor: XTraceCursor) (state: XTraceProjectionState) : XTraceCursor =

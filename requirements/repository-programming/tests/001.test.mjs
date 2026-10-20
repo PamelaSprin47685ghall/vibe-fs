@@ -50,23 +50,23 @@ const MEMBERS_BY_PERMISSION = {
 }
 
 const BINDING_BY_MEMBER = {
-  write: 'js.write',
-  rm: 'js.rm',
-  mv: 'js.mv',
-  cat: 'js.cat',
-  ls: 'js.ls',
-  rg: 'js.rg',
-  stat: 'js.stat',
-  mkdir: 'js.mkdir',
-  whereAll: 'js.whereAll',
-  where: 'js.where',
-  call: 'js.call',
-  fork: 'js.fork',
-  dag: 'js.dag',
-  join: 'js.join',
-  fission: 'js.fission',
-  horizon: 'js.horizon',
-  advisor: 'js.advisor',
+  write: 'write',
+  rm: 'rm',
+  mv: 'mv',
+  cat: 'cat',
+  ls: 'ls',
+  rg: 'rg',
+  stat: 'stat',
+  mkdir: 'mkdir',
+  whereAll: 'whereAll',
+  where: 'where',
+  call: 'call',
+  fork: 'fork',
+  dag: 'dag',
+  join: 'join',
+  fission: 'fission',
+  horizon: 'horizon',
+  advisor: 'advisor',
 }
 
 const MEMBER_ORDER = [
@@ -86,10 +86,8 @@ const layersOf = (s) =>
     s.members.map((fragment) => [
       fragment.memberName,
       {
-        description: fragment.description,
-        example: fragment.canonicalExample,
-        binding: fragment.runtimeBindingKey,
-        inBaseClass: s.baseClassSource.includes(`this._api.${fragment.runtimeBindingKey}`),
+        binding: fragment.memberName,
+        inBaseClass: s.baseClassSource.includes(`this._api.${fragment.memberName}`),
         inDescription: s.description.includes(fragment.memberName),
         inExamples: s.examples.some((example) => example.includes(fragment.memberName)),
       },

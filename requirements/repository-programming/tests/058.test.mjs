@@ -26,7 +26,7 @@ const sanity = (nextStep) => `sanity() {
         };
       }`
 
-test('WHAT[repository-programming-058] js.call drives an interactive child through send and observes the deltas', async () => {
+test('WHAT[repository-programming-058] this.call drives an interactive child through send and observes the deltas', async () => {
   const { dir, cleanup } = sandbox()
   try {
     // A child that echoes each stdin line back, prefixed.
@@ -34,7 +34,7 @@ test('WHAT[repository-programming-058] js.call drives an interactive child throu
     const outcome = await runProgram(
       dir,
       `    const seen = [];
-    const out = await js.call(class extends js.Callable {
+    const out = await this.call(class extends this.Callable {
       maxDuration = 15000;
       interval = 100;
       next(ctx) {
@@ -68,7 +68,7 @@ test('WHAT[repository-programming-058] send to an unknown child fails with CALL_
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 3000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? { send: { name: "nobody", input: "hi" } } : null; }

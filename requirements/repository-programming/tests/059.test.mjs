@@ -5,178 +5,119 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execute, caseName } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 import {
-  deliveredValue,
-  clearDeliveredValue,
-  recordDeliveredView,
-  takeDeliveredHandoff,
-  takeDeliveredHandoffWith,
-  clearDeliveredReturned,
-  deliveredReturned,
+  deliveredValue, clearDeliveredValue, recordDeliveredView, takeDeliveredHandoff,
+  takeDeliveredHandoffWith, clearDeliveredReturned, deliveredReturned,
 } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import { applyView, clearAll, numberMessage, setView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-delivered-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+const program = (body) => 'class Js extends JsProgram { async run() { ' + body + ' } }'
+const run = (dir, body, id) => execute(dir, 'Manager', 'en', id, { program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
+const declaration = (prefixUntil, thenMap) => ({ prefixUntil, thenMap })
+const seed = (id, texts) => {
+  const rows = texts.map((text, index) => ({ id: 'message-' + index, text }))
+  rows.forEach((row) => numberMessage(id, row.id))
+  applyView(id, rows)
+  return rows
 }
+test.beforeEach(() => clearAll())
 
-const program = (body) => `class Js extends JsProgram {
-  async run() {
-${body}
-  }
-}`
-
-const runProgram = (dir, body, sessionId) =>
-  execute(dir, 'Manager', 'en', sessionId, { program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
-
-test('WHAT[repository-programming-059] js.deliver records the handed-over value for the completion path', async () => {
-  const { dir, cleanup } = sandbox()
-  const sessionId = `sess-delivered-${Math.random().toString(36).slice(2, 8)}`
+test('WHAT[repository-programming-059] this.deliver records its terminal value and does not run later statements', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-view-deliver-'))
+  const id = 'native-deliver'
   try {
-    clearDeliveredValue(sessionId)
-    const outcome = await runProgram(
-      dir,
-      `    await this.deliver({ summary: "indexed the parser", files: 3 });
-    return { unreachable: true };`,
-      sessionId,
-    )
-    assert.equal(caseName(outcome), 'Succeeded')
-    const delivered = deliveredValue(sessionId)
-    assert.equal(delivered.summary, 'indexed the parser')
-    assert.equal(delivered.files, 3)
-  } finally {
-    clearDeliveredValue(sessionId)
-    cleanup()
-  }
+    clearDeliveredValue(id)
+    const result = await run(dir, 'await this.deliver({ summary: "indexed", files: 3 }); throw new Error("unreachable");', id)
+    assert.equal(caseName(result), 'Succeeded')
+    assert.equal(deliveredValue(id).summary, 'indexed')
+    assert.equal(deliveredValue(id).files, 3)
+  } finally { clearDeliveredValue(id); rmSync(dir, { recursive: true, force: true }) }
 })
 
-test('WHAT[repository-programming-059] view with thenRemove anchors >= prefixUntil returns summaries, deduplicates, and manages assistant prose', () => {
-  const sessionId = `sess-059-${Math.random().toString(36).slice(2, 8)}`
-  clearDeliveredValue(sessionId)
-  clearDeliveredReturned(sessionId)
-  try {
-    // (a) view with thenRemove anchors >= prefixUntil returns those summaries
-    recordDeliveredView(
-      sessionId,
-      { status: 'done' },
-      {
-        prefixUntil: 3,
-        thenRemove: {
-          '1': 'dropped summary before prefixUntil',
-          '3': 'summary at prefixUntil',
-          '5': 'summary after prefixUntil',
-        },
-      },
-    )
-    const firstHandoff = String(takeDeliveredHandoff(sessionId))
-    assert.match(firstHandoff, /summary at prefixUntil/)
-    assert.match(firstHandoff, /summary after prefixUntil/)
-    assert.equal(firstHandoff.includes('dropped summary before prefixUntil'), false, 'anchors < prefixUntil are omitted')
-    assert.deepEqual([...deliveredReturned(sessionId)].sort(), ['anchor:3', 'anchor:5'])
-
-    // (b) a second deliver in the same session naming the same anchor does not return it again
-    recordDeliveredView(
-      sessionId,
-      { status: 'continuation' },
-      {
-        prefixUntil: 3,
-        thenRemove: {
-          '3': 'summary at prefixUntil',
-          '7': 'fresh summary',
-        },
-      },
-    )
-    const secondHandoff = String(takeDeliveredHandoff(sessionId))
-    assert.equal(secondHandoff.includes('summary at prefixUntil'), false, 'previously returned anchor is not returned again')
-    assert.match(secondHandoff, /fresh summary/)
-    assert.deepEqual([...deliveredReturned(sessionId)].sort(), ['anchor:3', 'anchor:5', 'anchor:7'])
-  } finally {
-    clearDeliveredValue(sessionId)
-    clearDeliveredReturned(sessionId)
-  }
-
-  // (c) no view => no assistant prose returned
-  const noviewSession = `sess-059-noview-${Math.random().toString(36).slice(2, 8)}`
-  clearDeliveredValue(noviewSession)
-  clearDeliveredReturned(noviewSession)
-  try {
-    recordDeliveredView(noviewSession, { value: 'only value' }, null)
-    const handoffNoView = String(takeDeliveredHandoffWith(noviewSession, 'assistant prose without view'))
-    assert.equal(handoffNoView.includes('assistant prose without view'), false, 'no view implies no assistant prose')
-  } finally {
-    clearDeliveredValue(noviewSession)
-    clearDeliveredReturned(noviewSession)
-  }
-
-  // (d) view present => last assistant prose returned once
-  const viewSession = `sess-059-view-${Math.random().toString(36).slice(2, 8)}`
-  clearDeliveredValue(viewSession)
-  clearDeliveredReturned(viewSession)
-  try {
-    recordDeliveredView(viewSession, { value: 'with view' }, { prefixUntil: 1, thenRemove: {} })
-    const handoffWithView = String(takeDeliveredHandoffWith(viewSession, 'assistant prose with view'))
-    assert.match(handoffWithView, /assistant prose with view/, 'view present returns assistant prose')
-  } finally {
-    clearDeliveredValue(viewSession)
-    clearDeliveredReturned(viewSession)
-  }
+test('WHAT[repository-programming-059] handoff projects the complete view before dedup, including protected and null-kept content', () => {
+  const id = 'handoff-complete'
+  clearDeliveredReturned(id)
+  const rows = seed(id, ['protected-one', 'raw-two', 'kept-three'])
+  setView(id, declaration(2, { 2: 'summary-two' }))
+  applyView(id, rows)
+  recordDeliveredView(id, { files: 1 }, declaration(2, { 1: 'ignored', 2: 'summary-two', 3: null }))
+  const first = String(takeDeliveredHandoff(id))
+  assert.match(first, /protected-one/)
+  assert.match(first, /summary-two/)
+  assert.match(first, /kept-three/)
+  assert.doesNotMatch(first, /raw-two|ignored/)
+  assert.match(first, /files/)
+  assert.deepEqual(deliveredReturned(id), ['1:13:protected-one', '2:11:summary-two', '3:10:kept-three'])
+  seed(id, ['protected-one', 'raw-two', 'kept-three', 'new-four'])
+  recordDeliveredView(id, { files: 2 }, declaration(99, {}))
+  const second = String(takeDeliveredHandoff(id))
+  assert.match(second, /new-four/)
+  assert.doesNotMatch(second, /protected-one|raw-two|kept-three|summary-two/)
+  assert.equal(deliveredValue(id), null)
+  clearDeliveredReturned(id)
 })
 
-test('WHAT[repository-programming-059] an ordinary return leaves the delivered cell untouched', async () => {
-  const { dir, cleanup } = sandbox()
-  const sessionId = `sess-return-${Math.random().toString(36).slice(2, 8)}`
-  try {
-    clearDeliveredValue(sessionId)
-    const outcome = await runProgram(dir, `    return { plain: true };`, sessionId)
-    assert.equal(caseName(outcome), 'Succeeded')
-    assert.equal(deliveredValue(sessionId), null, 'a plain return is not a delivery')
-  } finally {
-    clearDeliveredValue(sessionId)
-    cleanup()
-  }
+test('WHAT[repository-programming-059] permanent compression survives a later protected handoff and latest interval replacement', () => {
+  const id = 'handoff-history'
+  clearDeliveredReturned(id)
+  const rows = seed(id, ['one', 'two', 'three'])
+  setView(id, declaration(1, { 2: 'old-two-summary' }))
+  applyView(id, rows)
+  recordDeliveredView(id, 'done', declaration(1, { 1: 'one-and-two-summary', 3: null }))
+  const result = String(takeDeliveredHandoff(id))
+  assert.match(result, /one-and-two-summary/)
+  assert.match(result, /three/)
+  assert.doesNotMatch(result, /old-two-summary/)
+  assert.deepEqual(deliveredReturned(id), ['1:19:one-and-two-summary', '3:5:three'])
+  clearDeliveredReturned(id)
 })
 
-test('WHAT[repository-programming-059] a later deliver does not return prose already handed back', () => {
-  const sessionId = `sess-view-${Math.random().toString(36).slice(2, 8)}`
-  clearDeliveredValue(sessionId)
-  clearDeliveredReturned(sessionId)
-  try {
-    recordDeliveredView(sessionId, { files: 1 }, {
-      prefixUntil: 1,
-      thenRemove: { '2': 'the parser index', '4': 'the retry' },
-    })
-    const first = String(takeDeliveredHandoff(sessionId))
-    assert.match(first, /\[\[returned\]\]/)
-    assert.match(first, /the parser index/)
-    assert.match(first, /the retry/)
-    assert.equal(first.includes('files'), true)
-    assert.deepEqual([...deliveredReturned(sessionId)].sort(), ['anchor:2', 'anchor:4'])
-
-    recordDeliveredView(sessionId, { files: 2 }, {
-      prefixUntil: 1,
-      thenRemove: { '2': 'the parser index', '7': 'the new seam' },
-    })
-    const second = String(takeDeliveredHandoff(sessionId))
-    assert.equal(second.includes('the parser index'), false, 'already returned prose is not returned again')
-    assert.match(second, /the new seam/)
-    assert.equal(deliveredValue(sessionId), null, 'take consumes the cell')
-  } finally {
-    clearDeliveredValue(sessionId)
-    clearDeliveredReturned(sessionId)
-  }
+test('WHAT[repository-programming-059] implicit zero can return the opening interval after anchor 1 disappears', () => {
+  const id = 'handoff-opening'
+  clearDeliveredReturned(id)
+  const rows = seed(id, ['one', 'two'])
+  setView(id, declaration(1, { 1: 'summary-one' }))
+  applyView(id, rows)
+  recordDeliveredView(id, null, declaration(0, { 0: 'opening-summary', 2: null }))
+  const result = String(takeDeliveredHandoff(id))
+  assert.match(result, /opening-summary/)
+  assert.doesNotMatch(result, /summary-one/)
+  assert.deepEqual(deliveredReturned(id), ['0:15:opening-summary', '2:3:two'])
+  clearDeliveredReturned(id)
 })
 
-test('WHAT[repository-programming-059] a deliver without a view does not hand the assistant prose back', () => {
-  const sessionId = `sess-noview-${Math.random().toString(36).slice(2, 8)}`
-  clearDeliveredValue(sessionId)
-  clearDeliveredReturned(sessionId)
+test('WHAT[repository-programming-059] without a view only the value returns; with a view assistant prose returns once', () => {
+  const id = 'handoff-prose'
+  clearDeliveredReturned(id)
+  recordDeliveredView(id, 'terminal value', null)
+  assert.equal(takeDeliveredHandoffWith(id, 'assistant prose'), 'terminal value')
+  assert.deepEqual(deliveredReturned(id), [])
+  recordDeliveredView(id, 'with view', declaration(1, {}))
+  assert.match(String(takeDeliveredHandoffWith(id, 'assistant prose')), /assistant prose/)
+  recordDeliveredView(id, 'next value', declaration(1, {}))
+  assert.doesNotMatch(String(takeDeliveredHandoffWith(id, 'assistant prose')), /assistant prose/)
+  clearDeliveredReturned(id)
+})
+
+test('WHAT[repository-programming-059] an ordinary return does not populate the delivered cell', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-view-return-'))
+  const id = 'ordinary-return'
   try {
-    recordDeliveredView(sessionId, 'the terminal value', null)
-    const handoff = String(takeDeliveredHandoff(sessionId))
-    assert.equal(handoff, 'the terminal value')
-    assert.equal(handoff.includes('[[returned]]'), false)
-    assert.deepEqual(deliveredReturned(sessionId), [])
-  } finally {
-    clearDeliveredValue(sessionId)
-    clearDeliveredReturned(sessionId)
-  }
+    clearDeliveredValue(id)
+    const result = await run(dir, 'return { plain: true };', id)
+    assert.equal(caseName(result), 'Succeeded')
+    assert.equal(deliveredValue(id), null)
+  } finally { clearDeliveredValue(id); rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('WHAT[repository-programming-059] changed opening material is returned once even though anchor zero remains', () => {
+  const id = 'handoff-opening-version'
+  clearDeliveredReturned(id)
+  seed(id, ['one'])
+  recordDeliveredView(id, null, declaration(0, { 0: 'first' }))
+  assert.match(String(takeDeliveredHandoff(id)), /first/)
+  recordDeliveredView(id, null, declaration(0, { 0: 'second' }))
+  assert.match(String(takeDeliveredHandoff(id)), /second/)
+  recordDeliveredView(id, null, declaration(0, { 0: 'second' }))
+  assert.doesNotMatch(String(takeDeliveredHandoff(id)), /second/)
+  clearDeliveredReturned(id)
 })

@@ -8,7 +8,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
 
-
 /// PROMPT-019: load already-localized js-program prose. Domain assembles;
 /// this module binds language.
 module JsDescriptionAssets =
@@ -22,21 +21,18 @@ module JsDescriptionAssets =
 
     let load (lang: ProviderLanguage) : JsCanonicalDescription.Prose =
         { Header = text lang JsCanonicalDescription.Path.Header
-          EditPrelude = template lang JsCanonicalDescription.Path.EditPrelude
-          EditStructuralGuidance = template lang JsCanonicalDescription.Path.EditStructuralGuidance
+
           Footer = text lang JsCanonicalDescription.Path.Footer
           Contract = template lang JsCanonicalDescription.Path.Contract
-          ContractEditRecommendation = template lang JsCanonicalDescription.Path.ContractEditRecommendation
+
           ContractParallelEdits = template lang JsCanonicalDescription.Path.ContractParallelEdits
           ContractParallelReads = template lang JsCanonicalDescription.Path.ContractParallelReads
           VerbRead = text lang JsCanonicalDescription.Path.VerbRead
-          VerbSearch = text lang JsCanonicalDescription.Path.VerbSearch
-          VerbTransform = text lang JsCanonicalDescription.Path.VerbTransform
-          VerbRewrite = text lang JsCanonicalDescription.Path.VerbRewrite
+
           VerbCreate = text lang JsCanonicalDescription.Path.VerbCreate
           ReadRules = template lang JsCanonicalDescription.Path.ReadRules
           Recipes = text lang JsCanonicalDescription.Path.Recipes
-          EditRules = template lang JsCanonicalDescription.Path.EditRules
+
           WriteRules = text lang JsCanonicalDescription.Path.WriteRules
           MutationRules = text lang JsCanonicalDescription.Path.MutationRules
           Rm = text lang JsCanonicalDescription.Path.Rm
@@ -52,35 +48,27 @@ module JsDescriptionAssets =
           UltraManagerInvestigation = text lang JsCanonicalDescription.Path.UltraManagerInvestigation
           UltraPlan = text lang JsCanonicalDescription.Path.UltraPlan
           MechanicalSemantic = text lang JsCanonicalDescription.Path.MechanicalSemantic
-          CommentAnchorOwnSearch = text lang JsCanonicalDescription.Path.CommentAnchorOwnSearch
-          CommentIgnoreGy = text lang JsCanonicalDescription.Path.CommentIgnoreGy
-          CommentHostCapability = text lang JsCanonicalDescription.Path.CommentHostCapability
-          ReasonEmptyStringPattern = text lang JsCanonicalDescription.Path.ReasonEmptyStringPattern
-          ReasonInvalidRegexp = text lang JsCanonicalDescription.Path.ReasonInvalidRegexp
-          ReasonPatternType = text lang JsCanonicalDescription.Path.ReasonPatternType
-          ReasonAnchorEmptyNames = text lang JsCanonicalDescription.Path.ReasonAnchorEmptyNames
-          ReasonAnchorReserved = text lang JsCanonicalDescription.Path.ReasonAnchorReserved
-          ReasonAnchorNamesDiffer = text lang JsCanonicalDescription.Path.ReasonAnchorNamesDiffer
-          ReasonAnchorNamesUnique = text lang JsCanonicalDescription.Path.ReasonAnchorNamesUnique
-          ReasonAnchorNotFound = text lang JsCanonicalDescription.Path.ReasonAnchorNotFound
-          ReasonUnknownAnchor = text lang JsCanonicalDescription.Path.ReasonUnknownAnchor
-          ReasonInvalidSlice = text lang JsCanonicalDescription.Path.ReasonInvalidSlice
-          ReasonFileReadFailed = text lang JsCanonicalDescription.Path.ReasonFileReadFailed
+
           ReasonRunUnimplemented = text lang JsCanonicalDescription.Path.ReasonRunUnimplemented
-          ReasonEditInvalid = text lang JsCanonicalDescription.Path.ReasonEditInvalid
-          ReasonEditNotFound = text lang JsCanonicalDescription.Path.ReasonEditNotFound
-          ReasonEditAmbiguous = text lang JsCanonicalDescription.Path.ReasonEditAmbiguous
-          ReasonEditOverlap = text lang JsCanonicalDescription.Path.ReasonEditOverlap
-          ReasonEditAtomicity = text lang JsCanonicalDescription.Path.ReasonEditAtomicity
-          ReasonEditPreview = text lang JsCanonicalDescription.Path.ReasonEditPreview
-          ReasonEditCopyReady = text lang JsCanonicalDescription.Path.ReasonEditCopyReady
-          ReasonEditAttempted = text lang JsCanonicalDescription.Path.ReasonEditAttempted
-          ReasonEditUnknownFields = text lang JsCanonicalDescription.Path.ReasonEditUnknownFields
-          ReasonEditCandidate = text lang JsCanonicalDescription.Path.ReasonEditCandidate
-          ReasonEditLine = text lang JsCanonicalDescription.Path.ReasonEditLine
-          ReasonEditOverlaps = text lang JsCanonicalDescription.Path.ReasonEditOverlaps
+
           Park = template lang JsCanonicalDescription.Path.Park
-          ParkedPayload = template lang JsCanonicalDescription.Path.ParkedPayload }
+          ParkedPayload = template lang JsCanonicalDescription.Path.ParkedPayload
+          BaseClass = template lang JsCanonicalDescription.Path.BaseClass
+          BaseClassCallable = template lang JsCanonicalDescription.Path.BaseClassCallable
+          BaseClassRead = template lang JsCanonicalDescription.Path.BaseClassRead
+          BaseClassGlob = template lang JsCanonicalDescription.Path.BaseClassGlob
+          BaseClassGrep = template lang JsCanonicalDescription.Path.BaseClassGrep
+          BaseClassWrite = template lang JsCanonicalDescription.Path.BaseClassWrite
+          BaseClassRemove = template lang JsCanonicalDescription.Path.BaseClassRemove
+          BaseClassMove = template lang JsCanonicalDescription.Path.BaseClassMove
+          BaseClassExec = template lang JsCanonicalDescription.Path.BaseClassExec
+          BaseClassFork = template lang JsCanonicalDescription.Path.BaseClassFork
+          BaseClassJoin = template lang JsCanonicalDescription.Path.BaseClassJoin
+          BaseClassFission = template lang JsCanonicalDescription.Path.BaseClassFission
+          BaseClassHorizon = template lang JsCanonicalDescription.Path.BaseClassHorizon
+          BaseClassAdvisor = template lang JsCanonicalDescription.Path.BaseClassAdvisor
+          BaseClassAsk = template lang JsCanonicalDescription.Path.BaseClassAsk
+          BaseClassLifecycle = template lang JsCanonicalDescription.Path.BaseClassLifecycle }
 
     let argProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.ArgProgram
@@ -187,17 +175,14 @@ module JsToolSpec =
         let abandonSchema =
             ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
-        // ANCHOR view declaration (PLAN phase 3): prefixUntil protects the
-        // cache prefix and thenRemove replaces anchors with the model's own
-        // summaries for good. Optional; consumed once by the next transform.
-        // The bilingual resource states the whole contract.
+        // One view contract: the prefix is protected; the map states keep or summary.
         let viewSchema =
             ToolHostCodec.objectSchemaOf
                 [ "prefixUntil", ToolHostCodec.numberSchema factory
-                  "thenRemove",
+                  "thenMap",
                   ToolHostCodec.recordSchemaOf
                       (ToolHostCodec.stringSchema factory)
-                      (ToolHostCodec.stringSchema factory)
+                      (ToolHostCodec.nullableStringSchema factory)
                       (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
                       factory ]
                 factory

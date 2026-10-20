@@ -107,7 +107,7 @@ module JsToolsData =
         with _ ->
             Error JsFailure.InvalidReturnValue
 
-    /// `js.deliver(value)` ends the program with an explicit terminal value;
+    /// `this.deliver(value)` ends the program with an explicit terminal value;
     /// the sandbox reports it as this sentinel instead of a return value.
     let private deliveredPrefix = "{\"__jsDelivered\":"
 
@@ -119,7 +119,7 @@ module JsToolsData =
         with _ ->
             Error JsFailure.InvalidReturnValue
 
-    /// The raw JS value a program handed over through `js.deliver(value)`.
+    /// The raw JS value a program handed over through `this.deliver(value)`.
     let parseDeliveredValue (json: string) : obj =
         try
             (JS.JSON.parse json)?value
@@ -132,7 +132,7 @@ module JsToolsData =
 
     /// Extract the payload from a parked sentinel JSON string. The sentinel is
     /// produced by the park signal path; its payload is the value the program
-    /// passed to `await js.park(payload)`.
+    /// passed to `await this.park(payload)`.
     let parseParkedPayload (json: string) : obj =
         try
             let payload = JS.JSON.parse json
@@ -153,7 +153,7 @@ module JsToolWorkflow =
 
     /// Outcome of one invocation: the program's structured value plus the
     /// commit report — or a stable JsFailure. `Parked` is the top-level parked
-    /// payload: the program suspended at `await js.park(payload)` and the site
+    /// payload: the program suspended at `await this.park(payload)` and the site
     /// is registered under `handle` (PLAN S2 step 4).
     type JsToolOutcome =
         | Succeeded of
@@ -437,6 +437,7 @@ module JsToolWorkflow =
                             ledger
                             (Some callHost)
                             None
+                            None
 
                     let! resultJson =
                         task {
@@ -459,8 +460,7 @@ module JsToolWorkflow =
             let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
 
             let hasMutationCapability =
-                Set.contains JsCapability.Edit capabilities
-                || Set.contains JsCapability.Write capabilities
+                Set.contains JsCapability.Write capabilities
                 || Set.contains JsCapability.Remove capabilities
                 || Set.contains JsCapability.Move capabilities
 
@@ -523,7 +523,7 @@ module JsToolWorkflow =
 
     /// Run a new program with park support. `sessionId` tags the site so
     /// session close can reap it. The park signal is installed before the
-    /// program starts; if the program suspends at `await js.park(payload)` the
+    /// program starts; if the program suspends at `await this.park(payload)` the
     /// signal wins the race and the workflow registers the site. A successful
     /// registration records the Parked lifecycle audit trace (best-effort).
     /// The buffers one run owns; `makeApi` decides which members see them.
@@ -580,7 +580,7 @@ module JsToolWorkflow =
             // Install the park signal the workflow races against the program
             // promise before the program starts: the async IIFE body runs
             // synchronously to its first await, so an immediate
-            // `await js.park(payload)` must already see ParkSignalResolve.
+            // `await this.park(payload)` must already see ParkSignalResolve.
             // Fable has no Task.WhenAny; Promise.race is the established
             // pattern (Await.fs / FinalityController).
             let parkSignal = JsSandbox.installParkSignal parkState
@@ -613,7 +613,7 @@ module JsToolWorkflow =
 
                     recordDeliveredValueIfNeeded sessionId json parsed
                 | Choice2Of2 _ ->
-                    // Park won: the program suspended at `await js.park`.
+                    // Park won: the program suspended at `await this.park`.
                     Ok(box "{\"__jsParked\":true}")
 
             let mutations = staging |> Seq.toList
@@ -625,8 +625,7 @@ module JsToolWorkflow =
             let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
 
             let hasMutationCapability =
-                Set.contains JsCapability.Edit capabilities
-                || Set.contains JsCapability.Write capabilities
+                Set.contains JsCapability.Write capabilities
                 || Set.contains JsCapability.Remove capabilities
                 || Set.contains JsCapability.Move capabilities
 
@@ -689,6 +688,7 @@ module JsToolWorkflow =
             parkState
             (Some callHost)
             (JsDelegationBridge.hostFor sessionId)
+            None
 
     let private runProgramWithPark
         (sessionId: string)
@@ -822,7 +822,7 @@ module JsToolWorkflow =
 
     /// Run a program whose api is supplied by the caller but whose park
     /// lifecycle, race and outcome rendering stay workflow-owned. The plan
-    /// tenure sandbox uses this so `js.ask` suspends through the same site
+    /// tenure sandbox uses this so `this.ask` suspends through the same site
     /// table as the generated surfaces.
     let runWithParkApi
         (sessionId: string)
@@ -985,7 +985,7 @@ module JsToolsResult =
             |> LlmFacing.render
         | JsToolWorkflow.JsToolOutcome.Parked(handle, payload, source) ->
             // Top-level parked payload (PLAN S2 step 4): the program suspended
-            // at `await js.park(payload)` and the site is registered under
+            // at `await this.park(payload)` and the site is registered under
             // handle. The caller resumes with `{ unpark: { handle, value } }`
             // or gives up with `{ abandon: { handle } }`.
             LlmFacing.instruction "parked"

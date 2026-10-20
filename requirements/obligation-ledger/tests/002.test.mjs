@@ -16,10 +16,10 @@ integrationTest('WHAT[obligation-ledger-002] programming-surface view declaratio
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
 
     const calls = [
-      { callID: 'view-cp-1', tool: 'todowrite-for-engineer', view: { prefixUntil: 1 } },
-      { callID: 'view-cp-2', tool: 'todowrite-for-devops', view: { prefixUntil: 1 } },
-      { callID: 'view-cp-3', tool: 'todowrite-for-manager', view: { prefixUntil: 3 } },
-      { callID: 'view-cp-4', tool: 'todowrite-for-plan', view: { prefixUntil: 4 } },
+      { callID: 'view-cp-1', tool: 'todowrite-for-engineer', view: { prefixUntil: 1, thenMap: {} } },
+      { callID: 'view-cp-2', tool: 'todowrite-for-devops', view: { prefixUntil: 1, thenMap: {} } },
+      { callID: 'view-cp-3', tool: 'todowrite-for-manager', view: { prefixUntil: 3, thenMap: {} } },
+      { callID: 'view-cp-4', tool: 'todowrite-for-plan', view: { prefixUntil: 4, thenMap: {} } },
     ]
 
     for (const { callID, tool, view } of calls) {

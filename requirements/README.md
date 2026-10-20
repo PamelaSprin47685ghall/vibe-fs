@@ -60,7 +60,7 @@ grounding 由 `requirement-system` package 拥有。
 | [participant-horizon](participant-horizon/WHAT.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |
 | [cognitive-environment](cognitive-environment/WHAT.md) | 长期认知层与瞬时 runtime/mission 分开；knowledge 不创造 authority。 |
 | [cognitive-workspace](cognitive-workspace/WHAT.md) | 持久认知画板已经退休；本包只保留负向合同，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
-| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume` 与编程面 ANCHOR `view.thenRemove` 摘要，本包只保留负向边界。 |
+| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume` 与编程面 ANCHOR `view.thenMap` 摘要，本包只保留负向边界。 |
 | [action-affordance](action-affordance/WHAT.md) | 决策点必须知道 act 的正负边界、成功后果与参数意义。 |
 | [provider-language](provider-language/WHAT.md) | 一个 life 一个稳定 natural-language world；protocol identifiers 不翻译。 |
 | [provider-projection](provider-projection/WHAT.md) | typed semantic intent 经唯一确定性投影成为 provider representation，表示不反向创造 authority。 |

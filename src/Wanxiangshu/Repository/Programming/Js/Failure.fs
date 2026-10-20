@@ -212,7 +212,7 @@ module JsFailure =
         | JsFailure.CallWaitTimeout -> "waitFor condition was not met before its timeout"
         | JsFailure.CallChildUnknown name -> "no background process with this name: " + name
         | JsFailure.CallParkUnsupported -> "park verdict requires the orchestrated execution path"
-        | JsFailure.CallHostUnavailable -> "js.call has no host loop in this execution path"
+        | JsFailure.CallHostUnavailable -> "this.call has no host loop in this execution path"
         | JsFailure.AskRefused detail -> reasonWithMessage "ask was refused" "" detail
         | JsFailure.DelegationUnavailable -> "fork/join is not wired in this execution path"
         | JsFailure.ViewDeclarationInvalid detail ->

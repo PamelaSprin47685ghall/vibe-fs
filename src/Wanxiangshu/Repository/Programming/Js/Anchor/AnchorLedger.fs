@@ -2,30 +2,25 @@ namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
 open System.Collections.Generic
 
-/// Process-live ANCHOR ledger. Module state by construction: restart resets
-/// numbers, drops pending declarations and forgets which anchors were
-/// summarized, matching the process-live parked sites.
+/// Process-live numbering, pending declarations and ordered interval replacements.
 module AnchorLedger =
-
-    // DSL-MUTABLE: resource — process-live anchor stream
+    // DSL-MUTABLE: resource — process-wide stable anchor numbers
     let private nextNumber = ref 0
-
-    // DSL-MUTABLE: resource — sessionId → (messageId → anchor)
+    // DSL-MUTABLE: resource — session message identities
     let private numbers = Dictionary<string, Dictionary<string, int>>()
-
-    // DSL-MUTABLE: resource — sessionId → pending one-turn declaration
+    // DSL-MUTABLE: resource — next-request declarations
     let private views = Dictionary<string, AnchorViewDeclaration>()
+    // DSL-MUTABLE: resource — permanent interval replacements in causal order
+    let private histories = Dictionary<string, AnchorReplacement list>()
+    // DSL-MUTABLE: resource — current caller context for view-based handoff
+    let private contexts = Dictionary<string, (string option * string) list>()
 
-    // DSL-MUTABLE: resource — sessionId → (anchor → summary standing in for it)
-    let private summaries = Dictionary<string, Dictionary<int, string>>()
+    let remember sessionId messages = contexts.[sessionId] <- messages
 
-    let private sessionTable (store: Dictionary<string, Dictionary<int, string>>) (sessionId: string) =
-        match store.TryGetValue sessionId with
-        | true, existing -> existing
-        | false, _ ->
-            let fresh = Dictionary<int, string>()
-            store.[sessionId] <- fresh
-            fresh
+    let context sessionId =
+        match contexts.TryGetValue sessionId with
+        | true, messages -> messages
+        | false, _ -> []
 
     let numberMessage (sessionId: string) (messageId: string) : int =
         let session =
@@ -43,7 +38,7 @@ module AnchorLedger =
             session.[messageId] <- nextNumber.Value
             nextNumber.Value
 
-    let anchors (sessionId: string) : (int * string) list =
+    let private numbered (sessionId: string) =
         match numbers.TryGetValue sessionId with
         | false, _ -> []
         | true, session ->
@@ -52,7 +47,28 @@ module AnchorLedger =
             |> Seq.sortBy fst
             |> Seq.toList
 
-    let setView (sessionId: string) (declaration: AnchorViewDeclaration) : unit = views.[sessionId] <- declaration
+    let knownAnchors sessionId = numbered sessionId |> List.map fst
+
+    let replacements (sessionId: string) : AnchorReplacement list =
+        match histories.TryGetValue sessionId with
+        | true, history -> history
+        | false, _ -> []
+
+    let anchors sessionId =
+        let live =
+            AnchorViewDeclaration.live (knownAnchors sessionId) (replacements sessionId)
+            |> Set.ofList
+
+        numbered sessionId |> List.filter (fun (anchor, _) -> Set.contains anchor live)
+
+    let setView (sessionId: string) (declaration: AnchorViewDeclaration) : unit =
+        let history = replacements sessionId
+
+        let changes =
+            AnchorViewDeclaration.plan (knownAnchors sessionId) history declaration
+
+        histories.[sessionId] <- history @ changes
+        views.[sessionId] <- declaration
 
     let takeView (sessionId: string) : AnchorViewDeclaration option =
         match views.TryGetValue sessionId with
@@ -61,26 +77,15 @@ module AnchorLedger =
             Some declaration
         | false, _ -> None
 
-    /// A summary is permanent: from here on the anchor's segments are replaced
-    /// by it, whether or not a later declaration names that anchor again.
-    let replaceAnchors (sessionId: string) (pairs: (int * string) list) : unit =
-        if not (List.isEmpty pairs) then
-            let session = sessionTable summaries sessionId
-
-            pairs |> List.iter (fun (anchor, summary) -> session.[anchor] <- summary)
-
-    let replacements (sessionId: string) : Map<int, string> =
-        match summaries.TryGetValue sessionId with
-        | true, existing -> existing |> Seq.map (fun pair -> pair.Key, pair.Value) |> Map.ofSeq
-        | false, _ -> Map.empty
-
-    let clearSession (sessionId: string) : unit =
+    let clearSession sessionId =
         numbers.Remove sessionId |> ignore
         views.Remove sessionId |> ignore
-        summaries.Remove sessionId |> ignore
+        histories.Remove sessionId |> ignore
+        contexts.Remove sessionId |> ignore
 
-    let clearAll () : unit =
+    let clearAll () =
         numbers.Clear()
         views.Clear()
-        summaries.Clear()
+        histories.Clear()
+        contexts.Clear()
         nextNumber.Value <- 0

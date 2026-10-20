@@ -1,5 +1,7 @@
 # GAP 台账
 
+> 2026-10-20 view 契约更新：当前统一形状为 `{ prefixUntil, thenMap }`，两字段必填。历史条目（如 GAP-237）中记载的 `extra` 是旧文档漂移，不是当前参数；当前语义以 `context-compression/WHAT.md` [031] 和 `repository-programming/WHAT.md` [053] 为准。历史验证数据仍只证明当时的状态。
+
 > 全仓已知 proof gap 的唯一单轨记录台账（按 [requirement-system-018] 规范和测试的印证：覆盖缺口由
 > requirements/GAP.md 记录）。GAP = 某条 WHAT 命题尚无独立可执行 oracle（机器可红
 > 落点），或该 oracle 由 e2e / 人工评审 / 其它包交叉承载。

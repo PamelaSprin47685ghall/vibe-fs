@@ -9,8 +9,7 @@ type JsSurface =
       Members: JsCapabilityFragment list
       Description: string
       BaseClassSource: string
-      Examples: string list
-      RuntimeBindings: Map<string, string> }
+      Examples: string list }
 
 module JsToolGenerator =
     val membersFor: capabilities: Set<JsCapability> -> JsCapabilityFragment list

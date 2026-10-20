@@ -521,7 +521,7 @@ type SyncDelegateRuntime
         task {
             // Completion marker for ManagerLife. HandleTurn
             // does not use Terminal to build the inspect payload;
-            // the terminal record comes from js.deliver (with turn parts fallback).
+            // the terminal record comes from this.deliver (with turn parts fallback).
             match! XTraceCapture.captureTerminalWithReceipt (Some journal) turn with
             // delegation-031: the terminal trace write is settlement evidence, not
             // the completion itself. WriterUnavailable/WriteUnknown means the

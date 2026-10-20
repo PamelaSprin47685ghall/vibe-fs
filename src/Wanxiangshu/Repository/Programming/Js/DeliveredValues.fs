@@ -7,32 +7,18 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
 /// Process-live delivered-value cell, keyed by session. The cell holds the value
-/// and the optional view `js.deliver` handed over. A separate returned cursor
-/// records the identity of every prose item already handed back, so a later
-/// deliver in the same session does not return it again. Identity is the host
-/// message id or the anchor number — never the prose text. Restart drops both;
-/// the durable terminal record is written when the call settles.
+/// and the optional view `this.deliver` handed over. A separate returned cursor
+/// records each representative together with its rendered material, so identical
+/// deliveries are not repeated and changed summaries remain visible. Restart
+/// drops both; the durable terminal record is written when the call settles.
 module JsDeliveredValues =
 
     [<Emit("$0 === undefined || $0 === null")>]
     let private isMissing (value: obj) : bool = jsNative
 
-    [<Emit("typeof $0 === 'object' && $0 !== null && !Array.isArray($0)")>]
-    let private isPlainObject (value: obj) : bool = jsNative
+    type private DeliveredCell = { Value: obj; View: obj option }
 
-    [<Emit("Object.keys($0)")>]
-    let private objectKeys (value: obj) : string[] = jsNative
-
-    [<Emit("$0[$1]")>]
-    let private getProp (value: obj) (key: string) : obj = jsNative
-
-    type private DeliveredCell =
-        { Value: obj
-          View: obj option }
-
-    type ReturnedPiece =
-        { Key: string
-          Text: string }
+    type ReturnedPiece = { Key: string; Text: string }
 
     // DSL-MUTABLE: resource — sessionId → delivered value and view
     let private delivered = Dictionary<string, DeliveredCell>()
@@ -96,67 +82,44 @@ module JsDeliveredValues =
     let render (value: obj) : string option =
         if isMissing value then None else renderPresentValue value
 
-    let private unboxInteger (value: obj) : int option =
-        try
-            Some(int (unbox<float> value))
-        with _ ->
-            None
+    let private declarationOf raw =
+        match Anchor.AnchorSurface.parseDeclaration raw with
+        | Ok parsed -> parsed
+        | Error failure -> invalidOp (JsFailure.code failure + ": " + JsFailure.reason failure)
 
-    let private numberOf (value: obj) : int option =
-        if isMissing value then None else unboxInteger value
+    let private newPiece (already: Set<string>) (anchor, text) =
+        let key = Anchor.AnchorView.materialKey anchor text
 
-    let private anchorKey (anchor: int) = "anchor:" + string anchor
-
-    let private entrySummary (raw: obj) (key: string) : string option =
-        let summary = getProp raw key
-
-        if isMissing summary || String.IsNullOrWhiteSpace(string summary) then
+        if Set.contains key already then
             None
         else
-            Some(string summary)
+            Some { Key = key; Text = text }
 
-    let private parseRemovalEntry (raw: obj) (key: string) : (int * string) option =
-        match Int32.TryParse key with
-        | true, anchor when string anchor = key ->
-            entrySummary raw key
-            |> Option.map (fun summary -> anchor, summary)
-        | _ -> None
+    /// Handoff uses the same projected view as requests and advisor consultation.
+    let select (sessionId: string) (view: obj option) (already: Set<string>) : ReturnedPiece list =
+        match view with
+        | None -> []
+        | Some raw ->
+            let declaration = declarationOf raw
 
-    let private removalsOf (view: obj) : Map<int, string> =
-        let raw = getProp view "thenRemove"
+            let numberOf = Anchor.AnchorLedger.numberMessage sessionId
 
-        if isMissing raw || not (isPlainObject raw) then
-            Map.empty
-        else
-            objectKeys raw
-            |> Array.choose (parseRemovalEntry raw)
-            |> Map.ofArray
+            let messages =
+                Anchor.AnchorLedger.context sessionId
+                |> List.map (fun (id, text) ->
+                    { Anchor.AnchorView.AnchorMessage.Id = id
+                      Anchor.AnchorView.AnchorMessage.Text = text
+                      Anchor.AnchorView.AnchorMessage.Raw = null })
 
-    let private eligiblePiece (prefixUntil: int) (already: Set<string>) (anchor: int, summary: string) : ReturnedPiece option =
-        let key = anchorKey anchor
+            let entries, _ =
+                Anchor.AnchorView.generate
+                    numberOf
+                    (fun _ -> 0)
+                    (Anchor.AnchorLedger.replacements sessionId)
+                    declaration
+                    messages
 
-        if anchor < prefixUntil || Set.contains key already then
-            None
-        else
-            Some { Key = key; Text = summary }
-
-    /// Prose the view chooses to hand back, minus identities already returned.
-    /// No view means no assistant prose. An item with no host-message id and no
-    /// anchor number is not returned: there is no cursor key that is not a guess
-    /// about the text.
-    let select (view: obj option) (already: Set<string>) (removals: Map<int, string>) : ReturnedPiece list =
-        let pieces =
-            view
-            |> Option.bind (fun declaration ->
-                numberOf (getProp declaration "prefixUntil")
-                |> Option.map (fun prefixUntil ->
-                    let named = if Map.isEmpty removals then removalsOf declaration else removals
-
-                    named
-                    |> Map.toList
-                    |> List.choose (eligiblePiece prefixUntil already)))
-
-        pieces |> Option.defaultValue []
+            Anchor.AnchorView.material numberOf entries |> List.choose (newPiece already)
 
     let private presentValueBlocks (value: obj) =
         match LlmFacing.Data.ofJs value with
@@ -187,7 +150,12 @@ module JsDeliveredValues =
             |> renderNonBlank
 
     let private proseKey (sessionId: string) (text: string) =
-        "prose:" + sessionId + ":" + string text.Length + ":" + text.Substring(0, min 24 text.Length)
+        "prose:"
+        + sessionId
+        + ":"
+        + string text.Length
+        + ":"
+        + text.Substring(0, min 24 text.Length)
 
     /// The last assistant prose is handed back only when this deliver carried a
     /// view. The cursor key is the session plus the prose itself, not a guess
@@ -219,7 +187,7 @@ module JsDeliveredValues =
         (assistant: string option)
         : string option =
         let pieces =
-            select cell.View (alreadyReturned sessionId) Map.empty
+            select sessionId cell.View (alreadyReturned sessionId)
             |> fun selected -> withAssistant sessionId cell.View selected assistant
 
         if advance then

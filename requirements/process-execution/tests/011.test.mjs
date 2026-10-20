@@ -6,7 +6,7 @@ import { sandbox, runProgram, caseName, render, nodeCommand } from './support/ex
 
 const { contextDecode, contextView } = await import('../../../dist/OpenCode/Codec/ToolHostSurface.js')
 
-// Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052]).
+// Host-native `run` tool is retired; `this.call` supersedes it (repository-programming [050]-[052]).
 
 test('WHAT[process-execution-011] RUN_host_context_codec_exposes_plain_snapshot', () => {
   const decoded = contextDecode({ sessionID: 'ses-exec', agent: 'devops' })
@@ -19,7 +19,7 @@ test('WHAT[process-execution-011] RUN_host_context_codec_exposes_plain_snapshot'
   })
 })
 
-test('WHAT[process-execution-011] js.call rejects incomplete Runnable specs before spawning', async () => {
+test('WHAT[process-execution-011] this.call rejects incomplete Runnable specs before spawning', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-011a-')
   try {
     const marker = join(dir, 'spawned')
@@ -32,7 +32,7 @@ test('WHAT[process-execution-011] js.call rejects incomplete Runnable specs befo
       `class { maxDuration = 1000; next() { return ${JSON.stringify(cmd)}; } }`,
     ]
     for (const spec of incompleteSpecs) {
-      const outcome = await runProgram(dir, `    return await js.call(${spec});`)
+      const outcome = await runProgram(dir, `    return await this.call(${spec});`)
       assert.equal(caseName(outcome), 'Failed')
       assert.match(render(outcome), /CALLABLE_SPEC_INCOMPLETE/)
       assert.equal(existsSync(marker), false, 'incomplete Runnable spec must not spawn the command')
@@ -42,12 +42,12 @@ test('WHAT[process-execution-011] js.call rejects incomplete Runnable specs befo
   }
 })
 
-test('WHAT[process-execution-011] js.call rejects unsupported command descriptors with CALL_COMMAND_UNSUPPORTED', async () => {
+test('WHAT[process-execution-011] this.call rejects unsupported command descriptors with CALL_COMMAND_UNSUPPORTED', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-011b-')
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 2000;
       next(ctx) { return ctx.step === 0 ? { unsupported: true } : null; }
       check() { return true; }
@@ -62,13 +62,13 @@ test('WHAT[process-execution-011] js.call rejects unsupported command descriptor
   }
 })
 
-test('WHAT[process-execution-011] js.call maxDuration overrun terminates the foreground command and reports timeout', async () => {
+test('WHAT[process-execution-011] this.call maxDuration overrun terminates the foreground command and reports timeout', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-011c-')
   try {
     const marker = join(dir, 'late-marker')
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 150;
       interval = 30;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late-marker" : null; }

@@ -20,6 +20,7 @@ const toolModule = () => {
   tool.schema = {
     string: () => ({
       type: 'string',
+      nullable: () => ({ type: 'string', nullable: true }),
       describe: (text) => ({ type: 'string', description: text }),
     }),
     any: () => ({

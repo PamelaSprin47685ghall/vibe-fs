@@ -31,9 +31,9 @@ type SessionAgentProjection =
         /// COMPANION-003 / HOST-005: the XTrace — the session's unique raw
         /// semantic trajectory. It is the raw record itself, not a compressed
         /// view of it: what the provider is shown is decided by the model's own
-        /// ANCHOR `view` declaration (prefixUntil / thenRemove), and the
+        /// ANCHOR `view` declaration (prefixUntil / thenMap), and the
         /// compressed result handed back to a caller is the delivered
-        /// `js.deliver` view.
+        /// `this.deliver` view.
         XTrace: XTraceProjectionState option
 
         /// COMPANION-009: which provider-visible prefix generation is in force.

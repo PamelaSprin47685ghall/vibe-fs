@@ -52,15 +52,15 @@ test('WHAT[work-024] an unreviewed tenure may read the draft and must refuse a w
 
     const read = await runJsPlan(store.gitCommonDir, root, 'work-24', `class Js extends JsProgram {
       async run() {
-        const file = await this.file([]);
-        return { text: file.text() };
+        const text = await this.cat(PLAN_PATH);
+        return { text };
       }
     }`)
     assert.match(read, /# ok/)
 
     const write = await runJsPlan(store.gitCommonDir, root, 'work-24', `class Js extends JsProgram {
       async run() {
-        this.rewrite('# mutated before review');
+        this.write(PLAN_PATH, '# mutated before review');
         return { written: true };
       }
     }`)
@@ -79,7 +79,7 @@ test('WHAT[work-024] a reviewed tenure may write; a second review and a delivere
 
     const write = await runJsPlan(store.gitCommonDir, root, 'work-24b', `class Js extends JsProgram {
       async run() {
-        this.rewrite('# written after review');
+        this.write(PLAN_PATH, '# written after review');
         return { written: true };
       }
     }`)

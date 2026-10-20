@@ -475,6 +475,9 @@ module ToolHostCodec =
 
     let stringSchema (HostToolFactory factory) = HostSchema(rawStringSchema factory)
 
+    let nullableStringSchema (HostToolFactory factory) =
+        HostSchema(emitJsExpr factory "$0.schema.string().nullable()")
+
     /// Free-form JSON value: the caller owns the injected value's shape.
     let anySchema (HostToolFactory factory) = HostSchema(rawAnySchema factory)
 

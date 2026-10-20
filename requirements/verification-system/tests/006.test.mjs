@@ -837,7 +837,7 @@ await superviseNodeTest({ files: process.argv.slice(2), label: 'file-wait-fixtur
     assert.match(diagnostics, /file streams: 1 drained, 1 active, 1 queued/)
     const activeWaits = diagnostics.split('\n').filter((line) => line.includes('active file '))
     assert.equal(activeWaits.length, 1, diagnostics)
-    assert.match(activeWaits[0], /leaks-handle-after-pass\.fixture\.mjs.*waiting for stream drain.*passes and leaks/)
+    assert.match(activeWaits[0], /leaks-handle-after-pass\.fixture\.mthis.*waiting for stream drain.*passes and leaks/)
     assert.match(diagnostics, /1 queued file\(s\) have not started/)
   } finally {
     fs.rmSync(directory, { recursive: true, force: true })

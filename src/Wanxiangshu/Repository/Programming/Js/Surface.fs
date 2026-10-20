@@ -14,9 +14,6 @@ type JsSurface =
         BaseClassSource: string
         /// GrandRewrite §6.10: exactly one responsibility-shaped Ultra Example.
         Examples: string list
-        /// member name → runtime binding key; the runtime gate checks the
-        /// invoked member against this exact map (JS-004).
-        RuntimeBindings: Map<string, string>
     }
 
 module JsToolGenerator =
@@ -74,11 +71,7 @@ module JsToolGenerator =
                   Members = members
                   Description = renderDescription prose roleName jsCapabilities
                   BaseClassSource = renderBaseClass prose jsCapabilities
-                  Examples = renderExamples prose roleName jsCapabilities
-                  RuntimeBindings =
-                    members
-                    |> List.map (fun fragment -> fragment.MemberName, fragment.RuntimeBindingKey)
-                    |> Map.ofList }
+                  Examples = renderExamples prose roleName jsCapabilities }
 
     /// Generated-name gate: a js-* tool call is accepted iff its name is the
     /// surface this profile generates; any other name fails closed (JS-001).
@@ -95,7 +88,7 @@ module JsToolGenerator =
         |> Option.bind (fun (_, _, members) ->
             members
             |> List.tryFind (fun fragment -> fragment.MemberName = memberName)
-            |> Option.map (fun fragment -> fragment.RuntimeBindingKey))
+            |> Option.map (fun fragment -> fragment.MemberName))
 
 /// Transaction context supporting separation of ReadSnapshots and SubstantiveAccess (repository-programming-026 / T18 / T19).
 type JsTransactionContext() =

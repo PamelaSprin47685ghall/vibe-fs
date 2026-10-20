@@ -34,8 +34,7 @@ open Wanxiangshu.Participant.Provider.Projection
 module PairProgrammingThoughtTransform =
 
     [<RequireQualifiedAccess>]
-    type CursorPresentationOwner =
-        | PairGuidance
+    type CursorPresentationOwner = | PairGuidance
 
     [<Literal>]
     let private PairProgrammingGuidelinePath = "host/pair-programming-guideline"
@@ -1302,7 +1301,7 @@ module PairProgrammingThoughtTransform =
         (restartGuidance: string option)
         : Task<LlmFacing.Document> =
         task {
-            let guidance : string option = None
+            let guidance: string option = None
 
             // Algorithm G2: every round that carries a PairHint also lists the
             // unresolved parked handles, so the AI is pressed to take a
@@ -1377,6 +1376,9 @@ module PairProgrammingThoughtTransform =
     [<Emit("({ info: { ...$0.info, id: (($0.info && $0.info.id) ? $0.info.id : ($0.id || 'anchor')) + '#summary', synthetic: true, source: 'anchor-summary' }, parts: [{ type: 'text', text: $1 }] })")>]
     let private summarizedMessage (raw: obj) (summary: string) : obj = jsNative
 
+    [<Emit("({ info: { id: 'anchor-zero#summary', role: 'user', synthetic: true, source: 'anchor-summary' }, parts: [{ type: 'text', text: $0 }] })")>]
+    let private openingSummary (summary: string) : obj = jsNative
+
     /// Selection applies on every request: a consumed declaration states this
     /// turn's statement (protected prefix, new summaries), while the summaries
     /// already recorded are permanent and outlive the declaration that made them.
@@ -1385,10 +1387,9 @@ module PairProgrammingThoughtTransform =
         (messages: obj list)
         (mapLines: string list)
         (declaration: AnchorViewDeclaration option)
-        (replaced: Map<int, string>)
+        (replaced: AnchorReplacement list)
         : obj list * string option =
-        let effective =
-            declaration |> Option.defaultValue { PrefixUntil = 0; ThenRemove = [] }
+        let effective = declaration |> Option.defaultValue AnchorViewDeclaration.empty
 
         let inputs =
             messages
@@ -1397,6 +1398,8 @@ module PairProgrammingThoughtTransform =
                   AnchorView.AnchorMessage.Text = wireTextOf raw
                   AnchorView.AnchorMessage.Raw = raw })
 
+        AnchorLedger.remember sessionId (inputs |> List.map (fun message -> message.Id, message.Text))
+
         let entries, report =
             AnchorView.apply (AnchorLedger.numberMessage sessionId) AnchorSurface.countTokens replaced effective inputs
 
@@ -1404,15 +1407,16 @@ module PairProgrammingThoughtTransform =
             entries
             |> List.map (function
                 | AnchorView.Kept message -> message.Raw
-                | AnchorView.Summarized(message, summary) -> summarizedMessage message.Raw summary)
+                | AnchorView.Summarized(message, summary) -> summarizedMessage message.Raw summary
+                | AnchorView.OpeningSummary summary -> openingSummary summary)
 
         let declaredLines =
             declaration
             |> Option.map (fun view ->
                 [ sprintf
-                      "ANCHOR view applied: prefixUntil=%d; thenRemove=[%s]"
+                      "ANCHOR view applied: prefixUntil=%d; thenMap=[%s]"
                       view.PrefixUntil
-                      (view.ThenRemove |> List.map fst |> hashText)
+                      (view.ThenMap |> List.map fst |> hashText)
                   sprintf
                       "this request: kept=%d summarized=%d folded=%d tokens total=%d used=%d cached=%d (anchors below prefixUntil survive in the cache prefix at a fraction of the price; everything else is recomputed every turn)"
                       report.Kept
@@ -1424,11 +1428,11 @@ module PairProgrammingThoughtTransform =
             |> Option.defaultValue []
 
         let replacedLines =
-            if Map.isEmpty replaced then
+            if List.isEmpty replaced then
                 []
             else
                 [ sprintf
-                      "summaries stand in for anchors [%s] for the rest of this session and are no longer anchors; replacing an earlier anchor folds them in"
+                      "replacement history for anchors [%s] is permanent; live anchors represent the latest intervals, including prior summaries; implicit anchor 0 always represents the beginning"
                       (hashText report.Replaced) ]
 
         let block =
@@ -1450,7 +1454,7 @@ module PairProgrammingThoughtTransform =
         let declaration = AnchorLedger.takeView sessionId
         let replaced = AnchorLedger.replacements sessionId
 
-        if declaration.IsNone && Map.isEmpty replaced && List.isEmpty mapLines then
+        if declaration.IsNone && List.isEmpty replaced && List.isEmpty mapLines then
             messages, None
         else
             applyDeclaredAnchorView sessionId messages mapLines declaration replaced
@@ -1465,10 +1469,7 @@ module PairProgrammingThoughtTransform =
             numberHostMessages sessionId messages
 
             let mapLines =
-                let replaced = AnchorLedger.replacements sessionId
-
                 AnchorLedger.anchors sessionId
-                |> List.filter (fun (anchor, _) -> not (Map.containsKey anchor replaced))
                 |> List.rev
                 |> List.truncate 20
                 |> List.rev

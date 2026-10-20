@@ -67,23 +67,23 @@ const MEMBERS_BY_PERMISSION = {
 }
 
 const BINDING_BY_MEMBER = {
-  write: 'js.write',
-  rm: 'js.rm',
-  mv: 'js.mv',
-  cat: 'js.cat',
-  ls: 'js.ls',
-  rg: 'js.rg',
-  stat: 'js.stat',
-  mkdir: 'js.mkdir',
-  whereAll: 'js.whereAll',
-  where: 'js.where',
-  call: 'js.call',
-  fork: 'js.fork',
-  dag: 'js.dag',
-  join: 'js.join',
-  fission: 'js.fission',
-  horizon: 'js.horizon',
-  advisor: 'js.advisor',
+  write: 'write',
+  rm: 'rm',
+  mv: 'mv',
+  cat: 'cat',
+  ls: 'ls',
+  rg: 'rg',
+  stat: 'stat',
+  mkdir: 'mkdir',
+  whereAll: 'whereAll',
+  where: 'where',
+  call: 'call',
+  fork: 'fork',
+  dag: 'dag',
+  join: 'join',
+  fission: 'fission',
+  horizon: 'horizon',
+  advisor: 'advisor',
 }
 
 const MEMBER_ORDER = [
@@ -104,21 +104,14 @@ const expectedMembers = (permissionNames) =>
 // layer is the public method they declare.
 const SUGAR_MEMBERS = ['dag']
 
-// The Exec member is NOT on the base class: it is a member of the global `js`
-// namespace only (`js.call(...)`), because the base class already owns `run()`
-// as the model's program entry. Its binding still resolves, its description and
-// example still name it, and the base class must not shadow it.
-const GLOBAL_MEMBERS = ['call']
 
 const layersOf = (s) =>
   Object.fromEntries(
     s.members.map((fragment) => [
       fragment.memberName,
       {
-        description: fragment.description,
-        example: fragment.canonicalExample,
-        binding: fragment.runtimeBindingKey,
-        inBaseClass: s.baseClassSource.includes(`this._api.${fragment.runtimeBindingKey}`),
+        binding: fragment.memberName,
+        inBaseClass: s.baseClassSource.includes(`this._api.${fragment.memberName}`),
         inDescription: s.description.includes(fragment.memberName),
         inExamples: s.examples.some((example) => example.includes(fragment.memberName)),
       },
@@ -160,9 +153,9 @@ test('WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_
   assert.equal(result.description.includes('edit(path'), false)
   assert.equal(result.description.includes('rewrite(path'), false)
   assert.equal(result.description.includes('write(path, content)'), false)
-  assert.equal(result.baseClassSource.includes('js.edit'), false)
-  assert.equal(result.baseClassSource.includes('js.write'), false)
-  assert.equal(result.examples.some((example) => example.includes('this.write')), false)
+  assert.equal(result.baseClassSource.includes('this.edit'), false)
+  assert.equal(result.baseClassSource.includes('write'), false)
+  assert.equal(result.examples.some((example) => example.includes('write')), false)
 })
 
 test('WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_read_or_write_members', () => {
@@ -207,11 +200,11 @@ test('WHAT[repository-programming-002] JS004_member_gate_binds_present_members_o
   assert.equal(memberBinding('Engineer', perms, 'file'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'glob'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'grep'), undefined)
-  assert.equal(memberBinding('Engineer', perms, 'cat'), 'js.cat')
-  assert.equal(memberBinding('Engineer', perms, 'ls'), 'js.ls')
-  assert.equal(memberBinding('Engineer', perms, 'stat'), 'js.stat')
-  assert.equal(memberBinding('Engineer', perms, 'whereAll'), 'js.whereAll')
-  assert.equal(memberBinding('Engineer', perms, 'where'), 'js.where')
+  assert.equal(memberBinding('Engineer', perms, 'cat'), 'cat')
+  assert.equal(memberBinding('Engineer', perms, 'ls'), 'ls')
+  assert.equal(memberBinding('Engineer', perms, 'stat'), 'stat')
+  assert.equal(memberBinding('Engineer', perms, 'whereAll'), 'whereAll')
+  assert.equal(memberBinding('Engineer', perms, 'where'), 'where')
   assert.equal(memberBinding('Engineer', perms, 'edit'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'write'), undefined)
@@ -229,7 +222,7 @@ test('WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_r
   assert.equal(memberBinding('Inspector', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Inspector', perms, 'write'), undefined)
   // the honest members resolve
-  assert.equal(memberBinding('Inspector', perms, 'cat'), 'js.cat')
+  assert.equal(memberBinding('Inspector', perms, 'cat'), 'cat')
   // a lying description would name methods the surface lacks; the generator
   // never does — prove the surface itself contains no unbounded members
   const result = generate('Inspector', perms, 'en')
@@ -252,30 +245,22 @@ test('WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_ev
     assert.deepEqual(memberNames(result), expectedMembers(permissions), `${role} member set`)
     assert.equal(
       memberBinding(role, permissions, 'horizon'),
-      'js.horizon',
+      'horizon',
       `${role} horizon runtime gate`,
     )
 
     const layers = layersOf(result)
-    assert.equal(layers.horizon.binding, 'js.horizon', `${role}: horizon binding key`)
-    assert.equal(layers.horizon.example.includes('horizon'), true, `${role}: horizon canonical example`)
+    assert.equal(layers.horizon.binding, 'horizon', `${role}: horizon binding key`)
+    assert.match(result.description, /async horizon\(\)/, `${role}: horizon pseudocode signature`)
     for (const [member, layer] of Object.entries(layers)) {
-      if (GLOBAL_MEMBERS.includes(member)) {
-        assert.equal(
-          result.baseClassSource.includes(`this._api.${layer.binding}`),
-          false,
-          `${role}: ${member} must not land on the base class`,
-        )
-      } else {
-        const baseClassMarker = SUGAR_MEMBERS.includes(member)
-          ? `async ${member}(`
-          : `this._api.${layer.binding}`
-        assert.equal(
-          result.baseClassSource.includes(baseClassMarker),
-          true,
-          `${role}: ${member} in base class`,
-        )
-      }
+            const baseClassMarker = SUGAR_MEMBERS.includes(member)
+        ? `async ${member}(`
+        : `this._api.${layer.binding}`
+      assert.equal(
+        result.baseClassSource.includes(baseClassMarker),
+        true,
+        `${role}: ${member} in base class`,
+      )
       assert.equal(layer.inDescription, true, `${role}: ${member} in description`)
       assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${role}: ${member} binding`)
     }
@@ -298,30 +283,22 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
     assert.deepEqual(memberNames(result), expectedMembers(permissions), `${role} member set`)
     assert.equal(
       memberBinding(role, permissions, 'advisor'),
-      'js.advisor',
+      'advisor',
       `${role} advisor runtime gate`,
     )
 
     const layers = layersOf(result)
-    assert.equal(layers.advisor.binding, 'js.advisor', `${role}: advisor binding key`)
-    assert.equal(layers.advisor.example.includes('advisor'), true, `${role}: advisor canonical example`)
+    assert.equal(layers.advisor.binding, 'advisor', `${role}: advisor binding key`)
+    assert.match(result.description, /async advisor\(intent, view\)/, `${role}: advisor pseudocode signature`)
     for (const [member, layer] of Object.entries(layers)) {
-      if (GLOBAL_MEMBERS.includes(member)) {
-        assert.equal(
-          result.baseClassSource.includes(`this._api.${layer.binding}`),
-          false,
-          `${role}: ${member} must not land on the base class`,
-        )
-      } else {
-        const baseClassMarker = SUGAR_MEMBERS.includes(member)
-          ? `async ${member}(`
-          : `this._api.${layer.binding}`
-        assert.equal(
-          result.baseClassSource.includes(baseClassMarker),
-          true,
-          `${role}: ${member} in base class`,
-        )
-      }
+            const baseClassMarker = SUGAR_MEMBERS.includes(member)
+        ? `async ${member}(`
+        : `this._api.${layer.binding}`
+      assert.equal(
+        result.baseClassSource.includes(baseClassMarker),
+        true,
+        `${role}: ${member} in base class`,
+      )
       assert.equal(layer.inDescription, true, `${role}: ${member} in description`)
       assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${role}: ${member} binding`)
     }
@@ -343,7 +320,7 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
     assert.equal(
       memberBinding(role, rolePermissions(role.toLowerCase()), 'advisor'),
       undefined,
-      `${role} never resolves js.advisor`,
+      `${role} never resolves this.advisor`,
     )
   }
 })

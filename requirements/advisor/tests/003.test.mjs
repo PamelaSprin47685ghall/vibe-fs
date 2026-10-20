@@ -1,103 +1,72 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-
+import { parse } from 'smol-toml'
 import { clear, clearAll, delivered, plan, record } from '../../../dist/Execution/Delegation/Advisor/Surface.js'
 
-// advisor-[003]: a follow-up appends the view delta behind the delivered cursor, never the whole
-// view again. The cursor is process-live and keyed by caller session.
-const message = (anchor, text) => ({ anchor, text })
-
-const request = (messages, { prefixUntil, thenRemove = [] } = {}) => ({
-  messages,
-  declaration: { prefixUntil, thenRemove },
+const request = (anchors, prefixUntil, thenMap = {}, history = []) => ({
+  messages: anchors.map((anchor) => ({ anchor, text: 'material-' + anchor })),
+  declaration: { prefixUntil, thenMap }, history,
 })
+const texts = (result) => (parse(result.viewPrompt).new_work_to_record ?? []).map((row) => row.record)
+test.beforeEach(() => clearAll())
 
-// The authored header prose itself names `[[new_work_to_record]]`, so every table count below is
-// scoped to the data body — the part after the header's blank line.
-const viewBody = (prompt) => {
-  const boundary = prompt.indexOf('\n\n')
-  return boundary === -1 ? '' : prompt.slice(boundary + 2)
-}
-
-const tableCount = (prompt) => (viewBody(prompt).match(/\[\[new_work_to_record\]\]/g) ?? []).length
-
-const material = (anchor) => `anchor-${anchor}-material`
-
-const messages = (anchors) => anchors.map((anchor) => message(anchor, material(anchor)))
-
-test('WHAT[advisor-003] a follow-up plan with the previous DeliveredAnchors emits the delta alone', () => {
-  const first = plan('en', [], request(messages([1, 2, 3]), { prefixUntil: 4 }))
-  assert.deepEqual(first.deliveredAnchors, [1, 2, 3])
-  assert.equal(tableCount(first.viewPrompt), 3)
-
-  const second = plan('en', first.deliveredAnchors, request(messages([1, 2, 3, 4, 5]), { prefixUntil: 6 }))
-  assert.equal(second.hasNewMaterial, true)
-  assert.deepEqual(second.deliveredAnchors, [1, 2, 3, 4, 5])
-  assert.equal(tableCount(second.viewPrompt), 2, 'only the two new anchors are handed over')
-  assert.equal(second.viewPrompt.includes(material(4)), true)
-  assert.equal(second.viewPrompt.includes(material(5)), true)
-  for (const anchor of [1, 2, 3]) {
-    assert.equal(
-      second.viewPrompt.includes(material(anchor)),
-      false,
-      `anchor ${anchor} was already delivered and must not be re-sent`,
-    )
-  }
-
-  const third = plan('en', second.deliveredAnchors, request(messages([1, 2, 3, 4, 5]), { prefixUntil: 6 }))
+test('WHAT[advisor-003] follow-ups use successfully delivered material rather than a declaration boundary', () => {
+  const first = plan('en', [], request([1, 2, 3], 0))
+  record('caller', first.deliveredMaterial)
+  const second = plan('en', delivered('caller'), request([1, 2, 3, 4, 5], 99))
+  assert.deepEqual(texts(second), ['material-4', 'material-5'])
+  record('caller', second.deliveredMaterial)
+  const third = plan('en', delivered('caller'), request([1, 2, 3, 4, 5], 0))
+  assert.deepEqual(texts(third), [])
   assert.equal(third.hasNewMaterial, false)
-  assert.equal(tableCount(third.viewPrompt), 0, 'an unchanged view re-sends no table')
-  assert.deepEqual(third.deliveredAnchors, [1, 2, 3, 4, 5])
+  assert.deepEqual(third.deliveredMaterial, [])
 })
 
-test('WHAT[advisor-003] a ThenRemove pair does not re-open an already delivered anchor', () => {
-  const planned = plan(
-    'en',
-    [1, 2],
-    request(messages([1, 2, 3]), { prefixUntil: 4, thenRemove: [[1, 'anchor-one-summary']] }),
-  )
-
-  assert.equal(tableCount(planned.viewPrompt), 1)
-  assert.equal(planned.viewPrompt.includes(material(3)), true)
-  assert.equal(
-    planned.viewPrompt.includes('anchor-one-summary'),
-    false,
-    'a delivered anchor stays delivered even when its removal pair is declared',
-  )
-  assert.equal(planned.viewPrompt.includes(material(1)), false)
-  assert.deepEqual(planned.deliveredAnchors, [1, 2, 3])
+test('WHAT[advisor-003] view generation folds intervals before delta and delivers a new representative summary', () => {
+  const initial = plan('en', [], request([1, 2, 3], 0))
+  record('caller', initial.deliveredMaterial)
+  const history = [{ anchor: 2, until: 3, summary: 'old-summary-two' }]
+  const result = plan('en', delivered('caller'), request([1, 2, 3], 1, { 1: 'one-and-two', 3: null }, history))
+  assert.deepEqual(texts(result), ['one-and-two'])
+  assert.equal(result.viewPrompt.includes('old-summary-two'), false)
+  record('caller', result.deliveredMaterial)
+  assert.deepEqual(texts(plan('en', delivered('caller'), request([1, 2, 3], 1, { 1: 'one-and-two' }, history))), [])
 })
 
-test('WHAT[advisor-003] the delivered cursor accumulates per caller session and only grows', () => {
-  const suffix = Math.random().toString(36).slice(2, 8)
-  const caller = `sess-advisor-cursor-${suffix}`
-  const other = `sess-advisor-cursor-${suffix}-other`
+test('WHAT[advisor-003] an unrecorded or failed consultation does not consume its proposed delta', () => {
+  const pending = request([1, 2], 0)
+  const first = plan('en', delivered('caller'), pending)
+  const retry = plan('en', delivered('caller'), pending)
+  assert.deepEqual(texts(retry), texts(first))
+  assert.deepEqual(delivered('caller'), [])
+})
 
-  try {
-    assert.deepEqual(delivered(caller), [], 'a fresh session has delivered nothing')
+test('WHAT[advisor-003] delivery cursors are isolated, monotone, and cleared per caller', () => {
+  const first = plan('en', [], request([1], 0))
+  const second = plan('en', [], request([2], 0))
+  record('caller', first.deliveredMaterial)
+  record('caller', first.deliveredMaterial)
+  record('other', second.deliveredMaterial)
+  assert.equal(delivered('caller').length, 1)
+  assert.equal(delivered('other').length, 1)
+  assert.notDeepEqual(delivered('caller'), delivered('other'))
+  clear('caller')
+  assert.deepEqual(delivered('caller'), [])
+  assert.equal(delivered('other').length, 1)
+  clearAll()
+  assert.deepEqual(delivered('other'), [])
+})
 
-    record(caller, [5, 3])
-    assert.deepEqual(delivered(caller), [3, 5])
-
-    record(caller, [1])
-    assert.deepEqual(delivered(caller), [1, 3, 5], 'recording accumulates')
-
-    // Monotone: an earlier (here: subset) anchor set cannot shrink the counts.
-    record(caller, [1])
-    record(caller, [])
-    assert.deepEqual(delivered(caller), [1, 3, 5], 'the cursor never loses an anchor')
-
-    record(other, [2])
-    assert.deepEqual(delivered(other), [2], 'a second caller session has its own cursor')
-    assert.deepEqual(delivered(caller), [1, 3, 5], 'sessions do not share a cursor')
-
-    clear(caller)
-    assert.deepEqual(delivered(caller), [])
-    assert.deepEqual(delivered(other), [2], 'clear resets one session only')
-  } finally {
-    clearAll()
-  }
-
-  assert.deepEqual(delivered(caller), [])
-  assert.deepEqual(delivered(other), [])
+test('WHAT[advisor-003] permanent anchor zero delivers changed material once and leaves caller state untouched', () => {
+  const firstRequest = request([1, 2], 0, { 0: 'first-opening', 1: null, 2: null })
+  const original = JSON.stringify(firstRequest)
+  const first = plan('en', [], firstRequest)
+  record('caller', first.deliveredMaterial)
+  assert.equal(JSON.stringify(firstRequest), original)
+  const history = [{ anchor: 0, until: 1, summary: 'first-opening' }]
+  const secondRequest = request([1, 2], 0, { 0: 'second-opening', 1: null, 2: null }, history)
+  const second = plan('en', delivered('caller'), secondRequest)
+  assert.deepEqual(texts(second), ['second-opening'])
+  record('caller', second.deliveredMaterial)
+  assert.deepEqual(texts(plan('en', delivered('caller'), secondRequest)), [])
 })

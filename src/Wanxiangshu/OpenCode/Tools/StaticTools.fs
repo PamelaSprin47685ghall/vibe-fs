@@ -27,19 +27,20 @@ module StaticTools =
         | ToolPermission.Move -> []
         | ToolPermission.Remove -> []
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
-        // Exec grants the programming surface's `js.call` loop; the Host-native
+        // Exec grants the programming surface's `this.call` loop; the Host-native
         // `run` tool is retired (repository-programming [050]-[052] supersede it).
         | ToolPermission.Exec -> []
         // Pty is retired: interactive execution is the programming surface's
-        // `js.call` ({ spawn, name } + { send, name, input } + { signal, name }).
+        // `this.call` ({ spawn, name } + { send, name, input } + { signal, name }).
         | ToolPermission.Pty -> []
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Fetch -> [ "fetch" ]
         | ToolPermission.Finality -> [ "deliver" ]
         | ToolPermission.JsPlan -> [ "todowrite-for-plan" ]
-        | ToolPermission.Ask -> [ "ask" ]
+        // Ask is a programming-surface member (this.ask), never a host tool.
+        | ToolPermission.Ask -> []
         | ToolPermission.DevOpsConsultation -> [ "devops" ]
-        // advisor gates the programming surface's `js.advisor` member: a
+        // advisor gates the programming surface's `this.advisor` member: a
         // consult seat that returns an envelope, never a host tool of its own.
         | ToolPermission.Advisor -> []
         | ToolPermission.Deliver -> [ "deliver" ]
@@ -128,7 +129,7 @@ module StaticTools =
     /// JS-001: a role whose capability set includes any programming-surface
     /// permission gets its todowrite-for-* tool allowed in the permission
     /// matrix. Fork/Join count: the Orchestrator's only programming surface is
-    /// delegation (js.fork/js.join).
+    /// delegation (this.fork/this.join).
     let private hasFsCapability (role: Role) : bool =
         let fsPermissions =
             set
@@ -172,7 +173,6 @@ module StaticTools =
           "todowrite-for-devops"
           "todowrite-for-bookkeeper"
           "todowrite-for-plan"
-          "ask"
           "devops" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
@@ -212,7 +212,7 @@ module StaticTools =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
         // 普通工具准入与可见性使用同一份能力映射。
-        | true, ("ask" | "devops" | "review" | "deliver" | "todowrite-for-plan"), Role.Plan -> "allow"
+        | true, ("devops" | "review" | "deliver" | "todowrite-for-plan"), Role.Plan -> "allow"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
 

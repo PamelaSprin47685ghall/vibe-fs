@@ -379,7 +379,7 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
       assert.equal(
         text.includes(`RAW-PROSE-Q${i + 1}`),
         false,
-        `Engineer Q${i + 1} must take the explicit js.deliver record rather than raw turn prose`,
+        `Engineer Q${i + 1} must take the explicit this.deliver record rather than raw turn prose`,
       )
       for (let prior = 0; prior < i; prior += 1) {
         assert.equal(

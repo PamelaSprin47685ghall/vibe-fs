@@ -62,7 +62,7 @@ module HorizonTool =
     val admission: ToolAdmission
     val spec: runtimeCtx: HorizonRuntimeContext -> ToolSpec
 
-    /// The same roster as data for `js.horizon()`: every horizon-visible
+    /// The same roster as data for `this.horizon()`: every horizon-visible
     /// participant with the status the prose line reports, its work state, its
     /// latest record body, and the four calibration numbers, plus the terminals
     /// still open. Provider prose is never rendered.

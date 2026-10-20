@@ -1,18 +1,18 @@
 import test from 'node:test'
 
 {
-// Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052]).
+// Host-native `run` tool is retired; `this.call` supersedes it (repository-programming [050]-[052]).
 const { default: assert } = await import('node:assert/strict')
 const { default: test } = await import('node:test')
 const { sandbox, runProgram, caseName, render } = await import('./support/executor.mjs')
 
-test('WHAT[process-execution-005] js.call rejects non-positive or non-finite maxDuration before spawning', async () => {
+test('WHAT[process-execution-005] this.call rejects non-positive or non-finite maxDuration before spawning', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-005-')
   try {
     for (const rawExpr of ['0', '-5', 'Number.NaN', 'Number.POSITIVE_INFINITY']) {
       const outcome = await runProgram(
         dir,
-        `    return await js.call(class extends js.Callable {
+        `    return await this.call(class extends this.Callable {
       maxDuration = ${rawExpr};
       next() { return "true"; }
       check() { return true; }

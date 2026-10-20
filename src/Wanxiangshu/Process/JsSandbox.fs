@@ -92,11 +92,11 @@ module JsSandbox =
     /// read from the vm-global `__deadlineRef.current` at each call, so a
     /// caller may reset it between calls without re-wrapping the program.
     ///
-    /// Park lifecycle: the api's `js.park(payload)` member (built by
+    /// Park lifecycle: the api's `park(payload)` member (built by
     /// ToolsBindings) sets `__parkState.ParkRequested`, fires the park signal
     /// the workflow races against, and returns a deferred Promise the program
     /// awaits. The wrapper itself is a plain async IIFE: it stays pending while
-    /// the program is suspended at `await js.park`, and resolves with the final
+    /// the program is suspended at `await this.park`, and resolves with the final
     /// result when the program finishes (or with a failure/timeout sentinel).
     /// `unpark` resolves the deferred with the injected value, letting the
     /// program continue as if the await returned that value.
@@ -107,8 +107,6 @@ module JsSandbox =
         "(async () => {\n"
         + baseClassSource
         + "\n"
-        + "const js = api.js;\n"
-        + "if (typeof JsCallable === 'function') { js.Callable = JsCallable; }\n"
         + modelSource
         + "\n"
         + "const __wrap = (target) => new Proxy(target, {\n"
@@ -185,7 +183,7 @@ module JsSandbox =
     /// bounds the serialized result (JS-054.2). Sentinel prefixes are matched
     /// before the byte bound so failures are never misreported as oversized.
     /// A parked sentinel is a normal outcome (the program suspended at
-    /// `await js.park`), not a failure; it decodes to `Ok` with the sentinel
+    /// `await this.park`), not a failure; it decodes to `Ok` with the sentinel
     /// JSON so the workflow can register the site.
     let private decodeRunResult (json: string) (outputBoundBytes: int) : Result<string, JsFailure> =
         if json.StartsWith hostFailedPrefix then
@@ -339,8 +337,8 @@ module JsSandbox =
     let sourceWithExecutionMarker (baseClassSource: string) (modelSource: string) (stack: string) : string =
         let lines = modelSource.Split('\n')
         // Wrapper lines: 1 = "(async () => {", then the base class, then the
-        // `const js = api.js;` prelude and the optional JsCallable bind.
-        let modelStartLine = baseClassSource.Split('\n').Length + 4
+        // model source.
+        let modelStartLine = baseClassSource.Split('\n').Length + 2
         let modelEndLine = modelStartLine + lines.Length - 1
         let currentLine = locateSuspendedLine modelStartLine modelEndLine stack
 
@@ -351,7 +349,7 @@ module JsSandbox =
 
     /// Install the park signal the workflow races against the program promise.
     /// The returned Task completes with the parked payload when the program's
-    /// `js.park(payload)` member fires; the resolver is stored in
+    /// `park(payload)` member fires; the resolver is stored in
     /// `parkState.ParkSignalResolve` so the park member can call it.
     let installParkSignal (parkState: ParkState) : Task<obj> =
         parkState.ParkRequested <- false
@@ -381,7 +379,7 @@ module JsSandbox =
             parkState
             "(function(state) { return new Promise(function(resolve, reject) { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })($0)"
 
-    /// Resolve the deferred promise the program is awaiting at `await js.park`.
+    /// Resolve the deferred promise the program is awaiting at `await this.park`.
     /// Called by `unpark` with the injected value; the program continues as if
     /// the await returned that value.
     let unpark (parkState: ParkState) (value: obj) : unit =

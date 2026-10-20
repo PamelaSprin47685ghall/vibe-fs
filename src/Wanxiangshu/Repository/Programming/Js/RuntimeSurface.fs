@@ -48,6 +48,7 @@ module JsRuntimeSurface =
                 (JsToolsBindings.createLedger None)
                 None
                 None
+                None
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 
@@ -55,7 +56,7 @@ module JsRuntimeSurface =
         match label with
         | "Read" -> Some JsCapability.Read
         | "Write" -> Some JsCapability.Write
-        | "Edit" -> Some JsCapability.Edit
+        
         | "Glob" -> Some JsCapability.Glob
         | "Grep" -> Some JsCapability.Grep
         | "Move" -> Some JsCapability.Move
@@ -85,6 +86,7 @@ module JsRuntimeSurface =
                 (JsToolsBindings.createLedger None)
                 None
                 None
+                None
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 
@@ -111,7 +113,7 @@ module JsRuntimeSurface =
 
     let clearDelegationHosts () : unit = JsDelegationBridge.clearAll ()
 
-    /// Test hook: the raw value a program handed over through `js.deliver`.
+    /// Test hook: the raw value a program handed over through `this.deliver`.
     
     /// Test hook: record a value with an already-shaped deliver view.
     let recordDeliveredView (sessionId: string) (value: obj) (view: obj) : unit =

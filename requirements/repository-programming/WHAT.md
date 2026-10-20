@@ -8,7 +8,7 @@
 
 每项文件系统 capability 在公开基类、工具描述、canonical examples 与运行时门禁中一致投影；缺失能力在四层均不可用，伪造调用也须拒绝。一项能力可生成固定顺序的同权成员族，不产生第二份授权。
 
-主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Grep → `rg`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `run`，Fork → `fork`/`dag`，Join → `join`，Fission → `fission`，Horizon → `horizon`，Advisor → `advisor`；canonical 成员序为 `write, rm, mv, cat, ls, rg, stat, mkdir, whereAll, where, run, fork, dag, join, fission, horizon, advisor`（生命周期成员 `park` 在基类与运行时绑定中携带，不进入 `members` 列表）。`ToolPermission.Edit` 不再投影任何 `JsCapability`；旧成员 `glob` 与 `file`/`edit`/`rewrite` 均已从仓库生成编程面彻底退役（Plan 任期专用工具 `todowrite-for-plan` 仍独立保有其无路径 `file`/`edit`/`rewrite` 接口）。`grep(needle, pattern)` 已退役，Grep 现在只投影 `rg(argv)`。
+主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Grep → `rg`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `call`，Fork → `fork`/`dag`，Join → `join`，Fission → `fission`，Horizon → `horizon`，Advisor → `advisor`；canonical 成员序为 `write, rm, mv, cat, ls, rg, stat, mkdir, whereAll, where, call, fork, dag, join, fission, horizon, advisor`（生命周期成员 `park` 在基类与运行时绑定中携带，不进入 `members` 列表）。`ToolPermission.Edit` 不再投影任何 `JsCapability`；旧成员 `glob` 与 `file`/`edit`/`rewrite` 均已从仓库生成编程面彻底退役。Plan 使用共享成员和 `PLAN_PATH` 单文件闸门。`grep(needle, pattern)` 已退役，Grep 现在只投影 `rg(argv)`。
 
 ## [003] 确定性生成
 
@@ -30,7 +30,7 @@
 
 `cat(path)` 返回当前事务的不可变 UTF-8 字符串快照并登记写前 `FILE_CHANGED` 校验使用的读快照；后续 `write` 修改不改变已取得的快照字符串。非法 UTF-8 拒绝为 `INVALID_UTF8`，不猜测或修复编码。
 
-在生成编程面中，旧 `file(path, matches)` 与 `FileView.text(from, to)` 已退役，定位与截取改由 `where`/`whereAll` 返回的 UTF-16 代码单元下标 `[begin, end]` 与 `text.slice(begin, end)` 组合完成；底层 `findAnchor`/`requireUnique` 实现单元与 Plan 任期面仍保持有序锚点与 UTF-16 偏移语义。
+在生成编程面中，旧 `file(path, matches)` 与 `FileView.text(from, to)` 已退役，定位与截取改由 `where`/`whereAll` 返回的 UTF-16 代码单元下标 `[begin, end]` 与 `text.slice(begin, end)` 组合完成；Plan 复用相同成员签名与 UTF-16 偏移语义。
 
 ## [008] 确定性路径枚举
 
@@ -252,7 +252,7 @@ parked 载荷的 `source` 字段携带完整程序与执行点标记（[037]）�
 
 ## [050] js.call：宿主拥有的工程执行循环
 
-Exec capability 投影出 `call` 成员与全局 `js.Callable`。模型写成 `await js.call(class extends js.Callable { ... })`；该成员只在全局 `js` 对象上，基类不提供 `this.call(...)`；控制流归宿主：宿主实例化类、校验规格、驱动 sanity thunk 并用它们返回的参数数组调用 `next`/`watch`、执行命令、按时间片调用 `watch`、派发 `onExit`、执行 `maxDuration` 上界，模型只写语义回调。
+Exec capability 在基类上投影 `this.call` 与 `this.Callable`。模型写 `await this.call(class extends this.Callable { ... })`。接口文档是整体本地化的基类伪代码，方法体内以紧凑的 `//` 注释说明返回值、行为与例子；能力片段直接写成伪代码，用 `{{...}}` 填入基类模板。控制流归宿主：校验规格、驱动 sanity thunk、执行命令、调用 `next` / `watch` / `onExit` 并执行 `maxDuration` 上界。
 
 必选 `maxDuration`（正数毫秒）、`next(ctx)`、`watch(ctx)` 与 `sanity()`；缺任一以 `CALLABLE_SPEC_INCOMPLETE` 失败。可选 `interval`（默认 10000ms，下限钳制）、`onExit(result)`、`onTimeout`。`watch` 与 `sanity` 是规格的一部分，因此 watchdog 不可能被绕过。
 
@@ -276,7 +276,9 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 
 ## [053] view 视图声明捕获
 
-每个生成的编程工具接受可选 `view` 参数 `{ prefixUntil, thenRemove? }`：捕获发生在工具调用时、进入下一次请求前，写入进程内 ANCHOR 现场表（context-compression [031]），被下一请求消费一次。`prefixUntil` 必填且必须是锚点编号；`thenRemove` 是 `{ 锚点编号: 摘要 }` 映射，取代累计生效且不可撤销。声明形状非法（缺 `prefixUntil`、`prefixUntil` 不是编号、`thenRemove` 不是映射、键不是锚点编号、摘要为空或非字符串）时整次调用以 `VIEW_DECLARATION_INVALID` 失败：不执行程序，也不改动任何现场。缺失该参数时行为不变。参数描述由双语资源 `tool/js-program/view-declaration-extra` 提供。
+每个生成编程工具接受可选 `view` 对象，提供时严格使用 `{ prefixUntil, thenMap }`，两字段都必填。prefixUntil 是非负整数锚点编号；thenMap 是编号到非空摘要或 null 的映射。完整规则由 context-compression [031] 唯一规定：存活锚点划分最新区间，摘要整段替换并永久生效，真实锚点替换后消失，0 隐含且永存。
+
+提示词要求 thenMap 覆盖所有保护范围外的可见锚点，null 表示保留；漏项按 null 保留，不抛错。本轮 map 对小于 prefixUntil 的编号静默忽略，历史压缩不因此逆转。形状非法以 VIEW_DECLARATION_INVALID 拒绝，不执行程序、不留下部分效果。不保留旧字段或兼容别名。声明在工具调用时捕获，供下一请求消费一次；替换状态持续存在。双语教学资源为 tool/js-program/view-declaration-extra。
 
 ## [054] deliver 显式终值与 view 视图返回
 
@@ -299,7 +301,7 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 - `fission({ charge, lanes })`：同身份多 lane 的任务分片执行（宿主负责 lane 绑定与收拢），返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组 lane。拒绝码：`fission-unavailable`/`lane-start-failed`/`not-ready`/`context-unavailable`/`invalid-prompt`。
 - `dag({ nodes: [{ id, charge, deps?, lanes? }] })`：纯声明糖，由基类编译成波次 `fork` + 一次 `join`；下游节点的 prompt 带上依赖记录。成功返回 `{ ok, results: { [id]: record }, skipped: [id...] }`。**节点失败 → `park`**（与 `where` 同一条恢复通道），payload 为 `{ dag, node, code, deps, done, pending }`；注入值语义：`"retry"` 重跑、`"skip"` 跳过（下游看到 null）、其他值直接作为该节点结果、`{ abort: reason }` 使程序失败。
 - `horizon()`：返回在场名册的数据信封 `{ ok, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`；`status ∈ returned | still-away | did-not-return`，`workState ∈ latest | none | unavailable`，`record` 是最新帧正文原文（无则为 `""`）；四个校准数 `turnsUsed`/`turnsLeft`/`timeUsedMs`/`timeLeftMs` 只在委任者 estimate 与子会话起点两者都可读时给出，否则全为 `0`，不猜测。拒绝码：`horizon-unavailable`。
-- `advisor(intent, view)`：请求本调用 session 自己的顾问专席——`view` 是 Anchor view 声明 `{ prefixUntil, thenRemove }`，返回的数据信封是 `{ ok, advice }` 或 `{ ok: false, code: "advisor-unavailable", reason }`。顾问读到的请求是彼此独立的 prompt，绝不拼成一段：顾问自己的 law、按 advisor 自有 TOML 视图形状渲染的 view（`# ` 注释表头 + `[[records]]` 数据表），以及自成一条 user prompt 的 `intent`；follow-up 只交付相对已交付部分的 view 增量，其后追加新的 intent。拒绝码：`advisor-unavailable`。
+- `advisor(intent, view)`：请求本调用 session 自己的顾问专席——`view` 是 Anchor view 声明 `{ prefixUntil, thenMap }`，返回的数据信封是 `{ ok, advice }` 或 `{ ok: false, code: "advisor-unavailable", reason }`。顾问读到的请求是彼此独立的 prompt，绝不拼成一段：顾问自己的 law、按 advisor 自有 TOML 视图形状渲染的 view（`# ` 注释表头 + `[[new_work_to_record]]` 数据表），以及自成一条 user prompt 的 `intent`；follow-up 只交付相对已交付部分的 view 增量，其后追加新的 intent。拒绝码：`advisor-unavailable`。
 
 实现边界：delegation shard 提供结构化入口（`ForkTool.executeReceipt`/`JoinTool.executeReceipt`/`FissionTool.executeReceipt`，返回数据与上述稳定码；宿主 `fork`/`join`/`fission` 工具的 prose 输出保持不变）；接线层在每次编程调用期间安装进程内委托宿主驱动这些入口，调用结束清除；未安装宿主时成员以 `{ ok:false, code:"DELEGATION_UNAVAILABLE" }` 拒绝，不静默降级。
 
@@ -309,15 +311,17 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 
 `ls(path)` 在列出一层目录时应用 gitignore 语义：逐级 `.gitignore`（含否定模式与目录剪枝）加上根 `.git/info/exclude`。递归枚举与内容搜索由 `rg(argv)` 承担（[009]）。
 
-旧 `glob` js 成员已退役。旧 `grep(needle, pattern)` 成员已退役，其能力现在只投影 `rg(argv)`。旧 `file`/`edit`/`rewrite` 成员仍从仓库生成编程面退役（仅 Plan tenure 编程面 `todowrite-for-plan` 保留其专用无路径实现）。
+旧 `glob` js 成员已退役。旧 `grep(needle, pattern)` 成员已退役，其能力现在只投影 `rg(argv)`。旧 `file`/`edit`/`rewrite` 成员仍从仓库生成编程面退役（包括 Plan；Plan 的文件参数受 `PLAN_PATH` 闸门限制）。
 
 ## [058] js.call 的交互形态（send）与唯一执行面
 
 Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`read-terminal`/`signal-terminal`）整体退役；`ToolPermission.Exec` 只投影编程面的 `call` 成员，`ToolPermission.Pty` 不再投影任何宿主工具。交互执行由 `js.call` 承担：`next()` 返回 `{ spawn, name }` 起后台子进程，`watch(ctx)` 的 `stdout`/`stderr` 是**该时间片的增量**（前台命令与全部后台子进程的增量合并为一个观察窗），`{ send: { name, input } }` 写进命名子进程的 stdin（缺行尾换行时补一个），`{ signal, name }` 收割，`{ waitFor: { port, timeoutMs } }` 等端口就绪。`send` 指向未知后台名以 `CALL_CHILD_UNKNOWN` 失败；嵌套 `{ send: { name, input } }` 是 canonical 形态，平铺 `{ send: input, name }` 拼写被接受为同一语义，`send` 载荷解析不出目标名时同样以 `CALL_CHILD_UNKNOWN` 失败；子进程 stdout 没有换行协议假设，增量就是字节。
 
-## [059] js.deliver 的视图记录与增量去重
+## [059] this.deliver 的视图记录与增量去重
 
-程序经 `js.deliver(value, view?)` 结束时，宿主将该次交付记录进进程内按会话的交付格（与 parked 现场同命：重启即丢，durable 终值在调用结算时另写）：子会话返回给调用方的完成载荷直接由 `js.deliver` 的 `view` 经增量去重（扣除本工作此前已返回过的交互条目）后渲染成 TOML 视图文本构造，彻底取代旧的 `WorkRecord` 三段式物化体系。最后的 assistant 散文是否纳入返回结果完全取决于该 `view` 覆盖范围。subagent 程序必须显式调用 `js.deliver`，普通 `return` 保持交付格为空，结算时 `join()` 记录报告 `status: "undelivered"`（`js.dag` 据此在 `node-undelivered` 处 park）。`value` 必须是 JSON 兼容数据，缺失或非法仍以 `INVALID_RETURN_VALUE` 失败（[054]）。交付格只在进程内被同一会话的完成路径读取一次（`take`）或窥视（`peek`），调用结算后清理。
+程序经 `this.deliver(value, view?)` 结束时，宿主保存显式终值和可选 view，普通 return 不填交付格。带 view 时，先用当前调用者上下文、已有压缩历史和同一声明规则生成完整 view，再按宿主记录的已返回身份去重并渲染成 TOML；不能只回传 thenMap 中的摘要而漏掉 null 保留或受保护的内容。prefixUntil 不承担交付筛选。后续重复包含的身份不再返回，交付格可 take 或 peek，peek 不推进返回记录。
+
+无 view 仅返回 value，不携带末条 assistant 散文；带 view 时按交付路径纳入末条散文并增量去重。value 必须是合法 JSON 数据，非法以 INVALID_RETURN_VALUE 失败；view 使用 [053] 的同一形状校验。交付格与返回记录为进程内状态，重启即丢；durable 终值在工具结算时另记。
 
 ## [060] "js" 机器词汇的终局
 

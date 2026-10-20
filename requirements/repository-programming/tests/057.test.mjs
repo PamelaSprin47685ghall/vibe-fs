@@ -41,7 +41,7 @@ test('WHAT[repository-programming-057] ls honours .gitignore, negation, nested .
     writeFileSync(join(dir, 'src', 'important.tmp'), 'important', 'utf8')
     writeFileSync(join(dir, 'src', 'nested', 'deep.ts'), 'deep', 'utf8')
 
-    const api = apiOf(createApi(dir)).js
+    const api = apiOf(createApi(dir))
 
     const rootListing = api.ls('.')
     assert.equal(rootListing.ok, true)

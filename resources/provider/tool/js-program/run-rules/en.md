@@ -1,9 +1,8 @@
-await js.call(class extends js.Callable { ... }) — the engineering member.
+await this.call(class extends this.Callable { ... }) — the engineering member.
 
-Call it on the global `js` object, never on the base class: `js.call(...)` is the
-only spelling and `this.call(...)` does not exist. Your program entry is
+The base class carries the member: `this.call(...)` is the only spelling, and the
+class you hand it must extend `this.Callable`. Your program entry is
 `async run()` — a different name for a different thing.
-base class.
 
 The Host owns the loop. You write only the semantic callbacks. On each round the
 Host calls `next(ctx)`, runs what you returned, supervises it once per interval
@@ -46,9 +45,9 @@ sanity() {
 the Host calls `next` and requires `null`. `watchVeto` puts the instance into the
 "something is wrong" state and returns `[ctx]` — the Host calls `watch` and requires
 a veto (`false` or `{ abort }`). A return that is not an array, or a called method
-that fails to show its exit, parks the whole `js.call` at the call site with the
+that fails to show its exit, parks the whole `this.call` at the call site with the
 diagnosis payload — fix the class in a new call, or unpark with a value your
-program consumes as the js.call outcome. Writing the thunks is designing the
+program consumes as the this.call outcome. Writing the thunks is designing the
 termination condition: if you cannot mock a state where next returns null, the
 exit does not exist yet.
 
@@ -88,7 +87,7 @@ slice misses.
 - nothing, or `true` — continue.
 - `false`, or `{ abort: reason }` — veto the run now. `false` is a real veto, not
   a synonym for continue.
-- `{ park: payload }` — suspend through the same channel as `js.park`. Resuming it
+- `{ park: payload }` — suspend through the same channel as `this.park`. Resuming it
   with the string 'abort' aborts; any other unparked value continues.
 
 Observe before ruling. `watch` should read the ctx deltas, keep what matters on
@@ -120,7 +119,7 @@ Failure modes, stated once:
 - A flat `{ send, name, input }` object does not name a child: the nested
   `{ send: { name, input } }` is canonical (the flat `{ send: input, name }` spelling
   is accepted; a `send` value that resolves to no name fails with `CALL_CHILD_UNKNOWN`).
-- `async run()` is your program entry. The engineering loop is `js.call` only.
+- `async run()` is your program entry. The engineering loop is `this.call` only.
 
 Consequences, stated once:
 - Abort SIGKILLs the foreground process; `maxDuration` expiry does the same and

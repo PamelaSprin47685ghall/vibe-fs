@@ -6,7 +6,7 @@
 
 强烈建议：
 - 只要可能，就调用 {{toolName}}，而不是 read/edit/write/glob/grep/patch。
-{{editRecommendation}}
+
 - 把复杂 JavaScript 写进一个 {{toolName}} program，而不是多次遗留 RPC。
 {{parallelLine}}
 

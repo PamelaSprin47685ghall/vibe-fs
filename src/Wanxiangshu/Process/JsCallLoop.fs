@@ -7,12 +7,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Repository.Programming.Js
 
-/// Host-owned execution loop for `js.call` (PLAN phase 2). The model writes one
+/// Host-owned execution loop for `this.call` (PLAN phase 2). The model writes one
 /// Callable class; this module owns the loop: it instantiates the class,
 /// validates the Callable spec, runs shell commands, calls `watch` once per
 /// time slice, dispatches `onExit`, enforces `maxDuration`, and returns one
 /// structured outcome. A `check` verdict of `{ park: payload }` suspends
-/// through the same park channel as `js.park`.
+/// through the same park channel as `this.park`.
 module JsCallLoop =
 
     [<Import("spawn", "node:child_process")>]
@@ -491,7 +491,7 @@ module JsCallLoop =
 
     let private validateCallableSpec (callableClass: obj) : Result<CallableValidated, obj> =
         if not (isFunction callableClass) then
-            Error(failure "CALLABLE_SPEC_INCOMPLETE" "js.call expects a class extending js.Callable")
+            Error(failure "CALLABLE_SPEC_INCOMPLETE" "this.call expects a class extending this.Callable")
         else
             let instance = construct callableClass
             let maxDurationValue = getProperty instance "maxDuration"
@@ -553,7 +553,7 @@ module JsCallLoop =
 
     /// A failed prove() is a semantic fork, not a terminal failure: suspend
     /// through the shared park channel with the diagnosis payload, and let the
-    /// injected unpark value become the js.call outcome by this park point's
+    /// injected unpark value become the this.call outcome by this park point's
     /// contract. Without a park channel the diagnosis cannot be presented, so
     /// the run refuses instead of silently degrading.
     let private parkOrFailProof
@@ -1002,7 +1002,7 @@ module JsCallLoop =
         }
 
     /// Execute one Callable class. `root` is the shell working directory;
-    /// `stack` is the model stack captured at the `js.call(...)` call site so a
+    /// `stack` is the model stack captured at the `this.call(...)` call site so a
     /// check-park carries the same execution marker as a direct park.
     let execute
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)

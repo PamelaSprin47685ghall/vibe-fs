@@ -229,7 +229,7 @@ module PluginHooks =
                     let onRunStarted =
                         Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
-                    // A participant's return is the js.deliver view.
+                    // A participant's return is the this.deliver view.
                     let deliveredView =
                         Some(fun sessionId ->
                             Task.FromResult(
@@ -437,7 +437,7 @@ module PluginHooks =
 
             let settleUserQuestion rawInput =
                 task {
-                    // `js.ask` inside a plan program records the same durable
+                    // `this.ask` inside a plan program records the same durable
                     // question under the plan tool's call id, so both the
                     // native ask tool and the plan programming tool complete
                     // as the interrupt boundary.
@@ -675,7 +675,7 @@ module PluginHooks =
                     | None -> ()
 
                     match toolRegistration with
-                    | Some registration when toolName <> "ask" && registration.Runtime.IsWaitingForUser sessionId ->
+                    | Some registration when registration.Runtime.IsWaitingForUser sessionId ->
                         invalidOp (
                             ProviderProse.render
                                 (ProviderLanguageBinding.forSessionText sessionId)

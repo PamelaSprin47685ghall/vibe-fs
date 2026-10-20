@@ -82,7 +82,7 @@ completion of the whole assignment.
 
 ## A string is the only accepted delivery
 
-The accepted return for this assignment is `js.deliver(verboseReport)`.
+The accepted return for this assignment is `this.deliver(verboseReport)`.
 `verboseReport` is one string that states what changed, what was established,
 and what remains. Text printed in the assistant message is not a return.
 An object value is not an accepted delivery for this role. Other callers still

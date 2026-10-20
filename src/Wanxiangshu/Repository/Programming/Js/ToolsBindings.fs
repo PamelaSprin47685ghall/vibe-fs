@@ -45,7 +45,7 @@ module JsToolsBindings =
     [<Emit("new Error().stack")>]
     let private currentStack () : string = jsNative
 
-    /// `js.call` returns a structured outcome; a host failure must surface as a
+    /// `call` returns a structured outcome; a host failure must surface as a
     /// decoded js failure, so reject the promise with the `__jsFailure`
     /// sentinel the wrapper classifies instead of returning ok:false as data.
     [<Emit("Promise.resolve($0).then(function(value) { if (value && value.ok === false) { const err = new Error(value.reason || value.code); err.__jsFailure = { code: value.code, reason: value.reason || value.code }; throw err; } return value; })")>]
@@ -853,12 +853,19 @@ module JsToolsBindings =
 
     /// Shared suspension path: park(payload) and where ambiguity both fire
     /// the same signal and await the same deferred promise.
-    let private suspend (parkState: Wanxiangshu.Process.JsSandbox.ParkState) (payload: obj) : obj =
+    let private suspendWithStack
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        (payload: obj)
+        (stack: string)
+        : obj =
         if parkState.AbandonRequested then
             failureObj JsFailure.CannotParkWhileAbandoning
         else
-            parkState.ParkStack <- currentStack ()
+            parkState.ParkStack <- stack
             Wanxiangshu.Process.JsSandbox.suspendProgram parkState payload
+
+    let private suspend (parkState: Wanxiangshu.Process.JsSandbox.ParkState) (payload: obj) : obj =
+        suspendWithStack parkState payload (currentStack ())
 
     let private candidateObjects (content: string) (spans: (int * int) list) =
         spans
@@ -878,10 +885,6 @@ module JsToolsBindings =
         else
             max 0 (int (unbox<float> fromIndex))
 
-    let private assignParkStack (state: Wanxiangshu.Process.JsSandbox.ParkState) (stack: obj) =
-        if not (isNull stack) then
-            state.ParkStack <- string stack
-
     let private whereNearestDiagnostic (content: string) (needle: string) (spans: (int * int) list) : obj =
         if List.isEmpty spans then
             nearestLine content needle
@@ -895,7 +898,7 @@ module JsToolsBindings =
         (spans: (int * int) list)
         (stack: obj)
         =
-        assignParkStack state stack
+
 
         let payload =
             createObj
@@ -903,7 +906,7 @@ module JsToolsBindings =
                   "candidates" ==> candidateObjects content spans
                   "nearest" ==> whereNearestDiagnostic content needle spans ]
 
-        suspend state payload
+        suspendWithStack state payload (if isNull stack then currentStack () else string stack)
 
     let private parkOrRejectAmbiguity
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
@@ -928,7 +931,7 @@ module JsToolsBindings =
         | _ -> parkOrRejectAmbiguity parkState needle content spans stack
 
     /// whereAll(content, needle, from?): every normalized match as [start, end].
-    let private makeWhereAllMember () =
+    let makeWhereAllMember () =
         "whereAll"
         ==> fun (content: string) (needle: string) (fromIndex: obj) ->
             if isNull content || isNull needle then
@@ -946,9 +949,9 @@ module JsToolsBindings =
 
     /// where(content, needle, from?): exactly one match returns its span;
     /// zero or many suspend the program through the same park channel as
-    /// js.park, with a diagnostic payload. The injected value is returned
+    /// park, with a diagnostic payload. The injected value is returned
     /// verbatim (Unix responsibility: a wrong injection fails downstream).
-    let private makeWhereMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
+    let makeWhereMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
         "where"
         ==> fun (content: string) (needle: string) (fromIndex: obj) (stack: obj) ->
             if isNull content || isNull needle then
@@ -958,17 +961,70 @@ module JsToolsBindings =
                 let spans = whereSpans content needle start
                 dispatchWhereOutcome parkState needle content spans stack
 
-    /// PLAN S2 step 4: the park member. `await js.park(payload)` suspends the
+    /// PLAN S2 step 4: the park member. `await this.park(payload)` suspends the
     /// program at this await point through the shared suspension path.
-    let private makeParkMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
+    let makeParkMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
         "park" ==> fun (payload: obj) -> suspend parkState payload
 
-    /// The host loop behind `js.call`. The closure is injected by the workflow
+    /// A refused ask must reject the program's await with the stable failure
+    /// sentinel instead of resolving to a data object.
+    [<Emit("Promise.reject(Object.assign(new Error($1), { __jsFailure: { code: $0, reason: $1 } }))")>]
+    let private rejectedJsFailure (code: string) (reason: string) : obj = jsNative
+
+    let private askText (question: obj) =
+        if emitJsExpr question "typeof $0 === 'string'" then
+            unbox<string> question
+        else
+            ""
+
+    let private settledAsk state stack =
+        function
+        | Ok() -> suspendWithStack state (createObj [ "question" ==> fst stack ]) (snd stack)
+        | Error reason ->
+            let failure = JsFailure.AskRefused reason
+            rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
+
+    let private askWithChannel
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        (ask: string -> Task<Result<unit, string>>)
+        (text: string)
+        (stack: obj)
+        =
+        if System.String.IsNullOrWhiteSpace text then
+            let failure = JsFailure.InvalidArgument "ask requires a question"
+            rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
+        elif state.AbandonRequested then
+            rejectedJsFailure
+                (JsFailure.code JsFailure.CannotParkWhileAbandoning)
+                (JsFailure.reason JsFailure.CannotParkWhileAbandoning)
+        else
+            task {
+                let! asked = ask text
+                return settledAsk state (text, string stack) asked
+            }
+            |> box
+
+    /// Ask uses the same suspension path as park after the host accepts the question.
+    let makeAskMember
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (ask: (string -> Task<Result<unit, string>>) option)
+        =
+        "ask"
+        ==> fun (question: obj) (stack: obj) ->
+            match parkState, ask with
+            | Some state, Some invoke -> askWithChannel state invoke (askText question) stack
+            | _ ->
+                let failure =
+                    JsFailure.AskRefused "this.ask has no user channel in this execution path"
+
+                rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
+
+    /// The host loop behind `call`. The closure is injected by the workflow
     /// (Process.JsCallLoop) so this module stays free of process interop.
     type JsCallHost =
         { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
 
-    /// `js.call(class extends js.Callable { ... })`: hand the class to the host
+    /// `call(class extends this.Callable { ... })`: hand the class to the host
     /// loop and await its structured outcome. Without an injected host loop
     /// the member refuses with CALL_HOST_UNAVAILABLE instead of pretending.
     let private makeCallMember (host: JsCallHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
@@ -980,8 +1036,8 @@ module JsToolsBindings =
 
         "call" ==> fun (callableClass: obj) -> rejectCallFailure (settled callableClass)
 
-    /// `js.fork(payload)` hands the payload to the wiring-owned fork spec and
-    /// returns its receipt text; `js.join()` waits for this session's children.
+    /// `fork(payload)` hands the payload to the wiring-owned fork spec and
+    /// returns its receipt text; `join()` waits for this session's children.
     /// Without an installed delegation host the members refuse with
     /// DELEGATION_UNAVAILABLE instead of pretending.
     let private makeForkMember (host: JsDelegationHost option) =
@@ -1005,7 +1061,7 @@ module JsToolsBindings =
             | Some delegation -> box (delegation.Fission payload)
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
-    /// `js.horizon()` returns the horizon roster as a data envelope (who is
+    /// `horizon()` returns the horizon roster as a data envelope (who is
     /// still away, each participant's status/workState/record and the four
     /// calibration numbers). Without an installed delegation host the member
     /// refuses with DELEGATION_UNAVAILABLE instead of pretending.
@@ -1016,7 +1072,7 @@ module JsToolsBindings =
             | Some delegation -> box (delegation.Horizon())
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
-    /// `js.advisor(intent, view)` consults this session's own advisor seat and
+    /// `advisor(intent, view)` consults this session's own advisor seat and
     /// returns its data envelope verbatim: the advice travels as the value the
     /// host closure produced, never as a rendering. Without an installed
     /// delegation host the member refuses with DELEGATION_UNAVAILABLE instead
@@ -1038,6 +1094,7 @@ module JsToolsBindings =
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         (callHost: JsCallHost option)
         (delegationHost: JsDelegationHost option)
+        (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
@@ -1080,11 +1137,14 @@ module JsToolsBindings =
               if Set.contains JsCapability.Advisor capabilities then
                   makeAdvisorMember delegationHost
 
+              if Set.contains JsCapability.Ask capabilities then
+                  makeAskMember parkState askInvoke
+
               match parkState with
               | Some state -> makeParkMember state
               | None -> () ]
 
-        createObj [ "js" ==> createObj members ]
+        createObj members
 
     /// Build the api object for one sandbox run. `staging` records every
     /// mutation that was actually persisted as-is; `ledger` is the H1
@@ -1100,12 +1160,23 @@ module JsToolsBindings =
         (ledger: JsAsIsLedger)
         (callHost: JsCallHost option)
         (delegationHost: JsDelegationHost option)
+        (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads ledger None callHost delegationHost
+        createApiCore
+            capabilities
+            root
+            staging
+            readSnapshots
+            explicitReads
+            ledger
+            None
+            callHost
+            delegationHost
+            askInvoke
 
     /// Build the api object for one sandbox run that carries a park lifecycle
     /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
-    /// the sandbox wrapper; the generated `js.park` member suspends through it.
+    /// the sandbox wrapper; the generated `park` member suspends through it.
     let createApiWithPark
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -1116,6 +1187,7 @@ module JsToolsBindings =
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
         (callHost: JsCallHost option)
         (delegationHost: JsDelegationHost option)
+        (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
         createApiCore
             capabilities
@@ -1127,3 +1199,4 @@ module JsToolsBindings =
             (Some parkState)
             callHost
             delegationHost
+            askInvoke

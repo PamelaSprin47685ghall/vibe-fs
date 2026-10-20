@@ -1,242 +1,167 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import {
-  anchors,
-  applyView,
-  clearAll,
-  clearSession,
-  countTokens,
-  numberMessage,
-  setView,
-  takeView,
-} from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
+import { readFileSync } from 'node:fs'
+import { anchors, applyView, clearAll, countTokens, numberMessage, captureView as setView, takeView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 
-const session = () => `sess-${Math.random().toString(36).slice(2, 10)}`
-
-const kinds = (result) => result.entries.map((entry) => entry.kind)
-
-const rendered = (result) =>
-  result.entries.map((entry) => (entry.kind === 'kept' ? entry.message.text : `#${entry.summary}`))
-
-const messagesOf = (id, messages) => {
-  for (const message of messages) numberMessage(id, message.id)
-  return messages
+const session = 'view-contract'
+const input = (...texts) => texts.map((text, index) => ({ id: String(index + 1), text }))
+const number = (rows) => { for (const row of rows) if (row.id) numberMessage(session, row.id); return rows }
+const view = (prefixUntil, thenMap) => ({ prefixUntil, thenMap })
+const declare = (prefixUntil, thenMap) => {
+  const result = setView(session, view(prefixUntil, thenMap))
+  assert.equal(result.ok, true, 'valid declaration must succeed')
 }
-
+const render = (rows) => applyView(session, rows).entries.map((entry) => entry.kind === 'kept' ? entry.message.text : entry.summary)
 test.beforeEach(() => clearAll())
 
-test('WHAT[context-compression-031] anchor numbers are stable per session and message id', () => {
-  const first = session()
-  const one = numberMessage(first, 'user-1')
-  assert.equal(numberMessage(first, 'user-1'), one, 'the same message id keeps its number')
-  const two = numberMessage(first, 'tool-1')
-  assert.equal(two > one, true, 'a fresh message id gets the next number')
-  assert.deepEqual(
-    anchors(first),
-    [
-      { anchor: one, messageId: 'user-1' },
-      { anchor: two, messageId: 'tool-1' },
-    ],
-    'the map lists anchors ascending',
-  )
-  assert.deepEqual(anchors(session()), [], 'another session has its own map')
+test('WHAT[context-compression-031] real anchors start at 1, remain stable, and declarations are consumed once', () => {
+  assert.equal(numberMessage(session, 'one'), 1)
+  assert.equal(numberMessage(session, 'one'), 1)
+  declare(1, { 1: null })
+  assert.deepEqual(takeView(session), view(1, { 1: null }))
+  assert.equal(takeView(session), null)
 })
 
-test('WHAT[context-compression-031] a view declaration is consumed exactly once', () => {
-  const id = session()
-  const declaration = { prefixUntil: 3, thenRemove: { 7: 'segment 7 held the benchmark table' } }
-  setView(id, declaration)
-  assert.deepEqual(takeView(id), declaration, 'the declaration echoes back as declared')
-  assert.equal(takeView(id), null, 'the declaration does not persist')
-})
-
-test('WHAT[context-compression-031] a malformed view declaration is refused and changes nothing', () => {
-  const id = session()
-  const messages = messagesOf(id, [
-    { id: 'a', text: 'alpha' },
-    { id: 'b', text: 'beta' },
-  ])
-
-  for (const malformed of [
-    {},
-    { prefixUntil: 'all' },
-    { thenRemove: { 1: 'summary' } },
-    { prefixUntil: 1, thenRemove: [1] },
-    { prefixUntil: 1, thenRemove: { 2: '' } },
-    { prefixUntil: 1, thenRemove: { two: 'summary' } },
-    { prefixUntil: 1, thenRemove: { 2: 3 } },
-  ]) {
-    setView(id, malformed)
-    assert.equal(takeView(id), null, `refused declaration must not be captured: ${JSON.stringify(malformed)}`)
+test('WHAT[context-compression-031] both fields are required and invalid shapes have zero effects', () => {
+  const rows = number(input('one', 'two'))
+  const bad = [
+    {}, { prefixUntil: 1 }, { thenMap: {} }, { prefixUntil: 'all', thenMap: {} },
+    { prefixUntil: -1, thenMap: {} }, { prefixUntil: 1.5, thenMap: {} },
+    { prefixUntil: 1, thenMap: null }, { prefixUntil: 1, thenMap: [] },
+    { prefixUntil: 1, thenMap: { two: 'summary' } },
+    { prefixUntil: 1, thenMap: { 1: '' } }, { prefixUntil: 1, thenMap: { 1: '  ' } },
+    { prefixUntil: 1, thenMap: { 1: 7 } },
+    { prefixUntil: 1, thenMap: { 1: 'valid', 2: false } },
+    { prefixUntil: 1, thenRemove: {} }, { prefixUntil: 1, thenMap: {}, extra: 'old' },
+  ]
+  for (const declaration of bad) {
+    assert.equal(setView(session, declaration).ok, false, JSON.stringify(declaration))
+    assert.equal(takeView(session), null)
+    assert.deepEqual(render(rows), ['one', 'two'])
   }
-
-  const result = applyView(id, messages)
-  assert.deepEqual(kinds(result), ['kept', 'kept'], 'refused declarations leave the request untouched')
 })
 
-test('WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged', () => {
-  const id = session()
-  const messages = messagesOf(id, [
-    { id: 'a', text: 'alpha' },
-    { id: 'b', text: 'beta' },
-  ])
-  const result = applyView(id, messages)
-  assert.deepEqual(kinds(result), ['kept', 'kept'])
-  assert.deepEqual(rendered(result), ['alpha', 'beta'])
-  assert.equal(result.report.summarized, 0)
-  assert.equal(result.report.folded, 0)
+test('WHAT[context-compression-031] null and omitted keys keep content; prefix is protected, boundary is not', () => {
+  const rows = number(input('one', 'two', 'three', 'four'))
+  declare(2, { 1: 'must be ignored', 2: 'summary-two', 3: null })
+  assert.deepEqual(render(rows), ['one', 'summary-two', 'three', 'four'])
+  assert.deepEqual(anchors(session).map((entry) => entry.anchor), [1, 3, 4])
 })
 
-test('WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything', () => {
-  const id = session()
-  const messages = messagesOf(id, [
-    { id: 'a', text: 'alpha' },
-    { id: 'b', text: 'beta' },
-    { id: 'c', text: 'gamma' },
-  ])
-  setView(id, { prefixUntil: 99 })
-  const result = applyView(id, messages)
-  assert.deepEqual(rendered(result), ['alpha', 'beta', 'gamma'], 'nothing is dropped by prefixUntil alone')
-  assert.equal(
-    result.report.cached,
-    countTokens('alpha') + countTokens('beta') + countTokens('gamma'),
-    'every anchor below prefixUntil sits in the cache prefix',
-  )
-  assert.ok(result.report.used <= result.report.total, 'the request is never larger than what it started from')
+test('WHAT[context-compression-031] protection and null never restore previously compressed content', () => {
+  const rows = number(input('one', 'two', 'three'))
+  declare(1, { 2: 'summary-two' })
+  assert.deepEqual(render(rows), ['one', 'summary-two', 'three'])
+  declare(99, { 2: 'forbidden update' })
+  assert.deepEqual(render(rows), ['one', 'summary-two', 'three'])
+  declare(0, { 2: null })
+  assert.deepEqual(render(rows), ['one', 'summary-two', 'three'])
+  assert.deepEqual(render(rows), ['one', 'summary-two', 'three'])
 })
 
-test('WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session', () => {
-  const id = session()
-  const messages = messagesOf(id, [
-    { id: 'a', text: 'alpha' },
-    { id: 'b', text: 'beta' },
-    { id: 'c', text: 'gamma' },
-  ])
-
-  setView(id, { prefixUntil: 1, thenRemove: { 2: 'b held the tool dump' } })
-  const first = applyView(id, messages)
-  assert.deepEqual(kinds(first), ['kept', 'summarized', 'kept'])
-  assert.deepEqual(rendered(first), ['alpha', '#b held the tool dump', 'gamma'])
-  assert.equal(first.report.summarized, 1)
-  assert.equal(first.report.folded, 0)
-
-  const second = applyView(id, messages)
-  assert.deepEqual(rendered(second), ['alpha', '#b held the tool dump', 'gamma'], 'the replacement outlives its declaration')
-
-  clearSession(id)
-  const third = applyView(id, messages)
-  assert.deepEqual(rendered(third), ['alpha', 'beta', 'gamma'], 'a restarted session forgets its replacements')
+test('WHAT[context-compression-031] replacing 6 removes its anchor; later 5 replaces the entire latest interval', () => {
+  const rows = number(input('one', 'two', 'three', 'four', 'five', 'six', 'seven'))
+  declare(5, { 5: null, 6: 'new-six', 7: null })
+  assert.deepEqual(render(rows), ['one', 'two', 'three', 'four', 'five', 'new-six', 'seven'])
+  assert.equal(anchors(session).some((entry) => entry.anchor === 6), false)
+  declare(5, { 5: 'five-and-six', 7: null })
+  assert.deepEqual(render(rows), ['one', 'two', 'three', 'four', 'five-and-six', 'seven'])
+  assert.deepEqual(render(rows), ['one', 'two', 'three', 'four', 'five-and-six', 'seven'])
 })
 
-test('WHAT[context-compression-031] separate replacements each stand in place', () => {
-  const id = session()
-  const messages = messagesOf(id, [
-    { id: 'a', text: 'alpha' },
-    { id: 'b', text: 'beta' },
-    { id: 'c', text: 'gamma' },
-  ])
-
-  setView(id, { prefixUntil: 1, thenRemove: { 1: 'a held the brief' } })
-  applyView(id, messages)
-  setView(id, { prefixUntil: 1, thenRemove: { 3: 'c held the tail' } })
-  const result = applyView(id, messages)
-  assert.deepEqual(rendered(result), ['#a held the brief', 'beta', '#c held the tail'])
-  assert.equal(result.report.folded, 0)
+test('WHAT[context-compression-031] adjacent replacements in one map retain both summaries regardless of key order', () => {
+  const rows = number(input('one', 'two', 'three'))
+  declare(1, { 2: 'two-summary', 1: 'one-summary', 3: null })
+  assert.deepEqual(render(rows), ['one-summary', 'two-summary', 'three'])
+  declare(0, { 0: 'opening-summary', 3: null })
+  assert.deepEqual(render(rows), ['opening-summary', 'three'])
 })
 
-test('WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span', () => {
-  const id = session()
-  const messages = messagesOf(id, [
-    { id: 'a', text: 'alpha' },
-    { id: 'b', text: 'beta' },
-    { id: 'c', text: 'gamma' },
-  ])
-
-  setView(id, { prefixUntil: 1, thenRemove: { 2: 'b held the tool dump' } })
-  applyView(id, messages)
-
-  setView(id, { prefixUntil: 1, thenRemove: { 1: 'a and the tool dump, in one paragraph' } })
-  const result = applyView(id, messages)
-  assert.deepEqual(
-    rendered(result),
-    ['#a and the tool dump, in one paragraph', 'gamma'],
-    'anchor 2 stopped existing, so replacing anchor 1 folded its summary away',
-  )
-  assert.equal(result.report.folded, 1)
-  assert.deepEqual(result.report.replaced.sort(), [1, 2], 'both anchors are gone: one summarized, one folded')
+test('WHAT[context-compression-031] implicit 0 represents replaced 1 and survives repeated replacement', () => {
+  const rows = number(input('one', 'two', 'three'))
+  declare(1, { 1: 'summary-one', 2: null, 3: null })
+  assert.deepEqual(render(rows), ['summary-one', 'two', 'three'])
+  declare(0, { 0: 'opening-one', 2: null, 3: null })
+  assert.deepEqual(render(rows), ['opening-one', 'two', 'three'])
+  declare(0, { 0: 'opening-two', 2: 'summary-two', 3: null })
+  assert.deepEqual(render(rows), ['opening-two', 'summary-two', 'three'])
+  declare(0, { 0: 'opening-three', 3: null })
+  assert.deepEqual(render(rows), ['opening-three', 'three'])
 })
 
-test('WHAT[context-compression-031] messages without an id are never silently dropped', () => {
-  const id = session()
-  const messages = messagesOf(id, [
-    { id: 'a', text: 'alpha' },
-    { text: 'unidentified tail' },
-  ])
-  setView(id, { prefixUntil: 1, thenRemove: { 9: 'nothing matches anchor 9' } })
-  const result = applyView(id, messages)
-  assert.deepEqual(rendered(result), ['alpha', 'unidentified tail'])
+test('WHAT[context-compression-031] a replacement covers unnumbered rows inside its interval, not later new content', () => {
+  const rows = number(input('one', 'two'))
+  rows.splice(1, 0, { text: 'inside-one' })
+  declare(1, { 1: 'whole-first-interval', 2: null })
+  assert.deepEqual(render(rows), ['whole-first-interval', 'two'])
+  declare(1, { 2: 'whole-last-interval' })
+  assert.deepEqual(render(rows), ['whole-first-interval', 'whole-last-interval'])
+  const expanded = number([...rows, { id: '3', text: 'new-content' }])
+  assert.deepEqual(render(expanded), ['whole-first-interval', 'whole-last-interval', 'new-content'])
 })
 
-test('WHAT[context-compression-031] countTokens reports the o200k_base token count', () => {
-  assert.ok(countTokens('hello world') > 0)
-  assert.ok(countTokens('hello world') >= countTokens('hello'))
+test('WHAT[context-compression-031] a missing declaration preserves history and token accounting uses rendered content', () => {
+  const rows = number(input('one', 'two'))
+  assert.deepEqual(render(rows), ['one', 'two'])
+  declare(1, { 1: 'short' })
+  render(rows)
+  declare(3, {})
+  const result = applyView(session, rows)
+  assert.equal(result.report.used, countTokens('short') + countTokens('two'))
+  assert.equal(result.report.cached, result.report.used)
 })
 
-test('WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one', async () => {
-  const { createRegistered, execute } = await import(
-    '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
-  )
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-anchor-view-'))
+test('WHAT[context-compression-031] bilingual prompts teach full coverage, implicit zero and missing-key preservation', () => {
+  for (const language of ['en', 'zh-CN']) {
+    const text = readFileSync(new URL('../../../resources/provider/tool/js-program/view-declaration-extra/' + language + '.md', import.meta.url), 'utf8')
+    assert.match(text, /thenMap/)
+    assert.match(text, /null/)
+    assert.match(text, /0/)
+    assert.doesNotMatch(text, /thenRemove/)
+    assert.match(text, language === 'en' ? /every visible/ : /所有.*可见/)
+  }
+})
+
+
+test('WHAT[context-compression-031] real Host schema admits nullable maps and rejects missing fields before program execution', async () => {
+  const { tool } = await import('@opencode-ai/plugin/tool')
+  const { createRegistered, argumentSchema, execute } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js')
+  const { mkdtempSync, existsSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-view-schema-'))
   try {
-    const toolModule = () => {
-      const tool = (definition) => definition
-      const any = () => ({ type: 'any', optional: () => ({ type: 'any', optional: true }) })
-      tool.schema = {
-        string: () => ({ type: 'string', describe: (text) => ({ type: 'string', description: text }) }),
-        number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
-        any,
-        array: (item) => ({
-          type: 'array',
-          item,
-          describe: (description) => ({ type: 'array', item, description }),
-        }),
-        record: (key, value) => ({
-          type: 'record',
-          key,
-          value,
-          describe: (description) => ({ type: 'record', key, value, description }),
-        }),
-        object: (shape) => ({ type: 'object', shape }),
-      }
-      return { tool }
-    }
-    const registered = createRegistered(toolModule(), 'Coder', 'en', dir, null)
-    const sessionId = session()
+    const registered = createRegistered({ tool }, 'Engineer', 'en', dir, null, null)
+    assert.ok(registered)
+    const schema = argumentSchema(registered, 'view')
+    assert.equal(schema.safeParse(view(1, { 1: null, 2: 'summary' })).success, true)
+    assert.equal(schema.safeParse({ prefixUntil: 1 }).success, false)
+    assert.equal(schema.safeParse({ thenMap: {} }).success, false)
+    numberMessage(session, 'schema-anchor')
+    const valid = await execute(registered, {
+      program: 'class Js extends JsProgram { async run() { this.write("ran.txt", "yes"); return true; } }',
+      view: view(1, { 1: null }),
+    }, { sessionID: session })
+    assert.equal(existsSync(join(dir, 'ran.txt')), true, String(valid))
+    const refused = await execute(registered, {
+      program: 'class Js extends JsProgram { async run() { this.write("must-not-exist.txt", "no"); return true; } }',
+      view: { prefixUntil: 1 },
+    }, { sessionID: session })
+    assert.match(String(refused), /VIEW_DECLARATION_INVALID/)
+    assert.equal(existsSync(join(dir, 'must-not-exist.txt')), false)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
 
-    await execute(
-      registered,
-      {
-        program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        view: { prefixUntil: 2, thenRemove: { 1: 'keep this' } },
-      },
-      { sessionID: sessionId },
-    )
-    assert.deepEqual(takeView(sessionId), { prefixUntil: 2, thenRemove: { 1: 'keep this' } })
-
-    const refused = await execute(
-      registered,
-      {
-        program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        view: { prefixUntil: 'all' },
-      },
-      { sessionID: sessionId },
-    )
-    assert.match(String(refused), /VIEW_DECLARATION_INVALID/, 'a malformed view fails the call with a stable code')
-    assert.equal(takeView(sessionId), null, 'the refused call captured nothing')
-  } finally {
-    rmSync(dir, { recursive: true, force: true })
+test('WHAT[context-compression-031] generated Host schema accepts null map values and requires both fields', async () => {
+  const { z } = await import('zod')
+  const { createRegistered, argumentSchema } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js')
+  const tool = definition => definition
+  tool.schema = z
+  const handle = createRegistered({ tool }, 'Engineer', 'en', process.cwd(), null, null)
+  const schema = argumentSchema(handle, 'view')
+  assert.equal(schema.safeParse({ prefixUntil: 0, thenMap: { 0: null, 1: 'summary' } }).success, true)
+  assert.equal(schema.safeParse({ prefixUntil: 0, thenMap: {} }).success, true)
+  for (const bad of [{ prefixUntil: 0 }, { thenMap: {} }, { prefixUntil: 0, thenMap: { 1: 7 } }, { prefixUntil: 0, thenMap: null }]) {
+    assert.equal(schema.safeParse(bad).success, false, JSON.stringify(bad))
   }
 })

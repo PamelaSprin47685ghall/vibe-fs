@@ -1,17 +1,13 @@
 class Js extends JsProgram {
   async run() {
-    const draft = await this.file([
-      ["facts", "afterFacts", "## Facts"],
-      ["target", "afterTarget", "## Target"],
-    ]);
-    const current = draft.text("target", "afterTarget");
-    if (!current.includes("undecidable")) return { changed: false };
-
-    const rebuilt =
-      draft.text("^", "target")
-      + "## Target\n"
-      + draft.text("afterTarget", "$").replace("undecidable", "decidable");
-    this.rewrite(rebuilt);
-    return { changed: true, headings: 2 };
+    const draft = await this.cat(PLAN_PATH);
+    const matches = this.whereAll(draft, "undecidable");
+    if (matches.length === 0) return { changed: false };
+    let text = draft;
+    for (const [begin, end] of matches.reverse()) {
+      text = text.slice(0, begin) + "decidable" + text.slice(end);
+    }
+    this.write(PLAN_PATH, text);
+    return { changed: true };
   }
 }

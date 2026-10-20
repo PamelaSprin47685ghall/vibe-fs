@@ -11,19 +11,10 @@ module JsCanonicalDescription =
         val Header: string = "tool/js-program/header"
 
         [<Literal>]
-        val EditPrelude: string = "tool/js-program/edit-prelude"
-
-        [<Literal>]
-        val EditStructuralGuidance: string = "tool/js-program/edit-structural-guidance"
-
-        [<Literal>]
         val Footer: string = "tool/js-program/footer"
 
         [<Literal>]
         val Contract: string = "tool/js-program/contract"
-
-        [<Literal>]
-        val ContractEditRecommendation: string = "tool/js-program/contract-edit-recommendation"
 
         [<Literal>]
         val ContractParallelEdits: string = "tool/js-program/contract-parallel-edits"
@@ -35,15 +26,6 @@ module JsCanonicalDescription =
         val VerbRead: string = "tool/js-program/verb-read"
 
         [<Literal>]
-        val VerbSearch: string = "tool/js-program/verb-search"
-
-        [<Literal>]
-        val VerbTransform: string = "tool/js-program/verb-transform"
-
-        [<Literal>]
-        val VerbRewrite: string = "tool/js-program/verb-rewrite"
-
-        [<Literal>]
         val VerbCreate: string = "tool/js-program/verb-create"
 
         [<Literal>]
@@ -51,10 +33,6 @@ module JsCanonicalDescription =
 
         [<Literal>]
         val Recipes: string = "tool/js-program/recipes"
-
-
-        [<Literal>]
-        val EditRules: string = "tool/js-program/rules-edit"
 
         [<Literal>]
         val WriteRules: string = "tool/js-program/rules-write"
@@ -105,85 +83,7 @@ module JsCanonicalDescription =
         val MechanicalSemantic: string = "tool/js-program/mechanical-semantic"
 
         [<Literal>]
-        val CommentAnchorOwnSearch: string = "tool/js-program/comment-anchor-own-search"
-
-        [<Literal>]
-        val CommentIgnoreGy: string = "tool/js-program/comment-ignore-gy"
-
-        [<Literal>]
-        val CommentHostCapability: string = "tool/js-program/comment-host-capability"
-
-        [<Literal>]
-        val ReasonEmptyStringPattern: string = "tool/js-program/reason-empty-string-pattern"
-
-        [<Literal>]
-        val ReasonInvalidRegexp: string = "tool/js-program/reason-invalid-regexp"
-
-        [<Literal>]
-        val ReasonPatternType: string = "tool/js-program/reason-pattern-type"
-
-        [<Literal>]
-        val ReasonAnchorEmptyNames: string = "tool/js-program/reason-anchor-empty-names"
-
-        [<Literal>]
-        val ReasonAnchorReserved: string = "tool/js-program/reason-anchor-reserved"
-
-        [<Literal>]
-        val ReasonAnchorNamesDiffer: string = "tool/js-program/reason-anchor-names-differ"
-
-        [<Literal>]
-        val ReasonAnchorNamesUnique: string = "tool/js-program/reason-anchor-names-unique"
-
-        [<Literal>]
-        val ReasonAnchorNotFound: string = "tool/js-program/reason-anchor-not-found"
-
-        [<Literal>]
-        val ReasonUnknownAnchor: string = "tool/js-program/reason-unknown-anchor"
-
-        [<Literal>]
-        val ReasonInvalidSlice: string = "tool/js-program/reason-invalid-slice"
-
-        [<Literal>]
-        val ReasonFileReadFailed: string = "tool/js-program/reason-file-read-failed"
-
-        [<Literal>]
         val ReasonRunUnimplemented: string = "tool/js-program/reason-run-unimplemented"
-
-        [<Literal>]
-        val ReasonEditInvalid: string = "tool/js-program/reason-edit-invalid"
-
-        [<Literal>]
-        val ReasonEditNotFound: string = "tool/js-program/reason-edit-not-found"
-
-        [<Literal>]
-        val ReasonEditAmbiguous: string = "tool/js-program/reason-edit-ambiguous"
-
-        [<Literal>]
-        val ReasonEditOverlap: string = "tool/js-program/reason-edit-overlap"
-
-        [<Literal>]
-        val ReasonEditAtomicity: string = "tool/js-program/reason-edit-atomicity"
-
-        [<Literal>]
-        val ReasonEditPreview: string = "tool/js-program/reason-edit-preview"
-
-        [<Literal>]
-        val ReasonEditCopyReady: string = "tool/js-program/reason-edit-copy-ready"
-
-        [<Literal>]
-        val ReasonEditAttempted: string = "tool/js-program/reason-edit-attempted"
-
-        [<Literal>]
-        val ReasonEditUnknownFields: string = "tool/js-program/reason-edit-unknown-fields"
-
-        [<Literal>]
-        val ReasonEditCandidate: string = "tool/js-program/reason-edit-candidate"
-
-        [<Literal>]
-        val ReasonEditLine: string = "tool/js-program/reason-edit-line"
-
-        [<Literal>]
-        val ReasonEditOverlaps: string = "tool/js-program/reason-edit-overlaps"
 
         [<Literal>]
         val ArgProgram: string = "tool/js-program/arg-program"
@@ -200,23 +100,68 @@ module JsCanonicalDescription =
         [<Literal>]
         val ParkedPayload: string = "tool/js-program/parked-payload"
 
+        [<Literal>]
+        val BaseClass: string = "tool/js-program/base-class"
+
+        [<Literal>]
+        val BaseClassCallable: string = "tool/js-program/base-class-callable"
+
+        [<Literal>]
+        val BaseClassRead: string = "tool/js-program/base-class-read"
+
+        [<Literal>]
+        val BaseClassGlob: string = "tool/js-program/base-class-glob"
+
+        [<Literal>]
+        val BaseClassGrep: string = "tool/js-program/base-class-grep"
+
+        [<Literal>]
+        val BaseClassWrite: string = "tool/js-program/base-class-write"
+
+        [<Literal>]
+        val BaseClassRemove: string = "tool/js-program/base-class-remove"
+
+        [<Literal>]
+        val BaseClassMove: string = "tool/js-program/base-class-move"
+
+        [<Literal>]
+        val BaseClassExec: string = "tool/js-program/base-class-exec"
+
+        [<Literal>]
+        val BaseClassFork: string = "tool/js-program/base-class-fork"
+
+        [<Literal>]
+        val BaseClassJoin: string = "tool/js-program/base-class-join"
+
+        [<Literal>]
+        val BaseClassFission: string = "tool/js-program/base-class-fission"
+
+        [<Literal>]
+        val BaseClassHorizon: string = "tool/js-program/base-class-horizon"
+
+        [<Literal>]
+        val BaseClassAdvisor: string = "tool/js-program/base-class-advisor"
+
+        [<Literal>]
+        val BaseClassAsk: string = "tool/js-program/base-class-ask"
+
+        [<Literal>]
+        val BaseClassLifecycle: string = "tool/js-program/base-class-lifecycle"
+
     type Prose =
         { Header: string
-          EditPrelude: string
-          EditStructuralGuidance: string
+
           Footer: string
           Contract: string
-          ContractEditRecommendation: string
+
           ContractParallelEdits: string
           ContractParallelReads: string
           VerbRead: string
-          VerbSearch: string
-          VerbTransform: string
-          VerbRewrite: string
+
           VerbCreate: string
           ReadRules: string
           Recipes: string
-          EditRules: string
+
           WriteRules: string
           MutationRules: string
           Rm: string
@@ -232,40 +177,28 @@ module JsCanonicalDescription =
           UltraManagerInvestigation: string
           UltraPlan: string
           MechanicalSemantic: string
-          CommentAnchorOwnSearch: string
-          CommentIgnoreGy: string
-          CommentHostCapability: string
-          ReasonEmptyStringPattern: string
-          ReasonInvalidRegexp: string
-          ReasonPatternType: string
-          ReasonAnchorEmptyNames: string
-          ReasonAnchorReserved: string
-          ReasonAnchorNamesDiffer: string
-          ReasonAnchorNamesUnique: string
-          ReasonAnchorNotFound: string
-          ReasonUnknownAnchor: string
-          ReasonInvalidSlice: string
-          ReasonFileReadFailed: string
+
           ReasonRunUnimplemented: string
-          ReasonEditInvalid: string
-          ReasonEditNotFound: string
-          ReasonEditAmbiguous: string
-          ReasonEditOverlap: string
-          ReasonEditAtomicity: string
-          ReasonEditPreview: string
-          ReasonEditCopyReady: string
-          ReasonEditAttempted: string
-          ReasonEditUnknownFields: string
-          ReasonEditCandidate: string
-          ReasonEditLine: string
-          ReasonEditOverlaps: string
+
           Park: string
-          ParkedPayload: string }
+          ParkedPayload: string
+          BaseClass: string
+          BaseClassCallable: string
+          BaseClassRead: string
+          BaseClassGlob: string
+          BaseClassGrep: string
+          BaseClassWrite: string
+          BaseClassRemove: string
+          BaseClassMove: string
+          BaseClassExec: string
+          BaseClassFork: string
+          BaseClassJoin: string
+          BaseClassFission: string
+          BaseClassHorizon: string
+          BaseClassAdvisor: string
+          BaseClassAsk: string
+          BaseClassLifecycle: string }
 
-
-    val planFileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
-    val planEditAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
-    val planRewriteAlgorithm: prose: Prose -> raiseFailure: string -> string
     val runtimePlanBaseClass: prose: Prose -> string
     val publicPlanBaseClass: prose: Prose -> string
     val has: capabilities: Set<JsCapability> -> capability: JsCapability -> bool

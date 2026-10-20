@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as toolResultBound from '../../../dist/Host/Contract/ToolResultBound.js'
 import { sandbox, runProgram, caseName, render, nodeCommand } from './support/executor.mjs'
 
-// Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052])
+// Host-native `run` tool is retired; `this.call` supersedes it (repository-programming [050]-[052])
 // and complete provider results are bounded to the UTF-8 window by ToolResultBound.
 
 for (const offset of [0, 1, 2, 3, 4, 7]) {
@@ -28,7 +28,7 @@ test('WHAT[process-execution-015] the complete visible result bounded by ToolRes
     const cmd = nodeCommand("process.stdout.write(('中文🔥line\\n').repeat(3000))")
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }

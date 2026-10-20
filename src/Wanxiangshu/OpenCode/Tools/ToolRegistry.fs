@@ -166,7 +166,7 @@ module ToolRegistry =
                 None
         )
 
-    
+
 
     /// capability-enforcement-025: current Manager facts close the office gate.
     /// A frozen retirement keeps Join, Finality and the explicit human Ask; the final incumbent
@@ -184,6 +184,7 @@ module ToolRegistry =
         : Task<string> =
         task {
             let! replayed = gate.RecordedDeliverReplay ctx
+
             if replayed then
                 return! spec.Execute args ctx
             else
@@ -232,7 +233,7 @@ module ToolRegistry =
         (ctx: HostToolContext)
         (role: Role)
         : Task<string> =
-        if gate.IsWaitingForUser ctx.SessionId && spec.Name <> "ask" then
+        if gate.IsWaitingForUser ctx.SessionId then
             Task.FromResult(
                 ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId) "tool/ask-waiting" Map.empty
             )
@@ -298,7 +299,7 @@ module ToolRegistry =
         (args: HostToolArguments)
         (ctx: HostToolContext)
         : Task<string> =
-                admissionStage gate spec managerPermission args ctx
+        admissionStage gate spec managerPermission args ctx
 
 
     let private runBoundaryStages
@@ -336,7 +337,7 @@ module ToolRegistry =
           "commission", ForkTool.orchestratorAdmission
 
           "join", JoinTool.admission
-          "ask", ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Ask)
+
           "devops",
           ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
           "horizon", HorizonTool.admission
@@ -354,7 +355,7 @@ module ToolRegistry =
     let private tryAdmissionFor (specName: string) : ToolAdmission option =
         match staticAdmissions () |> List.tryFind (fun (name, _) -> name = specName) with
         | Some(_, admission) -> Some admission
-        
+
         | None when specName.StartsWith "todowrite-for-" && specName <> "todowrite-for-bookkeeper" ->
             Some(JsToolSpec.admissionFor (specName.Substring 14))
         | None -> None
@@ -370,15 +371,11 @@ module ToolRegistry =
     /// capability-enforcement-006: the authority the execute gate resolves for a tool, so a
     /// consumer can tell an office tool from an internal leaf without guessing
     /// from the tool name.
-    let tryAdmission (specName: string) : ToolAdmission option =
-        tryAdmissionFor specName
+    let tryAdmission (specName: string) : ToolAdmission option = tryAdmissionFor specName
 
     /// capability-enforcement-006: the internal-leaf decision for a session that holds no public
     /// office profile at all. An office tool is never admitted this way.
-    let privateAttachmentAdmits
-        (specName: string)
-        (sessionId: string)
-        : bool =
+    let privateAttachmentAdmits (specName: string) (sessionId: string) : bool =
         match tryAdmissionFor specName with
         | Some(ToolAdmission.PrivateAttachment predicate) -> predicate (probeContext sessionId)
         | Some(ToolAdmission.OfficeRole _)
@@ -394,81 +391,72 @@ module ToolRegistry =
         | Some(ToolAdmission.PrivateAttachment _)
         | None -> fun _ -> false
 
-    /// A refused `js.ask` must reject the program's await with the stable
-    /// failure sentinel instead of resolving to a data object.
-    [<Emit("Promise.reject(Object.assign(new Error($1), { __jsFailure: { code: $0, reason: $1 } }))")>]
-    let private rejectedJsFailure (code: string) (reason: string) : obj = jsNative
+
 
     [<Emit("typeof $0 === 'string'")>]
     let private isStringValue (value: obj) : bool = jsNative
 
-    let private recordParkStack (state: Wanxiangshu.Process.JsSandbox.ParkState) (stack: obj) =
-        if not (isNull stack) then
-            state.ParkStack <- string stack
-
-    let private finishPlanAskOutcome
-        (state: Wanxiangshu.Process.JsSandbox.ParkState)
-        (text: string)
-        (stack: obj)
-        (asked: Result<unit, string>)
-        =
-        match asked with
-        | Ok() ->
-            recordParkStack state stack
-            Wanxiangshu.Process.JsSandbox.suspendProgram state (createObj [ "question" ==> text ])
-        | Error reason ->
-            let failure = JsFailure.AskRefused reason
-            rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
-
-    let private performPlanAsk
-        (state: Wanxiangshu.Process.JsSandbox.ParkState)
-        (invoke: string -> Task<Result<unit, string>>)
-        (text: string)
-        (stack: obj)
-        : Task<obj> =
-        task {
-            if System.String.IsNullOrWhiteSpace text then
-                let failure = JsFailure.InvalidArgument "ask requires a question"
-                return rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
-            else
-                let! asked = invoke text
-                return finishPlanAskOutcome state text stack asked
-        }
-
-    let private handlePlanAsk
-        (state: Wanxiangshu.Process.JsSandbox.ParkState)
-        (invoke: string -> Task<Result<unit, string>>)
-        (question: obj)
-        (stack: obj)
-        : obj =
-        if state.AbandonRequested then
-            rejectedJsFailure
-                (JsFailure.code JsFailure.CannotParkWhileAbandoning)
-                (JsFailure.reason JsFailure.CannotParkWhileAbandoning)
-        else
-            performPlanAsk state invoke (string question) stack |> box
-
     let private createPlanSandboxApi
+        (artifactPath: Result<string, string>)
         (currentContent: string)
         (stagedMutation: string option ref)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         (askInvoke: (string -> Task<Result<unit, string>>) option)
         =
+        let denied () =
+            createObj
+                [ "ok" ==> false
+                  "code" ==> "PATH_DENIED"
+                  "reason" ==> "Only PLAN_PATH may be read or written" ]
+
+        let statPath fullPath =
+            match JsMutationFs.statPath fullPath with
+            | Ok stat -> createObj [ "ok" ==> true; "stat" ==> stat ]
+            | Error failure ->
+                createObj
+                    [ "ok" ==> false
+                      "code" ==> JsFailure.code failure
+                      "reason" ==> JsFailure.reason failure ]
+
+        let artifactStat () =
+            match artifactPath with
+            | Error reason -> createObj [ "ok" ==> false; "code" ==> "PROGRAM_FAILED"; "reason" ==> reason ]
+            | Ok fullPath -> statPath fullPath
+
         let members =
-            [ "read" ==> fun (_: obj) -> currentContent
-              "edit"
-              ==> fun (_path: string) (newText: string) ->
-                  stagedMutation.Value <- Some newText
-                  createObj [ "ok" ==> true ] ]
+            [ "cat"
+              ==> fun (path: obj) ->
+                  if isStringValue path && string path = "plan.md" then
+                      createObj [ "ok" ==> true; "text" ==> currentContent ]
+                  else
+                      denied ()
+              "write"
+              ==> fun (path: obj) (newText: obj) ->
+                  if not (isStringValue path) || string path <> "plan.md" then
+                      denied ()
+                  elif not (isStringValue newText) then
+                      createObj
+                          [ "ok" ==> false
+                            "code" ==> "INVALID_ARGUMENT"
+                            "reason" ==> "write requires string content" ]
+                  else
+                      stagedMutation.Value <- Some(string newText)
+                      createObj [ "ok" ==> true ]
+              "stat"
+              ==> fun (path: obj) ->
+                  if isStringValue path && string path = "plan.md" then
+                      artifactStat ()
+                  else
+                      denied ()
+              "mkdir" ==> fun (_: obj) -> denied ()
+              JsToolsBindings.makeWhereAllMember ()
+              JsToolsBindings.makeWhereMember parkState
+              JsToolsBindings.makeAskMember parkState askInvoke
+              match parkState with
+              | Some state -> JsToolsBindings.makeParkMember state
+              | None -> () ]
 
-        let askMembers =
-            match parkState, askInvoke with
-            | Some state, Some invoke ->
-                [ "ask"
-                  ==> fun (question: obj) (stack: obj) -> handlePlanAsk state invoke question stack ]
-            | _ -> []
-
-        createObj [ "js" ==> createObj (members @ askMembers) ]
+        createObj members
 
     let private writePlanFile root sessionId newText value =
         match PlanPath.rewritePlanAtomic root sessionId newText with
@@ -511,7 +499,10 @@ module ToolRegistry =
 
             // DSL-MUTABLE: algorithm-scratch — staged mutation accumulator for Plan sandbox
             let stagedMutation = ref None
-            let api = createPlanSandboxApi currentContent stagedMutation None None
+
+            let api =
+                createPlanSandboxApi (PlanPath.resolvePlanPath root sessionId) currentContent stagedMutation None None
+
             let baseClassSource = JsCanonicalDescription.runtimePlanBaseClass prose
             let deadlineMs = 10000
             let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
@@ -571,102 +562,12 @@ module ToolRegistry =
     [<Emit("$0 === undefined || $0 === null")>]
     let private isNullishValue (value: obj) : bool = jsNative
 
-    [<Emit("typeof $0 === 'number'")>]
-    let private isNumberValue (value: obj) : bool = jsNative
-
-    [<Emit("typeof $0 === 'object'")>]
-    let private isObjectValue (value: obj) : bool = jsNative
-
-    [<Emit("Array.isArray($0)")>]
-    let private isArrayValue (value: obj) : bool = jsNative
-
-    [<Emit("$0[$1]")>]
-    let private propertyOf (value: obj) (name: string) : obj = jsNative
-
-    [<Emit("Object.keys($0)")>]
-    let private objectKeys (value: obj) : string[] = jsNative
-
-    let private advisorInvalid (detail: string) : Result<'a, JsFailure> =
-        Error(JsFailure.ViewDeclarationInvalid detail)
-
-    let private advisorAnchorOfKey (key: string) : int option =
-        match System.Int32.TryParse key with
-        | true, anchor when string anchor = key -> Some anchor
-        | _ -> None
-
-    let private advisorPrefixUntilOf (raw: obj) : Result<int, JsFailure> =
-        if isNumberValue raw then
-            Ok(int (unbox<float> raw))
-        else
-            advisorInvalid
-                "prefixUntil must be an anchor number; pass one above every anchor you have seen to keep everything"
-
-    /// `thenRemove` is an anchor→summary map: the summary is what stands in for
-    /// that anchor from here on, so a missing or blank summary is a declaration
-    /// that would silently drop knowledge.
-    let private advisorReplacePair (source: obj) (key: string) : Result<int * string, JsFailure> =
-        let summary = propertyOf source key
-
-        let isSummary =
-            isStringValue summary && not (String.IsNullOrWhiteSpace(unbox<string> summary))
-
-        match advisorAnchorOfKey key, isSummary with
-        | None, _ -> advisorInvalid (sprintf "thenRemove keys must be anchor numbers; \"%s\" is not one" key)
-        | Some _, false ->
-            advisorInvalid (
-                sprintf
-                    "thenRemove[%s] must be a non-blank summary string (the summary replaces that anchor's segments, not deletes them)"
-                    key
-            )
-        | Some anchor, true -> Ok(anchor, string summary)
-
-    let private advisorAppendPair
-        (accumulated: Result<(int * string) list, JsFailure>)
-        (pair: Result<int * string, JsFailure>)
-        : Result<(int * string) list, JsFailure> =
-        match accumulated, pair with
-        | Ok pairs, Ok entry -> Ok(pairs @ [ entry ])
-        | Error failure, _ -> Error failure
-        | _, Error failure -> Error failure
-
-    /// `prefixUntil` is a required anchor number (never "all"); `thenRemove` is
-    /// an optional anchor→summary map naming what stands in for which anchor.
-    /// The parse is the same one `AnchorSurface.setView` applies to a tool-level
-    /// declaration, but a consult never writes it back into the ANCHOR ledger:
-    /// the ledger's pending declaration belongs to the caller's own next
-    /// request, and consulting the advisor must not rewrite it (advisor-[005]).
-    let private advisorParseDeclaration (view: obj) : Result<AdvisorViewDeclaration, JsFailure> =
-        let thenRemoveOf (raw: obj) : Result<(int * string) list, JsFailure> =
-            if isNullishValue raw then
-                Ok []
-            elif isArrayValue raw || not (isObjectValue raw) then
-                advisorInvalid
-                    "thenRemove must be an object mapping anchor numbers to summaries, e.g. { \"3\": \"what segment 3 held\" }"
-            else
-                objectKeys raw
-                |> Array.toList
-                |> List.map (advisorReplacePair raw)
-                |> List.fold advisorAppendPair (Ok [])
-                |> Result.map (List.sortBy fst)
-
-        let prefixUntil = advisorPrefixUntilOf (propertyOf view "prefixUntil")
-        let thenRemove = thenRemoveOf (propertyOf view "thenRemove")
-
-        match prefixUntil, thenRemove with
-        | Ok prefixUntil, Ok thenRemove ->
-            Ok
-                { PrefixUntil = prefixUntil
-                  ThenRemove = thenRemove }
-        | Error failure, _
-        | _, Error failure -> Error failure
-
-    /// A missing declaration hands over no material (`PrefixUntil = 0`), the
-    /// same default the transform applies when a request carries no view.
-    let private advisorDeclarationOf (view: obj) : Result<AdvisorViewDeclaration, JsFailure> =
+    /// Consulting validates the shared declaration but does not capture or mutate it.
+    let private advisorDeclarationOf (view: obj) =
         if isNullishValue view then
-            Ok { PrefixUntil = 0; ThenRemove = [] }
+            Ok AnchorViewDeclaration.empty
         else
-            advisorParseDeclaration view
+            AnchorSurface.parseDeclaration view
 
     /// The transform's own wire text over a decoded snapshot part: the advisor
     /// reads exactly what the caller's request carried, tool calls included.
@@ -714,7 +615,8 @@ module ToolRegistry =
 
             let request: AdvisorViewRequest =
                 { Messages = messages |> List.map (advisorViewMessage sessionId)
-                  Declaration = declaration }
+                  Declaration = declaration
+                  History = AnchorLedger.replacements sessionId }
 
             let plan =
                 AdvisorView.plan (ProviderLanguage.label (lang ctx)) (Cursor.delivered sessionId) request
@@ -730,7 +632,7 @@ module ToolRegistry =
 
             match answered with
             | Ok advice ->
-                Cursor.record sessionId plan.DeliveredAnchors
+                Cursor.record sessionId plan.DeliveredMaterial
                 return createObj [ "ok" ==> true; "advice" ==> advice ]
             | Error reason -> return advisorRefusal "advisor-unavailable" reason
         }
@@ -779,7 +681,7 @@ module ToolRegistry =
         (beginToolExecution: string -> unit)
         (endToolExecution: string -> unit)
         (eventPort: IEventObservationPort option)
-                (syncDelegateRuntime: SyncDelegateRuntime option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (casebookToolSpecs: ToolSpec list)
 
         (jsTransactionPersistence: IJsTransactionPersistence option)
@@ -949,21 +851,25 @@ module ToolRegistry =
             [ for role in Roles.all do
                   yield! generatedJsSpecFor role |> Option.toList ]
 
-        
+
 
         // Lifecycle uses its own wanxiangli journal. The common directory is
         // data passed to that owner, not a borrowed workspace EventStore.
         let resolvePlanGitCommonDir () : Task<string option> =
             task {
                 match workspaceDirectory with
-                | Some ws -> let! root = RuntimePath.stateRoot ws in return Some root
+                | Some ws ->
+                    let! root = RuntimePath.stateRoot ws
+                    return Some root
                 | None -> return None
             }
 
         let resolvePlanRoot () : Task<string option> =
             task {
                 match workspaceDirectory with
-                | Some ws -> let! root = RuntimePath.stateRoot ws in return Some(root + "/wanxiangshu")
+                | Some ws ->
+                    let! root = RuntimePath.stateRoot ws
+                    return Some(root + "/wanxiangshu")
                 | None -> return None
             }
 
@@ -1005,6 +911,7 @@ module ToolRegistry =
 
                 let makeApi (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
                     createPlanSandboxApi
+                        (PlanPath.resolvePlanPath root ctx.SessionId)
                         currentContent
                         stagedMutation
                         (Some parkState)
@@ -1158,7 +1065,10 @@ module ToolRegistry =
             : Task<string> =
             askWithLifecycle syncRuntime args ctx
 
-        let lifecycleWorkOf (runtime: ToolRuntimeScope) (sessionId: string) : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+        let lifecycleWorkOf
+            (runtime: ToolRuntimeScope)
+            (sessionId: string)
+            : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
             runtime.LifecycleWorkFor sessionId
 
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : Task<string option> =
@@ -1453,18 +1363,14 @@ module ToolRegistry =
             let planAbandonSchema =
                 ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
-            // ANCHOR handover view (context-compression [031]): a retiring
-            // tenure declares what the successor request must keep. Same
-            // contract as the generated surfaces: prefixUntil protects the
-            // cache prefix, thenRemove replaces anchors with the tenure's own
-            // summaries for good.
+            // The Plan uses the same declaration as every generated programming surface.
             let planViewSchema =
                 ToolHostCodec.objectSchemaOf
                     [ "prefixUntil", ToolHostCodec.numberSchema factory
-                      "thenRemove",
+                      "thenMap",
                       ToolHostCodec.recordSchemaOf
                           (ToolHostCodec.stringSchema factory)
-                          (ToolHostCodec.stringSchema factory)
+                          (ToolHostCodec.nullableStringSchema factory)
                           (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
                           factory ]
                     factory
@@ -1492,27 +1398,6 @@ module ToolRegistry =
                 Admission = planningAdmission
                 Execute = fun args ctx -> executeAskTool syncDelegateRuntime args ctx } ]
 
-        let askSpec: ToolSpec =
-            { Name = "ask"
-              Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
-              Arguments =
-                [ "question",
-                  ToolHostCodec.stringSchemaDescribed
-                      (ProviderProse.render providerLanguage "tool/ask-question" Map.empty)
-                      factory ]
-              Admission = ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Ask)
-              Execute =
-                fun args ctx ->
-                    task {
-                        let! asked = runtime.AskUser(ctx, args.Text "question")
-                        let language = ProviderLanguageBinding.forSessionText ctx.SessionId
-
-                        return
-                            match asked with
-                            | Ok() -> ProviderProse.render language "tool/ask-sent" Map.empty
-                            | Error reason -> ProviderProse.render language "tool/ask-failed" (Map [ "reason", reason ])
-                    } }
-
         /// Algorithm D/E: one `deliver` tool. The work's sequence decides the
         /// path — S4 is the two-stage Manager deliver, S1–S3 the one-shot Plan
         /// deliver. The name, the registration and the resource are single.
@@ -1525,11 +1410,11 @@ module ToolRegistry =
                   Arguments = [ "note", ToolHostCodec.optionalStringSchema factory ]
                   Admission = planningAdmission
                   Execute =
-                      fun _ ctx ->
-                          task {
-                              let! root = resolvePlanRoot ()
-                              return! executeDeliverTool root runtime ctx
-                          } }
+                    fun _ ctx ->
+                        task {
+                            let! root = resolvePlanRoot ()
+                            return! executeDeliverTool root runtime ctx
+                        } }
 
             let sequenceOf (ctx: HostToolContext) : Task<string list option> =
                 task {
@@ -1581,7 +1466,7 @@ module ToolRegistry =
 
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
-              yield askSpec
+
 
               let horizonContext: HorizonTool.HorizonRuntimeContext =
                   { RuntimeFor = runtime.RuntimeFor

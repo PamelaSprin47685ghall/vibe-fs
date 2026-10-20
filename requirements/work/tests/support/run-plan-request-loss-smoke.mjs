@@ -145,13 +145,13 @@ const provider = await startHttpServer(async (request, response) => {
     }
     // Step 1: after the user follow-up — a todowrite-for-plan tool call (real JsProgram).
     if (step === 1) {
-      const program = `class Js extends JsProgram { async run() { const p = await this.file([]); const value = 'PLAN_SMOKE_TOOL_' + (p.text ? p.text.length : 0); return { computed: value, draftLength: p.text ? p.text.length : 0 }; } }`
+      const program = `class Js extends JsProgram { async run() { const text = await this.cat(PLAN_PATH); const value = 'PLAN_SMOKE_TOOL_' + text.length; return { computed: value, draftLength: text.length }; } }`
       sendSSE(response, buildToolCallsChunks(`plan-smoke-tool-${step}`, [{ name: 'todowrite-for-plan', argsStr: JSON.stringify({ program }) }], 1))
       return
     }
     // Step 2: tool result processed — deliver relay (unauthorized).
     if (step === 2) {
-      const program = `class Js extends JsProgram { async run() { const p = await this.file([]); const value = 'PLAN_SMOKE_TOOL_' + (p.text ? p.text.length : 0); return { computed: value, draftLength: p.text ? p.text.length : 0 }; } }`
+      const program = `class Js extends JsProgram { async run() { const text = await this.cat(PLAN_PATH); const value = 'PLAN_SMOKE_TOOL_' + text.length; return { computed: value, draftLength: text.length }; } }`
       sendSSE(response, buildToolCallsChunks(`plan-smoke-deliver-${step}`, [{ name: 'deliver', argsStr: JSON.stringify({}) }], 1))
       return
     }

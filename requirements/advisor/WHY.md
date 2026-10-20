@@ -14,7 +14,7 @@ follow-up 追加而不是重发：只把 view 相对上次已交付部分的增�
 
 ## 边界与关系
 
-- view 的渲染归本包，但"view 声明"本身的捕获与 ANCHOR 编址分别归 `repository-programming` 与 `context-compression`；本包只把调用者的声明渲成顾问可读的一条 prompt（`prefixUntil` 独占上界、`thenRemove` 以摘要替换 anchor 文本），不重新定义声明语义。
+- view 的 TOML 渲染归本包，声明解析与区间投影复用 repository-programming 的 AnchorSurface / AnchorView，不另定义语义。prefixUntil 不是交付边界：先生成完整 view，再按宿主已交付事实取 delta。首次交付完整 view。
 - 顾问"不携带任何 ToolPermission"的效力来自 `office-capability`（`Role.Advisor` 的 office 为空集）与 `capability-enforcement`（provider 看见的能力与 runtime 真能执行的能力同源且不扩大）；本包不通过呈现创造或取消任何权限。
 - 专席的建立与收束走 Host 的 session 通道（`host-boundary`、`managed-session-lifecycle`），advisor child 的生命周期归 Host 所有；本包不维护第二套会话拓扑，也不把 seat 当成 durable 事实。
 - 名册与 `js.horizon` 的呈现归 `participant-horizon`；语言选择与双语 law 的成对性归 `provider-language`。

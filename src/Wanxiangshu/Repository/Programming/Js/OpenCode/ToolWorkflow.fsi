@@ -22,7 +22,7 @@ module JsToolWorkflow =
 
     /// Outcome of one invocation: the program's structured value plus the
     /// commit report — or a stable JsFailure. `Parked` is the top-level parked
-    /// payload: the program suspended at `await js.park(payload)` and the site
+    /// payload: the program suspended at `await this.park(payload)` and the site
     /// is registered under `handle` (PLAN S2 step 4).
     [<RequireQualifiedAccess>]
     type JsToolOutcome =

@@ -27,10 +27,8 @@
     <Compile Include="Process/JsCallLoop.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fsi"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
-    <Compile Include="Repository/Programming/Js/DeliveredValues.fsi"/>
-    <Compile Include="Repository/Programming/Js/DeliveredValues.fs"/>
-    <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fsi"/>
-    <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fs"/>
+
+
     <Compile Include="Repository/Programming/Js/Anchor/AnchorModel.fsi"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorModel.fs"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorLedger.fsi"/>
@@ -39,6 +37,10 @@
     <Compile Include="Repository/Programming/Js/Anchor/AnchorView.fs"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/DeliveredValues.fsi"/>
+    <Compile Include="Repository/Programming/Js/DeliveredValues.fs"/>
+    <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fsi"/>
+    <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fs"/>
     <Compile Include="Repository/Programming/Js/DelegationBridge.fsi"/>
     <Compile Include="Repository/Programming/Js/DelegationBridge.fs"/>
   </ItemGroup>

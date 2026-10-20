@@ -12,7 +12,7 @@ const listFiles = (dir) => {
   })
 }
 
-// Superseded by js.fork / js.join / js.deliver / js.ask: the Interaction/Concern directory, ConcernTools, and compile shards are deleted.
+// Superseded by this.fork / this.join / this.deliver / this.ask: the Interaction/Concern directory, ConcernTools, and compile shards are deleted.
 test('WHAT[concern-routing-005] the Interaction/Concern directory, ConcernTools, and compile shards are gone', () => {
   const concernDir = resolve(root, 'src/Wanxiangshu/Interaction/Concern')
   assert.equal(

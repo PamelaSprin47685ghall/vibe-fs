@@ -1,7 +1,7 @@
-await js.call(class extends js.Callable { ... }) —— 工程成员。
+await this.call(class extends this.Callable { ... }) —— 工程成员。
 
-在全局 `js` 对象上调用它，不在基类上：`js.call(...)` 是唯一用法，`this.call(...)`
-不存在。你的程序入口是 `async run()`——两个不同的名字，两件不同的事。
+基类上就有这个成员：`this.call(...)` 是唯一用法，交给它的类要继承 `this.Callable`。
+你的程序入口是 `async run()`——两个不同的名字，两件不同的事。
 
 控制流归 Host，你只写语义回调。每轮 Host 调用 `next(ctx)`，执行你返回的东西，
 每个 interval 时间片用 `watch(ctx)` 守望一次，进程退出交给 `onExit(result)` 处置，
@@ -38,8 +38,8 @@ sanity() {
 ```
 `nextDone` 把实例拨到「全部完成」状态，返回 `[ctx]`——宿主调用 `next`，并要求返回 `null`。
 `watchVeto` 把实例拨到「出了问题」状态，返回 `[ctx]`——宿主调用 `watch`，并要求一次否决
-（`false` 或 `{ abort }`）。返回值不是数组，或调出的方法没展示出出口，整个 `js.call` 就在调用点 park，携带
-诊断载荷——在新调用里修好类，或 unpark 注入一个由你的程序当作 js.call 结局消费的值。
+（`false` 或 `{ abort }`）。返回值不是数组，或调出的方法没展示出出口，整个 `this.call` 就在调用点 park，携带
+诊断载荷——在新调用里修好类，或 unpark 注入一个由你的程序当作 this.call 结局消费的值。
 写 thunk 就是在设计终止条件：如果你 mock 不出一个让 next 返回 null 的状态，出口还不存在。
 
 驱动 `next` 的两种形态：轮次驱动（`ctx.step === 0 ? cmd : null`）适合固定剧本——
@@ -72,7 +72,7 @@ hold 一片、推进，或 `null`。完整示例两种都有：`run-recipes` 是
 - 什么都不返回，或 `true` —— 继续。
 - `false`，或 `{ abort: reason }` —— 立即否决。`false` 是真实的否决，不是「继续」
   的同义词。
-- `{ park: payload }` —— 通过与 `js.park` 相同的通道挂起。恢复时注入字符串 'abort'
+- `{ park: payload }` —— 通过与 `this.park` 相同的通道挂起。恢复时注入字符串 'abort'
   即中止；注入其他任何值都继续。
 
 先观察，再裁决。`watch` 应当读 ctx 增量、把要紧的状态记在实例字段
@@ -101,7 +101,7 @@ await 交回的结局是
 - 平铺的 `{ send, name, input }` 对象点不出子进程：嵌套 `{ send: { name, input } }`
   才是 canonical（平铺 `{ send: input, name }` 拼写被接受；`send` 载荷解析不出目标名
   时以 `CALL_CHILD_UNKNOWN` 失败）。
-- `async run()` 是你的程序入口。工程循环只有 `js.call` 一个入口。
+- `async run()` 是你的程序入口。工程循环只有 `this.call` 一个入口。
 
 后果，一次说清：
 - 中止用 SIGKILL 杀前台进程；`maxDuration` 到期时同样处理，并回报 status 'timeout'。

@@ -20,14 +20,14 @@ test('WHAT[repository-programming-009] JS010_bindings_grep_returns_matches', asy
   try {
     writeFileSync(join(dir, 'a.txt'), 'one two one', 'utf8')
     const api = apiOf(createApi(dir))
-    assert.equal(api.js.grep, undefined)
-    const listed = api.js.ls('.')
+    assert.equal(api.grep, undefined)
+    const listed = api.ls('.')
     assert.equal(listed.ok, true)
     const hits = []
     for (const entry of listed.entries.filter((e) => e.endsWith('.txt'))) {
-      const read = api.js.cat(entry)
+      const read = api.cat(entry)
       assert.equal(read.ok, true)
-      for (const [begin, end] of api.js.whereAll(read.text, 'one').spans) {
+      for (const [begin, end] of api.whereAll(read.text, 'one').spans) {
         hits.push({ path: entry, text: read.text.slice(begin, end) })
       }
     }
@@ -51,7 +51,7 @@ test('WHAT[repository-programming-009] rg binding returns a promise', async () =
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rg-promise-'))
   try {
     writeFileSync(join(dir, 'a.ts'), 'targetNeedle\n', 'utf8')
-    const pending = apiOf(createApi(dir)).js.rg(['targetNeedle', '.'])
+    const pending = apiOf(createApi(dir)).rg(['targetNeedle', '.'])
     assert.equal(typeof pending.then, 'function')
     const found = await pending
     assert.equal(found.ok, true)

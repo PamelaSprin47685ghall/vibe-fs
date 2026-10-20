@@ -75,7 +75,7 @@ module JsGeneratorSurface =
         match capability with
         | JsCapability.Read -> "Read"
         | JsCapability.Write -> "Write"
-        | JsCapability.Edit -> "Edit"
+        
         | JsCapability.Glob -> "Glob"
         | JsCapability.Grep -> "Grep"
         | JsCapability.Move -> "Move"
@@ -86,6 +86,7 @@ module JsGeneratorSurface =
         | JsCapability.Fission -> "Fission"
         | JsCapability.Horizon -> "Horizon"
         | JsCapability.Advisor -> "Advisor"
+        | JsCapability.Ask -> "Ask"
         | JsCapability.Park -> "Park"
 
     let private languageOf (value: string) = ProviderLanguage.parse value
@@ -121,21 +122,9 @@ module JsGeneratorSurface =
     let private fragmentToJs fragment =
         box
             {| capability = capabilityLabel fragment.Capability
-               memberName = fragment.MemberName
-               signature = fragment.Signature
-               description = fragment.Description
-               canonicalExample = fragment.CanonicalExample
-               runtimeBindingKey = fragment.RuntimeBindingKey |}
+               memberName = fragment.MemberName |}
 
     let private surfaceToJs (surface: JsSurface) : obj =
-        let bindings =
-            surface.RuntimeBindings
-            |> Map.toArray
-            |> Array.map (fun (memberName, binding) ->
-                box
-                    {| memberName = memberName
-                       binding = binding |})
-
         box
             {| toolName = surface.ToolName
                roleName = surface.RoleName
@@ -143,8 +132,7 @@ module JsGeneratorSurface =
                members = surface.Members |> List.toArray |> Array.map fragmentToJs
                description = surface.Description
                baseClassSource = surface.BaseClassSource
-               examples = surface.Examples |> List.toArray
-               runtimeBindings = bindings |}
+               examples = surface.Examples |> List.toArray |}
 
     /// Generate one JS SDK surface from plain role/permission labels.
     /// Unknown roles and capability-free roles return `null`.

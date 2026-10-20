@@ -32,7 +32,7 @@ type AgentFailurePayload =
 /// assistant message id, and PROMPT-002 makes the root a promoted physical
 /// message. `AssistantMessageId` was a second name for the former.
 ///
-/// `View` holds the final delivered TOML view from js.deliver,
+/// `View` holds the final delivered TOML view from this.deliver,
 /// materialised at terminal.
 /// DSL-state-combination: domain — optional child/session/provider identities
 /// are evidence facets of one terminal completion payload, not independent

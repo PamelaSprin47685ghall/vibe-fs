@@ -331,7 +331,7 @@ module HorizonTool =
                       "timeLeftMs" ==> timeLeftMs ]
         }
 
-    /// The same roster as data for `js.horizon()`: the participants this process
+    /// The same roster as data for `this.horizon()`: the participants this process
     /// still has at the caller's horizon, each with the status the prose line
     /// reports, its latest record body, and the four calibration numbers, plus
     /// the terminals still open. It states data only — no provider prose is

@@ -13,8 +13,8 @@ const listFiles = (dir) => {
   })
 }
 
-// Superseded by the programming surface (js.ask, js.deliver, js.fork, js.join): publish is retired and its provider resources are deleted.
-test('WHAT[concern-routing-003] publish is retired from ToolRegistry and provider resources, superseded by js.ask/js.deliver/js.fork/js.join', () => {
+// Superseded by the programming surface (this.ask, this.deliver, this.fork, this.join): publish is retired and its provider resources are deleted.
+test('WHAT[concern-routing-003] publish is retired from ToolRegistry and provider resources, superseded by this.ask/this.deliver/this.fork/this.join', () => {
   const staticTools = read('src/Wanxiangshu/OpenCode/Tools/StaticTools.fs')
   const toolRegistry = read('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs')
   const toolMap = JSON.parse(read('resources/ablation/tool-map.json'))

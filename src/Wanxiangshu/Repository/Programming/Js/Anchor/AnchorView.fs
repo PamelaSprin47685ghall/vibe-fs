@@ -1,23 +1,17 @@
 namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
-/// ANCHOR view application. Pure: identity numbering, token counting and the
-/// accumulated replacement map are parameters so the same selection can be
-/// driven from the transform pipeline and from semantic tests.
+/// Shared view projection. Each operation replaces its captured, latest interval.
 [<RequireQualifiedAccess>]
 module AnchorView =
-
     type AnchorMessage =
         { Id: string option
           Text: string
           Raw: obj }
 
-    /// One selected message: kept as it stands, or standing in for a replaced
-    /// anchor as the summary the model declared. Building the replacement
-    /// message is the caller's job — this module never touches host shapes.
-    /// Rows folded into an open replacement simply do not appear.
     type AnchorViewEntry =
         | Kept of AnchorMessage
         | Summarized of message: AnchorMessage * summary: string
+        | OpeningSummary of summary: string
 
     type AnchorViewReport =
         { Total: int
@@ -28,76 +22,109 @@ module AnchorView =
           Folded: int
           Replaced: int list }
 
-    /// Apply one declaration to a message list.
-    ///
-    /// `replaced` is the accumulated anchor→summary map. A replaced anchor stops
-    /// being an anchor: its row stands in as the summary, and that summary's span
-    /// runs to the next anchor that still exists (left-closed, right-open at
-    /// anchor boundaries). Anything already replaced inside that span — an
-    /// earlier turn's summary included — is folded into it and disappears.
-    /// Unnamed rows are never dropped: the view never discards what it cannot
-    /// name. `Cached` counts the protected prefix: the kept anchors below
-    /// `PrefixUntil`.
+    type private Row =
+        { Position: int
+          Entry: AnchorViewEntry }
+
+    let private textOf =
+        function
+        | Kept message -> message.Text
+        | Summarized(_, summary)
+        | OpeningSummary summary -> summary
+
+    let private messageOf =
+        function
+        | Kept message
+        | Summarized(message, _) -> message
+        | OpeningSummary _ -> invalidOp "a real anchor cannot replace the opening row"
+
+    let private replace (rows: Row list) (change: AnchorReplacement) =
+        let before = rows |> List.takeWhile (fun row -> row.Position < change.Anchor)
+        let remaining = rows |> List.skip before.Length
+
+        let covered, after =
+            remaining |> List.partition (fun row -> row.Position < change.Until)
+
+        match change.Anchor, covered with
+        | 0, _ ->
+            before
+            @ [ { Position = 0
+                  Entry = OpeningSummary change.Summary } ]
+            @ after
+        | _, [] -> rows
+        | _, first :: _ ->
+            let message = messageOf first.Entry
+
+            before
+            @ [ { Position = change.Anchor
+                  Entry = Summarized(message, change.Summary) } ]
+            @ after
+
     let apply
         (numberOf: string -> int)
         (countTokens: string -> int)
-        (replaced: Map<int, string>)
+        (history: AnchorReplacement list)
         (declaration: AnchorViewDeclaration)
         (messages: AnchorMessage list)
         : AnchorViewEntry list * AnchorViewReport =
-        let numbered =
-            messages |> List.map (fun message -> message, message.Id |> Option.map numberOf)
+        let _, rows =
+            messages
+            |> List.mapFold
+                (fun position message ->
+                    let anchor = message.Id |> Option.map numberOf |> Option.defaultValue position
 
-        let rec select rows spanOpen acc =
-            match rows with
-            | [] -> List.rev acc
-            | (message, anchorOpt) :: rest -> advance rest message anchorOpt spanOpen acc
+                    { Position = anchor
+                      Entry = Kept message },
+                    anchor)
+                0
+            |> fun (rows, position) -> position, rows
 
-        and advance rest message anchorOpt spanOpen acc =
-            match anchorOpt |> Option.filter (fun anchor -> Map.containsKey anchor replaced) with
-            | Some anchor when not spanOpen ->
-                // The replacement is not an anchor: its span swallows every
-                // following row up to the next anchor that still exists.
-                select rest true (Summarized(message, replaced.[anchor]) :: acc)
-            | Some _ -> select rest true acc
-            | None -> select rest false (Kept message :: acc)
+        let projected = history |> List.fold replace rows
+        let entries = projected |> List.map _.Entry
 
-        let entries = select numbered false []
-
-        let keptMessages =
+        let kept =
             entries
-            |> List.choose (function
-                | Kept message -> Some message
-                | Summarized _ -> None)
-
-        let summaries =
-            entries
-            |> List.choose (function
-                | Summarized(_, summary) -> Some summary
-                | Kept _ -> None)
-
-        let kept = entries.Length - summaries.Length
-        let summarized = summaries.Length
-        let folded = messages.Length - entries.Length
-
-        let total = messages |> List.sumBy (fun message -> countTokens message.Text)
-
-        let cached =
-            keptMessages
-            |> List.sumBy (fun message ->
-                match message.Id |> Option.map numberOf with
-                | Some anchor when anchor < declaration.PrefixUntil -> countTokens message.Text
+            |> List.sumBy (function
+                | Kept _ -> 1
                 | _ -> 0)
 
-        let used =
-            (keptMessages |> List.sumBy (fun message -> countTokens message.Text))
-            + (summaries |> List.sumBy countTokens)
+        let summarized = entries.Length - kept
+
+        let opening =
+            entries
+            |> List.sumBy (function
+                | OpeningSummary _ -> 1
+                | _ -> 0)
 
         entries,
-        { Total = total
-          Used = used
-          Cached = cached
+        { Total = messages |> List.sumBy (fun message -> countTokens message.Text)
+          Used = entries |> List.sumBy (textOf >> countTokens)
+          Cached =
+            projected
+            |> List.sumBy (fun row ->
+                if row.Position < declaration.PrefixUntil then
+                    countTokens (textOf row.Entry)
+                else
+                    0)
           Kept = kept
           Summarized = summarized
-          Folded = folded
-          Replaced = replaced |> Map.toList |> List.map fst }
+          Folded = max 0 (messages.Length - entries.Length + opening)
+          Replaced = history |> List.map _.Anchor |> List.distinct |> List.sort }
+
+    let generate numberOf countTokens history declaration messages =
+        let anchors =
+            messages |> List.choose (fun message -> message.Id |> Option.map numberOf)
+
+        let changes = AnchorViewDeclaration.plan anchors history declaration
+        apply numberOf countTokens (history @ changes) declaration messages
+
+    let material numberOf entries =
+        entries
+        |> List.map (function
+            | Kept message -> message.Id |> Option.map numberOf |> Option.defaultValue 0, message.Text
+            | Summarized(message, summary) -> message.Id |> Option.map numberOf |> Option.defaultValue 0, summary
+            | OpeningSummary summary -> 0, summary)
+
+    /// A material identity includes its representative and exact rendered bytes.
+    let materialKey (anchor: int) (text: string) =
+        string anchor + ":" + string text.Length + ":" + text

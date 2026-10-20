@@ -114,7 +114,7 @@ test('WHAT[repository-programming-056] delegation members return data envelopes,
   }
 })
 
-test('WHAT[repository-programming-056] js.horizon serves the installed host roster and refuses with DELEGATION_UNAVAILABLE without one', async () => {
+test('WHAT[repository-programming-056] this.horizon serves the installed host roster and refuses with DELEGATION_UNAVAILABLE without one', async () => {
   const { dir, cleanup } = sandbox()
   const sessionId = `sess-horizon-${Math.random().toString(36).slice(2, 8)}`
   const roster = {

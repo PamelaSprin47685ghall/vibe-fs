@@ -5,7 +5,7 @@ const { start } = await import('../../../dist/Repository/Programming/Js/RuntimeS
 
 const BASE = `class JsProgram {
   constructor(api) { this._api = api; }
-  cat(path) { return this._api.js.cat(path); }
+  cat(path) { return this._api.cat(path); }
 }`
 
 // The program yields to the microtask queue before its first api call, so a
@@ -25,7 +25,7 @@ const gatedApi = () => {
   const gate = {}
   gate.promise = new Promise((resolve) => { gate.resolve = resolve })
   return {
-    api: { js: { cat: async () => ({ text: 'hello' }) }, wait: () => gate.promise },
+    api: { cat: async () => ({ text: 'hello' }), wait: () => gate.promise },
     gate,
   }
 }

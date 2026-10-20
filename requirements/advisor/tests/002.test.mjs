@@ -1,108 +1,46 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-
+import { parse } from 'smol-toml'
 import { plan } from '../../../dist/Execution/Delegation/Advisor/Surface.js'
 
-// advisor-[002]: the view is the caller's own context, rendered by SyntheticToml: the authored
-// `# ` comment header, one blank line, then one `[[new_work_to_record]]` table per record.
-// The declaration says how far the view may reach (`prefixUntil`, exclusive) and which anchors
-// arrive as summaries (`thenRemove`).
-const message = (anchor, text) => ({ anchor, text })
+const messages = [1, 2, 3].map((anchor) => ({ anchor, text: 'material-' + anchor }))
+const request = (prefixUntil, thenMap, history = []) => ({ messages, declaration: { prefixUntil, thenMap }, history })
+const records = (result) => (parse(result.viewPrompt).new_work_to_record ?? []).map((row) => row.record)
 
-const request = (messages, { prefixUntil, thenRemove = [] } = {}) => ({
-  messages,
-  declaration: { prefixUntil, thenRemove },
+test('WHAT[advisor-002] first consult delivers the complete generated view, not a prefixUntil window', () => {
+  for (const prefixUntil of [0, 2, 3, 99]) {
+    const result = plan('en', [], request(prefixUntil, {}))
+    assert.deepEqual(records(result), ['material-1', 'material-2', 'material-3'])
+    assert.deepEqual(result.deliveredAnchors, [1, 2, 3])
+    assert.equal(result.hasNewMaterial, true)
+    assert.equal(result.viewPrompt.startsWith('# '), true)
+    assert.equal(result.viewPrompt.endsWith('\n'), true)
+  }
 })
 
-// The authored header prose itself names `[[new_work_to_record]]`, so every table count below is
-// scoped to the data body — the part after the header's blank line.
-const viewBody = (prompt) => {
-  const boundary = prompt.indexOf('\n\n')
-  return boundary === -1 ? '' : prompt.slice(boundary + 2)
-}
-
-const tableCount = (prompt) => (viewBody(prompt).match(/\[\[new_work_to_record\]\]/g) ?? []).length
-
-test('WHAT[advisor-002] the view prompt keeps the prefix under PrefixUntil in the advisor TOML shape', () => {
-  const planned = plan(
-    'en',
-    [],
-    request(
-      [
-        message(1, 'anchor-one-material'),
-        message(2, 'anchor-two-material'),
-        message(3, 'anchor-three-material'),
-      ],
-      { prefixUntil: 3 },
-    ),
-  )
-
-  assert.equal(planned.hasNewMaterial, true)
-  assert.deepEqual(planned.deliveredAnchors, [1, 2])
-
-  const prompt = planned.viewPrompt
-  const boundary = prompt.indexOf('\n\n')
-  assert.equal(prompt.startsWith('# '), true, 'the authored header opens the view as a comment block')
-  assert.equal(
-    prompt.slice(0, boundary).split('\n').every((line) => line.startsWith('#')),
-    true,
-    'every header line is a `# ` comment line',
-  )
-  assert.equal(boundary > 0, true, 'the header block is separated from the tables by one blank line')
-  assert.equal(
-    viewBody(prompt).startsWith('[[new_work_to_record]]'),
-    true,
-    'the data body opens with the first record table',
-  )
-  assert.equal(tableCount(prompt), 2, 'one table per kept record')
-  assert.equal(prompt.includes('record = "anchor-one-material"'), true)
-  assert.equal(prompt.includes('record = "anchor-two-material"'), true)
-  assert.equal(prompt.includes('anchor-three-material'), false, 'an anchor at PrefixUntil is outside the view')
-  assert.equal(
-    prompt.indexOf('anchor-one-material') < prompt.indexOf('anchor-two-material'),
-    true,
-    'records keep the caller anchor order',
-  )
-  assert.equal(prompt.endsWith('\n'), true)
+test('WHAT[advisor-002] shared view protects prefix, accepts null and missing keys, and summarizes at the boundary', () => {
+  const result = plan('en', [], request(2, { 1: 'forbidden', 2: 'summary-two', 3: null }))
+  assert.deepEqual(records(result), ['material-1', 'summary-two', 'material-3'])
+  assert.deepEqual(result.deliveredAnchors, [1, 2, 3])
 })
 
-test('WHAT[advisor-002] a ThenRemove pair substitutes that anchor text with its summary', () => {
-  const planned = plan(
-    'en',
-    [],
-    request([message(1, 'anchor-one-material'), message(2, 'anchor-two-material')], {
-      prefixUntil: 3,
-      thenRemove: [[2, 'anchor-two-summary']],
-    }),
-  )
-
-  assert.deepEqual(planned.deliveredAnchors, [1, 2])
-  assert.equal(planned.viewPrompt.includes('record = "anchor-two-summary"'), true)
-  assert.equal(
-    planned.viewPrompt.includes('anchor-two-material'),
-    false,
-    'the removed anchor arrives as its summary, not as its text',
-  )
-  assert.equal(planned.viewPrompt.includes('record = "anchor-one-material"'), true)
-  assert.equal(tableCount(planned.viewPrompt), 2)
+test('WHAT[advisor-002] prior compression remains and a later replacement covers the latest interval', () => {
+  const history = [{ anchor: 2, until: 3, summary: 'old-summary-two' }]
+  const preserved = plan('en', [], request(99, { 2: 'forbidden' }, history))
+  assert.deepEqual(records(preserved), ['material-1', 'old-summary-two', 'material-3'])
+  const replaced = plan('en', [], request(1, { 1: 'one-and-two', 3: null }, history))
+  assert.deepEqual(records(replaced), ['one-and-two', 'material-3'])
+  assert.deepEqual(replaced.deliveredAnchors, [1, 3])
 })
 
-test('WHAT[advisor-002] an empty delta reports HasNewMaterial false and emits no record', () => {
-  const delivered = [1, 2]
-  const empty = plan(
-    'en',
-    delivered,
-    request([message(1, 'anchor-one-material'), message(2, 'anchor-two-material')], { prefixUntil: 2 }),
-  )
+test('WHAT[advisor-002] implicit zero remains the opening representative', () => {
+  const history = [{ anchor: 1, until: 2, summary: 'old-summary-one' }]
+  const result = plan('zh-CN', [], request(0, { 0: 'opening', 2: null, 3: null }, history))
+  assert.deepEqual(records(result), ['opening', 'material-2', 'material-3'])
+  assert.deepEqual(result.deliveredAnchors, [0, 2, 3])
+})
 
-  assert.equal(empty.hasNewMaterial, false, 'nothing new was handed over')
-  assert.deepEqual(empty.deliveredAnchors, [1, 2], 'a delivered anchor is never dropped')
-  assert.equal(viewBody(empty.viewPrompt), '', 'no record is emitted for an empty delta')
-  assert.equal(tableCount(empty.viewPrompt), 0)
-  assert.equal(empty.viewPrompt.startsWith('# '), true, 'the view prompt keeps its header')
-
-  const noMaterial = plan('en', [], request([], { prefixUntil: 5 }))
-  assert.equal(noMaterial.hasNewMaterial, false)
-  assert.deepEqual(noMaterial.deliveredAnchors, [])
-  assert.equal(tableCount(noMaterial.viewPrompt), 0)
+test('WHAT[advisor-002] shape errors use the shared view validator', () => {
+  assert.throws(() => plan('en', [], { messages, declaration: { prefixUntil: 1 } }), /VIEW_DECLARATION_INVALID/)
+  assert.throws(() => plan('en', [], request(1, { 2: false })), /VIEW_DECLARATION_INVALID/)
 })

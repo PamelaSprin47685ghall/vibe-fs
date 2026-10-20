@@ -2,11 +2,11 @@
 
 ## [001] 同 epoch append-only prefix law
 
-同一 PrefixEpoch 内且未发生 `thenRemove` 破前缀取代时，前一次 provider wire 的缓存前缀区（`prefixUntil` 之下）必须是后一次的精确字节前缀。比较范围见 [013]；tools 必须完全一致，不以追加工具视为前缀稳定。
+同一 PrefixEpoch 内，前一次 provider wire 的缓存前缀区（`prefixUntil` 之下）必须是后一次的精确字节前缀。本轮 thenMap 对保护范围内的编号静默忽略，不允许用旧的“破前缀取代”例外修改缓存前缀；历史压缩不因此撤销。比较范围见 [013]；tools 必须完全一致，不以追加工具视为前缀稳定。
 
 ## [002] 冷边界只有已提交证据与显式 view 取代
 
-Epoch 只由 Host compaction 重锚（`ContextReanchored`）或 Plan tenure 交接重锚（`TenureReanchored`）推进，且每次恰好加一；请求级前缀裁剪与重排仅由模型显式提交的 ANCHOR `view` 声明（`prefixUntil` / `thenRemove`，`context-compression-031`）驱动。不得按容量或 Token 数由宿主主动估算切换。Plan tenure 交接重锚：Planner 任期交接触发 `TenureReanchored` 事件，epoch 加一、清除旧快照；同一 incumbencyId 不重锚两次。
+Epoch 只由 Host compaction 重锚（`ContextReanchored`）或 Plan tenure 交接重锚（`TenureReanchored`）推进，且每次恰好加一；请求级前缀裁剪与重排仅由模型显式提交的 ANCHOR `view` 声明（`prefixUntil` / `thenMap`，`context-compression-031`）驱动。不得按容量或 Token 数由宿主主动估算切换。Plan tenure 交接重锚：Planner 任期交接触发 `TenureReanchored` 事件，epoch 加一、清除旧快照；同一 incumbencyId 不重锚两次。
 
 ## [003] 废除 Y 候选 probe 与 FrozenRecordPrefix
 

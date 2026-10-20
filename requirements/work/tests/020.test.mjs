@@ -20,7 +20,7 @@ import {
 
 // WHAT[work-020] fixes the closed input set a Plan runner receives:
 // U (verbatim, original order), current-tenure interactions, the predecessor's
-// declared ANCHOR view (durable ViewCheckpointCommitted + view.thenRemove), and P
+// declared ANCHOR view (durable ViewCheckpointCommitted + view.thenMap), and P
 // (the only writable surface, reached through todowrite-for-plan only); no
 // synthetic predecessor message is ever injected.
 
@@ -162,7 +162,7 @@ test('WHAT[work-020] synthetic rows are stripped and never re-injected during as
   assert.deepEqual(ids(result.messages), ['u-1', 'a-1'])
 })
 
-test('WHAT[work-020] a relaying tenure declaring view: { prefixUntil, thenRemove } commits ViewCheckpointCommitted and carries the declared handover summary into the successor request', async () => {
+test('WHAT[work-020] a relaying tenure declaring view: { prefixUntil, thenMap } commits ViewCheckpointCommitted and carries the declared handover summary into the successor request', async () => {
   clearAll()
   const life = lifecycle.LifecycleSurface ?? lifecycle
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -208,7 +208,7 @@ test('WHAT[work-020] a relaying tenure declaring view: { prefixUntil, thenRemove
             status: 'completed',
             input: {
               program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-              view: { prefixUntil: 1, thenRemove: { 1: handoverProse } },
+              view: { prefixUntil: 1, thenMap: { 1: handoverProse } },
             },
             output: 'ok',
           },
@@ -219,7 +219,7 @@ test('WHAT[work-020] a relaying tenure declaring view: { prefixUntil, thenRemove
     await hooks.tool['todowrite-for-plan'].execute(
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        view: { prefixUntil: 1, thenRemove: { 1: handoverProse } },
+        view: { prefixUntil: 1, thenMap: { 1: handoverProse } },
       },
       { sessionID, agent: 'plan', callID: 'call-plan-view-1', messageID: 'run-plan-view-1', providerRunID: 'run-plan-view-1' },
     )
@@ -264,7 +264,7 @@ test('WHAT[work-020] a relaying tenure declaring view: { prefixUntil, thenRemove
     assert.notEqual(afterRelay.ActiveId, beforeRelay.ActiveId, 'deliver must open the successor tenure')
 
     // Successor request transform runs under the new tenure: strips predecessor assistant/tool,
-    // injects no synthetic-prev-*, and carries the predecessor's declared thenRemove summary.
+    // injects no synthetic-prev-*, and carries the predecessor's declared thenMap summary.
     const successorFollowup = {
       info: { id: 'user-plan-followup', role: 'user', sessionID, agent: 'plan', time: { created: 4 } },
       parts: [{ id: 'part-u2', type: 'text', text: 'Continue with the next leg.' }],
@@ -297,6 +297,6 @@ test('WHAT[work-020] a relaying tenure declaring view: { prefixUntil, thenRemove
     assert.ok(wireIds.includes('run-plan-view-1'), 'history outside the view boundary is retained by the relay')
     assert.ok(wireIds.includes('run-plan-deliver-1'), 'history outside the view boundary is retained by the relay')
     const serialized = JSON.stringify(successorOut.messages)
-    assert.ok(serialized.includes(handoverProse), 'successor request must carry the predecessor declared thenRemove summary')
+    assert.ok(serialized.includes(handoverProse), 'successor request must carry the predecessor declared thenMap summary')
   })
 })

@@ -1005,7 +1005,7 @@ module ForkToolSurface =
 
     /// The same roster the prose `executeHorizon` renders, as raw data: the
     /// session-bound language only feeds the fallback labels inside
-    /// `rosterReceipt`, which returns the JS envelope for `js.horizon()`.
+    /// `rosterReceipt`, which returns the JS envelope for `this.horizon()`.
     let executeHorizonReceipt (value: obj) (owner: string) : Task<obj> =
         let harness = unbox<ForkHarness> value
         let context = managerContext harness owner
