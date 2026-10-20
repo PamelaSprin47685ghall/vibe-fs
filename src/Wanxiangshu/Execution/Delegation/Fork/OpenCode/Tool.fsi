@@ -139,6 +139,7 @@ module ForkTool =
           Charge: string
           Keywords: string
           Attach: string option
+          CommissionerRecord: string option
           ExpectedToolCalls: int option }
 
     val managerAdmission: ToolAdmission
@@ -149,6 +150,12 @@ module ForkTool =
     val orchestratorSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
 
     val executeReceipt:
+        scope: ToolRuntimeScope ->
+        context: HostToolContext ->
+        args: HostToolArguments ->
+            Task<Result<ForkReceipt, string>>
+
+    val executeResumeReceipt:
         scope: ToolRuntimeScope ->
         context: HostToolContext ->
         args: HostToolArguments ->

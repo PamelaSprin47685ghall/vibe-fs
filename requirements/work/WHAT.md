@@ -282,7 +282,6 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
   - `resources/provider/planning/s3/`
   - `resources/provider/tool/js-plan/`
   - `resources/provider/tool/ask/`
-  - `resources/provider/tool/devops/`
   - `resources/provider/tool/review/`
   - `resources/provider/tool/deliver/`
   系统提示转换器在 `experimental.chat.system.transform` 挂钩中真正装配 Plan 提示：`catalogPrompt` 对 `Role.Plan` 返回 Plan 的 role law（`PlanSystemPrompt` 进入 PromptCatalog），`activeRoles` 包含 `Plan`，替换逻辑与其它 office 角色同规则（字节识别自己的段落、按当前全局语言本地化）。在 Plan 会话的系统提示中，按当前任期的 `stage` 以稳定字节幂等追加对应阶段的方法说明（S1 对应事实与取舍，S2 对应理解与路径，S3 对应 Knuth 伪代码）；stage 变化时下一次请求呈现新 stage 方法。

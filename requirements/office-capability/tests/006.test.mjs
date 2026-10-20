@@ -27,8 +27,8 @@ test('WHAT[office-capability-006] synthetic Manager checker rejects retired code
   const invalid = {
     role: 'manager',
     toolCalls: [
-      { name: 'fork', args: { calling: 'coder' } },
-      { name: 'resume', args: { name: 'Op' } },
+      { name: 'this.fork', args: { calling: 'coder' } },
+      { name: 'this.resume', args: { name: 'Op' } },
     ],
   }
   assert.equal(evaluateCase(example, invalid).ok, false)
@@ -39,7 +39,7 @@ test('WHAT[office-capability-006] synthetic repair checker requires repair follo
   for (const toolCalls of [
     [{ name: 'todowrite-for-devops', args: { program: 'this.call' } }],
     [{ name: 'todowrite-for-devops', args: { program: 'this.call' } }, { name: 'todowrite-for-devops', args: { program: "this.write('src/bug.ts', 'fixed')" } }],
-    [{ name: 'todowrite-for-devops', args: { program: 'this.call' } }, { name: 'todowrite-for-devops', args: { program: "this.write('src/bug.ts', 'fixed')" } }, { name: 'todowrite-for-devops', args: { program: 'this.call' } }, { name: 'fork' }],
+    [{ name: 'todowrite-for-devops', args: { program: 'this.call' } }, { name: 'todowrite-for-devops', args: { program: "this.write('src/bug.ts', 'fixed')" } }, { name: 'todowrite-for-devops', args: { program: 'this.call' } }, { name: 'this.fork', args: {} }],
   ]) {
     assert.equal(evaluateCase(example, { role: 'devops', toolCalls }).ok, false)
   }

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as ToolSurface from '../../../dist/OpenCode/Tools/ToolSurface.js'
 
-test('WHAT[work-030] StaticTools explicitly registers all five plan tools and excludes handoff/resume', () => {
-  const planTools = ['todowrite-for-plan', 'devops', 'review', 'deliver']
+test('WHAT[work-030] StaticTools explicitly registers all three plan tools and excludes handoff/delegation verbs', () => {
+  const planTools = ['todowrite-for-plan', 'review', 'deliver']
 
   // ToolSurface exports toolSpecNames as an array of all recognized tool names
   const names = ToolSurface.toolSpecNames()
@@ -13,9 +13,12 @@ test('WHAT[work-030] StaticTools explicitly registers all five plan tools and ex
     assert.ok(names.includes(tool), `StaticTools.knownToolNames must explicitly include "${tool}"`)
   }
 
-  // This existing surface excludes resume from the spec list. Its separate
-  // Manager permission remains intact; Plan still cannot use it.
+  // This existing surface excludes the delegation verbs from the spec list.
+  // Their separate Manager/Orchestrator permissions remain intact; Plan still
+  // cannot use them.
   assert.ok(!names.includes('resume'))
+  assert.ok(!names.includes('fork'))
+  assert.ok(!names.includes('commission'))
   assert.ok(!names.includes('handoff'))
 
   // Admission is by exact registered name: the plan tools are the only

@@ -7,13 +7,16 @@ open Wanxiangshu.Foundation
 /// owner-defined identity and catalog facts needed by semantic unit laws.
 module ToolSurface =
 
-    /// work-030: the spec projection of the static catalog. `resume` keeps
-    /// its permission entry for every role (Manager's delegation surface owns
-    /// the verb, capability-enforcement-011), but it is not a registered plan
-    /// spec; `handoff` left the catalog entirely.
+    /// The spec projection of the static catalog: the host provider tool
+    /// names that are actually registered as specs. `handoff` left the
+    /// catalog. `fork` / `resume` / `commission` keep their static catalog
+    /// entries (their ToolSpec constructors are retained for the delegation
+    /// wire protocol), but they are no longer registered as host provider
+    /// tools — the delegation line runs on the programming surface — so they
+    /// carry no registered spec and are filtered out here.
     let toolSpecNames () : string array =
         StaticTools.knownToolNames
-        |> List.filter (fun name -> name <> "resume")
+        |> List.filter (fun name -> name <> "fork" && name <> "resume" && name <> "commission")
         |> List.toArray
 
 

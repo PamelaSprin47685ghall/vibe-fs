@@ -166,6 +166,7 @@ module ForkTool =
           Charge: string
           Keywords: string
           Attach: string option
+          CommissionerRecord: string option
           ExpectedToolCalls: int option }
 
     let private decode language (args: HostToolArguments) =
@@ -178,6 +179,10 @@ module ForkTool =
                   Charge = args.Text "charge"
                   Keywords = args.Text "keywords"
                   Attach = args.OptionalText "attach" |> Option.map (fun value -> value.Trim())
+                  CommissionerRecord =
+                      args.OptionalText "commissioner_record"
+                      |> Option.map (fun value -> value.Trim())
+                      |> Option.filter (fun value -> value <> "")
                   ExpectedToolCalls = expectedToolCalls }
 
     let private consequence (message: string) =
@@ -185,6 +190,13 @@ module ForkTool =
 
     let private successInstruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
+
+    /// The commissioner record rides with the charge as parent-to-child
+    /// background; without one the charge is the whole prompt.
+    let private commissionCharge (request: Request) =
+        match request.CommissionerRecord with
+        | Some record -> request.Charge + "\n\n" + record
+        | None -> request.Charge
 
     let private personaBinding (role: Role) =
         PersonaCatalog.persona role, ManagedAgent.make role
@@ -231,14 +243,13 @@ module ForkTool =
         (runtime: HostForkRuntime)
         (role: Role)
         (request: Request)
-        (commissionerRecord: string option)
         (attachment: string option)
         : Task<string> =
         let baseDocument =
             ForkChildPayload.relayDocument
                 (forkInstructions runtime.ParentId)
                 request.Charge
-                commissionerRecord
+                request.CommissionerRecord
                 attachment
                 []
                 None
@@ -339,7 +350,7 @@ module ForkTool =
         =
         taskResult {
             let! rendered =
-                prepareForkPromptWithRecord scope runtime role request None attachment
+                prepareForkPromptWithRecord scope runtime role request attachment
                 |> TaskResultCE.ofTask
 
             let! result =
@@ -368,7 +379,7 @@ module ForkTool =
         =
         taskResult {
             let! rendered =
-                prepareForkPromptWithRecord scope runtime role request None attachment
+                prepareForkPromptWithRecord scope runtime role request attachment
                 |> TaskResultCE.ofTask
 
             return!
@@ -465,7 +476,7 @@ module ForkTool =
                 | Error path -> return consequence (prose language path)
                 | Ok attachment ->
                     let! rendered =
-                        prepareForkPromptWithRecord scope runtime profile.CanonicalRole request None attachment
+                        prepareForkPromptWithRecord scope runtime profile.CanonicalRole request attachment
 
                     return! appendBusyGuidance runtime request language agentId profile rendered
             }
@@ -789,7 +800,7 @@ module ForkTool =
                 host.ForkManagerJob(
                     managerId,
                     managed.Name,
-                    request.Charge,
+                    commissionCharge request,
                     byname = request.Name,
                     ?expectedToolCalls = request.ExpectedToolCalls
                 )
@@ -1142,7 +1153,7 @@ module ForkTool =
                 host.ForkManagerJob(
                     managerId,
                     managed.Name,
-                    request.Charge,
+                    commissionCharge request,
                     byname = request.Name,
                     ?expectedToolCalls = request.ExpectedToolCalls
                 )
@@ -1218,4 +1229,202 @@ module ForkTool =
                 let language = lang context
                 let decoded = decode language args
                 return! dispatchRoleReceipt scope context role decoded
+        }
+
+    let private resumeResultReceipt (request: Request) (result: ForkResult) : Result<ForkReceipt, string> =
+        match result with
+        | ForkResult.Created created -> Ok { Name = request.Name.Trim(); AgentId = created; Outcome = "created" }
+        | ForkResult.Nudged nudged -> Ok { Name = request.Name.Trim(); AgentId = nudged; Outcome = "nudged" }
+        | ForkResult.DispatchUncertain _ -> Error "dispatch-uncertain"
+        | ForkResult.NotFound _ -> Error "placement-failed"
+
+    /// The prose resume path answers with a rendered refusal; the structured
+    /// path answers with the stable kebab code that refusal stands for.
+    let private resumeRefusalCode (path: string) =
+        if path = Path.Fork.NameRequired then
+            "name-required"
+        elif path = Path.Fork.ChargeRequired then
+            "charge-required"
+        elif path = Path.Fork.AttachSelf then
+            "attach-self"
+        elif path = Path.Fork.AttachUnknown then
+            "attach-unknown"
+        elif path = Path.Fork.PersonUnknown then
+            "person-unknown"
+        elif path = Path.Fork.WarmStartUnavailable then
+            "warm-start-unavailable"
+        elif path = Path.Fork.ChargeContextUnavailable then
+            "context-unavailable"
+        elif path = Path.Resume.CallingNotAllowed then
+            "calling-not-allowed"
+        elif path = Path.Resume.AssessmentPendingForDevOps then
+            "assessment-pending-for-devops"
+        elif path = Path.Resume.DispatchClosed then
+            "dispatch-closed"
+        else
+            "placement-failed"
+
+    let private resumeBusyGuidanceReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (request: Request)
+        (handles: AgentLinkageProjection option)
+        agentId
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let! attachment = resolveAttachment scope handles request
+
+            match attachment with
+            | Error path -> return Error (resumeRefusalCode path)
+            | Ok attachment ->
+                let! rendered =
+                    prepareForkPromptWithRecord scope runtime profile.CanonicalRole request attachment
+
+                let! result = runtime.AppendGuidance(agentId, profile, rendered)
+
+                match result with
+                | Ok forkResult -> return resumeResultReceipt request forkResult
+                | Error _ -> return Error "placement-failed"
+        }
+
+    /// Busy child: the charge becomes guidance appended to the running turn.
+    let private resumeBusyReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (request: Request)
+        (handles: AgentLinkageProjection option)
+        agentId
+        : Task<Result<ForkReceipt, string>> =
+        match runtime.ActiveGuidanceProfile agentId with
+        | Error _ -> Task.FromResult(Error "placement-failed")
+        | Ok profile -> resumeBusyGuidanceReceipt scope runtime request handles agentId profile
+
+    let private resumeIdleAttachedReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        (handles: AgentLinkageProjection option)
+        (role: Role)
+        agentId
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let! attachment = resolveAttachment scope handles request
+
+            match attachment with
+            | Error path -> return Error (resumeRefusalCode path)
+            | Ok attachment ->
+                let! placement =
+                    taskResult {
+                        do! recordFissionAffinity scope context agentId
+                        let! reused = runManagerReuse scope runtime role request (lang context) attachment agentId
+                        announceChild runtime context agentId
+
+                        return reused
+                    }
+
+                match placement with
+                | Ok forkResult -> return resumeResultReceipt request forkResult
+                | Error _ -> return Error "placement-failed"
+        }
+
+    /// Idle child: the charge reopens the existing child session.
+    let private resumeIdleReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        (handles: AgentLinkageProjection option)
+        (role: Role)
+        agentId
+        : Task<Result<ForkReceipt, string>> =
+        if hasKeywords request && not (warmStartAllowed role) then
+            Task.FromResult(Error (resumeRefusalCode Path.Fork.WarmStartUnavailable))
+        else
+            resumeIdleAttachedReceipt scope runtime context request handles role agentId
+
+    let private resumeReceiptExistingPerson
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        (handles: AgentLinkageProjection option)
+        : Task<Result<ForkReceipt, string>> =
+        let existingByname =
+            handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+        match existingByname with
+        | None -> Task.FromResult(Error (resumeRefusalCode Path.Fork.PersonUnknown))
+        | Some handle ->
+            match HandleId.tryAgent handle.Handle with
+            | None -> Task.FromResult(Error (resumeRefusalCode Path.Fork.PersonUnknown))
+            | Some handleId ->
+                let agentId = AgentHandleId.value handleId
+
+                let activeRun =
+                    lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
+
+                match activeRun, runtime.TryFindAgentOrAdopt agentId, handle.CanonicalRole with
+                | true, _, _ -> resumeBusyReceipt scope runtime request handles agentId
+                | false, Some(_, role, _), _ -> resumeIdleReceipt scope runtime context request handles role agentId
+                | false, None, Role.DevOps -> resumeIdleReceipt scope runtime context request handles Role.DevOps agentId
+                | false, None, _ -> resumeIdleReceipt scope runtime context request handles handle.CanonicalRole agentId
+
+    let private executeManagerResumeReceiptAfterGuards
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let parentSessionId = resolveParentSessionId scope context.SessionId
+
+            let isDevOps =
+                String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
+
+            let! refusal = boundDevOpsDispatchRefusal scope parentSessionId isDevOps
+
+            match refusal with
+            | Some path -> return Error (resumeRefusalCode path)
+            | None ->
+                do! bindWorkDevOpsIfNeeded scope parentSessionId isDevOps
+
+                match scope.RuntimeFor context with
+                | Error _ -> return Error (resumeRefusalCode Path.Fork.ChargeContextUnavailable)
+                | Ok runtime ->
+                    let handles = agentHandles scope context
+                    return! resumeReceiptExistingPerson scope runtime context request handles
+        }
+
+    let private executeManagerResumeReceipt
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            if String.IsNullOrWhiteSpace request.Name then
+                return Error (resumeRefusalCode Path.Fork.NameRequired)
+            elif String.IsNullOrWhiteSpace request.Charge then
+                return Error (resumeRefusalCode Path.Fork.ChargeRequired)
+            elif isSelfAttachment request then
+                return Error (resumeRefusalCode Path.Fork.AttachSelf)
+            elif not (String.IsNullOrWhiteSpace request.Calling) then
+                return Error (resumeRefusalCode Path.Resume.CallingNotAllowed)
+            else
+                return! executeManagerResumeReceiptAfterGuards scope request context
+        }
+
+    /// Structured resume entry point: same guard chain as the prose `resume`
+    /// tool, but it answers with data instead of rendered prose.
+    let executeResumeReceipt
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (args: HostToolArguments)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let language = lang context
+
+            match decode language args with
+            | Error _ -> return Error "placement-failed"
+            | Ok request -> return! executeManagerResumeReceipt scope request context
         }

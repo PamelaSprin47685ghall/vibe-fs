@@ -33,6 +33,9 @@ module JsRuntimeSurface =
                   JsCapability.Remove
                   JsCapability.Exec
                   JsCapability.Fork
+                  JsCapability.Resume
+                  JsCapability.Commission
+                  JsCapability.DevOps
                   JsCapability.Join
                   JsCapability.Fission
                   JsCapability.Horizon
@@ -63,6 +66,9 @@ module JsRuntimeSurface =
         | "Remove" -> Some JsCapability.Remove
         | "Exec" -> Some JsCapability.Exec
         | "Fork" -> Some JsCapability.Fork
+        | "Resume" -> Some JsCapability.Resume
+        | "Commission" -> Some JsCapability.Commission
+        | "DevOps" -> Some JsCapability.DevOps
         | "Join" -> Some JsCapability.Join
         | "Fission" -> Some JsCapability.Fission
         | "Horizon" -> Some JsCapability.Horizon
@@ -93,10 +99,11 @@ module JsRuntimeSurface =
 
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api
 
-    /// Test hook: install a process-live delegation host for one session.
+    /// Test hook: install a process-live delegation host for one session. The
+    /// delegate callback takes `(name, payload, reportMapping)`.
     let installDelegationHost
         (sessionId: string)
-        (fork: obj)
+        (delegation: obj)
         (join: obj)
         (fission: obj)
         (horizon: obj)
@@ -104,11 +111,11 @@ module JsRuntimeSurface =
         : unit =
         JsDelegationBridge.install
             sessionId
-            { Fork = fun payload -> unbox<Task<obj>> (emitJsExpr (fork, payload) "$0($1)")
+            { Delegate = fun name payload mapping -> unbox<Task<obj>> (emitJsExpr (delegation, name, payload, mapping) "$0($1,$2,$3)")
               Join = fun () -> unbox<Task<obj>> (emitJsExpr join "$0()")
               Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)")
               Horizon = fun () -> unbox<Task<obj>> (emitJsExpr horizon "$0()")
-              Advisor = fun intent view -> unbox<Task<obj>> (emitJsExpr (advisor, intent, view) "$0($1,$2)") }
+              Advisor = fun intent mapping -> unbox<Task<obj>> (emitJsExpr (advisor, intent, mapping) "$0($1,$2)") }
 
     let clearDelegationHost (sessionId: string) : unit = JsDelegationBridge.clear sessionId
 

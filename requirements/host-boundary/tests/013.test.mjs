@@ -11,10 +11,16 @@ test('WHAT[host-boundary-013] bootstrap interrupts owned physical children but e
     const root = 'ses-loop-root'
     await acceptAuthorityRoot(runtime, root, 'manager')
     await grantWorkOwned(runtime, root)
-    const result = await hooks.tool.fork.execute(
-      { calling: 'engineer', name: 'Ada', charge: 'inspect the repository' },
+    // The delegation verbs are no longer host-registered tools: the child is
+    // placed through the Manager's programming-surface `this.fork` member,
+    // which carries the payload and the report mapping.
+    const result = await hooks.tool['todowrite-for-manager'].execute(
+      {
+        program: 'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "inspect the repository" }, {}); } }',
+      },
       { sessionID: root, agent: 'manager' },
     )
+    assert.match(String(result), /Ada/, 'the programming-surface fork member reports the placed child')
     assert.equal(createdIds.length, 1, result)
     const child = createdIds[0]
     const repetitive = ' retry'.repeat(2000)

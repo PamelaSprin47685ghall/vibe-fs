@@ -100,7 +100,7 @@ test('WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mu
     assert.equal(binding.write, undefined)
     assert.deepEqual(
       Object.keys(binding).sort(),
-      ['advisor', 'cat', 'fork', 'horizon', 'join', 'ls', 'rg', 'stat', 'where', 'whereAll'],
+      ['advisor', 'cat', 'fork', 'horizon', 'join', 'ls', 'resume', 'rg', 'stat', 'where', 'whereAll'],
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })

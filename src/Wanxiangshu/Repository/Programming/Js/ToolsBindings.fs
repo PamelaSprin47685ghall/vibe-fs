@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Repository.Programming.Js.Anchor
 
 /// JS-010/JS-016: the api object injected into the sandbox — the only
 /// authority a model program sees. Every member returns a JSON-compatible
@@ -1036,23 +1037,36 @@ module JsToolsBindings =
 
         "call" ==> fun (callableClass: obj) -> rejectCallFailure (settled callableClass)
 
-    /// `fork(payload)` hands the payload to the wiring-owned fork spec and
-    /// returns its receipt text; `join()` waits for this session's children.
-    /// Without an installed delegation host the members refuse with
-    /// DELEGATION_UNAVAILABLE instead of pretending.
-    let private makeCommissionMember (host: JsDelegationHost option) =
-        "commission"
-        ==> fun (payload: obj) ->
-            match host with
-            | Some delegation -> box (delegation.Fork payload)
-            | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+    /// The report mapping is the declared parent → child context projection:
+    /// it must arrive with every delegation member, and a missing or
+    /// malformed one refuses with VIEW_DECLARATION_INVALID instead of
+    /// falling back to an implicit empty mapping.
+    let private reportMappingFailure (reportMapping: obj) : JsFailure option =
+        if isUndefined reportMapping then
+            Some(
+                JsFailure.ViewDeclarationInvalid
+                    "reportMapping is required: pass the anchor mapping the delegate must report through"
+            )
+        else
+            match AnchorSurface.parseReportMapping reportMapping with
+            | Error failure -> Some failure
+            | Ok _ -> None
 
-    let private makeForkMember (host: JsDelegationHost option) =
-        "fork"
-        ==> fun (payload: obj) ->
+    /// `fork(payload, reportMapping)`, `resume(payload, reportMapping)`,
+    /// `commission(payload, reportMapping)` and
+    /// `devops(intent, reportMapping)` all travel the single delegation
+    /// entry of the host, which receives the member name together with the
+    /// payload and the report mapping. Without an installed delegation host
+    /// the members refuse with DELEGATION_UNAVAILABLE instead of pretending.
+    let private makeDelegateMember (host: JsDelegationHost option) (name: string) =
+        name
+        ==> fun (payload: obj) (reportMapping: obj) ->
             match host with
-            | Some delegation -> box (delegation.Fork payload)
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+            | Some delegation ->
+                match reportMappingFailure reportMapping with
+                | Some failure -> box (task { return failureObj failure })
+                | None -> box (delegation.Delegate name payload reportMapping)
 
     let private makeJoinMember (host: JsDelegationHost option) =
         "join"
@@ -1079,17 +1093,22 @@ module JsToolsBindings =
             | Some delegation -> box (delegation.Horizon())
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
-    /// `advisor(intent, view)` consults this session's own advisor seat and
-    /// returns its data envelope verbatim: the advice travels as the value the
-    /// host closure produced, never as a rendering. Without an installed
-    /// delegation host the member refuses with DELEGATION_UNAVAILABLE instead
-    /// of pretending.
+    /// `advisor(intent, reportMapping)` consults this session's own advisor
+    /// seat and returns its data envelope verbatim: the advice travels as the
+    /// value the host closure produced, never as a rendering. The report
+    /// mapping is mandatory — a missing or malformed one refuses with
+    /// VIEW_DECLARATION_INVALID; there is no silent empty-mapping path.
+    /// Without an installed delegation host the member refuses with
+    /// DELEGATION_UNAVAILABLE instead of pretending.
     let makeAdvisorMember (host: JsDelegationHost option) : (string * obj) =
         "advisor"
-        ==> fun (intent: obj) (view: obj) ->
+        ==> fun (intent: obj) (reportMapping: obj) ->
             match host with
-            | Some delegation -> box (delegation.Advisor intent view)
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+            | Some delegation ->
+                match reportMappingFailure reportMapping with
+                | Some failure -> box (task { return failureObj failure })
+                | None -> box (delegation.Advisor intent reportMapping)
 
     let private createApiCore
         (capabilities: Set<JsCapability>)
@@ -1130,10 +1149,16 @@ module JsToolsBindings =
                   makeCallMember callHost parkState
 
               if Set.contains JsCapability.Commission capabilities then
-                  makeCommissionMember delegationHost
+                  makeDelegateMember delegationHost "commission"
 
               if Set.contains JsCapability.Fork capabilities then
-                  makeForkMember delegationHost
+                  makeDelegateMember delegationHost "fork"
+
+              if Set.contains JsCapability.Resume capabilities then
+                  makeDelegateMember delegationHost "resume"
+
+              if Set.contains JsCapability.DevOps capabilities then
+                  makeDelegateMember delegationHost "devops"
 
               if Set.contains JsCapability.Join capabilities then
                   makeJoinMember delegationHost

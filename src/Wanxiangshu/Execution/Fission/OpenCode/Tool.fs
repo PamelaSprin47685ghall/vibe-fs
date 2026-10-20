@@ -19,10 +19,11 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.ToolHostCodec
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Programming.Js.Anchor
 
 /// Same-participant physical replacement. Fission never calls the Host session
 /// fork endpoint: it creates fresh sibling sessions, starts them from the
-/// owner's already-delivered view (when there is one) + exact lane input, then
+/// owner's current session context (when there is one) + exact lane input, then
 /// physically interrupts the old present without terminating the logical owner.
 module FissionTool =
 
@@ -577,11 +578,18 @@ module FissionTool =
 
             installPtyBroadcasts scope durable profile groupId owner lanes prePtys ownerRuntime
 
-    let private ownerViewPort (scope: ToolRuntimeScope) sessionId =
+    /// Fission is the same identity on another execution lane, so the lanes
+    /// inherit the owner's current conversation context unconditionally. The
+    /// source is the session context itself, not the last delivered record.
+    let private ownerViewPort (sessionId: SessionId) =
         task {
-            match! scope.ViewForSession(SessionId.value sessionId) with
-            | Some view when not (String.IsNullOrWhiteSpace view) -> return Ok(Some view)
-            | _ -> return Ok None
+            let context =
+                AnchorLedger.context (SessionId.value sessionId)
+                |> List.map (fun (_, text) -> text)
+                |> List.filter (fun text -> not (String.IsNullOrWhiteSpace text))
+                |> String.concat "\n"
+
+            if String.IsNullOrWhiteSpace context then return Ok None else return Ok(Some context)
         }
 
     let private createLanePort
@@ -778,7 +786,7 @@ module FissionTool =
 
             let deps: FissionAdmissionDependencies =
                 { ParentOf = scope.Sessions.TryGetParentSession
-                  OwnerView = ownerViewPort scope
+                  OwnerView = ownerViewPort
                   CreateLane = createLanePort scope groupId owner profile.SelectedAgent directory parsed.Count
                   StartLane = startLanePort scope durable profile directory
                   AbortLane = abortLanePort scope
@@ -999,7 +1007,7 @@ module FissionTool =
 
             let deps: FissionAdmissionDependencies =
                 { ParentOf = scope.Sessions.TryGetParentSession
-                  OwnerView = ownerViewPort scope
+                  OwnerView = ownerViewPort
                   CreateLane = createLanePort scope groupId owner profile.SelectedAgent directory parsed.Count
                   StartLane = startLanePort scope durable profile directory
                   AbortLane = abortLanePort scope

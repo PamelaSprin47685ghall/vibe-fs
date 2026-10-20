@@ -23,9 +23,11 @@ module JsToolsBindings =
     /// envelope; refuses with DELEGATION_UNAVAILABLE when no host is installed.
     val makeHorizonMember: host: JsDelegationHost option -> (string * obj)
 
-    /// `advisor(intent, view)`: the `(memberName, member)` pair for the
-    /// advisor consult; refuses with DELEGATION_UNAVAILABLE when no host is
-    /// installed and returns the host closure's envelope verbatim otherwise.
+    /// `advisor(intent, reportMapping)`: the `(memberName, member)` pair for
+    /// the advisor consult; the report mapping is mandatory and a missing or
+    /// malformed one refuses with VIEW_DECLARATION_INVALID. It refuses with
+    /// DELEGATION_UNAVAILABLE when no host is installed and returns the host
+    /// closure's envelope verbatim otherwise.
     val makeAdvisorMember: host: JsDelegationHost option -> (string * obj)
 
     /// `ask(question)`: the `(memberName, member)` pair for the user

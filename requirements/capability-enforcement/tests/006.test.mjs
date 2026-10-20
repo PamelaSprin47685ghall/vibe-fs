@@ -91,6 +91,12 @@ const HOST_UTILITY_ALLOW = ['skill']
 const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (_role) => HOST_UTILITY_ALLOW
 const cognitiveUtilityAllowFor = (_role) => COGNITIVE_UTILITY_ALLOW
+// Two distinct faces, kept apart:
+//   面 A — 宿主注册的工具面（宿主注册表 / `hooks.tool`）：`fork` / `resume` /
+//   `commission` / `devops` 四个名字都不再注册。
+//   面 B — 宿主权限目录面（`StaticTools.knownToolNames` 及其派生的权限矩阵）：
+//   `fork` / `resume` / `commission` 仍留在目录里（ToolSpec 构造器保留，委派线
+//   协议仍在），只有 `devops` 离开了权限目录。
 const ROLE_ALLOW = {
   Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
   Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
@@ -312,12 +318,24 @@ const { default: test } = await import("node:test");
 const { admissionAuthority, privateAttachmentAdmits, rolePredicate } = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
 const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js");
 
-const OFFICE_TOOLS = ['fetch', 'review', 'join', 'todowrite-for-devops', 'fork', 'resume']
+// 面 A — the office tools the Host actually registers: the registry admits
+// them with an office authority.
+const HOST_REGISTERED_OFFICE_TOOLS = ['fetch', 'review', 'join', 'todowrite-for-devops']
+// 面 B — the office permission catalog still names `fork` / `resume`, but the
+// Host registers no such tool, so they carry no admission authority.
+const CATALOG_ONLY_OFFICE_TOOLS = ['fork', 'resume']
+const OFFICE_TOOLS = [...HOST_REGISTERED_OFFICE_TOOLS, ...CATALOG_ONLY_OFFICE_TOOLS]
+// Retired as host tools: the delegation verbs live exclusively as programming
+// surface members, so the Host resolves no authority for them.
+const RETIRED_HOST_DELEGATION_TOOLS = ['fork', 'resume', 'commission', 'devops']
 
 test('WHAT[capability-enforcement-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
   assert.equal(admissionAuthority('todowrite-for-bookkeeper'), 'private-attachment')
-  for (const tool of OFFICE_TOOLS) {
+  for (const tool of HOST_REGISTERED_OFFICE_TOOLS) {
     assert.equal(admissionAuthority(tool), 'office', `${tool} is an office tool`)
+  }
+  for (const tool of RETIRED_HOST_DELEGATION_TOOLS) {
+    assert.equal(admissionAuthority(tool), 'unknown', `${tool} is no longer a host tool`)
   }
   assert.equal(admissionAuthority('no-such-tool'), 'unknown')
 })

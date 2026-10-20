@@ -3,9 +3,9 @@
     // Example: const decision = await this.park({ stage: "review" });
   }
 
-  async deliver(view) {
-    // Ends this program with the delivered view. First state the outcome as prose, then pass a { prefixUntil, thenMap } view pointing at the full material of this work, using the shared view rules.
-    // Example: await this.deliver({ prefixUntil: 3, thenMap: { 1: "setup summary", 2: null } });
+  async deliver(reportMapping) {
+    // Ends this program with the delivered view. First state the outcome as prose, then pass the reportMapping — a Record<string, null|string> mapping anchor numbers to summaries (null leaves an anchor unmapped) — pointing at the full material of this work; the host reads it as { prefixUntil: 0, thenMap: reportMapping }, and a { prefixUntil, thenMap } wrapper is not accepted. A missing or invalid reportMapping fails with VIEW_DECLARATION_INVALID, so the program is not delivered.
+    // Example: await this.deliver({ 1: "setup summary", 2: null });
   }
 
   async run() {

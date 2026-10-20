@@ -5,7 +5,7 @@ open Wanxiangshu.OpenCode
 
 /// Same-participant physical replacement. Fission never calls the Host session
 /// fork endpoint: it creates fresh sibling sessions, starts them from the
-/// owner's already-delivered view (when there is one) + exact lane input, then
+/// owner's current session context (when there is one) + exact lane input, then
 /// physically interrupts the old present without terminating the logical owner.
 module FissionTool =
 

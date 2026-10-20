@@ -11,6 +11,9 @@ class JsProgram {
 {{baseClassMove}}
 {{baseClassExec}}
 {{baseClassFork}}
+{{baseClassResume}}
+{{baseClassCommission}}
+{{baseClassDevOps}}
 {{baseClassJoin}}
 {{baseClassFission}}
 {{baseClassHorizon}}

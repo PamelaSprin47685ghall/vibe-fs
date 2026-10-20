@@ -2,8 +2,8 @@
   "tools": {
     "fork": "delegation.async-fork",
     "resume": "delegation.async-fork",
-    "join": "delegation.async-fork",
     "commission": "change-integration.orchestrator-tools",
+    "join": "delegation.async-fork",
     "fission": "intra-participant-parallelism",
     "review": "work",
     "fetch": "knowledge-reuse",
@@ -17,7 +17,6 @@
     "todowrite-for-devops": "process-execution",
     "todowrite-for-bookkeeper": "knowledge-reuse",
     "todowrite-for-plan": "work",
-    "devops": "work",
     "deliver": "work"
   }
 }

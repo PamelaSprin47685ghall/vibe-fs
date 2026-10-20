@@ -172,8 +172,10 @@ const handleProvider = async (request, response) => {
   }
   if (guidanceMode && messageID === rootID) {
     if (managerStep++ === 0) {
-      sendSSE(response, buildToolCallChunks('fork-child', 'fork', JSON.stringify({
-        calling: 'engineer', name: 'Ada', charge: 'USER_INPUT_CHILD_WORK',
+      // The delegation verbs are programming-surface members now: the
+      // Manager places the child through `this.fork` inside its own program.
+      sendSSE(response, buildToolCallChunks('fork-child', 'todowrite-for-manager', JSON.stringify({
+        program: 'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "USER_INPUT_CHILD_WORK" }, {}); } }',
       }), 1))
     } else sendSSE(response, buildToolCallChunks('join-child', 'join', '{}', 1))
     return
@@ -182,8 +184,10 @@ const handleProvider = async (request, response) => {
     assert.ok(JSON.stringify(body.messages).includes('USER_INPUT_HUMAN'))
     const step = humanStep++
     if (step === 0) {
-      sendSSE(response, buildToolCallChunks('guide-child', 'resume', JSON.stringify({
-        name: 'Ada', charge: 'USER_INPUT_GUIDANCE_ONLY',
+      // `this.resume` is a programming-surface member too: the guidance
+      // travels through the Manager's program, not a host-registered tool.
+      sendSSE(response, buildToolCallChunks('guide-child', 'todowrite-for-manager', JSON.stringify({
+        program: 'class Js extends JsProgram { async run() { return await this.resume({ name: "Ada", charge: "USER_INPUT_GUIDANCE_ONLY" }, {}); } }',
       }), 1))
     } else if (step === 1) sendSSE(response, buildToolCallChunks('join-guided-child', 'join', '{}', 1))
     else {

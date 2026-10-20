@@ -91,6 +91,12 @@ const HOST_UTILITY_ALLOW = ['skill']
 const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (_role) => HOST_UTILITY_ALLOW
 const cognitiveUtilityAllowFor = (_role) => COGNITIVE_UTILITY_ALLOW
+// Two distinct faces, kept apart:
+//   面 A — 宿主注册的工具面（宿主注册表 / `hooks.tool`）：`fork` / `resume` /
+//   `commission` / `devops` 四个名字都不再注册。
+//   面 B — 宿主权限目录面（`StaticTools.knownToolNames` 及其派生的权限矩阵）：
+//   `fork` / `resume` / `commission` 仍留在目录里（ToolSpec 构造器保留，委派线
+//   协议仍在），只有 `devops` 离开了权限目录。
 const ROLE_ALLOW = {
   Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
   Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
@@ -184,14 +190,14 @@ const { default: test } = await import("node:test");
 const { acceptAuthorityRoot, grantWorkOwned, withExecutablePlugin, withPlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 
 
-test('WHAT[capability-enforcement-010] FORK_orchestrator_missing_authority_is_refused_without_session_identity', async () => {
-  await withExecutablePlugin(async (hooks) => {
-    const result = await hooks.tool.commission.execute(
-      { calling: 'lead', name: 'North Road', charge: 'x' },
-      { sessionID: '', agent: 'orchestrator' },
-    )
-    assert.match(result, /caller's authority is established|调用方权威确立之前/i)
-    assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
+test('WHAT[capability-enforcement-010] FORK_delegation_verbs_are_no_longer_host_registered_tools', async () => {
+  // Clean-break: the delegation verbs are programming-surface members now, so
+  // the Host registry carries no such tool at all. The authority refusal they
+  // used to raise belongs to the member call surface, not to a host tool.
+  await withPlugin(async (hooks) => {
+    for (const tool of ['fork', 'resume', 'commission', 'devops']) {
+      assert.equal(hooks.tool[tool], undefined, `${tool} must not be a host-registered tool`)
+    }
   })
 })
 }
@@ -307,12 +313,14 @@ const TOOL_NAMES = [
   'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator',
 ]
 const PLUGIN_TOOL_NAMES = [
-  'ask', 'devops', 'todowrite-for-plan',
-  'fork', 'resume', 'commission',
+  'ask', 'todowrite-for-plan',
   'join', 'horizon', 'fission', 'review', 'deliver',
   'bash-honeypot', 'assume',
   'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator',
 ]
+// Clean-break: the delegation verbs are programming-surface members, so the
+// Host registry carries no such tool.
+const RETIRED_HOST_DELEGATION_TOOLS = ['fork', 'resume', 'commission', 'devops']
 const HOST_OWNED_TOOL_NAMES = ['skill',
 ]
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops']
@@ -354,6 +362,9 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_plugin_registers_only_
     for (const toolName of HOST_OWNED_TOOL_NAMES) {
       assert.equal(hooks.tool[toolName], undefined, `${toolName} stays Host-owned`)
     }
+    for (const toolName of RETIRED_HOST_DELEGATION_TOOLS) {
+      assert.equal(hooks.tool[toolName], undefined, `${toolName} is no longer a host tool`)
+    }
     const forbidden = ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'auto-injected', '-', 'tool', 'bash', 'shell', 'inspect', 'establish-behavior', 'repair-behavior', 'query-shell', 'js-browser', 'js-coder', 'js-inspector']
     for (const toolName of forbidden) assert.equal(hooks.tool[toolName], undefined, `${toolName} must not be an export`)
   })
@@ -361,9 +372,6 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_plugin_registers_only_
 integrationTest('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_present_for_every_declared_argument', async () => {
   await withPlugin(async (hooks) => {
     const expected = {
-      fork: ['calling', 'name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
-      resume: ['name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
-      commission: ['calling', 'name', 'charge', 'expected_tool_calls'],
       'bash-honeypot': [],
       assume: ['assumption'],
     }
@@ -372,25 +380,15 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_prese
         assert.equal(typeof hooks.tool[toolName].args[argument]?.safeParse, 'function', `${toolName}.${argument}`)
       }
     }
-    assert.equal(hooks.tool.commission.args.keywords, undefined)
   })
 })
-integrationTest('WHAT[capability-enforcement-010] MANAGER_calling_enum_uses_personas_while_name_remains_a_free_byname', async () => {
+integrationTest('WHAT[capability-enforcement-010] MANAGER_delegation_verbs_carry_no_host_schema_anymore', async () => {
+  // The `calling` enum and the free byname now belong to the programming
+  // surface member payload (`this.fork` / `this.commission`), not to a host
+  // tool schema: the Host registers no delegation tool to describe.
   await withPlugin(async (hooks) => {
-    const managerPersonas = ['engineer']
-    for (const calling of managerPersonas) {
-      assert.equal(hooks.tool.fork.args.calling.safeParse(calling).success, true, `fork.calling=${calling}`)
-    }
-    assert.equal(hooks.tool.fork.args.calling.safeParse(undefined).success, true, 'fork.calling is optional and may be omitted')
-    for (const calling of ['coder', 'investigator', 'operator', 'devops', 'researcher', 'analyst', 'coordinator', 'lead', 'director']) {
-      assert.equal(hooks.tool.fork.args.calling.safeParse(calling).success, false, `fork rejects ${calling}`)
-    }
-    for (const calling of ['lead']) {
-      assert.equal(hooks.tool.commission.args.calling.safeParse(calling).success, true, `commission.calling=${calling}`)
-    }
-    assert.equal(hooks.tool.commission.args.calling.safeParse(undefined).success, true, 'commission.calling is optional and may be omitted')
-    for (const calling of ['coordinator', 'director', 'coder', 'engineer', 'navigator']) {
-      assert.equal(hooks.tool.commission.args.calling.safeParse(calling).success, false, `commission rejects ${calling}`)
+    for (const toolName of RETIRED_HOST_DELEGATION_TOOLS) {
+      assert.equal(hooks.tool[toolName], undefined, `${toolName} must not be a host tool`)
     }
   })
 })

@@ -345,14 +345,7 @@ module ToolRegistry =
         }
 
     let private staticAdmissions () : (string * ToolAdmission) list =
-        [ "fork", ForkTool.managerAdmission
-          "resume", ForkTool.managerAdmission
-          "commission", ForkTool.orchestratorAdmission
-
-          "join", JoinTool.admission
-
-          "devops",
-          ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
+        [ "join", JoinTool.admission
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
           "review", ReviewShell.admission
@@ -409,6 +402,50 @@ module ToolRegistry =
     [<Emit("typeof $0 === 'string'")>]
     let private isStringValue (value: obj) : bool = jsNative
 
+    [<Emit("$0 === null || $0 === undefined")>]
+    let private isNullish (value: obj) : bool = jsNative
+
+    [<Emit("(() => { const out = {}; for (const k of Object.keys($0)) out[k] = $0[k]; out[$1] = $2; return out; })()")>]
+    let private withField (source: obj) (key: string) (value: obj) : obj = jsNative
+
+    /// The report material a delegate receives: the caller's report mapping
+    /// rendered as `<anchor>: <text>` lines, one per entry, newline-joined.
+    /// No entries means no material at all.
+    let private reportMaterialText (sessionId: string) (mapping: obj) : Result<string option, JsFailure> =
+        AnchorSurface.reportMaterial sessionId mapping
+        |> Result.map (fun entries ->
+            entries
+            |> List.map (fun (anchor, text) -> sprintf "%d: %s" anchor text)
+            |> fun lines ->
+                if List.isEmpty lines then
+                    None
+                else
+                    Some(String.concat "\n" lines))
+
+    /// The delegate payload keeps every field the program sent and gains the
+    /// report material under `commissioner_record`.
+    let private payloadWithRecord (payload: obj) (record: string option) : obj =
+        let raw =
+            if isStringValue payload then
+                createObj [ "charge" ==> payload ]
+            elif isNullish payload then
+                createObj []
+            else
+                payload
+
+        match record with
+        | None -> raw
+        | Some text -> withField raw "commissioner_record" (box text)
+
+    /// The devops intent travels as the program's own text: a plain string
+    /// payload is the intent itself, an object payload carries it under
+    /// `intent`.
+    let private devopsIntentText (payload: obj) : string =
+        if isStringValue payload then
+            unbox<string> payload
+        else
+            (ToolHostCodec.argumentsOfRaw payload).Text "intent"
+
     let runPlanProgram
         (prose: JsCanonicalDescription.Prose)
         (gitCommonDir: string)
@@ -449,11 +486,11 @@ module ToolRegistry =
             return JsToolsResult.render outcome
         }
 
-    let private advisorDeclarationOf (view: obj) =
-        if isNull view then
-            Ok AnchorViewDeclaration.empty
-        else
-            AnchorSurface.parseDeclaration view
+    /// The advisor consult accepts the report mapping only — a mapping of
+    /// anchor numbers to summaries, equivalent to a `prefixUntil = 0`
+    /// declaration. There is no lenient empty declaration.
+    let private advisorDeclarationOf (reportMapping: obj) =
+        AnchorSurface.parseReportMapping reportMapping
 
     /// The transform's own wire text over a decoded snapshot part: the advisor
     /// reads exactly what the caller's request carried, tool calls included.
@@ -539,12 +576,12 @@ module ToolRegistry =
         (runtime: ToolRuntimeScope)
         (ctx: HostToolContext)
         (intent: obj)
-        (view: obj)
+        (reportMapping: obj)
         : Task<obj> =
         task {
             let! loaded = advisorSnapshotMessages runtime ctx
 
-            match loaded, advisorDeclarationOf view with
+            match loaded, advisorDeclarationOf reportMapping with
             | Error reason, _ -> return advisorRefusal "advisor-unavailable" reason
             | _, Error failure -> return advisorRefusal (JsFailure.code failure) (JsFailure.reason failure)
             | Ok messages, Ok declaration -> return! advisorSeatAnswer runtime ctx messages declaration intent
@@ -608,6 +645,37 @@ module ToolRegistry =
                 ?eventPort = eventPort
             )
 
+        // work-028: the real delegation capability — the SyncDelegate
+        // runtime runs the bound fixed DevOps for this work synchronously and
+        // hands back its complete delivered view. A missing runtime fails closed.
+        let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
+            let invokeRuntime (runtime: SyncDelegateRuntime) (intent: string) : Task<string> =
+                task {
+                    let! outcome = runtime.Invoke(ctx.SessionId, SyncDelegateRole.DevOps, intent)
+
+                    return
+                        match outcome with
+                        | Ok record -> record
+                        | Error reason ->
+                            raise (InvalidOperationException(sprintf "DevOps delegation failed: %s" reason))
+                }
+
+            fun (intent: string) ->
+                task {
+                    match syncRuntime with
+                    | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
+                    | Some runtime -> return! invokeRuntime runtime intent
+                }
+
+        let askGitCommonDir (directory: string option) : Task<string> =
+            task {
+                match directory with
+                | Some workspace ->
+                    let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+                    return commonDir
+                | None -> return ""
+            }
+
         let generatedJsSpecFor (role: Role) =
             JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse
             |> Option.map (fun surface ->
@@ -649,30 +717,108 @@ module ToolRegistry =
                             let refusal (code: string) : obj =
                                 createObj [ "ok" ==> false; "code" ==> code ]
 
+                            let refusalWithReason (code: string) (reason: string) : obj =
+                                createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
+
                             let host: JsDelegationHost =
-                                { Fork =
-                                    fun payload ->
+                                { Delegate =
+                                    fun name payload mapping ->
                                         task {
-                                            let raw =
-                                                if isStringValue payload then
-                                                    createObj [ "charge" ==> payload ]
-                                                else
-                                                    payload
+                                            let material = reportMaterialText ctx.SessionId mapping
 
-                                            let! receipt =
-                                                ForkTool.executeReceipt
-                                                    runtime
-                                                    ctx
-                                                    (ToolHostCodec.argumentsOfRaw raw)
+                                            match name with
+                                            | "fork" | "commission" ->
+                                                match material with
+                                                | Error failure ->
+                                                    return
+                                                        refusalWithReason
+                                                            (JsFailure.code failure)
+                                                            (JsFailure.reason failure)
+                                                | Ok record ->
+                                                    let raw = payloadWithRecord payload record
 
-                                            return
-                                                match receipt with
-                                                | Ok placed ->
-                                                    envelopeOk
-                                                        [ "name" ==> placed.Name
-                                                          "agentId" ==> placed.AgentId
-                                                          "outcome" ==> placed.Outcome ]
-                                                | Error code -> refusal code
+                                                    let! receipt =
+                                                        ForkTool.executeReceipt
+                                                            runtime
+                                                            ctx
+                                                            (ToolHostCodec.argumentsOfRaw raw)
+
+                                                    return
+                                                        match receipt with
+                                                        | Ok placed ->
+                                                            envelopeOk
+                                                                [ "name" ==> placed.Name
+                                                                  "agentId" ==> placed.AgentId
+                                                                  "outcome" ==> placed.Outcome ]
+                                                        | Error code -> refusal code
+                                            | "resume" ->
+                                                match material with
+                                                | Error failure ->
+                                                    return
+                                                        refusalWithReason
+                                                            (JsFailure.code failure)
+                                                            (JsFailure.reason failure)
+                                                | Ok record ->
+                                                    let raw = payloadWithRecord payload record
+
+                                                    let! receipt =
+                                                        ForkTool.executeResumeReceipt
+                                                            runtime
+                                                            ctx
+                                                            (ToolHostCodec.argumentsOfRaw raw)
+
+                                                    return
+                                                        match receipt with
+                                                        | Ok placed ->
+                                                            envelopeOk
+                                                                [ "name" ==> placed.Name
+                                                                  "agentId" ==> placed.AgentId
+                                                                  "outcome" ==> placed.Outcome ]
+                                                        | Error code -> refusal code
+                                            | "devops" ->
+                                                match material with
+                                                | Error failure ->
+                                                    return
+                                                        refusalWithReason
+                                                            (JsFailure.code failure)
+                                                            (JsFailure.reason failure)
+                                                | Ok record ->
+                                                    let! gitCommonDir = askGitCommonDir workspaceDirectory
+
+                                                    if String.IsNullOrWhiteSpace gitCommonDir then
+                                                        return
+                                                            refusalWithReason
+                                                                "devops-failed"
+                                                                "devops failed: git common directory is missing"
+                                                    else
+                                                        let intentText = devopsIntentText payload
+
+                                                        let intent =
+                                                            match record with
+                                                            | Some text -> intentText + "\n\n" + text
+                                                            | None -> intentText
+
+                                                        let delegateTo = devopsDelegateOf syncDelegateRuntime ctx
+
+                                                        let! outcome =
+                                                            Wanxiangshu.Mission.Planning.PlanTools.executeAsk
+                                                                gitCommonDir
+                                                                ctx.SessionId
+                                                                intent
+                                                                delegateTo
+
+                                                        return
+                                                            match outcome with
+                                                            | Ok answer ->
+                                                                envelopeOk
+                                                                    [ "kind" ==> answer.Kind
+                                                                      "status" ==> answer.Status
+                                                                      "view" ==> answer.View ]
+                                                            | Error reason ->
+                                                                refusalWithReason
+                                                                    "devops-failed"
+                                                                    (sprintf "devops failed: %s" reason)
+                                            | _ -> return refusal "unknown-delegate"
                                         }
                                   Join =
                                     fun () ->
@@ -736,7 +882,9 @@ module ToolRegistry =
                                             ))
                                             horizonContext
                                             ctx
-                                  Advisor = fun intent view -> advisorConsult runtime ctx intent view }
+                                  Advisor =
+                                    fun intent reportMapping ->
+                                        advisorConsult runtime ctx intent reportMapping }
 
                             JsDelegationBridge.install ctx.SessionId host
                             JsDelegationBridge.installAsk ctx.SessionId (fun question -> runtime.AskUser(ctx, question))
@@ -753,11 +901,9 @@ module ToolRegistry =
                   yield! generatedJsSpecFor role |> Option.toList ]
 
         // Clean-break: all host delegation and lifecycle verbs (fork, resume,
-        // commission, join, horizon, fission, review, deliver, fetch) are
-        // retired from host registration and live exclusively as
-        // programming-surface members. devops stays host-registered: it is the
-        // Plan role's synchronous investigation channel into the bound fixed
-        // DevOps.
+        // commission, devops, join, horizon, fission, review, deliver, fetch)
+        // are retired from host registration and live exclusively as
+        // programming-surface members.
         let resolvePlanGitCommonDir () : Task<string option> =
             task {
                 match workspaceDirectory with
@@ -774,65 +920,6 @@ module ToolRegistry =
                     let! root = RuntimePath.stateRoot ws
                     return Some(root + "/wanxiangshu")
                 | None -> return None
-            }
-
-        // work-028: the real delegation capability — the SyncDelegate
-        // runtime runs the bound fixed DevOps for this work synchronously and
-        // hands back its complete delivered view. A missing runtime fails closed.
-        let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
-            let invokeRuntime (runtime: SyncDelegateRuntime) (intent: string) : Task<string> =
-                task {
-                    let! outcome = runtime.Invoke(ctx.SessionId, SyncDelegateRole.DevOps, intent)
-
-                    return
-                        match outcome with
-                        | Ok record -> record
-                        | Error reason ->
-                            raise (InvalidOperationException(sprintf "DevOps delegation failed: %s" reason))
-                }
-
-            fun (intent: string) ->
-                task {
-                    match syncRuntime with
-                    | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
-                    | Some runtime -> return! invokeRuntime runtime intent
-                }
-
-        let renderAskOutcome (outcome: Result<AskResult, string>) : string =
-            match outcome with
-            | Ok res -> res.View
-            | Error err -> sprintf "devops failed: %s" err
-
-        let askGitCommonDir (directory: string option) : Task<string> =
-            task {
-                match directory with
-                | Some workspace ->
-                    let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
-                    return commonDir
-                | None -> return ""
-            }
-
-        let askWithLifecycle
-            (syncRuntime: SyncDelegateRuntime option)
-            (args: HostToolArguments)
-            (ctx: HostToolContext)
-            : Task<string> =
-            task {
-                let! gitCommonDir = askGitCommonDir workspaceDirectory
-
-                if String.IsNullOrWhiteSpace gitCommonDir then
-                    return "devops failed: git common directory is missing"
-                else
-                    let delegateTo = devopsDelegateOf syncRuntime ctx
-
-                    let! outcome =
-                        Wanxiangshu.Mission.Planning.PlanTools.executeAsk
-                            gitCommonDir
-                            ctx.SessionId
-                            (args.Text "intent")
-                            delegateTo
-
-                    return renderAskOutcome outcome
             }
 
         let lifecycleWorkOf
@@ -1182,17 +1269,6 @@ module ToolRegistry =
 
         let deliverTool = deliverSpec ()
 
-        // LC-021/LC-022: a real host-registered devops spec. staticAdmissions
-        // already admits DevOpsConsultation; without this spec the Plan role
-        // sees an admission with no tool behind it.
-        let devopsTool =
-            { Name = "devops"
-              Description = ProviderProse.render providerLanguage "tool/devops" Map.empty
-              Arguments = [ "intent", ToolHostCodec.stringSchema factory ]
-              Admission = ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
-              Execute =
-                fun args ctx -> askWithLifecycle syncDelegateRuntime args ctx }
-
         let recordedDeliverReplay (ctx: HostToolContext) : Task<bool> =
             task {
                 match ctx.ProviderRunId, ctx.ToolCallId with
@@ -1207,11 +1283,7 @@ module ToolRegistry =
             }
 
         let baseSpecs =
-            [ yield ForkTool.managerSpec factory runtime
-              yield ForkTool.resumeSpec factory runtime
-
-              yield ForkTool.orchestratorSpec factory runtime
-              yield JoinTool.spec runtime
+            [ yield JoinTool.spec runtime
 
               let horizonContext: HorizonTool.HorizonRuntimeContext =
                   { RuntimeFor = runtime.RuntimeFor
@@ -1223,7 +1295,6 @@ module ToolRegistry =
               yield FissionTool.spec factory runtime
               yield ReviewShell.spec factory runtime
               yield deliverTool
-              yield devopsTool
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
 

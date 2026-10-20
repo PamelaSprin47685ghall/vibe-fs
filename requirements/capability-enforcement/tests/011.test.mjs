@@ -91,6 +91,12 @@ const HOST_UTILITY_ALLOW = ['skill']
 const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (_role) => HOST_UTILITY_ALLOW
 const cognitiveUtilityAllowFor = (_role) => COGNITIVE_UTILITY_ALLOW
+// Two distinct faces, kept apart:
+//   面 A — 宿主注册的工具面（宿主注册表 / `hooks.tool`）：`fork` / `resume` /
+//   `commission` / `devops` 四个名字都不再注册。
+//   面 B — 宿主权限目录面（`StaticTools.knownToolNames` 及其派生的权限矩阵）：
+//   `fork` / `resume` / `commission` 仍留在目录里（ToolSpec 构造器保留，委派线
+//   协议仍在），只有 `devops` 离开了权限目录。
 const ROLE_ALLOW = {
   Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
   Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
@@ -245,6 +251,9 @@ const TOOL_NAMES = [
   'review', 'fetch', 'deliver',
   'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator',
 ]
+// 面 B（宿主权限目录）：`fork` / `resume` / `commission` 仍留在权限目录里，
+// 权限对象仍为它们出条目；只有 `devops` 离开了权限目录，它的权限键不存在。
+const PERMISSION_CATALOG_REMOVED_TOOLS = ['devops']
 
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops']
 
@@ -277,6 +286,9 @@ integrationTest('WHAT[capability-enforcement-011] MANAGER_config_projects_owned_
         const expected = ALLOWED[role].includes(toolName) ? 'allow' : 'deny'
         const key = toolName
         assert.equal(permission[key], expected, `${role}.${key}`)
+      }
+      for (const toolName of PERMISSION_CATALOG_REMOVED_TOOLS) {
+        assert.equal(permission[toolName], undefined, `${role}.${toolName} must not be a host permission key`)
       }
       assert.equal(permission.external_directory, 'allow', `${role}.external_directory`)
       assert.equal(config.agent[role].model, undefined)

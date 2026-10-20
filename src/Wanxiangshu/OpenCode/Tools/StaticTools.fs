@@ -9,6 +9,11 @@ open Wanxiangshu.Foundation
 module StaticTools =
 
     /// One permission may expand to several provider verb names (Pty, Behavior, Exec).
+    /// `fork` / `resume` keep their provider verb names: their ToolSpec
+    /// constructors are retained for the delegation wire protocol, so the
+    /// static catalog still carries those names. A permission with no provider
+    /// tool name expands to the empty list: its office duty lives on the
+    /// programming surface only (this.devops), not as a host provider tool.
     let toolNames (p: ToolPermission) : string list =
         match p with
         | ToolPermission.Fork -> [ "fork" ]
@@ -31,16 +36,10 @@ module StaticTools =
         | ToolPermission.Finality -> [ "deliver" ]
         | ToolPermission.JsPlan -> [ "todowrite-for-plan" ]
         | ToolPermission.Ask -> []
-        | ToolPermission.DevOpsConsultation -> [ "devops" ]
+        | ToolPermission.DevOpsConsultation -> []
         | ToolPermission.Advisor -> []
         | ToolPermission.Deliver -> [ "deliver" ]
         | ToolPermission.Review -> [ "review" ]
-
-    /// Primary name for permissions with a single verb (tests / simple maps).
-    let toolName (p: ToolPermission) =
-        match toolNames p with
-        | name :: _ -> name
-        | [] -> invalidOp "ToolPermission must expand to at least one provider name"
 
     /// The complete constructor list of ToolPermission. It enumerates the
     /// catalog type for the reverse lookup; the name↔permission mapping itself
@@ -138,14 +137,20 @@ module StaticTools =
     /// Single source: OfficeCapability.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
     /// filters and contract tests see concrete denies (not only "*").
-    /// work-030: `handoff` is fully retired — no permission owns it and it
-    /// left this catalog. `resume` stays: Manager's delegation surface owns the
-    /// verb, so every role's permission object keeps its explicit entry.
+    /// The catalog holds exactly the host provider tool names. `handoff` is
+    /// fully retired. `devops` left the catalog with its ToolSpec: the host
+    /// devops tool is fully retired, and the verb survives only as a
+    /// programming-surface member (this.devops) projected by `Capability.fs`.
+    /// `fork` / `resume` / `commission` stay in the catalog because their
+    /// ToolSpec constructors are retained — they are no longer registered as
+    /// host provider tools (the delegation line runs on the programming
+    /// surface), yet every ToolSpec owner name must appear here
+    /// (tool-referential-integrity). Their permission entries are therefore
+    /// harmless: they match no registered tool.
     let knownToolNames =
         [ "fork"
           "resume"
           "commission"
-
           "join"
           "horizon"
           "fission"
@@ -160,8 +165,7 @@ module StaticTools =
           "todowrite-for-orchestrator"
           "todowrite-for-devops"
           "todowrite-for-bookkeeper"
-          "todowrite-for-plan"
-          "devops" ]
+          "todowrite-for-plan" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     /// The office half comes from the one reverse lookup; utility tools keep
@@ -199,16 +203,14 @@ module StaticTools =
     let private permissionFor (registry: AblationRegistry) allowed role name =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
-        | true, ("devops" | "review" | "deliver" | "todowrite-for-plan"), Role.Plan -> "allow"
+        | true, ("review" | "deliver" | "todowrite-for-plan"), Role.Plan -> "allow"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
-
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "resume", Role.Orchestrator -> "deny"
         | true, "commission", Role.Orchestrator -> "allow"
         | true, "fork", Role.DevOps -> "deny"
         | true, "resume", Role.DevOps -> "deny"
-
         | true, "skill", _ -> "allow"
         | true, "assume", role when not (cognitiveUtilityRoleAllowed role) -> "deny"
         | true, "assume", _ -> "allow"

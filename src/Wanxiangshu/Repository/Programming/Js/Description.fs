@@ -145,6 +145,15 @@ module JsCanonicalDescription =
         let BaseClassFork = "tool/js-program/base-class-fork"
 
         [<Literal>]
+        let BaseClassResume = "tool/js-program/base-class-resume"
+
+        [<Literal>]
+        let BaseClassCommission = "tool/js-program/base-class-commission"
+
+        [<Literal>]
+        let BaseClassDevOps = "tool/js-program/base-class-devops"
+
+        [<Literal>]
         let BaseClassJoin = "tool/js-program/base-class-join"
 
         [<Literal>]
@@ -208,6 +217,9 @@ module JsCanonicalDescription =
           BaseClassMove: string
           BaseClassExec: string
           BaseClassFork: string
+          BaseClassResume: string
+          BaseClassCommission: string
+          BaseClassDevOps: string
           BaseClassJoin: string
           BaseClassFission: string
           BaseClassHorizon: string
@@ -301,6 +313,21 @@ class JsProgram {"""
               "baseClassFork",
               if has capabilities JsCapability.Fork then
                   prose.BaseClassFork
+              else
+                  ""
+              "baseClassResume",
+              if has capabilities JsCapability.Resume then
+                  prose.BaseClassResume
+              else
+                  ""
+              "baseClassCommission",
+              if has capabilities JsCapability.Commission then
+                  prose.BaseClassCommission
+              else
+                  ""
+              "baseClassDevOps",
+              if has capabilities JsCapability.DevOps then
+                  prose.BaseClassDevOps
               else
                   ""
               "baseClassJoin",
@@ -480,20 +507,33 @@ class JsProgram {"""
                       [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Commission then
                   fill
-                      """  async commission(payload) {
+                      """  async commission(payload, reportMapping) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
-    return await this._api.commission(spec);
+    return await this._api.commission(spec, reportMapping);
   }"""
                       []
               if has capabilities JsCapability.Fork then
                   fill
-                      """  async fork(payload) {
+                      """  async fork(payload, reportMapping) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
     if (!spec.name) {
       const slug = String(spec.charge || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24);
       spec.name = slug || "child";
     }
-    return await this._api.fork(spec);
+    return await this._api.fork(spec, reportMapping);
+  }"""
+                      []
+              if has capabilities JsCapability.Resume then
+                  fill
+                      """  async resume(payload, reportMapping) {
+    const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
+    return await this._api.resume(spec, reportMapping);
+  }"""
+                      []
+              if has capabilities JsCapability.DevOps then
+                  fill
+                      """  async devops(intent, reportMapping) {
+    return await this._api.devops(intent, reportMapping);
   }"""
                       []
               if has capabilities JsCapability.Join then
@@ -510,8 +550,8 @@ class JsProgram {"""
                       []
               if has capabilities JsCapability.Advisor then
                   fill
-                      """  async advisor(intent, view) {
-    return await this._api.advisor(intent, view);
+                      """  async advisor(intent, reportMapping) {
+    return await this._api.advisor(intent, reportMapping);
   }"""
                       []
               if has capabilities JsCapability.Fission then
@@ -522,7 +562,7 @@ class JsProgram {"""
                       []
               if has capabilities JsCapability.Fork then
                   fill
-                      """  async dag(spec) {
+                      """  async dag(spec, reportMapping) {
     const nodes = (spec && spec.nodes) || [];
     if (nodes.length === 0) return { ok: true, results: {}, skipped: [] };
     const byId = {};
@@ -553,7 +593,7 @@ class JsProgram {"""
       if (ready.length === 0) {
         abortWith("DAG_CYCLE", "dag has a cycle or an unknown dependency");
       }
-      const receipts = await Promise.all(ready.map((node) => this.fork({ charge: prompt(node), name: node.id })));
+      const receipts = await Promise.all(ready.map((node) => this.fork({ charge: prompt(node), name: node.id }, reportMapping)));
       let waveRetry = false;
       for (let index = 0; index < ready.length; index += 1) {
         const node = ready[index];
@@ -637,14 +677,15 @@ class JsProgram {"""
     return await this._api.park(payload);
   }"""
                   []
-              // deliver(view): ends this program by handing over a view
-              // declaration; the prose must already exist in the assistant
-              // text before this call. Algorithm G1 gate is verified at
-              // settlement time.
+              // deliver(reportMapping): ends this program by handing over
+              // the report mapping; the prose must already exist in the
+              // assistant text before this call. The host reads the mapping
+              // as a prefixUntil=0 declaration. Algorithm G1 gate is verified
+              // at settlement time.
               fill
-                  """  async deliver(view) {
+                  """  async deliver(reportMapping) {
     const err = new Error("delivered");
-    err.__jsDelivered = { view: view };
+    err.__jsDelivered = { view: { prefixUntil: 0, thenMap: reportMapping } };
     throw err;
   }"""
                   []

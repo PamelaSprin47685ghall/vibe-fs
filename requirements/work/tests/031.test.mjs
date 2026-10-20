@@ -10,7 +10,7 @@ const rootDir = path.resolve(__dirname, '../../..')
 const resourcesDir = path.join(rootDir, 'resources/provider')
 
 test('WHAT[work-031] plan role, stages, and tool resources exist in paired English and Simplified Chinese markdown files', () => {
-  // Both human questions and DevOps investigations have paired resources.
+  // The human-question resources have paired languages.
   const resourceBases = [
     'role/plan',
     'planning/s1',
@@ -18,7 +18,6 @@ test('WHAT[work-031] plan role, stages, and tool resources exist in paired Engli
     'planning/s3',
     'tool/js-plan',
     'tool/ask',
-    'tool/devops',
     'tool/ask-question',
     'tool/ask-title',
     'tool/ask-sent',

@@ -97,9 +97,13 @@ const COGNITIVE_UTILITY_ALLOW = [
 ]
 const hostUtilityAllowFor = (_role) => HOST_UTILITY_ALLOW
 const cognitiveUtilityAllowFor = (_role) => COGNITIVE_UTILITY_ALLOW
-// Clean-break: all host delegation and lifecycle verbs are subsumed into the
-// programming surface (todowrite-for-<role>). Only the surface itself and host
-// utilities (bash-honeypot) appear in the host schema allow list.
+// Two distinct faces, kept apart:
+//   面 A — 宿主注册的工具面（宿主注册表 / `hooks.tool`）：`fork` / `resume` /
+//   `commission` / `devops` 四个名字都不再注册，宿主不再暴露它们。
+//   面 B — 宿主权限目录面（`StaticTools.knownToolNames` 及其派生的权限矩阵）：
+//   `fork` / `resume` / `commission` 仍留在目录里（它们的 ToolSpec 构造器保留，
+//   委派线协议仍在），因此权限对象仍为它们出条目：Manager 持有 fork / resume，
+//   Orchestrator 持有 commission。只有 `devops` 离开了权限目录。
 const ROLE_ALLOW = {
   Manager: [
     'fork',
@@ -127,6 +131,9 @@ test('WHAT[capability-enforcement-002] AGENT_006_role_tool_matrix_reaches_the_ho
   for (const role of ROLES) {
     const name = agentName(role)
     const allowed = allowList(config, name).sort()
+    // 面 A / 面 B 在 `devops` 上重合：它的 ToolSpec 已整体删除，宿主注册表与
+    // 权限目录都不再持有这个名字，所以任何角色都不得放行它。
+    assert.ok(!allowed.includes('devops'), `${name} must not expose devops as a host tool`)
     assert.deepEqual(
       allowed,
       [...ROLE_ALLOW[role], ...hostUtilityAllowFor(role), ...cognitiveUtilityAllowFor(role)].sort(),
@@ -159,11 +166,22 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
     // The generated surface's members are part of what the Host schema allows
     // for that tool, so a member whose only carrier is the surface (e.g.
     // `advisor`) must be counted beside any review-contract permissions.
+    // The delegation capability reaches the surface as a member (`fork`,
+    // `resume`, `commission`, `devops`), never as a host tool; the office
+    // vocabulary behind a member is the permission label it was granted by.
+    const OFFICE_LABEL_OF_SURFACE_CAPABILITY = {
+      Fork: 'Fork',
+      Resume: 'Resume',
+      Commission: 'Fork',
+      DevOps: 'DevOpsConsultation',
+    }
+    const officeLabel = (capability) =>
+      OFFICE_LABEL_OF_SURFACE_CAPABILITY[capability] ?? capability
     const generated = toolName.startsWith('todowrite-for-')
       ? generateRole(toolName.slice('todowrite-for-'.length), 'en')
       : null
 
-    if (generated) return [...new Set([...reviewPermissions, ...generated.capabilities])]
+    if (generated) return [...new Set([...reviewPermissions, ...generated.capabilities.map(officeLabel)])]
     if (reviewPermissions.length > 0) return reviewPermissions
     const single = permissionOf(toolName)
     return single ? [single] : []
@@ -219,23 +237,27 @@ test('WHAT[capability-enforcement-002] P7_SURFACE_public_internal_partition_and_
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { rolePredicate } = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
+const { generateRole } = await import("../../../dist/Repository/Programming/Js/GeneratorSurface.js");
 
 
-test('WHAT[capability-enforcement-002] TOOLSPEC_delegation_tools_have_owner_defined_admission', () => {
-  // fork & resume: Manager only
-  assert.equal(rolePredicate('fork', 'manager'), true)
-  assert.equal(rolePredicate('fork', 'engineer'), false)
-  assert.equal(rolePredicate('fork', 'orchestrator'), false)
-  assert.equal(rolePredicate('fork', 'devops'), false)
-  assert.equal(rolePredicate('resume', 'manager'), true)
-  assert.equal(rolePredicate('resume', 'engineer'), false)
-  assert.equal(rolePredicate('resume', 'orchestrator'), false)
-  assert.equal(rolePredicate('resume', 'devops'), false)
-
-  // commission: Orchestrator only
-  assert.equal(rolePredicate('commission', 'orchestrator'), true)
-  assert.equal(rolePredicate('commission', 'manager'), false)
-  assert.equal(rolePredicate('commission', 'engineer'), false)
+test('WHAT[capability-enforcement-002] TOOLSPEC_delegation_verbs_are_no_longer_host_tools', () => {
+  // Clean-break: the delegation verbs live exclusively as programming-surface
+  // members, so the Host registers no `fork` / `resume` / `commission` /
+  // `devops` tool and admits none of them for any role.
+  for (const tool of ['fork', 'resume', 'commission', 'devops']) {
+    for (const role of ['manager', 'orchestrator', 'engineer', 'devops']) {
+      assert.equal(rolePredicate(tool, role), false, `${tool} must not be admitted for ${role}`)
+    }
+  }
+})
+test('WHAT[capability-enforcement-002] TOOLSPEC_delegation_member_names_stay_on_the_programming_surface', () => {
+  const memberNames = (role) => generateRole(role, 'en').members.map((member) => member.memberName)
+  assert.ok(memberNames('manager').includes('fork'), 'manager keeps the fork member')
+  assert.ok(memberNames('manager').includes('resume'), 'manager keeps the resume member')
+  assert.ok(memberNames('orchestrator').includes('commission'), 'orchestrator keeps the commission member')
+  assert.ok(memberNames('plan').includes('devops'), 'plan keeps the devops member')
+})
+test('WHAT[capability-enforcement-002] TOOLSPEC_lifecycle_tools_have_owner_defined_admission', () => {
 
   // join & horizon: Join/Horizon permissions
   assert.equal(rolePredicate('join', 'manager'), true)
