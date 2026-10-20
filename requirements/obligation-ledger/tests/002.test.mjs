@@ -68,6 +68,8 @@ integrationTest('WHAT[obligation-ledger-002] installed OpenCode Host runs todowr
   assert.equal(evidence.versions.plugin, '1.18.29', `plugin version drifted: ${evidence.versions.plugin}`)
   assert.equal(evidence.observed.todowriteAdvertised, false, 'native todowrite must not be advertised on the Engineer provider wire')
   assert.equal(evidence.observed.programmingToolAdvertised, true, 'todowrite-for-engineer must be advertised on the Engineer provider wire')
+  assert.deepEqual(evidence.observed.toolCallsBySession[evidence.sessions.sessionA], ['ol002-a-view', 'ol002-a-no-view'])
+  assert.deepEqual(evidence.observed.toolCallsBySession[evidence.sessions.sessionB], ['ol002-b-view'])
   assert.deepEqual(
     evidence.observed.checkpointsBySession[evidence.sessions.sessionA],
     ['ol002-a-view'],

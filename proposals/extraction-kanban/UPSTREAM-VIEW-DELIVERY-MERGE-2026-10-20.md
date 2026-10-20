@@ -258,3 +258,7 @@ gen75 全仓单元测试为4460 pass、0 fail、108 skip、277 TODO，756/756文
 join 的实际阻断来自夹具重复装载插件；去除额外全局配置后，真实 Host 记录3次 Manager 请求、0次被拒子模型请求、1次 durable completion 与1次 join consumption。长链中的 Orchestrator 从已不可见的独立 deliver 工具迁到现有 todowrite-for-orchestrator 程序内 deliver(view)，保持先写正式散文、交付后自然停止的顺序。各轮原始失败保留；最终构建代次、完整集成、E2E、包消费与推送状态由复核收据逐项给出，历史 TODO 与既有隔离缺口不据此关闭。
 
 旧身份 v1 解码也补回 SelectedAgent 与 CanonicalRole 的一致性校验：拒绝矛盾证据，合法 DevOps 仍原样恢复。最终源码、库提交、完整 CI 配置下的验证与无 TODO 豁免的证明边界分别写入收据；历史失败日志保留。
+
+gen88 的真实 Long Stroke 已走完五次 Manager 任期、provider 故障恢复、交付与 join、冲突修复和发布，5 pass / 0 fail；发行包 1366 成员及仓外消费通过。完整集成按既有 CI 参数运行后为680 pass / 1 fail / 7 skip / 7 TODO，40/40文件排空；分发通过，harness 291 pass / 0 fail。唯一失败的 checkpoint 旧夹具只回复正文并把任意历史工具结果当作新调用证据。隔离诊断中，它曾报告通过，却只实际执行两个带 view 的调用，没有执行无 view 调用，并产生13次补交付提醒。夹具现在按精确 callID 依次执行带 view、无 view 两次调用，最后显式交付；从真实 Host ToolPart 核对三次成功结果后再验两个会话各自的 checkpoint。旧失败及最终定向复验分别保留。
+
+修复提交 f04201465 的 GitHub CI 已越过历史检出门，但 Ubuntu runner 没有 rg，9项实际搜索验证因此失败。工作流补装 ripgrep 并记录版本，不跳过搜索验证。与已观察新上游08a350dc5的最终预演为72个冲突文件；固定接收点之后的75个提交仍属下一轮，PR保持Draft。后续提交、完整远端CI和最终验收状态以复核收据为准。

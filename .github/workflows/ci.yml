@@ -24,6 +24,11 @@ jobs:
         run: node scripts/wanxiangli-source.mjs check
       - run: npm ci
       - run: dotnet tool restore
+      - name: Install ripgrep for real search checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ripgrep
+          rg --version
       - name: Run verification
         id: verify
         env:

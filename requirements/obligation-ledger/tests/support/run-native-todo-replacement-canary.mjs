@@ -13,6 +13,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { parse as parseToml } from 'smol-toml'
 
 import { ProcessHost } from '../../../verification-system/tests/e2e/support/process-host.js'
 import { OPENCODE_BIN, initGitWorkspace } from '../../../verification-system/tests/e2e/support/process-host-utils.js'
@@ -33,7 +34,8 @@ const messageText = (body) => (body?.messages ?? [])
   })
   .join('\n')
 
-const hasToolResult = (body) => (body?.messages ?? []).some((message) => message?.role === 'tool')
+const hasToolResult = (body, callID) => (body?.messages ?? [])
+  .some((message) => message?.role === 'tool' && message.tool_call_id === callID)
 const isTitleRequest = (body) => {
   const messages = Array.isArray(body?.messages) ? body.messages : []
   return messages.some(
@@ -44,16 +46,20 @@ const isTitleRequest = (body) => {
   )
 }
 
-const jsViewCall = (id, view) =>
-  buildToolCallChunks(
+const jsViewCall = (id, view, delivered = false) => {
+  const chunks = buildToolCallChunks(
     id,
     'todowrite-for-engineer',
     JSON.stringify({
-      program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
+      program: delivered
+        ? 'class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: { 0: "OL002_DONE" } }); } }'
+        : 'class Js extends JsProgram { async run() { return { ok: true }; } }',
       ...(view === undefined ? {} : view),
     }),
     1,
   )
+  return delivered ? [buildTextChunks(id, 'OL002_DONE', 1)[0], ...chunks] : chunks
+}
 
 const providerRequests = []
 const advertisedToolNames = new Set()
@@ -74,21 +80,21 @@ const provider = await startHttpServer(async (request, response) => {
       sendSSE(response, buildTextChunks(`title_${Date.now()}`, 'OL002 Title', 1))
       return
     }
-    if (hasToolResult(body)) {
-      sendSSE(response, buildTextChunks(`ol002_round_${providerRequests.length}`, 'OL002_DONE', 1))
-      return
-    }
     const text = messageText(body)
-    if (text.includes('OL002_A_NO_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-a-no-view', undefined))
-      return
-    }
     if (text.includes('OL002_A_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 100, thenMap: {} }))
+      if (!hasToolResult(body, 'ol002-a-view')) {
+        sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 100, thenMap: {} }))
+      } else if (!hasToolResult(body, 'ol002-a-no-view')) {
+        sendSSE(response, jsViewCall('ol002-a-no-view', undefined, true))
+      } else {
+        sendSSE(response, buildTextChunks(`ol002_round_${providerRequests.length}`, 'OL002_DONE', 1))
+      }
       return
     }
     if (text.includes('OL002_B_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-b-view', { prefixUntil: 100, thenMap: {} }))
+      sendSSE(response, hasToolResult(body, 'ol002-b-view')
+        ? buildTextChunks(`ol002_round_${providerRequests.length}`, 'OL002_DONE', 1)
+        : jsViewCall('ol002-b-view', { prefixUntil: 100, thenMap: {} }, true))
       return
     }
     sendJSON(response, 500, { error: `unexpected prompt text: ${text.slice(0, 200)}` })
@@ -116,20 +122,30 @@ const prompt = (text) => ({
   parts: [{ type: 'text', text }],
 })
 
-const waitForToolResultRound = async (marker, host) => {
+const waitForToolResultRound = async (callID, host) => {
   const deadline = Date.now() + 30000
-  const matches = () => providerRequests.some((body) => {
-    const text = messageText(body)
-    return text.includes(marker) && hasToolResult(body)
-      && (marker !== 'OL002_A_VIEW' || !text.includes('OL002_A_NO_VIEW'))
-  })
+  const matches = () => providerRequests.some((body) => hasToolResult(body, callID))
   while (Date.now() < deadline) {
     if (matches()) return
     await delay(200)
   }
   throw new Error(
-    `timeout waiting for the tool-result round of ${marker};\n=== HOST STDOUT ===\n${host.stdoutLog}\n=== HOST STDERR ===\n${host.stderrLog}`,
+    `timeout waiting for the tool-result round of ${callID};\n=== HOST STDOUT ===\n${host.stdoutLog}\n=== HOST STDERR ===\n${host.stderrLog}`,
   )
+}
+
+const completedToolCalls = async (host, sessionID) => {
+  const { data } = await request(host.baseUrl, 'GET', `/session/${sessionID}/message`, undefined, 200)
+  assert.ok(Array.isArray(data), 'public message response must be an array')
+  const calls = data.flatMap((message) => message.parts)
+    .filter((part) => part.type === 'tool' && part.tool === 'todowrite-for-engineer')
+  for (const part of calls) {
+    assert.equal(part.state.status, 'completed', JSON.stringify(part))
+    assert.deepEqual(parseToml(part.state.output).data, part.callID === 'ol002-a-view'
+      ? { ok: true }
+      : { prefixUntil: 0, thenMap: { 0: 'OL002_DONE' } }, part.state.output)
+  }
+  return calls.map((part) => part.callID)
 }
 
 const readViewCheckpointsBySession = (workDir) => {
@@ -195,16 +211,17 @@ try {
   assert.ok(sessionA && sessionB && sessionA !== sessionB, 'public session create responses omitted distinct ids')
 
   await request(host.baseUrl, 'POST', `/session/${sessionA}/prompt_async`, prompt('OL002_A_VIEW 为会话 A 提交带 view 的编程面调用'), 204)
-  await waitForToolResultRound('OL002_A_VIEW', host)
+  await waitForToolResultRound('ol002-a-no-view', host)
 
   await request(host.baseUrl, 'POST', `/session/${sessionB}/prompt_async`, prompt('OL002_B_VIEW 为会话 B 提交带 view 的编程面调用'), 204)
-  await waitForToolResultRound('OL002_B_VIEW', host)
-
-  await request(host.baseUrl, 'POST', `/session/${sessionA}/prompt_async`, prompt('OL002_A_NO_VIEW 会话 A 无 view 调用不产生 checkpoint'), 204)
-  await waitForToolResultRound('OL002_A_NO_VIEW', host)
+  await waitForToolResultRound('ol002-b-view', host)
 
   await delay(500)
   const checkpointsBySession = readViewCheckpointsBySession(host.workDir)
+  const toolCallsBySession = {
+    [sessionA]: await completedToolCalls(host, sessionA),
+    [sessionB]: await completedToolCalls(host, sessionB),
+  }
 
   process.stdout.write(`${JSON.stringify({
     schemaVersion: 1,
@@ -215,6 +232,7 @@ try {
       todowriteAdvertised: advertisedToolNames.has('todowrite'),
       programmingToolAdvertised: advertisedToolNames.has('todowrite-for-engineer'),
       checkpointsBySession,
+      toolCallsBySession,
     },
     hostStderrTail: host.stderrLog.slice(-4000),
     providerRequests: providerRequests.length,

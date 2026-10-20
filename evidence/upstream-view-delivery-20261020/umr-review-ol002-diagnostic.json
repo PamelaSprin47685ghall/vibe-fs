@@ -1,0 +1,11 @@
+{
+  "diagnosticOnly": true,
+  "fixtureReportedPass": true,
+  "completedToolCalls": [
+    "ol002-a-view",
+    "ol002-b-view"
+  ],
+  "requiredNoViewCallObserved": false,
+  "repairNudges": 13,
+  "observation": "Old provider accepted any historical tool result, so no-view was never executed. Plain prose stops kept triggering missing-delivery guidance."
+}

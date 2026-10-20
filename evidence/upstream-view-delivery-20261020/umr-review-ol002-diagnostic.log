@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "launched": "/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/node_modules/.bin/opencode serve --port 0 --hostname 127.0.0.1",
+  "versions": {
+    "opencode": "1.18.29",
+    "plugin": "1.18.29"
+  },
+  "sessions": {
+    "sessionA": "ses_ea52ad7b5ffeA4LH8NL5bpFz5r",
+    "sessionB": "ses_ea52ad766ffe8FzjUi04AZy17v"
+  },
+  "observed": {
+    "todowriteAdvertised": false,
+    "programmingToolAdvertised": true,
+    "checkpointsBySession": {
+      "ses_ea52ad7b5ffeA4LH8NL5bpFz5r": [
+        "ol002-a-view"
+      ],
+      "ses_ea52ad766ffe8FzjUi04AZy17v": [
+        "ol002-b-view"
+      ]
+    }
+  },
+  "hostStderrTail": "",
+  "providerRequests": 18
+}

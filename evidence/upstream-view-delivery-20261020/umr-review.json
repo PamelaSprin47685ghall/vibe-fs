@@ -141,10 +141,6 @@
       "probeLog": "umr-review-ci-history.log",
       "priorLog": "umr-review-prior-ci.log"
     },
-    "githubCi": {
-      "state": "TO_BE_RECORDED_IN_PR",
-      "note": "The final PR body will link the exact source-branch CI run; local results do not substitute for it."
-    },
     "sandboxProbe": {
       "outcome": "REPRODUCED_EXISTING_ESCAPE",
       "generation": 68,
@@ -219,8 +215,7 @@
     },
     "currentStatic": {
       "status": "passed",
-      "log": "umr-review-static-14.log",
-      "cacheConfirmationLog": "umr-review-static-final.log"
+      "log": "umr-review-static-15.log"
     },
     "currentFormat": {
       "status": "passed",
@@ -229,8 +224,8 @@
     },
     "currentBuild": {
       "status": "passed",
-      "generation": 88,
-      "log": "umr-review-build-25.log"
+      "generation": 90,
+      "log": "umr-review-build-27.log"
     },
     "integrationInitial": {
       "generation": 75,
@@ -387,14 +382,113 @@
     },
     "e2eFinal": {
       "status": "passed",
-      "generation": 88,
+      "generation": 90,
       "passed": 5,
       "failed": 0,
       "skipped": 0,
       "todo": 0,
-      "wallSeconds": 14.264767,
-      "log": "umr-review-e2e-12.log",
-      "scope": "Real OpenCode Host, two provider failures, interrupted join, child delivery, five Manager tenures, conflict repair and Published; no process restart in this stroke."
+      "wallSeconds": 13.247706,
+      "log": "umr-review-e2e-final.log",
+      "scope": "Real OpenCode Host; interrupted join, two provider failures, child delivery, five Manager tenures, conflict repair and final Published. This stroke does not restart the Host process."
+    },
+    "integrationInvocationError": {
+      "exit": 1,
+      "status": "truncated",
+      "plannedFiles": 40,
+      "drainedFiles": 39,
+      "reclamationAccepted": false,
+      "verdictCountsAvailable": false,
+      "backstopMs": 300000,
+      "ciBackstopMs": 900000,
+      "cause": "The direct local invocation omitted the existing CI SUITE_BACKSTOP_MS=900000; the default 300000 ceiling interrupted verification-system-016. No timeout source or CI policy was changed.",
+      "harness": {
+        "passed": 291,
+        "failed": 0
+      },
+      "distributionExit": 0,
+      "log": "umr-review-integration-final.log"
+    },
+    "currentPackage": {
+      "exit": 0,
+      "generation": 90,
+      "members": 1366,
+      "totalBytes": 11547094,
+      "tarballDigest": "862562681f0d85164e8d896cc9dd030797601730b08d0c9c8cc1066f948bc57e",
+      "tarballTracked": false,
+      "log": "umr-review-package-final-02.log"
+    },
+    "integrationBeforeCheckpointFix": {
+      "status": "failed",
+      "generation": 88,
+      "passed": 680,
+      "failed": 1,
+      "skipped": 7,
+      "todo": 7,
+      "plannedFiles": 40,
+      "drainedFiles": 40,
+      "reclamationAccepted": true,
+      "wallSeconds": 474.83,
+      "harness": {
+        "passed": 291,
+        "failed": 0
+      },
+      "distributionExit": 0,
+      "failure": "obligation-ledger-002 old provider can treat historical tool results as the next call and keeps replying with prose without delivery.",
+      "log": "umr-review-integration-final-02.log"
+    },
+    "checkpointDiagnostic": {
+      "status": "false_positive_reproduced",
+      "fixtureReportedPass": true,
+      "completedCalls": [
+        "ol002-a-view",
+        "ol002-b-view"
+      ],
+      "requiredNoViewCallObserved": false,
+      "repairNudges": 13,
+      "evidence": "umr-review-ol002-diagnostic.json",
+      "log": "umr-review-ol002-diagnostic.log"
+    },
+    "checkpointSearchFirst": {
+      "generation": 89,
+      "passed": 48,
+      "failed": 1,
+      "filesDrained": "4/4",
+      "reclamationAccepted": true,
+      "log": "umr-review-checkpoint-search-final.log",
+      "cause": "The new native assertion expected the ordinary return object after deliver, but the actual successful result is the declared sealed view. The assertion now requires that exact view for delivered calls and the ordinary object for the undelivered call."
+    },
+    "checkpointSearchFinal": {
+      "status": "passed",
+      "generation": 90,
+      "passed": 49,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "plannedFiles": 4,
+      "drainedFiles": 4,
+      "reclamationAccepted": true,
+      "wallSeconds": 9.84,
+      "log": "umr-review-checkpoint-search-final-02.log"
+    },
+    "githubCiInitial": {
+      "state": "completed",
+      "sourceCommit": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
+      "runId": 39484138208,
+      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39484138208",
+      "conclusion": "failure",
+      "unit": {
+        "passed": 4370,
+        "failed": 9,
+        "skipped": 194,
+        "todo": 277,
+        "files": 756
+      },
+      "failure": "Nine real rg search checks could not launch rg on the Ubuntu runner. The workflow does not install ripgrep.",
+      "log": "umr-review-ci-f042-failed.log"
+    },
+    "githubCi": {
+      "state": "AWAITING_PUSH_OF_CI_AND_CHECKPOINT_FIX",
+      "note": "The final PR will link the complete Ubuntu run for the repaired workflow and exact source commit. Prior failures remain recorded separately."
     }
   },
   "resolved": [
@@ -461,6 +555,14 @@
     {
       "id": "REAL-HOST-FIXTURES",
       "change": "Use awaited view delivery, retained read-only SQLite observation, precise anchors, and an exact second-attempt fallback declaration; remove the obsolete step-0 Manager exception."
+    },
+    {
+      "id": "CI-RIPGREP",
+      "change": "Install ripgrep in the Ubuntu workflow and report its version before running unchanged real search tests."
+    },
+    {
+      "id": "CHECKPOINT-FIXTURE",
+      "change": "Match exact tool call results, execute view and no-view operations in one controlled turn, explicitly deliver, and require successful native ToolParts for all three calls before asserting checkpoints."
     }
   ],
   "remaining": [
@@ -477,11 +579,18 @@
       "priority": "P1",
       "impact": "The PR cannot merge directly into the newly advanced upstream master.",
       "commitsAfterFixedTarget": 75,
-      "conflictedPaths": null,
-      "action": "Keep the agreed fixed candidate. Recompute final PR conflicts against the observed newer base and record them before publication.",
+      "conflictedPaths": 72,
+      "action": "Keep this fixed candidate as a Draft PR. A later batch must reconcile the 75 subsequent upstream commits.",
       "previousTrial": {
         "base": "f7d112dad75007f9ec2af754b95a8c264c359287",
         "conflictedPaths": 56
+      },
+      "finalTrial": {
+        "head": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
+        "base": "08a350dc52ee4a9f04b6e84679139018aa39ee91",
+        "exit": 1,
+        "conflictedPaths": 72,
+        "log": "umr-review-upstream-conflicts.log"
       }
     },
     {
@@ -532,9 +641,9 @@
   "mergeCommit": "f2f30d3fa7fd1fc84685b9c32cb4128f5999a4b3",
   "submoduleCommit": "a12ff4a99d401d9a8e8d9c57cb9a0eb1173a7d1b",
   "candidate": {
-    "generation": 88,
+    "generation": 90,
     "compilerInputDigest": "1014511c090d14b71548f0134e62cff179e86540cd6d4c4058280d36a6ca3597",
-    "generatedInputDigest": "b1215734c2246916d21eb4074471444133ae742091b9b9cf5e7d76ac178d6e94",
+    "generatedInputDigest": "b8bde9ad6f12f773f5c9dcedf40c231ac57b81114f579b23443f91700e28e621",
     "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
   },
   "formalAcceptance": false,
@@ -543,5 +652,14 @@
     "compilerInputDigest": "2a7dab57ba2a1d4b7ce75fd6dec1d842be2fc91e8192c4a059d72aba219c0c28",
     "generatedInputDigest": "2ca568febaf7a88aff7ab281af40997335cd906168c8e46f03e63e353e271b4b",
     "artifactsInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
+  },
+  "sourceCommit": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
+  "push": {
+    "originMaster": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
+    "originPrBranch": "codex/upstream-plan-20261020",
+    "atomic": true,
+    "force": false,
+    "transport": "existing SSH identity",
+    "httpsAttempt": "GitHub rejected the OAuth token because workflow scope was absent; no remote refs changed by that atomic attempt."
   }
 }
