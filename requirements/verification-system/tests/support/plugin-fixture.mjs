@@ -61,6 +61,7 @@ const setupRoutingHome = (directory) => {
   writeFileSync(
     join(routingDir, 'wanxiangshu.mjs'),
     `export const routingProtocol = 2
+export const hasTheoreticalCapacity = () => true
 export default function route(role, running, previous) {
   if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'bookkeeper', 'plan']).has(role)) throw new Error('unexpected managed role: ' + role)
   if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {

@@ -82,7 +82,7 @@ const withRoutingHome = async (body) => {
   mkdirSync(configDir, { recursive: true })
   writeFileSync(
     join(configDir, 'wanxiangshu.mjs'),
-    "export const routingProtocol = 2\nexport default function route(role, running, previous, purpose) { return { model: 'fixture/root-model', reasoning: 'none' } }\n",
+    "export const routingProtocol = 2\nexport const hasTheoreticalCapacity = () => true\nexport default function route(role, running, previous, purpose) { return { model: 'fixture/root-model', reasoning: 'none' } }\n",
     'utf8',
   )
   process.env.HOME = home

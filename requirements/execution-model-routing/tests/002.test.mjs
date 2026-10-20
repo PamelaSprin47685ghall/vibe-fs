@@ -91,6 +91,7 @@ const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js
 
 const { bootstrapAndLoadAt, invokeScheduler } = routing
 const template = `export const routingProtocol = 2
+export const hasTheoreticalCapacity = () => true
 export default function route(role, running) {
   if (role !== 'coder') return null
   return running.length === 0
@@ -109,6 +110,7 @@ const withTemp = async (run) => {
 test('WHAT[execution-model-routing-002] EMR_002_scheduler_preserves_running_duplicates_null_and_previous', async () => {
   await withTemp(async (path) => {
     const body = `export const routingProtocol = 2
+export const hasTheoreticalCapacity = () => true
 export default function route(role, running, previous) {
       if (running.length !== 2) throw new Error('duplicates lost')
       if (running[0].model !== running[1].model) throw new Error('unexpected running')
@@ -139,7 +141,7 @@ test('WHAT[execution-model-routing-002] EMR_002_scheduler_program_errors_fail_cl
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(
       path,
-      `export const routingProtocol = 2\nexport default async () => ({ model: 'provider/x', reasoning: 'none' })\n`,
+      `export const routingProtocol = 2\nexport const hasTheoreticalCapacity = () => true\nexport default async () => ({ model: 'provider/x', reasoning: 'none' })\n`,
     )
     assert.throws(() => invokeScheduler(scheduler, 'coder', []), /Promise|synchronous/i)
   })
@@ -147,7 +149,7 @@ test('WHAT[execution-model-routing-002] EMR_002_scheduler_program_errors_fail_cl
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(
       path,
-      `export const routingProtocol = 2\nexport default () => ({ model: 'bare-model', reasoning: 'none' })\n`,
+      `export const routingProtocol = 2\nexport const hasTheoreticalCapacity = () => true\nexport default () => ({ model: 'bare-model', reasoning: 'none' })\n`,
     )
     assert.throws(() => invokeScheduler(scheduler, 'coder', []), /provider\/model/i)
   })
@@ -155,7 +157,7 @@ test('WHAT[execution-model-routing-002] EMR_002_scheduler_program_errors_fail_cl
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(
       path,
-      `export const routingProtocol = 2\nexport default () => ({ model: 'provider/model', reasoning: '' })\n`,
+      `export const routingProtocol = 2\nexport const hasTheoreticalCapacity = () => true\nexport default () => ({ model: 'provider/model', reasoning: '' })\n`,
     )
     assert.throws(() => invokeScheduler(scheduler, 'coder', []), /reasoning/i)
   })
@@ -277,4 +279,72 @@ test('WHAT[execution-model-routing-002] EMR_002_invoke_scheduler_passes_role_run
   assert.equal(calls[0].previous, null)
 })
 
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { mkdir, mkdtemp, readFile, rm, writeFile } = await import("node:fs/promises");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const { default: test } = await import("node:test");
+const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+
+// CUT-10: the protocol-2 ABI is owned by wanxiangli/routing. These cases were
+// accepted by the host before the cut (see proposals/extraction-kanban/cards/CUT-10.md).
+const withConfig = async (body, run) => {
+  const root = await mkdtemp(join(tmpdir(), 'wanxiangshu-routing-cut10-'))
+  const path = join(root, 'nested', 'wanxiangshu.mjs')
+  try {
+    await mkdir(join(path, '..'), { recursive: true })
+    await writeFile(path, body, 'utf8')
+    await run(path)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
+test('WHAT[execution-model-routing-002] EMR_002_loader_refuses_module_without_theoretical_capacity_query', async () => {
+  const body = `export const routingProtocol = 2
+export default function route(role, running, previous) {
+  return { model: 'provider/model', reasoning: 'none' }
+}
+`
+  await withConfig(body, async (path) => {
+    await assert.rejects(() => routing.bootstrapAndLoadAt(path, body), /hasTheoreticalCapacity/)
+    assert.equal(await readFile(path, 'utf8'), body, 'an existing user configuration is never overwritten')
+  })
+})
+
+test('WHAT[execution-model-routing-002] EMR_002_async_theoretical_capacity_fails_closed_instead_of_queueing', async () => {
+  const scheduler = () => null
+  scheduler.hasTheoreticalCapacity = async () => false
+  const runtime = routing.createRuntime(scheduler)
+  await assert.rejects(
+    async () => routing.beginExecutionAdmission(runtime, 'session', 'msg-1', 'engineer', 'alice', null),
+    /hasTheoreticalCapacity must be synchronous/,
+  )
+  assert.equal(routing.pendingCount(runtime), 0, 'a Promise is not capacity: nothing may wait for it')
+  await assert.rejects(
+    async () => routing.beginExecutionAdmission(runtime, 'later', 'msg-2', 'engineer', 'bob', null),
+    /hasTheoreticalCapacity must be synchronous/,
+    'the configuration error poisons the runtime like a failing route',
+  )
+})
+
+test('WHAT[execution-model-routing-002] EMR_002_scheduler_receives_exactly_role_running_previous', async () => {
+  const seen = []
+  const scheduler = function (...args) {
+    seen.push(args.length)
+    return { model: 'provider/model', reasoning: 'none' }
+  }
+  scheduler.hasTheoreticalCapacity = function (...args) {
+    seen.push(args.length)
+    return true
+  }
+  const runtime = routing.createRuntime(scheduler)
+  const acquired = await routing.beginExecutionAdmission(runtime, 'session', 'msg-1', 'engineer', 'alice', null)
+  assert.equal(acquired.kind, 'Acquired')
+  assert.ok(seen.length >= 2)
+  assert.ok(seen.every((count, index) => count === (index === 0 ? 1 : 3)), `arities ${seen}`)
+})
 }

@@ -72,103 +72,51 @@ module ModelRouting =
     [<Emit("typeof $0 === 'function'")>]
     let private isFunction (value: obj) : bool = jsNative
 
-    [<Emit("$0 != null && typeof $0.then === 'function'")>]
-    let private isThenable (value: obj) : bool = jsNative
-
-    [<Emit("$0($1, $2, $3, $4)")>]
-    let private callScheduler
-        (scheduler: obj)
-        (role: string)
-        (running: obj array)
-        (previous: obj)
-        (purpose: string)
-        : obj =
-        jsNative
-
     [<Emit("$0($1)")>]
     let private callMarkProviderFailed (markFailed: obj) (provider: string) : unit = jsNative
 
-    [<Emit("$0($1, $2)")>]
-    let private callCapacityQuery (query: obj) (role: string) (purpose: string) : obj = jsNative
+    /// The slice of the stateless `wanxiangli/routing` protocol owner (CUT-10)
+    /// this module reads. Module shape, protocol version, the synchronous
+    /// three-argument call, strict target decoding and the boolean-only
+    /// capacity answer are decided there; this module keeps loading, the
+    /// shared ledger and admission.
+    type private RoutingProtocolLibrary =
+        abstract admit: moduleNamespace: obj -> obj
+        abstract route: route: obj * role: string * running: obj array * previous: obj -> obj
+        abstract hasTheoreticalCapacity: query: obj * role: string -> bool
+        abstract decodeTarget: value: obj -> obj
+        abstract decodeDurableTarget: value: string -> obj
 
-    [<Emit("typeof $0 === 'number'")>]
-    let private isNumber (value: obj) : bool = jsNative
+    [<Import("RoutingProtocol", "wanxiangli/routing")>]
+    let private routingProtocolClass: obj = jsNative
 
-    let private nonEmpty name (value: obj) =
-        match value with
-        | :? string as text when not (String.IsNullOrWhiteSpace text) -> text.Trim()
-        | _ -> invalidOp (sprintf "execution-model-routing: scheduler target requires non-empty %s" name)
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : RoutingProtocolLibrary = jsNative
 
-    let private requireFullModelSelector (model: string) =
-        let slash = model.IndexOf '/'
+    // Stateless library object; one shared instance.
+    let private protocol: RoutingProtocolLibrary = construct routingProtocolClass
 
-        if slash <= 0 || slash >= model.Length - 1 then
-            invalidOp "execution-model-routing: scheduler target model must be full provider/model"
-
-        model
-
-    let private parseTarget (value: obj) : ModelRoutingTarget =
-        if isNull value then
-            invalidOp "execution-model-routing: null is not a target"
-
-        let model = nonEmpty "model" value?model |> requireFullModelSelector
-        let reasoning = nonEmpty "reasoning" value?reasoning
-        { Model = model; Reasoning = reasoning }
+    let private targetOfDecoded (value: obj) : ModelRoutingTarget =
+        { Model = unbox<string> value?model
+          Reasoning = unbox<string> value?reasoning }
 
     /// A durable road stores the fixed DevOps target as the wire string
-    /// 'provider/model:reasoning'. Decoding it is fail-closed: the result must
-    /// satisfy exactly the field requirements parseTarget enforces on a target
-    /// the scheduler resolved, so a malformed road target is refused instead of
-    /// being silently dropped or guessed from the current configuration.
+    /// 'provider/model:reasoning'. Decoding is fail-closed and uses the same
+    /// field rules as a scheduler-resolved target; the separator is the last
+    /// ':' because model names may contain one (wanxiangli/routing).
     let private parseDurableModelTarget (value: string) : ModelRoutingTarget =
-        if String.IsNullOrWhiteSpace value then
-            invalidOp "execution-model-routing: durable DevOps model target is empty"
-
-        let text = value.Trim()
-        let separator = text.IndexOf ':'
-
-        if separator <= 0 || separator >= text.Length - 1 then
-            invalidOp (
-                sprintf
-                    "execution-model-routing: durable DevOps model target must be 'provider/model:reasoning' (got '%s')"
-                    text
-            )
-
-        parseTarget (
-            createObj
-                [ "model" ==> text.Substring(0, separator)
-                  "reasoning" ==> text.Substring(separator + 1) ]
-        )
+        protocol.decodeDurableTarget value |> targetOfDecoded
 
     let private targetObject (target: ModelRoutingTarget) =
         createObj [ "model" ==> target.Model; "reasoning" ==> target.Reasoning ]
-
-    let private routingProtocolVersion = 2.0
 
     let private purposeLabel =
         function
         | ModelExecutionPurpose.Normal -> "normal"
 
-    /// The protocol version is a stable contract version of the scheduler ABI,
-    /// not an enable switch. A three-parameter JS function silently ignores the
-    /// extra purpose argument, so neither `function.length` nor a quiet call can
-    /// prove the upgrade; the loader requires the explicit marker.
-    let private requireRoutingProtocol (moduleObj: obj) =
-        let declared = if isNull moduleObj then null else moduleObj?routingProtocol
-
-        if isNull declared then
-            invalidOp
-                "execution-model-routing: wanxiangshu.mjs must export `routingProtocol = 2`; the scheduler ABI is route(role, running, previous). Migrate the existing configuration manually (the recommended template in resources/wanxiangshu.mjs shows the new shape); an existing user file is never overwritten."
-        elif not (isNumber declared) then
-            invalidOp
-                "execution-model-routing: wanxiangshu.mjs routingProtocol must be the number 2; the scheduler ABI is route(role, running, previous). Migrate the existing configuration manually (the recommended template in resources/wanxiangshu.mjs shows the new shape); an existing user file is never overwritten."
-        elif unbox<float> declared <> routingProtocolVersion then
-            invalidOp (
-                sprintf
-                    "execution-model-routing: wanxiangshu.mjs declares routingProtocol = %s but this runtime requires 2 (route(role, running, previous)). Migrate the existing configuration manually (the recommended template in resources/wanxiangshu.mjs shows the new shape); an existing user file is never overwritten."
-                    (string declared)
-            )
-
+    /// The scheduler ABI is route(role, running, previous): exactly three
+    /// arguments (execution-model-routing-002). ModelExecutionPurpose has only
+    /// Normal and is not part of the user contract, so it is not passed.
     let invokeScheduler
         (scheduler: obj)
         (role: string)
@@ -176,24 +124,17 @@ module ModelRouting =
         (previous: ModelRoutingTarget option)
         (purpose: ModelExecutionPurpose)
         : ModelRoutingTarget option =
-        if not (isFunction scheduler) then
-            invalidOp "execution-model-routing: scheduler default export must be a function"
-
-        if String.IsNullOrWhiteSpace role then
-            invalidOp "execution-model-routing: scheduler role must be non-empty"
+        ignore purpose
 
         let result =
-            callScheduler
-                scheduler
-                (role.Trim())
-                (running |> Array.map targetObject)
-                (previous |> Option.map targetObject |> Option.defaultValue null)
-                (purposeLabel purpose)
+            protocol.route (
+                scheduler,
+                role,
+                running |> Array.map targetObject,
+                previous |> Option.map targetObject |> Option.defaultValue null
+            )
 
-        if isThenable result then
-            invalidOp "execution-model-routing: scheduler must be synchronous and must not return a Promise"
-
-        if isNull result then None else Some(parseTarget result)
+        if isNull result then None else Some(targetOfDecoded result)
 
     let configPath () =
         pathJoin (pathJoin (homeDir (), ".config"), "opencode")
@@ -244,17 +185,12 @@ module ModelRouting =
 
             let fileUrl = string (pathToFileUrl path)?href
             let! moduleObj = importModule fileUrl
-            let scheduler = if isNull moduleObj then null else moduleObj?``default``
-
-            if not (isFunction scheduler) then
-                invalidOp "execution-model-routing: scheduler default export must be a function"
-
-            requireRoutingProtocol moduleObj
-
-            if not (isNull moduleObj) then
-                scheduler?markProviderFailed <- moduleObj?markProviderFailed
-                scheduler?hasTheoreticalCapacity <- moduleObj?hasTheoreticalCapacity
-
+            // Shape and version are judged by wanxiangli/routing; a refused
+            // module fails closed here and the user file is left untouched.
+            let policy = protocol.admit moduleObj
+            let scheduler: obj = policy?route
+            scheduler?markProviderFailed <- policy?markProviderFailed
+            scheduler?hasTheoreticalCapacity <- policy?hasTheoreticalCapacity
             return scheduler
         }
 
@@ -430,12 +366,6 @@ module ModelRouting =
             else
                 scheduler?hasTheoreticalCapacity
 
-        let hasTheoreticalCapacityLocked (role: string) (purpose: ModelExecutionPurpose) : bool =
-            if not (isNull hasCapFn) && isFunction hasCapFn then
-                unbox<bool> (callCapacityQuery hasCapFn role (purposeLabel purpose))
-            else
-                true
-
         let running () = capacity.Snapshot()
 
         /// A fresh execution inherits the replaced execution's target only as a
@@ -548,6 +478,23 @@ module ModelRouting =
             fatalError <- Some error
             capacity.Fail error
             admissionQueue.Fail error
+
+        /// Theoretical capacity per role (execution-model-routing-002/013). The
+        /// answer must be a synchronous boolean (wanxiangli/routing); a Promise
+        /// or any other value is a configuration error and poisons the runtime
+        /// like a failing route, instead of being read as truthy capacity. A
+        /// scheduler injected without the query (createRuntime test seam) keeps
+        /// the old reading of unbounded theoretical capacity; the production
+        /// loader refuses such a module.
+        let hasTheoreticalCapacityLocked (role: string) (_purpose: ModelExecutionPurpose) : bool =
+            if isNull hasCapFn then
+                true
+            else
+                try
+                    protocol.hasTheoreticalCapacity (hasCapFn, role)
+                with ex ->
+                    poison ex
+                    raise ex
 
         let scheduleOrPoison running (role: Role) previous (purpose: ModelExecutionPurpose) =
             try

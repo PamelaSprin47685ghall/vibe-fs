@@ -67,7 +67,7 @@ if (mode === 'cold') {
   const configDirectory = path.join(directory, 'boot-routing', '.config', 'opencode')
   fs.mkdirSync(configDirectory, { recursive: true })
   fs.writeFileSync(path.join(configDirectory, 'wanxiangshu.mjs'),
-    'export const routingProtocol = 2\nexport default function route() { return { model: "fixture/bookkeeper", reasoning: "none" } }\n')
+    'export const routingProtocol = 2\nexport const hasTheoreticalCapacity = () => true\nexport default function route() { return { model: "fixture/bookkeeper", reasoning: "none" } }\n')
   const originalHomeDirectory = os.homedir
   os.homedir = () => path.join(directory, 'boot-routing')
   syncBuiltinESMExports()
