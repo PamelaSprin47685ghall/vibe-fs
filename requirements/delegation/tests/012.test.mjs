@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { withSyncRuntime } from './support/sync-runtime.mjs'
 
 test('WHAT[delegation-012] only the canonical call receives the delivered view and all siblings refer to it', async () => {
@@ -10,6 +11,11 @@ test('WHAT[delegation-012] only the canonical call receives the delivered view a
     const calls = order.map(call => sync.invokeBatch(runtime, owner, 'Engineer', `${call} charge`, 'canonical-run', call, order))
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
     assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 0), true)
+    const child = sync.child(runtime, owner, 'Engineer')
+    runtimeSurface.recordFencedDeliveredView(child, 'canonical-run', 'call-x', {
+      prefixUntil: 0,
+      thenMap: {},
+    })
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'canonical delivered view', 'canonical-run'), true)
     const [canonical, ...siblings] = await Promise.all(calls)
     assert.equal(canonical.kind, 'View')

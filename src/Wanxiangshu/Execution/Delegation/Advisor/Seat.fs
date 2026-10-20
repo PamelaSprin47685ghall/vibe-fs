@@ -54,6 +54,32 @@ module AdvisorSeat =
     /// AGENT-001: the managed agent this seat's child runs as.
     let private advisorAgent = ManagedAgent.nameOf Role.Advisor
 
+    /// advisor-[030] consult fence: the latest terminal identity a consult
+    /// observed. A consult only accepts the terminal of the intent prompt it
+    /// sent, never an older Completed that was already live when the consult
+    /// started.
+    type private ConsultFence =
+        { ProviderRun: ProviderRunIdentity
+          ConsultId: string }
+
+    /// DSL-MUTABLE: resource — child session id → fence of the consult whose
+    /// intent prompt most recently reached the child. Process-live; the seat
+    /// registry below has the same lifetime.
+    let private consultFences = Dictionary<string, ConsultFence>()
+
+    let private recordFence (childId: SessionId) (providerRun: ProviderRunIdentity) (consultId: string) : unit =
+        consultFences.[SessionId.value childId] <-
+            { ProviderRun = providerRun
+              ConsultId = consultId }
+
+    /// The provider run a new consult must outdate. It is the previous
+    /// consult's terminal run, so an older Completed — including a sticky
+    /// one replayed at subscribe time — can never answer the new consult.
+    let private priorRun (childId: SessionId) : ProviderRunIdentity option =
+        match consultFences.TryGetValue(SessionId.value childId) with
+        | true, fence -> Some fence.ProviderRun
+        | false, _ -> None
+
     /// DSL-MUTABLE: single-flight — memoized advisor child create task for one caller session.
     /// DSL-MUTABLE: resource — create-failure latch, cleared by the next consult.
     type private Seat =
@@ -141,6 +167,9 @@ module AdvisorSeat =
         else
             None
 
+    /// advisor-[030]: prose read-back after the fenced terminal. Only this
+    /// consult's own terminal has been processed when this runs, so the last
+    /// non-blank assistant message of the child is this consult's answer.
     let private latestAssistantProse (messages: SessionMessage list) : string option =
         messages |> List.rev |> List.tryPick assistantProse
 
@@ -156,9 +185,12 @@ module AdvisorSeat =
         | None -> Task.FromResult None
         | Some snapshot -> snapshotProseOf snapshot childId
 
-    /// The child's delivered view first, the Host snapshot as its fallback.
-    /// The seat stays. Both are empty for an
-    /// advisor that never spoke, and an empty answer is a refusal.
+    /// advisor-[030]: the read-back happens strictly after the fenced
+    /// terminal settled — the child's delivered view first, the Host
+    /// snapshot as its fallback. Both are empty for an advisor that never
+    /// spoke, and an empty answer is a refusal. Because only this consult's
+    /// terminal has been processed, the last non-blank assistant message is
+    /// this consult's answer, never an older consult's.
     let private readProse (deps: AdvisorSeatDeps) (childId: SessionId) : Task<string option> =
         task {
             let delivered =
@@ -179,13 +211,16 @@ module AdvisorSeat =
             | None -> return Error DidNotAnswer
         }
 
-    /// A terminal that is not a completed run produced no advice: refusing here keeps a
-    /// failed consult from reading an earlier consult's prose back as this consult's answer.
-    let private settleTerminal (outcome: TerminalOutcome) : Result<unit, string> =
+    /// advisor-[030]: settle only the fenced terminal. A Completed from an
+    /// older provider run (a sticky terminal or the view prompt finishing
+    /// first) is observation only; the first Completed after the fence is
+    /// this consult's terminal, older or repeated ones never answer.
+    let private settleTerminal (fence: ConsultFence) (outcome: TerminalOutcome) : Result<unit, string> option =
         match outcome with
-        | Completed _ -> Ok()
+        | Completed result when result.ProviderRun = fence.ProviderRun -> Some(Ok())
+        | Completed _ -> None
         | Aborted _
-        | Failed _ -> Error DidNotAnswer
+        | Failed _ -> Some(Error DidNotAnswer)
 
     let private settledAdvice
         (deps: AdvisorSeatDeps)
@@ -203,6 +238,7 @@ module AdvisorSeat =
     let private awaitAdvisorProse
         (deps: AdvisorSeatDeps)
         (childId: SessionId)
+        (fence: ConsultFence)
         (completion: TaskCompletionSource<Result<unit, string>>)
         : Task<Result<string, string>> =
         task {
@@ -218,6 +254,7 @@ module AdvisorSeat =
     let private sendThenAwait
         (deps: AdvisorSeatDeps)
         (childId: SessionId)
+        (fence: ConsultFence)
         (completion: TaskCompletionSource<Result<unit, string>>)
         (send: string -> Task<Result<PromptKey, string>>)
         (viewPrompt: string)
@@ -226,7 +263,7 @@ module AdvisorSeat =
         taskResult {
             let! _ = send viewPrompt
             let! _ = send intent
-            return! awaitAdvisorProse deps childId completion
+            return! awaitAdvisorProse deps childId fence completion
         }
 
     let private runConsult
@@ -250,17 +287,53 @@ module AdvisorSeat =
             let completion =
                 TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
+            // advisor-[030]: consult fence. The fence starts at the prior
+            // consult's recorded provider run (empty for the first consult)
+            // and advances to the intent prompt's own run once its send is
+            // accepted, so a consult only ever accepts the terminal of the
+            // intent it sent — never a sticky terminal or an older consult's.
+            let fence =
+                { ProviderRun = priorRun childId |> Option.defaultValue (ProviderRunIdentity.create "")
+                  ConsultId = Guid.NewGuid().ToString("N") }
+
+            let mutable intentRun = None
+
             // AG-LISTENER-BEFORE-SEND: the Host port refuses a prompt for a session with no
             // live terminal listener, and the listener must outlive both sends.
             let onTerminal _ outcome =
-                AsyncSupport.trySetResult completion (settleTerminal outcome) |> ignore
+                match intentRun with
+                | Some providerRun -> recordFence childId providerRun fence.ConsultId
+                | None -> ()
+
+                match settleTerminal fence outcome with
+                | Some verdict -> AsyncSupport.trySetResult completion verdict |> ignore
+                | None -> ()
 
             use _subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
 
             let send text =
                 dispatcher.SendManagedAssignment port childId text issueIdentitySeed deps.Directory None
 
-            return! sendThenAwait deps childId completion send viewPrompt intent
+            let! sent =
+                taskResult {
+                    let! _ = send viewPrompt
+                    let! key = send intent
+
+                    // The intent receipt is the fence's run identity: the
+                    // terminal answering this prompt carries it.
+                    intentRun <- Some(ProviderRunIdentity.create (PromptKey.value key))
+
+                    return! awaitAdvisorProse deps childId fence completion
+                }
+
+            // advisor-[030]: the recorded run advances only after the intent
+            // send was accepted, so a later consult beats exactly the terminal
+            // this consult awaited.
+            match intentRun with
+            | Some providerRun -> recordFence childId providerRun fence.ConsultId
+            | None -> ()
+
+            return sent
         }
 
     let private requireJournal (deps: AdvisorSeatDeps) : Result<AgentJournal, string> =
@@ -318,3 +391,6 @@ module AdvisorSeat =
 
     let clearAll () : unit =
         lock registryGate (fun () -> seats.Clear())
+
+    /// advisor-[030] test/dev hook: drop every recorded consult fence.
+    let clearConsultFences () : unit = consultFences.Clear()

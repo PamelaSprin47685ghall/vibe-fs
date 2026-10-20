@@ -3,9 +3,9 @@
     // Example: const decision = await this.park({ stage: "review" });
   }
 
-  async deliver(value, view) {
-    // Ends this program with an explicit terminal value. value is the data; optional view selects handoff material with { prefixUntil, thenMap }, using the shared view rules.
-    // Example: await this.deliver({ done: true });
+  async deliver(view) {
+    // Ends this program with the delivered view. First state the outcome as prose, then pass a { prefixUntil, thenMap } view pointing at the full material of this work, using the shared view rules.
+    // Example: await this.deliver({ prefixUntil: 3, thenMap: { 1: "setup summary", 2: null } });
   }
 
   async run() {

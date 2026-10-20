@@ -124,6 +124,11 @@ module ToolRegistry =
 
             IsRetirementFrozen: string -> Task<bool>
             IsWaitingForUser: string -> bool
+            /// LC-017: the pending question's exact fence (provider run, tool call)
+            /// for a session, when a question is waiting for the user. Ask replays
+            /// carrying the same fence pass the waiting gate; everything else
+            /// stays refused.
+            WaitingQuestionFenceFor: string -> (ProviderRunIdentity * ToolCallId) option
             BeginToolExecution: string -> unit
             EndToolExecution: string -> unit
             /// Algorithm E1.1: the work already recorded a retirement for this
@@ -233,7 +238,16 @@ module ToolRegistry =
         (ctx: HostToolContext)
         (role: Role)
         : Task<string> =
-        if gate.IsWaitingForUser ctx.SessionId then
+        let isExactQuestionReplay =
+            match ctx.ProviderRunId, ctx.ToolCallId with
+            | Some run, Some call -> gate.WaitingQuestionFenceFor ctx.SessionId = Some(run, call)
+            | _ -> false
+
+        let isWaitingReplayExempt =
+            (spec.Name = "deliver" || spec.Name.StartsWith "todowrite-for-")
+            && isExactQuestionReplay
+
+        if gate.IsWaitingForUser ctx.SessionId && not isWaitingReplayExempt then
             Task.FromResult(
                 ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId) "tool/ask-waiting" Map.empty
             )
@@ -422,6 +436,7 @@ module ToolRegistry =
             let! outcome =
                 JsToolWorkflow.execute
                     sessionId
+                    None
                     capabilities
                     planRoot
                     baseClass
@@ -719,353 +734,12 @@ module ToolRegistry =
             [ for role in Roles.all do
                   yield! generatedJsSpecFor role |> Option.toList ]
 
-        // work-028: the real delegation capability — the SyncDelegate
-        // runtime runs the bound fixed DevOps for this work synchronously and
-        // hands back its complete delivered view. A missing runtime fails closed.
-        let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
-            let invokeRuntime (runtime: SyncDelegateRuntime) (intent: string) : Task<string> =
-                task {
-                    let! outcome = runtime.Invoke(ctx.SessionId, SyncDelegateRole.DevOps, intent)
-
-                    return
-                        match outcome with
-                        | Ok record -> record
-                        | Error reason ->
-                            raise (InvalidOperationException(sprintf "DevOps delegation failed: %s" reason))
-                }
-
-            fun (intent: string) ->
-                task {
-                    match syncRuntime with
-                    | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
-                    | Some runtime -> return! invokeRuntime runtime intent
-                }
-
-        let renderAskOutcome (outcome: Result<AskResult, string>) : string =
-            match outcome with
-            | Ok res -> res.View
-            | Error err -> sprintf "devops failed: %s" err
-
-        let askGitCommonDir (directory: string option) : Task<string> =
-            task {
-                match directory with
-                | Some workspace ->
-                    let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
-                    return commonDir
-                | None -> return ""
-            }
-
-        let askWithLifecycle
-            (syncRuntime: SyncDelegateRuntime option)
-            (args: HostToolArguments)
-            (ctx: HostToolContext)
-            : Task<string> =
-            task {
-                let! gitCommonDir = askGitCommonDir workspaceDirectory
-
-                if String.IsNullOrWhiteSpace gitCommonDir then
-                    return "devops failed: git common directory is missing"
-                else
-                    let delegateTo = devopsDelegateOf syncRuntime ctx
-
-                    let! outcome =
-                        Wanxiangshu.Mission.Planning.PlanTools.executeAsk
-                            gitCommonDir
-                            ctx.SessionId
-                            (args.Text "intent")
-                            delegateTo
-
-                    return renderAskOutcome outcome
-            }
-
-        let executeAskTool
-            (syncRuntime: SyncDelegateRuntime option)
-            (args: HostToolArguments)
-            (ctx: HostToolContext)
-            : Task<string> =
-            askWithLifecycle syncRuntime args ctx
-
-        let lifecycleWorkOf
-            (runtime: ToolRuntimeScope)
-            (sessionId: string)
-            : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
-            runtime.LifecycleWorkFor sessionId
-
-        let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : Task<string option> =
-            task {
-                let! work = lifecycleWorkOf runtime sessionId
-                return work |> Option.bind (fun work -> work.ActiveId)
-            }
-
-        // work-026: the receipt names the artifact path and the fact that
-        // an execution session started; the spawned session id stays out of
-        // the provider-visible text.
-        let renderDeliverReceipt (res: DeliverResult) : string =
-            if res.Relayed then
-                res.Message
-            elif res.RetirementOutcome = "PostS3" then
-                sprintf
-                    "%s The plan artifact is ready at %s; nudges are permanently disabled and this session is now in post-S3 state."
-                    res.Message
-                    res.Path
-            elif res.Delivered then
-                sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
-            else
-                res.Message
-
-        // work-025/026: the retirement cursor is the exact consumed-through
-        // XTrace frontier of the physical exchange that owns this deliver call.
-        // The snapshot may already contain a newer user/provider message appended
-        // while this deliver tool runs; retirement is fenced to the exact
-        // assistant/tool exchange in ctx (its ProviderRunId message and the
-        // ToolCallId it answers), never the indiscriminate session head. The
-        // whole physical call/result exchange is kept atomic: the frontier lands
-        // after the owning assistant message, so the deliver call's own result
-        // (appended after retirement) belongs to the successor tenure, and no
-        // prior call/result pair is split. A missing snapshot, journal, or
-        // owning-exchange identity fails closed with no Plan writes or spawn.
-        let deliverPorts (runtime: ToolRuntimeScope) =
-            match runtime.Snapshot, runtime.Journal with
-            | Some snapshotPort, Some journal -> Ok(snapshotPort, journal)
-            | None, _ -> Error "deliver failed: session snapshot is unavailable"
-            | _, None -> Error "deliver failed: journal is unavailable"
-
-        let deliverOwnership (ctx: HostToolContext) =
-            match ctx.ProviderRunId, ctx.ToolCallId with
-            | Some providerRun, Some toolCall -> Ok(ProviderRunIdentity.value providerRun, ToolCallId.value toolCall)
-            | None, _ -> Error "deliver failed: owning provider message identity is unavailable"
-            | _, None -> Error "deliver failed: owning tool call identity is unavailable"
-
-        let messageOwnsDeliver (message: SessionMessage) (owningCallId: string) =
-            message.ToolParts
-            |> Array.exists (fun part -> ToolCallId.value part.ToolCallId = owningCallId && part.ToolName = "deliver")
-
-        // Fence to the owning exchange: keep every message up to and including
-        // the assistant message that owns this deliver call. The snapshot port
-        // pins `order = "asc"` (HOST 1.18.9 session.messages), so the list is
-        // already physical append order; it is preserved verbatim. Any newer
-        // user/provider message appended while deliver runs stays out of range.
-        let tryOwningExchange (messages: SessionMessage list) (owningMessageId: string) (owningCallId: string) =
-            let owningIndex =
-                messages
-                |> List.tryFindIndex (fun (message: SessionMessage) ->
-                    message.Id = owningMessageId && message.Role = "assistant")
-
-            match owningIndex with
-            | None -> Error "deliver failed: the owning provider message is absent from the session snapshot"
-            | Some index when not (messageOwnsDeliver messages.[index] owningCallId) ->
-                Error "deliver failed: the owning tool call does not match this deliver invocation"
-            | Some index -> Ok(messages.[0..index])
-
-        let readOwningExchange
-            (snapshotPort: ISessionSnapshotPort)
-            (sessionId: SessionId)
-            (owningMessageId: string)
-            (owningCallId: string)
-            =
-            task {
-                match! snapshotPort.GetMessages sessionId with
-                | Error reason -> return Error(sprintf "deliver failed: cannot read the session snapshot: %s" reason)
-                | Ok messages -> return tryOwningExchange messages owningMessageId owningCallId
-            }
-
-        let captureFencedFrontier journal sessionId fenced =
-            task {
-                match!
-                    Wanxiangshu.Context.Trace.XTraceCapture.captureSessionMessagesWithReceipt
-                        (Some journal)
-                        sessionId
-                        fenced
-                with
-                | Ok receipt -> return Ok(Wanxiangshu.Context.Trace.XTraceCursor.sequence receipt.CurrentHead)
-                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.Refused reason) ->
-                    return Error(sprintf "deliver failed: XTrace capture refused: %s" reason)
-                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageAppendFailed failure) ->
-                    return
-                        Error(
-                            sprintf
-                                "deliver failed: XTrace capture append failed: %s"
-                                (JournalOutcome.JournalAppendFailure.describe failure)
-                        )
-                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageFailed reason) ->
-                    return Error(sprintf "deliver failed: XTrace capture failed: %s" reason)
-            }
-
-        let captureOrPropagate journal sessionId =
-            function
-            | Error err -> Task.FromResult(Error err)
-            | Ok fenced -> captureFencedFrontier journal sessionId fenced
-
-        let fenceAndCapture journal sessionId snapshotPort owningMessageId owningCallId =
-            task {
-                let! exchange = readOwningExchange snapshotPort sessionId owningMessageId owningCallId
-                return! captureOrPropagate journal sessionId exchange
-            }
-
-        let resolveDeliverRetirementCursor
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            : Task<Result<int64, string>> =
-            task {
-                match deliverPorts runtime, deliverOwnership ctx with
-                | Ok(snapshotPort, journal), Ok(owningMessageId, owningCallId) ->
-                    return!
-                        fenceAndCapture
-                            journal
-                            (SessionId.create ctx.SessionId)
-                            snapshotPort
-                            owningMessageId
-                            owningCallId
-                | Error err, _ -> return Error err
-                | _, Error err -> return Error err
-            }
-
-        let deliverCreate (runtime: ToolRuntimeScope) (operationId: string) (agent: string) =
-            runtime.CreateExecutionSession(operationId, agent)
-
-        let deliverPrompt (runtime: ToolRuntimeScope) (execSessionId: string) (agent: string) (prompt: string) =
-            runtime.PromptExecutionSession(execSessionId, agent, prompt)
-
-        let deliverDiscard (runtime: ToolRuntimeScope) (execSessionId: string) =
-            runtime.DiscardExecutionSession execSessionId
-
-        let renderDeliverOutcome outcome =
-            match outcome with
-            | Ok res -> renderDeliverReceipt res
-            | Error err -> sprintf "deliver failed: %s" err
-
-        let registerPostS3IfEntered
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            (outcome: Result<DeliverResult, string>)
-            =
-            match outcome, ctx.ProviderRunId, ctx.ToolCallId with
-            | Ok res, Some runId, Some callId when res.RetirementOutcome = "PostS3" ->
-                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId)
-            | _ -> ()
-
-        let deliverCursor
-            (root: string)
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            (incumbencyId: string)
-            (gitCommonDir: string)
-            : Task<string> =
-            task {
-                let providerRunId =
-                    ctx.ProviderRunId
-                    |> Option.map ProviderRunIdentity.value
-                    |> Option.defaultValue ""
-
-                let toolCallId =
-                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
-
-                let retirementBlockers () =
-                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
-
-                match! resolveDeliverRetirementCursor runtime ctx with
-                | Error err -> return sprintf "deliver failed: %s" err
-                | Ok retirementCursor ->
-                    let! outcome =
-                        PlanTools.enterPostS3OrRelay
-                            gitCommonDir
-                            root
-                            ctx.SessionId
-                            incumbencyId
-                            providerRunId
-                            toolCallId
-                            retirementBlockers
-                            retirementCursor
-
-                    registerPostS3IfEntered runtime ctx outcome
-
-                    return renderDeliverOutcome outcome
-            }
-
-        let deliverPostS3
-            (root: string)
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            (gitCommonDir: string)
-            : Task<string> =
-            task {
-                let providerRunId =
-                    ctx.ProviderRunId
-                    |> Option.map ProviderRunIdentity.value
-                    |> Option.defaultValue ""
-
-                let toolCallId =
-                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
-
-                let retirementBlockers () =
-                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
-
-                match! resolveDeliverRetirementCursor runtime ctx with
-                | Error err -> return sprintf "deliver failed: %s" err
-                | Ok retirementCursor ->
-                    let! outcome =
-                        PlanTools.startPostS3Execution
-                            gitCommonDir
-                            root
-                            ctx.SessionId
-                            providerRunId
-                            toolCallId
-                            retirementBlockers
-                            (deliverCreate runtime)
-                            (deliverPrompt runtime)
-                            (deliverDiscard runtime)
-                            retirementCursor
-
-                    return renderDeliverOutcome outcome
-            }
-
-        let deliverForIncumbency
-            (root: string)
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            (incumbencyId: string)
-            : Task<string> =
-            task {
-                let! gitCommonDir =
-                    task {
-                        match runtime.WorkspaceDirectory with
-                        | Some ws -> return! Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
-                        | None -> return ""
-                    }
-
-                if String.IsNullOrWhiteSpace gitCommonDir then
-                    return "deliver failed: git common directory is missing"
-                else
-                    return! deliverCursor root runtime ctx incumbencyId gitCommonDir
-            }
-
-        let runDeliver (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
-            task {
-                let! gitCommonDir =
-                    task {
-                        match runtime.WorkspaceDirectory with
-                        | Some ws -> return! Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
-                        | None -> return ""
-                    }
-
-                match! lifecycleWorkOf runtime ctx.SessionId with
-                | Some work when work.ActiveId.IsSome ->
-                    return! deliverForIncumbency root runtime ctx work.ActiveId.Value
-                | Some work when
-                    work.Delivered
-                    && work.Sequence = [ "S1"; "S2"; "S3" ]
-                    && String.IsNullOrWhiteSpace gitCommonDir
-                    ->
-                    return "deliver failed: git common directory is missing"
-                | Some work when work.Delivered && work.Sequence = [ "S1"; "S2"; "S3" ] ->
-                    return! deliverPostS3 root runtime ctx gitCommonDir
-                | _ -> return "deliver failed: no active incumbency found for this work"
-            }
-
         // Clean-break: all host delegation and lifecycle verbs (fork, resume,
-        // commission, join, horizon, fission, review, deliver, devops, fetch)
-        // are retired from host registration and live exclusively as
-        // programming-surface members.
+        // commission, join, horizon, fission, review, deliver, fetch) are
+        // retired from host registration and live exclusively as
+        // programming-surface members. devops stays host-registered: it is the
+        // Plan role's synchronous investigation channel into the bound fixed
+        // DevOps.
         let resolvePlanGitCommonDir () : Task<string option> =
             task {
                 match workspaceDirectory with
@@ -1143,13 +817,6 @@ module ToolRegistry =
                     return renderAskOutcome outcome
             }
 
-        let executeAskTool
-            (syncRuntime: SyncDelegateRuntime option)
-            (args: HostToolArguments)
-            (ctx: HostToolContext)
-            : Task<string> =
-            askWithLifecycle syncRuntime args ctx
-
         let lifecycleWorkOf
             (runtime: ToolRuntimeScope)
             (sessionId: string)
@@ -1414,371 +1081,8 @@ module ToolRegistry =
                     }
 
                 match! lifecycleWorkOf runtime ctx.SessionId with
-                | Some work when work.ActiveId.IsSome ->
-                    return! deliverForIncumbency root runtime ctx work.ActiveId.Value
-                | Some work when
-                    work.Delivered
-                    && work.Sequence = [ "S1"; "S2"; "S3" ]
-                    && String.IsNullOrWhiteSpace gitCommonDir
-                    ->
-                    return "deliver failed: git common directory is missing"
-                | Some work when work.Delivered && work.Sequence = [ "S1"; "S2"; "S3" ] ->
+                | Some work when work.PendingDelivery && work.Sequence = [ "S1"; "S2"; "S3" ] ->
                     return! deliverPostS3 root runtime ctx gitCommonDir
-                | _ -> return "deliver failed: no active incumbency found for this work"
-            }
-
-        // Clean-break: all host delegation and lifecycle verbs (fork, resume,
-        // commission, join, horizon, fission, review, deliver, devops, fetch)
-        // are retired from host registration and live exclusively as
-        // programming-surface members.
-        let resolvePlanGitCommonDir () : Task<string option> =
-            task {
-                match workspaceDirectory with
-                | Some ws ->
-                    let! root = RuntimePath.stateRoot ws
-                    return Some root
-                | None -> return None
-            }
-
-        let resolvePlanRoot () : Task<string option> =
-            task {
-                match workspaceDirectory with
-                | Some ws ->
-                    let! root = RuntimePath.stateRoot ws
-                    return Some(root + "/wanxiangshu")
-                | None -> return None
-            }
-
-        // work-028: the real delegation capability — the SyncDelegate
-        // runtime runs the bound fixed DevOps for this work synchronously and
-        // hands back its complete delivered view. A missing runtime fails closed.
-        let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
-            let invokeRuntime (runtime: SyncDelegateRuntime) (intent: string) : Task<string> =
-                task {
-                    let! outcome = runtime.Invoke(ctx.SessionId, SyncDelegateRole.DevOps, intent)
-
-                    return
-                        match outcome with
-                        | Ok record -> record
-                        | Error reason ->
-                            raise (InvalidOperationException(sprintf "DevOps delegation failed: %s" reason))
-                }
-
-            fun (intent: string) ->
-                task {
-                    match syncRuntime with
-                    | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
-                    | Some runtime -> return! invokeRuntime runtime intent
-                }
-
-        let renderAskOutcome (outcome: Result<AskResult, string>) : string =
-            match outcome with
-            | Ok res -> res.View
-            | Error err -> sprintf "devops failed: %s" err
-
-        let askGitCommonDir (directory: string option) : Task<string> =
-            task {
-                match directory with
-                | Some workspace ->
-                    let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
-                    return commonDir
-                | None -> return ""
-            }
-
-        let askWithLifecycle
-            (syncRuntime: SyncDelegateRuntime option)
-            (args: HostToolArguments)
-            (ctx: HostToolContext)
-            : Task<string> =
-            task {
-                let! gitCommonDir = askGitCommonDir workspaceDirectory
-
-                if String.IsNullOrWhiteSpace gitCommonDir then
-                    return "devops failed: git common directory is missing"
-                else
-                    let delegateTo = devopsDelegateOf syncRuntime ctx
-
-                    let! outcome =
-                        Wanxiangshu.Mission.Planning.PlanTools.executeAsk
-                            gitCommonDir
-                            ctx.SessionId
-                            (args.Text "intent")
-                            delegateTo
-
-                    return renderAskOutcome outcome
-            }
-
-        let executeAskTool
-            (syncRuntime: SyncDelegateRuntime option)
-            (args: HostToolArguments)
-            (ctx: HostToolContext)
-            : Task<string> =
-            askWithLifecycle syncRuntime args ctx
-
-        let lifecycleWorkOf
-            (runtime: ToolRuntimeScope)
-            (sessionId: string)
-            : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
-            runtime.LifecycleWorkFor sessionId
-
-        let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : Task<string option> =
-            task {
-                let! work = lifecycleWorkOf runtime sessionId
-                return work |> Option.bind (fun work -> work.ActiveId)
-            }
-
-        // work-026: the receipt names the artifact path and the fact that
-        // an execution session started; the spawned session id stays out of
-        // the provider-visible text.
-        let renderDeliverReceipt (res: DeliverResult) : string =
-            if res.Relayed then
-                res.Message
-            elif res.RetirementOutcome = "PostS3" then
-                sprintf
-                    "%s The plan artifact is ready at %s; nudges are permanently disabled and this session is now in post-S3 state."
-                    res.Message
-                    res.Path
-            elif res.Delivered then
-                sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
-            else
-                res.Message
-
-        // work-025/026: the retirement cursor is the exact consumed-through
-        // XTrace frontier of the physical exchange that owns this deliver call.
-        // The snapshot may already contain a newer user/provider message appended
-        // while this deliver tool runs; retirement is fenced to the exact
-        // assistant/tool exchange in ctx (its ProviderRunId message and the
-        // ToolCallId it answers), never the indiscriminate session head. The
-        // whole physical call/result exchange is kept atomic: the frontier lands
-        // after the owning assistant message, so the deliver call's own result
-        // (appended after retirement) belongs to the successor tenure, and no
-        // prior call/result pair is split. A missing snapshot, journal, or
-        // owning-exchange identity fails closed with no Plan writes or spawn.
-        let deliverPorts (runtime: ToolRuntimeScope) =
-            match runtime.Snapshot, runtime.Journal with
-            | Some snapshotPort, Some journal -> Ok(snapshotPort, journal)
-            | None, _ -> Error "deliver failed: session snapshot is unavailable"
-            | _, None -> Error "deliver failed: journal is unavailable"
-
-        let deliverOwnership (ctx: HostToolContext) =
-            match ctx.ProviderRunId, ctx.ToolCallId with
-            | Some providerRun, Some toolCall -> Ok(ProviderRunIdentity.value providerRun, ToolCallId.value toolCall)
-            | None, _ -> Error "deliver failed: owning provider message identity is unavailable"
-            | _, None -> Error "deliver failed: owning tool call identity is unavailable"
-
-        let messageOwnsDeliver (message: SessionMessage) (owningCallId: string) =
-            message.ToolParts
-            |> Array.exists (fun part -> ToolCallId.value part.ToolCallId = owningCallId && part.ToolName = "deliver")
-
-        // Fence to the owning exchange: keep every message up to and including
-        // the assistant message that owns this deliver call. The snapshot port
-        // pins `order = "asc"` (HOST 1.18.9 session.messages), so the list is
-        // already physical append order; it is preserved verbatim. Any newer
-        // user/provider message appended while deliver runs stays out of range.
-        let tryOwningExchange (messages: SessionMessage list) (owningMessageId: string) (owningCallId: string) =
-            let owningIndex =
-                messages
-                |> List.tryFindIndex (fun (message: SessionMessage) ->
-                    message.Id = owningMessageId && message.Role = "assistant")
-
-            match owningIndex with
-            | None -> Error "deliver failed: the owning provider message is absent from the session snapshot"
-            | Some index when not (messageOwnsDeliver messages.[index] owningCallId) ->
-                Error "deliver failed: the owning tool call does not match this deliver invocation"
-            | Some index -> Ok(messages.[0..index])
-
-        let readOwningExchange
-            (snapshotPort: ISessionSnapshotPort)
-            (sessionId: SessionId)
-            (owningMessageId: string)
-            (owningCallId: string)
-            =
-            task {
-                match! snapshotPort.GetMessages sessionId with
-                | Error reason -> return Error(sprintf "deliver failed: cannot read the session snapshot: %s" reason)
-                | Ok messages -> return tryOwningExchange messages owningMessageId owningCallId
-            }
-
-        let captureFencedFrontier journal sessionId fenced =
-            task {
-                match!
-                    Wanxiangshu.Context.Trace.XTraceCapture.captureSessionMessagesWithReceipt
-                        (Some journal)
-                        sessionId
-                        fenced
-                with
-                | Ok receipt -> return Ok(Wanxiangshu.Context.Trace.XTraceCursor.sequence receipt.CurrentHead)
-                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.Refused reason) ->
-                    return Error(sprintf "deliver failed: XTrace capture refused: %s" reason)
-                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageAppendFailed failure) ->
-                    return
-                        Error(
-                            sprintf
-                                "deliver failed: XTrace capture append failed: %s"
-                                (JournalOutcome.JournalAppendFailure.describe failure)
-                        )
-                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageFailed reason) ->
-                    return Error(sprintf "deliver failed: XTrace capture failed: %s" reason)
-            }
-
-        let captureOrPropagate journal sessionId =
-            function
-            | Error err -> Task.FromResult(Error err)
-            | Ok fenced -> captureFencedFrontier journal sessionId fenced
-
-        let fenceAndCapture journal sessionId snapshotPort owningMessageId owningCallId =
-            task {
-                let! exchange = readOwningExchange snapshotPort sessionId owningMessageId owningCallId
-                return! captureOrPropagate journal sessionId exchange
-            }
-
-        let resolveDeliverRetirementCursor
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            : Task<Result<int64, string>> =
-            task {
-                match deliverPorts runtime, deliverOwnership ctx with
-                | Ok(snapshotPort, journal), Ok(owningMessageId, owningCallId) ->
-                    return!
-                        fenceAndCapture
-                            journal
-                            (SessionId.create ctx.SessionId)
-                            snapshotPort
-                            owningMessageId
-                            owningCallId
-                | Error err, _ -> return Error err
-                | _, Error err -> return Error err
-            }
-
-        let deliverCreate (runtime: ToolRuntimeScope) (operationId: string) (agent: string) =
-            runtime.CreateExecutionSession(operationId, agent)
-
-        let deliverPrompt (runtime: ToolRuntimeScope) (execSessionId: string) (agent: string) (prompt: string) =
-            runtime.PromptExecutionSession(execSessionId, agent, prompt)
-
-        let deliverDiscard (runtime: ToolRuntimeScope) (execSessionId: string) =
-            runtime.DiscardExecutionSession execSessionId
-
-        let renderDeliverOutcome outcome =
-            match outcome with
-            | Ok res -> renderDeliverReceipt res
-            | Error err -> sprintf "deliver failed: %s" err
-
-        let registerPostS3IfEntered
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            (outcome: Result<DeliverResult, string>)
-            =
-            match outcome, ctx.ProviderRunId, ctx.ToolCallId with
-            | Ok res, Some runId, Some callId when res.RetirementOutcome = "PostS3" ->
-                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId)
-            | _ -> ()
-
-        let deliverCursor
-            (root: string)
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            (incumbencyId: string)
-            (gitCommonDir: string)
-            : Task<string> =
-            task {
-                let providerRunId =
-                    ctx.ProviderRunId
-                    |> Option.map ProviderRunIdentity.value
-                    |> Option.defaultValue ""
-
-                let toolCallId =
-                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
-
-                let retirementBlockers () =
-                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
-
-                match! resolveDeliverRetirementCursor runtime ctx with
-                | Error err -> return sprintf "deliver failed: %s" err
-                | Ok retirementCursor ->
-                    let! outcome =
-                        PlanTools.enterPostS3OrRelay
-                            gitCommonDir
-                            root
-                            ctx.SessionId
-                            incumbencyId
-                            providerRunId
-                            toolCallId
-                            retirementBlockers
-                            retirementCursor
-
-                    registerPostS3IfEntered runtime ctx outcome
-
-                    return renderDeliverOutcome outcome
-            }
-
-        let deliverPostS3
-            (root: string)
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            (gitCommonDir: string)
-            : Task<string> =
-            task {
-                let providerRunId =
-                    ctx.ProviderRunId
-                    |> Option.map ProviderRunIdentity.value
-                    |> Option.defaultValue ""
-
-                let toolCallId =
-                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
-
-                let retirementBlockers () =
-                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
-
-                match! resolveDeliverRetirementCursor runtime ctx with
-                | Error err -> return sprintf "deliver failed: %s" err
-                | Ok retirementCursor ->
-                    let! outcome =
-                        PlanTools.startPostS3Execution
-                            gitCommonDir
-                            root
-                            ctx.SessionId
-                            providerRunId
-                            toolCallId
-                            retirementBlockers
-                            (deliverCreate runtime)
-                            (deliverPrompt runtime)
-                            (deliverDiscard runtime)
-                            retirementCursor
-
-                    return renderDeliverOutcome outcome
-            }
-
-        let deliverForIncumbency
-            (root: string)
-            (runtime: ToolRuntimeScope)
-            (ctx: HostToolContext)
-            (incumbencyId: string)
-            : Task<string> =
-            task {
-                let! gitCommonDir =
-                    task {
-                        match runtime.WorkspaceDirectory with
-                        | Some ws -> return! Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
-                        | None -> return ""
-                    }
-
-                if String.IsNullOrWhiteSpace gitCommonDir then
-                    return "deliver failed: git common directory is missing"
-                else
-                    return! deliverCursor root runtime ctx incumbencyId gitCommonDir
-            }
-
-        let runDeliver (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
-            task {
-                let! gitCommonDir =
-                    task {
-                        match runtime.WorkspaceDirectory with
-                        | Some ws -> return! Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
-                        | None -> return ""
-                    }
-
-                match! lifecycleWorkOf runtime ctx.SessionId with
                 | Some work when work.ActiveId.IsSome ->
                     return! deliverForIncumbency root runtime ctx work.ActiveId.Value
                 | Some work when
@@ -1841,7 +1145,7 @@ module ToolRegistry =
                     fun args ctx ->
                         task {
                             // Algorithm G1: the deliver hard gate.
-                            let parkedHandles = JsParkedSites.parkedHandles ()
+                            let parkedHandles = JsParkedSites.handlesForSession ctx.SessionId
 
                             if not (List.isEmpty parkedHandles) then
                                 let handles = String.Join(", ", parkedHandles)
@@ -1859,6 +1163,17 @@ module ToolRegistry =
                         } }
 
         let deliverTool = deliverSpec ()
+
+        // LC-021/LC-022: a real host-registered devops spec. staticAdmissions
+        // already admits DevOpsConsultation; without this spec the Plan role
+        // sees an admission with no tool behind it.
+        let devopsTool =
+            { Name = "devops"
+              Description = ProviderProse.render providerLanguage "tool/devops" Map.empty
+              Arguments = [ "intent", ToolHostCodec.stringSchema factory ]
+              Admission = ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
+              Execute =
+                fun args ctx -> askWithLifecycle syncDelegateRuntime args ctx }
 
         let recordedDeliverReplay (ctx: HostToolContext) : Task<bool> =
             task {
@@ -1890,6 +1205,7 @@ module ToolRegistry =
               yield FissionTool.spec factory runtime
               yield ReviewShell.spec factory runtime
               yield deliverTool
+              yield devopsTool
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
 
@@ -1902,6 +1218,7 @@ module ToolRegistry =
               ManagerFactsFor = (fun sessionId -> runtime.ManagerCapabilityFactsFor sessionId)
               IsRetirementFrozen = (fun sessionId -> runtime.IsRetirementFrozen sessionId)
               IsWaitingForUser = runtime.IsWaitingForUser
+              WaitingQuestionFenceFor = runtime.WaitingQuestionFenceFor
               BeginToolExecution = beginToolExecution
               EndToolExecution = endToolExecution
               RecordedDeliverReplay = recordedDeliverReplay }

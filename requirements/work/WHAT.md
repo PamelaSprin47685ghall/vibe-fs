@@ -167,8 +167,8 @@ S4 第一次调用只确认。第二次调用依持久退休结果分流：Relay
 
 当调度器识别到 CanonicalRole 为 `Plan`（Wire 标识为 `plan`）时，系统投影其专属权限与工具集。
 
-- 允许后果：Plan 的工作工具为 `todowrite-for-plan`、`devops`、`ask`、`review`、`deliver`。`todowrite-for-plan`、`devops` 与 `ask` 只向 Plan 开放；`ask` 供 Plan 明确询问用户（[049]），Manager 禁用 `ask`，且 `ask` 不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
-- 禁止后果：Plan 角色禁止获得代码仓库与执行工具的权限，包括但不限于 `read`、`glob`、`grep`、`edit`、`write`、`mv`、`rm`、`run`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`fork`、`fission`、`commission`。严禁向 Plan 开放任何真实 shell 或命令执行通道。`resume` 与 `handoff` 不再属于 Plan 的工具面。
+- 允许后果：Plan 的工作工具为 `todowrite-for-plan`、`devops`、`review`、`deliver`。`todowrite-for-plan` 与 `devops` 只向 Plan 开放；向用户提问走编程面成员 `this.ask`（[049]/[050]），仅 S1 阶段可用，不注册独立宿主工具，Manager 与其他角色禁用提问，且 `ask` 不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
+- 禁止后果：Plan 角色禁止获得代码仓库与执行工具的权限，包括但不限于 `read`、`glob`、`grep`、`edit`、`write`、`mv`、`rm`、`run`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`fork`、`fission`、`commission`。严禁向 Plan 开放任何真实 shell 或命令执行通道。`resume` 与 `handoff` 不再属于 Plan 的工具面；`ask` 不注册独立宿主工具，独立 `ask` 工具调用不是公开调用面。
 - 失败后果：任何越权工具调用必须在 `ToolRegistry` 执行门禁被直接拦截（fail-closed），返回强类型拒绝错误，零副作用。
 
 ## [022] 轮换事实与持久化重放
@@ -205,7 +205,7 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 工具调用进入执行前，动作门必须基于当前任期、授权与工作状态进行单一判定。
 
 - 允许后果：
-  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `todowrite-for-plan`、`devops`、`ask`、`review`、`deliver`；`ask` 另需当前 Plan 权威与精确调用身份（[049]），Manager 禁用 `ask`；
+  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `todowrite-for-plan`、`devops`、`review`、`deliver`；向用户提问走编程面 `this.ask`（仅 S1，[049]/[050]），需当前 Plan 权威与精确调用身份，Manager 禁用提问；
   2. 每一任期在调用 `review` 工具之前，`todowrite-for-plan` 工具是严格只读的（仅允许读操作 `read`）；若在此之前尝试写入（`edit`、`rewrite` 等修改操作），动作门与执行层均强制拦截拒绝，并向模型报错说明必须先完成 `review`。当前任期成功调用 `review` 工具之后方解锁写权限；接力（无权 deliver）开启的新任期在其成功调用 `review` 之前重新锁定为只读；
   3. 工作处于 `delivered`（`post-S3` 态）时，`todowrite-for-plan` 仅允许 `read`，`devops` 与 `review` 拒绝；当用户在 `post-S3` 态下输入命令要求执行交付时，允许调用 `deliver` 启动 `S4` 执行会话（且用户可反复要求启动 `S4`）；
   4. `review` 为硬门：本任已有 `Reviewed` 事实时拒绝再次调用（每任恰好一次，见 [038]）；
@@ -232,18 +232,18 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 当跑者调用 `deliver` 且本任已获授权（`Authorized = true`）时，系统将规划收束进 `post-S3` 态；随后在 `post-S3` 态下由用户命令触发 `deliver` 启动 `S4` 执行。
 
-- 允许后果：`S3` 持权任期调用 `deliver` 时，系统核查当前任期无活跃 blocker、确认 `P` 非空后，将工作结算为 `Delivered`（进入 `post-S3` 态），永久关闭该会话的自动催促（nudge），并在 Host 确认该 `deliver` 工具结果完成时像 `ask` 一样调用 `InterruptAttempt` 中断当前对话等待用户，不直接启动 `S4` 执行会话。
+- 允许后果：`S3` 持权任期调用 `deliver` 时，系统核查当前任期无活跃 blocker、确认 `P` 非空后，将工作结算为 `Delivered`（进入 `post-S3` 态），并在 Host 确认该 `deliver` 工具结果完成时像 `ask` 一样调用 `InterruptAttempt` 中断当前对话等待用户，不直接启动 `S4` 执行会话。post-S3 交付只关闭旧运行的 nudge：旧 post-S3 不催，旧运行退休不复活，也不再对新义务催促旧运行；新的真实用户输入继续规划时经 [037] 重开新任期并恢复催促（nudge）；用户只要求执行产物（启动 S4）时不重开规划，也不对已退休的规划运行催促。
 - 允许后果：处于 `post-S3` 态时，若用户输入命令要求执行 `deliver`，模型调用 `deliver` 即读取 `P` 的非空原文并启动无 parent 的 `S4`（Manager）执行会话；用户可以反复要求启动 `S4`。底层预留路径在 `Committed + DeliveryRequested` 时同样遵守先绑定 `execSessionId` 再发送 `P` 全文的持久边界：确切承接才提交 `ResolveDelivery(Accepted, execSessionId, digest, path)`；确切启动前拒绝才提交 `NotStarted`；`AcceptanceUnknown`、创建回执丢失或异常结果保持 pending，不写 NotStarted、不再次启动。
-- 禁止后果：`P` 为空或不存在时严禁进入 `post-S3` 态或启动 `S4`。无授权时严禁走本路径（走 [025] 接力）。`execSessionId` 严禁进入 provider 可见面。进入 `post-S3` 态后永久禁止对该会话发送工作催促（nudge）。
+- 禁止后果：`P` 为空或不存在时严禁进入 `post-S3` 态或启动 `S4`。无授权时严禁走本路径（走 [025] 接力）。`execSessionId` 严禁进入 provider 可见面。严禁以 post-S3 交付为由对退休后新开任期继续免除 nudge；旧运行退休不复活，nudge 只指向活跃义务。
 - 失败后果：预留前的文件读取/校验失败为零写入；预留提交失败为零启动。预留后的明确 NotStarted 可以追加拒绝事实，当前任期继续活跃；结果未知则保留 `DeliveryRequested` 作为未完成义务。任何路径都不得用“启动函数抛异常”本身证明外部效果没有发生。
 
 ## [027] 长程任务禁止静默停止
 
-Manager 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾散文或进度小结均不证明目标完成。2026-10-15 的本条修订取代 Plan 的自然停止豁免。
+所有实际执行角色（Manager、Orchestrator、Engineer、DevOps、Plan）的目标义务独立于物理回合：空 stop、合格收尾散文或进度小结均不证明目标完成。2026-10-15 的本条修订取代 Plan 的自然停止豁免。
 
-- 允许后果：没有有效交接/完成事实，也没有 [049] 的用户等待时，新的自然停机必须在真实 idle 许可上得到同运行 nudge。提示指出尚未解除的任务义务与下一步；Manager 保留当前评审/工作/收尾提示，并说明 `join` 可以临时等待后台工作。Plan 提醒 `devops`、`review`、`deliver` 的职责，以及 `ask` 是唯一自主暂停等用户的入口。
+- 允许后果：没有有效交接/完成事实，也没有 [049] 的用户等待时，新的自然停机必须在真实 idle 许可上得到同运行 nudge。目标义务覆盖所有实际执行角色（Manager、Orchestrator、Engineer、DevOps、Plan）：提示指出尚未解除的任务义务与下一步；Manager 保留当前评审/工作/收尾提示，并说明 `join` 可以临时等待后台工作；Engineer/DevOps 保留其工作与收尾职责；Orchestrator 保留委任与接续职责；Plan 提醒 `devops`、`review`、`deliver` 的职责，以及 `ask` 是唯一自主暂停等用户的入口。internal 末梢 Advisor/Bookkeeper 不承担公开 deliver 义务：Advisor 沿顾问专席的专用提交事实收敛，Bookkeeper 沿专用 staged transaction 提交收敛；不能用普通 stop 代替实际完成，也不能让一段内部散文直接解除外层目标义务。
 - 禁止后果：不得先发布 Completed 或关闭逻辑运行，再尝试催促；不得以无后台句柄、有正式文本或缺工作投影当作目标已完成。相同终态重复通知幂等，后续新的偷停仍须提醒，不因之前已经 nudge 过一次而永久静默。无 idle 许可时等待真实闲置，不抢占正在运行的工具。
-- 边界：已退休 run、旧权威回执、已交付工作、显式用户取消不被复活。provider 故障仍交给既有失败 owner；提醒或存储失败必须可见，不能伪造已发送或已完成。其他非长程角色保留各自的完成合同。
+- 边界：已退休 run、旧权威回执、已交付工作、显式用户取消不被复活。provider 故障仍交给既有失败 owner；提醒或存储失败必须可见，不能伪造已发送或已完成。internal 末梢 Advisor/Bookkeeper 沿各自的专用提交事实收敛，不以公开 deliver 为完成证据，也不让一段内部散文解除外层目标义务。
 
 ## [028] devops 契约（同步委派固定 DevOps）
 
@@ -267,7 +267,7 @@ Manager 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾�
 
 系统启动时，必须显式注册 Plan 相关的工具与参数规范。
 
-- 允许后果：在 `ToolRegistry` 中登记 `todowrite-for-plan`（JS 编程面）、`devops`、`ask`、`review`、`deliver`（编排面）。静态工具名单显式登记五个名称；`ask` 参数为 `question`，`devops` 参数为 `intent`，能力映射不得混用。`review` 与 Manager 共用同一 ToolSpec（见 [038]）。
+- 允许后果：在 `ToolRegistry` 中登记 `todowrite-for-plan`（JS 编程面）、`devops`、`review`、`deliver`（编排面）。静态工具名单显式登记这四个名称；向用户提问走编程面成员 `this.ask`（仅 S1，[049]/[050]），不注册独立宿主工具。`devops` 参数为 `intent`，能力映射不得混用。`review` 与 Manager 共用同一 ToolSpec（见 [038]）。
 - 禁止后果：严禁使用前缀匹配、通配符或模糊规则对工具进行分类或准入。未显式登记的工具不得进入 Plan 的工具列表。`handoff` 与 `resume` 不得作为 Plan 工具登记或注册。
 - 失败后果：若工具名称或分类缺失，系统在启动静态校验或工具构建期必须报错阻断。
 
@@ -291,9 +291,9 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
 
 ## [032] 非 Plan 路径行为不变
 
-Plan 的阶段与任期机制不得污染其他角色；[027] 明确规定的 Manager 长程连续性除外。
+Plan 的阶段与任期机制不得污染其他角色；[027] 明确规定的长程连续性除外。
 
-- 允许后果：Orchestrator、Engineer、DevOps 的既有角色合同不变。Manager 禁止静默停止且禁用 `ask`，`review` 的业务判断不变。
+- 允许后果：Orchestrator、Engineer、DevOps 的既有角色合同不变。所有实际执行角色依 [027] 承担长程连续性义务并经 `deliver` 形成有效交接或完成；internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛。Manager 禁止静默停止且禁用 `ask`，`review` 的业务判断不变。
 - 禁止后果：非 Plan 角色严禁获取 `todowrite-for-plan`、`devops` 或 `ask`。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 
@@ -328,7 +328,7 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
   2. 若工作视图处于 `Active(incumbencyId, stage)` 且底稿文件（`plan.md`）存在，恢复位置为 `Active`，准确重绑当前任期、阶段与授权（`Authorized`），并将底稿存在标志设为 true；
   3. 若工作视图处于 `Active(incumbencyId, stage)` 但底稿文件尚未创建，恢复位置仍为 `Active` 并标记底稿不存在，系统视为可继续推进（模型可从头编写底稿），绝对不得凭空假定已交付；
   4. 若工作视图既无活跃任期亦未交付，恢复位置为 `Nothing`，系统不执行猜测与推断。
-  5. ask 为同步委派（[028]），不存在悬挂的 ask 状态，恢复判定无需处理 ask。
+  5. `ask` 无悬挂状态：提问等待只从 durable 问题事实派生（[049]），重启后恢复判定无需处理 ask 的挂起；等待中的事实由 durable 侧原样承接。
   6. 若存在 pending DeliveryRequested，恢复义务是 `ObserveExecution`：只查询同一个 operation 的真实外部结果，严禁重新启动执行会话。只有 Accepted 或确定 NotStarted 才能把它收敛。
 - 禁止后果：严禁根据底稿文件内部的文本内容、标题或关键词推测任期阶段。严禁在恢复期间无故创建新任务、私自开启新任期、自动派发 DevOps 命令或自动执行 `Reopened`。严禁在恢复路径把 `Delivered` 工作重新激活为 `Active`（重开只由用户 reprompt 触发）。
 - 失败后果：若视图数据损坏或出现冲突（例如 Delivered 状态与 Active 任期同时并存），恢复函数必须 fail-closed 返回 `Conflict` 错误状态，保留原始证据，拒绝进入任何执行分支。
@@ -348,7 +348,7 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
 
 Plan 工作的状态（state）为 `active | delivered`，由 Durable 事实驱动，与 stage（[023]）正交。
 
-- 允许后果：结果为 Delivered 的 `IncumbencyRetired` 把 state 置为 `delivered`；`Reopened` 把 state 回滚为 `active`。处于 `delivered` 的 work 收到用户新 prompt（reprompt）时，系统以同一笔追加写入 `Reopened(retirementId)`（retirementId 取自该 work 的 `Delivered` 退休记录）与新的 `IncumbencyOpened`：投影清除 `Delivered`，`Active` 转为新任期——新 incumbencyId 由固定标记 `reopened-incumbency-v1` 与 retirementId、本次请求身份确定性派生，stage 沿用重开时的 stage，交付授权重置为假；旧任期永不复活。恢复后模型在新任期上继续工作：新任期在成功调用 `review` 前重新锁定为只读，之后可修改 `P`、可再次 `deliver`。重开的新任期保持被重开任期最初开任时继承的上任记录范围；被重开任期自己的 `Delivered` 退休记录不作为新任期的上一任期。
+- 允许后果：结果为 Delivered 的 `IncumbencyRetired` 把 state 置为 `delivered`；`Reopened` 把 state 回滚为 `active`。处于 `delivered` 的 work 收到用户新 prompt（reprompt）时，系统以同一笔追加写入 `Reopened(retirementId)`（retirementId 取自该 work 的 `Delivered` 退休记录）与新的 `IncumbencyOpened`：投影清除 `Delivered`，`Active` 转为新任期——新 incumbencyId 由固定标记 `reopened-incumbency-v1` 与 retirementId、本次请求身份确定性派生，stage 沿用重开时的 stage，交付授权重置为假；旧任期永不复活。重开后旧 post-S3 不催，新任期照常恢复催促；用户只要求执行产物（启动 S4）时不重开规划，只有真实用户继续规划才重开新任期并恢复催促。恢复后模型在新任期上继续工作：新任期在成功调用 `review` 前重新锁定为只读，之后可修改 `P`、可再次 `deliver`。重开的新任期保持被重开任期最初开任时继承的上任记录范围；被重开任期自己的 `Delivered` 退休记录不作为新任期的上一任期。
 - 禁止后果：严禁在无 `Delivered` 事实时追加 `Reopened`。严禁借重开推进或回退 stage、复活旧任期、清除 `Reviewed` 历史或恢复旧任期的交付授权。严禁在非 reprompt 场景（如恢复、调度）自动触发重开。`Retired` 列表的历史记录严禁删除。
 - 失败后果：同一身份重放幂等；载荷或 retirementId 与 `Delivered` 退休记录不符时拒绝；底层存储零写入。
 
@@ -420,7 +420,7 @@ Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择�
 
 ## [049] ask：向用户提问与显式暂停
 
-只有 S1 阶段的 Plan 可以使用 `ask(question)` 请求继续目标所必需的用户输入；其他阶段与其他角色一律禁用（Manager 同样禁用）。它不调用 DevOps，不假装拿到了用户回答，也不完成工作。
+只有 S1 阶段的 Plan 可以经编程面成员 `this.ask`（[050]）请求继续目标所必需的用户输入；其他阶段与其他角色一律禁用（Manager 同样禁用）。`ask` 不注册独立宿主工具。它不调用 DevOps，不假装拿到了用户回答，也不完成工作。
 
 - 真实呈现询问并成功登记 `UserQuestionAsked` 后，返回“你的询问已经发出”一类占位回执。事实绑定 session、logical run、authority root、提问所依据的物理输入、provider run、tool call 与原问题。占位回执不是用户原文，也不是完成报告。
 - 在 Host 已确认同一个 ask 工具结果的 `message.part.updated/completed` 上，立即调用 `InterruptAttempt`，不靠延时器猜测完成顺序，不在返回结果前销毁工具。不得使用逻辑终止、关闭 authority 或递归取消子资源替代。重复终态不重复中断；别的 call、别的会话或已回答提问的迟到事件不许中断新执行。

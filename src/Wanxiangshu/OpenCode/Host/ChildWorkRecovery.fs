@@ -8,24 +8,14 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
 
-/// crash-reconciliation-017/018/020: a restart never replays interrupted work and
-/// the tool call that was in flight stays failed in visible history. That leaves
-/// child work — the road's fixed DevOps and any forked Engineer child — with a
-/// logical run no live execution can ever satisfy: the previous runtime is gone,
-/// so `ChatExecutionRecovery` treats its physical evidence as stale and writes
-/// nothing, and the child authority stays open forever. The next handoff is then
-/// refused with `ActiveRunIdentityConflict` while the parent's join waits on a
-/// handle that will never complete.
-///
-/// The explicit reset happens here, once, at load: every child work run still
-/// active at startup is voided — the durable evidence that closes the child
-/// authority through its exact admitted work while
-/// leaving the handle itself untouched, so nothing appears as an unreported
-/// delivery. The child's transcript is untouched, and restarting the work
-/// remains the manager's own explicit decision.
+/// crash-reconciliation-017/018/020: orphaned child runs maintain visible obligations
+/// across restart. Active child runs are not voided into silence; they remain
+/// active so unfulfilled obligations remain observable to the parent road.
+/// Diagnostics are emitted for visibility, and Fission groups are settled as failed.
 module ChildWorkRecovery =
 
     [<Literal>]
@@ -103,21 +93,10 @@ module ChildWorkRecovery =
     let orphanedChildRuns (projections: AgentProjectionSet) : OrphanedChildRun list =
         activeChildRuns projections |> List.choose (handleFor projections)
 
-    /// The interrupted run produced nothing, so it owes nothing: closing the
-    /// child's logical run is the whole settlement. Marking a completion here
-    /// would leave an unreported delivery that horizon never shows and join is
-    /// asked to collect — the child stays reusable and both views stay empty,
-    /// exactly as a fresh process should look.
-    let settlementFact (orphaned: OrphanedChildRun) : ExecutionFactCases =
-        match orphaned with
-        | Admitted(parentSessionId, work) ->
-            ExecutionFactCases.ChildWorkVoided
-                {| ParentSessionId = parentSessionId
-                   Work = AdmittedWork.id work |}
-        | Historical(parentSessionId, childSessionId) ->
-            ExecutionFactCases.ChildRunVoided
-                {| ParentSessionId = parentSessionId
-                   ChildSessionId = childSessionId |}
+    /// Orphaned child runs maintain active obligations across restart without being voided.
+    /// settlementFact returns None so no ChildWorkVoided/ChildRunVoided fact is written.
+    let settlementFact (orphaned: OrphanedChildRun) : ExecutionFactCases option =
+        None
 
     let private parentOf =
         function
@@ -144,15 +123,12 @@ module ChildWorkRecovery =
             let projections = (AgentJournal.snapshot journal).AgentProjections
 
             for orphaned in orphanedChildRuns projections do
-                match!
-                    AgentJournal.appendAgent
-                        (StreamId.Session(parentOf orphaned))
-                        None
-                        (AgentFact.Execution(settlementFact orphaned))
-                        journal
-                with
-                | Ok _ -> ()
-                | Error failure -> raise (JournalAppendException failure)
+                let parent = parentOf orphaned
+
+                Diagnostic.emit
+                    "child-work-orphaned"
+                    [ "session_id", SessionId.value parent
+                      "result", sprintf "orphaned child work remains active: %A" orphaned ]
 
             for group in orphanedFissionGroups projections do
                 match!

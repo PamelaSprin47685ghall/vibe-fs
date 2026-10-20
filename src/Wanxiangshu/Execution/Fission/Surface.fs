@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode
 
 /// JS-native semantic surface for intra-participant Fission laws. Admission
 /// runtimes are opaque Host capabilities; lifecycle observations and algebraic
@@ -397,7 +398,10 @@ module FissionSurface =
                     try
                         let! _ = invoke1 abortFn (box (SessionId.value laneSession))
                         return ()
-                    with _ ->
+                    with ex ->
+                        Diagnostic.emit
+                            "fission-lane-abort-failed"
+                            [ "session_id", SessionId.value laneSession; "result", "fission lane abort failed: " + ex.Message ]
                         return ()
                 }
                 :> Task

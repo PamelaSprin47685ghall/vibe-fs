@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 const directories = new Set()
 const live = async (owner) => {
@@ -21,7 +22,13 @@ const waitForPromptCount = async (h, owner, role, count) => {
   assert.equal(sync.acceptPrompt(h, owner, role, count - 1), true)
 }
 
-const settle = async (h, owner, role, answer, run = 'run-1') => sync.settle(h, owner, role, answer, run)
+const settle = async (h, owner, role, answer, run = 'run-1') => {
+  runtimeSurface.recordFencedDeliveredView(sync.child(h, owner, role), run, `call-${run}`, {
+    prefixUntil: 0,
+    thenMap: {},
+  })
+  return sync.settle(h, owner, role, answer, run)
+}
 
 const remainsPending = async (promise) =>
   Promise.race([

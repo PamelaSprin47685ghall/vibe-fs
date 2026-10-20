@@ -301,15 +301,10 @@ module PluginRecoveryWiring =
         scope.AttachDurabilityActivation(fun () ->
             scope.RunBackground(fun () ->
                 task {
-                    // crash-reconciliation-020: the load-phase normalization settles
-                    // the child work runs the previous runtime left active, so the
-                    // next handoff to that child is a fresh root instead of a
-                    // refused identity. It is the first durable act of the
-                    // activation: the handoff that triggered this activation reads
-                    // the projection right after, and the leftover run has to be
-                    // closed before that read. Queuing it behind the git-backed
-                    // recovery below would let the handoff win the race and the
-                    // child would be refused for an identity it already retired.
+                    // crash-reconciliation-020: orphaned child runs maintain visible
+                    // obligations on restart rather than being voided or closed.
+                    // The active child work stays observable to the road, preserving
+                    // unfulfilled obligations across process restart without hiding them.
                     match boot.Journal with
                     | Some journal -> do! ChildWorkRecovery.settleOrphanedChildRuns journal
                     | None -> ()

@@ -1053,7 +1053,7 @@ module ForkToolSurface =
         }
 
     let recordDeliveredValue (sessionId: string) (deliveredValue: obj) : unit =
-        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record sessionId deliveredValue
+        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordView sessionId (if isNull deliveredValue then None else Some deliveredValue)
 
     let settle (value: obj) (owner: string) (answer: string) (providerRun: string) : Task<bool> =
         task {
@@ -1066,13 +1066,6 @@ module ForkToolSurface =
                 | None -> return false
                 | Some root ->
                     do! captureTraceText harness.Journal childId providerRun answer
-
-                    if
-                        isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId))
-                    then
-                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record
-                            (SessionId.value childId)
-                            (box answer)
 
                     match harness.Scope.RuntimeFor(managerContext harness owner) with
                     | Error _ -> return false
@@ -1176,13 +1169,6 @@ module ForkToolSurface =
                 with
                 | Some binding, Some root ->
                     do! captureTraceText harness.Journal childId providerRun answer
-
-                    if
-                        isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId))
-                    then
-                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record
-                            (SessionId.value childId)
-                            (box answer)
 
                     return
                         fun () ->

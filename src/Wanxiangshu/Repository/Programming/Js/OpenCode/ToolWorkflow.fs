@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Process
 
@@ -107,28 +108,29 @@ module JsToolsData =
         with _ ->
             Error JsFailure.InvalidReturnValue
 
-    /// `this.deliver(value)` ends the program with an explicit terminal value;
-    /// the sandbox reports it as this sentinel instead of a return value.
+        /// `this.deliver(view)` ends the program by handing over a view
+    /// declaration; the sandbox reports it as this sentinel instead of a
+    /// return value.
     let private deliveredPrefix = "{\"__jsDelivered\":"
 
     let isDelivered (json: string) = json.StartsWith deliveredPrefix
 
-    let private parseDelivered (json: string) : Result<obj, JsFailure> =
-        try
-            validateParsed ((JS.JSON.parse json)?value)
-        with _ ->
-            Error JsFailure.InvalidReturnValue
-
-    /// The raw JS value a program handed over through `this.deliver(value)`.
-    let parseDeliveredValue (json: string) : obj =
-        try
-            (JS.JSON.parse json)?value
-        with _ ->
-            null
-
-    /// One decode for both endings: a delivered value is the program's result.
+    /// One decode for both endings: a delivered program's value is the view
+    /// declaration it handed over. The declaration is validated as a view
+    /// at the deliver gate; a deliver without a view is not a delivery.
     let parseOutcome (json: string) : Result<obj, JsFailure> =
-        if isDelivered json then parseDelivered json else parse json
+        if not (isDelivered json) then
+            parse json
+        else
+            try
+                let view = (JS.JSON.parse json)?view
+
+                if isNull view then
+                    Error JsFailure.InvalidReturnValue
+                else
+                    Ok view
+            with _ ->
+                Error JsFailure.InvalidReturnValue
 
     /// Extract the payload from a parked sentinel JSON string. The sentinel is
     /// produced by the park signal path; its payload is the value the program
@@ -302,30 +304,65 @@ module JsToolWorkflow =
         else
             parseRawView json |> Result.bind decodeViewDeclaration
 
-    let private recordDeliveredValueIfNeeded sessionId (json: string) (parsed: Result<obj, JsFailure>) =
-        if JsToolsData.isDelivered json then
-            // Algorithm G1: the deliver hard gate. A program cannot deliver while
-            // unresolved parked sites exist.
-            let parkedHandles = JsParkedSites.parkedHandles ()
+        /// Algorithm G1: the deliver hard gate. A program cannot deliver while
+    /// its own session still has unresolved parked sites; an unrelated
+    /// session's park never blocks this delivery. On success the delivered
+    /// sentinel JSON is captured in `deliveredJson` so the cell write can
+    /// happen only after settlement.
+    let private validateDeliverGate
+        (deliveredJson: string option ref)
+        (sessionId: string)
+        (json: string)
+        (parsed: Result<obj, JsFailure>)
+        : Result<obj, JsFailure> =
+        if not (JsToolsData.isDelivered json) then
+            parsed
+        else
+            let parkedHandles = JsParkedSites.handlesForSession sessionId
+
             if not (List.isEmpty parkedHandles) then
                 let handles = System.String.Join(", ", parkedHandles)
-                Error(JsFailure.ProgramFailed (sprintf "delivery is blocked while parked handles are unresolved: %s" handles))
-            else
-                match parsed, deliveredView json with
-                | Ok _, Ok view ->
-                    JsDeliveredValues.recordView sessionId (JsToolsData.parseDeliveredValue json) view
-                    parsed
-                | _, Error failure -> Error failure
-                | _ -> parsed
-        else
-            parsed
 
-    let private decodeRunResult (sessionId: string) (decoded: Result<string, JsFailure>) =
+                Error(
+                    JsFailure.ProgramFailed
+                        (sprintf "delivery is blocked while this session has unresolved parked handles: %s" handles)
+                )
+            else
+                match deliveredView json with
+                | Error failure -> Error failure
+                | Ok _ ->
+                    deliveredJson.Value <- Some json
+                    parsed
+
+    /// The delivered view declaration, written into the session cell only
+    /// after the tool's observation and ledger settled successfully — a
+    /// failed tool must not leave a cell that can pass as a delivery.
+    let private recordDeliveredViewAfterSettlement
+        (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
+        (json: string)
+        =
+        if JsToolsData.isDelivered json then
+            match deliveredView json with
+            | Ok view ->
+                match fence with
+                | Some(providerRun, toolCallId) ->
+                    JsDeliveredValues.recordFencedView sessionId providerRun toolCallId view
+                | None -> JsDeliveredValues.recordView sessionId view
+            | Error _ -> ()
+
+
+    let private decodeRunResult
+        (deliveredJson: string option ref)
+        (sessionId: string)
+        (decoded: Result<string, JsFailure>)
+        : Result<obj, JsFailure> =
         match decoded with
         | Error failure -> Error failure
         | Ok json ->
             JsToolsData.parseOutcome json
-            |> fun parsed -> recordDeliveredValueIfNeeded sessionId json parsed
+            |> validateDeliverGate deliveredJson sessionId json
+
 
     let private settleExecutionOutcome
         (observation: Result<unit, JsFailure>)
@@ -545,6 +582,7 @@ module JsToolWorkflow =
 
     let private runProgramCore
         (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
         (capabilities: Set<JsCapability>)
         (root: string)
         (baseClassSource: string)
@@ -612,6 +650,10 @@ module JsToolWorkflow =
 
             let! winnerObj = emitJsExpr (taggedProgram, taggedPark) "Promise.race([$0, $1])": Task<obj>
 
+            // DSL-MUTABLE: algorithm-scratch — delivered sentinel JSON of this
+            // run; the cell is written only after settlement succeeds.
+            let deliveredJson = ref None
+
             let outcome =
                 match unbox<Choice<string, obj>> winnerObj with
                 | Choice1Of2 json ->
@@ -621,7 +663,7 @@ module JsToolWorkflow =
                         JsSandbox.classifyResult json outputBoundBytes
                         |> Result.bind JsToolsData.parseOutcome
 
-                    recordDeliveredValueIfNeeded sessionId json parsed
+                    validateDeliverGate deliveredJson sessionId json parsed
                 | Choice2Of2 _ ->
                     // Park won: the program suspended at `await this.park`.
                     Ok(box "{\"__jsParked\":true}")
@@ -645,6 +687,7 @@ module JsToolWorkflow =
                 // (H1) so no append task is left unsettled. The program
                 // failure keeps the reported code; landed writes stay as-is.
                 let! _ = settleLedger ledger
+                JsDeliveredValues.clear sessionId
                 return Failed(failure, rewritten, created, removed, moved)
             | Ok parkedValue when isParkedSentinel parkedValue ->
                 // The program parked. Register the site under a fresh handle.
@@ -669,11 +712,23 @@ module JsToolWorkflow =
                         removed
                         moved
             | Ok _ when (checkReadOnlyMutation hasMutationCapability mutations).IsSome ->
+                JsDeliveredValues.clear sessionId
                 return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
             | Ok value ->
                 let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
                 let! ledgerOutcome = settleLedger ledger
-                return settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
+                let settled = settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
+
+                // The delivered cell is written only after the tool settled
+                // successfully: a failed observation or ledger must not leave
+                // a cell that could pass as a delivery.
+                match settled with
+                | Succeeded _ ->
+                    deliveredJson.Value
+                    |> Option.iter (fun json -> recordDeliveredViewAfterSettlement sessionId fence json)
+                | _ -> JsDeliveredValues.clear sessionId
+
+                return settled
         }
 
     /// The generated-surface api factory: bindings own the file members and
@@ -702,6 +757,7 @@ module JsToolWorkflow =
 
     let private runProgramWithPark
         (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
         (capabilities: Set<JsCapability>)
         (root: string)
         (baseClassSource: string)
@@ -715,6 +771,7 @@ module JsToolWorkflow =
         : Task<JsToolOutcome> =
         runProgramCore
             sessionId
+            fence
             capabilities
             root
             baseClassSource
@@ -734,6 +791,7 @@ module JsToolWorkflow =
     /// is a new parked payload with a new handle.
     let private unparkSite
         (site: JsParkedSites.JsParkedSite)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
         (value: obj)
         (baseClassSource: string)
         (deadlineMs: int)
@@ -765,12 +823,16 @@ module JsToolWorkflow =
 
             let! winnerObj = emitJsExpr (taggedProgram, taggedPark) "Promise.race([$0, $1])": Task<obj>
 
+            // DSL-MUTABLE: algorithm-scratch — delivered sentinel JSON of the
+            // resumed run; the cell is written only after settlement succeeds.
+            let deliveredJson = ref None
+
             let outcome =
                 match unbox<Choice<string, obj>> winnerObj with
                 | Choice1Of2 _ ->
                     task {
                         let! decoded = JsSandbox.awaitResult site.RunHandle outputBoundBytes
-                        return decodeRunResult site.SessionId decoded
+                        return decodeRunResult deliveredJson site.SessionId decoded
                     }
                 | Choice2Of2 _ -> task { return Ok(box "{\"__jsParked\":true}") }
 
@@ -779,6 +841,7 @@ module JsToolWorkflow =
             match outcome with
             | Error failure ->
                 let! _ = settleLedger site.Ledger
+                JsDeliveredValues.clear site.SessionId
                 return Failed(failure, [], [], [], [])
             | Ok parkedValue when isParkedSentinel parkedValue ->
                 // The resumed program parked again: a new handle and a new
@@ -797,7 +860,15 @@ module JsToolWorkflow =
                 return registerResumedParkedSite newSite baseClassSource
             | Ok value ->
                 let! ledgerOutcome = settleLedger site.Ledger
-                return settleResumedExecutionOutcome ledgerOutcome value
+                let settled = settleResumedExecutionOutcome ledgerOutcome value
+
+                match settled with
+                | Succeeded _ ->
+                    deliveredJson.Value
+                    |> Option.iter (fun json -> recordDeliveredViewAfterSettlement site.SessionId fence json)
+                | _ -> JsDeliveredValues.clear site.SessionId
+
+                return settled
         }
 
     /// Abandon a parked site (algorithm F): reject the deferred promise with
@@ -845,6 +916,7 @@ module JsToolWorkflow =
         : Task<JsToolOutcome> =
         runProgramCore
             sessionId
+            None
             Set.empty
             ""
             baseClassSource
@@ -867,7 +939,7 @@ module JsToolWorkflow =
         : Task<JsToolOutcome> =
         match JsParkedSites.tryFind handle with
         | None -> Task.FromResult(Failed(JsFailure.HandleUnknown handle, [], [], [], []))
-        | Some site -> unparkSite site value baseClassSource deadlineMs outputBoundBytes
+        | Some site -> unparkSite site None value baseClassSource deadlineMs outputBoundBytes
 
     /// Abandon a parked site from any owning surface.
     let abandonParked (handle: string) (deadlineMs: int) (outputBoundBytes: int) : Task<JsToolOutcome> =
@@ -895,10 +967,18 @@ module JsToolWorkflow =
         else
             ToolWorkflowInvocation.Invalid
 
-    let private resolveParkedSite (handle: string) : Result<JsParkedSites.JsParkedSite, JsFailure> =
+    let private resolveParkedSite
+        (sessionId: string)
+        (handle: string)
+        : Result<JsParkedSites.JsParkedSite, JsFailure> =
         match JsParkedSites.tryFind handle with
-        | Some site -> Ok site
         | None -> Error(JsFailure.HandleUnknown handle)
+        | Some site when site.SessionId <> sessionId ->
+            // A parked site belongs to the session that suspended it; another
+            // session must never resume or abandon it, however guessable the
+            // handle.
+            Error(JsFailure.InvalidArgument "the paused program belongs to another session")
+        | Some site -> Ok site
 
     let private dispatchResolvedParkedSite
         (resolved: Result<JsParkedSites.JsParkedSite, JsFailure>)
@@ -919,6 +999,7 @@ module JsToolWorkflow =
     /// is recorded by the session-close path (PluginSessionScope).
     let execute
         (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
         (capabilities: Set<JsCapability>)
         (root: string)
         (baseClassSource: string)
@@ -936,6 +1017,7 @@ module JsToolWorkflow =
                 return!
                     runProgramWithPark
                         sessionId
+                        fence
                         capabilities
                         root
                         baseClassSource
@@ -948,12 +1030,12 @@ module JsToolWorkflow =
                         fileAccessObservation
             | ToolWorkflowInvocation.Unpark(handle, value) ->
                 return!
-                    dispatchResolvedParkedSite (resolveParkedSite handle) (fun site ->
+                    dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
-                        unparkSite site value baseClassSource deadlineMs outputBoundBytes)
+                        unparkSite site fence value baseClassSource deadlineMs outputBoundBytes)
             | ToolWorkflowInvocation.Abandon handle ->
                 return!
-                    dispatchResolvedParkedSite (resolveParkedSite handle) (fun site ->
+                    dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Abandoned handle sessionId
                         abandonSite site deadlineMs outputBoundBytes)
             | ToolWorkflowInvocation.Invalid ->

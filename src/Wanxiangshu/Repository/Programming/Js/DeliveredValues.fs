@@ -6,21 +6,31 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
-/// Process-live delivered-value cell, keyed by session. The cell holds the value
-/// and the optional view `this.deliver` handed over. A separate returned cursor
-/// records each representative together with its rendered material, so identical
-/// deliveries are not repeated and changed summaries remain visible. Restart
-/// drops both; the durable terminal record is written when the call settles.
+/// Process-live delivered-view cell, keyed by session. The cell holds the
+/// view declaration `this.deliver(view)` handed over, or material restored
+/// from a durable delivery witness after a restart. A separate returned
+/// cursor records each representative together with its rendered material,
+/// so identical deliveries are not repeated and changed summaries remain
+/// visible. Restart drops both; the durable witness is written when the
+/// call settles.
 module JsDeliveredValues =
 
-    [<Emit("$0 === undefined || $0 === null")>]
-    let private isMissing (value: obj) : bool = jsNative
+    /// The exact tool invocation that produced this cell. A terminal from an
+    /// older provider run cannot consume a newer run's delivery, and vice
+    /// versa. `None` exists only for the test/dev harness and restored
+    /// material whose call fence is no longer live.
+    type DeliveryFence =
+        { ProviderRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity
+          ToolCallId: Wanxiangshu.Foundation.Identity.ToolCallId }
 
-    type private DeliveredCell = { Value: obj; View: obj option }
+    type private DeliveredCell =
+        { View: obj option
+          Material: string option
+          Fence: DeliveryFence option }
 
     type ReturnedPiece = { Key: string; Text: string }
 
-    // DSL-MUTABLE: resource — sessionId → delivered value and view
+    // DSL-MUTABLE: resource — sessionId → delivered view or restored material
     let private delivered = Dictionary<string, DeliveredCell>()
 
     // DSL-MUTABLE: resource — sessionId → identities already handed back
@@ -43,44 +53,50 @@ module JsDeliveredValues =
         let set = returnedSet sessionId
         keys |> List.iter (fun key -> set.Add key |> ignore)
 
-    let record (sessionId: string) (value: obj) : unit =
-        delivered.[sessionId] <- { Value = value; View = None }
+    /// `view` is the validated view declaration handed over by
+    /// `this.deliver(view)`. The live delivery path always starts here.
+    let recordView (sessionId: string) (view: obj option) : unit =
+        delivered.[sessionId] <- { View = view; Material = None; Fence = None }
 
-    /// `view` is the already-validated deliver declaration, or None when the
-    /// program handed over a value without choosing prose to return.
-    let recordView (sessionId: string) (value: obj) (view: obj option) : unit =
-        delivered.[sessionId] <- { Value = value; View = view }
+    /// Record a delivery with the exact call fence that produced it. The
+    /// settled tool call owns this cell; another run cannot take it.
+    let recordFencedView
+        (sessionId: string)
+        (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
+        (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId)
+        (view: obj option)
+        : unit =
+        delivered.[sessionId] <-
+            { View = view
+              Material = None
+              Fence = Some { ProviderRun = providerRun; ToolCallId = toolCallId } }
+
+    /// Restore the cell from a durable delivery witness's material (crash
+    /// recovery) or from a harness that stands in for a real delivery. This
+    /// is the only entry that accepts ready-made material.
+    let restoreMaterial (sessionId: string) (text: string) : unit =
+        if not (String.IsNullOrWhiteSpace text) then
+            delivered.[sessionId] <- { View = None; Material = Some text; Fence = None }
+
+    let private cellMaterial (cell: DeliveredCell) : obj =
+        match cell.Material with
+        | Some material -> box material
+        | None -> cell.View |> Option.map box |> Option.defaultValue null
 
     let take (sessionId: string) : obj =
         match delivered.TryGetValue sessionId with
         | true, cell ->
             delivered.Remove sessionId |> ignore
-            cell.Value
+            cellMaterial cell
         | false, _ -> null
 
     let peek (sessionId: string) : obj =
         match delivered.TryGetValue sessionId with
-        | true, cell -> cell.Value
+        | true, cell -> cellMaterial cell
         | false, _ -> null
 
     let private renderNonBlank (text: string) : string option =
         if String.IsNullOrWhiteSpace text then None else Some text
-
-    let private renderStructured (structured: LlmFacing.Data.Value) : string option =
-        (LlmFacing.empty
-         |> LlmFacing.withData (LlmFacing.Data.structuredValue structured)
-         |> LlmFacing.render)
-            .TrimEnd('\n')
-        |> renderNonBlank
-
-    let private renderPresentValue (value: obj) : string option =
-        match LlmFacing.Data.ofJs value with
-        | LlmFacing.Data.Value.Null -> None
-        | LlmFacing.Data.Value.String text -> renderNonBlank text
-        | structured -> renderStructured structured
-
-    let render (value: obj) : string option =
-        if isMissing value then None else renderPresentValue value
 
     let private declarationOf raw =
         match Anchor.AnchorSurface.parseDeclaration raw with
@@ -119,21 +135,16 @@ module JsDeliveredValues =
                     declaration
                     messages
 
-            Anchor.AnchorView.material numberOf entries |> List.choose (newPiece already)
+            Anchor.AnchorView.material numberOf entries
+            |> List.choose (fun (anchor, text) -> newPiece already (anchor, text))
 
-    let private presentValueBlocks (value: obj) =
-        match LlmFacing.Data.ofJs value with
-        | LlmFacing.Data.Value.Null -> []
-        | LlmFacing.Data.Value.String text when String.IsNullOrWhiteSpace text -> []
-        | LlmFacing.Data.Value.String text -> [ LlmFacing.Data.stringField "value" text ]
-        | structured -> LlmFacing.Data.structuredValue structured
-
-    let private valueBlocks (value: obj) =
-        if isMissing value then [] else presentValueBlocks value
-
-    let private renderHandoff (value: obj) (pieces: ReturnedPiece list) : string option =
+    /// A delivery renders only what its view selected (plus the assistant
+    /// prose it names). An empty selection is not a delivery: the view
+    /// failed to point at the pre-call prose and the material it owes the
+    /// caller.
+    let private renderPieces (pieces: ReturnedPiece list) : string option =
         if List.isEmpty pieces then
-            render value
+            None
         else
             let prose =
                 pieces
@@ -144,7 +155,7 @@ module JsDeliveredValues =
                           LlmFacing.Data.stringMember "text" piece.Text ])
 
             (LlmFacing.empty
-             |> LlmFacing.withData (prose @ valueBlocks value)
+             |> LlmFacing.withData prose
              |> LlmFacing.render)
                 .TrimEnd('\n')
             |> renderNonBlank
@@ -186,21 +197,43 @@ module JsDeliveredValues =
         (advance: bool)
         (assistant: string option)
         : string option =
-        let pieces =
-            select sessionId cell.View (alreadyReturned sessionId)
-            |> fun selected -> withAssistant sessionId cell.View selected assistant
+        match cell.Material with
+        | Some material ->
+            // Restored material is already the complete handoff.
+            renderNonBlank material
+        | None ->
+            let pieces =
+                select sessionId cell.View (alreadyReturned sessionId)
+                |> fun selected -> withAssistant sessionId cell.View selected assistant
 
-        if advance then
-            markReturned sessionId (pieces |> List.map _.Key)
+            if advance then
+                markReturned sessionId (pieces |> List.map _.Key)
 
-        renderHandoff cell.Value pieces
+            renderPieces pieces
 
     let tryTakeRenderedWith (sessionId: string) (assistant: string option) : string option =
         match delivered.TryGetValue sessionId with
         | false, _ -> None
-        | true, cell ->
+        | true, cell when cell.Fence.IsNone ->
             delivered.Remove sessionId |> ignore
             handoff sessionId cell true assistant
+        | true, _ -> None
+
+    /// Take the cell only when it belongs to this exact provider run. An old
+    /// terminal that arrives after a newer delivery cannot consume it.
+    let tryTakeRenderedFor
+        (sessionId: string)
+        (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
+        (assistant: string option)
+        : string option =
+        match delivered.TryGetValue sessionId with
+        | false, _ -> None
+        | true, cell ->
+            match cell.Fence with
+            | Some fence when fence.ProviderRun = providerRun ->
+                delivered.Remove sessionId |> ignore
+                handoff sessionId cell true assistant
+            | _ -> None
 
     let tryTakeRendered (sessionId: string) : string option = tryTakeRenderedWith sessionId None
 
@@ -210,6 +243,23 @@ module JsDeliveredValues =
         match delivered.TryGetValue sessionId with
         | false, _ -> None
         | true, cell -> handoff sessionId cell false None
+
+    /// Peek with the pre-call assistant prose included, without consuming.
+    let tryPeekRenderedWith (sessionId: string) (assistant: string option) : string option =
+        match delivered.TryGetValue sessionId with
+        | false, _ -> None
+        | true, cell -> handoff sessionId cell false assistant
+
+    /// The raw view declaration of the current cell, without consuming it.
+    let peekView (sessionId: string) : obj option =
+        match delivered.TryGetValue sessionId with
+        | true, cell -> cell.View
+        | false, _ -> None
+
+    let peekFence (sessionId: string) : DeliveryFence option =
+        match delivered.TryGetValue sessionId with
+        | true, cell -> cell.Fence
+        | false, _ -> None
 
     let clear (sessionId: string) : unit = delivered.Remove sessionId |> ignore
 

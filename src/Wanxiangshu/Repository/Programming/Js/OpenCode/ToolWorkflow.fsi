@@ -9,7 +9,6 @@ module JsToolsData =
     val parse: json: string -> Result<obj, JsFailure>
     val isDelivered: json: string -> bool
     val parseOutcome: json: string -> Result<obj, JsFailure>
-    val parseDeliveredValue: json: string -> obj
     val parseParkedPayload: json: string -> obj
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
@@ -70,6 +69,7 @@ module JsToolWorkflow =
     /// parked site so session close can reap it.
     val execute:
         sessionId: string ->
+        fence: (Wanxiangshu.Foundation.Identity.ProviderRunIdentity * Wanxiangshu.Foundation.Identity.ToolCallId) option ->
         capabilities: Set<JsCapability> ->
         root: string ->
         baseClassSource: string ->

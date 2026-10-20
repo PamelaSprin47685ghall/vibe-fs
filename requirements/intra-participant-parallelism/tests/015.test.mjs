@@ -25,6 +25,13 @@ test('WHAT[intra-participant-parallelism-015] pure ring topology and work bundle
     assert.deepEqual(fission.workBundleKeys(bundle), [0, 1, 2])
     assert.equal(fission.ringFinalLane(3), 2)
   }
+  // 未交付 lane 保持 group 并发 nudge，不把整组失败当正确。
+  // Conflicting lane records fail the bundle mutation without destroying the aggregate.
+  const conflict = fission.workBundleAdd(0, 'conflicting-ref', mustOk(fission.workBundleAdd(0, 'record-0', fission.workBundleEmpty)).bundle)
+  assert.equal(conflict.ok, false)
+  assert.equal(conflict.reason, 'ConflictingLaneRecord')
+  assert.equal(fission.ringFinalLane(0), null)
+  assert.deepEqual(fission.ringMergeOrder(0), [])
 })
 
 test.todo('WHAT[intra-participant-parallelism-015] GAP-158: actual Host takeover always selects N-1 under reordered lane completion')

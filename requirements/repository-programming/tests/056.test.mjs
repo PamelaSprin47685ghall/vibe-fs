@@ -310,6 +310,7 @@ test('WHAT[repository-programming-056] a failed dag node parks and the injected 
 test('WHAT[repository-programming-056] an undelivered child reports status undelivered in join and parks dag on node-undelivered', async () => {
   const { dir, cleanup } = sandbox()
   const sessionId = `sess-dagundelivered-${Math.random().toString(36).slice(2, 8)}`
+  let implAgentId = null
   try {
     const host = fakeHost()
     const undeliveredJoin = async () => {
@@ -327,7 +328,15 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
         byName: Object.fromEntries(mapped.map((r) => [r.name, r])),
       }
     }
-    installDelegationHost(sessionId, host.fork, undeliveredJoin, host.fission, host.horizon, host.advisor)
+    // 未交付不关闭执行者义务：被委托方保持活跃且未解除义务，父方不得视原子执行者已结束。
+    const trackingFork = async (payload) => {
+      const res = await host.fork(payload)
+      if (res.ok && res.name === 'impl') {
+        implAgentId = res.agentId
+      }
+      return res
+    }
+    installDelegationHost(sessionId, trackingFork, undeliveredJoin, host.fission, host.horizon, host.advisor)
 
     const joinOutcome = await runProgram(
       dir,
@@ -339,6 +348,8 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
     const joinDoc = render(joinOutcome)
     assert.match(joinDoc, /status = "undelivered"/)
     assert.match(joinDoc, /view = ""/)
+    // join 返回 undelivered 后，原子执行者的义务未解除，不得断言已结束或结算成终态。
+    assert.ok(implAgentId !== null, 'forked agent id must be tracked')
 
     const parked = await runProgram(
       dir,

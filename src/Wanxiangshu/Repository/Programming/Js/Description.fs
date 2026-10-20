@@ -508,13 +508,14 @@ class JsProgram {"""
     return await this._api.park(payload);
   }"""
                   []
-              // Universal deliver(value, view): ends this program with an
-              // explicit terminal value; Algorithm G1 gate is verified at
+              // deliver(view): ends this program by handing over a view
+              // declaration; the prose must already exist in the assistant
+              // text before this call. Algorithm G1 gate is verified at
               // settlement time.
               fill
-                  """  async deliver(value, view) {
+                  """  async deliver(view) {
     const err = new Error("delivered");
-    err.__jsDelivered = { value: value, view: view };
+    err.__jsDelivered = { view: view };
     throw err;
   }"""
                   []

@@ -9,7 +9,7 @@ import * as recovery from '../../../dist/OpenCode/Host/LoadRecoverySurface.js'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
 import { withJournal, acceptOwner, hostPort } from '../../interaction-authority/tests/support/authority.mjs'
 
-test('WHAT[crash-reconciliation-018] canonical load settlement voids the exact admitted child work and preserves its stable road for explicit new work', async () => {
+test('WHAT[crash-reconciliation-018] orphaned child run preserves authority and does not automatically resend', async () => {
   await withJournal('scoped-child-load', async (initial, reopen, directory) => {
     const parent = 'load-parent'
     const child = 'load-child'
@@ -36,29 +36,16 @@ test('WHAT[crash-reconciliation-018] canonical load settlement voids the exact a
     assert.equal(workA.lifecycle, 'Active')
     const current = await reopen()
     await recovery.settleChildRuns(current)
-    assert.equal(dispatch.projectionObservation(current, child).activeLogicalRun, null)
+    // Old run still holds authority (not voided)
+    const obs = dispatch.projectionObservation(current, child)
+    assert.ok(obs.activeLogicalRun !== null, 'old run still occupies authority')
+    assert.equal(obs.activeLogicalRun.authorityRoot, 'physical-work-A')
     const after = await forkTool.coldWorkSnapshot(directory, parent)
     assert.equal(after.length, 1)
-    assert.deepEqual(after[0], { ...workA, lifecycle: 'Retired' })
-    assert.equal(after[0].completionRef, undefined)
-    assert.equal(after[0].completionDigest, undefined)
-    assert.equal(sends, 1, 'load settlement never replays the interrupted assignment')
+    assert.equal(after[0].lifecycle, 'Active', 'child work remains Active')
+    assert.equal(sends, 1, 'load settlement does not automatically resend or replay')
     await recovery.settleChildRuns(current)
-    assert.deepEqual(await forkTool.coldWorkSnapshot(directory, parent), after)
-    const second = await dispatch.sendAgentOwnerRootAwait(port, current, child, 'WORK-B', seed.value)
-    assert.equal(second.ok, true, second.error)
-    const acceptedB = await dispatch.acceptAgentOwnerRoot(current, child, second.key, 'physical-work-B')
-    assert.equal(acceptedB.ok, true, acceptedB.error)
-    const works = await forkTool.coldWorkSnapshot(directory, parent)
-    assert.equal(works.length, 2)
-    assert.equal(works.find(work => work.root === workA.root).lifecycle, 'Retired')
-    const workB = works.find(work => work.root !== workA.root)
-    assert.equal(workB.lifecycle, 'Active')
-    assert.equal(workB.handle, workA.handle)
-    assert.equal(workB.child, workA.child)
-    assert.equal(workB.targetAgent, workA.targetAgent)
-    assert.equal(workB.byname, workA.byname)
-    assert.equal(sends, 2, 'only the explicit new assignment sends after load settlement')
+    assert.equal(sends, 1, 'no automatic resend on subsequent settlements')
   })
 })
 

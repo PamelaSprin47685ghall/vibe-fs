@@ -1,1 +1,1 @@
-This assignment has no accepted string delivery. Assistant text is not a return, and an object is not accepted. Call this.deliver(verboseReport) with one string: what changed, what was established, and what remains. Do not stop.
+This assignment has no delivered view yet. Assistant text is not a return by itself. State the outcome as prose, then call this.deliver(view) with a view covering the full material: what changed, what was established, and what remains. Do not stop.

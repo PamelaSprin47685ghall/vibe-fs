@@ -1317,10 +1317,15 @@ module PairProgrammingThoughtTransform =
             // Algorithm G2: every round that carries a PairHint also lists the
             // unresolved parked handles, so the AI is pressed to take a
             // position (unpark/abandon) without being forced to resume. The
-            // parked site table and its read-only query are owned by
-            // lane-a-core (JsParkedSites.parkedHandles). A carrier-less round
-            // never reaches this point (decideCurrentPlacement).
-            let parkedHandles = JsParkedSites.parkedHandles ()
+            // parked site table and its per-session read-only query are owned
+            // by lane-a-core (JsParkedSites.handlesForSession); a hint must
+            // only mention handles parked by this session, never another
+            // session's. A carrier-less round never reaches this point
+            // (decideCurrentPlacement).
+            let parkedHandles =
+                match projectionSessionIdOpt with
+                | Some sessionId -> JsParkedSites.handlesForSession sessionId
+                | None -> []
 
             let resolveLanguage =
                 match journal, projectionSessionIdOpt with

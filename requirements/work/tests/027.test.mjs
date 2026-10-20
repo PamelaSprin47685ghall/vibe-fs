@@ -99,3 +99,47 @@ test('WHAT[work-027] a missing lifecycle projection is not evidence that the Man
     assert.equal(sent, 1)
   }, { session: 'manager-missing-projection-fixture' })
 })
+
+test('WHAT[work-027] Engineer/DevOps/Orchestrator progress stop cannot count as complete without TaskDelivery witness', async () => {
+  // 合法进度 stop 不能当完成：无 witness 的 TurnCompleted 不写完成事实且 logical run 保持活跃。
+  const { TerminalReporter_completeWithEvidence, XTraceTerminalCompletion } = await import('../../../dist/Context/Trace/TerminalReporter.js')
+  const { ReconciledTurn } = await import('../../../dist/Composition/Turn/Observation.js')
+  const { Role } = await import('../../../dist/Foundation/Roles.js')
+  const { SessionIdModule_create, PhysicalUserMessageIdModule_create, AuthorityRootUserMessageIdModule_create, ProviderRunIdentityModule_create } = await import('../../../dist/Foundation/Identity.js')
+  const { TurnOutcome } = await import('../../../dist/Composition/Turn/Program.js')
+  const { MessagePart } = await import('../../../dist/OpenCode/Host/Message.js')
+  const eventsSurface = await import('../../../dist/OpenCode/Host/EventsSurface.js')
+
+  const nonPlanExecutors = [
+    { name: 'engineer', role: Role.Engineer },
+    { name: 'devops', role: Role.DevOps },
+    { name: 'orchestrator', role: Role.Orchestrator },
+  ]
+
+  for (const { name, role } of nonPlanExecutors) {
+    await withReview(async ({ runtime, session, directory }) => {
+      const before = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+      assert.ok(before !== null, `${name} logical run must start active`)
+
+      const eventPort = runtime.eventPort ?? eventsSurface.create()
+      const turn = new ReconciledTurn(
+        SessionIdModule_create(session),
+        PhysicalUserMessageIdModule_create('user-root'),
+        AuthorityRootUserMessageIdModule_create('user-root'),
+        ProviderRunIdentityModule_create(`${name}-run-1`),
+        role,
+        directory ?? '/repo',
+        [new MessagePart(0, [`${name} progress report: implementation stepped forward, no deliver called.`])],
+        'stop',
+        undefined,
+        undefined,
+        TurnOutcome.TurnCompleted,
+        undefined,
+      )
+      const outcome = await TerminalReporter_completeWithEvidence(eventPort, undefined, turn, false)
+      assert.equal(outcome.tag, XTraceTerminalCompletion.RejectedUndelivered.tag, `${name} undelivered progress stop must be RejectedUndelivered`)
+      const after = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+      assert.deepEqual(after, before, `${name} logical run must not close without delivery witness`)
+    }, { session: `${name}-progress-stop-without-witness` })
+  }
+})

@@ -30,7 +30,7 @@
 #     ↓
 #   Iteration #4: same authority, fresh IncumbencyOpened → independent re-audit 8×10 → IncumbencyRetired(Accepted) → RebasedCandidateReady → Published
 #     ↓
-#   orch join / expectSatisfied / oracleLongStroke
+#   orch join / deliver(view) / expectSatisfied / oracleLongStroke
 #
 # ── §21 adversity checklist (one representative path each) ───────────────────
 #
@@ -303,7 +303,7 @@ user = "Ship publish_proof.txt to the target branch through the long stroke."
 id = "orch"
 lane = "orchestrator"
 user = "Ship publish_proof.txt to the target branch through the long stroke."
-tools = ["commission", "join"]
+tools = ["commission", "join", "deliver"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "commission", args = { calling = "lead", name = "Long Stroke Road", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed." } }
@@ -314,6 +314,11 @@ tools = ["commission", "join"]
   # Join stays blocked until Manager Published; then this harvest text (required).
   [[turn.step]]
   respond = { type = "text", text = "Long stroke publish completed after conflict resume." }
+
+  # View-only delivery: the Orchestrator states the outcome as assistant prose,
+  # then ends the turn with an explicit deliver(view) so the handoff is settled.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
 # EXEC-016 / INTERACTION-AUTHORITY-014: conditional protocol declaration only.
 # Ordinary Orchestrator completion receives JoinGuard exactly when a join obligation
@@ -653,7 +658,7 @@ user = "# Write publish_proof.txt."
 tools = ["todowrite-for-engineer"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return true; } }" } }
 
   # Read probe on the programming surface: ordinary Engineer mainline.
   # Unique path makes message.part.updated correlation unambiguous in the real Host SSE stream.
@@ -661,10 +666,12 @@ tools = ["todowrite-for-engineer"]
   respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { return await this.cat('read_probe.txt'); } }" } }
 
   [[turn.step]]
-  # A subagent is settled as completed only by `js.deliver` (repository-programming-054/059):
-  # a plain `return` leaves the delivery cell empty and the child reports `undelivered`,
-  # so no `HandleCompleted` is written and the join never closes.
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { return this.deliver({ file: 'publish_proof.txt', written: true }) } }" } }
+  # A subagent settles only through an explicit `this.deliver(view)` (repository-programming-054/059):
+  # the program states its outcome as assistant prose first, then delivers a
+  # `{ prefixUntil, thenMap }` view pointing at the work material. A plain
+  # `return` leaves the delivery cell empty, so the child is not settled as
+  # completed and the join stays open.
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "publish_proof.txt is written and verified; delivering the completed proof to the owner.", args = {  program = "class Js extends JsProgram { async run() { this.deliver({ prefixUntil: 0, thenMap: {} }) } }" } }
 
   # The delivery tool result asks the provider once more; the child closes its turn here.
   [[turn.step]]
@@ -677,11 +684,12 @@ user = "# Resolve the conflicted publish_proof.txt so it contains exactly: Publi
 tools = ["todowrite-for-engineer"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return true; } }" } }
 
   [[turn.step]]
-  # Same rule for the repair child: only `js.deliver` settles it as completed.
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { return this.deliver({ file: 'publish_proof.txt', resolved: true }) } }" } }
+  # Same view-only rule for the repair child: state the outcome as prose, then
+  # settle with an explicit `this.deliver(view)`.
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", prefixText = "The conflict is resolved; publish_proof.txt now contains exactly the required text, and the repaired file is delivered.", args = {  program = "class Js extends JsProgram { async run() { this.deliver({ prefixUntil: 0, thenMap: {} }) } }" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Conflict file resolved." }

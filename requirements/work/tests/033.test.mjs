@@ -263,6 +263,79 @@ test('WHAT[work-033] an illegal first stage is rejected by the fold before any l
   })
 })
 
+test('WHAT[work-033] Engineer/DevOps/Orchestrator TurnCompleted+stop without TaskDelivery witness does not complete or close logical run', async () => {
+  // LC-001 / LC-023: 未交付 stop 不能结算完成；无 TaskDelivery witness 时完成事实不写入、logical run 不关闭。
+  const { TerminalReporter_completeWithEvidence, XTraceTerminalCompletion } = await import('../../../dist/Context/Trace/TerminalReporter.js')
+  const { ReconciledTurn } = await import('../../../dist/Composition/Turn/Observation.js')
+  const { Role } = await import('../../../dist/Foundation/Roles.js')
+  const { SessionIdModule_create, PhysicalUserMessageIdModule_create, AuthorityRootUserMessageIdModule_create, ProviderRunIdentityModule_create } = await import('../../../dist/Foundation/Identity.js')
+  const { TurnOutcome } = await import('../../../dist/Composition/Turn/Program.js')
+  const { MessagePart } = await import('../../../dist/OpenCode/Host/Message.js')
+  const eventsSurface = await import('../../../dist/OpenCode/Host/EventsSurface.js')
+  const { withReview } = await import('./support/plugin.mjs')
+  const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+
+  const rolesToTest = [
+    { name: 'Engineer', role: Role.Engineer },
+    { name: 'DevOps', role: Role.DevOps },
+    { name: 'Orchestrator', role: Role.Orchestrator },
+  ]
+
+  for (const { name, role } of rolesToTest) {
+    const eventPort = eventsSurface.create()
+    const session = `session-undelivered-${name.toLowerCase()}`
+    const turn = new ReconciledTurn(
+      SessionIdModule_create(session),
+      PhysicalUserMessageIdModule_create('msg-physical-1'),
+      AuthorityRootUserMessageIdModule_create('msg-root-1'),
+      ProviderRunIdentityModule_create('run-1'),
+      role,
+      '/workspace',
+      [new MessagePart(0, ['I finished the task but did not call deliver.'])],
+      'stop',
+      undefined,
+      undefined,
+      TurnOutcome.TurnCompleted,
+      undefined,
+    )
+
+    // 1. 无 TaskDelivery witness 时 TerminalReporter 拒绝并发布 RejectedUndelivered
+    const deliveryWitness = false
+    const notified = []
+    eventPort.SubscribeTerminalListener((sid, outcome) => notified.push({ sid, outcome }))
+    const outcome = await TerminalReporter_completeWithEvidence(eventPort, undefined, turn, deliveryWitness)
+    assert.equal(outcome.tag, XTraceTerminalCompletion.RejectedUndelivered.tag, `${name} undelivered stop must be RejectedUndelivered`)
+    assert.equal(notified.filter(n => n.outcome.kind === 'Completed').length, 0, `${name} undelivered stop must not notify Completed`)
+  }
+
+  // 2. 验证真实插件运行时下未交付 stop 不写入完成事实、logical run 保持活跃
+  await withReview(async ({ runtime, session }) => {
+    const before = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+    assert.ok(before !== null, 'logical run must be active initially')
+
+    const eventPort = runtime.eventPort ?? eventsSurface.create()
+    const turn = new ReconciledTurn(
+      SessionIdModule_create(session),
+      PhysicalUserMessageIdModule_create('user-root'),
+      AuthorityRootUserMessageIdModule_create('user-root'),
+      ProviderRunIdentityModule_create('engineer-run-1'),
+      Role.Engineer,
+      runtime.directory ?? '/repo',
+      [new MessagePart(0, ['Work done without deliver witness'])],
+      'stop',
+      undefined,
+      undefined,
+      TurnOutcome.TurnCompleted,
+      undefined,
+    )
+    const result = await TerminalReporter_completeWithEvidence(eventPort, undefined, turn, false)
+    assert.equal(result.tag, XTraceTerminalCompletion.RejectedUndelivered.tag)
+
+    const after = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+    assert.deepEqual(after, before, 'logical run must not be closed when delivery witness is missing')
+  }, { session: 'engineer-undelivered-logical-run' })
+})
+
 test('WHAT[work-033] a same-request replay is idempotent and a different payload is a structured conflict', async () => {
   await withStore(async (store) => {
     const database = new DatabaseSync(surface.journalPath(store.gitCommonDir))

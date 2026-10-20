@@ -80,16 +80,17 @@ final continuation finishes, return one result. A lane's completion is not the
 completion of the whole assignment.
 
 
-## A string is the only accepted delivery
+## Deliver a view after the prose
 
-The accepted return for this assignment is `this.deliver(verboseReport)`.
-`verboseReport` is one string that states what changed, what was established,
-and what remains. Text printed in the assistant message is not a return.
-An object value is not an accepted delivery for this role. Other callers still
-use `deliver(value, view)`; this contract does not narrow that global entry
-to strings only.
+First state the outcome as assistant prose, then end the assignment with
+`this.deliver(view)`. `view` is `{ prefixUntil, thenMap }`, pointing at the
+full material of this work and needed context, including the closing prose;
+the caller receives what the `view` declares, rendered as TOML. Object or string
+final values no longer count as delivery. A plain `return` leaves the delivery cell empty: the child
+stays active, no completion is written and the join never closes. The old
+`deliver(value)` and `deliver(value, view)` forms are withdrawn.
 
-A natural stop without that non-empty string is nudged. An empty record is not
+A natural stop without a valid delivered view is nudged. An empty record is not
 completion.
 
 ## Return without creating another workflow

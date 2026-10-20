@@ -81,6 +81,7 @@ type AgentProjectionSet =
 
         /// Historical count of folded `RuntimeStarted` envelopes. Retained for
         /// audit/backward-compatible projections; it no longer drives recovery.
+        Deliveries: Map<SessionId * ProviderRunIdentity * ToolCallId, Wanxiangshu.Host.TaskDeliveryWitness>
         RuntimeStartCount: int
     }
 
@@ -106,6 +107,7 @@ module AgentProjection =
           Fission = FissionProjection.empty
           ChatExecutions = ChatExecutionProjection.empty
           ViewCheckpoints = Map.empty
+          Deliveries = Map.empty
           RuntimeStartCount = 0 }
 
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =

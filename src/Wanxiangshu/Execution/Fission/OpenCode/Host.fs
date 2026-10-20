@@ -174,7 +174,13 @@ module FissionHost =
         task {
             match! HandleController.consume durablePort ownerSessionId handle with
             | Ok _ -> return true
-            | Error _ -> return isHandleRetired durable ownerSessionId handle
+            | Error err ->
+                let retired = isHandleRetired durable ownerSessionId handle
+                if not retired then
+                    Diagnostic.emit
+                        "fission-handle-consume-failed"
+                        [ "session_id", SessionId.value ownerSessionId; "result", sprintf "handle consume failed: %A" err ]
+                return retired
         }
 
     let private tryConsumeCompletedHandle (durablePort: AgentJournalPort) durable ownerSessionId handle =
@@ -371,10 +377,32 @@ module FissionHost =
                     PromptDispatcher.AwaitMode.Await
                     None
             with
-            | Error _ -> return false
+            | Error reason ->
+                Diagnostic.emit
+                    "fission-send-failed"
+                    [ "session_id",
+                      SessionId.value laneSessionId
+                      "result",
+                      sprintf
+                          "fission takeover prompt send failed: group=%s lane=%d reason=%s"
+                          group.GroupId
+                          laneIndex
+                          reason ]
+                return false
             | Ok promptKey ->
                 match! appendTakeoverClaimed durable group aggregateBlob laneIndex laneSessionId promptKey with
-                | Error _ -> return false
+                | Error failure ->
+                    Diagnostic.emit
+                        "fission-takeover-claimed-append-failed"
+                        [ "session_id",
+                          SessionId.value laneSessionId
+                          "result",
+                          sprintf
+                              "fission takeover claim append failed: group=%s lane=%d reason=%s"
+                              group.GroupId
+                              laneIndex
+                              failure ]
+                    return false
                 | Ok() -> return true
         }
 
@@ -417,7 +445,14 @@ module FissionHost =
         =
         task {
             match! durable.WriteBlob aggregate with
-            | Error _ -> return false
+            | Error reason ->
+                Diagnostic.emit
+                    "fission-aggregate-write-failed"
+                    [ "session_id",
+                      SessionId.value group.OwnerSessionId
+                      "result",
+                      sprintf "fission aggregate blob write failed: group=%s reason=%s" group.GroupId reason ]
+                return false
             | Ok aggregateBlob ->
                 return!
                     sendTakeoverWithAggregateBlob
@@ -439,7 +474,14 @@ module FissionHost =
         =
         task {
             match! aggregateView durable group with
-            | Error _ -> return false
+            | Error reason ->
+                Diagnostic.emit
+                    "fission-aggregate-view-read-failed"
+                    [ "session_id",
+                      SessionId.value group.OwnerSessionId
+                      "result",
+                      sprintf "fission aggregate view read failed: group=%s reason=%s" group.GroupId reason ]
+                return false
             | Ok aggregate ->
                 return! writeAggregateAndTakeover sessionPort durable directoryFor group authority aggregate
         }
@@ -593,9 +635,36 @@ module FissionHost =
                     completionId
                     payload
             with
-            | Error _ -> return ()
+            | Error reason ->
+                Diagnostic.emit
+                    "fission-send-failed"
+                    [ "session_id",
+                      SessionId.value laneSessionId
+                      "result",
+                      sprintf
+                          "fission shared completion send failed: group=%s completion=%s lane=%d reason=%s"
+                          groupId
+                          completionId
+                          laneIndex
+                          reason ]
+                return ()
             | Ok _ ->
-                let! _ = appendDeliveryFact durable groupId now.OwnerSessionId completionId laneIndex
+                let! appended = appendDeliveryFact durable groupId now.OwnerSessionId completionId laneIndex
+
+                match appended with
+                | Error failure ->
+                    Diagnostic.emit
+                        "fission-delivery-fact-append-failed"
+                        [ "session_id",
+                          SessionId.value now.OwnerSessionId
+                          "result",
+                          sprintf
+                              "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
+                              groupId
+                              completionId
+                              laneIndex
+                              failure ]
+                | Ok() -> ()
                 return ()
         }
 
@@ -613,7 +682,22 @@ module FissionHost =
         =
         if Map.containsKey laneIndex now.LaneWork then
             task {
-                let! _ = appendDeliveryFact durable groupId now.OwnerSessionId completionId laneIndex
+                let! appended = appendDeliveryFact durable groupId now.OwnerSessionId completionId laneIndex
+
+                match appended with
+                | Error failure ->
+                    Diagnostic.emit
+                        "fission-delivery-fact-append-failed"
+                        [ "session_id",
+                          SessionId.value now.OwnerSessionId
+                          "result",
+                          sprintf
+                              "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
+                              groupId
+                              completionId
+                              laneIndex
+                              failure ]
+                | Ok() -> ()
                 return ()
             }
         else
@@ -677,8 +761,17 @@ module FissionHost =
     let private abortAllLaneSessions (sessionPort: ISessionHostPort) (group: FissionGroupProjection) =
         task {
             for KeyValue(_, laneSessionId) in group.LaneSessions do
-                let! _ = sessionPort.AbortSession laneSessionId
-                ()
+                let! aborted = sessionPort.AbortSession laneSessionId
+
+                match aborted with
+                | Ok() -> ()
+                | Error reason ->
+                    Diagnostic.emit
+                        "fission-lane-abort-failed"
+                        [ "session_id",
+                          SessionId.value laneSessionId
+                          "result",
+                          sprintf "fission lane abort failed: group=%s reason=%s" group.GroupId reason ]
         }
 
     let private failOpenGroup
@@ -699,12 +792,30 @@ module FissionHost =
                            OwnerSessionId = group.OwnerSessionId
                            Reason = reason |})
             with
-            | Error _ -> return ()
+            | Error failure ->
+                Diagnostic.emit
+                    "fission-failed-fact-append-failed"
+                    [ "session_id",
+                      SessionId.value group.OwnerSessionId
+                      "result",
+                      sprintf "fission failed fact append failed: group=%s reason=%s" group.GroupId failure ]
+
+                return ()
             | Ok() ->
                 do! abortAllLaneSessions sessionPort group
 
-                eventPort.NotifyTerminal group.OwnerSessionId (TerminalOutcome.Failed(TerminalStop.session reason))
-                |> ignore
+                let notified =
+                    eventPort.NotifyTerminal
+                        group.OwnerSessionId
+                        (TerminalOutcome.Failed(TerminalStop.session reason))
+
+                if not notified then
+                    Diagnostic.emit
+                        "fission-failed-terminal-unobserved"
+                        [ "session_id",
+                          SessionId.value group.OwnerSessionId
+                          "result",
+                          sprintf "fission failed terminal was a duplicate or found no listener: group=%s" group.GroupId ]
 
                 FissionAdmission.releaseOwner group.OwnerSessionId
                 FissionRuntime.clearOwner group.OwnerSessionId
@@ -782,7 +893,13 @@ module FissionHost =
 
             let tracePort = TerminalTracePort.forJournal durable |> Some
 
-            match! TerminalReporter.completeWithEvidence eventPort tracePort ownerTurn with
+            let deliveryWitness =
+                TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun
+                |> Option.exists (fun witness ->
+                    witness.Fence.AuthorityRoot = turn.AuthorityRootUserMessageId
+                    && witness.Fence.PhysicalUserMessageId = turn.PhysicalUserMessageId)
+
+            match! TerminalReporter.completeWithEvidence eventPort tracePort ownerTurn deliveryWitness with
             | XTraceTerminalCompletion.Published published when
                 published.SessionId = result.SessionId
                 && published.ProviderRun = result.ProviderRun
@@ -798,6 +915,8 @@ module FissionHost =
                 return Error "Fission takeover terminal reporter rejected the owner role"
             | XTraceTerminalCompletion.RejectedEmptyOutput ->
                 return Error "Fission takeover completed with empty terminal output"
+            | XTraceTerminalCompletion.RejectedUndelivered ->
+                return Error "Fission takeover completed without a delivery witness"
         }
 
     let private publishConvergedTakeover
@@ -921,7 +1040,12 @@ module FissionHost =
 
     let private materializeCompletedLane
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (joinGuardNudges: HashSet<string>)
+        (quiescence: ISessionQuiescenceGate)
+        (permit: QuiescencePermit option)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         laneIndex
@@ -932,7 +1056,57 @@ module FissionHost =
                 Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered (SessionId.value turn.SessionId)
             with
             | None ->
-                do! failGroup sessionPort eventPort durable group "Fission lane completed without a delivered view"
+                // LC-010: a lane that stops without a delivered view is not an
+                // infrastructure failure. The lane keeps the group and its
+                // resources; a same-run continuation nudge asks the same logical
+                // participant to continue. Only a nudge that itself failed makes
+                // the stranded group visible.
+                let! nudge =
+                    HostJoinGuard.nudge
+                        sessionPort
+                        rootWorkspace
+                        (Some(AgentJournalPortAdapter.forHostJoinGuard durable))
+                        (Some durable)
+                        joinGuardNudges
+                        (fun () ->
+                            match permit with
+                            | Some idlePermit -> quiescence.TryConsume idlePermit
+                            | None -> Error QuiescencePermitFailure.NoFreshIdle)
+                        (fun () ->
+                            match permit with
+                            | Some idlePermit -> quiescence.TryRelease idlePermit
+                            | None -> Error QuiescencePermitFailure.NoFreshIdle)
+                        turn.SessionId
+                        turn.ProviderRun
+                        turn.Directory
+
+                match nudge with
+                | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+                    do! failGroup sessionPort eventPort durable group (sprintf "fission undelivered lane nudge failed: %s" reason)
+                | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
+                    Diagnostic.emit
+                        "fission-join-nudge-unsent"
+                        [ "session_id",
+                          SessionId.value turn.SessionId
+                          "result",
+                          sprintf
+                              "fission undelivered lane nudge unsent: group=%s lane=%d reason=not-sent"
+                              group.GroupId
+                              laneIndex ]
+                | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
+                    Diagnostic.emit
+                        "fission-join-nudge-unsent"
+                        [ "session_id",
+                          SessionId.value turn.SessionId
+                          "result",
+                          sprintf
+                              "fission undelivered lane nudge admission rejected: group=%s lane=%d reason=%A"
+                              group.GroupId
+                              laneIndex
+                              failure ]
+                | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
+                | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding
+                | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()
 
                 return true
             | Some delivered ->
@@ -956,7 +1130,7 @@ module FissionHost =
             match laneHasOutstandingExternal durable laneIndex group, permit, sharedInputsAccounted laneIndex group with
             | true, None, _ -> return true
             | true, Some idlePermit, _ ->
-                let! _ =
+                let! nudge =
                     HostJoinGuard.nudge
                         sessionPort
                         rootWorkspace
@@ -970,12 +1144,42 @@ module FissionHost =
                         turn.ProviderRun
                         turn.Directory
 
+                match nudge with
+                | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+                    Diagnostic.emit
+                        "fission-join-nudge-failed"
+                        [ "session_id", SessionId.value turn.SessionId; "result", sprintf "fission outstanding external nudge failed: %s" reason ]
+                | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
+                    Diagnostic.emit
+                        "fission-join-nudge-unsent"
+                        [ "session_id", SessionId.value turn.SessionId; "result", "fission outstanding external nudge unsent: not-sent" ]
+                | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
+                    Diagnostic.emit
+                        "fission-join-nudge-unsent"
+                        [ "session_id", SessionId.value turn.SessionId; "result", sprintf "fission outstanding external nudge admission rejected: %A" failure ]
+                | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
+                | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding
+                | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()
+
                 return true
             | false, _, false ->
                 // The shared completion broadcaster will send a same-run
                 // continuation when the missing fact arrives.
                 return true
-            | false, _, true -> return! materializeCompletedLane sessionPort eventPort durable group laneIndex turn
+            | false, _, true ->
+                return!
+                    materializeCompletedLane
+                        sessionPort
+                        rootWorkspace
+                        eventPort
+                        journal
+                        joinGuardNudges
+                        quiescence
+                        permit
+                        durable
+                        group
+                        laneIndex
+                        turn
         }
 
     let private observeCompletedLane
@@ -1041,6 +1245,25 @@ module FissionHost =
         | FissionTakeoverSettlementDecision.FailGroup reason ->
             failSettlement sessionPort eventPort durable group reason
         | FissionTakeoverSettlementDecision.CompleteOwner ->
+            // LC-011: the final lane's delivered view becomes the material the
+            // owner integration continues from. Moving it is only material
+            // staging — the final settlement witness is still judged by
+            // publishOwnerTakeover's durable TaskDelivery witness, so a lane's
+            // local delivery can never stand in for the owner's integrated
+            // delivery. When the view cannot be moved, leave both cells alone.
+            let laneSessionKey = SessionId.value turn.SessionId
+            let ownerSessionKey = SessionId.value group.OwnerSessionId
+
+            match
+                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered laneSessionKey,
+                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek ownerSessionKey
+            with
+            | Some material, null ->
+                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordView
+                    ownerSessionKey
+                    (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peekView laneSessionKey)
+            | _ -> ()
+
             completeTakeover sessionPort eventPort durable group takeover turn
 
     let private observeTakeoverOutcome

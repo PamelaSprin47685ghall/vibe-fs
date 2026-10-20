@@ -254,6 +254,9 @@ module JsToolSpec =
                         let! outcome =
                             JsToolWorkflow.execute
                                 ctx.SessionId
+                                (match ctx.ProviderRunId, ctx.ToolCallId with
+                                 | Some providerRun, Some toolCallId -> Some(providerRun, toolCallId)
+                                 | _ -> None)
                                 surface.Capabilities
                                 root
                                 surface.BaseClassSource

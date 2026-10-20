@@ -11,6 +11,7 @@ type XTraceTerminalCompletion =
     | CaptureFailed of XTraceCaptureError
     | RejectedMissingRole
     | RejectedEmptyOutput
+    | RejectedUndelivered
 
 module TerminalReporter =
     val completeUsingTextEvidence:
@@ -18,13 +19,19 @@ module TerminalReporter =
         port: TerminalTracePort option ->
         turn: ReconciledTurn ->
         sessionWideText: string ->
+        deliveryWitness: bool ->
             Task<XTraceTerminalCompletion>
 
     val completeWithEvidence:
         eventPort: IEventObservationPort ->
         port: TerminalTracePort option ->
         turn: ReconciledTurn ->
+        deliveryWitness: bool ->
             Task<XTraceTerminalCompletion>
 
     val complete:
-        eventPort: IEventObservationPort -> port: TerminalTracePort option -> turn: ReconciledTurn -> Task<bool * bool>
+        eventPort: IEventObservationPort ->
+        port: TerminalTracePort option ->
+        turn: ReconciledTurn ->
+        deliveryWitness: bool ->
+            Task<bool * bool>

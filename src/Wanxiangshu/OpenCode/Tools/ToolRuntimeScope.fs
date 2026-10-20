@@ -166,7 +166,7 @@ type ToolRuntimeScope
     let questionInterrupts = HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
 
     let postS3PendingInterrupts =
-        HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
+        HashSet<SessionId * ProviderRunIdentity * ToolCallId * PhysicalUserMessageId option>()
 
     let postS3SettledInterrupts =
         HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
@@ -906,6 +906,12 @@ type ToolRuntimeScope
         |> Option.bind (fun durable -> UserQuestionJournal.pending durable (SessionId.create sessionId))
         |> Option.isSome
 
+    /// LC-017: 精确重放豁免依据——等待中问题的 (ProviderRunId, ToolCallId) 围栏。
+    member _.WaitingQuestionFenceFor(sessionId: string) =
+        journal
+        |> Option.bind (fun durable -> UserQuestionJournal.pending durable (SessionId.create sessionId))
+        |> Option.map (fun question -> (question.ProviderRunId, question.ToolCallId))
+
     member private _.ClearQuestionInterrupts(sid: SessionId) =
         let stale =
             questionInterrupts
@@ -1026,10 +1032,30 @@ type ToolRuntimeScope
 
         stopped
 
-    member private this.RunQuestionInterrupt(sessionId: SessionId, key: SessionId * ProviderRunIdentity * ToolCallId) =
+    /// LC-016: InterruptAttempt 是 session 级能力，检查之后仍可能在真正 abort
+    /// 落地前有新输入准入——返回后复核 current physical，若已变则只记诊断、
+    /// 不视为失败（旧 attempt 不再瞄准）。session 级 abort 的精确 attempt
+    /// 围栏需要带 attempt 参数的 Host AbortSession API，本 slice 不新造。
+    member private this.RunQuestionInterrupt
+        (
+            sessionId: SessionId,
+            question: UserQuestionAskedPayload,
+            key: SessionId * ProviderRunIdentity * ToolCallId
+        ) =
         task {
             try
                 let! stopped = sessions.InterruptAttempt sessionId
+
+                if
+                    currentPhysicalUserMessage (SessionId.value sessionId)
+                    <> Some(PhysicalUserMessageId.value question.PhysicalUserMessageId)
+                then
+                    Diagnostic.emit
+                        "question-interrupt-skipped-new-input"
+                        [ "session_id", SessionId.value sessionId
+                          "physical_user_message_id", PhysicalUserMessageId.value question.PhysicalUserMessageId ]
+
+                    questionInterrupts.Remove key |> ignore
                 return this.PruneFailedQuestionInterrupt(key, stopped)
             with ex ->
                 questionInterrupts.Remove key |> ignore
@@ -1053,7 +1079,7 @@ type ToolRuntimeScope
                 )
                 && questionInterrupts.Add(sessionId, question.ProviderRunId, callId)
                 ->
-                return! this.RunQuestionInterrupt(sessionId, (sessionId, question.ProviderRunId, callId))
+                return! this.RunQuestionInterrupt(sessionId, question, (sessionId, question.ProviderRunId, callId))
             | _ -> return Ok()
         }
 
@@ -1065,9 +1091,19 @@ type ToolRuntimeScope
                 let! stopped = sessions.InterruptAttempt sessionId
 
                 lock gate (fun () ->
-                    let _ =
-                        Result.isError stopped && postS3SettledInterrupts.Remove key
-                        || postS3PendingInterrupts.Remove key
+                    if Result.isError stopped then
+                        postS3SettledInterrupts.Remove key |> ignore
+
+                    // pending 已在 InterruptForPostS3Deliver 中按物理围栏移出；
+                    // 这里防御性清掉同 (session, run, call) 的任何残留元组。
+                    for stale in
+                        postS3PendingInterrupts
+                        |> Seq.filter (fun (owner, run, call, _) ->
+                            let (_, keyRun, keyCall) = key
+
+                            owner = sessionId && run = keyRun && call = keyCall)
+                        |> Seq.toList do
+                        postS3PendingInterrupts.Remove stale |> ignore
 
                     ())
 
@@ -1077,25 +1113,57 @@ type ToolRuntimeScope
                 return Error ex.Message
         }
 
+    /// LC-018: 登记时保存当时的 current physical；旧 deliver 完成事件只在
+    /// 该输入仍是最新输入时才允许触发 session 级中断。
     member _.RegisterPostS3Interrupt(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) =
-        lock gate (fun () -> postS3PendingInterrupts.Add(sessionId, providerRun, callId) |> ignore)
+        let physical =
+            currentPhysicalUserMessage (SessionId.value sessionId)
+            |> Option.map PhysicalUserMessageId.create
+
+        lock gate (fun () ->
+            postS3PendingInterrupts.Add(sessionId, providerRun, callId, physical) |> ignore)
 
     member _.HasPendingPostS3Interrupt(sessionId: string) =
         let sid = SessionId.create sessionId
-        lock gate (fun () -> postS3PendingInterrupts |> Seq.exists (fun (owner, _, _) -> owner = sid))
+        lock gate (fun () -> postS3PendingInterrupts |> Seq.exists (fun (owner, _, _, _) -> owner = sid))
 
     member this.InterruptForPostS3Deliver
         (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId)
         : Task<Result<unit, string>> =
-        let key = sessionId, providerRun, callId
+        task {
+            let key = sessionId, providerRun, callId
 
-        let shouldInterrupt =
-            lock gate (fun () -> postS3PendingInterrupts.Contains key && postS3SettledInterrupts.Add key)
+            // LC-018: 用户问题中断至少核对 current physical；post-S3 此前只查
+            // 进程集合。若登记之后已有新输入准入，清除 pending 并跳过中断，
+            // 旧 deliver 完成事件不得停止新执行。
+            let current =
+                currentPhysicalUserMessage (SessionId.value sessionId)
+                |> Option.map PhysicalUserMessageId.create
 
-        if shouldInterrupt then
-            this.RunPostS3InterruptAttempt(sessionId, key)
-        else
-            Task.FromResult(Ok())
+            let shouldInterrupt =
+                lock gate (fun () ->
+                    match
+                        postS3PendingInterrupts
+                        |> Seq.tryFind (fun (owner, run, call, _) ->
+                            owner = sessionId && run = providerRun && call = callId)
+                    with
+                    | None -> false
+                    | Some(_, _, _, savedPhysical) when savedPhysical <> current ->
+                        postS3PendingInterrupts.Remove(sessionId, providerRun, callId, savedPhysical)
+                        |> ignore
+
+                        false
+                    | Some(_, _, _, savedPhysical) ->
+                        postS3PendingInterrupts.Remove(sessionId, providerRun, callId, savedPhysical)
+                        |> ignore
+
+                        postS3SettledInterrupts.Add key)
+
+            if shouldInterrupt then
+                return! this.RunPostS3InterruptAttempt(sessionId, key)
+            else
+                return Ok()
+        }
 
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member _.RunStarted = onStarted
@@ -1596,7 +1664,7 @@ type ToolRuntimeScope
         lock gate (fun () ->
             for key in
                 postS3PendingInterrupts
-                |> Seq.filter (fun (owner, _, _) -> owner = questionOwner)
+                |> Seq.filter (fun (owner, _, _, _) -> owner = questionOwner)
                 |> Seq.toArray do
                 postS3PendingInterrupts.Remove key |> ignore
 

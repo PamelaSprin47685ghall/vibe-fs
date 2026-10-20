@@ -150,7 +150,17 @@ module PromptFactFold =
         | None when current.UserQuestions |> Map.exists (fun _ question -> question.Answer.IsNone) ->
             reject "a question is already waiting for the user"
         | None ->
-            let question: PromptAuthority.UserQuestion = { Request = payload; Answer = None }
+            // LC-015: 排除集由投影复算，不进事实 payload——提问登记时已落盘的
+            // 物理输入（含引发提问的那条）都不能在提问后作为新答复重放。
+            let question: PromptAuthority.UserQuestion =
+                { Request = payload
+                  Answer = None
+                  PriorPhysicalInputs =
+                    current.PhysicalLandings
+                    |> Map.toList
+                    |> List.map fst
+                    |> Set.ofList
+                    |> Set.add payload.PhysicalUserMessageId }
 
             let updated =
                 { current with
@@ -194,6 +204,11 @@ module PromptFactFold =
             && payload.PhysicalUserMessageId = question.Request.PhysicalUserMessageId
             ->
             reject "the input that caused ask cannot answer its own question"
+        | Some question when
+            question.Request.LogicalRunId = payload.LogicalRunId
+            && Set.contains payload.PhysicalUserMessageId question.PriorPhysicalInputs
+            ->
+            reject "an input admitted before the question cannot answer it"
         | Some question when
             question.Request.LogicalRunId = payload.LogicalRunId
             && question.Answer = Some payload.PhysicalUserMessageId

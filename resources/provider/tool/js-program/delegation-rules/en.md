@@ -23,7 +23,7 @@ const { records, byName } = await this.join();
 ```
 
 - Result: `{ ok: true, records: [{ name, agentId, role, status, view }], byName: { [name]: record } }`.
-- `status` is `completed` | `undelivered` | `failed` | `abandoned`; `view` is the child's delivered TOML view from `this.deliver` (empty when `undelivered`, `failed`, or `abandoned`).
+- `status` is `completed` | `failed` | `abandoned`; a child only enters the records after it ends with `this.deliver(view)` — a child that has not delivered is not settled: it stays active, the join does not close, and you may keep waiting or re-delegate. `view` is the child's delivered TOML view from `this.deliver` (empty when `failed` or `abandoned`).
 - Membership-scoped: it collects the children this session created. Refusal codes: `context-unavailable`, `not-ready`, `nothing-to-join`, `join-in-progress`, `interrupted`, `abandoned`.
 
 ## fission

@@ -13,6 +13,8 @@ open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Host
+open Wanxiangshu.Persistence.Journal
 
 /// Direct-CE child recovery (FLOW-001 / P0-1).
 /// Recovery consumes canonical admission and commits only exact scoped completions.
@@ -26,6 +28,8 @@ module ChildRecoveryWorkflow =
     type Ports =
         {
             Journal: AgentJournalPort option
+            /// Concrete journal when the process can read durable delivery witnesses.
+            DurableJournal: AgentJournal option
             ParentId: SessionId
             Snapshot: ISessionSnapshotPort option
             AgentId: string
@@ -124,6 +128,24 @@ module ChildRecoveryWorkflow =
         | Some user when assistant.ParentId <> Some user.Id ->
             ChildSnapshotEvidence.Unreadable "terminal assistant does not answer the exact accepted physical message"
         | Some user ->
+            let authorityRoot =
+                PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id)
+
+            let providerRun = ProviderRunIdentity.create assistant.Id
+
+            let witnessed =
+                match ports.DurableJournal with
+                | None -> false
+                | Some journal ->
+                    TaskDelivery.tryFind
+                        ports.ChildSession
+                        providerRun
+                        (AgentJournal.snapshot journal).AgentProjections.Deliveries
+                    |> Option.exists (fun witness -> witness.Fence.AuthorityRoot = authorityRoot)
+
+            if not witnessed then
+                ChildSnapshotEvidence.Unreadable "restart terminal has no durable delivery witness"
+            else
             let runId = "run-restored-" + ports.AgentId
             let view = textOfParts assistant.Parts
 

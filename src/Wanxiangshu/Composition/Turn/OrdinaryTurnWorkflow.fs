@@ -49,6 +49,7 @@ module OrdinaryTurnWorkflow =
 
     let private isTurnWorkSettled (turn: ReconciledTurn) : Task<bool> =
         task {
+            // Manager missing projection must not be treated as settled/completed
             match turn.Directory with
             | None -> return false
             | Some directory ->
@@ -60,7 +61,7 @@ module OrdinaryTurnWorkflow =
                 return
                     workOpt
                     |> Option.exists (fun work ->
-                        work.Delivered
+                        (work.Delivered || (work.PendingDelivery && work.Sequence = [ "S1"; "S2"; "S3" ]))
                         || List.contains (ProviderRunIdentity.value turn.ProviderRun) work.RetiredRuns)
         }
 
@@ -68,6 +69,9 @@ module OrdinaryTurnWorkflow =
         let turn = context.Turn
 
         match context.Failure, turn.Observation, turn.Outcome with
+        | None, None, ReconcileProgram.TurnCompleted when turn.Role = Some Role.Manager && turn.Directory.IsNone ->
+            // Manager 缺投影当未完成，继续推进
+            Continue
         | None, None, ReconcileProgram.TurnCompleted -> Continue
         | None, None, ReconcileProgram.TurnNeedsContinuation _ when
             turn.Finish
@@ -84,10 +88,7 @@ module OrdinaryTurnWorkflow =
         task {
             let turn = context.Turn
 
-            let isManaged =
-                match turn.Role with
-                | Some(Role.Manager | Role.Plan) -> true
-                | _ -> false
+            let hasRole = turn.Role.IsSome
 
             let authority () =
                 journal
@@ -96,13 +97,22 @@ module OrdinaryTurnWorkflow =
                     |> Map.tryFind turn.SessionId
                     |> Option.bind (fun session -> session.PromptAuthority))
 
-            if not isManaged then
+            if not hasRole then
                 return Ordinary
             elif isExplicitWaitOrOldTurn (authority ()) turn then
                 return Wait
             else
                 let! settled = isTurnWorkSettled turn
-                return classifyManagedTurnGate settled context
+                let hasDelivered =
+                    Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value turn.SessionId) <> null
+                    || (journal
+                        |> Option.bind (fun durable ->
+                            TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun)
+                        |> Option.isSome)
+                if settled || hasDelivered then
+                    return Wait
+                else
+                    return classifyManagerOrPlanTurn context
         }
 
     let private requestKindOfCompleted (port: TurnObservationJournalPort) (turn: ReconciledTurn) =
@@ -357,7 +367,8 @@ module OrdinaryTurnWorkflow =
                 | XTraceTerminalCompletion.Published _ -> true
                 | XTraceTerminalCompletion.CaptureFailed _
                 | XTraceTerminalCompletion.RejectedMissingRole
-                | XTraceTerminalCompletion.RejectedEmptyOutput -> false
+                | XTraceTerminalCompletion.RejectedEmptyOutput
+                | XTraceTerminalCompletion.RejectedUndelivered -> false
 
             if terminalValid then
                 do! recordSuccessIfValid journal observation turn
@@ -499,7 +510,21 @@ module OrdinaryTurnWorkflow =
             | _, None ->
                 let completeAgent () =
                     let tracePort = journal |> Option.map TerminalTracePort.forJournal
-                    TerminalReporter.completeWithEvidence eventPort tracePort turn
+
+                    let deliveryWitness =
+                        match journal with
+                        | Some durable ->
+                            TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun
+                            |> Option.exists (fun witness ->
+                                witness.Fence.AuthorityRoot = turn.AuthorityRootUserMessageId
+                                && witness.Fence.PhysicalUserMessageId = turn.PhysicalUserMessageId)
+                        | None ->
+                            // No journal means a test/dev harness; the process-live
+                            // cell is the only evidence available there.
+                            Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value turn.SessionId)
+                            <> null
+
+                    TerminalReporter.completeWithEvidence eventPort tracePort turn deliveryWitness
 
                 return!
                     handleOutcome

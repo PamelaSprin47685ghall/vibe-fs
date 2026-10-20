@@ -95,7 +95,7 @@ module UserQuestionJournal =
         authority journal sessionId
         |> Option.bind (fun state -> Map.tryFind callId state.UserQuestions)
 
-    let pending journal sessionId =
+    let private pendingQuestion journal sessionId =
         authority journal sessionId
         |> Option.bind (fun state ->
             state.ActiveLogicalRun
@@ -108,9 +108,12 @@ module UserQuestionJournal =
                         && question.Request.LogicalRunId = active.LogicalRunId
                         && question.Request.AuthorityRootUserMessageId = active.AuthorityRootUserMessageId
                     then
-                        Some question.Request
+                        Some question
                     else
                         None)))
+
+    let pending journal sessionId =
+        pendingQuestion journal sessionId |> Option.map (fun question -> question.Request)
 
     let suppressesTurn journal sessionId authorityRoot providerRun =
         authority journal sessionId
@@ -144,10 +147,12 @@ module UserQuestionJournal =
                 |> Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionProjection.byKey key
                 |> Option.map (fun execution -> execution.acceptedEvidence)
 
-            match pending journal sessionId, accepted with
+            match pendingQuestion journal sessionId, accepted with
             | Some question, Some input when
-                input.LogicalRunId = question.LogicalRunId
-                && input.PhysicalUserMessageId <> question.PhysicalUserMessageId
+                input.LogicalRunId = question.Request.LogicalRunId
+                && input.PhysicalUserMessageId <> question.Request.PhysicalUserMessageId
+                // LC-015: 提问登记时已准入的输入重放不构成真实新答复。
+                && not (Set.contains physicalId question.PriorPhysicalInputs)
                 && (input.Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot
                     || input.Origin = PromptOrigin.Continuation PromptContinuationKind.HumanMessage)
                 ->
@@ -158,8 +163,8 @@ module UserQuestionJournal =
                         (AgentFact.Prompt(
                             PromptFactCases.UserQuestionAnswered
                                 { SessionId = sessionId
-                                  LogicalRunId = question.LogicalRunId
-                                  ToolCallId = question.ToolCallId
+                                  LogicalRunId = question.Request.LogicalRunId
+                                  ToolCallId = question.Request.ToolCallId
                                   PhysicalUserMessageId = physicalId }
                         ))
                         journal

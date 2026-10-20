@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { withSyncRuntime } from './support/sync-runtime.mjs'
 
 test('WHAT[delegation-008] actual batch sends once in supplied Host order despite reverse invocation arrival', async () => {
@@ -16,6 +17,11 @@ test('WHAT[delegation-008] actual batch sends once in supplied Host order despit
     assert.ok(prompt.indexOf('FIRST-CHARGE') >= 0)
     assert.ok(prompt.indexOf('FIRST-CHARGE') < prompt.indexOf('SECOND-CHARGE'))
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 1)
+    const child = sync.child(runtime, owner, 'Engineer')
+    runtimeSurface.recordFencedDeliveredView(child, 'batch-run', 'call-first', {
+      prefixUntil: 0,
+      thenMap: {},
+    })
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'batch result', 'batch-run'), true)
     assert.equal((await first).kind, 'View')
     assert.deepEqual(await second, { kind: 'MergedInto', canonical: 'call-first' })

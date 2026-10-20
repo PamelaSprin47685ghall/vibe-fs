@@ -7,7 +7,12 @@ open System.Collections.Generic
 /// no filesystem-shaped Q.md/A.md surface exists here.
 module BookkeeperStaging =
 
-    type private Slot = { Question: string; Answer: string }
+    type private Slot =
+        { mutable Question: string
+          mutable Answer: string
+          // LC-029: the initial Q/A must never pass as this run's delivery, so
+          // the slot records whether the provider's program wrote through it.
+          mutable Touched: bool }
 
     let private gate = obj ()
     // DSL-MUTABLE: resource — staged transaction slot registry
@@ -15,7 +20,7 @@ module BookkeeperStaging =
     let private missingTransaction = "todowrite-for-bookkeeper: no staged transaction"
 
     let beginTransaction (txId: string) (question: string) (answer: string) : unit =
-        lock gate (fun () -> slots.[txId] <- { Question = question; Answer = answer })
+        lock gate (fun () -> slots.[txId] <- { Question = question; Answer = answer; Touched = false })
 
     let snapshot (txId: string) : Result<string * string, string> =
         lock gate (fun () ->
@@ -28,9 +33,9 @@ module BookkeeperStaging =
             match slots.TryGetValue txId with
             | false, _ -> Error missingTransaction
             | true, slot ->
-                slots.[txId] <-
-                    { Question = Option.defaultValue slot.Question question
-                      Answer = Option.defaultValue slot.Answer answer }
+                slot.Question <- Option.defaultValue slot.Question question
+                slot.Answer <- Option.defaultValue slot.Answer answer
+                slot.Touched <- true
 
                 Ok())
 
@@ -39,8 +44,19 @@ module BookkeeperStaging =
             match slots.TryGetValue txId with
             | false, _ -> Error missingTransaction
             | true, slot ->
-                slots.Remove txId |> ignore
-                Ok(slot.Question, slot.Answer))
+                if not slot.Touched then
+                    Error "the staged transaction was not written by this completion"
+                else
+                    slots.Remove txId |> ignore
+                    Ok(slot.Question, slot.Answer))
+
+    /// LC-029: whether the provider's program actually wrote through the
+    /// staged transaction. A terminal with no staged write has not delivered.
+    let touched (txId: string) : bool =
+        lock gate (fun () ->
+            match slots.TryGetValue txId with
+            | true, slot -> slot.Touched
+            | false, _ -> false)
 
     let abort (txId: string) : unit =
         lock gate (fun () -> slots.Remove txId |> ignore)

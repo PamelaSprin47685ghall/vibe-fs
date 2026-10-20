@@ -31,6 +31,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.host-fact.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-core.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.execution-session-sessionstartedatprojection.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj" />
     <Compile Include="Composition/Durable/HostFactFold.fsi" />
     <Compile Include="Composition/Durable/HostFactFold.fs" />
     <Compile Include="Composition/Durable/DelegationProjectionBridge.fsi" />

@@ -248,7 +248,10 @@ module HostForkRunLifecycle =
                     Some result.TerminalText
 
             let delivered =
-                JsDeliveredValues.tryTakeRenderedWith (SessionId.value run.ChildId) prose
+                JsDeliveredValues.tryTakeRenderedFor
+                    (SessionId.value run.ChildId)
+                    result.ProviderRun
+                    prose
 
             return chooseView delivered observed
         }
@@ -545,6 +548,11 @@ module HostForkRunLifecycle =
             // here would fail the run before the last effort. Observation only.
             Task.FromResult(())
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
+        | Completed _ when completedView.IsNone || completedView.Value = "" ->
+            // LC-004: An asynchronous child that completed its physical turn without
+            // delivering a view has not delivered its obligation. Do not settle or
+            // close the run; observation only, the child continues.
+            Task.FromResult(())
         | Completed result ->
             task {
                 let agentOutcome =

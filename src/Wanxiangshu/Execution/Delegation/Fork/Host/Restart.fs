@@ -27,6 +27,7 @@ module HostForkRestart =
         (runtime: ForkRuntime)
         (snapshot: ISessionSnapshotPort option)
         (journal: AgentJournalPort option)
+        (durableJournal: AgentJournal option)
         (parentId: SessionId)
         (agentId: string)
         (childSessionId: SessionId)
@@ -34,6 +35,7 @@ module HostForkRestart =
         (agent: string)
         : ChildRecoveryWorkflow.Ports =
         { Journal = journal
+          DurableJournal = durableJournal
           ParentId = parentId
           Snapshot = snapshot
           AgentId = agentId
@@ -105,7 +107,7 @@ module HostForkRestart =
             runtime.BindChildSession(agentId, childSessionId)
 
             let p =
-                ports runtime snapshot journalPort parentId agentId childSessionId role agent
+                ports runtime snapshot journalPort journal parentId agentId childSessionId role agent
 
             let! resolved = ChildRecoveryWorkflow.resolveAndCommit p
             return applyResolvedRecovery runtime agentId resolved

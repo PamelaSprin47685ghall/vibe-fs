@@ -14,6 +14,10 @@ module BookkeeperStaging =
     /// Apply optional question/answer patches to a staged transaction.
     val apply: txId: string -> question: string option -> answer: string option -> Result<unit, string>
 
+    /// LC-029: whether the provider's program wrote through the staged
+    /// transaction this run. The initial Q/A never counts as a delivery.
+    val touched: txId: string -> bool
+
     /// Remove and return the staged question and answer for a transaction.
     val take: txId: string -> Result<string * string, string>
 

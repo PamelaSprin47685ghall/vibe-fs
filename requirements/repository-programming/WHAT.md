@@ -280,9 +280,9 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 
 提示词要求 thenMap 覆盖所有保护范围外的可见锚点，null 表示保留；漏项按 null 保留，不抛错。本轮 map 对小于 prefixUntil 的编号静默忽略，历史压缩不因此逆转。形状非法以 VIEW_DECLARATION_INVALID 拒绝，不执行程序、不留下部分效果。不保留旧字段或兼容别名。声明在工具调用时捕获，供下一请求消费一次；替换状态持续存在。双语教学资源为 tool/js-program/view-declaration-extra。
 
-## [054] deliver 显式终值与 view 视图返回
+## [054] deliver 的 view-only 交付
 
-`deliver(value, view?)` 是生命周期成员，任何生成面无条件携带（与 park 同级）。调用即用该值与可选 `view` 声明结束程序：栈展开、不再执行后续语句，终值成为本次调用结果，子工作返回给调用方的内容由 `js.deliver` 交回的 `view` 决定并渲染成 TOML。最后的 assistant 散文是否交回由 LLM 自主决定（包含在 `view` 内则交回，否则不交回）。跨次调用遵循增量去重规则：本次工作之前已经返回过的内容，即使本次 `view` 中包含，也不再重复返回。`value` 必须是 JSON 兼容数据，缺失或非法时以 `INVALID_RETURN_VALUE` 失败；`view` 形状非法时以 `VIEW_DECLARATION_INVALID` 失败。程序捕获内部交付哨兵后可以继续存活，此后的 return 值才是结果——捕获即知情取消。subagent 程序必须以 `js.deliver` 显式交付：普通 `return` 保持交付格为空，子工作以 `undelivered` 状态结算（`js.dag` 据此以 `node-undelivered` 挂起）。描述与双语资源 `tool/js-program/deliver` 陈述同一契约。
+`deliver(view)` 是生命周期成员，任何生成面无条件携带（与 park 同级）。deliver 是 view-only：先输出散文，再以 `deliver(view)` 结束程序，`view` 指向本次工作的全部材料（含末条 assistant 散文）；栈展开、不再执行后续语句，子工作返回给调用方的内容由该 `view` 决定并渲染成 TOML。不接受旧的 value 终值形态，也不接受双参数形态：`deliver(value, view?)` 与 `deliver(value)` 已撤销，传入额外参数或非 view 对象以 `VIEW_DECLARATION_INVALID` 拒绝；`view` 形状非法时同样以 `VIEW_DECLARATION_INVALID` 失败。跨次调用遵循增量去重规则：本次工作之前已经返回过的内容，即使本次 `view` 中包含，也不再重复返回。程序捕获内部交付哨兵后可以继续存活，此后的 return 值才是结果——捕获即知情取消。subagent 程序必须以 `js.deliver` 显式交付：普通 `return` 保持交付格为空，子工作不写完成、join 不关闭（`js.dag` 据此以 `node-undelivered` 挂起），不把未交付结算成终态。描述与双语资源 `tool/js-program/deliver` 陈述同一契约。
 
 ## [055] vm 并行边界
 
@@ -297,7 +297,7 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 ```
 
 - `fork(payload)`：`payload` 是字符串（任务）或 `{ charge, name?, calling?, keywords? }`；缺 `name` 时由 charge 派生（派生名冲突报 `name-already-belongs`）。成功返回 `{ ok, name, agentId, outcome }`，`outcome ∈ created | nudged | commissioned`。拒绝码：`name-required`/`charge-required`/`unknown-calling`/`calling-conflict`/`name-already-belongs`/`warm-start-unavailable`/`context-unavailable`/`not-a-delegation-role`/`placement-failed`/`dispatch-uncertain`。
-- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, view }], byName }`；`status ∈ completed | undelivered | failed | abandoned`。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
+- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, view }], byName }`；只有经 `js.deliver(view)` 有效交付的成员才 `completed` 并进入 join 记录；`status ∈ completed | failed | abandoned`。未交付的成员不写完成、不进入终态记录，join 不关闭，成员保持活跃；父方可以继续等待或重派。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
 - `fission({ charge, lanes })`：同身份多 lane 的任务分片执行（宿主负责 lane 绑定与收拢），返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组 lane。拒绝码：`fission-unavailable`/`lane-start-failed`/`not-ready`/`context-unavailable`/`invalid-prompt`。
 - `dag({ nodes: [{ id, charge, deps?, lanes? }] })`：纯声明糖，由基类编译成波次 `fork` + 一次 `join`；下游节点的 prompt 带上依赖记录。成功返回 `{ ok, results: { [id]: record }, skipped: [id...] }`。**节点失败 → `park`**（与 `where` 同一条恢复通道），payload 为 `{ dag, node, code, deps, done, pending }`；注入值语义：`"retry"` 重跑、`"skip"` 跳过（下游看到 null）、其他值直接作为该节点结果、`{ abort: reason }` 使程序失败。
 - `horizon()`：返回在场名册的数据信封 `{ ok, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`；`status ∈ returned | still-away | did-not-return`，`workState ∈ latest | none | unavailable`，`record` 是最新帧正文原文（无则为 `""`）；四个校准数 `turnsUsed`/`turnsLeft`/`timeUsedMs`/`timeLeftMs` 只在委任者 estimate 与子会话起点两者都可读时给出，否则全为 `0`，不猜测。拒绝码：`horizon-unavailable`。
@@ -319,9 +319,9 @@ Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`
 
 ## [059] this.deliver 的视图记录与增量去重
 
-程序经 `this.deliver(value, view?)` 结束时，宿主保存显式终值和可选 view，普通 return 不填交付格。带 view 时，先用当前调用者上下文、已有压缩历史和同一声明规则生成完整 view，再按宿主记录的已返回身份去重并渲染成 TOML；不能只回传 thenMap 中的摘要而漏掉 null 保留或受保护的内容。prefixUntil 不承担交付筛选。后续重复包含的身份不再返回，交付格可 take 或 peek，peek 不推进返回记录。
+程序经 `this.deliver(view)` 结束时，宿主保存交付 view，普通 return 不填交付格。宿主先用当前调用者上下文、已有压缩历史和同一声明规则生成完整 view，再按宿主记录的已返回身份去重并渲染成 TOML；不能只回传 thenMap 中的摘要而漏掉 null 保留或受保护的内容。prefixUntil 不承担交付筛选。后续重复包含的身份不再返回，交付格可 take 或 peek，peek 不推进返回记录。
 
-无 view 仅返回 value，不携带末条 assistant 散文；带 view 时按交付路径纳入末条散文并增量去重。value 必须是合法 JSON 数据，非法以 INVALID_RETURN_VALUE 失败；view 使用 [053] 的同一形状校验。交付格与返回记录为进程内状态，重启即丢；durable 终值在工具结算时另记。
+deliver 只接受 view：`view` 使用 [053] 的同一形状校验，非法以 VIEW_DECLARATION_INVALID 拒绝；旧的 value 终值与双参数形态不是合法调用。交付格与返回记录为进程内状态，重启即丢；交付事实在工具结算时另记。
 
 ## [060] "js" 机器词汇的终局
 

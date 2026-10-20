@@ -36,6 +36,7 @@ type AgentProjectionSet =
         /// Successful view declaration checkpoints still on the raw side of the
         /// committed prefix. The retain window (K) is a fixed system parameter.
         ViewCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
+        Deliveries: Map<SessionId * ProviderRunIdentity * ToolCallId, Wanxiangshu.Host.TaskDeliveryWitness>
         RuntimeStartCount: int
     }
 

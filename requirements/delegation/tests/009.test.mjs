@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 test('WHAT[delegation-009] one active call blocks its own scope while another scope independently dispatches and completes', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-sync-scopes-'))
@@ -21,8 +22,16 @@ test('WHAT[delegation-009] one active call blocks its own scope while another sc
     await sync.awaitPromptCount(runtime, owners[1], 'Engineer', 1)
     assert.equal(sync.acceptPrompt(runtime, owners[1], 'Engineer', 0), true)
     assert.notEqual(sync.child(runtime, owners[0], 'Engineer'), sync.child(runtime, owners[1], 'Engineer'))
+    runtimeSurface.recordFencedDeliveredView(sync.child(runtime, owners[1], 'Engineer'), 'right-run', 'call-right', {
+      prefixUntil: 0,
+      thenMap: {},
+    })
     assert.equal(await sync.settle(runtime, owners[1], 'Engineer', 'right result', 'right-run'), true)
     assert.equal((await right).ok, true)
+    runtimeSurface.recordFencedDeliveredView(sync.child(runtime, owners[0], 'Engineer'), 'left-run', 'call-left', {
+      prefixUntil: 0,
+      thenMap: {},
+    })
     assert.equal(await sync.settle(runtime, owners[0], 'Engineer', 'left result', 'left-run'), true)
     assert.equal((await left).ok, true)
     assert.equal(sync.childCount(runtime), 2)

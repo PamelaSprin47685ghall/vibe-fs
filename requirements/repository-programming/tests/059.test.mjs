@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execute, caseName } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 import {
-  deliveredValue, clearDeliveredValue, recordDeliveredView, takeDeliveredHandoff,
-  takeDeliveredHandoffWith, clearDeliveredReturned, deliveredReturned,
+  deliveredValue, clearDeliveredValue, recordDeliveredView, recordFencedDeliveredView, takeDeliveredHandoff,
+  takeDeliveredHandoffWith, takeDeliveredHandoffFor, clearDeliveredReturned, deliveredReturned,
+  deliveredViewOf, deliveredFenceOf,
 } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { applyView, clearAll, numberMessage, setView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 
@@ -21,35 +22,38 @@ const seed = (id, texts) => {
 }
 test.beforeEach(() => clearAll())
 
-test('WHAT[repository-programming-059] this.deliver records its terminal value and does not run later statements', async () => {
+test('WHAT[repository-programming-059] this.deliver records its view declaration and does not run later statements', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-view-deliver-'))
   const id = 'native-deliver'
   try {
     clearDeliveredValue(id)
-    const result = await run(dir, 'await this.deliver({ summary: "indexed", files: 3 }); throw new Error("unreachable");', id)
+    const result = await run(dir, 'await this.deliver({ prefixUntil: 0, thenMap: { 0: "indexed" } }); throw new Error("unreachable");', id)
     assert.equal(caseName(result), 'Succeeded')
-    assert.equal(deliveredValue(id).summary, 'indexed')
-    assert.equal(deliveredValue(id).files, 3)
+    assert.deepEqual(deliveredViewOf(id), { prefixUntil: 0, thenMap: { 0: 'indexed' } })
   } finally { clearDeliveredValue(id); rmSync(dir, { recursive: true, force: true }) }
 })
 
-test('WHAT[repository-programming-059] handoff projects the complete view before dedup, including protected and null-kept content', () => {
-  const id = 'handoff-complete'
+test('WHAT[repository-programming-059] a fenced cell answers only its own provider run', () => {
+  const id = 'fence-owner'
   clearDeliveredReturned(id)
   const rows = seed(id, ['protected-one', 'raw-two', 'kept-three'])
   setView(id, declaration(2, { 2: 'summary-two' }))
   applyView(id, rows)
-  recordDeliveredView(id, { files: 1 }, declaration(2, { 1: 'ignored', 2: 'summary-two', 3: null }))
-  const first = String(takeDeliveredHandoff(id))
+  recordFencedDeliveredView(id, 'run-059', 'call-1', declaration(2, { 1: 'ignored', 2: 'summary-two', 3: null }))
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'run-059', toolCallId: 'call-1' })
+  assert.deepEqual(deliveredViewOf(id), declaration(2, { 1: 'ignored', 2: 'summary-two', 3: null }))
+  // A consumer from another run cannot take or peek the fenced cell.
+  assert.equal(takeDeliveredHandoff(id), null)
+  assert.equal(takeDeliveredHandoffFor(id, 'run-059-old', null), null)
+  const first = String(takeDeliveredHandoffFor(id, 'run-059', null))
   assert.match(first, /protected-one/)
   assert.match(first, /summary-two/)
   assert.match(first, /kept-three/)
   assert.doesNotMatch(first, /raw-two|ignored/)
-  assert.match(first, /files/)
   assert.deepEqual(deliveredReturned(id), ['1:13:protected-one', '2:11:summary-two', '3:10:kept-three'])
   seed(id, ['protected-one', 'raw-two', 'kept-three', 'new-four'])
-  recordDeliveredView(id, { files: 2 }, declaration(99, {}))
-  const second = String(takeDeliveredHandoff(id))
+  recordFencedDeliveredView(id, 'run-059', 'call-2', declaration(99, {}))
+  const second = String(takeDeliveredHandoffFor(id, 'run-059', null))
   assert.match(second, /new-four/)
   assert.doesNotMatch(second, /protected-one|raw-two|kept-three|summary-two/)
   assert.equal(deliveredValue(id), null)
@@ -62,8 +66,8 @@ test('WHAT[repository-programming-059] permanent compression survives a later pr
   const rows = seed(id, ['one', 'two', 'three'])
   setView(id, declaration(1, { 2: 'old-two-summary' }))
   applyView(id, rows)
-  recordDeliveredView(id, 'done', declaration(1, { 1: 'one-and-two-summary', 3: null }))
-  const result = String(takeDeliveredHandoff(id))
+  recordFencedDeliveredView(id, 'run-059', 'call-1', declaration(1, { 1: 'one-and-two-summary', 3: null }))
+  const result = String(takeDeliveredHandoffFor(id, 'run-059', null))
   assert.match(result, /one-and-two-summary/)
   assert.match(result, /three/)
   assert.doesNotMatch(result, /old-two-summary/)
@@ -77,7 +81,7 @@ test('WHAT[repository-programming-059] implicit zero can return the opening inte
   const rows = seed(id, ['one', 'two'])
   setView(id, declaration(1, { 1: 'summary-one' }))
   applyView(id, rows)
-  recordDeliveredView(id, null, declaration(0, { 0: 'opening-summary', 2: null }))
+  recordDeliveredView(id, declaration(0, { 0: 'opening-summary', 2: null }))
   const result = String(takeDeliveredHandoff(id))
   assert.match(result, /opening-summary/)
   assert.doesNotMatch(result, /summary-one/)
@@ -85,16 +89,18 @@ test('WHAT[repository-programming-059] implicit zero can return the opening inte
   clearDeliveredReturned(id)
 })
 
-test('WHAT[repository-programming-059] without a view only the value returns; with a view assistant prose returns once', () => {
+test('WHAT[repository-programming-059] handoff returns the assistant prose once and only through the owning run', () => {
   const id = 'handoff-prose'
   clearDeliveredReturned(id)
-  recordDeliveredView(id, 'terminal value', null)
-  assert.equal(takeDeliveredHandoffWith(id, 'assistant prose'), 'terminal value')
-  assert.deepEqual(deliveredReturned(id), [])
-  recordDeliveredView(id, 'with view', declaration(1, {}))
-  assert.match(String(takeDeliveredHandoffWith(id, 'assistant prose')), /assistant prose/)
-  recordDeliveredView(id, 'next value', declaration(1, {}))
-  assert.doesNotMatch(String(takeDeliveredHandoffWith(id, 'assistant prose')), /assistant prose/)
+  recordFencedDeliveredView(id, 'run-059', 'call-1', declaration(1, {}))
+  // An unfenced consumer sees nothing; the fenced cell stays in place.
+  assert.equal(takeDeliveredHandoffWith(id, 'assistant prose'), null)
+  assert.deepEqual(deliveredViewOf(id), declaration(1, {}), 'the cell survives the wrong consumer')
+  const first = String(takeDeliveredHandoffFor(id, 'run-059', 'assistant prose'))
+  assert.match(first, /assistant prose/)
+  assert.equal(deliveredReturned(id).some((key) => key.startsWith('prose:')), true)
+  recordFencedDeliveredView(id, 'run-059', 'call-2', declaration(1, {}))
+  assert.doesNotMatch(String(takeDeliveredHandoffFor(id, 'run-059', 'assistant prose')), /assistant prose/)
   clearDeliveredReturned(id)
 })
 
@@ -113,11 +119,11 @@ test('WHAT[repository-programming-059] changed opening material is returned once
   const id = 'handoff-opening-version'
   clearDeliveredReturned(id)
   seed(id, ['one'])
-  recordDeliveredView(id, null, declaration(0, { 0: 'first' }))
-  assert.match(String(takeDeliveredHandoff(id)), /first/)
-  recordDeliveredView(id, null, declaration(0, { 0: 'second' }))
-  assert.match(String(takeDeliveredHandoff(id)), /second/)
-  recordDeliveredView(id, null, declaration(0, { 0: 'second' }))
-  assert.doesNotMatch(String(takeDeliveredHandoff(id)), /second/)
+  recordFencedDeliveredView(id, 'run-059', 'call-1', declaration(0, { 0: 'first' }))
+  assert.match(String(takeDeliveredHandoffFor(id, 'run-059', null)), /first/)
+  recordFencedDeliveredView(id, 'run-059', 'call-2', declaration(0, { 0: 'second' }))
+  assert.match(String(takeDeliveredHandoffFor(id, 'run-059', null)), /second/)
+  recordFencedDeliveredView(id, 'run-059', 'call-3', declaration(0, { 0: 'second' }))
+  assert.doesNotMatch(String(takeDeliveredHandoffFor(id, 'run-059', null)), /second/)
   clearDeliveredReturned(id)
 })

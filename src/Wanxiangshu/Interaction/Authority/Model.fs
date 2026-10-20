@@ -209,7 +209,10 @@ module PromptAuthority =
     /// represent durable before/active evidence; they are not stage latches.
     type UserQuestion =
         { Request: UserQuestionAskedPayload
-          Answer: PhysicalUserMessageId option }
+          Answer: PhysicalUserMessageId option
+          /// LC-015: 提问登记时已准入的所有物理输入（含引发提问的那条）。
+          /// 这些输入不能在提问后作为"新答复"解锁提问。
+          PriorPhysicalInputs: Set<PhysicalUserMessageId> }
 
     type PromptAuthorityProjection =
         {

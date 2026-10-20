@@ -13,17 +13,14 @@ test('WHAT[crash-reconciliation-004] actual explicit recovery re-enters ordinary
   assert.equal(before.activeRun, child.logicalRun)
   assert.equal(before.lifecycle, 'Active')
 
+  // 孤儿保持 Active、不写 void、joinable 为 0
   // Load recovery re-enters ordinary workflow from durable facts:
-  // Settle active runs by voiding without replaying tool continuations or restoring program counters
+  // Settlement does not write void; active child run stays Active as child logical run
   const settlements = recovery.childSettlements(state)
-  assert.equal(settlements.length, 1)
-  assert.equal(JSON.parse(settlements[0])[1][1][0], 'ChildWorkVoided')
-
-  // Apply the settlement fact
-  fold(state, settlements[0])
+  assert.equal(settlements.length, 0, 'settlement does not write void facts')
 
   const after = recovery.childView(state, 'parent', 'child')
-  assert.equal(after.activeRun, '', 'interrupted run is voided; no program counter or tool continuation replayed')
-  assert.equal(after.lifecycle, 'Active', 'handle remains active for ordinary reuse')
+  assert.equal(after.activeRun, child.logicalRun, 'activeRun is still child logical run')
+  assert.equal(after.lifecycle, 'Active', 'lifecycle remains Active')
   assert.equal(after.joinable, 0, 'no fake completion created')
 })

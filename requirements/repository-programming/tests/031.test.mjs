@@ -20,9 +20,10 @@ test('WHAT[repository-programming-031] deliver hard gate is wired at the deliver
   // G1 门禁路径常量与资源路径一致。
   assert.match(registry, /DeliverBlockedByParked = "tool\/js-program\/parked-deliver-blocked"/)
 
-  // 门禁调用 lane-a-core 的只读查询接口，且位于 deliver 执行链（plan/manager
-  // 分派之前），拒绝时列出全部 handle。
-  assert.match(registry, /let parkedHandles = JsParkedSites\.parkedHandles \(\)/)
+  // 门禁调用 lane-a-core 的按会话只读查询接口，且位于 deliver 执行链
+  // （plan/manager 分派之前），拒绝时列出本 session 的全部 handle；
+  // 无关 session 的 park 不得阻塞本次交付（LC-008）。
+  assert.match(registry, /let parkedHandles = JsParkedSites\.handlesForSession ctx\.SessionId/)
   assert.match(registry, /if not \(List\.isEmpty parkedHandles\)/)
   assert.match(registry, /parked_handles/, 'refusal must carry the parked handle list')
   assert.match(registry, /Path\.DeliverBlockedByParked/)
@@ -35,10 +36,12 @@ test('WHAT[repository-programming-031] parked reminder rides the PairHint compos
   // G2 资源路径常量。
   assert.match(transform, /ParkedHintPath = "tool\/js-program\/parked-hint"/)
 
-  // 提醒并入 composeMarkerDocument：查询全部未表态 handle，非空时渲染提醒并
-  // 追加为 marker 文档指令。无载体回合不走到 composeMarkerDocument（由既有
+  // 提醒并入 composeMarkerDocument：只查询本 session 的未表态 handle，非空
+  // 时渲染提醒并追加为 marker 文档指令；全局 parkedHandles 消费已按 LC-008
+  // 移除。无载体回合不走到 composeMarkerDocument（由既有
   // decideCurrentPlacement 保证），因此不会凭空注入。
-  assert.match(transform, /let parkedHandles = JsParkedSites\.parkedHandles \(\)/)
+  assert.match(transform, /JsParkedSites\.handlesForSession sessionId/)
+  assert.doesNotMatch(transform, /JsParkedSites\.parkedHandles \(\)/)
   assert.match(transform, /LlmFacing\.withInstructions parkedHint/)
   assert.match(transform, /ProviderProse\.render language ParkedHintPath/)
 })
@@ -132,11 +135,15 @@ test('WHAT[repository-programming-031] a real parked handle blocks deliver and t
     })
     const context = { sessionID: session, agent: 'manager', callID: 'deliver-parked', messageID: 'parked-gate-run', providerRunID: 'run-parked' }
 
-    const handle = await parkOne(runtime.directory, 'parked-gate-js-031', 'deliver-gate')
+    // LC-008：门禁按会话隔离，park 必须发生在 deliver 的同一 session 下，
+    // 门禁才会拦截；无关 session 的 park 不得阻塞本次交付。
+    const handle = await parkOne(runtime.directory, session, 'deliver-gate')
     try {
       const refused = await hooks.tool.deliver.execute({}, context)
       assert.match(refused, /parked-deliver-blocked/, 'deliver must reach the parked gate and be refused with its code')
       assert.ok(String(refused).includes(handle), `refusal must list the live handle ${handle}`)
+      // 先放弃本 session 的 handle，才轮到外会话对照。
+      await executeWorkflow(runtime.directory, 'Engineer', 'en', session, { abandon: { handle } }, 2000, Date.now() + 60_000, 1 << 20, null)
 
       // 反向对照：清空现场后，同一合法权威的另一次调用直接落到正常两段确认
       // （confirmation_required），不再得到 parked 拒绝。这既证明上下文本来
@@ -145,6 +152,13 @@ test('WHAT[repository-programming-031] a real parked handle blocks deliver and t
       const released = await hooks.tool.deliver.execute({}, { ...context, callID: 'deliver-cleared', messageID: 'cleared-run', providerRunID: 'run-cleared' })
       assert.ok(!String(released).includes('parked-deliver-blocked'), 'cleared table must release the deliver gate')
       assert.match(released, /confirmation_required = true/, 'the released call must land on the real two-stage deliver path')
+
+      // LC-008 收尾对照：另一个 session 的 park 不阻塞本 session 的门禁。
+      // 放在最后：这次调用穿过门禁后走真实交付路径（上一次调用已提交确认
+      // 围栏），其终态不影响前面的断言。
+      await parkOne(runtime.directory, 'parked-gate-js-031', 'foreign-gate')
+      const afterForeign = await hooks.tool.deliver.execute({}, { ...context, callID: 'deliver-foreign', messageID: 'foreign-run', providerRunID: 'run-foreign' })
+      assert.ok(!String(afterForeign).includes('parked-deliver-blocked'), 'a foreign session park must not block this deliver')
     } finally {
       clearAll()
     }
@@ -174,7 +188,9 @@ test('WHAT[repository-programming-031] a live parked handle is folded into the P
     const session = 'parked-hint-031'
     try {
       const user = await bootstrap(hooks, runtime, session)
-      const handle = await parkOne(runtime.directory, 'parked-hint-js-031', 'pair-hint')
+      // LC-008/G2：提醒只列本 session 的 parked handle，park 与 transform
+      // 必须同 session 才能出现在 marker 里。
+      const handle = await parkOne(runtime.directory, session, 'pair-hint')
 
       const messages = [user]
       await hooks['experimental.chat.messages.transform']({ sessionID: session }, { messages })

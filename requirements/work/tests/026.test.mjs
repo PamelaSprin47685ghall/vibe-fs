@@ -98,7 +98,11 @@ test('WHAT[work-026] S3 authorized deliver enters post-S3 state without starting
     )
     assert.match(String(postS3Reply), /post-S3/i)
     assert.equal(createdIds.length, 0, 'S3 deliver must enter post-S3 state without immediately starting S4')
-    assert.equal(life.inspected(commonDir, sessionID).Delivered, true, 'work is settled as Delivered (post-S3) so nudges are permanently disabled')
+    // LC-019: a committed DeliveryRequested IS the durable fact of plan
+    // completion; the work is delivered pending the execution handoff. No
+    // synthesized Accepted/execution session exists until the user commands
+    // the real spawn.
+    assert.equal(life.inspected(commonDir, sessionID).PendingDelivery, true, 'a DeliveryRequested is durably pending the execution handoff')
     assert.deepEqual(runtime.abortedIds, [], 'interrupt happens when Host confirms the deliver tool part completed')
 
     // Host confirms deliver tool part completed -> interrupts conversation like ask
@@ -134,7 +138,7 @@ test('WHAT[work-026] S3 authorized deliver enters post-S3 state without starting
     )
     assert.match(String(start1), /an execution session has been started/i)
     assert.equal(createdIds.length, 1, 'first post-S3 deliver must start one S4 execution session')
-    assert.equal(life.inspected(commonDir, sessionID).Delivered, true, 'session remains in post-S3 state with nudges disabled')
+    assert.equal(life.inspected(commonDir, sessionID).Delivered, true, 'the accepted execution settles the delivery retirement')
 
     // User commands deliver again in post-S3 state -> starts another S4 (repeatedly)
     runtime.pushHostMessage(sessionID, {

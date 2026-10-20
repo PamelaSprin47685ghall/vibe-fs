@@ -30,6 +30,11 @@ module AdvisorSeat =
     /// prompt and the intent are never concatenated. `Ok` carries prose the advisor actually
     /// produced, and a missing terminal, a failed/aborted terminal, or an empty read-back is
     /// `Error "advisor did not answer"` (advisor-[004]).
+    ///
+    /// advisor-[030]: each consult is fenced to the terminal of its own intent prompt. A Completed
+    /// from an older provider run — a sticky replayed terminal or the view prompt finishing first —
+    /// never settles the consult, and the recorded fence advances so a later consult cannot accept
+    /// an earlier consult's answer either.
     val consult:
         deps: AdvisorSeatDeps ->
         callerSessionId: string ->
@@ -43,3 +48,6 @@ module AdvisorSeat =
 
     /// Drop every process-live seat.
     val clearAll: unit -> unit
+
+    /// advisor-[030] test/dev hook: drop every recorded consult fence.
+    val clearConsultFences: unit -> unit

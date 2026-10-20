@@ -110,9 +110,19 @@ module FissionTool =
     let private writeAndAppendCapture (durable: AgentJournal) owner groupId completionId payload =
         task {
             match! durable.WriteBlob payload with
-            | Error _ -> return ()
+            | Error reason ->
+                Diagnostic.emit
+                    "fission-capture-write-failed"
+                    [ "session_id", SessionId.value owner
+                      "result",
+                      sprintf
+                          "fission completion capture blob write failed: group=%s completion=%s reason=%s"
+                          groupId
+                          completionId
+                          reason ]
+                return ()
             | Ok blob ->
-                let! _ =
+                let! appended =
                     appendFission
                         durable
                         owner
@@ -124,6 +134,18 @@ module FissionTool =
                                PayloadRef = blob.BlobRef
                                PayloadDigest = blob.BlobDigest |})
 
+                match appended with
+                | Error failure ->
+                    Diagnostic.emit
+                        "fission-capture-fact-append-failed"
+                        [ "session_id", SessionId.value owner
+                          "result",
+                          sprintf
+                              "fission completion captured fact append failed: group=%s completion=%s reason=%s"
+                              groupId
+                              completionId
+                              failure ]
+                | Ok() -> ()
                 return ()
         }
 
@@ -181,9 +203,34 @@ module FissionTool =
                         PromptDispatcher.AwaitMode.Detached
                         None
                 with
-                | Error _ -> return ()
+                | Error reason ->
+                    Diagnostic.emit
+                        "fission-send-failed"
+                        [ "session_id", SessionId.value lane.SessionId
+                          "result",
+                          sprintf
+                              "fission shared completion send failed: group=%s completion=%s lane=%d reason=%s"
+                              groupId
+                              completionId
+                              lane.Index
+                              reason ]
+                    return ()
                 | Ok _ ->
-                    let! _ = appendDelivery durable owner None groupId completionId lane.Index
+                    let! appended = appendDelivery durable owner None groupId completionId lane.Index
+
+                    match appended with
+                    | Error failure ->
+                        Diagnostic.emit
+                            "fission-delivery-fact-append-failed"
+                            [ "session_id", SessionId.value owner
+                              "result",
+                              sprintf
+                                  "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
+                                  groupId
+                                  completionId
+                                  lane.Index
+                                  failure ]
+                    | Ok() -> ()
                     return ()
         }
 
@@ -200,7 +247,21 @@ module FissionTool =
         =
         task {
             if laneClosed then
-                let! _ = appendDelivery durable owner None groupId completionId lane.Index
+                let! appended = appendDelivery durable owner None groupId completionId lane.Index
+
+                match appended with
+                | Error failure ->
+                    Diagnostic.emit
+                        "fission-delivery-fact-append-failed"
+                        [ "session_id", SessionId.value owner
+                          "result",
+                          sprintf
+                              "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
+                              groupId
+                              completionId
+                              lane.Index
+                              failure ]
+                | Ok() -> ()
                 return ()
             else
                 return! continueLiveLane scope durable profile groupId owner lane completionId payload
@@ -315,15 +376,24 @@ module FissionTool =
         (completionId: string)
         (payload: string)
         =
+        let broadcast =
+            task {
+                do! ensureCompletionCaptured durable owner groupId completionId payload
+                do! deliverAllLaneCompletions scope durable profile groupId owner lanes completionId payload
+                do! convergeOwnerIfNeeded scope durable owner groupId
+            }
+
         task {
             try
-                do! ensureCompletionCaptured durable owner groupId completionId payload
+                do! broadcast
+            with ex ->
+                Diagnostic.emit
+                    "fission-broadcast-failed"
+                    [ "session_id", SessionId.value owner
+                      "result",
+                      sprintf "fission shared completion broadcast failed: group=%s completion=%s error=%s" groupId completionId ex.Message ]
 
-                do! deliverAllLaneCompletions scope durable profile groupId owner lanes completionId payload
-
-                do! convergeOwnerIfNeeded scope durable owner groupId
-            finally
-                FissionRuntime.endDelivery groupId completionId -1
+            FissionRuntime.endDelivery groupId completionId -1
         }
 
     /// Capture exactly one canonical payload for a pre-Fission completion, then
@@ -581,7 +651,14 @@ module FissionTool =
         task {
             FissionRuntime.unbindLane laneId
             ModelRouting.cancelUnacquiredExecution laneId |> ignore
-            let! _ = scope.Sessions.AbortSession laneId
+            let! aborted = scope.Sessions.AbortSession laneId
+
+            match aborted with
+            | Ok() -> ()
+            | Error reason ->
+                Diagnostic.emit
+                    "fission-lane-abort-failed"
+                    [ "session_id", SessionId.value laneId; "result", "fission lane abort failed: reason=" + reason ]
             return ()
         }
         :> Task
@@ -644,7 +721,7 @@ module FissionTool =
         (reason: string)
         =
         task {
-            let! _ =
+            let! appended =
                 appendFission
                     durable
                     logicalOwner
@@ -653,6 +730,16 @@ module FissionTool =
                         {| GroupId = groupId
                            OwnerSessionId = logicalOwner
                            Reason = reason |})
+
+            match appended with
+            | Error failure ->
+                Diagnostic.emit
+                    "fission-failed-fact-append-failed"
+                    [ "session_id",
+                      SessionId.value logicalOwner
+                      "result",
+                      sprintf "fission failed fact append failed: group=%s reason=%s" groupId failure ]
+            | Ok() -> ()
 
             return ()
         }

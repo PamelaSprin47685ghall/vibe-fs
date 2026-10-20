@@ -24,6 +24,17 @@ module HostFactFold =
 
     let fold (projection: AgentProjectionSet) (fact: HostFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
+        | HostFactCases.TaskDeliveryCommitted witness ->
+            TaskDelivery.validate HostDigest.sha256Hex witness
+            |> Result.mapError (fun reason -> { Fact = "TaskDeliveryCommitted"; Reason = reason })
+            |> Result.bind (fun () ->
+                let key = TaskDelivery.key witness.Fence
+                match Map.tryFind key projection.Deliveries with
+                | Some previous when previous = witness -> Ok projection
+                | Some _ -> reject "TaskDeliveryCommitted" "delivery fence has different material"
+                | None ->
+                    Ok { projection with Deliveries = Map.add key witness projection.Deliveries })
+
         | HostFactCases.PairProgrammingGuidelineAnchored payload ->
             AgentProjection.tryUpdate
                 payload.SessionId

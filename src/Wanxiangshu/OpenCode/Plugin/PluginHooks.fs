@@ -673,7 +673,26 @@ module PluginHooks =
                     | None -> ()
 
                     match toolRegistration with
-                    | Some registration when registration.Runtime.IsWaitingForUser sessionId ->
+                    | Some registration when
+                        registration.Runtime.IsWaitingForUser sessionId
+                        && not (
+                            // LC-017: 同一围栏的 ask/deliver 精确重放可穿越等待门。
+                            // 其余工具在等待期间仍拒绝。
+                            let isReplayExemptTool =
+                                toolName = "deliver"
+                                || toolName.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
+
+                            let replayFence =
+                                ToolHostCodec.decodeContext toolInput
+                                |> fun ctx ->
+                                    match ctx.ProviderRunId, ctx.ToolCallId with
+                                    | Some run, Some call -> Some(run, call)
+                                    | _ -> None
+
+                            isReplayExemptTool
+                            && replayFence = registration.Runtime.WaitingQuestionFenceFor sessionId
+                        )
+                        ->
                         invalidOp (
                             ProviderProse.render
                                 (ProviderLanguageBinding.forSessionText sessionId)

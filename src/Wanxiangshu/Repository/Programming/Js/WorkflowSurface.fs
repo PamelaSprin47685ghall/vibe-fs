@@ -131,6 +131,7 @@ module JsWorkflowSurface =
                 let! outcome =
                     JsToolWorkflow.execute
                         sessionId
+                        None
                         surface.Capabilities
                         workspaceRoot
                         surface.BaseClassSource

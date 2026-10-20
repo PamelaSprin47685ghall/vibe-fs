@@ -3,9 +3,9 @@
     // 例如: const decision = await this.park({ stage: "review" });
   }
 
-  async deliver(value, view) {
-    // 用显式终值结束本程序。value 是交出的数据；可选 view 用 { prefixUntil, thenMap } 选择回传材料，与其它入口采用同一视图规则。
-    // 例如: await this.deliver({ done: true });
+  async deliver(view) {
+    // 以交付视图结束本程序。先用散文讲清结果，再传入 { prefixUntil, thenMap } 视图，指向本次工作的全部材料，与其它入口采用同一视图规则。
+    // 例如: await this.deliver({ prefixUntil: 3, thenMap: { 1: "setup summary", 2: null } });
   }
 
   async run() {

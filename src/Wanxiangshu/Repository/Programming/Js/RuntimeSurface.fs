@@ -3,6 +3,7 @@ namespace Wanxiangshu.Repository.Programming.Js
 open Fable.Core
 open Fable.Core.JsInterop
 open System.Threading.Tasks
+open Wanxiangshu.Foundation.Identity
 
 /// JS runtime owner boundary for bindings and sandbox execution. The mutable
 /// as-is write ledger (persisted at each edit/write call) and sandbox failure
@@ -114,10 +115,24 @@ module JsRuntimeSurface =
     let clearDelegationHosts () : unit = JsDelegationBridge.clearAll ()
 
     /// Test hook: the raw value a program handed over through `this.deliver`.
-    
+
     /// Test hook: record a value with an already-shaped deliver view.
-    let recordDeliveredView (sessionId: string) (value: obj) (view: obj) : unit =
-        JsDeliveredValues.recordView sessionId value (if isNull view then None else Some view)
+    let recordDeliveredView (sessionId: string) (view: obj) : unit =
+        JsDeliveredValues.recordView sessionId (if isNull view then None else Some view)
+
+    /// Test hook: record a delivery carrying the exact call fence that
+    /// produced it, so old-terminal/old-consumer fencing is observable.
+    let recordFencedDeliveredView
+        (sessionId: string)
+        (providerRun: string)
+        (toolCallId: string)
+        (view: obj)
+        : unit =
+        JsDeliveredValues.recordFencedView
+            sessionId
+            (ProviderRunIdentity.create providerRun)
+            (ToolCallId.create toolCallId)
+            (if isNull view then None else Some view)
 
     /// Test hook: identities already handed back through a deliver view.
     let deliveredReturned (sessionId: string) : string array =
@@ -131,12 +146,32 @@ module JsRuntimeSurface =
         | Some text -> box text
         | None -> null
 
+    /// Test hook: consume the handoff only when the cell carries this exact
+    /// provider run; a fenced cell from another run stays untouched.
+    let takeDeliveredHandoffFor (sessionId: string) (providerRun: string) (assistantProse: string option) : obj =
+        match JsDeliveredValues.tryTakeRenderedFor sessionId (ProviderRunIdentity.create providerRun) assistantProse with
+        | Some text -> box text
+        | None -> null
+
     let takeDeliveredHandoff (sessionId: string) : obj =
         match JsDeliveredValues.tryTakeRendered sessionId with
         | Some text -> box text
         | None -> null
 
     let deliveredValue (sessionId: string) : obj = JsDeliveredValues.peek sessionId
+
+    let deliveredViewOf (sessionId: string) : obj =
+        match JsDeliveredValues.peekView sessionId with
+        | Some view -> view
+        | None -> null
+
+    let deliveredFenceOf (sessionId: string) : obj =
+        match JsDeliveredValues.peekFence sessionId with
+        | Some fence ->
+            createObj
+                [ "providerRun" ==> ProviderRunIdentity.value fence.ProviderRun
+                  "toolCallId" ==> ToolCallId.value fence.ToolCallId ]
+        | None -> null
 
     let clearDeliveredValue (sessionId: string) : unit = JsDeliveredValues.clear sessionId
 

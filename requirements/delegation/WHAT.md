@@ -96,7 +96,7 @@ attachment 只将指定同伴已经交回的 view 作为只读数据放入首 pr
 
 输入为新 charge（调用方在 charge 中显式提供上下文，SyncDelegate/dag 可直接拼接上游已交付的 view，且 ANCHOR 编号共享同一进程地址空间；父到子 `DelegationHandoff` delta tracking 已退役）。
 
-同步调用等待自己完成，只返回本次 `js.deliver` 交回的 view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自 `js.deliver` 交付格终值（未交付的子工作在结构化 join 记录中报告 `status = "undelivered"`）。S1/S2/S3/S4 接力不再主动清除上下文。
+同步调用等待自己完成，只返回本次 `js.deliver` 交回的 view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自 `js.deliver` 交付格的 view；未交付的子工作不写完成、join 不关闭，保持可见的未解除义务——父方可以继续等待或重派，原子工作保持活跃，不把 undelivered 结算成终态。S1/S2/S3/S4 接力不再主动清除上下文。
 
 ## [025] Completion 以因果身份认领
 

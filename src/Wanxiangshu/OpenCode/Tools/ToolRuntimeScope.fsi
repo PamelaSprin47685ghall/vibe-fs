@@ -57,11 +57,16 @@ type ToolRuntimeScope =
     member ActiveProfileFor: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
     member AttachQuestionNotifier: notify: (string -> Task<Result<unit, string>>) -> unit
     member IsWaitingForUser: sessionId: string -> bool
+    /// LC-017: the pending question's exact fence for a waiting session.
+    member WaitingQuestionFenceFor: sessionId: string -> (ProviderRunIdentity * ToolCallId) option
     member AskUser: ctx: HostToolContext * question: string -> Task<Result<unit, string>>
 
     member InterruptForUserQuestion:
         sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> Task<Result<unit, string>>
 
+    /// LC-018: registers the pending post-S3 interrupt with the current physical
+    /// user message; a later deliver-completed event only fires the session
+    /// interrupt while that input is still the latest one.
     member RegisterPostS3Interrupt: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit
     member HasPendingPostS3Interrupt: sessionId: string -> bool
 

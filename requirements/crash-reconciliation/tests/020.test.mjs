@@ -35,34 +35,30 @@ test('WHAT[crash-reconciliation-020] in-process physical terminals preserve an a
   }
 })
 
-test('WHAT[crash-reconciliation-020] production load decision voids active child runs without creating a completion', () => {
+test('WHAT[crash-reconciliation-020] production load decision leaves active child runs active without voiding', () => {
   for (const agent of ['engineer', 'devops']) {
     const state = recovery.create()
     link(state, { agent })
     const child = acceptRun(state, { agent })
     assert.equal(recovery.childView(state, 'parent', 'child').activeRun, child.logicalRun)
     const settlements = recovery.childSettlements(state)
-    assert.equal(settlements.length, 1)
-    assert.equal(JSON.parse(settlements[0])[1][1][0], 'ChildWorkVoided')
-    fold(state, settlements[0])
+    assert.equal(settlements.length, 0, 'no void facts emitted on load')
     assert.deepEqual(recovery.childView(state, 'parent', 'child'), {
-      activeRun: '', lifecycle: 'Active', joinable: 0, horizonVisible: 0,
+      activeRun: child.logicalRun, lifecycle: 'Active', joinable: 0, horizonVisible: 1,
     })
-    assert.deepEqual(recovery.childSettlements(state), [])
     assert.equal(recovery.lookupChild(state, 'parent', 'work', false).session, 'child')
   }
 })
 
-test('WHAT[crash-reconciliation-020] an active child work run leaves the horizon projection only after load settlement voids it', () => {
+test('WHAT[crash-reconciliation-020] an active child work run remains visible in horizon projection and is not settled away', () => {
   for (const agent of ['engineer', 'devops']) {
     const state = recovery.create()
     link(state, { agent })
     acceptRun(state, { agent })
     assert.equal(recovery.childView(state, 'parent', 'child').horizonVisible, 1)
     const settlements = recovery.childSettlements(state)
-    assert.equal(settlements.length, 1)
-    fold(state, settlements[0])
-    assert.equal(recovery.childView(state, 'parent', 'child').horizonVisible, 0)
+    assert.equal(settlements.length, 0, 'not settled away')
+    assert.equal(recovery.childView(state, 'parent', 'child').horizonVisible, 1, 'horizonVisible stays 1')
   }
 })
 

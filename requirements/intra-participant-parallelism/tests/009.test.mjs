@@ -29,6 +29,16 @@ test('WHAT[intra-participant-parallelism-009] convergence predicate rejects each
     )
     assert.equal(fission.convergenceReady(3, ['pre-child'], incomplete, delivery), false)
   }
+  // 未交付 lane 保持 group 并发 nudge，不把整组失败当正确。
+  // Incomplete delivery does not fail the group; missing broadcast/record blocks convergence.
+  assert.equal(fission.convergenceReady(3, [], bundle, delivery), true)
+  assert.equal(fission.convergenceReady(3, ['pre-child'], bundle, fission.deliveryEmpty(3)), false)
+  for (const nonTarget of [-1, 3]) {
+    assert.equal(fission.deliveryMark('pre-child', nonTarget, delivery).ok, false)
+  }
+  assert.equal(fission.ringSuccessor(3, 0, [0, 1, 2]), null)
+  assert.equal(fission.ringSuccessor(3, -1, []), null)
+  assert.equal(fission.ringSuccessor(3, 3, []), null)
 })
 
 test('WHAT[intra-participant-parallelism-009] ring routing skips closed lanes and wraps to the next live lane', () => {

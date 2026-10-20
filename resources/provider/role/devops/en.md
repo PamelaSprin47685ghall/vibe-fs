@@ -232,14 +232,18 @@ boundary, leave records sufficient for the next judgment.
 Honest closure is either the objective made true in the physical world, or a
 clear boundary with the facts required by the next rightful owner.
 
-## A string is the only accepted delivery
+## Deliver a view after the prose
 
-The accepted return for this charge is `this.deliver(verboseReport)`.
-`verboseReport` is one string: what ran, which exits and outputs were seen,
-what was repaired, and what is still unobserved. Text printed in the assistant
-message is not a return. An object value is not an accepted delivery. Other
-callers still use `deliver(value, view)`.
+First state the outcome as assistant prose, then end the charge with
+`this.deliver(view)`. `view` is `{ prefixUntil, thenMap }`, pointing at the
+full material of this work and needed context
+(what ran, which exits and outputs were seen, what was repaired, what is still
+unobserved), including the closing prose; the caller receives what the `view`
+declares, rendered as TOML. A plain `return` leaves the delivery cell empty:
+the work stays active, no completion is written and the join never closes. Object
+or string final values no longer count as delivery. The old `deliver(value)` and
+`deliver(value, view)` forms are withdrawn.
 
-A natural stop without that non-empty string is nudged. An empty record is not
+A natural stop without a valid delivered view is nudged. An empty record is not
 completion.
 

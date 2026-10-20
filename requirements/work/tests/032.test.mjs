@@ -48,3 +48,39 @@ test('WHAT[work-032] only Plan may ask the human; Manager and other roles are de
     assert.equal(isAllowed(role, 'DevOpsConsultation'), false, role)
   }
 })
+
+test('WHAT[work-032] Engineer, DevOps, and Orchestrator progress stops do not record completion fact without delivery witness', async () => {
+  // 合法进度 stop 不能当完成：无 witness 的 TurnCompleted 不写完成事实。
+  const { TerminalReporter_completeWithEvidence, XTraceTerminalCompletion } = await import('../../../dist/Context/Trace/TerminalReporter.js')
+  const { ReconciledTurn } = await import('../../../dist/Composition/Turn/Observation.js')
+  const { Role } = await import('../../../dist/Foundation/Roles.js')
+  const { SessionIdModule_create, PhysicalUserMessageIdModule_create, AuthorityRootUserMessageIdModule_create, ProviderRunIdentityModule_create } = await import('../../../dist/Foundation/Identity.js')
+  const { TurnOutcome } = await import('../../../dist/Composition/Turn/Program.js')
+  const { MessagePart } = await import('../../../dist/OpenCode/Host/Message.js')
+  const eventsSurface = await import('../../../dist/OpenCode/Host/EventsSurface.js')
+
+  for (const [name, role] of [['engineer', Role.Engineer], ['devops', Role.DevOps], ['orchestrator', Role.Orchestrator]]) {
+    const eventPort = eventsSurface.create()
+    const completedEvents = []
+    eventPort.SubscribeTerminalListener((sid, outcome) => {
+      if (outcome.kind === 'Completed') completedEvents.push({ sid, outcome })
+    })
+    const turn = new ReconciledTurn(
+      SessionIdModule_create(`ses-${name}-progress`),
+      PhysicalUserMessageIdModule_create(`msg-${name}-1`),
+      AuthorityRootUserMessageIdModule_create(`root-${name}-1`),
+      ProviderRunIdentityModule_create(`run-${name}-1`),
+      role,
+      '/repo',
+      [new MessagePart(0, [`[${name}] Finished subtask progress summary.`])],
+      'stop',
+      undefined,
+      undefined,
+      TurnOutcome.TurnCompleted,
+      undefined,
+    )
+    const outcome = await TerminalReporter_completeWithEvidence(eventPort, undefined, turn, false)
+    assert.equal(outcome.tag, XTraceTerminalCompletion.RejectedUndelivered.tag, `${name} progress stop without witness must be RejectedUndelivered`)
+    assert.equal(completedEvents.length, 0, `${name} progress stop without delivery witness must not notify Completed`)
+  }
+})
