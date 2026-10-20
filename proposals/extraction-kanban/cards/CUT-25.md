@@ -1,5 +1,14 @@
 # CUT-25 受限 JS 编程面与执行组合
 
+## 接手核对（2026-10-21，eng-cut25b-goose）
+
+- **Owner**：eng-cut25b-goose（board claim `eb172e465`）。
+- **(a) 逃逸回归**：`evidence/CUT-25/verification-2026-10-21.md`。`006-cut25-escapes` 前 6 条在 `f37a7ba48` dist-base 全红、当前全绿；WeakMap 两条在 0.23.1 红、0.23.2 绿。
+- **(b) await 后死循环**：已验证，~200ms 内 `PROGRAM_TIMEOUT`（子进程）。
+- **本轮合入**：库 0.23.2（`7b06b93`）；主仓 `f6749e0a2`、`dc3096154`。
+- **仍未 DONE**：能力面 / generator / Plan 接线、教程/描述/schema 同源依赖 CUT-08 收尾；不把本卡标 DONE。
+
+
 ## 状态（2026-10-21，eng-cut20b-goose）
 
 认领了子范围①「沙箱真实加载与拒绝逃逸」（不依赖 CUT-08 的能力投影），先做了反例调查，没有动 `src/`，
