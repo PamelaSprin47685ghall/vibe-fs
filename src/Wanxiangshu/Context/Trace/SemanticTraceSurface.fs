@@ -427,6 +427,7 @@ module SemanticTraceSurface =
 
         let state = stateOf projection
         let currentParts = XTraceProjection.currentGenerationSemanticParts state
+
         match currentParts |> List.tryFind (fun part -> part.Cursor = afterCursor) with
         | Some part ->
             box
@@ -438,10 +439,7 @@ module SemanticTraceSurface =
                 box
                     {| turn = last.Turn + 1
                        partIndex = 0 |}
-            | None ->
-                box
-                    {| turn = 0
-                       partIndex = 0 |}
+            | None -> box {| turn = 0; partIndex = 0 |}
 
     let originCursor: obj = XTraceCursor.originCursor |> cursorView
 

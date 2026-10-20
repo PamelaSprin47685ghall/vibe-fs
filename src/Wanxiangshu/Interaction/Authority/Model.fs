@@ -553,9 +553,8 @@ module PromptAuthority =
     let systemPromptIdFor (role: Role) : SystemPromptId =
         SystemPromptId.create (Roles.roleLabel role)
 
-        /// AGENT-007: ordinary requests use role permissions.
+    /// AGENT-007: ordinary requests use role permissions.
     let toolCapabilitiesFor (role: Role) (requestKind: ProviderRequestKind) : Set<ToolPermission> =
         match requestKind with
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.InteractionRepair -> OfficeCapability.permissions role
-

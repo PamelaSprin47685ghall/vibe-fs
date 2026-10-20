@@ -264,32 +264,38 @@ module ReviewBackendManager =
         : Task<Result<PreparedAssessment, ReviewFailure>> =
         task {
             let! workOpt = lifecycleWorkOf bound.Directory directorySessionId
+
             return
                 workOpt
-        |> requireSome BindingUnavailable
-        |> Result.bind (fun work ->
-            match work.ActiveId, work.Reviewed with
-            | None, _ -> Error BindingUnavailable
-            | Some _, true -> Error AlreadySubmitted
-            | Some activeId, false ->
-                scope.ActiveProfileFor sessionId
-                |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
                 |> requireSome BindingUnavailable
-                |> Result.map (fun rootAuthorityUserMessageId ->
-                    { Bound = bound
-                      SessionId = sessionId
-                      RootAuthorityUserMessageId = rootAuthorityUserMessageId
-                      IncumbencyId = activeId }))
+                |> Result.bind (fun work ->
+                    match work.ActiveId, work.Reviewed with
+                    | None, _ -> Error BindingUnavailable
+                    | Some _, true -> Error AlreadySubmitted
+                    | Some activeId, false ->
+                        scope.ActiveProfileFor sessionId
+                        |> Option.map (fun profile ->
+                            AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
+                        |> requireSome BindingUnavailable
+                        |> Result.map (fun rootAuthorityUserMessageId ->
+                            { Bound = bound
+                              SessionId = sessionId
+                              RootAuthorityUserMessageId = rootAuthorityUserMessageId
+                              IncumbencyId = activeId }))
         }
 
-    let private prepareAssessment (scope: ToolRuntimeScope) (context: HostToolContext) (bound: BoundReviewInvocation) : Task<Result<PreparedAssessment, ReviewFailure>> =
+    let private prepareAssessment
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (bound: BoundReviewInvocation)
+        : Task<Result<PreparedAssessment, ReviewFailure>> =
         task {
-        let sessionId = SessionId.create context.SessionId
+            let sessionId = SessionId.create context.SessionId
 
-        try
-            return! resolveAssessment scope sessionId context.SessionId bound
-        with _ ->
-            return Error BindingUnavailable
+            try
+                return! resolveAssessment scope sessionId context.SessionId bound
+            with _ ->
+                return Error BindingUnavailable
         }
 
     let private acceptedResult (findings: ReviewFindings) =
@@ -331,8 +337,7 @@ module ReviewBackendManager =
             match! lifecycleWorkOf prepared.Bound.Directory context.SessionId with
             | None -> return Error RecordFailed
             | Some _ ->
-                let! gitCommonDir =
-                    Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot prepared.Bound.Directory
+                let! gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot prepared.Bound.Directory
 
                 let requestId = prepared.IncumbencyId + ":review"
 

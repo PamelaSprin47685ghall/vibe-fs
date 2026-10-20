@@ -57,8 +57,7 @@ module RuntimePath =
 
     let private evictFailedRoot key (task: Task<string>) =
         match roots.TryGetValue key with
-        | true, cached when obj.ReferenceEquals(cached, task) ->
-            roots.Remove key |> ignore
+        | true, cached when obj.ReferenceEquals(cached, task) -> roots.Remove key |> ignore
         | _ -> ()
 
     let private parsePrimaryWorktree (first: string array) =
@@ -118,6 +117,7 @@ module RuntimePath =
                         evictFailedRoot key primaryTask
                         return raise ex
                 }
+
             let target = joinPath primary ".Herdchestra"
             let existing = lstat target (createObj [ "throwIfNoEntry" ==> false ])
 

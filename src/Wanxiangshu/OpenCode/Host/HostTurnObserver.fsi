@@ -20,7 +20,7 @@ module HostTurnObserver =
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
-                journal: AgentJournal option ->
+        journal: AgentJournal option ->
         scope: PluginRuntimeScope ->
 
         context: ReconciledTurnContext ->

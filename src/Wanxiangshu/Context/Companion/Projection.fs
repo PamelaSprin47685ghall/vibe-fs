@@ -6,4 +6,4 @@ open Wanxiangshu.Foundation.Identity
 type CompanionProjection = unit
 
 module CompanionProjection =
-    let empty : CompanionProjection = ()
+    let empty: CompanionProjection = ()

@@ -100,6 +100,7 @@ module CasebookLifecycleSurface =
     let touchAccess (workspaceRoot: string) (sessionId: string) : Task<obj> =
         task {
             let! store = acquireStore workspaceRoot
+
             match! CasebookLifecycle.touchAccess workspaceRoot store sessionId with
             | Ok() -> return box {| ok = true |}
             | Error error -> return CasebookAppendSurface.mutationErrorToJs error

@@ -69,9 +69,7 @@ module ToolResultBound =
     let ContentMaxBytes () = hostMaxBytes - MarkerBytes
 
     let private ceilingOf (value: obj) (floor: int) : int option =
-        if
-            emitJsExpr (value, floor) "typeof $0 === 'number' && Number.isFinite($0) && $0 > $1"
-        then
+        if emitJsExpr (value, floor) "typeof $0 === 'number' && Number.isFinite($0) && $0 > $1" then
             Some(int (unbox<float> value))
         else
             None
@@ -213,14 +211,16 @@ module ToolResultBound =
 
     /// Check whether text fits in the live host tool result window without truncation.
     let fitsInWindow (text: string) : bool =
-        fitsWith (HostMaxLines ()) (HostMaxBytes ()) text
+        fitsWith (HostMaxLines()) (HostMaxBytes()) text
 
     /// Bound a custom tool result against the live Host ceiling. Under the
     /// ceiling → identity. Over → `Marker + tail`, sized so the Host does not
     /// re-truncate.
     let bound (text: string) : string =
-        let maxLines = HostMaxLines ()
-        let maxBytes = HostMaxBytes ()
+        let maxLines = HostMaxLines()
+        let maxBytes = HostMaxBytes()
 
-        if fitsWith maxLines maxBytes text then text
-        else Marker + takeTail (maxLines - MarkerLineCost) (maxBytes - MarkerBytes) text
+        if fitsWith maxLines maxBytes text then
+            text
+        else
+            Marker + takeTail (maxLines - MarkerLineCost) (maxBytes - MarkerBytes) text

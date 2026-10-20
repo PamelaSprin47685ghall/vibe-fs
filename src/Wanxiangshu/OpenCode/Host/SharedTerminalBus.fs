@@ -54,7 +54,9 @@ module SharedTerminalBus =
         | Some key, Some target -> releaseTarget key target
         | _ -> ()
 
-    let tryAcquireForWorkspace (workspace: string option) : System.Threading.Tasks.Task<(string * Events.HostEventPort) option> =
+    let tryAcquireForWorkspace
+        (workspace: string option)
+        : System.Threading.Tasks.Task<(string * Events.HostEventPort) option> =
         task {
             match workspace with
             | None -> return None

@@ -26,13 +26,9 @@ module JsDeliveredValues =
     [<Emit("$0[$1]")>]
     let private getProp (value: obj) (key: string) : obj = jsNative
 
-    type private DeliveredCell =
-        { Value: obj
-          View: obj option }
+    type private DeliveredCell = { Value: obj; View: obj option }
 
-    type ReturnedPiece =
-        { Key: string
-          Text: string }
+    type ReturnedPiece = { Key: string; Text: string }
 
     // DSL-MUTABLE: resource — sessionId → delivered value and view
     let private delivered = Dictionary<string, DeliveredCell>()
@@ -117,9 +113,7 @@ module JsDeliveredValues =
 
     let private parseRemovalEntry (raw: obj) (key: string) : (int * string) option =
         match Int32.TryParse key with
-        | true, anchor when string anchor = key ->
-            entrySummary raw key
-            |> Option.map (fun summary -> anchor, summary)
+        | true, anchor when string anchor = key -> entrySummary raw key |> Option.map (fun summary -> anchor, summary)
         | _ -> None
 
     let private removalsOf (view: obj) : Map<int, string> =
@@ -128,11 +122,13 @@ module JsDeliveredValues =
         if isMissing raw || not (isPlainObject raw) then
             Map.empty
         else
-            objectKeys raw
-            |> Array.choose (parseRemovalEntry raw)
-            |> Map.ofArray
+            objectKeys raw |> Array.choose (parseRemovalEntry raw) |> Map.ofArray
 
-    let private eligiblePiece (prefixUntil: int) (already: Set<string>) (anchor: int, summary: string) : ReturnedPiece option =
+    let private eligiblePiece
+        (prefixUntil: int)
+        (already: Set<string>)
+        (anchor: int, summary: string)
+        : ReturnedPiece option =
         let key = anchorKey anchor
 
         if anchor < prefixUntil || Set.contains key already then
@@ -150,11 +146,13 @@ module JsDeliveredValues =
             |> Option.bind (fun declaration ->
                 numberOf (getProp declaration "prefixUntil")
                 |> Option.map (fun prefixUntil ->
-                    let named = if Map.isEmpty removals then removalsOf declaration else removals
+                    let named =
+                        if Map.isEmpty removals then
+                            removalsOf declaration
+                        else
+                            removals
 
-                    named
-                    |> Map.toList
-                    |> List.choose (eligiblePiece prefixUntil already)))
+                    named |> Map.toList |> List.choose (eligiblePiece prefixUntil already)))
 
         pieces |> Option.defaultValue []
 
@@ -187,7 +185,12 @@ module JsDeliveredValues =
             |> renderNonBlank
 
     let private proseKey (sessionId: string) (text: string) =
-        "prose:" + sessionId + ":" + string text.Length + ":" + text.Substring(0, min 24 text.Length)
+        "prose:"
+        + sessionId
+        + ":"
+        + string text.Length
+        + ":"
+        + text.Substring(0, min 24 text.Length)
 
     /// The last assistant prose is handed back only when this deliver carried a
     /// view. The cursor key is the session plus the prose itself, not a guess

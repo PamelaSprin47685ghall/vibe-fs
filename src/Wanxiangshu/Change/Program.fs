@@ -543,26 +543,28 @@ module OrchestratorProgram =
                    TargetHeadSnapshot: CommitHash |})
             : Task<Result<PublicationEvidence, OrchestratorVerdict>> =
             task {
-            if candidate <> rebasedReady.RebasedCommit then
-                return Error(
-                    failed
-                        job
-                        (sprintf
-                            "Candidate %s does not match rebased evidence pin %s"
-                            (CommitHash.value candidate)
-                            (CommitHash.value rebasedReady.RebasedCommit))
-                )
-            elif expectedHead <> rebasedReady.TargetHeadSnapshot then
-                return Error(
-                    failed
-                        job
-                        (sprintf
-                            "Target head %s does not match rebased evidence snapshot %s"
-                            (CommitHash.value expectedHead)
-                            (CommitHash.value rebasedReady.TargetHeadSnapshot))
-                )
-            else
-                return! buildPublicationEvidence deps job rebasedReady
+                if candidate <> rebasedReady.RebasedCommit then
+                    return
+                        Error(
+                            failed
+                                job
+                                (sprintf
+                                    "Candidate %s does not match rebased evidence pin %s"
+                                    (CommitHash.value candidate)
+                                    (CommitHash.value rebasedReady.RebasedCommit))
+                        )
+                elif expectedHead <> rebasedReady.TargetHeadSnapshot then
+                    return
+                        Error(
+                            failed
+                                job
+                                (sprintf
+                                    "Target head %s does not match rebased evidence snapshot %s"
+                                    (CommitHash.value expectedHead)
+                                    (CommitHash.value rebasedReady.TargetHeadSnapshot))
+                        )
+                else
+                    return! buildPublicationEvidence deps job rebasedReady
             }
 
         let continueCertifiedWithRebased

@@ -141,12 +141,7 @@ module ManagedChatProviderLifecycle =
         (requestKind: ProviderRequestKind)
         =
         ManagedChatExecutionFlight'.run (AgentJournal.runtimeId journal) key (fun () ->
-            ManagedChatProviderLifecycle.startWith
-                (forJournal journal)
-                key
-                acceptedEvidence
-                providerRun
-                requestKind)
+            ManagedChatProviderLifecycle.startWith (forJournal journal) key acceptedEvidence providerRun requestKind)
 
     let terminal
         (journal: AgentJournal)

@@ -104,7 +104,7 @@ module PluginHooks =
                         PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections))
                 |> Option.map (fun profile -> profile.CanonicalRole)
 
-            
+
 
             // work-031: resolve the stage-method semantic path for the
             // session's active plan incumbency. Non-plan sessions, missing
@@ -122,14 +122,16 @@ module PluginHooks =
                     match roleFor sessionId, workspaceDirectory with
                     | Some Role.Plan, Some workspace ->
                         let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+
                         return
-                            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId)
+                            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected
+                                commonDir
+                                (SessionId.value sessionId)
                             |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
                     | _ -> return None
                 }
 
-            let systemTransform =
-                                ProviderSystemTransform.createWith roleFor planStageFor
+            let systemTransform = ProviderSystemTransform.createWith roleFor planStageFor
 
 
             // CASE-003: typed capture at the tool boundary — shared
@@ -233,7 +235,8 @@ module PluginHooks =
                     let deliveredView =
                         Some(fun sessionId ->
                             Task.FromResult(
-                                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered sessionId))
+                                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered sessionId
+                            ))
 
                     let childViewForRun = fun _ _ -> Task.FromResult None
 
@@ -310,7 +313,7 @@ module PluginHooks =
                 | None -> Task.FromResult ToolRuntimeScope.emptyManagerFacts
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
-                                ManagerReviewContract.decorateDefinition toolInput toolOutput
+                ManagerReviewContract.decorateDefinition toolInput toolOutput
 
 
             let reviewToolPermitted toolName (facts: ManagerCapabilityFacts) =
@@ -622,11 +625,7 @@ module PluginHooks =
             let hiddenArgumentState owner toolName (toolOutput: obj) =
                 let isReview = ManagerReviewTools.isReviewTool toolName
 
-                if
-                    not isReview
-                    || isNull toolOutput
-                    || isNull toolOutput?args
-                then
+                if not isReview || isNull toolOutput || isNull toolOutput?args then
                     HiddenProtocolArguments.NotHidden
                 else
                     hiddenReviewState owner isReview toolOutput?args
@@ -686,11 +685,7 @@ module PluginHooks =
 
                     do! checkManagerReviewPermissions toolName toolInput
 
-                    do!
-                        beforeStagePrepareProtocolArguments
-                            toolName
-                            toolInput
-                            toolOutput
+                    do! beforeStagePrepareProtocolArguments toolName toolInput toolOutput
                 }
 
             let restoreArgumentsForTarget owner (target: obj) =
@@ -742,9 +737,7 @@ module PluginHooks =
                 let toolOutput = config?tool_output
 
                 if not (isNull toolOutput) then
-                    Wanxiangshu.Host.Contract.ToolResultBound.setHostLimits
-                        toolOutput?max_lines
-                        toolOutput?max_bytes
+                    Wanxiangshu.Host.Contract.ToolResultBound.setHostLimits toolOutput?max_lines toolOutput?max_bytes
 
             let configurePluginHost (config: obj) =
                 if not (isNull config) then

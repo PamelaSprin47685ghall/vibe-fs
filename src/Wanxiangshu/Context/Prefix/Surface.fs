@@ -73,14 +73,13 @@ module PrefixSurface =
         match text value |> fun item -> item.ToLowerInvariant() with
         | "workmain"
         | "work-main" -> Some ProviderRequestKind.WorkMain
-                | "interactionrepair"
+        | "interactionrepair"
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | _ -> None
 
 
     let requestKindLabels: string array =
-        [| ProviderRequestKind.WorkMain
-           ProviderRequestKind.InteractionRepair |]
+        [| ProviderRequestKind.WorkMain; ProviderRequestKind.InteractionRepair |]
         |> Array.map ProviderRequestKind.label
 
     let requestKindLabel (kind: string) : string =

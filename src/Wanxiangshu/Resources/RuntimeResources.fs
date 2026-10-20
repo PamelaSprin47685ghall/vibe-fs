@@ -5,14 +5,16 @@ open Wanxiangshu.Participant.Provider
 
 /// Bundle of package runtime data loaded once at plugin init.
 type RuntimeResources =
-    { Prompts: PromptCatalog
-      /// Phase 2: bilingual provider tree roots present (`resources/provider/{en,zh-CN}`).
-      ProviderLanguageRootsReady: bool
-      /// Per-language catalogs. The installed `Prompts` view stays the English
-      /// seed the system transform repairs; Host-config projection reads the
-      /// bound language from these.
-      EnglishPrompts: PromptCatalog
-      SimplifiedChinesePrompts: PromptCatalog }
+    {
+        Prompts: PromptCatalog
+        /// Phase 2: bilingual provider tree roots present (`resources/provider/{en,zh-CN}`).
+        ProviderLanguageRootsReady: bool
+        /// Per-language catalogs. The installed `Prompts` view stays the English
+        /// seed the system transform repairs; Host-config projection reads the
+        /// bound language from these.
+        EnglishPrompts: PromptCatalog
+        SimplifiedChinesePrompts: PromptCatalog
+    }
 
 module RuntimeResources =
 

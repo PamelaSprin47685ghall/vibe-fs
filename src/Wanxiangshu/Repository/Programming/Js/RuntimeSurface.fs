@@ -112,7 +112,6 @@ module JsRuntimeSurface =
     let clearDelegationHosts () : unit = JsDelegationBridge.clearAll ()
 
     /// Test hook: the raw value a program handed over through `js.deliver`.
-    
     /// Test hook: record a value with an already-shaped deliver view.
     let recordDeliveredView (sessionId: string) (value: obj) (view: obj) : unit =
         JsDeliveredValues.recordView sessionId value (if isNull view then None else Some view)
@@ -121,7 +120,8 @@ module JsRuntimeSurface =
     let deliveredReturned (sessionId: string) : string array =
         JsDeliveredValues.alreadyReturned sessionId |> Set.toArray
 
-    let clearDeliveredReturned (sessionId: string) : unit = JsDeliveredValues.clearReturned sessionId
+    let clearDeliveredReturned (sessionId: string) : unit =
+        JsDeliveredValues.clearReturned sessionId
 
     /// Test hook: consume the handoff the completion path reads.
     let takeDeliveredHandoffWith (sessionId: string) (assistantProse: string option) : obj =

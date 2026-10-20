@@ -599,8 +599,7 @@ module XTraceProjection =
             searchable
             |> List.tryFind (fun part -> XTraceCursor.sequence part.Cursor > sequence)
         with
-        | Some part ->
-            part.Cursor
+        | Some part -> part.Cursor
         | None -> cursorAfterSearch searchable
 
     let semanticCursorAfter (cursor: XTraceCursor) (state: XTraceProjectionState) : XTraceCursor =

@@ -235,12 +235,7 @@ module SessionRecoveryHostSurface =
             do! seedAccepted handle sessionId physicalUserMessageId
 
             match!
-                ManagedChatProviderLifecycle.providerStarted
-                    journal
-                    key
-                    evidence
-                    run
-                    ProviderRequestKind.WorkMain
+                ManagedChatProviderLifecycle.providerStarted journal key evidence run ProviderRequestKind.WorkMain
             with
             | Ok _ -> ()
             | Error error -> return invalidOp $"recovery proof provider-started seeding failed: {error}"

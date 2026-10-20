@@ -74,7 +74,11 @@ module PluginBoot =
                     match workspaceDirectory with
                     | Some workspace ->
                         let! commonDir = RuntimePath.stateRoot workspace
-                        return WorkspaceEventStore.tryCurrent commonDir |> Option.map Wanxiangshu.Repository.Programming.Js.JsToolsTransactionStore.createLifecyclePersistence
+
+                        return
+                            WorkspaceEventStore.tryCurrent commonDir
+                            |> Option.map
+                                Wanxiangshu.Repository.Programming.Js.JsToolsTransactionStore.createLifecyclePersistence
                     | None -> return None
                 }
 

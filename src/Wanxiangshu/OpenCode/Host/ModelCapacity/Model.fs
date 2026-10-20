@@ -10,8 +10,7 @@ type ModelRoutingTarget = { Model: string; Reasoning: string }
 /// request type / authorization binding, never from tool arguments, user text,
 /// model self-description or a role name.
 [<RequireQualifiedAccess>]
-type ModelExecutionPurpose =
-    | Normal
+type ModelExecutionPurpose = | Normal
 
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal CapacityCreditId = private CapacityCreditId of int64

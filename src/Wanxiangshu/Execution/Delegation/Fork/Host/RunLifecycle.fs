@@ -240,6 +240,7 @@ module HostForkRunLifecycle =
         =
         task {
             let! observed = childViewForRun run.ChildId result.ProviderRun
+
             let prose =
                 if System.String.IsNullOrWhiteSpace result.TerminalText then
                     None
@@ -248,6 +249,7 @@ module HostForkRunLifecycle =
 
             let delivered =
                 JsDeliveredValues.tryTakeRenderedWith (SessionId.value run.ChildId) prose
+
             return chooseView delivered observed
         }
 
@@ -668,9 +670,7 @@ module HostForkRunLifecycle =
                             try
                                 return! viewForOutcome childViewForRun run outcome
                             with error ->
-                                logError
-                                    "FORK-VIEW"
-                                    (sprintf "run %s view read faulted: %s" run.AgentId error.Message)
+                                logError "FORK-VIEW" (sprintf "run %s view read faulted: %s" run.AgentId error.Message)
 
                                 return None
                         }

@@ -78,4 +78,3 @@ module InteractionAttempt =
           SystemPromptId = PromptAuthority.systemPromptIdFor authority.CanonicalRole
           ToolCapabilitySet = PromptAuthority.toolCapabilitiesFor authority.CanonicalRole requestKind
           RequestKind = requestKind }
-

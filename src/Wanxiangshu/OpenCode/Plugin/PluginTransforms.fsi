@@ -14,24 +14,21 @@ module PluginTransforms =
           Receipt: XTraceCaptureReceipt option }
 
     type NormalTransformCapabilities =
-        {
-            BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
-            BindSessionStartedAt: string option -> Task<DateTimeOffset option>
-            ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
-            ApplyTenureIsolation: string option -> obj -> Task<unit>
-            CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
-            RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
-            ApplyCompanion: string option -> obj -> obj -> Task<unit>
-            ApplyXWire: obj -> Task
-            FreezeProviderAttemptPlan:
-                string option -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option -> Task<unit>
-            InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
-            SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
-            SanitizeMessages: obj -> unit
-        }
+        { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
+          BindSessionStartedAt: string option -> Task<DateTimeOffset option>
+          ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
+          ApplyTenureIsolation: string option -> obj -> Task<unit>
+          CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
+          RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
+          ApplyCompanion: string option -> obj -> obj -> Task<unit>
+          ApplyXWire: obj -> Task
+          FreezeProviderAttemptPlan:
+              string option -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option -> Task<unit>
+          InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
+          SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
+          SanitizeMessages: obj -> unit }
 
-    type TransformBranchCapabilities =
-        { RegisterOwned: string -> unit }
+    type TransformBranchCapabilities = { RegisterOwned: string -> unit }
 
     val defaultCapabilities: boot: PluginBoot.Boot -> host: PluginHostWiring.Host -> NormalTransformCapabilities
 

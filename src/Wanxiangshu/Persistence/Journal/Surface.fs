@@ -160,8 +160,7 @@ module JournalSurface =
     // owner-provided accessors (Relay.Fold.view/roads, SessionStartedAtProjection
     // .startedAt); no private representation is destructured outside its owner.
 
-    let private companionSliceToJs (state: CompanionProjection) : obj =
-        box {| sessionPresent = true |}
+    let private companionSliceToJs (state: CompanionProjection) : obj = box {| sessionPresent = true |}
 
     let private xTraceSliceToJs (state: XTraceProjectionState) : obj =
         box
@@ -170,8 +169,7 @@ module JournalSurface =
                latestTerminalPresent = XTraceProjection.latestTerminalEvidence state |> Option.isSome |}
 
     let private prefixEpochSliceToJs (epoch: ActivePrefixEpoch) : obj =
-        box
-            {| epochId = PrefixEpochId.value epoch.EpochId |}
+        box {| epochId = PrefixEpochId.value epoch.EpochId |}
 
     let private handleIdText (handleId: HandleId) =
         match handleId with

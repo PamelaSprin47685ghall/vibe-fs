@@ -453,7 +453,11 @@ module PluginHostInterop =
         task {
             let! commonDirOpt =
                 match workspaceDirectory with
-                | Some ws -> task { let! dir = RuntimePath.stateRoot ws in return Some dir }
+                | Some ws ->
+                    task {
+                        let! dir = RuntimePath.stateRoot ws
+                        return Some dir
+                    }
                 | None -> Task.FromResult None
 
             let jsTransactionPersistence =

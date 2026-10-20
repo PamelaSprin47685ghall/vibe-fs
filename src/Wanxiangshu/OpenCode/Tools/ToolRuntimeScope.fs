@@ -138,8 +138,7 @@ type ToolRuntimeScope
     // Workspace-snapshot capture is an injected capability: Relay certificate
     // binding owns the capture vocabulary, the composition root supplies it.
 
-    let childViewForRun =
-        defaultArg childViewForRun (fun _ _ -> Task.FromResult None)
+    let childViewForRun = defaultArg childViewForRun (fun _ _ -> Task.FromResult None)
 
     /// change-integration-005/013: the head cursor this process observed for one
     /// session, read from the same journal projection the Manager deliver used for
@@ -628,13 +627,17 @@ type ToolRuntimeScope
     let inspectWorkspaceWork workspace sessionId =
         task {
             let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+
             if String.IsNullOrWhiteSpace commonDir then
                 return None
             else
                 return Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
         }
 
-    let lifecycleWorkOfDirectory (directory: string option) (sessionId: string) : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+    let lifecycleWorkOfDirectory
+        (directory: string option)
+        (sessionId: string)
+        : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
         match directory with
         | None -> Task.FromResult None
         | Some workspace -> inspectWorkspaceWork workspace sessionId
@@ -1179,7 +1182,9 @@ type ToolRuntimeScope
     member self.ManagerCapabilityFactsFor(sessionId: string) : Task<ManagerCapabilityFacts> =
         managerFactsOfSession self.WorkspaceDirectory sessionId
 
-    member self.LifecycleWorkFor(sessionId: string) : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+    member self.LifecycleWorkFor
+        (sessionId: string)
+        : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
         lifecycleWorkOfDirectory self.WorkspaceDirectory sessionId
 
     member private _.OpenAndDrainTenureScope (sessionId: string) (incumbentId: string) (gen: int) =
@@ -1256,8 +1261,9 @@ type ToolRuntimeScope
                     | (true, (frozen, gen)), _ ->
                         let tenureScope = sprintf "tenure:%s:%s:%d" sessionId frozen gen
 
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipScopePhaseInMemory scopeOwnership tenureScope = Some
-                            "Draining")
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipScopePhaseInMemory
+                            scopeOwnership
+                            tenureScope = Some "Draining")
         }
 
     member _.RetirementBlockersFor(sessionId: string) =
@@ -1373,6 +1379,7 @@ type ToolRuntimeScope
                 let commonDir =
                     workspaceDirectory
                     |> Option.bind (fun ws -> Wanxiangshu.Persistence.Journal.RuntimePath.forStateRoot ws |> Some)
+
                 commonDir
                 |> Option.map (fun commonDir ->
                     Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipBlockersDurable
@@ -1484,8 +1491,7 @@ type ToolRuntimeScope
                       SendGateContinuation = HostSessionNudge.trySendGateContinuationPhysical sessions rootWorkspace
                       ContinueManagerLoop = continueManagerLoop
                       RepoPath = defaultArg workspaceDirectory "."
-                      TargetBranch = ""
-                    }
+                      TargetBranch = "" }
 
                 let host = OrchestratorHost(deps, SessionId.create sessionId)
                 orchestratorHosts.[sessionId] <- host

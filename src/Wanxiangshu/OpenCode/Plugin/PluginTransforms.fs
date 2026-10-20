@@ -127,8 +127,8 @@ module PluginTransforms =
           SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
           SanitizeMessages: obj -> unit }
 
-    type TransformBranchCapabilities =
-        { RegisterOwned: string -> unit }
+    type TransformBranchCapabilities = { RegisterOwned: string -> unit }
+
     let private languageFor (_projectionSessionIdOpt: string option) : ProviderLanguage =
         GlobalProviderLanguage.current ()
 
@@ -440,7 +440,9 @@ module PluginTransforms =
             | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Manager -> Some sid
             | _ -> None
 
-        let tryReadLifecycleWork (sid: string) : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+        let tryReadLifecycleWork
+            (sid: string)
+            : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
             task {
                 match workspaceDirectory with
                 | Some workspace ->
@@ -649,6 +651,7 @@ module PluginTransforms =
                         |> ProviderWireCapture.lastUserMessageId
 
                     let acceptedRequest = acceptedSuccessorRequestFor sessionId physicalUserMessageId
+
                     let! lifecycle =
                         match sessionId with
                         | Some sid -> tryReadLifecycleWork sid
@@ -763,8 +766,7 @@ module PluginTransforms =
                 if found then
                     traceState |> Option.iter companion.RefreshXTrace
           ApplyCompanion =
-            let apply _ _ _ =
-                Task.FromResult ()
+            let apply _ _ _ = Task.FromResult()
 
             apply
           ApplyXWire =
@@ -817,8 +819,7 @@ module PluginTransforms =
                         let replaced = SyncDelegateBatching.applyReplacedResults currentMessages
                         HostMessageProjection.replaceMessagesInPlace outObj replaced
                 }
-          SanitizeMessages =
-            fun outObj -> HostMessageProjection.sanitizeOutputMessages outObj }
+          SanitizeMessages = fun outObj -> HostMessageProjection.sanitizeOutputMessages outObj }
 
     let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
         let scope = boot.Scope
@@ -826,8 +827,7 @@ module PluginTransforms =
         let snapshotOpt = host.SnapshotOpt
         let wired = host.Wired
 
-        { RegisterOwned = wired.RegisterOwned
-        }
+        { RegisterOwned = wired.RegisterOwned }
 
     /// 普通分支请求的静态管道上下文：预读的物理消息 id 与各 stage 产出的
     /// 会话起点、重放计划、已捕获 XTrace、horizon 只经这份 frame 传递。

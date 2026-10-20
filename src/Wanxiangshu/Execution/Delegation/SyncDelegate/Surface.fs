@@ -2015,10 +2015,7 @@ module SyncDelegateSurface =
 
                 return
                     match result with
-                    | Ok(SyncDelegateInvocationResult.View record) ->
-                        box
-                            {| kind = "View"
-                               value = record |}
+                    | Ok(SyncDelegateInvocationResult.View record) -> box {| kind = "View"; value = record |}
                     | Ok(SyncDelegateInvocationResult.MergedInto canonical) ->
                         box
                             {| kind = "MergedInto"

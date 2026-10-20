@@ -145,7 +145,7 @@ module HorizonTool =
         | None -> Task.FromResult("none", "")
         | Some text -> Task.FromResult("latest", text)
 
-        /// The terminal name a pty is known by, when the runtime snapshot carries
+    /// The terminal name a pty is known by, when the runtime snapshot carries
     /// one. The prose line names a generic terminal when it does not; the data
     /// envelope stays empty rather than inventing a name.
     let private tryTerminalLabel (record: PtyRecord) =
@@ -169,7 +169,11 @@ module HorizonTool =
     /// delegator's estimate and the participant's own start are known: turns
     /// spent and left, and the wall-clock spent beside the time that remains at
     /// the pace this participant has shown. Absent (never guessed) otherwise.
-    let private calibrationNumbers (now: DateTimeOffset) (journal: AgentJournal) (handle: HandleRecord) : (int * int * float * float) option =
+    let private calibrationNumbers
+        (now: DateTimeOffset)
+        (journal: AgentJournal)
+        (handle: HandleRecord)
+        : (int * int * float * float) option =
         let estimateState =
             AgentJournalPortAdapter.forDelegatedToolEstimate journal
             |> fun port -> DelegatedToolEstimateLedger.tryState port handle.ChildSessionId
@@ -185,7 +189,12 @@ module HorizonTool =
             Some(turnsUsed, turnsLeft, timeUsedMs, timeUsedMs * float turnsLeft / float (max 1 turnsUsed))
         | _ -> None
 
-    let private calibrationLine language (now: DateTimeOffset) (journal: AgentJournal) (handle: HandleRecord) : string option =
+    let private calibrationLine
+        language
+        (now: DateTimeOffset)
+        (journal: AgentJournal)
+        (handle: HandleRecord)
+        : string option =
         calibrationNumbers now journal handle
         |> Option.map (fun (turnsUsed, turnsLeft, timeUsedMs, _) ->
             HorizonCalibration.render
@@ -240,6 +249,7 @@ module HorizonTool =
         handles
         =
         let now = runtime.Now()
+
         task {
             for agentId, handle in rosterEntries runtime handles do
                 do! appendHandleLines language journal snapshot now runtimeByAgentId agentLines agentId handle
@@ -353,6 +363,7 @@ module HorizonTool =
 
             let runtimeByAgentId =
                 agents |> List.map (fun record -> record.AgentId, record) |> Map.ofList
+
             let now = runtime.Now()
 
             // DSL-MUTABLE: algorithm-scratch — agent row accumulator

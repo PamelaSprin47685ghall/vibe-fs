@@ -199,7 +199,10 @@ module DeliverTool =
     let private enterDeliver (context: HostToolContext) (bound: BoundRetirement) : Task<Result<DeliverEntry, string>> =
         task {
             let fenceReplay (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
-                recordedFenceReplay work (ProviderRunIdentity.value bound.ProviderRun) (ToolCallId.value bound.ToolCallId)
+                recordedFenceReplay
+                    work
+                    (ProviderRunIdentity.value bound.ProviderRun)
+                    (ToolCallId.value bound.ToolCallId)
                 |> Option.map (Result.map Replayed)
 
             let activeEntry (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
@@ -257,14 +260,19 @@ module DeliverTool =
                     | None -> return false
                     | Some directory ->
                         let! workOpt = lifecycleWorkOf directory context.SessionId
-                        return workOpt |> Option.bind (fun work -> work.Confirmation) |> Option.exists (fun fence -> fence.ProviderRunId = providerRunId && fence.ToolCallId = toolCallId)
+
+                        return
+                            workOpt
+                            |> Option.bind (fun work -> work.Confirmation)
+                            |> Option.exists (fun fence ->
+                                fence.ProviderRunId = providerRunId && fence.ToolCallId = toolCallId)
                 }
 
-        if confirmedReplay then
-            scope.UnfreezeRetirement context.SessionId
-            return Ok(confirmationResult prepared pending)
-        else
-            return! confirmFirst ()
+            if confirmedReplay then
+                scope.UnfreezeRetirement context.SessionId
+                return Ok(confirmationResult prepared pending)
+            else
+                return! confirmFirst ()
         }
 
     let private enqueueRelayedSuccessor (scope: ToolRuntimeScope) (prepared: PreparedRetirement) (kind: string) =
@@ -405,10 +413,15 @@ module DeliverTool =
         let confirmFirst () =
             task {
                 let directory = scope.WorkspaceDirectory
+
                 let! commonDir =
                     match directory with
                     | None -> Task.FromResult None
-                    | Some d -> task { let! cr = RuntimePath.stateRoot d in return Some cr }
+                    | Some d ->
+                        task {
+                            let! cr = RuntimePath.stateRoot d
+                            return Some cr
+                        }
 
                 match commonDir with
                 | None -> return Error "lifecycle journal directory is unavailable"
@@ -457,14 +470,15 @@ module DeliverTool =
         (target: PreparedRetirement)
         : Task<Result<PreparedRetirement, string>> =
         task {
-        try
-            let! workOpt = lifecycleWorkOf target.Bound.Directory (SessionId.value target.SessionId)
-            return
-                workOpt
-            |> Option.map (refreshedTarget target)
-            |> Option.defaultValue (Error(text Path.BindingUnavailable))
-        with _ ->
-            return Error(text Path.FinishFailed)
+            try
+                let! workOpt = lifecycleWorkOf target.Bound.Directory (SessionId.value target.SessionId)
+
+                return
+                    workOpt
+                    |> Option.map (refreshedTarget target)
+                    |> Option.defaultValue (Error(text Path.BindingUnavailable))
+            with _ ->
+                return Error(text Path.FinishFailed)
         }
 
     let private refreshedOrRaise
@@ -482,7 +496,13 @@ module DeliverTool =
         task {
             try
                 scope.TryFreezeRetirement(context.SessionId, target.Incumbent) |> ignore
-                let! refreshed = task { let! r = refreshAfterFreeze context target in return refreshedOrRaise scope context r }
+
+                let! refreshed =
+                    task {
+                        let! r = refreshAfterFreeze context target
+                        return refreshedOrRaise scope context r
+                    }
+
                 let! outcome = runFrozen scope context refreshed
                 return finishOutcome scope context outcome
             with ex ->
@@ -493,15 +513,16 @@ module DeliverTool =
     let private execute (scope: ToolRuntimeScope) (_: HostToolArguments) (context: HostToolContext) =
         task {
             let boundRes = bindInvocation scope context
+
             let! entered =
                 match boundRes with
                 | Error err -> Task.FromResult(Error err)
                 | Ok bound -> enterDeliver context bound
 
-        match entered with
-        | Ok(Replayed result) -> return result
-        | Ok(Prepared target) -> return! executePrepared scope context target
-        | Error error -> return raise (InvalidOperationException error)
+            match entered with
+            | Ok(Replayed result) -> return result
+            | Ok(Prepared target) -> return! executePrepared scope context target
+            | Error error -> return raise (InvalidOperationException error)
         }
 
     let description () = text Path.Description

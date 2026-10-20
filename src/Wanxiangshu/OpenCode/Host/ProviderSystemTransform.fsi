@@ -13,7 +13,7 @@ module ProviderSystemTransform =
     /// ("planning/s1" | "planning/s2" | "planning/s3") for Plan sessions and
     /// None otherwise (work-031 stage guidance).
     val createWith:
-                role: (SessionId -> Role option) ->
+        role: (SessionId -> Role option) ->
         planStage: (SessionId -> Task<string option>) ->
 
             (obj -> obj -> Task<unit>)

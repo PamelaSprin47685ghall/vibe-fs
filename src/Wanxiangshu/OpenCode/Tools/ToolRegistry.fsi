@@ -73,7 +73,7 @@ module ToolRegistry =
         endToolExecution: (string -> unit) ->
         eventPort: IEventObservationPort option ->
         syncDelegateRuntime: SyncDelegateRuntime option ->
-        
+
         casebookToolSpecs: ToolSpec list ->
         jsTransactionPersistence: IJsTransactionPersistence option ->
         jsLifecyclePersistence: IJsLifecyclePersistence option ->

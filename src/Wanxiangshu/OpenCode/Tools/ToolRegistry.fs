@@ -166,7 +166,7 @@ module ToolRegistry =
                 None
         )
 
-    
+
 
     /// capability-enforcement-025: current Manager facts close the office gate.
     /// A frozen retirement keeps Join, Finality and the explicit human Ask; the final incumbent
@@ -184,6 +184,7 @@ module ToolRegistry =
         : Task<string> =
         task {
             let! replayed = gate.RecordedDeliverReplay ctx
+
             if replayed then
                 return! spec.Execute args ctx
             else
@@ -298,7 +299,7 @@ module ToolRegistry =
         (args: HostToolArguments)
         (ctx: HostToolContext)
         : Task<string> =
-                admissionStage gate spec managerPermission args ctx
+        admissionStage gate spec managerPermission args ctx
 
 
     let private runBoundaryStages
@@ -354,7 +355,7 @@ module ToolRegistry =
     let private tryAdmissionFor (specName: string) : ToolAdmission option =
         match staticAdmissions () |> List.tryFind (fun (name, _) -> name = specName) with
         | Some(_, admission) -> Some admission
-        
+
         | None when specName.StartsWith "todowrite-for-" && specName <> "todowrite-for-bookkeeper" ->
             Some(JsToolSpec.admissionFor (specName.Substring 14))
         | None -> None
@@ -370,15 +371,11 @@ module ToolRegistry =
     /// capability-enforcement-006: the authority the execute gate resolves for a tool, so a
     /// consumer can tell an office tool from an internal leaf without guessing
     /// from the tool name.
-    let tryAdmission (specName: string) : ToolAdmission option =
-        tryAdmissionFor specName
+    let tryAdmission (specName: string) : ToolAdmission option = tryAdmissionFor specName
 
     /// capability-enforcement-006: the internal-leaf decision for a session that holds no public
     /// office profile at all. An office tool is never admitted this way.
-    let privateAttachmentAdmits
-        (specName: string)
-        (sessionId: string)
-        : bool =
+    let privateAttachmentAdmits (specName: string) (sessionId: string) : bool =
         match tryAdmissionFor specName with
         | Some(ToolAdmission.PrivateAttachment predicate) -> predicate (probeContext sessionId)
         | Some(ToolAdmission.OfficeRole _)
@@ -779,7 +776,7 @@ module ToolRegistry =
         (beginToolExecution: string -> unit)
         (endToolExecution: string -> unit)
         (eventPort: IEventObservationPort option)
-                (syncDelegateRuntime: SyncDelegateRuntime option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (casebookToolSpecs: ToolSpec list)
 
         (jsTransactionPersistence: IJsTransactionPersistence option)
@@ -949,21 +946,25 @@ module ToolRegistry =
             [ for role in Roles.all do
                   yield! generatedJsSpecFor role |> Option.toList ]
 
-        
+
 
         // Lifecycle uses its own wanxiangli journal. The common directory is
         // data passed to that owner, not a borrowed workspace EventStore.
         let resolvePlanGitCommonDir () : Task<string option> =
             task {
                 match workspaceDirectory with
-                | Some ws -> let! root = RuntimePath.stateRoot ws in return Some root
+                | Some ws ->
+                    let! root = RuntimePath.stateRoot ws
+                    return Some root
                 | None -> return None
             }
 
         let resolvePlanRoot () : Task<string option> =
             task {
                 match workspaceDirectory with
-                | Some ws -> let! root = RuntimePath.stateRoot ws in return Some(root + "/wanxiangshu")
+                | Some ws ->
+                    let! root = RuntimePath.stateRoot ws
+                    return Some(root + "/wanxiangshu")
                 | None -> return None
             }
 
@@ -1158,7 +1159,10 @@ module ToolRegistry =
             : Task<string> =
             askWithLifecycle syncRuntime args ctx
 
-        let lifecycleWorkOf (runtime: ToolRuntimeScope) (sessionId: string) : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+        let lifecycleWorkOf
+            (runtime: ToolRuntimeScope)
+            (sessionId: string)
+            : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
             runtime.LifecycleWorkFor sessionId
 
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : Task<string option> =
@@ -1525,11 +1529,11 @@ module ToolRegistry =
                   Arguments = [ "note", ToolHostCodec.optionalStringSchema factory ]
                   Admission = planningAdmission
                   Execute =
-                      fun _ ctx ->
-                          task {
-                              let! root = resolvePlanRoot ()
-                              return! executeDeliverTool root runtime ctx
-                          } }
+                    fun _ ctx ->
+                        task {
+                            let! root = resolvePlanRoot ()
+                            return! executeDeliverTool root runtime ctx
+                        } }
 
             let sequenceOf (ctx: HostToolContext) : Task<string list option> =
                 task {

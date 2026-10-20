@@ -1301,7 +1301,7 @@ module PairProgrammingThoughtTransform =
         (restartGuidance: string option)
         : Task<LlmFacing.Document> =
         task {
-            let guidance : string option = None
+            let guidance: string option = None
 
             // Algorithm G2: every round that carries a PairHint also lists the
             // unresolved parked handles, so the AI is pressed to take a

@@ -21,24 +21,28 @@ module CasebookTools =
         (owner: CasebookSettlementOwner)
         : Task<ToolSpec list> =
         task {
-        try
-            let! commonDir = RuntimePath.stateRoot workspaceRoot
-            let store = WorkspaceEventStore.acquire commonDir
+            try
+                let! commonDir = RuntimePath.stateRoot workspaceRoot
+                let store = WorkspaceEventStore.acquire commonDir
 
-            return
-                [ FetchTool.spec factory workspaceRoot store owner
-                  JsBookkeeperTool.spec factory ]
-        with _ ->
-            return []
+                return
+                    [ FetchTool.spec factory workspaceRoot store owner
+                      JsBookkeeperTool.spec factory ]
+            with _ ->
+                return []
         }
 
-    let buildSpecs (factory: HostToolFactory) (workspaceRoot: string) (owner: CasebookSettlementOwner) : Task<ToolSpec list> =
+    let buildSpecs
+        (factory: HostToolFactory)
+        (workspaceRoot: string)
+        (owner: CasebookSettlementOwner)
+        : Task<ToolSpec list> =
         task {
-        if isNull (box owner) then
-            nullArg "owner"
+            if isNull (box owner) then
+                nullArg "owner"
 
-        if not (CasebookFeature.isEnabled workspaceRoot) then
-            return []
-        else
-            return! tryBuildSpecs factory workspaceRoot owner
+            if not (CasebookFeature.isEnabled workspaceRoot) then
+                return []
+            else
+                return! tryBuildSpecs factory workspaceRoot owner
         }
