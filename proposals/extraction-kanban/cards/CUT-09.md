@@ -63,7 +63,7 @@
 
 | 余项 | 为什么不在本卡 | 去向 |
 |---|---|---|
-| `OpenCode/Host/ChatAdmission/Intent.fs` 的入口准入决策（显式 participant 授予 HumanRoot、`UnknownOriginWhileActive`、claim 来源可准入性、缺物理 id 的拒绝） | 它是 D-01 指定的入口边界，状态机和宿主 Decision/Rejection 类型深度耦合；纯裁决可以抽，但需要单独的契约和差分 | **CUT-09-a**（新登记） |
+| `OpenCode/Host/ChatAdmission/Intent.fs` 的入口准入决策（显式 participant 授予 HumanRoot、`UnknownOriginWhileActive`、claim 来源可准入性、缺物理 id 的拒绝） | 它是 D-01 指定的入口边界，状态机和宿主 Decision/Rejection 类型深度耦合；纯裁决可以抽，但需要单独的契约和差分 | **CUT-09-a**（2026-10-21 DONE，见 [CUT-09-a](CUT-09-a.md)） |
 | interaction-authority-018 的五类 ExpectedClosureKind 与 source witness 精确匹配 | 宿主目前只有 retirement witness 字符串，缺少可迁移的事实；要先在宿主补齐事实再迁入库 | **CUT-09-b**（新登记，前置 CUT-11 对 claim 账的处置） |
 | 投影重置（清 run-scoped claims、continuation 映射、序列号、提问） | 与 claim 账耦合 | 随 CUT-11 |
 | 崩溃恢复（`ChildWorkRecovery`、`LoadRecoverySurface`） | 只读投影，不做裁决 | 保留 |

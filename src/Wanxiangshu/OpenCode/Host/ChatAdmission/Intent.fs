@@ -1,6 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -121,6 +123,140 @@ module ChatAdmissionIntent =
     let isHostInternal (message: DecodedMessage) : bool =
         message.IsHostCompaction || message.IsHostSynthetic
 
+    let private identityCarrierName =
+        function
+        | IdentityCarrierError.SessionId -> "SessionId"
+        | IdentityCarrierError.Agent -> "agent"
+        | IdentityCarrierError.PromptKey -> "PromptKey"
+
+    let private tryRootIdentity (value: string) =
+        ParticipantIdentity.resolveAtRoot value
+        |> Result.toOption
+        |> Option.filter (fun identity -> ParticipantIdentity.role identity |> Option.isSome)
+
+    let private seedAgent (seed: PromptAuthority.IdentitySeed) =
+        seed
+        |> PromptAuthority.identitySeedParticipantIdentity
+        |> ParticipantIdentity.selectedAgent
+
+    /// Typed projection of `wanxiangli/authority` `admit` (CUT-09-a): the entrance
+    /// order is decided by the library over plain observed facts; participant
+    /// resolution, identity seeds and the typed Decision payloads stay here.
+    module private AdmissionLaw =
+
+        type Law =
+            abstract admit: input: obj -> obj
+
+        [<Import("Authority", "wanxiangli/authority")>]
+        let private authorityClass: obj = jsNative
+
+        [<Emit("new $0()")>]
+        let private construct (cls: obj) : Law = jsNative
+
+        let law: Law = construct authorityClass
+
+        let kindLabel (kind: PromptAuthority.RootAuthorityKind) =
+            match kind with
+            | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
+            | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
+
+        let originView (origin: PromptAuthority.PromptOrigin) : obj =
+            match origin with
+            | PromptAuthority.PromptOrigin.AuthorityRoot kind ->
+                createObj [ "kind" ==> "AuthorityRoot"; "root" ==> kindLabel kind ]
+            | PromptAuthority.PromptOrigin.Continuation _ ->
+                createObj
+                    [ "kind" ==> "Continuation"
+                      "continuation" ==> PromptAuthority.originLabel origin ]
+            | PromptAuthority.PromptOrigin.HostInternal -> createObj [ "kind" ==> "HostInternal" ]
+            | PromptAuthority.PromptOrigin.UnknownOrigin -> createObj [ "kind" ==> "UnknownOrigin" ]
+
+    /// The physical-message evidence the library orders; looked up here so the
+    /// typed payloads are at hand when the verdict comes back.
+    type private Observed =
+        { Active: PromptAuthority.AuthorityExecutionProfile option
+          AcceptedContinuation: PromptAuthority.ContinuationKind option
+          Landed: PromptAuthority.PromptOrigin option
+          Pending: PromptAuthority.PromptClaim option
+          RootIdentity: ParticipantIdentityEvidence option }
+
+    let private observe (message: DecodedMessage) (snapshot: DurableSnapshot) : Observed =
+        let projection = snapshot.Authority
+
+        let atPhysical find =
+            match projection, message.PhysicalUserMessageId with
+            | Some projection, Some physical -> find projection physical
+            | _ -> None
+
+        { Active = projection |> Option.bind (fun projection -> projection.ActiveLogicalRun)
+          AcceptedContinuation =
+            atPhysical (fun projection physical -> Map.tryFind physical projection.AcceptedContinuationIds)
+          Landed =
+            atPhysical (fun projection physical ->
+                Map.tryFind physical projection.PhysicalLandings
+                |> Option.map (fun landing -> landing.Origin))
+          Pending =
+            match projection, message.PromptKey with
+            | Some projection, Some promptKey -> Map.tryFind promptKey projection.PendingClaims
+            | _ -> None
+          RootIdentity = message.ExplicitAgent |> Option.bind tryRootIdentity }
+
+    let private admissionInput (message: DecodedMessage) (snapshot: DurableSnapshot) (observed: Observed) : obj =
+        let text value = value |> Option.toObj
+
+        createObj
+            [ "invalidCarrier"
+              ==> (message.InvalidIdentityCarrier |> Option.map identityCarrierName |> text)
+              "sessionId" ==> (message.SessionId |> Option.map SessionId.value |> text)
+              "physicalId"
+              ==> (message.PhysicalUserMessageId |> Option.map PhysicalUserMessageId.value |> text)
+              "promptKey" ==> (message.PromptKey |> Option.map PromptKey.value |> text)
+              "explicitAgent" ==> text message.ExplicitAgent
+              "explicitRootAgent"
+              ==> (observed.RootIdentity |> Option.map ParticipantIdentity.selectedAgent |> text)
+              "hostInternal" ==> isHostInternal message
+              "authority"
+              ==> (snapshot.Authority
+                   |> Option.map (fun _ ->
+                       createObj
+                           [ "active"
+                             ==> (observed.Active
+                                  |> Option.map (fun profile ->
+                                      createObj
+                                          [ "kind" ==> AdmissionLaw.kindLabel profile.AuthorityKind
+                                            "selectedAgent" ==> profile.SelectedAgent ])
+                                  |> Option.toObj) ])
+                   |> Option.toObj)
+              "acceptedContinuation"
+              ==> (observed.AcceptedContinuation
+                   |> Option.map (fun kind ->
+                       PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation kind))
+                   |> text)
+              "landedOrigin"
+              ==> (observed.Landed |> Option.map AdmissionLaw.originView |> Option.toObj)
+              "pendingClaim"
+              ==> (observed.Pending
+                   |> Option.map (fun claim ->
+                       createObj
+                           [ "sessionId" ==> SessionId.value claim.SessionId
+                             "origin" ==> AdmissionLaw.originView claim.Origin
+                             "selectedAgent" ==> seedAgent claim.IdentitySeed ])
+                   |> Option.toObj)
+              "acceptedEvidence"
+              ==> (snapshot.AcceptedExecutionEvidence
+                   |> Option.map (fun accepted ->
+                       createObj
+                           [ "sessionId" ==> SessionId.value accepted.SessionId
+                             "physicalId" ==> PhysicalUserMessageId.value accepted.PhysicalUserMessageId
+                             "origin" ==> AdmissionLaw.originView accepted.Origin
+                             "selectedAgent" ==> seedAgent accepted.IdentitySeed ])
+                   |> Option.toObj) ]
+
+    let private required (what: string) (value: 'T option) : 'T =
+        match value with
+        | Some value -> value
+        | None -> failwithf "wanxiangli/authority admit returned %s without the evidence it needs" what
+
     let private hostInternal (message: DecodedMessage) : Decision =
         let evidence: HostInternalEvidence =
             { SessionId = message.SessionId
@@ -129,208 +265,101 @@ module ChatAdmissionIntent =
 
         Decision.HostInternal evidence
 
-    let private tryRootIdentity (value: string) =
-        ParticipantIdentity.resolveAtRoot value
-        |> Result.toOption
-        |> Option.filter (fun identity -> ParticipantIdentity.role identity |> Option.isSome)
+    let private decide (message: DecodedMessage) (snapshot: DurableSnapshot) (observed: Observed) (verdict: obj) =
+        let key () : ChatExecutionKey =
+            { SessionId = required "a keyed verdict" message.SessionId
+              PhysicalUserMessageId = required "a keyed verdict" message.PhysicalUserMessageId }
 
-    let private rejectMissingPhysical
-        (message: DecodedMessage)
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        : bool =
-        message.PromptKey.IsSome
-        || message.ExplicitAgent.IsSome
-        || projection.ActiveLogicalRun.IsSome
-
-    let private claimOriginAdmissible (origin: PromptAuthority.PromptOrigin) : bool =
-        match origin with
-        | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-        | PromptAuthority.PromptOrigin.Continuation _ -> true
-        | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
-        | PromptAuthority.PromptOrigin.HostInternal
-        | PromptAuthority.PromptOrigin.UnknownOrigin -> false
-
-    let private pendingPrompt
-        (key: ChatExecutionKey)
-        (promptKey: PromptKey)
-        (claim: PromptAuthority.PromptClaim)
-        (explicitAgentOpt: string option)
-        =
-        let selectedParticipant =
-            claim.IdentitySeed
-            |> PromptAuthority.identitySeedParticipantIdentity
-            |> ParticipantIdentity.selectedAgent
-
-        match claim.SessionId = key.SessionId, claimOriginAdmissible claim.Origin, explicitAgentOpt with
-        | false, _, _ -> Decision.Reject(Rejection.PromptClaimSessionMismatch(key.SessionId, claim.SessionId))
-        | true, false, _ -> Decision.Reject(Rejection.PromptClaimOriginNotAdmissible(promptKey, claim.Origin))
-        | true, true, Some explicitAgent when explicitAgent <> selectedParticipant ->
-            Decision.Reject(Rejection.InvalidExplicitAgent explicitAgent)
-        | true, true, _ ->
-            Decision.PendingPromptIntent
-                { Key = key
-                  PromptKey = promptKey
-                  Claim = claim
-                  Origin = claim.Origin
-                  IdentitySeed = claim.IdentitySeed }
-
-    let private externalRoot
-        (key: ChatExecutionKey)
-        (explicitAgent: string)
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        : Decision =
-        match tryRootIdentity explicitAgent, projection.ActiveLogicalRun with
-        | None, _ -> Decision.Reject(Rejection.InvalidExplicitAgent explicitAgent)
-        | Some identity, Some authority when ParticipantIdentity.selectedAgent identity = authority.SelectedAgent ->
+        let humanContinuation () =
             Decision.ActiveHumanContinuationIntent
-                { Key = key
+                { Key = key ()
                   Origin = PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.HumanMessage
-                  Authority = authority }
-        | Some _, Some _ -> Decision.Reject Rejection.UnknownOriginWhileActive
-        | Some identity, None ->
+                  Authority = required "active-human-continuation" observed.Active }
+
+        match unbox<string> verdict?kind with
+        | "unmanaged" -> Decision.NoManagedExecution NoManagedExecutionReason.UnmanagedMessage
+        | "already-accepted" ->
+            let origin =
+                match observed.AcceptedContinuation with
+                | Some continuation -> PromptAuthority.PromptOrigin.Continuation continuation
+                | None -> required "already-accepted" observed.Landed
+
+            Decision.NoManagedExecution(NoManagedExecutionReason.AlreadyAcceptedHostMessage origin)
+        | "host-internal" -> hostInternal message
+        | "accepted-root-replay" ->
+            let accepted = required "accepted-root-replay" snapshot.AcceptedExecutionEvidence
 
             Decision.ExternalRootIntent
-                { Key = key
+                { Key =
+                    { SessionId = accepted.SessionId
+                      PhysicalUserMessageId = accepted.PhysicalUserMessageId }
+                  ExplicitAgent = seedAgent accepted.IdentitySeed
+                  Origin = accepted.Origin
+                  IdentitySeed = accepted.IdentitySeed }
+        | "external-root" ->
+            let identity = required "external-root" observed.RootIdentity
+
+            Decision.ExternalRootIntent
+                { Key = key ()
                   ExplicitAgent = ParticipantIdentity.selectedAgent identity
                   Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
                   IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity }
+        | "active-human-continuation" -> humanContinuation ()
+        | "pending-prompt" ->
+            let claim = required "pending-prompt" observed.Pending
 
-    [<RequireQualifiedAccess>]
-    type private KnownEvidence =
-        | Accepted of PromptAuthority.PromptOrigin
-        | Pending of PromptAuthority.PromptClaim
-        | HostInternal
-        | Unaccepted
+            Decision.PendingPromptIntent
+                { Key = key ()
+                  PromptKey = claim.PromptKey
+                  Claim = claim
+                  Origin = claim.Origin
+                  IdentitySeed = claim.IdentitySeed }
+        | "reject" ->
+            let rejection =
+                match unbox<string> verdict?reason with
+                | "malformed-carrier" ->
+                    Rejection.MalformedIdentityCarrier(required "malformed-carrier" message.InvalidIdentityCarrier)
+                | "missing-session" -> Rejection.ManagedIntentMissingSessionId
+                | "missing-physical" -> Rejection.ManagedIntentMissingPhysicalUserMessageId
+                | "authority-unavailable" -> Rejection.DurableAuthorityUnavailable
+                | "invalid-explicit-agent" ->
+                    Rejection.InvalidExplicitAgent(required "invalid-explicit-agent" message.ExplicitAgent)
+                | "accepted-participant-conflict" ->
+                    let accepted =
+                        required "accepted-participant-conflict" snapshot.AcceptedExecutionEvidence
 
-    let private knownEvidence
-        (message: DecodedMessage)
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        (physicalMessageId: PhysicalUserMessageId)
-        : KnownEvidence =
-        let accepted = Map.tryFind physicalMessageId projection.AcceptedContinuationIds
-
-        let landed = Map.tryFind physicalMessageId projection.PhysicalLandings
-
-        let pending =
-            message.PromptKey
-            |> Option.bind (fun promptKey -> Map.tryFind promptKey projection.PendingClaims)
-
-        // dispatch-protocol-006: exact landing evidence answers which claim
-        // landed this physical message. A replay of an accepted Authority Root
-        // has no continuation mapping and no pending claim left, so without
-        // this evidence the replay would be refused as unclaimed.
-        match accepted, landed, pending, isHostInternal message with
-        | Some continuation, _, _, _ -> KnownEvidence.Accepted(PromptAuthority.PromptOrigin.Continuation continuation)
-        | None, Some landing, _, _ -> KnownEvidence.Accepted landing.Origin
-        | None, None, Some claim, _ -> KnownEvidence.Pending claim
-        | None, None, None, true -> KnownEvidence.HostInternal
-        | None, None, None, false -> KnownEvidence.Unaccepted
-
-    let private resolveUnaccepted
-        (key: ChatExecutionKey)
-        (message: DecodedMessage)
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        : Decision =
-        match message.PromptKey, message.ExplicitAgent, projection.ActiveLogicalRun with
-        | Some promptKey, _, Some profile when profile.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
-            Decision.Reject(Rejection.AgentOwnerRootPromptNotClaimed(promptKey, profile.IdentitySeed))
-        | Some promptKey, _, _ -> Decision.Reject(Rejection.PromptKeyNotClaimed promptKey)
-        | None, Some explicitAgent, _ -> externalRoot key explicitAgent projection
-        | None, None, Some authority ->
-            // interaction-authority-009: a wire message omitting the participant
-            // field resolves against the durable active profile; the omission
-            // itself is not UnknownOrigin.
-            Decision.ActiveHumanContinuationIntent
-                { Key = key
-                  Origin = PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.HumanMessage
-                  Authority = authority }
-        | None, None, None -> Decision.NoManagedExecution NoManagedExecutionReason.UnmanagedMessage
-
-    let private resolveWithProjection
-        (message: DecodedMessage)
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        (sessionId: SessionId)
-        (physicalMessageId: PhysicalUserMessageId)
-        : Decision =
-        let key: ChatExecutionKey =
-            { SessionId = sessionId
-              PhysicalUserMessageId = physicalMessageId }
-
-        match knownEvidence message projection physicalMessageId with
-        | KnownEvidence.Accepted origin ->
-            Decision.NoManagedExecution(NoManagedExecutionReason.AlreadyAcceptedHostMessage origin)
-        | KnownEvidence.Pending claim -> pendingPrompt key claim.PromptKey claim message.ExplicitAgent
-        | KnownEvidence.HostInternal -> hostInternal message
-        | KnownEvidence.Unaccepted -> resolveUnaccepted key message projection
-
-    let private resolveValid (message: DecodedMessage) (snapshot: DurableSnapshot) : Decision =
-        match message.SessionId, snapshot.Authority, message.PhysicalUserMessageId with
-        | None, _, _ when isHostInternal message -> hostInternal message
-        | None, _, _ when message.PromptKey.IsSome || message.ExplicitAgent.IsSome ->
-            Decision.Reject Rejection.ManagedIntentMissingSessionId
-        | None, _, _ -> Decision.NoManagedExecution NoManagedExecutionReason.UnmanagedMessage
-        | Some _, None, _ when isHostInternal message -> hostInternal message
-        | Some _, None, _ when message.PromptKey.IsSome || message.ExplicitAgent.IsSome ->
-            Decision.Reject Rejection.DurableAuthorityUnavailable
-        | Some _, None, _ -> Decision.NoManagedExecution NoManagedExecutionReason.UnmanagedMessage
-        | Some _, Some projection, None when rejectMissingPhysical message projection ->
-            Decision.Reject Rejection.ManagedIntentMissingPhysicalUserMessageId
-        | Some _, Some _, None when isHostInternal message -> hostInternal message
-        | Some _, Some _, None -> Decision.NoManagedExecution NoManagedExecutionReason.UnmanagedMessage
-        | Some sessionId, Some projection, Some physicalMessageId ->
-            resolveWithProjection message projection sessionId physicalMessageId
-
-    let private acceptedHumanRootReplay (message: DecodedMessage) (snapshot: DurableSnapshot) =
-        match
-            snapshot.AcceptedExecutionEvidence, message.SessionId, message.PhysicalUserMessageId, message.PromptKey
-        with
-        | Some accepted, Some sessionId, Some physicalId, None when
-            accepted.SessionId = sessionId
-            && accepted.PhysicalUserMessageId = physicalId
-            && accepted.Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
-            && not (isHostInternal message)
-            ->
-            let selectedAgent =
-                accepted.IdentitySeed
-                |> PromptAuthority.identitySeedParticipantIdentity
-                |> ParticipantIdentity.selectedAgent
-
-            match message.ExplicitAgent with
-            | Some explicitAgent when explicitAgent <> selectedAgent ->
-                Some(
-                    Decision.Reject(
-                        Rejection.AcceptedParticipantConflict(
-                            { SessionId = accepted.SessionId
-                              PhysicalUserMessageId = accepted.PhysicalUserMessageId },
-                            selectedAgent,
-                            explicitAgent
-                        )
+                    Rejection.AcceptedParticipantConflict(
+                        { SessionId = accepted.SessionId
+                          PhysicalUserMessageId = accepted.PhysicalUserMessageId },
+                        seedAgent accepted.IdentitySeed,
+                        required "accepted-participant-conflict" message.ExplicitAgent
                     )
-                )
-            | _ ->
-                Some(
-                    Decision.ExternalRootIntent
-                        { Key =
-                            { SessionId = accepted.SessionId
-                              PhysicalUserMessageId = accepted.PhysicalUserMessageId }
-                          ExplicitAgent = selectedAgent
-                          Origin = accepted.Origin
-                          IdentitySeed = accepted.IdentitySeed }
-                )
-        | _ -> None
+                | "prompt-key-not-claimed" ->
+                    Rejection.PromptKeyNotClaimed(required "prompt-key-not-claimed" message.PromptKey)
+                | "agent-owner-root-prompt-not-claimed" ->
+                    Rejection.AgentOwnerRootPromptNotClaimed(
+                        required "agent-owner-root-prompt-not-claimed" message.PromptKey,
+                        (required "agent-owner-root-prompt-not-claimed" observed.Active).IdentitySeed
+                    )
+                | "claim-session-mismatch" ->
+                    Rejection.PromptClaimSessionMismatch(
+                        required "claim-session-mismatch" message.SessionId,
+                        (required "claim-session-mismatch" observed.Pending).SessionId
+                    )
+                | "claim-origin-not-admissible" ->
+                    let claim = required "claim-origin-not-admissible" observed.Pending
+                    Rejection.PromptClaimOriginNotAdmissible(claim.PromptKey, claim.Origin)
+                | "unknown-origin-while-active" -> Rejection.UnknownOriginWhileActive
+                | other -> failwithf "wanxiangli/authority admit returned an unknown rejection %s" other
+
+            Decision.Reject rejection
+        | other -> failwithf "wanxiangli/authority admit returned an unknown verdict %s" other
 
     let resolve (message: DecodedMessage) (snapshot: DurableSnapshot) : Decision =
-        match message.InvalidIdentityCarrier with
-        | Some carrier -> Decision.Reject(Rejection.MalformedIdentityCarrier carrier)
-        | None ->
-            acceptedHumanRootReplay message snapshot
-            |> Option.defaultWith (fun () -> resolveValid message snapshot)
+        let observed = observe message snapshot
 
-    let private identityCarrierName =
-        function
-        | IdentityCarrierError.SessionId -> "SessionId"
-        | IdentityCarrierError.Agent -> "agent"
-        | IdentityCarrierError.PromptKey -> "PromptKey"
+        AdmissionLaw.law.admit (admissionInput message snapshot observed)
+        |> decide message snapshot observed
 
     let describeRejection (rejection: Rejection) : string =
         match rejection with
