@@ -2,165 +2,135 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
+
+/// The slice of the `wanxiangli/permit` exact execution permit owner (CUT-10)
+/// this host owner reads. Issue, the Pending → Committed → Released lifecycle,
+/// the two mutually exclusive releases, exact identity checks and the
+/// outcome classification are decided there; this adapter keeps the F#
+/// lease handle, maps outcomes and records the shared transition counters.
+type internal ExecutionPermitLibrary =
+    abstract issue: identity: obj * credit: float -> obj
+    abstract target: permit: obj * fence: float -> obj
+    abstract commit: permit: obj * fence: float * observed: obj -> string
+    abstract releaseBeforeProvider: permit: obj * fence: float * observed: obj -> string
+    abstract releasePhysical: sessionId: string * physicalUserMessageId: string -> string
+    abstract lifecycle: permit: obj * fence: float -> obj
+    abstract committed: sessionId: string * physicalUserMessageId: string -> obj
+
+module internal ExecutionPermitBinding =
+    [<Import("ExecutionPermits", "wanxiangli/permit")>]
+    let private permitsClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : ExecutionPermitLibrary = jsNative
+
+    let create () = construct permitsClass
+
+    let identity (value: ExecutionAdmissionExactIdentity) : obj =
+        createObj
+            [ "sessionId" ==> value.SessionId
+              "physicalUserMessageId" ==> value.PhysicalUserMessageId
+              "role" ==> Roles.roleLabel value.Role
+              "participant" ==> value.Participant
+              "target" ==> createObj [ "model" ==> value.Target.Model; "reasoning" ==> value.Target.Reasoning ] ]
+
+    let outcome (value: string) =
+        match value with
+        | "Applied" -> CapacityTransitionOutcome.Applied
+        | "AlreadyApplied" -> CapacityTransitionOutcome.AlreadyApplied
+        | "StaleFence" -> CapacityTransitionOutcome.StaleFence
+        | "Conflict" -> CapacityTransitionOutcome.Conflict
+        | other -> invalidOp (sprintf "execution-model-routing: unknown permit outcome '%s'" other)
+
+    let rejection (value: string) =
+        match value with
+        | "UnknownLease" -> ExecutionAdmissionRejection.UnknownLease
+        | "WrongFence" -> ExecutionAdmissionRejection.WrongFence
+        | "StaleLease" -> ExecutionAdmissionRejection.StaleLease
+        | "WrongSession" -> ExecutionAdmissionRejection.WrongSession
+        | "WrongPhysicalUserMessage" -> ExecutionAdmissionRejection.WrongPhysicalUserMessage
+        | "WrongRole" -> ExecutionAdmissionRejection.WrongRole
+        | "WrongParticipant" -> ExecutionAdmissionRejection.WrongParticipant
+        | "WrongTarget" -> ExecutionAdmissionRejection.WrongTarget
+        | "IllegalTransition" -> ExecutionAdmissionRejection.IllegalTransition
+        | "OppositeTerminalConflict" -> ExecutionAdmissionRejection.OppositeTerminalConflict
+        | other -> invalidOp (sprintf "execution-model-routing: unknown permit rejection '%s'" other)
+
+    let result (value: obj) : Result<obj, ExecutionAdmissionRejection> =
+        if unbox<bool> value?ok then
+            Ok(value?value: obj)
+        else
+            Error(rejection (unbox<string> value?rejection))
 
 type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
-    let gate = obj ()
-    let lifecycleBySession = Dictionary<string, ExecutionCapacityLifecycle>()
-    // DSL-MUTABLE: resource
+    let permits = ExecutionPermitBinding.create ()
+    // The F# handle of each session's current permit; Owner is the library permit.
+    let leaseBySession = Dictionary<string, ExecutionAdmissionLease>()
+    // DSL-MUTABLE: resource — host handle identity, kept in step with the library permit
     let mutable nextLeaseId = CapacityLeaseId.initial
     let mutable nextFence = CapacityFence.initial
 
-    let knownLifecycle (lease: ExecutionAdmissionLease) =
-        match obj.ReferenceEquals(lease.Owner, gate), lifecycleBySession.TryGetValue lease.Identity.SessionId with
-        | false, _ -> Error ExecutionAdmissionRejection.WrongFence
-        | true, (false, _) -> Error ExecutionAdmissionRejection.StaleLease
-        | true, (true, lifecycle) when not (obj.ReferenceEquals(ExecutionCapacityLifecycle.leaseOf lifecycle, lease)) ->
-            Error ExecutionAdmissionRejection.StaleLease
-        | true, (true, lifecycle) when (ExecutionCapacityLifecycle.leaseOf lifecycle).Fence <> lease.Fence ->
-            Error ExecutionAdmissionRejection.WrongFence
-        | true, (true, lifecycle) -> Ok lifecycle
+    let permitOf (lease: ExecutionAdmissionLease) : obj =
+        if isNull (box lease) then null else lease.Owner
 
-    let knownLease (lease: ExecutionAdmissionLease) =
-        match isNull (box lease) with
-        | true -> Error ExecutionAdmissionRejection.UnknownLease
-        | false -> knownLifecycle lease
+    let fenceOf (lease: ExecutionAdmissionLease) : float =
+        if isNull (box lease) then 0.0 else float (CapacityFence.value lease.Fence)
 
-    let apply lifecycle evidence =
-        match ExecutionCapacityLifecycle.decide (Some lifecycle) evidence with
-        | ExecutionCapacityDecision.Transitioned next ->
-            let lease = ExecutionCapacityLifecycle.leaseOf next
-            lifecycleBySession.[lease.Identity.SessionId] <- next
-            ExecutionCapacityDecision.Transitioned next
-        | decision -> decision
+    let record (outcome: string) =
+        outcome |> ExecutionPermitBinding.outcome |> counters.Record
 
-    let applyKnown lease evidence =
-        knownLease lease
-        |> Result.bind (fun lifecycle -> Ok(apply lifecycle evidence))
-        |> Result.defaultWith ExecutionCapacityDecision.Rejected
+    let handleFor (identity: ExecutionAdmissionExactIdentity) (capacityCredit: CapacityCreditId) (permit: obj) =
+        match leaseBySession.TryGetValue identity.SessionId with
+        | true, lease when obj.ReferenceEquals(lease.Owner, permit) -> lease
+        | _ ->
+            nextLeaseId <- CapacityLeaseId.next nextLeaseId
+            nextFence <- CapacityFence.next nextFence
 
-    let outcomeOf =
-        function
-        | ExecutionCapacityDecision.Transitioned _ -> CapacityTransitionOutcome.Applied
-        | ExecutionCapacityDecision.Idempotent -> CapacityTransitionOutcome.AlreadyApplied
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.UnknownLease
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongFence
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.StaleLease ->
-            CapacityTransitionOutcome.StaleFence
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongSession
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongPhysicalUserMessage
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongRole
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongParticipant
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongTarget
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.IllegalTransition
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.OppositeTerminalConflict ->
-            CapacityTransitionOutcome.Conflict
+            if float (CapacityFence.value nextFence) <> unbox<float> permit?fence then
+                invalidOp "execution-model-routing: host lease fence diverged from the exact permit owner"
 
-    let record decision =
-        decision |> outcomeOf |> counters.Record
+            let lease =
+                ExecutionAdmissionLease.Create(permit, capacityCredit, nextLeaseId, nextFence, identity)
 
-    let finishRelease lease release =
-        function
-        | ExecutionCapacityDecision.Transitioned releasing ->
-            apply releasing (ExecutionCapacityEvidence.CompleteRelease(lease, release))
-        | decision -> decision
-
-    let beginRelease lifecycle lease release evidence =
-        apply lifecycle evidence |> finishRelease lease release
-
-    let sameIssue
-        (identity: ExecutionAdmissionExactIdentity)
-        (capacityCredit: CapacityCreditId)
-        (lifecycle: ExecutionCapacityLifecycle)
-        : bool =
-        let current = ExecutionCapacityLifecycle.leaseOf lifecycle
-        current.Identity = identity && current.CapacityCredit = capacityCredit
-
-    let issueFresh
-        (identity: ExecutionAdmissionExactIdentity)
-        (capacityCredit: CapacityCreditId)
-        : ExecutionAdmissionLease =
-        nextLeaseId <- CapacityLeaseId.next nextLeaseId
-        nextFence <- CapacityFence.next nextFence
-
-        let lease =
-            ExecutionAdmissionLease.Create(gate, capacityCredit, nextLeaseId, nextFence, identity)
-
-        match ExecutionCapacityLifecycle.decide None (ExecutionCapacityEvidence.Acquire lease) with
-        | ExecutionCapacityDecision.Transitioned pending ->
-            lifecycleBySession.[identity.SessionId] <- pending
+            leaseBySession.[identity.SessionId] <- lease
             lease
-        | _ -> invalidOp "execution-model-routing: free capacity owner rejected acquire"
-
-    let physicalDecision
-        (physicalUserMessageId: string)
-        (lifecycle: ExecutionCapacityLifecycle)
-        : ExecutionCapacityDecision =
-        let lease = ExecutionCapacityLifecycle.leaseOf lifecycle
-
-        match lease.Identity.PhysicalUserMessageId = physicalUserMessageId with
-        | false -> ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongPhysicalUserMessage
-        | true ->
-            ExecutionCapacityEvidence.BeginPhysicalCompletion lease
-            |> beginRelease lifecycle lease ExecutionCapacityRelease.PhysicalCompletion
-
-    let issueLocked
-        (identity: ExecutionAdmissionExactIdentity)
-        (capacityCredit: CapacityCreditId)
-        : ExecutionAdmissionLease =
-        match lifecycleBySession.TryGetValue identity.SessionId with
-        | true, lifecycle when sameIssue identity capacityCredit lifecycle ->
-            ExecutionCapacityLifecycle.leaseOf lifecycle
-        | true, _
-        | false, _ -> issueFresh identity capacityCredit
-
-    let releasePhysicalLocked (sessionId: string) (physicalUserMessageId: string) : ExecutionCapacityDecision =
-        match lifecycleBySession.TryGetValue sessionId with
-        | true, lifecycle when
-            (ExecutionCapacityLifecycle.leaseOf lifecycle).Identity.PhysicalUserMessageId = physicalUserMessageId
-            ->
-            physicalDecision physicalUserMessageId lifecycle
-        | true, _ -> ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.StaleLease
-        | false, _ -> ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.UnknownLease
 
     member _.Issue(identity: ExecutionAdmissionExactIdentity, capacityCredit: CapacityCreditId) =
-        lock gate (fun () -> issueLocked identity capacityCredit)
+        permits.issue (ExecutionPermitBinding.identity identity, float (CapacityCreditId.value capacityCredit))
+        |> handleFor identity capacityCredit
 
     member _.Target(lease: ExecutionAdmissionLease) =
-        lock gate (fun () -> knownLease lease |> Result.map (fun _ -> lease.Identity.Target))
+        permits.target (permitOf lease, fenceOf lease)
+        |> ExecutionPermitBinding.result
+        |> Result.map (fun _ -> lease.Identity.Target)
 
     member _.Commit(lease: ExecutionAdmissionLease, observed: ExecutionAdmissionExactIdentity) =
-        lock gate (fun () -> ExecutionCapacityEvidence.Commit(lease, observed) |> applyKnown lease |> record)
-
-    member _.ReleaseBeforeProvider(lease: ExecutionAdmissionLease, observed: ExecutionAdmissionExactIdentity) =
-        lock gate (fun () ->
-            knownLease lease
-            |> Result.bind (fun lifecycle ->
-                ExecutionCapacityEvidence.BeginReleaseBeforeProvider(lease, observed)
-                |> beginRelease lifecycle lease ExecutionCapacityRelease.BeforeProvider
-                |> Ok)
-            |> Result.defaultWith ExecutionCapacityDecision.Rejected
-            |> record)
-
-    member _.ReleasePhysical(sessionId: string, physicalUserMessageId: string) =
-        lock gate (fun () -> releasePhysicalLocked sessionId physicalUserMessageId)
+        permits.commit (permitOf lease, fenceOf lease, ExecutionPermitBinding.identity observed)
         |> record
 
+    member _.ReleaseBeforeProvider(lease: ExecutionAdmissionLease, observed: ExecutionAdmissionExactIdentity) =
+        permits.releaseBeforeProvider (permitOf lease, fenceOf lease, ExecutionPermitBinding.identity observed)
+        |> record
+
+    member _.ReleasePhysical(sessionId: string, physicalUserMessageId: string) =
+        permits.releasePhysical (sessionId, physicalUserMessageId) |> record
+
     member _.LifecycleName(lease: ExecutionAdmissionLease) =
-        lock gate (fun () ->
-            knownLease lease
-            |> Result.map (function
-                | ExecutionCapacityLifecycle.Pending _ -> "Pending"
-                | ExecutionCapacityLifecycle.Committed _ -> "Committed"
-                | ExecutionCapacityLifecycle.Releasing _ -> "Releasing"
-                | ExecutionCapacityLifecycle.Released _ -> "Released"))
+        permits.lifecycle (permitOf lease, fenceOf lease)
+        |> ExecutionPermitBinding.result
+        |> Result.map unbox<string>
 
     /// Read-only exact committed lease query; a pending, releasing, released,
     /// absent or wrong-physical lease is not an executable resource.
     member _.TryReadCommittedLease(sessionId: string, physicalUserMessageId: string) =
-        lock gate (fun () ->
-            match lifecycleBySession.TryGetValue sessionId with
-            | true, ExecutionCapacityLifecycle.Committed lease when
-                lease.Identity.PhysicalUserMessageId = physicalUserMessageId
-                ->
-                Some lease
-            | _ -> None)
+        let permit = permits.committed (sessionId, physicalUserMessageId)
+
+        if isNull permit then
+            None
+        else
+            match leaseBySession.TryGetValue sessionId with
+            | true, lease when obj.ReferenceEquals(lease.Owner, permit) -> Some lease
+            | _ -> invalidOp "execution-model-routing: committed permit has no host lease handle"
