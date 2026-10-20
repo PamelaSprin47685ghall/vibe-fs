@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Session
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 
 /// HOST-008 / COMPANION-002: which kind of managed session this is.
@@ -143,60 +145,38 @@ module SessionAssociationProjection =
     /// Idempotent for the same pair: re-linking a Work session to the same
     /// Companion is what restart recovery does, and refusing it would turn recovery
     /// into a startup failure.
-    let private satelliteKindConflict
-        (kind: SatelliteKind)
-        (satelliteSessionId: SessionId)
-        (current: Map<SessionId, SessionAssociation>)
-        =
-        match tryFind satelliteSessionId current with
-        | Some { Kind = ManagedSessionKind.WorkSession } -> true
-        | Some { Kind = ManagedSessionKind.SatelliteSession(_, existingKind) } when existingKind <> kind -> true
-        | _ -> false
+    /// CUT-12: the Work ↔ Satellite link law has one owner,
+    /// wanxiangli/association. This projection answers the keyed lookups, maps
+    /// the verdict back to the typed rejection and writes both entries together.
+    [<Import("SessionAssociationLaw", "wanxiangli/association")>]
+    let private lawClass: obj = jsNative
 
-    let private linkedSatellite
-        (kind: SatelliteKind)
-        (mainSessionId: SessionId)
-        (satelliteSessionId: SessionId)
-        (parentOfMain: SessionId option)
-        (current: Map<SessionId, SessionAssociation>)
-        =
-        let owner = tryFind mainSessionId current
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
 
-        let parent =
-            parentOfMain
-            |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
+    let private law: obj = construct lawClass
 
-        Ok(
-            current
-            |> Map.add mainSessionId (workSession mainSessionId parent)
-            |> Map.add
-                satelliteSessionId
-                { SessionId = satelliteSessionId
-                  Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
-                  ParentSessionId = Some mainSessionId }
-        )
+    let private kindName (kind: SatelliteKind) =
+        match kind with
+        | SatelliteKind.Companion -> "Companion"
 
-    let private linkValidated
-        (kind: SatelliteKind)
-        (mainSessionId: SessionId)
-        (satelliteSessionId: SessionId)
-        (parentOfMain: SessionId option)
-        (current: Map<SessionId, SessionAssociation>)
-        =
-        let existingSatellite =
-            match kind with
-            | SatelliteKind.Companion -> tryCompanionOf mainSessionId current
+    let private optionalId (value: SessionId option) : obj =
+        match value with
+        | Some id -> box (SessionId.value id)
+        | None -> null
 
-        let existingOwner = tryOwnerOf satelliteSessionId current
-        let kindConflict = satelliteKindConflict kind satelliteSessionId current
+    let private entryInput (entry: SessionAssociation option) : obj =
+        match entry with
+        | None -> null
+        | Some { Kind = ManagedSessionKind.WorkSession
+                 ParentSessionId = parent } -> createObj [ "kind" ==> "Work"; "parent" ==> optionalId parent ]
+        | Some { Kind = ManagedSessionKind.SatelliteSession(owner, kind) } ->
+            createObj
+                [ "kind" ==> "Satellite"
+                  "owner" ==> SessionId.value owner
+                  "satelliteKind" ==> kindName kind ]
 
-        match existingSatellite, existingOwner, kindConflict with
-        | Some existing, _, _ when existing <> satelliteSessionId ->
-            Error(AssociationRejection.AlreadyLinkedToOther(existing, satelliteSessionId))
-        | _, Some owner, _ when owner <> mainSessionId ->
-            Error(AssociationRejection.CompanionClaimedByOther(owner, satelliteSessionId))
-        | _, _, true -> Error(AssociationRejection.SatelliteKindConflict satelliteSessionId)
-        | _ -> linkedSatellite kind mainSessionId satelliteSessionId parentOfMain current
+    let private idOf (value: obj) = SessionId.create (unbox<string> value)
 
     let linkSatellite
         (kind: SatelliteKind)
@@ -205,12 +185,47 @@ module SessionAssociationProjection =
         (parentOfMain: SessionId option)
         (current: Map<SessionId, SessionAssociation>)
         : Result<Map<SessionId, SessionAssociation>, AssociationRejection> =
-        if mainSessionId = satelliteSessionId then
-            Error(AssociationRejection.SelfLink mainSessionId)
-        elif isSatellite mainSessionId current then
-            Error(AssociationRejection.CompanionWouldRecurse mainSessionId)
-        else
-            linkValidated kind mainSessionId satelliteSessionId parentOfMain current
+        let existingSatellite =
+            match kind with
+            | SatelliteKind.Companion -> tryCompanionOf mainSessionId current
+
+        let verdict: obj =
+            law?link (
+                createObj
+                    [ "main" ==> SessionId.value mainSessionId
+                      "satellite" ==> SessionId.value satelliteSessionId
+                      "satelliteKind" ==> kindName kind
+                      "mainEntry" ==> entryInput (tryFind mainSessionId current)
+                      "satelliteEntry" ==> entryInput (tryFind satelliteSessionId current)
+                      "existingSatellite" ==> optionalId existingSatellite
+                      "parentOfMain" ==> optionalId parentOfMain ]
+            )
+
+        match unbox<string> verdict?verdict with
+        | "link" ->
+            let parent: obj = verdict?mainParent
+            let parent = if isNull parent then None else Some(idOf parent)
+
+            Ok(
+                current
+                |> Map.add mainSessionId (workSession mainSessionId parent)
+                |> Map.add
+                    satelliteSessionId
+                    { SessionId = satelliteSessionId
+                      Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
+                      ParentSessionId = Some mainSessionId }
+            )
+        | "reject" ->
+            match unbox<string> verdict?rejection with
+            | "SelfLink" -> Error(AssociationRejection.SelfLink(idOf verdict?session))
+            | "CompanionWouldRecurse" -> Error(AssociationRejection.CompanionWouldRecurse(idOf verdict?companion))
+            | "AlreadyLinkedToOther" ->
+                Error(AssociationRejection.AlreadyLinkedToOther(idOf verdict?existing, idOf verdict?proposed))
+            | "CompanionClaimedByOther" ->
+                Error(AssociationRejection.CompanionClaimedByOther(idOf verdict?owner, idOf verdict?proposed))
+            | "SatelliteKindConflict" -> Error(AssociationRejection.SatelliteKindConflict(idOf verdict?proposed))
+            | other -> invalidOp ("wanxiangli/association returned an unknown rejection: " + other)
+        | other -> invalidOp ("wanxiangli/association returned an unknown verdict: " + other)
 
     let link mainSessionId companionSessionId parentOfMain current =
         linkSatellite SatelliteKind.Companion mainSessionId companionSessionId parentOfMain current

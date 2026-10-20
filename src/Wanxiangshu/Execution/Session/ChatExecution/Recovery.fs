@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Failure
 
 [<RequireQualifiedAccess>]
@@ -103,54 +105,111 @@ module ChatExecutionRecovery =
               ResourceObservation = evidence.ResourceObservation
               InterventionReason = reason }
 
-    let private stale (evidence: ChatExecutionRecoveryEvidence) =
-        let providerEvidenceStale =
-            match evidence.ProviderObservation with
-            | ProviderPhysicalObservation.ProviderAlive started
-            | ProviderPhysicalObservation.ProviderTerminal(started, _) ->
-                started.Accepted <> evidence.ExecutionState.acceptedEvidence
-            | ProviderPhysicalObservation.ReceiptMissing
-            | ProviderPhysicalObservation.ReceiptAmbiguous
-            | ProviderPhysicalObservation.ProviderAbsent _ -> false
+    /// CUT-12: which single next step restart recovery may take is decided by
+    /// wanxiangli/chat-execution `recover`. This module computes the exact-key and
+    /// evidence equalities, hands over the phase and observation kinds, and builds
+    /// the typed request from the evidence it already holds.
+    [<Import("ChatExecutionLaw", "wanxiangli/chat-execution")>]
+    let private lawClass: obj = jsNative
 
-        (observationKey evidence.ProviderObservation
-         |> Option.exists ((<>) evidence.ExecutionState.key))
-        || resourceKey evidence.ResourceObservation <> evidence.ExecutionState.key
-        || providerEvidenceStale
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
 
-    let private terminalDecision
-        (evidence: ChatExecutionRecoveryEvidence)
-        (terminalEvidence: ChatExecutionTerminalEvidence)
-        (disposition: ChatExecutionTerminalDisposition)
-        =
-        match evidence.ResourceObservation with
-        | PhysicalResourceObservation.ResourceHeld key ->
-            ChatExecutionRecoveryDecision.ReconcilePhysical(
-                PhysicalReconciliationRequest.ReleaseTerminalResource(key, terminalEvidence, disposition)
-            )
-        | PhysicalResourceObservation.ResourceAbsent key
-        | PhysicalResourceObservation.ResourceReleased key ->
-            ChatExecutionRecoveryDecision.Ignore(key, IgnoreReason.DurableTerminalAlreadySettled)
-        | PhysicalResourceObservation.ResourceUnknown _ ->
-            manual ManualInterventionReason.PhysicalOutcomeUnknown evidence
+    let private law: obj = construct lawClass
 
-    let private acceptedDecision (evidence: ChatExecutionRecoveryEvidence) =
-        match evidence.ProviderObservation with
-        | ProviderPhysicalObservation.ReceiptMissing -> manual ManualInterventionReason.MissingExternalReceipt evidence
-        | ProviderPhysicalObservation.ReceiptAmbiguous ->
-            manual ManualInterventionReason.AmbiguousExternalReceipt evidence
-        | ProviderPhysicalObservation.ProviderAbsent _ ->
-            ChatExecutionRecoveryDecision.ResumePreProvider
-                { ExecutionKey = evidence.ExecutionState.key
-                  AcceptedEvidence = evidence.ExecutionState.acceptedEvidence }
-        | ProviderPhysicalObservation.ProviderAlive started ->
-            ChatExecutionRecoveryDecision.ReconcilePhysical(
-                PhysicalReconciliationRequest.PersistProviderStarted started
-            )
-        | ProviderPhysicalObservation.ProviderTerminal(started, disposition) ->
-            ChatExecutionRecoveryDecision.ReconcilePhysical(
-                PhysicalReconciliationRequest.PersistProviderStartedAndTerminal(started, disposition)
-            )
+    let private phaseInput (state: ChatExecutionState) : obj =
+        let disposition (value: ChatExecutionTerminalDisposition) =
+            match value with
+            | ChatExecutionTerminalDisposition.Completed -> "Completed"
+            | ChatExecutionTerminalDisposition.Cancelled -> "Cancelled"
+            | ChatExecutionTerminalDisposition.Rejected -> "Rejected"
+            | ChatExecutionTerminalDisposition.Failed -> "Failed"
+
+        match state with
+        | ChatExecutionState.Accepted _ -> createObj [ "phase" ==> "Accepted" ]
+        | ChatExecutionState.Started _ -> createObj [ "phase" ==> "ProviderStarted" ]
+        | ChatExecutionState.EndedBeforeStart(_, outcome) ->
+            createObj
+                [ "phase" ==> "EndedBeforeStart"
+                  "disposition" ==> disposition (PreStartOutcome.disposition outcome) ]
+        | ChatExecutionState.EndedAfterStart(_, value) ->
+            createObj [ "phase" ==> "EndedAfterStart"; "disposition" ==> disposition value ]
+
+    let private observedStarted (observation: ProviderPhysicalObservation) =
+        match observation with
+        | ProviderPhysicalObservation.ProviderAlive started
+        | ProviderPhysicalObservation.ProviderTerminal(started, _) -> Some started
+        | ProviderPhysicalObservation.ReceiptMissing
+        | ProviderPhysicalObservation.ReceiptAmbiguous
+        | ProviderPhysicalObservation.ProviderAbsent _ -> None
+
+    let private policyInput (evidence: ChatExecutionRecoveryEvidence) : obj =
+        match evidence.FailureDecisionEvidence, evidence.ExecutionState.startedEvidence with
+        | RecoveryPolicyEvidence.NoFailureDecision, _ -> null
+        | RecoveryPolicyEvidence.FailureDecision decision, started ->
+            let resolution, matches =
+                match decision.Resolution with
+                | ExecutionFailureResolution.RetryFreshAttempt authorization ->
+                    "RetryFreshAttempt",
+                    started
+                    |> Option.exists (fun started ->
+                        authorization.LogicalRun = started.Accepted.LogicalRunId
+                        && authorization.ProviderRun = started.ProviderRun
+                        && authorization.RequestKind = started.RequestKind)
+                | ExecutionFailureResolution.TerminalizeProviderStarted(key, _) ->
+                    "TerminalizeProviderStarted", key = evidence.ExecutionState.key
+                | ExecutionFailureResolution.PreserveCurrentFact -> "PreserveCurrentFact", false
+                | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ -> "AwaitAcceptanceReconciliation", false
+                | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ -> "TerminalizeAcceptedPreProvider", false
+
+            createObj [ "resolution" ==> resolution; "matches" ==> matches ]
+
+    let private recoveryInput (evidence: ChatExecutionRecoveryEvidence) : obj =
+        let state = evidence.ExecutionState
+        let observed = observedStarted evidence.ProviderObservation
+
+        createObj
+            [ "current" ==> phaseInput state
+              "provider"
+              ==> (match evidence.ProviderObservation with
+                   | ProviderPhysicalObservation.ReceiptMissing -> "ReceiptMissing"
+                   | ProviderPhysicalObservation.ReceiptAmbiguous -> "ReceiptAmbiguous"
+                   | ProviderPhysicalObservation.ProviderAbsent _ -> "Absent"
+                   | ProviderPhysicalObservation.ProviderAlive _ -> "Alive"
+                   | ProviderPhysicalObservation.ProviderTerminal _ -> "Terminal")
+              "resource"
+              ==> (match evidence.ResourceObservation with
+                   | PhysicalResourceObservation.ResourceAbsent _ -> "Absent"
+                   | PhysicalResourceObservation.ResourceHeld _ -> "Held"
+                   | PhysicalResourceObservation.ResourceReleased _ -> "Released"
+                   | PhysicalResourceObservation.ResourceUnknown _ -> "Unknown")
+              "persistence"
+              ==> (match evidence.PersistenceCommitment with
+                   | PersistenceCommitment.Unknown -> "Unknown"
+                   | PersistenceCommitment.NoNewWrite -> "NoNewWrite"
+                   | PersistenceCommitment.Committed -> "Committed"
+                   | PersistenceCommitment.NotCommitted -> "NotCommitted")
+              "providerKeySame"
+              ==> (observationKey evidence.ProviderObservation
+                   |> Option.forall (fun key -> key = state.key))
+              "resourceKeySame" ==> (resourceKey evidence.ResourceObservation = state.key)
+              "providerAcceptedSame"
+              ==> (observed
+                   |> Option.forall (fun started -> started.Accepted = state.acceptedEvidence))
+              "providerSameAsStarted"
+              ==> (match observed, state.startedEvidence with
+                   | Some observed, Some started -> observed = started
+                   | _ -> false)
+              "policy" ==> policyInput evidence ]
+
+    let private terminalOf (state: ChatExecutionState) =
+        match state with
+        | ChatExecutionState.EndedBeforeStart(accepted, outcome) ->
+            ChatExecutionTerminalEvidence.PreProvider accepted, PreStartOutcome.disposition outcome
+        | ChatExecutionState.EndedAfterStart(started, disposition) ->
+            ChatExecutionTerminalEvidence.AfterProviderStart started, disposition
+        | ChatExecutionState.Accepted _
+        | ChatExecutionState.Started _ -> invalidOp "recover released a terminal resource of a non-terminal execution"
 
     let private finalize (started: ProviderStartedEvidence) (disposition: ChatExecutionTerminalDisposition) =
         ChatExecutionRecoveryDecision.Finalize
@@ -160,78 +219,82 @@ module ChatExecutionRecovery =
               TerminalEvidence = ChatExecutionTerminalEvidence.AfterProviderStart started
               TerminalDisposition = disposition }
 
-    let private providerPolicyDecision
-        (evidence: ChatExecutionRecoveryEvidence)
-        (started: ProviderStartedEvidence)
-        (decision: ExecutionFailureDecision)
-        =
-        let authorizationMatches (authorization: ProviderRecoveryAuthorization) =
-            authorization.LogicalRun = started.Accepted.LogicalRunId
-            && authorization.ProviderRun = started.ProviderRun
-            && authorization.RequestKind = started.RequestKind
-
-        match decision.Resolution with
-        | ExecutionFailureResolution.RetryFreshAttempt authorization when authorizationMatches authorization ->
-            ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.key, IgnoreReason.ProviderRecoveryOwned)
-        | ExecutionFailureResolution.TerminalizeProviderStarted(key, disposition) when key = evidence.ExecutionState.key ->
-            finalize started disposition
-        | ExecutionFailureResolution.RetryFreshAttempt _
-        | ExecutionFailureResolution.TerminalizeProviderStarted _ ->
-            ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.key, IgnoreReason.StalePolicyEvidence)
-        | ExecutionFailureResolution.PreserveCurrentFact
-        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _
-        | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ ->
-            manual ManualInterventionReason.NoAuthorizedProviderDisposition evidence
-
-    let private providerAbsentDecision (evidence: ChatExecutionRecoveryEvidence) (started: ProviderStartedEvidence) =
-        match evidence.FailureDecisionEvidence with
-        | RecoveryPolicyEvidence.FailureDecision decision -> providerPolicyDecision evidence started decision
-        | RecoveryPolicyEvidence.NoFailureDecision ->
-            manual ManualInterventionReason.NoAuthorizedProviderDisposition evidence
-
-    let private startedDecision (evidence: ChatExecutionRecoveryEvidence) (started: ProviderStartedEvidence) =
-        match evidence.ProviderObservation with
-        | ProviderPhysicalObservation.ReceiptMissing -> manual ManualInterventionReason.MissingExternalReceipt evidence
-        | ProviderPhysicalObservation.ReceiptAmbiguous ->
-            manual ManualInterventionReason.AmbiguousExternalReceipt evidence
-        | ProviderPhysicalObservation.ProviderAlive observed when observed = started ->
-            ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.key, IgnoreReason.ProviderStillAlive)
-        | ProviderPhysicalObservation.ProviderTerminal(observed, disposition) when observed = started ->
-            finalize started disposition
-        | ProviderPhysicalObservation.ProviderAbsent _ -> providerAbsentDecision evidence started
-        | ProviderPhysicalObservation.ProviderAlive _
-        | ProviderPhysicalObservation.ProviderTerminal _ ->
-            ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.key, IgnoreReason.StalePhysicalEvidence)
-
-    let private notCommittedDecision (evidence: ChatExecutionRecoveryEvidence) =
-        match evidence.ExecutionState with
-        | ChatExecutionState.Accepted _ -> acceptedDecision evidence
-        | ChatExecutionState.Started started -> startedDecision evidence started
-        | ChatExecutionState.EndedBeforeStart _
-        | ChatExecutionState.EndedAfterStart _ -> manual ManualInterventionReason.PhysicalOutcomeUnknown evidence
-
-    let private persistenceDecision (evidence: ChatExecutionRecoveryEvidence) =
-        match evidence.PersistenceCommitment with
-        | PersistenceCommitment.Unknown -> manual ManualInterventionReason.PersistenceOutcomeUnknown evidence
-        | PersistenceCommitment.NoNewWrite -> manual ManualInterventionReason.PersistenceOutcomeUnknown evidence
-        | PersistenceCommitment.Committed ->
-            ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.key, IgnoreReason.RecoveryAlreadyCommitted)
-        | PersistenceCommitment.NotCommitted -> notCommittedDecision evidence
-
-    let terminalOfEnded (evidence: ChatExecutionRecoveryEvidence) : ChatExecutionRecoveryDecision =
-        match evidence.ExecutionState with
-        | ChatExecutionState.EndedBeforeStart(accepted, outcome) ->
-            terminalDecision
-                evidence
-                (ChatExecutionTerminalEvidence.PreProvider accepted)
-                (PreStartOutcome.disposition outcome)
-        | ChatExecutionState.EndedAfterStart(started, disposition) ->
-            terminalDecision evidence (ChatExecutionTerminalEvidence.AfterProviderStart started) disposition
-        | ChatExecutionState.Accepted _
-        | ChatExecutionState.Started _ -> persistenceDecision evidence
+    let private unexpected (what: string) : 'T =
+        invalidOp ("wanxiangli/chat-execution recover returned " + what)
 
     let decide (evidence: ChatExecutionRecoveryEvidence) : ChatExecutionRecoveryDecision =
-        if stale evidence then
-            ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.key, IgnoreReason.StalePhysicalEvidence)
-        else
-            terminalOfEnded evidence
+        let state = evidence.ExecutionState
+        let verdict: obj = law?recover (recoveryInput evidence)
+
+        match unbox<string> verdict?decision with
+        | "ignore" ->
+            let reason =
+                match unbox<string> verdict?reason with
+                | "DurableTerminalAlreadySettled" -> IgnoreReason.DurableTerminalAlreadySettled
+                | "ProviderStillAlive" -> IgnoreReason.ProviderStillAlive
+                | "RecoveryAlreadyCommitted" -> IgnoreReason.RecoveryAlreadyCommitted
+                | "ProviderRecoveryOwned" -> IgnoreReason.ProviderRecoveryOwned
+                | "StalePhysicalEvidence" -> IgnoreReason.StalePhysicalEvidence
+                | "StalePolicyEvidence" -> IgnoreReason.StalePolicyEvidence
+                | other -> unexpected ("an unknown ignore reason " + other)
+
+            let key =
+                match reason, evidence.ResourceObservation with
+                | IgnoreReason.DurableTerminalAlreadySettled, resource -> resourceKey resource
+                | _ -> state.key
+
+            ChatExecutionRecoveryDecision.Ignore(key, reason)
+        | "manual" ->
+            let reason =
+                match unbox<string> verdict?reason with
+                | "MissingExternalReceipt" -> ManualInterventionReason.MissingExternalReceipt
+                | "AmbiguousExternalReceipt" -> ManualInterventionReason.AmbiguousExternalReceipt
+                | "PhysicalOutcomeUnknown" -> ManualInterventionReason.PhysicalOutcomeUnknown
+                | "PersistenceOutcomeUnknown" -> ManualInterventionReason.PersistenceOutcomeUnknown
+                | "NoAuthorizedProviderDisposition" -> ManualInterventionReason.NoAuthorizedProviderDisposition
+                | other -> unexpected ("an unknown manual reason " + other)
+
+            manual reason evidence
+        | "releaseTerminalResource" ->
+            let terminalEvidence, disposition = terminalOf state
+
+            ChatExecutionRecoveryDecision.ReconcilePhysical(
+                PhysicalReconciliationRequest.ReleaseTerminalResource(
+                    resourceKey evidence.ResourceObservation,
+                    terminalEvidence,
+                    disposition
+                )
+            )
+        | "resumePreProvider" ->
+            ChatExecutionRecoveryDecision.ResumePreProvider
+                { ExecutionKey = state.key
+                  AcceptedEvidence = state.acceptedEvidence }
+        | "persistProviderStarted" ->
+            match evidence.ProviderObservation with
+            | ProviderPhysicalObservation.ProviderAlive started ->
+                ChatExecutionRecoveryDecision.ReconcilePhysical(
+                    PhysicalReconciliationRequest.PersistProviderStarted started
+                )
+            | _ -> unexpected "persistProviderStarted without a live provider"
+        | "persistProviderStartedAndTerminal" ->
+            match evidence.ProviderObservation with
+            | ProviderPhysicalObservation.ProviderTerminal(started, disposition) ->
+                ChatExecutionRecoveryDecision.ReconcilePhysical(
+                    PhysicalReconciliationRequest.PersistProviderStartedAndTerminal(started, disposition)
+                )
+            | _ -> unexpected "persistProviderStartedAndTerminal without a terminal provider"
+        | "finalize" ->
+            match
+                unbox<string> verdict?from,
+                state.startedEvidence,
+                evidence.ProviderObservation,
+                evidence.FailureDecisionEvidence
+            with
+            | "observation", Some started, ProviderPhysicalObservation.ProviderTerminal(_, disposition), _ ->
+                finalize started disposition
+            | "policy", Some started, _, RecoveryPolicyEvidence.FailureDecision decision ->
+                match decision.Resolution with
+                | ExecutionFailureResolution.TerminalizeProviderStarted(_, disposition) -> finalize started disposition
+                | _ -> unexpected "a policy finalize without a provider-started terminalization"
+            | _ -> unexpected "finalize without its started evidence and disposition"
+        | other -> unexpected ("an unknown decision " + other)
