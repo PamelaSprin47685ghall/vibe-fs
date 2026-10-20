@@ -119,3 +119,8 @@ node scripts/check.mjs
 
 - `Execution/Delegation/Fork/Host/{Agent,Join}.fs`、`Execution/Delegation/Handle/CompletionCodec.fs` 的 `open Wanxiangshu.OpenCode` 未被使用（文件中没有该命名空间下 255 个类型/模块名的任何引用，也没有限定名引用）。删除后同刀从基线移除三条。
 - 证据：全新构建（generation 40，`js-module-linkage` 725 个模块链接加载 OK）；三个文件的 Fable 产物与删除前（同一源码基线 generation 39）`cmp` 逐字节相同——行为不可能改变。`architecture.mjs` OK。
+- 落地复核（如实记录）：`59c5da9fd` 推送前的变基带入了 CUT-10 的 `1601da81c`/`06d8e1267`（ModelCapacity/ModelRouting 等 9 个源文件，未触及本刀三个文件），推送前只重跑了 `architecture.mjs`，没有重新构建——违反了“变基后先复核再推”。推送后立即在已落地的树上全新构建（generation 41，OK）并跑 `files.txt` 集 248 用例：237 pass / 0 fail / 1 skipped / 10 todo。master 未受影响。
+
+### 当前阻塞（DOING + BLOCKED）
+
+- 剩余能力（会话创建/查找/绑定、chat.params 精确租约、tool before/after 同源恢复、AttemptAborted 精确化、基线 28 个内核文件的收窄）分别与 CUT-11（Dispatch 5 个文件）、CUT-12（Session/ChatExecution、`AttemptAborted`）、CUT-25（tool 协议/JS 编程面）、CUT-10（chat.params 租约）相邻，按卡 §1 须待这些卡 DONE 后相邻验收。解除条件：CUT-10/11/12/25 在看板上 DONE。下一检查人：接手本卡的 worker 或协调者。
