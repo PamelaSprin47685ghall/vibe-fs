@@ -12,9 +12,6 @@ module ChatExecutionFactFold =
 
     let private invalidFact reason : Result<'value, FoldRejection> = Error(invalidFactRejection reason)
 
-    let private unsupportedSchema schemaVersion : Result<'value, FoldRejection> =
-        FoldRejection.reject "ChatExecution" (sprintf "UnsupportedSchema: expected 1, received %d" schemaVersion)
-
     let private replace (execution: ChatExecutionState) projection =
         { projection with
             ByKey = Map.add execution.key execution projection.ByKey }
@@ -27,68 +24,28 @@ module ChatExecutionFactFold =
         else
             Ok()
 
-    let private admitAccepted key evidence projection =
-        match ChatExecutionProjection.byKey key projection with
-        | None -> Ok(replace (ChatExecutionState.Accepted evidence) projection)
-        | Some current when current.acceptedEvidence = evidence -> Ok projection
-        | Some _ -> invalidFact "Accepted conflicts with the execution's established evidence"
+    let private sameAccepted (current: ChatExecutionState option) (evidence: AcceptedChatExecutionEvidence) =
+        current
+        |> Option.exists (fun execution -> execution.acceptedEvidence = evidence)
 
-    let private executionOrInvalid reason key projection =
-        match ChatExecutionProjection.byKey key projection with
-        | Some current -> Ok current
-        | None -> invalidFact reason
+    let private sameStarted (current: ChatExecutionState option) (evidence: ProviderStartedEvidence) =
+        current
+        |> Option.bind (fun execution -> execution.startedEvidence)
+        |> Option.exists (fun established -> established = evidence)
 
-    let private projectTransition projection transition =
-        match transition with
-        | Some updated -> replace updated projection
-        | None -> projection
-
-    let private advanceProviderStarted current evidence =
-        match current with
-        | ChatExecutionState.EndedBeforeStart _
-        | ChatExecutionState.EndedAfterStart _ -> invalidFact "ProviderStarted cannot follow a Terminal fact"
-        | ChatExecutionState.Accepted accepted when accepted = evidence.Accepted ->
-            Ok(Some(ChatExecutionState.Started evidence))
-        | ChatExecutionState.Started established when established = evidence -> Ok None
-        | ChatExecutionState.Accepted _
-        | ChatExecutionState.Started _ ->
-            invalidFact "ProviderStarted evidence does not match Accepted evidence or established provider run"
-
-    let private settleTerminal current evidence disposition =
-        match current, evidence with
-        | ChatExecutionState.Accepted accepted, ChatExecutionTerminalEvidence.PreProvider acceptedEvidence when
-            accepted = acceptedEvidence
-            && PreStartOutcome.ofDisposition disposition |> Option.isSome
-            ->
-            let outcome = PreStartOutcome.ofDisposition disposition |> Option.get
-
-            Ok(Some(ChatExecutionState.EndedBeforeStart(accepted, outcome)))
-        | ChatExecutionState.Accepted _, ChatExecutionTerminalEvidence.PreProvider _ ->
-            invalidFact "Pre-provider Terminal evidence mismatches Accepted or attempts Completed"
-        | ChatExecutionState.Accepted _, ChatExecutionTerminalEvidence.AfterProviderStart _ ->
-            invalidFact "After-provider Terminal has no preceding ProviderStarted fact"
-        | ChatExecutionState.Started established, ChatExecutionTerminalEvidence.AfterProviderStart started when
-            established = started
-            ->
-            Ok(Some(ChatExecutionState.EndedAfterStart(established, disposition)))
-        | ChatExecutionState.Started _, ChatExecutionTerminalEvidence.AfterProviderStart _ ->
-            invalidFact "Terminal evidence does not match ProviderStarted evidence"
-        | ChatExecutionState.Started _, ChatExecutionTerminalEvidence.PreProvider _ ->
-            invalidFact "Pre-provider Terminal cannot follow ProviderStarted"
-        | ChatExecutionState.EndedBeforeStart(establishedAccepted, establishedOutcome),
-          ChatExecutionTerminalEvidence.PreProvider acceptedEvidence when
-            establishedAccepted = acceptedEvidence
-            && PreStartOutcome.disposition establishedOutcome = disposition
-            ->
-            Ok None
-        | ChatExecutionState.EndedAfterStart(establishedStarted, establishedDisposition),
-          ChatExecutionTerminalEvidence.AfterProviderStart started when
-            establishedStarted = started && establishedDisposition = disposition
-            ->
-            Ok None
-        | ChatExecutionState.EndedBeforeStart _, _
-        | ChatExecutionState.EndedAfterStart _, _ ->
-            invalidFact "Terminal conflicts with the execution's established evidence or disposition"
+    /// CUT-12: which transition is legal is decided by wanxiangli/chat-execution;
+    /// this fold only builds the next typed state from the evidence it carries.
+    let private project key projection (current: ChatExecutionState option) verdict build =
+        match verdict with
+        | ChatExecutionLawFold.Keep -> Ok projection
+        | ChatExecutionLawFold.Reject reason ->
+            Error
+                { Fact = "ChatExecution"
+                  Reason = reason }
+        | next ->
+            match build current next with
+            | Some execution -> Ok(replace execution projection)
+            | None -> invalidOp (sprintf "ChatExecution phase law set an impossible phase for %A" key)
 
     let private validateTerminalEvidence =
         function
@@ -103,7 +60,18 @@ module ChatExecutionFactFold =
         AcceptedChatExecutionEvidence.validate evidence
         |> Result.mapError invalidFactRejection
         |> Result.bind (fun () -> validateAcceptedKey key evidence)
-        |> Result.bind (fun () -> admitAccepted key evidence projection)
+        |> Result.bind (fun () ->
+            let current = ChatExecutionProjection.byKey key projection
+
+            project
+                key
+                projection
+                current
+                (ChatExecutionPhaseLaw.foldAccepted current (sameAccepted current evidence))
+                (fun _ next ->
+                    match next with
+                    | ChatExecutionLawFold.SetAccepted -> Some(ChatExecutionState.Accepted evidence)
+                    | _ -> None))
 
     let applyProviderStarted
         (key: ChatExecutionKey)
@@ -112,9 +80,19 @@ module ChatExecutionFactFold =
         : Result<ChatExecutionProjectionState, FoldRejection> =
         ProviderStartedEvidence.validate evidence
         |> Result.mapError invalidFactRejection
-        |> Result.bind (fun () -> executionOrInvalid "ProviderStarted has no preceding Accepted fact" key projection)
-        |> Result.bind (fun current -> advanceProviderStarted current evidence)
-        |> Result.map (projectTransition projection)
+        |> Result.bind (fun () ->
+            let current = ChatExecutionProjection.byKey key projection
+
+            let verdict =
+                ChatExecutionPhaseLaw.foldProviderStarted
+                    current
+                    (sameAccepted current evidence.Accepted)
+                    (sameStarted current evidence)
+
+            project key projection current verdict (fun _ next ->
+                match next with
+                | ChatExecutionLawFold.SetStarted -> Some(ChatExecutionState.Started evidence)
+                | _ -> None))
 
     let applyTerminal
         (key: ChatExecutionKey)
@@ -124,20 +102,41 @@ module ChatExecutionFactFold =
         : Result<ChatExecutionProjectionState, FoldRejection> =
         validateTerminalEvidence evidence
         |> Result.mapError invalidFactRejection
-        |> Result.bind (fun () -> executionOrInvalid "Terminal has no preceding Accepted fact" key projection)
-        |> Result.bind (fun current -> settleTerminal current evidence disposition)
-        |> Result.map (projectTransition projection)
+        |> Result.bind (fun () ->
+            let current = ChatExecutionProjection.byKey key projection
+
+            let verdict =
+                match evidence with
+                | ChatExecutionTerminalEvidence.PreProvider accepted ->
+                    ChatExecutionPhaseLaw.foldTerminal current false (sameAccepted current accepted) false disposition
+                | ChatExecutionTerminalEvidence.AfterProviderStart started ->
+                    ChatExecutionPhaseLaw.foldTerminal
+                        current
+                        true
+                        (sameAccepted current started.Accepted)
+                        (sameStarted current started)
+                        disposition
+
+            project key projection current verdict (fun current next ->
+                match next, current with
+                | ChatExecutionLawFold.SetEndedBeforeStart outcome, Some execution ->
+                    Some(ChatExecutionState.EndedBeforeStart(execution.acceptedEvidence, outcome))
+                | ChatExecutionLawFold.SetEndedAfterStart disposition, Some(ChatExecutionState.Started established) ->
+                    Some(ChatExecutionState.EndedAfterStart(established, disposition))
+                | _ -> None))
 
     let fold
         (projection: ChatExecutionProjectionState)
         (fact: ChatExecutionFactCases)
         : Result<ChatExecutionProjectionState, FoldRejection> =
-        match fact with
-        | Accepted payload when payload.SchemaVersion = 1 -> applyAccepted payload.Key payload.Evidence projection
-        | ProviderStarted payload when payload.SchemaVersion = 1 ->
-            applyProviderStarted payload.Key payload.Evidence projection
-        | Terminal payload when payload.SchemaVersion = 1 ->
-            applyTerminal payload.Key payload.Evidence payload.Disposition projection
-        | Accepted payload -> unsupportedSchema payload.SchemaVersion
-        | ProviderStarted payload -> unsupportedSchema payload.SchemaVersion
-        | Terminal payload -> unsupportedSchema payload.SchemaVersion
+        let schemaVersion =
+            match fact with
+            | Accepted payload -> payload.SchemaVersion
+            | ProviderStarted payload -> payload.SchemaVersion
+            | Terminal payload -> payload.SchemaVersion
+
+        match ChatExecutionPhaseLaw.schemaRejection schemaVersion, fact with
+        | Some reason, _ -> FoldRejection.reject "ChatExecution" reason
+        | None, Accepted payload -> applyAccepted payload.Key payload.Evidence projection
+        | None, ProviderStarted payload -> applyProviderStarted payload.Key payload.Evidence projection
+        | None, Terminal payload -> applyTerminal payload.Key payload.Evidence payload.Disposition projection

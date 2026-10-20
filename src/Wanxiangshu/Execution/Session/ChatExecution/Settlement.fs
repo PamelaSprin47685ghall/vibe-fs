@@ -35,31 +35,30 @@ type PreProviderSettlementPersistence =
 [<RequireQualifiedAccess>]
 module PreProviderSettlement =
 
-    let private validDisposition =
-        function
-        | ChatExecutionTerminalDisposition.Cancelled
-        | ChatExecutionTerminalDisposition.Rejected
-        | ChatExecutionTerminalDisposition.Failed -> true
-        | ChatExecutionTerminalDisposition.Completed -> false
-
+    /// CUT-12: the pre-provider settlement decision is wanxiangli/chat-execution
+    /// `settlePreProvider`; `Ok true` appends, `Ok false` is an exact replay.
     let private currentDecision key evidence disposition (state: ChatExecutionState option) =
-        match state with
-        | None -> Error(PreProviderSettlementError.MissingAccepted key)
-        | Some current when current.acceptedEvidence <> evidence ->
+        let sameAccepted =
+            state |> Option.exists (fun current -> current.acceptedEvidence = evidence)
+
+        let decision =
+            ChatExecutionPhaseLaw.settlePreProvider state sameAccepted disposition
+
+        let established () =
+            match decision.Established with
+            | Some established -> established
+            | None -> invalidOp "wanxiangli/chat-execution terminalConflict without its established disposition"
+
+        match decision.Verdict, state with
+        | "invalidDisposition", _ -> Error(PreProviderSettlementError.InvalidDisposition disposition)
+        | "missingAccepted", _ -> Error(PreProviderSettlementError.MissingAccepted key)
+        | "evidenceConflict", Some current ->
             Error(PreProviderSettlementError.EvidenceConflict(current.acceptedEvidence, evidence))
-        | Some(ChatExecutionState.Accepted _) -> Ok true
-        | Some(ChatExecutionState.Started _) -> Error(PreProviderSettlementError.ProviderAlreadyStarted key)
-        | Some(ChatExecutionState.EndedBeforeStart(establishedEvidence, establishedOutcome)) when
-            PreStartOutcome.disposition establishedOutcome = disposition
-            && establishedEvidence = evidence
-            ->
-            Ok false
-        | Some(ChatExecutionState.EndedBeforeStart(_, establishedOutcome)) ->
-            Error(
-                PreProviderSettlementError.TerminalConflict(PreStartOutcome.disposition establishedOutcome, disposition)
-            )
-        | Some(ChatExecutionState.EndedAfterStart(_, establishedDisposition)) ->
-            Error(PreProviderSettlementError.TerminalConflict(establishedDisposition, disposition))
+        | "append", _ -> Ok true
+        | "existing", _ -> Ok false
+        | "providerAlreadyStarted", _ -> Error(PreProviderSettlementError.ProviderAlreadyStarted key)
+        | "terminalConflict", _ -> Error(PreProviderSettlementError.TerminalConflict(established (), disposition))
+        | other, _ -> invalidOp ("wanxiangli/chat-execution returned an unknown settlement verdict: " + other)
 
     let private witness key evidence disposition persistence =
         match persistence.ReadExact key with
@@ -78,12 +77,6 @@ module PreProviderSettlement =
         (disposition: ChatExecutionTerminalDisposition)
         : Task<Result<PreProviderTerminalWitness, PreProviderSettlementError>> =
         taskResult {
-            do!
-                if validDisposition disposition then
-                    Ok()
-                else
-                    Error(PreProviderSettlementError.InvalidDisposition disposition)
-
             let! append = currentDecision key evidence disposition (persistence.ReadExact key)
 
             if append then
