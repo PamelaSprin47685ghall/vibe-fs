@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-20",
+  "status": "ready_with_release_boundary",
+  "baseline": "0a9db16bac1e40e6df503791a5a7a346b7ebcf2f",
+  "upstream_reference": "0932e0c08de04a77d56b81722e90b308d6ce9e90",
+  "intake_mode": "selected semantic ports; mixed upstream commits are not marked wholly merged",
+  "source_commit_pushed_to_master": "e551b28880a150207e7c4ed8e3befacce9179a2a",
+  "last_product_change_commit": "349bac5a189618141a713a33c5a0e55fe29be7ca",
+  "candidate_digest": "1ec29b7d7179ac8692210610f9a70b813ff8bdb9ba3e6ef76efb375775bd9aee",
+  "normal_push_verified": true,
+  "force_push": false,
+  "work_packages": {
+    "M1": {
+      "status": "ready_limited",
+      "accepted": "完整candidateDigest；成功与捕获输入后的失败均携带候选身份，输入变化继续拒绝",
+      "evidence": ["m1-verification-016.log", "m1-verification-016-node22.log"],
+      "remaining": "系统Node26单独复制后缺动态libnode的27失败原件保留；官方Node22原生完整套件288/0/20skip/1旧TODO，不代证完整发行"
+    },
+    "M2": {
+      "status": "ready_limited",
+      "accepted": "实际Host行/字节预算、最小结果启动门禁、真实插件配置接线",
+      "evidence": ["m2-formal-02.log", "m6-focused-node22-02.log", "m6-physical-node26-02.log"],
+      "remaining": "采集容量与呈现预算分别受限；局部输出验收不代证完整发行"
+    },
+    "M3": {
+      "status": "ready_limited",
+      "accepted": "call/Callable、Host实际调用的sanity参数数组；共享绝对期限、取消、独立正式实例与既有进程收尾",
+      "evidence": ["m3-formal-03.log", "m3-formal-04.log", "m6-focused-node22-02.log", "m6-physical-node26-02.log"],
+      "remaining": "旧活动运行先按原协议收束；不重写或自动重播历史程序，不宣称通用异步CPU/Proxy隔离"
+    },
+    "M4": {
+      "status": "ready_limited",
+      "accepted": "Grep独立授权的真实rg；根内路径/侧文件、禁配置继承、JSON与NUL路径、严格解码、输出超量失败、期限取消及owner监管",
+      "evidence": ["m6-physical-node26-02.log", "m6-focused-node22-02.log", "m6-rg-bun-01.log"],
+      "remaining": "不支持组合短选项及count/vimgrep/type-list/quiet/外部预处理；显式拒绝后可改用独立参数与JSON/路径模式"
+    },
+    "M5": {
+      "status": "ready_limited",
+      "accepted": "真实Engineer无Exec搜索、Host配置、历史身份/cut/只读墓碑、原件Trace、Attachment与冻结读取回归",
+      "evidence": ["m6-related-node22-01.log", "m6-focused-node22-02.log", "m6-contract-node22-04.log"],
+      "historical_fixture_sha256": {
+        "mixed": "a9709c18a6a1a6256f04f0acf384945d002b5904a90dc8f2c4577fc1a8c36ef5",
+        "with_cut": "7a6ca9b312e0bb1b38546b521dc06390a7716bd56c4adf71903318105a3f0008",
+        "same_event": "51577bb621c510efd797db610b352071bb4aa00ddb8a40a8cb8d3cc8327d94fb"
+      },
+      "remaining": "Wave2同进程对象与策略代数不代证冷恢复或真实nonfatal路径；旧TODO/GAP保留。Manager只读示例白名单补Grep，没有授予Write/Exec"
+    },
+    "M6": {
+      "status": "review_with_release_boundary",
+      "accepted": "最终gen38构建、静态检查、正式核心物理集及三个运行时独立包消费通过；源提交已普通推送",
+      "remaining": "完整release仍未通过；旧运行工作树与活动资源未切换，不部署"
+    }
+  },
+  "verification": {
+    "counts_overlap_and_must_not_be_added": true,
+    "final_build_generation": 38,
+    "registered_surfaces": 171,
+    "emitted_modules_loaded": 826,
+    "format_check": { "generation": 37, "exit_code": 0, "later_change": "only partitioned one JavaScript negative test into independent cases" },
+    "final_static_check_exit_code": 0,
+    "final_library_source_check_exit_code": 0,
+    "freshness_after_commit": "passed, generation38",
+    "node22_related_generation32": { "passed": 611, "failed": 1, "todo": 8, "drained_files": 78, "reclamation_accepted": true, "failure": "new cancellation fixture assumed target startup within 3000ms; corrected and separately revalidated" },
+    "node22_protocol_generation33": { "passed": 80, "failed": 0, "todo": 0, "drained_files": 10, "reclamation_accepted": true, "exit_code": 0 },
+    "node22_capabilities_generation36": { "passed": 41, "failed": 0, "todo": 2, "drained_files": 4, "reclamation_accepted": true, "exit_code": 1, "reason": "old TODOs remain failures for acceptance" },
+    "node26_physical_first_generation37": { "authoritative_totals": false, "completed_files": 19, "planned_files": 25, "exit_code": 1, "failure": "two actual invalid-output queries in one test exceeded 5000ms verdict silence; split into independent cases without changing product deadlines" },
+    "node26_physical_final_generation38": { "passed": 253, "failed": 0, "todo": 0, "skipped": 0, "drained_files": 14, "planned_files": 14, "reclamation_accepted": true, "exit_code": 0 },
+    "bun_actual_rg_generation37": { "runtime": "1.3.14", "actual_query": true, "matches": 1, "utf8_crlf_preserved": true, "exit_code": 0 },
+    "release_last_attempt": {
+      "source_commit": "349bac5a189618141a713a33c5a0e55fe29be7ca",
+      "generation": 37,
+      "format_static_and_clean_build": "passed",
+      "exit_code": 1,
+      "failed_stage": "unit",
+      "reason": "5000ms verdict silence at distribution-007",
+      "completed_files": 255,
+      "planned_files": 870,
+      "authoritative_totals": false,
+      "reclamation_accepted": true,
+      "integration_e2e_package_stages_reached": false,
+      "later_change": "only independent test-case partition; rebuilt gen38 and scoped revalidated, no later full release claim"
+    },
+    "release_accepted": false,
+    "todo_acceptance_override_used": false,
+    "default_silence_limit_increased": false,
+    "product_deadline_relaxed": false,
+    "finite_physical_wait": "existing begin/end ACK protocol for actual target startup and cancellation drain; bounded at 12000ms in the cancellation fixture"
+  },
+  "packages": {
+    "generation": 38,
+    "member_count": 1722,
+    "total_bytes": 14397313,
+    "closure_issues": [],
+    "node22": { "version": "22.13.0", "pack_install_external_consumer": "passed", "sha256": "aedc4dbcd93443fca9fb4d8363428a03b154c56ab1d765916b7cefd90575f6a0" },
+    "node26": { "version": "26.6.0", "pack_install_external_consumer": "passed", "sha256": "57103eac980707b901ba18aba88c5f49f6f5cab171f30a9f2088af38de32df7a" },
+    "bun": { "version": "1.3.14", "pack_install_external_consumer": "passed", "sha256": "57103eac980707b901ba18aba88c5f49f6f5cab171f30a9f2088af38de32df7a" },
+    "separate_package_pass_does_not_replace_release_failure": true,
+    "registry_published": false
+  },
+  "library": { "commit": "05f6b5acf63a29d758e08e3162bba4c547dfda8d", "version": "0.8.1", "public_exports": 16, "changed_in_this_batch": false },
+  "failed_test_cleanup": {
+    "reason": "runner termination observation hit ps ETIMEDOUT after the combined negative test silence",
+    "confirmed_test_supervisor_group": 26630,
+    "actual_target_already_exited": 26631,
+    "request_cwd": "wxs-rg-invalid-RmptYO",
+    "only_this_group_killed": true,
+    "supervisor_absent_after_cleanup": true,
+    "old_groups_1199_and_96062_left_untouched": true,
+    "evidence": "m6-cleanup-node26-01.log"
+  },
+  "deployment": {
+    "deployed": false,
+    "runtime_cutover": false,
+    "original_checkout_head": "8db33b3429a70d5cdbea30e393363666b3649573",
+    "original_checkout_clean": true,
+    "Blogger_fully_retired": false,
+    "Herdchestra_cleared": false,
+    "old_GAPs_cleared": false
+  },
+  "remaining_boundaries": [
+    "完整发行的5000ms静默失败与旧TODO保持原状态，不以定向或包消费通过替代。",
+    "完整Long Stroke、通用恶意JS隔离、B2及旧冷恢复/耐久/并发GAP不在本批闭合范围。",
+    "rg首批选项有限；缺少原生rg时明确失败，不自动下载或替换实现。",
+    "受控查询启动延迟原因未定；实际进入、取消、PID死亡和真实排空断言保留。",
+    "存量历史程序不自动重播；部署前旧活动运行按原协议收束。",
+    "Blogger与历史读取职责保留，.Herdchestra及取证原件不清空。"
+  ]
+}
