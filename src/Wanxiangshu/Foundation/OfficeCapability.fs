@@ -67,6 +67,8 @@ module OfficeCapability =
         abstract toolNames: permission: string -> string array
         abstract permissionOfToolName: role: string * name: string -> string option
         abstract admitsToolForRole: role: string * name: string -> bool
+        abstract utilityToolNames: unit -> string array
+        abstract admitsUtility: role: string * name: string -> bool
 
     [<Import("Capability", "wanxiangli/capability")>]
     let private capabilityClass: obj = jsNative
@@ -181,3 +183,8 @@ module OfficeCapability =
 
     let admitsToolForRole (role: Role) (name: string) : bool =
         library.admitsToolForRole (Roles.roleLabel role, name)
+
+    let utilityToolNames: string list = library.utilityToolNames () |> Array.toList
+
+    let admitsUtility (role: Role) (name: string) : bool =
+        library.admitsUtility (Roles.roleLabel role, name)

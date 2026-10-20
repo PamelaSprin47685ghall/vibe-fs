@@ -65,3 +65,9 @@ module OfficeCapability =
     val permissionOfToolName: role: Role -> name: string -> ToolPermission option
     /// Visible equals callable: the role owns the permission this exact name maps to.
     val admitsToolForRole: role: Role -> name: string -> bool
+    /// Host utility tool names (`skill`, `assume`): not office permissions. Answered by
+    /// wanxiangli/capability.
+    val utilityToolNames: string list
+    /// Utility admission for one role: schema projection, request tool map and execute
+    /// admission all read this. Roles outside the office matrix fail closed.
+    val admitsUtility: role: Role -> name: string -> bool

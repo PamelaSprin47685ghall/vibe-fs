@@ -6,7 +6,6 @@ open Wanxiangshu.Foundation
 module StaticTools =
     val toolNames: p: ToolPermission -> string list
     val jsToolName: role: Role -> string
-    val cognitiveUtilityRoleAllowed: role: Role -> bool
     val hostExternalNamespaceAllowedForRole: role: Role -> bool
     val knownToolNames: string list
     val permissionOfToolName: role: Role -> name: string -> ToolPermission option

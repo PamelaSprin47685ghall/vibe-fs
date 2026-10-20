@@ -22,7 +22,7 @@ module AssumeTool =
         let Committed = "tool/assume/committed"
 
     let roleAllowed (role: Role) : bool =
-        StaticTools.cognitiveUtilityRoleAllowed role
+        OfficeCapability.admitsUtility role "assume"
 
     let admission: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ role -> roleAllowed role)

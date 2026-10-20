@@ -30,10 +30,6 @@ module StaticTools =
     let jsToolName (role: Role) : string =
         "todowrite-for-" + (string role).ToLowerInvariant()
 
-    /// Shared office boundary for lightweight cognitive utilities (`assume`) so
-    /// schema visibility and execution admission cannot drift.
-    let cognitiveUtilityRoleAllowed (role: Role) : bool = role <> Role.Distiller
-
     /// capability-enforcement-006/007: a Host-declared external (MCP) tool
     /// namespace is not an office capability, so it never enters
     /// `Roles.permissions` (capability-enforcement-006) and no per-source
@@ -97,16 +93,16 @@ module StaticTools =
           "todowrite-for-plan" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
-    /// The office half comes from the one reverse lookup; utility tools keep
-    /// their own predicates.
+    /// The office half comes from the one reverse lookup; utility tools read the
+    /// one utility admission in wanxiangli/capability, the same answer the
+    /// permission object and the tool admission give.
     let requestToolMap (role: Role) (allowed: Set<ToolPermission>) : Map<string, bool> =
         let registry = AblationGate.registry ()
 
         knownToolNames
         |> List.map (fun name ->
             name,
-            (name = "skill"
-             || name = "assume"
+            (OfficeCapability.admitsUtility role name
              || (permissionOfToolName role name
                  |> Option.exists (fun permission -> Set.contains permission allowed))))
         |> Map.ofList
@@ -137,9 +133,11 @@ module StaticTools =
         // host verb is `commission` (no office permission of its own).
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "commission", Role.Orchestrator -> "allow"
-        | true, "skill", _ -> "allow"
-        | true, "assume", role when not (cognitiveUtilityRoleAllowed role) -> "deny"
-        | true, "assume", _ -> "allow"
+        | true, name, role when List.contains name OfficeCapability.utilityToolNames ->
+            if OfficeCapability.admitsUtility role name then
+                "allow"
+            else
+                "deny"
         | true, "todowrite-for-bookkeeper", _ -> "deny"
         | true, name, _ when name.StartsWith "todowrite-for-" -> jsPermission role name
         | true, _, _ -> defaultPermission allowed role name
