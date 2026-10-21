@@ -6,6 +6,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
+import { scanAdapterThinness } from './adapter-thinness.mjs'
 
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 const SRC_ROOT = 'src'
@@ -183,6 +184,9 @@ export function scanArchitecture(productionFiles, read) {
       }
     }
   }
+
+  // ⑩ adapter-thinness ratchet and ⑪ port-purity (HNI-04): see scripts/checks/adapter-thinness.mjs.
+  for (const v of scanAdapterThinness(productionFs, read).violations) violations.push(v)
 
   return { violations, productionFsCount: productionFs.length }
 }
