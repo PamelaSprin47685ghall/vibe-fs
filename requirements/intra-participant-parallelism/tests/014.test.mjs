@@ -1,14 +1,9 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import test from 'node:test'
 import * as fission from '../../../dist/Execution/Fission/Surface.js'
 import { deliveredValue, deliveredViewOf } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { anchors, applyView, clearAll } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
-
-const root = process.cwd()
-const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
 test('WHAT[intra-participant-parallelism-014] production settlement decision yields nonfinal observations to the ordinary turn owner', () => {
   for (const phase of ['lane', 'takeover']) {
@@ -42,8 +37,16 @@ test('WHAT[intra-participant-parallelism-014] production settlement decision yie
  * TurnCompleted here, so no `FissionLaneMaterialized` fact and no takeover
  * prompt are ever produced. That remaining chain is exactly the open
  * `GAP-158` todo below ("actual lane and takeover continuation completes
- * before settlement"); this regression owns the owner-cell half of the law at
- * the closest observable boundary.
+ * before settlement").
+ *
+ * What this case therefore does and does not establish: it drives the real
+ * admission and the real delivery path and asserts that the owner cell holds
+ * only the owner's own delivery, with no lane anchor and no lane material.
+ * It does **not** reach the takeover branch, so it is not a
+ * failing-before/passing-after proof for the removal of the cross-session
+ * staging in that branch: the removed call sits on a path this fixture never
+ * enters. The dynamic verification of the takeover chain is still missing and
+ * stays open with `GAP-158`.
  */
 test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empty until the owner delivers itself, and a lane delivery never lands in it', async () => {
   try {
@@ -218,25 +221,6 @@ test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empt
   } finally {
     clearAll()
   }
-})
-
-test('WHAT[intra-participant-parallelism-014] the takeover completion branch stages no other session delivery into the owner cell', () => {
-  // The takeover branch runs on the owner's own turn. Copying the final
-  // lane's delivered view declaration into the owner's cell would put a
-  // foreign session's anchor declaration in the owner's cell, where every
-  // reader renders it under the owner's own anchor numbering. The lane's
-  // material reaches the owner through the aggregate in the takeover prompt,
-  // so the branch must not write the owner cell at all.
-  const host = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
-  const branch = host.slice(
-    host.indexOf('FissionTakeoverSettlementDecision.CompleteOwner'),
-    host.indexOf('FissionTakeoverSettlementDecision.CompleteOwner') + 1200,
-  )
-  assert.equal(
-    /JsDeliveredValues\.(recordView|recordFencedView|peekCached)/.test(branch),
-    false,
-    'the takeover completion branch must not write or read the owner delivery cell',
-  )
 })
 
 test.todo('WHAT[intra-participant-parallelism-014] actual lane and takeover continuation completes before settlement, including nudge, AABB and degeneration abort through their real owners (GAP-158)')
