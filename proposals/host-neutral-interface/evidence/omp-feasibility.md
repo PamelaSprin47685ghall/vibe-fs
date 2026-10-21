@@ -34,7 +34,8 @@ binary `~/.local/bin/omp` reports `omp/18.12.4`. Extension entry: `omp -e <file>
    lost `option`, a missing or extra union case or a changed member signature all break it — the earlier
    name-only comparison could not see any of those.
 3. `fixtures/fixture.test.ts` (bun, offline): a fake `ExtensionAPI` replays recorded-shape omp events
-   (`fixtures/events.json`) through the adapter to a fake product; 21 assertions (tool registration and execution
+   (`fixtures/events.json`) through the adapter to a fake product; 34 assertions at the tip of this lane's adapter
+   work (tool registration and execution
    encode, refuse→block, rewrite/allow, result replace, input refuse, system prompt, compaction context,
    auto-continue deny, turn_end error → `AttemptFinished Failed`, transcript decode, child create, model apply
    error, prompt correlation, the three parent-session forms: session id, resolvable file path, unresolvable

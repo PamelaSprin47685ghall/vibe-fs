@@ -11,7 +11,10 @@ Ablation, Change, Composition, Context, Execution, Git, Interaction, Mission, Pa
 Repository, Sphinx, Verification. It also counts the adapter files that reference **no** host-neutral port type at
 all.
 
-Current measurement: **151 adapter files, 40541 lines, product-reference 695, without-port 151.**
+Current measurement **at this lane's slice commits**: **151 adapter files, 40541 lines, product-reference 695,
+without-port 151.** Later master tips differ as other lanes edit adapters; the ratchet was never raised by this
+lane. Re-measure with `node scripts/checks/adapter-thinness.mjs` — the numbers above are a dated record, not a live
+claim.
 
 ## What gate ⑪ measures
 
