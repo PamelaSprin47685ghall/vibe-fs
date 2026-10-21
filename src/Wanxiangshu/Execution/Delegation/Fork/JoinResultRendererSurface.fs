@@ -1,8 +1,7 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Fork
 
 open Wanxiangshu.Foundation.HostSession
 
-open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation

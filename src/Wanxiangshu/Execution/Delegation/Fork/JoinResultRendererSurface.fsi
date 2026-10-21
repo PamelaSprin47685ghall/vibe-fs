@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Fork
 
 /// Entry-local join rendering owner surface. It accepts a plain delivered view
 /// and keeps join item unions/private non-empty batches inside the renderer.

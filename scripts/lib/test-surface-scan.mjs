@@ -1356,10 +1356,10 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'OpenCode/JoinResultRendererSurface.js',
+    module: 'Execution/Delegation/Fork/JoinResultRendererSurface.js',
     owner: 'provider-projection',
     laws: ['PROVIDER-PROJECTION-009'],
-    source: 'src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs',
+    source: 'src/Wanxiangshu/Execution/Delegation/Fork/JoinResultRendererSurface.fs',
     representation: 'json',
     kind: 'pure',
   },

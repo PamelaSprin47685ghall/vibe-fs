@@ -55,6 +55,8 @@
     <Compile Include="Host/DelegationCommand.fs"/>
     <Compile Include="Execution/Delegation/Fork/Command.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Command.fs"/>
+    <Compile Include="Execution/Delegation/Fork/JoinResultRendererSurface.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/JoinResultRendererSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fsi"/>
@@ -63,7 +65,5 @@
     <Compile Include="Execution/Delegation/SyncDelegate/Batching.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Batching.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Batching.fs"/>
-    <Compile Include="OpenCode/JoinResultRendererSurface.fsi"/>
-    <Compile Include="OpenCode/JoinResultRendererSurface.fs"/>
   </ItemGroup>
 </Project>

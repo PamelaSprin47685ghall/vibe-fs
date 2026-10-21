@@ -3,7 +3,7 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const join = await import("../../../dist/OpenCode/JoinResultRendererSurface.js");
+const join = await import("../../../dist/Execution/Delegation/Fork/JoinResultRendererSurface.js");
 
 
 test('WHAT[provider-projection-009] MISC_join_render_batch_empty_view_no_comment', () => {
