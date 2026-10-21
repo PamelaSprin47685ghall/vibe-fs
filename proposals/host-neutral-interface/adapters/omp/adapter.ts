@@ -178,18 +178,6 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
 
   const prompts: P.IPromptPort = {
     async Send(s, request, late) {
-      // Phase 1 (preparation): everything that happens BEFORE the host is
-      // asked to accept the prompt. A failure here means the prompt was never
-      // offered to the host, so acceptance is not unknown: it is a definite
-      // failure (`Fatal` = definitely not sent).
-      try {
-        if (request.Correlation !== undefined) pi.appendEntry("wxs.prompt-key", { session: s, key: request.Correlation });
-      } catch (e) {
-        // Our own correlation write failed: the host never saw the prompt.
-        // Reporting this as `AcceptanceUnknown` would hide an adapter bug
-        // behind an ambiguous host state.
-        return { tag: "Fatal", reason: why(e) };
-      }
       // The unsupported-field check is scoped to the delivery path actually
       // used, and the two paths are NOT the same:
       //   - `children.prompt(id, text)` takes a TEXT only. It carries no
@@ -200,6 +188,11 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
       //     expressible through it.
       // Both refuse, but the reason names the path that cannot carry the
       // field, so a child refusal is never read as a host-session refusal.
+      //
+      // The check runs BEFORE anything is written to the session log: a
+      // prompt that is refused was never sent, so a `"wxs.prompt-key"`
+      // entry written for it would be a phantom correlation for a prompt
+      // that does not exist.
       const unsupportedFields: string[] = [];
       if (request.Role !== undefined) unsupportedFields.push("Role");
       if (request.Route !== undefined) unsupportedFields.push("Route");
@@ -211,6 +204,18 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
           : `omp cannot carry ${unsupportedFields.join(", ")}`;
         if (late) await late({ tag: "Refused", reason });
         return { tag: "Fatal", reason };
+      }
+      // Phase 1 (preparation): everything that happens BEFORE the host is
+      // asked to accept the prompt. A failure here means the prompt was never
+      // offered to the host, so acceptance is not unknown: it is a definite
+      // failure (`Fatal` = definitely not sent).
+      try {
+        if (request.Correlation !== undefined) pi.appendEntry("wxs.prompt-key", { session: s, key: request.Correlation });
+      } catch (e) {
+        // Our own correlation write failed: the host never saw the prompt.
+        // Reporting this as `AcceptanceUnknown` would hide an adapter bug
+        // behind an ambiguous host state.
+        return { tag: "Fatal", reason: why(e) };
       }
       // Phase 2 (delivery): the point of no return. The host may already have
       // taken the prompt when this throws, so acceptance is genuinely unknown.
@@ -233,7 +238,12 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
       } catch (e) {
         return { tag: "AcceptanceUnknown", reason: why(e) };
       }
-      if (late) await late({ tag: "OwnedSettled" });
+      // `OwnedSettled` means the send settled with a receipt, so it is only
+      // correct for an ADMITTED prompt. A `Retryable` outcome was never
+      // accepted (`children.prompt` returned false): announcing it as
+      // settled would tell the caller its prompt was delivered when the
+      // host refused it.
+      if (outcome.tag === "AdmittedWithReceipt" && late) await late({ tag: "OwnedSettled" });
       return outcome;
     },
   };

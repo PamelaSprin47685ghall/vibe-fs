@@ -19,6 +19,9 @@ const on = ((event: string, handler: Handler) => { handlers.set(event, [...(hand
 // message is the DELIVERY phase (acceptance becomes unknown).
 let sendFault: Error | undefined;
 let appendFault: Error | undefined;
+// Fault injection for the CHILD delivery path: `children.prompt` resolves
+// `false` when the host refuses the prompt (the prompt was never accepted).
+let childPromptRefused = false;
 const pi: OmpApi = {
   on,
   registerTool: ((t: { name: string; execute: Function }) => { tools.push(t); }) as ExtensionAPI["registerTool"],
@@ -41,7 +44,7 @@ const ctx = {
   modelRegistry: { getAvailable: () => [{ provider: "fx", id: "m1" }], find: (p: string, m: string) => (p === "fx" && m === "m1" ? { provider: p, id: m } : undefined) },
 } as unknown as ExtensionContext;
 const children: OmpChildSessions = {
-  create: async (parent) => `child-of-${parent}`, prompt: async () => true, abort: async () => {}, close: async () => {},
+  create: async (parent) => `child-of-${parent}`, prompt: async () => !childPromptRefused, abort: async () => {}, close: async () => {},
   parentOf: (s) => (s.startsWith("child-of-") ? s.slice(9) : undefined), childrenOf: () => [], findByTitle: async () => [],
   messages: () => [],
   resolveSessionIdByPath: async (path) => (path === "/tmp/sessions/parent.jsonl" ? "parent-session-id" : undefined),
@@ -117,6 +120,22 @@ sendFault = undefined;
 expect("a child prompt carrying Role is refused with the child path's reason, not the host's",
   await portsSeen!.Prompts.Send("child-of-root" as P.SessionId, { Text: "go", Role: P.agentRole("coder") }, undefined),
   { tag: "Fatal", reason: "omp child prompts carry text only: cannot carry Role" });
+// A refused prompt was never sent, so it must not leave a phantom
+// correlation entry in the session log. The unsupported-field check runs
+// BEFORE the correlation write.
+expect("a prompt refused for an unsupported field does not append a correlation entry",
+  [await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go", Role: P.agentRole("coder"), Correlation: P.promptKey("pk-refused") }, undefined), entries],
+  [{ tag: "Fatal", reason: "omp cannot carry Role" }, []]);
+// `children.prompt` resolving false means the host REFUSED the prompt: it
+// was never accepted. The outcome is `Retryable`, and the `late` callback
+// must NOT be told the send settled.
+childPromptRefused = true;
+const lateVerdicts: P.DeliveryVerdict[] = [];
+expect("a child prompt the host refused is Retryable",
+  await portsSeen!.Prompts.Send("child-of-root" as P.SessionId, { Text: "go" }, async (v) => { lateVerdicts.push(v); }),
+  { tag: "Retryable", reason: "omp refused prompt" });
+expect("a refused child prompt does not fire late({ OwnedSettled })", lateVerdicts, []);
+childPromptRefused = false;
 const ctxEdit = await fire("context", { type: "context", messages: [{ role: "user", content: [{ type: "text", text: "REPLACE-ME" }], timestamp: 1 }] });
 const stamps = (ctxEdit as { messages: { timestamp?: number }[] }).messages.map((m) => m.timestamp);
 expect("both synthesized messages carry the same numeric timestamp",
