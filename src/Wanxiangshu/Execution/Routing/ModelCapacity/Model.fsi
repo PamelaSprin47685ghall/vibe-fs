@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Execution.Routing
 
 open Wanxiangshu.Foundation.HostSession
 
@@ -18,28 +18,27 @@ type ModelExecutionPurpose = | Normal
 type internal CapacityCreditId = private CapacityCreditId of int64
 
 module internal CapacityCreditId =
-    /// Credits are minted by wanxiangli/borrowing (CUT-10); the host only wraps the library's number.
-    let ofValue (value: int64) = CapacityCreditId value
-    let first = ofValue 1L
-    let value (CapacityCreditId value) = value
+    val ofValue: int64 -> CapacityCreditId
+    val first: CapacityCreditId
+    val value: CapacityCreditId -> int64
 
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal CapacityLeaseId = private CapacityLeaseId of int64
 
 module internal CapacityLeaseId =
-    let initial = CapacityLeaseId 0L
-    let next (CapacityLeaseId value) = CapacityLeaseId(value + 1L)
-    let first = next initial
-    let value (CapacityLeaseId value) = value
+    val initial: CapacityLeaseId
+    val next: CapacityLeaseId -> CapacityLeaseId
+    val first: CapacityLeaseId
+    val value: CapacityLeaseId -> int64
 
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal CapacityFence = private CapacityFence of int64
 
 module internal CapacityFence =
-    let initial = CapacityFence 0L
-    let next (CapacityFence value) = CapacityFence(value + 1L)
-    let first = next initial
-    let value (CapacityFence value) = value
+    val initial: CapacityFence
+    val next: CapacityFence -> CapacityFence
+    val first: CapacityFence
+    val value: CapacityFence -> int64
 
 type internal ExecutionAdmissionExactIdentity =
     { SessionId: string
@@ -48,59 +47,70 @@ type internal ExecutionAdmissionExactIdentity =
       Participant: string
       Target: ModelRoutingTarget }
 
-type internal ExecutionAdmissionLease
-    private
-    (
-        owner: obj,
-        capacityCredit: CapacityCreditId,
-        leaseId: CapacityLeaseId,
-        fence: CapacityFence,
-        identity: ExecutionAdmissionExactIdentity
-    ) =
-    member internal _.Owner = owner
-    member internal _.CapacityCredit = capacityCredit
-    member internal _.LeaseId = leaseId
-    member internal _.Fence = fence
-    member internal _.Identity = identity
+type internal ExecutionAdmissionLease =
+    private new:
+        owner: obj *
+        capacityCredit: CapacityCreditId *
+        leaseId: CapacityLeaseId *
+        fence: CapacityFence *
+        identity: ExecutionAdmissionExactIdentity ->
+            ExecutionAdmissionLease
 
-    static member internal Create(owner: obj, capacityCredit, leaseId, fence, identity) =
-        ExecutionAdmissionLease(owner, capacityCredit, leaseId, fence, identity)
+    member internal Owner: obj
+    member internal CapacityCredit: CapacityCreditId
+    member internal LeaseId: CapacityLeaseId
+    member internal Fence: CapacityFence
+    member internal Identity: ExecutionAdmissionExactIdentity
+
+    static member internal Create:
+        owner: obj *
+        capacityCredit: CapacityCreditId *
+        leaseId: CapacityLeaseId *
+        fence: CapacityFence *
+        identity: ExecutionAdmissionExactIdentity ->
+            ExecutionAdmissionLease
 
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal QueueNodeId = private QueueNodeId of int64
 
 module internal QueueNodeId =
-    let initial = QueueNodeId 0L
-    let next (QueueNodeId value) = QueueNodeId(value + 1L)
-    let value (QueueNodeId value) = value
+    val initial: QueueNodeId
+    val next: QueueNodeId -> QueueNodeId
+    val value: QueueNodeId -> int64
 
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal QueueFence = private QueueFence of int64
 
 module internal QueueFence =
-    let initial = QueueFence 0L
-    let next (QueueFence value) = QueueFence(value + 1L)
-    let value (QueueFence value) = value
+    val initial: QueueFence
+    val next: QueueFence -> QueueFence
+    val value: QueueFence -> int64
 
-type internal ExecutionAdmissionQueueNode
-    private
-    (
-        owner: obj,
-        nodeId: QueueNodeId,
-        fence: QueueFence,
-        sessionId: string,
-        physicalUserMessageId: string,
-        completion: TaskCompletionSource<ExecutionAdmissionAcquisition>
-    ) =
-    member internal _.Owner = owner
-    member internal _.NodeId = nodeId
-    member internal _.Fence = fence
-    member internal _.SessionId = sessionId
-    member internal _.PhysicalUserMessageId = physicalUserMessageId
-    member internal _.Completion = completion
+type internal ExecutionAdmissionQueueNode =
+    private new:
+        owner: obj *
+        nodeId: QueueNodeId *
+        fence: QueueFence *
+        sessionId: string *
+        physicalUserMessageId: string *
+        completion: TaskCompletionSource<ExecutionAdmissionAcquisition> ->
+            ExecutionAdmissionQueueNode
 
-    static member internal Create(owner: obj, nodeId, fence, sessionId, physicalUserMessageId, completion) =
-        ExecutionAdmissionQueueNode(owner, nodeId, fence, sessionId, physicalUserMessageId, completion)
+    member internal Owner: obj
+    member internal NodeId: QueueNodeId
+    member internal Fence: QueueFence
+    member internal SessionId: string
+    member internal PhysicalUserMessageId: string
+    member internal Completion: TaskCompletionSource<ExecutionAdmissionAcquisition>
+
+    static member internal Create:
+        owner: obj *
+        nodeId: QueueNodeId *
+        fence: QueueFence *
+        sessionId: string *
+        physicalUserMessageId: string *
+        completion: TaskCompletionSource<ExecutionAdmissionAcquisition> ->
+            ExecutionAdmissionQueueNode
 
 and [<RequireQualifiedAccess>] internal ExecutionAdmissionAcquisition =
     | Admitted of ExecutionAdmissionLease
@@ -134,29 +144,10 @@ type internal CapacityTransitionCountersSnapshot =
       Stale: int64
       Conflict: int64 }
 
-type internal CapacityTransitionCounters() =
-    let gate = obj ()
-    // DSL-MUTABLE: resource
-    let mutable duplicate = 0L
-    let mutable stale = 0L
-    // DSL-MUTABLE: resource
-    let mutable conflict = 0L
-
-    member _.Record(outcome: CapacityTransitionOutcome) =
-        lock gate (fun () ->
-            match outcome with
-            | CapacityTransitionOutcome.Applied -> ()
-            | CapacityTransitionOutcome.AlreadyApplied -> duplicate <- duplicate + 1L
-            | CapacityTransitionOutcome.StaleFence -> stale <- stale + 1L
-            | CapacityTransitionOutcome.Conflict -> conflict <- conflict + 1L)
-
-        outcome
-
-    member _.Snapshot() =
-        lock gate (fun () ->
-            { Duplicate = duplicate
-              Stale = stale
-              Conflict = conflict })
+type internal CapacityTransitionCounters =
+    new: unit -> CapacityTransitionCounters
+    member Record: outcome: CapacityTransitionOutcome -> CapacityTransitionOutcome
+    member Snapshot: unit -> CapacityTransitionCountersSnapshot
 
 type internal CapacityExactOwnerSnapshot =
     { SessionId: string

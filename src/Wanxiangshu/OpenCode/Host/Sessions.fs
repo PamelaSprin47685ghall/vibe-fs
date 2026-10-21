@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Routing
+
 open Wanxiangshu.Foundation.HostSession
 
 open Wanxiangshu.Foundation.TerminalSignal

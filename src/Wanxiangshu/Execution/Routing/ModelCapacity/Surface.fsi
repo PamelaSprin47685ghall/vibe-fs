@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Execution.Routing
 
 type internal ExecutionCapacityOwner =
     new: counters: CapacityTransitionCounters -> ExecutionCapacityOwner

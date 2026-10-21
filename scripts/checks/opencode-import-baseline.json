@@ -5,7 +5,6 @@
     "src/Wanxiangshu/Context/Trace/Capture.fs",
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
     "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
-    "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs",
-    "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs"
+    "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs"
   ]
 }

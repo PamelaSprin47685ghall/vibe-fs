@@ -11,7 +11,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
@@ -288,7 +288,7 @@ module ProviderRecoveryWorkflow =
 
             let hasCapacity =
                 roleName = ""
-                || ModelRouting.hasTheoreticalCapacity roleName Wanxiangshu.OpenCode.ModelExecutionPurpose.Normal
+                || ModelRouting.hasTheoreticalCapacity roleName Wanxiangshu.Execution.Routing.ModelExecutionPurpose.Normal
 
             let refusedSatellite =
                 SessionAssociationProjection.isSatellite turn.SessionId projections.AgentProjections.Associations
@@ -375,7 +375,7 @@ module ProviderRecoveryWorkflow =
 
             let hasCapacity =
                 roleName = ""
-                || ModelRouting.hasTheoreticalCapacity roleName Wanxiangshu.OpenCode.ModelExecutionPurpose.Normal
+                || ModelRouting.hasTheoreticalCapacity roleName Wanxiangshu.Execution.Routing.ModelExecutionPurpose.Normal
 
             let recoveryContext =
                 requestKindFor durable turn.SessionId turn.PhysicalUserMessageId

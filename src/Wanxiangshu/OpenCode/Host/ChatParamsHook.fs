@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Routing
+
 open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session.ChatExecution

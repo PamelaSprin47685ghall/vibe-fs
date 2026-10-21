@@ -23,6 +23,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Planning
 open Wanxiangshu.Mission.Work.OpenCode
 open Wanxiangshu.Mission.Work
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
