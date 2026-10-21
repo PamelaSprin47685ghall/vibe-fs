@@ -16,6 +16,7 @@
 - 041 是生产接线的源码静态断言：lifecycle persistence 沿 PluginHostInterop → ToolRegistry.create → JsToolSpec/execute 与 PluginBoot → PluginRuntimeScope → ClearSession 贯通，执行链不留硬编码 None，四类事件同住单一审计流，ParkedSites 表不触碰 durable。它证明接线存在，不证明运行期审计真实落盘。
 - 045—047 真实运行主原语面：cat/ls/stat/mkdir 的成功与稳定失败形态、write 覆盖与读快照冲突、whereAll 规范化匹配与 from、where 唯一/零/多三态与 park 注入、组合模式（find/replace、批量替换、append、锚点切片、grep/glob 组合）。长程异步与内存隔离仍沿 006 的 TODO，不在本批外推。
 - 048 真实运行 parked source：完整程序回传、挂起行 `>| ` 标记、where 调用点标记与渲染字面块；栈解析失败的降级路径未单独造桩。
+- 065 真实运行 parked source 的执行点换算（[048] 的补充）：经 `eval` 求值字符串的 park 落在程序自身的 `await eval(...)` 调用行，不落到被求值字符串自己的行号上（该行号与程序行号数值可相同，按数值范围判定会误标）；parked handle 以显式 abandon 收尾。
 - 049 以真实 ToolSpec 装配检查 unpark.value 的 host schema 为可选任意值，并核对描述中的自由注入责任文案。
 - 050 真实运行 js.call 单进程循环：规格拒绝、前台命令与结构化结局、onExit 退出码派发、check abort 杀死命令、check park 挂起与 unpark 继续、maxDuration 超时。
 - 051 真实运行多进程代数：spawn 后台、waitFor 端口就绪、signal 收割、waitFor 超时与未知后台稳定码、后台崩溃经 backgrounds 观察并 abort。

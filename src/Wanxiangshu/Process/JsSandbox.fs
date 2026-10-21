@@ -249,48 +249,74 @@ module JsSandbox =
     let resetDeadline (handle: JsRunHandle) (deadlineEpochMs: int64) : unit =
         setDeadline handle.DeadlineRef deadlineEpochMs
 
-    let private extractFrameDigits (frame: string) : string option =
-        let marker = "evalmachine.<anonymous>:"
-        let at = frame.IndexOf marker
+    /// The program-script line a stack frame reports, if the frame is one.
+    ///
+    /// The sandbox evaluates the program with `new Function`, so V8 prints a
+    /// program frame as `at Js.run (eval at globalThis.__makeRunner
+    /// (evalmachine.<anonymous>:226:19), <anonymous>:150:33)`: the trailing
+    /// position is the line inside the evaluated program, while the
+    /// `evalmachine.<anonymous>` position is the runner's own source. A
+    /// frame that ran an evaluated *string* carries a nested `eval at` in its
+    /// prefix, and its trailing position is that string's own line — a
+    /// number that can coincide with a model line, so such a frame reports
+    /// no line.
+    let private programLineOfFrame (rawFrame: string) : int option =
+        let frame = rawFrame.Trim()
+        let marker = ", <anonymous>:"
+        let at = frame.LastIndexOf(marker)
+        let rest = if at < 0 then "" else frame.Substring(at + marker.Length)
+        let colon = rest.IndexOf ':'
+        let digits = if colon >= 0 then rest.Substring(0, colon) else rest
+        let firstEvalAt = frame.IndexOf "eval at"
+        let lastEvalAt = frame.LastIndexOf "eval at"
+        let isProgramFrame =
+            frame.StartsWith "at "
+            && at >= 0
+            && firstEvalAt >= 0
+            && firstEvalAt = lastEvalAt
 
-        if at < 0 then
-            None
-        else
-            let rest = frame.Substring(at + marker.Length)
-            let colon = rest.IndexOf ':'
-            Some(if colon >= 0 then rest.Substring(0, colon) else rest)
-
-    let private parseModelLine (modelStartLine: int) (modelEndLine: int) (digits: string) : int option =
         match System.Int32.TryParse digits with
-        | true, line when line >= modelStartLine && line <= modelEndLine -> Some(line - modelStartLine)
+        | true, line when isProgramFrame -> Some line
         | _ -> None
 
-    let private tryResolveFrameLine (modelStartLine: int) (modelEndLine: int) (frame: string) : int option =
-        extractFrameDigits frame
-        |> Option.bind (parseModelLine modelStartLine modelEndLine)
+    /// The model line a frame reports, when it is a program frame inside the
+    /// model source.
+    let private modelLineOfFrame (modelStart: int) (modelEnd: int) (frame: string) : int option =
+        match programLineOfFrame frame with
+        | Some line when line >= modelStart && line <= modelEnd -> Some(line - modelStart)
+        | _ -> None
 
-    let private locateSuspendedLine (modelStartLine: int) (modelEndLine: int) (stack: string) : int =
+    /// The model line the program is suspended on, or -1 when no frame
+    /// identifies one (no stack, no frame, or no frame inside the model
+    /// source). A missing marker degrades to ` | ` on every line; it never
+    /// marks a line that is not the suspended one.
+    let private locateSuspendedLine (baseLines: int) (modelLines: int) (stack: string) : int =
         if isNull stack then
             -1
         else
+            // Script line of the model's first line. The `new Function`
+            // runner numbers the program from the reconstructed function
+            // source, whose two header lines (`function anonymous(api,JSON`
+            // and `) {`) precede the evaluated body, whose first line
+            // `(async () => {` shares the third line with the `return ((`
+            // prefix: the base class therefore starts at script line 4 and
+            // the model source at `baseLines + 4`.
+            let modelStart = baseLines + 4
+            let modelEnd = modelStart + modelLines - 1
+
             stack.Split('\n')
-            |> Array.tryPick (tryResolveFrameLine modelStartLine modelEndLine)
+            |> Array.tryPick (fun rawFrame -> modelLineOfFrame modelStart modelEnd rawFrame)
             |> Option.defaultValue -1
 
     /// Render the full model program with the suspended line marked. The
-    /// wrapper places line 1 at `(async () => {`, the generated base class
-    /// next, then the model source; `modelStartLine` is the base class line
-    /// count plus two. The closest vm frame at or after that line is the
-    /// model frame that called park (directly or through where). The marker
-    /// is `>| ` on the suspended line and ` | ` everywhere else; a missing
+    /// closest program frame inside the model source is the model frame that
+    /// called park (directly or through where). The marker is `>| ` on the
+    /// suspended line and ` | ` everywhere else; a missing or unreadable
     /// stack degrades to ` | ` on every line, never to a failed park.
     let sourceWithExecutionMarker (baseClassSource: string) (modelSource: string) (stack: string) : string =
         let lines = modelSource.Split('\n')
-        // Wrapper lines: 1 = "(async () => {", then the base class, then the
-        // model source.
-        let modelStartLine = baseClassSource.Split('\n').Length + 2
-        let modelEndLine = modelStartLine + lines.Length - 1
-        let currentLine = locateSuspendedLine modelStartLine modelEndLine stack
+        let currentLine =
+            locateSuspendedLine (baseClassSource.Split('\n').Length) lines.Length stack
 
         lines
         |> Array.mapi (fun index line -> (if index = currentLine then ">| " else " | ") + line)

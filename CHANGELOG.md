@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — parked source 的执行点标记按程序脚本位置换算
+
+- **修复：parked 载荷的 `source` 不再丢失执行点标记**。`Process/JsSandbox.fs` 的栈换算此前取 `evalmachine.<anonymous>:` 之后的数字；沙箱以 `new Function` 求值程序后，V8 把程序帧渲染为 `at Js.run (eval at <runner> (evalmachine.<anonymous>:226:19), <anonymous>:150:33)`，那个数字是 runner 自身源码的行、恒定落在程序行范围之外，于是每个帧都被判为不在范围内，标记退化为整篇 ` | `，没有一行带 `>| `。现在取程序帧尾随的 `<anonymous>` 位置，并按程序在脚本中的起始行（基类行数 + 4）换算到模型行。
+- **只认程序帧**：经 `eval` 求值字符串的帧，尾随位置是该字符串自己的行号，与程序行号数值可能相同；按数值范围判定会误标到无关的程序行上。这类帧不参与换算，标记落在程序自身的调用点上。
+- **改动文件**：`Process/JsSandbox.fs`（栈帧换算重写，旧的 runInContext 兼容分支一并删除——当前沙箱只有 `new Function` 一条路径）、`requirements/repository-programming/tests/065.test.mjs`（新增回归）、`requirements/repository-programming/WHAT.md`（换算规则并入既有 [048] 条款，不新增重复条款）、`requirements/repository-programming/tests/README.md`。
+- **验收**：`repository-programming/048` 三例全绿；`repository-programming/065` 一例全绿（`eval` 场景对旧算法会误标到 `const snippet = ...` 一行，故为真回归；parked handle 以显式 abandon 收尾）；`repository-programming/002|028|029|030|031|032|047|049|056` 全绿；`fsharp-control-pyramid` 在 `JsSandbox.fs` 上净减 3 处（1 处 match-pyramid、2 处 branch-pyramid），`js-boundary-gate` / `provider-leak-gate` / `clean-break-symbols` 绿。
+
 ## Unreleased — 锚声明：单一 typed 规则，公开面改回 JS-native 回执
 
 - **重构：锚声明的判定收敛为一条 typed 规则**。`AnchorDeclarationRule`（`Repository/Programming/Js/Anchor/AnchorModel.fs`）成为唯一的声明形状判定核心：覆盖律决定形状，宿主把首个违规映射到稳定失败码。F# 调用方直接消费这个 typed core，JS 边界只是同一判定的回执出口，不再各自复述一份解析。
