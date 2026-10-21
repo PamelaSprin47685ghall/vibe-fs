@@ -89,6 +89,10 @@ neutral ports use `Wanxiangshu.Host.Ports` (see DESIGN §1.1 and drift **D-05**)
 2. Port files reference only `Wanxiangshu.Foundation*`, `Wanxiangshu.Host*`, `System*` (gate ⑪ port-purity, strict).
 3. Reuse vocabulary: `HostResult<_>`/`HostError` for host round trips, `SessionId`/`ToolCallId`/`PromptKey`/`TranscriptMessageAddress`
    ids, `ModelRoute`, `AgentRole`, `CanonicalJsonText`. No `obj`, no `string` error channel, no host wire term.
-4. Add the type/member to `proposals/host-neutral-interface/adapters/omp/ports.ts` too (`adapters/omp/check.sh` fails on drift), or
-   leave it out and note "omp: n/a" here — the arch lane then completes the mirror.
+4. The TS mirror `proposals/host-neutral-interface/adapters/omp/ports.ts` is **generated** from the family `.fsi`
+   files — never hand-edit it. `adapters/omp/check.sh` regenerates it and fails on any byte difference, so a
+   changed type or member shows up as a mirror drift. If the change is not representable in the mirror, say
+   "omp: n/a" in the row and the arch lane completes the mirror. The port families are discovered from the
+   sources (each `Host/Ports/*.fsi` declares its reserved id in an `HNI P-xx` header marker), so a new family
+   is mirrored automatically.
 5. Update the row (Status, Replaces) in the same commit. Mark WIRED-OC when the OpenCode adapter implements it.
