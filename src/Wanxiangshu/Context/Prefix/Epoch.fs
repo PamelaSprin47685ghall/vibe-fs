@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Context.Prefix
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 
@@ -44,12 +46,76 @@ type PrefixFoldRejection =
     | CompactionAlreadyReanchored of run: ProviderRunIdentity
     | TenureAlreadyReanchored of incumbencyId: string
 
+type PrefixReanchorCandidate =
+    { PreviousEpochId: PrefixEpochId
+      NextEpochId: PrefixEpochId
+      CompactionRun: ProviderRunIdentity }
+
 module PrefixEpochProjection =
+
+    [<Import("Prefix", "wanxiangli/prefix")>]
+    let private prefixOwnerConstructor: obj = jsNative
+
+    let private prefixOwner: obj = createNew prefixOwnerConstructor ()
 
     let empty =
         { EpochId = PrefixEpochId.initial
           ReanchoredRuns = Set.empty
           ReanchoredTenures = Set.empty }
+
+    let private epochOf (value: obj) : PrefixEpochId =
+        match System.Int64.TryParse(unbox<string> value) with
+        | true, epoch -> PrefixEpochId.create epoch
+        | _ -> invalidArg "epoch" "Prefix epoch exceeds the int64 domain"
+
+    let private stateView (state: ActivePrefixEpoch) : obj =
+        createObj
+            [ "epoch" ==> string (PrefixEpochId.value state.EpochId)
+              "compactionRuns"
+              ==> (state.ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value)
+              "tenures" ==> Set.toArray state.ReanchoredTenures ]
+
+    let private stateOf (value: obj) : ActivePrefixEpoch =
+        { EpochId = epochOf value?epoch
+          ReanchoredRuns =
+            unbox<string array> value?compactionRuns
+            |> Array.map ProviderRunIdentity.create
+            |> Set.ofArray
+          ReanchoredTenures = unbox<string array> value?tenures |> Set.ofArray }
+
+    let private compaction (run: ProviderRunIdentity) : obj =
+        createObj [ "kind" ==> "compaction"; "run" ==> ProviderRunIdentity.value run ]
+
+    let private tenure (incumbencyId: string) : obj =
+        createObj [ "kind" ==> "tenure"; "incumbencyId" ==> incumbencyId ]
+
+    let private repeatedEvidence (evidence: obj) : PrefixFoldRejection =
+        match string evidence?kind with
+        | "compaction" ->
+            PrefixFoldRejection.CompactionAlreadyReanchored(ProviderRunIdentity.create (string evidence?run))
+        | "tenure" -> PrefixFoldRejection.TenureAlreadyReanchored(string evidence?incumbencyId)
+        | _ -> invalidOp "Unknown prefix reanchor evidence"
+
+    let private rejectionOf (result: obj) : PrefixFoldRejection =
+        match string result?error with
+        | "StaleEpoch" -> PrefixFoldRejection.StalePrefixEpoch(epochOf result?expected, epochOf result?actual)
+        | "NonSequentialEpoch" -> PrefixFoldRejection.NonSequentialPrefixEpoch
+        | "AlreadyReanchored" -> repeatedEvidence result?evidence
+        | _ -> invalidOp "Unknown prefix fold rejection"
+
+    let private commit previousEpoch nextEpoch evidence state =
+        let candidate =
+            createObj
+                [ "previousEpoch" ==> string (PrefixEpochId.value previousEpoch)
+                  "nextEpoch" ==> string (PrefixEpochId.value nextEpoch)
+                  "evidence" ==> evidence ]
+
+        let result: obj = prefixOwner?commit (stateView state, candidate)
+
+        if unbox<bool> result?ok then
+            Ok(stateOf result?state)
+        else
+            Error(rejectionOf result)
 
     /// PERSIST-010 `ContextReanchored`: HOST-006 containment.
     ///
@@ -76,24 +142,14 @@ module PrefixEpochProjection =
         (observedRun: ProviderRunIdentity)
         (state: ActivePrefixEpoch)
         : Result<ActivePrefixEpoch, PrefixFoldRejection> =
-        if Set.contains observedRun state.ReanchoredRuns then
-            Error(PrefixFoldRejection.CompactionAlreadyReanchored observedRun)
-        elif previousEpoch <> state.EpochId then
-            Error(PrefixFoldRejection.StalePrefixEpoch(state.EpochId, previousEpoch))
-        elif nextEpoch <> PrefixEpochId.next previousEpoch then
-            Error PrefixFoldRejection.NonSequentialPrefixEpoch
-        else
-            Ok
-                { EpochId = nextEpoch
-                  ReanchoredRuns = Set.add observedRun state.ReanchoredRuns
-                  ReanchoredTenures = state.ReanchoredTenures }
+        commit previousEpoch nextEpoch (compaction observedRun) state
 
     /// HOST-006: has this compaction pseudo-run already been reanchored.
     ///
-    /// The predicate `HostCompactionPolicy.nextReanchor` consumes. Exposed as a query
-    /// so the adapter reads it from the projection rather than keeping a runtime set
-    /// that a restart would lose.
-    let isReanchored (run: ProviderRunIdentity) (state: ActivePrefixEpoch) = Set.contains run state.ReanchoredRuns
+    /// Read the committed evidence through the prefix owner, without a runtime
+    /// set that a restart would lose.
+    let isReanchored (run: ProviderRunIdentity) (state: ActivePrefixEpoch) =
+        unbox<bool> (prefixOwner?isReanchored (stateView state, compaction run))
 
     let applyTenureReanchor
         (previousEpoch: PrefixEpochId)
@@ -101,20 +157,25 @@ module PrefixEpochProjection =
         (incumbencyId: string)
         (state: ActivePrefixEpoch)
         : Result<ActivePrefixEpoch, PrefixFoldRejection> =
-        if Set.contains incumbencyId state.ReanchoredTenures then
-            Error(PrefixFoldRejection.TenureAlreadyReanchored incumbencyId)
-        elif previousEpoch <> state.EpochId then
-            Error(PrefixFoldRejection.StalePrefixEpoch(state.EpochId, previousEpoch))
-        elif nextEpoch <> PrefixEpochId.next previousEpoch then
-            Error PrefixFoldRejection.NonSequentialPrefixEpoch
-        else
-            Ok
-                { EpochId = nextEpoch
-                  ReanchoredRuns = state.ReanchoredRuns
-                  ReanchoredTenures = Set.add incumbencyId state.ReanchoredTenures }
+        commit previousEpoch nextEpoch (tenure incumbencyId) state
 
     let isTenureReanchored (incumbencyId: string) (state: ActivePrefixEpoch) =
-        Set.contains incumbencyId state.ReanchoredTenures
+        unbox<bool> (prefixOwner?isReanchored (stateView state, tenure incumbencyId))
+
+    let proposeCompaction
+        (observed: ProviderRunIdentity list)
+        (state: ActivePrefixEpoch)
+        : PrefixReanchorCandidate option =
+        let runs = observed |> List.map ProviderRunIdentity.value |> List.toArray
+        let candidate: obj = prefixOwner?proposeCompaction (stateView state, runs)
+
+        if isNull candidate then
+            None
+        else
+            Some
+                { PreviousEpochId = epochOf candidate?previousEpoch
+                  NextEpochId = epochOf candidate?nextEpoch
+                  CompactionRun = ProviderRunIdentity.create (string candidate?evidence?run) }
 
     /// PERSIST-010 prefix-epoch absorption policy: `None` means the caller must
     /// write nothing, `Some reason` is the requirement text a refusal is

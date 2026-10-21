@@ -57,8 +57,8 @@ module HostCompactionGate =
     ///
     /// `observed` is every compaction run in the session's snapshot, oldest first.
     /// Which one to act on — and whether any is left — is
-    /// `HostCompactionPolicy.nextReanchor`'s decision; this function supplies the
-    /// "already handled" predicate from the journal and does the append.
+    /// the prefix owner's proposal; this function supplies the committed journal
+    /// projection and appends the proposed line.
     ///
     /// Idempotency has two independent guards, deliberately. Here, the predicate skips
     /// a run the journal already reanchored. At the fold, `PrefixEpochProjection`

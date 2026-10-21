@@ -15,3 +15,7 @@ WHAT 定义 byte identity、冷边界与呈现协议，本文只界定测试证�
 - 015 检查实际 SealRoot、synthetic memory identity 对持久化输入的稳定性与区分性，并保留 snapshot 中既有 ID 的复用及真实 guidance 重入。
 
 完成节点后先构建，再通过正式 runner 与 `TESTS_MJS_FILES` 执行本目录及相关模块。TODO 不计通过；发布节点已改为待闭合。没有执行真实 provider 或人工验收。
+
+本轮独立 prefix 接线：006 新增真实 durable fold 与规范行 codec replay 的反例，要求吸收重复/过期重锚时保留已重建检查点，只有成功后继清空窗口；这不是独立进程或物理日志重开的证明。typed adapter 使用十进制字符串消费库的精确 bigint 决策，覆盖大于 `2^53` 的 epoch、int64 最大值后继拒绝与最小值旧行；不把 number 转换舍入当作兼容。
+
+保留的 P2 边界：`proposeCompaction` 仍选“最新未处理”观察。一次观察 `[c1,c2,c3]` 提交 `c3` 后，下一次同样观察会选 `c2`；任期推进后亦然。这是接线前后的既有语义，下一包须以真实 Host 反例统一修订库合同与调用方，本轮不通过只传最新观察来隐藏它。

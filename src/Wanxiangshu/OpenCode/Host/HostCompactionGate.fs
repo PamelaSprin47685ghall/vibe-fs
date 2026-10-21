@@ -128,12 +128,35 @@ module HostCompactionGate =
     let logReanchorFailure (sessionId: SessionId) (reason: string) : unit =
         logWarn "reanchor_failed" [ "session_id", SessionId.value sessionId; "result", reason ]
 
+    let private appendReanchor
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (candidate: PrefixReanchorCandidate)
+        : Task<Result<ProviderRunIdentity option, string>> =
+        task {
+            let run = candidate.CompactionRun
+
+            let fact =
+                ContextFact.ContextReanchored
+                    {| SessionId = sessionId
+                       PreviousEpochId = candidate.PreviousEpochId
+                       NextEpochId = candidate.NextEpochId
+                       ObservedCompactionRun = run |}
+
+            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some run) fact journal
+
+            return
+                appended
+                |> Result.map (fun _ -> Some run)
+                |> Result.mapError JournalAppendFailure.describe
+        }
+
     /// HOST-006 containment: write one `ContextReanchored` for an observed pseudo-run.
     ///
     /// `observed` is every compaction run in the session's snapshot, oldest first.
     /// Which one to act on — and whether any is left — is
-    /// `HostCompactionPolicy.nextReanchor`'s decision; this function supplies the
-    /// "already handled" predicate from the journal and does the append.
+    /// the prefix owner's proposal; this function supplies the committed journal
+    /// projection and appends the proposed line.
     ///
     /// Idempotency has two independent guards, deliberately. Here, the predicate skips
     /// a run the journal already reanchored. At the fold, `PrefixEpochProjection`
@@ -155,21 +178,9 @@ module HostCompactionGate =
             // "Already reanchored" is answered from the durable projection, not a runtime
             // set: the observation repeats on every reconcile, and a memory-only set would
             // let a restart reanchor the same compaction a second time.
-            match
-                HostCompactionPolicy.nextReanchor observed (fun run -> PrefixEpochProjection.isReanchored run epoch)
-            with
+            match PrefixEpochProjection.proposeCompaction observed epoch with
             | None -> return Ok None
-            | Some run ->
-                let fact =
-                    ContextFact.ContextReanchored
-                        {| SessionId = sessionId
-                           PreviousEpochId = epoch.EpochId
-                           NextEpochId = PrefixEpochId.next epoch.EpochId
-                           ObservedCompactionRun = run |}
-
-                match! AgentJournal.appendAgent (StreamId.Session sessionId) (Some run) fact journal with
-                | Ok _ -> return Ok(Some run)
-                | Error failure -> return Error(JournalAppendFailure.describe failure)
+            | Some candidate -> return! appendReanchor journal sessionId candidate
         }
 
     /// HOST-006 startup probe: judge the first turn of the first managed session.

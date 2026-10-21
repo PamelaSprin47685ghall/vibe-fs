@@ -104,28 +104,6 @@ module HostCompactionPolicy =
     /// "which kind" and no branch to write.
     let isContainableCompaction (isCompaction: bool) = isCompaction
 
-    /// HOST-006 containment: which observed compaction still needs a reanchor.
-    ///
-    /// `observed` is every compaction pseudo-run in the session's snapshot, oldest
-    /// first. `isReanchored` answers whether the journal has already handled one.
-    ///
-    /// A predicate rather than a `Set`: the caller holds a keyed projection, so
-    /// "has this run been reanchored" is an O(1) lookup it can already answer
-    /// (PERSIST-008). Taking a `Set` would make the caller materialise every
-    /// reanchored run in the session's history just to ask about the two or three in
-    /// the current snapshot.
-    ///
-    /// Returns at most ONE run — the newest unhandled one — rather than all of them.
-    /// A reanchor retires the prefix and zeroes coverage; doing that twice in a row
-    /// changes nothing the second time, so emitting several would produce facts whose
-    /// only effect is to advance the epoch counter. The newest is chosen because it is
-    /// the one whose numbering the current transcript actually reflects.
-    let nextReanchor
-        (observed: ProviderRunIdentity list)
-        (isReanchored: ProviderRunIdentity -> bool)
-        : ProviderRunIdentity option =
-        observed |> List.filter (isReanchored >> not) |> List.tryLast
-
     /// HOST-006 startup probe: how many compaction pseudo-runs sit inside the
     /// first-turn window.
     ///

@@ -127,6 +127,17 @@ module PrefixSurface =
     let isReanchored (run: string) (state: obj) : bool =
         PrefixEpochProjection.isReanchored (ProviderRunIdentity.create (text run)) (stateOfJs state)
 
+    let proposeCompaction (observed: string array) (state: obj) : obj =
+        let runs = observed |> Array.map ProviderRunIdentity.create |> Array.toList
+
+        match PrefixEpochProjection.proposeCompaction runs (stateOfJs state) with
+        | None -> null
+        | Some candidate ->
+            box
+                {| previousEpoch = PrefixEpochId.value candidate.PreviousEpochId
+                   nextEpoch = PrefixEpochId.value candidate.NextEpochId
+                   observedRun = ProviderRunIdentity.value candidate.CompactionRun |}
+
 
     let private checkpointOfJs (item: obj) : Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCheckpoint =
         { ToolCallId = ToolCallId.create (string item?callId) }

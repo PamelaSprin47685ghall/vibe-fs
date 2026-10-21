@@ -13,4 +13,5 @@ module PrefixSurface =
     val reanchoredTenures: state: obj -> string array
     val isTenureReanchored: incumbencyId: string -> state: obj -> bool
     val isReanchored: run: string -> state: obj -> bool
+    val proposeCompaction: observed: string array -> state: obj -> obj
     val appendCheckpoint: callId: string -> window: obj array -> obj array

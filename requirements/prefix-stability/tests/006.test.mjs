@@ -91,3 +91,88 @@ test('WHAT[prefix-stability-006] HOST_006_a_genuinely_new_compaction_reanchors_a
   assert.equal(prefix.isReanchored('msg_c3', second.value), false)
 })
 }
+
+{
+const assert = (await import('node:assert/strict')).default
+const prefix = await import('../../../dist/Context/Prefix/Surface.js')
+const contextFold = await import('../../../dist/Context/Companion/FoldSurface.js')
+const session = 'ses_prefix_owner_fold'
+let sequence = 0
+const envelope = (caseName, payload) => ({
+  runtime: 'rt_prefix_owner_fold',
+  seq: ++sequence,
+  observedAt: '2026-10-21T00:00:00Z',
+  id: `prefix-owner-${sequence}`,
+  session,
+  run: null,
+  fact: { family: 'Context', case: caseName, payload: { SessionId: session, ...payload } },
+})
+const reanchor = (previous, next, run) => envelope('ContextReanchored', {
+  PreviousEpochId: previous, NextEpochId: next, ObservedCompactionRun: run,
+})
+const tenure = (previous, next, incumbency) => envelope('TenureReanchored', {
+  PreviousEpochId: previous, NextEpochId: next, WorkId: 'work-prefix', IncumbencyId: incumbency,
+})
+const checkpoint = callId => envelope('ViewCheckpointCommitted', { ToolCallId: callId })
+const folded = (lines, replay = false) => {
+  const result = replay ? contextFold.replay(lines) : contextFold.fold(lines)
+  assert.equal(result.ok, true, JSON.stringify(result.error))
+  return result.value
+}
+const callsOf = value => (value.viewCheckpoints[session]?.checkpoints ?? []).map(item => item.callId)
+
+test('WHAT[prefix-stability-006] absorbed reanchors preserve rebuilt checkpoints through canonical replay', () => {
+  const lines = [
+    reanchor('0', '1', 'compaction-1'),
+    checkpoint('before-tenure'),
+    tenure('1', '2', 'inc-1'),
+    checkpoint('after-tenure'),
+    reanchor('0', '1', 'stale-unrecorded-run'),
+    reanchor('2', '3', 'compaction-1'),
+    tenure('2', '3', 'inc-1'),
+  ]
+  for (const replay of [false, true]) {
+    const value = folded(lines, replay)
+    assert.deepEqual(callsOf(value), ['after-tenure'])
+    assert.deepEqual(value.sessions[session].PrefixEpoch, {
+      EpochId: 2n, ReanchoredRuns: ['compaction-1'], ReanchoredTenures: ['inc-1'],
+    })
+  }
+})
+
+test('WHAT[prefix-stability-006] only a committed successor clears checkpoints and corrupt lines fail the fold', () => {
+  const initial = reanchor('0', '1', 'compaction-1')
+  const second = reanchor('1', '2', 'compaction-2')
+  const value = folded([initial, checkpoint('retired'), second])
+  assert.deepEqual(callsOf(value), [])
+  assert.deepEqual(value.sessions[session].PrefixEpoch.ReanchoredRuns, ['compaction-1', 'compaction-2'])
+  const rejected = contextFold.fold([initial, checkpoint('retained'), reanchor('1', '3', 'corrupt-run')])
+  assert.equal(rejected.ok, false)
+  assert.match(JSON.stringify(rejected.error), /successor/)
+})
+
+test('WHAT[prefix-stability-006] owner proposals preserve exact int64 epochs and do not commit before append', () => {
+  const state = { epoch: '9007199254740993', reanchoredRuns: ['handled'], reanchoredTenures: [] }
+  const before = structuredClone(state)
+  const candidate = prefix.proposeCompaction(['handled', 'new'], state)
+  assert.deepEqual(candidate, { previousEpoch: 9007199254740993n, nextEpoch: 9007199254740994n, observedRun: 'new' })
+  assert.deepEqual(state, before)
+  const result = prefix.applyReanchor(candidate, state)
+  assert.equal(result.ok, true)
+  assert.equal(prefix.epochOf(result.value), 9007199254740994n)
+  assert.deepEqual(prefix.reanchoredRuns(result.value), ['handled', 'new'])
+  assert.equal(prefix.proposeCompaction(['handled', 'new'], result.value), null)
+})
+
+test('WHAT[prefix-stability-006] int64 maximum cannot propose a wrapped successor', () => {
+  const state = { epoch: '9223372036854775807', reanchoredRuns: ['handled'], reanchoredTenures: [] }
+  assert.equal(prefix.proposeCompaction(['handled'], state), null)
+  assert.throws(() => prefix.proposeCompaction(['new'], state), /int64 domain/)
+  assert.deepEqual(prefix.applyReanchor({ previousEpoch: state.epoch, nextEpoch: '-9223372036854775808', observedRun: 'new' }, state), {
+    ok: false, error: 'NonSequentialPrefixEpoch',
+  })
+  assert.deepEqual(prefix.applyReanchor({ previousEpoch: '-9223372036854775808', nextEpoch: '-9223372036854775807', observedRun: 'other' }, state), {
+    ok: false, error: 'StalePrefixEpoch',
+  })
+})
+}

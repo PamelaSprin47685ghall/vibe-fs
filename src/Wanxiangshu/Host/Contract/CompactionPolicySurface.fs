@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Host.Contract
 
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
@@ -11,6 +12,11 @@ open Wanxiangshu.Host
 /// parameters. This surface translates those into JSON-shaped objects so
 /// semantic tests observe the real policy without touching Fable representation.
 module CompactionPolicySurface =
+
+    [<Import("Prefix", "wanxiangli/prefix")>]
+    let private prefixOwnerConstructor: obj = jsNative
+
+    let private prefixOwner: obj = createNew prefixOwnerConstructor ()
 
     let private settingPath (setting: CompactionSetting) = setting.Path |> String.concat "."
 
@@ -67,9 +73,20 @@ module CompactionPolicySurface =
 
         let typed = observed |> Array.map ProviderRunIdentity.create |> Array.toList
 
-        match HostCompactionPolicy.nextReanchor typed predicate with
-        | Some runId -> box (ProviderRunIdentity.value runId)
-        | None -> null
+        let handled =
+            typed
+            |> List.filter predicate
+            |> List.map ProviderRunIdentity.value
+            |> List.toArray
+
+        let state =
+            createObj
+                [ "epoch" ==> "0"
+                  "compactionRuns" ==> handled
+                  "tenures" ==> Array.empty<string> ]
+
+        let candidate: obj = prefixOwner?proposeCompaction (state, observed)
+        if isNull candidate then null else candidate?evidence?run
 
     /// HOST-006 startup probe: compaction pseudo-runs inside the first-turn window.
     ///

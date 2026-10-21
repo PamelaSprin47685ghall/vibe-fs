@@ -151,9 +151,9 @@ module ContextProjectionBridge =
         ProjectionUpdate.updateSession sessionId ProjectionUpdate.retireAuxiliaryInjectionVisibility projection
 
     let private reanchor factName projection sessionId apply =
-        ProjectionUpdate.tryUpdatePrefix sessionId apply projection
-        |> ProjectionUpdate.prefixOutcome factName projection
-        |> Result.map (fun updated -> clearCheckpointGeneration (retireAuxiliaryVisibility updated sessionId) sessionId)
+        match ProjectionUpdate.tryUpdatePrefix sessionId apply projection with
+        | Ok advanced -> Ok(clearCheckpointGeneration (retireAuxiliaryVisibility advanced sessionId) sessionId)
+        | Error rejection -> ProjectionUpdate.prefixOutcome factName projection (Error rejection)
 
     let fold
         (causality: (EventId * (EventId -> bool)) option)

@@ -15,6 +15,11 @@ type PrefixFoldRejection =
     | CompactionAlreadyReanchored of run: ProviderRunIdentity
     | TenureAlreadyReanchored of incumbencyId: string
 
+type PrefixReanchorCandidate =
+    { PreviousEpochId: PrefixEpochId
+      NextEpochId: PrefixEpochId
+      CompactionRun: ProviderRunIdentity }
+
 module PrefixEpochProjection =
     val empty: ActivePrefixEpoch
 
@@ -35,6 +40,9 @@ module PrefixEpochProjection =
             Result<ActivePrefixEpoch, PrefixFoldRejection>
 
     val isTenureReanchored: incumbencyId: string -> state: ActivePrefixEpoch -> bool
+
+    val proposeCompaction:
+        observed: ProviderRunIdentity list -> state: ActivePrefixEpoch -> PrefixReanchorCandidate option
 
     /// Absorption policy for prefix observations. `None` means the observation is
     /// the expected steady state or an already-captured candidate, so the caller
