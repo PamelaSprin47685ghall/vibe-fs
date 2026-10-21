@@ -199,3 +199,21 @@
 - **回退**：纯计算，不改事件词汇与线上字节；`git revert c52bff68a` 回到手写版本（库 0.38.0 可保留）。
 - **未做**：全量 `scripts/verify.mjs` 与 integration tier。
 - **状态**：CUT-19-b `DONE`；剩余 CUT-19-c（BACKLOG，前置 CUT-11/12/29/31 未完成）。
+
+## 19. CUT-19-c：Journal / 旧 Store 去向裁决与残留 Git 类型（eng-cut09i-goose，2026-10-21）
+
+- **亲眼核对（master 56a054772）**：
+  - 生产里只有一个 `IJournalWriter` 实现 `EventStoreJournalWriter`，它把每个事实追加进统一 `IEventStore`（`Persistence/EventStore/Store.fs`，唯一生产实现；`OpenCode/Host/WorkspaceEventStore` 只是把它绑定到工作区）。另一个实现在 `SessionRecoveryHostSurface`（JS 测试面）。Blob 也经 `EventStoreBlobWriter` 写同一 store。`RuntimePath` 只定状态目录，注明“不读取或迁入旧 Git 数据”。代码里已经没有 SQLite 或 Git 后端的第二套存储。
+  - 所以 `Persistence/Journal`（约 3.5k 行，115 个文件 `open`）不是“旧存储”，而是统一 EventStore 之上的类型化事实层：事实编解码（`FactCodec`/`PromptFactCodec`/`Envelope`）、追加结果（`Outcome`）、投影等待（`AgentJournal.AwaitChangeFrom*`）。CUT-19-c 拆出时设想的“每个事实族退出旧存储接线”，在代码里没有对应的旧接线可退。
+  - `GitTypes`：`GitObjectId`、`RootOid`、`StoreSnapshot`、`PublishError`、`StoreRef.remoteTracking/tryRemoteFromTracking` 在 src/scripts/requirements 里零消费者（远程同步膜早已删除）。只有 `StoreRef.canonical` 被 `EventStore/Surface.canonicalStoreRef` 使用，并由 durable-events-016 测试断言；`unified-store-gate` 把这个名字保留给存储所有者。
+- **裁决**：
+  | 部件 | 裁决 | 理由 |
+  |---|---|---|
+  | `Persistence/Journal` 类型化事实层 | **RETAINED** | 它是统一 EventStore 的唯一类型化写入/投影入口，不是第二套存储；各事实族的业务折叠已在各自 owner 卡交库（11/12/27/29/31 等）。拆掉它只会让 115 个调用点直接拼 EventStore 记录，不是净改进（README §9）。继续维护者：主仓 `Persistence` owner；边界：不得再长出 Journal 自己的文件格式或第二个 writer。 |
+  | EventStore `Store` / `Surface` | **RETAINED** | `Store` 是唯一生产 store（宿主 I/O 已在 §16 登记保留），`Surface` 是 JS 证明面。 |
+  | `GitObjectId` / `RootOid` / `StoreSnapshot` / `PublishError` / 远程跟踪 ref 拼接与解析 | **REMOVED**（本刀删除，不记为抽取成功） | 零消费者，没有远程同步。durable-events-016“Git 物理概念不外泄”因此在类型层面直接成立。 |
+  | `StoreRef.canonical` | **RETAINED** | durable-events-016 保留的唯一 ref 名，测试与门禁都在用。 |
+- **改动**：`Persistence/EventStore/GitTypes.fs(i)` 只剩 `StoreRef.canonical`（删 60 行）。shard 与编译顺序不变。
+- **验证**：`node scripts/checks/architecture.mjs` OK；`node scripts/check.mjs` 与 base 逐行一致（只差行号，以及 master 新提交带来的一条 control-pyramid 报告，与本刀无关）。构建和 durable-events + durable-convergence 套件见落地记录。
+- **回退**：只删除类型，不改事件、文件或 ref；`git revert` 即可恢复。
+- **未做**：全量 `scripts/verify.mjs` 与 integration tier。
