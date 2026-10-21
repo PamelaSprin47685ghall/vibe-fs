@@ -19,5 +19,11 @@ module OmpExtension =
     val activate: pi: obj -> Task<unit>
 
     /// The omp extension factory: `export default (pi) => …`.
+    ///
+    /// omp's loader (`getExtensionFactory`) accepts the module itself or
+    /// `module.default` and rejects anything that is not callable, so the
+    /// default export must BE the function and not the result of calling it.
+    /// The factory therefore returns without waiting: the product is
+    /// activated later, on the first `session_start` event.
     [<ExportDefault>]
-    val defaultExport: pi: obj -> obj
+    val defaultExport: pi: obj -> unit
