@@ -102,7 +102,6 @@ module JsRuntimeSurface =
 
     let clearDelegationHost (sessionId: string) : unit = JsDelegationBridge.clear sessionId
 
-    let clearDelegationHosts () : unit = JsDelegationBridge.clearAll ()
 
     /// Test hook: record a value with an already-shaped deliver view.
     let recordDeliveredView (sessionId: string) (view: obj) : unit =

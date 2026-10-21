@@ -247,11 +247,6 @@ module JournalCodecSurface =
                payload = body?payload
                payloadRefs = event.PayloadRefs |> List.map PayloadRef.value |> List.toArray |}
 
-    let private envelopeForEvent (event: EventEnvelope) : obj =
-        match EventStoreJournalCodec.tryDecode event with
-        | Ok envelope -> envelopeToJs envelope
-        | Error error -> box {| ok = false; error = error |}
-
     /// Encode one JS-native journal envelope into a JS-native event object.
     let encode (parents: string array) (payloadRefs: string array) (envelope: obj) : obj =
         let parentIds = parents |> Array.toList |> List.map EventId.create
@@ -301,5 +296,3 @@ module JournalCodecSurface =
         |> List.sortWith Envelope.compareSortKey
         |> List.map envelopeToJs
         |> List.toArray
-
-    let decodeEventEnvelope (event: obj) : obj = envelopeForEvent (eventOfJs event)

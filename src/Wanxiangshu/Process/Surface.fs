@@ -394,7 +394,6 @@ module ProcessSurface =
 
         RegistrationHandle registration :> obj
 
-    let disposeCancellationRegistration (_registration: obj) : unit = ()
 
     let private launcherResult (value: obj) : Task<int * byte[] * byte[]> =
         task {
@@ -708,7 +707,6 @@ module ProcessSurface =
                   Message = message }
         )
 
-    let ptySignalParse (name: string) : obj = signalParse name
 
     let ptySignalView (name: string) : obj =
         match PtySignal.tryParse name with
@@ -1032,11 +1030,6 @@ module ProcessSurface =
         | ClosedImmediate -> box {| kind = "ClosedImmediate" |}
         | Park _ -> box {| kind = "Park" |}
 
-    let ptySessionCreate (id: string) (backend: obj) : obj = sessionCreate id backend
-    let ptySessionView (session: obj) : obj = sessionView session
-    let ptySessionSetClosed (session: obj) (closed: bool) : unit = sessionSetClosed session closed
-    let ptySessionSetBackend (session: obj) (backend: obj) : unit = sessionSetBackend session backend
-    let ptySessionPushPending (session: obj) (command: obj) : unit = sessionPushPending session command
 
     let sessionExitPending (session: obj) : bool = not ((sessionOf session).ExitCompleted)
 
@@ -1045,8 +1038,6 @@ module ProcessSurface =
         value.ExitCompleted <- true
         value.ExitCompletion.SetResult()
 
-    let ptySessionExitPending (session: obj) : bool = sessionExitPending session
-    let ptySessionResolveExit (session: obj) : unit = sessionResolveExit session
 
     let sessionPendingView (session: obj) : obj array =
         (sessionOf session).Pending
@@ -1064,7 +1055,6 @@ module ProcessSurface =
         |> List.map (fun (command, completion) -> PendingEntryHandle(command, completion) :> obj)
         |> List.toArray
 
-    let pendingCommands (pending: obj) : obj array = supervisorPendingEntries pending
 
     let pendingEntryView (entry: obj) : obj =
         let value = entry :?> PendingEntryHandle

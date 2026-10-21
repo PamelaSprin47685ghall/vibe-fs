@@ -80,11 +80,6 @@ module PairProgrammingThoughtSurface =
 
         fact, sessionId
 
-    let private flagsForJournal (journal: obj) (session: string) : obj =
-        let sessionId = SessionId.create session
-        let projection = AgentJournal.snapshot (agentJournalOf journal)
-        projectionFlagsOf projection.AgentProjections sessionId
-
     /// Boot the production EventStore journal behind one opaque capability.
     let createJournal (directory: string) : Task<obj> =
         task {
@@ -164,7 +159,6 @@ module PairProgrammingThoughtSurface =
                            error = JournalAppendFailure.describe failure |}
         }
 
-    let projectionFlags (journal: obj) (session: string) : obj = flagsForJournal journal session
 
     /// Fold one anchored pair without opening a journal; used by the pure law test.
     let foldAnchoredPair (payload: obj) : obj =
@@ -191,8 +185,6 @@ module PairProgrammingThoughtSurface =
     let source = PairProgrammingThoughtTransform.source
     let markerSource = source
     let markerToolName = PairProgrammingThoughtTransform.toolName
-    let canonicalText = text
-    let deniedText = PairProgrammingThoughtTransform.reprimandText None
 
     let private gapName gap =
         match gap with

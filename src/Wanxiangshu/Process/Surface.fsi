@@ -51,7 +51,6 @@ module ProcessSurface =
     val cancelToken: token: obj -> obj
     val tokenView: token: obj -> obj
     val registerCancellation: token: obj -> callback: obj -> obj
-    val disposeCancellationRegistration: _registration: obj -> unit
 
     val outcomeView: outcome: obj -> obj
     val resultView: result: obj -> obj
@@ -98,7 +97,6 @@ module ProcessSurface =
     val ptyFailed: id: string -> message: string -> obj
     val ptyAborted: id: string -> message: string -> obj
 
-    val ptySignalParse: name: string -> obj
     val ptySignalView: name: string -> obj
     val ptyCommandSpawn: command: string -> cwd: string -> obj
     val ptyCommandWrite: value: obj -> obj
@@ -138,13 +136,6 @@ module ProcessSurface =
     val sessionResolveExit: session: obj -> unit
     val sessionPendingView: session: obj -> obj array
 
-    val ptySessionCreate: id: string -> backend: obj -> obj
-    val ptySessionView: session: obj -> obj
-    val ptySessionSetClosed: session: obj -> closed: bool -> unit
-    val ptySessionSetBackend: session: obj -> backend: obj -> unit
-    val ptySessionPushPending: session: obj -> command: obj -> unit
-    val ptySessionExitPending: session: obj -> bool
-    val ptySessionResolveExit: session: obj -> unit
 
     val supervisorCreate: unit -> obj
     val supervisorAdd: supervisor: obj -> id: obj -> session: obj -> unit
@@ -164,7 +155,6 @@ module ProcessSurface =
     val supervisorSetSpawn: supervisor: obj -> spawn: obj -> unit
     val supervisorPendingEntries: pending: obj -> obj array
 
-    val pendingCommands: pending: obj -> obj array
     val pendingEntryView: entry: obj -> obj
     val pendingResolve: pending: obj -> index: int -> result: obj -> unit
     val readPlanView: plan: ReadPlan -> obj
