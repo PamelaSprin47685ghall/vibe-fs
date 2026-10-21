@@ -55,6 +55,15 @@ routed onto P-03. `Host/Ports/*` is unchanged, so the next free port id stays **
 adapter-thinness 139 files / 33000 lines, product-reference 595 (baseline 689), without-port 134 (baseline 149),
 fsharp-control-pyramid 2 findings (both pre-existing). **NOT BUILD-VERIFIED, NOT TEST-RUN** — the delivery team must
 build master and run the recovery requirement suites.
+P-08 fact (arch lane, 2026-10-22, slice P-08): P-08 now has an OpenCode implementation —
+`OpenCode/Host/ModelCatalogPort.fs(i)` implements `IModelCatalog`, and the neutral port family
+`Host/Ports/ModelRouting.fs(i)` is unchanged. `Available` reads the host catalog over
+`client.config.providers` (`GET /config/providers`); the host catalog carries no variant field, so every
+enumerated route has `Variant = None`. `Apply` is `HostError.Unsupported HostCapability.ProviderParams`:
+the host binds a model per prompt, never to a session. This is recorded as a fact only: it touches the
+HNI-08 (plugin-host) board's model-routing surface, but it claims no card and changes no card state. The
+legacy `OpencodeModel` and the `ModelRoutingSurface` host calls stay live (retirement is HNI-10) and no
+consumer was cut over; routing them onto P-08 is the next slice.
 
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 

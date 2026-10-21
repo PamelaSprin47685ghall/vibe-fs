@@ -803,6 +803,8 @@ OpenCode/Host/SessionSnapshotPort.fsi
 OpenCode/Host/SessionSnapshotPort.fs
 OpenCode/Host/TranscriptPort.fsi
 OpenCode/Host/TranscriptPort.fs
+OpenCode/Host/ModelCatalogPort.fsi
+OpenCode/Host/ModelCatalogPort.fs
 Execution/Session/ChatExecution/ProviderRunBinding.fsi
 Execution/Session/ChatExecution/ProviderRunBinding.fs
 OpenCode/Host/SessionSnapshotSurface.fsi

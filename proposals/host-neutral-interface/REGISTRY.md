@@ -17,7 +17,7 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 | P-05 | `IToolGate`, `ToolCallVerdict`, `ToolResultEdit`, `ToolDefinitionEdit` | `Host/Ports/ToolGates.fs(i)` | tools | `tool.execute.before/after`, `tool.definition` handling in `OpenCode/Plugin/PluginHooks` | DECLARED, SKELETON-OMP |
 | P-06 | `ITurnTransform`, `TurnAdmission`, `ContextEdit`, `ParamsVerdict` | `Host/Ports/TurnTransforms.fs(i)` | plugin-host | `OpenCode/Plugin/PluginTransforms`, `ChatParamsHook`, `ProviderSystemTransform` entry points | DECLARED, SKELETON-OMP |
 | P-07 | `ISignalSource`, `HostSignal`, `TurnTerminal` | `Host/Ports/Signals.fs(i)` | plugin-host | `OpenCode/Signals/HostSignal`, `HostEventCodec` terminal types | DECLARED, SKELETON-OMP |
-| P-08 | `IModelCatalog`, `ModelRoute`, `SpawnRoute` | `Host/Ports/ModelRouting.fs(i)` | plugin-host | `OpencodeModel` (Foundation), `ModelRoutingSurface` host calls | DECLARED, SKELETON-OMP |
+| P-08 | `IModelCatalog`, `ModelRoute`, `SpawnRoute` | `Host/Ports/ModelRouting.fs(i)` | plugin-host | `OpencodeModel` (Foundation), `ModelRoutingSurface` host calls — both **still live**; retiring them is HNI-10, not this slice | DECLARED, WIRED-OC, SKELETON-OMP |
 | P-09 | `ICompactionGate`, `CompactionContribution`, `ContinueVerdict` | `Host/Ports/Compaction.fs(i)` | plugin-host | `HostCompactionGate` hook entry | DECLARED, SKELETON-OMP |
 | P-10 | `IHostPaths` | `Host/Ports/Storage.fs(i)` | arch | ad-hoc `input.directory`/`project` reads | DECLARED, SKELETON-OMP |
 | P-11 | `IHostPlugin`, `HostPorts`, `ProductHooks`, `HostCapabilities`, `IAgentCatalog` | `Host/Ports/Lifecycle.fs(i)` | plugin-host | `OpenCode/Plugin/Plugin`, `PluginBoot`, `ManagedAgentConfig` host side | DECLARED, SKELETON-OMP |
@@ -398,6 +398,27 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   Rows P-14..P-18 carry the target; the owning lanes (fork/session, fission, tools, arch) land the numbered steps
   in §3.2–§3.4. **Nothing was compiled, built or tested on this machine** — the evidence is static (`git grep` /
   `git ls-tree` on `origin/master` `94218a2be`, plus `scripts/checks/architecture.mjs` printing `architecture: OK`).
+- 2026-10-22 eng-host-arch (slice P-08): P-08 is WIRED-OC — the OpenCode adapter now implements `IModelCatalog`
+  (`OpenCode/Host/ModelCatalogPort.fs(i)`, namespace `Wanxiangshu.OpenCode`). `Available` reads the host catalog
+  over the SDK verb `client.config.providers` (`GET /config/providers`, the only host verb that lists every
+  provider together with its models) or over `GET /config/providers` on the HTTP server, and maps the host
+  payload onto neutral `ModelRoute` values: the provider id becomes `Provider`, the model key becomes `Model`.
+  The host catalog carries **no variant field**, so every enumerated route has `Variant = None` (the product's
+  `OpencodeModel.variant` is a *reasoning* label set by `ModelRouting.toOpenCodeModel`, not a host-advertised
+  variant). An absent provider list is an **empty catalog**, never a failure; a host error becomes
+  `HostError.Refused`, a transport failure `HostError.Transport`. `Apply` is honestly
+  `HostError.Unsupported HostCapability.ProviderParams`: the host binds a model **per prompt**
+  (`OpenCode/Host/OpenCodePort.fs` `modelRequestFields`; per-message `ModelRouting.projectHostModel`), never to a
+  session — the session update verb carries only a title — so routing happens at prompt time (P-02
+  `PromptRequest.Route`). The adapter chooses no route; choosing is product logic. **The legacy `OpencodeModel`
+  (Foundation) and the `ModelRoutingSurface` host calls are deliberately still live** — retiring them is HNI-10;
+  no consumer was cut over in this commit. **No new port** — P-08 (`Host/Ports/ModelRouting.fs(i)`) is unchanged,
+  so the next free id stays **P-19**; `omp: n/a` (the family `.fsi` did not change, so the generated TS mirror is
+  unaffected). Gates: architecture OK, adapter-thinness 140 files / 33248 lines, product-reference 588
+  (baseline 689), without-port 134 (baseline 149), fsharp-control-pyramid 2 findings — both pre-existing in
+  `OpenCode/Host/SessionSnapshotPort.fs`, 0 in the new file, aggregate-retired OK, subsystems OK.
+  **No compile/test evidence** (owner's no-build-before-push rule; the compile slot gave up with exit 75 because the
+  machine was heavily loaded) — the delivery team must build master and run the model-routing requirement suites.
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.
