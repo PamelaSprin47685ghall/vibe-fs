@@ -14,6 +14,7 @@ module JoinRun =
 
     /// The DevOps join budget in milliseconds. A DevOps join may not wait
     /// longer than this; every other role waits untimed.
+    [<Literal>]
     val DevOpsJoinTimeoutMs: int
 
     /// Which join path the caller's role selects.

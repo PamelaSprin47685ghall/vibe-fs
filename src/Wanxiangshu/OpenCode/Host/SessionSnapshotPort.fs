@@ -399,7 +399,7 @@ module SessionSnapshotPort =
         acc
         |> Result.bind (fun sessions ->
             managerSessionOfRow row
-            |> Result.map (fun found -> found |> Option.toList @ sessions))
+            |> Result.map (fun found -> found |> Option.toList |> List.append sessions))
 
     /// The manager sessions among the candidate rows, or the first refusal a
     /// row carries.
