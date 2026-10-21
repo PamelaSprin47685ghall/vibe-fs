@@ -17,7 +17,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
@@ -35,7 +34,10 @@ module HostTurnObserver =
         : Task<Result<unit, string>> =
         task {
             let prompt =
-                ProviderProse.documentFor source.SessionId (LoopSensor.continuationPath kind) Map.empty
+                ProviderProse.documentFor
+                    source.SessionId
+                    (Wanxiangshu.Execution.Session.LoopSensor.continuationPath kind)
+                    Map.empty
 
             let! outcome =
                 HostSessionNudge.sendContinuationResult
@@ -66,7 +68,7 @@ module HostTurnObserver =
             | _ -> sendGuardContinuation sessionPort rootWorkspace journal source kind directory observer
 
         let sensor =
-            LoopSensor.create
+            Wanxiangshu.Execution.Session.LoopSensor.create
                 scope.Sessions.OwnedSessions
                 scope.Sessions.SessionParents
                 sessionPort.InterruptAttempt

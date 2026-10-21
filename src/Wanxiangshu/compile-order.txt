@@ -935,8 +935,8 @@ Execution/Delegation/Fork/Host/Pty.fsi
 Execution/Delegation/Fork/Host/Pty.fs
 Interaction/Repair/Port.fsi
 Interaction/Repair/Port.fs
-OpenCode/Host/LoopSensor.fsi
-OpenCode/Host/LoopSensor.fs
+Execution/Session/LoopSensor.fsi
+Execution/Session/LoopSensor.fs
 OpenCode/Host/LoopSensorSurface.fsi
 OpenCode/Host/LoopSensorSurface.fs
 OpenCode/Host/MessageVisibility.fsi

@@ -25,9 +25,18 @@ type AbortCause =
     | DegenerationGuard of DegenerationKind
     | External
 
+/// Host-neutral streaming text delta. `Message` carries the host message id
+/// that identifies the exact provider run; it is absent when the host did not
+/// report one. The delta text is already decoded — the host adapter owns the
+/// wire format.
+type LoopTextDelta =
+    { Session: SessionId
+      Message: string option
+      Delta: string }
+
 /// Process-local streaming degeneration sensor port.
 type ILoopSensor =
-    abstract Observe: raw: obj -> unit
+    abstract Observe: delta: LoopTextDelta -> unit
 
     abstract ConsumeAbortCause:
         source: ProviderAttemptSource * directory: string option * observer: ContinuationAcceptanceObserver option ->

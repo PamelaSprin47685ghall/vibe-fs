@@ -1084,7 +1084,13 @@ module SyncDelegateSurface =
     let closeGuardRecovery (value: obj) : Task = closeRecovery value
 
     let observeGuardDelta (value: obj) (raw: obj) : unit =
-        (unbox<Harness> value).Plugin.Value.LoopSensor.Observe raw
+        match LoopEventCodec.tryDecodeTextDelta raw with
+        | None -> ()
+        | Some delta ->
+            (unbox<Harness> value).Plugin.Value.LoopSensor.Observe
+                { Session = delta.SessionId
+                  Message = delta.MessageId
+                  Delta = delta.Delta }
 
     let awaitGuardInterrupt (value: obj) session providerRun : Task =
         match

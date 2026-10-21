@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Execution.Session
 
 open Wanxiangshu.Foundation.HostSession
 
@@ -20,7 +20,7 @@ type LoopSensor =
         ?runOwnedWork: ((unit -> Task) -> Task) ->
             LoopSensor
 
-    member Observe: raw: obj -> unit
+    member Observe: delta: LoopTextDelta -> unit
 
     member ConsumeAbortCause:
         source: ProviderAttemptSource * directory: string option * observer: ContinuationAcceptanceObserver option ->

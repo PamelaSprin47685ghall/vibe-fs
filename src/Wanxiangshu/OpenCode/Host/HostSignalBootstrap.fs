@@ -431,7 +431,16 @@ module HostSignalBootstrap =
                     }
                     :> Task
 
-            let onLoopEvent raw = scope.LoopSensor.Observe raw
+            // Host wire edge: the adapter decodes the raw delta into the
+            // neutral `LoopTextDelta` before the product sensor observes it.
+            let onLoopEvent raw =
+                match LoopEventCodec.tryDecodeTextDelta raw with
+                | None -> ()
+                | Some delta ->
+                    scope.LoopSensor.Observe
+                        { Session = delta.SessionId
+                          Message = delta.MessageId
+                          Delta = delta.Delta }
 
             let signalRouter =
                 HostSignalRouter(

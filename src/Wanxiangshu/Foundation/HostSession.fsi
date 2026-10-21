@@ -23,8 +23,13 @@ type AbortCause =
     | DegenerationGuard of DegenerationKind
     | External
 
+type LoopTextDelta =
+    { Session: SessionId
+      Message: string option
+      Delta: string }
+
 type ILoopSensor =
-    abstract Observe: raw: obj -> unit
+    abstract Observe: delta: LoopTextDelta -> unit
 
     abstract ConsumeAbortCause:
         source: ProviderAttemptSource * directory: string option * observer: ContinuationAcceptanceObserver option ->

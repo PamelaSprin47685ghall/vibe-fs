@@ -1,11 +1,11 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Execution.Session
 
 open Wanxiangshu.Foundation.HostSession
 
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Execution.Session
+
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
@@ -393,13 +393,13 @@ type LoopSensor
             detectors.[key] <- created
             created
 
-    member private this.TryEvaluate(delta: LoopEventCodec.TextDelta) : LoopDetector.Evaluation option =
+    member private this.TryEvaluate(delta: LoopTextDelta) : LoopDetector.Evaluation option =
         lock gate (fun () ->
-            let key = keyOf delta.SessionId
+            let key = keyOf delta.Session
 
             // 已截断 run 的迟到 delta 不能写入新的算法 scratch。
             let alreadyInterrupted =
-                match delta.MessageId, interruptAttempts.TryGetValue key with
+                match delta.Message, interruptAttempts.TryGetValue key with
                 | Some messageId, (true, runs) -> runs.Contains(ProviderRunIdentity.create messageId)
                 | None, _
                 | Some _, (false, _) -> false
@@ -407,33 +407,31 @@ type LoopSensor
             if armed.ContainsKey key || alreadyInterrupted then
                 None
             else
-                let detector = this.DetectorFor delta.SessionId
+                let detector = this.DetectorFor delta.Session
                 let updated, evaluation = LoopDetector.pushText detector delta.Delta
                 detectors.[key] <- updated
                 Some evaluation)
 
-    member private this.InterruptForEvaluation(delta: LoopEventCodec.TextDelta, evaluation: LoopDetector.Evaluation) =
+    member private this.InterruptForEvaluation(delta: LoopTextDelta, evaluation: LoopDetector.Evaluation) =
         // An anomaly requires its exact provider run: without a message id the
         // delta is observed into detector scratch only and never interrupts.
-        match this.ClassifyDegeneration evaluation.State, delta.MessageId with
+        match this.ClassifyDegeneration evaluation.State, delta.Message with
         | Some kind, Some messageId ->
             let providerRun = ProviderRunIdentity.create messageId
-            this.Interrupt(delta.SessionId, providerRun, kind, evaluation)
+            this.Interrupt(delta.Session, providerRun, kind, evaluation)
         | _ -> ()
 
-    member private this.ObserveEligible(delta: LoopEventCodec.TextDelta) =
+    member private this.ObserveEligible(delta: LoopTextDelta) =
         this.TryEvaluate delta
         |> Option.iter (fun evaluation -> this.InterruptForEvaluation(delta, evaluation))
 
-    member private this.ObserveOwned(delta: LoopEventCodec.TextDelta) =
-        if isOwned delta.SessionId then
+    member private this.ObserveOwned(delta: LoopTextDelta) =
+        if isOwned delta.Session then
             this.ObserveEligible delta
 
-    /// Raw stream edge. Non-text/reasoning events fail closed in LoopEventCodec.
-    member this.Observe(raw: obj) =
-        match LoopEventCodec.tryDecodeTextDelta raw with
-        | None -> ()
-        | Some delta -> this.ObserveOwned delta
+    /// Decoded stream edge. The host adapter owns the wire format and fails
+    /// closed on non-text/reasoning events.
+    member this.Observe(delta: LoopTextDelta) = this.ObserveOwned delta
 
     /// Exact-run consumption decision: armed anomaly plus active slot jointly
     /// decide whether the reconciled run may take ownership. Tuple match keeps
@@ -506,7 +504,7 @@ type LoopSensor
             | _ -> None)
 
     interface ILoopSensor with
-        member this.Observe raw = this.Observe raw
+        member this.Observe delta = this.ObserveOwned delta
 
         member this.ConsumeAbortCause(source, directory, observer) =
             this.ConsumeAbortCause(source, directory, observer)
