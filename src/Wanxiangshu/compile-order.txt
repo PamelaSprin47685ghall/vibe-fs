@@ -997,10 +997,14 @@ Execution/Delegation/Advisor/Seat.fsi
 Execution/Delegation/Advisor/Seat.fs
 OpenCode/Host/HostCompactionGate.fsi
 OpenCode/Host/HostCompactionGate.fs
+Context/Prefix/WireReconciliation.fsi
+Context/Prefix/WireReconciliation.fs
 Context/Prefix/OpenCode/Wire.fsi
 Context/Prefix/OpenCode/Wire.fs
 Context/Prefix/XWireSurface.fsi
 Context/Prefix/XWireSurface.fs
+Context/Prefix/OpenCode/XWireHostSurface.fsi
+Context/Prefix/OpenCode/XWireHostSurface.fs
 OpenCode/Host/PluginRecoveryScopeSurface.fsi
 OpenCode/Host/PluginRecoveryScopeSurface.fs
 OpenCode/Host/TurnRuntimePreparation.fsi

@@ -3,7 +3,7 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const xwire = await import("../../../dist/Context/Prefix/XWireSurface.js");
+const xwire = await import("../../../dist/Context/Prefix/OpenCode/XWireHostSurface.js");
 
 const textMessage = (id, role, text) => ({
   info: { id, role },

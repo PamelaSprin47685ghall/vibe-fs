@@ -27,8 +27,6 @@ module XWireSurface =
 
     val internal unwrapBoundPlan: handle: obj -> AttemptPlan
 
-    val suppressHostMessagesByIds: rawMessages: obj array -> hostMessageIds: string array -> obj array
-
     val transform: input: obj -> obj
 
     val reconcile: input: obj -> obj

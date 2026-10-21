@@ -8,8 +8,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Provider.Attempt
 
-type XWireReconciliationDecision = { Cleared: bool; KeptPlan: bool }
-
 type AttemptPlanCapability =
     { TryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option
       TryBindAttemptPlan: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> AttemptPlan option
@@ -18,8 +16,6 @@ type AttemptPlanCapability =
       TryPendingAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan option }
 
 module XWire =
-
-    val reconciliationDecision: hasPlan: bool -> outcome: AttemptOutcome option -> XWireReconciliationDecision
 
     val suppressHostMessagesByIds: rawMessages: obj list -> hostMessageIds: Set<string> -> obj list
 

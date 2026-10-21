@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as xwire from '../../../dist/Context/Prefix/XWireSurface.js'
+import * as xwire from '../../../dist/Context/Prefix/OpenCode/XWireHostSurface.js'
 
 test('WHAT[context-compression-017] physical user messages survive suppression as the exact Host object while unaddressed and unidentified messages are preserved', () => {
   const raw = [

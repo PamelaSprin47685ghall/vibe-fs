@@ -21,8 +21,6 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Participant.Provider.Projection
 
-type XWireReconciliationDecision = { Cleared: bool; KeptPlan: bool }
-
 type AttemptPlanCapability =
     { TryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option
       TryBindAttemptPlan: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> AttemptPlan option
@@ -31,15 +29,6 @@ type AttemptPlanCapability =
       TryPendingAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan option }
 
 module XWire =
-
-    let reconciliationDecision (hasPlan: bool) (outcome: AttemptOutcome option) : XWireReconciliationDecision =
-        match hasPlan, outcome with
-        | false, _ -> { Cleared = false; KeptPlan = false }
-        | true, Some AttemptOutcome.Completed -> { Cleared = true; KeptPlan = false }
-        | true, Some AttemptOutcome.CompletedInvalid
-        | true, Some AttemptOutcome.Failed
-        | true, Some AttemptOutcome.Aborted -> { Cleared = true; KeptPlan = false }
-        | true, None -> { Cleared = false; KeptPlan = true }
 
     let private sessionIdOfOutput (output: obj) : SessionId option =
         ProviderWireDecode.projectionSessionIdFromMessages output
@@ -321,7 +310,7 @@ module XWire =
         (plan: AttemptPlan)
         : Task =
         let outcome = attemptOutcomeOfTurn turn
-        let decision = reconciliationDecision true outcome
+        let decision = XWireReconciliation.reconciliationDecision true outcome
 
         match outcome, decision.Cleared with
         | Some settled, true -> settleAttemptPlan port attempts turn.SessionId turn.ProviderRun settled plan

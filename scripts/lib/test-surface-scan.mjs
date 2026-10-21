@@ -656,6 +656,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Context/Prefix/OpenCode/XWireHostSurface.js',
+    owner: 'prefix-stability',
+    laws: ['PREFIX-STABILITY-009'],
+    source: 'src/Wanxiangshu/Context/Prefix/OpenCode/XWireHostSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'OpenCode/Host/PluginRecoveryScopeSurface.js',
     owner: 'host-boundary',
     laws: ['PAR-011', 'PAR-020'],
