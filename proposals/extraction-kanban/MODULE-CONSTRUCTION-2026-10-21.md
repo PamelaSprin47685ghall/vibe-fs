@@ -144,3 +144,12 @@ release-07/gen106完整本地验收已通过，929.2秒：格式、静态、Fabl
 2. 优先处理两个功能P1：MF-01的Bun异步硬期限/完整物理owner协议；MF-02A的Host原子exact-attempt中断合同。受控SDK竞态反例只证明B已Accepted时仍发送session级abort，未证明真实B provider被杀。
 3. 长测需新目录、从零开始，先按新授权确定范围和时长。归档脚本含原绝对路径，不能直接在旧证据目录运行或覆盖旧记录。按交接重装真实包或重建并绑定新产物指纹，不冒称复原未保存的旧bundle字节。
 4. 小问题仍按原优先级留档：P2为Casebook旧hash碰撞、legacy/series活动选材、外部同inode历史改写热cache差异、prefix旧观测、大Git输出及borrowed_surface边界。convergence/degeneration/ablation同构纯包暂不为入口数量迁移；其余MF-05协议单独认领，局部验收不关闭整卡或历史GAP。
+
+<a id="resume-20261021"></a>
+## 用户恢复施工
+
+用户以“继续”恢复本轮，恢复时钟为2026-10-21T01:53:11Z。暂停期间不算实际施工时长；原暂停、取消和失败证据均保留。源码保存点`764e6778e`与交接存档提交`aad92fa0b`均已在本地，工作区干净。普通推送先后遇SSH banner超时及HTTPS TLS连接失败；远端新head与CI尚未取得，不把本地提交说成已推送。
+
+恢复后的并行范围：root核对交付状态与MF-05剩余真实消费者；physical_storage_audit只读评估Process暂停请求和capacity/queue边界，不提前发布无人消费接口；delivery_audit复核证据存档/包扫描边界及Host exact-attempt协议；sandbox_audit明确独立guest最小垂直链，并以新目录、零计时重跑已取消的Process/Supervision四小时与PTY两小时验收。固定新产物及精确启动回执后另记实际开始时间，不复用旧计时。共享公共元数据与主仓修改仍由root串行处理，实验不修改被测产物。
+
+本轮继续优先功能P1，但不把单纯允许STOP/CONT、Promise挂起或受控SDK回执称为完整sandbox/Host修复。小边界按原决定留档；固定上游输入、原运行目录及部署边界不变。
