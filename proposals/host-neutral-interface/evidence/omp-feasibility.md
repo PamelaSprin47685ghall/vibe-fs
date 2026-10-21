@@ -127,6 +127,16 @@ google uses `generationConfig.temperature`/`maxOutputTokens`/`topP`
 Applying *part* of a verdict (e.g. temperature but not the token cap) would silently change the model's
 behaviour, so the adapter refuses instead.
 
+**State of the reference skeleton.** The skeleton in `adapters/omp/` does **not implement this rule**. It
+registers no `before_provider_request` handler and holds no per-family encoder table, and it therefore does
+**not** advertise the `ProviderParams` capability: the `Capabilities.Supports` set the adapter hands to the
+product is exactly `ChildSessions`, `SessionDiscovery`, `Interrupt` and `SubagentRouting` (`adapter.ts`,
+`createOmpHostPorts`). That is **fail-closed at activation** in the sense of acceptance 2 — the product is
+told up front that the capability is absent — but it is **not** a partial encode: nothing is encoded at all.
+Acceptance 1 (the parametrised per-family encoder test), acceptance 3 (refusing an incompletely mappable
+verdict) and acceptance 4 (`ProviderParams.Extra` reaching the payload byte-for-byte) are **unimplemented**;
+they are owned by `cut36-omp-2`. The rule was **not** exercised against a running omp host.
+
 **Acceptance.**
 1. For every family in the adapter's table, a parametrised test asserts the encoded payload contains each
    mapped field. Mutation: drop one field from the encoder and the test fails.
@@ -182,6 +192,21 @@ specified as follows.
    failure (`src/extensibility/extensions/loader.ts:445-458`) and reports handler errors through the runner's
    error channel (`emitError`, `src/extensibility/extensions/runner.ts:1317`); the adapter must not convert a
    product failure into a host failure.
+
+**State of the reference skeleton.** The skeleton in `adapters/omp/` **partly implements this rule**. Rules 1–5
+and 7 are satisfied by the skeleton's shape: the product is passed in as a plain `IHostPlugin` value and
+activated through its single `Activate` entry point (`adapter.ts`, `activateOnOmp`); the wiring is
+hand-written and imports no product module; the SDK pieces come from `ExtensionAPI.pi`; `session_shutdown`
+disposes the product; and a failing activation is logged through `pi.logger` and degraded rather than thrown
+into omp. **Rule 6 (the activation latch) now conforms**: `activateOnOmp` keeps a single latch, the omp
+handlers are registered exactly once per extension and read the live product hooks out of a slot, so a second
+`session_start` neither activates the product again nor appends a second handler list entry. The offline
+fixture asserts this for real — `Activate` is called once across two `session_start`s, a handler-driven event
+after the second `session_start` reaches the product exactly once, `session_shutdown` disposes exactly once
+across two shutdowns, and a `session_start` after the shutdown activates a fresh product and announces exactly
+one more session. **Acceptance 5 does not exist**: no gate rejects a product decision in the entry module, and
+the skeleton has **no entry module at all** (only `activateOnOmp`), so `cut36-omp-2` owns both the entry
+module and the gate. The rule was **not** exercised against a running omp host.
 
 **Acceptance (for `cut36-omp-2`).**
 1. A golden-package test loads the **real** entry module with a fake `pi` and a **stub `IHostPlugin`**: the
