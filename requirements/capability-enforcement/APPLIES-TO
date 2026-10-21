@@ -6,6 +6,7 @@
 /src/Wanxiangshu/Foundation/RolesSurface.fs
 /src/Wanxiangshu/Participant/Persona/**
 /src/Wanxiangshu/OpenCode/Tools/**
+/src/Wanxiangshu/Execution/Tool/**
 /src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs
 /src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
 /src/Wanxiangshu/OpenCode/Host/ManagerConfig.fs

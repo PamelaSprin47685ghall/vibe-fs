@@ -692,10 +692,24 @@ const root = new URL('../../../', import.meta.url)
 const source = (path) => readFile(new URL(path, root), 'utf8')
 
 test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_current_provider_step_before_tool_body', async () => {
-  const [binding, registry] = await Promise.all([
+  const [binding, hostRegistry, registry] = await Promise.all([
     source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs'),
     source('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs'),
+    // The execute gate is product code behind the host-neutral tool port; the
+    // OpenCode registry wraps every registered tool body in it.
+    source('src/Wanxiangshu/Execution/Tool/ExecuteGate.fs'),
   ])
+
+  assert.match(
+    hostRegistry,
+    /baseSpecs \|> List\.map \(fun spec -> \{ spec with Execute = gateExecute spec \}\)/,
+    'every registered tool body is wrapped by the gate',
+  )
+  assert.match(
+    hostRegistry,
+    /let gateExecute[\s\S]*Execute = spec\.Execute[\s\S]*ToolExecuteGate\.execute gateFacts gated managerPermission args ctx/,
+    'the host registry delegates the original tool body to the product execute gate',
+  )
 
   // The tool context carries this call's own exact ProviderRunIdentity. The
   // physical message it answers comes from the ModelRouting relation the
@@ -710,7 +724,7 @@ test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_
   const boundaryCall = 'ModelRouting.tryProviderStepIdentity'
   const boundaryIndex = registry.indexOf(boundaryCall)
 
-  assert.ok(boundaryIndex >= 0, 'ToolRegistry must cross the provider→tool capacity boundary')
+  assert.ok(boundaryIndex >= 0, 'the execute gate must cross the provider→tool capacity boundary')
   assert.match(
     registry,
     /let (?:private )?endObservedStep[\s\S]*ModelRouting\.tryProviderStepIdentity[\s\S]*ModelRouting\.endProviderStep/,
@@ -739,7 +753,7 @@ test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_
   assert.match(
     registry,
     /let (?:private )?executeAdmittedRole[\s\S]*spec\.Execute args ctx/,
-    'after the outer handoff and gates, ToolRegistry still delegates to the original tool body',
+    'after the outer handoff and gates, the execute gate still delegates to the original tool body',
   )
   assert.match(
     registry,

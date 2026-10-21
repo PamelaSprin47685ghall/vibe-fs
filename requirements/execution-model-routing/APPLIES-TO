@@ -21,3 +21,4 @@
 /src/Wanxiangshu/Execution/Routing/ModelCapacity/Model.fs
 /src/Wanxiangshu/Execution/Routing/ModelCapacity/Queue.fs
 /src/Wanxiangshu/Execution/Routing/ModelCapacity/Surface.fs
+/src/Wanxiangshu/Execution/Tool/ExecuteGate.fs
