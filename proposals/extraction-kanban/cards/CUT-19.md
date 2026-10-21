@@ -216,4 +216,7 @@
 - **改动**：`Persistence/EventStore/GitTypes.fs(i)` 只剩 `StoreRef.canonical`（删 60 行）。shard 与编译顺序不变。
 - **验证**：`node scripts/checks/architecture.mjs` OK；`node scripts/check.mjs` 与 base 逐行一致（只差行号，以及 master 新提交带来的一条 control-pyramid 报告，与本刀无关）。构建和 durable-events + durable-convergence 套件见落地记录。
 - **回退**：只删除类型，不改事件、文件或 ref；`git revert` 即可恢复。
+- **落地复验**：落地循环 `logs-cut09i/loop19c.out` rebase 到 `56a054772` 后全量构建，durable-events + durable-convergence 276 tests / 252 pass / 0 fail / 0 cancelled / 14 skip / 10 todo（与 §15 的 252 pass / 0 fail 相同）；之后 master 前移到 `2dd501d2e`（32 个文件，与写集合不相交），rebase 并重跑推送前检查后推送 `f0d6ded47`。
+- **关闭（eng-cut09j-goose，2026-10-21）**：前置 CUT-11/12/27/29/31 均 DONE。CARDS 的退出条件“最后一个旧消费者退出后才能删旧 Store/Journal 相关实现”——核对后没有旧 Store 可删：只有一个生产 store、一个生产 writer，Journal 是其上的类型化事实层（RETAINED，见上表）；残留 Git 类型已按消费者删除或保留。
 - **未做**：全量 `scripts/verify.mjs` 与 integration tier。
+- **状态**：CUT-19-c `DONE`。

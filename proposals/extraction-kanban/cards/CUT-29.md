@@ -40,5 +40,5 @@
 
 - CUT-13 已在看板 DONE（b1b59d6f4）。亲眼核对：`RepositoryWarmStart` 的生产消费者只有 `Execution/Delegation/Fork/OpenCode/Tool.fs`（`appendToBaseDocument`）以及插件装配处的 `open`；CUT-13 的收尾提交没有改这条接线，本卡也没有改它的公开签名，§1 的“整卡 DONE 待 CUT-13 核对 Fork 接线”因此满足。
 - 退出条件（CARDS CUT-29）：抽出的算法（warm-start 律）只有 wanxiangli 一个 owner；不搬的部分已逐项登记——Strength/Replica 等 REMOVED（仓主已删，非本卡抽取）、只读调查契约与 Semble 传输 RETAINED。没有长期先验、历史迁移或工具配置被删除。
-- 落地复验：落地循环 `logs-cut09i/loop29*.out`，rebase 到最新 master 后重新构建，repository-investigation、provider-language、capability-enforcement、provider-projection 四个套件 0 fail；推送前跑了 lockfile、gitlink 祖先关系和 `architecture.mjs` 检查。
-- **状态**：CUT-29 `DONE`。
+- 落地复验：落地循环 `logs-cut09i/loop29*.out` 在推送前检查中误报 `GITLINK_OLDER`（脚本拿已前移的 origin/master gitlink 比较，不是本卡问题）后退出；接手者 eng-cut09j-goose 用修正后的循环 `logs-cut09j/loop29.out` 重来：rebase 到最新 master 后重新构建，repository-investigation、provider-language、capability-enforcement、provider-projection 四个套件合计 283 tests / 246 pass / 0 fail / 0 cancelled / 12 skip / 25 todo（在 `507d68d01` 上 `--clean` 全量构建；之后 master 若只做不相交前移，则只 rebase 并重跑推送前检查）；推送前跑了 lockfile、gitlink 祖先关系和 `architecture.mjs` 检查。
+- **状态**：CUT-29 `DONE`（两刀落地为 master `01488ebe4` 及其父提交）。
