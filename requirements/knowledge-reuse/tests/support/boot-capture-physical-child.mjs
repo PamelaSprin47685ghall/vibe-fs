@@ -6,12 +6,7 @@ import { syncBuiltinESMExports } from 'node:module'
 import { execFileSync } from 'node:child_process'
 import * as eventStore from '../../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../../dist/Repository/Knowledge/Casebook/Surface.js'
-import * as index from '../../../../dist/Repository/Knowledge/Casebook/IndexSurface.js'
-import * as lifecycle from '../../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
-import * as bookkeeper from '../../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
-import * as hostFinalize from '../../../../dist/OpenCode/Plugin/PluginHostWiringSurface.js'
-import { createCase } from './casebook.mjs'
-import { CANONICAL_Q, CANONICAL_A, installBookkeeperRuntime, scriptedBookkeeperPort } from './bookkeeper-session-support.mjs'
+import { CANONICAL_Q, CANONICAL_A } from './canonical.mjs'
 
 const [mode, directory, scenario, requestJson] = process.argv.slice(2)
 const request = JSON.parse(requestJson)
@@ -57,6 +52,18 @@ if (mode === 'cold') {
       before: encodeCase(before), current: encodeCase(current), preserved: true }) + '\n')
   } finally { eventStore.dispose(handle) }
 } else {
+  // The cold reader above is an independent process whose value is that it
+  // starts from nothing but the durable bytes on disk. It therefore never
+  // loads the Boot, index, lifecycle or bookkeeper graphs: a cold start that
+  // pays the whole Boot graph is no longer a cheap independent observation, it
+  // is a second Boot. The measure branch loads them here, in the order the
+  // module graph has always evaluated them.
+  const index = await import('../../../../dist/Repository/Knowledge/Casebook/IndexSurface.js')
+  const lifecycle = await import('../../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js')
+  const bookkeeper = await import('../../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js')
+  const hostFinalize = await import('../../../../dist/OpenCode/Plugin/PluginHostWiringSurface.js')
+  const { createCase } = await import('./casebook.mjs')
+  const { installBookkeeperRuntime, scriptedBookkeeperPort } = await import('./bookkeeper-session-support.mjs')
   assert.equal(mode, 'measure')
   assert.ok(['valid', 'valid-unknown', 'malformed', 'malformed-unknown'].includes(scenario))
   assert.equal(process.env.WANXIANGSHU_NO_FATAL_EXIT, undefined)

@@ -5,8 +5,8 @@ import * as bookkeeperRefresh from '../../../../dist/Repository/Knowledge/Casebo
 import * as lifecycle from '../../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
 
 export const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
-export const CANONICAL_Q = 'Canonical maintained question'
-export const CANONICAL_A = 'Summary of Inspector answers across turns.'
+import { CANONICAL_Q, CANONICAL_A } from './canonical.mjs'
+export { CANONICAL_Q, CANONICAL_A }
 
 export const scriptedBookkeeperPort = () => {
   const createCalls = []
