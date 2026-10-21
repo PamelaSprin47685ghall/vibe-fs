@@ -10,6 +10,7 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Host.Ports
 
 module SessionSnapshotPort =
 
@@ -384,46 +385,72 @@ module SessionSnapshotPort =
         && not (isNull row?title)
         && unbox<string> row?title = title
 
-    let private discoveredSessions (title: string) (response: obj) =
+    let private discoveredSessions (title: string) (response: obj) : Result<SessionId list, HostError> =
         let rows =
             if not (isNull response) && not (isNull response?error) then
-                invalidOp "Session discovery returned an error response"
+                Error(HostError.Refused "Session discovery returned an error response")
             elif isJsArray response then
-                unbox<obj array> response
+                Ok(unbox<obj array> response)
             elif not (isNull response) && isJsArray response?data then
-                unbox<obj array> response?data
+                Ok(unbox<obj array> response?data)
             else
-                invalidOp "Session discovery did not return a session list"
+                Error(HostError.Refused "Session discovery did not return a session list")
 
-        // Request two matches. A full page cannot prove there is only one
-        // candidate, even when local filtering would leave one usable row.
-        if rows.Length >= 2 then
-            invalidOp "Session discovery is ambiguous or its result page is full"
+        match rows with
+        | Error error -> Error error
+        | Ok rows ->
+            // Request two matches. A full page cannot prove there is only one
+            // candidate, even when local filtering would leave one usable row.
+            if rows.Length >= 2 then
+                Error(HostError.Refused "Session discovery is ambiguous or its result page is full")
+            else
+                let matches = rows |> Array.filter (exactRootTitle title)
 
-        rows
-        |> Array.filter (exactRootTitle title)
-        |> Array.map (fun row ->
-            if readString row?agent <> Some "manager" then
-                invalidOp "Delivery session does not identify the Manager agent"
+                let mutable refusal: HostError option = None
+                let sessions = ResizeArray<SessionId>()
 
-            match sessionIdOfRow row with
-            | Some session -> session
-            | None -> invalidOp "Delivery session has no valid identity")
-        |> Array.toList
+                for row in matches do
+                    match refusal with
+                    | Some _ -> ()
+                    | None ->
+                        if readString row?agent <> Some "manager" then
+                            refusal <- Some(HostError.Refused "Delivery session does not identify the Manager agent")
+                        else
+                            match sessionIdOfRow row with
+                            | Some session -> sessions.Add session
+                            | None -> refusal <- Some(HostError.Refused "Delivery session has no valid identity")
 
-    type SdkDiscoveryPort(client: obj, workspaceDirectory: string option) =
+                match refusal with
+                | Some error -> Error error
+                | None -> Ok(List.ofSeq sessions)
+
+    [<Emit("encodeURIComponent($0)")>]
+    let private encodeURIComponent (_value: string) : string = jsNative
+
+    /// Host-neutral session verbs. Slice A wires the discovery verb only; the
+    /// remaining verbs stay unsupported until the OpenCode session surface
+    /// moves onto this port.
+    let private unsupported (capability: HostCapability) : Task<Result<'T, HostError>> =
+        Task.FromResult(Error(HostError.Unsupported capability))
+
+    type SdkSessionPort(client: obj, workspaceDirectory: string option) =
         let headersObj () =
             match workspaceDirectory with
             | Some dir -> createObj [ "x-opencode-directory", box (emitJsExpr dir "encodeURIComponent($0)") ]
             | None -> createObj []
 
-        interface ISessionDiscoveryPort with
-            member _.FindRootSessionsByTitle(title) =
+        interface ISessionPort with
+            member _.FindByTitle(title) =
                 taskResult {
                     try
                         let sessObj = client?session
                         let listFn = sessObj?list
-                        do! Result.requireFalse "session.list unavailable on SDK client" (isNull listFn)
+
+                        do!
+                            Result.requireFalse
+                                (HostError.Transport "session.list unavailable on SDK client")
+                                (isNull listFn)
+
 
                         let queryFields =
                             [ "roots", box true; "search", box title; "limit", box 2 ]
@@ -436,10 +463,78 @@ module SessionSnapshotPort =
 
                         let! response = unbox<Task<obj>> (listFn?call (sessObj, payload)) |> TaskResultCE.ofTask
 
-                        return discoveredSessions title response
+                        return! discoveredSessions title response
                     with ex ->
-                        return! Error ex.Message
+                        return! Error(HostError.Transport ex.Message)
                 }
+
+            member _.Create(_parent, _spec) =
+                unsupported HostCapability.ChildSessions
+
+            member _.Parent(_session) =
+                unsupported HostCapability.ChildSessions
+
+            member _.Children(_parent) =
+                unsupported HostCapability.ChildSessions
+
+            member _.Abort(_session) =
+                unsupported HostCapability.ChildSessions
+
+            member _.Interrupt(_session) = unsupported HostCapability.Interrupt
+
+            member _.Close(_session) =
+                unsupported HostCapability.ChildSessions
+
+    type HttpSessionPort(baseUrl: string) =
+        let cleanBase =
+            if baseUrl.EndsWith("/") then
+                baseUrl.Substring(0, baseUrl.Length - 1)
+            else
+                baseUrl
+
+        [<Emit("fetch($0, $1)")>]
+        let jsFetch (url: string) (init: obj) : Task<obj> = jsNative
+
+        interface ISessionPort with
+            member _.FindByTitle(title) =
+                taskResult {
+                    try
+                        let url =
+                            sprintf "%s/session?roots=true&limit=2&search=%s" cleanBase (encodeURIComponent title)
+
+                        let! response = jsFetch url (createObj [ "method", box "GET" ]) |> TaskResultCE.ofTask
+                        let status = unbox<int> response?status
+
+                        do!
+                            Result.requireTrue
+                                (HostError.Transport(sprintf "HTTP %d" status))
+                                (status >= 200 && status < 300)
+
+
+                        let! body = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
+
+                        return! discoveredSessions title (JS.JSON.parse body)
+                    with ex ->
+                        return! Error(HostError.Transport ex.Message)
+                }
+
+            member _.Create(_parent, _spec) =
+                unsupported HostCapability.ChildSessions
+
+            member _.Parent(_session) =
+                unsupported HostCapability.ChildSessions
+
+            member _.Children(_parent) =
+                unsupported HostCapability.ChildSessions
+
+            member _.Abort(_session) =
+                unsupported HostCapability.ChildSessions
+
+            member _.Interrupt(_session) = unsupported HostCapability.Interrupt
+
+            member _.Close(_session) =
+                unsupported HostCapability.ChildSessions
+
 
     type HttpSnapshotPort(baseUrl: string) =
         let cleanBase =
@@ -468,35 +563,6 @@ module SessionSnapshotPort =
                         return! Error ex.Message
                 }
 
-    [<Emit("encodeURIComponent($0)")>]
-    let private encodeURIComponent (_value: string) : string = jsNative
-
-    type HttpDiscoveryPort(baseUrl: string) =
-        let cleanBase =
-            if baseUrl.EndsWith("/") then
-                baseUrl.Substring(0, baseUrl.Length - 1)
-            else
-                baseUrl
-
-        [<Emit("fetch($0, $1)")>]
-        let jsFetch (url: string) (init: obj) : Task<obj> = jsNative
-
-        interface ISessionDiscoveryPort with
-            member _.FindRootSessionsByTitle(title) =
-                taskResult {
-                    try
-                        let url =
-                            sprintf "%s/session?roots=true&limit=2&search=%s" cleanBase (encodeURIComponent title)
-
-                        let! response = jsFetch url (createObj [ "method", box "GET" ]) |> TaskResultCE.ofTask
-                        let status = unbox<int> response?status
-                        do! Result.requireTrue (sprintf "HTTP %d" status) (status >= 200 && status < 300)
-                        let! body = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
-
-                        return discoveredSessions title (JS.JSON.parse body)
-                    with ex ->
-                        return! Error ex.Message
-                }
 
     let create (input: obj) : ISessionSnapshotPort option =
         let workDir = directoryOption input
@@ -514,18 +580,20 @@ module SessionSnapshotPort =
         else
             None
 
-    let createDiscovery (input: obj) : ISessionDiscoveryPort option =
+    /// HNI P-01: the OpenCode adapter's session port. Slice A wires the
+    /// discovery verb; the remaining session verbs stay unsupported.
+    let createSessionPort (input: obj) : ISessionPort option =
         let workDir = directoryOption input
 
         if isNull input then
             None
         elif not (isNull input?client) && not (isNull input?client?session) then
-            Some(SdkDiscoveryPort(input?client, workDir) :> ISessionDiscoveryPort)
+            Some(SdkSessionPort(input?client, workDir) :> ISessionPort)
         elif not (isNull input?serverUrl) then
-            Some(HttpDiscoveryPort(unbox<string> input?serverUrl) :> ISessionDiscoveryPort)
+            Some(HttpSessionPort(unbox<string> input?serverUrl) :> ISessionPort)
         elif not (isNull input?baseUrl) then
-            Some(HttpDiscoveryPort(unbox<string> input?baseUrl) :> ISessionDiscoveryPort)
+            Some(HttpSessionPort(unbox<string> input?baseUrl) :> ISessionPort)
         elif not (isNull input?port) then
-            Some(HttpDiscoveryPort(sprintf "http://127.0.0.1:%d" (unbox<int> input?port)) :> ISessionDiscoveryPort)
+            Some(HttpSessionPort(sprintf "http://127.0.0.1:%d" (unbox<int> input?port)) :> ISessionPort)
         else
             None

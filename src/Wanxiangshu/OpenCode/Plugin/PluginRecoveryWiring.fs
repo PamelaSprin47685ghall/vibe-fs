@@ -13,8 +13,17 @@ open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Host.Ports
 
 module PluginRecoveryWiring =
+
+    let private hostErrorReason (error: HostError) =
+        match error with
+        | HostError.Unsupported capability -> sprintf "Host capability %A is unsupported" capability
+        | HostError.NotFound what -> what
+        | HostError.Refused reason -> reason
+        | HostError.Transport reason -> reason
+        | HostError.Unknown reason -> reason
 
     let private inspectRecoveryWork gitCommonDir workId =
         try
@@ -193,17 +202,19 @@ module PluginRecoveryWiring =
         (workId: string)
         (operationId: string)
         (snapshots: ISessionSnapshotPort option)
-        (discovery: ISessionDiscoveryPort)
+        (discovery: ISessionPort)
         (retirementBlockers: string -> string array)
         : Task =
         task {
             let title = "wanxiangshu-delivery:" + operationId
 
-            match! discovery.FindRootSessionsByTitle title with
-            | Error reason ->
+            match! discovery.FindByTitle title with
+            | Error error ->
                 Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-discovery-failed"
-                    [ "work_id", workId; "operation_id", operationId; "reason", reason ]
+                    [ "work_id", workId
+                      "operation_id", operationId
+                      "reason", hostErrorReason error ]
             | Ok [] ->
                 Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-unbound"
@@ -270,7 +281,7 @@ module PluginRecoveryWiring =
         (works: (SessionId * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) array)
         (workspace: string option)
         (snapshotPort: ISessionSnapshotPort option)
-        (discoveryPort: ISessionDiscoveryPort option)
+        (discoveryPort: ISessionPort option)
         (retirementBlockers: string -> string array)
         : Task =
         task {
@@ -306,7 +317,7 @@ module PluginRecoveryWiring =
     let attach (boot: PluginBoot.Boot) : unit =
         let scope = boot.Scope
         let snapshotPort = SessionSnapshotPort.create boot.Input
-        let discoveryPort = SessionSnapshotPort.createDiscovery boot.Input
+        let discoveryPort = SessionSnapshotPort.createSessionPort boot.Input
 
         let retirementBlockers sessionId =
             scope.RetirementBlockersFor sessionId |> List.toArray

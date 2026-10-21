@@ -5,6 +5,7 @@ open Wanxiangshu.Foundation.HostSession
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host.Ports
 
 module SessionSnapshotPort =
     val projectMessage: raw: obj -> SessionMessage option
@@ -19,4 +20,4 @@ module SessionSnapshotPort =
         interface ISessionSnapshotPort
 
     val create: input: obj -> ISessionSnapshotPort option
-    val createDiscovery: input: obj -> ISessionDiscoveryPort option
+    val createSessionPort: input: obj -> ISessionPort option

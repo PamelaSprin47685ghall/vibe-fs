@@ -12,6 +12,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Host.Ports
 
 /// JS-native observation surface for session Host adapter contracts.
 /// Parent lineage is a durable lookup; the physical parent for every child is
@@ -19,25 +20,33 @@ open Wanxiangshu.Participant.Provider
 /// return JSON observations and keep transport capabilities private.
 module SessionsSurface =
 
-    let private discoveryView (result: Result<SessionId list, string>) : obj =
+    let private hostErrorReason (error: HostError) =
+        match error with
+        | HostError.Unsupported capability -> sprintf "Host capability %A is unsupported" capability
+        | HostError.NotFound what -> what
+        | HostError.Refused reason -> reason
+        | HostError.Transport reason -> reason
+        | HostError.Unknown reason -> reason
+
+    let private discoveryView (result: Result<SessionId list, HostError>) : obj =
         match result with
         | Ok sessions ->
             box
                 {| ok = true
                    sessions = sessions |> List.map SessionId.value |> List.toArray
                    error = null |}
-        | Error reason ->
+        | Error error ->
             box
                 {| ok = false
                    sessions = ([||]: string array)
-                   error = reason |}
+                   error = hostErrorReason error |}
 
     let observeDeliveryDiscovery (input: obj) (title: string) : Task<obj> =
-        match SessionSnapshotPort.createDiscovery input with
-        | None -> Task.FromResult(discoveryView (Error "Session discovery is unavailable"))
-        | Some discovery ->
+        match SessionSnapshotPort.createSessionPort input with
+        | None -> Task.FromResult(discoveryView (Error(HostError.Transport "Session discovery is unavailable")))
+        | Some sessions ->
             task {
-                let! result = discovery.FindRootSessionsByTitle title
+                let! result = sessions.FindByTitle title
                 return discoveryView result
             }
 
