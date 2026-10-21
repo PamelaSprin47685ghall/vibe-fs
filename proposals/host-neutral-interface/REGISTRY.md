@@ -29,6 +29,12 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 Domain lanes declare seams their domain needs from a host in `src/Wanxiangshu/Host/<Name>.fs(i)`. IDs are reserved here
 so parallel lanes never collide (HNI-11 found two `P-13`s). Use the ID below in your row; next free ID: **P-19**.
 
+**These lane ports are not on `master` yet.** As of 2026-10-21 they live only on their lanes' branches
+(`origin/wip/hni-tools`, `origin/wip/hni-fork`, `origin/wip/hni-plugin`, `origin/wip/hni-fission`); `master` has no
+`Host/Ports/` consumers and none of these files. The rows below are ID reservations plus the shape review —
+they are not a claim that the files are merged. Namespace note: the lane ports use `Wanxiangshu.Host`, while the
+neutral ports use `Wanxiangshu.Host.Ports` (see DESIGN §1.1 and drift **D-05**).
+
 | ID | Port | File | Owner lane | Notes (HNI-11 review) |
 |---|---|---|---|---|
 | P-13 | `CommandDeclaration`, `CommandArgument`, `ArgumentShape`, `ICommandArguments` | `Host/CommandDeclaration.fs(i)` | fork | Neutral and product-shaped. Converges with P-04: `ArgumentShape` is what a `ToolSpec.Schema` is generated from. |
@@ -36,7 +42,7 @@ so parallel lanes never collide (HNI-11 found two `P-13`s). Use the ID below in 
 | P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. |
 | P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. |
 | P-17 | `FissionHostPort`, `FissionOwnerRuns` | `Host/FissionPort.fs(i)` | fission | D-03: carries `AgentJournal`, legacy `ISessionHostPort`, `Execution.Session` types. |
-| P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`), `ToolResultText` | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). |
+| P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). |
 
 ### Drift findings (HNI-11, 2026-10-21) and the convergence target
 - **D-01** ID collision (`P-13` used by fork and plugin-host) → plugin-host pair guidance is **P-16**.
@@ -48,6 +54,9 @@ so parallel lanes never collide (HNI-11 found two `P-13`s). Use the ID below in 
   P-07 signals) and (b) product-composition inputs supplied by `Composition/`. Card HNI-14.
 - **D-04** lane ports use `Result<_, string>` for host round trips; neutral ports use `HostResult<_>` (`HostError`). Convert when the
   lane switches from legacy `ISessionHostPort` to P-01.
+- **D-05** lane ports declare `namespace Wanxiangshu.Host`, the same namespace many adapter files `open` for `CanonicalJson`/`HostDigest`.
+  The neutral ports were moved to `Wanxiangshu.Host.Ports` for exactly that reason (DESIGN §1.1); the lane ports should move to a
+  namespace that is not `open`ed by adapters (e.g. `Wanxiangshu.Host.Domain.<Lane>`) or the same shadowing risk applies to them.
 - Lane domain ports are not under gate ⑪ (port-purity covers `Host/Ports/` only); HNI-14 moves them there once D-03 is resolved.
 
 ## Adapter folders (implementations, not ports)
