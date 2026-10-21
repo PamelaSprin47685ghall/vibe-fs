@@ -24,7 +24,7 @@ All numbers are `git grep` / `git ls-tree` measurements on `origin/master` `9421
 
 ### 2.1 P-15 adds no host-supplied member
 
-`Host/DelegationCommand.fsi` declares `IDelegationCommandHost` (line 18):
+`Host/Domain/DelegationCommand.fsi` declares `IDelegationCommandHost` (line 18):
 
 | member | line | what supplies it |
 |---|---|---|
@@ -37,8 +37,8 @@ All numbers are `git grep` / `git ls-tree` measurements on `origin/master` `9421
 
 Correction to the card's draft wording: P-15 **does** carry two product-typed members of its own. What decides the
 card is that **not one member of P-15 is host-supplied**; the inherited product-typed members are `Journal:
-AgentJournal option` (`Host/DelegationCaller.fsi:20`) and `ForkRuntime: unit -> Result<HostForkRuntime, string>`
-(`Host/DelegationCaller.fsi:25`), and everything else the two interfaces add is `string`/`Task`/`Result<_, string>`.
+AgentJournal option` (`Host/Domain/DelegationCaller.fsi:20`) and `ForkRuntime: unit -> Result<HostForkRuntime, string>`
+(`Host/Domain/DelegationCaller.fsi:25`), and everything else the two interfaces add is `string`/`Task`/`Result<_, string>`.
 
 ### 2.2 The only implementation delegates to the product's own runtime scope
 
@@ -62,8 +62,8 @@ $ git grep -o "IDelegationCommandHost" -- src | awk -F: '{print $1}' | sort | un
      66 src/Wanxiangshu/Execution/Delegation/Fork/Command.fs
       4 src/Wanxiangshu/Execution/Delegation/Fork/Command.fsi
       2 src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs
-      1 src/Wanxiangshu/Host/DelegationCommand.fs
-      1 src/Wanxiangshu/Host/DelegationCommand.fsi
+      1 src/Wanxiangshu/Host/Domain/DelegationCommand.fs
+      1 src/Wanxiangshu/Host/Domain/DelegationCommand.fsi
 ```
 
 74 occurrences in total: **70 in product code** (`Execution/Delegation/Fork/Command.fs` + `.fsi`), 2 in the adapter,
@@ -90,12 +90,12 @@ $ git grep -n "Result<.*string" -- 'src/Wanxiangshu/Host/**'
 
 | declaration | file:line | nature |
 |---|---|---|
-| `ForkRuntime` | `Host/DelegationCaller.fs(i):25` | host round trip → product runtime |
-| `OpenManagerJob` | `Host/DelegationCommand.fs(i):32` | host round trip → product orchestrator |
-| `ContinueManagerJob` | `Host/DelegationCommand.fs(i):41` | host round trip → product orchestrator |
+| `ForkRuntime` | `Host/Domain/DelegationCaller.fs(i):25` | host round trip → product runtime |
+| `OpenManagerJob` | `Host/Domain/DelegationCommand.fs(i):32` | host round trip → product orchestrator |
+| `ContinueManagerJob` | `Host/Domain/DelegationCommand.fs(i):41` | host round trip → product orchestrator |
 | `OwnerRuns` | `Host/FissionPort.fs(i):68` | host round trip → product run registry |
-| `Carrier` | `Host/PairGuidance.fs(i):22` | decoded host fact, `string` error channel |
-| `Append` | `Host/PairGuidance.fs(i):33` | product ledger write dressed as a host seam |
+| `Carrier` | `Host/Domain/PairGuidance.fs(i):22` | decoded host fact, `string` error channel |
+| `Append` | `Host/Domain/PairGuidance.fs(i):33` | product ledger write dressed as a host seam |
 | `TaskDelivery.validate` | `Host/Facts.fsi:35` | **not** a port, **not** a round trip |
 
 The first four are host round trips answering with the product's own runtime, orchestrator or run registry; the last is
@@ -138,7 +138,8 @@ type DelegationEnvironment =
 
 Ordered steps, each independently landable. **(a)** Move `Host/DelegationCaller.fs(i)` +
 `Host/DelegationCommand.fs(i)` to `Host/Domain/`, keep both interfaces, add the `HNI P-14` / `HNI P-15` markers —
-*the arch slice lands this half*. **(b)** Introduce `DelegationEnvironment` as a record **beside** the interfaces and
+***landed 2026-10-22 by the arch slice** (the files now live in `Host/Domain/` under `Wanxiangshu.Host.Domain`)*.
+**(b)** Introduce `DelegationEnvironment` as a record **beside** the interfaces and
 switch `ForkCommand` / `HorizonRoster` parameter types to it, with a product-side `ofHost` wrapper over the old
 interface (one file, mechanical, no behaviour change). **(c)** Convert the `Result<_, string>` members to
 `HostResult<_>` / `HostError` **while doing (b)** — `HostError.Refused of reason` carries the same prose and callers
@@ -192,7 +193,7 @@ disappears with it. **If** a future member cannot be folded into P-04/P-05, the 
 ## 4. D-04, restated precisely
 
 Inside `src/Wanxiangshu/Host/**`, a **host round trip** uses `HostResult<_>` / `HostError`. A **parse verdict** may
-keep `Result<_, unit>` — e.g. `ICommandArguments.OptionalCount` (`Host/CommandDeclaration.fsi:40`), a verdict about
+keep `Result<_, unit>` — e.g. `ICommandArguments.OptionalCount` (`Host/Domain/CommandDeclaration.fsi:40`), a verdict about
 one decoded argument, not a host round trip. `Result<_, string>` in **product** code is allowed and **not** in scope:
 a product's own error prose is the product's. The seven declarations of §2.5 are the whole population under
 `Host/**`; six are fixed by this card's steps, the seventh (`Host/Facts.fsi:35`) is out of scope by nature.
