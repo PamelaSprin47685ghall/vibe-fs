@@ -99,7 +99,14 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
   // 同一个空数组，子会话的认领永远 StillPending → join RECOVERY_BLOCKED
   // （`pending claim unknown ...`）。
   const messagesBySession = new Map() // sessionId -> message[]
+  // Sends the Host takes on the transport only: promptAsync returns, but no
+  // physical user message lands and no chat.message hook runs — the receipt
+  // without ingress (`nextPromptReceiptOnly`).
+  let receiptOnly = 0
   const self = {
+    __nextPromptReceiptOnly: () => {
+      receiptOnly += 1
+    },
     __pushHostMessage: (sessionId, message) => {
       const perSession = messagesBySession.get(sessionId) ?? []
       perSession.push(message)
@@ -153,6 +160,10 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
       },
       promptAsync: async (args) => {
         prompts.push(args)
+        if (receiptOnly > 0) {
+          receiptOnly -= 1
+          return {}
+        }
         // 生产在 terminal 订阅安装之后才发 prompt（OneShotAgentTool.fs:115 → send），
         // 故此调用即「可以安全 NotifyTerminal」的就绪信号。
         // OpenCodePort payload: { path: { id }, body: { parts, agent?, model?, metadata? }, headers }。
@@ -268,6 +279,7 @@ export const withExecutablePlugin = async (body, options = {}, createHooks = ini
         messages,
         abortedIds,
         pushHostMessage: client.__pushHostMessage,
+        nextPromptReceiptOnly: client.__nextPromptReceiptOnly,
       }
       await body(hooks, directory, createdIds, runtime)
     } finally {

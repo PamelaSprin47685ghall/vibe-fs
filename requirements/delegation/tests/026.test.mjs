@@ -1,4 +1,15 @@
 import test from 'node:test'
+import {
+  agentIdOf,
+  childTurn,
+  forkCall,
+  joinCall,
+  observeTerminals,
+  physicalUserMessageOf,
+  resumeCall,
+  workLifecycleOf,
+  withRealFork,
+} from './support/real-fork.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -30,46 +41,88 @@ const toolModule = {
 const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
-test('WHAT[delegation-026] RESUME_synchronous_admission_with_async_work_and_join_isolation', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-resume-sync-admit-'))
-  const owner = 'manager-resume-sync-admit'
-  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
-
+// A join that must answer inside a bounded window. The window is never
+// widened; its timer is always cleared, so a join that answered early never
+// keeps the process alive waiting for the deadline.
+const boundedJoin = async (runtime, owner, windowMs = 1500) => {
+  let timer
   try {
-    // 1. Initial fork
-    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'INITIAL-CHARGE')
-    await waitForPromptCount(runtime, 1)
-    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
-    assert.match(await first, /Ada/)
-    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'fork-run-1'), true)
-    const firstJoined = await forkTool.executeJoin(runtime, owner)
-    assert.match(firstJoined, /FIRST-ANSWER/)
-
-    // 2. Resume dispatch without physical acceptance must not complete successfully or create ghost run
-    forkTool.nextPromptAdmittedWithReceipt(runtime, 'accepted-receipt-only')
-    const unconfirmedResume = await forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'UNCONFIRMED-CHARGE')
-    assert.match(unconfirmedResume, /uncertain|不确定|may already have been accepted|可能已/i)
-    assert.doesNotMatch(unconfirmedResume, /carries this charge now|现已接下这项托付/i)
-
-    // 3. Join sees nothing to join because unconfirmed dispatch was not installed into pending runs
-    const joinResult = await forkTool.executeJoin(runtime, owner)
-    assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
-
-    // 4. Confirmed resume accepts and publishes assignment
-    const second = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'CONFIRMED-CHARGE')
-    await waitForPromptCount(runtime, 3)
-    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
-    assert.match(await second, /Ada/)
-    assert.match(await second, /carries this charge now|现已接下这项托付/i)
-
-    // 5. Completion with matching authority root settles the new assignment
-    assert.equal(await forkTool.settle(runtime, owner, 'SECOND-ANSWER', 'fork-run-2'), true)
-    const secondJoined = await forkTool.executeJoin(runtime, owner)
-    assert.match(secondJoined, /SECOND-ANSWER/)
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), windowMs)
+    })
+    return await Promise.race([forkTool.executeJoin(runtime, owner), deadline])
   } finally {
-    forkTool.disposeRuntime(runtime)
-    rmSync(directory, { recursive: true, force: true })
+    clearTimeout(timer)
   }
+}
+
+// The resume case runs on the real plugin wiring (support/real-fork.mjs): the
+// fork harness's settle notifies a terminal without the child's delivery, and
+// since D6 (60812f575) nothing settles without the durable witness that only a
+// real this.deliver writes, so the harness case hung. The receipt-only send is
+// the Host taking the prompt on the transport while no physical user message
+// lands (runtime.nextPromptReceiptOnly).
+
+test('WHAT[delegation-026] RESUME_synchronous_admission_with_async_work_and_join_isolation', async () => {
+  const owner = 'manager-resume-sync-admit'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      // 1. Initial fork, delivered and joined.
+      const first = await forkCall(hooks, owner, 'Ada', 'INITIAL-CHARGE')
+      assert.match(first, /ok = true/)
+      assert.match(first, /Ada/)
+      const child = createdIds[0]
+      const agentId = agentIdOf(first)
+      const firstRoot = physicalUserMessageOf(runtime, child).id
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'FIRST PROSE', 'FIRST-ANSWER', terminals.awaitRun)
+      const firstJoined = await joinCall(hooks, owner, 'call-join-first')
+      assert.match(firstJoined, /FIRST-ANSWER/)
+
+      // 2. A resume whose send has a transport receipt but no physical
+      //    acceptance must not report placement and must not leave a run.
+      const sentBefore = runtime.prompts.length
+      const previousTimeout = process.env.WANXIANGSHU_ADMISSION_TIMEOUT_MS
+      process.env.WANXIANGSHU_ADMISSION_TIMEOUT_MS = '100'
+      let unconfirmedResume
+      try {
+        runtime.nextPromptReceiptOnly()
+        unconfirmedResume = await resumeCall(hooks, owner, 'Ada', 'UNCONFIRMED-CHARGE', 'call-resume-unconfirmed')
+      } finally {
+        if (previousTimeout === undefined) delete process.env.WANXIANGSHU_ADMISSION_TIMEOUT_MS
+        else process.env.WANXIANGSHU_ADMISSION_TIMEOUT_MS = previousTimeout
+      }
+      assert.match(unconfirmedResume, /uncertain|不确定|may already have been accepted|可能已/i)
+      assert.doesNotMatch(unconfirmedResume, /ok = true/)
+      assert.doesNotMatch(unconfirmedResume, /carries this charge now|现已接下这项托付/i)
+      assert.equal(runtime.prompts.length, sentBefore + 1, 'the Host send was attempted exactly once')
+      assert.equal(physicalUserMessageOf(runtime, child).id, firstRoot, 'no physical input landed for the unconfirmed resume')
+
+      // 3. Join sees nothing to join: the unconfirmed dispatch installed no pending run.
+      const joinResult = await joinCall(hooks, owner, 'call-join-unconfirmed')
+      assert.match(joinResult, /code = "nothing-to-join"/)
+
+      // 4. A confirmed resume is accepted and places new work on the same child.
+      const second = await resumeCall(hooks, owner, 'Ada', 'CONFIRMED-CHARGE', 'call-resume-confirmed')
+      assert.match(second, /ok = true/)
+      assert.match(second, /Ada/)
+      assert.doesNotMatch(second, /uncertain/i)
+      assert.equal(agentIdOf(second), agentId)
+      assert.equal(createdIds.length, 1, 'the resume reuses the same physical child')
+      const secondRoot = physicalUserMessageOf(runtime, child).id
+      assert.notEqual(secondRoot, firstRoot, 'the confirmed resume roots a new physical input')
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, secondRoot), 'Active')
+
+      // 5. The new work's own delivery settles it, and the join returns it.
+      await childTurn(hooks, runtime, child, `run-${child}-2`, 'SECOND PROSE', 'SECOND-ANSWER', terminals.awaitRun)
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, secondRoot), 'CompletedAwaitingJoin')
+      const secondJoined = await joinCall(hooks, owner, 'call-join-second')
+      assert.match(secondJoined, /SECOND-ANSWER/)
+      assert.doesNotMatch(secondJoined, /FIRST-ANSWER/, 'the earlier joined result is not handed back again')
+    } finally {
+      terminals.dispose()
+    }
+  })
 })
 test('WHAT[delegation-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_placed', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-unknown-'))
@@ -94,6 +147,11 @@ test('WHAT[delegation-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_
     assert.equal(forkTool.childCount(runtime), 1)
     assert.equal(forkTool.promptCount(runtime), 1, 'physical Host send was attempted exactly once')
     assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
+
+    // An uncertain dispatch must leave no ghost run behind: join closes inside
+    // the bounded window instead of waiting on a run that was never confirmed.
+    const joinResult = await boundedJoin(runtime, owner)
+    assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
   } finally {
     forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
@@ -122,7 +180,7 @@ test('WHAT[delegation-026] FORK_TOOL_unconfirmed_dispatch_reports_uncertain_and_
     assert.doesNotMatch(result, /carries this charge now|现已接下这项托付/i)
 
     // Join must NOT hang waiting on an unconfirmed dispatch; it must report NothingToJoin / no active runs
-    const joinResult = await forkTool.executeJoin(runtime, owner)
+    const joinResult = await boundedJoin(runtime, owner)
     assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
 
     assert.equal(forkTool.promptCount(runtime), 1)
@@ -146,9 +204,7 @@ test('WHAT[delegation-026] IDLE_ROAD_DEVOPS_COMPANION_does_not_block_join_with_h
 
     // 2. devops is idle (never received any prompt or active run)
     // Join must NOT hang waiting on the idle devops handle; it must report NothingToJoin immediately
-    const joinPromise = forkTool.executeJoin(runtime, owner)
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
-    const joinResult = await Promise.race([joinPromise, timeout])
+    const joinResult = await boundedJoin(runtime, owner)
     assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
   } finally {
     forkTool.disposeRuntime(runtime)
@@ -181,9 +237,7 @@ test('WHAT[delegation-026] RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_
       assert.equal(forkTool.promptCount(restarted), 0)
 
       // 4. Join must NOT hang on the restored-but-idle devops handle.
-      const joinPromise = forkTool.executeJoin(restarted, owner)
-      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
-      const joinResult = await Promise.race([joinPromise, timeout])
+      const joinResult = await boundedJoin(restarted, owner)
       assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
     } finally {
       forkTool.disposeRuntime(restarted)
