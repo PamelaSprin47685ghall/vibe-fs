@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Participant.Provider.Attempt
 
-open System
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 
 /// Exact identity of one physical provider attempt (used for failure deduplication).
@@ -11,15 +12,24 @@ type FailedProviderAttemptIdentity =
       ProviderRun: ProviderRunIdentity }
 
 module FailedProviderAttemptIdentity =
-    /// Stable string form for set membership in a projection.
-    let dedupeKey (identity: FailedProviderAttemptIdentity) =
-        String.Join(
-            "\u001f",
-            [| SessionId.value identity.SessionId
-               LogicalRunId.value identity.LogicalRunId
-               AuthorityRootUserMessageId.value identity.AuthorityRootUserMessageId
-               ProviderRunIdentity.value identity.ProviderRun |]
-        )
+    [<Import("ProviderFailureBudget", "wanxiangli/failure-budget")>]
+    let private budgetLibraryClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
+
+    let private library = construct budgetLibraryClass
+
+    /// The plain identity `wanxiangli/failure-budget` keys an exact attempt by.
+    let view (identity: FailedProviderAttemptIdentity) : obj =
+        createObj
+            [ "sessionId" ==> SessionId.value identity.SessionId
+              "logicalRun" ==> LogicalRunId.value identity.LogicalRunId
+              "authorityRoot" ==> AuthorityRootUserMessageId.value identity.AuthorityRootUserMessageId
+              "providerRun" ==> ProviderRunIdentity.value identity.ProviderRun ]
+
+    /// Stable string form for set membership in a projection (owned by wanxiangli/failure-budget).
+    let dedupeKey (identity: FailedProviderAttemptIdentity) : string = library?dedupeKey (view identity)
 
 /// Pure provider failure budget. No Host, Journal or Fable dependency.
 ///
@@ -31,7 +41,7 @@ module ProviderFailureBudget =
     type FailureBudget = { ConsecutiveFailureCount: int }
 
     [<Literal>]
-    let DefaultBudget = 12
+    let DefaultBudget = 12 // = wanxiangli/failure-budget defaultBudget (asserted by execution-failure-policy-002)
 
     /// What the controller may do after a failure has been recorded.
     type Verdict =
@@ -51,12 +61,19 @@ module ProviderFailureBudget =
         ignore budget
         { ConsecutiveFailureCount = 0 }
 
-    /// Judgement happens after the failure is recorded.
+    [<Import("ProviderFailureBudget", "wanxiangli/failure-budget")>]
+    let private budgetLibraryClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
+
+    let private library = construct budgetLibraryClass
+
+    /// Judgement happens after the failure is recorded (owned by wanxiangli/failure-budget).
     let verdict (budgetLimit: int) (budget: FailureBudget) : Verdict =
-        if budget.ConsecutiveFailureCount >= budgetLimit then
-            Exhausted budget
-        else
-            MayRetry budget
+        match (library?verdict (budgetLimit, budget.ConsecutiveFailureCount): string) with
+        | "Exhausted" -> Exhausted budget
+        | _ -> MayRetry budget
 
     let forNewAuthorityRoot: FailureBudget = initial
 
