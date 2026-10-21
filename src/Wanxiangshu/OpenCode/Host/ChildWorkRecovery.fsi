@@ -13,11 +13,6 @@ open Wanxiangshu.Persistence.Journal
 /// voided. Diagnostics emit their presence while Fission groups are closed.
 module ChildWorkRecovery =
 
-    /// Reason recorded when a fresh process settles a Fission group the previous
-    /// runtime left Open.
-    [<Literal>]
-    val OrphanedFissionReason: string = "process_interrupted"
-
     /// A child work run the fresh process can no longer execute, and the parent
     /// handle that must carry its settlement.
     type OrphanedChildRun =
@@ -31,12 +26,6 @@ module ChildWorkRecovery =
     /// Orphaned child runs are not voided; settlementFact returns None to avoid
     /// appending ChildWorkVoided/ChildRunVoided facts.
     val settlementFact: orphaned: OrphanedChildRun -> ExecutionFactCases option
-
-    /// Open Fission groups left behind by a previous runtime.
-    val orphanedFissionGroups: projections: AgentProjectionSet -> FissionGroupProjection list
-
-    /// Exact FissionFailed fact closing an orphaned open Fission group at load.
-    val fissionSettlementFact: group: FissionGroupProjection -> FissionFactCases
 
     /// Append one settlement per orphaned child run. Load Phase; no dispatch, no
     /// provider call, no command replay.

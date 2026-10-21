@@ -30,7 +30,6 @@ module FissionRuntime =
     val clearSilentInterrupt: ownerSessionId: SessionId -> unit
     val isSilentInterrupt: ownerSessionId: SessionId -> bool
     val tryConsumeSilentInterrupt: ownerSessionId: SessionId -> bool
-    val bindHandleAffinity: ownerSessionId: SessionId -> handleId: string -> laneIndex: int -> unit
     val trackGroupResource: groupId: string -> resource: IDisposable -> unit
     val tryBeginDelivery: groupId: string -> completionId: string -> laneIndex: int -> bool
     val endDelivery: groupId: string -> completionId: string -> laneIndex: int -> unit
