@@ -1,6 +1,19 @@
 # Changelog — 版本历史
 
 
+## Unreleased — 委派 032/026：post-rebase 验证缺口已闭合（真编译 + 真跑 runner）
+
+- **缺口已闭合**。上一版记录的是「四个套件的裁决量在 rebase 之前的构建上」；本轮**重新编译**（`build-slot node scripts/build.mjs` → `[build] build ok (generation 3)`，151 surfaces / 734 modules，**没有** `--skip-staleness-check`）后，在**同一棵能编译通过的 upstream 树 `aa43d3455`** 上重跑了正式 runner。
+- **被测树**：`aa43d3455`（`refactor(HNI-06): join wire rules leave the OpenCode adapter for host-neutral Fork/JoinRules`），是 `origin/master` 的祖先（`merge-base --is-ancestor` → exit 0），本线五个提交全在其中。
+- **正式 runner 裁决**（`UNIT_VERDICT_SILENCE_MS=30000 NODE_TEST_CONCURRENCY=2`，`TESTS_MJS_FILES` 逗号分隔四个文件，槽外、不重编、**不放宽任何期限**）：`[test-summary] 4 file(s), 22 passed, 3 failed, 2 skipped, 1 todo (92.24s wall, 123.21s test time)`。逐文件：`032 = 3 passed / 0 failed`（12.53 s）、`026 = 5 passed / 1 failed / 1 todo`（18.12 s）、`024 = 7 passed / 0 failed`（29.76 s）、`027 = 7 passed / 2 failed / 2 skipped`（51.78 s）。
+- **与 rebase 之前的数字逐项一致**：合并总数与失败用例名（`026` case 6 `RESTART_PENDING_CHILD_WORK`、`027` 两条 `prepared busy guidance`）**完全相同** ⇒ 先前报告的裁决在重新编译后**成立**。
+- **同树复跑的门禁**：`node scripts/checks/architecture.mjs` → `architecture: OK`；smoke（仓库外）→ exit 0，`devopsRefusalCode: "unknown-calling"` / `deliveryWitnesses: 1`；`package-lock.json` 解析正常（lockfileVersion 3）；`wanxiangli` gitlink `fde10a080e86c80c3db05c73ecdfdbc4ef2c2e37` **等于**其 `origin/main` 且是祖先（不比 master 新），子模块干净。
+- **没有闭合到最新 tip，原因在 upstream 自身**：`origin/master` 的 tip（`e6cf370e7` → 之后 `f6f142d5a`）**编译不过**，错误全在别的 lane 的文件里（`Execution/Delegation/Fork/JoinRun.fs`/`.fsi` 的 `[<Literal>]` 签名失配、`OpenCode/Plugin/PluginHostWiring.fs` 缺 `HostProviderTerminalOutcome` 的 open、`OpenCode/Host/SessionSnapshotPort.fs` / `SessionsSurface.fs` 的类型与模式匹配、`Execution/Delegation/Fork/Command.fs` 的 `AgentHandleId` 类型）。**本线没有改动任何 `.fs`**（自 `d82b3e131` 起只改 `.md`），且一份 pristine clone 的报错文件 blob 与 upstream **逐一相同**，故该失败**不是本线造成的**。上游至今未修（这些 site 在其后的提交里一个都没被改）。
+- **仍红、未修的项（如实列出）**：`027` 的 2 条 `prepared busy guidance`（EMR-010，既存，非本线引入）；`026` case 6（`RESTART_PENDING_CHILD_WORK`，归 ruling-void，本轮未动其任何文件）。**最新 tip 上的四套件裁决未测**（编译不过）——**没有**用 `--skip-staleness-check` 或任何绕过手段凑数。
+- **改动文件**：`CHANGELOG.md`、`proposals/TODO施工分册-2026-10-03/05-逐项清单.md`（T117 / T112 行）、`保姆级交接与展望.md`（未完事项 #8 的实测结果）。**不含任何 `.mjs` 断言改动**。
+- **未验证（重要）**：本提交**只改 `.md`**，会让构建的 generated digest 再次失配 ⇒ 落地后需再跑一次 `build-slot node scripts/build.mjs` 刷新 manifest，正式 runner 才愿意开跑。上面那批数字对的是**本提交之前**的那棵树。
+
+
 ## Unreleased — 013 的 Boot 装配面改为惰性导入（首裁决提前，但 tier 静默窗口的结构性缺口未闭合）
 
 - **修复**：`requirements/knowledge-reuse/tests/013.test.mjs` 顶层静态 import 的 `dist/OpenCode/Plugin/PluginHostWiringSurface.js`（实测静态 import 图 **3340 ms** 的模块求值成本，391 个 dist 模块 / 4,050,480 B）改为**惰性**导入（`let hostFinalizeModule` + `loadHostFinalize()`），只在真正需要它的三个异步用例体内解析。`??=` 只在 `await` 成功后才赋值，故 import 失败不会缓存被拒的 promise，也不会留下半初始化的模块。
