@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.Fork
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation.Identity
 
@@ -230,70 +232,89 @@ module ChildRecovery =
     /// restore in flight / abort-only / unknown → RecoveryIncomplete (must not issue permit)
     /// ParentCancelled / DeadlineExceeded / HostSessionGone → RecoveredAbandoned
     /// conflict / retired → RecoveryBlocked
-    let private resolveTerminal evidence : ChildResolution =
-        match JoinableCompletion.tryFromProvenTerminal evidence with
-        | Ok proof -> ChildResolution.RecoveredTerminal proof
-        | Error reason -> ChildResolution.RecoveryBlocked reason
+    /// CUT-13: the resolution order is owned by wanxiangli/handle-lifecycle
+    /// `recoverChild`. This module hands over the evidence kinds, validates the
+    /// terminal proof itself and builds the typed resolution from what it holds.
+    [<Import("HandleLifecycleLaw", "wanxiangli/handle-lifecycle")>]
+    let private lawClass: obj = jsNative
 
-    let private resolveNonTerminal (observations: HostObservation list) : ChildResolution =
-        let hasAbortOnly =
-            observations
-            |> List.exists (function
-                | HostObservation.AbortedObserved _ -> true
-                | _ -> false)
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
 
-        let abandonReason =
-            observations
-            |> List.tryPick (function
-                | HostObservation.ParentCancelled -> Some HandleAbandonReason.ParentCancelled
-                | HostObservation.DeadlineExceeded -> Some HandleAbandonReason.DeadlineExceeded
-                | HostObservation.HostSessionGone -> Some HandleAbandonReason.HostSessionGone
-                | _ -> None)
+    let private law: obj = construct lawClass
 
-        let restoreInFlight =
-            observations
-            |> List.exists (function
-                | HostObservation.RecoveryInFlight -> true
-                | _ -> false)
+    let private reasonName (reason: HandleAbandonReason) =
+        match reason with
+        | HandleAbandonReason.ParentCancelled -> "ParentCancelled"
+        | HandleAbandonReason.DeadlineExceeded -> "DeadlineExceeded"
+        | HandleAbandonReason.HostSessionGone -> "HostSessionGone"
 
-        let sessionActive =
-            observations
-            |> List.exists (function
-                | HostObservation.SessionActive -> true
-                | _ -> false)
+    let private reasonOf (name: string) =
+        match name with
+        | "ParentCancelled" -> HandleAbandonReason.ParentCancelled
+        | "DeadlineExceeded" -> HandleAbandonReason.DeadlineExceeded
+        | "HostSessionGone" -> HandleAbandonReason.HostSessionGone
+        | other -> invalidOp ("wanxiangli/handle-lifecycle returned an unknown abandon reason: " + other)
 
-        match abandonReason with
-        | Some reason -> ChildResolution.RecoveredAbandoned reason
-        // Session active = child continues; recovery step for this handle is done.
-        | None when sessionActive -> ChildResolution.RecoveredActive
-        // Restore still running or only abort noise → incomplete (no permit).
-        | None when restoreInFlight -> ChildResolution.RecoveryIncomplete
-        | None when hasAbortOnly -> ChildResolution.RecoveryIncomplete
-        | None -> ChildResolution.RecoveryIncomplete
-
-    let private resolveSnapshot
-        (snapshot: ChildSnapshotEvidence)
-        (observations: HostObservation list)
-        : ChildResolution =
-        match snapshot with
-        | ChildSnapshotEvidence.Terminal evidence -> resolveTerminal evidence
-        // True GetMessages / decode failure: incomplete (wait), not definitive block.
-        // Family permit must not issue; join / onTurn consumers treat as wait-not-hard-error.
-        | ChildSnapshotEvidence.Unreadable _ -> ChildResolution.RecoveryIncomplete
-        | ChildSnapshotEvidence.Missing
-        | ChildSnapshotEvidence.Active -> resolveNonTerminal observations
+    let private observationName (observation: HostObservation) =
+        match observation with
+        | HostObservation.AbortedObserved _ -> "AbortedObserved"
+        | HostObservation.ParentCancelled -> "ParentCancelled"
+        | HostObservation.DeadlineExceeded -> "DeadlineExceeded"
+        | HostObservation.HostSessionGone -> "HostSessionGone"
+        | HostObservation.RecoveryInFlight -> "RecoveryInFlight"
+        | HostObservation.SessionActive -> "SessionActive"
 
     let resolveChild
         (durable: DurableHandleEvidence)
         (snapshot: ChildSnapshotEvidence)
         (observations: HostObservation list)
         : ChildResolution =
-        match durable with
-        | DurableHandleEvidence.Abandoned reason -> ChildResolution.RecoveredAbandoned reason
-        | DurableHandleEvidence.CompletedAwaitingJoin proof -> ChildResolution.RecoveredTerminal proof
-        | DurableHandleEvidence.Retired -> ChildResolution.RecoveryBlocked "handle already retired"
-        | DurableHandleEvidence.Unknown
-        | DurableHandleEvidence.Active -> resolveSnapshot snapshot observations
+        let proof =
+            match snapshot with
+            | ChildSnapshotEvidence.Terminal evidence -> Some(JoinableCompletion.tryFromProvenTerminal evidence)
+            | _ -> None
+
+        let durableKind, durableReason =
+            match durable with
+            | DurableHandleEvidence.Unknown -> "Unknown", null
+            | DurableHandleEvidence.Active -> "Active", null
+            | DurableHandleEvidence.CompletedAwaitingJoin _ -> "CompletedAwaitingJoin", null
+            | DurableHandleEvidence.Abandoned reason -> "Abandoned", box (reasonName reason)
+            | DurableHandleEvidence.Retired -> "Retired", null
+
+        let snapshotKind =
+            match snapshot with
+            | ChildSnapshotEvidence.Missing -> "Missing"
+            | ChildSnapshotEvidence.Active -> "Active"
+            | ChildSnapshotEvidence.Terminal _ -> "Terminal"
+            | ChildSnapshotEvidence.Unreadable _ -> "Unreadable"
+
+        let verdict: obj =
+            law?recoverChild (
+                createObj
+                    [ "durable" ==> durableKind
+                      "durableReason" ==> durableReason
+                      "snapshot" ==> snapshotKind
+                      "proofError"
+                      ==> (match proof with
+                           | Some(Error reason) -> box reason
+                           | _ -> null)
+                      "observations" ==> (observations |> List.map observationName |> List.toArray) ]
+            )
+
+        match unbox<string> verdict?resolution with
+        | "terminal" ->
+            match unbox<string> verdict?source, durable, proof with
+            | "durable", DurableHandleEvidence.CompletedAwaitingJoin completion, _ ->
+                ChildResolution.RecoveredTerminal completion
+            | "snapshot", _, Some(Ok completion) -> ChildResolution.RecoveredTerminal completion
+            | source, _, _ -> invalidOp ("wanxiangli/handle-lifecycle named a terminal it was not given: " + source)
+        | "abandoned" -> ChildResolution.RecoveredAbandoned(reasonOf (unbox<string> verdict?reason))
+        | "active" -> ChildResolution.RecoveredActive
+        | "incomplete" -> ChildResolution.RecoveryIncomplete
+        | "blocked" -> ChildResolution.RecoveryBlocked(unbox<string> verdict?reason)
+        | other -> invalidOp ("wanxiangli/handle-lifecycle returned an unknown child resolution: " + other)
 
     /// §九 join-recovery timeline events (pure observation log, not a program counter).
     /// agentId is the AgentHandle key string (same as JoinableCompletion.agentId).
