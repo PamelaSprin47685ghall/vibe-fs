@@ -1,5 +1,15 @@
 # Changelog — 版本历史
 
+
+## Unreleased — 委派 032 迁到真实交付路径（跨角色差遣在角色边界上被拒，不落到别的门）
+
+- **`requirements/delegation/tests/032.test.mjs` 迁到真实插件路径**：跨角色差遣那一条不再走旧 fork harness 的 `executeManagerFork` / `settle`（隔离的进程内 runtime，**不是**生产的差遣入口），改为真实 `todowrite-for-manager` 的 `this.fork` 成员（生产裁决放行与拒绝）。原来的两条（角色→权限投影、SyncDelegate 词汇）**原样保留**。
+- **拒绝按稳定码断言，不再用 `ok = false`**：拒绝码取自数据信封的 `code` 字段（渲染后的 TOML `[data]` 表），与 `capability-enforcement/026` 同一读法。角色边界那条断言 `code = "unknown-calling"`（`ManagedCatalog.fs:71` 的 `managerForkableRoles = [ Role.Engineer ]` + `Tool.fs` 的 `derivedForkCalling` / `managerCallingBindings` / `resolveDerivedManagedCalling`）。
+- **对照证明拒绝来自角色边界而不是别的门**：同一条 DevOps 差遣在评估未落时停在 `code = "assessment-pending-for-devops"`（生命周期门），评估经生产命令面落盘后改停在 `unknown-calling`（角色门）。同一调用、两个不同的码 ⇒ 后一次确实是角色边界。
+- **原断言集全部保留**：被拒的跨角色差遣不建子会话（`createdIds` 不变）、不发 prompt（prompt 计数不变、charge 不落在任何会话）、不留 durable 把手（**冷** journal 折出的工作单元只有 Engineer 那一个）。
+- **证据无伪造**：评估由生产的 `seedReviewAs` → `work?execute` 命令面落下（`Mission/Lifecycle/Surface.fs` / `DurableWorkHost.fs`），交付见证由生产的 settle 侧落下；测试与 smoke 只**读** durable 事实（冷工作快照、`TaskDeliveryCommitted`）。本批不写任何 durable 见证。
+- **改动文件**：`requirements/delegation/tests/032.test.mjs`（生产路径 smoke 脚本不入仓：它是本轮的一次性取证脚本，不是被测资产）。
+
 ## Unreleased — fission lane 的材料不再手工搬进 owner 的交付格
 
 - **修复：takeover 完成时不再把 lane 的交付视图写进 owner 的交付格**。`Execution/Fission/OpenCode/Host.fs` 的 `CompleteOwner` 分支此前读出最终 lane 的交付视图声明，再 `recordView` 到 owner 会话自己的交付格——一次**跨 session 的手工搬运**。owner 交付格没有正当的生产消费者：`deliveredView` / `tryPeekRendered` 按**读者自己**的 anchor ledger 渲染，把 lane 的锚点声明放进 owner 的格子里，只会让 owner 的编号重新解释那些锚点——这正是缺陷本身。lane 的材料经 `aggregateView`（已含各 lane 的 `FissionLaneMaterialized` work blob）进入接管 prompt，不需要第二个可见交付格。

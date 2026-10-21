@@ -2,8 +2,24 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { permissions, isAllowed } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
-import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
-import { toolModule, withForkRuntime } from './support/fork-runtime.mjs'
+import {
+  agentIdOf,
+  childTurn,
+  coldWorkSnapshot,
+  forkCall,
+  joinCall,
+  observeTerminals,
+  workLifecycleOf,
+  withRealFork,
+} from './support/real-fork.mjs'
+import { injectAcceptedAssessment } from '../../verification-system/tests/support/plugin-fixture.mjs'
+
+// 拒绝码取自数据信封的 `code` 字段（渲染后的 TOML `[data]` 表）。按码断言，
+// 不匹配散文，也不用 `ok = false` 这种「任何失败都能满足」的宽条件。
+const refusalCodeOf = (result) => {
+  const match = new RegExp('^code = "(.*)"$', 'm').exec(String(result))
+  return match === null ? null : match[1]
+}
 
 test('WHAT[delegation-032] office capability projection denies cross-role dispatch while retaining each role’s own work', () => {
   for (const [role, denied, allowed] of [
@@ -32,23 +48,99 @@ test('WHAT[delegation-032] SyncDelegate selects standard Engineer capabilities w
   assert.equal(isAllowed(vocabulary.agent, 'Exec'), false)
 })
 
-test('WHAT[delegation-032] Manager fork refuses a non-engineer calling and dispatches nothing while engineer calling still dispatches', async () => {
+// 真实交付路径：Manager 的差遣经由真实插件（`todowrite-for-manager` 的
+// `this.fork`），拒绝与放行都由生产自己裁决。测试只观察生产留下的事实：
+// 宿主创建的子会话、宿主发出的 prompt、冷 journal 折出的 durable 工作单元。
+//
+// 拒绝必须落在**角色边界**上，不能是别的门：同一条调用在「评估未落」时
+// 停在 `assessment-pending-for-devops`（生命周期门），在「评估已落」时改
+// 停在 `unknown-calling`（角色门：Manager 只能差遣 Engineer，
+// `managerForkableRoles = [ Role.Engineer ]`）。两次拒绝码不同，说明
+// 后一次确实是角色边界而不是顺手撞上的另一个门。
+test('WHAT[delegation-032] Manager fork refuses a DevOps calling at the role boundary and dispatches nothing, while the Engineer calling still delivers for real', async () => {
   const owner = 'owner-cross-role-dispatch'
-  await withForkRuntime(owner, async runtime => {
-    // The same runtime proves the counters are live: a legal engineer fork does dispatch.
-    const engineerFork = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'ENGINEER-CHARGE')
-    await forkTool.awaitPromptCount(runtime, 1)
-    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
-    assert.match(await engineerFork, /carries this charge now|现已接下这项托付/)
-    assert.equal(forkTool.childCount(runtime), 1)
+  await withRealFork(owner, async ({ hooks, createdIds, directory, runtime }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      // 对照一：评估未落时，同一条 DevOps 差遣停在生命周期门上。
+      const beforeAssessment = await hooks.tool['todowrite-for-manager'].execute(
+        {
+          program:
+            'class Js extends JsProgram { async run() { return await this.fork({ name: "devops", charge: "DEVOPS-CHARGE" }, { 1: null }); } }',
+        },
+        { sessionID: owner, agent: 'manager', callID: 'call-fork-devops-pending', messageID: 'msg-call-fork-devops-pending' },
+      )
+      assert.equal(
+        refusalCodeOf(beforeAssessment),
+        'assessment-pending-for-devops',
+        `without an accepted assessment the DevOps dispatch stops at the lifecycle gate: ${beforeAssessment}`,
+      )
+      assert.equal(createdIds.length, 0, 'a refused DevOps dispatch must not create a child')
 
-    // Manager may not fork DevOps. The refusal must leave no child, no prompt and no handle.
-    const devopsFork = await forkTool.executeManagerFork(runtime, toolModule, owner, 'devops', 'Grace', 'DEVOPS-CHARGE')
-    assert.doesNotMatch(devopsFork, /carries this charge now|现已接下这项托付/)
-    assert.equal(forkTool.childCount(runtime), 1, 'a refused cross-role fork must not create a child')
-    assert.equal(forkTool.promptCount(runtime), 1, 'a refused cross-role fork must not dispatch a prompt')
-    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Grace'), null, 'a refused cross-role fork must leave no durable handle')
+      // Manager 持 ReviewAssessment：DevOps 差遣的前置评估已就位，
+      // 于是拒绝只能来自「Manager 不得差遣 DevOps」这一条角色边界。
+      await injectAcceptedAssessment(runtime, owner)
 
-    assert.equal(await forkTool.settle(runtime, owner, 'ENGINEER-DONE', 'engineer-run'), true)
+      // 先证明同一条真实路径上的放行：Engineer 差遣真的派发。
+      const engineerFork = await forkCall(hooks, owner, 'Ada', 'ENGINEER-CHARGE', 'call-fork-ada')
+      assert.match(engineerFork, /Ada/, engineerFork)
+      const engineerAgent = agentIdOf(engineerFork)
+      assert.equal(createdIds.length, 1, 'the engineer fork creates exactly one child')
+      const child = createdIds[0]
+      const promptsAfterEngineer = runtime.prompts.length
+      assert.ok(promptsAfterEngineer >= 1, 'the engineer fork dispatches its charge')
+      assert.equal(
+        runtime.prompts.some((prompt) => JSON.stringify(prompt).includes('ENGINEER-CHARGE')),
+        true,
+        'the engineer charge reaches the child',
+      )
+
+      // Manager 不得差遣 DevOps：真实插件上的同一条 `this.fork` 成员。
+      const devopsFork = await hooks.tool['todowrite-for-manager'].execute(
+        {
+          program:
+            'class Js extends JsProgram { async run() { return await this.fork({ name: "devops", charge: "DEVOPS-CHARGE" }, { 1: null }); } }',
+        },
+        { sessionID: owner, agent: 'manager', callID: 'call-fork-devops', messageID: 'msg-call-fork-devops' },
+      )
+      assert.equal(
+        refusalCodeOf(devopsFork),
+        'unknown-calling',
+        `the DevOps calling is refused at the role boundary, not at another gate: ${devopsFork}`,
+      )
+      assert.notEqual(
+        refusalCodeOf(devopsFork),
+        'assessment-pending-for-devops',
+        'the assessment is in place, so the refusal is not the lifecycle gate',
+      )
+      assert.doesNotMatch(devopsFork, /agentId = "/, 'a refused cross-role fork must not place an agent')
+      assert.equal(createdIds.length, 1, 'a refused cross-role fork must not create a child')
+      assert.equal(runtime.prompts.length, promptsAfterEngineer, 'a refused cross-role fork must not dispatch a prompt')
+      assert.equal(
+        runtime.prompts.some((prompt) => JSON.stringify(prompt).includes('DEVOPS-CHARGE')),
+        false,
+        'the refused charge must reach no session',
+      )
+
+      // durable 侧：冷 journal 折出的工作单元里只有 Engineer 那一个。
+      const cold = await coldWorkSnapshot(directory, owner)
+      assert.deepEqual(
+        cold.map((unit) => unit.byname),
+        ['Ada'],
+        'a refused cross-role fork must leave no durable handle',
+      )
+
+      // 合法的那份工作仍走完真实交付：生产落 durable 交付见证，生命周期随之推进。
+      const root = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      assert.equal(workLifecycleOf(runtime, owner, engineerAgent, child, root), 'Active')
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'ENGINEER PROSE', 'ENGINEER-DONE', terminals.awaitRun)
+      assert.equal(workLifecycleOf(runtime, owner, engineerAgent, child, root), 'CompletedAwaitingJoin')
+
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /ENGINEER-DONE/, joined)
+      assert.match(joined, new RegExp(engineerAgent))
+    } finally {
+      terminals.dispose()
+    }
   })
 })
