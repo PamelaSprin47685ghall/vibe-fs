@@ -88,12 +88,8 @@ Sphinx/V2/Plugins/Questionnaire/Model.fsi
 Sphinx/V2/Plugins/Questionnaire/Design.fsi
 Sphinx/V2/Plugins/Questionnaire/Decode.fsi
 Sphinx/V2/Plugins/Ordinal/Surface.fsi
-Sphinx/V2/Plugins/Bayes/Exact.fsi
+Sphinx/V2/Plugins/Bayes/Model.fsi
 Sphinx/V2/Plugins/Bayes/Surface.fsi
-Sphinx/V2/Plugins/AStar/Refiner.fsi
-Sphinx/V2/Plugins/AStar/Surface.fsi
-Sphinx/V2/Plugins/Mcts/Refiner.fsi
-Sphinx/V2/Plugins/Mcts/Surface.fsi
 Sphinx/V2/Plugins/Inquiry/Plan.fsi
 Sphinx/V2/Plugins/Inquiry/Observe.fsi
 Sphinx/V2/Plugins/Inquiry/DecisionModel.fsi
@@ -131,12 +127,8 @@ Sphinx/V2/Plugins/Probes/Catalog.fs
 Sphinx/V2/Plugins/Probes/Prompts.fsi
 Sphinx/V2/Plugins/Probes/Prompts.fs
 Sphinx/V2/Plugins/Ordinal/Surface.fs
-Sphinx/V2/Plugins/Bayes/Exact.fs
+Sphinx/V2/Plugins/Bayes/Model.fs
 Sphinx/V2/Plugins/Bayes/Surface.fs
-Sphinx/V2/Plugins/AStar/Refiner.fs
-Sphinx/V2/Plugins/AStar/Surface.fs
-Sphinx/V2/Plugins/Mcts/Refiner.fs
-Sphinx/V2/Plugins/Mcts/Surface.fs
 Sphinx/V2/Plugins/Inquiry/Plan.fs
 Sphinx/V2/Plugins/Inquiry/Observe.fs
 Sphinx/V2/Plugins/Inquiry/DecisionModel.fs

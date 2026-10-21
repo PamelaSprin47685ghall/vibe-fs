@@ -584,22 +584,8 @@ export const SURFACE_MANIFEST = [
     representation: 'json',
     kind: 'pure',
   },
-  {
-    module: 'Sphinx/V2/Plugins/AStar/Surface.js',
-    owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-026'],
-    source: 'src/Wanxiangshu/Sphinx/V2/Plugins/AStar/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
-    module: 'Sphinx/V2/Plugins/Mcts/Surface.js',
-    owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-013', 'SPHINX-V2-026'],
-    source: 'src/Wanxiangshu/Sphinx/V2/Plugins/Mcts/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
+
+
   {
     module: 'Sphinx/V2/Plugins/Ordinal/Surface.js',
     owner: 'sphinx-v2',

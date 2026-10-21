@@ -1,5 +1,9 @@
 namespace Wanxiangshu.Sphinx.V2.Plugins
 
+/// The F# vocabulary of the Sphinx v2 exact Bayes posterior. The inference itself
+/// (WHAT[sphinx-v2-009/021/025/026]) is owned by `wanxiangli/bayes` (CUT-31 ②);
+/// `Surface` translates these records across that boundary.
+
 type Hypothesis = { Key: string; Prior: float }
 
 /// One observation's contribution. `ObservationId` is its identity: the same id
@@ -32,9 +36,3 @@ type ExactFault =
     | IncompleteLikelihood of semanticKey: string * missingKey: string
     | InvalidLikelihood of semanticKey: string * key: string
     | NonPositivePartition
-
-module Bayes =
-    val infer: Hypothesis list -> Factor list -> Result<Posterior, ExactFault>
-
-    /// A prior-only run is legal and says so: it is not new evidence and not convergence.
-    val priorOnly: Hypothesis list -> Result<Posterior, ExactFault>

@@ -5,8 +5,6 @@ import * as Core from '../../../dist/Sphinx/V2/Core/Surface.js'
 import * as Loop from '../../../dist/Sphinx/V2/Runtime/Surface.js'
 import * as Ordinal from '../../../dist/Sphinx/V2/Plugins/Ordinal/Surface.js'
 import * as Bayes from '../../../dist/Sphinx/V2/Plugins/Bayes/Surface.js'
-import * as AStar from '../../../dist/Sphinx/V2/Plugins/AStar/Surface.js'
-import * as Mcts from '../../../dist/Sphinx/V2/Plugins/Mcts/Surface.js'
 import {Host, admittedWithReceipt, withHost, hostRequest} from './host-support.mjs'
 
 const ok = (result) => {
