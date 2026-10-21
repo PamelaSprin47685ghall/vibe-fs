@@ -591,6 +591,8 @@ dotnet tool run fantomas src/Wanxiangshu
 
 ### 十·四 仍未闭合（需继续核查，非本批范围）
 
+> **历史条目，已被「十·六」的最新状态取代。** 本节是 2026-10-21 收口会话当时的快照，其中 B1、B4、B9 已闭合（下面仍写明），其余条目的当前状态一律以「十·六」为准，**不要**把本节里已被后续批次闭合的项继续当作未修项。
+
 - **B1** —— **已闭合**（2026-10-21 按当前代码核实，非本批引入）。`fork` 与 `commission` 共享 `deriveNameFromCharge`（`Description.fs:429`，`:565-571`、`:575-580`）；`resume` **有意不派生**（`Description.fs:581-585`），符合现行 WHAT（`repository-programming` [056]：`resume` 的 `payload` 必带 `name`，拒绝码含 `name-required`）。旧条目的「resume 应派生」是过时义务。
 - **B4** —— **已闭合**（2026-10-21 按当前代码核实，非本批引入）。`ReviewOnly` 子对象的成员读 `this._api`（构造器收到的就是 `api.reviewOnly` 命名空间本身，`Description.fs:771-778`），不再误访问 `this._api.reviewOnly`；缺失成员由 `missingMemberGuard`（`Description.fs:440-448`）以 `{ ok: false, code: "REVIEW_ONLY", reason: ... }` 拒绝。
 - **B5** `tryTakeRenderedFor` 只比 `ProviderRun` 不比 `ToolCallId` —— **仍未修**。本批的处置是**删除**了新增的 `tryTakeRenderedFenced`（它无调用方，且 owner 的 `claim` 只支持 `peek`/`cache`/`run` 三种 mode，`run` 只比 providerRun，见 `wanxiangli/src/delivery/Delivery.fs:154-176`），并把 `tryTakeRenderedFor` 的注释改成实话：它只比 provider run、是 harness/fallback 通道、**不是交付证据**，真正的证据是 durable 见证。按最新 WHAT（`repository-programming` [054]/[059]）核对后，**完整 ToolCallId 围栏消费仍是未闭合项**，保留在本任务书待办。
@@ -633,6 +635,8 @@ dotnet tool run fantomas src/Wanxiangshu
 | parked source 执行点换算（JsSandbox.fs + 065 + WHAT/README + CHANGELOG） | `f6010b688` | `build ok (generation 106)` | 主树 `065\|048\|002\|028\|029\|030\|031\|032\|047\|049\|056` → **67/67 pass**；重基树 `065\|048` → **4/4 pass** |
 | C3 死链删除（`Execution/Fission/OpenCode/Host.fs` −186） | `ad13783c9` | `build ok (generation 7)` | `intra-participant-parallelism/*` → **45 tests / 30 pass / 0 fail / 0 cancelled / 15 todo**；`effect-accounting/002` 挂起（改动前后同样挂起，非本批引入） |
 | 交付已证明的轮次发布真实终态（`OrdinaryTurnWorkflow.fs` + 024 迁移 + CHANGELOG） | `5df09d1d0` | `build ok (generation 3)` | `delegation/024` → **5/5 pass / 0 fail / 0 cancelled**；真实路径对照：已交付轮次发布终态且 `join` 返回 `status="completed"`；未交付对照 `terminals: []`、工作单元仍 `Active`、`join` 仍 not-ready |
+| 构建的 up-to-date 判据要看产物是否真在盘上（`scripts/build.mjs` + CHANGELOG） | `c6e42613a` | `build ok (generation 108)`；151 surfaces；724 modules | `distribution/005` + `verification-system/008` → **27 tests / 26 pass / 0 fail / 0 cancelled / 1 todo**；三态实测：产物齐全 → no-op；单删中间依赖 `dist/Execution/Fission/OpenCode/Host.js` → 全量重编且 `.js` 计数回到 724；再跑 → no-op |
+| 本节投递记录 | `feb9271a4` | — | 任务书十·六节本身 |
 
 **两处构建口径教训**（影响后续任何批次的判定）
 
@@ -641,8 +645,10 @@ dotnet tool run fantomas src/Wanxiangshu
 
 **仍未闭合**
 
-- **R6**：`host → application-composition` 反向边（`ToolWorkflow.fs:477` 的 `DeliveryAttemptLedger.recordEstablished`）——方案已定（callback 版），代码未落。
+- **R6**：`host → application-composition` 反向边（`ToolWorkflow.fs:477` 的 `DeliveryAttemptLedger.recordEstablished`）——方案已定（callback 版：删私有 `registerEstablishedDelivery`、`DeliveryWitnessWriter.create` 增加 `onCommitted` 回调、ToolRegistry 传回调、toolbindings 去掉 toolruntimescope ProjectReference），由 prod-closure 落码中，待其交付后单独验投。
 - **B5**：完整 ToolCallId 围栏消费（`tryTakeRenderedFor` 只比 provider run）仍未修。
 - **C3 材料搬运**：fission lane 的材料仍靠手工跨 session 搬运；应收敛到 `FissionLaneMaterialized` 的 `ViewRef/ViewDigest` 与 takeover 的 `AggregateViewRef/AggregateViewDigest`。
 - **D6 / harness 挂起**：`managed-session-lifecycle/006|007|008|013|015|022`、`effect-accounting/002`、`delegation/027|006|026` 的旧 harness 从不提交 durable 见证，须逐个迁到真实交付路径；**不得伪造见证**。
-- `scripts/build.mjs` 产物存在性判据（prod-closure）已实测合格，待单独投递。
+- `scripts/build.mjs` 产物存在性判据 —— **已闭合**（`c6e42613a`）：判据按 manifest 产物全集查盘，缺失即强制重编。
+
+**已闭项，不再列为未修**（历史条目见十·四）：B1、B4、B9（十·二·三已记）、C2（十·二·二已记）、anchor 声明单一规则与 JS-native 回执（`2dd501d2e`）、委派旧 root 归属与 029 窄能力（`507d68d01`）、parked source 执行点换算（`f6010b688`）、Fission 死链删除（`ad13783c9`）、交付已证明轮次发布终态与 024 迁移（`5df09d1d0`）、构建产物存在性判据（`c6e42613a`）。
