@@ -148,9 +148,15 @@ module ProviderProjection =
                   "name" ==> name
                   "args" ==> args ]
         | WireToolResult(callId, result) ->
-            createObj [ "kind" ==> "tool-result"; "callId" ==> ToolCallId.value callId; "result" ==> result ]
+            createObj
+                [ "kind" ==> "tool-result"
+                  "callId" ==> ToolCallId.value callId
+                  "result" ==> result ]
         | WireMedia(mediaType, digest) ->
-            createObj [ "kind" ==> "media"; "mediaType" ==> Option.toObj mediaType; "contentDigest" ==> digest ]
+            createObj
+                [ "kind" ==> "media"
+                  "mediaType" ==> Option.toObj mediaType
+                  "contentDigest" ==> digest ]
 
     let private semanticPartView (part: SemanticPart) : obj =
         match part with
@@ -159,7 +165,10 @@ module ProviderProjection =
         | SemanticToolCall(name, args) -> createObj [ "kind" ==> "tool-call"; "name" ==> name; "args" ==> args ]
         | SemanticToolResult result -> createObj [ "kind" ==> "tool-result"; "result" ==> result ]
         | SemanticMedia(mediaType, digest) ->
-            createObj [ "kind" ==> "media"; "mediaType" ==> Option.toObj mediaType; "contentDigest" ==> digest ]
+            createObj
+                [ "kind" ==> "media"
+                  "mediaType" ==> Option.toObj mediaType
+                  "contentDigest" ==> digest ]
 
     let private messageView (role: string) (parts: obj list) : obj =
         createObj [ "role" ==> role; "parts" ==> List.toArray parts ]

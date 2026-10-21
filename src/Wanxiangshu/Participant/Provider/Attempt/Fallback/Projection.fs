@@ -52,7 +52,8 @@ module ProviderFailureProjection =
     let private stateView (current: ProviderFailureProjection) : obj =
         createObj
             [ "logicalRun" ==> LogicalRunId.value current.LogicalRunId
-              "authorityRoot" ==> AuthorityRootUserMessageId.value current.AuthorityRootUserMessageId
+              "authorityRoot"
+              ==> AuthorityRootUserMessageId.value current.AuthorityRootUserMessageId
               "consecutiveFailureCount" ==> current.Budget.ConsecutiveFailureCount
               "recentFailureKeys" ==> Array.ofList current.RecentFailureKeys
               "exhausted" ==> current.Exhausted
@@ -115,7 +116,9 @@ module ProviderFailureProjection =
         (identity: FailedProviderAttemptIdentity)
         (current: ProviderFailureProjection)
         : ProviderFailureReplay =
-        match (library?replay (budgetLimit, FailedProviderAttemptIdentity.view identity, stateView current): string) with
+        match
+            (library?replay (budgetLimit, FailedProviderAttemptIdentity.view identity, stateView current): string)
+        with
         | "RetryAuthorized" -> ProviderFailureReplay.LatestMayRetry
         | "RetryExhausted" -> ProviderFailureReplay.LatestExhausted
         | _ -> ProviderFailureReplay.Superseded

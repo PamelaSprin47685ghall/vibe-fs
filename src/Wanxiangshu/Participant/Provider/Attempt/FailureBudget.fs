@@ -25,7 +25,8 @@ module FailedProviderAttemptIdentity =
         createObj
             [ "sessionId" ==> SessionId.value identity.SessionId
               "logicalRun" ==> LogicalRunId.value identity.LogicalRunId
-              "authorityRoot" ==> AuthorityRootUserMessageId.value identity.AuthorityRootUserMessageId
+              "authorityRoot"
+              ==> AuthorityRootUserMessageId.value identity.AuthorityRootUserMessageId
               "providerRun" ==> ProviderRunIdentity.value identity.ProviderRun ]
 
     /// Stable string form for set membership in a projection (owned by wanxiangli/failure-budget).

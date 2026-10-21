@@ -288,7 +288,9 @@ module ProviderRecoveryWorkflow =
 
             let hasCapacity =
                 roleName = ""
-                || ModelRouting.hasTheoreticalCapacity roleName Wanxiangshu.Execution.Routing.ModelExecutionPurpose.Normal
+                || ModelRouting.hasTheoreticalCapacity
+                    roleName
+                    Wanxiangshu.Execution.Routing.ModelExecutionPurpose.Normal
 
             let refusedSatellite =
                 SessionAssociationProjection.isSatellite turn.SessionId projections.AgentProjections.Associations
@@ -375,7 +377,9 @@ module ProviderRecoveryWorkflow =
 
             let hasCapacity =
                 roleName = ""
-                || ModelRouting.hasTheoreticalCapacity roleName Wanxiangshu.Execution.Routing.ModelExecutionPurpose.Normal
+                || ModelRouting.hasTheoreticalCapacity
+                    roleName
+                    Wanxiangshu.Execution.Routing.ModelExecutionPurpose.Normal
 
             let recoveryContext =
                 requestKindFor durable turn.SessionId turn.PhysicalUserMessageId
