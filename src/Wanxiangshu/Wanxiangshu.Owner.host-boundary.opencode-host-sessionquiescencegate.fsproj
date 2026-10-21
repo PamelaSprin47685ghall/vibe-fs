@@ -18,6 +18,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fsi"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fs"/>
+    <Compile Include="OpenCode/Host/TranscriptPort.fsi"/>
+    <Compile Include="OpenCode/Host/TranscriptPort.fs"/>
     <Compile Include="OpenCode/Host/SessionSnapshotSurface.fsi"/>
     <Compile Include="OpenCode/Host/SessionSnapshotSurface.fs"/>
     <Compile Include="OpenCode/Host/SessionQuiescenceGate.fsi"/>

@@ -22,6 +22,14 @@ land rebase + ff. Ratchets (architecture ⑧, ⑨, HNI-04 thinness) only go down
 
 
 HNI-05 progress (eng-hni-fission, 2026-10-22): S0 landed the transitional P-17 port. S1 done: the fission tool-visibility decision is product-owned in `Execution/Fission/Visibility.fs(i)` (`FissionToolVisibility`); the adapters keep only the wire write. S2 done: the fission canaries moved to the product lane (`Execution/Fission/Canaries.fs(i)`); `OpenCode/Host/FissionHostSurface.fs` shrank 251 → 46 lines. S3 done: the Fission lane speaks its own convergence vocabulary (`FissionSessionPort` / `FissionEventPort` in `Host/FissionPort.fs(i)`). S4 done: the `fission` tool's product policy (prose vocabulary, prose rendering, office entitlement) is product-owned in `Execution/Fission/ToolPolicy.fs(i)` (`FissionToolPolicy`); the adapter keeps only the wire mapping and encoding. S0–S4 are on `master`.
+
+P-03 fact (arch lane, 2026-10-22, slice S3): P-03 now has an OpenCode implementation —
+`OpenCode/Host/TranscriptPort.fs(i)` implements `ITranscriptPort` as a projection over the existing
+`ISessionSnapshotPort` plumbing, and the neutral port family `Host/Ports/Transcript.fs(i)` is unchanged. This is
+recorded as a fact only: it touches the HNI-08 (plugin-host) and HNI-09 (leftovers) boards' transcript surface,
+but it claims no card and changes no card state. The legacy `ISessionSnapshotPort` / `SessionMessage` contract
+stays live and no consumer was cut over; routing them onto P-03 is the next slice.
+
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 
 ## Gate ⑩/⑪/⑫ (HNI-04) — `scripts/checks/adapter-thinness.mjs`, run inside `architecture.mjs`

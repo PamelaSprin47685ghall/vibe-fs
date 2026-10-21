@@ -12,7 +12,7 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 |---|---|---|---|---|---|
 | P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Ports/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo` | DECLARED, WIRED-OC, SKELETON-OMP |
 | P-02 | `IPromptPort`, `PromptRequest`, `DeliveryVerdict` | `Host/Ports/Prompts.fs(i)` | fission (+ Interaction/Dispatch) | `OpenCode.IPromptPort`, `OpenCodePromptOptions`, `DetachedSendVerdict` | DECLARED, SKELETON-OMP |
-| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` | DECLARED, SKELETON-OMP |
+| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` (both still live; cutover pending) | DECLARED, WIRED-OC, SKELETON-OMP |
 | P-04 | `IToolRegistrar`, `ToolSpec`, `ToolInvocation`, `ToolOutcome` | `Host/Ports/Tools.fs(i)` | tools | `OpenCode/Tools/ToolContext` `Tool`/`ToolContext`/`ToolOutput` | DECLARED, SKELETON-OMP |
 | P-05 | `IToolGate`, `ToolCallVerdict`, `ToolResultEdit`, `ToolDefinitionEdit` | `Host/Ports/ToolGates.fs(i)` | tools | `tool.execute.before/after`, `tool.definition` handling in `OpenCode/Plugin/PluginHooks` | DECLARED, SKELETON-OMP |
 | P-06 | `ITurnTransform`, `TurnAdmission`, `ContextEdit`, `ParamsVerdict` | `Host/Ports/TurnTransforms.fs(i)` | plugin-host | `OpenCode/Plugin/PluginTransforms`, `ChatParamsHook`, `ProviderSystemTransform` entry points | DECLARED, SKELETON-OMP |
@@ -265,6 +265,24 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   `evidence/omp-feasibility.md` ("Decided rules (was: open items)") and are **binding on `cut36-omp-2`**, the lane
   that builds the real omp adapter. `DESIGN.md` gains §3.1 (omp binding contract) and §3.2 (provider-params encode
   rule). No port id was added, renamed or renumbered; no F# source was touched; nothing was compiled.
+
+- 2026-10-22 eng-host-arch (slice S3): P-03 is WIRED-OC — the OpenCode adapter now implements
+  `ITranscriptPort`. The adapter (`OpenCode/Host/TranscriptPort.fs(i)`) is a *projection* over the existing
+  `ISessionSnapshotPort` plumbing: it reuses the snapshot port untouched and translates the host-shaped
+  `SessionMessage` into the neutral `TranscriptMessage`. Host role strings map strictly
+  (`user`/`assistant`/`system`); an unrecognised role refuses the whole transcript with
+  `HostError.Unknown` instead of coercing, and a snapshot failure becomes `HostError.Transport`. Tool parts are
+  joined to the snapshot tool parts by call id — a tool part with no matching snapshot part stays an opaque
+  `Other "tool"` part, and a snapshot tool part no message part mentions is still projected, so no call is lost.
+  The raw host error name is carried as `TurnTerminal.Failed` with `HostFailureKind.Provider`; classifying it into
+  an execution failure or a retry decision stays product logic. **The legacy `ISessionSnapshotPort` /
+  `SessionMessage` contract is deliberately still live** — many consumers remain, and routing them onto P-03 is
+  the next slice; no consumer was cut over in this commit. **No new port** — P-03 (`Host/Ports/Transcript.fs(i)`)
+  is unchanged, so the next free id stays **P-19**; `omp: n/a` (the family `.fsi` did not change, so the
+  generated TS mirror is unaffected). Gates: architecture OK, adapter-thinness 139 files / 32830 lines,
+  product-reference 595 (baseline 689), without-port 136 (baseline 149), fsharp-control-pyramid 5 findings — all
+  pre-existing in `OpenCode/Host/SessionSnapshotPort.fs`, 0 in the new file. **No compile/test evidence** (owner's
+  no-build-before-push rule) — the delivery team must build master and run the transcript requirement suites.
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.
