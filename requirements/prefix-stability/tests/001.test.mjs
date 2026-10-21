@@ -11,6 +11,7 @@ const canonicalJson = await import("../../../dist/OpenCode/Codec/CanonicalJsonSu
 const providerCodec = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
 const providerProjection = await import("../../../dist/Participant/Provider/Projection/Surface.js");
 const delegation = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
+const runtimeSurface = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
 
 const ENGINEER_AGENT = 'engineer'
 const ENGINEER_PROVIDER = 'g2-test-provider'
@@ -112,6 +113,15 @@ test('WHAT[prefix-stability-001] reused delegation completes three questions; se
       assert.equal(wire.providerId, ENGINEER_PROVIDER)
       assert.equal(wire.messages.at(-1).parts[0].text, question)
 
+      // The child delivers before its terminal (repository-programming [059]):
+      // the fenced delivery cell of this exact assistant run, as `this.deliver`
+      // leaves it. A terminal without a delivery keeps the obligation open.
+      runtimeSurface.recordFencedDeliveredView(
+        child,
+        `asst_q${ordinal + 1}`,
+        `call_q${ordinal + 1}`,
+        { prefixUntil: 0, thenMap: { 0: answer } },
+      )
       const settled = await delegation.settle(harness, OWNER, 'Engineer', answer, `asst_q${ordinal + 1}`)
       assert.equal(settled, true, `Q${ordinal + 1} completion must be observed`)
       const completed = await resultValue(pending, `Q${ordinal + 1}`)
