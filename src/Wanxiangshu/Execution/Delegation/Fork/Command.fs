@@ -1304,7 +1304,7 @@ module ForkCommand =
     let private handleAgentId (handle: HandleRecord) : Result<AgentHandleId, string> =
         match HandleId.tryAgent handle.Handle with
         | None -> Error(refusalCode Path.Fork.PersonUnknown)
-        | Some handleId -> Ok(AgentHandleId.value handleId)
+        | Some handleId -> Ok handleId
 
     /// A busy child takes the charge as guidance; an idle one is reopened under
     /// its live (or adopted) role, else its durable canonical role.

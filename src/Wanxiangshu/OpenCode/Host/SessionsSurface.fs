@@ -498,9 +498,10 @@ module SessionsSurface =
                     member _.NotifyTerminal session outcome =
                         let kind, reason, root =
                             match outcome with
-                            | Failed stop -> "Failed", stop.Reason, stop.AuthorityRootUserMessageId
-                            | Aborted stop -> "Aborted", stop.Reason, stop.AuthorityRootUserMessageId
-                            | Completed result -> "Completed", "", Some result.AuthorityRootUserMessageId
+                            | TerminalOutcome.Failed stop -> "Failed", stop.Reason, stop.AuthorityRootUserMessageId
+                            | TerminalOutcome.Aborted stop -> "Aborted", stop.Reason, stop.AuthorityRootUserMessageId
+                            | TerminalOutcome.Completed result ->
+                                "Completed", "", Some result.AuthorityRootUserMessageId
 
                         terminals.Add(
                             box
