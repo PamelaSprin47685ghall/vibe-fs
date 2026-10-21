@@ -16,14 +16,6 @@ module PairProgrammingThoughtTransform =
     [<RequireQualifiedAccess>]
     type CursorPresentationOwner = | PairGuidance
 
-    /// Durable/memory pair with both halves' transcript gap anchors.
-    type PairProgrammingGuidelineWire =
-        { Ordinal: int64
-          CallId: string
-          MarkerText: string
-          CallGap: TranscriptGap
-          ResultGap: TranscriptGap }
-
     /// HOST-013 English canonical used by tests; production loads via session language.
     val text: string
 
@@ -32,14 +24,6 @@ module PairProgrammingThoughtTransform =
 
     /// Most recent provider id on the transcript (assistant `providerID` or user `model.providerID`).
     val providerIdFromMessages: rawMessages: obj list -> string option
-
-    /// Emergency fuse only. Cursor is a provider-specific projection, not an
-    /// occurrence bypass: it still creates/replays the same durable HOST-013 fact.
-    val skipAutoInjectedRequested: _providerId: string option -> bool
-
-    /// The marker's source identity (HOST-013). Filtering must use this, never
-    /// the text: a real user may quote the sentence.
-    val source: string
 
     /// HOST-013 borrows the Host-owned skill wire. Empty name is injection-only;
     /// real non-empty skill names remain ordinary executable Host skills.
@@ -50,9 +34,6 @@ module PairProgrammingThoughtTransform =
 
     /// Active empty-name skill loads are reserved for synthetic injection only.
     val reprimandText: lang: ProviderLanguage option -> string
-
-    /// CallId = digest(transcript + source + ordinal). Stable across restarts.
-    val stableCallId: sessionId: string option -> ordinal: int64 -> string
 
     val cursorGuidanceSeparator: string
 

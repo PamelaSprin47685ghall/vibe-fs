@@ -20,6 +20,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.pair-guidance-projection.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.pair-guidance-occurrences.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.host-pair-guidance-port.fsproj" />
     
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj" />

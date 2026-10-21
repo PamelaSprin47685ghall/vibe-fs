@@ -2,7 +2,6 @@ namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation.HostSession
 
-open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -12,7 +11,6 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
@@ -79,30 +77,18 @@ module PairProgrammingThoughtTransform =
     let providerIdFromMessages (rawMessages: obj list) : string option =
         rawMessages |> List.rev |> List.tryPick providerIdOfMessage
 
-    /// Emergency fuse only. Cursor is a provider-specific projection, not an
-    /// occurrence bypass: it still creates/replays the same durable HOST-013 fact.
-    let skipAutoInjectedRequested (_providerId: string option) : bool =
-        match Environment.GetEnvironmentVariable "WANXIANGSHU_SKIP_AUTO_INJECTED" with
-        | "1" -> true
-        | _ -> false
-
     /// Unconditionally true: Cursor mode (NUL+BOM tool result suffix injection without synthetic tool messages)
     /// is unified across all providers.
     let isCursorProvider (providerId: string option) =
         ignore providerId
         true
 
-    /// The marker's source identity (HOST-013). Filtering must use this, never
-    /// the text: a real user may quote the sentence.
-    let source = "pair-programming-auto-injected"
-
-    let private idPrefix = "pair-programming-auto-injected-"
-
     /// HOST-013 borrows the Host-owned skill wire. Empty name is injection-only;
     /// real non-empty skill names remain ordinary executable Host skills.
     let toolName = "skill"
 
-    let private isMarkerSource (markerSource: string) = markerSource = source
+    let private isMarkerSource (markerSource: string) =
+        markerSource = PairGuidanceOccurrences.source
 
     /// HOST-013：marker 身份仅按 `info.source`。
     let isPairProgrammingThought (rawMsg: obj) : bool =
@@ -204,28 +190,6 @@ module PairProgrammingThoughtTransform =
     let sanitizeActiveToolCalls (lang: ProviderLanguage option) (rawMessages: obj list) : obj list =
         rawMessages |> List.map (sanitizeActiveReservedSkillMessage lang)
 
-    /// Durable/memory pair with both halves' transcript gap anchors.
-    type PairProgrammingGuidelineWire =
-        { Ordinal: int64
-          CallId: string
-          MarkerText: string
-          CallGap: TranscriptGap
-          ResultGap: TranscriptGap }
-
-    /// Process-local fallback when journal is unavailable (tests / no workspace).
-    /// Keyed by transcript identity; append-only within process.
-    let private memoryLedger =
-        Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
-
-    let private transcriptKey (sessionId: string option) : string = defaultArg sessionId ""
-
-    /// CallId = digest(transcript + source + ordinal). Stable across restarts.
-    let stableCallId (sessionId: string option) (ordinal: int64) : string =
-        let digest =
-            HostDigest.sha256Hex ((transcriptKey sessionId) + source + string ordinal)
-
-        idPrefix + digest.Substring(0, 24)
-
     let private buildPairMessage (callId: string) (markerText: string) : obj =
         let part =
             createObj
@@ -247,7 +211,7 @@ module PairProgrammingThoughtTransform =
                   createObj
                       [ "id", box callId
                         "role", box "assistant"
-                        "source", box source
+                        "source", box PairGuidanceOccurrences.source
                         "synthetic", box true ]
               )
               "parts", box [| part |] ]
@@ -736,9 +700,9 @@ module PairProgrammingThoughtTransform =
         | TranscriptGap.After address -> Set.contains (TranscriptMessageAddress.value address) addressSet
 
     let private bucketAdd
-        (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
+        (table: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>)
         (address: TranscriptMessageAddress)
-        (pair: PairProgrammingGuidelineWire)
+        (pair: PairGuidanceOccurrence)
         =
         let key = TranscriptMessageAddress.value address
 
@@ -746,15 +710,15 @@ module PairProgrammingThoughtTransform =
         | true, entries -> entries.Add pair
         | false, _ ->
             // DSL-MUTABLE: algorithm-scratch — new entry list for dictionary insert
-            let entries = ResizeArray<PairProgrammingGuidelineWire>()
+            let entries = ResizeArray<PairGuidanceOccurrence>()
             entries.Add pair
             table.[key] <- entries
 
     let private addAtGap
-        (starts: ResizeArray<PairProgrammingGuidelineWire>)
-        (before: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
-        (after: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
-        (pair: PairProgrammingGuidelineWire)
+        (starts: ResizeArray<PairGuidanceOccurrence>)
+        (before: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>)
+        (after: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>)
+        (pair: PairGuidanceOccurrence)
         (gap: TranscriptGap)
         =
         match gap with
@@ -763,8 +727,8 @@ module PairProgrammingThoughtTransform =
         | TranscriptGap.After address -> bucketAdd after address pair
 
     let private placeCursorResultGap
-        (cursorAfter: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
-        (pair: PairProgrammingGuidelineWire)
+        (cursorAfter: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>)
+        (pair: PairGuidanceOccurrence)
         =
         match pair.ResultGap with
         | TranscriptGap.After address -> bucketAdd cursorAfter address pair
@@ -772,32 +736,32 @@ module PairProgrammingThoughtTransform =
 
     let private registerPlaceablePair
         (providerId: string option)
-        (starts: ResizeArray<PairProgrammingGuidelineWire>)
-        (before: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
-        (after: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
-        (cursorAfter: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
-        (pair: PairProgrammingGuidelineWire)
+        (starts: ResizeArray<PairGuidanceOccurrence>)
+        (before: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>)
+        (after: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>)
+        (cursorAfter: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>)
+        (pair: PairGuidanceOccurrence)
         =
         if isCursorProvider providerId then
             placeCursorResultGap cursorAfter pair
         else
             addAtGap starts before after pair pair.ResultGap
 
-    let private ordered (entries: ResizeArray<PairProgrammingGuidelineWire>) =
+    let private ordered (entries: ResizeArray<PairGuidanceOccurrence>) =
         entries |> Seq.sortBy (fun pair -> pair.Ordinal) |> Seq.toList
 
-    let private emitPairs (output: ResizeArray<obj>) (entries: ResizeArray<PairProgrammingGuidelineWire>) =
+    let private emitPairs (output: ResizeArray<obj>) (entries: ResizeArray<PairGuidanceOccurrence>) =
         for pair in ordered entries do
             output.Add(buildPairMessage pair.CallId pair.MarkerText)
 
-    let private tryBucket (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>) (address: string) =
+    let private tryBucket (table: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>) (address: string) =
         match table.TryGetValue address with
         | true, entries -> Some entries
         | _ -> None
 
     let private emitBucketPairs
         (output: ResizeArray<obj>)
-        (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
+        (table: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>)
         (address: string)
         =
         tryBucket table address |> Option.iter (emitPairs output)
@@ -845,7 +809,7 @@ module PairProgrammingThoughtTransform =
 
     let private projectCursorMessage
         captures
-        (cursorAfter: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
+        (cursorAfter: Dictionary<string, ResizeArray<PairGuidanceOccurrence>>)
         (address: string)
         (message: obj)
         =
@@ -862,7 +826,7 @@ module PairProgrammingThoughtTransform =
         captures
         (providerId: string option)
         (addressed: (string * obj) list)
-        (pairs: PairProgrammingGuidelineWire list)
+        (pairs: PairGuidanceOccurrence list)
         : obj list =
         let addressSet = addressed |> List.map fst |> Set.ofList
 
@@ -874,13 +838,13 @@ module PairProgrammingThoughtTransform =
             |> List.filter (fun pair -> gapPresent addressSet pair.CallGap && gapPresent addressSet pair.ResultGap)
 
         // DSL-MUTABLE: algorithm-scratch — placeable pair start accumulator
-        let starts = ResizeArray<PairProgrammingGuidelineWire>()
+        let starts = ResizeArray<PairGuidanceOccurrence>()
         // DSL-MUTABLE: algorithm-scratch — before-gap pair bucket
-        let before = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
+        let before = Dictionary<string, ResizeArray<PairGuidanceOccurrence>>()
         // DSL-MUTABLE: algorithm-scratch — after-gap pair bucket
-        let after = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
+        let after = Dictionary<string, ResizeArray<PairGuidanceOccurrence>>()
         // DSL-MUTABLE: algorithm-scratch — cursor result-gap pair bucket
-        let cursorAfter = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
+        let cursorAfter = Dictionary<string, ResizeArray<PairGuidanceOccurrence>>()
 
         for pair in placeable do
             registerPlaceablePair providerId starts before after cursorAfter pair
@@ -900,7 +864,7 @@ module PairProgrammingThoughtTransform =
         captures
         (providerId: string option)
         (realMessages: obj list)
-        (pairs: PairProgrammingGuidelineWire list)
+        (pairs: PairGuidanceOccurrence list)
         : Result<obj list, string> =
         addressedRealMessages realMessages
         |> Result.map (fun addressed -> replayAddressed captures providerId addressed pairs)
@@ -958,138 +922,6 @@ module PairProgrammingThoughtTransform =
             |> Result.map Some
         | _ -> Ok None
 
-    // ── durable / memory history ─────────────────────────────────────────────
-
-    let private readDurableHistory (journal: AgentJournal) (sessionId: SessionId) : PairProgrammingGuidelineWire list =
-        match AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections with
-        | None -> []
-        | Some session ->
-            session.Guidelines
-            |> Option.map GuidelineProjection.pairs
-            |> Option.defaultValue []
-            |> List.map (fun pair ->
-                { Ordinal = pair.Ordinal
-                  CallId = ToolCallId.value pair.CallId
-                  MarkerText = pair.MarkerText
-                  CallGap = pair.CallGap
-                  ResultGap = pair.ResultGap })
-
-    let private readDurableVisibleHistory
-        (journal: AgentJournal)
-        (sessionId: SessionId)
-        : PairProgrammingGuidelineWire list =
-        match AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections with
-        | None -> []
-        | Some session ->
-            session.Guidelines
-            |> Option.map GuidelineProjection.visiblePairs
-            |> Option.defaultValue []
-            |> List.map (fun pair ->
-                { Ordinal = pair.Ordinal
-                  CallId = ToolCallId.value pair.CallId
-                  MarkerText = pair.MarkerText
-                  CallGap = pair.CallGap
-                  ResultGap = pair.ResultGap })
-
-    let private readMemoryHistory (key: string) : PairProgrammingGuidelineWire list =
-        match memoryLedger.TryGetValue key with
-        | true, pairs -> pairs |> Seq.toList
-        | false, _ -> []
-
-    let private appendMemory (key: string) (pair: PairProgrammingGuidelineWire) : Result<unit, string> =
-        match memoryLedger.TryGetValue key with
-        | true, pairs -> pairs.Add pair
-        | false, _ ->
-            // DSL-MUTABLE: algorithm-scratch — new pair list for dictionary insert
-            let pairs = ResizeArray<PairProgrammingGuidelineWire>()
-            pairs.Add pair
-            memoryLedger.[key] <- pairs
-
-        Ok()
-
-    let private appendDurable
-        (journal: AgentJournal)
-        (sessionId: SessionId)
-        (pair: PairProgrammingGuidelineWire)
-        : Task<Result<unit, string>> =
-        task {
-            let fact =
-                HostFact.PairProgrammingGuidelineAnchored
-                    {| SessionId = sessionId
-                       Ordinal = pair.Ordinal
-                       CallId = ToolCallId.create pair.CallId
-                       MarkerText = pair.MarkerText
-                       CallGap = pair.CallGap
-                       ResultGap = pair.ResultGap |}
-
-            match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
-            | Ok _ -> return Ok()
-            | Error failure -> return Error(JournalAppendFailure.describe failure)
-        }
-
-    let private nextGuidelineOrdinal (history: PairProgrammingGuidelineWire list) =
-        match history with
-        | [] -> 1L
-        | pairs -> (List.last pairs).Ordinal + 1L
-
-    let private findPlacement
-        (history: PairProgrammingGuidelineWire list)
-        (callGap: TranscriptGap)
-        (resultGap: TranscriptGap)
-        =
-        history
-        |> List.tryFind (fun pair -> pair.CallGap = callGap && pair.ResultGap = resultGap)
-
-    let private commitPairInjection
-        (replayMessages: obj list -> PairProgrammingGuidelineWire list -> Result<obj list, string>)
-        (providerId: string option)
-        (history: PairProgrammingGuidelineWire list)
-        (visibleHistory: PairProgrammingGuidelineWire list)
-        (append: PairProgrammingGuidelineWire -> Task<Result<unit, string>>)
-        (sessionId: string option)
-        (markerText: string)
-        (realMessages: obj list)
-        (callGap: TranscriptGap)
-        (resultGap: TranscriptGap)
-        : Task<Result<obj list * bool, string>> =
-        taskResult {
-            let existing = findPlacement visibleHistory callGap resultGap
-
-            if Option.isSome existing || skipAutoInjectedRequested providerId then
-                let! replayed = replayMessages realMessages visibleHistory
-                return (replayed, false)
-            else
-                let ordinal = nextGuidelineOrdinal history
-
-                let candidate =
-                    { Ordinal = ordinal
-                      CallId = stableCallId sessionId ordinal
-                      MarkerText = markerText
-                      CallGap = callGap
-                      ResultGap = resultGap }
-
-                let! rendered = replayMessages realMessages (visibleHistory @ [ candidate ])
-                do! append candidate
-                return (rendered, true)
-        }
-
-    let private sessionRole (journal: AgentJournal option) (sessionId: SessionId) : Role option =
-        journal
-        |> Option.bind (fun durable ->
-            let projections = (AgentJournal.snapshot durable).AgentProjections
-
-            PromptAuthorityProjectionQueries.activeProfile sessionId projections
-            |> Option.orElseWith (fun () ->
-                PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections)
-            |> Option.map (fun profile -> profile.CanonicalRole)
-            |> Option.orElseWith (fun () ->
-                projections.HandleByChildSession
-                |> Map.tryFind sessionId
-                |> Option.map (fun handle -> handle.CanonicalRole)))
-
-    let private isInternalRole (roleOpt: Role option) =
-        roleOpt |> Option.exists Roles.isInternal
-
     let private messageRoleIsInternal (msg: obj) : bool =
         if isNull msg then
             false
@@ -1108,54 +940,7 @@ module PairProgrammingThoughtTransform =
                     |> Option.orElseWith (fun () -> tryUnboxString msg?role)
                     |> Option.bind Roles.tryParseRole)
 
-            isInternalRole role
-
-    let private isInternalSessionOrMessage
-        (journal: AgentJournal option)
-        (sessionId: string option)
-        (rawMessages: obj list)
-        =
-        match journal, sessionId with
-        | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
-            let session = SessionId.create sid
-            let snapshot = AgentJournal.snapshot durable
-
-            SessionAssociationProjection.isCompanion session snapshot.AgentProjections.Associations
-            || isInternalRole (sessionRole journal session)
-            || (rawMessages |> List.exists messageRoleIsInternal)
-        | _ -> rawMessages |> List.exists messageRoleIsInternal
-
-    let private commitCurrentPairPlacement
-        (replayMessages: obj list -> PairProgrammingGuidelineWire list -> Result<obj list, string>)
-        providerId
-        history
-        visibleHistory
-        append
-        sessionId
-        markerText
-        realMessages
-        =
-        taskResult {
-            let! placementOpt = decideCurrentPlacement realMessages
-
-            match placementOpt with
-            | None ->
-                let! replayed = replayMessages realMessages visibleHistory
-                return (replayed, false)
-            | Some(callGap, resultGap) ->
-                return!
-                    commitPairInjection
-                        replayMessages
-                        providerId
-                        history
-                        visibleHistory
-                        append
-                        sessionId
-                        markerText
-                        realMessages
-                        callGap
-                        resultGap
-        }
+            role |> Option.exists Roles.isInternal
 
     // ── 入口 ─────────────────────────────────────────────────────────────────
 
@@ -1177,21 +962,8 @@ module PairProgrammingThoughtTransform =
         (rawMessages: obj list)
         : Task<Result<obj list * bool, string>> =
         taskResult {
-            let key = transcriptKey sessionId
-
-            let history, visibleHistory, append =
-                match journal, sessionId with
-                | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
-                    let session = SessionId.create sid
-
-                    readDurableHistory durable session,
-                    readDurableVisibleHistory durable session,
-                    appendDurable durable session
-                | _ ->
-                    let memory = readMemoryHistory key
-                    memory, memory, (fun pair -> Task.FromResult(appendMemory key pair))
-
-            let suffixes = history |> List.map (fun pair -> pair.MarkerText)
+            let ledger = PairGuidanceOccurrences.ledger journal sessionId
+            let suffixes = ledger.History |> List.map (fun pair -> pair.MarkerText)
 
             let! captures =
                 match journal, sessionId with
@@ -1207,11 +979,6 @@ module PairProgrammingThoughtTransform =
                 rawMessages
                 |> List.traverseResultM (stripCapturedResult captures CursorPresentationOwner.PairGuidance suffixes)
 
-            let strippedCallIds =
-                rawMessages
-                |> List.filter isPairProgrammingThought
-                |> List.choose syntheticCallIdOf
-
             let lang =
                 if markerText.Contains "以" || markerText.Contains "我" || markerText.Contains "结对" then
                     Some ProviderLanguage.SimplifiedChinese
@@ -1223,51 +990,30 @@ module PairProgrammingThoughtTransform =
                 |> List.filter (isPairProgrammingThought >> not)
                 |> sanitizeActiveToolCalls lang
 
-            let providerId = providerIdFromMessages realMessages
-            let replayMessages = replay captures providerId
+            let transcript =
+                { Carrier = decideCurrentPlacement realMessages
+                  SyntheticCallIds =
+                    rawMessages
+                    |> List.filter isPairProgrammingThought
+                    |> List.choose syntheticCallIdOf
+                  InternalAuthor = rawMessages |> List.exists messageRoleIsInternal }
 
-            let knownCallIds = history |> List.map (fun pair -> pair.CallId) |> Set.ofList
+            let replayMessages =
+                replay captures (providerIdFromMessages realMessages) realMessages
 
-            let orphaned =
-                strippedCallIds
-                |> List.filter (fun callId -> not (Set.contains callId knownCallIds))
-
-            do!
-                Result.requireTrue
-                    (sprintf
-                        "synthetic messages without durable record (callId %s, HOST-013)"
-                        (String.Join(", ", orphaned |> List.truncate 3)))
-                    (List.isEmpty orphaned)
-
-            if isInternalSessionOrMessage journal sessionId rawMessages then
-                let! replayed = replayMessages realMessages visibleHistory
-                return (replayed, false)
-            else
-                return!
-                    commitCurrentPairPlacement
-                        replayMessages
-                        providerId
-                        history
-                        visibleHistory
-                        append
-                        sessionId
-                        markerText
-                        realMessages
+            return!
+                PairGuidanceOccurrences.occur
+                    ledger
+                    sessionId
+                    (PairGuidanceOccurrences.isInternalSession journal sessionId)
+                    markerText
+                    transcript
+                    replayMessages
         }
 
     // ── Pair guideline injection (migrated from PluginTransforms composition root) ──
 
     type private SessionTermination = SessionId -> string -> Task<Result<unit, string>>
-
-    let private skipPairGuideline (journal: AgentJournal option) (projectionSessionIdOpt: string option) : bool =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
-            let sid = SessionId.create sessionId
-            let snapshot = AgentJournal.snapshot durable
-
-            SessionAssociationProjection.isCompanion sid snapshot.AgentProjections.Associations
-            || isInternalRole (sessionRole journal sid)
-        | _ -> false
 
     /// The four calibration numbers, when the delegator's estimate and the
     /// session start are both known; otherwise the round falls back to the
@@ -1639,7 +1385,7 @@ module PairProgrammingThoughtTransform =
         (markRestartGuidanceDelivered: unit -> unit)
         (outObj: obj)
         : Task =
-        if skipPairGuideline journal projectionSessionIdOpt then
+        if PairGuidanceOccurrences.isInternalSession journal projectionSessionIdOpt then
             Task.FromResult()
         else
             injectPairProgrammingGuideline

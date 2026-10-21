@@ -60,7 +60,7 @@ The delivery team must build master at `aa43d3455` or later to get compile/test 
 | P-13 | `CommandDeclaration`, `CommandArgument`, `ArgumentShape`, `ICommandArguments` | `Host/CommandDeclaration.fs(i)` | fork | Neutral and product-shaped. Converges with P-04: `ArgumentShape` is what a `ToolSpec.Schema` is generated from. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
 | P-14 | `IDelegationCallerHost`, `DelegationCaller` | `Host/DelegationCaller.fs(i)` | fork | D-03: carries `AgentJournal` (product persistence) and fork runtime — a composition seam, not a host port. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
 | P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
-| P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. Status: **not on `master`** — the file lives on `origin/wip/hni-plugin` (branch still exists, measured 2026-10-21). |
+| P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. Status: **not on `master`** — the file lives on `origin/wip/hni-plugin` (branch still exists, measured 2026-10-21). | Status **WIRED-OC**: the OpenCode adapter (`OpenCode/Host/PairProgrammingThoughtTransform`) decodes the transcript and renders only; the product owner is `Interaction/PairGuidance/Occurrences` (ledger, ordinal, placement, commit order) |
 | P-17 | `FissionHostPort`, `FissionOwnerRuns`, `FissionPtyCompletion`, `FissionPtyStatus` | `Host/FissionPort.fs(i)` | fission | WIRED-OC. Declared in namespace `Wanxiangshu.Host.Ports` (drift **D-05**) but the file stays outside `Host/Ports/`, so gate ⑫ does not treat it as a neutral family. D-03 partly resolved: `AgentJournal` left the port (it is threaded into the launch call instead); the legacy `ISessionHostPort` / `IEventObservationPort` remain until P-01 / P-07 land. Status: **on `master`** (`2680bc07d`, `0287a2349` — the port moved into the `Wanxiangshu.Host.Ports` namespace — and `9894b1e0c`); `origin/wip/hni-fission` is **deleted**. |
 | P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). **D-07: this file name collides with P-04's `Host/Ports/Tools.fs(i)` — rename before moving it under `Host/Ports/`.** Status: **not on `master`** — the file lives on `origin/wip/hni-tools` (branch still exists, measured 2026-10-21). |
 
@@ -196,6 +196,10 @@ These are the concrete steps, so a lane does not have to re-derive them:
   requirements import path `dist/Execution/Delegation/Fork/OpenCode/JoinTool.js` is untouched. `omp: n/a` (no port type).
   **No compile/test evidence** (owner's no-build-before-push rule; the compile slot gave up with exit 75 twice) —
   the delivery team must build master and run the join requirement suites.
+
+- 2026-10-21 eng-hni-plugin-goose (HNI-08): P-16 pair guidance is WIRED-OC — the guideline fold moved out of
+  `OpenCode/Host/PairProgramming` into the domain owner `Interaction/PairGuidance/Occurrences`; the OpenCode transform
+  decodes the transcript and renders only. The ID is P-16 (D-01: P-13 is the fork lane's `CommandDeclaration`).
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.

@@ -182,7 +182,7 @@ module PairProgrammingThoughtSurface =
                report = Option.toObj report |}
 
     let text = PairProgrammingThoughtTransform.text
-    let source = PairProgrammingThoughtTransform.source
+    let source = PairGuidanceOccurrences.source
     let markerSource = source
     let markerToolName = PairProgrammingThoughtTransform.toolName
 
@@ -246,7 +246,7 @@ module PairProgrammingThoughtSurface =
                    error = error.Message |}
 
     let stableCallId (sessionId: obj) (ordinal: int64) : string =
-        PairProgrammingThoughtTransform.stableCallId (if isNull sessionId then None else Some(string sessionId)) ordinal
+        PairGuidanceOccurrences.stableCallId (if isNull sessionId then None else Some(string sessionId)) ordinal
 
     let isPairProgrammingThought (raw: obj) : bool =
         PairProgrammingThoughtTransform.isPairProgrammingThought raw
@@ -261,10 +261,10 @@ module PairProgrammingThoughtSurface =
         |> Option.toObj
         |> box
 
+    /// The fuse is provider-blind: Cursor projection still records the same occurrence.
     let skipAutoInjectedRequested (providerId: obj) : bool =
-        PairProgrammingThoughtTransform.skipAutoInjectedRequested (
-            if isNull providerId then None else Some(string providerId)
-        )
+        ignore providerId
+        PairGuidanceOccurrences.skipRequested ()
 
     let tryInject (sessionId: obj) (markerText: string) (rawMessages: obj array) : Task<obj> =
         task {
