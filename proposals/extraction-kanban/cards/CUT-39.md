@@ -3,7 +3,7 @@
 返回 [看板](../BOARD.md)。来源：[CUT-38 §7.6 F38-01](CUT-38.md)。
 
 - **裁决人**：eng-cut39-goose，2026-10-21，按仓主“完全自主决定”的授权。
-- **裁决**：advisor 是现行产品功能（`todowrite-for-manager` 的 `this.advisor(intent, reportMapping)` 成员，WHAT 001–006），**不删除**。纯规则抽取到 `wanxiangli/advisor`（0.63.0）；角色/权限表、view 生成与渲染、专席 child 与派发留主仓（RETAINED）。审查中发现终态围栏的一个生产缺陷，登记为 F39-01 交 owner，本卡不改它的语义。
+- **裁决**：advisor 是现行产品功能（`todowrite-for-manager` 的 `this.advisor(intent, reportMapping)` 成员，WHAT 001–006），**不删除**。纯规则抽取到 `wanxiangli/advisor`（0.63.0）；角色/权限表、view 生成与渲染、专席 child 与派发留主仓（RETAINED）。审查中发现终态围栏的一个生产缺陷，登记为 F39-01；后由 `b9772a9f5` 修复（首次咨询），follow-up 余项为 F39-02。
 
 ## A. 范围（亲眼核对，master `e6d490d7a`）
 
@@ -32,7 +32,7 @@
 
 - **按编号去重会吞掉新摘要**：把身份改成只含锚点（变异 M02/W1），advisor-003 的“同锚点新摘要”“锚点 0 新开场”两条，以及 handoff 侧 repository-programming-059 的 4 条立刻变红——证明身份律被两条生产链共用，不能各写一份。
 - **无长度前缀会碰撞**：`1` + `2:x` 与 `12` + `x` 在朴素 `锚点:原文` 编码下相同（库 SPEC 1 显式断言，变异 M01 被抓）。
-- **终态围栏不可能命中（F39-01，现行缺陷，正控保留）**：见下节。
+- **终态围栏不可能命中（F39-01）**：`b9772a9f5` 已修复首次咨询，余项 F39-02，见下节。
 
 ## D–F. 实现、npm 消费、接回真实链
 
@@ -61,7 +61,7 @@
 - **未做**：全量 `scripts/verify.mjs`、integration tier、format:check。
 - **回退**：`git revert` 主仓接线提交，即回到手写版本（库 0.63.0 可以保留，没有别的消费者）。不涉及事件、持久数据或资源文本。
 
-## F39-01（后继项，未修复）：advisor 终态围栏永不命中
+## F39-01（FIXED，首次咨询；follow-up 余项转 F39-02）：advisor 终态围栏永不命中
 
 `Seat.fs` 的 `settleTerminal` 只接受 `result.ProviderRun = fence.ProviderRun` 的 Completed，而 `fence.ProviderRun` 有两种取值：第一次咨询是空串，之后是**上一次**咨询意图 prompt 的 `PromptKey`。`PromptKey` 是 `PromptAuthority.derivePromptKey` 生成的 sha256 摘要，`Completed.ProviderRun` 却是宿主 assistant 消息 id（HOST-010/011）。两者不在同一个身份域，所以真实的 Completed 永远命中不了：
 
@@ -78,6 +78,30 @@
 
 **由谁接**：advisor 包 owner（delegation 泳道，CUT-13 后继）。
 
+### F39-01 修复记录（eng-f39-goose / eng-f39b-goose，2026-10-21）
+
+- **提交**：`b9772a9f5` `fix(advisor): bind the consult fence to the intent prompt's identity (F39-01)`。
+- **做法**：
+  - 围栏改为绑定 intent prompt 的身份。Completed 按 HOST-010/011 归属：assistant 消息（id = provider run）→ `parentID` 的 user 消息 → dispatcher 盖在其上的 `PromptKey`（快照 metadata 优先，退而用 journal 的物理落地）。只在归属到本次 intent key 时结算。
+  - `PriorRun` 记录上一次咨询结算的那个 provider run（assistant id），它的重放或重复投递一律拒绝。订阅时的 sticky 重放发生在 `armed` 之前，只作观察。
+  - **产品假设（如实登记）**：宿主不给归属证据时（无快照或找不到 assistant 消息），取 intent 被接受之后第一个新的 Completed；intent 被接受之前看到的 Completed 只在有归属证据时才算。
+  - 新 seat 上 view 作为 awaited AgentOwnerRoot 发出，等宿主接受后再发 intent，否则 intent 会被认作第二个 root（`ActiveRunIdentityConflict`）。view 发送有 120 s 上界。
+  - `OrdinaryTurnWorkflow`：advisor 专席没有工具、以散文交付，completed turn 就是普通终态，不再收 plan-continue nudge，也不等 `this.deliver` 见证。
+  - `plugin-fixture` 的路由桩接受 `advisor` 角色。
+- **证据**（`wt/logs-f39/`）：
+  - 先红：`requirements/advisor/tests/004.test.mjs` 在 base `c768df811`（只带新测试和 fixture）上红（`base.fail`）。
+  - 后绿：候选构建（`land1.build.log`，rebase 到 `d25e69894`、`--clean`）后，137 个文件的 advisor / repository-programming / delegation 等定向套件（`files.txt`）与 base 名单对比：`advisor-004` 首次咨询转绿，`delegation-031` 也已绿（上游修复）；唯一多出的名字是 delegation-027 两条 “prepared busy guidance … original active work”（EMR-010），它们在 master `da790ef5d` 上不带本修复同样失败（`logs-red-integ/integ2.log`），而在 `c768df811` + 本修复上通过（`oldfix.tap`），**不是本修复引入**。
+  - 004 当前：3 tests / 2 pass / 0 fail / 1 todo（`t004.tap`）。拒绝旧 run 的断言单独成一条强制用例：“the earlier consult's sticky Completed never answers a follow-up consult (stale-run rejection)”。
+  - `check.mjs`：先 fantomas 后 check，候选与 master 的发现逐条一致（`check.master.out` / `check.cand2.out`，均 132 条，Seat.fs 未新增 pyramid）。`architecture.mjs` 在落地循环里通过。
+- **回退**：`git revert b9772a9f5`。不涉及事件格式、持久数据或资源文本。
+
+### F39-02（未修复）：follow-up 咨询的 view prompt 没有 model-routing lease
+
+同一 child 上第二次咨询时，上一次的 logical run 仍是 `ActiveLogicalRun`，所以 `SendManagedAssignment` 把 view 作为 `ManagedDelegationAssignment` continuation 追加到已经结束的 run 上。这个 provider step 没有已提交的 model-routing lease，transform 边界报 EMR-010（`SessionExecutionBinding.enterBoundProviderStep`；`tryContinuationAdmission` 只给 BusyAgentNudge/HumanMessage）。在 `c768df811` + 本修复上同样复现，所以与 master 的 delegation-027 EMR-010 回归无关。
+
+- 用例：004 第三条 “a follow-up consult ignores the earlier consult and its own view run, and answers on its intent run”，标为运行中的 `todo`（`F39-02`），修好后去掉 `todo`。
+- 方向：咨询结算后关闭该 child 的 logical run（`AuthorityRun.closeAuthority`，fork 的 idle resume 就是另起 root），或让 seat 在上一次咨询已结算时另起 root。不要放宽 EMR-010。
+
 ## 状态
 
-CUT-39 `DONE`：纯规则只有 `wanxiangli/advisor` 一个 owner，其余各项已登记 RETAINED，并有后继项 F39-01。这不是“advisor 已抽干”：专席编排与围栏仍在主仓。
+CUT-39 `DONE`：纯规则只有 `wanxiangli/advisor` 一个 owner，其余各项已登记 RETAINED，并有后继项 F39-01（已由 `b9772a9f5` 修复）与 F39-02（未修）。这不是“advisor 已抽干”：专席编排与围栏仍在主仓。
