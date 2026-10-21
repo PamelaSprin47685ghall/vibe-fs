@@ -38,4 +38,5 @@ type ActiveRunBinding =
       PhysicalUserMessageId: PhysicalUserMessageId option
       ContinuationMessageIds: Set<string>
       Role: Role option
-      Directory: string option }
+      Directory: string option
+      InheritedAuthorityOwner: SessionId option }

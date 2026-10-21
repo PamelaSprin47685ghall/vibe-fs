@@ -5,7 +5,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
 
 module PromptJournalAdapter =
@@ -18,25 +17,16 @@ module PromptJournalAdapter =
                 let snapshot = AgentJournal.snapshot journal
 
                 let authority =
-                    Map.tryFind sessionId snapshot.AgentProjections.Sessions
-                    |> Option.bind (fun s -> s.PromptAuthority)
+                    PromptAuthorityProjectionQueries.projectionFor sessionId snapshot.AgentProjections
                     |> Option.defaultValue PromptAuthorityLedger.empty
 
-                let targetSessionId =
-                    FissionProjection.tryOwnerOfLane sessionId snapshot.AgentProjections.Fission
-                    |> Option.defaultValue sessionId
-
-                let ownerAuthority =
-                    if targetSessionId = sessionId then
-                        None
-                    else
-                        Map.tryFind targetSessionId snapshot.AgentProjections.Sessions
-                        |> Option.bind (fun s -> s.PromptAuthority)
-
-                let inheritedRun =
-                    ownerAuthority |> Option.bind (fun ownerAuth -> ownerAuth.ActiveLogicalRun)
-
-                match authority.ActiveLogicalRun, inheritedRun with
+                // A Fission lane continues the owner's logical run: the owner is
+                // resolved from the durable lane membership, by the same query
+                // the turn binding uses, so both surfaces agree.
+                match
+                    authority.ActiveLogicalRun,
+                    PromptAuthorityProjectionQueries.inheritedOwnerProfile sessionId snapshot.AgentProjections
+                with
                 | None, Some run ->
                     { authority with
                         ActiveLogicalRun = Some run }

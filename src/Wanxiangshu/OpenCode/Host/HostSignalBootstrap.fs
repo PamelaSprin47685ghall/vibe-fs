@@ -534,7 +534,8 @@ module HostSignalBootstrap =
                       PhysicalUserMessageId = physical
                       ContinuationMessageIds = Set.empty
                       Role = Some role
-                      Directory = directory }
+                      Directory = directory
+                      InheritedAuthorityOwner = None }
 
             let admissionTransaction =
                 journal

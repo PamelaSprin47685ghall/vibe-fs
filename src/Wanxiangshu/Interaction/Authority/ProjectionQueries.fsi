@@ -9,6 +9,22 @@ open Wanxiangshu.Foundation.Identity
 /// has complete knowledge of AgentProjectionSet.
 module PromptAuthorityProjectionQueries =
 
+
+    /// The durable PromptAuthority projection of one session.
+    val projectionFor:
+        sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.PromptAuthorityProjection option
+
+    /// The durable Fission owner of a lane session, when this session is a lane.
+    val laneOwnerSessionId: sessionId: SessionId -> agentProjections: AgentProjectionSet -> SessionId option
+
+    /// The physical ids this session accepted as continuations of its own claims.
+    val ownContinuationPhysicals:
+        sessionId: SessionId -> agentProjections: AgentProjectionSet -> PhysicalUserMessageId list
+
+    /// The owner's active logical run for a lane session (never for an ordinary session).
+    val inheritedOwnerProfile:
+        sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.AuthorityExecutionProfile option
+
     /// Returns the authority projection for the fission-owner of this session.
     val activeProfile:
         sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.AuthorityExecutionProfile option

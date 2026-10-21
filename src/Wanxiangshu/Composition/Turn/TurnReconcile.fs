@@ -26,7 +26,7 @@ module TurnReconcile =
     let private containsAddress (messages: SessionMessage list) (address: string) =
         messages |> List.exists (fun message -> message.Id = address)
 
-    let private resolveRoot (messages: SessionMessage list) (declaredRoot: string) =
+    let private resolveRoot (messages: SessionMessage list) (declaredRoot: string) (inherited: bool) =
         if containsAddress messages declaredRoot then
             Some declaredRoot
         elif isAdmissionAddress declaredRoot then
@@ -35,6 +35,12 @@ module TurnReconcile =
             // the first physical user in that child transcript; this is causal
             // correlation, not text guessing.
             users messages |> List.tryHead |> Option.map (fun message -> message.Id)
+        elif inherited then
+            // A Fission lane continues the owner's logical run: the owner's
+            // authority root is not in the lane's transcript, and must not be.
+            // The inheritance is proven by the durable lane membership, and the
+            // physical cursor is still required to be in this transcript.
+            Some declaredRoot
         else
             None
 
@@ -44,11 +50,15 @@ module TurnReconcile =
         (root: string)
         (physical: string)
         (declaredPhysicalIsContinuationUser: bool)
+        (inherited: bool)
         =
         if declaredPhysicalIsContinuationUser && isAdmissionAddress physical then
             users messages |> List.tryLast |> Option.map (fun message -> message.Id)
         elif physical = declaredRoot then
-            Some root
+            // The bound physical is the inherited root itself: for a lane that
+            // root lives in the owner's transcript, so it can never be this
+            // lane's physical cursor.
+            if inherited then None else Some root
         elif containsAddress messages physical then
             Some physical
         elif isAdmissionAddress physical then
@@ -91,11 +101,13 @@ module TurnReconcile =
     /// `PhysicalUserMessageId`, because PROMPT-002 makes the promotion one-way and
     /// there is deliberately no inverse.
     let reconcile (messages: SessionMessage list) (binding: ActiveRunBinding) : ReconciledTurn option =
+        let inherited = binding.InheritedAuthorityOwner.IsSome
+
         binding.AuthorityRootUserMessageId
         |> Option.bind (fun declaredRootId ->
             let declaredRoot = AuthorityRootUserMessageId.value declaredRootId
 
-            resolveRoot messages declaredRoot
+            resolveRoot messages declaredRoot inherited
             |> Option.bind (fun root ->
                 let declaredPhysical =
                     binding.PhysicalUserMessageId
@@ -105,7 +117,13 @@ module TurnReconcile =
                 let declaredPhysicalIsContinuationUser =
                     binding.ContinuationMessageIds.Contains declaredPhysical
 
-                resolvePhysical messages declaredRoot root declaredPhysical declaredPhysicalIsContinuationUser
+                resolvePhysical
+                    messages
+                    declaredRoot
+                    root
+                    declaredPhysical
+                    declaredPhysicalIsContinuationUser
+                    inherited
                 |> Option.bind (fun physical ->
                     resolveAssistant messages physical
                     |> Option.map (fun assistant ->

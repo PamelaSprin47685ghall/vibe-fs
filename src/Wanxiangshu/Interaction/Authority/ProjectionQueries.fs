@@ -17,6 +17,40 @@ module PromptAuthorityProjectionQueries =
         FissionProjection.tryOwnerOfLane sessionId agentProjections.Fission
         |> Option.defaultValue sessionId
 
+    /// The durable Fission owner of a lane session.
+    ///
+    /// This is the one place that knows a lane inherits the owner's authority:
+    /// the membership is durable (`FissionAdmitted` folded it), so a restarted
+    /// process resolves the same owner as a live one.
+    let laneOwnerSessionId (sessionId: SessionId) (agentProjections: AgentProjectionSet) =
+        FissionProjection.tryOwnerOfLane sessionId agentProjections.Fission
+
+    /// The physical ids this session accepted as continuations of its own
+    /// dispatch claims.
+    ///
+    /// A Fission lane never owns an authority root; its only durable evidence
+    /// of the owner's logical run is the continuation it accepted. These ids
+    /// are the lane's own physical cursor candidates.
+    let ownContinuationPhysicals (sessionId: SessionId) (agentProjections: AgentProjectionSet) =
+        projectionFor sessionId agentProjections
+        |> Option.map (fun authority -> authority.AcceptedContinuationIds |> Map.toList |> List.map fst)
+        |> Option.defaultValue []
+
+    /// The owner's active logical run for a lane session, when the lane is a
+    /// durable member of a Fission group whose owner differs from the lane.
+    ///
+    /// `None` for an ordinary session, and for a lane whose owner has no
+    /// active run: an ordinary session must never inherit a root.
+    let inheritedOwnerProfile
+        (sessionId: SessionId)
+        (agentProjections: AgentProjectionSet)
+        : PromptAuthority.AuthorityExecutionProfile option =
+        match laneOwnerSessionId sessionId agentProjections with
+        | Some owner when owner <> sessionId ->
+            projectionFor owner agentProjections
+            |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+        | _ -> None
+
     let activeProfile (sessionId: SessionId) (agentProjections: AgentProjectionSet) =
         projectionFor (profileOwner sessionId agentProjections) agentProjections
         |> Option.bind (fun authority -> authority.ActiveLogicalRun)

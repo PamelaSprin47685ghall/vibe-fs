@@ -68,4 +68,11 @@ type ActiveRunBinding =
         ContinuationMessageIds: Set<string>
         Role: Role option
         Directory: string option
+        /// The Fission owner whose authority this session inherits.
+        ///
+        /// A Fission lane never owns an authority root: it continues the
+        /// owner's logical run. This marker says the bound root belongs to
+        /// another session, so reconcile may accept a root that is not in this
+        /// session's transcript. `None` for every ordinary session.
+        InheritedAuthorityOwner: SessionId option
     }
