@@ -60,7 +60,7 @@ nudge、provider fallback/AABB 和 degeneration 恢复由各自 owner 负责。l
 
 只有稳定 TurnCompleted 可进入 lane 物化或最终接管完成；真正外部 abort 才可终止 group。
 
-takeover 终态准入需独立交付见证：owner 终端发布由 publishOwnerTakeover 按 durable TaskDelivery witness 裁定，最终 lane 的局部交付只作整合材料搬回 owner 交付格，不能替代 owner 自己的整合交付；无有效见证的 owner 终态被拒（RejectedUndelivered），不发布 Completed。
+takeover 终态准入需独立交付见证：owner 终端发布由 publishOwnerTakeover 按 durable TaskDelivery witness 裁定，最终 lane 的局部交付只作整合材料——经 aggregate 进入接管 prompt，不写入 owner 交付格，也不作见证，不能替代 owner 自己的整合交付；无有效见证的 owner 终态被拒（RejectedUndelivered），不发布 Completed。
 
 ## [015] Deterministic ring convergence
 
