@@ -91,6 +91,7 @@ const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js
 
 const { bootstrapAndLoadAt, invokeScheduler } = routing
 const template = `export const routingProtocol = 2
+export const hasTheoreticalCapacity = () => true
 export default function route(role, running) {
   if (role !== 'coder') return null
   return running.length === 0
@@ -109,6 +110,7 @@ const withTemp = async (run) => {
 test('WHAT[execution-model-routing-002] EMR_002_scheduler_preserves_running_duplicates_null_and_previous', async () => {
   await withTemp(async (path) => {
     const body = `export const routingProtocol = 2
+export const hasTheoreticalCapacity = () => true
 export default function route(role, running, previous) {
       if (running.length !== 2) throw new Error('duplicates lost')
       if (running[0].model !== running[1].model) throw new Error('unexpected running')
@@ -139,7 +141,7 @@ test('WHAT[execution-model-routing-002] EMR_002_scheduler_program_errors_fail_cl
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(
       path,
-      `export const routingProtocol = 2\nexport default async () => ({ model: 'provider/x', reasoning: 'none' })\n`,
+      `export const routingProtocol = 2\nexport const hasTheoreticalCapacity = () => true\nexport default async () => ({ model: 'provider/x', reasoning: 'none' })\n`,
     )
     assert.throws(() => invokeScheduler(scheduler, 'coder', []), /Promise|synchronous/i)
   })
@@ -147,7 +149,7 @@ test('WHAT[execution-model-routing-002] EMR_002_scheduler_program_errors_fail_cl
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(
       path,
-      `export const routingProtocol = 2\nexport default () => ({ model: 'bare-model', reasoning: 'none' })\n`,
+      `export const routingProtocol = 2\nexport const hasTheoreticalCapacity = () => true\nexport default () => ({ model: 'bare-model', reasoning: 'none' })\n`,
     )
     assert.throws(() => invokeScheduler(scheduler, 'coder', []), /provider\/model/i)
   })
@@ -155,7 +157,7 @@ test('WHAT[execution-model-routing-002] EMR_002_scheduler_program_errors_fail_cl
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(
       path,
-      `export const routingProtocol = 2\nexport default () => ({ model: 'provider/model', reasoning: '' })\n`,
+      `export const routingProtocol = 2\nexport const hasTheoreticalCapacity = () => true\nexport default () => ({ model: 'provider/model', reasoning: '' })\n`,
     )
     assert.throws(() => invokeScheduler(scheduler, 'coder', []), /reasoning/i)
   })
@@ -201,9 +203,9 @@ const writeConfig = async (path, body) => {
 
 const observingScheduler = (behaviour) => {
   const calls = []
-  const scheduler = (role, running, previous, purpose) => {
-    calls.push({ role, running, previous: previous ?? null, purpose })
-    return behaviour(role, running, previous, purpose)
+  const scheduler = (role, running, previous) => {
+    calls.push({ role, running, previous: previous ?? null })
+    return behaviour(role, running, previous)
   }
   return { scheduler, calls }
 }
@@ -234,8 +236,7 @@ const acquire = async (runtime, sessionId, physicalUserMessageId, role, particip
 
 test('WHAT[execution-model-routing-002] EMR_002_loader_rejects_pre_protocol_two_configuration_without_touching_it', async () => {
   await withTemp(async (path) => {
-    // A three-parameter JS function silently ignores the extra argument, so a
-    // quiet call proves nothing: the loader must require the explicit marker.
+    // A quiet call proves no protocol version: the loader requires the marker.
     const old = `export default function route(role, running) {
   return { model: 'provider/old', reasoning: 'none' }
 }
@@ -277,4 +278,111 @@ test('WHAT[execution-model-routing-002] EMR_002_invoke_scheduler_passes_role_run
   assert.equal(calls[0].previous, null)
 })
 
+}
+
+{
+const assert = (await import('node:assert/strict')).default
+const { mkdtemp, readFile, rm } = await import('node:fs/promises')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
+const routing = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
+const withConfig = async (body, run) => {
+  const root = await mkdtemp(join(tmpdir(), 'routing-strict-abi-'))
+  const path = join(root, 'wanxiangshu.mjs')
+  try {
+    await run(path, body)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+const bodyWithQuery = (query) => `export const routingProtocol = 2
+${query}
+export default function route(...args) {
+  route.calls = (route.calls ?? 0) + 1
+  route.routeArguments = args.length
+  return { model: 'provider/strict', reasoning: 'high' }
+}
+route.capacity = true
+`
+
+for (const [name, query, expected] of [
+  ['missing capacity query', '', /hasTheoreticalCapacity/],
+  ['non-function capacity query', 'export const hasTheoreticalCapacity = true', /hasTheoreticalCapacity/],
+  ['non-function provider failure callback', 'export const hasTheoreticalCapacity = () => true\nexport const markProviderFailed = 7', /markProviderFailed/],
+]) {
+  test(`WHAT[execution-model-routing-002] configured ${name} is refused without rewriting the file`, async () => {
+    const body = bodyWithQuery(query)
+    await withConfig(body, async (path) => {
+      await assert.rejects(() => routing.bootstrapAndLoadAt(path, body), expected)
+      assert.equal(await readFile(path, 'utf8'), body)
+    })
+  })
+}
+
+for (const [name, value] of [
+  ['string', 'false'],
+  ['object', { available: false }],
+  ['number', 0],
+  ['undefined', undefined],
+  ['Promise', Promise.resolve(false)],
+]) {
+  test(`WHAT[execution-model-routing-002] ${name} capacity result refuses fresh admission before scheduling or retiring the incumbent`, async () => {
+    const body = bodyWithQuery('export const hasTheoreticalCapacity = () => route.capacity')
+    await withConfig(body, async (path) => {
+      const scheduler = await routing.bootstrapAndLoadAt(path, body)
+      const runtime = routing.createRuntime(scheduler)
+      const acquired = await routing.beginExecutionAdmission(runtime, 'strict-session', 'old-physical', 'engineer', 'owner', null)
+      assert.equal(acquired.kind, 'Acquired')
+      const target = routing.executionAdmissionTarget(runtime, acquired.lease)
+      assert.deepEqual(routing.commitExecutionAdmission(runtime, acquired.lease, {
+        sessionId: 'strict-session', physicalUserMessageId: 'old-physical', role: 'engineer', participant: 'owner', target,
+      }), { kind: 'Applied' })
+      const before = routing.capacitySnapshot(runtime)
+      const calls = scheduler.calls
+      scheduler.capacity = value
+      try {
+        await assert.rejects(
+          () => routing.beginExecutionAdmission(runtime, 'strict-session', 'new-physical', 'engineer', 'owner', null),
+          /hasTheoreticalCapacity.*(?:boolean|synchronous|Promise)/,
+        )
+        assert.equal(scheduler.calls, calls)
+        assert.equal(routing.pendingCount(runtime), 0)
+        assert.deepEqual(routing.capacitySnapshot(runtime), before)
+        assert.equal(routing.tryReadExecution(runtime, 'strict-session', 'old-physical'), acquired.lease)
+      } finally {
+        scheduler.capacity = true
+        routing.cancelPendingExecution(runtime, 'strict-session')
+        routing.releasePhysicalExecution(runtime, 'strict-session', 'new-physical')
+        routing.releasePhysicalExecution(runtime, 'strict-session', 'old-physical')
+      }
+      assert.deepEqual(routing.snapshotOccupied(runtime), [])
+    })
+  })
+}
+
+test('WHAT[execution-model-routing-002] configured protocol calls route with three arguments and capacity with one, and false never schedules', async () => {
+  const body = bodyWithQuery(`export function hasTheoreticalCapacity(...args) {
+  route.capacityArguments = args.length
+  return route.capacity
+}`)
+  await withConfig(body, async (path) => {
+    const scheduler = await routing.bootstrapAndLoadAt(path, body)
+    const runtime = routing.createRuntime(scheduler)
+    scheduler.capacity = false
+    const unavailable = await routing.beginExecutionAdmission(runtime, 'unavailable', 'unavailable-physical', 'engineer', 'owner', null)
+    assert.equal(unavailable.kind, 'QueueFull')
+    assert.equal(scheduler.calls, undefined)
+    assert.equal(scheduler.capacityArguments, 1)
+    assert.equal(routing.pendingCount(runtime), 0)
+    assert.deepEqual(routing.snapshotOccupied(runtime), [])
+
+    scheduler.capacity = true
+    const acquired = await routing.beginExecutionAdmission(runtime, 'available', 'available-physical', 'engineer', 'owner', null)
+    assert.equal(acquired.kind, 'Acquired')
+    assert.equal(scheduler.routeArguments, 3)
+    assert.equal(scheduler.capacityArguments, 1)
+    assert.deepEqual(routing.releasePhysicalExecution(runtime, 'available', 'available-physical'), { kind: 'Applied' })
+    assert.deepEqual(routing.snapshotOccupied(runtime), [])
+  })
+})
 }

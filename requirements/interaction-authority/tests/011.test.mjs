@@ -80,6 +80,7 @@ const createChatParamsEnvironment = () => {
   writeFileSync(
     join(routingDir, 'wanxiangshu.mjs'),
     'export const routingProtocol = 2\n' +
+      'export const hasTheoreticalCapacity = () => true\n' +
       'export default function route(role, running) {\n' +
       "  if (role === 'engineer') {\n" +
       "    const occupied = running.filter((item) => item.model === 'provider/model-a' && item.reasoning === 'none').length\n" +

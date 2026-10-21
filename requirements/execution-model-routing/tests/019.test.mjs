@@ -120,3 +120,21 @@ test('WHAT[execution-model-routing-019] durable target seeding belongs only to t
   assert.deepEqual(routing.boundDevopsTarget(second, 'same-devops-session'), changedTarget)
   assert.deepEqual(routing.boundDevopsTarget(first, 'same-devops-session'), firstTarget)
 })
+
+test('WHAT[execution-model-routing-019] a durable model colon survives seeding, admission, commit, and physical release', async () => {
+  const fixed = { model: 'provider/model:v1', reasoning: 'high' }
+  const runtime = routing.createRuntime(() => fixed)
+  routing.seedDevOpsModelTarget(runtime, 'devops-session', 'provider/model:v1:high')
+  assert.deepEqual(routing.boundDevopsTarget(runtime, 'devops-session'), fixed)
+  routing.seedDevOpsModelTarget(runtime, 'devops-session', 'provider/model:v1:high')
+  assert.throws(() => routing.seedDevOpsModelTarget(runtime, 'devops-session', 'provider/model:v2:high'), /immutable/)
+  assert.deepEqual(routing.boundDevopsTarget(runtime, 'devops-session'), fixed)
+  const acquired = await acquire(runtime, 'colon-physical')
+  assert.equal(acquired.kind, 'Acquired')
+  assert.deepEqual(routing.executionAdmissionTarget(runtime, acquired.lease), fixed)
+  assert.deepEqual(commit(runtime, acquired, 'colon-physical'), { kind: 'Applied' })
+  assert.deepEqual(routing.boundDevopsTarget(runtime, 'devops-session'), fixed)
+  assert.deepEqual(routing.releasePhysicalExecution(runtime, 'devops-session', 'colon-physical'), { kind: 'Applied' })
+  assert.deepEqual(routing.snapshotOccupied(runtime), [])
+  assert.deepEqual(routing.boundDevopsTarget(runtime, 'devops-session'), fixed)
+})

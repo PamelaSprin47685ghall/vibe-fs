@@ -11,6 +11,7 @@ export const createEnvironment = (initPlugin) => {
   writeFileSync(
     join(routingDir, 'wanxiangshu.mjs'),
     `export const routingProtocol = 2
+export const hasTheoreticalCapacity = () => true
 export default function route(role, running) {
   if (role === 'engineer' || role === 'coder') {
     const occupied = running.filter((item) => item.model === 'provider/model-a' && item.reasoning === 'none').length

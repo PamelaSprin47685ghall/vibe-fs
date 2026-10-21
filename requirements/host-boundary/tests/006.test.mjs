@@ -19,6 +19,7 @@ await writeFile(
   join(home, '.config', 'opencode', 'wanxiangshu.mjs'),
   `
 export const routingProtocol = 2
+export const hasTheoreticalCapacity = () => true
 export default function route(role, running, previous, purpose) {
   return { model: 'test/system', reasoning: 'none' }
 }
