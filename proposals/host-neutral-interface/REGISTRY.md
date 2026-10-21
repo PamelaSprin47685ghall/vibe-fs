@@ -29,17 +29,28 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 Domain lanes declare seams their domain needs from a host in `src/Wanxiangshu/Host/<Name>.fs(i)`. IDs are reserved here
 so parallel lanes never collide (HNI-11 found two `P-13`s). Use the ID below in your row; next free ID: **P-19**.
 
-**These lane ports are not on `master` yet.** As of 2026-10-21 they live only on their lanes' branches
-(`origin/wip/hni-tools`, `origin/wip/hni-fork`, `origin/wip/hni-plugin`, `origin/wip/hni-fission`); `master` has no
-`Host/Ports/` consumers and none of these files. The rows below are ID reservations plus the shape review —
-they are not a claim that the files are merged. Namespace note: the lane ports use `Wanxiangshu.Host`, while the
+**The fork lane's ports (P-13/P-14/P-15) are on `master`.** `Host/CommandDeclaration.fs(i)`,
+`Host/DelegationCaller.fs(i)` and `Host/DelegationCommand.fs(i)` landed on `master` through the fork lane's six
+commits `58660d4d9`, `2e9d5025d`, `6c6b8cfdf`, `a4222e3fb`, `e16e72c34` (slice A) and `aa43d3455` (slice B,
+`Fork/JoinRules`). The fork lane's branches `origin/wip/hni-fork` and `origin/wip/hni-fork-next` are **deleted**
+(their content is on `master`).
+
+The other lanes' ports are **still not on `master`**: P-16 (`Host/PairGuidance.fs(i)`) lives on
+`origin/wip/hni-plugin`, P-17 (`Host/FissionPort.fs(i)`) on `origin/wip/hni-fission`, P-18 (`Host/Tools.fs(i)`) on
+`origin/wip/hni-tools`. Those three branches still exist on the remote (as of 2026-10-21); the fork branches do not.
+`master` still has **no `Host/Ports/` consumer** — the neutral families are declared types only.
+Namespace note: the lane ports use `Wanxiangshu.Host`, while the
 neutral ports use `Wanxiangshu.Host.Ports` (see DESIGN §1.1 and drift **D-05**).
+
+**No compile/test evidence for the fork lane.** The fork lane was pushed under the owner's "no build before push"
+rule: only the non-compiling gates were run (`architecture.mjs`, `adapter-thinness.mjs`, `provider-leak-gate.mjs`).
+The delivery team must build master at `aa43d3455` or later to get compile/test evidence for P-13/P-14/P-15.
 
 | ID | Port | File | Owner lane | Notes (HNI-11 review) |
 |---|---|---|---|---|
-| P-13 | `CommandDeclaration`, `CommandArgument`, `ArgumentShape`, `ICommandArguments` | `Host/CommandDeclaration.fs(i)` | fork | Neutral and product-shaped. Converges with P-04: `ArgumentShape` is what a `ToolSpec.Schema` is generated from. Status: WIRED-OC. |
-| P-14 | `IDelegationCallerHost`, `DelegationCaller` | `Host/DelegationCaller.fs(i)` | fork | D-03: carries `AgentJournal` (product persistence) and fork runtime — a composition seam, not a host port. Status: WIRED-OC. |
-| P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. Status: WIRED-OC. |
+| P-13 | `CommandDeclaration`, `CommandArgument`, `ArgumentShape`, `ICommandArguments` | `Host/CommandDeclaration.fs(i)` | fork | Neutral and product-shaped. Converges with P-04: `ArgumentShape` is what a `ToolSpec.Schema` is generated from. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
+| P-14 | `IDelegationCallerHost`, `DelegationCaller` | `Host/DelegationCaller.fs(i)` | fork | D-03: carries `AgentJournal` (product persistence) and fork runtime — a composition seam, not a host port. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
+| P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
 | P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. |
 | P-17 | `FissionHostPort`, `FissionOwnerRuns` | `Host/FissionPort.fs(i)` | fission | D-03: carries `AgentJournal`, legacy `ISessionHostPort`, `Execution.Session` types. |
 | P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). **D-07: this file name collides with P-04's `Host/Ports/Tools.fs(i)` — rename before moving it under `Host/Ports/`.** |
@@ -134,6 +145,12 @@ These are the concrete steps, so a lane does not have to re-derive them:
   they need is already bound through `ToolRuntimeScope` + P-14/P-15. Next free id stays **P-19**. The adapter keeps only the wiring
   (journal read for the manager job name, runtime name/role resolution, window rendering) and re-exports `JoinRecord` so `ToolSurface` and
   `ToolRegistry` are unchanged. `omp: n/a` (no port type, so the omp mirror is untouched).
+- 2026-10-21 eng-hni-fork (bookkeeping): corrected the lane-port status — P-13/P-14/P-15 **are on `master`**
+  (`58660d4d9`, `2e9d5025d`, `6c6b8cfdf`, `a4222e3fb`, `e16e72c34`, slice B `aa43d3455`); `origin/wip/hni-fork` and
+  `origin/wip/hni-fork-next` are deleted. P-16/P-17/P-18 are still branch-only (`origin/wip/hni-plugin`,
+  `origin/wip/hni-fission`, `origin/wip/hni-tools` — all three branches still exist). Recorded that the fork lane has
+  **no compile/test evidence** (owner's no-build-before-push rule): the delivery team must build master at
+  `aa43d3455` or later. No id, name or port shape changed; next free id stays **P-19**.
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.
