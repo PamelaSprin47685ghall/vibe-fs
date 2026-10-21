@@ -1373,3 +1373,9 @@ Verification/JournalPortObservationSurface.fsi
 Verification/JournalPortObservationSurface.fs
 OpenCode/Plugin/Plugin.fsi
 OpenCode/Plugin/Plugin.fs
+Omp/Adapter.fsi
+Omp/Adapter.fs
+Host/SecondHost/HostPlugin.fsi
+Host/SecondHost/HostPlugin.fs
+Composition/Omp/OmpExtension.fsi
+Composition/Omp/OmpExtension.fs

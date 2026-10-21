@@ -6,7 +6,7 @@
 
 - **当前列状态**：`DONE`（2026-10-21，eng-cut35b-goose；终局交账见 §7）
 - **所属泳道 / 波次**：收尾 / W6 终局交账
-- **切换前置**：`CUT-00` 至 `CUT-35`、`CUT-37`（注：`CUT-36` 为 `OPTIONAL`，不阻塞本卡）
+- **切换前置**：`CUT-00` 至 `CUT-35`、`CUT-37`（注：`CUT-36` 交账时为 `OPTIONAL`，不阻塞本卡；2026-10-21 仓主授权后 `CUT-36` 转 `DOING`，仍不阻塞本卡）
 - **关联决策护栏（`D-05`、`D-06`）**：
   - **D-05**：对 `CUT-27`（Casebook）、`CUT-29`（Strength）、`CUT-30`（Rulebook/Enforcer）、`CUT-31`（Sphinx），按实际产品裁决如实归入“已抽取并清旧 / 明确保留（`RETAINED`） / 经批准删除（`REMOVED`）”，严禁为了追求“全部抽干”的虚名而擅自删除仍生效的产品保护；
   - **D-06**：合并采用用户授权的“相对当前 `master` 净改进准入”，同时原样报告固定验收器结果（含剩余历史 TODO / skip 计数），不修改验收门禁来伪造全绿。
@@ -134,11 +134,11 @@ node scripts/verify-package.mjs
 
 ## 7. 终局交账（2026-10-21，eng-cut35b-goose）
 
-本节按卡 §2 的四种去向逐项交账：**已抽取并清旧（DONE）**、**明确保留（RETAINED）**、**经批准删除（REMOVED）**、**尚未闭合（转具体后继项）**。依 W6，下面列出的保留项和后继项都**不**计入“抽干”。CUT-36 是 OPTIONAL，不算遗漏。全部卡处置完毕，不等于软件再无缺陷。
+本节按卡 §2 的四种去向逐项交账：**已抽取并清旧（DONE）**、**明确保留（RETAINED）**、**经批准删除（REMOVED）**、**尚未闭合（转具体后继项）**。依 W6，下面列出的保留项和后继项都**不**计入“抽干”。CUT-36 交账时是 OPTIONAL，不算遗漏。**2026-10-21 更新**：仓主已指认 omp 18.12.4 并授权真实模型调用，CUT-36 转为 `DOING`；本卡这次交账不追溯改写，CUT-36 仍不计入“抽干”。全部卡处置完毕，不等于软件再无缺陷。
 
 ### 7.1 看板终态
 
-- 44 行：DONE 41（含 09-a/09-b/19-a/19-b/19-c 子卡和本卡），REMOVED 1（CUT-22），OPTIONAL 1（CUT-36）。建板时的卡全部处置完毕。本卡另在看板新增两张后继卡 CUT-39、CUT-40（BACKLOG，对应 F38-01、F38-02）。
+- 44 行：DONE 41（含 09-a/09-b/19-a/19-b/19-c 子卡和本卡），REMOVED 1（CUT-22），OPTIONAL 1（CUT-36）。建板时的卡全部处置完毕。本卡另在看板新增两张后继卡 CUT-39、CUT-40（BACKLOG，对应 F38-01、F38-02）。**2026-10-21 更新**：CUT-36 一行现为 `DOING`（授权已具备，真实 smoke 尚未通过）。
 - 各卡 DONE 的具体范围、证据和回退点在各自的 BOARD 行和 `cards/CUT-NN.md`。本节只汇总保留项、删除项和后继项，不重写各卡结论。
 
 ### 7.2 本卡的清理刀（真正零消费者的部分）
@@ -259,7 +259,7 @@ wanxiangli 0.62.0 共 52 个模块、51 个 exports。主仓消费了除 `host-o
 | F38-08 | 余下可收窄的导出：14 个成员、9 个同文件重名值，以及 Surface 模块里只给测试用的导出。收益很小 | 按需（不另开卡） | 继续收窄的收益已经很低，本卡止于此 |
 | F38-09 | 发布门禁在 base 上就是红的（§7.7）：wanxiangli `build-001` sandbox、64 个文件 format:check、pyramid 122 条、`run.mjs` 在 `repository-programming-032/036` 停住（580/765）、集成 `durable-events-022` 超过 300 s 兜底，以及各自的既有失败用例 | 发布 owner（CUT-32 后继） | 都不是本卡引入的；本卡只报告结果，不修改门禁 |
 | F38-10 | rebase 到最新 master 后新出现的门禁 ⑩ `adapter-thinness` 棘轮回归：候选 `src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs` 的 product-domain 引用由基线 24 升到 26（全仓 695 → 697），门禁红。**已闭合**：`ForkReceipt` 改由适配层命名空间 `ForkTool.PlacementReceipt` 别名导出，`AskResult` 用既有的 `open Wanxiangshu.Mission.Planning` 非限定引用，两处 product 引用回到 24 / 全仓 695（在 base `2702b0058` 上，master 基线已被 `3cd7432da` 收到 689，候选实测 596，仍在基线之下） | 已闭合 | 未改 `scripts/checks/adapter-thinness-baseline.json`，未加豁免（D-06）。新增的 shard-edge 类型名选 `PlacementReceipt` 而非 `Receipt`，以免引入 14 条同名 low 边 |
-| CUT-36 | 第二宿主真实 canary | OPTIONAL，解除条件见 cards/CUT-36.md §6 | 需要用户指定宿主，并花真实模型额度 |
+| CUT-36 | 第二宿主真实 canary | 交账时为 OPTIONAL，解除条件见 cards/CUT-36.md §6；**2026-10-21 起为 `DOING`**（omp 18.12.4 已指认、真实模型调用已授权），进度见 cards/CUT-36.md §7 | 交账时需要用户指定宿主并花真实模型额度；该授权现由仓主给出，本卡不追溯改写 |
 
 ### 7.7 验证（README §9：同输入、同环境的 base 与候选）
 

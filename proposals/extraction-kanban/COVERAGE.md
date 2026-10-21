@@ -114,7 +114,7 @@
 | `src/delegation` | 已退役（wanxiangli `d4ff4fb`）：规则由 `handle-lifecycle`、`delegate-batch` 承接 | CUT-13 |
 | `src/events` | 草稿，不能强行统一不同现行格式 | CUT-18 |
 | `src/failure` | 草稿，决议与精确结算尚未实现 | CUT-14 |
-| `src/host-omp` | 草稿，目标环境和可用能力尚未验证 | CUT-36，当前主线不依赖它 |
+| `src/host-omp` | 草稿，目标环境和可用能力尚未验证 | CUT-36，当前主线不依赖它。**2026-10-21 更新**：目标环境已核实并由仓主指认为 **omp 18.12.4**（真实模型调用获授权），CUT-36 转 `DOING`；该草稿仍不进入发布包（`files`/`exports` 不导出），主线仍不依赖它 |
 | `src/identity` | 草稿，不预建全集 ID 包 | CUT-07 |
 | `src/prefix` | 草稿，需承接同 epoch/候选/四类冷边界 | CUT-15 |
 | `src/resources` | 草稿，成对资源与实际包定位待实现 | CUT-05 |
@@ -174,4 +174,4 @@ CUT-38 不能只跑 grep 验证旧符号为零。每个实际删除/保留文件
 - **需求包**：现行 49 包。建板时的 `behavior-diagnosis`、`guidance-delivery`、`speculative-investigation`、`work-record`（仓主 `584c30c61`/`6eef89d1e`）和 `requirement-grounding`（`da42898c4`）已整包删除，记 REMOVED，不记为抽取。建板后新增的 `advisor`（`131a79106`）尚无主责卡，登记为后继项 F38-01（建议 CUT-39，挂 delegation 泳道）。CUT-39 已处置：纯规则归 `wanxiangli/advisor`（0.63.0），其余 RETAINED，围栏缺陷 F39-01 已由 `b9772a9f5` 修复、其 follow-up 余项 F39-02 已由 `a8f431bd` 修复（rebase 到最新 master 后落为 `e11fc96c5`；[cards/CUT-39.md](cards/CUT-39.md)）。
 - **源码顶层目录**：现存 18 个。`Enforcer`、`Strength`（`6eef89d1e`）和 `Requirement`（`da42898c4`）已删除。
 - **独立库**：wanxiangli 0.62.0 共 52 个模块、51 个 exports，主仓消费了除 `host-omp`（CUT-36 草稿）之外的全部模块。§3 是 0.5.2 时的草稿表，已过时。
-- **未闭合项**：F38-01…F38-09 与 OPTIONAL 的 CUT-36，均不计入“抽干”。
+- **未闭合项**：F38-01…F38-09 与 CUT-36，均不计入“抽干”。**2026-10-21 更新**：CUT-36 当时以 `OPTIONAL` 记入本盘点，现已由仓主授权（第二宿主指认为 **omp 18.12.4** 锁定版本 + 真实模型调用获授权）转为 **`DOING`**；真实 smoke 尚未通过，故仍不计入“抽干”，也不宣称已支持第二宿主。权威进度见 [cards/CUT-36.md](cards/CUT-36.md) §7。

@@ -1,16 +1,17 @@
-# CUT-36：第二宿主真实 canary（可选 OPTIONAL，不挡主线）
+# CUT-36：第二宿主真实 canary（DOING，不挡主线）
 
 返回 [看板](../BOARD.md) / [职责卡](../CARDS.md#cut-36) / [范围对账](../COVERAGE.md) / [模板](../TEMPLATES.md#contract)。
 
 ## 1. 当前状态与 D-07 处置边界
 
-- **当前列状态**：`OPTIONAL`（明确不在当前主线完成条件中，`CUT-38` 终局交账不等它）
-- **所属泳道 / 波次**：可选 / W5（仅在明确授权且具备真实第二宿主环境后启动）
+- **当前列状态**：`DOING`（2026-10-21 仓主授权后由 `OPTIONAL` 转入；`CUT-38` 终局交账当时不等它，但本卡自有后续交账）
+- **所属泳道 / 波次**：可选 / W5（授权已具备：仓主确认以 **omp 18.12.4** 为第二宿主（含锁定版本），并同意发起 canary 所需的**真实模型调用**）
 - **切换前置**：`CUT-34`（OpenCode 适配边界）、`CUT-35`（顶层组装与逐域恢复）
 - **关联决策护栏（`D-07`）**：
-  - 独立库仓虽存在 `wanxiangli/src/host-omp` 草稿目录，但当前尚未核实该草稿对应的实际外部宿主产品、锁定版本号、公开入口、Hook/SDK 协议及子会话能力；
+  - 历史记载（2026-10-21 之前）：独立库仓虽存在 `wanxiangli/src/host-omp` 草稿目录，但当时尚未核实该草稿对应的实际外部宿主产品、锁定版本号、公开入口、Hook/SDK 协议及子会话能力；
   - 严禁根据目录名 `host-omp` 凭空编造宿主 API、写模拟回调冒充物理 canary，或宣布“已获全面实现授权”；
   - 更不得把“领域库采用了可移植的宿主无关设计”偷换表述为“已经支持第二宿主”。
+  - **2026-10-21 更新（取代上面前两条）**：第二宿主已由仓主指认为 omp 18.12.4，且真实模型调用已获授权；上两条约束中“尚未核实宿主身份/版本/入口”一条已解除，“不得凭空编造 API / 不得用模拟回调冒充 canary / 不得宣称已支持第二宿主”三条**继续有效**。
 
 ## 2. 目标与启动前提
 
@@ -19,6 +20,7 @@
   1. 用户或委派人明确指认第二宿主的真实软件包名称、精确锁定版本及可复现安装方式；
   2. `CUT-34` 与 `CUT-35` 已将 OpenCode 专属 SDK 调用与领域组合切开；
   3. 看板协调者登记将本卡从 `OPTIONAL` 转为 `READY` / `DOING`。
+  - **2026-10-21 更新**：三条前提均已具备，逐条依据：① 宿主指认——仓主指认 **omp 18.12.4**（本机 `omp --version` = `omp/18.12.4`，可执行文件 `/usr/local/bin/omp` → `/home/hermes/.local/bin/omp`）；② `cards/CUT-34.md` 与 `cards/CUT-35.md` §1 均记 `当前列状态：DONE`；③ 本卡已在看板登记为 `DOING`。下面“明确不做”三条继续有效。
 - **明确不做**：
   - 在没有真实第二宿主进程的情况下，不编写纯内存 mock 宿主或假 callback 测试来宣称完成；
   - 不为迁就假想的第二宿主而提前在主仓制造一层“通用万能宿主抽象框架（Universal Host Framework）”；
@@ -40,12 +42,12 @@
 
 ## 5. 写集合与退出口径
 
-- **当前写集合**：仅本卡说明文档 `proposals/extraction-kanban/cards/CUT-36.md`；主仓 `src/` 与库仓 `src/host-omp` 保持零代码改动。
+- **当前写集合（2026-10-21 更新）**：本卡说明文档 `proposals/extraction-kanban/cards/CUT-36.md` 与相关看板/交接文档；实现侧的第二宿主产品装配写在主仓 `src/Wanxiangshu/Host/SecondHost/HostPlugin.fs`（见 §7 范围说明），omp 侧适配仍在 `proposals/host-neutral-interface/adapters/omp/`。库仓 `wanxiangli/src/host-omp` 草稿保持零改动。
 - **对 `CUT-38` 终局交账的口径**：
-  - 若至终局交账时第二宿主环境仍未启用，`CUT-36` 诚实保留为 `OPTIONAL`；
+  - `CUT-38` 当时已按 OPTIONAL 交账，本卡不追溯改写那一笔；本卡的后续交账以本卡 §7 与看板为准；
   - `wanxiangli/src/host-omp` 草稿在发布打包白名单（`package.json` `files` / `exports`）中保持不导出、不夹带，不影响主线净改进验收。
 
-## 6. 2026-10-21 可行性核对（eng-cut34b-goose 核对，eng-cut34c-goose 复核确认）
+## 6. 2026-10-21 可行性核对（eng-cut34b-goose 核对，eng-cut34c-goose 复核确认）〔本节结论已被 §7 取代，保留为历史〕
 
 - **找到了什么**：本机 `/home/box/.local/bin/omp` 是真实的 oh-my-pi CLI，`omp --version` 输出 `omp/18.12.4`。它和库仓草稿 `src/host-omp` 的名字对得上，公开入口也有：`-e/--extension`、`--hook`、`--plugin-dir`，以及 `--mode rpc|json` 和 `-p` 非交互模式。所以“有没有真实第二宿主二进制”这一条，在本机上可以答“有”。
 - **为什么仍保持 `OPTIONAL`（不启动）**：
@@ -54,3 +56,17 @@
   3. §3 第 3 项要观察一次真实 provider 请求，就得用本机 omp 配置的真实模型凭据发起一次真实模型调用，会花用户的额度。这超出本次授权。只读加载、不发请求的半截 canary 达不到 §3 的四项，按 §4 反例 2 的精神也不能算数。
 - **本次没有做的事**：没有读取或使用 `~/.omp` 下的凭据或 token，没有启动 omp 会话，没有写 `src/host-omp`。
 - **解除条件 / 下一检查人**：CUT-35 DONE，且用户确认以 `omp 18.12.4` 作为第二宿主并同意发起 canary 所需的真实模型调用后，由协调者把本卡转为 READY。CUT-38 交账时本卡按 §5 诚实保留为 OPTIONAL。
+
+## 7. 2026-10-21 授权确认与当前实现范围（supersede §6 的“不启动”结论）
+
+- **授权事实（仓主，本轮明确指示）**：
+  1. 第二宿主确认为 **omp 18.12.4**（锁定版本）；
+  2. canary 所需的**真实模型调用已获授权**（会消耗用户额度），凭据按 omp 自身配置使用；
+  3. 据此本卡由 `OPTIONAL` 转为 **`DOING`**。
+- **§6 的历史结论如何处置**：§6 记录的是 2026-10-21 可行性核对当时“保持 `OPTIONAL`、不启动”的判断与理由（当时 `CUT-35` 未 DONE、宿主未指认、真实调用未授权）。该判断**已被本节取代**，其段落保留作为审计痕迹，不再是当前状态依据。
+- **当前实现范围（诚实边界）**：
+  - **产品侧**：主仓新增 `src/Wanxiangshu/Host/SecondHost/HostPlugin.fs`（`IHostPlugin` 的真实实例，端口族 P-11）：激活时用 `GitSubject.revParseShowToplevel` 定位工作树根，用 `RuntimePath.stateRoot` 解析机器状态目录（产品内部 `gitCommonDir` 语义即该状态目录），打开 durable Work 与 durable Ownership scope，并提供产品工具 `wxs_deliver`（描述取自产品资源树，成对双语）。该文件当前**尚未纳入编译分片清单**（`src/Wanxiangshu/*.fsproj` 未收录），因此尚无对应构建产物。
+  - **宿主侧**：`proposals/host-neutral-interface/adapters/omp/` 仍是 **HNI-03 的类型检查 + 离线 fixture 通过的骨架**（`ports.ts` 由 `gen-ports.mjs` 机械生成并由 `mirror-check.mjs` 逐字节比对），`activateOnOmp` 尚未与产品产物绑定；O-3（真实绑定需要 Fable 编译出的 JS 产物并绑定到 `activateOnOmp`）**仍然开放**。
+  - **smoke 侧**：`proposals/host-neutral-interface/smoke/` 已备好 opt-in 真实 smoke（`CUT36_OMP_REAL_SMOKE=1` 才启动真实 omp 进程；断言只认宿主观察事件与磁盘事实，产品不写自述报告）。**真实 smoke 尚未通过**：最近一次运行为 FAIL（宿主侧扩展加载失败），不得据此宣称 canary 成立。
+- **因此当前不能说的话**：不说“smoke 已通过”，不说“已支持第二宿主”，不说端口族已 WIRED-OMP。当前只能说：授权已具备，canary 在做。
+- **下一检查人 / 转 DONE 条件**：待真实 smoke 跑通 §3 四项（产物真实加载、工作区根与状态目录定位、一次真实 provider 请求且双语资源注入、真实子会话/受管执行边界）并留下 `proposals/extraction-kanban/evidence/CUT-36/` 下的证据后，由协调者把本卡与看板改为 `DONE`；在那之前保持 `DOING`。
