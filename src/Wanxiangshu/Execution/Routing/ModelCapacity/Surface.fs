@@ -35,7 +35,8 @@ module internal ExecutionPermitBinding =
               "physicalUserMessageId" ==> value.PhysicalUserMessageId
               "role" ==> Roles.roleLabel value.Role
               "participant" ==> value.Participant
-              "target" ==> createObj [ "model" ==> value.Target.Model; "reasoning" ==> value.Target.Reasoning ] ]
+              "target"
+              ==> createObj [ "model" ==> value.Target.Model; "reasoning" ==> value.Target.Reasoning ] ]
 
     let outcome (value: string) =
         match value with
@@ -77,7 +78,10 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
         if isNull (box lease) then null else lease.Owner
 
     let fenceOf (lease: ExecutionAdmissionLease) : float =
-        if isNull (box lease) then 0.0 else float (CapacityFence.value lease.Fence)
+        if isNull (box lease) then
+            0.0
+        else
+            float (CapacityFence.value lease.Fence)
 
     let record (outcome: string) =
         outcome |> ExecutionPermitBinding.outcome |> counters.Record

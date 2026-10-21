@@ -16,8 +16,7 @@ module internal FissionGroupLaw =
 
     let law: obj = construct lawClass
 
-    let ints (value: obj) : int list =
-        unbox<int array> value |> Array.toList
+    let ints (value: obj) : int list = unbox<int array> value |> Array.toList
 
 [<RequireQualifiedAccess>]
 type FissionRejectReason =
@@ -70,7 +69,9 @@ module FissionCompletionRouting =
             | FissionCompletionAffinity.PreFissionBroadcast -> null
             | FissionCompletionAffinity.Lane index -> box index
 
-        FissionGroupLaw.ints (FissionGroupLaw.law?routeCompletion (createObj [ "laneCount" ==> laneCount; "lane" ==> lane ]))
+        FissionGroupLaw.ints (
+            FissionGroupLaw.law?routeCompletion (createObj [ "laneCount" ==> laneCount; "lane" ==> lane ])
+        )
 
 [<RequireQualifiedAccess>]
 type FissionDeliveryError = InvalidLane of int

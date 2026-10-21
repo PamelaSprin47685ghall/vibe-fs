@@ -9,8 +9,7 @@ open Wanxiangshu.Foundation.HostSession
 module ChildRecoveryWorkflow =
     /// delegation-029: the recovery runtime consumes a narrow capability, never
     /// the durable journal handle.
-    type DeliveryWitnessReader =
-        SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> bool
+    type DeliveryWitnessReader = SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> bool
 
     type Ports =
         { Journal: AgentJournalPort option

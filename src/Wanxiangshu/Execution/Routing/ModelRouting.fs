@@ -316,7 +316,10 @@ module ModelRouting =
     let private constructWitness (cls: obj) : ProviderRunWitnessLibrary = jsNative
 
     let private targetOrNone (value: obj) : ModelRoutingTarget option =
-        if isNull value then None else Some(unbox<ModelRoutingTarget> value)
+        if isNull value then
+            None
+        else
+            Some(unbox<ModelRoutingTarget> value)
 
     let private targetProvider (target: ModelRoutingTarget) =
         target.Model.Substring(0, target.Model.IndexOf '/')
@@ -325,8 +328,7 @@ module ModelRouting =
         let gate = obj ()
         let transitionCounters = CapacityTransitionCounters()
 
-        let capacity =
-            BorrowingCapacity<ModelRoutingTarget>(targetProvider, (=))
+        let capacity = BorrowingCapacity<ModelRoutingTarget>(targetProvider, (=))
         // DSL-MUTABLE: resource — active execution lease map per session
         let activeBySession = Dictionary<string, ExecutionLease>()
         let activeProviderStepTasks = Dictionary<string, Task>()

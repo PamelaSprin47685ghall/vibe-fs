@@ -828,7 +828,7 @@ type HostForkRuntime
                     // faulting read is an empty view (bounded auxiliary
                     // evidence) and must never convert a proven child
                     // terminal into a failed settlement.
-                    let view : HostForkRunLifecycle.ViewResolution =
+                    let view: HostForkRunLifecycle.ViewResolution =
                         fun () ->
                             task {
                                 try

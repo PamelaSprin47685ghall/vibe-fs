@@ -23,8 +23,7 @@ module ChildRecoveryWorkflow =
     /// the durable journal handle. The reader answers "does a delivery witness
     /// exist for this child session, provider run and Authority Root?"; the
     /// durable composition owns the concrete journal read behind it.
-    type DeliveryWitnessReader =
-        SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> bool
+    type DeliveryWitnessReader = SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> bool
 
     /// DSL-state-combination: physical — optional Journal/Snapshot capabilities
     /// are injected infrastructure ports; the remaining fields are one recovery

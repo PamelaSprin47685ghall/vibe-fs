@@ -14,8 +14,12 @@ open Wanxiangshu.Foundation
 /// fence sets) and maps the invariant snapshot onto the host records.
 type internal CapacityBorrowingLibrary =
     abstract routeFresh:
-        sessionId: string * oldPhysicalUserMessageId: obj * newPhysicalUserMessageId: string * lenderSessionId: obj *
-        route: obj * retireOnUnavailable: bool ->
+        sessionId: string *
+        oldPhysicalUserMessageId: obj *
+        newPhysicalUserMessageId: string *
+        lenderSessionId: obj *
+        route: obj *
+        retireOnUnavailable: bool ->
             obj
 
     abstract reserveFresh: sessionId: string * lenderSessionId: obj * route: obj -> obj
@@ -25,7 +29,11 @@ type internal CapacityBorrowingLibrary =
     abstract releasePhysical: sessionId: string * physicalUserMessageId: string -> string
 
     abstract enterStep:
-        sessionId: string * physicalUserMessageId: string * target: obj * fence: string array * tryOrdinary: obj *
+        sessionId: string *
+        physicalUserMessageId: string *
+        target: obj *
+        fence: string array *
+        tryOrdinary: obj *
         requestKey: obj ->
             Task
 
@@ -47,7 +55,8 @@ module internal CapacityBorrowingBinding =
         construct
             borrowingClass
             (createObj
-                [ "providerOf" ==> Func<obj, string>(fun target -> providerOf (unbox<'target> target))
+                [ "providerOf"
+                  ==> Func<obj, string>(fun target -> providerOf (unbox<'target> target))
                   "sameTarget"
                   ==> Func<obj, obj, bool>(fun left right -> sameTarget (unbox<'target> left) (unbox<'target> right)) ])
 
@@ -105,21 +114,31 @@ type internal BorrowingCapacity<'target>(providerOf: 'target -> string, sameTarg
         )
         |> CapacityBorrowingBinding.target
 
-    member _.ReserveFresh(sessionId: string, lenderSessionId: string option, route: 'target array -> 'target option) : 'target option =
-        capacity.reserveFresh (sessionId, CapacityBorrowingBinding.text lenderSessionId, CapacityBorrowingBinding.route route)
+    member _.ReserveFresh
+        (sessionId: string, lenderSessionId: string option, route: 'target array -> 'target option)
+        : 'target option =
+        capacity.reserveFresh (
+            sessionId,
+            CapacityBorrowingBinding.text lenderSessionId,
+            CapacityBorrowingBinding.route route
+        )
         |> CapacityBorrowingBinding.target
 
     member _.AdoptReservation(sessionId: string, physicalUserMessageId: string, target: 'target) =
         capacity.adoptReservation (sessionId, physicalUserMessageId, box target)
 
-    member _.ContinueExecution(sessionId: string, previousPhysicalId: string, physicalId: string, target: 'target) : 'target =
-        capacity.continueExecution (sessionId, previousPhysicalId, physicalId, box target) |> unbox<'target>
+    member _.ContinueExecution
+        (sessionId: string, previousPhysicalId: string, physicalId: string, target: 'target)
+        : 'target =
+        capacity.continueExecution (sessionId, previousPhysicalId, physicalId, box target)
+        |> unbox<'target>
 
     member _.ReleaseSession(sessionId: string) =
         capacity.releaseSession sessionId |> CapacityBorrowingBinding.outcome
 
     member _.ReleasePhysical(sessionId: string, physicalUserMessageId: string) =
-        capacity.releasePhysical (sessionId, physicalUserMessageId) |> CapacityBorrowingBinding.outcome
+        capacity.releasePhysical (sessionId, physicalUserMessageId)
+        |> CapacityBorrowingBinding.outcome
 
     member _.EnterStep
         (

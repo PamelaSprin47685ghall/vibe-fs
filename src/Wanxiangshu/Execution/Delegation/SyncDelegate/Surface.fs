@@ -567,8 +567,12 @@ module SyncDelegateSurface =
             // test can assert that the interrupt was issued (and observed)
             // before the stale attempt's lease was released. A refusal can be
             // injected to exercise the degraded path.
-            member _.AbortSession sessionId = recordSessionControl "AbortSession" sessionId
-            member _.InterruptAttempt sessionId = recordSessionControl "InterruptAttempt" sessionId
+            member _.AbortSession sessionId =
+                recordSessionControl "AbortSession" sessionId
+
+            member _.InterruptAttempt sessionId =
+                recordSessionControl "InterruptAttempt" sessionId
+
             member _.IsManagedChild _ = true
             member _.AbortChildren _ = Task.FromResult()
 
@@ -1103,14 +1107,14 @@ module SyncDelegateSurface =
 
         box
             {| calls =
-               harness.Sessions.SessionControlCalls
-               |> List.map (fun call ->
-                   box
-                       {| sessionId = call.SessionId
-                          providerRun = call.ProviderRun
-                          kind = call.Kind
-                          refused = call.Refused
-                          reason = call.Reason |> Option.defaultValue null |}) |}
+                harness.Sessions.SessionControlCalls
+                |> List.map (fun call ->
+                    box
+                        {| sessionId = call.SessionId
+                           providerRun = call.ProviderRun
+                           kind = call.Kind
+                           refused = call.Refused
+                           reason = call.Reason |> Option.defaultValue null |}) |}
 
     /// D5: inject a refusal for the session-control calls this harness's Host
     /// boundary receives, so the degraded path (a refused interrupt that does
@@ -1129,17 +1133,12 @@ module SyncDelegateSurface =
 
         match
             harness.Sessions.SessionControlCalls
-            |> List.filter (fun call ->
-                call.SessionId = session && call.ProviderRun = providerRun)
+            |> List.filter (fun call -> call.SessionId = session && call.ProviderRun = providerRun)
             |> List.tryLast
         with
         | Some call -> call.Outcome :> Task
         | None ->
-            raise (
-                InvalidOperationException(
-                    "no session control call exists for the exact session and provider run"
-                )
-            )
+            raise (InvalidOperationException("no session control call exists for the exact session and provider run"))
 
     let private createForObservation (directory: string) (observationMode: string option) : Task<obj> =
         match ownerAdmissionFor "managed-child-reconciliation" "manager" with

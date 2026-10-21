@@ -240,15 +240,14 @@ module private SyncDelegateStoreOps =
         | SyncDelegateRole.Engineer -> "Engineer"
         | SyncDelegateRole.DevOps -> "DevOps"
 
-    let private callKeys (calls: ToolCallId list) = calls |> List.map callKey |> List.toArray
+    let private callKeys (calls: ToolCallId list) =
+        calls |> List.map callKey |> List.toArray
 
     let batchOfObservedRun providerRun role currentCall (observed: ObservedProviderRun) =
         let calls =
             observed.Calls
             |> Seq.map (fun (observedRole, callId) ->
-                createObj
-                    [ "role" ==> roleName observedRole
-                      "callId" ==> callKey callId ])
+                createObj [ "role" ==> roleName observedRole; "callId" ==> callKey callId ])
             |> Seq.toArray
 
         let order: obj =

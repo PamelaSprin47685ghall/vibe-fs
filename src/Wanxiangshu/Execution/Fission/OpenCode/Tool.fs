@@ -124,6 +124,7 @@ module FissionTool =
                           groupId
                           completionId
                           reason ]
+
                 return ()
             | Ok blob ->
                 let! appended =
@@ -150,6 +151,7 @@ module FissionTool =
                               completionId
                               failure ]
                 | Ok() -> ()
+
                 return ()
         }
 
@@ -218,6 +220,7 @@ module FissionTool =
                               completionId
                               lane.Index
                               reason ]
+
                     return ()
                 | Ok _ ->
                     let! appended = appendDelivery durable owner None groupId completionId lane.Index
@@ -235,6 +238,7 @@ module FissionTool =
                                   lane.Index
                                   failure ]
                     | Ok() -> ()
+
                     return ()
         }
 
@@ -266,6 +270,7 @@ module FissionTool =
                               lane.Index
                               failure ]
                 | Ok() -> ()
+
                 return ()
             else
                 return! continueLiveLane scope durable profile groupId owner lane completionId payload
@@ -386,7 +391,11 @@ module FissionTool =
                     "fission-broadcast-failed"
                     [ "session_id", SessionId.value owner
                       "result",
-                      sprintf "fission shared completion broadcast failed: group=%s completion=%s error=%s" groupId completionId ex.Message ]
+                      sprintf
+                          "fission shared completion broadcast failed: group=%s completion=%s error=%s"
+                          groupId
+                          completionId
+                          ex.Message ]
 
             FissionRuntime.endDelivery groupId completionId -1
         }
@@ -583,7 +592,10 @@ module FissionTool =
                 |> List.filter (fun text -> not (String.IsNullOrWhiteSpace text))
                 |> String.concat "\n"
 
-            if String.IsNullOrWhiteSpace context then return Ok None else return Ok(Some context)
+            if String.IsNullOrWhiteSpace context then
+                return Ok None
+            else
+                return Ok(Some context)
         }
 
     let private createLanePort
@@ -660,7 +672,9 @@ module FissionTool =
             | Error reason ->
                 Diagnostic.emit
                     "fission-lane-abort-failed"
-                    [ "session_id", SessionId.value laneId; "result", "fission lane abort failed: reason=" + reason ]
+                    [ "session_id", SessionId.value laneId
+                      "result", "fission lane abort failed: reason=" + reason ]
+
             return ()
         }
         :> Task
@@ -737,10 +751,8 @@ module FissionTool =
             | Error failure ->
                 Diagnostic.emit
                     "fission-failed-fact-append-failed"
-                    [ "session_id",
-                      SessionId.value logicalOwner
-                      "result",
-                      sprintf "fission failed fact append failed: group=%s reason=%s" groupId failure ]
+                    [ "session_id", SessionId.value logicalOwner
+                      "result", sprintf "fission failed fact append failed: group=%s reason=%s" groupId failure ]
             | Ok() -> ()
 
             return ()

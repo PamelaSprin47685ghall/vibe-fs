@@ -240,6 +240,8 @@ type internal ExecutionAdmissionQueue(owner: obj, counters: CapacityTransitionCo
 
     member _.Fail(error: exn) =
         queue.drain ()
-        |> Array.iter (fun node -> trySetException (AdmissionQueueBinding.demand node).Node.Completion error |> ignore)
+        |> Array.iter (fun node ->
+            trySetException (AdmissionQueueBinding.demand node).Node.Completion error
+            |> ignore)
 
     member _.Count = queue.count ()

@@ -120,8 +120,10 @@ module ExecutionFailurePolicy =
         let capacity =
             match unbox<string> d?capacitySettlement with
             | "NoCapacitySettlement" -> CapacitySettlement.NoCapacitySettlement
-            | "RetainExactFence" -> CapacitySettlement.RetainExactFence(unbox<ExactCapacityFenceReference> d?capacityFence)
-            | "ReleaseExactFence" -> CapacitySettlement.ReleaseExactFence(unbox<ExactCapacityFenceReference> d?capacityFence)
+            | "RetainExactFence" ->
+                CapacitySettlement.RetainExactFence(unbox<ExactCapacityFenceReference> d?capacityFence)
+            | "ReleaseExactFence" ->
+                CapacitySettlement.ReleaseExactFence(unbox<ExactCapacityFenceReference> d?capacityFence)
             | _ -> unexpected "capacity settlement" d?capacitySettlement
 
         let fatality =
@@ -141,7 +143,10 @@ module ExecutionFailurePolicy =
               "phase" ==> phaseLabel lifecycle
               "executionKey" ==> box key
               "capacityFence" ==> fenceView capacity
-              "provider" ==> (match provider with Some facts -> providerView facts | None -> null) ]
+              "provider"
+              ==> (match provider with
+                   | Some facts -> providerView facts
+                   | None -> null) ]
         |> library.decide
         |> decisionOf key provider
 

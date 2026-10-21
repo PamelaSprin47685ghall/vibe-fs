@@ -401,7 +401,9 @@ module FissionSurface =
                     with ex ->
                         Diagnostic.emit
                             "fission-lane-abort-failed"
-                            [ "session_id", SessionId.value laneSession; "result", "fission lane abort failed: " + ex.Message ]
+                            [ "session_id", SessionId.value laneSession
+                              "result", "fission lane abort failed: " + ex.Message ]
+
                         return ()
                 }
                 :> Task

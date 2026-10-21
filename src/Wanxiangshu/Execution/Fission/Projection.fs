@@ -200,7 +200,9 @@ module FissionProjection =
     /// and every pre-Fission completion reached every lane. Hosts ask this
     /// instead of re-deriving it from the group maps.
     let convergenceReady (group: FissionGroupProjection) =
-        unbox<bool> (law?convergenceReady (createObj [ "laneCount" ==> group.LaneCount; "progress" ==> progressOf group ]))
+        unbox<bool> (
+            law?convergenceReady (createObj [ "laneCount" ==> group.LaneCount; "progress" ==> progressOf group ])
+        )
 
     let private laneSessionOf (group: FissionGroupProjection) laneIndex (laneSessionId: SessionId) =
         match Map.tryFind laneIndex group.LaneSessions with
@@ -374,8 +376,9 @@ module FissionProjection =
                        |> Option.exists (fun g -> Set.contains payload.CompletionId g.PreFissionCompletionIds))
                   "captured"
                   ==> heldOf
-                          (group |> Option.bind (fun g -> Map.tryFind payload.CompletionId g.CapturedCompletions))
-                          (fun existing -> existing = (payload.PayloadRef, payload.PayloadDigest)) ]
+                      (group
+                       |> Option.bind (fun g -> Map.tryFind payload.CompletionId g.CapturedCompletions))
+                      (fun existing -> existing = (payload.PayloadRef, payload.PayloadDigest)) ]
 
         apply state payload.GroupId payload.OwnerSessionId 0 group verdict (fun group ->
             replaceGroup
@@ -383,7 +386,10 @@ module FissionProjection =
                 payload.GroupId
                 { group with
                     CapturedCompletions =
-                        Map.add payload.CompletionId (payload.PayloadRef, payload.PayloadDigest) group.CapturedCompletions })
+                        Map.add
+                            payload.CompletionId
+                            (payload.PayloadRef, payload.PayloadDigest)
+                            group.CapturedCompletions })
 
     let private foldCompletionDelivered (state: FissionProjectionState) (payload: CompletionDeliveredPayload) =
         let group = Map.tryFind payload.GroupId state.Groups
@@ -420,8 +426,9 @@ module FissionProjection =
                   "laneIndex" ==> payload.LaneIndex
                   "bound"
                   ==> heldOf
-                          (group |> Option.bind (fun g -> Map.tryFind payload.ExternalId g.ExternalAffinities))
-                          (fun existing -> existing = payload.LaneIndex) ]
+                      (group
+                       |> Option.bind (fun g -> Map.tryFind payload.ExternalId g.ExternalAffinities))
+                      (fun existing -> existing = payload.LaneIndex) ]
 
         apply state payload.GroupId payload.OwnerSessionId payload.LaneIndex group verdict (fun group ->
             replaceGroup

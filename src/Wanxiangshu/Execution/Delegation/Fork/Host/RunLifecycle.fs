@@ -734,8 +734,7 @@ module HostForkRunLifecycle =
                             result
                             taken
                             resolved
-                | None ->
-                    return ()
+                | None -> return ()
                 | Some witness ->
                     // D1: the view is resolved only now. The terminal has
                     // been proven to address this run, so its material may
@@ -772,6 +771,7 @@ module HostForkRunLifecycle =
                                     result.ProviderRun
                                     toolCallId
                                     prose
+
                         return!
                             settleCompletedView
                                 gate

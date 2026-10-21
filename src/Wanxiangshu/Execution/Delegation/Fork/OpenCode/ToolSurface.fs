@@ -1056,7 +1056,9 @@ module ForkToolSurface =
         }
 
     let recordDeliveredValue (sessionId: string) (deliveredValue: obj) : unit =
-        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordView sessionId (if isNull deliveredValue then None else Some deliveredValue)
+        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordView
+            sessionId
+            (if isNull deliveredValue then None else Some deliveredValue)
 
     let settle (value: obj) (owner: string) (answer: string) (providerRun: string) : Task<bool> =
         task {
