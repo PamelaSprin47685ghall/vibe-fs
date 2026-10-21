@@ -182,8 +182,9 @@ is minted by the product's own run registry, not by the host, so a typed id woul
 property of the contributed tool and the product decides it); `HostToolArguments` → P-04 `CanonicalJson` args with
 a product-side accessor; `ToolResultText` (TOML prose rendering) → a product module — product prose, not a host
 seam. **Deciding criterion (JUDGE): does any type in `Host/Tools.fs(i)` need a home that P-04/P-05 cannot give it?**
-Answer: **no** — all three have homes. So **P-18 is voided** and the reserved id `P-18` is **retired, not reused**
-(the file was never delivered to master; an undelivered child may settle its obligation by writing a void); the
+Answer: **no** — all three have homes. So **P-18 is voided** and the reserved id `P-18` is **retired, not reused**.
+The file is **not on `master`** (measured: `git ls-tree -r origin/master` lists no `src/Wanxiangshu/Host/Tools.fs(i)`);
+it lives on `origin/wip/hni-tools`, which is unmerged. The void therefore **settles that branch's obligation** — the
 branch's `Host/Tools.fs(i)` is deleted rather than renamed, and its "P-04 tool contribution port" header claim
 disappears with it. **If** a future member cannot be folded into P-04/P-05, the fallback is a renamed family
 `Host/Ports/ToolAdmission.fs(i)` with the `HNI P-18` marker — not the target recorded here.
