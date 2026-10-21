@@ -192,6 +192,8 @@ Host/Ports/TurnTransforms.fsi
 Host/Ports/TurnTransforms.fs
 Host/Ports/Compaction.fsi
 Host/Ports/Compaction.fs
+Host/Ports/HostConfig.fsi
+Host/Ports/HostConfig.fs
 Host/Ports/Lifecycle.fsi
 Host/Ports/Lifecycle.fs
 Persistence/EventStore/Model.fsi

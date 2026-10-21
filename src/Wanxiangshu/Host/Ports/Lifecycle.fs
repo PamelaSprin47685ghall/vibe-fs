@@ -25,16 +25,23 @@ type HostPorts =
       Signals: ISignalSource
       Tools: IToolRegistrar
       Paths: IHostPaths
+      Config: IHostConfigPort
       Diagnostics: IDiagnosticSink
       Agents: IAgentCatalog
       Capabilities: HostCapabilities }
 
+/// What the product decides, handed to the host at activation.
+///
+/// `option` means "the product does not make this decision yet". Absence is declared, not
+/// faked: the adapter must not substitute a pass-through implementation (an always-Allow
+/// gate or an identity transform) for a member the product left `None`, because the core
+/// could then no longer tell "no decision" from "decided nothing".
 type ProductHooks =
-    { ToolGate: IToolGate
-      Turn: ITurnTransform
+    { ToolGate: IToolGate option
+      Turn: ITurnTransform option
       Compaction: ICompactionGate
       Spawn: SpawnRouting option
-      OnSignal: HostSignal -> Task
+      OnSignal: (HostSignal -> Task) option
       Dispose: unit -> Task }
 
 type IHostPlugin =

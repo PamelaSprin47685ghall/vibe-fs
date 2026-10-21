@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source of truth: src/Wanxiangshu/Host/Ports/*.fsi (HNI P-00, P-01, P-02, P-03, P-04, P-05, P-06, P-07, P-08, P-09, P-10, P-11, P-12), plus
+// Source of truth: src/Wanxiangshu/Host/Ports/*.fsi (HNI P-00, P-01, P-02, P-03, P-04, P-05, P-06, P-07, P-08, P-09, P-10, P-11, P-12, P-19), plus
 // src/Wanxiangshu/Foundation/{Identity,Outcome}.fsi for the opaque ids and
 // Outcome.SendOutcome.
 // The port families are discovered from the sources, so a family another lane lands shows up
@@ -420,17 +420,18 @@ export interface HostPorts {
   Signals: ISignalSource
   Tools: IToolRegistrar
   Paths: IHostPaths
+  Config: IHostConfigPort
   Diagnostics: IDiagnosticSink
   Agents: IAgentCatalog
   Capabilities: HostCapabilities
 }
 
 export interface ProductHooks {
-  ToolGate: IToolGate
-  Turn: ITurnTransform
+  ToolGate?: IToolGate
+  Turn?: ITurnTransform
   Compaction: ICompactionGate
   Spawn?: SpawnRouting
-  OnSignal: (arg: HostSignal) => Promise<void>
+  OnSignal?: (arg: HostSignal) => Promise<void>
   Dispose: () => Promise<void>
 }
 
@@ -448,4 +449,24 @@ export type SendOutcome =
 // ---- P-12 Diagnostics
 export interface IDiagnosticSink {
   Emit(operation: string, fields: [string, string][]): void
+}
+
+// ---- P-19 HostConfig
+export type HostSettingValue =
+  | { tag: "Bool"; value: boolean }
+  | { tag: "Text"; value: string };
+
+export interface RequiredSetting {
+  Path: string[]
+  Value: HostSettingValue
+}
+
+export interface SettingGap {
+  Path: string[]
+  Reason: string
+}
+
+export interface IHostConfigPort {
+  Read(path: string[]): Result<HostSettingValue | undefined, HostError>
+  Apply(settings: RequiredSetting[]): Result<SettingGap | undefined, HostError>
 }

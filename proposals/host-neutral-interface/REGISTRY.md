@@ -22,6 +22,7 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 | P-10 | `IHostPaths` | `Host/Ports/Storage.fs(i)` | arch | ad-hoc `input.directory`/`project` reads | DECLARED, SKELETON-OMP |
 | P-11 | `IHostPlugin`, `HostPorts`, `ProductHooks`, `HostCapabilities`, `IAgentCatalog` | `Host/Ports/Lifecycle.fs(i)` | plugin-host | `OpenCode/Plugin/Plugin`, `PluginBoot`, `ManagedAgentConfig` host side | DECLARED, SKELETON-OMP |
 | P-12 | `IDiagnosticSink` | `Host/Ports/Diagnostics.fs(i)` | plugin-host | `client.app.log` call sites | DECLARED, SKELETON-OMP |
+| P-19 | `IHostConfigPort`, `RequiredSetting`, `HostSettingValue`, `SettingGap` | `Host/Ports/HostConfig.fs(i)` | plugin-host | `HostCompactionGate.enforceSettings`/`writeSetting` host-side writes, `config`-hook mutation | DECLARED, SKELETON-OMP |
 | P-00 | `HostError`, `HostResult`, `HostCapability`, `WorkspacePath`, `AgentRole`, `CanonicalJsonText`, `JsonSchema`, `HostFailure`, `TurnTerminal` (shared vocabulary; ids `SessionId`/`ToolCallId`/`PromptKey`/`TranscriptMessageAddress` come from `Foundation.Identity`) | `Host/Ports/Vocabulary.fs(i)` | arch | `string` error channels on host ports | DECLARED, SKELETON-OMP |
 
 ## Lane-declared domain seams (tier B, namespace `Wanxiangshu.Host.Domain`, files `Host/Domain/*.fs(i)`) — ID reservations
@@ -117,6 +118,15 @@ The delivery team must build master at `aa43d3455` or later to get compile/test 
   mirror generator (it reads `Host/Ports/*.fsi` only). Gate ⑬ covers them instead: it checks that a tier-B
   file declares `Wanxiangshu.Host.Domain` and lives under `Host/Domain/`, and it ratchets the adapter files
   that reference the seam.
+
+**P-19 (2026-10-22, plugin-host lane).** Declared: the host's activation config as product-shaped
+data. Status is DECLARED only — no adapter implements it yet. Notably absent by design:
+`ConfigureAgents` (projecting the P-11 role catalog onto host agent entries, `ManagedAgentConfig`)
+is **not** part of P-19, because it would make `HostConfig` depend on `AgentRoleSpec` from
+`Lifecycle` while `HostPorts` depends on `HostConfig`; it needs its own reserved id when a lane
+takes it. P-11's `Lifecycle` row gains `HostPorts.Config`, and `ProductHooks.ToolGate`, `.Turn` and
+`.OnSignal` become `option`: a member the product does not decide yet is absent, not a pass-through
+shim (DESIGN rule 4 + rule 8). No consumer exists at this commit, so the shape change is inert.
 
 ### What a lane must do when it lands a domain seam (the D-05/D-06/D-07 checklist)
 

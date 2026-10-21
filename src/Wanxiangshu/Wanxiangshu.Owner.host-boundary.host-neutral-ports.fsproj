@@ -33,6 +33,8 @@
     <Compile Include="Host/Ports/TurnTransforms.fs"/>
     <Compile Include="Host/Ports/Compaction.fsi"/>
     <Compile Include="Host/Ports/Compaction.fs"/>
+    <Compile Include="Host/Ports/HostConfig.fsi"/>
+    <Compile Include="Host/Ports/HostConfig.fs"/>
     <Compile Include="Host/Ports/Lifecycle.fsi"/>
     <Compile Include="Host/Ports/Lifecycle.fs"/>
   </ItemGroup>
