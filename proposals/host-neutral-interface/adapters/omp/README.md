@@ -23,6 +23,10 @@ implementable on a second host and keeps the TS mirror honest.
 - `adapter.ts`, `sdk-children.ts` and the fixture **type-check** against the omp 18.12.4 type definitions
   (`tsc --noEmit`) and against the generated mirror.
 - The fixture drives the adapter offline and passes.
+- A transcript message address **is** the omp session entry id (`SessionEntry.id`), on the host path
+  (`sessionManager.getEntries()`) and on the child path (the child's own `sessionManager.getEntries()`). The
+  adapter never synthesises a positional address, and an entry with no usable id fails the read with
+  `HostError.Transport` naming the entry's position instead of returning a fabricated address.
 
 What is **not** proven: no omp process is started, no model is called, and no behaviour against a real host is
 exercised. The adapter is a type-checked skeleton, not a wired host.
@@ -89,8 +93,10 @@ What the receipt asserts, and what it does not:
 
 `Sessions.Parent` is one more: omp records `SessionHeader.parentSession` **verbatim**, and its own callers pass
 either a session id or a session **file path**. A path-shaped value is resolved through the host's own
-session-file lookup (`readSessionInfo`); when the file does not resolve, the request is refused with
-`HostError.Refused` rather than returning a path masquerading as a `SessionId`.
+session-file lookup (`readSessionInfo`); when the file does not resolve, the request fails with
+`HostError.NotFound` — whose reason carries the raw recorded value verbatim — rather than returning a path
+masquerading as a `SessionId`. A parent session that cannot be found is a *missing* session, not a refused
+request.
 
 ## Which session id is the neutral `SessionId`
 

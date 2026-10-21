@@ -31,7 +31,18 @@ const pi: OmpApi = {
   setActiveTools: async () => {},
   logger: { debug() {}, info() {}, warn() {}, error() {} } as unknown as ExtensionAPI["logger"],
 };
-const history: AgentMessage[] = events.history as unknown as AgentMessage[];
+// The recorded omp session ENTRIES: a transcript address IS the entry id, so
+// the fake host session exposes entries (with ids), not bare messages.
+type FakeEntry = { type: "message"; id: string; message: AgentMessage };
+const entryList: FakeEntry[] = (events.history as unknown as { id: string }[] & Record<string, unknown>[]).map((h) => {
+  const { id, ...message } = h as { id: string } & Record<string, unknown>;
+  return { type: "message", id, message: message as unknown as AgentMessage };
+});
+// The child's own entries: a child transcript is addressed by entry ids too.
+const childEntries: { id: string; message: AgentMessage }[] = [
+  { id: "c-1", message: { role: "user", content: "child hello", timestamp: 7 } as unknown as AgentMessage },
+  { id: "c-2", message: { role: "assistant", content: "child ok", stopReason: "stop", timestamp: 8 } as unknown as AgentMessage },
+];
 let recordedParentSession: string | undefined;
 // The session id the product sees for the compaction hooks; the omp events
 // carry a *provider* session id, so this asserts which id the adapter passes
@@ -40,13 +51,13 @@ let compactionSession: string | undefined;
 const ctx = {
   cwd: "/tmp/fixture", model: { provider: "fx", id: "m1" }, isIdle: () => true, abort() {},
   sessionManager: { getSessionId: () => "root", getHeader: () => ({ parentSession: recordedParentSession }),
-                    getEntries: () => history.map((message) => ({ type: "message", message })) },
+                    getEntries: () => entryList },
   modelRegistry: { getAvailable: () => [{ provider: "fx", id: "m1" }], find: (p: string, m: string) => (p === "fx" && m === "m1" ? { provider: p, id: m } : undefined) },
 } as unknown as ExtensionContext;
 const children: OmpChildSessions = {
   create: async (parent) => `child-of-${parent}`, prompt: async () => !childPromptRefused, abort: async () => {}, close: async () => {},
   parentOf: (s) => (s.startsWith("child-of-") ? s.slice(9) : undefined), childrenOf: () => [], findByTitle: async () => [],
-  messages: () => [],
+  entries: (s) => (s.startsWith("child-of-") ? childEntries : undefined),
   resolveSessionIdByPath: async (path) => (path === "/tmp/sessions/parent.jsonl" ? "parent-session-id" : undefined),
 };
 
@@ -156,6 +167,33 @@ expect("turn_end error -> AttemptFinished Failed", signals.at(-1), { tag: "Attem
 const tr = await portsSeen!.Transcript.Messages("root" as P.SessionId);
 expect("transcript decode", tr.ok ? tr.value.map((m) => [m.Role, m.Parts.map((p) => p.tag), m.Terminal?.tag]) : tr,
   [["User", ["Text"], null], ["Assistant", ["Reasoning", "Text", "ToolUse"], "Completed"]]);
+// O-1: a transcript address IS the omp entry id, not a positional id.
+expect("transcript addresses are the omp entry ids",
+  tr.ok ? tr.value.map((m) => m.Id) : tr, ["e-1", "e-2"]);
+// O-1 acceptance 1: appending an entry must not move the earlier
+// addresses. A positional id would shift them.
+const firstTwo = tr.ok ? tr.value.map((m) => m.Id) : [];
+entryList.push({ type: "message", id: "e-3", message: { role: "user", content: "again", timestamp: 3 } as unknown as AgentMessage });
+const tr2 = await portsSeen!.Transcript.Messages("root" as P.SessionId);
+expect("appending an entry leaves the earlier addresses unchanged",
+  tr2.ok ? tr2.value.slice(0, 2).map((m) => m.Id) : tr2, firstTwo);
+expect("the appended entry is addressed by its own id",
+  tr2.ok ? tr2.value.map((m) => m.Id) : tr2, ["e-1", "e-2", "e-3"]);
+// O-1 acceptance 2: an entry with no usable id fails the read with a typed
+// `HostError.Transport` naming the entry's position — never a fabricated
+// address.
+entryList.push({ type: "message", id: "", message: { role: "user", content: "no id", timestamp: 4 } as unknown as AgentMessage });
+const trBad = await portsSeen!.Transcript.Messages("root" as P.SessionId);
+expect("an entry without an id fails the read with Transport, naming the position",
+  trBad.ok ? trBad.value : trBad,
+  { ok: false, error: { tag: "Transport", reason: "omp session entry at position 3 has no id" } });
+entryList.pop();
+entryList.pop();
+// O-1 acceptance 4: a CHILD session's transcript is addressed by entry ids
+// too (the child's own session manager entries).
+const ctr = await portsSeen!.Transcript.Messages("child-of-root" as P.SessionId);
+expect("a child session's transcript addresses are entry ids",
+  ctr.ok ? ctr.value.map((m) => m.Id) : ctr, ["c-1", "c-2"]);
 expect("child session create", await portsSeen!.Sessions.Create("root" as P.SessionId, { Title: "t" }), { ok: true, value: "child-of-root" });
 expect("model apply unknown -> Transport error", (await portsSeen!.Models.Apply("root" as P.SessionId, { Provider: "x", Model: "y" })).ok, false);
 expect("prompt correlation echoed as entry", [await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go", Correlation: P.promptKey("pk-1") }, undefined), entries, sent],
@@ -189,9 +227,11 @@ recordedParentSession = "/tmp/sessions/parent.jsonl";
 expect("parent recorded as a file path resolves to the session id",
   await portsSeen!.Sessions.Parent("root" as P.SessionId), { ok: true, value: "parent-session-id" });
 recordedParentSession = "/tmp/sessions/gone.jsonl";
-expect("parent recorded as an unresolvable file path is refused",
+// O-4: an unresolvable path-shaped parent is a MISSING session, not a
+// refusal, and the reason carries the raw recorded value verbatim.
+expect("parent recorded as an unresolvable file path is NotFound, with the raw path",
   await portsSeen!.Sessions.Parent("root" as P.SessionId),
-  { ok: false, error: { tag: "Refused", reason: "omp recorded the parent session as a file path that does not resolve to a session id: /tmp/sessions/gone.jsonl" } });
+  { ok: false, error: { tag: "NotFound", what: "omp recorded the parent session as a file path that does not resolve to a session id: /tmp/sessions/gone.jsonl" } });
 recordedParentSession = undefined;
 
 // The neutral `SessionId` of a child is the PERSISTED id, not omp's provider
@@ -203,6 +243,12 @@ recordedParentSession = undefined;
 const fakeSessionManager = {
   getSessionId: () => "persisted-session-id",
   setSessionName: async (_name: string) => {},
+  // The child's own entries: a child transcript is addressed by entry ids,
+  // read from the child's own session manager.
+  getEntries: () => [
+    { type: "message", id: "c-1", message: { role: "user", content: "child hello", timestamp: 7 } },
+    { type: "message", id: "c-2", message: { role: "assistant", content: "child ok", stopReason: "stop", timestamp: 8 } },
+  ],
 };
 const fakeAgentSession = {
   sessionId: "provider-session-id",
@@ -210,7 +256,6 @@ const fakeAgentSession = {
   prompt: async (_text: string) => true,
   abort: async () => {},
   dispose: async () => {},
-  messages: [],
 };
 const sdkChildren = sdkChildSessions(
   async () => ({ session: fakeAgentSession } as unknown as CreateAgentSessionResult),
@@ -223,5 +268,11 @@ expect("child session id is the persisted id, not the provider one",
   await sdkChildren.create("root", "t", "/tmp/fixture"), "persisted-session-id");
 expect("the provider session id is not registered as the child",
   await sdkChildren.parentOf("provider-session-id"), undefined);
+// The real child seam reads the CHILD's own session manager entries, so the
+// addresses it hands back are entry ids — never `session.messages`.
+expect("the sdk child seam exposes entries with entry ids",
+  sdkChildren.entries("persisted-session-id")?.map((e) => e.id), ["c-1", "c-2"]);
+expect("an unknown child session has no entries",
+  sdkChildren.entries("no-such-session"), undefined);
 console.log(failures === 0 ? "# fixture: all ok" : `# fixture: ${failures} failed`);
 if (failures) process.exit(1);

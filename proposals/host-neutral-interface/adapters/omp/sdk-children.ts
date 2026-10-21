@@ -59,6 +59,11 @@ export function sdkChildSessions(
       const info = await readSessionFile(path);
       return info?.id;
     },
-    messages: (id) => live.get(id)?.session.messages as AgentMessage[] | undefined,
+    // The child's transcript is read from the CHILD's own session manager:
+    // a transcript address IS the omp entry id, and `session.messages` yields
+    // `AgentMessage` objects that carry no entry id, so it cannot be an
+    // address source. `AgentSession.sessionManager` is public.
+    entries: (id) => live.get(id)?.session.sessionManager.getEntries()
+      .flatMap((e) => (e.type === "message" ? [{ id: e.id, message: e.message as AgentMessage }] : [])),
   };
 }

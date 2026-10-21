@@ -24,7 +24,12 @@ export interface OmpChildSessions {
   parentOf(session: string): string | undefined;
   childrenOf(parent: string): { id: string; title?: string }[];
   findByTitle(title: string): Promise<string[]>;
-  messages(session: string): AgentMessage[] | undefined;
+  /**
+   * The child's transcript ENTRIES, not bare messages: a transcript address
+   * is the omp entry id, and `AgentMessage` carries no id. `undefined` means
+   * the session is unknown to the host.
+   */
+  entries(session: string): { id: string; message: AgentMessage }[] | undefined;
   /**
    * Resolve a parent-session *file path* to the session id recorded in that
    * file. omp stores `SessionHeader.parentSession` verbatim and its own callers
@@ -49,7 +54,7 @@ const why = (e: unknown): string => (e instanceof Error ? e.message : String(e))
  * `accepted-detached-<promptKey>` for a detached send). A receipt that
  * does not look like one means the Host returned something else and the
  * caller must decide, so the adapter emits the same shape its peers emit
- * rather than a private `omp:` namespace.
+ * rather than a private `omp` namespace.
  *
  * The receipt is a DETACHED admission receipt: it says the host took the
  * prompt, not that a physical message id exists. It is deliberately NOT
@@ -69,10 +74,27 @@ export function looksLikePath(value: string): boolean {
   return value.includes("/") || value.includes("\\") || value.endsWith(".jsonl");
 }
 
-/** Raised when the host recorded a parent session it cannot express as a session id. */
+/**
+ * Raised when the host recorded a parent session it cannot express as a
+ * session id. The reason carries the RAW recorded value verbatim.
+ */
 export class ParentUnresolvedError extends Error {
   readonly reason: string;
   constructor(reason: string) { super(reason); this.reason = reason; }
+}
+/**
+ * Raised when a session entry has no usable id. A transcript address IS the
+ * omp entry id, so an entry without one cannot be addressed: the read fails
+ * with `HostError.Transport` instead of fabricating an address. The reason
+ * names the entry's POSITION so the failure is diagnosable.
+ */
+export class EntryIdMissingError extends Error {
+  readonly reason: string;
+  constructor(position: number) {
+    const reason = `omp session entry at position ${position} has no id`;
+    super(reason);
+    this.reason = reason;
+  }
 }
 /** Raised when a session id is unknown to the host; mapped to `HostError.NotFound`. */
 export class UnknownSessionError extends Error {
@@ -85,7 +107,11 @@ async function guard<T>(f: () => Promise<T>): P.HostResult<T> {
     return ok(await f());
   } catch (e) {
     if (e instanceof UnknownSessionError) return err(notFound(e.what));
-    if (e instanceof ParentUnresolvedError) return err({ tag: "Refused", reason: e.reason });
+    // An unresolvable path-shaped parent is a MISSING session, not a refusal:
+    // the host cannot find what the recorded value points at. The reason
+    // carries the raw recorded value verbatim.
+    if (e instanceof ParentUnresolvedError) return err(notFound(e.reason));
+    if (e instanceof EntryIdMissingError) return err({ tag: "Transport", reason: e.reason });
     return err(transport(e));
   }
 }
@@ -123,12 +149,19 @@ export function decodeTerminal(m: AgentMessage): P.TurnTerminal | undefined {
   return { tag: "Completed", finish: a.stopReason };
 }
 
-export function decodeMessage(m: AgentMessage, index: number): P.TranscriptMessage | undefined {
+/**
+ * Decode one omp session entry into a transcript message.
+ *
+ * The address IS the omp entry id (`SessionEntryBase.id`): the adapter never
+ * synthesises a positional address, because any append would shift the later
+ * messages' positions and the address would stop meaning the same message.
+ */
+export function decodeMessage(m: AgentMessage, id: string): P.TranscriptMessage | undefined {
   const role = decodeRole(m);
   if (role === undefined) return undefined;
   const a = m as { provider?: string; model?: string; timestamp?: number };
   return {
-    Id: `omp:${index}` as P.TranscriptMessageAddress, Role: role,
+    Id: P.transcriptMessageAddress(id), Role: role,
     Route: a.provider && a.model ? { Provider: a.provider, Model: a.model } : undefined,
     CreatedAt: a.timestamp, Completed: role !== "Assistant" || decodeTerminal(m) !== undefined,
     Terminal: decodeTerminal(m), IsCompaction: false, Parts: decodeParts(m),
@@ -279,10 +312,25 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
 
   const transcript: P.ITranscriptPort = {
     Messages: (s) => guard(async () => {
-      const raw = isOwnChild(s) ? children.messages(s) : (ctx().sessionManager.getEntries()
-        .flatMap((e) => (e.type === "message" ? [e.message as AgentMessage] : [])));
+      // The address of a transcript message IS the omp entry id, so both
+      // paths read ENTRIES. The host path reads the host session's own
+      // `sessionManager.getEntries()`; the child path reads the CHILD's own
+      // session manager (via the child seam), never `session.messages` —
+      // `AgentMessage` carries no entry id, so a message-only path could
+      // not produce an entry-id address at all.
+      const raw = isOwnChild(s)
+        ? children.entries(s)
+        : ctx().sessionManager.getEntries()
+            .flatMap((e) => (e.type === "message" ? [{ id: e.id, message: e.message as AgentMessage }] : []));
       if (raw === undefined) throw new Error(`unknown session ${s}`);
-      return raw.flatMap((m, i) => { const d = decodeMessage(m, i); return d ? [d] : []; });
+      return raw.flatMap((e, position) => {
+        // An entry with no usable id cannot be addressed: the read fails
+        // with `HostError.Transport` naming the entry's position, rather
+        // than fabricating an address.
+        if (typeof e.id !== "string" || e.id.length === 0) throw new EntryIdMissingError(position);
+        const d = decodeMessage(e.message, e.id);
+        return d ? [d] : [];
+      });
     }),
   };
 
