@@ -148,82 +148,75 @@ const durableEvents = async (directory) => {
   })
 }
 
-integrationTest('WHAT[crash-reconciliation-020] actual child settlement persists voids across journal reopen without a completion', async () => {
+// Owner law since 60812f575 ("restart keeps unfinished child work visible"):
+// load settlement no longer voids an orphaned child run. The unit laws above
+// pin the pure decision; these two pin the actual journal: the orphaned runs
+// keep their exact authority across reopen, and settlement publishes no
+// durable fact for them (neither a void nor a completion).
+integrationTest('WHAT[crash-reconciliation-020] actual child settlement keeps orphaned runs active across journal reopen without a void or a completion', async () => {
   await withDurableChildRuns(async ({ handle, directory, reopen, dispatch, profiles }) => {
-    const before = new Set((await durableEvents(directory)).map(event => event.event_id))
+    const before = await durableEvents(directory)
     for (const child of ['engineer', 'devops']) {
       assert.deepEqual(dispatch.projectionObservation(handle, child).activeLogicalRun, profiles.get(child))
     }
     await recovery.settleChildRuns(handle)
     for (const child of ['engineer', 'devops']) {
-      assert.equal(dispatch.projectionObservation(handle, child).activeLogicalRun, null)
+      assert.deepEqual(dispatch.projectionObservation(handle, child).activeLogicalRun, profiles.get(child),
+        `${child} keeps its exact active run after settlement`)
     }
     const added = (await durableEvents(directory))
-      .filter(event => !before.has(event.event_id))
+      .filter(event => !before.some(prior => prior.event_id === event.event_id))
       .map(event => event.payload.Fact)
-    const settlements = added.filter(fact => fact[0] === 'Agent')
-    assert.equal(settlements.length, 2, 'settlement appends only the two void facts, never a completion')
-    for (const child of ['engineer', 'devops']) {
-      assert.deepEqual(settlements.find(fact => fact[1]?.[1]?.[1]?.Work?.ChildSessionId?.[1] === child), [
-        'Agent', ['Execution', ['ChildWorkVoided', {
-          ParentSessionId: ['SessionId', 'parent'], Work: {
-            Handle: ['Agent', ['AgentHandleId', `work-${child}`]],
-            ChildSessionId: ['SessionId', child],
-            AuthorityRoot: ['AuthorityRootUserMessageId', profiles.get(child).authorityRoot],
-          },
-        }]],
-      ])
-    }
+    const childFacts = added.filter(fact => fact[0] === 'Agent' && fact[1]?.[0] === 'Execution')
+    assert.deepEqual(childFacts, [], 'settlement appends no ChildWorkVoided, ChildRunVoided or completion fact')
     const reopened = await reopen()
     for (const child of ['engineer', 'devops']) {
-      assert.equal(dispatch.projectionObservation(reopened, child).activeLogicalRun, null)
+      assert.deepEqual(dispatch.projectionObservation(reopened, child).activeLogicalRun, profiles.get(child),
+        `${child} keeps its exact active run across reopen`)
     }
     const settled = await durableEvents(directory)
     await recovery.settleChildRuns(reopened)
-    assert.deepEqual(await durableEvents(directory), settled, 'settled runs produce no duplicate facts')
+    assert.deepEqual(await durableEvents(directory), settled, 'repeated settlement produces no durable fact')
   })
 })
 
-integrationTest('WHAT[crash-reconciliation-020] actual child settlement propagates unknown and unattempted append failures', async () => {
-  await withDurableChildRuns(async ({ handle, directory, reopen, dispatch }) => {
+integrationTest('WHAT[crash-reconciliation-020] actual child settlement never attempts a child-run append, so a broken writer cannot close or void either run', async () => {
+  await withDurableChildRuns(async ({ handle, directory, reopen, dispatch, profiles }) => {
     const { renameSync, mkdirSync, readdirSync, rmSync } = await import('node:fs')
     const { join } = await import('node:path')
     const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
     const saved = join(directory, '.Herdchestra', 'wanxiangshu', 'saved-events')
-    // Activate the fresh writer before the fault, so the failed physical append
-    // is the child void itself rather than its preceding RuntimeStarted watermark.
     const admitted = await dispatch.acceptHumanRootSelection(handle, 'current-manager', 'root-current-manager', managerRootSelection)
     assert.equal(admitted.ok, true, JSON.stringify(admitted.error))
     const before = await durableEvents(directory)
-    const active = child => dispatch.projectionObservation(handle, child).activeLogicalRun
-    const initial = ['engineer', 'devops'].map(active)
-    assert.ok(initial.every(profile => profile !== null), 'the failed operation must have real unsettled child work')
+    const active = (journal, child) => dispatch.projectionObservation(journal, child).activeLogicalRun
+    const initial = ['engineer', 'devops'].map(child => active(handle, child))
+    assert.deepEqual(initial, ['engineer', 'devops'].map(child => profiles.get(child)), 'real unsettled child work exists')
     mkdirSync(saved, { recursive: true })
     const writers = readdirSync(events).filter(name => name.endsWith('.ndjson'))
+    assert.ok(writers.length > 0, 'the fault must replace a real writer file')
     const stashed = writers.map(name => ({ live: join(events, name), held: join(saved, name) }))
-    // Replace each existing writer file with a same-named directory: the events
-    // directory stays usable, so the fault lands in PhysicalAppend
-    // (AppendAllText against a directory) and reports an unknown outcome.
+    // Same fault as before the law change: any physical append would now land
+    // on a directory and report an unknown outcome. Settlement must not reach it.
     for (const writer of stashed) renameSync(writer.live, writer.held)
     for (const writer of stashed) mkdirSync(writer.live)
     try {
-      await assert.rejects(() => recovery.settleChildRuns(handle), /append outcome unknown/i)
-      assert.deepEqual(['engineer', 'devops'].map(active), initial, 'failed durability cannot close either run')
+      await recovery.settleChildRuns(handle)
+      assert.deepEqual(['engineer', 'devops'].map(child => active(handle, child)), initial, 'settlement cannot close either run')
     } finally {
       for (const writer of stashed) rmSync(writer.live, { recursive: true, force: true })
       for (const writer of stashed) renameSync(writer.held, writer.live)
       rmSync(saved, { recursive: true, force: true })
     }
-    assert.deepEqual(await durableEvents(directory), before, 'the refused append publishes no durable fact')
-    await assert.rejects(() => recovery.settleChildRuns(handle), /append not attempted.*writer poisoned/i)
-    assert.deepEqual(['engineer', 'devops'].map(active), initial)
-    assert.deepEqual(await durableEvents(directory), before, 'the poisoned writer must not retry physical append')
+    assert.deepEqual(await durableEvents(directory), before, 'settlement publishes no durable fact')
+    // The writer was never touched, so it is not poisoned: a real append still lands.
+    const probe = await dispatch.acceptHumanRootSelection(handle, 'probe-manager', 'root-probe-manager', managerRootSelection)
+    assert.equal(probe.ok, true, `writer must remain healthy after settlement: ${JSON.stringify(probe.error)}`)
+    assert.ok((await durableEvents(directory)).length > before.length, 'the healthy writer publishes the probe fact')
     const reopened = await reopen()
-    assert.deepEqual(['engineer', 'devops'].map(child => dispatch.projectionObservation(reopened, child).activeLogicalRun), initial)
+    assert.deepEqual(['engineer', 'devops'].map(child => active(reopened, child)), initial)
     await recovery.settleChildRuns(reopened)
-    for (const child of ['engineer', 'devops']) {
-      assert.equal(dispatch.projectionObservation(reopened, child).activeLogicalRun, null)
-    }
+    assert.deepEqual(['engineer', 'devops'].map(child => active(reopened, child)), initial)
   })
 })
 

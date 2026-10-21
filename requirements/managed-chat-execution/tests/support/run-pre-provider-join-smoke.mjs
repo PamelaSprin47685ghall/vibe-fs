@@ -31,9 +31,13 @@ const provider = await startHttpServer(async (request, response) => {
   const names = (body.tools ?? []).map(tool => tool.function?.name ?? tool.name)
   if (names.includes('todowrite-for-engineer')) childRequests++
   const call = (name, args) => sendSSE(response, buildToolCallsChunks(`join-smoke-${requestNumber}`, [{ name, argsStr: JSON.stringify(args) }], 10))
-  if (names.includes('fork')) {
+  // Since df7846ab8 the delegation verbs are programming-surface members: the
+  // Manager places the child through `this.fork` inside its own program.
+  if (names.includes('todowrite-for-manager')) {
     managerRequests++
-    if (managerRequests === 1) return call('fork', { calling: 'engineer', name: 'Worker', charge: 'Do not modify files. Return one short report.' })
+    if (managerRequests === 1) return call('todowrite-for-manager', {
+      program: 'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Worker", charge: "Do not modify files. Return one short report." }, {}); } }',
+    })
     if (managerRequests === 2) return call('join', {})
     joinResult = (body.messages ?? []).findLast(message => message.role === 'tool')
   }
