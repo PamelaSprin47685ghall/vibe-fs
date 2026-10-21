@@ -185,6 +185,17 @@ These are the concrete steps, so a lane does not have to re-derive them:
   `31a5a2426`, while `Host.Ports` had **zero** openers at creation and every opener it has today was added
   deliberately by a named commit. Documentation only — no build, no compile, no test run; all numbers are static
   `git grep`/`git ls-tree` measurements at `31a5a2426`.
+- 2026-10-21 eng-hni-fork (slice C): the join run's product decisions leave `Fork/OpenCode/JoinTool` for host-neutral
+  `Execution/Delegation/Fork/JoinRun` (`JoinRun`: `JoinRoute`, `JoinLane`, `AgentIdentity`, `BatchWindow`, `decideRoute`,
+  `appliesWaitBudget`, `normalizeInterruptReason`, `decideLane`, `resolveAgentName`, `resolveAgentRole`,
+  `resolveTerminalLabel`, `windowOf`, `ptyTrackIds`, `mapOrchestratorMailboxError`, `DevOpsJoinTimeoutMs`). **No new port**:
+  the rules consume only product-domain types (`Role`, `JoinItem`, `JoinInterruptReason`, `NonEmptyBatch`); the host
+  capability they need is supplied by the adapter as one plain record of callbacks (`JoinRun.AgentIdentity`), so the
+  neutral module holds no host capability. Next free id stays **P-19**. The adapter keeps only the wiring (journal/runtime
+  identity lookup, mailbox wait, PTY release and buffering, wire rendering) and re-exports `JoinRecord` unchanged, so the
+  requirements import path `dist/Execution/Delegation/Fork/OpenCode/JoinTool.js` is untouched. `omp: n/a` (no port type).
+  **No compile/test evidence** (owner's no-build-before-push rule; the compile slot gave up with exit 75 twice) —
+  the delivery team must build master and run the join requirement suites.
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.

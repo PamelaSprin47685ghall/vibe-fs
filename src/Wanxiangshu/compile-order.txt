@@ -1160,6 +1160,8 @@ OpenCode/Host/HostTurnObserver.fsi
 OpenCode/Host/HostTurnObserver.fs
 Execution/Delegation/Fork/JoinRules.fsi
 Execution/Delegation/Fork/JoinRules.fs
+Execution/Delegation/Fork/JoinRun.fsi
+Execution/Delegation/Fork/JoinRun.fs
 Execution/Delegation/Fork/OpenCode/JoinTool.fsi
 Execution/Delegation/Fork/OpenCode/JoinTool.fs
 
