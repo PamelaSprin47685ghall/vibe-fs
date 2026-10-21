@@ -18,6 +18,20 @@ module RetentionSurface =
         | Ok streams -> streams |> List.map fst |> List.toArray
         | Error error -> failwith (sprintf "%A" error)
 
+    let writerEventIds (stateRoot: string) : obj array =
+        match ProcessEventLog.readStreams stateRoot with
+        | Ok streams ->
+            streams
+            |> List.map (fun (writerId, events) ->
+                createObj
+                    [ "writerId" ==> writerId
+                      "eventIds"
+                      ==> (events
+                           |> List.map (fun event -> Wanxiangshu.Foundation.Identity.EventId.value event.EventId)
+                           |> List.toArray) ])
+            |> List.toArray
+        | Error error -> failwith (sprintf "%A" error)
+
     /// 测试边界只调用已有的本机段整理，不创建 Git snapshot，也不读取远端。
     let reorganizeWithSegmentCap (stateRoot: string) (capBytes: int) : Task<obj> =
         task {

@@ -46,7 +46,9 @@ durable-events [010]/[011] 之后，运行数据只在主工作树的 `.Herdches
 
 每个 writer 是一次进程输出流，物理上表现为同 `WriterId` 的段序列（见 durable-events-005）。保留单位是最近活动时间的 **UTC 日期分组**：今天与昨天保留，前天及更早整体过期（连同全部段文件）。`Retain(now, W) = {w ∈ W | utcDay(lastActivity(w)) >= utcDay(now) - 1}`。日期只作 GC 分组，不携带历史语义，允许 writer 因活动推进而移动到更晚的日期。同次收敛按统一截止时刻满足 `Retain(A ∪ B) = Retain(A) ∪ Retain(B)`；过期 writer 退出本地集合，缓存不得跨下一 expiry 命中。
 
-活动时间优先取 writer 逻辑流尾部（最高 `seq` 段末尾）Journal 的 `payload.ObservedAt`；连续 `ProjectionCutTail` 须向前越过后再判定，越过可跨段回溯。非 Journal 尾部才可回退到 producer-side file activity。收敛不得以拷贝时间或新 mtime 刷新活动性。
+活动时间优先取 writer 逻辑流尾部（最高 `seq` 段末尾）Journal 的 `payload.ObservedAt`；连续 `ProjectionCutTail` 须向前越过后再判定，越过可跨段回溯。未取得有效持久活动时才可回退到 producer-side file activity。收敛不得以拷贝时间或新 mtime 刷新活动性。
+
+截止时刻与活动时刻必须是有限毫秒数；非有限输入须拒绝，不能据此返回空保留集合或保留全部 writer。`ObservedAt` 只有在本身为可解析成有限时刻的字符串时才建立持久活动；数值、数组或其它无效字段不经日期强转，也不向前越过该行寻找旧 Journal，而是按无持久活动退回 producer-side file activity。保留后的事实仍须通过原有 canonical 与领域校验，尾行分类不替代它们。
 
 `writer-manifest` 与远端 writer tree 随 [009] 退役；无段后缀的本地旧形态文件按其 `WriterId` 聚合为单条逻辑流参与收敛。
 

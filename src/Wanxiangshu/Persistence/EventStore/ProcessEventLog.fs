@@ -37,6 +37,14 @@ type StoreFileGate internal (releaseFn: obj) =
 [<RequireQualifiedAccess>]
 module ProcessEventLog =
 
+    [<Import("WriterRetention", "wanxiangli/retention")>]
+    let private retentionClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private constructRetention (cls: obj) : obj = jsNative
+
+    let private retention: obj = constructRetention retentionClass
+
     [<RequireQualifiedAccess>]
     type PhysicalAppendCompletion =
         | NoAppend
@@ -168,12 +176,6 @@ module ProcessEventLog =
     [<Emit("Date.now()")>]
     let private currentTimeMs () : float = jsNative
 
-    [<Emit("Date.parse($0)")>]
-    let private parseDateMs (value: string) : float = jsNative
-
-    [<Emit("Number.isFinite($0)")>]
-    let private isFiniteNumber (value: float) : bool = jsNative
-
     [<Import("openSync", "node:fs")>]
     let private openSync (path: string) (flags: string) : int = jsNative
 
@@ -258,14 +260,12 @@ module ProcessEventLog =
     /// is today or yesterday; the day before and earlier are collected. The date
     /// is a GC grouping only — it carries no history meaning, and a writer's
     /// activity may move it to a later day.
-    let private utcDayMilliseconds = 24.0 * 60.0 * 60.0 * 1000.0
+    let utcDayOf (timeMs: float) : float = retention?utcDay (timeMs)
 
-    let utcDayOf (timeMs: float) = floor (timeMs / utcDayMilliseconds)
+    let writerRetentionMilliseconds () : float = retention?dayMilliseconds
 
-    let writerRetentionMilliseconds () = utcDayMilliseconds
-
-    let isWriterActiveAt nowMs lastActivityMs =
-        utcDayOf lastActivityMs >= utcDayOf nowMs - 1.0
+    let isWriterActiveAt (nowMs: float) (lastActivityMs: float) : bool =
+        retention?isRetained (nowMs, lastActivityMs)
 
     let private tryAcquireLock (target: string) (options: obj) waitStep : Task<obj option> =
         task {
@@ -829,42 +829,13 @@ module ProcessEventLog =
         | ProjectionCutTail
         | NoDurableActivity
 
-    let private tryParseJson line =
-        try
-            Some(JS.JSON.parse line)
-        with _ ->
-            None
-
-    let private observedJournalActivity (value: obj) =
-        let payload: obj = value?payload
-
-        let observedAt =
-            if isNull payload || isNull payload?ObservedAt then
-                None
-            else
-                Some(parseDateMs (unbox<string> payload?ObservedAt))
-
-        observedAt
-        |> Option.filter isFiniteNumber
-        |> Option.map TailActivity.JournalActivity
-        |> Option.defaultValue TailActivity.NoDurableActivity
-
-    let private classifyParsedTail (value: obj) =
-        let eventType =
-            if isNull value?event_type then
-                ""
-            else
-                unbox<string> value?event_type
-
-        match eventType with
-        | "JournalEnvelope" -> observedJournalActivity value
-        | "ProjectionCutTail" -> TailActivity.ProjectionCutTail
-        | _ -> TailActivity.NoDurableActivity
-
     let private classifyTailActivity (line: string) =
-        tryParseJson line
-        |> Option.map classifyParsedTail
-        |> Option.defaultValue TailActivity.NoDurableActivity
+        let verdict: obj = retention?classifyTail (line)
+
+        match string verdict?kind with
+        | "observed" -> TailActivity.JournalActivity(unbox<float> verdict?observedAtMs)
+        | "cutTail" -> TailActivity.ProjectionCutTail
+        | _ -> TailActivity.NoDurableActivity
 
     type private TailSearch =
         | SearchBefore of int
@@ -1066,18 +1037,18 @@ module ProcessEventLog =
             prefixMatches prefix full
 
     let private canonicalLines (bytes: byte[]) : (string[] * string[]) option =
-        match CanonicalEventCodec.tryDecodeUtf8Text bytes with
-        | Error _ -> None
-        | Ok text ->
-            match decodeWriterText "coexistence" text with
-            | Error _ -> None
-            | Ok events ->
+        CanonicalEventCodec.tryDecodeUtf8Text bytes
+        |> Result.toOption
+        |> Option.bind (fun text ->
+            decodeWriterText "coexistence" text
+            |> Result.toOption
+            |> Option.map (fun events ->
                 let ids =
                     events
                     |> List.map (fun envelope -> EventId.value envelope.EventId)
                     |> List.toArray
 
-                Some(text.Split('\n') |> Array.take ids.Length, ids)
+                text.Split('\n') |> Array.take ids.Length, ids))
 
     /// A copied legacy prefix must be the exact canonical suffix of the series.
     /// Every remaining legacy id must still be absent from the series.
@@ -1111,6 +1082,11 @@ module ProcessEventLog =
                 None
         | _ -> None
 
+    let private requireContinuationCopiedLines writerId legacyBytes segmentBytes =
+        match continuationCopiedLines legacyBytes segmentBytes with
+        | Some copied -> Ok copied
+        | None -> Error(sprintf "writer files diverged: %s" writerId)
+
     /// durable-events-005: the authoritative file list of one writer's
     /// logical stream. A coexisting legacy file and segment series is only a
     /// legal intermediate of an interrupted reorganization, import, or
@@ -1136,9 +1112,8 @@ module ProcessEventLog =
         elif isPrefixOf segmentBytes legacyBytes then
             Ok [ legacyFile, 0 ]
         else
-            match continuationCopiedLines legacyBytes segmentBytes with
-            | Some copied -> Ok((segments |> List.map (fun name -> name, 0)) @ [ legacyFile, copied ])
-            | None -> Error(sprintf "writer files diverged: %s" writerId)
+            requireContinuationCopiedLines writerId legacyBytes segmentBytes
+            |> Result.map (fun copied -> (segments |> List.map (fun name -> name, 0)) @ [ legacyFile, copied ])
 
     let private logicalStreamFiles (commonDir: string) (group: WriterFileGroup) : Result<(string * int) list, string> =
         let directory = eventsDirectory commonDir
@@ -1335,6 +1310,10 @@ module ProcessEventLog =
             AppendAllText path piece "utf8"
             durabilityBarrier path
 
+    let private syncCopiedSeries directory copied segments =
+        if copied > 0 then
+            segments |> List.iter (fun name -> durabilityBarrier (join2 directory name))
+
     let private appendLegacyLinesToSeries
         (commonDir: string)
         (writerId: string)
@@ -1356,9 +1335,7 @@ module ProcessEventLog =
             pieces
             |> List.iteri (fun index piece -> appendLegacyPiece directory writerId tailName index piece)
 
-            if copied > 0 then
-                segments |> List.iter (fun name -> durabilityBarrier (join2 directory name))
-
+            syncCopiedSeries directory copied segments
             unlinkSync legacyFile
             Ok()
 
@@ -1384,9 +1361,8 @@ module ProcessEventLog =
         elif isPrefixOf segmentBytes legacyBytes then
             dropSeriesAndReassign commonDir writerId legacyFile segments
         else
-            match continuationCopiedLines legacyBytes segmentBytes with
-            | Some copied -> appendLegacyLinesToSeries commonDir writerId legacyFile copied
-            | None -> Error(sprintf "writer files diverged: %s" writerId)
+            requireContinuationCopiedLines writerId legacyBytes segmentBytes
+            |> Result.bind (appendLegacyLinesToSeries commonDir writerId legacyFile)
 
     let internal convergeWriterFiles (commonDir: string) (writerId: string) : Result<unit, string> =
         let directory = eventsDirectory commonDir
@@ -1405,6 +1381,7 @@ module ProcessEventLog =
     /// Integrator still owns cross-stream ordering and interpretation. Segments
     /// aggregate into one stream before k-way merge (durable-events-014).
     let readStreamsAt (commonDir: string) (nowMs: float) : Result<(string * EventEnvelope list) list, StorageInvalid> =
+        utcDayOf nowMs |> ignore
         pruneDecodeCache ()
 
         let rec read remaining acc =

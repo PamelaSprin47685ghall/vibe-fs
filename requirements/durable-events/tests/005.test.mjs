@@ -1,4 +1,25 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
+import { nativeCrashPoints, verifyNativeCrashCase } from './support/native-crash.mjs'
+
+for (const point of nativeCrashPoints) {
+  test(`WHAT[durable-events-005] real OS crash at ${point} preserves the complete continuation and resumes idempotently`,
+    { timeout: 20000 }, async t => {
+      const evidence = await withFinitePhysicalWait(t,
+        { operation: `writer continuation native crash ${point}`, limitMs: 19000 },
+        () => verifyNativeCrashCase(point, { signal: t.signal }))
+      assert.equal(evidence.point, point)
+      assert.equal(evidence.crashes.length, point === 'resume-copied-fsync' ? 2 : 1)
+      assert.deepEqual(evidence.finalIds, [1, 2, 3, 4, 5].map(n => n.toString(16).padStart(40, '0')))
+      assert.equal(evidence.finalBytes, 1664)
+      assert.equal(evidence.idempotent, true)
+      assert.equal(evidence.childrenExited, true)
+      t.diagnostic(JSON.stringify({ point, crashes: evidence.crashes.map(crash => ({
+        pid: crash.pid, ownerPid: crash.owner.pid, signal: crash.signal, cut: crash.trace.at(-1),
+      })), coldReaderPids: evidence.coldReads.map(read => read.pid), recoveryPids: evidence.recoveryPids }))
+    })
+}
 
 // WHAT[durable-events-005] — writer 段序列合同（红阶段）。
 // 本文件承载无需注入段上限的用例：

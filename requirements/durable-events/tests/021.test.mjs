@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -6,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as eventCodec from '../../../dist/Persistence/EventStore/CodecSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 
 const id = (n) => n.toString(16).padStart(40, '0')
@@ -173,6 +175,72 @@ test('WHAT[durable-events-021] an uncut historical Journal fault suppresses only
       'a semantic fault in one Journal stream must not black out later independent session streams',
     )
     journal.JournalSurface_dispose(booted.journal)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[durable-events-021] cold replay rejects an old cut for a newer fault and resumes only after the matching cut', () => {
+  const dir = withTemp((base) => base)
+  const eventsDir = path.join(dir, 'wanxiangshu', 'events')
+  const file = path.join(eventsDir, 'stale-cut-proof-0000.ndjson')
+  const capture = (n, parent, session) => event(n, [parent], 'InspectorCaseCaptured', {
+    session_id: session,
+    q: 'Q',
+    a: 'A',
+  })
+  const cut = (n, parent, failed) => event(n, [parent], 'ProjectionCutTail', {
+    rule: 'Casebook',
+    failed_event_id: id(failed),
+    reason: 'case payload decode failure',
+    reset_json: '{}',
+  })
+  const trace = [
+    event(101, [], 'InspectorCaseCaptured', {}),
+    cut(102, 101, 101),
+    capture(103, 102, 'after-first-cut'),
+    event(104, [103], 'InspectorCaseCaptured', {}),
+    cut(105, 104, 101),
+    capture(106, 105, 'must-stay-quarantined'),
+  ]
+  const coldRead = () => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict'
+    import * as eventStore from ${JSON.stringify(new URL('../../../dist/Persistence/EventStore/Surface.js', import.meta.url).href)}
+    import * as casebook from ${JSON.stringify(new URL('../../../dist/Repository/Knowledge/Casebook/Surface.js', import.meta.url).href)}
+    const store = eventStore.create(process.argv[1], 'stale-cut-cold-reader')
+    try {
+      const present = {}
+      for (const identity of ['after-first-cut', 'must-stay-quarantined', 'after-current-cut']) {
+        const result = await casebook.fetchCase(store, 0, identity)
+        assert.equal(result.ok, true)
+        present[identity] = result.value != null
+      }
+      console.log(JSON.stringify(present))
+    } finally {
+      eventStore.dispose(store)
+    }
+  `, dir], { encoding: 'utf8', timeout: 10_000 }))
+
+  try {
+    mkdirSync(eventsDir, { recursive: true })
+    const before = trace.map(eventCodec.encode).join('')
+    writeFileSync(file, before)
+    assert.deepEqual(coldRead(), {
+      'after-first-cut': true,
+      'must-stay-quarantined': false,
+      'after-current-cut': false,
+    })
+    assert.equal(readFileSync(file, 'utf8'), before, 'replay must preserve the original bad and stale-cut facts')
+
+    const recovered = [...trace, cut(107, 106, 104), capture(108, 107, 'after-current-cut')]
+      .map(eventCodec.encode).join('')
+    writeFileSync(file, recovered)
+    assert.deepEqual(coldRead(), {
+      'after-first-cut': true,
+      'must-stay-quarantined': false,
+      'after-current-cut': true,
+    })
+    assert.equal(readFileSync(file, 'utf8'), recovered, 'a matching cut resumes from its durable timeline position')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
