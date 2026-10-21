@@ -596,21 +596,96 @@ module Adapter =
                 return ()
             }
 
-    let private appendCorrelation (pi: obj) (session: string) (request: PromptRequest) : Task<Result<unit, HostError>> =
+    /// Append the prompt correlation key to the omp session.
+    let private appendCorrelationEntry (pi: obj) (session: string) (key: PromptKey) : Task<obj> =
+        awaitObj
+            (call2
+                (fieldValue pi "appendEntry")
+                (box "wxs.prompt-key")
+                (createObj [ "session", box session; "key", box (PromptKey.value key) ]))
+
+    let private tryAppendCorrelationEntry (pi: obj) (session: string) (key: PromptKey) : Task<Result<unit, HostError>> =
         task {
             try
-                match request.Correlation with
-                | None -> return Ok()
-                | Some key ->
-                    let! _ =
-                        awaitObj
-                            (call2
-                                (fieldValue pi "appendEntry")
-                                (box "wxs.prompt-key")
-                                (createObj [ "session", box session; "key", box (PromptKey.value key) ]))
-                    return Ok()
+                let! _ = appendCorrelationEntry pi session key
+                return Ok()
             with ex ->
                 return Error(HostError.Transport ex.Message)
+        }
+
+    let private appendCorrelation (pi: obj) (session: string) (request: PromptRequest) : Task<Result<unit, HostError>> =
+        task {
+            match request.Correlation with
+            | None -> return Ok()
+            | Some key -> return! tryAppendCorrelationEntry pi session key
+        }
+
+    /// Hand a prompt to omp's own session.
+    let private sendToOmp (pi: obj) (text: string) : Task<unit> =
+        task {
+            let! _ =
+                awaitObj
+                    (call2
+                        (fieldValue pi "sendUserMessage")
+                        (box text)
+                        (createObj [ "deliverAs", box "followUp" ]))
+            return ()
+        }
+
+    /// Settle a delivered prompt. A prompt that went to the host's own
+    /// session is announced to omp first; the settlement notice follows in
+    /// both cases.
+    let private settleDelivery (pi: obj) (own: bool) (text: string) (late: LateDeliveryListener option) : Task<unit> =
+        task {
+            if not own then
+                do! sendToOmp pi text
+            do! notifyLate late (DeliveryVerdict.OwnedSettled)
+        }
+
+    /// Deliver the prompt to the session that owns it.
+    let private deliverPromptOutcome (pi: obj) (session: string) (request: PromptRequest) (late: LateDeliveryListener option) : Task<SendOutcome> =
+        task {
+            let ctx = context ()
+            let own = isOwnChild ctx session
+            let! delivered =
+                if own
+                then promptChild session request.Text
+                else Task.FromResult(Ok true)
+            match delivered with
+            | Error error -> return SendOutcome.Fatal(reasonOf error)
+            | Ok false -> return SendOutcome.Retryable "omp refused prompt"
+            | Ok true ->
+                do! settleDelivery pi own request.Text late
+                return SendOutcome.AdmittedWithReceipt(TransportReceipt.create(sprintf "omp:%s" session))
+        }
+
+    /// Deliver the prompt. The prompt may already have reached omp, so a
+    /// failure here is an unknown acceptance.
+    let private deliverPrompt (pi: obj) (session: string) (request: PromptRequest) (late: LateDeliveryListener option) : Task<SendOutcome> =
+        task {
+            try
+                return! deliverPromptOutcome pi session request late
+            with ex ->
+                return SendOutcome.AcceptanceUnknown ex.Message
+        }
+
+    /// Refuse a request omp cannot carry.
+    let private refuseUnsupported (fields: string list) (late: LateDeliveryListener option) : Task<SendOutcome> =
+        task {
+            let reason = sprintf "omp cannot carry %s" (String.Join(", ", fields))
+            do! notifyLate late (DeliveryVerdict.Refused reason)
+            return SendOutcome.Fatal reason
+        }
+
+    /// Phase 2 of a prompt: the request is prepared, so it is either refused
+    /// or handed to omp.
+    let private sendPreparedPrompt (pi: obj) (session: string) (request: PromptRequest) (late: LateDeliveryListener option) : Task<SendOutcome> =
+        task {
+            let fields = unsupportedFields request
+            if fields.IsEmpty then
+                return! deliverPrompt pi session request late
+            else
+                return! refuseUnsupported fields late
         }
 
     let private sendPrompt (pi: obj) (session: string) (request: PromptRequest) (late: LateDeliveryListener option) : Task<SendOutcome> =
@@ -620,39 +695,7 @@ module Adapter =
             let! preparation = appendCorrelation pi session request
             match preparation with
             | Error error -> return SendOutcome.Fatal(reasonOf error)
-            | Ok() ->
-                let fields = unsupportedFields request
-                if not fields.IsEmpty then
-                    let reason = sprintf "omp cannot carry %s" (String.Join(", ", fields))
-                    do! notifyLate late (DeliveryVerdict.Refused reason)
-                    return SendOutcome.Fatal reason
-                else
-                    // Phase 2: delivery. The prompt may already have reached
-                    // omp, so a failure here is an unknown acceptance.
-                    try
-                        let ctx = context ()
-                        let own = isOwnChild ctx session
-                        let! delivered =
-                            if own
-                            then promptChild session request.Text
-                            else Task.FromResult(Ok true)
-                        match delivered with
-                        | Error error -> return SendOutcome.Fatal(reasonOf error)
-                        | Ok false -> return SendOutcome.Retryable "omp refused prompt"
-                        | Ok true ->
-                            if own then
-                                do! notifyLate late (DeliveryVerdict.OwnedSettled)
-                            else
-                                let! _ =
-                                    awaitObj
-                                        (call2
-                                            (fieldValue pi "sendUserMessage")
-                                            (box request.Text)
-                                            (createObj [ "deliverAs", box "followUp" ]))
-                                do! notifyLate late (DeliveryVerdict.OwnedSettled)
-                            return SendOutcome.AdmittedWithReceipt(TransportReceipt.create(sprintf "omp:%s" session))
-                    with ex ->
-                        return SendOutcome.AcceptanceUnknown ex.Message
+            | Ok() -> return! sendPreparedPrompt pi session request late
         }
 
     // -- transcript ---------------------------------------------------------------------
@@ -663,20 +706,33 @@ module Adapter =
         |> Array.choose id
         |> Array.toList
 
+    /// The transcript of a child session the adapter created.
+    let private childTranscript (id: string) : Result<TranscriptMessage list, HostError> =
+        match messagesOfChild id with
+        | None -> Error(HostError.NotFound id)
+        | Some messages -> Ok(decodeTranscript (Array.ofList messages))
+
+    /// The transcript of the host's own session, read from the persisted
+    /// session entries.
+    let private hostTranscript (ctx: obj) : TranscriptMessage list =
+        let entries =
+            ctxEntries ctx
+            |> Array.filter (fun entry -> stringOf (fieldValue entry "type") = "message")
+            |> Array.map (fun entry -> fieldValue entry "message")
+        decodeTranscript entries
+
+    /// The transcript of a session: the child's own messages when the
+    /// adapter created it, the host session's entries otherwise.
+    let private transcriptFor (ctx: obj) (id: string) : Result<TranscriptMessage list, HostError> =
+        if isOwnChild ctx id then
+            childTranscript id
+        else
+            Ok(hostTranscript ctx)
+
     let private transcriptOf (ctx: obj) (id: string) : Task<Result<TranscriptMessage list, HostError>> =
         task {
             try
-                let own = isOwnChild ctx id
-                if own then
-                    match messagesOfChild id with
-                    | None -> return Error(HostError.NotFound id)
-                    | Some messages -> return Ok(decodeTranscript (Array.ofList messages))
-                else
-                    let entries =
-                        ctxEntries ctx
-                        |> Array.filter (fun entry -> stringOf (fieldValue entry "type") = "message")
-                        |> Array.map (fun entry -> fieldValue entry "message")
-                    return Ok(decodeTranscript entries)
+                return transcriptFor ctx id
             with ex ->
                 return Error(HostError.Transport ex.Message)
         }
@@ -699,17 +755,30 @@ module Adapter =
                 return Error(HostError.Transport ex.Message)
         }
 
+    /// Ask omp to switch the active session to the requested model.
+    let private setRequestedModel (pi: obj) (ctx: obj) (route: ModelRoute) : Task<Result<unit, HostError>> =
+        task {
+            let registry = ctxModelRegistry ctx
+            let model = callOptionalMethod2 registry "find" (box route.Provider) (box route.Model)
+            if isNull model then
+                return Error(HostError.NotFound(sprintf "%s/%s" route.Provider route.Model))
+            let! outcome = awaitObj (call1 (fieldValue pi "setModel") (box model))
+            if isTrue outcome then return Ok() else return Error(HostError.Transport "omp refused the requested model")
+        }
+
+    /// Change the model of the active session to the requested one.
+    let private applyModelInner (pi: obj) (ctx: obj) (id: string) (route: ModelRoute) : Task<Result<unit, HostError>> =
+        task {
+            if id <> ctxSessionId ctx then
+                return Error(HostError.Refused "omp can only change the model of the active session")
+            else
+                return! setRequestedModel pi ctx route
+        }
+
     let private applyModel (pi: obj) (ctx: obj) (id: string) (route: ModelRoute) : Task<Result<unit, HostError>> =
         task {
             try
-                if id <> ctxSessionId ctx then
-                    return Error(HostError.Refused "omp can only change the model of the active session")
-                let registry = ctxModelRegistry ctx
-                let model = callOptionalMethod2 registry "find" (box route.Provider) (box route.Model)
-                if isNull model then
-                    return Error(HostError.NotFound(sprintf "%s/%s" route.Provider route.Model))
-                let! outcome = awaitObj (call1 (fieldValue pi "setModel") (box model))
-                if isTrue outcome then return Ok() else return Error(HostError.Transport "omp refused the requested model")
+                return! applyModelInner pi ctx id route
             with ex ->
                 return Error(HostError.Transport ex.Message)
         }
@@ -786,17 +855,21 @@ module Adapter =
     [<Emit("Object.fromEntries($0)")>]
     let private entriesOf (fields: (string * string) list) : obj = jsNative
 
+    /// The neutral route of a model object, when it names one.
+    let private modelRouteOf (model: obj) : ModelRoute option =
+        let provider = optionalString (fieldValue model "provider")
+        let id = optionalString (fieldValue model "id")
+        match provider, id with
+        | Some p, Some m -> Some { Provider = p; Model = m; Variant = None }
+        | _ -> None
+
     /// The neutral route of the model the session currently uses.
     let private ctxRoute (ctx: obj) : ModelRoute option =
         let model = ctxModel ctx
         if isNull model then
             None
         else
-            let provider = optionalString (fieldValue model "provider")
-            let id = optionalString (fieldValue model "id")
-            match provider, id with
-            | Some p, Some m -> Some { Provider = p; Model = m; Variant = None }
-            | _ -> None
+            modelRouteOf model
 
     /// Build the host-neutral ports over the omp extension API, together with
     /// the signal emitter the product hooks publish through.
@@ -921,6 +994,114 @@ module Adapter =
                 None)
         |> Array.toList
 
+    /// The neutral spawn request an omp spawn event carries.
+    let private spawnRequest (event: obj) (ctx: obj) : SpawnRequest =
+        { Parent = SessionId.create (ctxSessionId ctx)
+          Role = AgentRole(stringOf (fieldValue event "agent"))
+          Candidates = spawnCandidates (fieldValue event "patterns")
+          SpawnKey = optionalString (fieldValue event "spawnKey") }
+
+    /// The omp reply to a spawn routing decision.
+    let private spawnReply (route: SpawnRoute) : obj =
+        match route with
+        | SpawnRoute.Keep -> jsUndefined
+        | SpawnRoute.Refuse reason -> createObj [ "block", box true; "reason", box reason ]
+        | SpawnRoute.Route routes ->
+            let models = routes |> List.map (fun route -> sprintf "%s/%s" route.Provider route.Model)
+            createObj [ "model", box (List.toArray models) ]
+
+    /// Ask the product how an omp spawn should be routed.
+    let private routeSpawn (hooks: ProductHooks) (event: obj) (ctx: obj) : Task<obj> =
+        task {
+            match hooks.Spawn with
+            | None -> return jsUndefined
+            | Some spawn ->
+                let! route = spawn (spawnRequest event ctx)
+                return spawnReply route
+        }
+
+    /// The omp role name of a neutral transcript role.
+    let private roleName (role: TranscriptRole) : string =
+        match role with
+        | TranscriptRole.User -> "user"
+        | TranscriptRole.Assistant -> "assistant"
+        | TranscriptRole.System -> "system"
+
+    /// Encode the replacement messages for omp. A message that omp cannot
+    /// represent makes the whole edit unusable, and is reported as such.
+    let private encodeContextMessages (replacements: ContextMessage list) : obj option =
+        // One stamp for the whole edit: every message produced here belongs
+        // to the same replacement, so mixed provenance would make the
+        // transcript order ambiguous.
+        let stamp = nowStamp ()
+        let encoded = replacements |> List.map (fun message -> message, encodeParts message.Parts)
+        if encoded |> List.exists (fun (_, parts) -> parts.IsNone) then
+            None
+        else
+            let payload =
+                encoded
+                |> List.map (fun (message, parts) ->
+                    let content = parts |> Option.defaultValue [] |> List.map (fun part -> box part)
+                    createObj
+                        [ "role", box (roleName message.Role)
+                          "content", box (List.toArray content)
+                          "timestamp", box stamp ])
+            Some(createObj [ "messages", box (List.toArray payload) ])
+
+    /// Apply the route the product admitted for a turn to omp's active
+    /// session. A model omp does not know, or one omp refuses, ends the
+    /// turn.
+    let private applyAdmittedRoute (pi: obj) (ctx: obj) (chosen: ModelRoute) : Task<obj> =
+        task {
+            let model =
+                callOptionalMethod2
+                    (ctxModelRegistry ctx)
+                    "find"
+                    (box chosen.Provider)
+                    (box chosen.Model)
+            if isNull model then
+                return createObj [ "handled", box true ]
+            else
+                let! accepted = awaitObj (call1 (fieldValue pi "setModel") (box model))
+                if isTrue accepted then return jsUndefined
+                else return createObj [ "handled", box true ]
+        }
+
+    /// The omp reply to an admitted turn: nothing when the turn runs with
+    /// the current model, an object that ends the turn otherwise.
+    let private admittedReply (pi: obj) (ctx: obj) (route: ModelRoute option) : Task<obj> =
+        task {
+            match route with
+            | None -> return jsUndefined
+            | Some chosen -> return! applyAdmittedRoute pi ctx chosen
+        }
+
+    /// The omp reply to a turn admission: nothing when the turn runs with
+    /// the current model, an object that ends the turn otherwise.
+    let private admissionReply (pi: obj) (ctx: obj) (verdict: TurnAdmission) : Task<obj> =
+        task {
+            match verdict with
+            | TurnAdmission.Refuse _ -> return createObj [ "handled", box true ]
+            | TurnAdmission.Admit route -> return! admittedReply pi ctx route
+        }
+
+    /// The omp reply to a context edit: nothing when the context stays, the
+    /// replacement messages otherwise.
+    let private contextEditReply (edit: ContextEdit) : obj option =
+        match edit with
+        | ContextEdit.Keep -> None
+        | ContextEdit.Replace replacements -> encodeContextMessages replacements
+
+    /// The neutral view of one omp context message.
+    let private contextMessageView (message: obj) : ContextMessage option =
+        match decodeRole message with
+        | None -> None
+        | Some role ->
+            Some
+                { Address = None
+                  Role = role
+                  Parts = decodeParts message }
+
     /// Register the product hooks on the omp event bus and return the
     /// combined signal emitter: every signal reaches the host subscribers
     /// and the product at the same time.
@@ -948,24 +1129,7 @@ module Adapter =
                               Message = None
                               Text = stringOf (fieldValue event "text")
                               Correlation = None }
-                    match verdict with
-                    | TurnAdmission.Refuse _ -> return createObj [ "handled", box true ]
-                    | TurnAdmission.Admit route ->
-                        match route with
-                        | None -> return jsUndefined
-                        | Some chosen ->
-                            let model =
-                                callOptionalMethod2
-                                    (ctxModelRegistry ctx)
-                                    "find"
-                                    (box chosen.Provider)
-                                    (box chosen.Model)
-                            if isNull model then
-                                return createObj [ "handled", box true ]
-                            else
-                                let! accepted = awaitObj (call1 (fieldValue pi "setModel") (box model))
-                                if isTrue accepted then return jsUndefined
-                                else return createObj [ "handled", box true ]
+                    return! admissionReply pi ctx verdict
                 }
                 |> unbox<obj>)
 
@@ -989,43 +1153,12 @@ module Adapter =
                 task {
                     let messages =
                         tryArray (fieldValue event "messages")
-                        |> Array.choose (fun message ->
-                            match decodeRole message with
-                            | None -> None
-                            | Some role ->
-                                Some
-                                    { Address = None
-                                      Role = role
-                                      Parts = decodeParts message })
+                        |> Array.choose contextMessageView
                         |> Array.toList
                     let! edit = hooks.Turn.ContextMessages (turnContext ctx) messages
-                    match edit with
-                    | ContextEdit.Keep -> return jsUndefined
-                    | ContextEdit.Replace replacements ->
-                        // One stamp for the whole edit: every message produced
-                        // here belongs to the same replacement, so mixed
-                        // provenance would make the transcript order ambiguous.
-                        let stamp = nowStamp ()
-                        let encoded = replacements |> List.map (fun message -> message, encodeParts message.Parts)
-                        if encoded |> List.exists (fun (_, parts) -> parts.IsNone) then
-                            // A message that omp cannot represent is left
-                            // alone rather than silently dropped.
-                            return jsUndefined
-                        else
-                            let payload =
-                                encoded
-                                |> List.map (fun (message, parts) ->
-                                    let content = parts |> Option.defaultValue [] |> List.map (fun part -> box part)
-                                    let role =
-                                        match message.Role with
-                                        | TranscriptRole.User -> "user"
-                                        | TranscriptRole.Assistant -> "assistant"
-                                        | TranscriptRole.System -> "system"
-                                    createObj
-                                        [ "role", box role
-                                          "content", box (List.toArray content)
-                                          "timestamp", box stamp ])
-                            return createObj [ "messages", box (List.toArray payload) ]
+                    match contextEditReply edit with
+                    | None -> return jsUndefined
+                    | Some payload -> return payload
                 }
                 |> unbox<obj>)
 
@@ -1116,23 +1249,7 @@ module Adapter =
             "before_subagent_spawn"
             (fun (event: obj) (ctx: obj) ->
                 task {
-                    match hooks.Spawn with
-                    | None -> return jsUndefined
-                    | Some spawn ->
-                        let request: SpawnRequest =
-                            { Parent = SessionId.create (ctxSessionId ctx)
-                              Role = AgentRole(stringOf (fieldValue event "agent"))
-                              Candidates = spawnCandidates (fieldValue event "patterns")
-                              SpawnKey = optionalString (fieldValue event "spawnKey") }
-                        let! route = spawn request
-                        match route with
-                        | SpawnRoute.Keep -> return jsUndefined
-                        | SpawnRoute.Refuse reason -> return createObj [ "block", box true; "reason", box reason ]
-                        | SpawnRoute.Route routes ->
-                            let models =
-                                routes
-                                |> List.map (fun route -> sprintf "%s/%s" route.Provider route.Model)
-                            return createObj [ "model", box (List.toArray models) ]
+                    return! routeSpawn hooks event ctx
                 }
                 |> unbox<obj>)
 
