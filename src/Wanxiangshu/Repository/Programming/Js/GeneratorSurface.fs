@@ -5,7 +5,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// JS-native generator boundary. Role and permission labels are vocabulary at
 /// the JS edge; typedRole exposes the typed JsSurface to real F# composition

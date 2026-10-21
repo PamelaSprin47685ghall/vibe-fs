@@ -20,6 +20,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fsi"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
+    <Compile Include="Repository/Programming/Js/DescriptionAssets.fsi"/>
+    <Compile Include="Repository/Programming/Js/DescriptionAssets.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fsi"/>

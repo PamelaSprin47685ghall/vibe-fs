@@ -6,7 +6,6 @@
     "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
     "src/Wanxiangshu/Mission/Work/ProjectionSurface.fs",
     "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs",
-    "src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs",
     "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"
   ]
 }

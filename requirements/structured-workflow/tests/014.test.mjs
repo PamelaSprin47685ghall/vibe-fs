@@ -549,10 +549,12 @@ test('WHAT[structured-workflow-014] NodeFs physical port and tool contracts have
   // lifecycle port work; js-toolbindings retains bindings/workflow/tool-host/generator only.
   assert.deepEqual(compileItems(jsToolBindingsProject), [
     'Repository/Programming/Js/ToolsBindings.fsi',
+    'Repository/Programming/Js/DescriptionAssets.fsi',
     'Repository/Programming/Js/OpenCode/ToolWorkflow.fsi',
     'Repository/Programming/Js/OpenCode/ToolHost.fsi',
     'Repository/Programming/Js/GeneratorSurface.fsi',
     'Repository/Programming/Js/ToolsBindings.fs',
+    'Repository/Programming/Js/DescriptionAssets.fs',
     'Repository/Programming/Js/OpenCode/ToolWorkflow.fs',
     'Repository/Programming/Js/OpenCode/ToolHost.fs',
     'Repository/Programming/Js/GeneratorSurface.fs',

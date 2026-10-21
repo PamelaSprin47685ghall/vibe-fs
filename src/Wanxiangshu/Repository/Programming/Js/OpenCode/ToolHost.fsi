@@ -8,11 +8,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
 
 
-/// PROMPT-019: load already-localized js-program prose. Domain assembles;
-/// this module binds language.
-module JsDescriptionAssets =
-    val load: lang: ProviderLanguage -> JsCanonicalDescription.Prose
-
 /// JS-073/JS-074: a generated js-* tool spec — the dynamic counterpart of the
 /// static baseSpecs. Built from a generated surface (JS-002); execution goes
 /// through JsToolWorkflow (sandbox → staging → preflight → durable facts →
