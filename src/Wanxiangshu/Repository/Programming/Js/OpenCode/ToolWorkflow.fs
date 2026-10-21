@@ -378,10 +378,7 @@ module JsToolWorkflow =
     /// Clear only what this call produced (deliver clause 6). A delivery
     /// another call of the same session made is evidence and stays: a later
     /// failure in that session must not erase it.
-    let private clearOwnDelivery
-        (sessionId: string)
-        (fence: (ProviderRunIdentity * ToolCallId) option)
-        : unit =
+    let private clearOwnDelivery (sessionId: string) (fence: (ProviderRunIdentity * ToolCallId) option) : unit =
         match fence with
         | None ->
             // Without a call fence the cell cannot be attributed to this
@@ -395,8 +392,7 @@ module JsToolWorkflow =
 
     /// The declared view as text: the exact declaration the program handed
     /// over, so the witness states the view and not a paraphrase of it.
-    let private declarationText (view: obj) : string =
-        JS.JSON.stringify view
+    let private declarationText (view: obj) : string = JS.JSON.stringify view
 
     /// The materialized view of a delivered declaration: the entries its view
     /// selects, rendered as text. This is the material the witness digests
@@ -418,12 +414,7 @@ module JsToolWorkflow =
         (view: obj)
         : Result<DeliveryWitness, JsFailure> =
         match fence with
-        | None ->
-            Error(
-                JsFailure.DeliveryNotEstablished(
-                    "the delivering call has no fence to own the witness"
-                )
-            )
+        | None -> Error(JsFailure.DeliveryNotEstablished("the delivering call has no fence to own the witness"))
         | Some(providerRun, toolCallId) ->
             let declaration = declarationText view
             let material = materializedView sessionId view
@@ -434,11 +425,7 @@ module JsToolWorkflow =
                 || System.String.IsNullOrWhiteSpace material
 
             if incomplete then
-                Error(
-                    JsFailure.DeliveryNotEstablished(
-                        "the attributed prose or the materialized view is empty"
-                    )
-                )
+                Error(JsFailure.DeliveryNotEstablished("the attributed prose or the materialized view is empty"))
             else
                 Ok
                     { SessionId = SessionId.create sessionId
@@ -474,9 +461,8 @@ module JsToolWorkflow =
         task {
             match deliveredView json with
             | Error failure -> return Error failure
-            | Ok None ->
-                return Error(JsFailure.ViewDeclarationInvalid "the delivered view declaration is empty")
-            | Ok (Some view) ->
+            | Ok None -> return Error(JsFailure.ViewDeclarationInvalid "the delivered view declaration is empty")
+            | Ok(Some view) ->
                 let record () =
                     match fence with
                     | Some(providerRun, toolCallId) ->
@@ -508,9 +494,7 @@ module JsToolWorkflow =
                             return
                                 Error(
                                     JsFailure.DeliveryNotEstablished(
-                                        "the durable delivery witness was not committed ("
-                                        + reason
-                                        + ")"
+                                        "the durable delivery witness was not committed (" + reason + ")"
                                     )
                                 )
         }
@@ -1124,9 +1108,12 @@ module JsToolWorkflow =
         if isNull input then
             []
         else
-            [ if isPresent (input?program) then ("program", input?program)
-              if isPresent (input?unpark) then ("unpark", input?unpark)
-              if isPresent (input?abandon) then ("abandon", input?abandon) ]
+            [ if isPresent (input?program) then
+                  ("program", input?program)
+              if isPresent (input?unpark) then
+                  ("unpark", input?unpark)
+              if isPresent (input?abandon) then
+                  ("abandon", input?abandon) ]
 
     /// Why a js-* input is contradictory: it carries more than one of
     /// program / unpark / abandon. The reason names the conflicting states.
@@ -1154,8 +1141,7 @@ module JsToolWorkflow =
         | [ ("program", source) ] -> ToolWorkflowInvocation.Program(string source)
         | [ ("unpark", unpark) ] -> ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value)
         | [ ("abandon", abandon) ] -> ToolWorkflowInvocation.Abandon(string (abandon?handle))
-        | states ->
-            ToolWorkflowInvocation.Invalid(conflictReason states)
+        | states -> ToolWorkflowInvocation.Invalid(conflictReason states)
 
     let private resolveParkedSite (sessionId: string) (handle: string) : Result<JsParkedSites.JsParkedSite, JsFailure> =
         match JsParkedSites.tryFind handle with
@@ -1234,8 +1220,7 @@ module JsToolWorkflow =
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Abandoned handle sessionId
                         abandonSite site deadlineMs outputBoundBytes)
-            | ToolWorkflowInvocation.Invalid reason ->
-                return Failed(JsFailure.InvalidArgument reason, [], [], [], [])
+            | ToolWorkflowInvocation.Invalid reason -> return Failed(JsFailure.InvalidArgument reason, [], [], [], [])
         }
 
     /// The same invocation without a review check and without a delivery

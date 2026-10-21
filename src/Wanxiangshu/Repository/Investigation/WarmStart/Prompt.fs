@@ -61,7 +61,8 @@ module RepositoryWarmStartPrompt =
     let MaxHintsTotal = law.maxHintsTotal
     let MaxWarmStartBytes = law.maxWarmStartBytes
 
-    let isDirectConsumer (role: Role) = law.isDirectConsumer (Roles.roleLabel role)
+    let isDirectConsumer (role: Role) =
+        law.isDirectConsumer (Roles.roleLabel role)
 
     let normalizeKeywords (raw: string) : string list =
         law.normalizeKeywords raw |> List.ofArray
@@ -144,7 +145,9 @@ module RepositoryWarmStartPrompt =
     let private fitted build fallback (hints: RepositoryWarmStartHint list) initialOmitted =
         let measure =
             Func<int, int, int>(fun kept omitted ->
-                build (List.truncate kept hints) omitted |> LlmFacing.render |> LlmFacing.byteCount)
+                build (List.truncate kept hints) omitted
+                |> LlmFacing.render
+                |> LlmFacing.byteCount)
 
         let verdict =
             law.fit (List.length hints, initialOmitted, measure, MaxWarmStartBytes)

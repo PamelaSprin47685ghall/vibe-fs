@@ -226,10 +226,7 @@ module JsFailure =
         | JsFailure.ViewDeclarationInvalid detail ->
             reasonWithMessage "view declaration is invalid" "view declaration is invalid: " detail
         | JsFailure.DeliveryNotEstablished detail ->
-            reasonWithMessage
-                "delivery was not established"
-                "delivery was not established: "
-                detail
+            reasonWithMessage "delivery was not established" "delivery was not established: " detail
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =
@@ -302,6 +299,5 @@ module JsFailure =
         | "ASK_REFUSED" -> JsFailure.AskRefused text
         | "DELEGATION_UNAVAILABLE" -> JsFailure.DelegationUnavailable
         | "VIEW_DECLARATION_INVALID" -> JsFailure.ViewDeclarationInvalid text
-        | "DELIVERY_NOT_ESTABLISHED" ->
-            JsFailure.DeliveryNotEstablished(after "delivery was not established: ")
+        | "DELIVERY_NOT_ESTABLISHED" -> JsFailure.DeliveryNotEstablished(after "delivery was not established: ")
         | _ -> JsFailure.ProgramFailed text

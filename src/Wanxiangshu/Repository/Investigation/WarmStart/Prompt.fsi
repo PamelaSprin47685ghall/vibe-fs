@@ -27,9 +27,13 @@ module RepositoryWarmStartPrompt =
     val MaxWarmStartBytes: int
     val isDirectConsumer: role: Role -> bool
     val normalizeKeywords: raw: string -> string list
+
     /// The first TopKPerKeyword hits in search order, stamped (keywordOrdinal, localRank) by the law.
     val rankHits:
-        ordinal: int -> hits: 'hit list -> toHint: (int -> int -> 'hit -> RepositoryWarmStartHint) -> RepositoryWarmStartHint list
+        ordinal: int ->
+        hits: 'hit list ->
+        toHint: (int -> int -> 'hit -> RepositoryWarmStartHint) ->
+            RepositoryWarmStartHint list
 
     val buildDocument:
         instructions: string list ->

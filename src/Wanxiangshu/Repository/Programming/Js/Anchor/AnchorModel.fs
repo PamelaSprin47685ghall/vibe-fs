@@ -91,7 +91,8 @@ module AnchorCoverage =
             Error(parsed?reason: string)
 
     let live (anchors: int list) (history: AnchorReplacement list) : int list =
-        unbox<int array> (law.live (intsToJs anchors, historyToJs history)) |> Array.toList
+        unbox<int array> (law.live (intsToJs anchors, historyToJs history))
+        |> Array.toList
 
     let plan (anchors: int list) (history: AnchorReplacement list) (declaration: AnchorViewDeclaration) =
         unbox<obj array> (law.plan (intsToJs anchors, historyToJs history, viewToJs declaration))

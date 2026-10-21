@@ -47,10 +47,7 @@ module AnchorSurface =
         let value = declarationValue declaration
         let prefixUntil: int = value?prefixUntil
 
-        createObj
-            [ "ok" ==> true
-              "prefixUntil" ==> prefixUntil
-              "thenMap" ==> value?thenMap ]
+        createObj [ "ok" ==> true; "prefixUntil" ==> prefixUntil; "thenMap" ==> value?thenMap ]
 
     /// The plain-JS receipt of one typed decision.
     let private receiptOf (decision: Result<AnchorViewDeclaration, JsFailure>) : obj =
@@ -96,9 +93,8 @@ module AnchorSurface =
                 [ "ok" ==> true
                   "material"
                   ==> (AnchorView.material numberOf entries
-                      |> List.map (fun (anchor, text) ->
-                          createObj [ "anchor" ==> anchor; "text" ==> text ])
-                      |> List.toArray) ]
+                       |> List.map (fun (anchor, text) -> createObj [ "anchor" ==> anchor; "text" ==> text ])
+                       |> List.toArray) ]
 
     let numberMessage sessionId messageId =
         AnchorLedger.numberMessage sessionId messageId
@@ -118,7 +114,8 @@ module AnchorSurface =
         if isNullish declaration then
             Ok()
         else
-            AnchorDeclarationRule.parse declaration |> Result.map (AnchorLedger.setView sessionId)
+            AnchorDeclarationRule.parse declaration
+            |> Result.map (AnchorLedger.setView sessionId)
 
     /// Plain JS receipt for declaration capture; typed Host callers use setView.
     let captureView (sessionId: string) (declaration: obj) : obj =

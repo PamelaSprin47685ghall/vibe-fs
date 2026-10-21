@@ -20,7 +20,11 @@ module BookkeeperStaging =
     let private missingTransaction = "todowrite-for-bookkeeper: no staged transaction"
 
     let beginTransaction (txId: string) (question: string) (answer: string) : unit =
-        lock gate (fun () -> slots.[txId] <- { Question = question; Answer = answer; Touched = false })
+        lock gate (fun () ->
+            slots.[txId] <-
+                { Question = question
+                  Answer = answer
+                  Touched = false })
 
     let snapshot (txId: string) : Result<string * string, string> =
         lock gate (fun () ->

@@ -163,9 +163,17 @@ module JsToolSpec =
         let inputOf (args: HostToolArguments) : obj =
             let program = readProgram args
 
-            let unpark = if isPresent (args.Raw?unpark) then Some(args.Raw?unpark) else None
+            let unpark =
+                if isPresent (args.Raw?unpark) then
+                    Some(args.Raw?unpark)
+                else
+                    None
 
-            let abandon = if isPresent (args.Raw?abandon) then Some(args.Raw?abandon) else None
+            let abandon =
+                if isPresent (args.Raw?abandon) then
+                    Some(args.Raw?abandon)
+                else
+                    None
 
             let programEntry =
                 match program with
@@ -183,13 +191,10 @@ module JsToolSpec =
 
             let abandonEntry =
                 match abandon with
-                | Some abandonValue ->
-                    Some("abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ])
+                | Some abandonValue -> Some("abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ])
                 | None -> None
 
-            [ programEntry; unparkEntry; abandonEntry ]
-            |> List.choose id
-            |> createObj
+            [ programEntry; unparkEntry; abandonEntry ] |> List.choose id |> createObj
 
         // The unpark/abandon arguments are nested objects; the Host schema
         // describes them as plain objects with string handle fields. The value
@@ -238,13 +243,7 @@ module JsToolSpec =
                     | Some reason ->
                         return
                             JsToolsResult.render (
-                                JsToolWorkflow.JsToolOutcome.Failed(
-                                    JsFailure.InvalidArgument reason,
-                                    [],
-                                    [],
-                                    [],
-                                    []
-                                )
+                                JsToolWorkflow.JsToolOutcome.Failed(JsFailure.InvalidArgument reason, [], [], [], [])
                             )
                     | None ->
                         let hasProgram = isPresent (input?program)
@@ -255,7 +254,8 @@ module JsToolSpec =
                             && not (isPresent (input?abandon))
 
                         let declaration =
-                            if isUndefined (args.Raw?prefixUntil) && isUndefined (args.Raw?thenMap) then null
+                            if isUndefined (args.Raw?prefixUntil) && isUndefined (args.Raw?thenMap) then
+                                null
                             else
                                 createObj [ "prefixUntil" ==> args.Raw?prefixUntil; "thenMap" ==> args.Raw?thenMap ]
 
@@ -273,19 +273,13 @@ module JsToolSpec =
                             elif not (isPresent declaration) then
                                 None
                             else
-                                match
-                                    Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse
-                                        declaration
-                                with
+                                match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse declaration with
                                 | Ok _ -> None
                                 | Error failure -> Some failure
 
                         match viewFailure with
                         | Some failure ->
-                            return
-                                JsToolsResult.render (
-                                    JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])
-                                )
+                            return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
                         | None when noState ->
                             return
                                 ToolHostCodec.tomlObject
@@ -366,9 +360,7 @@ module JsToolSpec =
                             match commitFailure with
                             | Some failure ->
                                 return
-                                    JsToolsResult.render (
-                                        JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])
-                                    )
+                                    JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
                             | None -> return JsToolsResult.render outcome
                 } }
 

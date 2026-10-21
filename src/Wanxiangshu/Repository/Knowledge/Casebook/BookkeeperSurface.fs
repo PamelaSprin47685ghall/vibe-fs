@@ -114,8 +114,10 @@ module CasebookBookkeeperSurface =
                                 let res =
                                     match outcome with
                                     | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Completed _ -> Ok()
-                                    | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Failed stop -> Error stop.Reason
-                                    | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Aborted stop -> Error stop.Reason
+                                    | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Failed stop ->
+                                        Error stop.Reason
+                                    | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Aborted stop ->
+                                        Error stop.Reason
 
                                 listener id res)
                         )

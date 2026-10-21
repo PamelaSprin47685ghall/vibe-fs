@@ -196,9 +196,7 @@ module JsDeliveredValues =
         (assistant: string option)
         : string option =
         match peekFence sessionId with
-        | Some fence
-            when fence.ProviderRun = providerRun
-                 && fence.ToolCallId = toolCallId ->
+        | Some fence when fence.ProviderRun = providerRun && fence.ToolCallId = toolCallId ->
             // The run mode is the owner's only mode that claims a fenced
             // cell; it compares the provider run alone, which the check
             // above has already done together with the tool call id.
