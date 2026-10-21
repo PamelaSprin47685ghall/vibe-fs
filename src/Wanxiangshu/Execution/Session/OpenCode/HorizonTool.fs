@@ -14,6 +14,52 @@ open Wanxiangshu.Persistence.Journal
 /// OpenCode adapter for horizon(): binds `IDelegationCallerHost` to one tool
 /// call and puts `HorizonRoster` on the OpenCode wire.
 module HorizonTool =
+    /// Provider prose paths for the horizon surfaces. They live on the adapter
+    /// side so an OpenCode adapter never reaches into a product namespace for
+    /// a render path; `HorizonRoster` keeps the same vocabulary host-neutrally.
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let Description = "tool/horizon/description"
+
+        [<Literal>]
+        let Returned = "tool/horizon/returned"
+
+        [<Literal>]
+        let StillAway = "tool/horizon/still-away"
+
+        [<Literal>]
+        let DidNotReturn = "tool/horizon/did-not-return"
+
+        [<Literal>]
+        let RemainsOpen = "tool/horizon/remains-open"
+
+        [<Literal>]
+        let Someone = "tool/horizon/someone"
+
+        [<Literal>]
+        let TerminalLabel = "tool/horizon/terminal-label"
+
+        [<Literal>]
+        let EmptyRoster = "tool/horizon/empty-roster"
+
+        [<Literal>]
+        let UnavailableFromContext = "tool/horizon/unavailable-from-context"
+
+        [<Literal>]
+        let CannotBeSeen = "tool/horizon/cannot-be-seen"
+
+        [<Literal>]
+        let LatestWork = "tool/horizon/latest-work"
+
+        [<Literal>]
+        let NoWorkYet = "tool/horizon/no-work-yet"
+
+        [<Literal>]
+        let LatestWorkUnavailable = "tool/horizon/latest-work-unavailable"
+
+        [<Literal>]
+        let Calibration = "tool/horizon/calibration"
 
     type HorizonRuntimeContext =
         { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
@@ -82,10 +128,7 @@ module HorizonTool =
     let spec (runtimeCtx: HorizonRuntimeContext) =
         { Name = "horizon"
           Description =
-            ProviderProse.render
-                (ProviderLanguageBinding.readGlobalPreference ())
-                HorizonRoster.Path.Description
-                Map.empty
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
           Admission = admission
           Execute = execute runtimeCtx }

@@ -86,6 +86,12 @@ type PluginSessionScope
     // DSL-MUTABLE: resource — per-instance join interrupt registry.
     member val JoinInterrupts: IJoinAttemptRegistry = JoinAttemptRegistry() :> IJoinAttemptRegistry
 
+    /// EXEC-017: a visible user message wakes the CURRENT active join attempt.
+    /// The adapter-facing scope owns the call so the host boundary never opens
+    /// the delegation handle namespace itself.
+    member this.ObserveAcceptedMessage(evidence: AcceptedChatExecutionEvidence) =
+        JoinWake.observeAcceptedMessage this.JoinInterrupts evidence
+
     member private _.SettleExecution(durable: AgentJournal, execution: ChatExecutionState) : Task =
         task {
             let! settled =

@@ -17,7 +17,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session
@@ -747,8 +746,7 @@ module HostSignalBootstrap =
                                 |> Option.bind (fun durable ->
                                     SessionExecutionBinding.tryContinuationAdmission durable state.acceptedEvidence)
                                 |> Option.isSome)))
-                    |> Option.iter (fun state ->
-                        JoinWake.observeAcceptedMessage scope.Sessions.JoinInterrupts state.acceptedEvidence)
+                    |> Option.iter (fun state -> scope.Sessions.ObserveAcceptedMessage state.acceptedEvidence)
 
             let executionKey intent =
                 match intent with
@@ -1130,8 +1128,9 @@ module HostSignalBootstrap =
                 |> Option.filter (fun _ ->
                     ProviderWireDecode.firstString info [ "role" ] = Some "user"
                     && ProviderWireDecode.firstString info [ "sessionID"; "sessionId" ] = Some(
-                        SessionId.value selected.SessionId
-                    ))
+                                                                                              SessionId.value
+                                                                                                  selected.SessionId
+                                                                                          ))
                 |> Option.map (fun physical ->
                     { SessionId = selected.SessionId
                       PhysicalUserMessageId = PhysicalUserMessageId.create physical })

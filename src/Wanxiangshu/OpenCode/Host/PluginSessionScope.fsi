@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Execution.Delegation.Handle
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 
 /// Per-instance session registry state for one plugin instance (HOST-012):
@@ -45,6 +46,11 @@ type PluginSessionScope =
 
     /// Per-instance join interrupt registry.
     member JoinInterrupts: IJoinAttemptRegistry
+
+    /// Wakes the CURRENT active join attempt when a visible user message is
+    /// accepted. The adapter-facing scope owns the call so the host boundary
+    /// never opens the delegation handle namespace itself.
+    member ObserveAcceptedMessage: evidence: AcceptedChatExecutionEvidence -> unit
 
 
     /// Drops the provider-language identity for this session idempotently.
