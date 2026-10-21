@@ -4,12 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Persistence.Journal
-
-[<RequireQualifiedAccess>]
-type RelayProjectionDisposition =
-    | Unchanged
-    | CurrentTenure
-    | RetiredAttemptStopped
+open Wanxiangshu.Mission.Work
 
 module RelayNarrativeTransform =
     val isStaleRetiredAttempt:

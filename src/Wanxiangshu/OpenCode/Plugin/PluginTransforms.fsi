@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Mission.Work.OpenCode
+open Wanxiangshu.Mission.Work
 
 module PluginTransforms =
 

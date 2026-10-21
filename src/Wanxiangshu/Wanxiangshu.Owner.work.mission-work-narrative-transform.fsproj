@@ -20,6 +20,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
         <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
+<Compile Include="Mission/Work/RelayProjection.fsi"/>
+<Compile Include="Mission/Work/RelayProjection.fs"/>
 <Compile Include="Mission/Work/OpenCode/NarrativeTransform.fsi"/>
     <Compile Include="Mission/Work/OpenCode/NarrativeTransform.fs"/>
   </ItemGroup>

@@ -4,7 +4,6 @@
     "src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs",
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
     "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
-    "src/Wanxiangshu/Mission/Work/ProjectionSurface.fs",
     "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs"
   ]
 }

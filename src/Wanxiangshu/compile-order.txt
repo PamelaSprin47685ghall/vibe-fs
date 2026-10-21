@@ -1039,6 +1039,8 @@ Execution/Delegation/Fork/CleanBreakSurface.fsi
 Execution/Delegation/Fork/CleanBreakSurface.fs
 OpenCode/JoinResultRendererSurface.fsi
 OpenCode/JoinResultRendererSurface.fs
+Mission/Work/RelayProjection.fsi
+Mission/Work/RelayProjection.fs
 Mission/Work/OpenCode/NarrativeTransform.fsi
 Mission/Work/OpenCode/NarrativeTransform.fs
 

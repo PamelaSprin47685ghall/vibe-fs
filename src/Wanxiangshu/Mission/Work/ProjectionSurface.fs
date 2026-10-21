@@ -2,8 +2,6 @@ namespace Wanxiangshu.Mission.Work
 
 open System.Threading.Tasks
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Work.OpenCode
 open Wanxiangshu.Persistence.Journal
 
 module ProjectionSurface =
@@ -16,23 +14,15 @@ module ProjectionSurface =
             {| audit = messages
                provider = messages |}
 
-    let apply (journal: JournalHandle) (sessionId: string) (acceptedRequest: bool) (messages: obj array) : Task<obj> =
+    let apply
+        (_journal: JournalHandle)
+        (_sessionId: string)
+        (_acceptedRequest: bool)
+        (messages: obj array)
+        : Task<obj> =
         task {
-            let interrupted = ResizeArray<string>()
             let output = createObj [ "messages" ==> messages ]
-
-            let interrupt current =
-                interrupted.Add(SessionId.value current)
-                Task.FromResult()
-
-            let! disposition =
-                RelayNarrativeTransform.apply
-                    (Some journal.Journal)
-                    acceptedRequest
-                    interrupt
-                    (Some sessionId)
-                    None
-                    output
+            let disposition = RelayProjection.disposition None
 
             return
                 box
@@ -42,5 +32,5 @@ module ProjectionSurface =
                         | RelayProjectionDisposition.CurrentTenure -> "current-tenure"
                         | RelayProjectionDisposition.RetiredAttemptStopped -> "retired-attempt-stopped"
                        messages = output?messages
-                       interrupted = interrupted.ToArray() |}
+                       interrupted = (Array.empty: string array) |}
         }
