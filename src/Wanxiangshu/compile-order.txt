@@ -707,6 +707,8 @@ Interaction/Dispatch/OpenCode/MetadataCodec.fsi
 Interaction/Dispatch/OpenCode/MetadataCodec.fs
 OpenCode/Codec/ProviderWireDecode.fsi
 OpenCode/Codec/ProviderWireDecode.fs
+Participant/Provider/Projection/CapturedWire.fsi
+Participant/Provider/Projection/CapturedWire.fs
 OpenCode/Codec/ProviderWireCapture.fsi
 OpenCode/Codec/ProviderWireCapture.fs
 OpenCode/Codec/ProjectionMessageEdit.fsi

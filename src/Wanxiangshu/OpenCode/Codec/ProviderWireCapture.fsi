@@ -2,17 +2,9 @@ namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
+open Wanxiangshu.Participant.Provider.Projection.CapturedWire
 
 module ProviderWireCapture =
-    type CapturedWirePart =
-        { WirePart: WirePart
-          HostPartId: HostMessagePartId option
-          HostToolPartId: HostToolPartId option }
-
-    type CapturedWireMessage =
-        { Role: string
-          ProviderRun: ProviderRunIdentity option
-          Parts: CapturedWirePart list }
 
     val decodeCapturedMessage: rawObj: obj -> CapturedWireMessage option
     val isSyntheticMessage: rawObj: obj -> bool
