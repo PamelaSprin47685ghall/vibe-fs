@@ -8,11 +8,7 @@ open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 type CompanionHost =
-    new:
-        primaryId: SessionId *
-        sessions: ISessionHostPort *
-        ?durable: ICompanionDurablePort ->
-            CompanionHost
+    new: primaryId: SessionId * sessions: ISessionHostPort * ?durable: ICompanionDurablePort -> CompanionHost
 
     member Memory: CompanionMemory
     member RefreshXTrace: state: XTraceProjectionState -> unit

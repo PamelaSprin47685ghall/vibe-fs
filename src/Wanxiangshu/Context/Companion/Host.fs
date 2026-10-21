@@ -7,12 +7,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
-type CompanionHost
-    (
-        primaryId: SessionId,
-        sessions: ISessionHostPort,
-        ?durable: ICompanionDurablePort
-    ) =
+type CompanionHost(primaryId: SessionId, sessions: ISessionHostPort, ?durable: ICompanionDurablePort) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
 
     member _.Memory = companion.Memory
