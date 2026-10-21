@@ -385,6 +385,38 @@ module SessionSnapshotPort =
         && not (isNull row?title)
         && unbox<string> row?title = title
 
+    /// The manager session a candidate row carries, or the refusal it raises.
+    let private managerSessionOfRow (row: obj) : Result<SessionId option, HostError> =
+        if readString row?agent <> Some "manager" then
+            Error(HostError.Refused "Delivery session does not identify the Manager agent")
+        else
+            sessionIdOfRow row
+            |> Option.map (fun session -> Ok(Some session))
+            |> Option.defaultWith (fun () -> Error(HostError.Refused "Delivery session has no valid identity"))
+
+    /// One step of the row scan: the first refusal stops the scan.
+    let private scanStep (acc: Result<SessionId list, HostError>) (row: obj) : Result<SessionId list, HostError> =
+        acc
+        |> Result.bind (fun sessions ->
+            managerSessionOfRow row
+            |> Result.map (fun found -> found |> Option.toList @ sessions))
+
+    /// The manager sessions among the candidate rows, or the first refusal a
+    /// row carries.
+    let private scanManagerSessions (rows: obj array) : Result<SessionId list, HostError> =
+        rows |> Array.fold scanStep (Ok []) |> Result.map List.rev
+
+    /// The manager sessions on a discovery page, or the ambiguity refusal.
+    /// A full page cannot prove there is only one candidate, even when local
+    /// filtering would leave one usable row.
+    let private managerSessionsOnPage (title: string) (rows: obj array) : Result<SessionId list, HostError> =
+        if rows.Length >= 2 then
+            Error(HostError.Refused "Session discovery is ambiguous or its result page is full")
+        else
+            let matches = rows |> Array.filter (exactRootTitle title)
+
+            scanManagerSessions matches
+
     let private discoveredSessions (title: string) (response: obj) : Result<SessionId list, HostError> =
         let rows =
             if not (isNull response) && not (isNull response?error) then
@@ -398,31 +430,7 @@ module SessionSnapshotPort =
 
         match rows with
         | Error error -> Error error
-        | Ok rows ->
-            // Request two matches. A full page cannot prove there is only one
-            // candidate, even when local filtering would leave one usable row.
-            if rows.Length >= 2 then
-                Error(HostError.Refused "Session discovery is ambiguous or its result page is full")
-            else
-                let matches = rows |> Array.filter (exactRootTitle title)
-
-                let mutable refusal: HostError option = None
-                let sessions = ResizeArray<SessionId>()
-
-                for row in matches do
-                    match refusal with
-                    | Some _ -> ()
-                    | None ->
-                        if readString row?agent <> Some "manager" then
-                            refusal <- Some(HostError.Refused "Delivery session does not identify the Manager agent")
-                        else
-                            match sessionIdOfRow row with
-                            | Some session -> sessions.Add session
-                            | None -> refusal <- Some(HostError.Refused "Delivery session has no valid identity")
-
-                match refusal with
-                | Some error -> Error error
-                | None -> Ok(List.ofSeq sessions)
+        | Ok rows -> managerSessionsOnPage title rows
 
     [<Emit("encodeURIComponent($0)")>]
     let private encodeURIComponent (_value: string) : string = jsNative

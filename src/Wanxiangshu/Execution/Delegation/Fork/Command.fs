@@ -1215,6 +1215,18 @@ module ForkCommand =
         | ForkResult.DispatchUncertain _ -> Error(refusalCode Path.Fork.ChargePlacementUncertain)
         | ForkResult.NotFound _ -> Error "placement-failed"
 
+    /// A placement either resumes the child (its fork result is the receipt) or
+    /// refuses as placement-failed.
+    let private placedResumeReceipt
+        (request: Request)
+        (placement: Result<ForkResult, string>)
+        : Result<ForkReceipt, string> =
+        match placement with
+        | Ok forkResult -> resumeResultReceipt request forkResult
+        | Error _ -> Error "placement-failed"
+
+
+
     let private resumeBusyGuidanceReceipt
         (host: IDelegationCommandHost)
         (runtime: HostForkRuntime)
@@ -1233,9 +1245,7 @@ module ForkCommand =
 
                 let! result = runtime.AppendGuidance(agentId, profile, rendered)
 
-                match result with
-                | Ok forkResult -> return resumeResultReceipt request forkResult
-                | Error _ -> return Error "placement-failed"
+                return placedResumeReceipt request result
         }
 
     /// Busy child: the charge becomes guidance appended to the running turn.
@@ -1273,9 +1283,7 @@ module ForkCommand =
                         return reused
                     }
 
-                match placement with
-                | Ok forkResult -> return resumeResultReceipt request forkResult
-                | Error _ -> return Error "placement-failed"
+                return placedResumeReceipt request placement
         }
 
     /// Idle child: the charge reopens the existing child session.
@@ -1292,6 +1300,46 @@ module ForkCommand =
         else
             resumeIdleAttachedReceipt host runtime request handles role agentId
 
+    /// The agent id behind a handle, or the person-unknown refusal.
+    let private handleAgentId (handle: HandleRecord) : Result<AgentHandleId, string> =
+        match HandleId.tryAgent handle.Handle with
+        | None -> Error(refusalCode Path.Fork.PersonUnknown)
+        | Some handleId -> Ok(AgentHandleId.value handleId)
+
+    /// A busy child takes the charge as guidance; an idle one is reopened under
+    /// its live (or adopted) role, else its durable canonical role.
+    let private resumeKnownAgent
+        (host: IDelegationCommandHost)
+        (runtime: HostForkRuntime)
+        (request: Request)
+        (handles: AgentLinkageProjection option)
+        (handle: HandleRecord)
+        (handleId: AgentHandleId)
+        : Task<Result<ForkReceipt, string>> =
+        let agentId = AgentHandleId.value handleId
+
+        let activeRun =
+            lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
+
+        match activeRun, runtime.TryFindAgentOrAdopt agentId, handle.CanonicalRole with
+        | true, _, _ -> resumeBusyReceipt host runtime request handles agentId
+        | false, Some(_, role, _), _ -> resumeIdleReceipt host runtime request handles role agentId
+        | false, None, Role.DevOps -> resumeIdleReceipt host runtime request handles Role.DevOps agentId
+        | false, None, _ -> resumeIdleReceipt host runtime request handles handle.CanonicalRole agentId
+
+    /// The resume of a known person: the handle's agent id decides whether the
+    /// child is busy or idle.
+    let private resumeKnownHandle
+        (host: IDelegationCommandHost)
+        (runtime: HostForkRuntime)
+        (request: Request)
+        (handles: AgentLinkageProjection option)
+        (handle: HandleRecord)
+        : Task<Result<ForkReceipt, string>> =
+        match handleAgentId handle with
+        | Error path -> Task.FromResult(Error path)
+        | Ok handleId -> resumeKnownAgent host runtime request handles handle handleId
+
     let private resumeReceiptExistingPerson
         (host: IDelegationCommandHost)
         (runtime: HostForkRuntime)
@@ -1303,21 +1351,29 @@ module ForkCommand =
 
         match existingByname with
         | None -> Task.FromResult(Error(refusalCode Path.Fork.PersonUnknown))
-        | Some handle ->
-            match HandleId.tryAgent handle.Handle with
-            | None -> Task.FromResult(Error(refusalCode Path.Fork.PersonUnknown))
-            | Some handleId ->
-                let agentId = AgentHandleId.value handleId
+        | Some handle -> resumeKnownHandle host runtime request handles handle
 
-                let activeRun =
-                    lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
+    /// The manager resume against an available fork runtime.
+    let private resumeWithForkRuntime
+        (host: IDelegationCommandHost)
+        (request: Request)
+        (runtime: HostForkRuntime)
+        : Task<Result<ForkReceipt, string>> =
+        let handles = agentHandles host
+        resumeReceiptExistingPerson host runtime request handles
 
-                match activeRun, runtime.TryFindAgentOrAdopt agentId, handle.CanonicalRole with
-                | true, _, _ -> resumeBusyReceipt host runtime request handles agentId
-                | false, Some(_, role, _), _ -> resumeIdleReceipt host runtime request handles role agentId
-                | false, None, Role.DevOps -> resumeIdleReceipt host runtime request handles Role.DevOps agentId
-                | false, None, _ -> resumeIdleReceipt host runtime request handles handle.CanonicalRole agentId
+    /// The manager resume against the host's fork runtime, or the
+    /// charge-context-unavailable refusal.
+    let private resumeWithHostRuntime
+        (host: IDelegationCommandHost)
+        (request: Request)
+        : Task<Result<ForkReceipt, string>> =
+        match host.ForkRuntime() with
+        | Error _ -> Task.FromResult(Error(refusalCode Path.Fork.ChargeContextUnavailable))
+        | Ok runtime -> resumeWithForkRuntime host request runtime
 
+
+    /// The manager resume once the devops guards have passed.
     let private executeManagerResumeReceiptAfterGuards
         (host: IDelegationCommandHost)
         (request: Request)
@@ -1335,11 +1391,7 @@ module ForkCommand =
             | None ->
                 do! bindWorkDevOpsIfNeeded host parentSessionId isDevOps
 
-                match host.ForkRuntime() with
-                | Error _ -> return Error(refusalCode Path.Fork.ChargeContextUnavailable)
-                | Ok runtime ->
-                    let handles = agentHandles host
-                    return! resumeReceiptExistingPerson host runtime request handles
+                return! resumeWithHostRuntime host request
         }
 
     let private executeManagerResumeReceipt
