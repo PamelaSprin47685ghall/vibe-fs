@@ -70,3 +70,53 @@
   - **smoke 侧**：`proposals/host-neutral-interface/smoke/` 已备好 opt-in 真实 smoke（`CUT36_OMP_REAL_SMOKE=1` 才启动真实 omp 进程；断言只认宿主观察事件与磁盘事实，产品不写自述报告）。**真实 smoke 尚未通过**：最近一次运行为 FAIL（宿主侧扩展加载失败），不得据此宣称 canary 成立。
 - **因此当前不能说的话**：不说“smoke 已通过”，不说“已支持第二宿主”，不说端口族已 WIRED-OMP。当前只能说：授权已具备，canary 在做。
 - **下一检查人 / 转 DONE 条件**：待真实 smoke 跑通 §3 四项（产物真实加载、工作区根与状态目录定位、一次真实 provider 请求且双语资源注入、真实子会话/受管执行边界）并留下 `proposals/extraction-kanban/evidence/CUT-36/` 下的证据后，由协调者把本卡与看板改为 `DONE`；在那之前保持 `DOING`。
+
+## 8. 2026-10-22 实现进展（本机能核实的事实）
+
+本节只记录在本机读文件 / 跑命令能核实的事实；凡未在本机复现的，一律标注来源。
+
+### 8.1 代码已进入三个编译分片（但从未编译过）
+
+- **omp 侧已是真实 F# 源码**，不再是只有 TS 骨架：
+  - `src/Wanxiangshu/Omp/Adapter.fs(i)` —— F# 宿主适配层（`activateOnOmp`：`src/Wanxiangshu/Omp/Adapter.fs:1382-1383`；公开面 `src/Wanxiangshu/Omp/Adapter.fsi:21`）；
+  - `src/Wanxiangshu/Host/SecondHost/HostPlugin.fs(i)` —— P-11 `IHostPlugin` 的产品组合根；
+  - `src/Wanxiangshu/Composition/Omp/OmpExtension.fs(i)` —— 扩展入口（`activate` 把 `HostPlugin.plugin` 接到 `Adapter.activateOnOmp`，`src/Wanxiangshu/Composition/Omp/OmpExtension.fs:21-23`；`[<ExportDefault>] defaultExport`，`:26-28`）。
+- **三个分片已列入编译顺序清单**：`src/Wanxiangshu/compile-order.txt` 第 1360-1365 行依次是 `Omp/Adapter.fsi` / `.fs`、`Host/SecondHost/HostPlugin.fsi` / `.fs`、`Composition/Omp/OmpExtension.fsi` / `.fs`；对应分片文件为 `Wanxiangshu.Owner.host-boundary.omp-adapter.fsproj`、`.omp-extension.fsproj`、`.second-host-plugin.fsproj`。
+- **但这三个分片在本分支上从未被编译**：仓内 `dist/Composition/Omp/` 目录**不存在**（`dist/Composition/` 下只有 `Durable` 与 `Turn`），`dist/` 内也搜不到任何 `*Omp*` / `*SecondHost*` 产物。
+- **构建时序**：`scripts/build.mjs:78` 的 `CrossProcessMutex.acquire(waitTimeoutMs = 180_000)` 是 build-slot 的 180 s 排队/编译上限；本树的全影响面重建实测 **3059 s**（来源：仓外构建日志 `/home/hermes/work/cut36-omp/build-baseline.log` 末行 `build_exit=0 wall=3059s`；**该数字不可由仓内内容复现**）。所以“先编译再看”在当前额度下不成立。
+
+### 8.2 本次门禁读数（2026-10-22，HEAD `5494db8f5`）
+
+| 门禁 | 读数 |
+|---|---|
+| `node scripts/checks/fsharp-control-pyramid.mjs --root=src/Wanxiangshu --show-all` | **5** 处，全部在 `src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs`（444 match-pyramid、473 match-pyramid、629/648/715 branch-pyramid）；**omp 三文件 0 处** |
+| `node scripts/checks/architecture.mjs` | exit 0，`architecture: OK` |
+| `node scripts/checks/aggregate-retired.mjs` | exit 0，`aggregate-retired: OK` |
+| `node scripts/checks/adapter-thinness.mjs --report` | 141 个适配器文件 / 34547 行；product-reference **595**（baseline 689）；without-port **137**（baseline 150）；报告里**没有任何 omp 文件**（`grep -i "omp/"` 无命中） |
+| `node scripts/checks/shard-edge-audit.mjs` | 245 个分片 / 268 处发现；**high 0 / medium 0**，268 处全是 `[low]` 类型名边；其中 8 处涉及 omp 三个分片 |
+
+两次“拉平控制金字塔”的无语义改动提交：`caaacdcf5`（`Host/SecondHost/HostPlugin.fs`）、`5494db8f5`（`Omp/Adapter.fs`）——两者都只改结构不改语义，因此上述读数不含语义变更。
+
+### 8.3 四个会挡住真实加载的缺陷（本机核实到 file:line；以下行号对应 HEAD `5494db8f5`）
+
+> 注：本节描述的是 HEAD `5494db8f5` 的树。2026-10-22 同日在工作树中已有人开始修这四处（`Omp/Adapter.fs`、
+> `Omp/Adapter.fsi`、`Composition/Omp/OmpExtension.fs(i)` 有未提交的改动），因此这些 file:line 描述的是**已提交**
+> 的状态；修复合入后本节需重新核对。
+
+1. **扩展工厂形状不对** —— omp 的加载器只接受“函数”式工厂：`getExtensionFactory` 取 `module` 本身或其 `.default`，且必须 `typeof === "function"`，否则报 “Extension does not export a valid factory function”
+   （omp `src/extensibility/extensions/loader.ts:62-67`、`:420-428`），调用点是 `await factory(api)`（`:405`）。而 F# 侧 `[<ExportDefault>] let defaultExport (pi: obj) : obj` 返回的是一个 **obj**（盒装的 Task），不是工厂函数
+   （`src/Wanxiangshu/Composition/Omp/OmpExtension.fs:26-28`）。→ 真实宿主加载这一步就会失败。
+2. **`SessionManager` 构造方式不存在** —— 适配器把 `SessionManager` 当可 `new` 的类调用：`call1 (fieldValue module_ "SessionManager") (box dir)`（`src/Wanxiangshu/Omp/Adapter.fs:246-249`）。但 omp 的 `SessionManager` 构造函数是 **private**（omp `src/session/session-manager.ts:1017`），公开入口是静态 `SessionManager.create(cwd, sessionDir?, storage?)`（`:4004`），第一个参数是 **cwd**，不是 session 目录。
+3. **动态 import 的包路径解析不到** —— 适配器用裸标识符 `import("@oh-my-pi/pi-coding-agent/…")`（`src/Wanxiangshu/Omp/Adapter.fs:248`、`:255`、`:368`、`:555`、`:556`）。omp 的 `package.json`（18.12.4）`exports` 里没有 `./sdk`、也没有裸的 `./session/session-manager`（只有 `"."` 与 `"./*"` 等），本机 `require.resolve` 这四个标识符全部 `ERR_PACKAGE_PATH_NOT_EXPORTED`；而扩展 API 把 SDK 作为 `pi.pi` 交给扩展（omp `src/extensibility/extensions/types.ts:1642`），适配器**从未读过 `pi.pi`**。
+4. **transcript id 是位置序号而非 omp 的 entry id** —— 适配器用 `TranscriptMessageAddress.create (sprintf "omp:%d" index)`（`src/Wanxiangshu/Omp/Adapter.fs:188`），而 omp 的每条记录本身带 `id`（omp `src/session/session-entries.ts:79-82`）。这正是开放项 **O-1**（见 `proposals/host-neutral-interface/evidence/omp-feasibility.md:14,46`）。
+
+### 8.4 因此本节明确不宣称的事
+
+- **仍未通过真实 smoke；不得宣称已支持第二宿主。** `proposals/host-neutral-interface/smoke/` 仍是 opt-in（`CUT36_OMP_REAL_SMOKE=1`），最近一次运行为 FAIL。
+- 不说任何端口已 WIRED-OMP：端口族状态保持 `DECLARED` / `SKELETON-OMP` 不变。
+- O-3（Fable 产物与 `activateOnOmp` 的真实绑定）**仍然开放**：F# 产物没编译出来，工厂形状也还与 omp 不匹配（见 8.3 第 1 条）。
+- O-5（`AgentSession.sessionId` 是 provider id、不是持久化 id）对应的实现细节仍在 `src/Wanxiangshu/Omp/Adapter.fs:291`（读 `sessionManager.getSessionId()`），未闭合。
+
+### 8.5 下一检查人 / 转 DONE 条件
+
+不变：仍需真实 smoke 跑通 §3 四项，并在 `proposals/extraction-kanban/evidence/CUT-36/` 留下证据后，由协调者把本卡与看板改为 `DONE`；在那之前保持 `DOING`。本节的 8.3 四个缺陷是当前最先需要修的东西。

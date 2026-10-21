@@ -122,9 +122,6 @@ Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: 
 
 - **状态**：`DOING`。仓主已指认 **omp 18.12.4**（锁定版本）为第二宿主，并授权 canary 所需的真实模型调用。
 - **本板不变的部分**：端口族仍是 `DECLARED` + `SKELETON-OMP`（`ports.ts` 为机械生成镜像，`mirror-check.mjs` 逐字节比对；适配器只做到类型检查 + 离线 fixture）。**不宣称已支持第二宿主，也不宣称 smoke 已通过。**
-- **推进中的部分**：产品侧第二宿主组合根 `src/Wanxiangshu/Host/SecondHost/HostPlugin.fs`（P-11 `IHostPlugin`）已存在但未进编译分片；真实 smoke 目录 `proposals/host-neutral-interface/smoke/` 已就绪（opt-in，最近一次运行为 FAIL）。
-- **关联**：抽取看板卡 `proposals/extraction-kanban/cards/CUT-36.md` §7 为权威进度记录；O-3 未闭合前本板不升级任何行的状态。
-## Gate ⑩/⑪/⑫/⑬ (HNI-04, HNI-11) — `scripts/checks/adapter-thinness.mjs`, run inside `architecture.mjs`
 - ⑩a product-reference: distinct product-domain namespaces (`Wanxiangshu.<Execution|Interaction|Mission|Context|…>`, not
   `*.OpenCode`) referenced per adapter file (`OpenCode/**`, `**/OpenCode/**`, future `Omp/**`). Start **695** over 151 files.
 - ⑩b without-port: adapter files that use no host-neutral port type. Start **151 / 151** (no adapter is wired yet).
