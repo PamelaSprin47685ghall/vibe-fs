@@ -3,7 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.HostSession
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Domain
 
 /// Host-neutral sync-delegate batching rules: which sibling calls one provider
 /// turn batched together, and the deferred-inspection ledger whose settled

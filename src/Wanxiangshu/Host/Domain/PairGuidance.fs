@@ -1,4 +1,6 @@
-namespace Wanxiangshu.Host
+// HNI P-16 (domain seam): the pair-guidance transcript and ledger; tier B,
+// never mirrored to the TypeScript port surface.
+namespace Wanxiangshu.Host.Domain
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity

@@ -2,7 +2,7 @@ namespace Wanxiangshu.Execution.Delegation.Fork
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Domain
 open Wanxiangshu.Participant.Provider
 
 /// Manager fork & resume / Orchestrator commission: the product rules behind

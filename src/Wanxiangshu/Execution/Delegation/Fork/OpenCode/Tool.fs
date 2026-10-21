@@ -4,7 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Domain
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 

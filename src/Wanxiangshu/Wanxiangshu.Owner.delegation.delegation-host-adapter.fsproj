@@ -61,7 +61,7 @@
     <Compile Include="Execution/Delegation/Fork/Host/Join.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/Agent.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Host/Agent.fs"/>
-    <Compile Include="Host/DelegationCaller.fsi"/>
-    <Compile Include="Host/DelegationCaller.fs"/>
+    <Compile Include="Host/Domain/DelegationCaller.fsi"/>
+    <Compile Include="Host/Domain/DelegationCaller.fs"/>
   </ItemGroup>
 </Project>

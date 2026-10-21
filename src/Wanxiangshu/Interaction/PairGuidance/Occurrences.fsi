@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Interaction.PairGuidance
 
 open System.Threading.Tasks
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Domain
 open Wanxiangshu.Persistence.Journal
 
 /// HOST-013 occurrence owner. It decides whether a request carries a new

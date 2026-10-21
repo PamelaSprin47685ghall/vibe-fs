@@ -10,7 +10,7 @@ open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Domain
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Persona

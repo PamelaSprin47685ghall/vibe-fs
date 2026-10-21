@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ⑩/⑪ host-neutral interface gates (HNI-04, proposals/host-neutral-interface).
+// ⑩/⑪/⑫/⑬ host-neutral interface gates (HNI-04, HNI-11, proposals/host-neutral-interface).
 //
 // ⑩ adapter-thinness (ratchet, baseline scripts/checks/adapter-thinness-baseline.json):
 //   a) product-reference: distinct product-domain namespaces (Wanxiangshu.<Domain>… that are not an
@@ -19,11 +19,20 @@
 //   `HNI P-xx` header marker, no two families claim the same id, and no file directly under Host/ takes
 //   the base name of a neutral family. The mirror generator keys on the marker and reads the family by
 //   file name, so both are checked here instead of by a failing build.
+// ⑬ namespace-tier integrity (drift D-05/D-06): src/Wanxiangshu/Host/ holds two tiers, each with one
+//   namespace: tier A `Host/Ports/` declares exactly `Wanxiangshu.Host.Ports`; tier B `Host/Domain/`
+//   declares exactly `Wanxiangshu.Host.Domain`; a file directly under Host/ declares neither. The
+//   tier-B ratchet (baseline scripts/checks/domain-seam-baseline.json) keeps the adapter files that
+//   reference the domain seam from growing. The scope is discovered from the sources.
 //
 // Honest scope notes (see proposals/host-neutral-interface/evidence/adapter-thinness-gate.md):
-//   * The legacy composition seams (P-14 delegation-caller / P-15 delegation-command / P-17 fission port
-//     shapes) live in src/Wanxiangshu/Host/*.fs, NOT under Host/Ports/. They are RETAINED legacy, not neutral
-//     ports, so they are deliberately outside the strict purity scope; the gate does not pretend they are ports.
+//   * The domain seams (P-13 command declaration / P-14 delegation-caller / P-15 delegation-command /
+//     P-16 pair guidance) live in src/Wanxiangshu/Host/Domain/, NOT under Host/Ports/. They are tier B —
+//     a lane's own seam, never mirrored to the TypeScript port surface — so they are deliberately
+//     outside the strict purity scope; the gate does not pretend they are neutral ports.
+//   * Host/FissionPort.fs(i) already declares the safe `Wanxiangshu.Host.Ports` namespace but still
+//     sits directly under Host/ instead of Host/Ports/; its location is tracked on HNI-14 and is the
+//     one exemption of gate ⑬'s location rule.
 //   * src/Wanxiangshu/Host/** outside Host/Ports/ is product/neutral-host code, not adapter code; it is not
 //     counted as "adapter" either, so a neutral-host adapter folder convention is not yet covered here.
 //
@@ -225,6 +234,119 @@ export function scanPortFamilies(productionFiles, read, options) {
   return { violations, families: [...claims.entries()].sort() }
 }
 
+// ⑬ namespace-tier integrity (HNI-11, drift D-05/D-06): src/Wanxiangshu/Host/ holds two tiers and
+// each tier has exactly one namespace, so a file's folder and its namespace can never drift apart:
+//   * tier A — Host/Ports/ declares exactly `Wanxiangshu.Host.Ports` (the neutral, mirrorable ports);
+//   * tier B — Host/Domain/ declares exactly `Wanxiangshu.Host.Domain` (a lane's own domain seam);
+//   * a file directly under Host/ (outside the two tier folders) declares NEITHER of them: the
+//     shadowing `Wanxiangshu.Host` namespace is what made `Host/Ports/Tools.fs` and `Host/Tools.fs`
+//     collide (D-07) and what let a port family hide behind the base namespace (D-05).
+// The check reads the sources, so a family another lane lands is covered without editing this file.
+export const HOST_ROOT = `${PRODUCTION_ROOT}/Host`
+export const DOMAIN_ROOT = `${PRODUCTION_ROOT}/Host/Domain`
+export const PORT_NAMESPACE = 'Wanxiangshu.Host.Ports'
+export const DOMAIN_NAMESPACE = 'Wanxiangshu.Host.Domain'
+export const DOMAIN_SEAM_BASELINE = 'scripts/checks/domain-seam-baseline.json'
+
+// Host/FissionPort.fs(i) is the one known exception: it already declares the safe
+// `Wanxiangshu.Host.Ports` namespace but sits directly under Host/ instead of Host/Ports/.
+// Its location is tracked on HNI-14; until that lane moves it, the gate records the debt instead
+// of failing the tree. Nothing else is exempt.
+export const DOMAIN_SEAM_LOCATION_EXEMPT = [
+  `${HOST_ROOT}/FissionPort.fs`,
+  `${HOST_ROOT}/FissionPort.fsi`,
+]
+
+const declaresNamespace = (text) => {
+  const decl = /^(?:namespace|module)\s+(?:rec\s+)?([\w.]+)/m.exec(text)
+  return decl ? decl[1] : null
+}
+
+// The ratchet scope: an adapter file that opens or qualifies the tier-B namespace. The set may not
+// grow and a baselined file that stops referencing the seam must leave the baseline, so the
+// ratchet never loosens. It records existing debt; it does not forbid the seam from being used.
+const referencesDomainSeam = (text) => /\bWanxiangshu\.Host\.Domain\b/.test(code(text))
+
+export const readDomainSeamBaseline = (root = process.cwd()) => {
+  const candidates = [join(root, DOMAIN_SEAM_BASELINE), DOMAIN_SEAM_BASELINE]
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return JSON.parse(readFileSync(candidate, 'utf8'))
+  }
+  return null
+}
+
+export function measureDomainSeam(productionFiles, read, root = process.cwd()) {
+  const files = (productionFiles ?? []).map(norm)
+  const adapters = files.filter(isAdapterFile).sort()
+  const referencing = []
+  for (const file of adapters) {
+    if (referencesDomainSeam(read(file))) referencing.push(file)
+  }
+  return { adapters: referencing, adapterCount: referencing.length }
+}
+
+export function scanNamespaceTiers(productionFiles, read, options) {
+  const violations = []
+  const fail = (gate, message) => violations.push({ gate, message })
+  const root = options?.root ?? process.cwd()
+  const files = (productionFiles ?? []).map(norm).filter((f) => f.endsWith('.fs') || f.endsWith('.fsi'))
+
+  const tierFiles = files.filter((f) => f.startsWith(`${HOST_ROOT}/`))
+  if (tierFiles.length === 0) {
+    const base = join(root, HOST_ROOT)
+    if (existsSync(base)) {
+      tierFiles.push(...walk(base, ['.fs', '.fsi']).map((p) => norm(relative(root, p))))
+    }
+  }
+  for (const file of tierFiles) {
+    const ns = declaresNamespace(read(file))
+    if (!ns) continue
+    const exempt = DOMAIN_SEAM_LOCATION_EXEMPT.includes(file)
+    if (file.startsWith(`${PORT_ROOT}/`)) {
+      if (ns !== PORT_NAMESPACE) {
+        fail('namespace-tier', `${file}: a tier-A port file must declare '${PORT_NAMESPACE}', not '${ns}'`)
+      }
+      continue
+    }
+    if (file.startsWith(`${DOMAIN_ROOT}/`)) {
+      if (ns !== DOMAIN_NAMESPACE) {
+        fail('namespace-tier', `${file}: a tier-B domain seam must declare '${DOMAIN_NAMESPACE}', not '${ns}'`)
+      }
+      continue
+    }
+    // Directly under Host/ (or another folder): neither tier namespace may be claimed here.
+    if ((ns === PORT_NAMESPACE || ns === DOMAIN_NAMESPACE) && !exempt) {
+      fail('namespace-tier', `${file}: declares '${ns}' but sits outside ${PORT_ROOT}/ and ${DOMAIN_ROOT}/`)
+    }
+  }
+
+  // The tier-B ratchet: adapter files may not grow their references to the domain seam.
+  const baseline = options?.seamBaseline ?? readDomainSeamBaseline(root)
+  const now = measureDomainSeam(files, read, root)
+  if (!baseline) {
+    fail('domain-seam-ratchet', `${DOMAIN_SEAM_BASELINE} missing`)
+    return { violations, measurement: now }
+  }
+  const baselined = baseline.adapters ?? []
+  for (const file of now.adapters) {
+    if (!baselined.includes(file)) {
+      fail('domain-seam-ratchet', `${file}: adapter newly references '${DOMAIN_NAMESPACE}'; the domain seam may not grow`)
+    }
+  }
+  // A baselined file that no longer references the seam must leave the baseline, so the ratchet
+  // never loosens. Only a file that is still in the scanned tree is judged: a fixture that scans a
+  // subset of the tree is not evidence that the other files stopped referencing the seam.
+  const scanned = new Set(files)
+  for (const file of baselined) {
+    if (!scanned.has(file)) continue
+    if (!now.adapters.includes(file)) {
+      fail('domain-seam-ratchet', `${file}: no longer references '${DOMAIN_NAMESPACE}'; drop it from ${DOMAIN_SEAM_BASELINE}`)
+    }
+  }
+
+  return { violations, measurement: now }
+}
+
 export function scanAdapterThinness(productionFiles, read, options) {
   const violations = []
   const fail = (gate, message) => violations.push({ gate, message })
@@ -244,6 +366,10 @@ export function scanAdapterThinness(productionFiles, read, options) {
   // ⑫ port-family integrity — the mirror generator keys on the `HNI P-xx` marker and on the family
   // file name, so both are checked here rather than discovered by a failing build.
   violations.push(...scanPortFamilies(files, read, { root }).violations)
+
+  // ⑬ namespace-tier integrity — the two Host/ tiers keep their own namespaces, and the tier-B
+  // ratchet keeps the domain seam from spreading into more adapter files.
+  violations.push(...scanNamespaceTiers(files, read, { root, seamBaseline: options?.seamBaseline }).violations)
 
   // ⑩ adapter thinness ratchet
   const baseline = options?.baseline ?? readThinnessBaseline()
@@ -278,15 +404,16 @@ export function scanAdapterThinness(productionFiles, read, options) {
 // Pure decision function: a baseline may only be written on a clean run. Any violation (product-reference
 // total rose, a baselined file grew, adapter files without a port rose, or a port-purity violation) refuses
 // the write, so the ratchet can never be raised by a regression.
-export function baselineWritePlan(violations, measurement, prior) {
+export function baselineWritePlan(violations, measurement, prior, seam = null) {
   const list = violations ?? []
   if (list.length > 0) {
     const reasons = list.map((v) => `${v.gate}: ${v.message}`)
     return {
       allowed: false,
-      reason: `refusing to write ${THINNESS_BASELINE}: ${list.length} violation(s) would raise the ratchet; the baseline file is left unchanged`,
+      reason: `refusing to write ${THINNESS_BASELINE}: ${list.length} violation(s) would raise the ratchet; the baseline files are left unchanged`,
       reasons,
       content: null,
+      seamContent: null,
     }
   }
   const m = measurement
@@ -296,6 +423,7 @@ export function baselineWritePlan(violations, measurement, prior) {
       reason: `refusing to write ${THINNESS_BASELINE}: no measurement available`,
       reasons: [],
       content: null,
+      seamContent: null,
     }
   }
   const content = JSON.stringify({
@@ -303,15 +431,24 @@ export function baselineWritePlan(violations, measurement, prior) {
     productReference: m.productReference,
     withoutPort: m.withoutPort,
   }, null, 2) + '\n'
-  return { allowed: true, reason: null, reasons: [], content }
+  const seamContent = seam
+    ? JSON.stringify({
+      _note: seam.prior?._note ?? 'HNI-11 gate 13 (namespace tiers, tier-B domain seam). The set may only shrink; tighten with --write-baseline.',
+      adapters: seam.measurement.adapters,
+    }, null, 2) + '\n'
+    : null
+  return { allowed: true, reason: null, reasons: [], content, seamContent }
 }
 
-// Applies the decision: `write` is only called when the plan allows it.
-export function applyBaselineWrite({ violations, measurement, prior, write }) {
-  const plan = baselineWritePlan(violations, measurement, prior)
-  if (!plan.allowed) return { written: false, reason: plan.reason, reasons: plan.reasons, content: null }
+// Applies the decision: `write` is only called when the plan allows it. When a seam measurement is
+// given, the tier-B baseline is written through `writeSeam` in the same pass, so a single
+// --write-baseline keeps both ratchets in step.
+export function applyBaselineWrite({ violations, measurement, prior, write, seam = null, writeSeam = null }) {
+  const plan = baselineWritePlan(violations, measurement, prior, seam)
+  if (!plan.allowed) return { written: false, reason: plan.reason, reasons: plan.reasons, content: null, seamContent: null }
   write(plan.content)
-  return { written: true, reason: null, reasons: [], content: plan.content }
+  if (plan.seamContent && writeSeam) writeSeam(plan.seamContent)
+  return { written: true, reason: null, reasons: [], content: plan.content, seamContent: plan.seamContent }
 }
 
 // --- CLI -----------------------------------------------------------------------------------------
@@ -321,6 +458,7 @@ function runCli() {
   const read = (p) => readFileSync(p, 'utf8')
   const { violations, measurement, baselineTotals } = scanAdapterThinness(files, read, { root })
   const m = measurement ?? measure(files.filter((f) => f.endsWith('.fs')), read, root)
+  const seamMeasurement = measureDomainSeam(files, read, root)
   if (process.argv.includes('--write-baseline')) {
     const prior = readThinnessBaseline()
     const result = applyBaselineWrite({
@@ -328,13 +466,16 @@ function runCli() {
       measurement: m,
       prior,
       write: (content) => writeFileSync(THINNESS_BASELINE, content),
+      seam: { measurement: seamMeasurement, prior: readDomainSeamBaseline(root) },
+      writeSeam: (content) => writeFileSync(join(root, DOMAIN_SEAM_BASELINE), content),
     })
     if (result.written) {
-      console.log(`baseline written: product-reference ${m.productReferenceTotal}, without-port ${m.withoutPort.length}`)
+      console.log(`baseline written: product-reference ${m.productReferenceTotal}, without-port ${m.withoutPort.length}` +
+        `; domain seam ${seamMeasurement.adapters.length}`)
     } else {
       console.error(result.reason)
       for (const reason of result.reasons ?? []) console.error(`  ${reason}`)
-      console.error(`${THINNESS_BASELINE} was NOT modified`)
+      console.error(`${THINNESS_BASELINE} and ${DOMAIN_SEAM_BASELINE} were NOT modified`)
     }
   }
   console.log(`adapter-thinness: ${m.adapterFiles} adapter files, ${m.adapterLines} lines; product-reference ${m.productReferenceTotal}` +

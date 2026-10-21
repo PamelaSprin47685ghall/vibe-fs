@@ -1,4 +1,6 @@
-namespace Wanxiangshu.Host
+// HNI P-15 (domain seam): the host port the fork / resume / commission
+// commands bind to; tier B, never mirrored to the TypeScript port surface.
+namespace Wanxiangshu.Host.Domain
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation

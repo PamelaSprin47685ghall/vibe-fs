@@ -1,4 +1,6 @@
-namespace Wanxiangshu.Host
+// HNI P-13 (domain seam): the command vocabulary a host registers; tier B,
+// never mirrored to the TypeScript port surface.
+namespace Wanxiangshu.Host.Domain
 
 /// The shape of one command argument, as the product needs it; a host maps
 /// each shape onto its own schema vocabulary.

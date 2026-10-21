@@ -6,7 +6,7 @@ open Fable.Core
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.HostSession
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Domain
 open Wanxiangshu.Participant.Provider
 
 [<RequireQualifiedAccess>]

@@ -931,8 +931,8 @@ Execution/Delegation/Fork/Host/JoinSurface.fsi
 Execution/Delegation/Fork/Host/JoinSurface.fs
 Execution/Delegation/Fork/Host/Agent.fsi
 Execution/Delegation/Fork/Host/Agent.fs
-Host/DelegationCaller.fsi
-Host/DelegationCaller.fs
+Host/Domain/DelegationCaller.fsi
+Host/Domain/DelegationCaller.fs
 Execution/Delegation/Fork/Host/Pty.fsi
 Execution/Delegation/Fork/Host/Pty.fs
 Interaction/Repair/Port.fsi
@@ -949,8 +949,8 @@ OpenCode/Host/ProviderTokenUse.fsi
 OpenCode/Host/ProviderTokenUse.fs
 OpenCode/Host/DeclaredContextLimit.fsi
 OpenCode/Host/DeclaredContextLimit.fs
-Host/PairGuidance.fsi
-Host/PairGuidance.fs
+Host/Domain/PairGuidance.fsi
+Host/Domain/PairGuidance.fs
 Interaction/PairGuidance/Occurrences.fsi
 Interaction/PairGuidance/Occurrences.fs
 OpenCode/Host/PairProgrammingThoughtTransform.fsi
@@ -1187,10 +1187,10 @@ Mission/Work/OpenCode/ReviewBackendManager.fsi
 Mission/Work/OpenCode/ReviewBackendManager.fs
 Mission/Work/OpenCode/ReviewShell.fsi
 Mission/Work/OpenCode/ReviewShell.fs
-Host/CommandDeclaration.fsi
-Host/CommandDeclaration.fs
-Host/DelegationCommand.fsi
-Host/DelegationCommand.fs
+Host/Domain/CommandDeclaration.fsi
+Host/Domain/CommandDeclaration.fs
+Host/Domain/DelegationCommand.fsi
+Host/Domain/DelegationCommand.fs
 Execution/Delegation/Fork/Command.fsi
 Execution/Delegation/Fork/Command.fs
 Execution/Delegation/Fork/OpenCode/Tool.fsi

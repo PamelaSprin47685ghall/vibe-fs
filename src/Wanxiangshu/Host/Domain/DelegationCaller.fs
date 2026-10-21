@@ -1,4 +1,6 @@
-namespace Wanxiangshu.Host
+// HNI P-14 (domain seam): what every delegation-family command needs about
+// its caller; tier B, never mirrored to the TypeScript port surface.
+namespace Wanxiangshu.Host.Domain
 
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork.Host

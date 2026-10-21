@@ -49,10 +49,10 @@
     <Compile Include="Execution/Delegation/Handle/JoinWake.fs"/>
     <Compile Include="Execution/Delegation/Fork/JoinResultRenderer.fsi"/>
     <Compile Include="Execution/Delegation/Fork/JoinResultRenderer.fs"/>
-    <Compile Include="Host/CommandDeclaration.fsi"/>
-    <Compile Include="Host/CommandDeclaration.fs"/>
-    <Compile Include="Host/DelegationCommand.fsi"/>
-    <Compile Include="Host/DelegationCommand.fs"/>
+    <Compile Include="Host/Domain/CommandDeclaration.fsi"/>
+    <Compile Include="Host/Domain/CommandDeclaration.fs"/>
+    <Compile Include="Host/Domain/DelegationCommand.fsi"/>
+    <Compile Include="Host/Domain/DelegationCommand.fs"/>
     <Compile Include="Execution/Delegation/Fork/Command.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Command.fs"/>
     <Compile Include="Execution/Delegation/Fork/JoinResultRendererSurface.fsi"/>

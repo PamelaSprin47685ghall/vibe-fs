@@ -1,20 +1,22 @@
-// WHAT[host-boundary-034] gate ⑩/⑪ adapter-thinness: the baseline write is refused on any violation,
-// the port purity scope and the neutral-port vocabulary are discovered from the sources, a per-file
-// product-reference growth is reported even when the aggregate total stays flat, and an adapter file that
-// is not in the baseline is allowed while the totals stay within the baseline (moves and splits).
+// WHAT[host-boundary-034] gate ⑩/⑪/⑫/⑬ adapter-thinness: the baseline write is refused on any
+// violation, the port purity scope and the neutral-port vocabulary are discovered from the sources,
+// a per-file product-reference growth is reported even when the aggregate total stays flat, an
+// adapter file that is not in the baseline is allowed while the totals stay within the baseline
+// (moves and splits), and the two Host/ namespace tiers keep their own namespaces.
 import test from 'node:test'
 
 {
 const { default: assert } = await import('node:assert/strict')
 const { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } = await import('node:fs')
 const { tmpdir } = await import('node:os')
-const { join, dirname } = await import('node:path')
+const { join, dirname, relative } = await import('node:path')
 const { fileURLToPath } = await import('node:url')
 const { spawnSync } = await import('node:child_process')
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
 const REPO = join(ROOT, '../../..')
 const GATE = join(REPO, 'scripts/checks/adapter-thinness.mjs')
+const { walk } = await import(join(REPO, 'scripts/lib/walk.mjs'))
 const {
   scanAdapterThinness,
   measure,
@@ -23,6 +25,7 @@ const {
   baselineWritePlan,
   applyBaselineWrite,
   scanPortFamilies,
+  scanNamespaceTiers,
 } = await import(GATE)
 
 const fixture = () => {
@@ -283,5 +286,113 @@ test('WHAT[host-boundary-034] a port family without a marker, a duplicated id an
   } finally {
     fx.cleanup()
   }
+})
+
+// (g) namespace-tier integrity: a tier-A file with the wrong namespace, a tier-B file with the
+// wrong namespace and a tier namespace claimed directly under Host/ are all reported (HNI-11
+// drift D-05). The tree is read from the sources, so a family another lane lands is covered
+// without editing the gate.
+test('WHAT[host-boundary-034] a wrong tier namespace and a misplaced tier namespace are reported', () => {
+  const fx = fixture()
+  try {
+    fx.write('src/Wanxiangshu/Host/Ports/Tools.fs', [
+      'namespace Wanxiangshu.Host',
+      'type ToolInvocation = { Name: string }',
+      '',
+    ].join('\n'))
+    fx.write('src/Wanxiangshu/Host/Domain/PairGuidance.fs', [
+      'namespace Wanxiangshu.Host',
+      'type PairGuidanceLedger = { History: string list }',
+      '',
+    ].join('\n'))
+    fx.write('src/Wanxiangshu/Host/Stray.fs', [
+      'namespace Wanxiangshu.Host.Ports',
+      'type Stray = { X: int }',
+      '',
+    ].join('\n'))
+
+    const files = [...fx.files.keys()]
+    const { violations } = scanNamespaceTiers(files, fx.read, {
+      root: fx.dir,
+      seamBaseline: { adapters: [] },
+    })
+    const messages = violations.map((v) => v.message)
+
+    assert.ok(
+      messages.some((m) => /Host\/Ports\/Tools\.fs: a tier-A port file must declare 'Wanxiangshu\.Host\.Ports'/.test(m)),
+      `a tier-A file with the wrong namespace must be reported: ${JSON.stringify(messages)}`,
+    )
+    assert.ok(
+      messages.some((m) => /Host\/Domain\/PairGuidance\.fs: a tier-B domain seam must declare 'Wanxiangshu\.Host\.Domain'/.test(m)),
+      `a tier-B file with the wrong namespace must be reported: ${JSON.stringify(messages)}`,
+    )
+    assert.ok(
+      messages.some((m) => /Host\/Stray\.fs: declares 'Wanxiangshu\.Host\.Ports' but sits outside/.test(m)),
+      `a tier namespace claimed directly under Host/ must be reported: ${JSON.stringify(messages)}`,
+    )
+  } finally {
+    fx.cleanup()
+  }
+})
+
+// (h) the tier-B ratchet: an adapter that newly references the domain seam fails, a baselined
+// adapter that stops referencing it must leave the baseline, and the baselined set passes.
+test('WHAT[host-boundary-034] the domain-seam ratchet may only go down', () => {
+  const fx = fixture()
+  try {
+    fx.write('src/Wanxiangshu/OpenCode/Baselined.fs', [
+      'namespace Wanxiangshu.OpenCode',
+      'open Wanxiangshu.Host.Domain',
+      '',
+    ].join('\n'))
+    fx.write('src/Wanxiangshu/OpenCode/Newcomer.fs', [
+      'namespace Wanxiangshu.OpenCode',
+      'open Wanxiangshu.Host.Domain',
+      '',
+    ].join('\n'))
+
+    const files = [...fx.files.keys()]
+    const baselined = { adapters: ['src/Wanxiangshu/OpenCode/Baselined.fs'] }
+    const { violations } = scanNamespaceTiers(files, fx.read, { root: fx.dir, seamBaseline: baselined })
+    const messages = violations.map((v) => v.message)
+
+    assert.ok(
+      messages.some((m) => /Newcomer\.fs: adapter newly references 'Wanxiangshu\.Host\.Domain'/.test(m)),
+      `a new adapter reference must be reported: ${JSON.stringify(messages)}`,
+    )
+
+    // Drop the newcomer from the tree: the baselined file that no longer references the seam must
+    // leave the baseline, so the ratchet never loosens.
+    fx.write('src/Wanxiangshu/OpenCode/Baselined.fs', [
+      'namespace Wanxiangshu.OpenCode',
+      '',
+    ].join('\n'))
+    const after = scanNamespaceTiers([...fx.files.keys()], fx.read, { root: fx.dir, seamBaseline: baselined })
+    assert.ok(
+      after.violations.some((v) => /Baselined\.fs: no longer references/.test(v.message)),
+      `a stale baseline entry must be reported: ${JSON.stringify(after.violations.map((v) => v.message))}`,
+    )
+
+    // The baselined set itself passes.
+    const clean = scanNamespaceTiers([...fx.files.keys()], fx.read, {
+      root: fx.dir,
+      seamBaseline: { adapters: ['src/Wanxiangshu/OpenCode/Newcomer.fs'] },
+    })
+    assert.equal(clean.violations.length, 0, `the baselined set must pass: ${JSON.stringify(clean.violations)}`)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+// (i) the real tree passes gate ⑬: the two tiers hold their own namespaces and the domain-seam
+// baseline matches the adapter files that reference the seam.
+test('WHAT[host-boundary-034] the repository tree passes the namespace-tier gate', () => {
+  const files = walk(join(REPO, 'src/Wanxiangshu'), ['.fs', '.fsi'])
+    .map((p) => relative(REPO, p).replace(/\\/g, '/'))
+    .sort()
+  const read = (p) => readFileSync(join(REPO, p), 'utf8')
+  const { violations, measurement } = scanNamespaceTiers(files, read, { root: REPO })
+  assert.deepEqual(violations, [], `the tree must pass gate 13: ${JSON.stringify(violations)}`)
+  assert.ok(measurement.adapters.length > 0, 'the measured domain-seam set must not be empty')
 })
 }

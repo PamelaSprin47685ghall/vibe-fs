@@ -2,7 +2,7 @@ namespace Wanxiangshu.Execution.Session
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Domain
 open Wanxiangshu.Participant.Provider
 
 /// horizon(): who remains at the caller's horizon, as prose or as data.
