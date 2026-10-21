@@ -1067,25 +1067,11 @@ module FissionHost =
         | FissionTakeoverSettlementDecision.FailGroup reason ->
             failSettlement sessionPort eventPort durable group reason
         | FissionTakeoverSettlementDecision.CompleteOwner ->
-            // LC-011: the final lane's delivered view becomes the material the
-            // owner integration continues from. Moving it is only material
-            // staging — the final settlement witness is still judged by
-            // publishOwnerTakeover's durable TaskDelivery witness, so a lane's
-            // local delivery can never stand in for the owner's integrated
-            // delivery. When the view cannot be moved, leave both cells alone.
-            let laneSessionKey = SessionId.value turn.SessionId
-            let ownerSessionKey = SessionId.value group.OwnerSessionId
-
-            match
-                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered laneSessionKey,
-                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peekCached ownerSessionKey
-            with
-            | Some material, null ->
-                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordView
-                    ownerSessionKey
-                    (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peekView laneSessionKey)
-            | _ -> ()
-
+            // LC-011: the lane's local delivery is integration material only —
+            // it already travelled into the takeover prompt via the aggregate,
+            // so it is neither the owner delivery cell's content nor a witness.
+            // The owner's own integrated delivery is judged by publishOwnerTakeover's
+            // durable TaskDelivery witness.
             completeTakeover sessionPort eventPort durable group takeover turn
 
     let private observeTakeoverOutcome

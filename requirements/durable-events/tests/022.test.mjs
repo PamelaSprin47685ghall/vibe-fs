@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { basename, join, resolve } from 'node:path'
 import test from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { availableParallelism, tmpdir } from 'node:os'
 import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
 import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 import { planOwnerCompile, compileOwnerProject } from '../../../scripts/lib/owner-compile.mjs'
@@ -35,6 +35,69 @@ const planShard = (shard) => {
     plan: planOwnerCompile({ projectPath: project.projectPath, aggregatePath: null }),
   }
 }
+
+// The real Fable compiles in this file are launched together through one
+// bounded pool and their verdicts are asserted afterwards in declaration
+// order. Concurrency changes wall time only: every compile still runs, and
+// every positive, negative and isolation assertion is the one the sequential
+// form made. Compiles of the same owner project share its materialized
+// project directory, so compiles keyed by the same project never overlap.
+const COMPILE_CONCURRENCY = Math.max(2, Math.min(6, Math.floor(availableParallelism() / 2)))
+const activeCompileKeys = new Set()
+const queuedCompiles = []
+const pumpCompiles = () => {
+  for (let index = 0; index < queuedCompiles.length && activeCompileKeys.size < COMPILE_CONCURRENCY;) {
+    const { key, run, resolve: settle, reject } = queuedCompiles[index]
+    if (activeCompileKeys.has(key)) {
+      index += 1
+      continue
+    }
+    queuedCompiles.splice(index, 1)
+    activeCompileKeys.add(key)
+    Promise.resolve()
+      .then(run)
+      .then(settle, reject)
+      .finally(() => {
+        activeCompileKeys.delete(key)
+        pumpCompiles()
+      })
+  }
+}
+// The returned promise is marked handled at once so a compile that fails
+// before its assertion awaits it is still reported by that assertion, not as
+// an unhandled rejection.
+const boundedCompile = (key, run) => {
+  const pending = new Promise((settle, reject) => {
+    queuedCompiles.push({ key: resolve(key), run, resolve: settle, reject })
+    pumpCompiles()
+  })
+  pending.catch(() => {})
+  return pending
+}
+
+// The two whole-owner compiles are the longest single compiles in this file;
+// the locality test queues them first so they overlap its batch, and each
+// owner test awaits and asserts its own verdict (starting it itself when run
+// alone). A prefetched compile whose test is filtered out is still reclaimed.
+const ownerCompiles = new Map()
+const ownerCompile = (fsproj, scratchPrefix) => {
+  if (!ownerCompiles.has(fsproj)) {
+    const scratchRoot = mkdtempSync(join(tmpdir(), scratchPrefix))
+    process.once('exit', () => rmSync(scratchRoot, { recursive: true, force: true }))
+    const projectPath = join(SOURCE_ROOT, fsproj)
+    const result = boundedCompile(projectPath, () => compileOwnerProject({
+      projectPath,
+      aggregatePath: null,
+      scratchRoot,
+      rootPropsPath: join(ROOT, 'Directory.Build.props'),
+      stdio: 'pipe',
+    }))
+    ownerCompiles.set(fsproj, { scratchRoot, result })
+  }
+  return ownerCompiles.get(fsproj)
+}
+const JOURNAL_OBSERVATION_OWNER = ['Wanxiangshu.Owner.verification-system.verification-eventstorewritersurface.fsproj', 'wxs-journal-owner-compile-']
+const EVENTSTORE_COMPOSITION_OWNER = ['Wanxiangshu.Owner.durable-events.runtime.fsproj', 'wxs-eventstore-surface-compile-']
 
 const productionSources = (plan) => plan.compileItems
   .filter((path) => path.endsWith('.fs'))
@@ -309,6 +372,9 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
     ...EXTENDED_FOCUSED_RUNTIME_LOCALITIES,
   ]
 
+  ownerCompile(...JOURNAL_OBSERVATION_OWNER)
+  ownerCompile(...EVENTSTORE_COMPOSITION_OWNER)
+
   const scratch = mkdtempSync(joinPath(tmpdir(), 'wxs-de022-compile-'))
   try {
     // Positive: one flat project per locality. planOwnerCompile derives the
@@ -317,7 +383,7 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
     // one `dotnet tool run fable` invocation against it. A locality whose
     // closure is missing a declared edge fails here for real — that is a
     // shard-graph gap, not a test defect, and it must surface as red.
-    for (const shard of LOCALITIES) {
+    const localityCompiles = LOCALITIES.map((shard) => {
       const project = requireShard(shard)
       const plan = planOwnerCompile({ projectPath: project.projectPath, aggregatePath: null })
       const materialized = materializeOwnerCompile(plan, { scratchRoot: scratch })
@@ -331,19 +397,17 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
         plan.compileItems.length,
         `${shard} flat project must carry the full closure compile list`,
       )
-      const result = await compileOwnerProject({
-        projectPath: project.projectPath,
-        aggregatePath: null,
-        scratchRoot: scratch,
-        stdio: 'pipe',
-        compilePlan: plan,
-      })
-      assert.equal(
-        result.ok,
-        true,
-        `${shard} locality must compile as one flat project\n${result.stdout}\n${result.stderr}`,
-      )
-    }
+      return {
+        shard,
+        result: boundedCompile(project.projectPath, () => compileOwnerProject({
+          projectPath: project.projectPath,
+          aggregatePath: null,
+          scratchRoot: scratch,
+          stdio: 'pipe',
+          compilePlan: plan,
+        })),
+      }
+    })
 
     // Negative probes (WHAT-022: a business consumer's transitive compile
     // input must contain neither the Git object/ref implementation nor the
@@ -396,16 +460,26 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
     // event-store closure that owns the adapter.
     const hostAdapterPositive = isolate('opencode-host-workspaceeventstore', HOST_ADAPTER_PROBE)
     const hostAdapterNegative = isolate('eventstore-model-contract', HOST_ADAPTER_PROBE)
+    const compileIsolated = ({ shard, plan }) => boundedCompile(requireShard(shard).projectPath, () => compileOwnerProject({
+      projectPath: requireShard(shard).projectPath,
+      aggregatePath: null,
+      scratchRoot: scratch,
+      stdio: 'pipe',
+      compilePlan: plan,
+    }))
+    const hostPositiveCompile = compileIsolated(hostAdapterPositive)
+    const hostNegativeCompile = compileIsolated(hostAdapterNegative)
     try {
-      const compileIsolated = async ({ shard, plan }) => compileOwnerProject({
-        projectPath: requireShard(shard).projectPath,
-        aggregatePath: null,
-        scratchRoot: scratch,
-        stdio: 'pipe',
-        compilePlan: plan,
-      })
+      for (const { shard, result: pending } of localityCompiles) {
+        const result = await pending
+        assert.equal(
+          result.ok,
+          true,
+          `${shard} locality must compile as one flat project\n${result.stdout}\n${result.stderr}`,
+        )
+      }
 
-      const hostPositive = await compileIsolated(hostAdapterPositive)
+      const hostPositive = await hostPositiveCompile
       assert.equal(
         hostPositive.ok,
         true,
@@ -413,7 +487,7 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
           + String(hostPositive.stdout ?? '').slice(-400),
       )
 
-      const hostNegative = await compileIsolated(hostAdapterNegative)
+      const hostNegative = await hostNegativeCompile
       assert.equal(
         hostNegative.ok,
         false,
@@ -427,6 +501,11 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
       const after = [digestOf(realStoreTypes), digestOf(realModel), digestOf(realHostAdapter)]
       assert.deepEqual(after, before, 'the real owner sources are untouched (bytes and mtime)')
     } finally {
+      await Promise.allSettled([
+        ...localityCompiles.map(({ result }) => result),
+        hostPositiveCompile,
+        hostNegativeCompile,
+      ])
       rmSync(hostAdapterPositive.iso, { recursive: true, force: true })
       rmSync(hostAdapterNegative.iso, { recursive: true, force: true })
     }
@@ -436,33 +515,23 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
 })
 
 integrationTest('WHAT[durable-events-022] real Fable compiles the journal observation owner using its declared closure', async () => {
-  const scratchRoot = mkdtempSync(join(tmpdir(), 'wxs-journal-owner-compile-'))
+  const { scratchRoot, result: pending } = ownerCompile(...JOURNAL_OBSERVATION_OWNER)
   try {
-    const result = await compileOwnerProject({
-      projectPath: join(SOURCE_ROOT, 'Wanxiangshu.Owner.verification-system.verification-eventstorewritersurface.fsproj'),
-      aggregatePath: null,
-      scratchRoot,
-      rootPropsPath: join(ROOT, 'Directory.Build.props'),
-      stdio: 'pipe',
-    })
+    const result = await pending
     assert.equal(result.ok, true, `journal observation owner must compile without undeclared siblings\n${result.stdout}\n${result.stderr}`)
   } finally {
+    await Promise.allSettled([pending])
     rmSync(scratchRoot, { recursive: true, force: true })
   }
 })
 
 integrationTest('WHAT[durable-events-022] actual EventStore composition surface compiles its registered Sphinx rule dependency', async () => {
-  const scratchRoot = mkdtempSync(join(tmpdir(), 'wxs-eventstore-surface-compile-'))
+  const { scratchRoot, result: pending } = ownerCompile(...EVENTSTORE_COMPOSITION_OWNER)
   try {
-    const result = await compileOwnerProject({
-      projectPath: join(SOURCE_ROOT, 'Wanxiangshu.Owner.durable-events.runtime.fsproj'),
-      aggregatePath: null,
-      scratchRoot,
-      rootPropsPath: join(ROOT, 'Directory.Build.props'),
-      stdio: 'pipe',
-    })
+    const result = await pending
     assert.equal(result.ok, true, `actual composition surface must compile without undeclared Sphinx siblings\n${result.stdout}\n${result.stderr}`)
   } finally {
+    await Promise.allSettled([pending])
     rmSync(scratchRoot, { recursive: true, force: true })
   }
 })
@@ -578,31 +647,47 @@ integrationTest('WHAT[durable-events-022] pure append results compile every sett
     const xml = readFileSync(flat.projectPath, 'utf8')
     assert.ok(!xml.includes('<ProjectReference'), `${shard} must compile one flat project`)
     assert.equal((xml.match(/<Compile Include=/g) ?? []).length, isolatedPlan.compileItems.length)
-    return compileOwnerProject({
+    return boundedCompile(project.projectPath, () => compileOwnerProject({
       projectPath: project.projectPath,
       aggregatePath: null,
       scratchRoot,
       stdio: 'pipe',
       compilePlan: isolatedPlan,
-    })
+    }))
   }
+  // Each probe is launched once, before the subtests, and each subtest awaits
+  // and asserts its own verdict.
+  const launched = new Map()
+  const launch = (shard, source) => {
+    const key = `${shard}\0${source}`
+    if (!launched.has(key)) {
+      const pending = Promise.resolve().then(() => compileProbe(shard, source))
+      pending.catch(() => {})
+      launched.set(key, pending)
+    }
+    return launched.get(key)
+  }
+  launch('eventstore-port-contract', capabilityProbe)
+  launch('eventstore-append-result-contract', resultProbe)
+  launch('eventstore-append-result-contract', capabilityProbe)
   try {
     await t.test('WHAT[durable-events-022] the original port closure compiles its real append capability', async () => {
-      const result = await compileProbe('eventstore-port-contract', capabilityProbe)
+      const result = await launch('eventstore-port-contract', capabilityProbe)
       assert.equal(result.ok, true, `the original capability probe must compile\n${result.stdout}\n${result.stderr}`)
     })
     await t.test('WHAT[durable-events-022] the pure result closure compiles all settlement cases and evidence', async () => {
-      const result = await compileProbe('eventstore-append-result-contract', resultProbe)
+      const result = await launch('eventstore-append-result-contract', resultProbe)
       assert.equal(result.ok, true, `all settlement cases and evidence must compile\n${result.stdout}\n${result.stderr}`)
     })
     await t.test('WHAT[durable-events-022] the pure result closure rejects the identical append capability', async () => {
-      const result = await compileProbe('eventstore-append-result-contract', capabilityProbe)
+      const result = await launch('eventstore-append-result-contract', capabilityProbe)
       assert.equal(result.ok, false, 'a pure result consumer must not acquire IEventStore')
       const rejection = String(result.stdout ?? '') + String(result.stderr ?? '')
       assert.match(rejection, /IEventStore/)
       assert.match(rejection, /is not defined/, 'the failure must name the missing capability, not probe syntax or the toolchain')
     })
   } finally {
+    await Promise.allSettled(launched.values())
     for (const copyRoot of copies) rmSync(copyRoot, { recursive: true, force: true })
     rmSync(scratchRoot, { recursive: true, force: true })
     for (const [file, digest] of sourceDigests) {
@@ -623,7 +708,7 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserv
   const SNAPSHOT_PROBE = [
     'namespace Wanxiangshu.Probe',
     'open Wanxiangshu.Foundation.Identity',
-    'open Wanxiangshu.OpenCode',
+    'open Wanxiangshu.Foundation.HostSession',
     'module ProbeSnapshotConsumer =',
     '    let read (port: ISessionSnapshotPort) (session: SessionId) =',
     '        port.GetMessages(session)',
@@ -633,7 +718,7 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserv
   const HOST_EFFECT_PROBE = [
     'namespace Wanxiangshu.Probe',
     'open Wanxiangshu.Foundation.Identity',
-    'open Wanxiangshu.OpenCode',
+    'open Wanxiangshu.Foundation.HostSession',
     'module ProbeHostEffect =',
     '    let send (port: ISessionHostPort) (session: SessionId)',
     '             (text: string) (options: SessionPromptOptions) =',
@@ -698,28 +783,46 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserv
     const flatXml = readFileSync(flat.projectPath, 'utf8')
     assert.ok(!flatXml.includes('<ProjectReference'), `${shard} must compile one flat project`)
     assert.equal((flatXml.match(/<Compile Include=/g) ?? []).length, isolatedPlan.compileItems.length)
-    return compileOwnerProject({
+    return boundedCompile(project.projectPath, () => compileOwnerProject({
       projectPath: project.projectPath,
       aggregatePath: null,
       scratchRoot,
       stdio: 'pipe',
       compilePlan: isolatedPlan,
-    })
+    }))
+  }
+  // Each probe is launched once, before the subtests, and each subtest awaits
+  // and asserts its own verdict.
+  const launched = new Map()
+  const launch = (shard, source) => {
+    const key = `${shard}\0${source}`
+    if (!launched.has(key)) {
+      const pending = Promise.resolve().then(() => compileProbe(shard, source))
+      pending.catch(() => {})
+      launched.set(key, pending)
+    }
+    return launched.get(key)
   }
 
+  launch('host-session-contract', HOST_EFFECT_PROBE)
+  launch('delegation-recovery-runtime', SNAPSHOT_PROBE)
+  launch('delegation-recovery-runtime', HOST_EFFECT_PROBE)
+  launch('host-session-snapshot-contract', SNAPSHOT_PROBE)
+  launch('journal-outcome-contract', JOURNAL_OUTCOME_PROBE)
+  launch('journal-outcome-contract', HOST_EFFECT_PROBE)
   try {
     await t.test('WHAT[durable-events-022] full Host contract compiles with its real SendPrompt capability', async () => {
-      const result = await compileProbe('host-session-contract', HOST_EFFECT_PROBE)
+      const result = await launch('host-session-contract', HOST_EFFECT_PROBE)
       assert.equal(result.ok, true, `the full Host owner must retain its real SendPrompt capability\n${result.stdout}\n${result.stderr}`)
     })
 
     await t.test('WHAT[durable-events-022] actual recovery compiles with only its Snapshot read capability', async () => {
-      const result = await compileProbe('delegation-recovery-runtime', SNAPSHOT_PROBE)
+      const result = await launch('delegation-recovery-runtime', SNAPSHOT_PROBE)
       assert.equal(result.ok, true, `actual recovery must retain the Snapshot read capability\n${result.stdout}\n${result.stderr}`)
     })
 
     await t.test('WHAT[durable-events-022] actual recovery rejects the identical full Host effect probe', async () => {
-      const result = await compileProbe('delegation-recovery-runtime', HOST_EFFECT_PROBE)
+      const result = await launch('delegation-recovery-runtime', HOST_EFFECT_PROBE)
       assert.equal(result.ok, false, 'the identical full Host effect probe must fail in the actual recovery closure')
       const rejection = String(result.stdout ?? '') + String(result.stderr ?? '')
       assert.match(rejection, /ISessionHostPort|SessionPromptOptions/)
@@ -727,23 +830,24 @@ integrationTest('WHAT[durable-events-022] Snapshot recovery flat compile preserv
     })
 
     await t.test('WHAT[durable-events-022] standalone Snapshot contract compiles its real read capability', async () => {
-      const result = await compileProbe('host-session-snapshot-contract', SNAPSHOT_PROBE)
+      const result = await launch('host-session-snapshot-contract', SNAPSHOT_PROBE)
       assert.equal(result.ok, true, `the standalone Snapshot contract must compile without full Host admission\n${result.stdout}\n${result.stderr}`)
     })
 
     await t.test('WHAT[durable-events-022] standalone Journal outcome contract compiles every original result and diagnostic case', async () => {
-      const result = await compileProbe('journal-outcome-contract', JOURNAL_OUTCOME_PROBE)
+      const result = await launch('journal-outcome-contract', JOURNAL_OUTCOME_PROBE)
       assert.equal(result.ok, true, `the pure Journal contract must retain its original typed results\n${result.stdout}\n${result.stderr}`)
     })
 
     await t.test('WHAT[durable-events-022] standalone Journal outcome contract rejects the full Host effect probe', async () => {
-      const result = await compileProbe('journal-outcome-contract', HOST_EFFECT_PROBE)
+      const result = await launch('journal-outcome-contract', HOST_EFFECT_PROBE)
       assert.equal(result.ok, false, 'the pure Journal result contract must reject the identical full Host effect capability')
       const rejection = String(result.stdout ?? '') + String(result.stderr ?? '')
       assert.match(rejection, /ISessionHostPort|SessionPromptOptions/)
       assert.match(rejection, /is not defined/)
     })
   } finally {
+    await Promise.allSettled(launched.values())
     for (const copyRoot of copies) rmSync(copyRoot, { recursive: true, force: true })
     rmSync(scratchRoot, { recursive: true, force: true })
     for (const [file, digest] of sourceDigests) {
