@@ -8,8 +8,11 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-neutral-ports.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <Compile Include="Execution/Failure/Model.fsi"/>
     <Compile Include="Execution/Failure/Model.fs"/>
+    <Compile Include="Execution/Failure/HostFailure.fsi"/>
+    <Compile Include="Execution/Failure/HostFailure.fs"/>
   </ItemGroup>
 </Project>

@@ -228,6 +228,8 @@ Execution/Session/ChatExecution/Facts.fsi
 Execution/Session/ChatExecution/Facts.fs
 Execution/Failure/Model.fsi
 Execution/Failure/Model.fs
+Execution/Failure/HostFailure.fsi
+Execution/Failure/HostFailure.fs
 Execution/Failure/Decision.fsi
 Execution/Failure/Decision.fs
 Execution/Failure/Policy.fsi
