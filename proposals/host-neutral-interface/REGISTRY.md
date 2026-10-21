@@ -34,11 +34,20 @@ so parallel lanes never collide (HNI-11 found two `P-13`s). Use the ID below in 
 commits `58660d4d9`, `2e9d5025d`, `6c6b8cfdf`, `a4222e3fb`, `e16e72c34` (slice A) and `aa43d3455` (slice B,
 `Fork/JoinRules`). The fork lane's branches `origin/wip/hni-fork` and `origin/wip/hni-fork-next` are **deleted**
 (their content is on `master`).
-
-The other lanes' ports are **still not on `master`**: P-16 (`Host/PairGuidance.fs(i)`) lives on
-`origin/wip/hni-plugin`, P-17 (`Host/FissionPort.fs(i)`) on `origin/wip/hni-fission`, P-18 (`Host/Tools.fs(i)`) on
-`origin/wip/hni-tools`. Those three branches still exist on the remote (as of 2026-10-21); the fork branches do not.
-`master` still has **no `Host/Ports/` consumer** — the neutral families are declared types only.
+The other lanes' ports are **not all still off `master`**: P-16 (`Host/PairGuidance.fs(i)`) lives on
+`origin/wip/hni-plugin` and P-18 (`Host/Tools.fs(i)`) on `origin/wip/hni-tools` — both branches still exist on the
+remote (measured 2026-10-21). **P-17 (`Host/FissionPort.fs(i)`) is now on `master`**: the fission lane landed
+`2680bc07d` ("Fission launch runs behind the host-neutral FissionHostPort (P-17)"), `0287a2349` ("P-17 FissionPort
+moves to `Wanxiangshu.Host.Ports`, journal leaves the port") and `9894b1e0c` ("the fission host call sites use the
+short FissionHost form"), and `origin/wip/hni-fission` is **deleted**.
+`master` has **7 files outside the shard that `open Wanxiangshu.Host.Ports`** (measured at `31a5a2426`, 2026-10-21):
+`OpenCode/Host/SessionSnapshotPort.fs`, `OpenCode/Host/SessionSnapshotPort.fsi`, `OpenCode/Host/SessionsSurface.fs`
+and `OpenCode/Plugin/PluginRecoveryWiring.fs` — all four added by `4403f579b` ("session discovery behind P-01
+ISessionPort") — plus `Execution/Fission/Launch.fs`, `Execution/Fission/Launch.fsi` and
+`Execution/Fission/OpenCode/Tool.fs` from the HNI-05 fission lane. **An `open` is not an implementation**: the
+neutral families are still *declared* types, and whether a port is actually wired is decided per row, not by the
+presence of an `open`. Measured at `31a5a2426`, only **P-01** of P-01..P-12 has an implementation in `src/`
+(`SdkSessionPort`/`HttpSessionPort` in `OpenCode/Host/SessionSnapshotPort.fs`); P-02..P-12 have none.
 Namespace note: the lane ports use `Wanxiangshu.Host`, while the
 neutral ports use `Wanxiangshu.Host.Ports` (see DESIGN §1.1 and drift **D-05**).
 
@@ -51,9 +60,9 @@ The delivery team must build master at `aa43d3455` or later to get compile/test 
 | P-13 | `CommandDeclaration`, `CommandArgument`, `ArgumentShape`, `ICommandArguments` | `Host/CommandDeclaration.fs(i)` | fork | Neutral and product-shaped. Converges with P-04: `ArgumentShape` is what a `ToolSpec.Schema` is generated from. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
 | P-14 | `IDelegationCallerHost`, `DelegationCaller` | `Host/DelegationCaller.fs(i)` | fork | D-03: carries `AgentJournal` (product persistence) and fork runtime — a composition seam, not a host port. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
 | P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
-| P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. |
-| P-17 | `FissionHostPort`, `FissionOwnerRuns`, `FissionPtyCompletion`, `FissionPtyStatus` | `Host/FissionPort.fs(i)` | fission | WIRED-OC. Declared in namespace `Wanxiangshu.Host.Ports` (drift **D-05**) but the file stays outside `Host/Ports/`, so gate ⑫ does not treat it as a neutral family. D-03 partly resolved: `AgentJournal` left the port (it is threaded into the launch call instead); the legacy `ISessionHostPort` / `IEventObservationPort` remain until P-01 / P-07 land. |
-| P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). **D-07: this file name collides with P-04's `Host/Ports/Tools.fs(i)` — rename before moving it under `Host/Ports/`.** |
+| P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. Status: **not on `master`** — the file lives on `origin/wip/hni-plugin` (branch still exists, measured 2026-10-21). |
+| P-17 | `FissionHostPort`, `FissionOwnerRuns`, `FissionPtyCompletion`, `FissionPtyStatus` | `Host/FissionPort.fs(i)` | fission | WIRED-OC. Declared in namespace `Wanxiangshu.Host.Ports` (drift **D-05**) but the file stays outside `Host/Ports/`, so gate ⑫ does not treat it as a neutral family. D-03 partly resolved: `AgentJournal` left the port (it is threaded into the launch call instead); the legacy `ISessionHostPort` / `IEventObservationPort` remain until P-01 / P-07 land. Status: **on `master`** (`2680bc07d`, `0287a2349` — the port moved into the `Wanxiangshu.Host.Ports` namespace — and `9894b1e0c`); `origin/wip/hni-fission` is **deleted**. |
+| P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). **D-07: this file name collides with P-04's `Host/Ports/Tools.fs(i)` — rename before moving it under `Host/Ports/`.** Status: **not on `master`** — the file lives on `origin/wip/hni-tools` (branch still exists, measured 2026-10-21). |
 
 ### Drift findings (HNI-11, 2026-10-21) and the convergence target
 - **D-01** ID collision (`P-13` used by fork and plugin-host) → plugin-host pair guidance is **P-16**.
@@ -97,10 +106,16 @@ These are the concrete steps, so a lane does not have to re-derive them:
    the table above (P-13 … P-18). The generator matches `/\bHNI (P-\d{2})\b/` anywhere in the header; a family
    without one is a **hard error**, not a silent skip. Put it in the file's leading doc comment, e.g.
    `/// HNI P-18: product tool contribution — what one product tool call knows about its invocation.`
-4. **Use a namespace that adapters do not `open`**: `Wanxiangshu.Host` is `open`ed by 76 files under
-   `src/Wanxiangshu/` (mostly for `CanonicalJson`/`HostDigest`), so a type named e.g. `Digest` in that namespace
-   shadows the real one at every one of those call sites. Use `Wanxiangshu.Host.Domain.<Lane>` (**D-05**). The
-   neutral families use `Wanxiangshu.Host.Ports`, which nothing `open`s.
+4. **Use a namespace that adapters do not `open`**: `Wanxiangshu.Host` is `open`ed by **95 files** under
+   `src/Wanxiangshu/` (measured at `31a5a2426`; mostly for `CanonicalJson`/`HostDigest`), so a type named e.g.
+   `Digest` in that namespace shadows the real one at every one of those call sites. Use
+   `Wanxiangshu.Host.Domain.<Lane>` (**D-05**). The neutral families use `Wanxiangshu.Host.Ports`, which had
+   **zero** openers when it was created; the openers it has today were each added deliberately (the first four by
+   `4403f579b`, the fission ones by the HNI-05 lane). The risk **D-05** guards against is therefore not "some file
+   `open`s the namespace" but "a **pre-existing** namespace with 90+ openers": port names placed in
+   `Wanxiangshu.Host` would shadow real types across every one of those call sites, whereas a namespace nothing
+   opened before is safe to add to. **An `open` is not an implementation** — see the status column for whether a
+   port is actually wired.
 5. **Reuse the neutral vocabulary** (DESIGN §2): `HostResult<_>`/`HostError` instead of `Result<_, string>`
    (**D-04**), and `SessionId`/`ToolCallId`/`PromptKey`/`TranscriptMessageAddress`/`ModelRoute`/`AgentRole`/
    `CanonicalJsonText` from `Host/Ports/Vocabulary.fs(i)` instead of `string`.
@@ -153,6 +168,23 @@ These are the concrete steps, so a lane does not have to re-derive them:
   `aa43d3455` or later. No id, name or port shape changed; next free id stays **P-19**.
 - 2026-10-21 eng-hni-fission: P-17 `FissionHostPort` declared and wired to the OpenCode fission adapter (transitional: still carries Foundation `ISessionHostPort` / `IEventObservationPort`).
 - 2026-10-21 eng-hni-fission: S1 — the fission tool-visibility decision moved out of the adapter folders into the product lane (`Execution/Fission/Visibility.fs(i)`, `FissionToolVisibility`); no port change (P-17 unchanged).
+- 2026-10-21 eng-host-arch-goose (correction): the statement that `master` has "no `Host/Ports/` consumer — the
+  neutral families are declared types only" was false. Measured at `31a5a2426`: **7** files outside the shard
+  `open Wanxiangshu.Host.Ports` — `OpenCode/Host/SessionSnapshotPort.fs`, `OpenCode/Host/SessionSnapshotPort.fsi`,
+  `OpenCode/Host/SessionsSurface.fs` and `OpenCode/Plugin/PluginRecoveryWiring.fs` (all four added by `4403f579b`),
+  plus `Execution/Fission/Launch.fs`, `Execution/Fission/Launch.fsi` and `Execution/Fission/OpenCode/Tool.fs` from
+  the HNI-05 lane. (A count of 9 comes from matching *any* `Host.Ports`
+  reference, which also hits `Host/FissionPort.fs(i)` — those two files are themselves in the
+  `Wanxiangshu.Host.Ports` namespace and contain no `open` of it.) An `open` is not an implementation: P-02..P-12
+  still have no implementation anywhere in `src/`, while **P-01 is implemented** (`SdkSessionPort`/`HttpSessionPort`
+  in `OpenCode/Host/SessionSnapshotPort.fs`, `interface ISessionPort with`) and P-17 is implemented by the OpenCode
+  fission adapter — so their rows say `WIRED-OC` and the other rows do not. Also corrected: **P-17 is on `master`**
+  (`2680bc07d`, `0287a2349`, `9894b1e0c`) and `origin/wip/hni-fission` is **deleted**; P-16 and P-18 remain
+  branch-only on `origin/wip/hni-plugin` / `origin/wip/hni-tools` (both branches still exist). The checklist item 4
+  "76 files" figure was replaced by the mechanism it stands for: `open Wanxiangshu.Host` matched **95** files at
+  `31a5a2426`, while `Host.Ports` had **zero** openers at creation and every opener it has today was added
+  deliberately by a named commit. Documentation only — no build, no compile, no test run; all numbers are static
+  `git grep`/`git ls-tree` measurements at `31a5a2426`.
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.
