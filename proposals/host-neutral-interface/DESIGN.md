@@ -249,5 +249,54 @@ Every family has an omp mapping above. Gaps and how the design absorbs them:
 - Prompt correlation is not echoed by the host: adapter writes a `custom` entry; P-03 surfaces it as `Correlation`.
 Detailed evidence and the adapter skeleton: HNI-03 (`evidence/omp-feasibility.md`, `adapters/omp/`).
 
+### 3.1 omp binding contract
+
+The omp adapter and the Fable-built product meet at exactly one point: a plain `IHostPlugin` value.
+
+- The **omp entry module is hand-written and product-free**. omp loads it as an extension module and calls its
+  default export as the factory (`ExtensionFactory = (pi: ExtensionAPI) => void | Promise<void>`;
+  `getExtensionFactory`, `src/extensibility/extensions/loader.ts:62-67`;
+  `src/extensibility/extensions/types.ts:2054`). Its only job is wiring:
+  `export default (pi) => activateOnOmp(pi, plugin, sdkChildSessions(...), agents)`. It contains no product
+  decision — no admission rule, no retry, no budget, no prose, no product state.
+- The **Fable-built product is passed in as a plain `IHostPlugin` value** (`Lifecycle.fsi:37-38`:
+  `abstract Activate: ports: HostPorts -> HostResult<ProductHooks>`). No reflection, no dynamic import of
+  product internals, no runtime lookup of product symbols: the product is a value the entry module already
+  holds, and the only thing crossing the boundary is `Activate` and the `ProductHooks` it returns.
+- **Activation is deferred to the first `session_start`**, because `ExtensionContext` exists only inside
+  handlers (it is a handler parameter, `types.ts:1610`; `ExtensionContext` at `:671`) while the factory receives
+  only `pi` (`ExtensionAPI`, `:1624`). The adapter latches activation, so a second `session_start` does not
+  register the product hooks twice.
+- **The SDK pieces come from `pi.pi`**, which is typed `typeof PiCodingAgent` (`types.ts:1642`) and is the
+  package namespace (`src/extensibility/extensions/loader.ts:29`, `:451`); that namespace re-exports
+  `createAgentSession` (`src/index.ts:40` → `src/sdk.ts:1735`) and `SessionManager` (`src/index.ts:52` →
+  `src/session/session-manager.ts:890`).
+- **Disposal** happens on `session_shutdown` (`src/extensibility/shared-events.ts:105-107`): `hooks.Dispose` once.
+- **Failure semantics**: an activation error is logged through `pi.logger` and degraded — the adapter never
+  throws into omp, so a product failure is never reported as a host failure.
+
+Decided rule **O-3** in `evidence/omp-feasibility.md` is the normative statement of this contract, with its
+acceptance criteria; it binds the lane that builds the real adapter.
+
+### 3.2 Provider params encode rule
+
+`ProviderParams` (P-06) is the one port request whose payload is provider-shaped, so the encode rule is
+explicit:
+
+- The encode is **adapter-only** and **per provider family**: the adapter holds an explicit table of the
+  families it can encode, keyed by omp's `Model.api`. The wire names differ per family
+  (`temperature`/`top_p`/`max_tokens` for openai-completions, `temperature`/`top_p`/`max_output_tokens` for
+  openai-responses, `max_tokens`/`thinking` for anthropic-messages,
+  `generationConfig.temperature`/`maxOutputTokens`/`topP` for google), so a generic encoder cannot exist.
+- Capability `ProviderParams` is advertised **only** for the families in that table; a family outside it is
+  refused at activation, not discovered per request.
+- The verdict **fails closed**: a request the family cannot map completely is refused as a whole. The adapter
+  never applies a subset of a verdict — a partially applied parameter set is a silent behaviour change.
+- `ProviderParams.Extra` (a `CanonicalJsonText`) is the only payload that passes through, and it passes
+  through **byte-for-byte**.
+
+Decided rule **O-2** in `evidence/omp-feasibility.md` is the normative statement of this rule, with its
+acceptance criteria.
+
 ## 4. Out of scope
 Rendering of TUI widgets, slash commands, keybindings (omp-only UI) — the product has no need for them.

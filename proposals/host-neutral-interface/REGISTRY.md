@@ -130,6 +130,26 @@ These are the concrete steps, so a lane does not have to re-derive them:
 | OpenCode | `src/Wanxiangshu/OpenCode/**`, `src/Wanxiangshu/**/OpenCode/**` | per domain lane (fission, fork, tools, plugin-host) |
 | omp | `proposals/host-neutral-interface/adapters/omp/` (skeleton, offline fixtures) → `src/Wanxiangshu/Omp/` once wired | arch |
 
+### SKELETON-OMP (what it means now)
+
+`proposals/host-neutral-interface/adapters/omp/` is a **type-checked skeleton with an offline fixture**: the
+generated TS mirror is byte-identical to the F# signatures, the adapter type-checks against omp 18.12.4's own
+types, and the fixture drives it offline. It is **not** wired to a running host and **not** shipped.
+
+The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: open items)", O-1..O-5) are
+**binding on `cut36-omp-2`**, the lane that builds the real omp adapter:
+
+- **O-1** — the transcript message address is the omp `SessionEntry.id`; never a positional index.
+- **O-2** — provider-param encode is adapter-only, per provider family, and fails closed.
+- **O-3** — the omp binding contract: hand-written, product-free entry module; the Fable-built product is
+  passed in as a plain `IHostPlugin` value.
+- **O-4** — a path-shaped `parentSession` is resolved through the host's lookup, or the call fails with
+  `HostError.NotFound` carrying the raw value.
+- **O-5** — the neutral `SessionId` is always the persisted id, never omp's provider id.
+
+`cut36-omp-2` implements these rules; it does not re-decide them. The same rules are summarised in
+`DESIGN.md` §3.1 (binding contract) and §3.2 (provider-params encode rule).
+
 ## Domain lanes (owner directive 06:05 UTC)
 
 | Lane | Scope | Ports it may extend |
@@ -240,6 +260,11 @@ These are the concrete steps, so a lane does not have to re-derive them:
 - 2026-10-21 eng-hni-plugin-goose (HNI-08): P-16 pair guidance is WIRED-OC — the guideline fold moved out of
   `OpenCode/Host/PairProgramming` into the domain owner `Interaction/PairGuidance/Occurrences`; the OpenCode transform
   decodes the transcript and renders only. The ID is P-16 (D-01: P-13 is the fork lane's `CommandDeclaration`).
+
+- 2026-10-22 eng-host-arch (HNI-13): the five omp open items O-1..O-5 are **decided** — they now live in
+  `evidence/omp-feasibility.md` ("Decided rules (was: open items)") and are **binding on `cut36-omp-2`**, the lane
+  that builds the real omp adapter. `DESIGN.md` gains §3.1 (omp binding contract) and §3.2 (provider-params encode
+  rule). No port id was added, renamed or renumbered; no F# source was touched; nothing was compiled.
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.
