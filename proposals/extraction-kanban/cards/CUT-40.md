@@ -58,7 +58,7 @@
 
 剩下 5 个 Surface 都是 JS 测试边界：它们引用适配器，是为了让测试打到真实的宿主编解码与工具绑定。如果把它们挪进 `…/OpenCode/` 目录来“清零”，宿主依赖并没有减少，只是换了门禁看不到的位置，所以不这么做。
 
-## 4. 结果：16 → 5
+## 4. 结果：16 → 5（后继收口后 17 → 0，见 §5.1）
 
 | 提交（master） | 内容 | 门禁 ⑨ |
 |---|---|---|
@@ -79,6 +79,24 @@
 | F40-02 | `Context/Prefix/OpenCode/Wire.fs` 放在适配目录里，命名空间却是 `Wanxiangshu.Context.Prefix`（`XWire`），所以门禁 ⑨ 的命名空间口径看不到 `XWireSurface` 对它的引用 | 要么改名空间（`XWireSurface` 随之计入基线），要么判定它不是适配器、移出 `OpenCode/` 目录。这需要先对 `XWire` 是否碰宿主做判定（它 `open Wanxiangshu.OpenCode`）。登记在此，不顺手改 |
 | F40-03 | 门禁 ⑨ 只扫 `.fs`，与 ⑧ 一致。`.fsi` 的 `open` 随实现文件一起改动；本卡涉及的 `.fsi` 都已同步 | 如果要把 `.fsi` 也纳入，⑧ 和 ⑨ 应该一起改，属于门禁 owner 的事 |
 
+### 5.1 F40-01 … F40-03 的处置（2026-10-21，eng-cut40-fu）
+
+三个后继项已全部落地。提交（master，最旧 → 最新）：
+
+| ID | 处置 | 提交 | 门禁计数 |
+|---|---|---|---|
+| F40-01 | `JoinResultRenderer`/`JoinSurface` 移出 `Fork/OpenCode/` 到 `Fork/`；`CleanBreakSurface` 删去适配器 `open`；`JoinResultRendererSurface` 随后继移出 `OpenCode/` 到 `Fork/`（见下），6 个测试的 dist 导入路径同步 | `bb5a52853`、`4018499d6` | ⑨ 6 → 5 → 0 |
+| F40-02 | `Context/Prefix/OpenCode/Wire.fs` 命名空间改为 `Wanxiangshu.Context.Prefix.OpenCode`；拆出宿主中立的 `Context/Prefix/WireReconciliation.fs(i)` 与薄的 `Context/Prefix/OpenCode/XWireHostSurface.fs(i)`；`SatelliteSurface` 移到 `Execution/Session/Attachment/`；Sphinx `Hosts/OpenCode/Adapter.fs` 命名空间同步。**新增门禁 ⑨b `adapter-namespace-folder`**：命名空间不得藏起自己的 `OpenCode/` 目录，反之亦然 | `e7bae9f8e` | ⑨ 5 → 6 → 0（含新增计数 1） |
+| F40-03 | 门禁 ⑧ 与 ⑨ 同时扫 `.fsi` 签名文件；⑧ 如实登记随之出现的 3 个内核签名 | `444ce53d8`、`ef386922d` | ⑧ 3 → 0；⑨ +0 |
+
+其余的收口提交：`1ad762ff2`（DispatchSurface 删重复解码器、SyncDelegate/Surface 删两个无消费者包装，⑨ 5 → 3）、`3d93806a1`（Bookkeeper 工具绑定拆到 `Casebook/OpenCode/BookkeeperToolSurface`，⑨ 3 → 2）、`3bd34e680`（XWireSurface 拆分，⑨ 2 → 1）、`fc6673767`（删除 `Mission/Work/ProjectionSurface` 及其分片，⑨ 1 → 0）。
+
+**门禁 ⑨ 的诚实起点是 17，不是 16。** F40-02 把 `Wire.fs` 的命名空间改为 `…Prefix.OpenCode` 之后，原本躲在 `Wanxiangshu.Context.Prefix` 里的消费者 `XWireSurface.fs` 第一次被 ⑨ 看见，所以 ⑨ 如实 +1。基线文件 `scripts/checks/domain-adapter-import-baseline.json` 的 `_note` 记下了这件事。
+
+**⑨ 收口过程**：master 上 ⑨ 有 5 个文件（`Fork/CleanBreakSurface.fs`、`SyncDelegate/Surface.fs`、`Dispatch/DispatchSurface.fs`、`Mission/Work/ProjectionSurface.fs`、`Casebook/BookkeeperSurface.fs`）。逐刀清零：`DispatchSurface` 删掉重复的 `chat.message` 解码器、`SyncDelegate/Surface` 删掉两个无消费者的 `SyncDelegateBatching` 包装、`BookkeeperSurface` 的工具绑定条目拆到 `Casebook/OpenCode/BookkeeperToolSurface`、`XWireSurface` 拆分、`ProjectionSurface` 整体删除（无测试、无插件、无 F# 调用方）。**终点 ⑨ = 0。**
+
+**门禁 ⑩ 的一个回带问题。** rebase 到带 ⑩ 的 master 之后，`OpenCode/JoinResultRendererSurface.fs` 报 `product-domain references rose 3 -> 4`：F40-01 把它的 `open Wanxiangshu.Execution.Delegation.Fork.OpenCode` 换成了 `open Wanxiangshu.Execution.Delegation.Fork`，适配器之间的引用豁免没了，域内命名空间就变成第 4 个被计数的命名空间。**修法是搬文件，不是改基线**——`JoinResultRendererSurface` 只是 join 线格式的散文包装（无任何宿主引用），因此移到 `Execution/Delegation/Fork/`，命名空间随之改为 `Wanxiangshu.Execution.Delegation.Fork`；离开适配区之后 ⑩ 就不再数它。`scripts/checks/adapter-thinness-baseline.json` 一行未动（PROTOCOL：泳道不改基线）。
+
 ## 6. 验证（README §9：同输入、同环境的 base 与候选）
 
 - **编译**：落地循环 `wt/logs-cut40/land.sh`（沿用 eng-cut34 的循环；heavy.lock 只包编译，测试不持锁，测试加 `timeout`）。在 master `c31e4cd2b` 和 `b4d09a3f7`（中间进来的是仓主的 fantomas 批次）上各做一次 `node scripts/build.mjs --clean`，都通过：`js-module-linkage` 714 个模块，比 base 多 1 个，就是新文件 `DescriptionAssets`；`js-surface-manifest` 通过。
@@ -87,5 +105,13 @@
 - **格式**：本卡改动的 48 个 `.fs/.fsi` 跑 `fantomas --check` 全部通过。第一次落地前查出 `ToolRegistrySurface.fs` 因限定名变短需要重排，已在落地前并入 `827c68dba`。
 - **`node scripts/checks/architecture.mjs`**：每次推送前都通过，包括 ⑧ 和 ⑨。
 - **必须能红的反例**：在任意内核文件里加一行 `open Wanxiangshu.Interaction.Dispatch.OpenCode`，⑨ 报 `newly references an in-domain *.OpenCode adapter namespace`；在基线里留一个已清零的文件，⑨ 报 `drop it from …baseline`。两条都在施工中实际触发过：第一条出现在写基线之前首次加门禁时（16 条“newly references”）；第二条出现在每刀之后、删基线条目之前。不是只靠推断。
+
+### 6.1 F40-01 … F40-03 的验证（eng-cut40-fu）
+
+- **门禁计数（独立复算，不采信分支自带的基线）**：⑨ master = 5 → 分支 = 0；⑧ master = 3（`Interaction/Dispatch/JournalPort.fsi`、`Mission/Manager/Workflow.fsi`、`Participant/Provider/Attempt/Fallback/Workflow.fsi`）→ 分支 = 0；⑨b 新增门禁生效。
+- **门禁 ⑩（adapter-thinness）**：product-domain 引用总数 695（基线）→ 671（分支）；无端口的适配器文件数 151（基线）→ 149（分支）。**只降不升**，`scripts/checks/adapter-thinness-baseline.json` 未被修改。过程中出现过一次 `JoinResultRendererSurface.fs: product-domain references rose 3 -> 4`，按上文“搬文件不改基线”处置。
+- **`node scripts/checks/architecture.mjs`**：推送前通过，输出 `architecture: OK`。
+- **格式**：`dotnet tool run fantomas --check src/Wanxiangshu` 通过。
+- **落地**：rebase 到 `origin/master`（`f214ece07`）后，`git push origin HEAD:master` 快进推送成功；推送前 `package-lock.json` 解析通过，`wanxiangli` gitlink 是 `origin/main` 的祖先。证据见 `wt/logs-cut40-fu/logs/land.log` 与同目录 `vibe-fs/logs/{architecture,build,tests,check,fantomas}-land.log`。
 
 **回退**：每个提交只移动文件、改命名空间或删除无用的 `open`，没有改持久格式，也没有改行为。可以单独 `git revert`；revert 某个移动提交时，要连同它在基线里删掉的条目一起恢复，否则 ⑨ 会报“新引用”。
