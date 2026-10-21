@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
@@ -128,9 +129,6 @@ module private SyncDelegateStoreOps =
     let observedKey (owner: SessionId) (providerRun: ProviderRunIdentity) =
         sessionKey owner, providerRunKey providerRun
 
-    let sameCallOrder left right =
-        List.map callKey left = List.map callKey right
-
     let failInvocation (invocation: SyncDelegateInvocation) error =
         AsyncSupport.trySetResult invocation.Completion (Error error) |> ignore
 
@@ -223,106 +221,129 @@ module private SyncDelegateStoreOps =
             failCalls failCall calls error
         | false, _ -> ()
 
-    let batchOfObservedRun providerRun role currentCall (observed: ObservedProviderRun) =
-        let callOrder =
-            observed.Calls
-            |> Seq.choose (fun (observedRole, callId) -> if observedRole = role then Some callId else None)
-            |> Seq.toList
+    /// CUT-13: which invocations form one admitted semantic batch, and when,
+    /// is wanxiangli/delegate-batch's law. This module keeps the rendezvous
+    /// buffers, the invocations and their completion tasks, and writes what the
+    /// law decides.
+    [<Fable.Core.Import("DelegateBatchLaw", "wanxiangli/delegate-batch")>]
+    let private lawClass: obj = Fable.Core.Util.jsNative
 
-        if List.contains currentCall callOrder then
+    [<Fable.Core.Emit("new $0()")>]
+    let private construct (_cls: obj) : obj = Fable.Core.Util.jsNative
+
+    let private law: obj = construct lawClass
+
+    let private roleName (role: SyncDelegateRole) =
+        match role with
+        | SyncDelegateRole.Inspector -> "Inspector"
+        | SyncDelegateRole.Coder -> "Coder"
+        | SyncDelegateRole.Engineer -> "Engineer"
+        | SyncDelegateRole.DevOps -> "DevOps"
+
+    let private callKeys (calls: ToolCallId list) = calls |> List.map callKey |> List.toArray
+
+    let batchOfObservedRun providerRun role currentCall (observed: ObservedProviderRun) =
+        let calls =
+            observed.Calls
+            |> Seq.map (fun (observedRole, callId) ->
+                createObj
+                    [ "role" ==> roleName observedRole
+                      "callId" ==> callKey callId ])
+            |> Seq.toArray
+
+        let order: obj =
+            law?observedBatch (
+                createObj
+                    [ "role" ==> roleName role
+                      "currentCall" ==> callKey currentCall
+                      "calls" ==> calls ]
+            )
+
+        if isNull order then
+            None
+        else
+            let byKey =
+                observed.Calls
+                |> Seq.map (fun (_, callId) -> callKey callId, callId)
+                |> Map.ofSeq
+
             Some
                 { ProviderRun = providerRun
-                  CallOrder = callOrder
+                  CallOrder = unbox<string array> order |> Array.toList |> List.map (fun key -> byKey.[key])
                   CurrentCall = currentCall }
-        else
-            None
 
-    let admitSingle
+    let private rejection (reason: string) =
+        match reason with
+        | "ActiveBatch" -> "sync delegate rejected: dedicated delegate already has an active batch"
+        | "BatchPending" -> "sync delegate rejected: semantic batch already pending"
+        | "InvalidBatch" -> "sync delegate rejected: invalid ProviderRun batch"
+        | "OtherRunPending" -> "sync delegate rejected: another ProviderRun batch is pending"
+        | "DuplicateCall" -> "sync delegate rejected: duplicate ToolCallId in batch"
+        | other -> invalidOp ("wanxiangli/delegate-batch returned an unknown rejection: " + other)
+
+    let admit
         (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
         (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
         key
         (invocation: SyncDelegateInvocation)
         =
-        if pendingBatches.ContainsKey key then
-            SyncDelegateAdmission.Rejected "sync delegate rejected: semantic batch already pending"
-        else
+        let pending =
+            match pendingBatches.TryGetValue key with
+            | true, existing ->
+                createObj
+                    [ "providerRun" ==> providerRunKey existing.ProviderRun
+                      "callOrder" ==> callKeys existing.CallOrder
+                      "received" ==> (existing.Items.Keys |> Seq.toArray) ]
+            | false, _ -> null
+
+        let batch =
+            match invocation.Batch with
+            | Some batch ->
+                createObj
+                    [ "providerRun" ==> providerRunKey batch.ProviderRun
+                      "callOrder" ==> callKeys batch.CallOrder
+                      "currentCall" ==> callKey batch.CurrentCall ]
+            | None -> null
+
+        let verdict: obj =
+            law?admit (
+                createObj
+                    [ "active" ==> activeBatches.ContainsKey key
+                      "pending" ==> pending
+                      "batch" ==> batch ]
+            )
+
+        let buffer (batch: SyncDelegateBatch) =
+            if unbox<bool> verdict?``open`` then
+                pendingBatches.[key] <-
+                    { ProviderRun = batch.ProviderRun
+                      CallOrder = batch.CallOrder
+                      Items = Dictionary<string, SyncDelegateInvocation>() }
+
+            let state = pendingBatches.[key]
+            state.Items.[callKey batch.CurrentCall] <- invocation
+            state
+
+        match unbox<string> verdict?verdict, invocation.Batch with
+        | "reject", _ -> SyncDelegateAdmission.Rejected(rejection (unbox<string> verdict?reason))
+        | "single", None ->
             activeBatches.[key] <- [ invocation ]
             SyncDelegateAdmission.Ready [ invocation ]
-
-    let resolvePendingBatch
-        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
-        key
-        (batch: SyncDelegateBatch)
-        =
-        match pendingBatches.TryGetValue key with
-        | true, existing when
-            ProviderRunIdentity.value existing.ProviderRun = ProviderRunIdentity.value batch.ProviderRun
-            && sameCallOrder existing.CallOrder batch.CallOrder
-            ->
-            Ok existing
-        | true, _ -> Error "sync delegate rejected: another ProviderRun batch is pending"
-        | false, _ ->
-            let created =
-                { ProviderRun = batch.ProviderRun
-                  CallOrder = batch.CallOrder
-                  Items = Dictionary<string, SyncDelegateInvocation>() }
-
-            pendingBatches.[key] <- created
-            Ok created
-
-    let completeOrWaitBatch
-        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
-        (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
-        key
-        (batchState: PendingBatch)
-        currentKey
-        (invocation: SyncDelegateInvocation)
-        =
-        batchState.Items.[currentKey] <- invocation
-
-        if batchState.Items.Count <> batchState.CallOrder.Length then
+        | "wait", Some batch ->
+            buffer batch |> ignore
             SyncDelegateAdmission.Waiting
-        else
+        | "ready", Some batch ->
+            let state = buffer batch
+
             let ordered =
-                batchState.CallOrder
-                |> List.map (fun callId -> batchState.Items.[callKey callId])
+                unbox<string array> verdict?order
+                |> Array.toList
+                |> List.map (fun callId -> state.Items.[callId])
 
             pendingBatches.Remove key |> ignore
             activeBatches.[key] <- ordered
             SyncDelegateAdmission.Ready ordered
-
-    let admitBatched
-        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
-        (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
-        key
-        (invocation: SyncDelegateInvocation)
-        (batch: SyncDelegateBatch)
-        =
-        let orderedKeys = batch.CallOrder |> List.map callKey
-        let currentKey = callKey batch.CurrentCall
-
-        if
-            List.isEmpty orderedKeys
-            || Set.count (Set.ofList orderedKeys) <> List.length orderedKeys
-            || not (List.contains currentKey orderedKeys)
-        then
-            SyncDelegateAdmission.Rejected "sync delegate rejected: invalid ProviderRun batch"
-        else
-            match resolvePendingBatch pendingBatches key batch with
-            | Error error -> SyncDelegateAdmission.Rejected error
-            | Ok batchState when batchState.Items.ContainsKey currentKey ->
-                SyncDelegateAdmission.Rejected "sync delegate rejected: duplicate ToolCallId in batch"
-            | Ok batchState -> completeOrWaitBatch pendingBatches activeBatches key batchState currentKey invocation
-
-    let admitByBatch
-        (pendingBatches: Dictionary<string * SyncDelegateRole, PendingBatch>)
-        (activeBatches: Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>)
-        key
-        (invocation: SyncDelegateInvocation)
-        =
-        match invocation.Batch with
-        | None -> admitSingle pendingBatches activeBatches key invocation
-        | Some batch -> admitBatched pendingBatches activeBatches key invocation batch
+        | other, _ -> invalidOp ("wanxiangli/delegate-batch returned an unexpected admission: " + other)
 
     let disposeCallRegistration
         gate
@@ -443,11 +464,7 @@ type internal SyncDelegateCallStore() as this =
     member _.Admit(invocation: SyncDelegateInvocation) : SyncDelegateAdmission =
         lock gate (fun () ->
             let key = keyOf invocation.OwnerScope invocation.Role
-
-            if activeBatches.ContainsKey key then
-                SyncDelegateAdmission.Rejected "sync delegate rejected: dedicated delegate already has an active batch"
-            else
-                admitByBatch pendingBatches activeBatches key invocation)
+            admit pendingBatches activeBatches key invocation)
 
     member _.ReleaseAdmission(ownerScope: ReuseScopeId, role: SyncDelegateRole) =
         lock gate (fun () -> activeBatches.Remove(keyOf ownerScope role) |> ignore)
