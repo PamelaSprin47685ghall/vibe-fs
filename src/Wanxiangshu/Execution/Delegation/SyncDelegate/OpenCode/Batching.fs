@@ -8,7 +8,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
-open Wanxiangshu.Host.Domain
 open ToolHostCodec
 
 /// OpenCode binding of the host-neutral `SyncDelegateBatchRules`: the tool
