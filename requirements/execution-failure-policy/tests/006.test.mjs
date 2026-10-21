@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as policy from '../../../dist/Execution/Failure/Surface.js'
 import * as hooks from '../../../dist/OpenCode/Host/PluginHooksSurface.js'
-import * as transaction from '../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js'
+import * as transaction from '../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js'
 import { input, capacityFence } from './support/policy-input.mjs'
 
 test('WHAT[execution-failure-policy-006] policy requests exact pre-provider settlement and membrane rejects fatal before settlement', () => {

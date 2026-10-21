@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Interaction.Admission
 
 module ChatAdmissionIntentSurface =
     /// host-boundary-008: the wire evidence that marks one message HostInternal

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import * as chat from '../../../../dist/Execution/Session/ChatExecution/Surface.js'
 import * as recovery from '../../../../dist/Execution/Session/ChatExecution/RecoverySurface.js'
 import * as authority from '../../../../dist/Interaction/Authority/RuntimeSurface.js'
-import * as transaction from '../../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js'
+import * as transaction from '../../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js'
 import * as routing from '../../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import * as persona from '../../../../dist/Participant/Persona/Surface.js'
 

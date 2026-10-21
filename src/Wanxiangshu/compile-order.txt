@@ -359,8 +359,8 @@ Participant/Persona/ManagedAgent.fsi
 Participant/Persona/ManagedAgent.fs
 Interaction/Admission/ChatAdmissionIntent.fsi
 Interaction/Admission/ChatAdmissionIntent.fs
-OpenCode/Host/ChatAdmission/IntentSurface.fsi
-OpenCode/Host/ChatAdmission/IntentSurface.fs
+Interaction/Admission/ChatAdmissionIntentSurface.fsi
+Interaction/Admission/ChatAdmissionIntentSurface.fs
 Persistence/Journal/PromptFactCodec.fsi
 Persistence/Journal/PromptFactCodec.fs
 Persistence/Journal/FactCodec.fsi
@@ -819,12 +819,12 @@ Interaction/Dispatch/PhysicalAcceptance.fsi
 Interaction/Dispatch/PhysicalAcceptance.fs
 Interaction/Dispatch/Dispatcher.fsi
 Interaction/Dispatch/Dispatcher.fs
-OpenCode/Host/ChatAdmission/Transaction.fsi
-OpenCode/Host/ChatAdmission/Transaction.fs
+Interaction/Admission/ChatAdmissionTransaction.fsi
+Interaction/Admission/ChatAdmissionTransaction.fs
 OpenCode/Host/ChatAdmission/ProviderLifecycle.fsi
 OpenCode/Host/ChatAdmission/ProviderLifecycle.fs
-OpenCode/Host/ChatAdmission/TransactionSurface.fsi
-OpenCode/Host/ChatAdmission/TransactionSurface.fs
+Interaction/Admission/ChatAdmissionTransactionSurface.fsi
+Interaction/Admission/ChatAdmissionTransactionSurface.fs
 Interaction/Dispatch/Send.fsi
 Interaction/Dispatch/Send.fs
 Composition/Durable/PromptJournalAdapter.fsi

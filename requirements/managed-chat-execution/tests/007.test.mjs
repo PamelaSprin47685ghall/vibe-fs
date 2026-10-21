@@ -3,7 +3,7 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const transaction = await import("../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js");
+const transaction = await import("../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js");
 
 const evidence = {
   sessionId: 'ses-transaction',
@@ -206,7 +206,7 @@ test('WHAT[managed-chat-execution-007] pre-provider failure cancellation and rej
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const transaction = await import("../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js");
+const transaction = await import("../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js");
 const executionStatus = await import("../../../dist/Execution/Session/ChatExecution/StatusSurface.js");
 
 const evidence = (suffix, overrides = {}) => ({

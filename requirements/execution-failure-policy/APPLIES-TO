@@ -28,7 +28,7 @@
 /src/Wanxiangshu/Interaction/Dispatch/Send.fs
 /src/Wanxiangshu/Execution/Routing/ModelCapacity/**
 /src/Wanxiangshu/Execution/Routing/ModelRouting.fs
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/TransactionSurface.fs
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionTransactionSurface.fs
 /src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs
 /src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs
 /src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs
