@@ -1,6 +1,17 @@
 # Changelog — 版本历史
 
 
+## Unreleased — 013 的 Boot 装配面改为惰性导入（首裁决提前，但 tier 静默窗口的结构性缺口未闭合）
+
+- **修复**：`requirements/knowledge-reuse/tests/013.test.mjs` 顶层静态 import 的 `dist/OpenCode/Plugin/PluginHostWiringSurface.js`（实测静态 import 图 **3340 ms** 的模块求值成本，391 个 dist 模块 / 4,050,480 B）改为**惰性**导入（`let hostFinalizeModule` + `loadHostFinalize()`），只在真正需要它的三个异步用例体内解析。`??=` 只在 `await` 成功后才赋值，故 import 失败不会缓存被拒的 promise，也不会留下半初始化的模块。
+- **判据**：`verdict-feed.mjs` 的 `BLOCKING` 集合只有 `test:pass` / `test:fail` / `test:complete`；`test:stdout` / `test:stderr` / `test:diagnostic` 是后台事件，**不续窗**。unit 层看门狗是**整个 tier 共享**的 5,000 ms 窗口。
+- **验收**：六个文件**各自独立** `node --test` 直跑全绿 —— 011 tests 8 / pass 7 / todo 1（16,223 ms）、012 tests 5 / pass 5（2,993 ms）、013 tests 32 / pass 31 / todo 1（69,225 ms）、014 tests 3 / pass 2 / todo 1（1,088 ms）、015 tests 3 / pass 3（4,636 ms）、016 tests 15 / pass 15（4,805 ms），全部 exit 0。门禁 `node scripts/lib/test-surface-scan.mjs` → exit 0 且静默；`node scripts/checks/js-surface-manifest.mjs` → `OK — 149 registered surfaces`。
+- **如实记录的边界（未闭合）**：**scoped tier 仍然红**。`TESTS_MJS_FILES=...011..016.test.mjs node requirements/verification-system/tests/run.mjs --skip-staleness-check` → exit 1（35,425 ms，load 13.75），`WATCHDOG: 'tests/unit' silent for 5001ms (limit 5000ms); 127 blocking progress update(s), last progress: test:pass:WHAT[knowledge-reuse-013] original Host finalization observer-throws without cuts retains the ordinary settlement after actual Capture`，`runner: 1 file(s) had not reported completion` / `5 drained, 1 active`（active = `013.test.mjs`）。原因是**结构性的**：013 的四个 Boot leaf 各自 await **一个不可中断的真实子进程探针**，实测 **10,151–11,814 ms**，其内部**不可能**产生裁决（子测试的裁决也只在**其结束时**才发），因此**任何保留断言的测试改动都无法满足这个 tier 全局窗口**。
+- **两个合法出路（都不在本 lane 范围）**：① 把真实进程 leaf 移进 integration harness 层，其 case 静默预算是 20,000 ms（`time-budget.js` 的 `HARNESS_CASE_SILENCE_MS`）；② 给验证系统一条针对子进程工作的**真实因果进展通道**（不是心跳字节）。
+- **本 lane 的额外上下文**：全量 unit tier 在**冻结基线**上本场就已经是红的（`762 test file(s)`，`27/762 planned file(s) completed`，同一个看门狗），所以 011–016 的连带取消是**既有 tier 级症状**，不是这六个文件自身的缺陷。
+- **改动文件**：`requirements/knowledge-reuse/tests/013.test.mjs`。
+- **未验证**：本轮**没有跑 F# 构建**，**没有**从新基线重建 `dist`，**没有**跑全量 unit tier；上面的运行数对的是**当前 dist**。
+
 
 ## Unreleased — 委派 032/026 落地：push 手法的如实更正
 
