@@ -110,6 +110,13 @@ expect("a failure in the delivery phase is AcceptanceUnknown, with the original 
   await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go" }, undefined),
   { tag: "AcceptanceUnknown", reason: "host refused the message" });
 sendFault = undefined;
+// A child prompt must NOT be refused for a field the child path cannot
+// carry: `children.prompt` takes text only, so `Role` on a child is refused
+// for the CHILD path's reason, not the host session's. The child prompt is
+// delivered, not refused.
+expect("a child prompt carrying Role is refused with the child path's reason, not the host's",
+  await portsSeen!.Prompts.Send("child-of-root" as P.SessionId, { Text: "go", Role: P.agentRole("coder") }, undefined),
+  { tag: "Fatal", reason: "omp child prompts carry text only: cannot carry Role" });
 const ctxEdit = await fire("context", { type: "context", messages: [{ role: "user", content: [{ type: "text", text: "REPLACE-ME" }], timestamp: 1 }] });
 const stamps = (ctxEdit as { messages: { timestamp?: number }[] }).messages.map((m) => m.timestamp);
 expect("both synthesized messages carry the same numeric timestamp",
@@ -134,6 +141,16 @@ expect("child session create", await portsSeen!.Sessions.Create("root" as P.Sess
 expect("model apply unknown -> Transport error", (await portsSeen!.Models.Apply("root" as P.SessionId, { Provider: "x", Model: "y" })).ok, false);
 expect("prompt correlation echoed as entry", [await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go", Correlation: P.promptKey("pk-1") }, undefined), entries, sent],
   [{ tag: "AdmittedWithReceipt", value: "omp:root" }, [{ session: "root", key: "pk-1" }], ["go"]]);
+// The `late` callback runs AFTER delivery settled. A throw from the caller's
+// own callback must not be reported as `AcceptanceUnknown`: the host already
+// accepted the prompt, so acceptance is NOT unknown. The throw propagates to
+// the caller unchanged instead of being mapped to a delivery verdict.
+let lateThrew = false;
+const lateOutcome = await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go" }, async () => { lateThrew = true; throw new Error("late exploded"); })
+  .then((r) => ({ tag: "resolved", outcome: r }), (e) => ({ tag: "rejected", reason: e instanceof Error ? e.message : String(e) }));
+expect("a throw from the late callback after a settled delivery is not mapped to AcceptanceUnknown",
+  lateOutcome, { tag: "rejected", reason: "late exploded" });
+expect("the late callback did throw, so the assertion above really exercised the path", lateThrew, true);
 recordedParentSession = "parent-session-id";
 expect("parent recorded as a session id", await portsSeen!.Sessions.Parent("root" as P.SessionId), { ok: true, value: "parent-session-id" });
 recordedParentSession = "/tmp/sessions/parent.jsonl";

@@ -184,40 +184,57 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
       // failure (`Fatal` = definitely not sent).
       try {
         if (request.Correlation !== undefined) pi.appendEntry("wxs.prompt-key", { session: s, key: request.Correlation });
-        // The host session is the one the extension is running in: role, route,
-        // workspace and tool policy are not expressible through
-        // `sendUserMessage`, so they are reported as unsupported instead of
-        // being dropped.
-        const unsupportedFields: string[] = [];
-        if (request.Role !== undefined) unsupportedFields.push("Role");
-        if (request.Route !== undefined) unsupportedFields.push("Route");
-        if (request.Workspace !== undefined) unsupportedFields.push("Workspace");
-        if (request.ToolPolicy !== undefined) unsupportedFields.push("ToolPolicy");
-        if (unsupportedFields.length > 0) {
-          if (late) await late({ tag: "Refused", reason: `omp cannot carry ${unsupportedFields.join(", ")}` });
-          return { tag: "Fatal", reason: `omp cannot carry ${unsupportedFields.join(", ")}` };
-        }
       } catch (e) {
-        // Our own encode path or the correlation write failed: the host never
-        // saw the prompt. Reporting this as `AcceptanceUnknown` would hide an
-        // adapter bug behind an ambiguous host state.
+        // Our own correlation write failed: the host never saw the prompt.
+        // Reporting this as `AcceptanceUnknown` would hide an adapter bug
+        // behind an ambiguous host state.
         return { tag: "Fatal", reason: why(e) };
+      }
+      // The unsupported-field check is scoped to the delivery path actually
+      // used, and the two paths are NOT the same:
+      //   - `children.prompt(id, text)` takes a TEXT only. It carries no
+      //     role, route, workspace or tool policy either, so a child prompt
+      //     asking for them is refused rather than silently dropped.
+      //   - `pi.sendUserMessage(text, { deliverAs })` is the host's OWN
+      //     session; role, route, workspace and tool policy are not
+      //     expressible through it.
+      // Both refuse, but the reason names the path that cannot carry the
+      // field, so a child refusal is never read as a host-session refusal.
+      const unsupportedFields: string[] = [];
+      if (request.Role !== undefined) unsupportedFields.push("Role");
+      if (request.Route !== undefined) unsupportedFields.push("Route");
+      if (request.Workspace !== undefined) unsupportedFields.push("Workspace");
+      if (request.ToolPolicy !== undefined) unsupportedFields.push("ToolPolicy");
+      if (unsupportedFields.length > 0) {
+        const reason = isOwnChild(s)
+          ? `omp child prompts carry text only: cannot carry ${unsupportedFields.join(", ")}`
+          : `omp cannot carry ${unsupportedFields.join(", ")}`;
+        if (late) await late({ tag: "Refused", reason });
+        return { tag: "Fatal", reason };
       }
       // Phase 2 (delivery): the point of no return. The host may already have
       // taken the prompt when this throws, so acceptance is genuinely unknown.
-      try {
+      // The `late` callback is deliberately OUTSIDE this `try`: once the host
+      // has accepted the prompt, delivery is settled, and a throw from the
+      // caller's own callback cannot make host acceptance unknown. Reporting
+      // `AcceptanceUnknown` there would lie about a settled delivery.
+      const deliver = async (): Promise<{ tag: "AdmittedWithReceipt"; value: P.TransportReceipt } | { tag: "Retryable"; reason: string }> => {
         if (isOwnChild(s)) {
           const accepted = await children.prompt(s, request.Text);
           if (!accepted) return { tag: "Retryable", reason: "omp refused prompt" };
-          if (late) await late({ tag: "OwnedSettled" });
           return { tag: "AdmittedWithReceipt", value: P.transportReceipt(`omp:${s}`) };
         }
         pi.sendUserMessage(request.Text, { deliverAs: "followUp" });
-        if (late) await late({ tag: "OwnedSettled" });
         return { tag: "AdmittedWithReceipt", value: P.transportReceipt(`omp:${s}`) };
+      };
+      let outcome: { tag: "AdmittedWithReceipt"; value: P.TransportReceipt } | { tag: "Retryable"; reason: string };
+      try {
+        outcome = await deliver();
       } catch (e) {
         return { tag: "AcceptanceUnknown", reason: why(e) };
       }
+      if (late) await late({ tag: "OwnedSettled" });
+      return outcome;
     },
   };
 
