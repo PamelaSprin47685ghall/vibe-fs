@@ -1,7 +1,34 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
-import { nativeCrashPoints, verifyNativeCrashCase } from './support/native-crash.mjs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { coldReaderWriterId, nativeCrashPoints, verifyNativeCrashCase } from './support/native-crash.mjs'
+
+test('WHAT[durable-events-005] native crash cold-reader identities stay legal across PID digit boundaries', async () => {
+  const store = await import('../../../dist/Persistence/EventStore/Surface.js')
+  const root = mkdtempSync(join(tmpdir(), 'wxs-cold-reader-identity-'))
+  const pids = [1, 999, 1000, 4242, 9999, 10000, 4194304]
+  try {
+    assert.equal(new Set(pids.map(coldReaderWriterId)).size, pids.length)
+    for (const pid of pids) {
+      const writerId = coldReaderWriterId(pid)
+      const handle = store.create(join(root, 'state'), writerId)
+      try {
+        assert.deepEqual(store.heads(handle, 'absent-stream'), [])
+      } finally {
+        store.dispose(handle)
+      }
+    }
+    for (const suffix of ['0000', '0001', '0999', '1000', '4242', '9999']) {
+      assert.throws(() => store.create(join(root, 'state'), `cold-reader-${suffix}`),
+        /WriterId must not end with a hyphen and four digits/)
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
 
 for (const point of nativeCrashPoints) {
   test(`WHAT[durable-events-005] real OS crash at ${point} preserves the complete continuation and resumes idempotently`,

@@ -19,6 +19,8 @@ const segmentOf = (root, n) => join(directoryOf(root), `${writer}-${String(n).pa
 const snapshot = (root) => Object.fromEntries(fs.readdirSync(directoryOf(root)).sort()
   .map((name) => [name, fs.readFileSync(join(directoryOf(root), name)).toString('base64')]))
 
+export const coldReaderWriterId = (pid) => `cold-reader-p${pid}`
+
 export const nativeCrashPoints = Object.freeze([
   'append-first', 'fsync-first', 'append-unicode-second',
   'before-unlink', 'after-unlink', 'resume-copied-fsync',
@@ -75,7 +77,7 @@ async function cold(root) {
   const ids = writers[0].eventIds
   assert.deepEqual(ids, events.map((event) => event.id))
   assert.equal(new Set(ids).size, ids.length)
-  const handle = store.create(join(root, 'state'), `cold-reader-${process.pid}`)
+  const handle = store.create(join(root, 'state'), coldReaderWriterId(process.pid))
   try {
     for (const event of events) assert.deepEqual(store.read(handle, event.id), event)
     assert.deepEqual(store.heads(handle, events[0].stream), [events.at(-1).id])
