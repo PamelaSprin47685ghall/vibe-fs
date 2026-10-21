@@ -152,3 +152,53 @@ test('WHAT[repository-programming-059] a call of the same run cannot take the ce
   assert.equal(deliveredFenceOf(id), null)
   clearDeliveredReturned(id)
 })
+
+// Moved from tests/061.test.mjs (LC-006): the fenced delivered-view cell is [059]'s take/peek, and the requirement tree keeps one test file per clause.
+{
+// LC-006: 交付格按 provider run 实施精确围栏，防止旧终态错领新任务交付
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const {
+  clearDeliveredValue,
+  clearDeliveredReturned,
+  recordFencedDeliveredView,
+  takeDeliveredHandoffFor,
+  deliveredFenceOf,
+} = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
+const { clearAll, numberMessage, applyView } = await import("../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js");
+
+
+test('WHAT[repository-programming-059] LC-006: fenced delivered view answers only the owning run', () => {
+  const session = 'session-lc006'
+  const runA = 'run-A'
+  const callA = 'call-A'
+  const runB = 'run-B'
+  const view = { prefixUntil: 1, thenMap: {} }
+
+  clearDeliveredValue(session)
+  clearDeliveredReturned(session)
+  try {
+    const rows = [{ id: 'msg-0', text: 'summary-text' }]
+    rows.forEach((row) => numberMessage(session, row.id))
+    applyView(session, rows)
+
+    recordFencedDeliveredView(session, runA, callA, view)
+
+    // runB 取交付必须返回 null，且 deliveredFenceOf 保持为 runA
+    assert.equal(takeDeliveredHandoffFor(session, runB, null), null)
+    assert.deepEqual(deliveredFenceOf(session), { providerRun: runA, toolCallId: callA })
+
+    // runA 才能取走
+    const handoffA = takeDeliveredHandoffFor(session, runA, null)
+    assert.notEqual(handoffA, null)
+    assert.match(String(handoffA), /summary-text/)
+
+    // 取走后交付格已被消费
+    assert.equal(deliveredFenceOf(session), null)
+    assert.equal(takeDeliveredHandoffFor(session, runA, null), null)
+  } finally {
+    clearDeliveredValue(session)
+    clearDeliveredReturned(session)
+  }
+})
+}

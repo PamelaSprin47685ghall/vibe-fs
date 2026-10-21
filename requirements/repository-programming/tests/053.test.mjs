@@ -53,7 +53,7 @@ const failureOf = (result) => {
 
 test.beforeEach(() => clearAll())
 
-test('WHAT[repository-programming-063] flat prefixUntil and thenMap are accepted and captured as the pending view', async () => {
+test('WHAT[repository-programming-053] flat prefixUntil and thenMap are accepted and captured as the pending view', async () => {
   const { dir, cleanup } = sandbox()
   const session = 'ses-063-flat'
   try {
@@ -76,7 +76,7 @@ test('WHAT[repository-programming-063] flat prefixUntil and thenMap are accepted
   }
 })
 
-test('WHAT[repository-programming-063] the retired view wrapper is refused and points at the flat parameters', async () => {
+test('WHAT[repository-programming-053] the retired view wrapper is refused and points at the flat parameters', async () => {
   const { dir, cleanup } = sandbox()
   const session = 'ses-063-view-wrapper'
   try {
@@ -102,7 +102,7 @@ test('WHAT[repository-programming-063] the retired view wrapper is refused and p
   }
 })
 
-test('WHAT[repository-programming-063] a call without prefixUntil and thenMap sets no view at all', async () => {
+test('WHAT[repository-programming-053] a call without prefixUntil and thenMap sets no view at all', async () => {
   const { dir, cleanup } = sandbox()
   const session = 'ses-063-no-args'
   try {
@@ -117,7 +117,7 @@ test('WHAT[repository-programming-063] a call without prefixUntil and thenMap se
   }
 })
 
-test('WHAT[repository-programming-063] a malformed prefixUntil or thenMap is refused with VIEW_DECLARATION_INVALID', async () => {
+test('WHAT[repository-programming-053] a malformed prefixUntil or thenMap is refused with VIEW_DECLARATION_INVALID', async () => {
   const { dir, cleanup } = sandbox()
   const session = 'ses-063-invalid'
   try {
