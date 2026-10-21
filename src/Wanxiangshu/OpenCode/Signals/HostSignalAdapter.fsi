@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Session.ChatExecution
 
 module HostSignalAdapter =
     val sessionIdOf: HostSignal -> SessionId

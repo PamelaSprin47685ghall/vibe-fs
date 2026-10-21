@@ -8,31 +8,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
 
-[<RequireQualifiedAccess>]
-type HostProviderCompletion =
-    | Stop
-    | Length
-    | ContentFiltered
-
-[<RequireQualifiedAccess>]
-type HostProviderTerminalOutcome =
-    | Completed of HostProviderCompletion
-    | Cancelled of ExecutionFailure
-    | Interrupted of ExecutionFailure
-    | ProviderFailure of ExecutionFailure
-
-type ExactProviderTerminalObservation =
-    { SessionId: SessionId
-      PhysicalUserMessageId: PhysicalUserMessageId
-      ProviderRun: ProviderRunIdentity
-      Outcome: HostProviderTerminalOutcome
-      Disposition: ChatExecutionTerminalDisposition option }
-
-type ExactProviderStartObservation =
-    { SessionId: SessionId
-      PhysicalUserMessageId: PhysicalUserMessageId
-      ProviderRun: ProviderRunIdentity }
-
 /// Outputs typed `HostSignal` for the coarse signals:
 ///   - session.status idle / session.idle
 ///   - session.status retry

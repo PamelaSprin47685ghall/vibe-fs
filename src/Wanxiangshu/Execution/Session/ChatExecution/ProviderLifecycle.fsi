@@ -1,7 +1,6 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Execution.Session.ChatExecution
 
 open System.Threading.Tasks
-open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal

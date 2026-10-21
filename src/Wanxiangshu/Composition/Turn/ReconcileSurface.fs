@@ -8,6 +8,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.HostSession
 
 /// JS boundary for reconciliation's classifiers, evidence, wakes and publish

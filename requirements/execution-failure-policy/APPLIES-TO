@@ -5,6 +5,7 @@
 /src/Wanxiangshu/Execution/Failure/**
 /src/Wanxiangshu/Participant/Provider/Attempt/**
 /src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/ProviderObservation.fs
 /src/Wanxiangshu/OpenCode/Signals/HostSignal.fs
 /src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs
 /src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs
