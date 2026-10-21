@@ -71,14 +71,25 @@ function registerReclamationTest(scenario) {
       fs.writeFileSync(toolPath, `import fs from 'node:fs'
 import { execFileSync, spawn } from 'node:child_process'
 const child = spawn(process.execPath, ['-e', ${JSON.stringify(`require('node:fs').watch(${JSON.stringify(directory)}, () => {}); process.stdout.write('ready\\n')`)}], { stdio: ['ignore', 'pipe', 'inherit'] })
-child.stdout.once('data', () => {
-  const pgid = Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(process.pid)], { encoding: 'utf8' }).trim())
-  const childPgid = Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(child.pid)], { encoding: 'utf8' }).trim())
-  const monitorPgid = Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(process.ppid)], { encoding: 'utf8' }).trim())
-  const identity = { pid: process.pid, pgid, childPid: child.pid, childPgid, monitorPid: process.ppid, monitorPgid }
-  fs.writeFileSync(${JSON.stringify(`${ownershipPath}.tmp`)}, JSON.stringify(identity))
-  fs.renameSync(${JSON.stringify(`${ownershipPath}.tmp`)}, ${JSON.stringify(ownershipPath)})
-})
+child.stdout.resume()
+const sleep = ms => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms) }
+function observeOwnedGroups() {
+  const output = execFileSync('ps', ['-o', 'pid=,pgid=', '-p', [process.pid, child.pid, process.ppid].join(',')], { encoding: 'utf8' })
+  return new Map(output.trim().split('\\n').filter(Boolean).map(line => {
+    const fields = line.trim().split(/\\s+/)
+    return [Number(fields[0]), Number(fields[1])]
+  }))
+}
+let observed = observeOwnedGroups()
+const observationDeadline = Date.now() + 2000
+while (!observed.has(process.pid) || !observed.has(child.pid) || !observed.has(process.ppid)) {
+  if (Date.now() >= observationDeadline) throw new Error('The owned tool could not observe its own live identity')
+  sleep(5)
+  observed = observeOwnedGroups()
+}
+const identity = { pid: process.pid, pgid: observed.get(process.pid), childPid: child.pid, childPgid: observed.get(child.pid), monitorPid: process.ppid, monitorPgid: observed.get(process.ppid) }
+fs.writeFileSync(${JSON.stringify(`${ownershipPath}.tmp`)}, JSON.stringify(identity))
+fs.renameSync(${JSON.stringify(`${ownershipPath}.tmp`)}, ${JSON.stringify(ownershipPath)})
 `)
       fs.writeFileSync(foreignPath, `import fs from 'node:fs'
 import { execFileSync } from 'node:child_process'
