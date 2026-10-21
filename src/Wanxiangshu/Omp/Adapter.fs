@@ -553,7 +553,7 @@ module Adapter =
             | Ok None ->
                 return
                     Error(
-                        HostError.Refused(
+                        HostError.NotFound(
                             sprintf
                                 "omp recorded the parent session as a file path that does not resolve to a session id: %s"
                                 value
