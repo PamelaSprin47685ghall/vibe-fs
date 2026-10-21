@@ -779,6 +779,7 @@ module internal PtyRecovery =
     let start (binding: PtyRecoveryBinding) (command: string) (cwd: string) =
         N.require (not (String.IsNullOrWhiteSpace binding.Key)) "PTY recovery key is required"
         N.require (not (String.IsNullOrWhiteSpace binding.IncarnationId)) "PTY recovery incarnation is required"
+        let workingDirectory = PtyScope.resolveWorkingDirectory cwd
         (N.files?mkdirSync (binding.Directory, N.objectOf [ "recursive", box true; "mode", box 448 ]): unit)
 
         let endpointDirectory: string =
@@ -792,11 +793,7 @@ module internal PtyRecovery =
                   "secret", box (N.token ())
                   "endpoint", box (N.join endpointDirectory "control")
                   "command", box command
-                  "cwd",
-                  (if String.IsNullOrEmpty cwd then
-                       N.runtime?cwd ()
-                   else
-                       box cwd)
+                  "cwd", box workingDirectory
                   "bunMode", N.originalBunMode N.runtime?env?BUN_BE_BUN ]
 
         prepare binding.Directory request

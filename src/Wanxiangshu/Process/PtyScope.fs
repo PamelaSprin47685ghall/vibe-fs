@@ -19,6 +19,9 @@ module private PtyScopeNative =
     [<Import("join", "node:path")>]
     let join (directory: string) (name: string) : string = jsNative
 
+    [<Import("isAbsolute", "node:path")>]
+    let isAbsolute (path: string) : bool = jsNative
+
     [<Import("randomUUID", "node:crypto")>]
     let identity () : string = jsNative
 
@@ -64,8 +67,8 @@ module private PtyScopeNative =
     [<Emit("$0 && (($0.signal === null && Number.isInteger($0.code) && $0.code >= 0) || ($0.code === null && typeof $0.signal === 'string' && $0.signal.startsWith('SIG')))")>]
     let validExit (_value: obj) : bool = jsNative
 
-    [<Emit("({...$0, env: {...process.env, BUN_BE_BUN: '1'}})")>]
-    let workerOptions (_options: obj) : obj = jsNative
+    [<Emit("({...$0, cwd: $1, env: {...process.env, BUN_BE_BUN: '1'}})")>]
+    let workerOptions (_options: obj) (_cwd: string) : obj = jsNative
 
     [<Emit("Object.hasOwn($0, 'originalBunMode') ? $0.originalBunMode : process.env.BUN_BE_BUN")>]
     let originalBunMode (_options: obj) : obj = jsNative
@@ -629,7 +632,20 @@ module internal PtyScope =
     let membershipRows owner sampler text : obj =
         box (N.decodeMembership owner sampler text)
 
+    let resolveWorkingDirectory (cwd: string) : string =
+        let directory =
+            if String.IsNullOrEmpty cwd then
+                unbox<string> (N.runtime?cwd ())
+            else
+                cwd
+
+        N.require (N.isAbsolute directory) "PTY cwd must be an absolute path"
+        let metadata: obj = N.files?statSync directory
+        N.require (unbox<bool> (metadata?isDirectory ())) ("PTY cwd is not a directory: " + directory)
+        directory
+
     let private openScope spawn command options =
+        let workingDirectory = resolveWorkingDirectory options?cwd
         let directory = N.createDirectory ()
         let incarnation = N.identity ()
         let mode = N.originalBunMode options
@@ -652,7 +668,7 @@ module internal PtyScope =
                "owner" |]
 
         let term: obj =
-            emitJsExpr (spawn, N.runtime?execPath, arguments, N.workerOptions options) "$0($1, $2, $3)"
+            emitJsExpr (spawn, N.runtime?execPath, arguments, N.workerOptions options workingDirectory) "$0($1, $2, $3)"
 
         let exits = ResizeArray<obj -> unit>()
         let faults = ResizeArray<string -> unit>()

@@ -56,7 +56,7 @@ const refused = (request, secret, action) => new Promise((resolve, reject) => {
 })
 
 if (process.argv[2] === 'host') {
-  const [, , , directory, key, incarnation, command, mode] = process.argv
+  const [, , , directory, key, incarnation, command, mode, cwd] = process.argv
   if (mode === 'not-started') {
     const create = net.createConnection
     net.createConnection = (...args) => {
@@ -70,7 +70,7 @@ if (process.argv[2] === 'host') {
     }
     syncBuiltinESMExports()
   }
-  const terminal = physical.ptyRecoveryOpen(directory, key, incarnation, command, directory)
+  const terminal = physical.ptyRecoveryOpen(directory, key, incarnation, command, cwd)
   terminal.onData(data => process.send({ data }))
   terminal.onFault(() => {})
   terminal.onExit(() => {})
@@ -82,7 +82,9 @@ if (process.argv[2] === 'host') {
   setInterval(() => {}, 1000)
 } else {
   const root = fs.mkdtempSync(join(tmpdir(), 'wxs-r6c-physical-'))
+  const cwd = join(root, 'workspace')
   try {
+    fs.mkdirSync(cwd)
     for (const runtime of process.env.WXS_COMPILED_HOST ? ['compiled'] : ['node', 'bun']) {
       for (const mode of ['running', 'exited', 'creator', ...(runtime === 'node' ? ['not-started'] : [])]) {
         const directory = join(root, `${runtime}-${mode}`)
@@ -95,7 +97,7 @@ if (process.argv[2] === 'host') {
         const key = randomUUID()
         const incarnation = randomUUID()
         const command = `printf 'launched\\n' >> '${launches}'; printf '%s' "$$" > '${target}.tmp'; mv '${target}.tmp' '${target}'; ${mode === 'exited' ? 'sleep 0.3; exit 23' : mode === 'creator' ? `IFS= read -r value; stty size > '${dimensions}'; printf '%s' "$BUN_BE_BUN" > '${environment}'; printf '%s' "$value" > '${input}.tmp'; mv '${input}.tmp' '${input}'; printf 'creator-output:%s\\n' "$value"; exec sleep 60` : `trap 'printf x > "${userSignal}"' USR1; read value; printf '%s' "$value" > '${input}'; exec sleep 60`}`
-        const host = fork(script, ['host', directory, key, incarnation, command, mode], {
+        const host = fork(script, ['host', directory, key, incarnation, command, mode, cwd], {
           execPath: runtime === 'compiled' ? process.env.WXS_COMPILED_HOST : runtime,
           stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
           ...(runtime === 'compiled' ? { env: { ...process.env, BUN_BE_BUN: '1' } } : {}),
@@ -114,7 +116,7 @@ if (process.argv[2] === 'host') {
           await until(() => fs.existsSync(join(directory, 'available')), 'the physical owner must become available')
           if (mode !== 'not-started') {
             await until(() => fs.existsSync(target), 'the real target must start')
-            assert.throws(() => physical.ptyRecoveryOpen(directory, key, randomUUID(), 'must-not-launch', directory), /EEXIST/)
+            assert.throws(() => physical.ptyRecoveryOpen(directory, key, randomUUID(), 'must-not-launch', cwd), /EEXIST/)
             await assert.rejects(() => physical.ptyRecoveryDrain(directory, key, 'old-incarnation', 20), /incarnation mismatch/)
             await assert.rejects(() => physical.ptyRecoveryDrain(directory, 'wrong-key', incarnation, 20), /key mismatch/)
             if (mode === 'running') await assert.rejects(() => physical.ptyRecoveryDrain(directory, key, incarnation, 20), /live control connection/)

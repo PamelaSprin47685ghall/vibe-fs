@@ -1,6 +1,27 @@
 import test from 'node:test'
 
 {
+const assert = (await import('node:assert/strict')).default
+const { execFile, spawnSync } = await import('node:child_process')
+const { promisify } = await import('node:util')
+const { fileURLToPath } = await import('node:url')
+const { withFinitePhysicalWait } = await import('../../verification-system/tests/support/finite-physical-wait.mjs')
+for (const mode of ['scope', 'recovery']) {
+  for (const kind of ['valid', 'missing', 'file', 'relative', 'empty', 'null']) {
+    test(`WHAT[process-execution-005] PTY ${mode} validates ${kind} cwd before physical preparation`, { timeout: 15000 }, async t => {
+      if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY proof')
+      const helper = fileURLToPath(new URL('./support/pty-cwd.mjs', import.meta.url))
+      const { stdout } = await withFinitePhysicalWait(t, { operation: `PTY cwd ${mode} ${kind}`, limitMs: 14000 },
+        () => promisify(execFile)('bun', [helper, mode, kind], { timeout: 12000 }))
+      const evidence = JSON.parse(stdout.trim())
+      assert.equal(evidence.mode, mode)
+      assert.equal(evidence.kind, kind)
+    })
+  }
+}
+}
+
+{
 // Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052]).
 const { default: assert } = await import('node:assert/strict')
 const { default: test } = await import('node:test')
