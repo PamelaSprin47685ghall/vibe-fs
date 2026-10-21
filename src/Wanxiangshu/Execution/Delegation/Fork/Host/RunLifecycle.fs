@@ -565,6 +565,62 @@ module HostForkRunLifecycle =
             (TerminalEvidence.failed run.AgentId handle childId body)
             agentOutcome
 
+    /// Settle a proven completion with the material this run delivered.
+    ///
+    /// `taken` is the consumed delivery cell (already fenced by its whole
+    /// delivery fence), and `resolved` is the peeked view that a take that
+    /// found nothing falls back to — the peek is idempotent, so a second
+    /// reader of the same terminal still sees the material.
+    let private settleCompletedView
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (runId: string)
+        (handle: HandleId)
+        (result: AgentRunResult)
+        (taken: string option)
+        (resolved: string option)
+        : Task =
+        task {
+            match resolved with
+            | Some completedView when not (System.String.IsNullOrWhiteSpace completedView) ->
+                let finalView =
+                    match taken with
+                    | Some consumed -> consumed
+                    | None -> completedView
+
+                let agentOutcome =
+                    AgentCompletion.completed
+                        run.AgentId
+                        childId
+                        runId
+                        run.Role
+                        result.AuthorityRootUserMessageId
+                        result.ProviderRun
+                        finalView
+                        result.Directory
+
+                let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+                do!
+                    deliverProvenCompletion
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        run
+                        (TerminalEvidence.completed run.AgentId handle childId body)
+                        agentOutcome
+            | _ ->
+                // LC-004: An asynchronous child that completed its physical turn without
+                // delivering a view has not delivered its obligation. Do not settle or
+                // close the run; observation only, the child continues.
+                return ()
+        }
+
     let complete
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -599,9 +655,13 @@ module HostForkRunLifecycle =
                 // open (LC-004) instead of writing a HandleCompleted that
                 // nobody witnessed. The journal-less harness path has no
                 // witness to ask for and keeps working.
-                let witnessed =
+                // The witness is kept, not reduced to a flag: it carries the
+                // fence of the delivery that was proven, and that fence's
+                // tool call id is what the cell must be matched against
+                // before it may be consumed.
+                let witness =
                     match journal with
-                    | None -> true
+                    | None -> None
                     | Some durable ->
                         // LogicalRunId 是实值：写入端与本处同源。
                         // 写入端取被调会话的 activeProfile.LogicalRunId
@@ -631,11 +691,52 @@ module HostForkRunLifecycle =
                             // 永远 witnessed=false 而卡死。缺失的这一位由交付见证的写入方
                             // 另行核对。
                             None
-                        |> Option.isSome
 
-                if not witnessed then
+                match witness with
+                | None when journal.IsNone ->
+                    // The journal-less harness path has no witness to ask
+                    // for and keeps working. There is no proven fence there,
+                    // so the cell may only be taken under its own complete
+                    // identity: the cell of this child session whose
+                    // provider run is this run's. Another run's cell is never
+                    // taken.
+                    let prose =
+                        if System.String.IsNullOrWhiteSpace result.TerminalText then
+                            None
+                        else
+                            Some result.TerminalText
+
+                    let taken =
+                        match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
+                        | Some fence when fence.ProviderRun = result.ProviderRun ->
+                            JsDeliveredValues.tryTakeRenderedForCall
+                                (SessionId.value run.ChildId)
+                                result.ProviderRun
+                                fence.ToolCallId
+                                prose
+                        | _ -> None
+
+                    let! resolved =
+                        match view with
+                        | Some resolution -> resolution ()
+                        | None -> Task.FromResult None
+
+                    return!
+                        settleCompletedView
+                            gate
+                            pendingRuns
+                            journal
+                            parentId
+                            run
+                            childId
+                            runId
+                            handle
+                            result
+                            taken
+                            resolved
+                | None ->
                     return ()
-                else
+                | Some witness ->
                     // D1: the view is resolved only now. The terminal has
                     // been proven to address this run, so its material may
                     // be read and — once the outcome is admissible — spent.
@@ -656,36 +757,34 @@ module HostForkRunLifecycle =
                         // only for an admissible outcome. A take that finds
                         // nothing (another reader already consumed the cell)
                         // falls back to the peeked view, which is idempotent.
+                        //
+                        // The take is fenced by the whole delivery fence the
+                        // witness proved — the provider run AND the tool call
+                        // id. Matching the run alone would let another call of
+                        // the same run take this cell and advance the returned
+                        // cursor; the owning call would then lose its
+                        // delivery. A mismatch takes nothing.
                         let taken =
-                            JsDeliveredValues.tryTakeRenderedFor (SessionId.value run.ChildId) result.ProviderRun prose
-
-                        let finalView =
-                            match taken with
-                            | Some consumed -> consumed
-                            | None -> completedView
-
-                        let agentOutcome =
-                            AgentCompletion.completed
-                                run.AgentId
-                                childId
-                                runId
-                                run.Role
-                                result.AuthorityRootUserMessageId
-                                result.ProviderRun
-                                finalView
-                                result.Directory
-
-                        let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
-
-                        do!
-                            deliverProvenCompletion
+                            match witness.Fence.ToolCallId with
+                            | toolCallId ->
+                                JsDeliveredValues.tryTakeRenderedForCall
+                                    (SessionId.value run.ChildId)
+                                    result.ProviderRun
+                                    toolCallId
+                                    prose
+                        return!
+                            settleCompletedView
                                 gate
                                 pendingRuns
                                 journal
                                 parentId
                                 run
-                                (TerminalEvidence.completed run.AgentId handle childId body)
-                                agentOutcome
+                                childId
+                                runId
+                                handle
+                                result
+                                taken
+                                (Some completedView)
                     | _ ->
                         // LC-004: An asynchronous child that completed its physical turn without
                         // delivering a view has not delivered its obligation. Do not settle or

@@ -7,7 +7,7 @@ import { execute, caseName } from '../../../dist/Repository/Programming/Js/Workf
 import {
   deliveredValue, clearDeliveredValue, recordDeliveredView, recordFencedDeliveredView, takeDeliveredHandoff,
   takeDeliveredHandoffWith, takeDeliveredHandoffFor, clearDeliveredReturned, deliveredReturned,
-  deliveredViewOf, deliveredFenceOf,
+  deliveredViewOf, deliveredFenceOf, takeDeliveredHandoffForCall,
 } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { applyView, clearAll, numberMessage, setView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 
@@ -125,5 +125,30 @@ test('WHAT[repository-programming-059] changed opening material is returned once
   assert.match(String(takeDeliveredHandoffFor(id, 'run-059', null)), /second/)
   recordFencedDeliveredView(id, 'run-059', 'call-3', declaration(0, { 0: 'second' }))
   assert.doesNotMatch(String(takeDeliveredHandoffFor(id, 'run-059', null)), /second/)
+  clearDeliveredReturned(id)
+})
+
+test('WHAT[repository-programming-059] a call of the same run cannot take the cell of another call of that run', () => {
+  const id = 'handoff-same-run-two-calls'
+  clearDeliveredReturned(id)
+  seed(id, ['material-one', 'material-two'])
+  // Two deliveries in ONE provider run: the second overwrites the cell.
+  setView(id, declaration(2, { 1: 'first-call' }))
+  recordFencedDeliveredView(id, 'run-059', 'call-1', declaration(2, { 1: 'first-call' }))
+  setView(id, declaration(2, { 2: 'second-call' }))
+  recordFencedDeliveredView(id, 'run-059', 'call-2', declaration(2, { 2: 'second-call' }))
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'run-059', toolCallId: 'call-2' })
+
+  // The terminal of call-1 holds the whole fence of its own delivery. It
+  // must not take the cell that call-2 left behind.
+  const wrongTake = takeDeliveredHandoffForCall(id, 'run-059', 'call-1', null)
+  assert.equal(wrongTake, null, 'a different call of the same run must not take this cell')
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'run-059', toolCallId: 'call-2' })
+  assert.deepEqual(deliveredReturned(id), [], 'a refused take must not advance the returned cursor')
+
+  // The owning call takes its own cell.
+  const rightTake = takeDeliveredHandoffForCall(id, 'run-059', 'call-2', null)
+  assert.match(String(rightTake), /second-call/)
+  assert.equal(deliveredFenceOf(id), null)
   clearDeliveredReturned(id)
 })

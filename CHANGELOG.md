@@ -1,5 +1,15 @@
 # Changelog — 版本历史
 
+
+## Unreleased — 交付格的消费按完整围栏，不只按 provider run
+
+- **修复：同一 provider run 内另一次调用的交付不会被错取**。交付格记的是产生它的那次调用的完整围栏（provider run + tool call id），而消费面只比 provider run。于是同一 run 里的第二次交付会**覆盖**第一次的格子，而只持 run 的终态会把**另一次调用**的材料取走并推进 returned 游标——真正拥有该交付的那次调用随后拿不到自己的材料。这不是可接受的降级，是一次真实的错取。
+- **消费改为完整围栏比对**。新增 `tryTakeRenderedForCall`：先读交付格的围栏，provider run 与 tool call id **都**相符才取；不符则**不取、不推进游标**，格子原地不动。比对与取之间没有 await，且 owner 的 fence/claim/handOff 不触碰用户代码，因此在单线程 JS 下这一步是原子的。
+- **生产消费方全部接线**。fork 侧不再把 durable 见证压成一个布尔：它保留见证对象，取见证自带的 `Fence.ToolCallId` 作为精确围栏；无 journal 的夹具路径只按交付格**自身**的完整身份（该子会话 + 该 run）取，绝不取别次调用的格。sync delegate 侧优先直接返回 durable 见证的材料；无 journal 时只从「该子会话 + 该 run」这一格自身身份取，**不从父方工具调用序列猜子方那次交付**（那序列是父方的，交付是子方的）。
+- **弱围栏读取器降级为仅夹具**。`tryTakeRenderedFor`（只比 run）保留，但注释改成实话：同一 run 内另一调用可取走该格并推进游标；生产消费方一律走精确围栏或 durable 见证。
+- **改动文件**：`Repository/Programming/Js/DeliveredValues.fs`/`.fsi`、`Repository/Programming/Js/RuntimeSurface.fs`/`.fsi`（新增精确围栏测试钩子）、`Execution/Delegation/Fork/Host/RunLifecycle.fs`、`Execution/Delegation/SyncDelegate/Runtime.fs`。
+- **验收**：`repository-programming/059` 新增永久回归「同一 run 的另一次调用不得取走该格」——错取返回 null、围栏不变、returned 游标未推进，正确调用随后可取自己的材料（该用例在只比 run 的旧实现下为红）。回归：`059` + `delegation/007|008|009|010|011|012|023|025|033` → tests 54 / pass 49 / fail 0 / cancelled 0 / todo 5。
+
 ## Unreleased — 构建的 up-to-date 判据要看产物是否真的在盘上
 
 - **修复：产物缺失不再被报成「build up-to-date (no-op)」**。构建的「已是最新」判定此前只看**编译快照**（编译器输入摘要、生成语料摘要、产物语料摘要），这份快照说的是「源码没变」，不是「产物还在」。于是 `dist/` 被清空、被部分删除、或只复制了一半时，编译缓存仍会命中，构建日志照样打印 `build up-to-date (no-op)`，而磁盘上的产物已经缺失或不全——一次「构建绿」什么也没产出。

@@ -132,9 +132,31 @@ module JsRuntimeSurface =
 
     /// Test hook: consume the handoff only when the cell carries this exact
     /// provider run; a fenced cell from another run stays untouched.
+    ///
+    /// Run-only on purpose: within one run a different call can hold the
+    /// cell. The exact hook below is the one production reads.
     let takeDeliveredHandoffFor (sessionId: string) (providerRun: string) (assistantProse: string option) : obj =
         match
             JsDeliveredValues.tryTakeRenderedFor sessionId (ProviderRunIdentity.create providerRun) assistantProse
+        with
+        | Some text -> box text
+        | None -> null
+
+    /// Test hook: consume the handoff only when the cell carries this exact
+    /// fence — the provider run AND the tool call id. A cell of another call
+    /// stays untouched and the returned cursor does not move.
+    let takeDeliveredHandoffForCall
+        (sessionId: string)
+        (providerRun: string)
+        (toolCallId: string)
+        (assistantProse: string option)
+        : obj =
+        match
+            JsDeliveredValues.tryTakeRenderedForCall
+                sessionId
+                (ProviderRunIdentity.create providerRun)
+                (ToolCallId.create toolCallId)
+                assistantProse
         with
         | Some text -> box text
         | None -> null

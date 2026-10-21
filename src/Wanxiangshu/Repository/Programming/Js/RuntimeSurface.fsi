@@ -33,6 +33,10 @@ module JsRuntimeSurface =
     val takeDeliveredHandoffWith: sessionId: string -> assistantProse: string option -> obj
     val takeDeliveredHandoffFor:
         sessionId: string -> providerRun: string -> assistantProse: string option -> obj
+    /// Test hook: consume the handoff only when the cell carries this exact
+    /// fence — the provider run AND the tool call id.
+    val takeDeliveredHandoffForCall:
+        sessionId: string -> providerRun: string -> toolCallId: string -> assistantProse: string option -> obj
     val takeDeliveredHandoff: sessionId: string -> obj
     val deliveredValue: sessionId: string -> obj
     val deliveredViewOf: sessionId: string -> obj
