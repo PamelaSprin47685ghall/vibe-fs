@@ -6,6 +6,18 @@ open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.TerminalSignal
 
+/// HNI P-17 (transitional): the Fission lane's own name for the session
+/// lifecycle seam it consumes. Today that seam is the Foundation legacy
+/// `ISessionHostPort`; when P-01 lands, this name keeps its meaning and only
+/// its definition changes. Fission speaks this name, never the legacy one.
+type FissionSessionPort = ISessionHostPort
+
+/// HNI P-17 (transitional): the Fission lane's own name for the terminal
+/// observation seam it consumes. Today that seam is the Foundation legacy
+/// `IEventObservationPort`; when P-07 lands, this name keeps its meaning and
+/// only its definition changes. Fission speaks this name, never the legacy one.
+type FissionEventPort = IEventObservationPort
+
 /// HNI port (fission lane): how a delegated PTY run ended, as Fission sees it.
 /// The host runtime's own join item stays in the product domain; the port
 /// carries the neutral facts Fission broadcasts to its lanes.
@@ -42,9 +54,9 @@ type FissionOwnerRuns =
 type FissionHostPort =
     {
         /// Session lifecycle: sibling creation, parent lookup, abort, interrupt, prompts.
-        Sessions: ISessionHostPort
+        Sessions: FissionSessionPort
         /// Terminal observation, when the host publishes it.
-        Events: IEventObservationPort option
+        Events: FissionEventPort option
         /// The working directory a session runs in, if the host knows it.
         DirectoryFor: SessionId -> string option
         /// The workspace directory used when the caller's own is unknown.

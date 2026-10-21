@@ -7,6 +7,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Persistence.Journal
 
 /// Host-side terminal bridge for same-participant Fission lanes. A physical lane
@@ -38,7 +39,7 @@ module FissionHost =
     /// owner remains open until that continuation itself reaches an ordinary
     /// terminal turn.
     val tryConverge:
-        sessionPort: ISessionHostPort ->
+        sessionPort: FissionSessionPort ->
         durable: AgentJournal ->
         directoryFor: (SessionId -> string option) ->
         owner: SessionId ->
@@ -48,9 +49,9 @@ module FissionHost =
     /// were consumed here. Retired owner sessions are absorbed; non-terminal lane
     /// turns return false so ordinary repair/recovery behavior still runs.
     val observeLaneTurn:
-        sessionPort: ISessionHostPort ->
+        sessionPort: FissionSessionPort ->
         rootWorkspace: IRootWorkspaceReader ->
-        eventPort: IEventObservationPort ->
+        eventPort: FissionEventPort ->
         journal: AgentJournal option ->
         joinGuardNudges: HashSet<string> ->
         quiescence: ISessionQuiescenceGate ->

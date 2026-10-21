@@ -813,6 +813,8 @@ OpenCode/Host/ModelRoutingSurface.fsi
 OpenCode/Host/ModelRoutingSurface.fs
 Foundation/HostSessionPort.fsi
 Foundation/HostSessionPort.fs
+Host/FissionPort.fsi
+Host/FissionPort.fs
 Execution/Session/Attachment/CompanionLeaseRuntime.fsi
 Execution/Session/Attachment/CompanionLeaseRuntime.fs
 Execution/Session/Attachment/AttachmentSurface.fsi
@@ -1171,8 +1173,6 @@ Execution/Delegation/Fork/JoinRun.fs
 Execution/Delegation/Fork/OpenCode/JoinTool.fsi
 Execution/Delegation/Fork/OpenCode/JoinTool.fs
 
-Host/FissionPort.fsi
-Host/FissionPort.fs
 Execution/Fission/Launch.fsi
 Execution/Fission/Launch.fs
 Execution/Fission/OpenCode/Tool.fsi

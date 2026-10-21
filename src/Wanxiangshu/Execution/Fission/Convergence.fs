@@ -10,6 +10,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Foundation
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
@@ -291,7 +292,7 @@ module FissionHost =
                    AggregateViewDigest = aggregateBlob.BlobDigest |})
 
     let private sendTakeover
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
@@ -345,7 +346,7 @@ module FissionHost =
         }
 
     let private sendTakeoverWithAggregateBlob
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
@@ -374,7 +375,7 @@ module FissionHost =
                 laneSessionId
 
     let private writeAggregateAndTakeover
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
@@ -403,7 +404,7 @@ module FissionHost =
         }
 
     let private startTakeoverWithAuthority
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
@@ -423,7 +424,7 @@ module FissionHost =
         }
 
     let private runClaimedTakeover
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
@@ -441,7 +442,7 @@ module FissionHost =
         }
 
     let private startTakeover
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
@@ -452,7 +453,7 @@ module FissionHost =
             task { return false }
 
     let private startTakeoverIfPreConsumed
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
@@ -464,7 +465,7 @@ module FissionHost =
             task { return false }
 
     let private tryConvergeOpen
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
@@ -480,7 +481,7 @@ module FissionHost =
         }
 
     let private tryConvergeGroup
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
@@ -495,7 +496,7 @@ module FissionHost =
     /// owner remains open until that continuation itself reaches an ordinary
     /// terminal turn.
     let tryConverge
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (durable: AgentJournal)
         (directoryFor: SessionId -> string option)
         (owner: SessionId)
@@ -517,7 +518,7 @@ module FissionHost =
                 [ "session_id", SessionId.value laneSessionId
                   "result", sprintf "fission lane abort failed: group=%s reason=%s" group.GroupId reason ]
 
-    let private abortAllLaneSessions (sessionPort: ISessionHostPort) (group: FissionGroupProjection) =
+    let private abortAllLaneSessions (sessionPort: FissionSessionPort) (group: FissionGroupProjection) =
         task {
             for KeyValue(_, laneSessionId) in group.LaneSessions do
                 let! aborted = sessionPort.AbortSession laneSessionId
@@ -525,8 +526,8 @@ module FissionHost =
         }
 
     let private failOpenGroup
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
+        (sessionPort: FissionSessionPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         reason
@@ -567,8 +568,8 @@ module FissionHost =
         }
 
     let private failGroup
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
+        (sessionPort: FissionSessionPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         reason
@@ -622,7 +623,7 @@ module FissionHost =
                    AggregateViewDigest = takeover.AggregateViewDigest |})
 
     let private publishOwnerTakeover
-        (eventPort: IEventObservationPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (turn: ReconciledTurn)
@@ -688,8 +689,8 @@ module FissionHost =
     /// and can be failed, its lanes aborted, the owner notified and the owner
     /// reservation released.
     let private settleTakeoverConvergence
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
+        (sessionPort: FissionSessionPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         convergence
@@ -706,8 +707,8 @@ module FissionHost =
         }
 
     let private publishConvergedTakeover
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
+        (sessionPort: FissionSessionPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (takeover: FissionTakeoverProjection)
@@ -732,8 +733,8 @@ module FissionHost =
         }
 
     let private completeTakeover
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
+        (sessionPort: FissionSessionPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (takeover: FissionTakeoverProjection)
@@ -769,8 +770,8 @@ module FissionHost =
                    ViewDigest = workBlob.BlobDigest |})
 
     let private afterLaneMaterializedAppend
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
+        (sessionPort: FissionSessionPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (directoryFor: SessionId -> string option)
@@ -793,8 +794,8 @@ module FissionHost =
             None
 
     let private writeLaneWorkAndMaterialize
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
+        (sessionPort: FissionSessionPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         laneIndex
@@ -812,9 +813,9 @@ module FissionHost =
         }
 
     let private materializeCompletedLane
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
+        (eventPort: FissionEventPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (quiescence: ISessionQuiescenceGate)
@@ -912,9 +913,9 @@ module FissionHost =
         | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()
 
     let private observeOpenLaneCompletion
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
+        (eventPort: FissionEventPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (quiescence: ISessionQuiescenceGate)
@@ -966,9 +967,9 @@ module FissionHost =
         }
 
     let private observeCompletedLane
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
+        (eventPort: FissionEventPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (quiescence: ISessionQuiescenceGate)
@@ -1015,8 +1016,8 @@ module FissionHost =
         }
 
     let private observeCurrentTakeoverOutcome
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
+        (sessionPort: FissionSessionPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (takeover: FissionTakeoverProjection)
@@ -1036,8 +1037,8 @@ module FissionHost =
             completeTakeover sessionPort eventPort durable group takeover turn
 
     let private observeTakeoverOutcome
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
+        (sessionPort: FissionSessionPort)
+        (eventPort: FissionEventPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (takeover: FissionTakeoverProjection)
@@ -1056,9 +1057,9 @@ module FissionHost =
             task { return true }
 
     let private observeOpenLaneOutcome
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
+        (eventPort: FissionEventPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (quiescence: ISessionQuiescenceGate)
@@ -1087,9 +1088,9 @@ module FissionHost =
                 turn
 
     let private observeLaneOutcome
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
+        (eventPort: FissionEventPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (quiescence: ISessionQuiescenceGate)
@@ -1121,9 +1122,9 @@ module FissionHost =
                 turn
 
     let private observeDurableLaneTurn
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
+        (eventPort: FissionEventPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (quiescence: ISessionQuiescenceGate)
@@ -1157,9 +1158,9 @@ module FissionHost =
     /// were consumed here. Retired owner sessions are absorbed; non-terminal lane
     /// turns return false so ordinary repair/recovery behavior still runs.
     let observeLaneTurn
-        (sessionPort: ISessionHostPort)
+        (sessionPort: FissionSessionPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
+        (eventPort: FissionEventPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (quiescence: ISessionQuiescenceGate)

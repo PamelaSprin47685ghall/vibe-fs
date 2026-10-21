@@ -37,6 +37,13 @@ Architect lane: eng-host-arch. Registry of every port and its owner: [REGISTRY.m
    type aliases: a legacy name that survives as an alias is a second convention, and the ratchet counts alias
    re-introduction as a regression.
 
+   *Transitional exception (HNI-05, 2026-10-22):* a lane may declare a **lane-owned transitional alias** for a
+   legacy shape it has not yet cut over to, when the neutral target does not exist yet — the alias carries the
+   lane's own name (`FissionSessionPort`, `FissionEventPort` in `Host/FissionPort.fs(i)`), the lane's product code
+   speaks **only** the lane-owned name, and the alias is deleted in the same change that lands the neutral family
+   (P-01 / P-07). The alias is a migration seam inside the lane's own port file, not a re-introduction of the
+   legacy Foundation name at the product boundary.
+
 ## 2. Port families
 
 Notation: `P-xx` ids are stable and used by REGISTRY.md, BOARD.md and gate HNI-04. **The authoritative shapes are the
