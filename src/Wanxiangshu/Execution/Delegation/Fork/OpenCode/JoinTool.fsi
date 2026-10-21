@@ -21,12 +21,8 @@ module JoinTool =
         [<Literal>]
         val UnavailableFromContext: string = "tool/join/unavailable-from-context"
 
-    type JoinRecord =
-        { Name: string
-          AgentId: string
-          Role: string
-          Status: string
-          View: string }
+    /// The join wire record; the rules that produce it live in `JoinRules`.
+    type JoinRecord = Wanxiangshu.Execution.Delegation.Fork.JoinRules.JoinRecord
 
     val admission: ToolAdmission
     val spec: scope: ToolRuntimeScope -> ToolSpec

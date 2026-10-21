@@ -59,6 +59,8 @@
     <Compile Include="Execution/Delegation/Fork/JoinResultRendererSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fs"/>
+    <Compile Include="Execution/Delegation/Fork/JoinRules.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/JoinRules.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Batching.fsi"/>

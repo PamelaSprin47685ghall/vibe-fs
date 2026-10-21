@@ -128,6 +128,12 @@ These are the concrete steps, so a lane does not have to re-derive them:
 - 2026-10-21 eng-hni-fork: horizon joins P-14 (HorizonRoster holds the roster rules, prose and data rows; HorizonTool keeps its `HorizonRuntimeContext` API for ToolRegistry/ToolSurface and only binds the port and encodes the wire).
 - 2026-10-21 eng-hni-fork: `Handle/OpenCode/JoinWake` had no host reference; it moves to `Execution/Delegation/Handle/JoinWake` (namespace `…Handle`), the `Handle/OpenCode` folder is gone, and three plugin-host files drop their unused `open …Handle.OpenCode`.
 - 2026-10-21 eng-hni-fork: sync-delegate batching rules (batch resolution, deferred-inspection ledger, settled-result instructions, merged-reference prose) leave `SyncDelegate/OpenCode/Batching` for host-neutral `Execution/Delegation/SyncDelegate/Batching` (`SyncDelegateBatchRules`), a P-14 consumer: resolution reads the `DelegationCaller`, the ledger stores instruction lines. The adapter keeps only the HostToolContext → DelegationCaller mapping, the TOML reply and the OpenCode message-part mutation (279 → 102 lines); its API is unchanged.
+- 2026-10-21 eng-hni-fork (slice B): the join wire rules leave `Fork/OpenCode/JoinTool` for host-neutral `Execution/Delegation/Fork/JoinRules`
+  (`JoinRules`: `JoinRecord`, `decideCompletedStatus`, `mapForkError`, `mapJoinItem`, `mapOrchestratorVerdict`). **No new port**: the rules
+  consume only product-domain types (`ForkError`, `JoinItem`, `Role`, `ManagerJobId`, `CommitHash`, `OrchestratorVerdict`), and the host capability
+  they need is already bound through `ToolRuntimeScope` + P-14/P-15. Next free id stays **P-19**. The adapter keeps only the wiring
+  (journal read for the manager job name, runtime name/role resolution, window rendering) and re-exports `JoinRecord` so `ToolSurface` and
+  `ToolRegistry` are unchanged. `omp: n/a` (no port type, so the omp mirror is untouched).
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.

@@ -957,6 +957,8 @@ OpenCode/Host/SharedState.fsi
 OpenCode/Host/SharedState.fs
 OpenCode/Host/SharedStateSurface.fsi
 OpenCode/Host/SharedStateSurface.fs
+Execution/Delegation/Handle/JoinWake.fsi
+Execution/Delegation/Handle/JoinWake.fs
 OpenCode/Host/PluginSessionScope.fsi
 OpenCode/Host/PluginSessionScope.fs
 OpenCode/Host/PluginRecoveryScope.fsi
@@ -1019,8 +1021,6 @@ OpenCode/Host/HostCompactionObserver.fsi
 OpenCode/Host/HostCompactionObserver.fs
 Execution/Delegation/SyncDelegate/OpenCode/Observation.fsi
 Execution/Delegation/SyncDelegate/OpenCode/Observation.fs
-Execution/Delegation/Handle/JoinWake.fsi
-Execution/Delegation/Handle/JoinWake.fs
 OpenCode/Codec/ToolHostCodec.fsi
 OpenCode/Codec/ToolHostCodec.fs
 Change/Host/GitAdapter.fsi
@@ -1154,6 +1154,8 @@ OpenCode/Tools/ToolRuntimeScope.fsi
 OpenCode/Tools/ToolRuntimeScope.fs
 OpenCode/Host/HostTurnObserver.fsi
 OpenCode/Host/HostTurnObserver.fs
+Execution/Delegation/Fork/JoinRules.fsi
+Execution/Delegation/Fork/JoinRules.fs
 Execution/Delegation/Fork/OpenCode/JoinTool.fsi
 Execution/Delegation/Fork/OpenCode/JoinTool.fs
 

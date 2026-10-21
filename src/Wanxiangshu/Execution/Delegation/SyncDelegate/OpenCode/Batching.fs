@@ -49,9 +49,10 @@ module SyncDelegateBatching =
 
     let settleDeferredInspections
         (runtime: SyncDelegateRuntime)
-        (_workspaceDirectory: string option)
+        (workspaceDirectory: string option)
         (sessionId: string)
         : Task<unit> =
+        ignore workspaceDirectory
         SyncDelegateBatchRules.settleDeferredInspections runtime sessionId
 
     let private isToolPart (part: obj) =
