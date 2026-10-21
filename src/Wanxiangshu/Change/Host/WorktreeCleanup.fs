@@ -71,24 +71,32 @@ module OrchestratorSweep =
     /// (`branch refs/heads/main`) and detached worktrees are never ours to remove
     /// (measured on Host 1.18.9: removing the main tree killed every orchestrator
     /// canary in init). This module only performs the removals, in order.
+    let private removeStaleWorktrees
+        (git: GitPort)
+        (owned: string list)
+        (entries: (WorktreePath * WorktreeIdentity option) list)
+        : Task<Result<unit, string>> =
+        task {
+            let stale =
+                GitPorcelain.staleWorktrees
+                    (entries
+                     |> List.map (fun (path, identity) ->
+                         WorktreePath.value path, identity |> Option.map WorktreeIdentity.value))
+                    owned
+                |> List.map WorktreePath.create
+
+            match! removeWorktrees git stale with
+            | Error error -> return Error error
+            | Ok() -> return! afterRemoveWorktrees git owned
+        }
+
     let sweepStaleArtifacts (git: GitPort) (activeJobs: ManagerJobProjection list) : Task<Result<unit, string>> =
         task {
             let owned = ownedIdentities activeJobs
 
             match! git.ListWorktrees() with
             | Error error -> return Error(sprintf "cannot list worktrees for cleanup: %s" error)
-            | Ok entries ->
-                let stale =
-                    GitPorcelain.staleWorktrees
-                        (entries
-                         |> List.map (fun (path, identity) ->
-                             WorktreePath.value path, identity |> Option.map WorktreeIdentity.value))
-                        owned
-                    |> List.map WorktreePath.create
-
-                match! removeWorktrees git stale with
-                | Error error -> return Error error
-                | Ok() -> return! afterRemoveWorktrees git owned
+            | Ok entries -> return! removeStaleWorktrees git owned entries
         }
 
     let sweepLocked

@@ -108,15 +108,23 @@ module AblationManifest =
 
         record
 
+    let private errorOfViolation (violation: obj) : AblationLoadError =
+        let reason: string = violation?reason
+
+        match (violation?kind: string) with
+        | "DagViolation" -> DagViolation reason
+        | _ -> InvalidManifest reason
+
     let private toError (violation: obj) : AblationLoadError option =
         if isNull violation then
             None
         else
-            let reason: string = violation?reason
+            Some(errorOfViolation violation)
 
-            match (violation?kind: string) with
-            | "DagViolation" -> Some(DagViolation reason)
-            | _ -> Some(InvalidManifest reason)
+    let private errorToResult (error: AblationLoadError option) : Result<unit, AblationLoadError> =
+        match error with
+        | Some err -> Error err
+        | None -> Ok()
 
     let validateNodes (document: ManifestDocument) : Result<unit, AblationLoadError> =
         match law.validateNodes (nodesToJs document) |> toError with
@@ -172,12 +180,12 @@ module AblationManifest =
         (document: ManifestDocument)
         (modes: Map<AblationNodeId, AblationMode>)
         : Result<unit, AblationLoadError> =
-        match detectCycle document with
-        | Some err -> Error err
-        | None ->
-            match law.validateModes (edgesToJs document, modesToJs modes) |> toError with
-            | Some err -> Error err
-            | None -> Ok()
+        detectCycle document
+        |> errorToResult
+        |> Result.bind (fun () ->
+            law.validateModes (edgesToJs document, modesToJs modes)
+            |> toError
+            |> errorToResult)
 
     let nodeIds (document: ManifestDocument) =
         document.Nodes |> List.map (fun node -> AblationNodeId.create node.Id)

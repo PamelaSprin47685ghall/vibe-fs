@@ -75,6 +75,12 @@ module ProjectionPlanner =
                   "rows" ==> List.length insertion.Rows
                   "fingerprint" ==> fingerprint insertion.Rows ]
 
+    let private conflictOf (answer: obj) : ProjectionConflict =
+        match unbox<string> answer?conflict with
+        | "ConflictingMessageBase" -> ProjectionConflict.ConflictingMessageBase
+        | "ConflictingMessageRows" -> ProjectionConflict.ConflictingMessageRows(unbox<string> answer?key)
+        | other -> invalidOp ("wanxiangli/projection plan returned an unknown conflict: " + other)
+
     /// Dedupe owner keys, reject conflicts, and return base then canonically sorted insertions.
     /// The result is invariant under registration order for every conflict-free multiset.
     let plan (intents: ProjectionIntent list) : Result<ProjectionIntent list, ProjectionConflict> =
@@ -89,10 +95,7 @@ module ProjectionPlanner =
             |> Array.toList
             |> Ok
         else
-            match unbox<string> answer?conflict with
-            | "ConflictingMessageBase" -> Error ProjectionConflict.ConflictingMessageBase
-            | "ConflictingMessageRows" -> Error(ProjectionConflict.ConflictingMessageRows(unbox<string> answer?key))
-            | other -> invalidOp ("wanxiangli/projection plan returned an unknown conflict: " + other)
+            Error(conflictOf answer)
 
     /// 布局规则的唯一实现：wanxiangli/projection `layout`（CUT-17）。只对无冲突的意图集调用；
     /// 锚点原样交库，负锚点或超出（替换后）基底长度的锚点由库拒绝。返回每一输出行的来源：

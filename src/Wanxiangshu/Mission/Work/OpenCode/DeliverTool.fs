@@ -241,12 +241,9 @@ module DeliverTool =
                 |> Option.defaultValue (Error(text Path.BindingUnavailable))
 
             let openedEntry (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
-                match fenceReplay work with
-                | Some replay -> replay
-                | None ->
-                    match confirmationReplay work with
-                    | Some replay -> replay
-                    | None -> activeEntry work
+                fenceReplay work
+                |> Option.orElseWith (fun () -> confirmationReplay work)
+                |> Option.defaultWith (fun () -> activeEntry work)
 
             match! lifecycleWorkOf bound.Directory context.SessionId with
             | Some work when work.Sequence = [ "S4" ] -> return openedEntry work

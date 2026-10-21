@@ -265,6 +265,17 @@ module ChildRecovery =
         | HostObservation.RecoveryInFlight -> "RecoveryInFlight"
         | HostObservation.SessionActive -> "SessionActive"
 
+    let private recoveredTerminalOf
+        (source: string)
+        (durable: DurableHandleEvidence)
+        (proof: Result<JoinableCompletion, string> option)
+        : ChildResolution =
+        match source, durable, proof with
+        | "durable", DurableHandleEvidence.CompletedAwaitingJoin completion, _ ->
+            ChildResolution.RecoveredTerminal completion
+        | "snapshot", _, Some(Ok completion) -> ChildResolution.RecoveredTerminal completion
+        | source, _, _ -> invalidOp ("wanxiangli/handle-lifecycle named a terminal it was not given: " + source)
+
     let resolveChild
         (durable: DurableHandleEvidence)
         (snapshot: ChildSnapshotEvidence)
@@ -304,12 +315,7 @@ module ChildRecovery =
             )
 
         match unbox<string> verdict?resolution with
-        | "terminal" ->
-            match unbox<string> verdict?source, durable, proof with
-            | "durable", DurableHandleEvidence.CompletedAwaitingJoin completion, _ ->
-                ChildResolution.RecoveredTerminal completion
-            | "snapshot", _, Some(Ok completion) -> ChildResolution.RecoveredTerminal completion
-            | source, _, _ -> invalidOp ("wanxiangli/handle-lifecycle named a terminal it was not given: " + source)
+        | "terminal" -> recoveredTerminalOf (unbox<string> verdict?source) durable proof
         | "abandoned" -> ChildResolution.RecoveredAbandoned(reasonOf (unbox<string> verdict?reason))
         | "active" -> ChildResolution.RecoveredActive
         | "incomplete" -> ChildResolution.RecoveryIncomplete

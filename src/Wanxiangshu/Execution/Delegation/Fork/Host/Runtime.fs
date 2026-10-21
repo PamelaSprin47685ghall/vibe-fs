@@ -498,6 +498,19 @@ type HostForkRuntime
     let viewForOutcome (run: PendingHostRun) (outcome: TerminalOutcome) =
         HostForkRunLifecycle.viewForOutcome childViewOfRun run outcome
 
+    // D4: the view read has its own fault boundary — a faulting read is an
+    // empty view (bounded auxiliary evidence) and must never convert a proven
+    // child terminal into a failed settlement.
+    let guardedViewForOutcome (run: PendingHostRun) (outcome: TerminalOutcome) =
+        task {
+            try
+                return! viewForOutcome run outcome
+            with error ->
+                ForkRuntimeLog.logError "FORK-VIEW" (sprintf "run %s view read faulted: %s" run.AgentId error.Message)
+
+                return None
+        }
+
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
     let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())
@@ -824,22 +837,9 @@ type HostForkRuntime
 
                     // D1: the view is resolved lazily, so a terminal that does
                     // not address this run never reads its material.
-                    // D4: the view read has its own fault boundary — a
-                    // faulting read is an empty view (bounded auxiliary
-                    // evidence) and must never convert a proven child
-                    // terminal into a failed settlement.
+                    // D4: guardedViewForOutcome owns the view-read fault boundary.
                     let view: HostForkRunLifecycle.ViewResolution =
-                        fun () ->
-                            task {
-                                try
-                                    return! viewForOutcome run outcome
-                                with error ->
-                                    ForkRuntimeLog.logError
-                                        "FORK-VIEW"
-                                        (sprintf "run %s view read faulted: %s" run.AgentId error.Message)
-
-                                    return None
-                            }
+                        fun () -> guardedViewForOutcome run outcome
 
                     do!
                         HostForkRunLifecycle.complete

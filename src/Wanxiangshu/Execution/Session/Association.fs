@@ -173,6 +173,17 @@ module SessionAssociationProjection =
 
     let private idOf (value: obj) = SessionId.create (unbox<string> value)
 
+    let private rejectionOf (verdict: obj) : AssociationRejection =
+        match unbox<string> verdict?rejection with
+        | "SelfLink" -> AssociationRejection.SelfLink(idOf verdict?session)
+        | "CompanionWouldRecurse" -> AssociationRejection.CompanionWouldRecurse(idOf verdict?companion)
+        | "AlreadyLinkedToOther" ->
+            AssociationRejection.AlreadyLinkedToOther(idOf verdict?existing, idOf verdict?proposed)
+        | "CompanionClaimedByOther" ->
+            AssociationRejection.CompanionClaimedByOther(idOf verdict?owner, idOf verdict?proposed)
+        | "SatelliteKindConflict" -> AssociationRejection.SatelliteKindConflict(idOf verdict?proposed)
+        | other -> invalidOp ("wanxiangli/association returned an unknown rejection: " + other)
+
     let linkSatellite
         (kind: SatelliteKind)
         (mainSessionId: SessionId)
@@ -210,16 +221,7 @@ module SessionAssociationProjection =
                       Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
                       ParentSessionId = Some mainSessionId }
             )
-        | "reject" ->
-            match unbox<string> verdict?rejection with
-            | "SelfLink" -> Error(AssociationRejection.SelfLink(idOf verdict?session))
-            | "CompanionWouldRecurse" -> Error(AssociationRejection.CompanionWouldRecurse(idOf verdict?companion))
-            | "AlreadyLinkedToOther" ->
-                Error(AssociationRejection.AlreadyLinkedToOther(idOf verdict?existing, idOf verdict?proposed))
-            | "CompanionClaimedByOther" ->
-                Error(AssociationRejection.CompanionClaimedByOther(idOf verdict?owner, idOf verdict?proposed))
-            | "SatelliteKindConflict" -> Error(AssociationRejection.SatelliteKindConflict(idOf verdict?proposed))
-            | other -> invalidOp ("wanxiangli/association returned an unknown rejection: " + other)
+        | "reject" -> Error(rejectionOf verdict)
         | other -> invalidOp ("wanxiangli/association returned an unknown verdict: " + other)
 
     let link mainSessionId companionSessionId parentOfMain current =

@@ -138,6 +138,18 @@ module OrdinaryTurnWorkflow =
         | _, ReconcileProgram.TurnCompleted -> Ordinary
         | _, _ -> Wait
 
+    let private settledTurnGate
+        (journal: AgentJournal option)
+        (context: ReconciledTurnContext)
+        (settled: bool)
+        : LongWorkGate =
+        if settled then
+            Wait
+        elif hasDeliveryEvidence journal context.Turn then
+            classifyDeliveredTurn context.Turn
+        else
+            classifyManagerOrPlanTurn context
+
     let private longWorkGate (journal: AgentJournal option) (context: ReconciledTurnContext) : Task<LongWorkGate> =
         task {
             let turn = context.Turn
@@ -159,13 +171,7 @@ module OrdinaryTurnWorkflow =
                 return Ordinary
             else
                 let! settled = isTurnWorkSettled turn
-
-                if settled then
-                    return Wait
-                elif hasDeliveryEvidence journal turn then
-                    return classifyDeliveredTurn turn
-                else
-                    return classifyManagerOrPlanTurn context
+                return settledTurnGate journal context settled
         }
 
     let private requestKindOfCompleted (port: TurnObservationJournalPort) (turn: ReconciledTurn) =

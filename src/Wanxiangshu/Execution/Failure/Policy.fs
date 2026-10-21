@@ -87,23 +87,25 @@ module ExecutionFailurePolicy =
         | "Failed" -> ChatExecutionTerminalDisposition.Failed
         | _ -> unexpected "terminal disposition" value
 
+    let private retryFreshAttemptOf (provider: ProviderRecoveryFacts option) (d: obj) =
+        match provider with
+        | Some facts ->
+            ExecutionFailureResolution.RetryFreshAttempt(
+                ProviderRecoveryAuthorization.Create(
+                    ProviderRecoveryDecisionId.Create(unbox<string> d?authorization?decisionId),
+                    facts.LogicalRun,
+                    facts.ProviderRun,
+                    facts.RequestKind
+                )
+            )
+        | None -> unexpected "retry without provider facts" d?resolution
+
     let private decisionOf (key: ChatExecutionKey) (provider: ProviderRecoveryFacts option) (d: obj) =
         let resolution =
             match unbox<string> d?resolution with
             | "PreserveCurrentFact" -> ExecutionFailureResolution.PreserveCurrentFact
             | "AwaitAcceptanceReconciliation" -> ExecutionFailureResolution.AwaitAcceptanceReconciliation key
-            | "RetryFreshAttempt" ->
-                match provider with
-                | Some facts ->
-                    ExecutionFailureResolution.RetryFreshAttempt(
-                        ProviderRecoveryAuthorization.Create(
-                            ProviderRecoveryDecisionId.Create(unbox<string> d?authorization?decisionId),
-                            facts.LogicalRun,
-                            facts.ProviderRun,
-                            facts.RequestKind
-                        )
-                    )
-                | None -> unexpected "retry without provider facts" d?resolution
+            | "RetryFreshAttempt" -> retryFreshAttemptOf provider d
             | "TerminalizeAcceptedPreProvider" ->
                 ExecutionFailureResolution.TerminalizeAcceptedPreProvider(key, dispositionOf d?terminalDisposition)
             | "TerminalizeProviderStarted" ->

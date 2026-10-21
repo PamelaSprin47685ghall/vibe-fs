@@ -254,6 +254,18 @@ module OrchestratorProjection =
     let tryWorktreeEffect (identity: WorktreeIdentity) (projection: OrchestratorProjection) =
         Map.tryFind identity projection.WorktreeEffects
 
+    let private worktreeRejectionOf (answer: obj) : WorktreeReconciliationDecision =
+        match ChangeIntegrationLaw.answerField answer "reason" with
+        | "DurableOwnershipConflict" ->
+            WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.DurableOwnershipConflict
+        | "PhysicalIdentityPathConflict" ->
+            WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.PhysicalIdentityPathConflict
+        | "WorktreeQueryFailed" ->
+            WorktreeReconciliationDecision.Reject(
+                WorktreeReconciliationFailure.WorktreeQueryFailed(ChangeIntegrationLaw.answerField answer "error")
+            )
+        | other -> invalidOp ("wanxiangli/integration returned an unknown rejection: " + other)
+
     /// PERSIST-009: decide from durable intent plus, only when Requested is
     /// ambiguous, one complete physical worktree observation.
     let decideWorktreeReconciliation
@@ -309,17 +321,7 @@ module OrchestratorProjection =
         | "CreateAfterProvenMissing" -> WorktreeReconciliationDecision.CreateAfterProvenMissing
         | "AdoptThenRecordCreated" -> WorktreeReconciliationDecision.AdoptThenRecordCreated
         | "AdoptCreated" -> WorktreeReconciliationDecision.AdoptCreated
-        | "Reject" ->
-            match ChangeIntegrationLaw.answerField answer "reason" with
-            | "DurableOwnershipConflict" ->
-                WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.DurableOwnershipConflict
-            | "PhysicalIdentityPathConflict" ->
-                WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.PhysicalIdentityPathConflict
-            | "WorktreeQueryFailed" ->
-                WorktreeReconciliationDecision.Reject(
-                    WorktreeReconciliationFailure.WorktreeQueryFailed(ChangeIntegrationLaw.answerField answer "error")
-                )
-            | other -> invalidOp ("wanxiangli/integration returned an unknown rejection: " + other)
+        | "Reject" -> worktreeRejectionOf answer
         | other -> invalidOp ("wanxiangli/integration returned an unknown decision: " + other)
 
     let requestWorktree

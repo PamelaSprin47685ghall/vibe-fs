@@ -351,6 +351,11 @@ module HandleProjection =
     /// CompletedAwaitingJoin and ref/digest match exactly → Active. Mismatch
     /// refuses so a true terminal cannot be revoked by a bad compensation fact.
     /// Already Active = prior reject succeeded (idempotent Ok).
+    let private cellCompletionMatches (expectedRef: BlobRef) (expectedDigest: BlobDigest) (cell: HandleCompletion) =
+        match cell.CompletionRef, cell.CompletionDigest with
+        | Some blobRef, Some digest -> blobRef = expectedRef && digest = expectedDigest
+        | _ -> false
+
     let rejectFalseCompletion
         (handle: HandleId)
         (expectedRef: BlobRef)
@@ -361,10 +366,7 @@ module HandleProjection =
 
         let cellMatches =
             match found with
-            | Some { Lifecycle = CompletedAwaitingJoin cell } ->
-                match cell.CompletionRef, cell.CompletionDigest with
-                | Some blobRef, Some digest -> blobRef = expectedRef && digest = expectedDigest
-                | _ -> false
+            | Some { Lifecycle = CompletedAwaitingJoin cell } -> cellCompletionMatches expectedRef expectedDigest cell
             | _ -> false
 
         match judgeHandle "rejectFalseCompletion" found [ "cellMatches" ==> cellMatches ], found with

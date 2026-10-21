@@ -43,9 +43,10 @@ module ChatExecutionFactFold =
                 { Fact = "ChatExecution"
                   Reason = reason }
         | next ->
-            match build current next with
-            | Some execution -> Ok(replace execution projection)
-            | None -> invalidOp (sprintf "ChatExecution phase law set an impossible phase for %A" key)
+            build current next
+            |> Option.map (fun execution -> Ok(replace execution projection))
+            |> Option.defaultWith (fun () ->
+                invalidOp (sprintf "ChatExecution phase law set an impossible phase for %A" key))
 
     let private validateTerminalEvidence =
         function
