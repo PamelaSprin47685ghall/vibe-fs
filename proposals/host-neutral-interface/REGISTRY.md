@@ -126,6 +126,7 @@ These are the concrete steps, so a lane does not have to re-derive them:
   `Result<_, string>` (the `HostForkRuntime`/`OrchestratorHost` error channel); moving to `HostError` waits for P-00.
   `DelegationCaller.Session` is `SessionId option` (rule 2): the OpenCode adapter maps a blank `sessionID` to None.
 - 2026-10-21 eng-hni-fork: horizon joins P-14 (HorizonRoster holds the roster rules, prose and data rows; HorizonTool keeps its `HorizonRuntimeContext` API for ToolRegistry/ToolSurface and only binds the port and encodes the wire).
+- 2026-10-21 eng-hni-fork: `Handle/OpenCode/JoinWake` had no host reference; it moves to `Execution/Delegation/Handle/JoinWake` (namespace `…Handle`), the `Handle/OpenCode` folder is gone, and three plugin-host files drop their unused `open …Handle.OpenCode`.
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.

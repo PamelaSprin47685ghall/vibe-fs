@@ -19,7 +19,6 @@ open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Execution.Delegation.Handle.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode

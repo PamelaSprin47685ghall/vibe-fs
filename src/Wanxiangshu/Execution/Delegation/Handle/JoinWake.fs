@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Execution.Delegation.Handle.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Handle
 
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Session.ChatExecution
