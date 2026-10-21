@@ -587,10 +587,7 @@ module HostForkRunLifecycle =
         task {
             match resolved with
             | Some completedView when not (System.String.IsNullOrWhiteSpace completedView) ->
-                let finalView =
-                    match taken with
-                    | Some consumed -> consumed
-                    | None -> completedView
+                let finalView = taken |> Option.defaultValue completedView
 
                 let agentOutcome =
                     AgentCompletion.completed
@@ -621,6 +618,211 @@ module HostForkRunLifecycle =
                 return ()
         }
 
+    let private deliveryWitnessOf
+        (journal: AgentJournal option)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (result: AgentRunResult)
+        =
+        match journal with
+        | None -> None
+        | Some durable ->
+            // LogicalRunId 是实值：写入端与本处同源。
+            // 写入端取被调会话的 activeProfile.LogicalRunId
+            // （ToolRegistry.fs:821），而该 profile 就是子会话自己的
+            // ActiveLogicalRun（ProjectionQueries.fs:16-21，profileOwner
+            // 对非 fission lane 就是会话自己）；本处取子会话准入时记下的
+            // 逻辑运行（LinkageProjection.fs:310，准入用的也是该子会话
+            // 自己的 ActiveLogicalRun —— DelegationProjectionBridge.fs:100
+            // 取 childId 的 PromptAuthority）。同一条逻辑运行，
+            // 别的逻辑运行的见证不得满足本子运行的交付门禁。
+            let logicalRunId = run.Work |> Option.map AdmittedWork.logicalRunId
+
+            TaskDeliveryJournal.tryFindByFenceFields
+                durable
+                childId
+                result.ProviderRun
+                None
+                (Some result.AuthorityRootUserMessageId)
+                None
+                logicalRunId
+                // Task 不启用：写入端按「本会话的 lifecycle 退休 → 本会话
+                // 的子句柄 → 本次 toolCall」三级判定
+                // （ToolRegistry.fs:768-800），Manager 子运行的交付会落到
+                // Lifecycle 分支，其余才可能是 ChildWork 或 Invocation。
+                // 本处只能确定「这是哪个子运行」，断定不了写入端落到了哪一支；
+                // 断言 ChildWork 会让本该命中的见证永不匹配，D6 门禁下子运行
+                // 永远 witnessed=false 而卡死。缺失的这一位由交付见证的写入方
+                // 另行核对。
+                None
+
+    let private terminalProse (result: AgentRunResult) : string option =
+        if System.String.IsNullOrWhiteSpace result.TerminalText then
+            None
+        else
+            Some result.TerminalText
+
+    let private resolveView (view: ViewResolution option) : Task<string option> =
+        match view with
+        | Some resolution -> resolution ()
+        | None -> Task.FromResult None
+
+    /// Journal-less harness: only this child's own provider run's cell may be taken.
+    let private takeOwnRunCell (run: PendingHostRun) (result: AgentRunResult) (prose: string option) =
+        match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
+        | Some fence when fence.ProviderRun = result.ProviderRun ->
+            JsDeliveredValues.tryTakeRenderedForCall
+                (SessionId.value run.ChildId)
+                result.ProviderRun
+                fence.ToolCallId
+                prose
+        | _ -> None
+
+    let private completeHarnessRun
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (runId: string)
+        (handle: HandleId)
+        (result: AgentRunResult)
+        (view: ViewResolution option)
+        =
+        task {
+            let taken = takeOwnRunCell run result (terminalProse result)
+            let! resolved = resolveView view
+            return! settleCompletedView gate pendingRuns journal parentId run childId runId handle result taken resolved
+        }
+
+    let private completeWitnessedRun
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (runId: string)
+        (handle: HandleId)
+        (result: AgentRunResult)
+        toolCallId
+        (witnessView: string)
+        (view: ViewResolution option)
+        =
+        task {
+            let! resolved = resolveView view
+
+            // The durable witness is the delivery proof and it
+            // carries the material of that very delivery. The
+            // process-live cell is only a cache of it: when the
+            // cell was lost (another reader took it) or the view
+            // read faulted, the proven material is still on the
+            // durable side. A proven terminal must therefore always
+            // yield an observable settlement — otherwise the parent's
+            // join waits on a journal revision that never comes.
+            // Nothing is invented: it is the material that was delivered.
+            let settledView =
+                match resolved with
+                | Some completedView when not (System.String.IsNullOrWhiteSpace completedView) -> Some completedView
+                | _ when not (System.String.IsNullOrWhiteSpace witnessView) -> Some witnessView
+                | _ -> None
+
+            match settledView with
+            | Some completedView ->
+                // D2: the delivered cell is consumed exactly once, and
+                // only for an admissible outcome. A take that finds
+                // nothing (another reader already consumed the cell)
+                // falls back to the peeked view, which is idempotent.
+                //
+                // The take is fenced by the whole delivery fence the
+                // witness proved — the provider run AND the tool call
+                // id. Matching the run alone would let another call of
+                // the same run take this cell and advance the returned
+                // cursor; the owning call would then lose its
+                // delivery. A mismatch takes nothing.
+                let taken =
+                    JsDeliveredValues.tryTakeRenderedForCall
+                        (SessionId.value run.ChildId)
+                        result.ProviderRun
+                        toolCallId
+                        (terminalProse result)
+
+                return!
+                    settleCompletedView
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        run
+                        childId
+                        runId
+                        handle
+                        result
+                        taken
+                        (Some completedView)
+            | _ ->
+                // LC-004: An asynchronous child that completed its physical turn without
+                // delivering a view has not delivered its obligation. Do not settle or
+                // close the run; observation only, the child continues.
+                return ()
+        }
+
+    let private completeProvenResult
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (runId: string)
+        (handle: HandleId)
+        (result: AgentRunResult)
+        (view: ViewResolution option)
+        =
+        task {
+            // D6: a durable completion must be backed by a durable
+            // delivery witness. Without a fence-matched witness nothing
+            // proves that this run delivered anything, so the run stays
+            // open (LC-004) instead of writing a HandleCompleted that
+            // nobody witnessed. The journal-less harness path has no
+            // witness to ask for and keeps working.
+            // The witness is kept, not reduced to a flag: it carries the
+            // fence of the delivery that was proven, and that fence's
+            // tool call id is what the cell must be matched against
+            // before it may be consumed.
+            let witness = deliveryWitnessOf journal run childId result
+
+            match witness with
+            | None when journal.IsNone ->
+                // The journal-less harness path has no witness to ask
+                // for and keeps working. There is no proven fence there,
+                // so the cell may only be taken under its own complete
+                // identity: the cell of this child session whose
+                // provider run is this run's. Another run's cell is never
+                // taken.
+                return! completeHarnessRun gate pendingRuns journal parentId run childId runId handle result view
+            | None -> return ()
+            | Some witness ->
+                // D1: the view is resolved only now. The terminal has
+                // been proven to address this run, so its material may
+                // be read and — once the outcome is admissible — spent.
+                return!
+                    completeWitnessedRun
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        run
+                        childId
+                        runId
+                        handle
+                        result
+                        witness.Fence.ToolCallId
+                        witness.View
+                        view
+        }
+
     let complete
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -648,197 +850,7 @@ module HostForkRunLifecycle =
             Task.FromResult(())
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->
-            task {
-                // D6: a durable completion must be backed by a durable
-                // delivery witness. Without a fence-matched witness nothing
-                // proves that this run delivered anything, so the run stays
-                // open (LC-004) instead of writing a HandleCompleted that
-                // nobody witnessed. The journal-less harness path has no
-                // witness to ask for and keeps working.
-                // The witness is kept, not reduced to a flag: it carries the
-                // fence of the delivery that was proven, and that fence's
-                // tool call id is what the cell must be matched against
-                // before it may be consumed.
-                let witness =
-                    match journal with
-                    | None -> None
-                    | Some durable ->
-                        // LogicalRunId 是实值：写入端与本处同源。
-                        // 写入端取被调会话的 activeProfile.LogicalRunId
-                        // （ToolRegistry.fs:821），而该 profile 就是子会话自己的
-                        // ActiveLogicalRun（ProjectionQueries.fs:16-21，profileOwner
-                        // 对非 fission lane 就是会话自己）；本处取子会话准入时记下的
-                        // 逻辑运行（LinkageProjection.fs:310，准入用的也是该子会话
-                        // 自己的 ActiveLogicalRun —— DelegationProjectionBridge.fs:100
-                        // 取 childId 的 PromptAuthority）。同一条逻辑运行，
-                        // 别的逻辑运行的见证不得满足本子运行的交付门禁。
-                        let logicalRunId = run.Work |> Option.map AdmittedWork.logicalRunId
-
-                        TaskDeliveryJournal.tryFindByFenceFields
-                            durable
-                            childId
-                            result.ProviderRun
-                            None
-                            (Some result.AuthorityRootUserMessageId)
-                            None
-                            logicalRunId
-                            // Task 不启用：写入端按「本会话的 lifecycle 退休 → 本会话
-                            // 的子句柄 → 本次 toolCall」三级判定
-                            // （ToolRegistry.fs:768-800），Manager 子运行的交付会落到
-                            // Lifecycle 分支，其余才可能是 ChildWork 或 Invocation。
-                            // 本处只能确定「这是哪个子运行」，断定不了写入端落到了哪一支；
-                            // 断言 ChildWork 会让本该命中的见证永不匹配，D6 门禁下子运行
-                            // 永远 witnessed=false 而卡死。缺失的这一位由交付见证的写入方
-                            // 另行核对。
-                            None
-
-                match witness with
-                | None when journal.IsNone ->
-                    // The journal-less harness path has no witness to ask
-                    // for and keeps working. There is no proven fence there,
-                    // so the cell may only be taken under its own complete
-                    // identity: the cell of this child session whose
-                    // provider run is this run's. Another run's cell is never
-                    // taken.
-                    let prose =
-                        if System.String.IsNullOrWhiteSpace result.TerminalText then
-                            None
-                        else
-                            Some result.TerminalText
-
-                    let taken =
-                        match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
-                        | Some fence when fence.ProviderRun = result.ProviderRun ->
-                            JsDeliveredValues.tryTakeRenderedForCall
-                                (SessionId.value run.ChildId)
-                                result.ProviderRun
-                                fence.ToolCallId
-                                prose
-                        | _ -> None
-
-                    let! resolved =
-                        match view with
-                        | Some resolution -> resolution ()
-                        | None -> Task.FromResult None
-
-                    return!
-                        settleCompletedView
-                            gate
-                            pendingRuns
-                            journal
-                            parentId
-                            run
-                            childId
-                            runId
-                            handle
-                            result
-                            taken
-                            resolved
-                | None -> return ()
-                | Some witness ->
-                    // D1: the view is resolved only now. The terminal has
-                    // been proven to address this run, so its material may
-                    // be read and — once the outcome is admissible — spent.
-                    let! resolved =
-                        match view with
-                        | Some resolution -> resolution ()
-                        | None -> Task.FromResult None
-
-                    // The durable witness is the delivery proof and it
-                    // carries the material of that very delivery. The
-                    // process-live cell is only a cache of it: when the
-                    // cell was lost (another reader took it) or the view
-                    // read faulted, the proven material is still on the
-                    // durable side. A proven terminal must therefore always
-                    // yield an observable settlement — otherwise the parent's
-                    // join waits on a journal revision that never comes.
-                    let durableView =
-                        if System.String.IsNullOrWhiteSpace witness.View then
-                            None
-                        else
-                            Some witness.View
-
-                    match resolved with
-                    | Some completedView when not (System.String.IsNullOrWhiteSpace completedView) ->
-                        let prose =
-                            if System.String.IsNullOrWhiteSpace result.TerminalText then
-                                None
-                            else
-                                Some result.TerminalText
-
-                        // D2: the delivered cell is consumed exactly once, and
-                        // only for an admissible outcome. A take that finds
-                        // nothing (another reader already consumed the cell)
-                        // falls back to the peeked view, which is idempotent.
-                        //
-                        // The take is fenced by the whole delivery fence the
-                        // witness proved — the provider run AND the tool call
-                        // id. Matching the run alone would let another call of
-                        // the same run take this cell and advance the returned
-                        // cursor; the owning call would then lose its
-                        // delivery. A mismatch takes nothing.
-                        let taken =
-                            match witness.Fence.ToolCallId with
-                            | toolCallId ->
-                                JsDeliveredValues.tryTakeRenderedForCall
-                                    (SessionId.value run.ChildId)
-                                    result.ProviderRun
-                                    toolCallId
-                                    prose
-
-                        return!
-                            settleCompletedView
-                                gate
-                                pendingRuns
-                                journal
-                                parentId
-                                run
-                                childId
-                                runId
-                                handle
-                                result
-                                taken
-                                (Some completedView)
-                    | _ when durableView.IsSome ->
-                        // The cell is gone or unreadable, but the delivery
-                        // itself is proven: settle with the material the
-                        // durable witness carries. Nothing is invented here
-                        // — this is the material that was delivered.
-                        let prose =
-                            if System.String.IsNullOrWhiteSpace result.TerminalText then
-                                None
-                            else
-                                Some result.TerminalText
-
-                        let taken =
-                            match witness.Fence.ToolCallId with
-                            | toolCallId ->
-                                JsDeliveredValues.tryTakeRenderedForCall
-                                    (SessionId.value run.ChildId)
-                                    result.ProviderRun
-                                    toolCallId
-                                    prose
-
-                        return!
-                            settleCompletedView
-                                gate
-                                pendingRuns
-                                journal
-                                parentId
-                                run
-                                childId
-                                runId
-                                handle
-                                result
-                                taken
-                                durableView
-                    | _ ->
-                        // LC-004: An asynchronous child that completed its physical turn without
-                        // delivering a view has not delivered its obligation. Do not settle or
-                        // close the run; observation only, the child continues.
-                        return ()
-            }
-            :> Task
+            completeProvenResult gate pendingRuns journal parentId run childId runId handle result view :> Task
         | Failed stop when
             stop.Reason = "MISSING_FINAL_REPORT"
             || stop.Reason.Contains("MISSING_FINAL_REPORT")

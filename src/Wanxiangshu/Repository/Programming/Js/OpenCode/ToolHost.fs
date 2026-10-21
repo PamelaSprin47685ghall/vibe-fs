@@ -140,6 +140,119 @@ module JsToolSpec =
                 (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
                 factory
 
+        let viewDeclarationOf (raw: obj) : obj =
+            if isUndefined (raw?prefixUntil) && isUndefined (raw?thenMap) then
+                null
+            else
+                createObj [ "prefixUntil" ==> raw?prefixUntil; "thenMap" ==> raw?thenMap ]
+
+        let parsedDeclarationFailure (declaration: obj) : JsFailure option =
+            match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse declaration with
+            | Ok _ -> None
+            | Error failure -> Some failure
+
+        let viewFailureOf (raw: obj) (declaration: obj) : JsFailure option =
+            if not (isUndefined (raw?view)) then
+                Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
+            elif not (isPresent declaration) then
+                None
+            else
+                parsedDeclarationFailure declaration
+
+        let callFenceOf (ctx: HostToolContext) =
+            match ctx.ProviderRunId, ctx.ToolCallId with
+            | Some providerRun, Some toolCallId -> Some(providerRun, toolCallId)
+            | _ -> None
+
+        // A delivery witness belongs to a fenced call: without the
+        // call fence there is nothing that can own the witness.
+        // A fence-less call therefore never carries a settlement.
+        let settlementFor (ctx: HostToolContext) fence : Task<DeliverySettlement option> =
+            match fence with
+            | None -> Task.FromResult None
+            | Some _ -> settlementOf ctx
+
+        let commitView (sessionId: string) (declaration: obj) : JsFailure option =
+            match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView sessionId declaration with
+            | Ok() -> None
+            | Error failure -> Some failure
+
+        // Commit the declaration only after the program settled: the pending
+        // view is what the next request projects, and a failed program must
+        // not be able to present anything.
+        let viewCommitFailure (sessionId: string) (declaration: obj) outcome : JsFailure option =
+            match outcome with
+            | JsToolWorkflow.JsToolOutcome.Failed _ -> None
+            | JsToolWorkflow.JsToolOutcome.Succeeded _
+            | JsToolWorkflow.JsToolOutcome.Parked _ -> commitView sessionId declaration
+
+        let renderCommitted (sessionId: string) (declaration: obj) outcome =
+            match viewCommitFailure sessionId declaration outcome with
+            | Some failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
+            | None -> JsToolsResult.render outcome
+
+        let runProgramCall (ctx: HostToolContext) (input: obj) (declaration: obj) =
+            task {
+                // 10 s sandbox deadline; 1 MiB output bound (JS-054).
+                let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
+
+                // The session's own directory wins over the plugin workspace:
+                // a road's deliverable belongs in the worktree that session was
+                // created in, not in the target's checkout.
+                let root = rootOf ctx.SessionId
+                let fence = callFenceOf ctx
+                let! settlement = settlementFor ctx fence
+
+                // Without a settlement this is exactly executeWithReviewCheck.
+                let! outcome =
+                    JsToolWorkflow.executeWithReviewCheckAndDelivery
+                        (reviewCheck |> Option.map (fun check -> fun () -> check ctx))
+                        settlement
+                        ctx.SessionId
+                        fence
+                        surface.Capabilities
+                        root
+                        surface.BaseClassSource
+                        input
+                        10000
+                        deadlineEpochMs
+                        (1 <<< 20)
+                        persistence
+                        lifecyclePersistence
+                        (fileAccessObservation |> Option.map (fun observe -> observe ctx))
+
+                return renderCommitted ctx.SessionId declaration outcome
+            }
+
+        // Clause 6: a failed call must not leave a presentable
+        // view declaration behind. The declaration is validated
+        // here — an invalid one is still refused before anything
+        // runs — but it is committed to the pending view only
+        // after the program settled, so a program that threw, exited
+        // non-zero or never settled leaves the pending view empty.
+        let admitProgramCall (args: HostToolArguments) (ctx: HostToolContext) (input: obj) =
+            let hasProgram = isPresent (input?program)
+
+            let noState =
+                not hasProgram
+                && not (isPresent (input?unpark))
+                && not (isPresent (input?abandon))
+
+            let declaration = viewDeclarationOf args.Raw
+
+            match viewFailureOf args.Raw declaration with
+            | Some failure ->
+                Task.FromResult(JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])))
+            | None when noState ->
+                Task.FromResult(
+                    ToolHostCodec.tomlObject
+                        [ "error",
+                          ToolHostCodec.TString(
+                              JsDescriptionAssets.missingProgram (ProviderLanguageBinding.readGlobalPreference ())
+                          ) ]
+                )
+            | None -> runProgramCall ctx input declaration
+
         { Name = surface.ToolName
           Description = surface.Description
           Arguments =
@@ -167,123 +280,7 @@ module JsToolSpec =
                             JsToolsResult.render (
                                 JsToolWorkflow.JsToolOutcome.Failed(JsFailure.InvalidArgument reason, [], [], [], [])
                             )
-                    | None ->
-                        let hasProgram = isPresent (input?program)
-
-                        let noState =
-                            not hasProgram
-                            && not (isPresent (input?unpark))
-                            && not (isPresent (input?abandon))
-
-                        let declaration =
-                            if isUndefined (args.Raw?prefixUntil) && isUndefined (args.Raw?thenMap) then
-                                null
-                            else
-                                createObj [ "prefixUntil" ==> args.Raw?prefixUntil; "thenMap" ==> args.Raw?thenMap ]
-
-                        let setView = Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView
-
-                        // Clause 6: a failed call must not leave a presentable
-                        // view declaration behind. The declaration is validated
-                        // here — an invalid one is still refused before anything
-                        // runs — but it is committed to the pending view only
-                        // after the program settled, so a program that threw, exited
-                        // non-zero or never settled leaves the pending view empty.
-                        let viewFailure =
-                            if not (isUndefined (args.Raw?view)) then
-                                Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
-                            elif not (isPresent declaration) then
-                                None
-                            else
-                                match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse declaration with
-                                | Ok _ -> None
-                                | Error failure -> Some failure
-
-                        match viewFailure with
-                        | Some failure ->
-                            return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-                        | None when noState ->
-                            return
-                                ToolHostCodec.tomlObject
-                                    [ "error",
-                                      ToolHostCodec.TString(
-                                          JsDescriptionAssets.missingProgram (
-                                              ProviderLanguageBinding.readGlobalPreference ()
-                                          )
-                                      ) ]
-                        | None ->
-                            // 10 s sandbox deadline; 1 MiB output bound (JS-054).
-                            let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
-
-                            // The session's own directory wins over the plugin workspace:
-                            // a road's deliverable belongs in the worktree that session was
-                            // created in, not in the target's checkout.
-                            let root = rootOf ctx.SessionId
-
-                            let fence =
-                                match ctx.ProviderRunId, ctx.ToolCallId with
-                                | Some providerRun, Some toolCallId -> Some(providerRun, toolCallId)
-                                | _ -> None
-
-                            // A delivery witness belongs to a fenced call: without the
-                            // call fence there is nothing that can own the witness.
-                            // A fence-less call therefore never carries a settlement.
-                            let! settlement =
-                                match fence with
-                                | None -> Task.FromResult None
-                                | Some _ -> settlementOf ctx
-
-                            let! outcome =
-                                match settlement with
-                                | Some settlement ->
-                                    JsToolWorkflow.executeWithReviewCheckAndDelivery
-                                        (reviewCheck |> Option.map (fun check -> fun () -> check ctx))
-                                        (Some settlement)
-                                        ctx.SessionId
-                                        fence
-                                        surface.Capabilities
-                                        root
-                                        surface.BaseClassSource
-                                        input
-                                        10000
-                                        deadlineEpochMs
-                                        (1 <<< 20)
-                                        persistence
-                                        lifecyclePersistence
-                                        (fileAccessObservation |> Option.map (fun observe -> observe ctx))
-                                | None ->
-                                    JsToolWorkflow.executeWithReviewCheck
-                                        (reviewCheck |> Option.map (fun check -> fun () -> check ctx))
-                                        ctx.SessionId
-                                        fence
-                                        surface.Capabilities
-                                        root
-                                        surface.BaseClassSource
-                                        input
-                                        10000
-                                        deadlineEpochMs
-                                        (1 <<< 20)
-                                        persistence
-                                        lifecyclePersistence
-                                        (fileAccessObservation |> Option.map (fun observe -> observe ctx))
-
-                            // Commit the declaration only now: the pending view is
-                            // what the next request projects, and a failed program
-                            // must not be able to present anything.
-                            let commitFailure =
-                                match outcome with
-                                | JsToolWorkflow.JsToolOutcome.Failed _ -> None
-                                | JsToolWorkflow.JsToolOutcome.Succeeded _
-                                | JsToolWorkflow.JsToolOutcome.Parked _ ->
-                                    match setView ctx.SessionId declaration with
-                                    | Ok() -> None
-                                    | Error failure -> Some failure
-
-                            match commitFailure with
-                            | Some failure ->
-                                return
-                                    JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-                            | None -> return JsToolsResult.render outcome
+                    | None -> return! admitProgramCall args ctx input
                 } }
 
     let create

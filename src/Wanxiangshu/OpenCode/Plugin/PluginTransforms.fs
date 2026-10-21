@@ -669,12 +669,11 @@ module PluginTransforms =
 
             let sessionId = SessionId.create sessionText
 
-            match DeliveryAttemptLedger.tryFindEstablished sessionId physical with
-            | Some(fence, _) -> DeliveryAdjudication.StopDelivery fence
-            | None ->
-                match DeliveryAttemptLedger.tryFindDurableEstablished journal sessionId physical with
-                | Some fence -> DeliveryAdjudication.StopDelivery fence
-                | None -> DeliveryAdjudication.ContinueDelivery
+            DeliveryAttemptLedger.tryFindEstablished sessionId physical
+            |> Option.map fst
+            |> Option.orElseWith (fun () -> DeliveryAttemptLedger.tryFindDurableEstablished journal sessionId physical)
+            |> Option.map DeliveryAdjudication.StopDelivery
+            |> Option.defaultValue DeliveryAdjudication.ContinueDelivery
 
         let deliveryInterruptResultName (outcome: Result<unit, string>) =
             match outcome with
