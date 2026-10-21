@@ -687,7 +687,7 @@ dotnet tool run fantomas src/Wanxiangshu
 - **C3 材料搬运**：fission lane 的材料仍靠手工跨 session 搬运；应收敛到 `FissionLaneMaterialized` 的 `ViewRef/ViewDigest` 与 takeover 的 `AggregateViewRef/AggregateViewDigest`。
 - **MSL 013/015/022/028** 与 **effect-accounting/002**：旧 harness 从不提交围栏匹配的 durable 见证，须逐个迁到真实交付路径；**不得伪造见证**。
 - **附件读取无可注入缝**（生产缺口）：真实路径的 `childViewForRun` 恒为 `fun _ _ -> Task.FromResult None`，attachment 准备读的是 `viewForSession`，没有可阻塞的缝，所以「attachment 准备期间阻塞、指引尚未发出」这一中间态在真实路径无法注入。已改为断言最终可观测事实，并在 CHANGELOG 记为缺口。
-- **R6 的新回归未写**：commit 失败不登记、成功登记可观察 transition（`DeliveryAttemptLedger.tryFindEstablished` 命中后 transform 判 `StopDelivery`）——须在真实交付路径上写，commit 失败走「同围栏异材料」的既有拒交路径。
+- ~~**R6 的新回归未写**~~ —— **已闭合**（`964a0221e`）：真实插件 + 真实 journal + 真实 `this.deliver` 提交成功后，durable 见证 1 条、进程内 attempt 台账有登记、且该物理输入上的 provider 请求被 transform 钩子的交付裁决清空（模型看不到 deliver 回复）；把真实 durable 存储破坏后，真实提交入口返回 `# failed` / `DELIVERY_NOT_ESTABLISHED`，台账**仍只指向那次真正成立的交付**，没有留下本次 attempt 的登记。判别性已实测：把 `onCommitted` 挪回 commit 之前重编，该用例**失败**。
 
 ### 十·八 当前状态（integration 实测，2026-10-21，`origin/master` = `716876b6a`）
 
@@ -708,6 +708,8 @@ dotnet tool run fantomas src/Wanxiangshu
 | **delegation 027 + MSL 006/007/008 迁真实交付路径** | `2d35b2ef0` | `build ok (generation 14)`；149 surfaces；715 modules | `delegation/024` + `027` + `managed-session-lifecycle/006\|007\|008` → **62 tests / 60 pass / 0 fail / 0 cancelled / 2 skipped**（2 个 `integrationTest` 按 tier 门禁 skip） |
 | **MSL 013 / 015 迁真实交付路径** | `74e135d6c` | `build ok (generation 15)`；149 surfaces；715 modules | `013` → **7 tests / 6 pass / 0 fail / 1 todo**；`015` → **11/11 pass / 0 fail**；七文件合跑 → **80 tests / 77 pass / 0 fail / 0 cancelled / 2 skipped / 1 todo** |
 | **MSL 022 迁真实交付路径** | `462b79864` | `build ok (generation 17)`；149 surfaces；713 modules | `managed-session-lifecycle/022` → **6 tests / 5 pass / 0 fail / 0 cancelled / 1 todo**（GAP-133 的 `test.todo` 原样保留） |
+| **C3：fission lane 的视图不再手工写进 owner 交付格** | `d84f4fefe` | `build ok (generation 14)`；149 surfaces；714 modules | `intra-participant-parallelism/014` → **4 tests / 3 pass / 0 fail / 1 todo**；全 parallelism 套件 + `work/011` + `work/026` + `semantic-trace/013` → **69 tests / 54 pass / 0 fail / 0 cancelled / 15 todo** |
+| **R6 回归：被拒交付不留下自己的登记** | `964a0221e` | `build ok (generation 14)` | `effect-accounting/013` → **6/6 pass / 0 fail**；与 parallelism 全套 + work/011 + work/026 + semantic-trace/013 合跑 → **75 tests / 60 pass / 0 fail / 0 cancelled / 15 todo** |
 
 **B5 的事实**（此前记作「同 run 内被别 call 先取无害」，**该说法已证伪并修正**）：交付格记的是产生它那次调用的完整围栏（provider run + tool call id），旧消费面只比 provider run；同一 run 的第二次交付会**覆盖**第一次的格子，于是只持 run 的终态会取走**另一次调用**的材料并推进 returned 游标，真正拥有该交付的调用随后拿不到材料——是真实错取，不是可接受的降级。实测：同 run `call-1`/`call-2` 两次交付后，`call-1` 的终态取走了 `call-2` 的材料，格子被清空。该事实已由 `059` 的永久回归钉住。
 
@@ -720,13 +722,13 @@ dotnet tool run fantomas src/Wanxiangshu
 
 **仍未闭合（如实列出，均为「未修 / 未验」，不作豁免）**
 
-- **C3 材料搬运**：fission lane 的**视图声明仍靠手工跨 session 转发**给 owner 格；应收敛到 `FissionLaneMaterialized` 的 `ViewRef/ViewDigest` 与 takeover 的 `AggregateViewRef/AggregateViewDigest`，由 owner 自己的交付路径建立见证（不 recordFenced 假证、不产生第二个可见交付格）。**尚未落码。**
+- ~~**C3 材料搬运**~~ —— **已闭合**（`d84f4fefe`）：fission lane 的视图声明**不再**手工跨 session 转发进 owner 的交付格。takeover 完成分支里那处 `recordView ownerSessionKey (peekView laneSessionKey)` 已删；owner 交付格在 owner 自己交付前为空、交付后只含 owner 自己的锚点与材料。材料本身走既有 durable 事实（`aggregateView` 已含各 lane 的 `FissionLaneMaterialized` work blob），不 recordFenced 假证、不产生第二个可见交付格。两条永久回归钉住：真实 fission + 真实 `this.deliver` 的可观察断言，以及「takeover 完成分支不得写/读 owner 交付格」的结构性守卫。
 - **`effect-accounting/002` 挂起**：该文件在多批改动**前后同样挂起**（`cancelled 1`，240s 超时），不是本轮引入的回归，但**仍未解决**，不记作通过。
-- **MSL 028**：尚未迁到真实交付路径。
+- ~~**MSL 028**~~ —— **已闭合**（`5fa92c1e3`）：三条 case 迁到真实插件路径（真实 `this.fork` / 真实 `this.deliver` / 生产 `message.updated` → `session.idle` / 真实 `this.join`），唯一注入的故障是**真实 append 失败**（事件日志置只读，由写者自己的 EACCES 打穿结算），不伪造任何事实。同批还修了生产缺口：命中围栏匹配的 durable 见证后，若进程内交付格已丢失或视图读取故障，运行改用**见证自带的材料**结算（不伪造事实），否则父侧 `join` 永远等不到结算。实测 `028` → **3/3 pass**。
 - **`delegation/032` 第三条挂起**：前两条通过（office capability 跨角色拒绝、SyncDelegate 只取标准 Engineer 能力），第三条在 200s 内不返回（`cancelled 1`），挂起点未定位。
 - **GAP 台账重核中**：GAP-123（InternalLeaf/Attached 的 witness 未实现）、GAP-005/050（无机械 oracle）、GAP-015（指向已不存在的 requirement 包）。
 - **附件读取无可注入缝**（生产缺口）：真实路径的 `childViewForRun` 恒为 `fun _ _ -> Task.FromResult None`，attachment 准备读的是 `viewForSession`，没有可阻塞的缝，所以「attachment 准备期间阻塞、指引尚未发出」这一中间态在真实路径无法注入。已改为断言最终可观测事实，并在 CHANGELOG 记为缺口。
-- **R6 的新回归未写**：commit 失败不登记、成功登记可观察 transition（`DeliveryAttemptLedger.tryFindEstablished` 命中后 transform 判 `StopDelivery`）——须在真实交付路径上写，commit 失败走「同围栏异材料」的既有拒交路径。
+- ~~**R6 的新回归未写**~~ —— **已闭合**（`964a0221e`）：真实插件 + 真实 journal + 真实 `this.deliver` 提交成功后，durable 见证 1 条、进程内 attempt 台账有登记、且该物理输入上的 provider 请求被 transform 钩子的交付裁决清空（模型看不到 deliver 回复）；把真实 durable 存储破坏后，真实提交入口返回 `# failed` / `DELIVERY_NOT_ESTABLISHED`，台账**仍只指向那次真正成立的交付**，没有留下本次 attempt 的登记。判别性已实测：把 `onCommitted` 挪回 commit 之前重编，该用例**失败**。
 
 **两处构建口径教训**（影响后续任何批次的判定）
 
