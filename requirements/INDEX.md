@@ -132,7 +132,7 @@
 | 7 | `causal-wait` | 9 | causal-wait-001 ~ 009 |
 | 8 | `session-ontology` | 14 | session-ontology-001 ~ 012、014 ~ 015 |
 | 9 | `managed-session-lifecycle` | 28 | managed-session-lifecycle-001 ~ 022、managed-session-lifecycle-023（身份替换后旧活跃会话显式收束）、managed-session-lifecycle-024（固定 DevOps 崩溃恢复单一权威与进程排空）、managed-session-lifecycle-025（固定 DevOps 每次工作返回时 PTY 进程彻底收束与记账清理）、managed-session-lifecycle-026（Main 收束级联 Attached InternalLeaf 的 execution 结算）、managed-session-lifecycle-027（Session 收束的作用域保留取消与延后归还）、managed-session-lifecycle-028（子完成投递必达与 join guard 有出口） |
-| 10 | `host-boundary` | 33 | host-boundary-001 ~ 031、host-boundary-032（Contract 提示字段解耦与参数清理安全）、host-boundary-033（旧租约保持到可见输入进入下一步与流式/非 join 工具保留） |
+| 10 | `host-boundary` | 34 | host-boundary-001 ~ 031、host-boundary-032（Contract 提示字段解耦与参数清理安全）、host-boundary-033（旧租约保持到可见输入进入下一步与流式/非 join 工具保留）、host-boundary-034（adapter 薄度棘轮与 Host 命名空间层级门禁） |
 | 11 | `participant-identity` | 10 | participant-identity-001 ~ 009、participant-identity-010（活跃身份解析与历史身份隔离解码） |
 | 12 | `execution-model-routing` | 20 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型）、execution-model-routing-020（多席位路由与外部占位模型被租约覆盖） |
 | 13 | `office-capability` | 13 | office-capability-001、003 ~ 007、011 ~ 012、015 ~ 016、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部标准 Engineer）、office-capability-019（Plan 规划角色与四工具权限集） |
