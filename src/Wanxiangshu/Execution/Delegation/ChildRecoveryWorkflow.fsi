@@ -1,16 +1,20 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 
 module ChildRecoveryWorkflow =
+    /// delegation-029: the recovery runtime consumes a narrow capability, never
+    /// the durable journal handle.
+    type DeliveryWitnessReader =
+        SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> bool
+
     type Ports =
         { Journal: AgentJournalPort option
-          DurableJournal: AgentJournal option
+          DeliveryWitness: DeliveryWitnessReader option
           ParentId: SessionId
           Snapshot: ISessionSnapshotPort option
           AgentId: string

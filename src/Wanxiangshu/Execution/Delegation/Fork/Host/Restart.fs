@@ -35,7 +35,22 @@ module HostForkRestart =
         (agent: string)
         : ChildRecoveryWorkflow.Ports =
         { Journal = journal
-          DurableJournal = durableJournal
+          // delegation-029: the durable delivery-witness read stays in durable
+          // composition; the recovery runtime only sees the narrow reader.
+          DeliveryWitness =
+            durableJournal
+            |> Option.map (fun durable ->
+                fun childSession providerRun authorityRoot ->
+                    TaskDeliveryJournal.tryFindByFenceFields
+                        durable
+                        childSession
+                        providerRun
+                        None
+                        (Some authorityRoot)
+                        None
+                        None
+                        None
+                    |> Option.isSome)
           ParentId = parentId
           Snapshot = snapshot
           AgentId = agentId

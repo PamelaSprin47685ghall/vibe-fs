@@ -13,13 +13,18 @@ open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Host
-open Wanxiangshu.Persistence.Journal
 
 /// Direct-CE child recovery (FLOW-001 / P0-1).
 /// Recovery consumes canonical admission and commits only exact scoped completions.
 /// GREEN-5: after durable commit, Pulse agent handle only (wake); Journal is fact source.
 module ChildRecoveryWorkflow =
+
+    /// delegation-029: the recovery runtime consumes a narrow capability, never
+    /// the durable journal handle. The reader answers "does a delivery witness
+    /// exist for this child session, provider run and Authority Root?"; the
+    /// durable composition owns the concrete journal read behind it.
+    type DeliveryWitnessReader =
+        SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> bool
 
     /// DSL-state-combination: physical — optional Journal/Snapshot capabilities
     /// are injected infrastructure ports; the remaining fields are one recovery
@@ -28,8 +33,9 @@ module ChildRecoveryWorkflow =
     type Ports =
         {
             Journal: AgentJournalPort option
-            /// Concrete journal when the process can read durable delivery witnesses.
-            DurableJournal: AgentJournal option
+            /// Durable delivery-witness reader; None = no witness source, so a
+            /// restored terminal is not proven.
+            DeliveryWitness: DeliveryWitnessReader option
             ParentId: SessionId
             Snapshot: ISessionSnapshotPort option
             AgentId: string
@@ -134,30 +140,9 @@ module ChildRecoveryWorkflow =
             let providerRun = ProviderRunIdentity.create assistant.Id
 
             let witnessed =
-                match ports.DurableJournal with
+                match ports.DeliveryWitness with
                 | None -> false
-                | Some journal ->
-                    // 围栏感知读取：同一 (SessionId, ProviderRun) 下可能并存多条
-                    // 见证（同轮重试换了 toolCallId），粗粒度读取会把证据整体丢掉，
-                    // 误判成"没有见证"。这里只知道 AuthorityRoot，
-                    // 交给围栏子集入口按围栏字段精取，材料不一致时仍然拒绝。
-                    TaskDelivery.tryFindByFenceFields
-                        ports.ChildSession
-                        providerRun
-                        None
-                        (Some authorityRoot)
-                        None
-                        // 本次只有子集围栏：恢复端口只给出子会话与 agent 句柄，
-                        // 没有该子运行的逻辑运行 id，缺失的那一位（逻辑运行）
-                        // 由子运行自身的准入记录（AdmittedWork.logicalRunId）
-                        // 另行核对。
-                        None
-                        // 交付任务的种类（ChildWork / Invocation / Lifecycle）
-                        // 恢复端口并不掌握：写入侧按 settle 时的退役状态决定，
-                        // 缺失的这一位（交付任务）由交付见证的写入方另行核对。
-                        None
-                        (AgentJournal.snapshot journal).AgentProjections.Deliveries
-                    |> Option.isSome
+                | Some reader -> reader ports.ChildSession providerRun authorityRoot
 
             if not witnessed then
                 ChildSnapshotEvidence.Unreadable "restart terminal has no durable delivery witness"
