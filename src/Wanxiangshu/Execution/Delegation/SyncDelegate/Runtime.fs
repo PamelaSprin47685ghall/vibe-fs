@@ -38,7 +38,9 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Execution.Routing
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Repository.Programming.Js
 
 module HostForkProse =
@@ -138,10 +140,17 @@ module internal SyncDelegateInternals =
     /// D2: consume the delivery of this turn and settle the call with it.
     /// `None` means no delivery was found: the obligation is still owed.
     ///
-    /// The durable witness is consumed first. The process-live fenced cell is
-    /// the fallback for the harness path, where the delivery was recorded in
-    /// the cell and no durable witness exists. The cell keeps its own fence
-    /// check: only a cell that belongs to this exact provider run is taken.
+    /// The durable witness is consumed first: it is the settlement of record
+    /// and it carries the materialized view directly. The process-live cell
+    /// is the fallback for the journal-less path, where the delivery was
+    /// recorded in the cell and no durable witness exists.
+    ///
+    /// That fallback takes the cell only under its own complete identity:
+    /// the cell of this child session whose provider run is this turn's run,
+    /// matched on the whole fence. The child's deliver call id is NOT
+    /// guessed from the parent's tool-call sequence — that sequence is the
+    /// parent's, and the delivery is the child's. A cell that does not carry
+    /// this turn's run is not taken at all.
     let private settleDeliveredFromParts
         (journal: AgentJournal option)
         (noteDelegateIfRole: SyncDelegateCall -> SessionId -> string -> unit)
@@ -155,13 +164,17 @@ module internal SyncDelegateInternals =
             match durableWitnessView journal turn with
             | Some view -> Some view
             | None ->
-                JsDeliveredValues.tryTakeRenderedFor
-                    (SessionId.value turn.SessionId)
-                    turn.ProviderRun
-                    (if System.String.IsNullOrWhiteSpace assistant then
-                         None
-                     else
-                         Some assistant)
+                match JsDeliveredValues.peekFence (SessionId.value turn.SessionId) with
+                | Some fence when fence.ProviderRun = turn.ProviderRun ->
+                    JsDeliveredValues.tryTakeRenderedForCall
+                        (SessionId.value turn.SessionId)
+                        turn.ProviderRun
+                        fence.ToolCallId
+                        (if System.String.IsNullOrWhiteSpace assistant then
+                             None
+                         else
+                             Some assistant)
+                | _ -> None
 
         match resolved with
         | Some record when not (System.String.IsNullOrWhiteSpace record) ->
@@ -799,12 +812,6 @@ type SyncDelegateRuntime
 
     member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) = attached.TryFind(ownerSessionId, role)
 
-    member _.TryFindDelegateOwner(delegateSessionId: SessionId) : SessionId option =
-        attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Inspector)
-        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Coder))
-        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Engineer))
-        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.DevOps))
-
     member _.TryFindForScopeClose(ownerSessionId: SessionId, role: SyncDelegateRole) =
         match attached.TryFind(ownerSessionId, role) with
         | Some sessionId -> Some sessionId
@@ -857,30 +864,6 @@ type SyncDelegateRuntime
             expectedToolCalls
             None
             (fun () -> Task.FromResult(HostForkProse.chargeDocument owner charge))
-            None
-            None
-            (fun () -> false)
-        |> singletonResult
-
-    /// EXEC-032 composition seam: caller supplies a low-trust provider prompt
-    /// producer; workflow invokes it only after semantic batch admission.
-    member _.InvokePrepared
-        (
-            ownerSessionKey: string,
-            role: SyncDelegateRole,
-            charge: string,
-            prepareProviderPrompt: unit -> Task<LlmFacing.Document>,
-            ?expectedToolCalls: int
-        ) : Task<Result<string, string>> =
-        SyncDelegateWorkflow.invoke
-            store
-            deps
-            (SessionId.create ownerSessionKey)
-            role
-            charge
-            expectedToolCalls
-            None
-            prepareProviderPrompt
             None
             None
             (fun () -> false)

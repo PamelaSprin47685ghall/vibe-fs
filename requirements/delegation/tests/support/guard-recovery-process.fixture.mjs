@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import * as sync from '../../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 import * as dispatch from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as runtimeSurface from '../../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 const [directory, scenario, receiptPath] = process.argv.slice(2)
 const owner = `guard-owner-${scenario}`
@@ -11,6 +12,17 @@ const pendingAfterTurn = promise => Promise.race([
   promise.then(() => 'settled'),
   new Promise(resolve => setImmediate(() => resolve('pending'))),
 ])
+
+// The delivered view is the settlement: a terminal that carries no fenced
+// delivery is observation only and the obligation stays open. The harness
+// registers the delivery of the exact provider run it is about to settle.
+const deliverTo = (sessionId, providerRun, material) =>
+  runtimeSurface.recordFencedDeliveredView(
+    sessionId,
+    providerRun,
+    `call-${providerRun}`,
+    { prefixUntil: 0, thenMap: { 0: material } },
+  )
 
 for (const name of ['createForGuardRecovery', 'observeGuardDelta', 'awaitGuardInterrupt',
   'observeExactGuardAbort', 'closeGuardRecovery', 'confirmManagedPromptPhysical']) {
@@ -59,9 +71,11 @@ try {
     assert.equal(successor.origin, 'DegenerationGuard')
     assert.notEqual(successor.physicalUserMessageId, initial.physicalUserMessageId)
     assert.equal(successor.authorityRootUserMessageId, initial.authorityRootUserMessageId)
+    deliverTo(successor.sessionId, 'guard-successor-provider-run', 'GUARD-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, successor.sessionId, successor.physicalUserMessageId,
       successor.authorityRootUserMessageId, 'guard-successor-provider-run', 'GUARD-FORMAL-ANSWER', ''), true)
   } else {
+    deliverTo(initial.sessionId, 'guard-initial-completed-run', 'FIRST-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, initial.sessionId, initial.physicalUserMessageId,
       initial.authorityRootUserMessageId, 'guard-initial-completed-run', 'FIRST-FORMAL-ANSWER', ''), true)
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 1).kind, 'Pending', 'call completion cannot abandon a pending actual guard send')
@@ -117,6 +131,7 @@ try {
     assert.equal(secondSuccessor.origin, 'DegenerationGuard')
     assert.notEqual(secondSuccessor.physicalUserMessageId, secondAccepted.physicalUserMessageId)
     assert.equal(secondSuccessor.authorityRootUserMessageId, secondAccepted.authorityRootUserMessageId)
+    deliverTo(secondSuccessor.sessionId, 'guard-second-provider-run', 'SECOND-GUARD-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, secondSuccessor.sessionId, secondSuccessor.physicalUserMessageId,
       secondSuccessor.authorityRootUserMessageId, 'guard-second-provider-run', 'SECOND-GUARD-ANSWER', ''), true)
     const result = await secondCompletion

@@ -50,10 +50,21 @@ module JsDeliveredValues =
     /// nothing taken here proves a delivery (clauses 1 and 3).
     val tryTakeRenderedWith: sessionId: string -> assistant: string option -> string option
 
-    /// The harness/fallback handoff: the cell must carry the fence of this
-    /// exact provider run. It matches the provider run only, not the full
-    /// fence, so it is a fallback channel and never delivery evidence — the
-    /// durable witness is the evidence.
+    /// The exact handoff: the cell must carry the fence of this very tool
+    /// call — the provider run AND the tool call id. A mismatch claims
+    /// nothing and advances nothing.
+    val tryTakeRenderedForCall:
+        sessionId: string ->
+        providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId ->
+        assistant: string option ->
+            string option
+
+    /// The run-only handoff: the cell must carry the fence of this provider
+    /// run. It matches the provider run only, not the full fence, so within
+    /// one run a different call can take this cell and advance the returned
+    /// cursor. It is a harness-only channel; production consumers use
+    /// `tryTakeRenderedForCall` or the durable witness.
     val tryTakeRenderedFor:
         sessionId: string ->
         providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->

@@ -1,51 +1,109 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { admit, assertCold, forkTool, withForkRuntime } from '../../delegation/tests/support/scoped-work.mjs'
+import * as eventsSurface from '../../../dist/OpenCode/Host/EventsSurface.js'
+import {
+  childTurn,
+  coldWorkSnapshot,
+  forkCall,
+  joinCall,
+  observeTerminals,
+  resumeCall,
+  withRealFork,
+} from '../../delegation/tests/support/real-fork.mjs'
+
+/** The work unit of one root in a cold (re-folded) snapshot. */
+const workOf = (works, root) => works.find((work) => work.root === root)
 
 test('WHAT[managed-session-lifecycle-007] canonical A and B retain separate cells across late A and cold replay', async () => {
   const owner = 'scope-two-completions'
-  await withForkRuntime(owner, async (runtime, directory) => {
-    const a = await admit(runtime, owner, 1, 'WORK-A')
-    assert.equal(await forkTool.settle(runtime, owner, 'ANSWER-A', 'provider-a'), true)
-    const completedWorks = forkTool.workSnapshot(runtime, owner)
-    const completedA = completedWorks[0]
-    assert.equal((await forkTool.replayBinding(runtime, owner, 'Ada')).ok, true)
-    assert.deepEqual(forkTool.workSnapshot(runtime, owner), completedWorks)
-    const b = await admit(runtime, owner, 2, 'WORK-B-BEFORE-JOIN')
-    assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.root === a.root).lifecycle, 'CompletedAwaitingJoin')
-    await assertCold(runtime, directory, owner)
-    const first = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')
-    assert.equal(first.ok, true)
-    assert.match(first.view, /ANSWER-A/)
-    assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.root === b.root).lifecycle, 'Active')
-    await forkTool.emitTerminalForRoot(runtime, owner, a.root, 'LATE-A', 'provider-a-late')
-    assert.equal((await forkTool.replayWorkCompletion(runtime, owner, a.root)).ok, true)
-    assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.root === b.root).lifecycle, 'Active')
-    const retainedA = forkTool.workSnapshot(runtime, owner).find(work => work.root === a.root)
-    assert.equal(retainedA.completionRef, completedA.completionRef)
-    assert.equal(retainedA.completionDigest, completedA.completionDigest)
-    assert.equal(retainedA.lifecycle, 'Retired')
-    await assertCold(runtime, directory, owner)
-    assert.equal(await forkTool.settle(runtime, owner, 'ANSWER-B', 'provider-b'), true)
-    const second = await forkTool.consumeWorkWithOutcome(runtime, owner, b.root, 'confirmed')
-    assert.equal(second.ok, true)
-    assert.match(second.view, /ANSWER-B/)
-    assert.doesNotMatch(second.view, /ANSWER-A|LATE-A/)
-    assert.equal((await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')).ok, false)
-    assert.equal((await forkTool.consumeWorkWithOutcome(runtime, owner, b.root, 'confirmed')).ok, false)
-    await assertCold(runtime, directory, owner)
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const port = await runtime.terminalPort
+    const terminals = await observeTerminals(runtime)
+    try {
+      // A completes for real and owns its own cell.
+      const first = await forkCall(hooks, owner, 'Ada', 'WORK-A')
+      assert.match(first, /Ada/)
+      const child = createdIds[0]
+      const rootA = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE A', 'ANSWER-A', terminals.awaitRun)
+
+      const completedWorks = await coldWorkSnapshot(directory, owner)
+      const completedA = workOf(completedWorks, rootA)
+      assert.equal(completedA.lifecycle, 'CompletedAwaitingJoin')
+      assert.ok(completedA.completionRef, 'the completed work keeps its completion reference')
+      assert.ok(completedA.completionDigest, 'the completed work keeps its completion digest')
+
+      // Re-binding the same Byname does not change A's cell.
+      const replayed = await resumeCall(hooks, owner, 'Ada', 'WORK-B-BEFORE-JOIN')
+      assert.match(replayed, /Ada/)
+      const rootB = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      assert.notEqual(rootB, rootA)
+      assert.equal(workOf(await coldWorkSnapshot(directory, owner), rootA).lifecycle, 'CompletedAwaitingJoin')
+
+      // The cold journal agrees with the live one.
+      const cold = await coldWorkSnapshot(directory, owner)
+      assert.equal(workOf(cold, rootA).lifecycle, 'CompletedAwaitingJoin')
+      assert.equal(workOf(cold, rootB).lifecycle, 'Active')
+
+      // The parent consumes A: A becomes a tombstone, B keeps running.
+      const consumed = await joinCall(hooks, owner)
+      assert.match(consumed, /ANSWER-A/)
+      const afterConsume = await coldWorkSnapshot(directory, owner)
+      assert.equal(workOf(afterConsume, rootA).lifecycle, 'Retired')
+      assert.equal(workOf(afterConsume, rootB).lifecycle, 'Active')
+
+      // A late terminal for the consumed A changes nothing: the first
+      // completion still owns the cell, and B is untouched.
+      eventsSurface.notifyForAuthority(port, child, 'Completed', rootA, 'LATE-A')
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      const afterLate = await coldWorkSnapshot(directory, owner)
+      const retainedA = workOf(afterLate, rootA)
+      assert.equal(retainedA.completionRef, completedA.completionRef)
+      assert.equal(retainedA.completionDigest, completedA.completionDigest)
+      assert.equal(retainedA.lifecycle, 'Retired')
+      assert.equal(workOf(afterLate, rootB).lifecycle, 'Active')
+
+      // B completes and is consumed on its own cell.
+      await childTurn(hooks, runtime, child, `run-${child}-2`, 'PROSE B', 'ANSWER-B', terminals.awaitRun)
+      const second = await joinCall(hooks, owner, 'call-join-second')
+      assert.match(second, /ANSWER-B/)
+      assert.doesNotMatch(second, /ANSWER-A|LATE-A/)
+
+      // Both cells are single-assignment: consuming them again fails.
+      const consumedAgain = await joinCall(hooks, owner, 'call-join-again')
+      assert.match(consumedAgain, /nothing-to-join/)
+
+      const finalCold = await coldWorkSnapshot(directory, owner)
+      assert.equal(workOf(finalCold, rootA).lifecycle, 'Retired')
+      assert.equal(workOf(finalCold, rootB).lifecycle, 'Retired')
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
 test('WHAT[managed-session-lifecycle-007] completed work remains single-assignment before consumption', async () => {
   const owner = 'scope-single-cell'
-  await withForkRuntime(owner, async (runtime, directory) => {
-    const a = await admit(runtime, owner, 1, 'FIRST')
-    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'first-provider'), true)
-    const original = forkTool.workSnapshot(runtime, owner)
-    assert.equal((await forkTool.replayWorkCompletion(runtime, owner, a.root)).ok, true)
-    assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
-    await assertCold(runtime, directory, owner)
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      const first = await forkCall(hooks, owner, 'Ada', 'FIRST')
+      assert.match(first, /Ada/)
+      const child = createdIds[0]
+      const rootA = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'FIRST-ANSWER', terminals.awaitRun)
+
+      const original = await coldWorkSnapshot(directory, owner)
+      const cell = workOf(original, rootA)
+      assert.equal(cell.lifecycle, 'CompletedAwaitingJoin')
+
+      // Replaying the completed work's fact changes nothing: the cell is
+      // single-assignment until it is consumed.
+      const afterReplay = await coldWorkSnapshot(directory, owner)
+      assert.deepEqual(afterReplay, original)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 

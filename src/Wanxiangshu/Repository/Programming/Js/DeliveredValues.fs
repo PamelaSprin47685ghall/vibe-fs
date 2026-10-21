@@ -165,29 +165,67 @@ module JsDeliveredValues =
 
     let private peekRequest () : obj = createObj [ "mode" ==> "peek" ]
 
+    let peekFence (sessionId: string) : DeliveryFence option =
+        match owner.fence sessionId with
+        | null -> None
+        | fence ->
+            Some
+                { ProviderRun = Identity.ProviderRunIdentity.create fence?providerRun
+                  ToolCallId = Identity.ToolCallId.create fence?toolCallId }
+
+    /// The exact handoff: the cell must carry the fence of this very tool
+    /// call — the provider run AND the tool call id.
+    ///
+    /// The owner stores the whole fence when a delivery is recorded and can
+    /// read it back, but its claim compares the provider run alone. Within
+    /// one run a second delivery overwrites the cell, so a consumer that
+    /// matches only the run takes the *other* call's material and advances
+    /// the returned cursor; the owning call then loses its delivery. That
+    /// is a wrong take, not a benign degradation.
+    ///
+    /// So the fence is compared here first, in both fields. A mismatch
+    /// claims nothing and advances nothing: the cell stays where it is and
+    /// the consumer sees nothing. The compare and the claim run in one
+    /// synchronous step — there is no await between them, and the owner's
+    /// fence, claim and hand-off touch no user code — so no other turn can
+    /// slip in between.
+    let tryTakeRenderedForCall
+        (sessionId: string)
+        (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
+        (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId)
+        (assistant: string option)
+        : string option =
+        match peekFence sessionId with
+        | Some fence when fence.ProviderRun = providerRun && fence.ToolCallId = toolCallId ->
+            // The run mode is the owner's only mode that claims a fenced
+            // cell; it compares the provider run alone, which the check
+            // above has already done together with the tool call id.
+            let request =
+                createObj
+                    [ "mode" ==> "run"
+                      "providerRun" ==> Identity.ProviderRunIdentity.value providerRun ]
+
+            handoff sessionId request assistant
+        | _ -> None
+
     /// Render the staged view of a render cache cell. Presentation only:
     /// nothing taken here proves a delivery (clauses 1 and 3).
     let tryTakeRenderedWith (sessionId: string) (assistant: string option) : string option =
         handoff sessionId (cacheRequest ()) assistant
 
-    /// The harness/fallback handoff: the cell must carry the fence of this
-    /// exact provider run. An old terminal cannot consume a newer delivery.
+    /// The run-only handoff: the cell must carry the fence of this provider
+    /// run. An old terminal cannot consume a newer delivery.
     ///
-    /// This matches the provider run only — it is NOT the full fence (the
-    /// tool call id is not compared) — so this reader is a harness/fallback
-    /// channel for the process-live cell when no durable witness exists, and
-    /// it is NOT delivery evidence. The real delivery evidence is the durable
-    /// witness (`TaskDeliveryJournal.tryFindByFence*`, which filters on the
-    /// logical run and the delivery task as well); a consumer must read that
-    /// witness first and only fall back here.
+    /// This matches the provider run only — the tool call id is NOT compared
+    /// — so within one run a different call can take this cell and advance
+    /// the returned cursor, and the owning call loses its delivery. It is
+    /// therefore a harness-only channel: production consumers must use
+    /// `tryTakeRenderedForCall` (the exact fence) or the durable witness
+    /// (`TaskDeliveryJournal.tryFindByFence*`, which also filters on the
+    /// logical run and the delivery task).
     ///
-    /// Known and accepted degradation: within one run another call could in
-    /// principle take this cell first. That is harmless because the cell is
-    /// not evidence — taking it does not change settlement correctness.
-    /// The owner's `claim` matches the provider run alone as well (its
-    /// request modes are `peek`, `cache` and `run`), so a full-fence claim
-    /// has to wait until a consumer holds a tool call id; this entry
-    /// migrates there then.
+    /// The owner has no claim mode that compares the tool call id, so the
+    /// exact comparison lives in `tryTakeRenderedForCall` above.
     let tryTakeRenderedFor
         (sessionId: string)
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
@@ -211,14 +249,6 @@ module JsDeliveredValues =
 
     let peekView (sessionId: string) : obj option =
         owner.peekCached sessionId |> optionalView
-
-    let peekFence (sessionId: string) : DeliveryFence option =
-        match owner.fence sessionId with
-        | null -> None
-        | fence ->
-            Some
-                { ProviderRun = Identity.ProviderRunIdentity.create fence?providerRun
-                  ToolCallId = Identity.ToolCallId.create fence?toolCallId }
 
     let clear (sessionId: string) : unit = owner.clear sessionId
 

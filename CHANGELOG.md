@@ -1,5 +1,81 @@
 # Changelog — 版本历史
 
+## Unreleased — 已证明的终态必须结算（见证在、活格没了，也照样结算）
+
+- **修复：durable 交付见证存在、但进程内交付格已丢失（或视图读取故障）时，运行不再永远挂着**。`Execution/Delegation/Fork/Host/RunLifecycle.fs` 的 `complete` 在命中围栏匹配的 durable 见证后，只认「活格 / 视图读取」这一路材料；活格被别的读者取走、或视图读取故障时该路为空，于是走 LC-004 的「只观察、不结算」分支——**交付明明已被证明**，父侧的 `this.join()` 却永远等不到结算，工作单元停在 `Active`。
+- **判据：见证自带材料**。durable 见证（`TaskDeliveryWitness`）本来就携带那次交付的 `View`（物化后的交付物）、`ViewDeclaration`、`FormalText` 与 `MaterialDigest`。因此当活格与视图读取都拿不到材料时，改用**见证所携带的那份材料**结算——不伪造任何事实，这正是已交付的那份材料。见证为空（无证明）时行为不变：仍不结算。
+- **`requirements/managed-session-lifecycle/tests/028.test.mjs` 迁到真实插件路径**：三条 case 不再用旧 harness 的 `settle` / `prepareTerminalDelivery` / `injectPendingPersistFailure`（前者从不下落围栏匹配的 durable 见证，整文件挂起），改为真实 `this.fork` / 真实 `this.deliver`（生产落唯一那条 durable 见证）/ 生产的 `message.updated` → `session.idle` 终态发布 / 真实 `this.join`。唯一注入的故障是**真实的 append 失败**：把 durable 事件日志置为只读，由写者自己的 EACCES 打穿结算，不写任何伪造事实。
+- **断言口径换成真实事实**：交付格丢失时，已证明的终态仍结算为 `CompletedAwaitingJoin`，join 返回 `ok = true` 且视图含交付原文；结算期 append 失败时 join **及时返回** `ok = false` / `code = "not-ready"`（不挂起），durable 工作单元仍是 `CompletedAwaitingJoin`（失败不释放材料）；结算期 append 失败且终态本身无法落盘时，父侧 join 同样及时返回 `ok = false` / `code = "not-ready"`，durable 工作单元**仍是 `Active`**——未知的持久提交既不放行新工作，也不冒充成功。
+- **验收**：`node --test requirements/managed-session-lifecycle/tests/028.test.mjs` → tests 3 / pass 3 / fail 0 / cancelled 0（改动前整文件挂起）；`024` / `027` / `006` / `007` / `008` / `013` / `015` / `022` / `028` 合跑 tests 91 / pass 85 / fail 2 / cancelled 0 / skipped 2 / todo 2（那 2 个 fail 是 `delegation-027` 的「prepared busy guidance」，在该基线上单跑同样失败，与本次改动无关）。
+- **改动文件**：`src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs`（净增 47 行，无新模块、无新分层、无测试专属入口）、`requirements/managed-session-lifecycle/tests/028.test.mjs`。
+
+## Unreleased — 生命周期 022 迁到真实交付路径（Engineer 的完成必须是一次真实交付，父侧才拿得到草稿）
+
+- **`requirements/managed-session-lifecycle/tests/022.test.mjs` 迁到真实插件路径**：`finalize prerequisite uses the original plugin scope for Manager admission, attached Engineer completion and its production draft` 与 `original child and owner deletion archive the completed Engineer and same-scope dispose awaits actual Bookkeeper completion` 此前只在 harness 里把文本 push 进 assistant 消息，**从未发生一次真实交付**——生产因此看不到 durable 交付见证，父侧的 `await` 永不结算（实测：缺见证时 `this.deliver` 直接报 `AcceptedExecutionMissing`），整条 case 挂起。现在交付改为真实 `this.deliver`（`hooks.tool['todowrite-for-engineer'].execute`），由生产落唯一那条 durable 交付见证，随后照旧 `message.updated` → `session.idle` 发布终态。
+- **断言口径换成真实事实**：交付后 `invokeEngineer` 立刻返回 `ok = true` 且 view 含交付原文；`semanticTrace.terminalEvidenceForProviderRun` 给出 `blobs/<sha256>` 且其 payload 恰为交付原文；`takeEngineerDraft` 一次取到 `{ sessionId: child, turns: [{ question: charge, answer: view }] }`、第二次取到 `null`（草稿是消费式的，不是只读窥视）；删除 child 与 owner 后，同作用域 dispose 内的真实 Bookkeeper `SendPrompt` 收到原始 charge/answer，`EngineerCaseCaptured` 恰好两条且 identity 为该 child、canonical Q/A 正确、canonical 前缀逐字节保留、decoy 未被改写，冷子进程复核 `verified = true`。
+- **其余 case 原样保留**：三条 casebook finalize 归档（未提交不发布、只提交一次、空草稿不建 Bookkeeper 子会话）本就在真实插件路径上，不依赖旧 harness。
+- **验收**：`022` → tests 6 / pass 5 / fail 0 / cancelled 0 / todo 1（原有 GAP-133 `test.todo` 原样保留）。
+- **改动文件**：`requirements/managed-session-lifecycle/tests/022.test.mjs`。
+
+## Unreleased — 生命周期 013 / 015 迁到真实交付路径（跨实例消费由 durable 墓碑仲裁，绑定跨重启不变）
+
+- **`requirements/managed-session-lifecycle/tests/013.test.mjs` 迁到真实插件路径**：`a stale-projection consumer is arbitrated by the durable consumption tombstone, not its own fold` 不再用 harness 的 `settle`（从不下落围栏匹配的 durable 见证，因而永远等不到结算），交付改为真实 `this.deliver` + 生产的 `message.updated` → `session.idle` 终态发布。冷消费（另一个写者 + 重放）先消费成功并交出载荷；旧运行时随后消费时**不交出任何载荷**（`ok = false`），durable 面上该格为 `Retired`、再次冷消费得到 `AlreadyRetired`、总交付次数恒为 1。**不比较错误码**是有意的：生产 join 报 `nothing-to-join`、旧 harness 报 `AlreadyRetired`，二者同义（没有可交出的载荷），所以仲裁这一事实断言在耐久面（冷读 `Retired` / 冷消费 `AlreadyRetired` / 交付次数不增）上，比断言文案更贴切。
+- **`requirements/managed-session-lifecycle/tests/015.test.mjs` 迁到真实插件路径**：`actual admissions and replay retain exact handle child participant binding` 与 `actual recovered fork uses its runtime Agent ID handle and rebinds the same physical child (GAP-133)` 不再用 harness 的 `settle`，改为真实 `this.fork` / `this.resume` / `this.deliver` 与生产终态发布。第一次与第二次准入共享**同一个 handle、同一个物理 child、同一个参与者身份**，只有 root 不同；未被接受的 root 的消费被拒（`WorkNotAdmitted`）且快照不变；未知 Byname 得到有类型的拒绝（`person-unknown`）且**不新建物理 child**、快照不变。**GAP-133 的多进程编排被压缩**为「同一插件运行时 + 一次冷恢复读」——真实路径没有多进程编排，而冷恢复读（新写者 + 全量重放）证明的正是该 case 要证的事：durable 绑定在创建它的写者之外依然成立（同一 handle、同一物理 child）。
+- **验收**：`013` → tests 7 / pass 6 / fail 0 / cancelled 0 / todo 1（原有 `test.todo`）；`015` → tests 11 / pass 11 / fail 0 / cancelled 0；`024` / `027` / `006` / `007` / `008` / `013` / `015` 合跑 tests 80 / pass 77 / fail 0 / cancelled 0 / skipped 2 / todo 1。
+- **改动文件**：`requirements/managed-session-lifecycle/tests/013.test.mjs`、`requirements/managed-session-lifecycle/tests/015.test.mjs`。
+
+## Unreleased — 委派 027 迁到真实交付路径（旧 root 停机、busy 指引、attachment 绑定）
+
+- **`requirements/delegation/tests/027.test.mjs` 迁到真实插件路径**：三个测试组（2 个 old-root、1 个 busy guidance、6 个 prepared busy guidance）不再走旧 fork harness 的 `settle`（它从不下落围栏匹配的 durable 见证，因此永远等不到结算），改为真实 `this.fork` / `this.resume` / `this.join` / `this.deliver` 与生产的 `message.updated` → `session.idle` 终态发布。测试只**观察**共享终端端口，从不发布终态、从不写 durable 见证。
+- **old root 停机信号**改由生产面 `EventsSurface.notifyForAuthority` 发布带 root 归属的 `Failed` / `Aborted` 终态：断言从「await 一个没有见证的终态完成」改为「注入停机信号 → 工作单元的 durable 快照不变」，随后当前轮仍走真实交付完成并被 join 取到。
+- **busy 指引**的全部行为断言保留：指引期间原工作生命周期仍为 `Active`、共享端口没有该子会话的终态、指引作为真实 prompt 落到 Host、同一文本两次发送是两次独立发送（promptKey 不同）、完成后生命周期转为 `CompletedAwaitingJoin`、idle 后的 resume 起新工作（新的物理输入根）且 join 同时拿到两轮交付。
+- **公共夹具**：`requirements/delegation/tests/support/real-fork.mjs`（纯 Host I/O：真实顺序的子轮、终态观察、`fork`/`resume`/`join` 调用封装、工作单元生命周期读取），`024` 与 `027` 共用；它不含任何业务判定或持久逻辑。
+- **验收**：`node --test requirements/delegation/tests/027.test.mjs` → tests 11 / pass 9 / fail 0 / cancelled 0（2 个 `integrationTest` 按 tier 门禁 skip）；`024` 仍 tests 5 / pass 5 / fail 0 / cancelled 0；两文件合跑 tests 16 / pass 14 / fail 0 / cancelled 0。
+- **改动文件**：`requirements/delegation/tests/027.test.mjs`、`requirements/delegation/tests/support/real-fork.mjs`（新增）、`requirements/delegation/tests/024.test.mjs`（改为共用该夹具）。
+
+## Unreleased — 生命周期 006 迁到真实交付路径（消费后的工作留下墓碑，重放不复活它）
+
+- **`requirements/managed-session-lifecycle/tests/006.test.mjs` 迁到真实插件路径**：唯一一条依赖旧 harness 的 case（`exact admission resumes the road without reviving its consumed work`）不再用 harness 的 `settle`（从不下落围栏匹配的 durable 见证，因而永远等不到结算）、`consumeWorkWithOutcome` 与 `replayBinding` 这几个只有 harness 提供的面，改为真实 `this.fork` / `this.resume` / `this.join` / `this.deliver` 与生产的 `message.updated` → `session.idle` 终态发布。测试只**观察**共享终端端口，从不发布终态、从不写 durable 见证。
+- **断言口径换成真实事实**：交付由真实 `this.deliver` 落见证并由生产发布终态；「消费」由生产的 `this.join()` 完成——它交出已交付的视图，并把被消费的工作转成 `Retired` 墓碑；「重放」由真实 `resume` 复用同一 Byname 完成——它开出**新的 root**、保持同一 handle 与同一物理 child，而**旧 root 仍是 `Retired`**（墓碑既不被复活，也不被新的工作覆盖）。
+- **公共夹具**：`requirements/managed-session-lifecycle/tests/support/real-fork.mjs` 只是跨目录 re-export（不复制实现、不引入第二套状态），委派侧的 `requirements/delegation/tests/support/real-fork.mjs` 仍是唯一的真实路径夹具。
+- **验收**：`node --test requirements/managed-session-lifecycle/tests/006.test.mjs` → tests 22 / pass 22 / fail 0 / cancelled 0（其余 21 条纯 `Handle/Surface` 折叠与策略 case 原样保留）；`024` / `027` / `006` 合跑 tests 38 / pass 36 / fail 0 / cancelled 0 / skipped 2。
+- **改动文件**：`requirements/managed-session-lifecycle/tests/006.test.mjs`、`requirements/managed-session-lifecycle/tests/support/real-fork.mjs`（新增）。
+
+## Unreleased — 生命周期 007 迁到真实交付路径（两轮完成各占一格，迟到终态不夺格）
+
+- **`requirements/managed-session-lifecycle/tests/007.test.mjs` 迁到真实插件路径**：两条依赖旧 harness 的 case（`canonical A and B retain separate cells across late A and cold replay`、`completed work remains single-assignment before consumption`）不再用 harness 的 `settle`（从不下落围栏匹配的 durable 见证，因而永远等不到结算）、`consumeWorkWithOutcome`、`replayBinding` / `replayWorkCompletion`、`emitTerminalForRoot` 这几个只有 harness 提供的面，改为真实 `this.fork` / `this.resume` / `this.join` / `this.deliver` 与生产的 `message.updated` → `session.idle` 终态发布。测试只**观察**共享终端端口，从不发布终态、从不写 durable 见证。
+- **断言口径换成真实事实**：交付由真实 `this.deliver` 落见证；「消费」由生产的 `this.join()` 完成（交出视图并把该格转成 `Retired` 墓碑）；「迟到终态」由生产的带 root 归属终态面发布（`EventsSurface.notifyForAuthority`），它**不改**已完成格的事实——第一个完成者仍持有 `completionRef` / `completionDigest`，另一格仍 `Active`；「冷读」由既有冷恢复面在同一工作区上重新折叠 durable 事件日志得到（`coldWorkSnapshot`），与热读一致。
+- **公共夹具**：`requirements/delegation/tests/support/real-fork.mjs` 增加 `coldWorkSnapshot`（冷恢复读），生命周期 006 / 007 直接 import 委派侧这一份夹具（不设转发层）。
+- **验收**：`node --test requirements/managed-session-lifecycle/tests/007.test.mjs` → tests 14 / pass 14 / fail 0 / cancelled 0（改动前该文件为挂起）；`006` 仍 tests 22 / pass 22；`024` / `027` / `006` / `007` 合跑 tests 52 / pass 50 / fail 0 / cancelled 0 / skipped 2。
+- **改动文件**：`requirements/managed-session-lifecycle/tests/007.test.mjs`、`requirements/delegation/tests/support/real-fork.mjs`（增补冷恢复读）。
+
+## Unreleased — 生命周期 008 迁到真实交付路径（提交失败的消费不交出载荷，工作至多交付一次）
+
+- **`requirements/managed-session-lifecycle/tests/008.test.mjs` 迁到真实插件路径**：四条依赖旧 harness 的 case（`exact consume with {before|after} commit failure never releases an unconfirmed payload`、`concurrent exact consumers deliver a work at most once`、`actual join withholds payload until retirement append confirms and survives each crash cut with one delivery (GAP-133)`）不再用 harness 的 `settle`（从不下落围栏匹配的 durable 见证，因而永远等不到结算），交付改为真实 `this.deliver` + 生产的 `message.updated` → `session.idle` 终态发布；测试只**观察**共享终端端口，从不写 durable 见证。
+- **断言口径换成真实事实**：失败的消费**不交出载荷**（无 `view`）——before 切时该格仍 `CompletedAwaitingJoin`（后续 confirmed 消费可成功并带出视图），after 切时该格**已 `Retired`**（后续 confirmed 消费必然 `AlreadyRetired`）；第三次消费必失败（工作单次赋值）。两个并发消费同一格时**恰好一个**成功并带出载荷，另一个被生产的单飞保护挡下（`join-in-progress`），冷读该格为 `Retired`。两个崩溃切之间**恰好一次交付**。
+- **崩溃切的注入点**：只有冷恢复面能制造「append 未提交 / 提交后回执丢失」（生产的 `this.join()` 不暴露这种注入口），因此 before / after 两种切继续走既有冷恢复消费面 `coldConsumeWorkWithOutcome`——它只对**durable 事实**结算，失败是真实的 append 失败，不写任何伪造事实；admit / 交付 / 成功消费 / 冷读 / 单次赋值全部走真实路径。
+- **验收**：`node --test requirements/managed-session-lifecycle/tests/008.test.mjs` → tests 10 / pass 10 / fail 0 / cancelled 0（改动前该文件为挂起）；`024` / `027` / `006` / `007` / `008` 合跑 tests 62 / pass 60 / fail 0 / cancelled 0 / skipped 2。
+- **改动文件**：`requirements/managed-session-lifecycle/tests/008.test.mjs`。
+
+
+## Unreleased — 交付登记不再让宿主反向依赖应用组合层
+
+- **修复：host → application-composition 的反向边消失**。`Repository/Programming/Js/OpenCode/ToolWorkflow.fs` 此前直接引用 `DeliveryAttemptLedger.recordEstablished` 来登记「本次交付已成立」，为此整个 `repository-programming-js-toolbindings`（subsystem = host）必须引用 `managed-session-lifecycle.opencode-tools-toolruntimescope`（subsystem = application-composition）——宿主层反向依赖应用组合层。唯一的符号依赖就是那一次登记。
+- **改法：登记挂在 durable 提交点上**。`DeliveryWitnessWriter.create` 增加一个 `onCommitted` 回调，**只在** `TaskDeliveryJournal.commit` 返回成功之后才调用；提交被拒则一次也不登记（零登记）。`IDeliveryWitnessWriter` **不加任何成员**（仍只有 `CommitDeliveryWitness`），回调没有空默认值，必须显式传；全部调用点已迁（`DeliveryWitnessWriter.create` 全仓仅一处调用，已注入 ledger 登记）。`ToolWorkflow.fs` 里私有的 `registerEstablishedDelivery` 随之删除。
+- **回调抛错不抹除已 durable 的事实**：回调运行时 `TaskDeliveryCommitted` 事实已写入 journal 并已折叠进投影；回调抛错只让本次调用以异常渠道失败（不转成拒绝、不吞异常），已写入的事实既不回滚也不被改写——journal 写入先于回调，回调没有写权限。
+- **改动文件**：`OpenCode/Host/DeliveryWitnessWriter.fs`/`.fsi`、`OpenCode/Tools/ToolRegistry.fs`、`Repository/Programming/Js/OpenCode/ToolWorkflow.fs`、`Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj`（去掉那条 ProjectReference，未新增任何 application-composition 引用）。
+- **验收**：`node scripts/build.mjs` → `[build] build ok`；`js-surface-manifest: OK — 149 registered surfaces`；`js-module-linkage: OK — 715 emitted modules linked and loaded`；`node scripts/checks/subsystems.mjs` → `subsystems: OK — 25 subsystems, 240 compile shards, 646 sources, 1954 refs, shard DAG, largest subsystem cycle=10`（改前 1955 refs / cycle=16）；host → application-composition 边 = 0。回归：`effect-accounting/013` + `semantic-trace/013` + `work/011` → tests 24 / pass 24 / fail 0 / cancelled 0。
+
+
+## Unreleased — 交付格的消费按完整围栏，不只按 provider run
+
+- **修复：同一 provider run 内另一次调用的交付不会被错取**。交付格记的是产生它的那次调用的完整围栏（provider run + tool call id），而消费面只比 provider run。于是同一 run 里的第二次交付会**覆盖**第一次的格子，而只持 run 的终态会把**另一次调用**的材料取走并推进 returned 游标——真正拥有该交付的那次调用随后拿不到自己的材料。这不是可接受的降级，是一次真实的错取。
+- **消费改为完整围栏比对**。新增 `tryTakeRenderedForCall`：先读交付格的围栏，provider run 与 tool call id **都**相符才取；不符则**不取、不推进游标**，格子原地不动。比对与取之间没有 await，且 owner 的 fence/claim/handOff 不触碰用户代码，因此在单线程 JS 下这一步是原子的。
+- **生产消费方全部接线**。fork 侧不再把 durable 见证压成一个布尔：它保留见证对象，取见证自带的 `Fence.ToolCallId` 作为精确围栏；无 journal 的夹具路径只按交付格**自身**的完整身份（该子会话 + 该 run）取，绝不取别次调用的格。sync delegate 侧优先直接返回 durable 见证的材料；无 journal 时只从「该子会话 + 该 run」这一格自身身份取，**不从父方工具调用序列猜子方那次交付**（那序列是父方的，交付是子方的）。
+- **弱围栏读取器降级为仅夹具**。`tryTakeRenderedFor`（只比 run）保留，但注释改成实话：同一 run 内另一调用可取走该格并推进游标；生产消费方一律走精确围栏或 durable 见证。
+- **改动文件**：`Repository/Programming/Js/DeliveredValues.fs`/`.fsi`、`Repository/Programming/Js/RuntimeSurface.fs`/`.fsi`（新增精确围栏测试钩子）、`Execution/Delegation/Fork/Host/RunLifecycle.fs`、`Execution/Delegation/SyncDelegate/Runtime.fs`。
+- **验收**：`repository-programming/059` 新增永久回归「同一 run 的另一次调用不得取走该格」——错取返回 null、围栏不变、returned 游标未推进，正确调用随后可取自己的材料（该用例在只比 run 的旧实现下为红）。回归：`059` + `delegation/007|008|009|010|011|012|023|025|033` → tests 54 / pass 49 / fail 0 / cancelled 0 / todo 5。
+
 ## Unreleased — 构建的 up-to-date 判据要看产物是否真的在盘上
 
 - **修复：产物缺失不再被报成「build up-to-date (no-op)」**。构建的「已是最新」判定此前只看**编译快照**（编译器输入摘要、生成语料摘要、产物语料摘要），这份快照说的是「源码没变」，不是「产物还在」。于是 `dist/` 被清空、被部分删除、或只复制了一半时，编译缓存仍会命中，构建日志照样打印 `build up-to-date (no-op)`，而磁盘上的产物已经缺失或不全——一次「构建绿」什么也没产出。
