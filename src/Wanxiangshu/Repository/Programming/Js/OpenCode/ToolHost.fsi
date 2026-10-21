@@ -12,9 +12,6 @@ open Wanxiangshu.Repository.Programming.Js
 /// this module binds language.
 module JsDescriptionAssets =
     val load: lang: ProviderLanguage -> JsCanonicalDescription.Prose
-    val argProgram: lang: ProviderLanguage -> string
-    val missingProgram: lang: ProviderLanguage -> string
-    val viewDeclarationExtra: lang: ProviderLanguage -> string
 
 /// JS-073/JS-074: a generated js-* tool spec — the dynamic counterpart of the
 /// static baseSpecs. Built from a generated surface (JS-002); execution goes

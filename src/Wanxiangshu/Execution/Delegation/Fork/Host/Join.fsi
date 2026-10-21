@@ -32,6 +32,3 @@ module HostForkJoin =
         maxCount: int ->
         interrupt: Task<JoinInterruptReason> ->
             Task<Result<JoinWaitOutcome<JoinItem>, ForkError>>
-
-    val awaitAgent:
-        runtime: HostForkRuntime -> agentId: string -> timeoutMs: int option -> Task<Result<RunCompletion, string>>

@@ -20,8 +20,6 @@ module GitPorcelain =
     val primaryWorktree: outputZ: string -> Result<string, string>
     /// `git branch --list` without the `*` / `+` checkout markers.
     val branches: output: string -> string list
-    val shortBranch: reference: string -> string
-    val isManagerBranch: reference: string -> bool
     val managerBranchOf: jobId: string -> string
     /// Rebase state directories to probe from `rev-parse --git-path rebase-merge|rebase-apply`.
     val rebaseStatePaths: merge: (int * string) -> apply: (int * string) -> string list

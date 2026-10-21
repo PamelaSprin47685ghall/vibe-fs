@@ -10,8 +10,6 @@ type PtySupervisor =
       Sessions: Dictionary<PtyId, PtySession> }
 
 module PtySupervisor =
-    [<Literal>]
-    val PtyReadFirstByteMs: int = 250
 
     val create: unit -> PtySupervisor
     val add: supervisor: PtySupervisor -> id: PtyId -> session: PtySession -> unit

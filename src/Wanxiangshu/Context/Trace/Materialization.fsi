@@ -28,11 +28,5 @@ module XTraceMaterialization =
         xTrace: XTraceProjectionState ->
             Task<Result<ProviderProjection.ProviderSemanticProjection, string>>
 
-    val materializeRange:
-        journal: AgentJournal ->
-        range: XTraceRange ->
-        xTrace: XTraceProjectionState ->
-            Task<Result<XTraceItem list, string>>
-
     val renderRange:
         journal: AgentJournal -> range: XTraceRange -> xTrace: XTraceProjectionState -> Task<Result<string, string>>

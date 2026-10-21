@@ -52,12 +52,6 @@ type XTraceMessageCapture =
 module XTraceCapture =
     val semanticPart: part: MessagePart -> SemanticPart option
 
-    val stableCaptureEligibility:
-        journal: AgentJournal option ->
-        sessionId: SessionId ->
-        hostMessageIds: string option list ->
-            XTraceStableCaptureEligibility
-
     val captureOpeningWithReceipt:
         journal: AgentJournal option ->
         sessionId: SessionId ->

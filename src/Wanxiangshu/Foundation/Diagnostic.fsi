@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Foundation
 
 module Diagnostic =
-    val AllowedFields: Set<string>
     val validateOperation: operation: string -> bool
     val diagnosticsVisible: unit -> bool
     val redactText: value: string -> string

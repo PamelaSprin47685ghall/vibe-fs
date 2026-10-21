@@ -25,55 +25,22 @@ module ForkTool =
             val ArgCharge: string = "tool/fork/arg-charge"
 
             [<Literal>]
-            val ArgKeywords: string = "tool/fork/arg-keywords"
-
-            [<Literal>]
-            val ArgAttach: string = "delegation/fork-attach-argument"
-
-            [<Literal>]
-            val AttachUnknown: string = "delegation/fork-attach-unknown"
-
-            [<Literal>]
-            val AttachSelf: string = "delegation/fork-attach-self"
-
-            [<Literal>]
             val NameRequired: string = "tool/fork/name-required"
 
             [<Literal>]
             val ChargeRequired: string = "tool/fork/charge-required"
 
             [<Literal>]
-            val CallingConflict: string = "tool/fork/calling-conflict"
-
-            [<Literal>]
             val UnknownCalling: string = "tool/fork/unknown-calling"
 
             [<Literal>]
-            val ChargeContextUnavailable: string = "tool/fork/charge-context-unavailable"
-
-            [<Literal>]
             val NameAlreadyBelongs: string = "tool/fork/name-already-belongs"
-
-            [<Literal>]
-            val WarmStartUnavailable: string = "tool/fork/warm-start-unavailable"
-
-            [<Literal>]
-            val ChargeCarried: string = "tool/fork/charge-carried"
-
-            [<Literal>]
-            val ChargeNotPlaced: string = "tool/fork/charge-not-placed"
-
-            [<Literal>]
-            val ChargePlacementUncertain: string = "tool/fork/charge-placement-uncertain"
 
             [<Literal>]
             val PersonUnknown: string = "tool/fork/person-unknown"
 
             [<Literal>]
             val PersonUnavailable: string = "tool/fork/person-unavailable"
-
-            [<Literal>]
-            val PersonCannotTakeCharge: string = "tool/fork/person-cannot-take-charge"
 
             [<Literal>]
             val PersonSessionUnknown: string = "tool/fork/person-session-unknown"
@@ -93,9 +60,6 @@ module ForkTool =
             val ArgCharge: string = "tool/commission/arg-charge"
 
             [<Literal>]
-            val AuthorityRequired: string = "tool/commission/authority-required"
-
-            [<Literal>]
             val NameRequired: string = "tool/commission/name-required"
 
             [<Literal>]
@@ -107,31 +71,10 @@ module ForkTool =
             [<Literal>]
             val NameAlreadyBelongs: string = "tool/commission/name-already-belongs"
 
-            [<Literal>]
-            val ChargeTaken: string = "tool/commission/charge-taken"
-
-            [<Literal>]
-            val WorkNotOpened: string = "tool/commission/work-not-opened"
-
-            [<Literal>]
-            val WorkCannotTakeCharge: string = "tool/commission/work-cannot-take-charge"
-
         [<RequireQualifiedAccess>]
         module Resume =
             [<Literal>]
             val Description: string = "tool/resume/description"
-
-            [<Literal>]
-            val CallingNotAllowed: string = "tool/resume/calling-not-allowed"
-
-            [<Literal>]
-            val GuidanceSent: string = "tool/resume/guidance-sent"
-
-            [<Literal>]
-            val AssessmentPendingForDevOps: string = "tool/resume/assessment-pending-for-devops"
-
-            [<Literal>]
-            val DispatchClosed: string = "tool/resume/dispatch-closed"
 
     type Request =
         { Calling: string
@@ -142,9 +85,6 @@ module ForkTool =
           CommissionerRecord: string option
           ExpectedToolCalls: int option }
 
-    val managerAdmission: ToolAdmission
-    val resumeAdmission: ToolAdmission
-    val orchestratorAdmission: ToolAdmission
     val managerSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
     val resumeSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
     val orchestratorSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec

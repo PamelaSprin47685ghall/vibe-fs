@@ -9,9 +9,6 @@ open Wanxiangshu.Repository.Programming.Js.OpenCode
 /// witness fact and commits it through the injected journal.
 [<RequireQualifiedAccess>]
 module DeliveryWitnessWriter =
-    /// The durable witness of one delivery: the js witness's fence and
-    /// material, plus the digest that seals the material it states.
-    val toWitness: witness: DeliveryWitness -> TaskDeliveryWitness
 
     /// The writer the settle point uses. A refused commit is reported as a
     /// refused delivery — the caller learns that the delivery is not

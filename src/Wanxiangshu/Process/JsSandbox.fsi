@@ -26,12 +26,6 @@ module JsSandbox =
           Api: obj
           ParkState: ParkState }
 
-    /// Sentinel family recognized by the wrapper (JS-019: prefix, never
-    /// exception-message sniffing). `__jsAbandoned` is the ABANDONED protocol
-    /// sentinel: rejecting the program promise with it unwinds the stack from
-    /// the await point so native try/finally runs (PLAN S2 step 6 / algorithm F).
-    val abandonedSentinel: string
-
     val runSurface:
         baseClassSource: string ->
         modelSource: string ->

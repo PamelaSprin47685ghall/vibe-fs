@@ -10,9 +10,6 @@ open Wanxiangshu.OpenCode
 /// DevOps join: 10s timeout budget (NodeTiming.timerTask 10000). Orch/Manager join remains untimed.
 module JoinTool =
 
-    [<Literal>]
-    val DevOpsJoinTimeoutMs: int = 10_000
-
     [<RequireQualifiedAccess>]
     module Path =
         [<Literal>]
@@ -20,15 +17,6 @@ module JoinTool =
 
         [<Literal>]
         val RecoveryBlocked: string = "tool/join/recovery-blocked"
-
-        [<Literal>]
-        val RecoveryWaiting: string = "tool/join/recovery-waiting"
-
-        [<Literal>]
-        val UnavailableUntilAuthority: string = "tool/join/unavailable-until-authority"
-
-        [<Literal>]
-        val OrchestratorNotReady: string = "tool/join/orchestrator-not-ready"
 
         [<Literal>]
         val UnavailableFromContext: string = "tool/join/unavailable-from-context"

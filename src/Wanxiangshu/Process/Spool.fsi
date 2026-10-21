@@ -5,8 +5,6 @@ open System.Threading.Tasks
 /// Host binding to `wanxiangli/spool`. The library owns memory bounds, the spool
 /// file and its write failures; this module only adapts its messages to F#.
 module Spool =
-    [<Literal>]
-    val ChunkSizeBytes: int = 204800
 
     /// One live `OutputSpool` instance from the library.
     type OutputSpool

@@ -92,8 +92,6 @@ module XTraceProjection =
         state: XTraceProjectionState ->
             Result<XTraceProjectionState, XTraceFoldRejection>
 
-    val provenanceGeneration: provenance: string -> int
-
     val applyPart:
         cursorSequence: int64 ->
         role: string ->

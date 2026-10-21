@@ -15,25 +15,16 @@ module FissionTool =
         val Description: string = "tool/fission/description"
 
         [<Literal>]
-        val TooFew: string = "tool/fission/too-few"
-
-        [<Literal>]
         val InvalidOrigin: string = "tool/fission/invalid-origin"
 
         [<Literal>]
         val Capacity: string = "tool/fission/capacity"
 
         [<Literal>]
-        val AlreadyActive: string = "tool/fission/already-active"
-
-        [<Literal>]
         val Unavailable: string = "tool/fission/unavailable"
 
         [<Literal>]
         val Started: string = "tool/fission/started"
-
-        [<Literal>]
-        val SharedCompletion: string = "tool/fission/shared-completion"
 
     type FissionReceipt =
         { GroupId: string

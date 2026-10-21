@@ -37,8 +37,6 @@ module PairProgrammingThoughtTransform =
     /// occurrence bypass: it still creates/replays the same durable HOST-013 fact.
     val skipAutoInjectedRequested: _providerId: string option -> bool
 
-    val isCursorProvider: providerId: string option -> bool
-
     /// The marker's source identity (HOST-013). Filtering must use this, never
     /// the text: a real user may quote the sentence.
     val source: string
@@ -53,17 +51,10 @@ module PairProgrammingThoughtTransform =
     /// Active empty-name skill loads are reserved for synthetic injection only.
     val reprimandText: lang: ProviderLanguage option -> string
 
-    /// Transform only active `skill({ name: "" })` calls from failed into completed DENIED results.
-    /// Every non-empty real skill call passes through untouched.
-    val sanitizeActiveToolCalls: lang: ProviderLanguage option -> rawMessages: obj list -> obj list
-
     /// CallId = digest(transcript + source + ordinal). Stable across restarts.
     val stableCallId: sessionId: string option -> ordinal: int64 -> string
 
     val cursorGuidanceSeparator: string
-
-    val appendCursorSuffixes: suffixTexts: string list -> rawMsg: obj -> obj option
-    val stripCursorSuffixes: suffixTexts: string list -> rawMsg: obj -> obj
 
     val stripCursorSuffixesWithJournal:
         journal: AgentJournal ->

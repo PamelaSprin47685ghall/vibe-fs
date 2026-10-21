@@ -14,13 +14,6 @@ type XTraceTerminalCompletion =
     | RejectedUndelivered
 
 module TerminalReporter =
-    val completeUsingTextEvidence:
-        eventPort: IEventObservationPort ->
-        port: TerminalTracePort option ->
-        turn: ReconciledTurn ->
-        sessionWideText: string ->
-        deliveryWitness: bool ->
-            Task<XTraceTerminalCompletion>
 
     val completeWithEvidence:
         eventPort: IEventObservationPort ->

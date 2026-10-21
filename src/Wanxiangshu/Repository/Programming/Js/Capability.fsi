@@ -71,5 +71,4 @@ module JsFragmentRegistry =
     val ask: JsCapabilityFragment
     val park: JsCapabilityFragment
     val deliver: JsCapabilityFragment
-    val additionalCapabilities: fragment: JsCapabilityFragment -> JsCapability list
     val all: JsCapabilityFragment list

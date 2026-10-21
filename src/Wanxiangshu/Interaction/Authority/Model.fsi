@@ -8,22 +8,8 @@ open Wanxiangshu.Participant.Provider.Attempt
 /// Typed projection of the `wanxiangli/dispatch` claim-ledger law (CUT-11).
 [<RequireQualifiedAccess>]
 module DispatchLaw =
-    val recoveryTailWindow: int
-
-    val claimScope:
-        sessionId: string -> logicalRunId: string option -> origin: string -> payloadDigest: string -> string
-
-    val promptKeyMaterial:
-        sessionId: string ->
-        logicalRunId: string option ->
-        authorityRoot: string option ->
-        origin: string ->
-        payloadDigest: string ->
-        claimSequence: int ->
-            string
 
     val nextClaimSequence: consumed: int option -> int
-    val alreadyClaimed: consumed: int option -> bool
 
     [<RequireQualifiedAccess>]
     type Edit =
@@ -35,7 +21,6 @@ module DispatchLaw =
         | ClearOccasion
 
     val settle: event: string -> pending: bool -> continuation: bool -> Edit list
-    val occasionAdmitted: pendingSameOccasion: bool -> landedOrigin: string option -> origin: string -> bool
 
     val answer: sent: string -> string * bool * string
 
@@ -170,7 +155,6 @@ module PromptAuthority =
 
     type ParsedAgentName = { Name: string; Role: Role }
 
-    val parseAgentNameTyped: value: string -> Result<ParsedAgentName, AgentNameRejection>
     val parseAgentName: value: string -> Result<string * Role, string>
 
     val stableLogicalRunId:

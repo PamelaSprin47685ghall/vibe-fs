@@ -21,9 +21,6 @@ module ProcessEventLog =
         | BeforeAppend of AppendFault
         | AfterAppend of primary: AppendFault * cleanupFailures: AppendFault list
 
-    [<Literal>]
-    val WanxiangshuRootName: string = "wanxiangshu"
-
     type WriterPhysicalMetadata =
         { WriterId: string
           FileNames: string list
@@ -44,10 +41,7 @@ module ProcessEventLog =
     val append:
         log: ProcessEventLog -> events: EventEnvelope list -> Result<PhysicalAppendCompletion, PhysicalAppendFailure>
 
-    val decodeWriterText: label: string -> text: string -> Result<EventEnvelope list, StorageInvalid>
-    val decodeWriterBytes: label: string -> bytes: byte[] -> Result<EventEnvelope list, StorageInvalid>
     val readLastCompleteLine: path: string -> Result<string option, string>
-    val isWriterActiveAt: nowMs: float -> lastActivityMs: float -> bool
     val writerPhysicalMetadata: commonDir: string -> WriterPhysicalMetadata list
     val internal withSegmentCap: cap: int -> work: (unit -> 'T) -> 'T
     val internal withSegmentCapTask: cap: int -> work: (unit -> Task<'T>) -> Task<'T>

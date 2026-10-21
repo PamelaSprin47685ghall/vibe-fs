@@ -32,14 +32,6 @@ module SessionAssociationProjection =
     val executionClassOf: kind: ManagedSessionKind -> SessionExecutionClass
     val tryMainSessionOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
 
-    val linkSatellite:
-        kind: SatelliteKind ->
-        mainSessionId: SessionId ->
-        satelliteSessionId: SessionId ->
-        parentOfMain: SessionId option ->
-        current: Map<SessionId, SessionAssociation> ->
-            Result<Map<SessionId, SessionAssociation>, AssociationRejection>
-
     val link:
         mainSessionId: SessionId ->
         companionSessionId: SessionId ->
@@ -54,7 +46,6 @@ module SessionAssociationProjection =
 
 module SessionOwnershipClassification =
     val executionClassOf: kind: ManagedSessionKind -> SessionExecutionClass
-    val classifyLegacy: entry: SessionAssociation -> SessionExecutionClass * SessionOwnership option
 
     val tryClassify:
         sessionId: SessionId ->

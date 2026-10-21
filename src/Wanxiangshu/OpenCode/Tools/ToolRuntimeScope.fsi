@@ -47,7 +47,6 @@ module DeliveryAttemptLedger =
           Sequence: int }
 
     val recordEstablished: fence: Fence -> physical: PhysicalUserMessageId option -> unit
-    val recordPresented: fence: Fence -> unit
     val tryFindEstablished: sessionId: SessionId -> physical: PhysicalUserMessageId option -> (Fence * Record) option
 
     /// 条款 3：以 durable 交付见证为准的交付成立读取（进程内台账只是快速路径）。
@@ -58,10 +57,6 @@ module DeliveryAttemptLedger =
         physical: PhysicalUserMessageId option ->
             Fence option
 
-    /// 本 session 是否存在任何一次已成立的交付（durable 见证口径，不绑定物理输入）。
-    val hasDurableEstablished: journal: AgentJournal option -> sessionId: SessionId -> bool
-
-    val hasEstablished: sessionId: SessionId -> bool
     val recordInterruptIssued: fence: Fence -> issued: Task -> unit
     val recordInterruptObserved: fence: Fence -> outcome: Result<unit, string> -> unit
     val interruptFacts: fence: Fence -> InterruptFacts

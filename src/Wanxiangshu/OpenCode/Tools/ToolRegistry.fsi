@@ -24,17 +24,6 @@ type ToolRegistration =
 
 module ToolRegistry =
 
-    [<RequireQualifiedAccess>]
-    module Path =
-        [<Literal>]
-        val DeniedRole: string = "tool/registry/denied-role"
-
-        [<Literal>]
-        val DeniedUnestablished: string = "tool/registry/denied-unestablished"
-
-        [<Literal>]
-        val DeniedTaskState: string = "tool/registry/denied-task-state"
-
     /// capability-enforcement-006: the authority the execute gate resolves for a tool, so a
     /// consumer can tell an office tool from an internal leaf without guessing
     /// from the tool name.

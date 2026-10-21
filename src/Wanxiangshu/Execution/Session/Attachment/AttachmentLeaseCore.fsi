@@ -44,7 +44,6 @@ module AttachmentLeaseCore =
         }
 
     val kindKey: kind: AttachmentKind -> string
-    val leaseKey: owner: SessionId -> kind: AttachmentKind -> string
 
     /// Establish (or re-establish) the kind's lease and publish its association.
     val ensure: operations: Operations -> owner: SessionId -> spec: Spec -> Task<Result<Lease, string>>

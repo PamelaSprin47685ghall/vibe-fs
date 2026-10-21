@@ -31,6 +31,4 @@ module Persona =
 module PersonaCatalog =
     val persona: Role -> Persona
     val bookkeeperPersona: unit -> Persona
-    val personaV1: Role -> string
-    val bookkeeperPersonaV1: unit -> string
     val inheritFrom: string -> string

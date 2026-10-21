@@ -29,7 +29,6 @@ module ModelRouting =
 
     val configPath: unit -> string
     val bootstrapAndLoadAt: path: string -> template: string -> Task<obj>
-    val bootstrapDefault: unit -> Task<obj>
     val toOpenCodeModel: target: ModelRoutingTarget -> OpencodeModel
     val sameTarget: expected: ModelRoutingTarget -> observed: OpencodeModel -> bool
 

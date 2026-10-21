@@ -8,11 +8,6 @@ module AblationManifest =
     val loadToolMap: unit -> Result<ToolMapDocument, AblationLoadError>
     val loadFactMap: unit -> Result<FactMapDocument, AblationLoadError>
 
-    val validateNodes: document: ManifestDocument -> Result<unit, AblationLoadError>
-
-    val validateDag:
-        document: ManifestDocument -> modes: Map<AblationNodeId, AblationMode> -> Result<unit, AblationLoadError>
-
     val nodeIds: document: ManifestDocument -> AblationNodeId list
 
     /// Decode a manifest document from a JS value the caller already holds.

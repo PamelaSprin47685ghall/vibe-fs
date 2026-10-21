@@ -9,10 +9,6 @@ open Wanxiangshu.Foundation.Identity
 /// has complete knowledge of AgentProjectionSet.
 module PromptAuthorityProjectionQueries =
 
-    /// Returns the authority projection associated with the given session.
-    val projectionFor:
-        sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.PromptAuthorityProjection option
-
     /// Returns the authority projection for the fission-owner of this session.
     val activeProfile:
         sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.AuthorityExecutionProfile option

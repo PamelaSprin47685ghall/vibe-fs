@@ -24,7 +24,6 @@ module XTraceCursor =
     val isAfter: next: XTraceCursor -> previous: XTraceCursor -> bool
     val isAtOrAfter: cursor: XTraceCursor -> lowerBound: XTraceCursor -> bool
     val isBefore: cursor: XTraceCursor -> upperBound: XTraceCursor -> bool
-    val maxCursor: left: XTraceCursor -> right: XTraceCursor -> XTraceCursor
 
 [<RequireQualifiedAccess>]
 module XTraceRange =

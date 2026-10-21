@@ -21,7 +21,6 @@ type ManagedAgentParseError =
 module ManagedAgent =
     val roleName: (Role -> string)
     val nameOf: (Role -> string)
-    val visibilityOf: role: Role -> AgentVisibility
     val make: role: Role -> ManagedAgent
     val allPublicRoles: Role list
     val allInternalRoles: Role list

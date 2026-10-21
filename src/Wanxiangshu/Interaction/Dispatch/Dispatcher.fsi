@@ -30,7 +30,6 @@ module PromptDispatcher =
         | IdentityRejected of string
         | AuthorityRegistrationRejected of AuthorityRegistrationFailure
 
-    val describeAuthorityRegistrationFailure: AuthorityRegistrationFailure -> string
     val describeHumanRootAcceptanceFailure: HumanRootAcceptanceFailure -> string
 
     [<RequireQualifiedAccess>]

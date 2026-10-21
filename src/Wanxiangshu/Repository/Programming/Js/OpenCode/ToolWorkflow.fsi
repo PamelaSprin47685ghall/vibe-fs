@@ -8,8 +8,6 @@ open Wanxiangshu.Repository.Programming.Js
 /// Parse the sandbox JSON string into LlmFacing reference data and enforce JS-010.
 module JsToolsData =
     val parse: json: string -> Result<obj, JsFailure>
-    val isDelivered: json: string -> bool
-    val parseOutcome: json: string -> Result<obj, JsFailure>
 
 /// The task a delivery serves. The durable witness names the same three
 /// references; this layer states them in its own vocabulary because it runs

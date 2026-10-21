@@ -13,11 +13,6 @@ type Observation =
 /// same content (or same result set) dedupe to one identity (CASE-003).
 type ObservationIdentity = private ObservationIdentity of string
 
-module ObservationIdentity =
-
-    /// CASE-003: derive the canonical identity of an observation.
-    val ofObservation: observation: Observation -> ObservationIdentity
-
 /// DSL-class: DurableFact — CASE-002 / KR-002: minimal Case model with dual baselines.
 /// Identity is the stable logical case identity (scoped to invocation).
 type Case =

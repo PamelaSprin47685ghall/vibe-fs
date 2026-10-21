@@ -9,7 +9,6 @@ open Wanxiangshu.Change
 /// ORCH-007 forbids substituting filesystem state for a durable fact, and the
 /// active-job set here comes from the projection.
 module OrchestratorSweep =
-    val sweepStaleArtifacts: git: GitPort -> activeJobs: ManagerJobProjection list -> Task<Result<unit, string>>
 
     val sweepLocked:
         lockPath: string ->

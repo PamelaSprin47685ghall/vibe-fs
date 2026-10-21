@@ -22,13 +22,7 @@ module FetchTool =
         val Stale: string = "tool/fetch/stale"
 
         [<Literal>]
-        val NoCase: string = "tool/fetch/no-case"
-
-        [<Literal>]
         val Unavailable: string = "tool/fetch/unavailable"
-
-        [<Literal>]
-        val ShelfmarkRequired: string = "tool/fetch/shelfmark-required"
 
     val admission: ToolAdmission
 

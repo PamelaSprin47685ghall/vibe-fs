@@ -14,12 +14,6 @@ module SessionStartedAtLedger =
         candidate: DateTimeOffset ->
             Task<Result<DateTimeOffset, string>>
 
-    val bindOrAbort:
-        port: SessionStartedAtPort ->
-        sessionId: SessionId ->
-        candidate: DateTimeOffset ->
-            Task<Result<DateTimeOffset option, string>>
-
     val tryBindOrAbort:
         port: SessionStartedAtPort option ->
         projectionSessionIdOpt: string option ->

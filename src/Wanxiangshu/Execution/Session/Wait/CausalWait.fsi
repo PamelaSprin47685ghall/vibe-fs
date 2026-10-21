@@ -112,7 +112,6 @@ module CausalOwner =
 
 module CausalProducer =
     val key: producer: CausalProducerRef -> string
-    val asOwner: producer: CausalProducerRef -> CausalOwnerRef option
 
 module DiagnosticWait =
     val create:

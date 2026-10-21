@@ -26,10 +26,4 @@ module ChildRecoveryWorkflow =
           Pulse: (unit -> unit) option
           Clock: IClockPort }
 
-    val commitJoinable:
-        journal: AgentJournalPort option ->
-        parentId: SessionId ->
-        proof: JoinableCompletion ->
-            Task<Result<unit, string>>
-
     val resolveAndCommit: ports: Ports -> Task<Result<ChildRecoveryResult, string>>
