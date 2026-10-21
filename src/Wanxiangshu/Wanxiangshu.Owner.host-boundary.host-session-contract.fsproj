@@ -14,8 +14,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-snapshot-contract.fsproj"/>
 
-    <Compile Include="OpenCode/Host/SessionContract.fsi"/>
-    <Compile Include="OpenCode/Host/SessionContract.fs"/>
+    <Compile Include="Foundation/HostSession.fsi"/>
+    <Compile Include="Foundation/HostSession.fs"/>
     <Compile Include="OpenCode/Host/SessionHostPort.fsi"/>
     <Compile Include="OpenCode/Host/SessionHostPort.fs"/>
     <Compile Include="OpenCode/Host/SessionRuntimeOwner.fsi"/>

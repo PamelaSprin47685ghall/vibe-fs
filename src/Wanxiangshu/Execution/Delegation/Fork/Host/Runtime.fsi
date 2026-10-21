@@ -10,6 +10,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal

@@ -17,8 +17,6 @@
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
     "src/Wanxiangshu/Execution/Session/Attachment/CompanionLeaseRuntime.fs",
     "src/Wanxiangshu/Interaction/Dispatch/DispatchSessionPort.fs",
-    "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
-    "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
     "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
     "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
     "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",

@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Interaction.Admission
+
 open System
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling

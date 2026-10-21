@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System.Collections.Generic
 open Fable.Core
 open Wanxiangshu.Foundation

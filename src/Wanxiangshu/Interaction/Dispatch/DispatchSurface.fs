@@ -10,6 +10,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Admission
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Persona

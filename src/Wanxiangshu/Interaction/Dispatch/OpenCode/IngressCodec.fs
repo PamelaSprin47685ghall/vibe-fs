@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Interaction.Dispatch.OpenCode
 
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Admission
 open System
 open Fable.Core
 open Fable.Core.JsInterop

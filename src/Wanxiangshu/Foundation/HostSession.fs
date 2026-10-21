@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Foundation.HostSession
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Interaction.Admission
 
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Session.ChatExecution

@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Admission
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Foundation
 open Wanxiangshu.Interaction.Authority

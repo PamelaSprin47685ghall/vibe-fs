@@ -62,7 +62,7 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
   const { plan } = planShard('host-session-contract')
   const sources = productionSources(plan)
 
-  assert.ok(sources.includes('OpenCode/Host/SessionContract.fs'), 'host-session-contract must include SessionContract.fs')
+  assert.ok(sources.includes('Foundation/HostSession.fs'), 'host-session-contract must include SessionContract.fs')
   assert.ok(sources.includes('OpenCode/Host/SessionHostPort.fs'), 'host-session-contract must include SessionHostPort.fs')
   assert.ok(sources.includes('OpenCode/Host/SessionSnapshot.fs'), 'host-session-contract must include SessionSnapshot.fs')
   const forbidden = [
@@ -154,7 +154,7 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
   // SessionContract was retagged to provider because its shape carries provider request-kind
   // types and the dispatch layer consumes it through the boundary; keeping it in host would
   // drag provider-typed data down into the physical codec tier.
-  const contractSource = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'OpenCode/Host/SessionContract.fs'))
+  const contractSource = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'Foundation/HostSession.fs'))
   assert.ok(contractSource, 'SessionContract.fs must have a unique production shard')
   assert.equal(
     subsystemInventory.projects.get(contractSource.projectPath).subsystem,
@@ -185,7 +185,7 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
   assert.deepEqual(
     sessionContract.compile.sort(),
     [
-      'OpenCode/Host/SessionContract.fs',
+      'Foundation/HostSession.fs',
       'OpenCode/Host/SessionHostPort.fs',
       'OpenCode/Host/SessionRuntimeOwner.fs',
     ].sort(),
@@ -198,7 +198,7 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
   assert.equal(snapshotContract.subsystem, 'provider')
   const snapshotSources = productionSources(planShard('host-session-snapshot-contract').plan)
   for (const unrelated of [
-    'OpenCode/Host/SessionContract.fs',
+    'Foundation/HostSession.fs',
     'OpenCode/Host/SessionHostPort.fs',
     'OpenCode/Host/SessionRuntimeOwner.fs',
     'Execution/Session/ChatExecution/Acceptance.fs',

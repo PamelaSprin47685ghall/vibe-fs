@@ -32,8 +32,8 @@ Host/CanonicalJson.fsi
 Host/CanonicalJson.fs
 OpenCode/Host/Message.fsi
 OpenCode/Host/Message.fs
-OpenCode/Host/SessionContract.fsi
-OpenCode/Host/SessionContract.fs
+Foundation/HostSession.fsi
+Foundation/HostSession.fs
 OpenCode/Host/SessionQuiescenceGate.fsi
 OpenCode/Host/SessionQuiescenceGate.fs
 OpenCode/Host/ProviderAttemptStopFence.fsi
@@ -359,8 +359,8 @@ Persistence/EventStore/RetentionSurface.fsi
 Persistence/EventStore/RetentionSurface.fs
 Participant/Persona/ManagedAgent.fsi
 Participant/Persona/ManagedAgent.fs
-OpenCode/Host/ChatAdmission/Intent.fsi
-OpenCode/Host/ChatAdmission/Intent.fs
+Interaction/Admission/ChatAdmissionIntent.fsi
+Interaction/Admission/ChatAdmissionIntent.fs
 OpenCode/Host/ChatAdmission/IntentSurface.fsi
 OpenCode/Host/ChatAdmission/IntentSurface.fs
 Persistence/Journal/PromptFactCodec.fsi

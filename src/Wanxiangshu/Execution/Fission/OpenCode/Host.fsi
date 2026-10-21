@@ -6,6 +6,8 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Admission
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 

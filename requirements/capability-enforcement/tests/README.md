@@ -32,7 +32,7 @@ OrdinaryTurnWorkflow.applyJoinGuardNudge 与 FissionHost.observeOpenLaneCompleti
 
 待 owner 明确决定：Quiescence 是可归还 reservation，还是每次物理 claim 各自持有 one-shot grant。若选择后者，建议保持 TryRelease : QuiescencePermit -> Result<unit, QuiescencePermitFailure> 只关闭 exact grant，另设 TryAdmitRetry : QuiescencePermit * ProvenNotAcceptedDispatch -> Result<QuiescencePermit, QuiescencePermitFailure>。此处 Proposed 型名和签名只是方案，不是现有 export。Dispatch owner 必须发行绑定 exact PromptKey/claim 的确定未接受 witness；gate 以 attempt serial + 独立 grant identity 原子发行新许可，旧 grant 永不复活，重复 witness/旧 callback 零效果。不能把新 grant 伪装为新 provider attempt，不能清墓碑或按 session 永久封锁。
 
-该方案至少涉及 Foundation/Quiescence 的合同、OpenCode/Host/SessionContract.fs/.fsi、SessionQuiescenceGate.fs/.fsi、QuiescenceSurface.fs/.fsi、Interaction/Dispatch/Dispatcher 与 Send 的 typed NotSent 合同，以及 SessionNudge、JoinGuard 的释放接线；若闭包签名改变，还涉及 OrdinaryTurnWorkflow 和 Execution/Fission/OpenCode/Host。018、crash-reconciliation-006 的现有归还正例也必须由其 owner 对齐，不能在本写区偷偷改变。这里仅交方案，不修改这些文件，不替 owner 选择冲突条款。
+该方案至少涉及 Foundation/Quiescence 的合同、Foundation/HostSession.fs/.fsi、SessionQuiescenceGate.fs/.fsi、QuiescenceSurface.fs/.fsi、Interaction/Dispatch/Dispatcher 与 Send 的 typed NotSent 合同，以及 SessionNudge、JoinGuard 的释放接线；若闭包签名改变，还涉及 OrdinaryTurnWorkflow 和 Execution/Fission/OpenCode/Host。018、crash-reconciliation-006 的现有归还正例也必须由其 owner 对齐，不能在本写区偷偷改变。这里仅交方案，不修改这些文件，不替 owner 选择冲突条款。
 
 ## 四项待办的最窄可落地证明边界
 

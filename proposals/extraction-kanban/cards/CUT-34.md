@@ -146,3 +146,10 @@ node scripts/check.mjs
   - 026 的路径断言已按上条修正。
 - 两刀合并后的落地复验见落地循环 `logs-cut09i/loop34*.out`。
 - 回退：`git revert` 即可，不涉及持久数据。
+
+### 子范围⑥：会话侧中性契约与入口准入决策移出适配层（棘轮 24 → 22，eng-cut09i-goose）
+
+- `OpenCode/Host/SessionContract`（`ProviderAttemptSource`、`ContinuationAcceptanceObserver`、`DegenerationKind`、`AbortCause`、`ILoopSensor`、`ISessionQuiescenceGate`）只用 Foundation 的身份和 quiescence 类型，不含 SDK 形状。它移到 `Foundation/HostSession.fs(i)`，命名空间 `Wanxiangshu.Foundation.HostSession`，shard 仍是 `host-session-contract`（provider）。
+- `OpenCode/Host/ChatAdmission/Intent`（`ChatAdmissionIntent`）在 CUT-09-a 之后只是 `wanxiangli/authority.admit` 的类型化门面，依赖 Foundation、Interaction.Authority、ChatExecution，属于领域决策（卡 §5 的 B），不是适配。它移到 `Interaction/Admission/ChatAdmissionIntent.fs(i)`，命名空间 `Wanxiangshu.Interaction.Admission`，shard 不变。`Transaction`、`IntentSurface` 这两个适配和测试面仍留在 `OpenCode/Host/ChatAdmission`。
+- 结果：`Interaction/Dispatch/{Dispatcher,Ingress}` 不再引用适配层，离开基线。host-boundary-026、delegation-028 的路径断言（包括 delegation-028“恢复闭包不得含 SessionContract”的反向断言）以及 dispatch-protocol、interaction-authority 的 `APPLIES-TO` 跟着改路径。
+- 静态证据：`architecture.mjs` OK（棘轮 22 条）。`check.mjs` 与子范围⑤在归一行号和路径后相同；多出的一条 control-pyramid（`Fork/ChildRecovery.fs`）来自 master 的新提交，与本刀无关。

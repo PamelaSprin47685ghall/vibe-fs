@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Interaction.Admission
+
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Threading.Tasks

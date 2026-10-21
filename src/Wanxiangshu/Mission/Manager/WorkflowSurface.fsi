@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Manager
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]

@@ -23,6 +23,8 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Admission
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Persona

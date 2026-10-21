@@ -9,8 +9,8 @@
 /src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
 /src/Wanxiangshu/Execution/Session/Recovery/Model.fs
 /src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fsi
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionIntent.fs
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionIntent.fsi
 /src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs

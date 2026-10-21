@@ -7,7 +7,8 @@ open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Admission
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Persona
 
 [<RequireQualifiedAccess>]

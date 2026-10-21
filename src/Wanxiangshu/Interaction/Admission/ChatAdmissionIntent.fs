@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Interaction.Admission
 
 open System
 open Fable.Core

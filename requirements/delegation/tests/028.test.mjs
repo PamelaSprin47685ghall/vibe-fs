@@ -148,7 +148,7 @@ test('WHAT[delegation-028] recovery Snapshot consumer excludes full Host admissi
   assert.ok(sources.includes('Execution/Delegation/ChildRecoveryWorkflow.fs'))
   assert.ok(sources.includes('OpenCode/Host/SessionSnapshot.fs'))
   for (const forbidden of [
-    'OpenCode/Host/SessionContract.fs',
+    'Foundation/HostSession.fs',
     'OpenCode/Host/SessionHostPort.fs',
     'OpenCode/Host/SessionRuntimeOwner.fs',
     'Execution/Session/ChatExecution/Acceptance.fs',
