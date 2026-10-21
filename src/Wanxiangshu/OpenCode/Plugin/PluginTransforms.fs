@@ -692,6 +692,16 @@ module PluginTransforms =
             | Ok() -> "ok"
             | Error _ -> "failed"
 
+        /// 中断请求本身：宿主拒绝或抛错都只记成「已观察到失败」，不向上抛。
+        let requestRetiredAttemptInterrupt (exactSessionId: SessionId) : Task<Result<unit, string>> =
+            task {
+                try
+                    let! outcome = sessionPort.InterruptAttempt exactSessionId
+                    return outcome
+                with ex ->
+                    return Error ex.Message
+            }
+
         /// 条款 4/6：发出本次 attempt 的中断。「已发出」与「已观察到结算结果」
         /// 是两个分别登记的事实：请求发出不是成功，宿主拒绝了这次中断也不是
         /// 交付失败。中断未确认时已提交的交付仍然成立。
@@ -706,14 +716,7 @@ module PluginTransforms =
                 match facts.Issued with
                 | true -> ()
                 | false ->
-                    let interrupt =
-                        task {
-                            try
-                                let! outcome = sessionPort.InterruptAttempt exactSessionId
-                                return outcome
-                            with ex ->
-                                return Error ex.Message
-                        }
+                    let interrupt = requestRetiredAttemptInterrupt exactSessionId
 
                     DeliveryAttemptLedger.recordInterruptIssued fence (interrupt :> Task)
 
@@ -748,16 +751,6 @@ module PluginTransforms =
                 { SessionId = sessionId
                   ProviderRun = ProviderRunIdentity.create entry.Fence.ProviderRunId
                   CallId = ToolCallId.create entry.Fence.ToolCallId })
-
-        /// 中断请求本身：宿主拒绝或抛错都只记成「已观察到失败」，不向上抛。
-        let requestRetiredAttemptInterrupt (exactSessionId: SessionId) : Task<Result<unit, string>> =
-            task {
-                try
-                    let! outcome = sessionPort.InterruptAttempt exactSessionId
-                    return outcome
-                with ex ->
-                    return Error ex.Message
-            }
 
         let recordRetiredInterruptIssued (fence: DeliveryAttemptLedger.Fence option) (issued: Task) =
             match fence with

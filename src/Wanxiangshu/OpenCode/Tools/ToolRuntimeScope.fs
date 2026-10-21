@@ -198,6 +198,35 @@ module DeliveryAttemptLedger =
     ///
     /// 查不到见证时返回 None。这不是「没交付过」的断言，只是「无法证明成立」：
     /// 条款 3 只认真实交付事实，所以查不到见证就不能当作已完成。
+    ///
+    /// 围栏复核是独立的一步：一条候选见证先按 session 与物理输入过滤，再
+    /// 用它自己的围栏字段复核一次，两步都命中才算「本次交付已成立」。
+    let private confirmedFence
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (physical: PhysicalUserMessageId)
+        (witness: Wanxiangshu.Host.TaskDeliveryWitness)
+        : Fence option =
+        match witness.Fence.PhysicalUserMessageId = physical with
+        | false -> None
+        | true ->
+            TaskDeliveryJournal.tryFindByFenceFields
+                durable
+                sessionId
+                witness.Fence.ProviderRun
+                (Some witness.Fence.ToolCallId)
+                None
+                (Some physical)
+                // 这条见证自身的围栏已登记逻辑运行与交付任务：
+                // 用它们做同一围栏的复核，别的逻辑运行 / 别的交付任务的
+                // 见证不得满足「本次交付已成立」的判定。
+                (Some witness.Fence.LogicalRunId)
+                (Some witness.Fence.Task)
+            |> Option.map (fun confirmed ->
+                { SessionId = sessionId
+                  ProviderRun = confirmed.Fence.ProviderRun
+                  CallId = confirmed.Fence.ToolCallId })
+
     let tryFindDurableEstablished
         (journal: AgentJournal option)
         (sessionId: SessionId)
@@ -205,32 +234,10 @@ module DeliveryAttemptLedger =
         : Fence option =
         match journal, physical with
         | Some durable, Some physical ->
-            let deliveries = (AgentJournal.snapshot durable).AgentProjections.Deliveries
-
-            deliveries
+            (AgentJournal.snapshot durable).AgentProjections.Deliveries
             |> Map.toList
-            |> List.choose (fun ((session, _, _), witness) ->
-                if session <> sessionId then
-                    None
-                elif witness.Fence.PhysicalUserMessageId <> physical then
-                    None
-                else
-                    TaskDeliveryJournal.tryFindByFenceFields
-                        durable
-                        sessionId
-                        witness.Fence.ProviderRun
-                        (Some witness.Fence.ToolCallId)
-                        None
-                        (Some physical)
-                        // 这条见证自身的围栏已登记逻辑运行与交付任务：
-                        // 用它们做同一围栏的复核，别的逻辑运行 / 别的交付任务的
-                        // 见证不得满足「本次交付已成立」的判定。
-                        (Some witness.Fence.LogicalRunId)
-                        (Some witness.Fence.Task)
-                    |> Option.map (fun confirmed ->
-                        { SessionId = sessionId
-                          ProviderRun = confirmed.Fence.ProviderRun
-                          CallId = confirmed.Fence.ToolCallId }))
+            |> List.filter (fun ((session, _, _), _) -> session = sessionId)
+            |> List.choose (fun (_, witness) -> confirmedFence durable sessionId physical witness)
             // 同一条物理输入下有多条见证时取映射序的最后一条（确定），裁决只需
             // 知道「存在一次已成立的交付」，围栏只用来登记本次中断的事实。
             |> List.tryLast
