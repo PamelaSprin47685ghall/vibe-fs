@@ -1045,8 +1045,6 @@ Change/Recovery.fsi
 Change/Recovery.fs
 OpenCode/Codec/ToolHostSurface.fsi
 OpenCode/Codec/ToolHostSurface.fs
-Execution/Delegation/OpenCode/DelegatedToolEstimate.fsi
-Execution/Delegation/OpenCode/DelegatedToolEstimate.fs
 Execution/Delegation/Fork/JoinResultRenderer.fsi
 Execution/Delegation/Fork/JoinResultRenderer.fs
 Execution/Delegation/Fork/JoinResultRendererSurface.fsi
