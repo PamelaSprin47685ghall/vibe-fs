@@ -911,6 +911,10 @@ OpenCode/Host/ProviderTokenUse.fsi
 OpenCode/Host/ProviderTokenUse.fs
 OpenCode/Host/DeclaredContextLimit.fsi
 OpenCode/Host/DeclaredContextLimit.fs
+Host/PairGuidance.fsi
+Host/PairGuidance.fs
+Interaction/PairGuidance/Occurrences.fsi
+Interaction/PairGuidance/Occurrences.fs
 OpenCode/Host/PairProgrammingThoughtTransform.fsi
 OpenCode/Host/PairProgrammingThoughtTransform.fs
 Context/Companion/JournalPort.fsi

@@ -21,6 +21,7 @@ adapter implements it) · WIRED-OMP (omp adapter skeleton conforms) · LEGACY-GO
 | P-10 | `IHostPaths` | `Host/Storage.fs(i)` | arch | ad-hoc `input.directory`/`project` reads | PLANNED |
 | P-11 | `IHostPlugin`, `HostPorts`, `ProductHooks`, `HostCapabilities`, `IAgentCatalog` | `Host/Lifecycle.fs(i)` | plugin-host | `OpenCode/Plugin/Plugin`, `PluginBoot`, `ManagedAgentConfig` host side | PLANNED |
 | P-12 | `IDiagnosticSink` | `Host/Diagnostics.fs(i)` | plugin-host | `client.app.log` call sites | PLANNED |
+| P-13 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` (HOST-013 pair guidance; feeds P-06 `ContextMessages`) | `Host/PairGuidance.fs(i)` | plugin-host (logic: `Interaction/PairGuidance/Occurrences`) | occurrence ledger, ordinal, placement and commit order inside `OpenCode/Host/PairProgrammingThoughtTransform` (`PairProgrammingGuidelineWire`) | WIRED-OC |
 | P-00 | `HostError`, `WorkspacePath`, `AgentRole`, `PromptKey`, `HostMessageId` (shared vocabulary) | `Host/Vocabulary.fs(i)` | arch | `string` error channels on host ports | PLANNED |
 
 ## Adapter folders (implementations, not ports)
@@ -43,3 +44,4 @@ adapter implements it) · WIRED-OMP (omp adapter skeleton conforms) · LEGACY-GO
 
 ## Change log
 - 2026-10-21 eng-host-arch: initial registry (P-00..P-12 PLANNED).
+- 2026-10-21 eng-hni-plugin-goose: P-13 pair guidance (domain `Interaction/PairGuidance`: guideline fold moved out of `OpenCode/Host/PairProgramming`, occurrence owner `PairGuidanceOccurrences`); OpenCode transform decodes the transcript and renders only.
