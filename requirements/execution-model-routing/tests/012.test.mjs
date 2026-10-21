@@ -337,4 +337,28 @@ test('WHAT[execution-model-routing-012] fabricated fences and foreign custody fa
 })
 
 test.todo('WHAT[execution-model-routing-012] compiler rejects fabricated exact opaque capacity fences and direct foreign custody construction (GAP-128: F# type-level opacity proof pending — the runtime fail-closed test above is retained but does not prove compile-time rejection)')
+
+test('WHAT[execution-model-routing-012] successor permit keeps one opaque projection through predecessor replay and committed queries', async () => {
+  const runtime = routing.createRuntime(() => target())
+  const firstIdentity = identity()
+  const first = await acquire(runtime, firstIdentity)
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, first, firstIdentity), { kind: 'Applied' })
+  assert.equal(routing.tryReadExecution(runtime, firstIdentity.sessionId, firstIdentity.physicalUserMessageId), first)
+
+  const nextIdentity = identity({ physicalUserMessageId: 'message-successor' })
+  const next = await acquire(runtime, nextIdentity)
+  assert.notEqual(next, first)
+  assert.equal(await acquire(runtime, nextIdentity), next)
+  assert.equal(routing.tryReadExecution(runtime, firstIdentity.sessionId, firstIdentity.physicalUserMessageId), null)
+  assert.equal(routing.tryReadExecution(runtime, nextIdentity.sessionId, nextIdentity.physicalUserMessageId), null)
+  assert.deepEqual(routing.releasePhysicalExecution(runtime, firstIdentity.sessionId, firstIdentity.physicalUserMessageId), { kind: 'StaleFence' })
+  assert.equal(routing.executionAdmissionLifecycle(runtime, next), 'Pending')
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, next, nextIdentity), { kind: 'Applied' })
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, first, firstIdentity), { kind: 'StaleFence' })
+  assert.equal(routing.tryReadExecution(runtime, nextIdentity.sessionId, nextIdentity.physicalUserMessageId), next)
+  assert.equal(routing.tryReadExecution(runtime, nextIdentity.sessionId, nextIdentity.physicalUserMessageId), next)
+  assert.deepEqual(routing.executionAdmissionTarget(runtime, next), nextIdentity.target)
+  assert.deepEqual(routing.releasePhysicalExecution(runtime, nextIdentity.sessionId, nextIdentity.physicalUserMessageId), { kind: 'Applied' })
+  assert.equal(routing.tryReadExecution(runtime, nextIdentity.sessionId, nextIdentity.physicalUserMessageId), null)
+})
 }

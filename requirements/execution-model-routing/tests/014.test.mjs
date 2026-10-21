@@ -130,6 +130,32 @@ const drainBlockedAdmissions = async (runtime, entries, guard) => {
   assert.deepEqual(drained.owners, [])
 }
 
+test('WHAT[execution-model-routing-014] exact permit outcomes reach the shared counters once across supersession and release', async () => {
+  const runtime = routing.createRuntime(() => target)
+  const firstIdentity = identity('permit-counter', 'physical-first')
+  const first = await acquire(runtime, firstIdentity)
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, first, firstIdentity), { kind: 'Applied' })
+  const nextIdentity = identity('permit-counter', 'physical-next')
+  const next = await acquire(runtime, nextIdentity)
+  const before = routing.capacitySnapshot(runtime).counters
+
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, first, firstIdentity), { kind: 'StaleFence' })
+  assert.deepEqual(routing.releasePhysicalExecution(runtime, firstIdentity.sessionId, firstIdentity.physicalUserMessageId), { kind: 'StaleFence' })
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, next, nextIdentity), { kind: 'Applied' })
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, next, nextIdentity), { kind: 'AlreadyApplied' })
+  assert.deepEqual(routing.releaseExecutionAdmissionBeforeProvider(runtime, next, nextIdentity), { kind: 'Conflict' })
+  assert.deepEqual(routing.releasePhysicalExecution(runtime, nextIdentity.sessionId, nextIdentity.physicalUserMessageId), { kind: 'Applied' })
+  assert.deepEqual(routing.releasePhysicalExecution(runtime, nextIdentity.sessionId, nextIdentity.physicalUserMessageId), { kind: 'AlreadyApplied' })
+
+  const after = routing.capacitySnapshot(runtime)
+  assert.equal(after.counters.stale, before.stale + 2)
+  assert.equal(after.counters.duplicate, before.duplicate + 2)
+  assert.equal(after.counters.conflict, before.conflict + 1)
+  assert.deepEqual(after.ledgerEntries, [])
+  assert.deepEqual(after.tokens, [])
+  assert.deepEqual(after.executions, [])
+})
+
 test('WHAT[execution-model-routing-014] queue-full fresh admission preserves the exact active execution and all capacity evidence', async () => {
   const runtime = routing.createRuntime((role, _running, previous) =>
     role === 'manager' && previous == null ? target : null,

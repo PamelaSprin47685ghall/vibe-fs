@@ -25,19 +25,17 @@ module internal CapacityCreditId =
 type internal CapacityLeaseId = private CapacityLeaseId of int64
 
 module internal CapacityLeaseId =
-    val initial: CapacityLeaseId
-    val next: CapacityLeaseId -> CapacityLeaseId
     val first: CapacityLeaseId
     val value: CapacityLeaseId -> int64
+    val ofValue: int64 -> CapacityLeaseId
 
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal CapacityFence = private CapacityFence of int64
 
 module internal CapacityFence =
-    val initial: CapacityFence
-    val next: CapacityFence -> CapacityFence
     val first: CapacityFence
     val value: CapacityFence -> int64
+    val ofValue: int64 -> CapacityFence
 
 type internal ExecutionAdmissionExactIdentity =
     { SessionId: string
@@ -214,35 +212,3 @@ type internal CapacityReconciliationDecision =
 
 module internal CapacityReconciliation =
     val decide: evidence: CapacityInvariantEvidence -> CapacityReconciliationDecision
-
-[<RequireQualifiedAccess>]
-type internal ExecutionCapacityRelease =
-    | BeforeProvider
-    | PhysicalCompletion
-
-[<RequireQualifiedAccess>]
-type internal ExecutionCapacityLifecycle =
-    | Pending of ExecutionAdmissionLease
-    | Committed of ExecutionAdmissionLease
-    | Releasing of ExecutionAdmissionLease * ExecutionCapacityRelease
-    | Released of ExecutionAdmissionLease * ExecutionCapacityRelease
-
-[<RequireQualifiedAccess>]
-type internal ExecutionCapacityEvidence =
-    | Acquire of ExecutionAdmissionLease
-    | Commit of ExecutionAdmissionLease * ExecutionAdmissionExactIdentity
-    | BeginReleaseBeforeProvider of ExecutionAdmissionLease * ExecutionAdmissionExactIdentity
-    | BeginPhysicalCompletion of ExecutionAdmissionLease
-    | CompleteRelease of ExecutionAdmissionLease * ExecutionCapacityRelease
-
-[<RequireQualifiedAccess>]
-type internal ExecutionCapacityDecision =
-    | Transitioned of ExecutionCapacityLifecycle
-    | Idempotent
-    | Rejected of ExecutionAdmissionRejection
-
-module internal ExecutionCapacityLifecycle =
-    val leaseOf: ExecutionCapacityLifecycle -> ExecutionAdmissionLease
-
-    val decide:
-        current: ExecutionCapacityLifecycle option -> evidence: ExecutionCapacityEvidence -> ExecutionCapacityDecision
