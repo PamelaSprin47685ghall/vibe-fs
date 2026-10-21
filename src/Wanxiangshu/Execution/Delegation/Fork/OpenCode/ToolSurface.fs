@@ -17,6 +17,7 @@ open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal

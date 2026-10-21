@@ -18,7 +18,7 @@ export const PROVIDER_ROOT = 'resources/provider'
 export const LOCALE_FILES = Object.freeze(['en.md', 'zh-CN.md'])
 export const PROVIDER_RESOURCES_REL = 'src/Wanxiangshu/Participant/Provider/ProviderResources.fs'
 export const PROVIDER_LANGUAGE_BINDING_REL =
-  'src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs'
+  'src/Wanxiangshu/Participant/Provider/ProviderLanguageBinding.fs'
 export const STATIC_TOOLS_REL = 'src/Wanxiangshu/OpenCode/Tools/StaticTools.fs'
 
 /**

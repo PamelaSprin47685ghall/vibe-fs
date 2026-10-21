@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Participant.Provider
 
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider

@@ -635,8 +635,8 @@ Participant/Provider/ProviderResources.fsi
 Participant/Provider/ProviderResources.fs
 Participant/Provider/Prose.fsi
 Participant/Provider/Prose.fs
-OpenCode/Host/ProviderLanguageBinding.fsi
-OpenCode/Host/ProviderLanguageBinding.fs
+Participant/Provider/ProviderLanguageBinding.fsi
+Participant/Provider/ProviderLanguageBinding.fs
 Context/Prefix/Surface.fsi
 Context/Prefix/Surface.fs
 Execution/Delegation/PtyPort.fsi
