@@ -48,6 +48,3 @@ module AdvisorSeat =
 
     /// Drop every process-live seat.
     val clearAll: unit -> unit
-
-    /// advisor-[030] test/dev hook: drop every recorded consult fence.
-    val clearConsultFences: unit -> unit

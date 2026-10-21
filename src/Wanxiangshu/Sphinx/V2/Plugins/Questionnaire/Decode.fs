@@ -71,48 +71,6 @@ module Decode =
           Description = textOf "description" raw
           ExpectedContribution = textOf "expectedContribution" raw }
 
-    /// The canonical payload is carried alongside the typed reading so a replay sees
-    /// what the model actually said (WHAT[sphinx-v2-021]).
-    let decodePairwise (canonicalResult: string) (raw: obj) : Result<PairwiseResponse, DecodeError> =
-        stringField "judgment" raw
-        |> Result.bind judgmentOf
-        |> Result.bind (fun judgment ->
-            stringField "rationale" raw
-            |> Result.bind (fun rationale ->
-                arrayField "sourceLabels" raw
-                |> Result.map (fun items -> items |> Array.map string |> Array.toList)
-                |> Result.bind (fun labels ->
-                    arrayField "proposedAlternatives" raw
-                    |> Result.map (fun items ->
-                        items
-                        |> Array.toList
-                        |> List.map alternativeOf
-                        |> List.filter (fun alternative -> alternative.LocalId <> ""))
-                    |> Result.map (fun alternatives ->
-                        { Judgment = judgment
-                          Rationale = rationale
-                          SourceLabels = labels
-                          ProposedAlternatives = alternatives }))))
-
-    let decodeRanking (raw: obj) : Result<RankingResponse, DecodeError> =
-        arrayField "presentedSet" raw
-        |> Result.map (fun items -> items |> Array.map string |> Array.toList)
-        |> Result.bind (fun presented ->
-            arrayField "rankedTiers" raw
-            |> Result.map (fun items ->
-                items
-                |> Array.toList
-                |> List.map (fun tier -> unbox<obj array> tier |> Array.map string |> Array.toList))
-            |> Result.bind (fun tiers ->
-                arrayField "unjudged" raw
-                |> Result.map (fun items -> items |> Array.map string |> Array.toList)
-                |> Result.map (fun unjudged ->
-                    { PresentedSet = presented
-                      RankedTiers = tiers
-                      Best = None
-                      Worst = None
-                      Unjudged = unjudged })))
-
     /// best/worst is a joint observation, so an input where they coincide is refused
     /// rather than expanded into a pair of independent votes (WHAT[sphinx-v2-014]).
     let decodeMaxDiff (raw: obj) : Result<MaxDiffObservation, DecodeError> =

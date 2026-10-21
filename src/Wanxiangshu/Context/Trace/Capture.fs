@@ -1005,18 +1005,6 @@ module XTraceCapture =
         captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
             captureTerminalText journal sessionId text providerRun)
 
-    let captureTerminalBlobWithReceipt
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (textRef: BlobRef)
-        (textDigest: BlobDigest)
-        (providerRun: ProviderRunIdentity)
-        =
-        captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
-            match journal with
-            | None -> Task.FromResult(())
-            | Some durable -> captureTerminalBlobWhenFresh durable sessionId textRef textDigest providerRun)
-
     let captureTerminalWithReceipt (journal: AgentJournal option) (turn: ReconciledTurn) =
         captureUnitWithReceipt journal turn.SessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
             captureTerminal journal turn)

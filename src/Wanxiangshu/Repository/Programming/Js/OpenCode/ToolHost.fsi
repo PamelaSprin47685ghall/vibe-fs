@@ -53,15 +53,3 @@ module JsToolSpec =
         rootOf: (string -> string) ->
         settlementOf: (HostToolContext -> Task<DeliverySettlement option>) ->
             ToolSpec
-
-    val createWithAdmission:
-        factory: HostToolFactory ->
-        surface: JsSurface ->
-        admission: ToolAdmission ->
-        workspaceRoot: string ->
-        persistence: IJsTransactionPersistence option ->
-        lifecyclePersistence: IJsLifecyclePersistence option ->
-        fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
-        rootOf: (string -> string) ->
-        settlementOf: (HostToolContext -> Task<DeliverySettlement option>) ->
-            ToolSpec

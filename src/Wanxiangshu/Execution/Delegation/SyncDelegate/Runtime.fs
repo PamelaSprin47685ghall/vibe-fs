@@ -812,12 +812,6 @@ type SyncDelegateRuntime
 
     member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) = attached.TryFind(ownerSessionId, role)
 
-    member _.TryFindDelegateOwner(delegateSessionId: SessionId) : SessionId option =
-        attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Inspector)
-        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Coder))
-        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Engineer))
-        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.DevOps))
-
     member _.TryFindForScopeClose(ownerSessionId: SessionId, role: SyncDelegateRole) =
         match attached.TryFind(ownerSessionId, role) with
         | Some sessionId -> Some sessionId
@@ -870,30 +864,6 @@ type SyncDelegateRuntime
             expectedToolCalls
             None
             (fun () -> Task.FromResult(HostForkProse.chargeDocument owner charge))
-            None
-            None
-            (fun () -> false)
-        |> singletonResult
-
-    /// EXEC-032 composition seam: caller supplies a low-trust provider prompt
-    /// producer; workflow invokes it only after semantic batch admission.
-    member _.InvokePrepared
-        (
-            ownerSessionKey: string,
-            role: SyncDelegateRole,
-            charge: string,
-            prepareProviderPrompt: unit -> Task<LlmFacing.Document>,
-            ?expectedToolCalls: int
-        ) : Task<Result<string, string>> =
-        SyncDelegateWorkflow.invoke
-            store
-            deps
-            (SessionId.create ownerSessionKey)
-            role
-            charge
-            expectedToolCalls
-            None
-            prepareProviderPrompt
             None
             None
             (fun () -> false)

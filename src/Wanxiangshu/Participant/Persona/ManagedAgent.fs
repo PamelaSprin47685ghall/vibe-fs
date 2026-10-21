@@ -97,10 +97,3 @@ module ManagedAgent =
             " Use 'engineer'."
         else
             " Use a valid canonical managed agent name."
-
-    let formatParseError (err: ManagedAgentParseError) : string =
-        match err with
-        | ManagedAgentParseError.LegacyAgentName name -> ManagedAgentCatalog.formatLegacyNameNotSupported name
-        | ManagedAgentParseError.UnknownManagedAgent name ->
-            sprintf "Unknown managed agent '%s'.%s" name (unknownAgentSuggestion name)
-        | ManagedAgentParseError.Malformed name -> sprintf "Malformed managed agent name '%s'." name

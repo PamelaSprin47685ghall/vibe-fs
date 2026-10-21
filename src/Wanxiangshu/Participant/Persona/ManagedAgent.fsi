@@ -33,4 +33,3 @@ module ManagedAgent =
     val tryParse: value: string -> ManagedAgent option
     val peer: agent: ManagedAgent -> ManagedAgent
     val isInternal: agent: ManagedAgent -> bool
-    val formatParseError: err: ManagedAgentParseError -> string

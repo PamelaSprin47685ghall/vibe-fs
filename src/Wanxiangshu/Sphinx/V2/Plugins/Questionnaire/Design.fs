@@ -75,18 +75,6 @@ module Design =
 
         move items 0
 
-    /// Opaque labels are assigned from the seed too, and are deliberately not the real
-    /// ids: a worker must not be able to infer a candidate's identity from its label.
-    let buildAssignment (seed: string) (presented: string list) : Assignment =
-        let ordered = shuffle seed presented
-
-        let labels = ordered |> List.mapi (fun index _ -> sprintf "item_%d" (index + 1))
-
-        { Seed = seed
-          ShuffleAlgorithm = "fisher-yates/1"
-          LabelMap = List.zip labels ordered |> Map.ofList
-          Order = labels }
-
     let tryValidate (design: RoundDesign) : Result<RoundDesign, DesignError> =
         let presented = set design.PresentedSet
         let omitted = set design.OmittedSet
@@ -121,15 +109,3 @@ module Design =
             error "invalid-design" "a round must expect at least one response"
         else
             Ok design
-
-    /// The worker-visible envelope: opaque labels in the displayed order, the question
-    /// and the response schema. The label map is deliberately absent.
-    let workerView (design: RoundDesign) : (string * string) list =
-        [ ("scopeId", design.ScopeId)
-          ("snapshotId", design.SnapshotId)
-          ("purpose", design.Purpose)
-          ("questionId", design.QuestionId)
-          ("templateHash", design.TemplateHash)
-          ("presentedLabels", design.Assignment.Order |> String.concat ",")
-          ("visibleBytesHash", design.TemplateHash)
-          ("clusterId", design.ClusterId) ]

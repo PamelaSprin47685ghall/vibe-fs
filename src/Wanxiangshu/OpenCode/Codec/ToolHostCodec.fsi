@@ -17,13 +17,11 @@ type HostToolArguments =
     internal new: raw: obj -> HostToolArguments
     member Text: name: string -> string
     member OptionalText: name: string -> string option
-    member OptionalTextIn: objectName: string * propertyName: string -> string option
     member OptionalTexts: name: string -> string list option
     member Texts: name: string -> string list
     member OptionalNumber: name: string -> float option
     member OptionalNonNegativeInteger: name: string -> Result<int option, unit>
     member Raw: obj
-    member OptionalBool: name: string -> bool option
 
 type HostToolContext =
     { SessionId: string
@@ -63,12 +61,6 @@ module ToolHostCodec =
     val numberSchema: factory: HostToolFactory -> HostSchema
     val numberSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
 
-    val boundedIntegerSchema:
-        minimum: int -> maximum: int -> description: string -> factory: HostToolFactory -> HostSchema
-
-    val optionalBoundedIntegerSchema:
-        minimum: int -> maximum: int -> description: string -> factory: HostToolFactory -> HostSchema
-
     val boolSchema: factory: HostToolFactory -> HostSchema
     val boolSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val enumSchema: values: string list -> factory: HostToolFactory -> HostSchema
@@ -91,9 +83,6 @@ module ToolHostCodec =
     val optionalObjectSchema: fields: (string * HostSchema) list -> factory: HostToolFactory -> HostSchema
 
     val arraySchemaOf: item: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
-
-    val recordSchemaOf:
-        key: HostSchema -> value: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
 
     /// Optional open key→value map (zod `record`); the description carries the key shape.
     val optionalRecordSchemaOf:

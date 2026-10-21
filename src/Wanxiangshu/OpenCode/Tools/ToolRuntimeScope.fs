@@ -1348,19 +1348,6 @@ type ToolRuntimeScope
     member _.ContinueManagerLoop(sessionId: SessionId, workspace: string) : Task<Result<unit, string>> =
         continueManagerLoop sessionId workspace
 
-    /// EXEC-011: the administrator's ceiling on any single process.
-    ///
-    /// Resolved once per scope so every executor call in a session shares one
-    /// ceiling. A non-positive or unparseable setting falls back to the default
-    /// rather than being treated as "no limit": the clause requires the hard limit
-    /// to be finite, so an unreadable configuration must not widen it.
-    // DSL-MUTABLE: resource — resolved process hard limit ceiling
-    member val ProcessHardLimit =
-        match Environment.GetEnvironmentVariable "WANXIANGSHU_PROCESS_HARD_LIMIT_SECS" with
-        | null
-        | "" -> TimeSpan.FromHours 1.0
-        | value -> parseProcessHardLimit value
-
     member _.SessionParents = sessionParents
     member _.CurrentPhysicalUserMessage(sessionId) = currentPhysicalUserMessage sessionId
     member _.ViewForSession(sessionId) = sessionView sessionId
@@ -1377,9 +1364,6 @@ type ToolRuntimeScope
 
     member _.RoleFor(ctx: HostToolContext) = roleFor ctx
     member _.EnsureRoleFor(ctx: HostToolContext) = ensureRoleFor ctx
-
-    member _.EnsureCommandRoleFor(sessionId: SessionId, resolveAgent: SessionId -> Task<string option>) =
-        ensureCommandRoleFor sessionId resolveAgent
 
     member _.EnsureWorkDevOpsBound(parentSessionId: SessionId) = ensureWorkDevOpsBound parentSessionId
 
@@ -1411,18 +1395,6 @@ type ToolRuntimeScope
     /// A failed cleanup prevents NotStarted settlement so no orphan is hidden.
     member _.DiscardExecutionSession(execSessionId: string) : Task<Result<unit, string>> =
         sessions.AbortSession(SessionId.create execSessionId)
-
-    /// Manager authorization facts for the capability gate, derived purely
-    /// from the lifecycle work. The final incumbent is the one whose review
-    /// is Promoted: it keeps the read/cleanup/close-out surface and loses
-    /// every new-work capability. The cleanup blocker digest is the stored
-    /// objective evidence, passed through verbatim.
-    static member emptyManagerFacts: ManagerCapabilityFacts =
-        { HasActiveIncumbency = false
-          HasAssessment = false
-          HasConfirmation = false
-          IsFinalIncumbent = false
-          CleanupBlockerDigest = None }
 
     member self.ManagerCapabilityFactsFor(sessionId: string) : Task<ManagerCapabilityFacts> =
         managerFactsOfSession self.WorkspaceDirectory sessionId
@@ -1639,9 +1611,6 @@ type ToolRuntimeScope
             |> List.distinct
             |> List.sort)
 
-    /// AGENT-013 + PROMPT-008: the managed agent a PTY is opened for.
-    member _.ManagedAgentFor(ctx: HostToolContext) = managedAgentFor ctx
-
     member this.IsRole(ctx: HostToolContext, expected: Role) = this.RoleFor ctx = Some expected
 
     /// Wire PluginRuntimeScope.RequireCurrentProcessJoin (or test double).
@@ -1682,41 +1651,12 @@ type ToolRuntimeScope
             |> SessionId.value
             |> getOrCreateRuntime
 
-    member this.PtyCapabilityFor(ctx: HostToolContext) : Result<DelegationPtyCapability, string> =
-        this.RuntimeFor ctx |> Result.map (fun r -> r.PtyCapability)
-
     /// crash-reconciliation-018: process-local adoption for explicit /continue. The durable
     /// handle stays byte-for-byte as it was at the crash boundary; a later LLM
     /// fork reuse is the first action allowed to reopen it durably.
     member _.AdoptExistingChild(parentSessionId: SessionId, record: HandleRecord) : Result<unit, string> =
         resumableAgentId record
         |> Result.bind (adoptExistingIntoRuntime parentSessionId record)
-
-    member _.ExecutorRuntimeFor(ctx: HostToolContext) =
-        lock gate (fun () ->
-            match executorRuntimes.TryGetValue ctx.SessionId with
-            | true, runtime when not runtime.IsCancelled -> runtime
-            | _ ->
-                let runtime =
-                    HostForkRuntime(
-                        SessionId.create ctx.SessionId,
-                        sessions,
-                        childViewForRun,
-                        CompletionMailboxRuntime.create,
-                        NodeTiming.nodeClockPort (),
-                        NodeTiming.raceExit,
-                        ?journal = journal,
-                        onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId),
-                        // EXEC-014: host executor leaves are Host-owned and
-                        // parent-invisible. A DurableParentHandle would leak every
-                        // worker into the caller's list/join/guard (EXEC-016) and
-                        // block deliver with "join before end" long after `run`
-                        // returned its bounded result.
-                        ownership = HandleOwnership.HostOwnedHidden
-                    )
-
-                executorRuntimes.[ctx.SessionId] <- runtime
-                runtime)
 
     member _.OrchestratorHostFor(sessionId: string) : OrchestratorHost =
         lock gate (fun () ->
@@ -2011,13 +1951,6 @@ type ToolRuntimeScope
                 return!
                     this.ContinueAfterRetire durable parentSessionId devopsAgentId oldChildSessionId devopsName role key
         }
-
-    member this.ReplacePhysicalSession
-        (parentSessionId: SessionId, devopsAgentId: string, oldChildSessionId: SessionId)
-        : Task<Result<SessionId, string>> =
-        match journal with
-        | None -> Task.FromResult(Error "journal unavailable")
-        | Some durable -> this.ProceedReplacePhysicalSession durable parentSessionId devopsAgentId oldChildSessionId
 
     member _.DisposeAsync() : Task =
         let forkRuntimes, orchestrators =

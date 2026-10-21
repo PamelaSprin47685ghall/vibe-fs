@@ -25,47 +25,6 @@ type QuestionTemplate =
 /// confidence values or invented numeric weights.
 module Prompts =
 
-    /// The shared prefix every protocol compiler assembles. A probe never rewrites the
-    /// goal: the compiler owns it, so no probe can silently substitute its own target.
-    let goalPrefix
-        (goalText: string)
-        (visibleMaterials: string)
-        (remainingBudget: string)
-        (comparedPlans: string list)
-        : string =
-        String.concat
-            "\n"
-            [ "原目标：" + goalText
-              "当前可用材料：" + visibleMaterials
-              "后续可用资源：" + remainingBudget
-              "本次比较的对象：" + String.concat "、" comparedPlans
-              "请根据对原目标的预计贡献判断，而不是按名称、篇幅或已经投入的成本判断。"
-              "请同时考虑执行消耗和执行之后仍能开展的工作。"
-              "可以并列、暂不判断、给出改变结论的条件，或提出没有列出的更好路径。"
-              "不要填写概率、置信度或自行编造数值权重。"
-              "只返回本次响应 schema；理由可以用自然语言放在相应字段内。" ]
-
-    /// The eight question primitives, as template ids. Each one asks for a relation,
-    let templateId (template: QuestionTemplate) : string =
-        match template with
-        | QuestionTemplate.PlanContributionPair -> "sphinx.question.plan-contribution-pair@2"
-        | QuestionTemplate.SmallSetRanking -> "sphinx.question.small-set-ranking@2"
-        | QuestionTemplate.RankingReversal -> "sphinx.question.ranking-reversal@2"
-        | QuestionTemplate.CombinationAndSequence -> "sphinx.question.combination-sequence@2"
-        | QuestionTemplate.InvestigationValue -> "sphinx.question.investigation-value@2"
-        | QuestionTemplate.ImprovementMagnitude -> "sphinx.question.improvement-magnitude@2"
-        | QuestionTemplate.CandidateRelations -> "sphinx.question.candidate-relations@2"
-        | QuestionTemplate.AnswerNowVersusInvestigate -> "sphinx.question.answer-now-versus-investigate@2"
-
-    /// The default profile's question set. The others can be activated by a plan; they
-    /// are not required of every inquiry.
-    let defaultTemplates: QuestionTemplate list =
-        [ QuestionTemplate.PlanContributionPair
-          QuestionTemplate.RankingReversal
-          QuestionTemplate.CombinationAndSequence
-          QuestionTemplate.InvestigationValue
-          QuestionTemplate.AnswerNowVersusInvestigate ]
-
     let private goalPrefixBody (template: QuestionTemplate) : string =
         match template with
         | QuestionTemplate.PlanContributionPair -> "优先执行哪条路径，预计更有助于达成原目标？不要仅比较眼前一步的产出；把各自完成后还可以做的工作算在内。"

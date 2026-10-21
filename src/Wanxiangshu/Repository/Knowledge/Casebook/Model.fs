@@ -50,7 +50,6 @@ type Case =
       Observations: Observation list }
 
     member this.SessionId = this.Identity
-    member this.LastAccessOrder = this.AccessOrder
 
 /// DSL-class: DurableFact — CASE-007 / KR-007: the Casebook domain events. Physical
 /// persistence is the unified EventStore; these are the fold inputs.

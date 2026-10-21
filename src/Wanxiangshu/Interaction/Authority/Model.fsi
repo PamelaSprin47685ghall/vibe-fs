@@ -204,7 +204,6 @@ module PromptAuthority =
     val repairPayloadDigest:
         requestId: RepairRequestId -> terminalProviderRun: ProviderRunIdentity -> repairKind: string -> string
 
-    val repairPayloadBelongsToRequest: requestId: RepairRequestId -> payloadDigest: string -> bool
     val gateNudgePayloadDigest: gateKind: string -> terminalProviderRun: ProviderRunIdentity -> string
 
     val gateNudgeAlreadyAdmitted:

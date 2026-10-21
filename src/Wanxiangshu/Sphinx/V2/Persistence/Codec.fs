@@ -31,41 +31,6 @@ module Codec =
     let private inquiryStream (inquiryId: InquiryId) : EventStreamId =
         EventStreamId.create ("sphinx-v2/" + InquiryId.value inquiryId)
 
-    /// The event body tag the Integrator routes on; the payload carries the bytes the
-    /// reducer rebuilds the body from.
-    let bodyTag (body: InquiryEventBody) : string =
-        match body with
-        | InquiryEventBody.InquiryCreated _ -> "InquiryCreated"
-        | InquiryEventBody.GoalAmended _ -> "GoalAmended"
-        | InquiryEventBody.SnapshotRegistered _ -> "SnapshotRegistered"
-        | InquiryEventBody.DecisionScopeOpened _ -> "DecisionScopeOpened"
-        | InquiryEventBody.RoundOpened _ -> "RoundOpened"
-        | InquiryEventBody.WorkPlanned _ -> "WorkPlanned"
-        | InquiryEventBody.RoundClosed _ -> "RoundClosed"
-        | InquiryEventBody.BudgetReserved _ -> "BudgetReserved"
-        | InquiryEventBody.UsageSettled _ -> "UsageSettled"
-        | InquiryEventBody.ReservationReleased _ -> "ReservationReleased"
-        | InquiryEventBody.UsageOverrunRecorded _ -> "UsageOverrunRecorded"
-        | InquiryEventBody.DispatchRequested _ -> "DispatchRequested"
-        | InquiryEventBody.DispatchReceiptRecorded _ -> "DispatchReceiptRecorded"
-        | InquiryEventBody.WorkAttemptTransitioned _ -> "WorkAttemptTransitioned"
-        | InquiryEventBody.HostTerminalRecorded _ -> "HostTerminalRecorded"
-        | InquiryEventBody.ResultAccepted _ -> "ResultAccepted"
-        | InquiryEventBody.InterpretationPending _ -> "InterpretationPending"
-        | InquiryEventBody.InterpretationApplied _ -> "InterpretationApplied"
-        | InquiryEventBody.InterpretationFailed _ -> "InterpretationFailed"
-        | InquiryEventBody.GraphPatched _ -> "GraphPatched"
-        | InquiryEventBody.CertificateSlotsPatched _ -> "CertificateSlotsPatched"
-        | InquiryEventBody.CertificateInvalidated _ -> "CertificateInvalidated"
-        | InquiryEventBody.DecisionRecorded _ -> "DecisionRecorded"
-        | InquiryEventBody.AnswerPrepared _ -> "AnswerPrepared"
-        | InquiryEventBody.AnswerCommitted _ -> "AnswerCommitted"
-        | InquiryEventBody.CancelRequested _ -> "CancelRequested"
-        | InquiryEventBody.InquiryCancelled _ -> "InquiryCancelled"
-        | InquiryEventBody.InquirySuspended _ -> "InquirySuspended"
-        | InquiryEventBody.InquiryFailed _ -> "InquiryFailed"
-        | InquiryEventBody.InquiryStatusChanged _ -> "InquiryStatusChanged"
-
     let private batchDecoder: Decoder<TransitionBatch> =
         BodyDto.exact
             [ "schemaVersion"

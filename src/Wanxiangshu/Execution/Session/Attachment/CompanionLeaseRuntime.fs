@@ -147,16 +147,6 @@ type CompanionLeaseRuntime(sessions: ISessionHostPort, registry: AttachmentLease
                           Origin = originOf lease.Origin }
         }
 
-    /// Only the binding is dropped, so the next material re-observes Host and durable
-    /// state instead of trusting a stale cache entry. The child lease itself ends with
-    /// the owner's lifetime or with an explicit `Retire`.
-    member _.Invalidate(owner: SessionId, kind: SatelliteKind) =
-        // The parameter names the caller's SatelliteKind (always Companion today);
-        // this adapter owns exactly the Companion AttachmentKind.
-        ignore kind
-        registry.Remove(owner, selfKind) |> ignore
-        registry.FinishEnsure(owner, selfKind)
-
     /// The owner ended, or the child has to go: end the resident child and close the
     /// durable association. Nothing resident means only the association is closed,
     /// exactly as an owner outside the runtime closes it.

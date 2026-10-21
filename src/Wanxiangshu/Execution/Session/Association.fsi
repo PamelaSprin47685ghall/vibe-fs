@@ -31,7 +31,6 @@ module SessionAssociationProjection =
     val tryCompanionOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
     val executionClassOf: kind: ManagedSessionKind -> SessionExecutionClass
     val tryMainSessionOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
-    val tryOwnerOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
 
     val linkSatellite:
         kind: SatelliteKind ->

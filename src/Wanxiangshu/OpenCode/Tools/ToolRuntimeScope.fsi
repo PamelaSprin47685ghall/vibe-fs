@@ -129,14 +129,6 @@ type ToolRuntimeScope =
     member RunStarted: (SessionId -> Role -> string option -> unit)
     member ContinueManagerLoop: sessionId: SessionId * workspace: string -> Task<Result<unit, string>>
 
-    /// EXEC-011: the administrator's ceiling on any single process.
-    ///
-    /// Resolved once per scope so every executor call in a session shares one
-    /// ceiling. A non-positive or unparseable setting falls back to the default
-    /// rather than being treated as "no limit": the clause requires the hard limit
-    /// to be finite, so an unreadable configuration must not widen it.
-    member ProcessHardLimit: TimeSpan
-
     member SessionParents: Dictionary<string, string>
     member CurrentPhysicalUserMessage: sessionId: string -> string option
     member ViewForSession: sessionId: string -> Task<string option>
@@ -151,10 +143,6 @@ type ToolRuntimeScope =
     member RoleFor: ctx: HostToolContext -> Role option
     member EnsureRoleFor: ctx: HostToolContext -> Task<Role option>
 
-    member EnsureCommandRoleFor:
-        sessionId: SessionId * resolveAgent: (SessionId -> Task<string option>) -> Task<string option>
-
-    static member emptyManagerFacts: ManagerCapabilityFacts
     member ManagerCapabilityFactsFor: sessionId: string -> Task<ManagerCapabilityFacts>
 
     member LifecycleWorkFor:
@@ -164,9 +152,6 @@ type ToolRuntimeScope =
     member UnfreezeRetirement: sessionId: string -> unit
     member IsRetirementFrozen: sessionId: string -> Task<bool>
     member RetirementBlockersFor: sessionId: string -> string list
-
-    /// AGENT-013 + PROMPT-008: the managed agent a PTY is opened for.
-    member ManagedAgentFor: ctx: HostToolContext -> ManagedAgent option
 
     member IsRole: ctx: HostToolContext * expected: Role -> bool
 
@@ -185,7 +170,6 @@ type ToolRuntimeScope =
     member RequireCurrentProcessJoin: root: SessionId -> Task<FamilyRecovery>
 
     member RuntimeFor: ctx: HostToolContext -> Result<HostForkRuntime, string>
-    member PtyCapabilityFor: ctx: HostToolContext -> Result<DelegationPtyCapability, string>
 
     member EnsureWorkDevOpsBound: parentSessionId: SessionId -> Task<unit>
 
@@ -204,8 +188,6 @@ type ToolRuntimeScope =
     /// fork reuse is the first action allowed to reopen it durably.
     member AdoptExistingChild: parentSessionId: SessionId * record: HandleRecord -> Result<unit, string>
 
-    member ExecutorRuntimeFor: ctx: HostToolContext -> HostForkRuntime
-
     member OrchestratorHostFor: sessionId: string -> OrchestratorHost
 
     member RunOwnedWork: start: (unit -> Task) -> bool
@@ -222,11 +204,6 @@ type ToolRuntimeScope =
     /// fork handle and wakes the parent; no future TurnAborted callback carries
     /// workflow continuation state.
     member TerminateSession: sessionId: string * reason: string -> Task<Result<unit, string>>
-
-    /// managed-session-lifecycle-024: Replace crashed DevOps physical session under single logical authority
-    member ReplacePhysicalSession:
-        parentSessionId: SessionId * devopsAgentId: string * oldChildSessionId: SessionId ->
-            Task<Result<SessionId, string>>
 
     member DisposeSession: sessionId: string -> Task
 

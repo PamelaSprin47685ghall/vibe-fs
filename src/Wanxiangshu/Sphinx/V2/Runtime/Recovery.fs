@@ -118,11 +118,3 @@ module Recovery =
             [ InquiryId.value inquiryId
               WorkId.value workId
               string (Attempt.value attempt) ]
-
-    /// A restart may only claim at-most-once *semantic* adoption when the store can
-    /// identify a duplicate physical call. Without that, the honest claim is that a
-    /// duplicate may exist and is auditable.
-    let adoptionGuarantee (durableIdentity: bool) : string =
-        match durableIdentity with
-        | true -> "at-most-once semantic adoption, auditable duplicate physical calls"
-        | false -> "at-most-once semantic adoption only; duplicate physical calls are auditable but not excluded"

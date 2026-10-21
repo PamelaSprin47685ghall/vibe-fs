@@ -66,7 +66,6 @@ type HostForkRuntime =
             Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>
 
     member SendDeferredFirstPrompt: agentId: string -> Task<Result<unit, string>>
-    member DiscardDeferredFirstPrompt: agentId: string -> unit
     member internal Gate: obj
     member internal TerminalByName: Dictionary<string, string>
     member internal Sessions: ISessionHostPort
@@ -113,7 +112,6 @@ type HostForkRuntime =
     member DetachAndDrain: unit -> Task
     member Cancel: unit -> unit
     member List: unit -> AgentRecord list * PtyRecord list
-    member TryFindAgent: agentId: string -> AgentRecord option
     member internal OwnsAgent: agentId: string -> bool
     member internal EstablishedByProcess: agentId: string -> bool
     member internal EstablishedAgentIds: string list
@@ -150,7 +148,6 @@ type HostForkRuntime =
     member DrainOwnedWork: unit -> Task<unit>
     member internal InjectPendingPersistFailure: unit -> unit
     member CloseOwnedPtys: ?graceMs: int -> Task<unit>
-    member IsPtyCompletion: runId: string -> bool
     member TryBindTerminalName: name: string * id: PtyId -> Result<unit, string>
     member TryPtyByName: name: string -> PtyId option
     member ForkPty: command: string * agent: ManagedAgent * ?cwd: string -> Task<Result<PtyId, string>>

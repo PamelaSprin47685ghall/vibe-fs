@@ -73,5 +73,3 @@ module JsFragmentRegistry =
     val deliver: JsCapabilityFragment
     val additionalCapabilities: fragment: JsCapabilityFragment -> JsCapability list
     val all: JsCapabilityFragment list
-    val byCapability: Map<JsCapability, JsCapabilityFragment list>
-    val isProjected: capabilities: Set<JsCapability> -> fragment: JsCapabilityFragment -> bool

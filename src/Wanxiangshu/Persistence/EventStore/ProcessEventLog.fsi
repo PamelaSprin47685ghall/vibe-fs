@@ -47,8 +47,6 @@ module ProcessEventLog =
     val decodeWriterText: label: string -> text: string -> Result<EventEnvelope list, StorageInvalid>
     val decodeWriterBytes: label: string -> bytes: byte[] -> Result<EventEnvelope list, StorageInvalid>
     val readLastCompleteLine: path: string -> Result<string option, string>
-    val writerRetentionMilliseconds: unit -> float
-    val utcDayOf: timeMs: float -> float
     val isWriterActiveAt: nowMs: float -> lastActivityMs: float -> bool
     val writerPhysicalMetadata: commonDir: string -> WriterPhysicalMetadata list
     val internal withSegmentCap: cap: int -> work: (unit -> 'T) -> 'T

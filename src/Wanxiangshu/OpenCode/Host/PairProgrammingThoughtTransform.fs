@@ -102,8 +102,6 @@ module PairProgrammingThoughtTransform =
     /// real non-empty skill names remain ordinary executable Host skills.
     let toolName = "skill"
 
-    let skillName = ""
-
     let private isMarkerSource (markerSource: string) = markerSource = source
 
     /// HOST-013：marker 身份仅按 `info.source`。

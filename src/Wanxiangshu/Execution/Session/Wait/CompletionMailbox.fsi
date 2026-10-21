@@ -17,7 +17,6 @@ type CompletionMailbox =
     member Cancel: unit -> bool
     member PendingCount: int
     member PendingPtyCount: int
-    member PendingAgentWakeCount: int
     member IsCancelled: bool
 
 module CompletionMailboxRuntime =

@@ -25,7 +25,6 @@ type VerdictMailbox =
     member DrainAvailable: maxCount: int -> OrchestratorVerdict list
     member HasActive: bool
     member PendingCount: int
-    member TryJoinBatch: maxCount: int -> Task<OrchestratorVerdict list>
 
     member JoinAvailable:
         maxCount: int * interrupt: Task<JoinInterruptReason> -> Task<JoinWaitOutcome<OrchestratorVerdict>>

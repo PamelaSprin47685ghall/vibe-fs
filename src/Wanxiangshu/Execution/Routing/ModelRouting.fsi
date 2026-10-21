@@ -31,7 +31,6 @@ module ModelRouting =
     val bootstrapAndLoadAt: path: string -> template: string -> Task<obj>
     val bootstrapDefault: unit -> Task<obj>
     val toOpenCodeModel: target: ModelRoutingTarget -> OpencodeModel
-    val ofOpenCodeModel: model: OpencodeModel -> ModelRoutingTarget option
     val sameTarget: expected: ModelRoutingTarget -> observed: OpencodeModel -> bool
 
     type internal ModelRoutingRuntime =
@@ -164,8 +163,6 @@ module ModelRouting =
 
     val internal releaseExecutionAdmissionBeforeProvider:
         lease: ExecutionAdmissionLease -> observed: ExecutionAdmissionExactIdentity -> CapacityTransitionOutcome
-
-    val hasRuntime: unit -> bool
 
     val tryReserveManaged:
         sessionId: SessionId ->

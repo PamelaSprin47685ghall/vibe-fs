@@ -46,20 +46,3 @@ module PackageResources =
     /// True when `resources/<relativeResourcePath>` exists (file or directory).
     let exists (relativeResourcePath: string) : bool =
         existsSync (resolveResource relativeResourcePath)
-
-    /// Child directory basenames under `resources/<relativeDir>`, lexical sort.
-    /// Files (e.g. leftover catalog.json) are ignored. Missing parent → throw.
-    let listChildDirectoryNames (relativeDir: string) : string list =
-        let full = resolveResource relativeDir
-
-        if not (existsSync full) then
-            raise (InvalidOperationException(sprintf "package resource missing: %s" full))
-
-        readdirSync full
-        |> Array.toList
-        |> List.filter (fun name ->
-            try
-                statsIsDirectory (statSync (pathJoin (full, name)))
-            with _ ->
-                false)
-        |> List.sort

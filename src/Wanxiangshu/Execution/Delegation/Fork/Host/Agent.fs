@@ -540,10 +540,6 @@ module HostForkAgent =
 
     type HostForkRuntime with
 
-        /// Current durable Authority Root binding for an already-linked child.
-        member this.BoundManagedAgent(childId: SessionId) : string option =
-            HostForkBinding.managedAgent this.Journal childId
-
         /// PROMPT-008: `agent` is the managed agent name the caller selected, and
         /// it is required. It is never defaulted, and the selected name travels to the
         /// Host send boundary as chosen.

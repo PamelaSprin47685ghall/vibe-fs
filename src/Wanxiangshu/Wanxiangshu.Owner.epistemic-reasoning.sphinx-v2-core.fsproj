@@ -21,7 +21,6 @@
     <Compile Include="Sphinx/V2/Runtime/Ports.fsi"/><Compile Include="Sphinx/V2/Runtime/Ports.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Registry.fsi"/><Compile Include="Sphinx/V2/Runtime/Registry.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Admission.fsi"/><Compile Include="Sphinx/V2/Runtime/Admission.fs"/>
-    <Compile Include="Sphinx/V2/Runtime/Agenda.fsi"/><Compile Include="Sphinx/V2/Runtime/Agenda.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Context.fsi"/><Compile Include="Sphinx/V2/Runtime/Context.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Refinement.fsi"/><Compile Include="Sphinx/V2/Runtime/Refinement.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Decision.fsi"/><Compile Include="Sphinx/V2/Runtime/Decision.fs"/>

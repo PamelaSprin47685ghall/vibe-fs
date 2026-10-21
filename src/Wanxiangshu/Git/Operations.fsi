@@ -11,5 +11,3 @@ module GitOperations =
 
     val candidateCommit:
         runner: (Command -> Task<int * string * string>) -> dir: string -> msg: string -> Task<Result<unit, string>>
-
-    val createWithRunner: runner: (Command -> Task<int * string * string>) -> GitPort

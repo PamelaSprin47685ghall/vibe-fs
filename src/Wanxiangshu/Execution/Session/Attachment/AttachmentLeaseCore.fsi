@@ -58,7 +58,6 @@ type AttachmentLeaseRegistry =
     new: unit -> AttachmentLeaseRegistry
     member Bind: owner: SessionId * kind: AttachmentKind * lease: AttachmentLeaseCore.Lease -> unit
     member TryFind: owner: SessionId * kind: AttachmentKind -> AttachmentLeaseCore.Lease option
-    member TryFindScoped: owner: SessionId * kind: AttachmentKind -> AttachmentLeaseCore.Lease option
     member TryFindByChild: child: SessionId -> (SessionId * AttachmentKind) list
     member Snapshot: unit -> (SessionId * AttachmentKind) list
     member Remove: owner: SessionId * kind: AttachmentKind -> bool

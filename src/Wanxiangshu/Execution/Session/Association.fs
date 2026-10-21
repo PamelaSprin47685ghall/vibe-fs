@@ -124,11 +124,6 @@ module SessionAssociationProjection =
         | Some { Kind = ManagedSessionKind.SatelliteSession(main, SatelliteKind.Companion) } -> Some main
         | _ -> None
 
-    let tryOwnerOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
-        match tryFind sessionId current with
-        | Some { Kind = ManagedSessionKind.SatelliteSession(owner, _) } -> Some owner
-        | _ -> None
-
     let private workSession sessionId parent =
         { SessionId = sessionId
           Kind = ManagedSessionKind.WorkSession

@@ -40,8 +40,6 @@
     <Compile Include="Git/WorktreeResource.fs"/>
     <Compile Include="Change/Job.fsi"/>
     <Compile Include="Change/Job.fs"/>
-    <Compile Include="Change/Prompts.fsi"/>
-    <Compile Include="Change/Prompts.fs"/>
     <Compile Include="Change/Program.fsi"/>
     <Compile Include="Change/Program.fs"/>
     <Compile Include="Change/Runtime.fsi"/>

@@ -119,20 +119,6 @@ type VerdictMailbox(observer: IWaitObserver) =
 
             AsyncSupport.trySetResult waiter () |> ignore)
 
-    /// EXEC-019: first verdict wakes; immediately drain backlog; cap MaxJoinBatch; FIFO.
-    member this.TryJoinBatch(maxCount: int) : Task<OrchestratorVerdict list> =
-        let joinWhenCapped (cap: int) =
-            match this.DrainAvailable cap with
-            | _ :: _ as ready -> Task.FromResult ready
-            | [] ->
-                task {
-                    do! this.awaitSignal ()
-                    return this.DrainAvailable cap
-                }
-
-        let cap = min (max 0 maxCount) JoinBatch.Max
-        if cap <= 0 then Task.FromResult [] else joinWhenCapped cap
-
     member private _.signalOrEnqueue(waiter: TaskCompletionSource<unit>) =
         lock gate (fun () ->
             if verdicts.Count > 0 || active = 0 then

@@ -61,10 +61,6 @@ module ProviderLanguageBinding =
     let refreshGlobalLanguage () : unit =
         GlobalProviderLanguage.refresh readGlobalPreference
 
-    /// The one language resolution: the live global preference. The session id
-    /// is accepted so call sites keep one shape; it decides nothing.
-    let forSession (_sessionId: SessionId) : ProviderLanguage = GlobalProviderLanguage.current ()
-
     let forSessionText (sessionText: string) : ProviderLanguage =
         ignore sessionText
         GlobalProviderLanguage.current ()

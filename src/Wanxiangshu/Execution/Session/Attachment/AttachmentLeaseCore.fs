@@ -276,13 +276,6 @@ type AttachmentLeaseRegistry() =
     member _.Remove(owner: SessionId, kind: AttachmentKind) : bool =
         lock gate (fun () -> bindings.Remove(AttachmentLeaseCore.leaseKey owner kind))
 
-    /// One kind's lease for one owner. This is the axis the Sync family resolves
-    /// its `ReuseScopeId` lookup on: `ReuseScope.ofSession` is the identity wrap of
-    /// a SessionId value, so an owner IS its own scope and the scope axis is the
-    /// owner axis (see `AttachmentPort`).
-    member this.TryFindScoped(owner: SessionId, kind: AttachmentKind) : AttachmentLeaseCore.Lease option =
-        this.TryFind(owner, kind)
-
     /// Reverse lookup: which `(owner, kind)` currently holds this child. Used by
     /// callers that are handed a child id and must find its owner (Sync's
     /// scope-close and deleted-delegate paths).

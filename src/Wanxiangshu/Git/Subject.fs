@@ -39,51 +39,7 @@ module GitSubject =
 
     // --- common-dir ---
 
-    let revParseGitCommonDir (workspace: string) : Task<string> =
-        task {
-            let! result = execIn workspace [| "rev-parse"; "--git-common-dir" |]
-            return result.Trim()
-        }
-
     // --- tree-hash ---
-
-    let diffHeadBinary (directory: string) : Task<string> =
-        execIn directory [| "diff"; "HEAD"; "--binary"; "--no-ext-diff"; "--" |]
-
-    let lsFilesUntracked (directory: string) : Task<string> =
-        execIn directory [| "ls-files"; "--others"; "--exclude-standard" |]
-
-    let lsFilesUntrackedZ (directory: string) : Task<string> =
-        execIn directory [| "ls-files"; "--others"; "--exclude-standard"; "-z" |]
-
-    let statusPorcelainV2Z (directory: string) : Task<string> =
-        execIn directory [| "status"; "--porcelain=v2"; "-z"; "--untracked-files=all" |]
-
-    let lsFilesStageZ (directory: string) : Task<string> =
-        execIn directory [| "ls-files"; "--stage"; "-z" |]
-
-    let hashObjectNoFilters (directory: string) (path: string) : Task<string> =
-        task {
-            let! result = execIn directory [| "hash-object"; "--no-filters"; "--"; path |]
-            return result.Trim()
-        }
-
-    let revParseHeadTree (directory: string) : Task<string> =
-        task {
-            let! result = execIn directory [| "rev-parse"; "HEAD^{tree}" |]
-            return result.Trim()
-        }
-
-    let tryRevParseHeadTree (directory: string) : Task<string option> =
-        task {
-            try
-                let! output =
-                    execFileAsync execFileJs Executable [| "-C"; directory; "rev-parse"; "HEAD^{tree}" |] quietUtf8
-
-                return Some(output.Trim())
-            with _ ->
-                return None
-        }
 
 module GitPorcelain =
     type private Messages =

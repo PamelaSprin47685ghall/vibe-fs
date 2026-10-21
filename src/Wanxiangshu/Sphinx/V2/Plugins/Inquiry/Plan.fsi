@@ -35,4 +35,3 @@ type PlanFault =
 
 module Plan =
     val validateCard: PlanCard -> Result<unit, PlanFault>
-    val validateProposal: Set<string> -> PlanProposal -> Result<PlanProposal, PlanFault>

@@ -170,36 +170,6 @@ module RepositoryWarmStart =
         : Task<Result<string, string>> =
         prepareWithSearch SembleMcpClient.searchFromEnvironment sessionId role workspaceDirectory keywordsRaw charge
 
-    let prepareDocument
-        (sessionId: SessionId)
-        (role: Role)
-        (workspaceDirectory: string option)
-        (keywordsRaw: string)
-        (charge: string)
-        : Task<Result<LlmFacing.Document, string>> =
-        prepareDocumentWithSearch
-            SembleMcpClient.searchFromEnvironment
-            sessionId
-            role
-            workspaceDirectory
-            keywordsRaw
-            charge
-
-    let appendToBase
-        (sessionId: SessionId)
-        (role: Role)
-        (workspaceDirectory: string option)
-        (keywordsRaw: string)
-        (basePrompt: string)
-        : Task<Result<string, string>> =
-        appendToBaseWithSearch
-            SembleMcpClient.searchFromEnvironment
-            sessionId
-            role
-            workspaceDirectory
-            keywordsRaw
-            basePrompt
-
     let appendToBaseDocument
         (sessionId: SessionId)
         (role: Role)

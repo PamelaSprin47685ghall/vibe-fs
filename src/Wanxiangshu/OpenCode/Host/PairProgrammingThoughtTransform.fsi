@@ -46,7 +46,6 @@ module PairProgrammingThoughtTransform =
     /// HOST-013 borrows the Host-owned skill wire. Empty name is injection-only;
     /// real non-empty skill names remain ordinary executable Host skills.
     val toolName: string
-    val skillName: string
 
     /// HOST-013：marker 身份仅按 `info.source`。
     val isPairProgrammingThought: rawMsg: obj -> bool

@@ -393,6 +393,3 @@ module AdvisorSeat =
 
     let clearAll () : unit =
         lock registryGate (fun () -> seats.Clear())
-
-    /// advisor-[030] test/dev hook: drop every recorded consult fence.
-    let clearConsultFences () : unit = consultFences.Clear()

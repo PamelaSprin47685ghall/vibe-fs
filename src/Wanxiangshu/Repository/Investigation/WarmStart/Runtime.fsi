@@ -53,22 +53,6 @@ module RepositoryWarmStart =
         charge: string ->
             Task<Result<string, string>>
 
-    val prepareDocument:
-        sessionId: SessionId ->
-        role: Role ->
-        workspaceDirectory: string option ->
-        keywordsRaw: string ->
-        charge: string ->
-            Task<Result<LlmFacing.Document, string>>
-
-    val appendToBase:
-        sessionId: SessionId ->
-        role: Role ->
-        workspaceDirectory: string option ->
-        keywordsRaw: string ->
-        basePrompt: string ->
-            Task<Result<string, string>>
-
     val appendToBaseDocument:
         sessionId: SessionId ->
         role: Role ->

@@ -91,4 +91,3 @@ module ChatAdmissionIntent =
     val isHostInternal: message: DecodedMessage -> bool
 
     val resolve: message: DecodedMessage -> snapshot: DurableSnapshot -> Decision
-    val describeRejection: rejection: Rejection -> string

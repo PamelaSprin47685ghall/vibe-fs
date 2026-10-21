@@ -91,7 +91,5 @@ module InquiryState =
 
     val reservationKey: ReservationKey -> string
 
-    val trySlots: InquiryState -> string -> string -> string -> string -> CertificateSlotPatch list option
-
     val isTerminal: InquiryStatus -> bool
     val readyWork: InquiryState -> WorkItem list

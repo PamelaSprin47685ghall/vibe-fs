@@ -9,5 +9,4 @@ module ProviderLanguageBinding =
     val clearHostConfigPreferenceForTests: unit -> unit
     val readGlobalPreference: unit -> ProviderLanguage
     val refreshGlobalLanguage: unit -> unit
-    val forSession: _sessionId: SessionId -> ProviderLanguage
     val forSessionText: sessionText: string -> ProviderLanguage

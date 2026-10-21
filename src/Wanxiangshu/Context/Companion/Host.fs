@@ -19,7 +19,6 @@ type CompanionHost
 
     member _.Memory = companion.Memory
     member _.RefreshXTrace(state: XTraceProjectionState) = companion.RefreshXTrace(state)
-    member _.PrimarySessionId = primaryId
 
     interface IDisposable with
         member _.Dispose() = ()

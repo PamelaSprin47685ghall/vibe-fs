@@ -34,5 +34,4 @@ type SatelliteSpec =
 type CompanionLeaseRuntime =
     new: sessions: ISessionHostPort * registry: AttachmentLeaseRegistry -> CompanionLeaseRuntime
     member Ensure: owner: SessionId * spec: SatelliteSpec -> Task<Result<SatelliteLease, string>>
-    member Invalidate: owner: SessionId * kind: SatelliteKind -> unit
     member Retire: owner: SessionId * spec: SatelliteSpec -> Task<Result<unit, string>>

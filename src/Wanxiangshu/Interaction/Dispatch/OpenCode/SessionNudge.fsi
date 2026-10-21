@@ -160,17 +160,3 @@ module HostSessionNudge =
         terminalProviderRun: ProviderRunIdentity ->
         observer: ContinuationAcceptanceObserver option ->
             Task<IdleContinuationOutcome>
-
-    val trySendIdleInteractionRepair:
-        quiescence: ISessionQuiescenceGate ->
-        permit: QuiescencePermit ->
-        sessionPort: ISessionHostPort ->
-        rootWorkspace: IRootWorkspaceReader ->
-        sessionId: SessionId ->
-        prompt: string ->
-        directory: string option ->
-        journal: AgentJournal option ->
-        requestId: RepairRequestId ->
-        terminalProviderRun: ProviderRunIdentity ->
-        repairKind: string ->
-            Task<IdleContinuationOutcome>

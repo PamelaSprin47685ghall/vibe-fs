@@ -4,4 +4,3 @@ namespace Wanxiangshu.Ablation
 module AblationToolMap =
     val resetCache: unit -> unit
     val tryNode: toolName: string -> AblationNodeId option
-    val allTools: unit -> (string * AblationNodeId) list

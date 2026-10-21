@@ -209,22 +209,6 @@ module ModelRouting =
           modelID = target.Model.Substring(slash + 1)
           variant = Some target.Reasoning }
 
-    let ofOpenCodeModel (model: OpencodeModel) : ModelRoutingTarget option =
-        if
-            String.IsNullOrWhiteSpace model.providerID
-            || String.IsNullOrWhiteSpace model.modelID
-        then
-            None
-        else
-            model.variant
-            |> Option.bind (fun reasoning ->
-                if String.IsNullOrWhiteSpace reasoning then
-                    None
-                else
-                    Some
-                        { Model = model.providerID.Trim() + "/" + model.modelID.Trim()
-                          Reasoning = reasoning.Trim() })
-
     let private matchReasoning (expectedReasoning: string) (obsReasoning: string) =
         if String.IsNullOrWhiteSpace expectedReasoning then
             String.IsNullOrWhiteSpace obsReasoning
@@ -1933,9 +1917,6 @@ module ModelRouting =
         (observed: ExecutionAdmissionExactIdentity)
         =
         current().ReleaseExecutionAdmissionBeforeProvider(lease, observed)
-
-    let hasRuntime () : bool =
-        lock sharedGate (fun () -> sharedRuntime.IsSome)
 
     let tryReserveManaged
         (sessionId: SessionId)

@@ -34,8 +34,6 @@ module internal ModelCapacityQueue =
 
 type internal CapacityStepDemandQueue<'target> =
     new: unit -> CapacityStepDemandQueue<'target>
-    member NextSequence: unit -> int64
-    member TryAdd: demand: CapacityStepDemand<'target> -> bool
     member Remove: demand: CapacityStepDemand<'target> -> bool
     member Clear: unit -> unit
     member Snapshot: unit -> CapacityStepDemand<'target> array

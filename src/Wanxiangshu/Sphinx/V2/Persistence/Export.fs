@@ -43,17 +43,6 @@ module Export =
     let private error code message : Result<'value, ExportError> =
         Error { Code = code; Message = message }
 
-    /// What a bundle may claim. A redacted bundle never claims complete replay, and a
-    /// collocated-blob bundle never hides that its blobs are external.
-    let replayabilityOf (mode: ExportMode) (redacted: bool) (externalBlobs: bool) : Result<Replayability, ExportError> =
-        let summary = mode = ExportMode.Summary
-
-        match summary, redacted, externalBlobs with
-        | true, _, _ -> Ok Replayability.SummaryOnly
-        | false, true, _ -> Ok Replayability.SummaryOnly
-        | false, false, true -> Ok Replayability.RequiresExternalBlobs
-        | false, false, false -> Ok Replayability.Complete
-
     /// An export that cannot produce its own hashes is not an export.
     let validate (bundle: ExportBundle) : Result<ExportBundle, ExportError> =
         let blankHash =

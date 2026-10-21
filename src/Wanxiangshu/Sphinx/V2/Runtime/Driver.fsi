@@ -15,6 +15,5 @@ type AdvancePlan =
       Outcome: AdvanceOutcome }
 
 module Driver =
-    val maxPureSteps: int
     val advance: InquiryState -> AdvancePlan
     val classify: InquiryState -> AdvanceOutcome

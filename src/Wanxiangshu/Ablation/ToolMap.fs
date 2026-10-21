@@ -22,5 +22,3 @@ module AblationToolMap =
     let resetCache () = cached <- None
 
     let tryNode (toolName: string) = map () |> Map.tryFind toolName
-
-    let allTools () = map () |> Map.toList

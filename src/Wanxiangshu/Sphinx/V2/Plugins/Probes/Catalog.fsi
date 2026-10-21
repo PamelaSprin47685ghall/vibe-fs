@@ -25,10 +25,6 @@ module Catalog =
     /// The shared envelope every probe response carries.
     val sharedResponseFields: string list
 
-    /// `applicability` is one of three honest answers, and "not-applicable" is a
-    /// successful result rather than a retry signal.
-    val applicabilityValues: string list
-
     /// The 16 probes. The count is not a product target.
     val all: ProbeManifest list
 

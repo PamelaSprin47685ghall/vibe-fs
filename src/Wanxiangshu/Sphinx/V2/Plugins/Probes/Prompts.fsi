@@ -14,10 +14,6 @@ type QuestionTemplate =
     | AnswerNowVersusInvestigate
 
 module Prompts =
-    /// The shared prefix every protocol compiler assembles. A probe never rewrites the goal.
-    val goalPrefix: string -> string -> string -> string list -> string
-    val defaultTemplates: QuestionTemplate list
-    val templateId: QuestionTemplate -> string
 
     /// The rendered question. `goalPrefixBody` is versioned text, not a seam for a
     /// probe to substitute its own target.

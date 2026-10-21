@@ -36,12 +36,9 @@ module AblationGate =
     /// The registry explicitly installed, without consulting the environment.
     val installedRegistry: unit -> AblationRegistry option
 
-    val deniedPath: string
-
     val toolDenied: registry: AblationRegistry -> toolName: string -> bool
     val toolSchemaDenied: registry: AblationRegistry -> toolName: string -> bool
     val filterToolPermissionMap: registry: AblationRegistry -> permissions: Map<string, bool> -> Map<string, bool>
-    val filterKnownToolNames: registry: AblationRegistry -> names: string list -> string list
 
     val deniedFactPath: string
 

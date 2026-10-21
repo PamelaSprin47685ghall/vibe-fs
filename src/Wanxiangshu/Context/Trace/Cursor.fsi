@@ -40,4 +40,3 @@ module RecordCoverage =
     val create: ingestedThrough: XTraceCursor -> RecordCoverage
     val ingestedThrough: coverage: RecordCoverage -> XTraceCursor
     val covers: cursor: XTraceCursor -> coverage: RecordCoverage -> bool
-    val firstUncoveredCursor: coverage: RecordCoverage -> XTraceCursor

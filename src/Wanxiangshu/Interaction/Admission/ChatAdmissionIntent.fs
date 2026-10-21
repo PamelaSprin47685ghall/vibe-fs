@@ -360,33 +360,3 @@ module ChatAdmissionIntent =
 
         AdmissionLaw.law.admit (admissionInput message snapshot observed)
         |> decide message snapshot observed
-
-    let describeRejection (rejection: Rejection) : string =
-        match rejection with
-        | Rejection.MalformedIdentityCarrier carrier ->
-            sprintf "Malformed identity carrier: %s" (identityCarrierName carrier)
-        | Rejection.ManagedIntentMissingSessionId -> "Managed chat intent requires a SessionId"
-        | Rejection.ManagedIntentMissingPhysicalUserMessageId ->
-            "Managed chat intent requires an exact PhysicalUserMessageId"
-        | Rejection.DurableAuthorityUnavailable -> "Managed chat intent requires a durable authority snapshot"
-        | Rejection.InvalidExplicitAgent agent ->
-            sprintf "HumanRoot participant identity resolution failed for %s" agent
-        | Rejection.AcceptedParticipantConflict(key, acceptedAgent, requestedAgent) ->
-            sprintf
-                "accepted participant conflict for %s/%s: accepted %s, requested %s"
-                (SessionId.value key.SessionId)
-                (PhysicalUserMessageId.value key.PhysicalUserMessageId)
-                acceptedAgent
-                requestedAgent
-        | Rejection.PromptKeyNotClaimed promptKey ->
-            sprintf "PromptKey %s is not an exact pending claim" (PromptKey.value promptKey)
-        | Rejection.AgentOwnerRootPromptNotClaimed(promptKey, _) ->
-            sprintf "AgentOwnerRoot PromptKey %s is not an exact pending claim" (PromptKey.value promptKey)
-        | Rejection.PromptClaimSessionMismatch(expectedSessionId, claimedSessionId) ->
-            sprintf
-                "Prompt claim session mismatch: expected %s, claimed %s"
-                (SessionId.value expectedSessionId)
-                (SessionId.value claimedSessionId)
-        | Rejection.PromptClaimOriginNotAdmissible(promptKey, _) ->
-            sprintf "PromptKey %s has a non-admissible origin" (PromptKey.value promptKey)
-        | Rejection.UnknownOriginWhileActive -> "UnknownOrigin cannot enter an active Logical Run"

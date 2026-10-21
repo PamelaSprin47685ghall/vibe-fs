@@ -59,12 +59,9 @@ module AblationNodeId =
 module AblationMode =
     val parse: raw: string -> AblationMode option
     val wire: mode: AblationMode -> string
-    val allowsToolExecution: mode: AblationMode -> bool
     val allowsToolSchema: mode: AblationMode -> bool
 
 [<RequireQualifiedAccess>]
 module AblationRegistry =
     val modeFor: id: AblationNodeId -> registry: AblationRegistry -> AblationMode
     val isActive: id: AblationNodeId -> registry: AblationRegistry -> bool
-    val isBorrowedOrActive: id: AblationNodeId -> registry: AblationRegistry -> bool
-    val tryFindNode: id: AblationNodeId -> registry: AblationRegistry -> ManifestNode option

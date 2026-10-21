@@ -40,17 +40,6 @@ type internal CapacityStepDemandQueue<'target>() =
     // DSL-MUTABLE: resource
     let mutable nextCapacityDemandSequence = 0L
 
-    member _.NextSequence() =
-        nextCapacityDemandSequence <- nextCapacityDemandSequence + 1L
-        nextCapacityDemandSequence
-
-    member _.TryAdd(demand) =
-        if demands.Count >= ModelCapacityQueue.MaximumPendingDemands then
-            false
-        else
-            demands.Add demand
-            true
-
     member _.Remove(demand) = demands.Remove demand
     member _.Clear() = demands.Clear()
     member _.Snapshot() = demands.ToArray()

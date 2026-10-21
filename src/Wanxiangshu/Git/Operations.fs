@@ -305,5 +305,3 @@ module GitOperations =
                     repoPath
                     (targetSpec target)
                     (sprintf "target branch not found: %s" (TargetRef.value target)) }
-
-    let createWithRunner runner = createWithRepo "." runner

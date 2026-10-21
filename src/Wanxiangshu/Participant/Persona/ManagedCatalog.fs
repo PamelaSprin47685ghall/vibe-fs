@@ -70,9 +70,6 @@ module ManagedAgentCatalog =
     /// Only Engineer is forkable by Manager.
     let managerForkableRoles: Role list = [ Role.Engineer ]
 
-    /// InternalLeaf Bookkeeper — not a public Role.
-    let bookkeeperNames: string list = [ "bookkeeper" ]
-
     let bookkeeperName: string = "bookkeeper"
 
     let isBookkeeperName (name: string) : bool = name.ToLowerInvariant() = "bookkeeper"
@@ -85,8 +82,6 @@ module ManagedAgentCatalog =
         managerForkableRoles |> List.map Roles.roleLabel
 
     let orchestratorForkableNames: string list = [ Roles.roleLabel Role.Manager ]
-
-    let engineerToolNames: string list = [ Roles.roleLabel Role.Engineer ]
 
     /// Retired participant names, owned by `wanxiangli/identity` (CUT-07).
     let legacyAgentNames: Set<string> =

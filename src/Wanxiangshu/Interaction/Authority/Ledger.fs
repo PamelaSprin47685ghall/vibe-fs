@@ -56,49 +56,6 @@ module PromptAuthorityLedger =
             closeActiveRun profile projection
         | _ -> projection
 
-    /// PROMPT-005 `Claimed`.
-    let foldPromptClaimed
-        (runtimeStartCount: int)
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        (fact:
-            {| PromptKey: PromptKey
-               SessionId: SessionId
-               ContinuationKind: string
-               LogicalRunId: LogicalRunId option
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId option
-               IdentitySeed: PromptIdentitySeed
-               PayloadDigest: string |})
-        =
-        let origin =
-            if fact.ContinuationKind = "AgentOwnerRoot" then
-                Some(PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
-            else
-                PromptAuthority.tryParseContinuationKind fact.ContinuationKind
-                |> Option.map PromptAuthority.PromptOrigin.Continuation
-
-        match origin with
-        // PROMPT-004: UnknownOrigin fails closed. A registered claim with an
-        // unrecognised origin would later resolve into whatever the resolution
-        // order defaults to.
-        | None -> projection
-        | Some resolvedOrigin ->
-            let claim: PromptAuthority.PromptClaim =
-                { PromptKey = fact.PromptKey
-                  SessionId = fact.SessionId
-                  Origin = resolvedOrigin
-                  LogicalRunId = fact.LogicalRunId
-                  AuthorityRootUserMessageId = fact.AuthorityRootUserMessageId
-                  IdentitySeed = fact.IdentitySeed
-                  PayloadDigest = fact.PayloadDigest
-                  // PROMPT-005: `Claimed` precedes the Host call, so no transport
-                  // receipt can exist yet. `foldPromptSubmitted` attaches it.
-                  Receipt = None
-                  // PROMPT-011: watermark of the workspace RuntimeStartCount.
-                  // Subsequent RuntimeStarted envelopes only advance that counter.
-                  ClaimedAtRuntimeStartCount = runtimeStartCount }
-
-            PromptAuthorityRun.registerClaim claim projection
-
     /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
     ///
     /// The receipt lands on the pending claim. It used to be discarded (`_fact ->

@@ -72,14 +72,6 @@ module XTraceCapture =
         providerRun: ProviderRunIdentity ->
             Task<Result<XTraceCaptureReceipt, XTraceCaptureError>>
 
-    val captureTerminalBlobWithReceipt:
-        journal: AgentJournal option ->
-        sessionId: SessionId ->
-        textRef: BlobRef ->
-        textDigest: BlobDigest ->
-        providerRun: ProviderRunIdentity ->
-            Task<Result<XTraceCaptureReceipt, XTraceCaptureError>>
-
     val captureTerminalWithReceipt:
         journal: AgentJournal option -> turn: ReconciledTurn -> Task<Result<XTraceCaptureReceipt, XTraceCaptureError>>
 

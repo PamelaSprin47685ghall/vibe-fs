@@ -37,4 +37,3 @@ type StopFault =
 module Stop =
     val reasonName: StopReason -> string
     val isModelRelative: StopReason -> bool
-    val validateClaim: StopClaim -> Result<StopClaim, StopFault>

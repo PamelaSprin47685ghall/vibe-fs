@@ -132,16 +132,6 @@ module JsToolsData =
             with _ ->
                 Error JsFailure.InvalidReturnValue
 
-    /// Extract the payload from a parked sentinel JSON string. The sentinel is
-    /// produced by the park signal path; its payload is the value the program
-    /// passed to `await this.park(payload)`.
-    let parseParkedPayload (json: string) : obj =
-        try
-            let payload = JS.JSON.parse json
-            jsGet payload "payload"
-        with _ ->
-            null
-
 /// The task a delivery serves. The durable witness names the same three
 /// references; this layer states them in its own vocabulary because it runs
 /// below the host turn and cannot reach the host's witness type.
@@ -1118,35 +1108,6 @@ module JsToolWorkflow =
             return Failed(JsFailure.Abandoned, [], [], [], [])
         }
 
-    /// Run a program whose api is supplied by the caller but whose park
-    /// lifecycle, race and outcome rendering stay workflow-owned. The plan
-    /// tenure sandbox uses this so `this.ask` suspends through the same site
-    /// table as the generated surfaces.
-    let runWithParkApi
-        (sessionId: string)
-        (baseClassSource: string)
-        (modelSource: string)
-        (makeApi: Wanxiangshu.Process.JsSandbox.ParkState -> obj)
-        (deadlineMs: int)
-        (deadlineEpochMs: int64)
-        (outputBoundBytes: int)
-        : Task<JsToolOutcome> =
-        runProgramCore
-            sessionId
-            None
-            None
-            Set.empty
-            ""
-            baseClassSource
-            modelSource
-            deadlineMs
-            deadlineEpochMs
-            outputBoundBytes
-            None
-            None
-            None
-            (fun _ parkState -> makeApi parkState)
-
     [<RequireQualifiedAccess>]
     type private ToolWorkflowInvocation =
         | Program of source: string
@@ -1298,38 +1259,6 @@ module JsToolWorkflow =
         executeWithReviewCheckAndDelivery
             reviewCheck
             None
-            sessionId
-            fence
-            capabilities
-            root
-            baseClassSource
-            input
-            deadlineMs
-            deadlineEpochMs
-            outputBoundBytes
-            persistence
-            lifecyclePersistence
-            fileAccessObservation
-
-    /// One js-* invocation whose delivery commits a durable witness.
-    let executeWithDelivery
-        settlement
-        sessionId
-        fence
-        capabilities
-        root
-        baseClassSource
-        (input: obj)
-        deadlineMs
-        deadlineEpochMs
-        outputBoundBytes
-        persistence
-        lifecyclePersistence
-        fileAccessObservation
-        =
-        executeWithReviewCheckAndDelivery
-            None
-            settlement
             sessionId
             fence
             capabilities

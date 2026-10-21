@@ -23,8 +23,6 @@ module ProviderRunBinding =
     /// only evidence missing is the not-yet-projected assistant message.
     val projectionCatchupMaxReads: int
 
-    val projectionCatchupDelayMilliseconds: int
-
     val quiescedRun: messages: SessionMessage list -> Result<SessionMessage, Rejection>
 
     /// Bind one physical user message to exactly one unsealed assistant child

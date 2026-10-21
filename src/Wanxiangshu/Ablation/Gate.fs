@@ -49,8 +49,6 @@ module AblationGate =
     /// different one — "did anyone install anything" — and must not fall back.
     let installedRegistry () : AblationRegistry option = registryCell
 
-    let deniedPath = "tool/registry/denied-ablation"
-
     /// A node is denied only when the registry ablates it; active and borrowed both
     /// stay reachable. Unmapped tags are denied by nobody.
     let private nodeDenied (registry: AblationRegistry) (node: AblationNodeId) =
@@ -84,9 +82,6 @@ module AblationGate =
     let filterToolPermissionMap (registry: AblationRegistry) (permissions: Map<string, bool>) =
         permissions
         |> Map.map (fun name allowed -> allowed && not (toolSchemaDenied registry name))
-
-    let filterKnownToolNames (registry: AblationRegistry) (names: string list) =
-        names |> List.filter (fun name -> not (toolSchemaDenied registry name))
 
     let deniedFactPath = "journal/denied-ablation"
 

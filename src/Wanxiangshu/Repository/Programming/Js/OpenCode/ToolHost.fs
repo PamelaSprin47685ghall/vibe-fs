@@ -414,28 +414,3 @@ module JsToolSpec =
             fileAccessObservation
             rootOf
             settlementOf
-
-    /// Build a ToolSpec with dedicated ToolAdmission.
-    let createWithAdmission
-        (factory: HostToolFactory)
-        (surface: JsSurface)
-        (admission: ToolAdmission)
-        (workspaceRoot: string)
-        (persistence: IJsTransactionPersistence option)
-        (lifecyclePersistence: IJsLifecyclePersistence option)
-        (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
-        (rootOf: string -> string)
-        (settlementOf: HostToolContext -> Task<DeliverySettlement option>)
-        : ToolSpec =
-        let spec =
-            create
-                factory
-                surface
-                workspaceRoot
-                persistence
-                lifecyclePersistence
-                fileAccessObservation
-                rootOf
-                settlementOf
-
-        { spec with Admission = admission }

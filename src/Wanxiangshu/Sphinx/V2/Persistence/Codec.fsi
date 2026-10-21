@@ -22,9 +22,6 @@ module Codec =
     val decodeInput: obj -> Result<TransitionBatch, CodecError>
     val decode: (string -> string) -> EventEnvelope -> Result<TransitionBatch, CodecError>
 
-    /// The event body tag the Integrator routes on.
-    val bodyTag: InquiryEventBody -> string
-
     /// Native @2 payload: schemaVersion/inquiry/previousRevision/previousHead/revision,
     /// commandId/commandFingerprint/postStateFingerprint/events. Revisions are exact
     /// int64 decimal strings; bodies are { case: string, payload: native DTO }; all

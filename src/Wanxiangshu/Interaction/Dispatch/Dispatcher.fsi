@@ -106,15 +106,7 @@ module PromptDispatcher =
 
         member ActiveProfile: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
 
-        member ResolveOrigin:
-            physicalMessageId: PhysicalUserMessageId ->
-            promptKey: PromptKey option ->
-            hostCompaction: bool ->
-            sessionId: SessionId ->
-                PromptAuthority.PromptOrigin
-
         member PendingClaim: sessionId: SessionId * promptKey: PromptKey -> PromptAuthority.PromptClaim option
-        member DispatchAccepted: sessionId: SessionId * claim: PromptAuthority.PromptClaim -> bool
 
         member GateNudgeAlreadyAdmitted:
             profile: PromptAuthority.AuthorityExecutionProfile ->

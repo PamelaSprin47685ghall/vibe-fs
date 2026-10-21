@@ -8,8 +8,6 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module SessionStartedAtLedger =
 
-    let tryStartedAt (port: SessionStartedAtPort) sessionId = port.TryStartedAt sessionId
-
     let bind (port: SessionStartedAtPort) sessionId (candidate: DateTimeOffset) : Task<Result<DateTimeOffset, string>> =
         port.Bind sessionId candidate
 

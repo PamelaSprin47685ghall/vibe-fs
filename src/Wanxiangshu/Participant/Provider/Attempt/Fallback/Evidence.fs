@@ -8,12 +8,6 @@ module ProviderFailureEvidence =
 
     let currentState (state: ProviderFailureProjection option) : ProviderFailureProjection option = state
 
-    let tryCurrentState (state: ProviderFailureProjection option) : ProviderFailureProjection option =
-        currentState state
-
-    let currentBudget (state: ProviderFailureProjection option) : ProviderFailureBudget.FailureBudget option =
-        currentState state |> Option.map (fun failure -> failure.Budget)
-
     let mayRetry (budgetLimit: int) (state: ProviderFailureProjection option) : bool =
         currentState state
         |> Option.map (ProviderFailureProjection.mayRetry budgetLimit)

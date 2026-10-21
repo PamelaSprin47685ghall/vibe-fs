@@ -260,10 +260,6 @@ module ProcessEventLog =
 
     let private retention: obj = constructRetention retentionClass
 
-    let utcDayOf (timeMs: float) : float = unbox<float> (retention?utcDay timeMs)
-
-    let writerRetentionMilliseconds () : float = unbox<float> retention?dayMilliseconds
-
     let isWriterActiveAt (nowMs: float) (lastActivityMs: float) : bool =
         unbox<bool> (retention?isRetained (nowMs, lastActivityMs))
 

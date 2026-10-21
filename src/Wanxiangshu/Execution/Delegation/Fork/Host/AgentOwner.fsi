@@ -8,14 +8,6 @@ open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 module HostForkAgentOwner =
-    val sendFirstPrompt:
-        sessions: ISessionHostPort ->
-        journal: AgentJournal option ->
-        childId: SessionId ->
-        identitySeed: PromptAuthority.IdentitySeed ->
-        directory: string option ->
-        prompt: string ->
-            Task<Result<PromptKey, string>>
 
     val sendFirstPromptObserved:
         sessions: ISessionHostPort ->

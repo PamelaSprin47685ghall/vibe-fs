@@ -10,7 +10,6 @@ module JsToolsData =
     val parse: json: string -> Result<obj, JsFailure>
     val isDelivered: json: string -> bool
     val parseOutcome: json: string -> Result<obj, JsFailure>
-    val parseParkedPayload: json: string -> obj
 
 /// The task a delivery serves. The durable witness names the same three
 /// references; this layer states them in its own vocabulary because it runs
@@ -133,25 +132,6 @@ module JsToolWorkflow =
         fileAccessObservation: FileAccessObservation option ->
             Task<JsToolOutcome>
 
-    /// Execute one js-* tool invocation whose delivery commits a durable
-    /// delivery witness: the settlement carries the host's attribution of the
-    /// call and the durable place its witness goes.
-    val executeWithDelivery:
-        settlement: DeliverySettlement option ->
-        sessionId: string ->
-        fence: (Wanxiangshu.Foundation.Identity.ProviderRunIdentity * Wanxiangshu.Foundation.Identity.ToolCallId) option ->
-        capabilities: Set<JsCapability> ->
-        root: string ->
-        baseClassSource: string ->
-        input: obj ->
-        deadlineMs: int ->
-        deadlineEpochMs: int64 ->
-        outputBoundBytes: int ->
-        persistence: IJsTransactionPersistence option ->
-        lifecyclePersistence: IJsLifecyclePersistence option ->
-        fileAccessObservation: FileAccessObservation option ->
-            Task<JsToolOutcome>
-
     val executeWithReviewCheck:
         reviewCheck: (unit -> Task<bool>) option ->
         sessionId: string ->
@@ -185,18 +165,6 @@ module JsToolWorkflow =
         persistence: IJsTransactionPersistence option ->
         lifecyclePersistence: IJsLifecyclePersistence option ->
         fileAccessObservation: FileAccessObservation option ->
-            Task<JsToolOutcome>
-
-    /// Run a program whose api is caller-supplied while the park lifecycle,
-    /// race and outcome stay workflow-owned (the plan tenure sandbox).
-    val runWithParkApi:
-        sessionId: string ->
-        baseClassSource: string ->
-        modelSource: string ->
-        makeApi: (Wanxiangshu.Process.JsSandbox.ParkState -> obj) ->
-        deadlineMs: int ->
-        deadlineEpochMs: int64 ->
-        outputBoundBytes: int ->
             Task<JsToolOutcome>
 
     /// Why a js-* input is contradictory: it carries more than one of

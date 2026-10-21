@@ -70,9 +70,6 @@ module HostForkAgentOwner =
         | None -> Task.FromResult(Error "No journal: an AgentOwnerRoot prompt cannot be claimed")
         | Some durable -> sendClaimed durable
 
-    let sendFirstPrompt sessions journal childId identitySeed directory prompt =
-        sendFirstPromptCore sessions journal childId identitySeed directory prompt None
-
     let sendFirstPromptObserved sessions journal childId identitySeed directory prompt onAccepted =
         HostForkRunLifecycle.sendAgentOwnerRootObserved
             sessions

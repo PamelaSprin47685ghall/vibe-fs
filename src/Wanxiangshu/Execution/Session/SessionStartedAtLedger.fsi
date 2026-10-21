@@ -7,7 +7,6 @@ open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
 module SessionStartedAtLedger =
-    val tryStartedAt: port: SessionStartedAtPort -> sessionId: SessionId -> DateTimeOffset option
 
     val bind:
         port: SessionStartedAtPort ->

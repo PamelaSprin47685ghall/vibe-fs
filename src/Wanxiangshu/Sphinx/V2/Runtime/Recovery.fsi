@@ -42,6 +42,3 @@ module Recovery =
 
     /// Intent identity is the reconciliation key: two restarts must converge on one child.
     val intentKey: InquiryId -> WorkId -> Attempt -> string
-
-    /// What the store can honestly claim about duplicate physical calls.
-    val adoptionGuarantee: bool -> string

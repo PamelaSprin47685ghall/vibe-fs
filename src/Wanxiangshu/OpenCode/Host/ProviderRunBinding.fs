@@ -26,8 +26,6 @@ module ProviderRunBinding =
     /// Identity rejections are never retried.
     let projectionCatchupMaxReads = 6
 
-    let projectionCatchupDelayMilliseconds = 10
-
     let private confirmLatestRun single latest =
         if latest.Id = single.Id then
             Ok single

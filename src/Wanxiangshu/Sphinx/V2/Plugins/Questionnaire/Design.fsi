@@ -33,6 +33,4 @@ type RoundDesign =
 type DesignError = { Code: string; Message: string }
 
 module Design =
-    val buildAssignment: string -> string list -> Assignment
     val tryValidate: RoundDesign -> Result<RoundDesign, DesignError>
-    val workerView: RoundDesign -> (string * string) list

@@ -18,6 +18,5 @@ type CompanionHost =
 
     member Memory: CompanionMemory
     member RefreshXTrace: state: XTraceProjectionState -> unit
-    member PrimarySessionId: SessionId
 
     interface IDisposable
