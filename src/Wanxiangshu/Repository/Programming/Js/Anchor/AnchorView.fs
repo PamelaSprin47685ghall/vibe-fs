@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
+open Fable.Core
+
 /// Shared view projection. Each operation replaces its captured, latest interval.
 [<RequireQualifiedAccess>]
 module AnchorView =
@@ -80,6 +82,18 @@ module AnchorView =
             | Summarized(message, summary) -> message.Id |> Option.map numberOf |> Option.defaultValue 0, summary
             | OpeningSummary summary -> 0, summary)
 
-    /// A material identity includes its representative and exact rendered bytes.
-    let materialKey (anchor: int) (text: string) =
-        string anchor + ":" + string text.Length + ":" + text
+    [<AllowNullLiteral>]
+    type private MaterialIdentityLaw =
+        abstract materialKey: anchor: int * text: string -> string
+
+    [<Import("AdvisorLaw", "wanxiangli/advisor")>]
+    let private advisorLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : MaterialIdentityLaw = jsNative
+
+    let private identityLaw = construct advisorLawClass
+
+    /// A material identity includes its representative and exact rendered bytes. The identity
+    /// law is owned by `wanxiangli/advisor` (CUT-39); handoff selection and advisor deltas share it.
+    let materialKey (anchor: int) (text: string) = identityLaw.materialKey (anchor, text)

@@ -28,52 +28,13 @@ module GitSubject =
     let execIn (directory: string) (arguments: string array) : Task<string> =
         execFileAsync execFileJs Executable (Array.append [| "-C"; directory |] arguments) utf8
 
-    // --- common-dir ---
+    // --- worktree root ---
 
-    let revParseGitCommonDir (workspace: string) : Task<string> =
+    /// The worktree root of `directory`, not the entry directory and not the common Git dir.
+    let revParseShowToplevel (directory: string) : Task<string> =
         task {
-            let! result = execIn workspace [| "rev-parse"; "--git-common-dir" |]
-            return result.Trim()
-        }
-
-    // --- tree-hash ---
-
-    let diffHeadBinary (directory: string) : Task<string> =
-        execIn directory [| "diff"; "HEAD"; "--binary"; "--no-ext-diff"; "--" |]
-
-    let lsFilesUntracked (directory: string) : Task<string> =
-        execIn directory [| "ls-files"; "--others"; "--exclude-standard" |]
-
-    let lsFilesUntrackedZ (directory: string) : Task<string> =
-        execIn directory [| "ls-files"; "--others"; "--exclude-standard"; "-z" |]
-
-    let statusPorcelainV2Z (directory: string) : Task<string> =
-        execIn directory [| "status"; "--porcelain=v2"; "-z"; "--untracked-files=all" |]
-
-    let lsFilesStageZ (directory: string) : Task<string> =
-        execIn directory [| "ls-files"; "--stage"; "-z" |]
-
-    let hashObjectNoFilters (directory: string) (path: string) : Task<string> =
-        task {
-            let! result = execIn directory [| "hash-object"; "--no-filters"; "--"; path |]
-            return result.Trim()
-        }
-
-    let revParseHeadTree (directory: string) : Task<string> =
-        task {
-            let! result = execIn directory [| "rev-parse"; "HEAD^{tree}" |]
-            return result.Trim()
-        }
-
-    let tryRevParseHeadTree (directory: string) : Task<string option> =
-        task {
-            try
-                let! output =
-                    execFileAsync execFileJs Executable [| "-C"; directory; "rev-parse"; "HEAD^{tree}" |] quietUtf8
-
-                return Some(output.Trim())
-            with _ ->
-                return None
+            let! raw = execIn directory [| "rev-parse"; "--show-toplevel" |]
+            return raw.TrimEnd('\r', '\n')
         }
 
 module GitPorcelain =
@@ -85,6 +46,8 @@ module GitPorcelain =
         abstract isManagerBranch: reference: string -> bool
         abstract managerBranchOf: jobId: string -> string
         abstract rebaseStatePaths: merge: obj * apply: obj -> string array
+        abstract staleWorktrees: entries: obj array * owned: string array -> string array
+        abstract staleBranches: branches: string array * owned: string array -> string array
 
     [<Import("GitPorcelain", "wanxiangli/git-porcelain")>]
     let private factory: unit -> Messages = jsNative
@@ -123,3 +86,20 @@ module GitPorcelain =
             createObj [ "code" ==> applyCode; "path" ==> applyPath ]
         )
         |> Array.toList
+
+    let staleWorktrees (entries: (string * string option) list) (owned: string list) : string list =
+        let wire =
+            entries
+            |> List.map (fun (path, branch) ->
+                createObj
+                    [ "path" ==> path
+                      "branch"
+                      ==> (match branch with
+                           | Some value -> box value
+                           | None -> null) ])
+            |> List.toArray
+
+        law.staleWorktrees (wire, List.toArray owned) |> Array.toList
+
+    let staleBranches (branches: string list) (owned: string list) : string list =
+        law.staleBranches (List.toArray branches, List.toArray owned) |> Array.toList

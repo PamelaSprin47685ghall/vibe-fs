@@ -118,7 +118,7 @@
     {
       "id": "F08",
       "ownerRequirement": "dispatch-protocol",
-      "sourceSymbol": "Interaction/Dispatch/OpenCode/SessionNudge.fs :: NudgeToDispatchSessionPort — ReportFatalDiagnostic arm removed under W4",
+      "sourceSymbol": "Interaction/Dispatch/SessionNudge.fs :: NudgeToDispatchSessionPort — ReportFatalDiagnostic arm removed under W4",
       "operation": "dynamic (caller-supplied operation string)",
       "triggerBranch": "The continuation-send adapter implements IDispatchSessionPort.ReportFatalDiagnostic by forwarding to FatalProcess.trip,",
       "inputSource": "Continuation/nudge repair sends via toDispatchPort at SessionNudge.fs use sites (idle-gate repair, interaction repair, nudge/AABB sends),",
@@ -270,7 +270,7 @@
     {
       "id": "F32",
       "ownerRequirement": "host-boundary",
-      "sourceSymbol": "OpenCode/Host/Diagnostic.fs :: Diagnostic.fatal + Foundation/FatalProcess.fs :: FatalProcess.kill/trip/physicalKill",
+      "sourceSymbol": "Foundation/Diagnostic.fs :: Diagnostic.fatal + Foundation/FatalProcess.fs :: FatalProcess.kill/trip/physicalKill",
       "operation": "dynamic (physical exit adapter itself; per-call operation strings belong to F-rows above)",
       "triggerBranch": "Diagnostic.fatal: validate fields → console.error one JSON line (fallback line on render failure) → FatalProcess.kill. FatalProcess.trip: console.error JSON {operation,result} → kill. kill → physicalKill: single gate WANXIANGSHU_NO_FATAL_EXIT; else process.kill(pid,SIGKILL), fallback process.exit(1), else throw (never returns in production),",
       "inputSource": "All F-row call sites + any future caller holding the composed capability,",

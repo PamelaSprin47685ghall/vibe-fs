@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.Advisor
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js.Anchor
@@ -19,8 +21,22 @@ type AdvisorViewPlan =
       HasNewMaterial: bool }
 
 /// The shared view is generated first. Delivery facts filter its output, never its input.
+/// The delta law (filter the generated view by delivered identities, in view order) is owned by
+/// `wanxiangli/advisor` (CUT-39); this host keeps view generation and TOML rendering.
 [<RequireQualifiedAccess>]
 module AdvisorView =
+    [<AllowNullLiteral>]
+    type private AdvisorDeltaLaw =
+        abstract plan: delivered: string array * material: obj array -> obj
+
+    [<Import("AdvisorLaw", "wanxiangli/advisor")>]
+    let private advisorLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : AdvisorDeltaLaw = jsNative
+
+    let private law = construct advisorLawClass
+
     let private headerLines language =
         ProviderProse.instructionLines (ProviderLanguage.parse language) "lifecycle/advisor/view" Map.empty
 
@@ -43,16 +59,21 @@ module AdvisorView =
         let entries, _ =
             AnchorView.generate numberOf (fun _ -> 0) request.History request.Declaration messages
 
-        let view = AnchorView.material numberOf entries
+        let material =
+            AnchorView.material numberOf entries
+            |> List.map (fun (anchor, text) -> createObj [ "anchor" ==> anchor; "text" ==> text ])
+            |> List.toArray
 
-        let delta =
-            view
-            |> List.filter (fun (anchor, text) -> not (Set.contains (AnchorView.materialKey anchor text) delivered))
+        let planned = law.plan (Set.toArray delivered, material)
+        let delta: obj array = planned?delta
+        let deliveredAnchors: int array = planned?deliveredAnchors
+        let deliveredMaterial: string array = planned?deliveredMaterial
 
         { ViewPrompt =
             delta
-            |> List.map (snd >> recordBlock)
+            |> Array.toList
+            |> List.map (fun piece -> recordBlock (unbox<string> piece?text))
             |> SyntheticToml.document (headerLines language)
-          DeliveredAnchors = view |> List.map fst |> List.distinct
-          DeliveredMaterial = delta |> List.map (fun (anchor, text) -> AnchorView.materialKey anchor text)
-          HasNewMaterial = not (List.isEmpty delta) }
+          DeliveredAnchors = List.ofArray deliveredAnchors
+          DeliveredMaterial = List.ofArray deliveredMaterial
+          HasNewMaterial = unbox<bool> planned?hasNewMaterial }

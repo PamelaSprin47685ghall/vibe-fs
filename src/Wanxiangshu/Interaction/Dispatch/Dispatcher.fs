@@ -1,8 +1,8 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
 open Wanxiangshu.Persistence.Journal.JournalOutcome
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Interaction.Admission
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Persona
 
 open System
@@ -699,31 +699,10 @@ module PromptDispatcher =
                         (LogicalRunId.value expected.LogicalRunId)
                 )
 
-        member this.ResolveOrigin
-            (physicalMessageId: PhysicalUserMessageId)
-            (promptKey: PromptKey option)
-            (hostCompaction: bool)
-            (sessionId: SessionId)
-            : PromptAuthority.PromptOrigin =
-            PromptAuthorityRun.resolveKnownOrigin
-                physicalMessageId
-                promptKey
-                hostCompaction
-                (this.ProjectionFor sessionId)
-
         /// Physical execution routing reads the same durable claim that owns the
         /// dispatch. Host message fields are never execution authority for a plugin prompt.
         member this.PendingClaim(sessionId: SessionId, promptKey: PromptKey) =
             Map.tryFind promptKey (this.ProjectionFor sessionId).PendingClaims
-
-        /// PhysicalAccepted consumes PendingClaims. Execution capability may be
-        /// handed to the provider only after the exact dispatch appears here.
-        member this.DispatchAccepted(sessionId: SessionId, claim: PromptAuthority.PromptClaim) =
-            let key = PromptAuthority.acceptedDispatchKey sessionId claim.PayloadDigest
-
-            match Map.tryFind key (this.ProjectionFor sessionId).AcceptedDispatches with
-            | Some accepted when accepted.PromptKey = claim.PromptKey -> true
-            | _ -> false
 
         /// Has this exact gate + terminal occasion already admitted its reminder?
         /// Fresh ProviderRun identities are deliberately unbounded.

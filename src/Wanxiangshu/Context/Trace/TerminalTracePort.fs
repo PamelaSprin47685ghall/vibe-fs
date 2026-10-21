@@ -14,7 +14,3 @@ module TerminalTracePort =
         { CaptureTerminalText =
             fun sessionId text providerRun ->
                 XTraceCapture.captureTerminalTextWithReceipt (Some journal) sessionId text providerRun }
-
-    let forTerminalTrace (journal: AgentJournal) : TerminalTracePort = forJournal journal
-
-    let tryForJournal (journal: AgentJournal option) : TerminalTracePort option = journal |> Option.map forJournal

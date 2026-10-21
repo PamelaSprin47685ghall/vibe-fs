@@ -3,12 +3,16 @@ namespace Wanxiangshu.Execution.Delegation.Advisor
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Participant.ManagedAgents
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 
@@ -148,6 +152,20 @@ module AdvisorSeat =
                 seat.ChildTask <- Some pending
                 pending)
 
+    [<AllowNullLiteral>]
+    type private AdvisorAnswerLaw =
+        abstract answer: messages: obj array -> string
+
+    [<Import("AdvisorLaw", "wanxiangli/advisor")>]
+    let private advisorLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : AdvisorAnswerLaw = jsNative
+
+    /// The read-back law (last non-blank assistant prose, role case-insensitive) is owned by
+    /// `wanxiangli/advisor` (CUT-39); this host only flattens Host message parts to text.
+    let private answerLaw = construct advisorLawClass
+
     let private nonBlank (text: string) : string option =
         if String.IsNullOrWhiteSpace text then None else Some text
 
@@ -161,17 +179,15 @@ module AdvisorSeat =
                 | _ -> None)
             |> String.concat ""
 
-    let private assistantProse (message: SessionMessage) : string option =
-        if String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) then
-            textOfParts message.Parts |> nonBlank
-        else
-            None
-
     /// advisor-[030]: prose read-back after the fenced terminal. Only this
     /// consult's own terminal has been processed when this runs, so the last
     /// non-blank assistant message of the child is this consult's answer.
     let private latestAssistantProse (messages: SessionMessage list) : string option =
-        messages |> List.rev |> List.tryPick assistantProse
+        messages
+        |> List.map (fun message -> createObj [ "role" ==> message.Role; "text" ==> textOfParts message.Parts ])
+        |> List.toArray
+        |> answerLaw.answer
+        |> Option.ofObj
 
     let private snapshotProseOf (snapshot: ISessionSnapshotPort) (childId: SessionId) : Task<string option> =
         task {
@@ -296,6 +312,7 @@ module AdvisorSeat =
                 { ProviderRun = priorRun childId |> Option.defaultValue (ProviderRunIdentity.create "")
                   ConsultId = Guid.NewGuid().ToString("N") }
 
+            // DSL-MUTABLE: subscription — the terminal listener's read of the intent receipt's run, written once when that send is accepted.
             let mutable intentRun = None
 
             // AG-LISTENER-BEFORE-SEND: the Host port refuses a prompt for a session with no
@@ -391,6 +408,3 @@ module AdvisorSeat =
 
     let clearAll () : unit =
         lock registryGate (fun () -> seats.Clear())
-
-    /// advisor-[030] test/dev hook: drop every recorded consult fence.
-    let clearConsultFences () : unit = consultFences.Clear()

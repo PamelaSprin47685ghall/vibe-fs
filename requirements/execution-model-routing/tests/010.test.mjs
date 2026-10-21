@@ -307,15 +307,15 @@ const CONTROLLED_PUBLIC_TYPES = Object.freeze([
   'BorrowingCapacity',
 ])
 const OWNER_FILES = Object.freeze([
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs',
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs',
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs',
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelCapacity/Model.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelCapacity/Queue.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelCapacity/Borrowing.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelCapacity/Surface.fs',
 ])
 const LIBRARY_OWNER_FILE = 'wanxiangli/src/borrowing/CapacityBorrowing.fs'
 const PERMITTED_CONSUMER_FILES = Object.freeze([
   ...OWNER_FILES,
-  'src/Wanxiangshu/OpenCode/Host/ModelRouting.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelRouting.fs',
 ])
 
 test('WHAT[execution-model-routing-010] EMR_010_model_capacity_owner_defines_all_private_borrowing_knowledge', async () => {
@@ -645,16 +645,16 @@ const source = async (relative) => readFile(new URL(`../../../${relative}`, impo
 test('WHAT[execution-model-routing-010] EMR_010_borrowing_complexity_is_owned_only_by_the_capacity_decorator', async () => {
   const capacity = (
     await Promise.all([
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs'),
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs'),
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs'),
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs'),
+      source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Model.fs'),
+      source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Queue.fs'),
+      source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Borrowing.fs'),
+      source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Surface.fs'),
       source('wanxiangli/src/borrowing/CapacityBorrowing.fs'),
     ])
   ).join('\n')
-  const adapter = await source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs')
+  const adapter = await source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Borrowing.fs')
   const library = await source('wanxiangli/src/borrowing/CapacityBorrowing.fs')
-  const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
+  const routing = await source('src/Wanxiangshu/Execution/Routing/ModelRouting.fs')
   const sessions = await source('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const binding = await source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
   const transform = await source('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')

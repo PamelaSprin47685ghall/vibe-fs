@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 /// Physical Host binding for the assistant run created for one user message.
 /// This is transport identity only; it carries no Review semantics.
 module ProviderRunBinding =
@@ -20,8 +22,6 @@ module ProviderRunBinding =
     /// Maximum public-snapshot reads used by the physical Host seam when the
     /// only evidence missing is the not-yet-projected assistant message.
     val projectionCatchupMaxReads: int
-
-    val projectionCatchupDelayMilliseconds: int
 
     val quiescedRun: messages: SessionMessage list -> Result<SessionMessage, Rejection>
 

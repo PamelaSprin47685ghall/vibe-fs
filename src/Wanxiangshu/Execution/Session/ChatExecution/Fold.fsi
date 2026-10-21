@@ -10,12 +10,6 @@ module ChatExecutionFactFold =
         projection: ChatExecutionProjectionState ->
             Result<ChatExecutionProjectionState, FoldRejection>
 
-    val applyProviderStarted:
-        key: ChatExecutionKey ->
-        evidence: ProviderStartedEvidence ->
-        projection: ChatExecutionProjectionState ->
-            Result<ChatExecutionProjectionState, FoldRejection>
-
     val applyTerminal:
         key: ChatExecutionKey ->
         evidence: ChatExecutionTerminalEvidence ->

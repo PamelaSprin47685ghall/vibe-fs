@@ -584,22 +584,8 @@ export const SURFACE_MANIFEST = [
     representation: 'json',
     kind: 'pure',
   },
-  {
-    module: 'Sphinx/V2/Plugins/AStar/Surface.js',
-    owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-026'],
-    source: 'src/Wanxiangshu/Sphinx/V2/Plugins/AStar/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
-    module: 'Sphinx/V2/Plugins/Mcts/Surface.js',
-    owner: 'sphinx-v2',
-    laws: ['SPHINX-V2-013', 'SPHINX-V2-026'],
-    source: 'src/Wanxiangshu/Sphinx/V2/Plugins/Mcts/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
+
+
   {
     module: 'Sphinx/V2/Plugins/Ordinal/Surface.js',
     owner: 'sphinx-v2',
@@ -794,10 +780,10 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'Repository/Programming/Js/OpenCode/ParkedSites.js',
+    module: 'Repository/Programming/Js/ParkedSites.js',
     owner: 'repository-programming',
     laws: ['REPOSITORY-PROGRAMMING-031'],
-    source: 'src/Wanxiangshu/Repository/Programming/Js/OpenCode/ParkedSites.fs',
+    source: 'src/Wanxiangshu/Repository/Programming/Js/ParkedSites.fs',
     representation: 'opaque-capability',
     kind: 'resource',
   },
@@ -841,10 +827,10 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
-    module: 'OpenCode/Host/OpenCodeContract.js',
+    module: 'Foundation/HostSendContract.js',
     owner: 'dispatch-protocol',
     laws: ['DISPATCH-PROTOCOL-009'],
-    source: 'src/Wanxiangshu/OpenCode/Host/OpenCodeContract.fs',
+    source: 'src/Wanxiangshu/Foundation/HostSendContract.fs',
     representation: 'json',
     kind: 'pure',
   },

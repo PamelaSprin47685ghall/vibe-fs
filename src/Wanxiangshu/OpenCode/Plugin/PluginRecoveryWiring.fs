@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Session.ChatExecution
@@ -7,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Mission.Planning
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
@@ -17,7 +20,10 @@ module PluginRecoveryWiring =
         try
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
         with error ->
-            Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", error.Message ]
+            Wanxiangshu.Foundation.Diagnostic.emit
+                "lifecycle-work-recovery-refused"
+                [ "work_id", workId; "reason", error.Message ]
+
             None
 
     let private chooseRecoveredWork
@@ -27,7 +33,10 @@ module PluginRecoveryWiring =
         | Ok(Some work) -> Some(SessionId.create workId, work)
         | Ok None -> None
         | Error reason ->
-            Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", reason ]
+            Wanxiangshu.Foundation.Diagnostic.emit
+                "lifecycle-work-recovery-refused"
+                [ "work_id", workId; "reason", reason ]
+
             None
 
     let private queryInspectedWorks stateRoot workIds =
@@ -35,7 +44,10 @@ module PluginRecoveryWiring =
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspectedMany stateRoot workIds
             |> Array.choose chooseRecoveredWork
         with error ->
-            Diagnostic.emit "lifecycle-work-recovery-refused" [ "workspace", stateRoot; "reason", error.Message ]
+            Wanxiangshu.Foundation.Diagnostic.emit
+                "lifecycle-work-recovery-refused"
+                [ "workspace", stateRoot; "reason", error.Message ]
+
             [||]
 
     let private inspectRecoveryWorks (journal: AgentJournal) (workspace: string option) =
@@ -131,9 +143,11 @@ module PluginRecoveryWiring =
 
             match settled with
             | Ok _ ->
-                Diagnostic.emit "plan-delivery-recovery-settled" [ "work_id", workId; "exec_session_id", execSessionId ]
+                Wanxiangshu.Foundation.Diagnostic.emit
+                    "plan-delivery-recovery-settled"
+                    [ "work_id", workId; "exec_session_id", execSessionId ]
             | Error(kind, reason) ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     ("plan-delivery-recovery-" + kind)
                     [ "work_id", workId; "exec_session_id", execSessionId; "reason", reason ]
         }
@@ -142,7 +156,10 @@ module PluginRecoveryWiring =
         match snapshots with
         | Some snapshot -> observeBoundDelivery gitCommonDir workId execSessionId snapshot retirementBlockers
         | None ->
-            Diagnostic.emit "plan-delivery-recovery-no-snapshot" [ "work_id", workId; "exec_session_id", execSessionId ]
+            Wanxiangshu.Foundation.Diagnostic.emit
+                "plan-delivery-recovery-no-snapshot"
+                [ "work_id", workId; "exec_session_id", execSessionId ]
+
             Task.FromResult(()) :> Task
 
     let private bindDiscoveredDelivery
@@ -162,7 +179,7 @@ module PluginRecoveryWiring =
                     execSessionId
             with
             | Error reason ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-bind-refused"
                     [ "work_id", workId
                       "operation_id", operationId
@@ -184,11 +201,11 @@ module PluginRecoveryWiring =
 
             match! discovery.FindRootSessionsByTitle title with
             | Error reason ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-discovery-failed"
                     [ "work_id", workId; "operation_id", operationId; "reason", reason ]
             | Ok [] ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-unbound"
                     [ "work_id", workId
                       "operation_id", operationId
@@ -197,7 +214,7 @@ module PluginRecoveryWiring =
                 let execSessionId = SessionId.value sessionId
                 do! bindDiscoveredDelivery gitCommonDir workId operationId execSessionId snapshots retirementBlockers
             | Ok sessions ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-ambiguous"
                     [ "work_id", workId
                       "operation_id", operationId
@@ -219,9 +236,11 @@ module PluginRecoveryWiring =
             | None, Some operationId, Some discovery ->
                 do! discoverUnboundDelivery gitCommonDir workId operationId snapshotPort discovery retirementBlockers
             | None, Some operationId, None ->
-                Diagnostic.emit "plan-delivery-recovery-no-discovery" [ "work_id", workId; "operation_id", operationId ]
+                Wanxiangshu.Foundation.Diagnostic.emit
+                    "plan-delivery-recovery-no-discovery"
+                    [ "work_id", workId; "operation_id", operationId ]
             | None, None, _ ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-unbound"
                     [ "work_id", workId; "reason", "pending delivery has no operation identity" ]
         }
@@ -237,7 +256,9 @@ module PluginRecoveryWiring =
             try
                 do! reconcileDeliveryWork gitCommonDir workId snapshotPort discoveryPort retirementBlockers
             with error ->
-                Diagnostic.emit "plan-delivery-recovery-failed" [ "work_id", workId; "reason", error.Message ]
+                Wanxiangshu.Foundation.Diagnostic.emit
+                    "plan-delivery-recovery-failed"
+                    [ "work_id", workId; "reason", error.Message ]
         }
 
     /// A delivery session is bound durably before its first prompt is sent.

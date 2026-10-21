@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.Advisor
 
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 /// advisor-[001]: the caller-supplied physical handles one consult runs on.
@@ -48,6 +48,3 @@ module AdvisorSeat =
 
     /// Drop every process-live seat.
     val clearAll: unit -> unit
-
-    /// advisor-[030] test/dev hook: drop every recorded consult fence.
-    val clearConsultFences: unit -> unit

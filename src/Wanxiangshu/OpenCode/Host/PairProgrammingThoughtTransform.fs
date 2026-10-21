@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic
@@ -18,7 +20,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Repository.Programming.Js.OpenCode
+open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Participant.Provider.Projection
 
@@ -99,8 +101,6 @@ module PairProgrammingThoughtTransform =
     /// HOST-013 borrows the Host-owned skill wire. Empty name is injection-only;
     /// real non-empty skill names remain ordinary executable Host skills.
     let toolName = "skill"
-
-    let skillName = ""
 
     let private isMarkerSource (markerSource: string) = markerSource = source
 
@@ -1328,7 +1328,8 @@ module PairProgrammingThoughtTransform =
 
             let resolveLanguage =
                 match journal, projectionSessionIdOpt with
-                | Some _, Some sessionId -> Wanxiangshu.OpenCode.ProviderLanguageBinding.forSessionText sessionId
+                | Some _, Some sessionId ->
+                    Wanxiangshu.Participant.Provider.ProviderLanguageBinding.forSessionText sessionId
                 | _ -> ProviderLanguage.SimplifiedChinese
 
             let parkedHint =

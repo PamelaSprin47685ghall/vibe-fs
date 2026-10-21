@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
@@ -35,8 +37,6 @@ module PairProgrammingThoughtTransform =
     /// occurrence bypass: it still creates/replays the same durable HOST-013 fact.
     val skipAutoInjectedRequested: _providerId: string option -> bool
 
-    val isCursorProvider: providerId: string option -> bool
-
     /// The marker's source identity (HOST-013). Filtering must use this, never
     /// the text: a real user may quote the sentence.
     val source: string
@@ -44,7 +44,6 @@ module PairProgrammingThoughtTransform =
     /// HOST-013 borrows the Host-owned skill wire. Empty name is injection-only;
     /// real non-empty skill names remain ordinary executable Host skills.
     val toolName: string
-    val skillName: string
 
     /// HOST-013：marker 身份仅按 `info.source`。
     val isPairProgrammingThought: rawMsg: obj -> bool
@@ -52,17 +51,10 @@ module PairProgrammingThoughtTransform =
     /// Active empty-name skill loads are reserved for synthetic injection only.
     val reprimandText: lang: ProviderLanguage option -> string
 
-    /// Transform only active `skill({ name: "" })` calls from failed into completed DENIED results.
-    /// Every non-empty real skill call passes through untouched.
-    val sanitizeActiveToolCalls: lang: ProviderLanguage option -> rawMessages: obj list -> obj list
-
     /// CallId = digest(transcript + source + ordinal). Stable across restarts.
     val stableCallId: sessionId: string option -> ordinal: int64 -> string
 
     val cursorGuidanceSeparator: string
-
-    val appendCursorSuffixes: suffixTexts: string list -> rawMsg: obj -> obj option
-    val stripCursorSuffixes: suffixTexts: string list -> rawMsg: obj -> obj
 
     val stripCursorSuffixesWithJournal:
         journal: AgentJournal ->

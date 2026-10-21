@@ -8,5 +8,4 @@ open Wanxiangshu.Persistence.EventStore
 [<RequireQualifiedAccess>]
 module CasebookIntegrationRules =
 
-    val casebookRule: IntegrationRule
     val rules: IntegrationRule list

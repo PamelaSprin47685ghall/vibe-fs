@@ -7,7 +7,7 @@ import { execute, caseName } from '../../../dist/Repository/Programming/Js/Workf
 import {
   deliveredValue, clearDeliveredValue, recordDeliveredView, recordFencedDeliveredView, takeDeliveredHandoff,
   takeDeliveredHandoffWith, takeDeliveredHandoffFor, clearDeliveredReturned, deliveredReturned,
-  deliveredViewOf, deliveredFenceOf,
+  deliveredViewOf, deliveredFenceOf, takeDeliveredHandoffForCall,
 } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { applyView, clearAll, numberMessage, setView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 
@@ -127,3 +127,78 @@ test('WHAT[repository-programming-059] changed opening material is returned once
   assert.doesNotMatch(String(takeDeliveredHandoffFor(id, 'run-059', null)), /second/)
   clearDeliveredReturned(id)
 })
+
+test('WHAT[repository-programming-059] a call of the same run cannot take the cell of another call of that run', () => {
+  const id = 'handoff-same-run-two-calls'
+  clearDeliveredReturned(id)
+  seed(id, ['material-one', 'material-two'])
+  // Two deliveries in ONE provider run: the second overwrites the cell.
+  setView(id, declaration(2, { 1: 'first-call' }))
+  recordFencedDeliveredView(id, 'run-059', 'call-1', declaration(2, { 1: 'first-call' }))
+  setView(id, declaration(2, { 2: 'second-call' }))
+  recordFencedDeliveredView(id, 'run-059', 'call-2', declaration(2, { 2: 'second-call' }))
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'run-059', toolCallId: 'call-2' })
+
+  // The terminal of call-1 holds the whole fence of its own delivery. It
+  // must not take the cell that call-2 left behind.
+  const wrongTake = takeDeliveredHandoffForCall(id, 'run-059', 'call-1', null)
+  assert.equal(wrongTake, null, 'a different call of the same run must not take this cell')
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'run-059', toolCallId: 'call-2' })
+  assert.deepEqual(deliveredReturned(id), [], 'a refused take must not advance the returned cursor')
+
+  // The owning call takes its own cell.
+  const rightTake = takeDeliveredHandoffForCall(id, 'run-059', 'call-2', null)
+  assert.match(String(rightTake), /second-call/)
+  assert.equal(deliveredFenceOf(id), null)
+  clearDeliveredReturned(id)
+})
+
+// Moved from tests/061.test.mjs (LC-006): the fenced delivered-view cell is [059]'s take/peek, and the requirement tree keeps one test file per clause.
+{
+// LC-006: 交付格按 provider run 实施精确围栏，防止旧终态错领新任务交付
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const {
+  clearDeliveredValue,
+  clearDeliveredReturned,
+  recordFencedDeliveredView,
+  takeDeliveredHandoffFor,
+  deliveredFenceOf,
+} = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
+const { clearAll, numberMessage, applyView } = await import("../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js");
+
+
+test('WHAT[repository-programming-059] LC-006: fenced delivered view answers only the owning run', () => {
+  const session = 'session-lc006'
+  const runA = 'run-A'
+  const callA = 'call-A'
+  const runB = 'run-B'
+  const view = { prefixUntil: 1, thenMap: {} }
+
+  clearDeliveredValue(session)
+  clearDeliveredReturned(session)
+  try {
+    const rows = [{ id: 'msg-0', text: 'summary-text' }]
+    rows.forEach((row) => numberMessage(session, row.id))
+    applyView(session, rows)
+
+    recordFencedDeliveredView(session, runA, callA, view)
+
+    // runB 取交付必须返回 null，且 deliveredFenceOf 保持为 runA
+    assert.equal(takeDeliveredHandoffFor(session, runB, null), null)
+    assert.deepEqual(deliveredFenceOf(session), { providerRun: runA, toolCallId: callA })
+
+    // runA 才能取走
+    const handoffA = takeDeliveredHandoffFor(session, runA, null)
+    assert.notEqual(handoffA, null)
+    assert.match(String(handoffA), /summary-text/)
+
+    // 取走后交付格已被消费
+    assert.equal(deliveredFenceOf(session), null)
+    assert.equal(takeDeliveredHandoffFor(session, runA, null), null)
+  } finally {
+    clearDeliveredValue(session)
+    clearDeliveredReturned(session)
+  }
+})
+}

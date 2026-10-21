@@ -6,7 +6,7 @@
 |---|---|---|
 | F05 | `Interaction/Dispatch/DispatchSurface.fs` 的端口适配不含 `ReportFatalDiagnostic`。 | 实际调度的完整 fatal/结算边界，GAP-136。 |
 | F06 | `Interaction/Dispatch/DispatchSessionPort.fs` 只转接发送和终态订阅，接口无 `ReportFatalDiagnostic`。 | 同上；接口删除不证明所有调用者行为。 |
-| F08 | `Interaction/Dispatch/OpenCode/SessionNudge.fs` 的 `toDispatchPort` 不含 fatal reporter。 | 实际 nudge 到调度的整链证据，GAP-136。 |
+| F08 | `Interaction/Dispatch/SessionNudge.fs` 的 `toDispatchPort` 不含 fatal reporter。 | 实际 nudge 到调度的整链证据，GAP-136。 |
 | F33 | `OpenCode/Host/OpenCodePort.fs` 无旧 `observeSdkPromptDispatch` 或 `prompt-async-dispatch-listener-failed` 入口。 | SDK 异步失败到精确调度身份的交付与结算，GAP-136。 |
 | F34 | 同文件无旧 `verdictForDetachedError` 或上述 fatal 入口。 | HTTP 拒绝、响应丢失及接受后失败的实际分类，GAP-136。 |
 | C01 | `Strength/Persistence/Durability.fs` 的 `publishPrepared` 返回 `Rejected`，`append` 返回 `SemanticRejected`；没有可选 fatal handler。现存 composition fatal `strength-semantic-cut` 仍由 F17 索引。 | 真实 cut 的 owner 传播、结算与一次终止，GAP-183、durable-events[025]。 |

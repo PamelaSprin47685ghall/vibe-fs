@@ -18,8 +18,10 @@ open Wanxiangshu.Persistence.Journal
 /// Diagnostics are emitted for visibility, and Fission groups are settled as failed.
 module ChildWorkRecovery =
 
+    /// Reason recorded when a fresh process settles a Fission group the previous
+    /// runtime left Open.
     [<Literal>]
-    let OrphanedFissionReason = "process_interrupted"
+    let private OrphanedFissionReason = "process_interrupted"
 
     type OrphanedChildRun =
         private
@@ -95,15 +97,15 @@ module ChildWorkRecovery =
 
     /// Orphaned child runs maintain active obligations across restart without being voided.
     /// settlementFact returns None so no ChildWorkVoided/ChildRunVoided fact is written.
-    let settlementFact (orphaned: OrphanedChildRun) : ExecutionFactCases option =
-        None
+    let settlementFact (orphaned: OrphanedChildRun) : ExecutionFactCases option = None
 
     let private parentOf =
         function
         | Admitted(parentSessionId, _)
         | Historical(parentSessionId, _) -> parentSessionId
 
-    let orphanedFissionGroups (projections: AgentProjectionSet) : FissionGroupProjection list =
+    /// Open Fission groups left behind by a previous runtime.
+    let private orphanedFissionGroups (projections: AgentProjectionSet) : FissionGroupProjection list =
         projections.Fission.ActiveByOwner
         |> Map.toList
         |> List.choose (fun (_, groupId) -> Map.tryFind groupId projections.Fission.Groups)
@@ -112,7 +114,8 @@ module ChildWorkRecovery =
             | FissionGroupTerminal.Open -> true
             | _ -> false)
 
-    let fissionSettlementFact (group: FissionGroupProjection) : FissionFactCases =
+    /// Exact FissionFailed fact closing an orphaned open Fission group at load.
+    let private fissionSettlementFact (group: FissionGroupProjection) : FissionFactCases =
         FissionFactCases.FissionFailed
             {| GroupId = group.GroupId
                OwnerSessionId = group.OwnerSessionId

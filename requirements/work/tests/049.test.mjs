@@ -49,7 +49,7 @@ const handleOf = (doc) => {
 }
 
 const completePart = async (hooks, session, call, run) => {
-  // WHAT[049]: the interrupt fires on the Host's confirmation of this very
+  // WHAT[work-049]: the interrupt fires on the Host's confirmation of this very
   // ask tool result — `message.part.updated` with a completed tool part.
   // The plugin registers the `event` hook, so the envelope must be the real
   // Host event shape.
@@ -70,7 +70,7 @@ const completePart = async (hooks, session, call, run) => {
   })
 }
 
-test('WHAT[049] ask parks and records the question before the attempt interrupt', async () => {
+test('WHAT[work-049] ask parks and records the question before the attempt interrupt', async () => {
   await withPlanSession(async ({ hooks, runtime, session }) => {
     const notices = []
     runtime.client.tui = { showToast: async ({ body }) => { notices.push(body); return {} } }
@@ -92,7 +92,7 @@ test('WHAT[049] ask parks and records the question before the attempt interrupt'
   })
 })
 
-test('WHAT[049] a repeated completed event does not interrupt twice', async () => {
+test('WHAT[work-049] a repeated completed event does not interrupt twice', async () => {
   await withPlanSession(async ({ hooks, runtime, session }) => {
     runtime.client.tui = { showToast: async () => ({}) }
     await hooks.tool['todowrite-for-plan'].execute(
@@ -107,7 +107,7 @@ test('WHAT[049] a repeated completed event does not interrupt twice', async () =
   })
 })
 
-test('WHAT[049] an unrelated call and an old human input do not unlock the wait', async () => {
+test('WHAT[work-049] an unrelated call and an old human input do not unlock the wait', async () => {
   await withPlanSession(async ({ hooks, runtime, session }) => {
     runtime.client.tui = { showToast: async () => ({}) }
     const parked = await hooks.tool['todowrite-for-plan'].execute(
@@ -124,7 +124,7 @@ test('WHAT[049] an unrelated call and an old human input do not unlock the wait'
   })
 })
 
-test('WHAT[049] a new human reply after the question unlocks the same task', async () => {
+test('WHAT[work-049] a new human reply after the question unlocks the same task', async () => {
   await withPlanSession(async ({ hooks, runtime, session }) => {
     runtime.client.tui = { showToast: async () => ({}) }
     const parked = await hooks.tool['todowrite-for-plan'].execute(

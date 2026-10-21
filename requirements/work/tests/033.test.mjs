@@ -300,7 +300,7 @@ test('WHAT[work-033] Engineer/DevOps/Orchestrator TurnCompleted+stop without Tas
   //
   // 被删除的对内部表示的断言（原先直接 import dist/Context/Trace/TerminalReporter.js、
   // dist/Composition/Turn/{Observation,Program}.js、dist/Foundation/{Identity,Roles}.js、
-  // dist/OpenCode/Host/Message.js，并断言终态 union 的 case 标签）：终态裁决没有已
+  // dist/Foundation/HostMessage.js，并断言终态 union 的 case 标签）：终态裁决没有已
   // 注册的公开等价入口（没有任何已注册的 Surface 包装
   // TerminalReporter.completeWithEvidence），且它断言的只是内部 union 的标签。
   // 同一事实改由消费者可见的两条证据表达：

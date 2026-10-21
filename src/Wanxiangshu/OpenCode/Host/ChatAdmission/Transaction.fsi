@@ -1,5 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Routing
+
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Interaction.Admission
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Session.ChatExecution

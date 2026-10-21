@@ -8,7 +8,6 @@ open Wanxiangshu.Persistence.EventStore
 /// injection and never references this module.
 [<RequireQualifiedAccess>]
 module JsTransactionIntegrationRules =
-    val jsTransactionRule: IntegrationRule
     val rules: IntegrationRule list
 
 /// Js parked-site lifecycle audit integration oracle (PLAN S2 step 8 /
@@ -18,5 +17,4 @@ module JsTransactionIntegrationRules =
 module JsLifecycleIntegrationRules =
     type JsLifecycleAuditProjection = { Head: EventId option }
     val empty: JsLifecycleAuditProjection
-    val jsLifecycleRule: IntegrationRule
     val rules: IntegrationRule list

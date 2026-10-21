@@ -4,8 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
-open Wanxiangshu.OpenCode.Host
+open Wanxiangshu.Foundation.HostSession
 
 /// The observed allocation origin of a Companion child. The core's `Origin` is the
 /// single source; this is its Companion-facing name.
@@ -35,5 +34,4 @@ type SatelliteSpec =
 type CompanionLeaseRuntime =
     new: sessions: ISessionHostPort * registry: AttachmentLeaseRegistry -> CompanionLeaseRuntime
     member Ensure: owner: SessionId * spec: SatelliteSpec -> Task<Result<SatelliteLease, string>>
-    member Invalidate: owner: SessionId * kind: SatelliteKind -> unit
     member Retire: owner: SessionId * spec: SatelliteSpec -> Task<Result<unit, string>>

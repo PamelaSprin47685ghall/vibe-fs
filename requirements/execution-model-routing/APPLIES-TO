@@ -4,9 +4,9 @@
 
 /src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs
 /src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fs
-/src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
+/src/Wanxiangshu/Execution/Routing/ModelRouting.fs
 /src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs
-/src/Wanxiangshu/OpenCode/Host/ModelCapacity/**
+/src/Wanxiangshu/Execution/Routing/ModelCapacity/**
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs
 /src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs
@@ -17,7 +17,7 @@
 /src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
 /src/Wanxiangshu/Strength/OpenCode/**
 /src/Wanxiangshu/Strength/Policy.fs
-/src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs
-/src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs
-/src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs
-/src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs
+/src/Wanxiangshu/Execution/Routing/ModelCapacity/Borrowing.fs
+/src/Wanxiangshu/Execution/Routing/ModelCapacity/Model.fs
+/src/Wanxiangshu/Execution/Routing/ModelCapacity/Queue.fs
+/src/Wanxiangshu/Execution/Routing/ModelCapacity/Surface.fs

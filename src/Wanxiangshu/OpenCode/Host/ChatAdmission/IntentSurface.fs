@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Interaction.Admission
+
 open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation

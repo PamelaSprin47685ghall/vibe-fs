@@ -31,9 +31,3 @@ type SnapshotError = { Code: string; Message: string }
 
 module Context =
     val tryValidate: ContextSnapshot -> Result<ContextSnapshot, SnapshotError>
-
-    /// What a worker sees. Never carries the opaque-label to real-candidate mapping.
-    val publicEnvelopeView: ContextSnapshot -> string -> string -> (string * string) list
-
-    /// What the host keeps. Never crosses to a worker.
-    val privateTicketView: string -> string -> string -> (string * string) list -> (string * string) list

@@ -25,9 +25,6 @@ type IJsLifecyclePersistence =
 /// / feature store). A transaction is Prepared before any filesystem effect
 /// and Committed after; an uncommitted Prepared remains interrupted-tool evidence.
 module JsToolsTransactionStore =
-    val TransactionStream: string
-    val PreparedEventType: string
-    val CommittedEventType: string
 
     [<RequireQualifiedAccess>]
     type DecodedTransactionEvent =
@@ -44,13 +41,6 @@ module JsToolsTransactionStore =
         store: IEventStore -> transactionId: JsTransactionId -> Task<Result<EventId, JsTransactionAppendFailure>>
 
     val createPersistence: store: IEventStore -> IJsTransactionPersistence
-
-    /// Independent linear audit stream, separate from `js-tools/transactions`.
-    val LifecycleAuditStream: string
-    val ParkedEventType: string
-    val UnparkedEventType: string
-    val AbandonedEventType: string
-    val ReapedEventType: string
 
     val lifecycleEventTypeOf: eventType: JsLifecycleEventType -> string
     val lifecycleEventTypeOfName: eventType: string -> JsLifecycleEventType option

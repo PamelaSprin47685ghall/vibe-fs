@@ -244,10 +244,6 @@ type HostToolArguments internal (raw: obj) =
         |> Option.ofObj
         |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
-    member _.OptionalTextIn(objectName: string, propertyName: string) =
-        HostIngressCodec.objectProperty raw objectName
-        |> Option.bind (fun nested -> HostIngressCodec.stringProperty nested propertyName)
-
     member _.OptionalTexts(name: string) =
         HostIngressCodec.optionalObjectProperty raw name
         |> Option.bind HostArgDecode.tryTextsFromArrayValue
@@ -267,10 +263,6 @@ type HostToolArguments internal (raw: obj) =
         | Some value -> HostArgDecode.nonNegativeIntegerFromValue value
 
     member _.Raw: obj = raw
-
-    member _.OptionalBool(name: string) =
-        HostIngressCodec.optionalObjectProperty raw name
-        |> Option.bind HostArgDecode.tryBoolFromValue
 
 /// Typed subset of the OpenCode tool invocation context used by domain tools.
 ///
@@ -495,13 +487,6 @@ module ToolHostCodec =
     let numberSchemaDescribed description (HostToolFactory factory) =
         HostSchema(rawNumberSchemaDescribed factory description)
 
-    let boundedIntegerSchema minimum maximum description (HostToolFactory factory) =
-        HostSchema(rawBoundedIntegerSchema factory minimum maximum description)
-
-    let optionalBoundedIntegerSchema minimum maximum description (HostToolFactory factory) =
-        let schema = rawBoundedIntegerSchema factory minimum maximum description
-        HostSchema(emitJsExpr schema "$0.optional()")
-
     let boolSchema (HostToolFactory factory) = HostSchema(rawBooleanSchema factory)
 
     let boolSchemaDescribed description (HostToolFactory factory) =
@@ -555,10 +540,6 @@ module ToolHostCodec =
 
     let arraySchemaOf (HostSchema item) description (HostToolFactory factory) =
         HostSchema(rawArraySchemaOf factory item description)
-
-    /// Open key→value map (zod `record`); the description carries the key shape.
-    let recordSchemaOf (HostSchema key) (HostSchema value) description (HostToolFactory factory) =
-        HostSchema(rawRecordSchemaOf factory key value description)
 
     /// Optional open key→value map (zod `record`); the description carries the key shape.
     let optionalRecordSchemaOf (HostSchema key) (HostSchema value) description (HostToolFactory factory) =

@@ -574,7 +574,7 @@ const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
-const contract = await import("../../../dist/OpenCode/Host/OpenCodeContract.js");
+const contract = await import("../../../dist/Foundation/HostSendContract.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
 const hash = (value) => `H(${value})`

@@ -70,12 +70,6 @@ module AblationMode =
         | AblationMode.Borrowed -> "borrowed"
         | AblationMode.Active -> "active"
 
-    let allowsToolExecution mode =
-        match mode with
-        | AblationMode.Active -> true
-        | AblationMode.Borrowed
-        | AblationMode.Ablated -> false
-
     let allowsToolSchema mode =
         match mode with
         | AblationMode.Active
@@ -89,11 +83,3 @@ module AblationRegistry =
 
     let isActive id registry =
         modeFor id registry = AblationMode.Active
-
-    let isBorrowedOrActive id registry =
-        match modeFor id registry with
-        | AblationMode.Active
-        | AblationMode.Borrowed -> true
-        | AblationMode.Ablated -> false
-
-    let tryFindNode (id: AblationNodeId) (registry: AblationRegistry) = registry.Nodes |> Map.tryFind id

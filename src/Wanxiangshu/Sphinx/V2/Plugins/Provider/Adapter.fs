@@ -52,16 +52,3 @@ module ProviderAdapter =
     /// Whether the outcome must keep its reservation booked because the provider's usage
     /// figure is missing.
     let keepsReservation (outcome: ProviderOutcome) : bool = outcome.UsageUnresolved
-
-    /// A settled usage record for one work item, derived from the outcome.
-    let settledUsageOf (workId: WorkId) (attempt: Attempt) (outcome: ProviderOutcome) : SettledUsage =
-        { WorkId = workId
-          Attempt = attempt
-          Resources =
-            [ "inputTokens", float outcome.InputTokens
-              "outputTokens", float outcome.OutputTokens
-              "calls", float outcome.Calls ]
-            |> Map.ofList
-          MoneyMinor = Some outcome.MoneyMinor
-          UsageUnresolved = keepsReservation outcome
-          Overrun = false }

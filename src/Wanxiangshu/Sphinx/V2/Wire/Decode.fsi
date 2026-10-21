@@ -12,8 +12,6 @@ type WireError =
 module Decode =
     val stringField: obj -> string -> Result<string, WireError>
 
-    /// NaN and Infinity are refused, never clamped.
-    val finiteField: obj -> string -> Result<float, WireError>
     val nonNegativeIntegerField: obj -> string -> Result<int64, WireError>
 
     /// A revision arrives as a decimal string so no precision is lost in JavaScript.

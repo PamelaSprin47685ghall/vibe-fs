@@ -44,7 +44,6 @@ module AttachmentLeaseCore =
         }
 
     val kindKey: kind: AttachmentKind -> string
-    val leaseKey: owner: SessionId -> kind: AttachmentKind -> string
 
     /// Establish (or re-establish) the kind's lease and publish its association.
     val ensure: operations: Operations -> owner: SessionId -> spec: Spec -> Task<Result<Lease, string>>
@@ -58,7 +57,6 @@ type AttachmentLeaseRegistry =
     new: unit -> AttachmentLeaseRegistry
     member Bind: owner: SessionId * kind: AttachmentKind * lease: AttachmentLeaseCore.Lease -> unit
     member TryFind: owner: SessionId * kind: AttachmentKind -> AttachmentLeaseCore.Lease option
-    member TryFindScoped: owner: SessionId * kind: AttachmentKind -> AttachmentLeaseCore.Lease option
     member TryFindByChild: child: SessionId -> (SessionId * AttachmentKind) list
     member Snapshot: unit -> (SessionId * AttachmentKind) list
     member Remove: owner: SessionId * kind: AttachmentKind -> bool

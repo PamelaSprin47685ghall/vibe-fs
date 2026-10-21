@@ -7,5 +7,5 @@ PASS ratchet: master tree: 0 violation(s)
 PASS N5 new kernel file opens Wanxiangshu.OpenCode: 1 violation(s) e.g. src/Wanxiangshu/Mission/Work/Contract.fs: kernel code newly references Wanxiangshu.OpenCode (adapter layer)
 PASS N6 qualified Wanxiangshu.OpenCode.ProviderWireDecode reference: 1 violation(s) e.g. src/Wanxiangshu/Mission/Work/Contract.fs: kernel code newly references Wanxiangshu.OpenCode (adapter layer)
 PASS N7 commented reference is ignored: 0 violation(s)
-PASS N8 baseline entry stops referencing (ratchet must be tightened): 1 violation(s) e.g. src/Wanxiangshu/Context/Prefix/Wire.fs: no longer references Wanxiangshu.OpenCode; drop it from scripts/checks/opencode-import-baseline.json
+PASS N8 former baseline file re-opens the adapter (baseline grants nothing): 1 violation(s) e.g. src/Wanxiangshu/Interaction/Dispatch/Send.fs: kernel code newly references Wanxiangshu.OpenCode (adapter layer)
 PASS P1 adapter files really touch the client: src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs, src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs

@@ -523,36 +523,6 @@ module XTraceProjection =
             | Some stable when stable = messageId -> Some part.Turn
             | _ -> None)
 
-    /// context-compression-028: the turn a committed tool call started in.
-    ///
-    /// `Bi` is the start of `Ai`'s own complete semantic turn, so the answer must be
-    /// read from the CURRENT generation: a phase committed in a voided numbering
-    /// cannot name a boundary the prefix may fold at. `None` therefore means "this
-    /// phase has no addressable turn here", which the window treats as no desire.
-    let tryTurnOfToolCallId (callId: ToolCallId) (state: XTraceProjectionState) : int option =
-        state
-        |> parts
-        |> currentGenerationParts
-        |> List.tryPick (fun part ->
-            match part.ToolCallId with
-            | Some owned when owned = callId -> Some part.Turn
-            | _ -> None)
-
-    /// context-compression-028/029: the turn of the newest captured message in the
-    /// current generation — the message this request answers.
-    ///
-    /// A loop's later provider steps answer their own assistant/tool history, so this
-    /// is NOT the trailing user message: one user message can drive many provider
-    /// steps, and bounding a fold by the message that opened the loop would forbid
-    /// every fold inside it. A candidate cutoff may not pass this turn, or the fold
-    /// would replace the very message being answered.
-    let frontierTurn (state: XTraceProjectionState) : int option =
-        state
-        |> parts
-        |> currentGenerationParts
-        |> List.tryLast
-        |> Option.map (fun part -> part.Turn)
-
     /// The first stable user message in the current Host generation is the raw
     /// session Opening. Same-session prefix replacement never removes it from
     /// the trace (semantic-trace-010); what the provider is shown is trimmed
@@ -604,6 +574,3 @@ module XTraceProjection =
 
     let semanticCursorAfter (cursor: XTraceCursor) (state: XTraceProjectionState) : XTraceCursor =
         semanticCursorFor (XTraceCursor.sequence cursor) state
-
-    let semanticCursorAfterCoverage (coverage: RecordCoverage) (state: XTraceProjectionState) : XTraceCursor =
-        semanticCursorAfter (RecordCoverage.ingestedThrough coverage) state

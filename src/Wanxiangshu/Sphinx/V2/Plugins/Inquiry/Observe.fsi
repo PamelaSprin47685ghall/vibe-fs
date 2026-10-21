@@ -24,9 +24,3 @@ type ObserveFault =
 module Observe =
     /// An empty delta is a legitimate outcome and must not advance the revision.
     val empty: string -> GraphDelta
-
-    /// A directional preference becomes a typed edge; an abstention becomes nothing.
-    val fromJudgment: string -> string -> string -> Judgment -> Result<GraphDelta, ObserveFault>
-
-    /// A conditional outcome is a new investigation candidate, not a missing vote.
-    val fromConditional: string -> string -> Result<GraphDelta, ObserveFault>

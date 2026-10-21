@@ -10,8 +10,8 @@
 /src/Wanxiangshu/OpenCode/Host/SessionRecoveryHostSurface.fs
 /src/Wanxiangshu/OpenCode/Host/SessionRecoveryHostSurface.fsi
 /src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs
-/src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
-/src/Wanxiangshu/OpenCode/Host/ModelCapacity/**
+/src/Wanxiangshu/Execution/Routing/ModelRouting.fs
+/src/Wanxiangshu/Execution/Routing/ModelCapacity/**
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs
 /src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs

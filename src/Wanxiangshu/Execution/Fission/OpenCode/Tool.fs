@@ -15,7 +15,10 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.OpenCode.ToolHostCodec
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -121,6 +124,7 @@ module FissionTool =
                           groupId
                           completionId
                           reason ]
+
                 return ()
             | Ok blob ->
                 let! appended =
@@ -147,6 +151,7 @@ module FissionTool =
                               completionId
                               failure ]
                 | Ok() -> ()
+
                 return ()
         }
 
@@ -215,6 +220,7 @@ module FissionTool =
                               completionId
                               lane.Index
                               reason ]
+
                     return ()
                 | Ok _ ->
                     let! appended = appendDelivery durable owner None groupId completionId lane.Index
@@ -232,6 +238,7 @@ module FissionTool =
                                   lane.Index
                                   failure ]
                     | Ok() -> ()
+
                     return ()
         }
 
@@ -263,6 +270,7 @@ module FissionTool =
                               lane.Index
                               failure ]
                 | Ok() -> ()
+
                 return ()
             else
                 return! continueLiveLane scope durable profile groupId owner lane completionId payload
@@ -309,17 +317,8 @@ module FissionTool =
         }
 
     let private readyExceptForRetirement (durable: AgentJournal) groupId =
-        match capturedGroup durable groupId with
-        | None -> false
-        | Some group ->
-            group.LaneWork.Count = group.LaneCount
-            && group.PreFissionCompletionIds
-               |> Set.forall (fun id ->
-                   let delivered =
-                       group.CompletionDeliveries |> Map.tryFind id |> Option.defaultValue Set.empty
-
-                   Map.containsKey id group.CapturedCompletions
-                   && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
+        capturedGroup durable groupId
+        |> Option.exists FissionProjection.convergenceReady
 
     let private convergeWithScope
         (scope: ToolRuntimeScope)
@@ -392,7 +391,11 @@ module FissionTool =
                     "fission-broadcast-failed"
                     [ "session_id", SessionId.value owner
                       "result",
-                      sprintf "fission shared completion broadcast failed: group=%s completion=%s error=%s" groupId completionId ex.Message ]
+                      sprintf
+                          "fission shared completion broadcast failed: group=%s completion=%s error=%s"
+                          groupId
+                          completionId
+                          ex.Message ]
 
             FissionRuntime.endDelivery groupId completionId -1
         }
@@ -450,11 +453,11 @@ module FissionTool =
         (lanes: FissionStartedLane list)
         (childId: SessionId)
         (completionId: string)
-        (outcome: Wanxiangshu.OpenCode.TerminalOutcome)
+        (outcome: Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome)
         =
         match outcome with
-        | Wanxiangshu.OpenCode.TerminalOutcome.Aborted _ -> ()
-        | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop ->
+        | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Aborted _ -> ()
+        | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Failed stop ->
             captureAndBroadcast
                 scope
                 durable
@@ -465,7 +468,7 @@ module FissionTool =
                 completionId
                 (String.concat "\n" [ "status=failed"; "error=" + stop.Reason ])
             |> ignore
-        | Wanxiangshu.OpenCode.TerminalOutcome.Completed terminal ->
+        | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Completed terminal ->
             captureCompletedTerminal scope durable profile groupId owner lanes childId completionId terminal
             |> ignore
 
@@ -479,7 +482,7 @@ module FissionTool =
         (childId: SessionId)
         (completionId: string)
         (sessionId: SessionId)
-        (outcome: Wanxiangshu.OpenCode.TerminalOutcome)
+        (outcome: Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome)
         =
         if sessionId <> childId then
             ()
@@ -589,7 +592,10 @@ module FissionTool =
                 |> List.filter (fun text -> not (String.IsNullOrWhiteSpace text))
                 |> String.concat "\n"
 
-            if String.IsNullOrWhiteSpace context then return Ok None else return Ok(Some context)
+            if String.IsNullOrWhiteSpace context then
+                return Ok None
+            else
+                return Ok(Some context)
         }
 
     let private createLanePort
@@ -666,7 +672,9 @@ module FissionTool =
             | Error reason ->
                 Diagnostic.emit
                     "fission-lane-abort-failed"
-                    [ "session_id", SessionId.value laneId; "result", "fission lane abort failed: reason=" + reason ]
+                    [ "session_id", SessionId.value laneId
+                      "result", "fission lane abort failed: reason=" + reason ]
+
             return ()
         }
         :> Task
@@ -743,10 +751,8 @@ module FissionTool =
             | Error failure ->
                 Diagnostic.emit
                     "fission-failed-fact-append-failed"
-                    [ "session_id",
-                      SessionId.value logicalOwner
-                      "result",
-                      sprintf "fission failed fact append failed: group=%s reason=%s" groupId failure ]
+                    [ "session_id", SessionId.value logicalOwner
+                      "result", sprintf "fission failed fact append failed: group=%s reason=%s" groupId failure ]
             | Ok() -> ()
 
             return ()

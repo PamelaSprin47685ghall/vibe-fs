@@ -1,5 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
@@ -19,20 +23,6 @@ type ToolRegistration =
       Runtime: ToolRuntimeScope }
 
 module ToolRegistry =
-
-    [<RequireQualifiedAccess>]
-    module Path =
-        [<Literal>]
-        val DeniedRole: string = "tool/registry/denied-role"
-
-        [<Literal>]
-        val DeniedStrength: string = "tool/registry/denied-strength"
-
-        [<Literal>]
-        val DeniedUnestablished: string = "tool/registry/denied-unestablished"
-
-        [<Literal>]
-        val DeniedTaskState: string = "tool/registry/denied-task-state"
 
     /// capability-enforcement-006: the authority the execute gate resolves for a tool, so a
     /// consumer can tell an office tool from an internal leaf without guessing

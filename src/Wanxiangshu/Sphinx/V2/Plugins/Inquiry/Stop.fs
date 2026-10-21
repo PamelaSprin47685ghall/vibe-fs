@@ -62,16 +62,3 @@ module Stop =
         match reason with
         | StopReason.CertifiedWithinModel _ -> true
         | _ -> false
-
-    let validateClaim (claim: StopClaim) : Result<StopClaim, StopFault> =
-        let noVocsMeasured () =
-            claim.VocValue.IsSome && not claim.VocMeasured
-
-        let inconsistentRelativity () =
-            isModelRelative claim.Reason <> claim.ModelRelative
-
-        match List.isEmpty claim.CoveredPlanIds, noVocsMeasured (), inconsistentRelativity () with
-        | true, _, _ -> Error StopFault.ClaimCoversNothing
-        | false, true, _ -> Error StopFault.VocClaimedWithoutMeasurement
-        | false, false, true -> Error StopFault.ModelRelativeReasonClaimedAbsolutely
-        | false, false, false -> Ok claim

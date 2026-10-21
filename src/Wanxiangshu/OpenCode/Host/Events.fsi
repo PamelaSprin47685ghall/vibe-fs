@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

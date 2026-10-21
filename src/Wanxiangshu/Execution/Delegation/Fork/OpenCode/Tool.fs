@@ -14,6 +14,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -215,9 +216,9 @@ module ForkTool =
                   Keywords = args.Text "keywords"
                   Attach = args.OptionalText "attach" |> Option.map (fun value -> value.Trim())
                   CommissionerRecord =
-                      args.OptionalText "commissioner_record"
-                      |> Option.map (fun value -> value.Trim())
-                      |> Option.filter (fun value -> value <> "")
+                    args.OptionalText "commissioner_record"
+                    |> Option.map (fun value -> value.Trim())
+                    |> Option.filter (fun value -> value <> "")
                   ExpectedToolCalls = expectedToolCalls }
 
     let private consequence (message: string) =
@@ -510,8 +511,7 @@ module ForkTool =
                 match! resolveAttachment scope handles request with
                 | Error path -> return consequence (prose language path)
                 | Ok attachment ->
-                    let! rendered =
-                        prepareForkPromptWithRecord scope runtime profile.CanonicalRole request attachment
+                    let! rendered = prepareForkPromptWithRecord scope runtime profile.CanonicalRole request attachment
 
                     return! appendBusyGuidance runtime request language agentId profile rendered
             }
@@ -1021,7 +1021,7 @@ module ForkTool =
             return
                 match placement with
                 | Error _ -> Error "placement-failed"
-                | Ok(ForkResult.DispatchUncertain _) -> Error (refusalCode Path.Fork.ChargePlacementUncertain)
+                | Ok(ForkResult.DispatchUncertain _) -> Error(refusalCode Path.Fork.ChargePlacementUncertain)
                 | Ok(ForkResult.NotFound _) -> Error "placement-failed"
                 | Ok(ForkResult.Created agentId) ->
                     Ok
@@ -1047,7 +1047,7 @@ module ForkTool =
         : Task<Result<ForkReceipt, string>> =
         task {
             match! resolveAttachment scope handles request with
-            | Error path -> return Error (refusalCode path)
+            | Error path -> return Error(refusalCode path)
             | Ok attachment ->
                 return! commitNewManagerForkReceipt scope runtime context request language managed role attachment
         }
@@ -1064,7 +1064,7 @@ module ForkTool =
         let role = managed.Role
 
         if hasKeywords request && not (warmStartAllowed role) then
-            Task.FromResult(Error (refusalCode Path.Fork.WarmStartUnavailable))
+            Task.FromResult(Error(refusalCode Path.Fork.WarmStartUnavailable))
         else
             finishNewManagerForkReceipt scope runtime context request language handles managed role
 
@@ -1120,7 +1120,7 @@ module ForkTool =
         language
         : Task<Result<ForkReceipt, string>> =
         match scope.RuntimeFor context with
-        | Error _ -> Task.FromResult(Error (refusalCode Path.Fork.ChargeContextUnavailable))
+        | Error _ -> Task.FromResult(Error(refusalCode Path.Fork.ChargeContextUnavailable))
         | Ok runtime ->
             let handles = agentHandles scope context
             createManagerForkIfNameFree scope runtime context request language handles
@@ -1268,9 +1268,17 @@ module ForkTool =
 
     let private resumeResultReceipt (request: Request) (result: ForkResult) : Result<ForkReceipt, string> =
         match result with
-        | ForkResult.Created created -> Ok { Name = request.Name.Trim(); AgentId = created; Outcome = "created" }
-        | ForkResult.Nudged nudged -> Ok { Name = request.Name.Trim(); AgentId = nudged; Outcome = "nudged" }
-        | ForkResult.DispatchUncertain _ -> Error (refusalCode Path.Fork.ChargePlacementUncertain)
+        | ForkResult.Created created ->
+            Ok
+                { Name = request.Name.Trim()
+                  AgentId = created
+                  Outcome = "created" }
+        | ForkResult.Nudged nudged ->
+            Ok
+                { Name = request.Name.Trim()
+                  AgentId = nudged
+                  Outcome = "nudged" }
+        | ForkResult.DispatchUncertain _ -> Error(refusalCode Path.Fork.ChargePlacementUncertain)
         | ForkResult.NotFound _ -> Error "placement-failed"
 
     let private resumeBusyGuidanceReceipt
@@ -1285,10 +1293,9 @@ module ForkTool =
             let! attachment = resolveAttachment scope handles request
 
             match attachment with
-            | Error path -> return Error (refusalCode path)
+            | Error path -> return Error(refusalCode path)
             | Ok attachment ->
-                let! rendered =
-                    prepareForkPromptWithRecord scope runtime profile.CanonicalRole request attachment
+                let! rendered = prepareForkPromptWithRecord scope runtime profile.CanonicalRole request attachment
 
                 let! result = runtime.AppendGuidance(agentId, profile, rendered)
 
@@ -1322,7 +1329,7 @@ module ForkTool =
             let! attachment = resolveAttachment scope handles request
 
             match attachment with
-            | Error path -> return Error (refusalCode path)
+            | Error path -> return Error(refusalCode path)
             | Ok attachment ->
                 let! placement =
                     taskResult {
@@ -1349,7 +1356,7 @@ module ForkTool =
         agentId
         : Task<Result<ForkReceipt, string>> =
         if hasKeywords request && not (warmStartAllowed role) then
-            Task.FromResult(Error (refusalCode Path.Fork.WarmStartUnavailable))
+            Task.FromResult(Error(refusalCode Path.Fork.WarmStartUnavailable))
         else
             resumeIdleAttachedReceipt scope runtime context request handles role agentId
 
@@ -1364,10 +1371,10 @@ module ForkTool =
             handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
 
         match existingByname with
-        | None -> Task.FromResult(Error (refusalCode Path.Fork.PersonUnknown))
+        | None -> Task.FromResult(Error(refusalCode Path.Fork.PersonUnknown))
         | Some handle ->
             match HandleId.tryAgent handle.Handle with
-            | None -> Task.FromResult(Error (refusalCode Path.Fork.PersonUnknown))
+            | None -> Task.FromResult(Error(refusalCode Path.Fork.PersonUnknown))
             | Some handleId ->
                 let agentId = AgentHandleId.value handleId
 
@@ -1377,7 +1384,8 @@ module ForkTool =
                 match activeRun, runtime.TryFindAgentOrAdopt agentId, handle.CanonicalRole with
                 | true, _, _ -> resumeBusyReceipt scope runtime request handles agentId
                 | false, Some(_, role, _), _ -> resumeIdleReceipt scope runtime context request handles role agentId
-                | false, None, Role.DevOps -> resumeIdleReceipt scope runtime context request handles Role.DevOps agentId
+                | false, None, Role.DevOps ->
+                    resumeIdleReceipt scope runtime context request handles Role.DevOps agentId
                 | false, None, _ -> resumeIdleReceipt scope runtime context request handles handle.CanonicalRole agentId
 
     let private executeManagerResumeReceiptAfterGuards
@@ -1394,12 +1402,12 @@ module ForkTool =
             let! refusal = boundDevOpsDispatchRefusal scope parentSessionId isDevOps
 
             match refusal with
-            | Some path -> return Error (refusalCode path)
+            | Some path -> return Error(refusalCode path)
             | None ->
                 do! bindWorkDevOpsIfNeeded scope parentSessionId isDevOps
 
                 match scope.RuntimeFor context with
-                | Error _ -> return Error (refusalCode Path.Fork.ChargeContextUnavailable)
+                | Error _ -> return Error(refusalCode Path.Fork.ChargeContextUnavailable)
                 | Ok runtime ->
                     let handles = agentHandles scope context
                     return! resumeReceiptExistingPerson scope runtime context request handles
@@ -1412,13 +1420,13 @@ module ForkTool =
         : Task<Result<ForkReceipt, string>> =
         task {
             if String.IsNullOrWhiteSpace request.Name then
-                return Error (refusalCode Path.Fork.NameRequired)
+                return Error(refusalCode Path.Fork.NameRequired)
             elif String.IsNullOrWhiteSpace request.Charge then
-                return Error (refusalCode Path.Fork.ChargeRequired)
+                return Error(refusalCode Path.Fork.ChargeRequired)
             elif isSelfAttachment request then
-                return Error (refusalCode Path.Fork.AttachSelf)
+                return Error(refusalCode Path.Fork.AttachSelf)
             elif not (String.IsNullOrWhiteSpace request.Calling) then
-                return Error (refusalCode Path.Resume.CallingNotAllowed)
+                return Error(refusalCode Path.Resume.CallingNotAllowed)
             else
                 return! executeManagerResumeReceiptAfterGuards scope request context
         }

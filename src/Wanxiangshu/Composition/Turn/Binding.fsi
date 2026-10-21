@@ -8,13 +8,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 
 module TurnBinding =
-    val fromProjection:
-        sessionId: SessionId ->
-        projection: PromptAuthority.PromptAuthorityProjection ->
-        userBindings: Dictionary<string, PhysicalUserMessageId> ->
-        continuationIds: Set<string> ->
-            ActiveRunBinding option
-
     type Store =
         new: unit -> Store
 

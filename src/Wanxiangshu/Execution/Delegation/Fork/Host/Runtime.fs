@@ -22,7 +22,10 @@ open Fable.Core.JsInterop
 open Microsoft.FSharp.Control
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Participant.ManagedAgents
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Host
 open Wanxiangshu.Process
 open Wanxiangshu.Foundation
@@ -715,11 +718,6 @@ type HostForkRuntime
             | Some pending -> return! deliverDeferredPrompt pending
         }
 
-    /// Drop a deferSend preamble so process-review assignment can go out as
-    /// AgentOwnerRoot instead of a busy nudge against a session with no profile.
-    member _.DiscardDeferredFirstPrompt(agentId: string) : unit =
-        lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
-
     member internal _.Gate = gate
     member internal _.TerminalByName = terminalByName
     member internal _.Sessions = sessions
@@ -830,7 +828,7 @@ type HostForkRuntime
                     // faulting read is an empty view (bounded auxiliary
                     // evidence) and must never convert a proven child
                     // terminal into a failed settlement.
-                    let view : HostForkRunLifecycle.ViewResolution =
+                    let view: HostForkRunLifecycle.ViewResolution =
                         fun () ->
                             task {
                                 try
@@ -1023,9 +1021,6 @@ type HostForkRuntime
     member this.Cancel() : unit = this.CancelAndDrain() |> ignore
 
     member _.List() = runtime.List()
-
-    member _.TryFindAgent(agentId: string) =
-        runtime.List() |> fst |> List.tryFind (fun a -> a.AgentId = agentId)
 
     member internal _.OwnsAgent(agentId: string) =
         lock gate (fun () -> processOwnedAgents.Contains agentId)
@@ -1240,8 +1235,6 @@ type HostForkRuntime
                 do! ptyPortInstance.ClosePty(id, ?graceMs = graceMs)
                 settlePtyLease id.Value "Cancelled"
         }
-
-    member this.IsPtyCompletion(runId: string) = this.OwnsPty(PtyId.Create runId)
 
     member this.TryBindTerminalName(name: string, id: PtyId) : Result<unit, string> =
         if String.IsNullOrWhiteSpace name then

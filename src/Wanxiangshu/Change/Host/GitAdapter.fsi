@@ -8,8 +8,6 @@ module OrchestratorGit =
 
     val command: dir: string -> args: string list -> Command
 
-    val hasRebaseHead: runner: (Command -> Task<int * string * string>) -> worktree: string -> Task<bool>
-
     val finalizeWorktree:
         runner: (Command -> Task<int * string * string>) ->
         managerId: string ->

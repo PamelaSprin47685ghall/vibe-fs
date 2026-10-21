@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Process
 
 /// delegation-029: Delegation-owned narrow PTY capability port.

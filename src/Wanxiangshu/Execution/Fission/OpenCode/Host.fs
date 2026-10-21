@@ -8,7 +8,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
@@ -18,6 +18,10 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Interaction.Admission
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
 
@@ -312,21 +316,6 @@ module FissionHost =
         |> Option.orElseWith (fun () ->
             PromptAuthorityProjectionQueries.lastAuthorityProfile ownerSessionId projections)
 
-    let private allLaneWorkPresent (group: FissionGroupProjection) =
-        group.LaneWork.Count = group.LaneCount
-        && group.LaneProviderRuns.Count = group.LaneCount
-
-    let private allSharedCompletionsDelivered (group: FissionGroupProjection) =
-        group.PreFissionCompletionIds
-        |> Set.forall (fun completionId ->
-            let delivered =
-                group.CompletionDeliveries
-                |> Map.tryFind completionId
-                |> Option.defaultValue Set.empty
-
-            Map.containsKey completionId group.CapturedCompletions
-            && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
-
     let private takeoverPrompt aggregate =
         LlmFacing.renderInstructions
             [ "The Fission ring has collected every lane's delivered view and returned the complete handoff to this final present."
@@ -537,7 +526,7 @@ module FissionHost =
         task {
             if group.Takeover.IsSome then
                 return true
-            elif not (allLaneWorkPresent group) || not (allSharedCompletionsDelivered group) then
+            elif not (FissionProjection.convergenceReady group) then
                 return false
             else
                 let! preConsumed = consumePreFissionAgents durable group

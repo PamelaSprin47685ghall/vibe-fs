@@ -45,3 +45,66 @@ commission/manager 绑定、Clean/Integration Gate、冲突归属、崩溃恢复
 ### 还没做（卡片保持 DOING）
 
 commission/manager 绑定、Clean/Integration Gate、冲突归属、崩溃恢复、工作树回收依赖 CUT-12、CUT-13，两者尚未 DONE，留待接续。
+
+## 子范围②：commission 绑定、Integration Gate、冲突归属、崩溃恢复、工作树回收（2026-10-21，eng-cut25i-goose）
+
+CUT-12、CUT-13 已 DONE，接续卡片顺序第 2–4 步。
+
+### 抽出了什么
+
+`wanxiangli/integration`（新模块，发布 0.61.0 / `71f80c4`）是下面这些判定的唯一 owner；`git-porcelain` 同版本新增工作树回收的选择。
+两者都不跑 Git、不读写日志、不持锁；主仓只做 I/O 与事务次序（创建/工作/清理/集成仍由 `OrchestratorProgram` 这个 C 执行）。
+
+| 判定 | 原来的位置 | 库入口 |
+|---|---|---|
+| commission 工作树绑定（PERSIST-009：耐久意图 + 仅在 Requested 歧义时看一次完整物理观察） | `OrchestratorProjection.decideWorktreeReconciliation` | `reconcileWorktree` |
+| rebased 候选 / publish claim 的现实分类（ORCH-007） | `OrchestratorProjection.classifyRebasedCandidate` / `classifyPublishClaim` | `rebasedCandidate` / `publishClaim` |
+| 崩溃恢复入口：终态只清理、有 claim 重入、否则续跑 | `OrchestratorProgram.program` 的 match | `resume` |
+| claim 重入：目标 ref、记录、rebased 钉是否仍同一提交与期望头 | `reentryClaimTargetVerdict`、`reentryRebasedMatches`、`continueReentryWith{Record,Rebased}` | `reenterClaim` |
+| 候选准入：只有最新 rebased 记录恰钉本候选+本目标才发布，否则 rebase（TargetAdvanced / InitialRebaseRequired） | `admitPreparedCandidate` + `rebaseReason` | `admitCandidate` |
+| 认证证据钉（先候选、后快照） | `publishCertified.certifiedEvidence` | `certify` |
+| Integration Gate：证据归属 job、目标、CAS 头 | `publicationIdentityVerdict` | `checkPublication` |
+| FF 结果：只有被钉候选算落地；声明的 target-moved 错误是可重试未命中 | `ffMergeVerdict` | `ffMerge` |
+| 冲突归属：rebase 失败且有未合并文件 → 记为本 job 的冲突；无文件 → 不是冲突，失败 | `handleRebase.handleConflictFiles` | `rebaseFailed` |
+| 工作树回收：哪些工作树/分支陈旧（主工作树、detached 永不陈旧；短名整体比较） | `OrchestratorSweep` 的 `normalize`/`isStale`/`isManagerBranch` 过滤 | `git-porcelain` `staleWorktrees` / `staleBranches` |
+
+主仓侧：`Change/Projection.fs` 新增 `ChangeIntegrationLaw` 绑定（只做 F# 值 ↔ 库的 step/code 词汇转换），三处 Projection 判定与 `Program.fs`
+七处判定改为问库；`Host/WorktreeCleanup.fs` 只剩按序删除。错误文案、调用次序、I/O 次数不变。
+未迁：`OrchestratorProgram` 里的三处一行等值守卫（worktree HEAD 钉、发布前冲突非空、claim 期望一致）仍在宿主——它们夹在 I/O 中间，单独搬只会多一次 FFI；
+`IntegrationGate`（proper-lockfile 跨进程锁）是物理资源适配器，不是规律，留在主仓。
+
+### 诚实账
+
+- 主仓本刀 +389/−193 行：判定逻辑移走了，但绑定的线格式转换比原先的模式匹配长。收益不在行数，在于这些判定现在有一个可独立编译、独立测试的 owner
+  （`src/integration/tests/001.test.mjs` 6 项，含 4 组反例：换 job/换 path 的回执不收养、物理身份/路径冲突、外来落地不算成功、大小写不同的 moved 错误不算 TargetMoved；
+  `git-porcelain` `SPEC[git-porcelain-2]`：主工作树永不陈旧、job id 前缀不算归属），宿主不再各自拼一份。
+- 行为未改：没有修好也没有弄坏任何既有测试。
+
+### 证据
+
+- 库：integration 6/6、git-porcelain 9/9；`build-001` 两模块隔离编译通过；发布脚本定向 24/24 通过（`logs-cut25i/rel23b.out`）。
+- 差分 `evidence/CUT-23/differential-integration.mjs`（旧 dist = master 1c1f5519f 构建，候选 dist = 本刀）：
+  A. 三个纯判定各 20000 例（小字母表，等值大量碰撞）0 差异；B. `observeRelayProgram` 全部 22 个脚本化场景（fresh、冲突、目标移动、CAS miss、陈旧证书、12 种重入…）逐字节相同；
+  C. `sweepStaleArtifacts` 2000 个随机世界（含主工作树、detached、`manager/j` 前缀、注入 list/remove/delete 失败）删除调用序列与结果 0 差异。结果见 `differential-integration.json`。
+- 定向套件（change-integration、crash-reconciliation、managed-session-lifecycle、effect-accounting、durable-events 003/009/010/011/016/028、work 011/048、delegation）：
+  675 项，504 通过，4 失败，23 skip，53 todo（`integration-targeted-summary.txt`）。失败文件逐个隔离重跑：候选 95 项 not ok 与基线 95 项**名字完全相同**
+  （`integration-failures-{candidate,baseline}.txt`，comm 为空）：delegation 006/024/026/027/029/031/032、effect-accounting 002、managed-session-lifecycle 006–028 的 master 既有失败。
+- `scripts/checks/architecture.mjs` OK。
+
+## 子范围③：Git 动词收口与收卡（2026-10-21，eng-cut25i-goose 做、eng-cut25j-goose 落地收卡）
+
+- 882dc531c：工作树根查询只剩 `GitSubject` 一个动词（`Mission/Manager/Workflow.fs`、`OpenCode/Plugin/PlanWorkOpenWiring.fs` 不再各拼一份）；
+  `Git/Operations.fs`、`Git/WorktreeResource.fs` 与 `Change/Host/GitAdapter.fs` 都通过 `GitSubject.Executable` 拼写可执行文件。
+- 落地验证（落在 master 507d68d01 上全量构建，之后 master 仅不相交移动到 ad13783c9，重跑 pre-push 检查）：定向 847 项，677 通过，1 失败，23 skip，54 todo；
+  失败文件逐个隔离重跑，未出现基线之外的新失败（delegation 006/024/026/027/031/032、effect-accounting 002、managed-session-lifecycle 006–028 为 master 既有）。
+  `scripts/checks/architecture.mjs` OK。日志 `/workspace/vfs-cut/wt/logs-cut25i/land23c.out`。
+
+### 退出条件核对
+
+- Git 命令与路径校验不再跨 Change/Process/Host 重复：`src/` 中 `Git/` 之外再无 `"git"` 字面量启动进程；`Change/Host/GitAdapter.fs` 是 Orchestrator 这个 C 的 I/O 端口，
+  只经 `ProcessRunner` + `GitSubject.Executable` 执行，porcelain 读法归 git-porcelain，`Persistence/Journal/RuntimePath.fs` 经 `GitSubject.execIn`。
+- 业务发布状态不留两份：发布/准入/冲突/重入判定只在 wanxiangli/integration。
+- 保留在宿主（不是规律、而是物理资源或夹在 I/O 中间）：`Git/IntegrationGate`（proper-lockfile 跨进程锁）、`OrchestratorProgram` 三处一行等值守卫。
+- 没有修好也没有弄坏任何既有测试；破坏性 Git 场景沿用各套件的临时仓夹具，本卡未新增对开发主仓的操作。
+
+卡片 DONE。

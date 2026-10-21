@@ -1,5 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Participant.ManagedAgents
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Collections.Generic
 open Fable.Core
@@ -41,21 +47,13 @@ module DeliveryAttemptLedger =
           Sequence: int }
 
     val recordEstablished: fence: Fence -> physical: PhysicalUserMessageId option -> unit
-    val recordPresented: fence: Fence -> unit
     val tryFindEstablished: sessionId: SessionId -> physical: PhysicalUserMessageId option -> (Fence * Record) option
 
     /// 条款 3：以 durable 交付见证为准的交付成立读取（进程内台账只是快速路径）。
     /// 查不到见证返回 None——那是「无法证明成立」，不是「没交付过」。
     val tryFindDurableEstablished:
-        journal: AgentJournal option ->
-        sessionId: SessionId ->
-        physical: PhysicalUserMessageId option ->
-            Fence option
+        journal: AgentJournal option -> sessionId: SessionId -> physical: PhysicalUserMessageId option -> Fence option
 
-    /// 本 session 是否存在任何一次已成立的交付（durable 见证口径，不绑定物理输入）。
-    val hasDurableEstablished: journal: AgentJournal option -> sessionId: SessionId -> bool
-
-    val hasEstablished: sessionId: SessionId -> bool
     val recordInterruptIssued: fence: Fence -> issued: Task -> unit
     val recordInterruptObserved: fence: Fence -> outcome: Result<unit, string> -> unit
     val interruptFacts: fence: Fence -> InterruptFacts
@@ -112,7 +110,12 @@ type ToolRuntimeScope =
     /// interrupt is not issued here: the transform hook adjudicates it. The
     /// physical user message is the one bound at delivery time — passing it
     /// explicitly keeps a later new input from becoming this delivery's aim.
-    member RegisterEstablishedDelivery: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId * ?physicalUserMessageId: PhysicalUserMessageId -> unit
+    member RegisterEstablishedDelivery:
+        sessionId: SessionId *
+        providerRun: ProviderRunIdentity *
+        callId: ToolCallId *
+        ?physicalUserMessageId: PhysicalUserMessageId ->
+            unit
 
     /// The Host accepted this delivery's tool result (presentation face).
     member RecordDeliveryPresented: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit
@@ -122,14 +125,6 @@ type ToolRuntimeScope =
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member RunStarted: (SessionId -> Role -> string option -> unit)
     member ContinueManagerLoop: sessionId: SessionId * workspace: string -> Task<Result<unit, string>>
-
-    /// EXEC-011: the administrator's ceiling on any single process.
-    ///
-    /// Resolved once per scope so every executor call in a session shares one
-    /// ceiling. A non-positive or unparseable setting falls back to the default
-    /// rather than being treated as "no limit": the clause requires the hard limit
-    /// to be finite, so an unreadable configuration must not widen it.
-    member ProcessHardLimit: TimeSpan
 
     member SessionParents: Dictionary<string, string>
     member CurrentPhysicalUserMessage: sessionId: string -> string option
@@ -145,10 +140,6 @@ type ToolRuntimeScope =
     member RoleFor: ctx: HostToolContext -> Role option
     member EnsureRoleFor: ctx: HostToolContext -> Task<Role option>
 
-    member EnsureCommandRoleFor:
-        sessionId: SessionId * resolveAgent: (SessionId -> Task<string option>) -> Task<string option>
-
-    static member emptyManagerFacts: ManagerCapabilityFacts
     member ManagerCapabilityFactsFor: sessionId: string -> Task<ManagerCapabilityFacts>
 
     member LifecycleWorkFor:
@@ -158,9 +149,6 @@ type ToolRuntimeScope =
     member UnfreezeRetirement: sessionId: string -> unit
     member IsRetirementFrozen: sessionId: string -> Task<bool>
     member RetirementBlockersFor: sessionId: string -> string list
-
-    /// AGENT-013 + PROMPT-008: the managed agent a PTY is opened for.
-    member ManagedAgentFor: ctx: HostToolContext -> ManagedAgent option
 
     member IsRole: ctx: HostToolContext * expected: Role -> bool
 
@@ -179,7 +167,6 @@ type ToolRuntimeScope =
     member RequireCurrentProcessJoin: root: SessionId -> Task<FamilyRecovery>
 
     member RuntimeFor: ctx: HostToolContext -> Result<HostForkRuntime, string>
-    member PtyCapabilityFor: ctx: HostToolContext -> Result<DelegationPtyCapability, string>
 
     member EnsureWorkDevOpsBound: parentSessionId: SessionId -> Task<unit>
 
@@ -198,8 +185,6 @@ type ToolRuntimeScope =
     /// fork reuse is the first action allowed to reopen it durably.
     member AdoptExistingChild: parentSessionId: SessionId * record: HandleRecord -> Result<unit, string>
 
-    member ExecutorRuntimeFor: ctx: HostToolContext -> HostForkRuntime
-
     member OrchestratorHostFor: sessionId: string -> OrchestratorHost
 
     member RunOwnedWork: start: (unit -> Task) -> bool
@@ -216,11 +201,6 @@ type ToolRuntimeScope =
     /// fork handle and wakes the parent; no future TurnAborted callback carries
     /// workflow continuation state.
     member TerminateSession: sessionId: string * reason: string -> Task<Result<unit, string>>
-
-    /// managed-session-lifecycle-024: Replace crashed DevOps physical session under single logical authority
-    member ReplacePhysicalSession:
-        parentSessionId: SessionId * devopsAgentId: string * oldChildSessionId: SessionId ->
-            Task<Result<SessionId, string>>
 
     member DisposeSession: sessionId: string -> Task
 

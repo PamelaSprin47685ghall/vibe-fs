@@ -44,19 +44,12 @@ module PluginTransforms =
 
     type TransformBranchCapabilities = { RegisterOwned: string -> unit }
 
-    val defaultCapabilities: boot: PluginBoot.Boot -> host: PluginHostWiring.Host -> NormalTransformCapabilities
-
-    val defaultBranchCapabilities: boot: PluginBoot.Boot -> host: PluginHostWiring.Host -> TransformBranchCapabilities
-
     val normalTransform:
         caps: NormalTransformCapabilities ->
         projectionSessionIdOpt: string option ->
         inObj: obj ->
         outObj: obj ->
             Task<unit>
-
-    val createWithCaps:
-        caps: NormalTransformCapabilities -> branches: TransformBranchCapabilities -> (obj -> obj -> Task<unit>)
 
     /// Provider-facing transform composition: order only.
     /// Relay cut → Companion/XWire → pair; retired raw history is removed

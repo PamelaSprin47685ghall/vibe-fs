@@ -124,6 +124,8 @@ module PromptFactFold =
         PromptAuthorityRun.replayLogicalRunClosed
             payload.LogicalRunId
             payload.AuthorityRootUserMessageId
+            payload.RootKind
+            payload.ClosureWitness
             currentAuthority
         |> Result.map (function
             | Some closed -> [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, closed) ]

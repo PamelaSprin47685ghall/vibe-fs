@@ -19,14 +19,10 @@ module LlmFacing =
     val withData: blocks: DataBlock list -> document: Document -> Document
     val combine: documents: Document list -> Document
     val render: document: Document -> string
-    val originalMaterial: content: string -> metadata: DataBlock -> OriginalMaterial
-    val renderOriginalMaterial: material: OriginalMaterial -> string
     val renderInstruction: text: string -> string
     val renderInstructions: texts: string list -> string
     val normalizeNewlines: (string -> string)
     val byteCount: (string -> int)
-    val stringValueByteCount: text: string -> int
-    val stringValuePrefixByteCount: text: string -> length: int -> suffix: string -> int
 
     [<RequireQualifiedAccess>]
     module Data =
@@ -44,7 +40,6 @@ module LlmFacing =
         val stringField: name: string -> value: string -> DataBlock
         val intField: name: string -> value: int -> DataBlock
         val int64Field: name: string -> value: int64 -> DataBlock
-        val floatField: name: string -> value: float -> DataBlock
         val boolField: name: string -> value: bool -> DataBlock
         val stringMember: name: string -> value: string -> Field
         val intMember: name: string -> value: int -> Field
@@ -56,7 +51,6 @@ module LlmFacing =
         val structuredValue: value: Value -> DataBlock list
         val rootStructuredValue: value: Value -> DataBlock list
         val ofJs: value: obj -> Value
-        val ofJson: jsonText: string -> Value
 
         val fileEffects:
             rewritten: string list ->

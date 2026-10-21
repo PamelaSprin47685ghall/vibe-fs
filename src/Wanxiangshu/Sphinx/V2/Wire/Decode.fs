@@ -54,15 +54,6 @@ module Decode =
         | true, true -> error "INVALID_SCHEMA" name (sprintf "field %s must not be blank" name)
         | true, false -> Ok(unbox<string> value)
 
-    /// A finite number. NaN and Infinity are refused rather than clamped: a caller that
-    /// sends them has a bug, and silently repairing it hides the bug.
-    let finiteField (raw: obj) (name: string) : Result<float, WireError> =
-        let value = field raw name
-
-        match isFiniteNumber value with
-        | true -> Ok(unbox<float> value)
-        | false -> error "INVALID_SCHEMA" name (sprintf "field %s must be a finite number" name)
-
     /// A checked non-negative quantity. Negative tokens or calls are a defect, not a
     /// request to be normalized.
     let nonNegativeIntegerField (raw: obj) (name: string) : Result<int64, WireError> =

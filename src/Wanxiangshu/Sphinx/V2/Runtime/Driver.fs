@@ -32,10 +32,6 @@ type AdvancePlan =
 
 module Driver =
 
-    /// The pure materialization limit. A plugin loop that never settles stops here and
-    /// reports what is left, rather than spinning (WHAT[sphinx-v2-027]).
-    let maxPureSteps = 128
-
     let private hasPendingInterpretation (state: InquiryState) : bool =
         state.Interpretations
         |> Map.toList

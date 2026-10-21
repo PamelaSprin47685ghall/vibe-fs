@@ -40,10 +40,7 @@ module RepositoryWarmStart =
         task {
             let! hits = trySearch search repo query
 
-            let neutral =
-                hits
-                |> List.truncate RepositoryWarmStartPrompt.TopKPerKeyword
-                |> List.mapi (fun index hit -> toHint ordinal (index + 1) hit)
+            let neutral = RepositoryWarmStartPrompt.rankHits ordinal hits toHint
 
             return
                 { RepositoryWarmStartSearch.Ordinal = ordinal
@@ -66,9 +63,8 @@ module RepositoryWarmStart =
                         (runSearchShard search repo)
                         indexed
 
-                // Parallel.mapBounded preserves input ordering; sorting makes
-                // keyword-ordinal merge explicit and implementation-independent.
-                return Ok(Some(searches |> List.sortBy (fun item -> item.Ordinal)))
+                // Keyword-ordinal merge order is the warm-start law's (wanxiangli/warm-start select).
+                return Ok(Some searches)
         }
 
     let private collectWithSearch
@@ -173,36 +169,6 @@ module RepositoryWarmStart =
         (charge: string)
         : Task<Result<string, string>> =
         prepareWithSearch SembleMcpClient.searchFromEnvironment sessionId role workspaceDirectory keywordsRaw charge
-
-    let prepareDocument
-        (sessionId: SessionId)
-        (role: Role)
-        (workspaceDirectory: string option)
-        (keywordsRaw: string)
-        (charge: string)
-        : Task<Result<LlmFacing.Document, string>> =
-        prepareDocumentWithSearch
-            SembleMcpClient.searchFromEnvironment
-            sessionId
-            role
-            workspaceDirectory
-            keywordsRaw
-            charge
-
-    let appendToBase
-        (sessionId: SessionId)
-        (role: Role)
-        (workspaceDirectory: string option)
-        (keywordsRaw: string)
-        (basePrompt: string)
-        : Task<Result<string, string>> =
-        appendToBaseWithSearch
-            SembleMcpClient.searchFromEnvironment
-            sessionId
-            role
-            workspaceDirectory
-            keywordsRaw
-            basePrompt
 
     let appendToBaseDocument
         (sessionId: SessionId)

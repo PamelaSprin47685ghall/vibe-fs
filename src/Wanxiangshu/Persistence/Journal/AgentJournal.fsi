@@ -73,5 +73,4 @@ module AgentJournal =
 
     val handleProjection: journal: AgentJournal -> sessionId: SessionId -> AgentLinkageProjection
     val runtimeId: journal: AgentJournal -> RuntimeId
-    val writeBlob: content: string -> journal: AgentJournal -> Task<Result<BlobWriteReceipt, string>>
     val isPoisoned: journal: AgentJournal -> bool

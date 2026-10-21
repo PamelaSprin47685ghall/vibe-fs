@@ -18,20 +18,6 @@ module PromptAuthorityLedger =
     val closeCompletedHumanRootManager:
         projection: PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection
 
-    /// PROMPT-005 `Claimed`.
-    val foldPromptClaimed:
-        runtimeStartCount: int ->
-        projection: PromptAuthority.PromptAuthorityProjection ->
-        fact:
-            {| PromptKey: PromptKey
-               SessionId: SessionId
-               ContinuationKind: string
-               LogicalRunId: LogicalRunId option
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId option
-               IdentitySeed: PromptIdentitySeed
-               PayloadDigest: string |} ->
-            PromptAuthority.PromptAuthorityProjection
-
     /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
     val foldPromptSubmitted:
         projection: PromptAuthority.PromptAuthorityProjection ->

@@ -3,6 +3,7 @@ namespace Wanxiangshu.Interaction.Dispatch
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 /// Dispatch-owned JavaScript boundary. Host ports stay opaque and durable

@@ -98,17 +98,3 @@ module QuestionnaireModel =
             Ok()
         else
             Error(sprintf "response cites labels outside the presented set: %s" (String.concat ", " unknown))
-
-    /// Local ids must be unique inside one response, otherwise two proposals collapse
-    /// into one when the Runtime assigns canonical ids.
-    let uniqueLocalIds (response: PairwiseResponse) : Result<unit, string> =
-        let ids =
-            response.ProposedAlternatives
-            |> List.map (fun alternative -> alternative.LocalId)
-
-        let distinct = ids |> Set.ofList |> Set.count
-
-        if distinct = List.length ids then
-            Ok()
-        else
-            Error "proposed alternatives repeat a local id"

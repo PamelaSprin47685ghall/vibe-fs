@@ -22,8 +22,5 @@ module Contract =
 
     val roleOf: SphinxTool -> string
 
-    /// Read-only tools never create a lease, call a model, or change business state.
-    val isReadOnly: SphinxTool -> bool
-
     /// True when a name is one of the seven public tools.
     val isTool: string -> bool

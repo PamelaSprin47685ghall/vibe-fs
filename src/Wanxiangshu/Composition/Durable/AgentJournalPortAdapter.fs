@@ -16,7 +16,7 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Delegation.Fork
 
 module AgentJournalPortAdapter =
     let forDelegatedToolEstimate (journal: AgentJournal) : DelegatedToolEstimatePort =

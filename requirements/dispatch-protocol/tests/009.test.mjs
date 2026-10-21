@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import * as contract from '../../../dist/OpenCode/Host/OpenCodeContract.js'
+import * as contract from '../../../dist/Foundation/HostSendContract.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import {
   withJournal, hostPort, prepareAcceptanceObserver, sendWithAcceptanceObserver,

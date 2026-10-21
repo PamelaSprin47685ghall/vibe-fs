@@ -4,6 +4,8 @@
     <WanxiangshuCompileShard>host-opencode-types</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Foundation/HostModel.fsi" />
+    <Compile Include="Foundation/HostModel.fs" />
     <Compile Include="OpenCode/Codec/OpencodeTypes.fsi" />
     <Compile Include="OpenCode/Codec/OpencodeTypes.fs" />
   </ItemGroup>

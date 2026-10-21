@@ -11,6 +11,8 @@ open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Session.Wait

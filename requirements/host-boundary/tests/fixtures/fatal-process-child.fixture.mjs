@@ -95,7 +95,7 @@ if (mode === 'exhaustion') {
 }
 
 if (mode === 'diagnostic' || mode === 'diagnostic-console-throw') {
-  const { fatal } = await import('../../../../dist/OpenCode/Host/Diagnostic.js')
+  const { fatal } = await import('../../../../dist/Foundation/Diagnostic.js')
   console.log('before-fatal')
   fatal('fixture-fatal-diagnostic', [['result', 'fatal must terminate through the diagnostic owner path']])
   console.log('after-fatal')

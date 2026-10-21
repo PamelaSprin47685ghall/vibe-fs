@@ -4,9 +4,9 @@
 
 /src/Wanxiangshu/Interaction/Authority/**
 /src/Wanxiangshu/Interaction/Dispatch/Ingress.fs
-/src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs
+/src/Wanxiangshu/Interaction/Dispatch/SessionNudge.fs
 /src/Wanxiangshu/Interaction/Dispatch/Send.fs
-/src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinGuard.fs
+/src/Wanxiangshu/Execution/Delegation/Fork/JoinGuard.fs
 /src/Wanxiangshu/Composition/Durable/Fold.fs
 /src/Wanxiangshu/OpenCode/Host/ChatAdmission/**
 /src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs
@@ -16,7 +16,7 @@
 /src/Wanxiangshu/Composition/Turn/TurnObservationPort.fs
 /src/Wanxiangshu/Composition/Turn/TurnObservationPort.fsi
 /src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionIntent.fs
 /src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs
 /src/Wanxiangshu/Interaction/Authority/Child.fs
 /src/Wanxiangshu/Interaction/Authority/Fact.fs

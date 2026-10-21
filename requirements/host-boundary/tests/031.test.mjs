@@ -43,7 +43,7 @@ test('WHAT[host-boundary-031] RootWorkspace runtime is private and every observe
 
   assert.equal(contract.subsystem, 'host')
   assert.equal(runtime.subsystem, 'host')
-  assert.deepEqual(relSources(contract), ['src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs'])
+  assert.deepEqual(relSources(contract), ['src/Wanxiangshu/Foundation/RootWorkspace.fs'])
   assert.deepEqual(refShards(contract, projects), [])
   assert.deepEqual(relSources(runtime), ['src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs'])
   assert.deepEqual(refShards(runtime, projects), ['host-root-workspace-contract'])

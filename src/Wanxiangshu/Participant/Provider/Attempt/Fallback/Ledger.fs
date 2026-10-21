@@ -21,15 +21,10 @@ module ProviderFailureLedger =
         (identity: FailedProviderAttemptIdentity)
         (current: ProviderFailureProjection)
         =
-        let exactLatest =
-            current.RecentFailureKeys
-            |> List.tryHead
-            |> Option.contains (FailedProviderAttemptIdentity.dedupeKey identity)
-
-        match exactLatest, ProviderFailureProjection.mayRetry budgetLimit current with
-        | true, true -> FailureAdmissionOutcome.RetryAuthorized
-        | true, false -> FailureAdmissionOutcome.RetryExhausted
-        | false, _ -> FailureAdmissionOutcome.EpisodeSuperseded
+        match ProviderFailureProjection.replay budgetLimit identity current with
+        | ProviderFailureReplay.LatestMayRetry -> FailureAdmissionOutcome.RetryAuthorized
+        | ProviderFailureReplay.LatestExhausted -> FailureAdmissionOutcome.RetryExhausted
+        | ProviderFailureReplay.Superseded -> FailureAdmissionOutcome.EpisodeSuperseded
 
     let private appendExhausted
         (port: ProviderFailureJournalPort)

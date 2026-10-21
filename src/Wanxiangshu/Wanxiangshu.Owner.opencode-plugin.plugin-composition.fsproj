@@ -91,8 +91,6 @@
     <Compile Include="OpenCode/Host/ProtocolArgumentStash.fs" />
     <Compile Include="OpenCode/Host/ManagerReviewContract.fsi" />
     <Compile Include="OpenCode/Host/ManagerReviewContract.fs" />
-    <Compile Include="OpenCode/Host/ToolSchemaJson.fsi" />
-    <Compile Include="OpenCode/Host/ToolSchemaJson.fs" />
 
     <Compile Include="OpenCode/Host/PluginHost.fsi" />
     <Compile Include="OpenCode/Host/PluginHost.fs" />

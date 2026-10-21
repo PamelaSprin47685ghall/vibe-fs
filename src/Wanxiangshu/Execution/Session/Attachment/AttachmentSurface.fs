@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// JS-native boundary for the attached-session owner. The lease registry and every
 /// kind adapter stay opaque; callers observe binding snapshots or drive the ONE

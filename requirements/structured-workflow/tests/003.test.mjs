@@ -223,12 +223,17 @@ test('WHAT[structured-workflow-003] SW_003_domain_flow_and_outcome_types_are_dom
     'src/Wanxiangshu/Context/Companion/Runtime.fs',
     'src/Wanxiangshu/Context/Companion/Host.fs',
     'src/Wanxiangshu/Context/Companion/JournalPort.fs',
-    'src/Wanxiangshu/Context/Companion/Transform.fs',
   ]
   const companionOwners = companionOwnerFiles.map(readSrc).join('\n')
   assert.doesNotMatch(companionOwners, /\b(?:CompanionProgram|CompanionContext|CompanionError)\b/)
   assert.match(companionOwners, /\bICompanionDurablePort\b/)
-  assert.match(companionOwners, /\bapplyCompanionForOrdinaryMaterial\b/)
+  // CUT-34: the consumer-less CompanionTransform (raw Host message surgery behind a no-op
+  // ApplyCompanion stage) was deleted rather than kept as a kernel import of the adapter layer.
+  assert.equal(
+    existsSync(join(ROOT, 'src/Wanxiangshu/Context/Companion/Transform.fs')),
+    false,
+    'Context/Companion/Transform.fs must stay deleted',
+  )
 
   // AgentRunResult is the completion payload of a successful agent run
   // (EXEC-006): typed physical facts plus terminal output, validated by

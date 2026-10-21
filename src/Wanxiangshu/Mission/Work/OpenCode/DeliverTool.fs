@@ -12,6 +12,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
@@ -53,9 +54,7 @@ module DeliverTool =
     /// over to a successor or ended it. The instruction alone cannot tell the
     /// two apart, so the recorded outcome travels with it.
     let private retirementResult (outcome: string) =
-        ToolHostCodec.tomlObjectWithInstructions
-            [ text Path.Retired ]
-            [ "outcome", ToolHostCodec.TString outcome ]
+        ToolHostCodec.tomlObjectWithInstructions [ text Path.Retired ] [ "outcome", ToolHostCodec.TString outcome ]
 
     /// The first call of the two-stage sequence records the confirmation and
     /// does not finish the work; a second deliver ends it.
@@ -293,8 +292,7 @@ module DeliverTool =
         (retirementId: string)
         : Task<unit> =
         task {
-            let! closureOutcome =
-                tryAppendAuthorityClosure journalDir (SessionId.value prepared.SessionId) retirementId
+            let! closureOutcome = tryAppendAuthorityClosure journalDir (SessionId.value prepared.SessionId) retirementId
 
             // 条款 3/4/6：交付已成立是提交面事实，登记精确 attempt 围栏；
             // 物理中断不在工具内部发起——停止由 transform 钩子的交付裁决执行。
@@ -305,7 +303,7 @@ module DeliverTool =
             let boundPhysical = prepared.Bound.PhysicalUserMessageId
 
             let currentPhysical =
-                scope.CurrentPhysicalUserMessage (SessionId.value prepared.SessionId)
+                scope.CurrentPhysicalUserMessage(SessionId.value prepared.SessionId)
                 |> Option.map PhysicalUserMessageId.create
 
             if currentPhysical = Some boundPhysical then
@@ -321,8 +319,7 @@ module DeliverTool =
                     [ "session_id", SessionId.value prepared.SessionId
                       "physical_user_message_id", PhysicalUserMessageId.value boundPhysical ]
 
-            closureOutcome
-            |> Result.defaultWith (fun ex -> raise ex)
+            closureOutcome |> Result.defaultWith (fun ex -> raise ex)
         }
 
     let private deliverFrozenCursor
@@ -350,9 +347,7 @@ module DeliverTool =
         let receipt =
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute journalDir context.SessionId requestId command
 
-        let durableOutcome =
-            receipt.Status = "Committed"
-            || receipt.Status = "Replayed"
+        let durableOutcome = receipt.Status = "Committed" || receipt.Status = "Replayed"
 
         if
             receipt.Status = "Unknown"
@@ -461,8 +456,7 @@ module DeliverTool =
                 | None -> return Error "lifecycle journal directory is unavailable"
                 | Some journalDir when String.IsNullOrWhiteSpace journalDir ->
                     return Error "lifecycle journal directory is unavailable"
-                | Some journalDir ->
-                    return! runFrozenDeliver scope context prepared providerRunId toolCallId journalDir
+                | Some journalDir -> return! runFrozenDeliver scope context prepared providerRunId toolCallId journalDir
             }
 
         if not hasAssessment then
@@ -499,9 +493,7 @@ module DeliverTool =
                   Reviewed = reviewed }
         | _ -> Error(text Path.BindingUnavailable)
 
-    let private refreshAfterFreeze
-        (target: PreparedRetirement)
-        : Task<Result<PreparedRetirement, string>> =
+    let private refreshAfterFreeze (target: PreparedRetirement) : Task<Result<PreparedRetirement, string>> =
         task {
             try
                 let! workOpt = lifecycleWorkOf target.Bound.Directory (SessionId.value target.SessionId)

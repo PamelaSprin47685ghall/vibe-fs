@@ -1251,13 +1251,22 @@ module JsReviewOnly =
     let scopeReviewOnly (check: unit -> Task<bool>) (api: obj) : obj =
         let guarded name =
             let invoke: obj = api?(name)
-            name ==> fun (argument: obj) ->
+
+            name
+            ==> fun (argument: obj) ->
                 task {
                     let! allowed = check ()
-                    if not allowed then return JsToolsBindings.failureObj JsFailure.ReviewOnly
-                    else return! unbox<Task<obj>> (emitJsExpr (invoke, argument) "Promise.resolve($0($1))")
+
+                    if not allowed then
+                        return JsToolsBindings.failureObj JsFailure.ReviewOnly
+                    else
+                        return! unbox<Task<obj>> (emitJsExpr (invoke, argument) "Promise.resolve($0($1))")
                 }
+
         let review = [ "cat"; "stat"; "ls"; "rg" ] |> List.map guarded |> createObj
-        for name in [ "cat"; "stat"; "ls"; "rg" ] do emitJsExpr (api, name) "delete $0[$1]" |> ignore
+
+        for name in [ "cat"; "stat"; "ls"; "rg" ] do
+            emitJsExpr (api, name) "delete $0[$1]" |> ignore
+
         api?reviewOnly <- review
         api

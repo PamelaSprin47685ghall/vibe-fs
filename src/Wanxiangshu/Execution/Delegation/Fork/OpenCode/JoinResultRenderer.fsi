@@ -17,65 +17,15 @@ module JoinResultRenderer =
 
     [<RequireQualifiedAccess>]
     module Path =
-        [<Literal>]
-        val AgentReturned: string = "tool/join/agent-returned"
 
         [<Literal>]
         val AgentFailed: string = "tool/join/agent-failed"
 
         [<Literal>]
-        val AgentDidNotReturn: string = "tool/join/agent-did-not-return"
-
-        [<Literal>]
-        val PtyEnded: string = "tool/join/pty-ended"
-
-        [<Literal>]
-        val PtyInterrupted: string = "tool/join/pty-interrupted"
-
-        [<Literal>]
         val TerminalLabel: string = "tool/join/terminal-label"
 
         [<Literal>]
-        val InterruptOperatorAbort: string = "tool/join/interrupt-operator-abort"
-
-        [<Literal>]
-        val InterruptUserMessage: string = "tool/join/interrupt-user-message"
-
-        [<Literal>]
-        val InterruptDeadline: string = "tool/join/interrupt-deadline"
-
-        [<Literal>]
         val OrchestratorPublished: string = "tool/join/orchestrator-published"
-
-        [<Literal>]
-        val OrchestratorRejectedDirty: string = "tool/join/orchestrator-rejected-dirty"
-
-        [<Literal>]
-        val OrchestratorIntegrationFailed: string = "tool/join/orchestrator-integration-failed"
-
-        [<Literal>]
-        val OrchestratorEmpty: string = "tool/join/orchestrator-empty"
-
-        [<Literal>]
-        val ForkNothingToJoin: string = "tool/join/fork-nothing-to-join"
-
-        [<Literal>]
-        val ForkCancelled: string = "tool/join/fork-cancelled"
-
-        [<Literal>]
-        val ForkJoinInProgress: string = "tool/join/fork-join-in-progress"
-
-        [<Literal>]
-        val ForkNotFound: string = "tool/join/fork-not-found"
-
-        [<Literal>]
-        val ForkTimedOut: string = "tool/join/fork-timed-out"
-
-        [<Literal>]
-        val ForkMaterializationFailed: string = "tool/join/fork-materialization-failed"
-
-        [<Literal>]
-        val RemainingCompletions: string = "tool/join/remaining-completions"
 
     /// EXEC-017: interrupt consequences are natural language, not error DTO.
     val renderInterrupted: lang: ProviderLanguage -> reason: JoinInterruptReason -> string

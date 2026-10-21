@@ -3,6 +3,7 @@ namespace Wanxiangshu.Composition.Turn
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 module ReconcilePass =
     val run:

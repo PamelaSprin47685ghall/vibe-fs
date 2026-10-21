@@ -593,9 +593,6 @@ module PromptAuthority =
                repairKind |]
         )
 
-    let repairPayloadBelongsToRequest (requestId: RepairRequestId) (payloadDigest: string) =
-        payloadDigest.StartsWith(RepairRequestId.value requestId + "\u001f", System.StringComparison.Ordinal)
-
     /// Gate nudges are not a finite repair budget. They are repeatable while the
     /// guarded condition remains unsatisfied, but one exact terminal occasion is
     /// idempotent across duplicate Host observations / restart replay.

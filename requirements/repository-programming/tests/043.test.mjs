@@ -167,8 +167,9 @@ test('WHAT[repository-programming-043] Description declares the rm/mv resource p
   assert.match(description, /Rm: string\s*\n\s*Mv: string/)
 })
 
-test('WHAT[repository-programming-043] ToolHost loads the rm/mv prose bilingually through the same resource paths', () => {
-  const toolHost = read(join(SOURCE_ROOT, 'Repository/Programming/Js/OpenCode/ToolHost.fs'))
+test('WHAT[repository-programming-043] JsDescriptionAssets loads the rm/mv prose bilingually through the same resource paths', () => {
+  // CUT-40: the prose loader left the OpenCode tool binding (ToolHost.fs) for the host-neutral Js domain.
+  const toolHost = read(join(SOURCE_ROOT, 'Repository/Programming/Js/DescriptionAssets.fs'))
 
   // 双语装载：text 按当前语言渲染资源路径，不内嵌多语散文。
   assert.match(

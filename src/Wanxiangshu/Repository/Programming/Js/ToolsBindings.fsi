@@ -15,28 +15,12 @@ module JsToolsBindings =
 
     val createLedger: persistence: IJsTransactionPersistence option -> JsAsIsLedger
 
-    val makeWhereAllMember: unit -> (string * obj)
-    val makeWhereMember: parkState: Wanxiangshu.Process.JsSandbox.ParkState option -> (string * obj)
-    val makeParkMember: parkState: Wanxiangshu.Process.JsSandbox.ParkState -> (string * obj)
-
-    /// `horizon()`: the `(memberName, member)` pair for the horizon roster
-    /// envelope; refuses with DELEGATION_UNAVAILABLE when no host is installed.
-    val makeHorizonMember: host: JsDelegationHost option -> (string * obj)
-
     /// `advisor(intent, reportMapping)`: the `(memberName, member)` pair for
     /// the advisor consult; the report mapping is mandatory and a missing or
     /// malformed one refuses with VIEW_DECLARATION_INVALID. It refuses with
     /// DELEGATION_UNAVAILABLE when no host is installed and returns the host
     /// closure's envelope verbatim otherwise.
     val makeAdvisorMember: host: JsDelegationHost option -> (string * obj)
-
-    /// `ask(question)`: the `(memberName, member)` pair for the user
-    /// question; it is a park that carries the question, so the program
-    /// suspends and resumes with the injected answer.
-    val makeAskMember:
-        parkState: Wanxiangshu.Process.JsSandbox.ParkState option ->
-        ask: (string -> Task<Result<unit, string>>) option ->
-            (string * obj)
 
     val createApi:
         capabilities: Set<JsCapability> ->

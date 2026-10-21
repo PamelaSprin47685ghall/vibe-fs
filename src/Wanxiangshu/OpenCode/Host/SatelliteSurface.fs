@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 type private SatelliteSessionPort(physical: bool, conflict: bool, queryError: bool) =
     let created = ResizeArray<string>()

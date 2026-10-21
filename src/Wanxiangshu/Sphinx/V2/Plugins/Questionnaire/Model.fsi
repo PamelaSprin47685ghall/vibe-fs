@@ -56,4 +56,3 @@ module QuestionnaireModel =
     val isAbstention: Judgment -> bool
     val isConditional: Judgment -> bool
     val labelsWithin: Set<string> -> PairwiseResponse -> Result<unit, string>
-    val uniqueLocalIds: PairwiseResponse -> Result<unit, string>

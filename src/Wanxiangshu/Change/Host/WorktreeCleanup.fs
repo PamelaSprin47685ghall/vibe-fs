@@ -50,61 +50,45 @@ module OrchestratorSweep =
 
         loop identities
 
-    /// `git worktree list` reports a branch as `refs/heads/manager/<job>`, while
-    /// `git branch --list` reports it as `manager/<job>`. Both name the same
-    /// identity, so stripping the ref prefix is the only normalisation needed.
-    ///
-    /// The job id is never parsed back out. The previous version cut at
-    /// `refs/heads/manager/` and at the first `/`, reconstructing an id to compare
-    /// against a set of ids — two different string surgeries for one question, and
-    /// ORCH-006 makes the identity opaque precisely so it is compared whole.
-    let private normalize (identity: WorktreeIdentity) =
-        WorktreeIdentity.create (GitPorcelain.shortBranch (WorktreeIdentity.value identity))
+    let private ownedIdentities (activeJobs: ManagerJobProjection list) =
+        activeJobs |> List.map (fun job -> WorktreeIdentity.value job.WorktreeIdentity)
 
-    let private afterRemoveWorktrees (git: GitPort) (isStale: WorktreeIdentity -> bool) : Task<Result<unit, string>> =
+    let private afterRemoveWorktrees (git: GitPort) (owned: string list) : Task<Result<unit, string>> =
         task {
             match! git.ListManagerBranches() with
             | Error error -> return Error(sprintf "cannot list manager branches for cleanup: %s" error)
-            | Ok branches -> return! deleteBranches git (branches |> List.filter isStale)
+            | Ok branches ->
+                let stale =
+                    GitPorcelain.staleBranches (branches |> List.map WorktreeIdentity.value) owned
+                    |> List.map WorktreeIdentity.create
+
+                return! deleteBranches git stale
         }
 
-    let private afterListWorktrees
-        (git: GitPort)
-        (isManagerBranch: WorktreeIdentity -> bool)
-        (isStale: WorktreeIdentity -> bool)
-        (entries: (WorktreePath * WorktreeIdentity option) list)
-        : Task<Result<unit, string>> =
-        task {
-            let staleWorktrees =
-                entries
-                |> List.choose (fun (path, identity) ->
-                    match identity with
-                    | Some value when isManagerBranch value && isStale value -> Some path
-                    | _ -> None)
-
-            match! removeWorktrees git staleWorktrees with
-            | Error error -> return Error error
-            | Ok() -> return! afterRemoveWorktrees git isStale
-        }
-
+    /// Which worktrees and branches are stale is wanxiangli/git-porcelain's
+    /// `staleWorktrees` / `staleBranches` (CUT-23 ②): only manager branches whose
+    /// short name no active job owns, compared whole — the MAIN working tree
+    /// (`branch refs/heads/main`) and detached worktrees are never ours to remove
+    /// (measured on Host 1.18.9: removing the main tree killed every orchestrator
+    /// canary in init). This module only performs the removals, in order.
     let sweepStaleArtifacts (git: GitPort) (activeJobs: ManagerJobProjection list) : Task<Result<unit, string>> =
         task {
-            let owned = activeJobs |> List.map (fun job -> job.WorktreeIdentity) |> Set.ofList
-
-            let isStale identity =
-                not (Set.contains (normalize identity) owned)
-
-            // Only manager-branch worktrees are ours to clean. The MAIN working tree
-            // carries `branch refs/heads/main` in `worktree list --porcelain`, so a
-            // stale test alone would classify the repository itself as stale and
-            // `git worktree remove` would fail with "is a main working tree" —
-            // measured on Host 1.18.9: every orchestrator canary died in init.
-            let isManagerBranch identity =
-                GitPorcelain.isManagerBranch (WorktreeIdentity.value identity)
+            let owned = ownedIdentities activeJobs
 
             match! git.ListWorktrees() with
             | Error error -> return Error(sprintf "cannot list worktrees for cleanup: %s" error)
-            | Ok entries -> return! afterListWorktrees git isManagerBranch isStale entries
+            | Ok entries ->
+                let stale =
+                    GitPorcelain.staleWorktrees
+                        (entries
+                         |> List.map (fun (path, identity) ->
+                             WorktreePath.value path, identity |> Option.map WorktreeIdentity.value))
+                        owned
+                    |> List.map WorktreePath.create
+
+                match! removeWorktrees git stale with
+                | Error error -> return Error error
+                | Ok() -> return! afterRemoveWorktrees git owned
         }
 
     let sweepLocked

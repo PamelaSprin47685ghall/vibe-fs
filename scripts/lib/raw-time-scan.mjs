@@ -62,7 +62,7 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Repository/Investigation/Semble/Stdio.fs',
   'Repository/Programming/Js/OpenCode/BookkeeperTool.fs',
   'Repository/Programming/Js/OpenCode/ToolHost.fs',
-  'Repository/Programming/Js/OpenCode/ToolWorkflow.fs',
+  'Repository/Programming/Js/ToolWorkflow.fs',
   'OpenCode/Host/PluginSessionScope.fs',
 ])
 

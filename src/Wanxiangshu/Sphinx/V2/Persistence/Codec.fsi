@@ -12,18 +12,11 @@ open Wanxiangshu.Sphinx.V2.Core
 /// thing, so a partial transition can never become the accepted current.
 module Codec =
 
-    /// New writes use @2. @1 keeps its identity and is explicitly rejected/cut, not reinterpreted.
-    val transitionEventType: string
-    val legacyTransitionEventType: string
-
     type CodecError = { Code: string; Message: string }
 
     val decodeBody: obj -> Result<InquiryEventBody, CodecError>
     val decodeInput: obj -> Result<TransitionBatch, CodecError>
     val decode: (string -> string) -> EventEnvelope -> Result<TransitionBatch, CodecError>
-
-    /// The event body tag the Integrator routes on.
-    val bodyTag: InquiryEventBody -> string
 
     /// Native @2 payload: schemaVersion/inquiry/previousRevision/previousHead/revision,
     /// commandId/commandFingerprint/postStateFingerprint/events. Revisions are exact
@@ -31,7 +24,6 @@ module Codec =
     /// collections are arrays, and optional fields are explicit null. Persisted @2
     /// requires a complete sealed post-state fingerprint; preparation may carry null.
     val toWire: TransitionBatch -> obj
-    val eventIdentity: (string -> string) -> TransitionBatch -> Wanxiangshu.Foundation.Identity.EventId
     val seal: (string -> string) -> InquiryState option -> TransitionBatch -> Result<EventEnvelope, CoreError>
 
     /// Encodes one sealed transition. Id derives from immutable command identity,

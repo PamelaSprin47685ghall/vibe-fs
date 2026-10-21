@@ -54,26 +54,3 @@ module Plan =
         | true, _ -> Error PlanFault.BlankDescription
         | _, true -> Error PlanFault.BlankCapability
         | false, false -> Ok()
-
-    /// A proposal must offer at least one card, and every target reference must be a
-    /// real, non-blank artifact reference.
-    let validateProposal (knownRefs: Set<string>) (proposal: PlanProposal) : Result<PlanProposal, PlanFault> =
-        let cards = proposal.Cards
-
-        let unknown =
-            cards
-            |> List.collect (fun card -> card.TargetArtifactRefs)
-            |> List.tryFind (fun reference -> not (Set.contains reference knownRefs))
-
-        let duplicates =
-            let ids = cards |> List.map (fun card -> card.PlanId)
-            List.length ids <> (ids |> Set.ofList |> Set.count)
-
-        match List.isEmpty cards, unknown, duplicates with
-        | true, _, _ -> Error PlanFault.NoPlans
-        | _, Some reference, _ -> Error(PlanFault.UnknownTargetRef reference)
-        | _, _, true -> Error(PlanFault.DuplicatePlanId(cards |> List.map (fun card -> card.PlanId) |> List.head))
-        | false, None, false ->
-            cards
-            |> List.fold (fun state card -> state |> Result.bind (fun () -> validateCard card)) (Ok())
-            |> Result.map (fun () -> proposal)

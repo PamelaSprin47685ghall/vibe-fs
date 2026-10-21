@@ -10,6 +10,7 @@ type FailedProviderAttemptIdentity =
       ProviderRun: ProviderRunIdentity }
 
 module FailedProviderAttemptIdentity =
+    val view: identity: FailedProviderAttemptIdentity -> obj
     val dedupeKey: identity: FailedProviderAttemptIdentity -> string
 
 [<RequireQualifiedAccess>]

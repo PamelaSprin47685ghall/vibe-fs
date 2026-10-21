@@ -120,16 +120,6 @@ module InquiryState =
     let reservationKey (key: ReservationKey) : string =
         String.concat "|" [ WorkId.value key.WorkId; string (Attempt.value key.Attempt) ]
 
-    let trySlots
-        (state: InquiryState)
-        (targetRef: string)
-        (valueSpaceId: string)
-        (scopeId: string)
-        (semanticsModelRef: string)
-        : CertificateSlotPatch list option =
-        state.Certificates
-        |> Map.tryFind (certificateKey targetRef valueSpaceId scopeId semanticsModelRef)
-
     let isTerminal (status: InquiryStatus) : bool =
         match status with
         | InquiryStatus.StopReached _

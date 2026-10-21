@@ -8,84 +8,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
 
-/// PROMPT-019: load already-localized js-program prose. Domain assembles;
-/// this module binds language.
-module JsDescriptionAssets =
-
-    let private text (lang: ProviderLanguage) (path: string) =
-        ProviderProse.render lang path Map.empty
-
-    let private template (lang: ProviderLanguage) (path: string) =
-        ProviderResources.requireLanguagePair path
-        ProviderResources.readText lang path
-
-    let load (lang: ProviderLanguage) : JsCanonicalDescription.Prose =
-        { Header = text lang JsCanonicalDescription.Path.Header
-
-          Footer = text lang JsCanonicalDescription.Path.Footer
-          Contract = template lang JsCanonicalDescription.Path.Contract
-
-          ContractParallelEdits = template lang JsCanonicalDescription.Path.ContractParallelEdits
-          ContractParallelReads = template lang JsCanonicalDescription.Path.ContractParallelReads
-          VerbRead = text lang JsCanonicalDescription.Path.VerbRead
-
-          VerbCreate = text lang JsCanonicalDescription.Path.VerbCreate
-          ReadRules = template lang JsCanonicalDescription.Path.ReadRules
-          ReviewOnlyRules = text lang JsCanonicalDescription.Path.ReviewOnlyRules
-          Recipes = text lang JsCanonicalDescription.Path.Recipes
-
-          WriteRules = text lang JsCanonicalDescription.Path.WriteRules
-          MutationRules = text lang JsCanonicalDescription.Path.MutationRules
-          Rm = text lang JsCanonicalDescription.Path.Rm
-          Mv = text lang JsCanonicalDescription.Path.Mv
-          RunRules = text lang JsCanonicalDescription.Path.RunRules
-          Deliver = text lang JsCanonicalDescription.Path.Deliver
-          DelegationRules = text lang JsCanonicalDescription.Path.DelegationRules
-          UltraFraming = text lang JsCanonicalDescription.Path.UltraFraming
-          UltraUnavailable = text lang JsCanonicalDescription.Path.UltraUnavailable
-          UltraEngineering = text lang JsCanonicalDescription.Path.UltraEngineering
-          UltraInvestigation = text lang JsCanonicalDescription.Path.UltraInvestigation
-          UltraDevOps = text lang JsCanonicalDescription.Path.UltraDevOps
-          UltraManagerInvestigation = text lang JsCanonicalDescription.Path.UltraManagerInvestigation
-          UltraPlan = text lang JsCanonicalDescription.Path.UltraPlan
-          MechanicalSemantic = text lang JsCanonicalDescription.Path.MechanicalSemantic
-
-          ReasonRunUnimplemented = text lang JsCanonicalDescription.Path.ReasonRunUnimplemented
-
-          Park = template lang JsCanonicalDescription.Path.Park
-          ParkedPayload = template lang JsCanonicalDescription.Path.ParkedPayload
-          BaseClass = template lang JsCanonicalDescription.Path.BaseClass
-          BaseClassCallable = template lang JsCanonicalDescription.Path.BaseClassCallable
-          BaseClassRead = template lang JsCanonicalDescription.Path.BaseClassRead
-          BaseClassAnchors = template lang JsCanonicalDescription.Path.BaseClassAnchors
-          BaseClassGlob = template lang JsCanonicalDescription.Path.BaseClassGlob
-          BaseClassGrep = template lang JsCanonicalDescription.Path.BaseClassGrep
-          BaseClassWrite = template lang JsCanonicalDescription.Path.BaseClassWrite
-          BaseClassRemove = template lang JsCanonicalDescription.Path.BaseClassRemove
-          BaseClassMove = template lang JsCanonicalDescription.Path.BaseClassMove
-          BaseClassExec = template lang JsCanonicalDescription.Path.BaseClassExec
-          BaseClassFork = template lang JsCanonicalDescription.Path.BaseClassFork
-          BaseClassDag = template lang JsCanonicalDescription.Path.BaseClassDag
-          BaseClassResume = template lang JsCanonicalDescription.Path.BaseClassResume
-          BaseClassCommission = template lang JsCanonicalDescription.Path.BaseClassCommission
-          BaseClassDevOps = template lang JsCanonicalDescription.Path.BaseClassDevOps
-          BaseClassJoin = template lang JsCanonicalDescription.Path.BaseClassJoin
-          BaseClassFission = template lang JsCanonicalDescription.Path.BaseClassFission
-          BaseClassHorizon = template lang JsCanonicalDescription.Path.BaseClassHorizon
-          BaseClassAdvisor = template lang JsCanonicalDescription.Path.BaseClassAdvisor
-          BaseClassAsk = template lang JsCanonicalDescription.Path.BaseClassAsk
-          BaseClassLifecycle = template lang JsCanonicalDescription.Path.BaseClassLifecycle
-          JsPlan = text lang JsCanonicalDescription.Path.JsPlan }
-
-    let argProgram (lang: ProviderLanguage) =
-        text lang JsCanonicalDescription.Path.ArgProgram
-
-    let missingProgram (lang: ProviderLanguage) =
-        text lang JsCanonicalDescription.Path.MissingProgram
-
-    let viewDeclarationExtra (lang: ProviderLanguage) =
-        text lang JsCanonicalDescription.Path.ViewDeclarationExtra
-
 /// JS-073/JS-074: a generated js-* tool spec — the dynamic counterpart of the
 /// static baseSpecs. Built from a generated surface (JS-002); execution goes
 /// through JsToolWorkflow (sandbox → staging → preflight → durable facts →
@@ -163,9 +85,17 @@ module JsToolSpec =
         let inputOf (args: HostToolArguments) : obj =
             let program = readProgram args
 
-            let unpark = if isPresent (args.Raw?unpark) then Some(args.Raw?unpark) else None
+            let unpark =
+                if isPresent (args.Raw?unpark) then
+                    Some(args.Raw?unpark)
+                else
+                    None
 
-            let abandon = if isPresent (args.Raw?abandon) then Some(args.Raw?abandon) else None
+            let abandon =
+                if isPresent (args.Raw?abandon) then
+                    Some(args.Raw?abandon)
+                else
+                    None
 
             let programEntry =
                 match program with
@@ -183,13 +113,10 @@ module JsToolSpec =
 
             let abandonEntry =
                 match abandon with
-                | Some abandonValue ->
-                    Some("abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ])
+                | Some abandonValue -> Some("abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ])
                 | None -> None
 
-            [ programEntry; unparkEntry; abandonEntry ]
-            |> List.choose id
-            |> createObj
+            [ programEntry; unparkEntry; abandonEntry ] |> List.choose id |> createObj
 
         // The unpark/abandon arguments are nested objects; the Host schema
         // describes them as plain objects with string handle fields. The value
@@ -238,13 +165,7 @@ module JsToolSpec =
                     | Some reason ->
                         return
                             JsToolsResult.render (
-                                JsToolWorkflow.JsToolOutcome.Failed(
-                                    JsFailure.InvalidArgument reason,
-                                    [],
-                                    [],
-                                    [],
-                                    []
-                                )
+                                JsToolWorkflow.JsToolOutcome.Failed(JsFailure.InvalidArgument reason, [], [], [], [])
                             )
                     | None ->
                         let hasProgram = isPresent (input?program)
@@ -255,7 +176,8 @@ module JsToolSpec =
                             && not (isPresent (input?abandon))
 
                         let declaration =
-                            if isUndefined (args.Raw?prefixUntil) && isUndefined (args.Raw?thenMap) then null
+                            if isUndefined (args.Raw?prefixUntil) && isUndefined (args.Raw?thenMap) then
+                                null
                             else
                                 createObj [ "prefixUntil" ==> args.Raw?prefixUntil; "thenMap" ==> args.Raw?thenMap ]
 
@@ -273,19 +195,13 @@ module JsToolSpec =
                             elif not (isPresent declaration) then
                                 None
                             else
-                                match
-                                    Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse
-                                        declaration
-                                with
+                                match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse declaration with
                                 | Ok _ -> None
                                 | Error failure -> Some failure
 
                         match viewFailure with
                         | Some failure ->
-                            return
-                                JsToolsResult.render (
-                                    JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])
-                                )
+                            return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
                         | None when noState ->
                             return
                                 ToolHostCodec.tomlObject
@@ -366,9 +282,7 @@ module JsToolSpec =
                             match commitFailure with
                             | Some failure ->
                                 return
-                                    JsToolsResult.render (
-                                        JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])
-                                    )
+                                    JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
                             | None -> return JsToolsResult.render outcome
                 } }
 
@@ -414,28 +328,3 @@ module JsToolSpec =
             fileAccessObservation
             rootOf
             settlementOf
-
-    /// Build a ToolSpec with dedicated ToolAdmission.
-    let createWithAdmission
-        (factory: HostToolFactory)
-        (surface: JsSurface)
-        (admission: ToolAdmission)
-        (workspaceRoot: string)
-        (persistence: IJsTransactionPersistence option)
-        (lifecyclePersistence: IJsLifecyclePersistence option)
-        (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
-        (rootOf: string -> string)
-        (settlementOf: HostToolContext -> Task<DeliverySettlement option>)
-        : ToolSpec =
-        let spec =
-            create
-                factory
-                surface
-                workspaceRoot
-                persistence
-                lifecyclePersistence
-                fileAccessObservation
-                rootOf
-                settlementOf
-
-        { spec with Admission = admission }

@@ -14,6 +14,8 @@
 
 `Cursor` 按调用 session 记录已经成功交付的视图材料身份。身份包含代表锚点和精确呈现内容，不能仅记编号：隐含锚点 0 永久存在，其新摘要仍是新材料。同一份材料不会重复发送；同编号的内容变化会产生增量。只有咨询成功后调用 `record`；失败与未确认结果不推进。`clear` / `clearAll` 用于相应专席清理。无增量时仍可独立追加新 intent。
 
+材料身份、增量过滤、账本（按调用 session 隔离、单调、只由成功的咨询推进）和散文读回（最后一条非空白 assistant 文本）的规则由 `wanxiangli/advisor` 承担（CUT-39）。主仓的 `Cursor`、`AdvisorView.plan` 和 `AdvisorSeat` 只持有进程内实例、生成 view 并渲染 TOML，不再各写一份。
+
 ## 成员与信封
 
 `this.advisor(intent, view)` 由 `JsCapability.Advisor` 投影：注册表提供成员名，本地化基类伪代码提供接口、说明与例子，运行时按同一能力集提供绑定，`ToolsBindings.makeAdvisorMember` 把宿主闭包（`JsDelegationHost.Advisor`）注入成员，两处 install 分别在 `ToolRegistry` 的生成面宿主与 `RuntimeSurface`。宿主闭包本身实现 view 声明解析（非法声明拒绝为 `VIEW_DECLARATION_INVALID`）、调用 `AdvisorView.plan` + `AdvisorSeat.consult`、成功后推进游标，返回值是数据信封：`{ ok: true, advice }`，或 `{ ok: false, code, reason }`——席位无法作答为 `advisor-unavailable`，宿主缺席为 `DELEGATION_UNAVAILABLE`。拒绝是数据而非抛出，程序不需要为它写 catch；渲染只在工具结果边界发生。

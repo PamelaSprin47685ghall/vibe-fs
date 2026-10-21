@@ -30,8 +30,10 @@ run('ratchet: master tree', real, false)
 run('N5 new kernel file opens Wanxiangshu.OpenCode', plant('\nopen Wanxiangshu.OpenCode\n'), true)
 run('N6 qualified Wanxiangshu.OpenCode.ProviderWireDecode reference', plant('\nlet leak4 = Wanxiangshu.OpenCode.ProviderWireDecode.hostMessageId\n'), true)
 run('N7 commented reference is ignored', plant('\n// open Wanxiangshu.OpenCode\n'), false)
-const shrunk = 'src/Wanxiangshu/Context/Prefix/Wire.fs'
-run('N8 baseline entry stops referencing (ratchet must be tightened)', (p) => (p === shrunk ? real(p).replace(/Wanxiangshu\.OpenCode/g, 'Wanxiangshu.Elsewhere') : real(p)), true)
+// N8 (eng-cut34b-goose): the baseline is empty since the ratchet reached 0, so "an entry stops referencing" has no
+// subject left. Instead: a former baseline file (Send.fs, removed at 4 -> 1) that re-opens the adapter must be red.
+const former = 'src/Wanxiangshu/Interaction/Dispatch/Send.fs'
+run('N8 former baseline file re-opens the adapter (baseline grants nothing)', (p) => (p === former ? real(p).replace(/^open Wanxiangshu\.Foundation$/m, 'open Wanxiangshu.Foundation\nopen Wanxiangshu.OpenCode') : real(p)), true)
 // positive control: the real adapter files do match, so excluding the adapter area must turn the master tree red
 const adapterHits = files.filter((p) => p.includes('/OpenCode/Host/') && /\?client\b|\bclient\s*(?:\?|\.(?:session|event|app|config|tui|find|file|project|path)\b)/.test(real(p)))
 console.log(`${adapterHits.length > 0 ? 'PASS' : 'FAIL'} P1 adapter files really touch the client: ${adapterHits.join(', ')}`)

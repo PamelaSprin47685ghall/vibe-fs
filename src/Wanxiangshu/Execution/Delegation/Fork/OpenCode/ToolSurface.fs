@@ -16,8 +16,10 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
@@ -1053,7 +1055,9 @@ module ForkToolSurface =
         }
 
     let recordDeliveredValue (sessionId: string) (deliveredValue: obj) : unit =
-        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordView sessionId (if isNull deliveredValue then None else Some deliveredValue)
+        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordView
+            sessionId
+            (if isNull deliveredValue then None else Some deliveredValue)
 
     let settle (value: obj) (owner: string) (answer: string) (providerRun: string) : Task<bool> =
         task {

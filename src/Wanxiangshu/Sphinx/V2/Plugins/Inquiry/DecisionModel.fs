@@ -34,25 +34,6 @@ module DecisionModel =
     let usable (estimate: ContributionEstimate) : bool =
         estimate.Kind <> ContributionKind.Unestimated && estimate.Rank.IsSome
 
-    /// Ranks estimates within one scope. Unestimated plans are never placed, and never
-    /// given a rank below the lowest estimated one — "no data" is not "last place".
-    let rankInScope (scopeId: string) (estimates: ContributionEstimate list) : ContributionEstimate list =
-        let estimated =
-            estimates
-            |> List.filter usable
-            |> List.sortBy (fun estimate -> defaultArg estimate.Rank System.Int32.MaxValue)
-
-        let renumbered =
-            estimated
-            |> List.mapi (fun index estimate -> { estimate with Rank = Some(index + 1) })
-
-        let renumberedIds =
-            renumbered |> List.map (fun estimate -> estimate.PlanId) |> Set.ofList
-
-        renumbered
-        @ (estimates
-           |> List.filter (fun estimate -> not (Set.contains estimate.PlanId renumberedIds)))
-
     /// Whether a scope's estimates can support a numeric comparison. A single-response
     /// provisional order is a real answer with a real limitation: it is not an
     /// independent panel (WHAT[sphinx-v2-021]).
@@ -66,11 +47,3 @@ module DecisionModel =
                 match kind with
                 | ContributionKind.ModelEstimate _ -> true
                 | _ -> false))
-
-    /// Whether the set is provisional only: usable for a first decision, not for a
-    /// claim about the ranking's stability.
-    let isProvisionalOnly (estimates: ContributionEstimate list) : bool =
-        let kinds =
-            estimates |> List.filter usable |> List.map (fun estimate -> estimate.Kind)
-
-        kinds |> List.contains ContributionKind.SingleResponseProvisional

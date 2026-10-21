@@ -28,7 +28,8 @@ type DeliverySpawnOutcome =
     | Unknown of reason: string
 
 module PlanTools =
-    let private executionFences = System.Collections.Generic.Dictionary<string, string>()
+    let private executionFences =
+        System.Collections.Generic.Dictionary<string, string>()
 
     let private requireOpt (err: string) =
         function
@@ -261,12 +262,13 @@ module PlanTools =
         (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
         (retired: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement)
         : string =
-        let rec after
-            (remaining: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement list)
-            (found: bool)
-            =
+        let rec after (remaining: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement list) (found: bool) =
             match remaining with
-            | [] -> if found then work.ActiveId |> Option.defaultValue "" else ""
+            | [] ->
+                if found then
+                    work.ActiveId |> Option.defaultValue ""
+                else
+                    ""
             | retirement :: rest ->
                 if found then
                     retirement.IncumbencyId
@@ -822,8 +824,7 @@ module PlanTools =
         let observation =
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
                 "ResolveDelivery"
-                [ "operationId", box operationId
-                  "outcome", box "Unknown" ]
+                [ "operationId", box operationId; "outcome", box "Unknown" ]
 
         let receipt =
             durableObservation gitCommonDir workId (operationId + ":unknown") observation
@@ -929,10 +930,11 @@ module PlanTools =
                     match lifecycleWorkOf gitCommonDir workId with
                     | None -> Error "lifecycle work is missing"
                     | Some work ->
-                        match work.PendingOperationId, work.PendingExecSessionId, work.PendingDigest, work.PendingPath with
+                        match
+                            work.PendingOperationId, work.PendingExecSessionId, work.PendingDigest, work.PendingPath
+                        with
                         | Some operationId, None, Some digest, Some path -> Ok(operationId, digest, path)
-                        | Some _, Some bound, Some digest, Some path ->
-                            Ok("replay:" + bound, digest, path)
+                        | Some _, Some bound, Some digest, Some path -> Ok("replay:" + bound, digest, path)
                         | _ -> Error "pending delivery evidence is incomplete"
 
                 match pending with
@@ -1118,8 +1120,7 @@ module PlanTools =
 
         if work.PendingDelivery && retiredCount = 0 then
             work.PendingOperationId
-            |> Option.iter (fun operationId ->
-                executionFences[providerRunId + ":" + toolCallId] <- operationId)
+            |> Option.iter (fun operationId -> executionFences[providerRunId + ":" + toolCallId] <- operationId)
 
             startFreshPostS3Execution
                 gitCommonDir
@@ -1132,7 +1133,11 @@ module PlanTools =
         elif executionFences.ContainsKey(providerRunId + ":" + toolCallId) then
             let remembered =
                 let key = executionFences[providerRunId + ":" + toolCallId]
-                if executionFences.ContainsKey key then executionFences[key] else key
+
+                if executionFences.ContainsKey key then
+                    executionFences[key]
+                else
+                    key
 
             Task.FromResult(
                 Ok

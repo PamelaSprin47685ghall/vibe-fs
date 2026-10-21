@@ -18,6 +18,12 @@ type ProviderFailureAdvanceRejection =
     | NoActiveBudget
     | InvalidTransition
 
+[<RequireQualifiedAccess>]
+type ProviderFailureReplay =
+    | LatestMayRetry
+    | LatestExhausted
+    | Superseded
+
 module ProviderFailureProjection =
     val forAuthority:
         logicalRunId: LogicalRunId -> authorityRoot: AuthorityRootUserMessageId -> ProviderFailureProjection
@@ -31,3 +37,9 @@ module ProviderFailureProjection =
     val applyExhausted: current: ProviderFailureProjection -> ProviderFailureProjection
     val recordSuccess: current: ProviderFailureProjection -> ProviderFailureProjection
     val mayRetry: budgetLimit: int -> current: ProviderFailureProjection -> bool
+
+    val replay:
+        budgetLimit: int ->
+        identity: FailedProviderAttemptIdentity ->
+        current: ProviderFailureProjection ->
+            ProviderFailureReplay

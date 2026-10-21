@@ -1,8 +1,7 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
-open Wanxiangshu.OpenCode
-open Wanxiangshu.OpenCode.Host
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 
 open System
 open System.Threading.Tasks

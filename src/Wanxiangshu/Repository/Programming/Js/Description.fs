@@ -458,7 +458,11 @@ class JsProgram {"""
     /// The file members of a base class. `namespace` is the api expression
     /// the member reads through; `guardOf` builds the refusal that precedes
     /// the read when the namespace cannot serve the member.
-    let private runtimeFileMethods (capabilities: Set<JsCapability>) (memberNamespace: string) (guardOf: string -> string) =
+    let private runtimeFileMethods
+        (capabilities: Set<JsCapability>)
+        (memberNamespace: string)
+        (guardOf: string -> string)
+        =
         [ if present capabilities "cat" then
               fill
                   """  async cat(path) {
@@ -466,7 +470,9 @@ class JsProgram {"""
     {{rethrow_host}}
     return result.text;
   }"""
-                  [ "rethrow_host", rethrowHost; "namespace", memberNamespace; "guard", guardOf "cat" ]
+                  [ "rethrow_host", rethrowHost
+                    "namespace", memberNamespace
+                    "guard", guardOf "cat" ]
 
               fill
                   """  async stat(path) {
@@ -474,7 +480,9 @@ class JsProgram {"""
     {{rethrow_host}}
     return result.stat;
   }"""
-                  [ "rethrow_host", rethrowHost; "namespace", memberNamespace; "guard", guardOf "stat" ]
+                  [ "rethrow_host", rethrowHost
+                    "namespace", memberNamespace
+                    "guard", guardOf "stat" ]
           if present capabilities "ls" then
               fill
                   """  async ls(path) {
@@ -482,7 +490,9 @@ class JsProgram {"""
     {{rethrow_host}}
     return result.entries;
   }"""
-                  [ "rethrow_host", rethrowHost; "namespace", memberNamespace; "guard", guardOf "ls" ]
+                  [ "rethrow_host", rethrowHost
+                    "namespace", memberNamespace
+                    "guard", guardOf "ls" ]
           if present capabilities "rg" then
               fill
                   """  async rg(argv) {
@@ -492,7 +502,9 @@ class JsProgram {"""
       ? { exitCode: result.exitCode, paths: result.paths }
       : { exitCode: result.exitCode, messages: result.messages };
   }"""
-                  [ "rethrow_host", rethrowHost; "namespace", memberNamespace; "guard", guardOf "rg" ] ]
+                  [ "rethrow_host", rethrowHost
+                    "namespace", memberNamespace
+                    "guard", guardOf "rg" ] ]
 
     let private runtimeBaseClassCore reviewOnly (prose: Prose) (capabilities: Set<JsCapability>) : string =
         "const PLAN_PATH = \"plan.md\";\n"

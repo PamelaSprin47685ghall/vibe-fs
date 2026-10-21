@@ -63,9 +63,6 @@ module RecordCoverage =
     let covers (cursor: XTraceCursor) (coverage: RecordCoverage) =
         not (XTraceCursor.isAfter cursor (ingestedThrough coverage))
 
-    let firstUncoveredCursor (coverage: RecordCoverage) : XTraceCursor =
-        XTraceCursor.nextCursor (ingestedThrough coverage)
-
 [<RequireQualifiedAccess>]
 module XTraceRange =
     let create (startInclusive: XTraceCursor) (endExclusive: XTraceCursor) : XTraceRange =

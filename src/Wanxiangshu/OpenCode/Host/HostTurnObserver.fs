@@ -1,5 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
@@ -11,7 +17,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -131,11 +136,7 @@ module HostTurnObserver =
                 // await（异常不被吞掉），未结算的那个由其发起方各自结算。
                 // Fable has no Task.WhenAny; Promise.race is the established
                 // pattern (Await.fs / ToolWorkflow.fs).
-                do!
-                    (Fable.Core.JsInterop.emitJsExpr
-                        (guard, delivery)
-                        "Promise.race([$0, $1])"
-                        : Task)
+                do! (Fable.Core.JsInterop.emitJsExpr (guard, delivery) "Promise.race([$0, $1])": Task)
         }
 
     let private observeApplicationTurn

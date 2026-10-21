@@ -50,7 +50,7 @@ test('WHAT[repository-programming-041] JsToolSpec.execute call site passes the l
 })
 
 test('WHAT[repository-programming-041] the workflow records Parked, Unparked and Abandoned audit events on the execute chain', () => {
-  const workflow = read(join(SOURCE_ROOT, 'Repository/Programming/Js/OpenCode/ToolWorkflow.fs'))
+  const workflow = read(join(SOURCE_ROOT, 'Repository/Programming/Js/ToolWorkflow.fs'))
 
   assert.match(workflow, /recordLifecycle lifecyclePersistence JsLifecycleEventType\.Parked site\.Handle site\.SessionId/)
   assert.match(workflow, /recordLifecycle lifecyclePersistence JsLifecycleEventType\.Unparked handle sessionId/)
@@ -101,7 +101,7 @@ test('WHAT[repository-programming-041] PluginSessionScope carries the lifecycle 
 
 test('WHAT[repository-programming-041] ClearSession records a Reaped audit event per reaped handle with close-isolated failure handling', () => {
   const scope = read(join(SOURCE_ROOT, 'OpenCode/Host/PluginSessionScope.fs'))
-  const parkedSites = read(join(SOURCE_ROOT, 'Repository/Programming/Js/OpenCode/ParkedSites.fs'))
+  const parkedSites = read(join(SOURCE_ROOT, 'Repository/Programming/Js/ParkedSites.fs'))
 
   // The handles are enumerated before reapSession consumes the sites.
   assert.match(scope, /let reapedHandles = JsParkedSites\.handlesForSession sessionId/)

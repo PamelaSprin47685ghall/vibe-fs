@@ -11,5 +11,3 @@ type TerminalTracePort =
 [<RequireQualifiedAccess>]
 module TerminalTracePort =
     val forJournal: journal: AgentJournal -> TerminalTracePort
-    val forTerminalTrace: journal: AgentJournal -> TerminalTracePort
-    val tryForJournal: journal: AgentJournal option -> TerminalTracePort option

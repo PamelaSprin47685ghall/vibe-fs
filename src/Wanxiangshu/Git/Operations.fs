@@ -12,7 +12,7 @@ open Wanxiangshu.Process
 module GitOperations =
 
     let private command repo args =
-        { FileName = "git"
+        { FileName = GitSubject.Executable
           Arguments = args
           WorkingDirectory = Some repo
           Environment = None
@@ -305,5 +305,3 @@ module GitOperations =
                     repoPath
                     (targetSpec target)
                     (sprintf "target branch not found: %s" (TargetRef.value target)) }
-
-    let createWithRunner runner = createWithRepo "." runner

@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 module SessionSnapshotSurface =
     type ProjectedMessages =
         internal new: messages: SessionMessage list -> ProjectedMessages

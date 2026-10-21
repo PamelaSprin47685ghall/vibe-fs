@@ -42,8 +42,7 @@ module StaticTools =
     /// the role's office permissions project a programming surface. Same
     /// predicate as JsToolSpec.admissionFor and JsToolGenerator (no second list).
     let private admitsProgrammingSurface (role: Role) : bool =
-        Wanxiangshu.Repository.Programming.Js.JsCapability.admitsProgrammingSurface
-            (OfficeCapability.permissions role)
+        Wanxiangshu.Repository.Programming.Js.JsCapability.admitsProgrammingSurface (OfficeCapability.permissions role)
 
     /// Single source: OfficeCapability.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
@@ -123,8 +122,7 @@ module StaticTools =
         // host verb is `commission` (no office permission of its own).
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "commission", Role.Orchestrator -> "allow"
-        | true, name, role when List.contains name OfficeCapability.utilityToolNames ->
-            utilityPermission role name
+        | true, name, role when List.contains name OfficeCapability.utilityToolNames -> utilityPermission role name
         | true, "todowrite-for-bookkeeper", _ -> "deny"
         | true, name, _ when name.StartsWith "todowrite-for-" -> jsPermission role name
         | true, _, _ -> defaultPermission allowed role name

@@ -1224,11 +1224,11 @@ test('WHAT[structured-workflow-012] focused Controller compilation includes Snap
   assert.ok(plan.compileItems.includes(controllerFs))
   assert.ok(plan.compileItems.includes(recoveryFs))
   for (const extension of ['fsi', 'fs']) {
-    const snapshot = join(SOURCE_ROOT, `OpenCode/Host/SessionSnapshot.${extension}`)
-    assert.ok(plan.compileItems.includes(snapshot), `focused Controller compilation must include SessionSnapshot.${extension}`)
+    const snapshot = join(SOURCE_ROOT, `Foundation/HostSessionSnapshot.${extension}`)
+    assert.ok(plan.compileItems.includes(snapshot), `focused Controller compilation must include HostSessionSnapshot.${extension}`)
     assert.ok(plan.compileItems.indexOf(snapshot) < plan.compileItems.indexOf(recoveryFs), 'Snapshot must precede its recovery consumer in canonical order')
   }
-  for (const path of ['OpenCode/Host/SessionHostPort', 'Execution/Session/ChatExecution/Acceptance', 'Execution/Session/ChatExecution/Settlement']) {
+  for (const path of ['Foundation/HostSessionPort', 'Execution/Session/ChatExecution/Acceptance', 'Execution/Session/ChatExecution/Settlement']) {
     for (const extension of ['fsi', 'fs']) {
       assert.equal(plan.compileItems.includes(join(SOURCE_ROOT, `${path}.${extension}`)), false, `Snapshot recovery must not import ${path}.${extension}`)
     }

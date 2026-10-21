@@ -306,14 +306,3 @@ module JsFragmentRegistry =
           ask
           deliver
           park ]
-
-    let byCapability: Map<JsCapability, JsCapabilityFragment list> =
-        all |> List.groupBy _.Capability |> Map.ofList
-
-    /// Whether a member may be projected into a surface: its own capability
-    /// plus every extra capability it needs. The base class and the member
-    /// list read this one rule, so a member never appears without a body.
-    let isProjected (capabilities: Set<JsCapability>) (fragment: JsCapabilityFragment) : bool =
-        Set.contains fragment.Capability capabilities
-        && additionalCapabilities fragment
-           |> List.forall (fun capability -> Set.contains capability capabilities)

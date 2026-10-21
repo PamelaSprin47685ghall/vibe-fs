@@ -11,7 +11,8 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 
@@ -67,21 +68,12 @@ type SyncDelegateRuntime =
             SyncDelegateBatch option
 
     member TryFind: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
-    member TryFindDelegateOwner: delegateSessionId: SessionId -> SessionId option
     member TryFindForScopeClose: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
     member StageDeletedDelegate: ownerSessionId: SessionId * delegateSessionId: SessionId -> bool
     member StageDeletedDelegateBySession: delegateSessionId: SessionId -> SessionId option
 
     member Invoke:
         ownerSessionKey: string * role: SyncDelegateRole * charge: string * ?expectedToolCalls: int ->
-            Task<Result<string, string>>
-
-    member InvokePrepared:
-        ownerSessionKey: string *
-        role: SyncDelegateRole *
-        charge: string *
-        prepareProviderPrompt: (unit -> Task<LlmFacing.Document>) *
-        ?expectedToolCalls: int ->
             Task<Result<string, string>>
 
     member InvokeBatchPrepared:

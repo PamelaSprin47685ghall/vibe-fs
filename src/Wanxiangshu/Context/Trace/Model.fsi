@@ -10,8 +10,6 @@ type XTraceItem =
 
 [<RequireQualifiedAccess>]
 module internal WanxiangliTrace =
-    [<Literal>]
-    val MaxPartChunkBytes: int = 524288
 
     type ProjectionBridge =
         { TraceId: string
@@ -71,5 +69,4 @@ module XTrace =
     val head: items: XTraceItem list -> XTraceCursor
     val flatten: messages: SemanticMessage list -> {| Part: SemanticPart; Role: string |} list
     val forOpening: items: XTraceItem list -> XTraceItem list
-    val renderItem: item: XTraceItem -> string
     val render: items: XTraceItem list -> string

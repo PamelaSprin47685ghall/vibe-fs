@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 /// Physical Host binding for the assistant run created for one user message.
 /// This is transport identity only; it carries no Review semantics.
 module ProviderRunBinding =
@@ -23,8 +25,6 @@ module ProviderRunBinding =
     /// `message.updated` signal with the budget below as deadline backstop.
     /// Identity rejections are never retried.
     let projectionCatchupMaxReads = 6
-
-    let projectionCatchupDelayMilliseconds = 10
 
     let private confirmLatestRun single latest =
         if latest.Id = single.Id then

@@ -24,7 +24,6 @@ module XTraceCursor =
     val isAfter: next: XTraceCursor -> previous: XTraceCursor -> bool
     val isAtOrAfter: cursor: XTraceCursor -> lowerBound: XTraceCursor -> bool
     val isBefore: cursor: XTraceCursor -> upperBound: XTraceCursor -> bool
-    val maxCursor: left: XTraceCursor -> right: XTraceCursor -> XTraceCursor
 
 [<RequireQualifiedAccess>]
 module XTraceRange =
@@ -40,4 +39,3 @@ module RecordCoverage =
     val create: ingestedThrough: XTraceCursor -> RecordCoverage
     val ingestedThrough: coverage: RecordCoverage -> XTraceCursor
     val covers: cursor: XTraceCursor -> coverage: RecordCoverage -> bool
-    val firstUncoveredCursor: coverage: RecordCoverage -> XTraceCursor

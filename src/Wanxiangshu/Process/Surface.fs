@@ -11,7 +11,7 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.ManagedAgents
 
 /// JS-native time/process boundary. Clocks, timers and deadlines are opaque
 /// capabilities; estimates, elapsed text and validation results are plain data.

@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Participant.ManagedAgents
+
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Resources
 

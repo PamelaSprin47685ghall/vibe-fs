@@ -18,11 +18,12 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-tools-toolruntimescope.fsproj"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fsi"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
-    <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fsi"/>
-    <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fs"/>
+    <Compile Include="Repository/Programming/Js/DescriptionAssets.fsi"/>
+    <Compile Include="Repository/Programming/Js/DescriptionAssets.fs"/>
+    <Compile Include="Repository/Programming/Js/ToolWorkflow.fsi"/>
+    <Compile Include="Repository/Programming/Js/ToolWorkflow.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fs"/>
     <Compile Include="Repository/Programming/Js/GeneratorSurface.fsi"/>

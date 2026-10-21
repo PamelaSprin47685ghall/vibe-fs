@@ -13,6 +13,7 @@ open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Mission.Work.Review
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 

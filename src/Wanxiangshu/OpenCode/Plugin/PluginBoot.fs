@@ -6,6 +6,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
@@ -50,7 +51,7 @@ module PluginBoot =
         task {
             // HOST-026: the global preference is the only language authority;
             // resolve it once at load so the first request already speaks it.
-            Wanxiangshu.OpenCode.ProviderLanguageBinding.refreshGlobalLanguage ()
+            Wanxiangshu.Participant.Provider.ProviderLanguageBinding.refreshGlobalLanguage ()
 
             // Fail-fast resource load before any consumer (StaticTools / BlogTool / EnforcerHost).
             RuntimeResources.install (RuntimeResourceAssembly.load ())

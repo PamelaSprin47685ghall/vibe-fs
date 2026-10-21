@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 /// JS-native boundary for host-boundary-010 shared cross-instance state and
 /// host-boundary-031 root workspace first-binding. The physical Map/Set
 /// singletons and RootWorkspace runtime stay opaque. Every operation

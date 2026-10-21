@@ -35,14 +35,12 @@ open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Host
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation.Handle.OpenCode
 open Wanxiangshu.Execution.Delegation.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -97,10 +95,8 @@ module PluginHooks =
                 Some(prefixUntil, thenMap)
 
         fields
-        |> Option.filter (fun (prefixUntil, thenMap) ->
-            not (isUndefined prefixUntil && isUndefined thenMap))
-        |> Option.map (fun (prefixUntil, thenMap) ->
-            createObj [ "prefixUntil" ==> prefixUntil; "thenMap" ==> thenMap ])
+        |> Option.filter (fun (prefixUntil, thenMap) -> not (isUndefined prefixUntil && isUndefined thenMap))
+        |> Option.map (fun (prefixUntil, thenMap) -> createObj [ "prefixUntil" ==> prefixUntil; "thenMap" ==> thenMap ])
 
     /// A declaration counts only when it is valid: an invalid one never
     /// committed a view, so it must never commit a checkpoint.
@@ -111,7 +107,7 @@ module PluginHooks =
     /// it is asked, not recounted here.
     let private declaredViewOf (input: obj) : bool =
         let conflictingState =
-            Wanxiangshu.Repository.Programming.Js.OpenCode.JsToolWorkflow.conflictingInputReason input
+            Wanxiangshu.Repository.Programming.Js.JsToolWorkflow.conflictingInputReason input
             |> Option.isSome
 
         if conflictingState then

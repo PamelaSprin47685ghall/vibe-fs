@@ -7,7 +7,8 @@ open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Admission
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Persona
 
 [<RequireQualifiedAccess>]
@@ -29,7 +30,6 @@ module PromptDispatcher =
         | IdentityRejected of string
         | AuthorityRegistrationRejected of AuthorityRegistrationFailure
 
-    val describeAuthorityRegistrationFailure: AuthorityRegistrationFailure -> string
     val describeHumanRootAcceptanceFailure: HumanRootAcceptanceFailure -> string
 
     [<RequireQualifiedAccess>]
@@ -105,15 +105,7 @@ module PromptDispatcher =
 
         member ActiveProfile: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
 
-        member ResolveOrigin:
-            physicalMessageId: PhysicalUserMessageId ->
-            promptKey: PromptKey option ->
-            hostCompaction: bool ->
-            sessionId: SessionId ->
-                PromptAuthority.PromptOrigin
-
         member PendingClaim: sessionId: SessionId * promptKey: PromptKey -> PromptAuthority.PromptClaim option
-        member DispatchAccepted: sessionId: SessionId * claim: PromptAuthority.PromptClaim -> bool
 
         member GateNudgeAlreadyAdmitted:
             profile: PromptAuthority.AuthorityExecutionProfile ->

@@ -1,5 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Routing
+
+open Wanxiangshu.Foundation.HostSession
+
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
@@ -224,19 +228,23 @@ module ModelRoutingSurface =
     [<Emit("new $0()")>]
     let private constructReconciliation (cls: obj) : CapacityReconciliationLibrary = jsNative
 
-    let private capacityReconciliation = constructReconciliation capacityReconciliationClass
+    let private capacityReconciliation =
+        constructReconciliation capacityReconciliationClass
 
     let private reconciliationOwner (owner: CapacityExactOwnerSnapshot) : obj =
         createObj
             [ "sessionId" ==> owner.SessionId
               "physicalUserMessageId" ==> owner.PhysicalUserMessageId
-              "role" ==> (owner.Role |> Option.map (Roles.roleLabel >> box) |> Option.defaultValue null)
-              "participant" ==> (owner.Participant |> Option.map box |> Option.defaultValue null) ]
+              "role"
+              ==> (owner.Role |> Option.map (Roles.roleLabel >> box) |> Option.defaultValue null)
+              "participant"
+              ==> (owner.Participant |> Option.map box |> Option.defaultValue null) ]
 
     let private reconciliationEvidence (evidence: CapacityInvariantEvidence) : obj =
         createObj
             [ "ledgerEntries"
-              ==> (evidence.LedgerEntries |> Array.map (fun entry -> createObj [ "credit" ==> float entry.Credit ]))
+              ==> (evidence.LedgerEntries
+                   |> Array.map (fun entry -> createObj [ "credit" ==> float entry.Credit ]))
               "tokens"
               ==> (evidence.Tokens
                    |> Array.map (fun token ->
@@ -247,9 +255,13 @@ module ModelRoutingSurface =
               "custodies"
               ==> (evidence.Custodies
                    |> Array.map (fun custody ->
-                       createObj [ "credit" ==> float custody.Credit; "owner" ==> reconciliationOwner custody.Owner ]))
+                       createObj
+                           [ "credit" ==> float custody.Credit
+                             "owner" ==> reconciliationOwner custody.Owner ]))
               "executions" ==> (evidence.Executions |> Array.map reconciliationOwner)
-              "waiters" ==> (evidence.Waiters |> Array.map (fun waiter -> createObj [ "owner" ==> reconciliationOwner waiter.Owner ]))
+              "waiters"
+              ==> (evidence.Waiters
+                   |> Array.map (fun waiter -> createObj [ "owner" ==> reconciliationOwner waiter.Owner ]))
               "owners" ==> (evidence.Owners |> Array.map reconciliationOwner)
               "idleCount" ==> evidence.IdleCount
               "inFlightCount" ==> evidence.InFlightCount
@@ -886,7 +898,10 @@ module ModelRoutingSurface =
 
     let reconcileCapacityEvidence (evidence: obj) : obj =
         let decision =
-            evidence |> invariantEvidenceOf |> reconciliationEvidence |> capacityReconciliation.decide
+            evidence
+            |> invariantEvidenceOf
+            |> reconciliationEvidence
+            |> capacityReconciliation.decide
 
         match unbox<string> decision?decision with
         | "NoOp" -> box {| kind = "NoOp" |}

@@ -11,6 +11,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 

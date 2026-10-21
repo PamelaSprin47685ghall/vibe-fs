@@ -4,6 +4,7 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 type ReconciledTurn =
     { SessionId: SessionId

@@ -10,6 +10,7 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 module LoadRecoverySurface =
@@ -37,10 +38,7 @@ module LoadRecoverySurface =
         ChildWorkRecovery.orphanedChildRuns (stateOf state).Projection.AgentProjections
         |> List.choose (
             ChildWorkRecovery.settlementFact
-            >> Option.map (
-                AgentFact.Execution
-                >> Fact.Agent
-                >> FactCodec.serializeFact)
+            >> Option.map (AgentFact.Execution >> Fact.Agent >> FactCodec.serializeFact)
         )
         |> List.toArray
 

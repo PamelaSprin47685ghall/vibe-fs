@@ -4,7 +4,7 @@
 
 ## 1. 当前状态与前置核对
 
-- **当前列状态**：`DOING`（2026-10-21 由 `eng-cut17f-goose` 认领；先做前置已 DONE 的部分，CUT-11/12/25 相邻能力待其 DONE 后接续）
+- **当前列状态**：`DONE`（2026-10-21 由 `eng-cut17f-goose` 认领，eng-cut09i/eng-cut34/eng-cut34b/eng-cut34c-goose 接续；内核→适配层引用棘轮 31 → 0，见 §10）
 - **所属泳道 / 波次**：宿主 / W5
 - **切换前置**：`CUT-11`（派发认领与外部效果记账）、`CUT-12`（会话关联与执行事实）、`CUT-17`（请求投影与信息边界）、`CUT-25`（受限 JS 编程面与执行组合）
 - **关联决策护栏**：受 `D-07` 约束——OpenCode SDK 与 Hook 适配能力留在主仓明确适配层，不要求另发布一个独立 npm 包；内核与独立库绝不反向导入 OpenCode 适配层。
@@ -124,3 +124,74 @@ node scripts/check.mjs
 ### 当前阻塞（DOING + BLOCKED）
 
 - 剩余能力（会话创建/查找/绑定、chat.params 精确租约、tool before/after 同源恢复、AttemptAborted 精确化、基线 28 个内核文件的收窄）分别与 CUT-11（Dispatch 5 个文件）、CUT-12（Session/ChatExecution、`AttemptAborted`）、CUT-25（tool 协议/JS 编程面）、CUT-10（chat.params 租约）相邻，按卡 §1 须待这些卡 DONE 后相邻验收。解除条件：CUT-10/11/12/25 在看板上 DONE。下一检查人：接手本卡的 worker 或协调者。
+
+### 子范围④：终端信号契约移出适配层（棘轮 28 → 26，eng-cut09i-goose）
+
+- 现状：`TerminalStop`、`TerminalOutcome`、`TerminalCompletionListener`、`IEventObservationPort` 只用 Foundation 的身份类型和 `AgentRunResult`，不含任何 SDK 形状，却放在 `OpenCode/Signals/EventContract`。内核文件为了用这四个类型不得不 `open Wanxiangshu.OpenCode`。
+- 改动：文件移到 `Foundation/TerminalSignal.fs(i)`，命名空间改为 `Wanxiangshu.Foundation.TerminalSignal`；shard（`host-signal-contract`，runtime-platform）和编译位置都不变。用到这些类型的文件在原 `open Wanxiangshu.OpenCode` 后加一行新 `open`，保持原来的名字解析次序；限定名引用同步改名。`SyncDelegate/Workflow`、`Trace/TerminalReporter` 因此不再引用适配层，同刀从基线删掉。
+- 路径断言：host-boundary-026/027 里按文件路径写的 shard 归属断言和“不得获得终端词汇”的反向断言改为新路径。不改的话，反向断言会因为旧路径不存在而永远通过，失去作用。WHAT 107 行的名字同步更新。
+
+### 子范围⑤：受管 agent 名册移出适配层（棘轮 26 → 24，eng-cut09i-goose）
+
+- 现状：`ManagedAgent`、`AgentVisibility`、`ManagedAgentParseError`（Role → 名字/可见性、名字解析）是参与者名册，不是宿主协议，却放在 `OpenCode/Tools/ManagedAgent`。
+- 改动：文件移到 `Participant/Persona/ManagedAgent.fs(i)`，命名空间 `Wanxiangshu.Participant.ManagedAgents`，shard（`opencode-tools-managedagent`）不变。`Delegation/PtyPort`、`Fork/Host/Pty` 离开基线。`Process/Surface`（JS 测试面，不受棘轮约束）原来只为 `ManagedAgent` 打开适配层，这次一并删掉这条 `open`，否则 shard-edge-audit 会多出 2 条 high。structured-workflow-014 的 shard 编译项断言和 participant-identity 的 `APPLIES-TO` 跟着改路径。
+
+### 子范围④⑤ 证据
+
+- 两刀都只是移动文件、改命名空间，没有改任何类型定义或函数体。
+- `node scripts/checks/architecture.mjs` OK（棘轮 24 条）。`node scripts/check.mjs` 与 base 在归一行号后逐行相同：shard-edge-audit 258 条，control-pyramid 111 条。
+- 子范围④在 b1b59d6f4 上全量构建通过（`js-module-linkage` 全部链接）。host-boundary、semantic-trace、advisor、intra-participant-parallelism 共 346 例：pass 317，fail 3。3 个失败如下：
+  - host-boundary-023 并发下偶发失败，单独重跑通过。
+  - 026 的“tool registration … terminal bus”子项在未改动的 master 上同样失败（bookkeepertool 的 shard 闭包获得了 HostEventCodec，静态检查，与本刀无关）。
+  - 026 的路径断言已按上条修正。
+- 两刀合并后的落地复验见落地循环 `logs-cut09i/loop34*.out`。
+- 回退：`git revert` 即可，不涉及持久数据。
+
+### 子范围⑥：会话侧中性契约与入口准入决策移出适配层（棘轮 24 → 22，eng-cut09i-goose）
+
+- `OpenCode/Host/SessionContract`（`ProviderAttemptSource`、`ContinuationAcceptanceObserver`、`DegenerationKind`、`AbortCause`、`ILoopSensor`、`ISessionQuiescenceGate`）只用 Foundation 的身份和 quiescence 类型，不含 SDK 形状。它移到 `Foundation/HostSession.fs(i)`，命名空间 `Wanxiangshu.Foundation.HostSession`，shard 仍是 `host-session-contract`（provider）。
+- `OpenCode/Host/ChatAdmission/Intent`（`ChatAdmissionIntent`）在 CUT-09-a 之后只是 `wanxiangli/authority.admit` 的类型化门面，依赖 Foundation、Interaction.Authority、ChatExecution，属于领域决策（卡 §5 的 B），不是适配。它移到 `Interaction/Admission/ChatAdmissionIntent.fs(i)`，命名空间 `Wanxiangshu.Interaction.Admission`，shard 不变。`Transaction`、`IntentSurface` 这两个适配和测试面仍留在 `OpenCode/Host/ChatAdmission`。
+- 结果：`Interaction/Dispatch/{Dispatcher,Ingress}` 不再引用适配层，离开基线。host-boundary-026、delegation-028 的路径断言（包括 delegation-028“恢复闭包不得含 SessionContract”的反向断言）以及 dispatch-protocol、interaction-authority 的 `APPLIES-TO` 跟着改路径。
+- 静态证据：`architecture.mjs` OK（棘轮 22 条）。`check.mjs` 与子范围⑤在归一行号和路径后相同；多出的一条 control-pyramid（`Fork/ChildRecovery.fs`）来自 master 的新提交，与本刀无关。
+
+### 子范围⑦：宿主会话端口契约移出适配层（棘轮 22 → 11，eng-cut34-goose，master `687d3fae7`）
+
+- `OpenCode/Host/{Message,SessionSnapshot,SessionHostPort,RootWorkspace}` 以及从 `OpencodeTypes`、`OpenCodeContract` 中切出的 `OpencodeModel`、分离发送判决和子会话选项，只用 Foundation 的身份类型，不含 SDK 形状。它们移到 `Foundation/{HostMessage,HostSessionSnapshot,HostSessionPort,RootWorkspace,HostModel,HostSendContract}`，命名空间 `Wanxiangshu.Foundation.HostSession`，shard 不变。真正调 SDK 的 `OpenCodePort`、`SessionSnapshotPort`、`Sessions` 仍在适配区。
+- 路径断言同步：structured-workflow-012“恢复闭包必须含 Snapshot、不得含 SessionHostPort”的正反两条断言改用新路径。第一次落地循环正是因为这里漏改而红（`must include SessionSnapshot.fsi`）。修正后反向断言在真实路径上仍然成立。
+
+### 子范围⑧：无用 open、角色律、无消费者的 CompanionTransform（棘轮 11 → 7，eng-cut34-goose，master `55167c54b`/`8bf3db977`/`68febbabf`）
+
+- `Change/Host/Types`、`CompanionLeaseRuntime` 的适配层 `open` 没有被用到，直接删掉（11 → 9）。
+- agent 名 → 角色的映射是参与者规律，不是宿主协议，移到 `Participant/Persona/AgentRole`（9 → 8）。
+- `Context/Companion/Transform` 在全仓没有任何调用方，整文件删除（8 → 7）。
+
+### 子范围⑨：剩余 7 个内核文件逐个收口（棘轮 7 → 0，eng-cut34b-goose 施工，eng-cut34c-goose 修复并落地）
+
+逐文件核对剩余 7 个内核文件到底用了适配层的什么，结论都是“用的东西本身不是宿主适配”，只有 XWire 例外：它本身就是适配代码。
+
+| 刀 | 内容 | 离开基线的文件 |
+|---|---|---|
+| 7 → 6 | `ProviderLanguageBinding`（环境变量/宿主配置偏好阶梯 → `GlobalProviderLanguage`）不碰 SDK，移到 `Participant/Provider/`，命名空间 `Wanxiangshu.Participant.Provider`，shard（`participant-provider-language`）不变 | `Mission/Manager/Workflow` |
+| 6 → 5 | `ModelRouting`、`ModelCapacity/{Model,Queue,Borrowing,Surface}`、`ProviderAttemptStopFence` 一个适配层名字都不 `open`，只是命名空间挂在 `Wanxiangshu.OpenCode`；卡 §5 也把 ModelRouting 列为 B（业务个体）。移到 `Execution/Routing/`，命名空间 `Wanxiangshu.Execution.Routing`，shard（`strength-policy`、`host-session-runtime`）不变 | `Participant/Provider/Attempt/Fallback/Workflow` |
+| 5 → 4 | XTrace 捕获只读 `CapturedWirePart`/`CapturedWireMessage` 两个纯记录。把它们切成 `Participant/Provider/Projection/CapturedWire`，解码函数仍留在 `OpenCode/Codec/ProviderWireCapture` | `Context/Trace/Capture` |
+| 4 → 1 | `Diagnostic`（CTX-014 白名单、`emit`/`fatal`、脱敏、`WANXIANGSHU_DIAG` 可见性）只依赖 `FatalProcess` 和三个纯文本函数，移到 `Foundation/Diagnostic`。三个函数归 `Diagnostic` 所有，`ReliabilityDiagnostics(.Surface)` 原有的同名公开函数改为一行转发，对外 API 不变。`emitCausal` 全仓没有调用方，删除 | `Interaction/Dispatch/Send`、`Interaction/Repair/InteractionRepair`、`Execution/Delegation/SyncDelegate/Runtime` |
+| 1 → 0 | `XWire` 读宿主 `experimental.chat.messages.transform` 的原始输出（`parentID`/`finish` 字段、原始消息编辑），调用方只有适配层（`HostTurnObserver`、`PluginRecoveryScope`、`PluginTransforms`）和 JS 测试面 `XWireSurface`。它就是适配代码，按既有约定移到域内适配子目录 `Context/Prefix/OpenCode/Wire.fs`，命名空间和 shard 都不变。这一刀是归类，不是抽取 | `Context/Prefix/Wire` |
+
+- 门禁：`opencode-import-baseline.json` 现在是空表，⑧ 棘轮因此变成“内核文件零引用”。负控 N8 原本是“基线条目不再引用时必须收紧”，基线空了以后没有对象，改为：曾在基线上的 `Send.fs` 重新 `open Wanxiangshu.OpenCode` 必须报红。N1–N8、P1 全部 PASS，见 `evidence/CUT-34/sdk-boundary-negative.txt`。
+- 静态对照：`node scripts/check.mjs` 与 34m 头相比，归一行号后只有路径改名。shard-edge-audit 的 high 仍是原有的 2 条。
+- 过程中如实记录的一处错误：移动 Routing 时脚本按名字匹配，误给 `ReliabilityDiagnostics(.Surface)` 加了 `open Wanxiangshu.Execution.Routing`（`CapacityFence` 在那里只是记录字段名）。shard-edge-audit 因此多报 2 条 high，已在落地前撤掉。
+
+- 落地复核（如实记录，eng-cut34c-goose）：第一次 34o 落地循环在全新构建时红了。原因在 4 → 1 那一刀：脚本把 `ReliabilityDiagnostics.validateOperation` 改成一行转发时，没有带走原函数的第三个条件 `&& not (operation.Contains '\r')`。这一行留在转发式下面成了悬空续行，Fable 报 `ReliabilityDiagnostics.fs(224)` “Unexpected symbol '&&'”和“operation 未定义”。修正以 fixup 并入该提交：`\r` 条件移进 `Foundation.Diagnostic.validateOperation`，与移动前 `Diagnostic.shouldEmit` 实际调用的校验（非空白、无 `\n`、无 `\r`）完全一致；`ReliabilityDiagnostics.validateOperation` 是纯转发。行为不变。修正后第二轮落地循环又红了 host-boundary-024：它按源码文本断言 `HookPolicy.observeOptional Diagnostic.emit …`，而这一刀把调用写成了全限定名 `Wanxiangshu.Foundation.Diagnostic.emit`。同一 fixup 里给 `HookPolicySurface` 加了 `open Wanxiangshu.Foundation`，并恢复短名调用，断言因此在真实源码上重新成立，没有改测试。修正后用 `node scripts/build.mjs --clean` 全新构建，定向套件以已构建的 master `68febbabf` 树（wt/CUT-34m-main）为基线，无新增失败。
+
+### 留在适配层的部分（合法保留，不是待办）
+
+- `OpenCode/{Host,Codec,Signals,Tools,Plugin}` 与 `Host/`：SDK 传输、会话创建/查找/快照读取、原始事件与消息解码、工具协议编解码与参数保险箱、Hook 策略膜和插件装配，即卡 §2 判定为 A/C 的全部内容。按 D-07 留在主仓适配层，不另发 npm 包。
+- 域内适配子目录 `*/OpenCode/`（如 `Interaction/Dispatch/OpenCode`、`Execution/*/OpenCode`、`Mission/Work/OpenCode`、`Context/Prefix/OpenCode`）：各域的宿主翻译代码。门禁把它们算作适配区。
+- 尚存的已知边（如实记录，交 CUT-35/38）：
+  - 内核文件仍会 `open` 域内适配子目录的命名空间，例如 `Interaction.Dispatch.OpenCode`。门禁 ⑧ 只认 `Wanxiangshu.OpenCode` 这一个顶层命名空间，所以不统计这类边。
+  - `ReliabilityDiagnostics` 的 `PolicyClass` 字段用的是适配层的 `HookCriticality`；它本身是 Hook 膜的诊断，留在适配区。
+
+### 收尾结论（eng-cut34c-goose，2026-10-21）
+
+- `scripts/checks/opencode-import-baseline.json` 的 `files` 为空：没有内核文件引用 `Wanxiangshu.OpenCode`。门禁 ⑦ host-sdk-boundary 和 ⑧ adapter-import-ratchet 都在 `architecture.mjs` 中常驻（OK），以后新增引用会直接报红。
+- 卡 §3 的目标已达成：SDK 只在适配区被消费，内核不反向导入适配层，适配层只做宿主翻译。列状态改为 `DONE`。尚存的域内适配子目录边以及顶层组装交给 CUT-35/38。

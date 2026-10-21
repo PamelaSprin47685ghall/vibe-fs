@@ -13,7 +13,3 @@ module Fold =
     val foldFact: projection: ProjectionSet -> fact: Fact -> Result<ProjectionSet, FoldRejection>
 
     val foldEnvelope: projection: ProjectionSet -> envelope: Envelope -> Result<ProjectionSet, FoldRejection>
-
-    val isOk: result: Result<'T, 'E> -> bool
-
-    val unwrap: result: Result<'T, 'E> -> 'T

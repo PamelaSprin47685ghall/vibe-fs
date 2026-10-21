@@ -11,7 +11,6 @@ type PreStartOutcome =
 [<RequireQualifiedAccess>]
 module PreStartOutcome =
     val disposition: outcome: PreStartOutcome -> ChatExecutionTerminalDisposition
-    val ofDisposition: disposition: ChatExecutionTerminalDisposition -> PreStartOutcome option
 
 [<RequireQualifiedAccess>]
 type ChatExecutionState =

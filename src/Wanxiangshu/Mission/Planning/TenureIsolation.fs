@@ -65,5 +65,8 @@ module TenureIsolation =
         let kept =
             projection.tenure (rows |> Array.map (wireMessage messageCursors) |> box, box tenure.OpeningCursor)
 
-        { Messages = unbox<int array> kept |> Array.map (fun index -> rows.[index].Raw) |> Array.toList
+        { Messages =
+            unbox<int array> kept
+            |> Array.map (fun index -> rows.[index].Raw)
+            |> Array.toList
           ReanchorRequested = tenure.IsFreshHandover }

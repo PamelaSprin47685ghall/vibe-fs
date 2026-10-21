@@ -52,12 +52,6 @@ module LlmFacing =
         let body = document.Data |> List.map (fun (DataBlock block) -> block)
         SyntheticToml.document document.Instructions body
 
-    let originalMaterial (content: string) (metadata: DataBlock) : OriginalMaterial =
-        OriginalMaterial(content, metadata)
-
-    let renderOriginalMaterial (OriginalMaterial(content, DataBlock metadata)) : string =
-        content + "\n\n" + metadata + "\n"
-
     let renderInstruction (text: string) : string = instruction text |> render
 
     let renderInstructions (texts: string list) : string = instructions texts |> render
@@ -65,12 +59,6 @@ module LlmFacing =
     let normalizeNewlines = SyntheticToml.normalizeNewlines
 
     let byteCount = SyntheticToml.byteCount
-
-    let stringValueByteCount (text: string) =
-        text |> SyntheticToml.renderString |> SyntheticToml.byteCount
-
-    let stringValuePrefixByteCount (text: string) (length: int) (suffix: string) =
-        SyntheticToml.renderStringByteCountPrefix text length suffix
 
     [<RequireQualifiedAccess>]
     module Data =
@@ -139,12 +127,6 @@ module LlmFacing =
                 let keys = jsKeys value
                 Value.Object [ for k in keys -> k, ofJs (jsGet value k) ]
             else
-                Value.Null
-
-        let ofJson (jsonText: string) : Value =
-            try
-                ofJs (JS.JSON.parse jsonText)
-            with _ ->
                 Value.Null
 
         let rec private isPrimitiveTree =
@@ -356,9 +338,6 @@ module LlmFacing =
 
         let int64Field name (value: int64) =
             SyntheticToml.field name (string value) |> block
-
-        let floatField name (value: float) =
-            SyntheticToml.field name (SyntheticToml.renderFloat value) |> block
 
         let boolField name (value: bool) =
             SyntheticToml.field name (SyntheticToml.renderBool value) |> block

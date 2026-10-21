@@ -32,7 +32,6 @@ type ExportBundle =
 type ExportError = { Code: string; Message: string }
 
 module Export =
-    val replayabilityOf: ExportMode -> bool -> bool -> Result<Replayability, ExportError>
     val validate: ExportBundle -> Result<ExportBundle, ExportError>
 
     /// A summary export never carries raw material, the system prompt or Host receipts.

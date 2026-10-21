@@ -1,6 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Interaction.Dispatch
 
 open System
 open Fable.Core

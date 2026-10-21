@@ -109,33 +109,6 @@ module ProjectionMessageEdit =
     /// representation different from the generic one-row-per-wire-message adapter.
     module HostWireEncoding =
 
-        let tryEncodeNonToolParts (parts: WirePart list) : Result<obj list, string> =
-            parts
-            |> List.traverseResultM (fun part ->
-                match part with
-                | WireToolCall _
-                | WireToolResult _ -> Error "Host wire encoding received a tool part"
-                | _ -> encodeWirePart part)
-
-        let completedToolPart
-            (callId: ToolCallId)
-            (name: string)
-            (argsCanonical: string)
-            (resultCanonical: string)
-            : obj =
-            createObj
-                [ "type", box "tool"
-                  "tool", box name
-                  "callID", box (ToolCallId.value callId)
-                  "state",
-                  box (
-                      createObj
-                          [ "status", box "completed"
-                            "input", canonicalValue argsCanonical
-                            "output", box resultCanonical
-                            "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
-                  ) ]
-
         let rawMessage
             (sessionId: string)
             (sha256: string -> string)
