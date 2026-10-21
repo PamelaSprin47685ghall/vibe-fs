@@ -89,6 +89,140 @@ type PublishClaimReality =
     | PublishReady
     | ClaimExpired
 
+/// wanxiangli/integration binding (CUT-23 ②); see Projection.fsi.
+module ChangeIntegrationLaw =
+    [<Fable.Core.Import("IntegrationLaw", "wanxiangli/integration")>]
+    let private lawClass: obj = Fable.Core.Util.jsNative
+
+    [<Fable.Core.Emit("new $0()")>]
+    let private construct (_cls: obj) : obj = Fable.Core.Util.jsNative
+
+    [<Fable.Core.Emit("$0[$1]($2)")>]
+    let private invoke (_law: obj) (_name: string) (_input: obj) : obj = Fable.Core.Util.jsNative
+
+    [<Fable.Core.Emit("$0[$1]")>]
+    let private field (_value: obj) (_name: string) : obj = Fable.Core.Util.jsNative
+
+    let private law: obj = construct lawClass
+
+    let private ask (name: string) (pairs: (string * obj) list) : obj =
+        invoke law name (Fable.Core.JsInterop.createObj pairs)
+
+    let private code (name: string) (answer: obj) : string =
+        let value = field answer name
+
+        match value with
+        | :? string as text -> text
+        | _ -> invalidOp ("wanxiangli/integration returned no " + name)
+
+    let internal text (value: string) : obj = box value
+
+    let internal rebasedWire
+        (rebased:
+            {| RebasedCommit: CommitHash
+               TargetHeadSnapshot: CommitHash |} option)
+        : obj =
+        match rebased with
+        | None -> null
+        | Some ready ->
+            Fable.Core.JsInterop.createObj
+                [ "rebasedCommit", text (CommitHash.value ready.RebasedCommit)
+                  "targetHeadSnapshot", text (CommitHash.value ready.TargetHeadSnapshot) ]
+
+    let resume (record: ManagerJobProjection option) : string =
+        let wire =
+            match record with
+            | None -> null
+            | Some job ->
+                Fable.Core.JsInterop.createObj
+                    [ "terminal", box job.Terminal.IsSome; "claimed", box job.PublishClaimed.IsSome ]
+
+        ask "resume" [ "record", wire ] |> code "step"
+
+    let reenterClaim
+        (jobTargetRef: TargetRef)
+        (claimTargetRef: TargetRef)
+        (claimRebased: CommitHash)
+        (claimExpected: CommitHash)
+        (record: ManagerJobProjection option)
+        : string =
+        let wire =
+            match record with
+            | None -> null
+            | Some job -> Fable.Core.JsInterop.createObj [ "rebased", rebasedWire job.RebasedCandidateReady ]
+
+        let answer =
+            ask
+                "reenterClaim"
+                [ "jobTargetRef", text (TargetRef.value jobTargetRef)
+                  "claim",
+                  Fable.Core.JsInterop.createObj
+                      [ "targetRef", text (TargetRef.value claimTargetRef)
+                        "rebasedCommit", text (CommitHash.value claimRebased)
+                        "expectedHead", text (CommitHash.value claimExpected) ]
+                  "record", wire ]
+
+        match code "step" answer with
+        | "Refuse" -> code "reason" answer
+        | step -> step
+
+    let admitCandidate candidate target rebased : string =
+        let answer =
+            ask
+                "admitCandidate"
+                [ "candidate", text (CommitHash.value candidate)
+                  "target", text (CommitHash.value target)
+                  "rebased", rebasedWire rebased ]
+
+        match code "step" answer with
+        | "Rebase" -> code "reason" answer
+        | step -> step
+
+    let certify candidate expectedHead rebased : string =
+        let answer =
+            ask
+                "certify"
+                [ "candidate", text (CommitHash.value candidate)
+                  "expectedHead", text (CommitHash.value expectedHead)
+                  "rebased", rebasedWire rebased ]
+
+        if unbox<bool> (field answer "ok") then "Ok" else code "code" answer
+
+    let rebaseFailed (conflictFiles: string list) : string =
+        ask "rebaseFailed" [ "conflictFiles", box (List.toArray conflictFiles) ] |> code "step"
+
+    let checkPublication jobId jobTargetRef evidenceJobId evidenceTargetRef evidenceExpectedHead current : string =
+        let answer =
+            ask
+                "checkPublication"
+                [ "jobId", text (ManagerJobId.value jobId)
+                  "jobTargetRef", text (TargetRef.value jobTargetRef)
+                  "evidence",
+                  Fable.Core.JsInterop.createObj
+                      [ "jobId", text (ManagerJobId.value evidenceJobId)
+                        "targetRef", text (TargetRef.value evidenceTargetRef)
+                        "expectedHead", text (CommitHash.value evidenceExpectedHead) ]
+                  "current", text (CommitHash.value current) ]
+
+        if unbox<bool> (field answer "ok") then "Ok" else code "code" answer
+
+    let ffMerge (merge: Result<CommitHash, string>) (candidate: CommitHash) (targetMovedError: string) : string =
+        let wire =
+            match merge with
+            | Ok landed -> Fable.Core.JsInterop.createObj [ "ok", box true; "landed", text (CommitHash.value landed) ]
+            | Error error -> Fable.Core.JsInterop.createObj [ "ok", box false; "error", text error ]
+
+        ask
+            "ffMerge"
+            [ "merge", wire
+              "candidate", text (CommitHash.value candidate)
+              "targetMovedError", text targetMovedError ]
+        |> code "outcome"
+
+    let internal reconcileWorktree (pairs: (string * obj) list) : obj = ask "reconcileWorktree" pairs
+    let internal reality (name: string) (pairs: (string * obj) list) : string = ask name pairs |> code "reality"
+    let internal answerField (answer: obj) (name: string) : string = code name answer
+
 module OrchestratorProjection =
 
     let empty =
@@ -120,44 +254,65 @@ module OrchestratorProjection =
         (path: WorktreePath)
         (observation: WorktreeReconciliationObservation)
         : WorktreeReconciliationDecision =
-        let sameDurableOwner recordedJobId recordedPath =
-            recordedJobId = jobId && recordedPath = path
+        // PERSIST-009 is wanxiangli/integration `reconcileWorktree` (CUT-23 ②).
+        let text = ChangeIntegrationLaw.text
 
-        let decidePhysicalWorktreeReconciliation physical =
-            let relevantPhysicalEntries =
-                physical
-                |> Result.map (
-                    List.filter (fun (observedPath, observedIdentity) ->
-                        observedPath = path || observedIdentity = Some identity)
+        let owner kind (recordedJobId: ManagerJobId) (recordedPath: WorktreePath) extra =
+            Fable.Core.JsInterop.createObj (
+                [ "kind", text kind
+                  "jobId", text (ManagerJobId.value recordedJobId)
+                  "path", text (WorktreePath.value recordedPath) ]
+                @ extra
+            )
+
+        let evidence =
+            match observation with
+            | WorktreeReconciliationObservation.NoDurableEffect ->
+                Fable.Core.JsInterop.createObj [ "kind", text "NoDurableEffect" ]
+            | WorktreeReconciliationObservation.CreatedReceipt(recordedJobId, recordedPath) ->
+                owner "CreatedReceipt" recordedJobId recordedPath []
+            | WorktreeReconciliationObservation.RequestedConflict(recordedJobId, recordedPath) ->
+                owner "RequestedConflict" recordedJobId recordedPath []
+            | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, Error error) ->
+                owner "RequestedQueryFailure" recordedJobId recordedPath [ "error", text error ]
+            | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, Ok entries) ->
+                let wire =
+                    entries
+                    |> List.map (fun (observedPath, observedIdentity) ->
+                        Fable.Core.JsInterop.createObj
+                            [ "path", text (WorktreePath.value observedPath)
+                              "identity",
+                              (match observedIdentity with
+                               | Some value -> text (WorktreeIdentity.value value)
+                               | None -> null) ])
+                    |> List.toArray
+
+                owner "RequestedEntries" recordedJobId recordedPath [ "entries", box wire ]
+
+        let answer =
+            ChangeIntegrationLaw.reconcileWorktree
+                [ "jobId", text (ManagerJobId.value jobId)
+                  "identity", text (WorktreeIdentity.value identity)
+                  "path", text (WorktreePath.value path)
+                  "evidence", evidence ]
+
+        match ChangeIntegrationLaw.answerField answer "decision" with
+        | "RequestThenCreate" -> WorktreeReconciliationDecision.RequestThenCreate
+        | "CreateAfterProvenMissing" -> WorktreeReconciliationDecision.CreateAfterProvenMissing
+        | "AdoptThenRecordCreated" -> WorktreeReconciliationDecision.AdoptThenRecordCreated
+        | "AdoptCreated" -> WorktreeReconciliationDecision.AdoptCreated
+        | "Reject" ->
+            match ChangeIntegrationLaw.answerField answer "reason" with
+            | "DurableOwnershipConflict" ->
+                WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.DurableOwnershipConflict
+            | "PhysicalIdentityPathConflict" ->
+                WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.PhysicalIdentityPathConflict
+            | "WorktreeQueryFailed" ->
+                WorktreeReconciliationDecision.Reject(
+                    WorktreeReconciliationFailure.WorktreeQueryFailed(ChangeIntegrationLaw.answerField answer "error")
                 )
-
-            match relevantPhysicalEntries with
-            | Error error ->
-                WorktreeReconciliationDecision.Reject(WorktreeReconciliationFailure.WorktreeQueryFailed error)
-            | Ok [] -> WorktreeReconciliationDecision.CreateAfterProvenMissing
-            | Ok relevant when
-                relevant
-                |> List.forall (fun (observedPath, observedIdentity) ->
-                    observedPath = path && observedIdentity = Some identity)
-                ->
-                WorktreeReconciliationDecision.AdoptThenRecordCreated
-            | Ok _ -> WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.PhysicalIdentityPathConflict
-
-        match observation with
-        | WorktreeReconciliationObservation.NoDurableEffect -> WorktreeReconciliationDecision.RequestThenCreate
-        | WorktreeReconciliationObservation.CreatedReceipt(recordedJobId, recordedPath) when
-            sameDurableOwner recordedJobId recordedPath
-            ->
-            WorktreeReconciliationDecision.AdoptCreated
-        | WorktreeReconciliationObservation.CreatedReceipt _
-        | WorktreeReconciliationObservation.RequestedConflict _ ->
-            WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.DurableOwnershipConflict
-        | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, _) when
-            not (sameDurableOwner recordedJobId recordedPath)
-            ->
-            WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.DurableOwnershipConflict
-        | WorktreeReconciliationObservation.RequestedAmbiguity(_, _, physical) ->
-            decidePhysicalWorktreeReconciliation physical
+            | other -> invalidOp ("wanxiangli/integration returned an unknown rejection: " + other)
+        | other -> invalidOp ("wanxiangli/integration returned an unknown decision: " + other)
 
     let requestWorktree
         (identity: WorktreeIdentity)
@@ -326,23 +481,45 @@ module OrchestratorProjection =
     let recordTerminal (jobId: ManagerJobId) (terminal: TerminalOutcome) (projection: OrchestratorProjection) =
         updateActiveJob jobId (fun job -> { job with Terminal = Some terminal }) projection
 
+    let private headWire (currentHead: CommitHash option) : obj =
+        match currentHead with
+        | None -> null
+        | Some head -> ChangeIntegrationLaw.text (CommitHash.value head)
+
+    /// ORCH-007, owned by wanxiangli/integration `rebasedCandidate` (CUT-23 ②).
     let classifyRebasedCandidate
         (currentHead: CommitHash option)
         (rebasedCommit: CommitHash)
         (targetHeadSnapshot: CommitHash)
         : RebasedCandidateReality =
-        match currentHead with
-        | None -> RebasedCandidateReality.HeadUnreadable
-        | Some head when head = targetHeadSnapshot -> RebasedCandidateReality.PublishReady
-        | Some _ -> RebasedCandidateReality.NeedsRebase
+        match
+            ChangeIntegrationLaw.reality
+                "rebasedCandidate"
+                [ "head", headWire currentHead
+                  "rebasedCommit", ChangeIntegrationLaw.text (CommitHash.value rebasedCommit)
+                  "targetHeadSnapshot", ChangeIntegrationLaw.text (CommitHash.value targetHeadSnapshot) ]
+        with
+        | "HeadUnreadable" -> RebasedCandidateReality.HeadUnreadable
+        | "PublishReady" -> RebasedCandidateReality.PublishReady
+        | "NeedsRebase" -> RebasedCandidateReality.NeedsRebase
+        | other -> invalidOp ("wanxiangli/integration returned an unknown rebased reality: " + other)
 
+    /// ORCH-007, owned by wanxiangli/integration `publishClaim` (CUT-23 ②):
+    /// already-published first, then unchanged target, then expired.
     let classifyPublishClaim
         (currentHead: CommitHash option)
         (rebasedCommit: CommitHash)
         (expectedHead: CommitHash)
         : PublishClaimReality =
-        match currentHead with
-        | None -> PublishClaimReality.HeadUnreadable
-        | Some head when head = rebasedCommit -> PublishClaimReality.AlreadyFastForwarded
-        | Some head when head = expectedHead -> PublishClaimReality.PublishReady
-        | Some _ -> PublishClaimReality.ClaimExpired
+        match
+            ChangeIntegrationLaw.reality
+                "publishClaim"
+                [ "head", headWire currentHead
+                  "rebasedCommit", ChangeIntegrationLaw.text (CommitHash.value rebasedCommit)
+                  "expectedHead", ChangeIntegrationLaw.text (CommitHash.value expectedHead) ]
+        with
+        | "HeadUnreadable" -> PublishClaimReality.HeadUnreadable
+        | "AlreadyFastForwarded" -> PublishClaimReality.AlreadyFastForwarded
+        | "PublishReady" -> PublishClaimReality.PublishReady
+        | "ClaimExpired" -> PublishClaimReality.ClaimExpired
+        | other -> invalidOp ("wanxiangli/integration returned an unknown claim reality: " + other)

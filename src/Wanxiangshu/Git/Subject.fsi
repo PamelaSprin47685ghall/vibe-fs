@@ -32,3 +32,7 @@ module GitPorcelain =
     val managerBranchOf: jobId: string -> string
     /// Rebase state directories to probe from `rev-parse --git-path rebase-merge|rebase-apply`.
     val rebaseStatePaths: merge: (int * string) -> apply: (int * string) -> string list
+    /// Worktree cleanup: paths of manager-branch worktrees whose short branch no active job owns.
+    val staleWorktrees: entries: (string * string option) list -> owned: string list -> string list
+    /// The listed manager branches whose short name no active job owns, as listed.
+    val staleBranches: branches: string list -> owned: string list -> string list

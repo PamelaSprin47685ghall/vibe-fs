@@ -85,6 +85,8 @@ module GitPorcelain =
         abstract isManagerBranch: reference: string -> bool
         abstract managerBranchOf: jobId: string -> string
         abstract rebaseStatePaths: merge: obj * apply: obj -> string array
+        abstract staleWorktrees: entries: obj array * owned: string array -> string array
+        abstract staleBranches: branches: string array * owned: string array -> string array
 
     [<Import("GitPorcelain", "wanxiangli/git-porcelain")>]
     let private factory: unit -> Messages = jsNative
@@ -123,3 +125,20 @@ module GitPorcelain =
             createObj [ "code" ==> applyCode; "path" ==> applyPath ]
         )
         |> Array.toList
+
+    let staleWorktrees (entries: (string * string option) list) (owned: string list) : string list =
+        let wire =
+            entries
+            |> List.map (fun (path, branch) ->
+                createObj
+                    [ "path" ==> path
+                      "branch"
+                      ==> (match branch with
+                           | Some value -> box value
+                           | None -> null) ])
+            |> List.toArray
+
+        law.staleWorktrees (wire, List.toArray owned) |> Array.toList
+
+    let staleBranches (branches: string list) (owned: string list) : string list =
+        law.staleBranches (List.toArray branches, List.toArray owned) |> Array.toList
