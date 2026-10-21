@@ -30,7 +30,7 @@
 //     而非以终态 union 的标签表达。
 
 import assert from 'node:assert/strict'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as change from '../../../dist/Change/Surface.js'
@@ -223,6 +223,34 @@ const recordRealEffect = async (runtime, directory) => {
   }
 }
 
+
+// ── 交付成立的登记（attempt 台账）读回 ─────────────────────────────────
+// 台账是呈现面事实：它让 transform 钩子的交付裁决能停掉这一 attempt。
+// 它与 durable 见证同生同灭：提交被拒 → 台账没有任何登记。
+// 读法与 transform 钩子完全一致（同一份台账、同一把读法）。
+const { DeliveryAttemptLedger_tryFindEstablished } = await import(
+  '../../../dist/OpenCode/Tools/ToolRuntimeScope.js'
+)
+const {
+  SessionIdModule_create,
+  PhysicalUserMessageIdModule_create,
+  ToolCallIdModule_value,
+} = await import('../../../dist/Foundation/Identity.js')
+
+const establishedIn = (session, physical) =>
+  DeliveryAttemptLedger_tryFindEstablished(
+    SessionIdModule_create(session),
+    PhysicalUserMessageIdModule_create(physical),
+  )?.[0] ?? null
+
+// provider 请求：交付裁决读的是本次请求携带的物理用户消息。
+const providerRequest = (session, physical, run) => ({
+  messages: [
+    { role: 'user', info: { id: physical, sessionID: session, role: 'user' }, parts: [{ type: 'text', text: 'Do the work.' }] },
+    { role: 'assistant', info: { id: run, sessionID: session, role: 'assistant', parentID: physical, providerID: 'provider', modelID: 'engineer-model' }, parts: [] },
+  ],
+})
+
 test('WHAT[effect-accounting-013] a committed delivery is not an effect confirmation: the effect ledger is unchanged and the effect keeps its own confirmation', async () => {
   await withRealPlugin(async ({ directory, runtime, deliver }) => {
     // 效果账先真的记下一笔效果：请求意图在前，物理确认在后。
@@ -388,4 +416,106 @@ test('WHAT[effect-accounting-013] assistant prose and a provider stop cannot fab
       'a provider stop leaves no fenced delivery cell',
     )
   }, 'sess-effect-013-prose')
+})
+
+test('WHAT[effect-accounting-013] a refused delivery commit registers nothing, and a committed delivery registers an observable established attempt', async () => {
+  // 自己的会话：进程内台账按 session 分区，同一文件里的其它用例不能污染它。
+  const session = 'sess-effect-013-registration'
+  const run = 'run-effect-013-registration'
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    await acceptAuthorityRoot(runtime, session, 'engineer')
+
+    const root1 = { info: { id: 'root-registration-1', role: 'user', sessionID: session, time: { created: 1 } }, parts: [{ type: 'text', text: 'Do the work.' }] }
+    runtime.pushHostMessage(session, root1)
+    await hooks['chat.message']({ sessionID: session, messageID: 'root-registration-1', agent: 'engineer' }, { message: root1, parts: root1.parts })
+    runtime.pushHostMessage(session, {
+      info: { id: run, role: 'assistant', sessionID: session, parentID: 'root-registration-1', time: { created: 2 } },
+      parts: [{ type: 'text', text: 'the assistant prose of this turn' }],
+    })
+
+    const deliver = async (material, callId = 'call-effect-013-registration') =>
+      hooks.tool['todowrite-for-engineer'].execute(
+        { program: `class Js extends JsProgram { async run() { await this.deliver({ 0: "${material}" }); } }` },
+        { sessionID: session, agent: 'engineer', callID: callId, messageID: run },
+      )
+
+    // ── 提交成功：durable 见证落账，台账登记，裁决可停 ──────────────
+    const committed = await deliver('material-A')
+    assert.match(String(committed), /# ok/, 'the delivery is established')
+
+    const witnesses = distinctDeliveryWitnesses(durableFacts(join(directory, '.Herdchestra')))
+    assert.equal(witnesses.length, 1, 'the committed delivery left exactly one durable witness')
+
+    const fence = establishedIn(session, 'root-registration-1')
+    assert.ok(fence, 'a committed delivery registers the established attempt in the ledger')
+    assert.equal(
+      ToolCallIdModule_value(fence.CallId),
+      'call-effect-013-registration',
+      'the registration names the exact attempt that delivered',
+    )
+
+    // 交付格（呈现面事实）也在：提交成功才写。
+    assert.equal(
+      jsRuntime.deliveredFenceOf(session).toolCallId,
+      'call-effect-013-registration',
+      'a committed delivery owns the fenced delivery cell',
+    )
+
+    // 可观察的 transition：登记成立 → transform 钩子的交付裁决停掉这一
+    // attempt（请求被清空，模型看不到 deliver 回复）。
+    const stopped = providerRequest(session, 'root-registration-1', run)
+    await hooks['experimental.chat.messages.transform']({ sessionID: session }, stopped)
+    assert.equal(
+      stopped.messages.length,
+      0,
+      'the established delivery stops the request that answered the delivered physical input',
+    )
+
+    // ── 提交被拒（真实存储失败）：台账不得留下任何新登记 ────────────
+    // 被拒的这次尝试回答另一个物理输入，所以它若被登记，登记会落在那个
+    // 物理输入上 —— 这正是「有没有登记」的可判别处。
+    const root2 = { info: { id: 'root-registration-2', role: 'user', sessionID: session, time: { created: 3 } }, parts: [{ type: 'text', text: 'Do more work.' }] }
+    runtime.pushHostMessage(session, root2)
+    await hooks['chat.message']({ sessionID: session, messageID: 'root-registration-2', agent: 'engineer' }, { message: root2, parts: root2.parts })
+    runtime.pushHostMessage(session, {
+      info: { id: run, role: 'assistant', sessionID: session, parentID: 'root-registration-2', time: { created: 4 } },
+      parts: [{ type: 'text', text: 'the assistant prose of the second turn' }],
+    })
+
+    // 真实存储被破坏（事件目录不再是目录）：真实提交入口因此拒绝这份
+    // 见证 —— 真实的提交失败，不是伪造的失败。
+    const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
+    rmSync(eventsDir, { recursive: true, force: true })
+    writeFileSync(eventsDir, 'the durable store is no longer a directory')
+
+    const refused = await deliver('material-B', 'call-effect-013-refused')
+    assert.match(String(refused), /# failed/, 'the delivery is not established when the durable commit fails')
+    assert.match(
+      String(refused),
+      /DELIVERY_NOT_ESTABLISHED|not established/i,
+      'the refusal names that the delivery was not established',
+    )
+
+    // 台账：被拒的提交没有登记它自己的围栏。已成立的那次交付仍停在自己的
+    // 围栏上 —— 被拒的 attempt 从未成为「已成立的交付」。
+    const afterRefusal = establishedIn(session, 'root-registration-1')
+    assert.ok(afterRefusal, 'the committed delivery stays registered')
+    assert.equal(
+      ToolCallIdModule_value(afterRefusal.CallId),
+      'call-effect-013-registration',
+      'a refused commit registers nothing of its own: the ledger still names the committed attempt',
+    )
+    assert.equal(
+      establishedIn(session, 'root-registration-2'),
+      null,
+      'a refused commit registers nothing in the attempt ledger',
+    )
+
+    // 交付格：被拒的提交没有改写交付格，它仍属于那次真正成立的交付。
+    assert.equal(
+      jsRuntime.deliveredFenceOf(session).toolCallId,
+      'call-effect-013-registration',
+      'a refused commit leaves the fenced delivery cell with the committed attempt',
+    )
+  })
 })
