@@ -632,3 +632,30 @@ dotnet tool run fantomas src/Wanxiangshu
 **过程记录**：首轮 build 红在 `ToolRegistry.fs`（`:445` Unmatched `[` / `:447` Unmatched `(` / `:448` unit-null / `:449` incomplete structured construct），根因是 `createObj` 与参数列表分行同缩进导致 offside 失配；已改为 `createObj [ ... ]` 并把 if/else 提成 `let record: obj`，语义不变，重跑 build 绿。
 
 **仍未闭合（不在本批）**：R6 ledger 反向边；B5 完整 ToolCallId 围栏消费；C3 材料搬运；`Execution/Fission/OpenCode/Host.fs` 的 -186 行死链（属已结束的 build-doctor，不在本批，也未做 Tool.fs rename——`Tool.fs` 另有活跃 `deliverOneLane` 交付）。
+
+### 十·六 integration 收口会话的投递记录（2026-10-21）
+
+本节只记录**已推送并实测**的批次与仍未闭合项。上文一到九节是历史施工书；本节以真实 commit 与实测输出为准。
+
+**已推送到 origin/master 的批次**
+
+| 批次 | commit | build | 实测 |
+|---|---|---|---|
+| 锚声明（8 文件 + CHANGELOG + 本任务书十·五） | `2dd501d2e` | `build ok (generation 104)`；151 surfaces；724 modules | `context-compression/031\|032` + `repository-programming/059\|063\|064` + `work/020\|034` + `delegation/033` + `advisor/006` → **68/68 pass / 0 fail / 0 cancelled** |
+| 委派旧 root 归属 + 029 窄能力（4 源文件 + CHANGELOG） | `507d68d01` | `build ok (generation 4)` | `delegation/019\|020\|021\|029` + `managed-session-lifecycle/018` → **21 tests / 17 pass / 0 fail / 0 cancelled / 4 todo**；old-root 探针：外来 `Failed` 后快照逐字节不变、lifecycle 仍 `Active` |
+| parked source 执行点换算（JsSandbox.fs + 065 + WHAT/README + CHANGELOG） | `f6010b688` | `build ok (generation 106)` | 主树 `065\|048\|002\|028\|029\|030\|031\|032\|047\|049\|056` → **67/67 pass**；重基树 `065\|048` → **4/4 pass** |
+| C3 死链删除（`Execution/Fission/OpenCode/Host.fs` −186） | `ad13783c9` | `build ok (generation 7)` | `intra-participant-parallelism/*` → **45 tests / 30 pass / 0 fail / 0 cancelled / 15 todo**；`effect-accounting/002` 挂起（改动前后同样挂起，非本批引入） |
+| 交付已证明的轮次发布真实终态（`OrdinaryTurnWorkflow.fs` + 024 迁移 + CHANGELOG） | `5df09d1d0` | `build ok (generation 3)` | `delegation/024` → **5/5 pass / 0 fail / 0 cancelled**；真实路径对照：已交付轮次发布终态且 `join` 返回 `status="completed"`；未交付对照 `terminals: []`、工作单元仍 `Active`、`join` 仍 not-ready |
+
+**两处构建口径教训**（影响后续任何批次的判定）
+
+1. `js-module-linkage: emitted ESM graph is not package-closed`（`Package subpath './integration' is not defined by "exports"`）**不是**源码问题，而是隔离 worktree 的 `wanxiangli` 子模块未同步到父提交 pin 的版本。同步子模块到 pin 后同一次构建即绿。
+2. 共享主树曾被一次违规 `stash pop` + `checkout stash -- <files>` 覆盖，6 个文件被回退到 03:17 的旧 stash 版本（丢失已推的 `DeliveryWitnessReader` / `declarationOf` / `confirmedFence`）。已按「逐文件从 origin/master 写回、blob 逐个核对」恢复，未使用 reset/checkout/restore。**共享树禁止 stash/checkout/restore**。
+
+**仍未闭合**
+
+- **R6**：`host → application-composition` 反向边（`ToolWorkflow.fs:477` 的 `DeliveryAttemptLedger.recordEstablished`）——方案已定（callback 版），代码未落。
+- **B5**：完整 ToolCallId 围栏消费（`tryTakeRenderedFor` 只比 provider run）仍未修。
+- **C3 材料搬运**：fission lane 的材料仍靠手工跨 session 搬运；应收敛到 `FissionLaneMaterialized` 的 `ViewRef/ViewDigest` 与 takeover 的 `AggregateViewRef/AggregateViewDigest`。
+- **D6 / harness 挂起**：`managed-session-lifecycle/006|007|008|013|015|022`、`effect-accounting/002`、`delegation/027|006|026` 的旧 harness 从不提交 durable 见证，须逐个迁到真实交付路径；**不得伪造见证**。
+- `scripts/build.mjs` 产物存在性判据（prod-closure）已实测合格，待单独投递。
