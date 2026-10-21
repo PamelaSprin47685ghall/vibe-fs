@@ -1,0 +1,8 @@
+{"at":"2026-10-21T02:05:47.899Z","elapsedMs":0.8247499999999945,"event":"artifacts-selected","manifest":"../gen106-build-manifest.json","runtime":"1.3.14","installedBunPty":"file:///private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/node_modules/bun-pty/src/index.ts","installedProcess":"file:///private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/node_modules/wanxiangli/dist/process/ProcessSession.js"}
+{"at":"2026-10-21T02:05:51.582Z","elapsedMs":3684.276708,"event":"long-pty-started","minimumRealMs":7200000,"ownedPids":[61511,61521,61523,61524]}
+{"at":"2026-10-21T04:05:51.595Z","elapsedMs":7203689.492,"event":"long-pty-interval-ended","requests":120,"activeElapsedMs":7200000.237209}
+{"at":"2026-10-21T04:05:51.839Z","elapsedMs":7203934.089125,"event":"target-exited-scope-retained","targetExit":{"incarnation":"9a1e9128-e1a8-4c81-9904-ed57a0d2cd96","code":23,"signal":null},"descendant":80321}
+{"at":"2026-10-21T04:05:51.842Z","elapsedMs":7203937.092917,"event":"creator-detached-fault","reason":"PTY owner connection was lost"}
+{"at":"2026-10-21T04:05:56.962Z","elapsedMs":5018.469790999778,"event":"paused-custodian-recovery-remained-unknown","reason":"PTY owner startup acknowledgement timed out","terminalAbsent":true}
+{"at":"2026-10-21T04:06:11.978Z","elapsedMs":7224072.452167,"event":"failed","message":"HARNESS_BOUND: Stale recovery controller detach","stack":"Error: HARNESS_BOUND: Stale recovery controller detach\n    at <anonymous> (/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/pty-soak.mjs:66:9)\n    at processTicksAndRejections (native:7:39)"}
+{"at":"2026-10-21T04:06:12.072Z","elapsedMs":7224166.347917,"event":"cleanup-recovery-error","message":"PTY owner still has a live control connection"}

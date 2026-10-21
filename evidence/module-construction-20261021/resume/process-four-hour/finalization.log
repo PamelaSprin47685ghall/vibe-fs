@@ -1,0 +1,484 @@
+{
+  "state": "Passed finite four-hour Node22 and Bun Process/Supervision experiments",
+  "lanes": {
+    "node22": {
+      "totalElapsedMs": 14400552.629916,
+      "actualObservedOutputBytes": 12657899,
+      "phases": [
+        {
+          "name": "process",
+          "elapsedMs": 7200149.248833,
+          "actualObserved": {
+            "bytes": {
+              "stdout": 3164466,
+              "stderr": 3164466
+            },
+            "frames": 720,
+            "inputStages": 120,
+            "exit": {
+              "code": 0,
+              "signal": null
+            },
+            "eofWitness": {
+              "frames": 720,
+              "inputBytes": 4210,
+              "inputHash": "c68c1b5ef70712ae1724f580b8de32b7c01354d5462d3a281800039633555ffd",
+              "descendant": null
+            }
+          },
+          "actualStreamAssertionsPassedInOriginalHarness": {
+            "contiguousChannelOffsets": true,
+            "maximumChunkBytes": 65536,
+            "streamShaEqualsExpected": true,
+            "exact4096ByteTail": true,
+            "validUtf8SuffixText": true,
+            "closedWithNoCaptureFailure": true,
+            "nativeTargetGone": true,
+            "waitRegistryEmpty": true,
+            "source": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+            "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5",
+            "lineAnchors": {
+              "actualEofAndInputDigest": 166,
+              "actualStreamSha": 189,
+              "actualTail": 190,
+              "actualPhysicalClosed": 181,
+              "nativeGone": 194,
+              "waitRegistryEmpty": 200
+            }
+          },
+          "postHocRecomputedExpectedOutput": {
+            "stdout": {
+              "bytes": 3164466,
+              "sha256": "340b1ff59d83136ed91c20b0392288628474d05eb4c438c5ce8b95801e502438"
+            },
+            "stderr": {
+              "bytes": 3164466,
+              "sha256": "57825f8be72f113bde5f2e2cefb71d52cf047460c317630cee08e07fce5fb1d1"
+            }
+          },
+          "digestProvenance": "Expected hashes above were recomputed offline from retained witness.frames and fixed payload code. The original runtime compared each actual stream hash to its expected hash before writing phase-completed. No second capture or separately persisted original output digest is claimed.",
+          "backpressure": {
+            "at": "2026-10-21T02:04:46.925Z",
+            "elapsedMs": 2178.080208,
+            "event": "physical-backpressure-observed",
+            "name": "process",
+            "pausedMs": 2000,
+            "burstBytesPerChannel": 3145728
+          },
+          "supervisedClosure": null
+        },
+        {
+          "name": "supervision",
+          "elapsedMs": 7200303.361375,
+          "actualObserved": {
+            "bytes": {
+              "stdout": 3164484,
+              "stderr": 3164483
+            },
+            "frames": 720,
+            "inputStages": 121,
+            "exit": {
+              "code": 23,
+              "signal": null
+            },
+            "eofWitness": {
+              "frames": 720,
+              "inputBytes": 4730,
+              "inputHash": "b73dcd36caf97eef87add3be31e95c96987d94786dcc5ed578a884aa99621aba",
+              "descendant": 4823
+            }
+          },
+          "actualStreamAssertionsPassedInOriginalHarness": {
+            "contiguousChannelOffsets": true,
+            "maximumChunkBytes": 65536,
+            "streamShaEqualsExpected": true,
+            "exact4096ByteTail": true,
+            "validUtf8SuffixText": true,
+            "closedWithNoCaptureFailure": true,
+            "nativeTargetGone": true,
+            "waitRegistryEmpty": true,
+            "source": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+            "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5",
+            "lineAnchors": {
+              "actualEofAndInputDigest": 166,
+              "actualStreamSha": 189,
+              "actualTail": 190,
+              "actualPhysicalClosed": 181,
+              "nativeGone": 194,
+              "waitRegistryEmpty": 200
+            }
+          },
+          "postHocRecomputedExpectedOutput": {
+            "stdout": {
+              "bytes": 3164484,
+              "sha256": "6407386964c2ab21c63f1a917eeb802308bd70eb0f11124400871163b6b88a5b"
+            },
+            "stderr": {
+              "bytes": 3164483,
+              "sha256": "c876364eaf88582686b9e844f40d7beba91f49552bc3c880816675ff5d673468"
+            }
+          },
+          "digestProvenance": "Expected hashes above were recomputed offline from retained witness.frames and fixed payload code. The original runtime compared each actual stream hash to its expected hash before writing phase-completed. No second capture or separately persisted original output digest is claimed.",
+          "backpressure": {
+            "at": "2026-10-21T04:04:47.512Z",
+            "elapsedMs": 7202757.597208,
+            "event": "physical-backpressure-observed",
+            "name": "supervision",
+            "pausedMs": 2000,
+            "burstBytesPerChannel": 3145728
+          },
+          "supervisedClosure": {
+            "sourceAssertionsAtLines": [
+              172,
+              173,
+              174,
+              175,
+              176,
+              177,
+              178,
+              179,
+              195,
+              196,
+              197,
+              198
+            ],
+            "preservedTargetExit": {
+              "code": 23,
+              "signal": null
+            },
+            "termWitness": "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/supervision/term-seen",
+            "descendant": 4823,
+            "meaning": "Real target exit23 while descendant holds pipes; Draining with supervisor alive; TERM witnessed and 25ms wait TimedOut; group KILL; Closed capture; descendant and supervisor absent."
+          }
+        }
+      ],
+      "actualOwnedKeeperReceipt": {
+        "exitWon": false,
+        "elapsedMs": 14400052.660708
+      },
+      "exitCode": 0,
+      "activeWaitsAtEnd": 0,
+      "remainingTmp": [],
+      "resourceSummary": {
+        "samples": 481,
+        "firstAt": "2026-10-21T02:04:44.778Z",
+        "lastAt": "2026-10-21T06:04:45.399Z",
+        "harnessRssBytes": {
+          "min": 12369920,
+          "max": 50954240,
+          "last": 40124416
+        },
+        "ownProcessSamples": {
+          "61128": {
+            "samples": 481,
+            "firstAt": "2026-10-21T02:04:44.778Z",
+            "maxRssKiB": 49744,
+            "minNumericFds": 23,
+            "maxNumericFds": 29,
+            "maxObservedCpuSeconds": 141.89,
+            "lastAt": "2026-10-21T06:04:45.399Z",
+            "lastObservedState": "S"
+          },
+          "61133": {
+            "samples": 479,
+            "firstAt": "2026-10-21T02:05:14.852Z",
+            "maxRssKiB": 37264,
+            "minNumericFds": 14,
+            "maxNumericFds": 14,
+            "maxObservedCpuSeconds": 0.1,
+            "lastAt": "2026-10-21T06:04:15.877Z",
+            "lastObservedState": "Ss"
+          },
+          "61134": {
+            "samples": 239,
+            "firstAt": "2026-10-21T02:05:14.852Z",
+            "maxRssKiB": 40928,
+            "minNumericFds": 15,
+            "maxNumericFds": 15,
+            "maxObservedCpuSeconds": 1.15,
+            "lastAt": "2026-10-21T04:04:15.641Z",
+            "lastObservedState": "Ss"
+          },
+          "79867": {
+            "samples": 240,
+            "firstAt": "2026-10-21T04:04:45.823Z",
+            "maxRssKiB": 43936,
+            "minNumericFds": 20,
+            "maxNumericFds": 20,
+            "maxObservedCpuSeconds": 1.13,
+            "lastAt": "2026-10-21T06:04:15.877Z",
+            "lastObservedState": "Ss"
+          },
+          "79879": {
+            "samples": 240,
+            "firstAt": "2026-10-21T04:04:45.823Z",
+            "maxRssKiB": 54800,
+            "minNumericFds": 15,
+            "maxNumericFds": 15,
+            "maxObservedCpuSeconds": 1.07,
+            "lastAt": "2026-10-21T06:04:15.877Z",
+            "lastObservedState": "S"
+          }
+        },
+        "limitation": "Only finite own-PID observations. Max sampled RSS/CPU and numeric FD counts are not universal leak guarantees or new production limits."
+      }
+    },
+    "bun": {
+      "totalElapsedMs": 14400440.8375,
+      "actualObservedOutputBytes": 12657899,
+      "phases": [
+        {
+          "name": "process",
+          "elapsedMs": 7200156.182124999,
+          "actualObserved": {
+            "bytes": {
+              "stdout": 3164466,
+              "stderr": 3164466
+            },
+            "frames": 720,
+            "inputStages": 120,
+            "exit": {
+              "code": 0,
+              "signal": null
+            },
+            "eofWitness": {
+              "frames": 720,
+              "inputBytes": 3850,
+              "inputHash": "a4f85589289dbfe822216d2a0c0f48bc89a77984fab7d7c117d68004e5f8ac55",
+              "descendant": null
+            }
+          },
+          "actualStreamAssertionsPassedInOriginalHarness": {
+            "contiguousChannelOffsets": true,
+            "maximumChunkBytes": 65536,
+            "streamShaEqualsExpected": true,
+            "exact4096ByteTail": true,
+            "validUtf8SuffixText": true,
+            "closedWithNoCaptureFailure": true,
+            "nativeTargetGone": true,
+            "waitRegistryEmpty": true,
+            "source": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+            "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5",
+            "lineAnchors": {
+              "actualEofAndInputDigest": 166,
+              "actualStreamSha": 189,
+              "actualTail": 190,
+              "actualPhysicalClosed": 181,
+              "nativeGone": 194,
+              "waitRegistryEmpty": 200
+            }
+          },
+          "postHocRecomputedExpectedOutput": {
+            "stdout": {
+              "bytes": 3164466,
+              "sha256": "340b1ff59d83136ed91c20b0392288628474d05eb4c438c5ce8b95801e502438"
+            },
+            "stderr": {
+              "bytes": 3164466,
+              "sha256": "57825f8be72f113bde5f2e2cefb71d52cf047460c317630cee08e07fce5fb1d1"
+            }
+          },
+          "digestProvenance": "Expected hashes above were recomputed offline from retained witness.frames and fixed payload code. The original runtime compared each actual stream hash to its expected hash before writing phase-completed. No second capture or separately persisted original output digest is claimed.",
+          "backpressure": {
+            "at": "2026-10-21T02:04:46.998Z",
+            "elapsedMs": 2102.8911660000003,
+            "event": "physical-backpressure-observed",
+            "name": "process",
+            "pausedMs": 2000,
+            "burstBytesPerChannel": 3145728
+          },
+          "supervisedClosure": null
+        },
+        {
+          "name": "supervision",
+          "elapsedMs": 7200217.223875,
+          "actualObserved": {
+            "bytes": {
+              "stdout": 3164484,
+              "stderr": 3164483
+            },
+            "frames": 720,
+            "inputStages": 120,
+            "exit": {
+              "code": 23,
+              "signal": null
+            },
+            "eofWitness": {
+              "frames": 720,
+              "inputBytes": 4330,
+              "inputHash": "dd44f70cb2fb8ac879524d1ded755e30d077194588dd2415f61dd4301a3bfa40",
+              "descendant": 4825
+            }
+          },
+          "actualStreamAssertionsPassedInOriginalHarness": {
+            "contiguousChannelOffsets": true,
+            "maximumChunkBytes": 65536,
+            "streamShaEqualsExpected": true,
+            "exact4096ByteTail": true,
+            "validUtf8SuffixText": true,
+            "closedWithNoCaptureFailure": true,
+            "nativeTargetGone": true,
+            "waitRegistryEmpty": true,
+            "source": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+            "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5",
+            "lineAnchors": {
+              "actualEofAndInputDigest": 166,
+              "actualStreamSha": 189,
+              "actualTail": 190,
+              "actualPhysicalClosed": 181,
+              "nativeGone": 194,
+              "waitRegistryEmpty": 200
+            }
+          },
+          "postHocRecomputedExpectedOutput": {
+            "stdout": {
+              "bytes": 3164484,
+              "sha256": "6407386964c2ab21c63f1a917eeb802308bd70eb0f11124400871163b6b88a5b"
+            },
+            "stderr": {
+              "bytes": 3164483,
+              "sha256": "c876364eaf88582686b9e844f40d7beba91f49552bc3c880816675ff5d673468"
+            }
+          },
+          "digestProvenance": "Expected hashes above were recomputed offline from retained witness.frames and fixed payload code. The original runtime compared each actual stream hash to its expected hash before writing phase-completed. No second capture or separately persisted original output digest is claimed.",
+          "backpressure": {
+            "at": "2026-10-21T04:04:47.674Z",
+            "elapsedMs": 7202771.57725,
+            "event": "physical-backpressure-observed",
+            "name": "supervision",
+            "pausedMs": 2000,
+            "burstBytesPerChannel": 3145728
+          },
+          "supervisedClosure": {
+            "sourceAssertionsAtLines": [
+              172,
+              173,
+              174,
+              175,
+              176,
+              177,
+              178,
+              179,
+              195,
+              196,
+              197,
+              198
+            ],
+            "preservedTargetExit": {
+              "code": 23,
+              "signal": null
+            },
+            "termWitness": "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/supervision/term-seen",
+            "descendant": 4825,
+            "meaning": "Real target exit23 while descendant holds pipes; Draining with supervisor alive; TERM witnessed and 25ms wait TimedOut; group KILL; Closed capture; descendant and supervisor absent."
+          }
+        }
+      ],
+      "actualOwnedKeeperReceipt": {
+        "exitWon": false,
+        "elapsedMs": 14400037.5705
+      },
+      "exitCode": 0,
+      "activeWaitsAtEnd": 0,
+      "remainingTmp": [
+        "bun"
+      ],
+      "resourceSummary": {
+        "samples": 481,
+        "firstAt": "2026-10-21T02:04:44.919Z",
+        "lastAt": "2026-10-21T06:04:45.436Z",
+        "harnessRssBytes": {
+          "min": 19988480,
+          "max": 55066624,
+          "last": 46891008
+        },
+        "ownProcessSamples": {
+          "61129": {
+            "samples": 481,
+            "firstAt": "2026-10-21T02:04:44.919Z",
+            "maxRssKiB": 53504,
+            "minNumericFds": 9,
+            "maxNumericFds": 14,
+            "maxObservedCpuSeconds": 446.17,
+            "lastAt": "2026-10-21T06:04:45.436Z",
+            "lastObservedState": "S"
+          },
+          "61139": {
+            "samples": 479,
+            "firstAt": "2026-10-21T02:05:14.965Z",
+            "maxRssKiB": 30448,
+            "minNumericFds": 4,
+            "maxNumericFds": 4,
+            "maxObservedCpuSeconds": 2.39,
+            "lastAt": "2026-10-21T06:04:15.505Z",
+            "lastObservedState": "Ss"
+          },
+          "61141": {
+            "samples": 239,
+            "firstAt": "2026-10-21T02:05:14.965Z",
+            "maxRssKiB": 35664,
+            "minNumericFds": 6,
+            "maxNumericFds": 6,
+            "maxObservedCpuSeconds": 12.32,
+            "lastAt": "2026-10-21T04:04:15.295Z",
+            "lastObservedState": "Ss"
+          },
+          "79873": {
+            "samples": 239,
+            "firstAt": "2026-10-21T04:05:15.360Z",
+            "maxRssKiB": 22336,
+            "minNumericFds": 12,
+            "maxNumericFds": 12,
+            "maxObservedCpuSeconds": 138.66,
+            "lastAt": "2026-10-21T06:04:15.505Z",
+            "lastObservedState": "Ss"
+          },
+          "79884": {
+            "samples": 239,
+            "firstAt": "2026-10-21T04:05:15.360Z",
+            "maxRssKiB": 20608,
+            "minNumericFds": 6,
+            "maxNumericFds": 6,
+            "maxObservedCpuSeconds": 18.4,
+            "lastAt": "2026-10-21T06:04:15.505Z",
+            "lastObservedState": "S"
+          }
+        },
+        "limitation": "Only finite own-PID observations. Max sampled RSS/CPU and numeric FD counts are not universal leak guarantees or new production limits."
+      }
+    }
+  },
+  "cleanup": {
+    "at": "2026-10-21T06:07:43.402Z",
+    "ownedPids": [
+      61126,
+      61128,
+      61133,
+      61134,
+      79879,
+      79867,
+      4823,
+      61129,
+      61139,
+      61141,
+      79884,
+      79873,
+      4825
+    ],
+    "ps": {
+      "command": "/bin/ps -p <only recorded owned PIDs> -o pid=,ppid=,pgid=,rss=,stat=,comm=",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "lsof": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "allRecordedPidsAbsent": true,
+    "allRecordedPidFdsAbsent": true,
+    "ownNativeScopeAndPipeDirectoriesAbsent": true,
+    "remainingBunCache": "Only own Bun cache may remain; all logs and witnesses retained."
+  }
+}

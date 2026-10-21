@@ -1,0 +1,66 @@
+{
+  "at": "2026-10-21T02:04:12.886Z",
+  "sourceCommit": "45849f51778f6a12dcafbc12ce1c8c7f7f65502b",
+  "previousSourceCommit": "3db7b439283779f6037244d57cf05e6ec3e7ab31",
+  "sourceContinuity": {
+    "command": "git diff --exit-code 3db7b439283779f6037244d57cf05e6ec3e7ab31 -- src/process src/supervision src/time src/time-node src/native-process",
+    "exitCode": 0,
+    "output": "source-continuity.diff",
+    "bytes": 0
+  },
+  "package": "/private/tmp/vibe-fs-routing-public-pack/wanxiangli-0.11.0.tgz",
+  "packageSha256": "687cf81f702a2f229f7924442b9c454d9a96576e61a3ccd819323e0e716d3b93",
+  "packageVersion": "0.11.0",
+  "installedPackage": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/node_modules/wanxiangli",
+  "symlink": false,
+  "fallback": false,
+  "installCommand": "npm install --ignore-scripts --offline --cache /private/tmp/vibe-fs-physical-soak-20261021-b/npm-cache",
+  "installExitCode": 0,
+  "normalizedArtifactContinuity": "Only exact esbuild .build/<module>-<decimal PID>/ comment prefixes normalized; all checked runtime artifacts equal. Not a raw-byte equality claim.",
+  "artifacts": [
+    {
+      "path": "dist/process/ProcessSession.js",
+      "rawSha256": "57ecdb37c1c7c00cca0b735853fb563c85b42efd9ca3290261a332cd0f199054",
+      "previousRawSha256": "b4b1cedfc7191e82ee869c9ed82233bc16245801be171dcd18b95456c6e3e4ee",
+      "normalizedSha256": "15c59630b86e1e48dd2d55b7fd89b541b0e3635004705d0227d6321a66056f32",
+      "bytes": 48329
+    },
+    {
+      "path": "dist/supervision/SupervisedProcess.js",
+      "rawSha256": "e5d4f7e4ce6b5d049b595278f73eac579e96f9bace4bc0b3f479f7a519d38ead",
+      "previousRawSha256": "30054b069acd78f591fad37b967e38613e2ff8e3af4fa8b2c879a13959dac6f0",
+      "normalizedSha256": "aa9f95b7ee2d5231d653feb5d25373b6cc853dadf35be51c66ef3a0323efc55b",
+      "bytes": 54818
+    },
+    {
+      "path": "dist/time/Time.js",
+      "rawSha256": "1f8f36fb9e156b530220152d763b882e8dd413284eeca8c2a83be3617c2fbe07",
+      "previousRawSha256": "00c46be7c67cb9496567e4ba0dcbf39c3bfdc5d2fbc476f384026db2e57b564e",
+      "normalizedSha256": "d756ddbd7fb2811c04ec3a80da920db9363541e02df7e81f1efee83f6f42edbe",
+      "bytes": 15540
+    },
+    {
+      "path": "dist/time-node/NodeTime.js",
+      "rawSha256": "9a7eff652871ad3a391ea0aece3dff3dc68bc230ebc6a8688e45d7c032e78a79",
+      "previousRawSha256": "c26922be96516ad796c980d10f9bb6c5777f48c4f900f72b9d1347f20a330695",
+      "normalizedSha256": "59d1c64a683f3113b974deee791a85efcb533efd68df7dcf5e3dc6952db64af3",
+      "bytes": 8012
+    }
+  ],
+  "harness": [
+    {
+      "path": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/coordinator.mjs",
+      "sha256": "573235636462f48589a0f7000b287f2e36fef1c1ff38768c2a95f05b44a53994"
+    },
+    {
+      "path": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+      "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5"
+    },
+    {
+      "path": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/worker.mjs",
+      "sha256": "7ee45b10f9efbee9d5b43b3a192fc9777236720ebae1c83f5905b9c6bb90ef31"
+    }
+  ],
+  "node": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node v22.13.0",
+  "bun": "/opt/homebrew/bin/bun 1.3.14"
+}

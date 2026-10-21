@@ -1,0 +1,119 @@
+{
+  "at": "2026-10-21T06:17:23.313334+00:00",
+  "scope": "Final endurance evidence and issue-record archive only; no production source or library changes since the accepted source. All md/mjs inputs staged and frozen before normal build.",
+  "sourceParent": "a6e3917caf6111e025b167e7124eea0cbfc2bd90",
+  "productionSource": "764e6778e99d485ed2dafa97072e1f6711b74161",
+  "publicLibrary": "45849f51778f6a12dcafbc12ce1c8c7f7f65502b",
+  "generation": 109,
+  "compilerInputDigest": "4f18f7819bfb250791fba47e21a70725a902e1f14c543ebe41e690b48f6f300b",
+  "generatedInputDigest": "b97be4666bf7cd5ece44b27adedb6325b575481f4133c1286e4a903f243fe008",
+  "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225",
+  "checks": {
+    "normalBuild": {
+      "exit": 0
+    },
+    "format": {
+      "exit": 0
+    },
+    "static": {
+      "exit": 0
+    },
+    "scoped": {
+      "exit": 0,
+      "selection": [
+        "requirements/degeneration-guard/tests/004.test.mjs",
+        "requirements/verification-system/tests/016.test.mjs"
+      ],
+      "pass": 295,
+      "fail": 0,
+      "plannedFiles": 2,
+      "completedFiles": 2,
+      "skip": 20,
+      "todo": 2,
+      "wallSeconds": 180.31,
+      "testSeconds": 264.74,
+      "reclaimedAccepted": true,
+      "policy": "Unchanged WXS_ACCEPT_TODO=1; skip and existing TODO are not passes."
+    },
+    "actualPackage": {
+      "exit": 0,
+      "members": 1380,
+      "bytes": 11916728,
+      "sha256": "18eec6f32cf8a0acd8b873c56bb840e0666978e7c995754003c9a13091953caf"
+    }
+  },
+  "compiledContinuity": {
+    "oldGeneration": 108,
+    "newGeneration": 109,
+    "oldOutputs": 783,
+    "newOutputs": 783,
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "actualCurrentOutputsRawHashVerified": true,
+    "compilerInputDigest": "4f18f7819bfb250791fba47e21a70725a902e1f14c543ebe41e690b48f6f300b",
+    "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225",
+    "oldGeneratedDigest": "b05d8a07e24a94bddcedeaf27a7769747d2291e61d2bd2d687ce03bd7bdcb794",
+    "newGeneratedDigest": "b97be4666bf7cd5ece44b27adedb6325b575481f4133c1286e4a903f243fe008",
+    "scope": "Only manifest.outputs; package validation and library source identity reported separately."
+  },
+  "previousFullRelease": "release08-receipt.json",
+  "previousExactRemoteCI": {
+    "head": "a6e3917caf6111e025b167e7124eea0cbfc2bd90",
+    "url": "https://github.com/dyx13/vibe-fs/actions/runs/39539917238",
+    "conclusion": "success",
+    "unitPass": 4440,
+    "unitFail": 0,
+    "integrationPass": 709,
+    "integrationFail": 0,
+    "newClosingCommitCI": "Not yet created at receipt time; exact final head/run will be recorded in the existing PR and final handover."
+  },
+  "endurance": {
+    "archiveAudit": "endurance-archive-audit.json",
+    "filesByteVerified": 125,
+    "processFourHour": {
+      "receipt": "process-four-hour/final-receipt.json",
+      "coordinatorExit": 0,
+      "nodeExit": 0,
+      "bunExit": 0,
+      "all13RecordedPidsAndFdsAbsent": true
+    },
+    "ptyTwoHour": {
+      "receipt": "pty-2h/final-receipt.json",
+      "overallExit": 1,
+      "activeIntervalAndEofPassed": true,
+      "deferredPriority": "P2",
+      "scope": "Timed-out recovery connection remains live after paused custodian resumes; ordinary creator detach proved separately. No fix or expanded matrix."
+    }
+  },
+  "productionReception": "Isolated A/B/C evidence only; D design only. Main VM/Host integration and other recorded P1 remain open.",
+  "originalRuntime": {
+    "head": "8db33b3429a70d5cdbea30e393363666b3649573",
+    "trackedFilesUnchanged": true,
+    "stashesPreserved": 3,
+    "untrackedUserFilePreserved": "万象术独特功能导论.md",
+    "deployed": false
+  },
+  "logs": {
+    "closing-build.log": {
+      "bytes": 51414,
+      "sha256": "0dec706b5abda8d13549452b7f8310932675ccd627317828411eac21dcba7187"
+    },
+    "closing-format.log": {
+      "bytes": 95,
+      "sha256": "281f0bd0fbe5b3ec70a9768849332b2eee00c98a74c101070acb6862030f7975"
+    },
+    "closing-check.log": {
+      "bytes": 88,
+      "sha256": "dac427479a3f74999821841535e209f13ff82e1bf236b23cdc06047897471ba3"
+    },
+    "closing-scoped.log": {
+      "bytes": 396515,
+      "sha256": "3e62eb87bd14a0202a6e091e6c77b6542d7c8f036f05666085c9f92e37e58f2c"
+    },
+    "closing-package.log": {
+      "bytes": 336,
+      "sha256": "eb0d3466646c156b151e60ea30df5dd45c151882eff475ffdc559095f482e682"
+    }
+  }
+}

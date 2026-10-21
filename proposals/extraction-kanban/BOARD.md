@@ -6,7 +6,7 @@
 
 ## 2026-10-21 已拆模块修正施工
 
-**用户已于2026-10-21恢复施工。** 源码`764e6778e`、库`45849f5`/0.11.0；恢复后gen107完整本地发行通过，逐字日志与收据提交`e34d0c2c4`。新原型证据与计划另行进入正常corpus重建。推送仍遇SSH/HTTPS连接失败，新head未取得远端CI；原长测取消记录保留，新实验从零计时。当前入口见[恢复记录](MODULE-CONSTRUCTION-2026-10-21.md#resume-20261021)。
+**用户已于2026-10-21恢复施工。** 源码`764e6778e`、库`45849f5`/0.11.0；gen107完整本地发行通过，证据归档gen108后783编译产物原字节不变。候选`a6e3917ca`已以原SHA/force=false快进自有master及PR分支，完整Linux CI39539917238成功；PR #62描述已同步。原长测取消记录保留，新实验从零计时。当前入口见[恢复记录](MODULE-CONSTRUCTION-2026-10-21.md#resume-20261021)。
 
 用户已授权按[本轮施工范围](MODULE-CONSTRUCTION-2026-10-21.md)持续施工至少五小时（全部计划提前完成除外），允许subagent与独立测试。固定主仓c78c9d53c、库a12ff4a，上游只读参照5880b824f/202a41ab；原运行目录保持原版。
 
@@ -17,7 +17,7 @@
 | MF-02A | REVIEW（限定修复） | gen95目标集合38/0；严格S4夹具已证明持久准入；Host缺原子attempt中断，check到abort窗口仍在 |
 | MF-02B | REVIEW（delivery/prefix/compression） | 库3db7b43及后续c4bc2ca已推；18入口公开包及Node/Bun各73+独立6项通过；gen102完整发行通过，旧TODO另列；projection后续分包审查 |
 | MF-03A | REVIEW（续接恢复） | 新增6个原生write/fsync/unlink切点用例，本机gen106发行通过；Linux四位PID夹具已修，148adbb42完整远端CI通过，生产身份规范未放宽；不等于断电或完整GAP-151闭合 |
-| MF-03B | DOING（重跑长测） | cwd/等待子包已验。新Process/Supervision于02:04:44Z启动各2h+2h，PTY实际2h于02:05:51Z启动，尚待最终hash/EOF与回收。旧115.44/88.65分钟取消证据保留，不累计；双路spool与Git大输出P2仍留档 |
+| MF-03B | REVIEW（限定长测） | 新Process/Supervision在Node22和Bun各满2h+2h通过，独立keeper各满4h，实际EOF/hash/TERM-KILL/Closed/Wait0通过；归档见本轮收尾。PTY2h交互/EOF经过，但暂停custodian后的超时recover占位失败，原exit1及唯一短例完整保留，按用户要求记P2不修。旧取消时长不累计；双路spool与Git大输出P2仍留档 |
 | MF-04 | REVIEW（retention/防回退） | 库c4bc2ca/0.9.2已推，20入口包消费通过；数值ObservedAt反例已修，主仓9项011进gen101单元；021保住exact cut guard。legacy/series活动选材P2另记，多writer/GAP-151不销项 |
 | MF-05 | REVIEW（已验子包） | permit/routing已接，库45849f5/0.11.0已推，22入口真包通过；gen107完整发行单元4537/0、集成725/0，旧skip/TODO单列；capacity/queue暂保留原owner，未证明收益且桥会缩窄Int64，其余authority/dispatch/session未认领闭合 |
 | MF-06 | REVIEW（wait/Casebook/消融窄修） | gen102完整发行通过；消融严格集合22/0/1既有integration skip，4/4回收；独立真实ToolRegistry拒绝无效profile。hash碰撞及borrowed_surface边界P2另记，不为同构纯包增加适配 |

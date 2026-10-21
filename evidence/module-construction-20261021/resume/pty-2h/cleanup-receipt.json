@@ -1,0 +1,88 @@
+{
+  "at": "2026-10-21T04:08:32.088Z",
+  "outcome": "Failed original PTY endurance experiment; owned cleanup verified, no retry",
+  "originalState": "Failed",
+  "originalError": {
+    "message": "HARNESS_BOUND: Stale recovery controller detach",
+    "stack": "Error: HARNESS_BOUND: Stale recovery controller detach\n    at <anonymous> (/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/pty-soak.mjs:66:9)\n    at processTicksAndRejections (native:7:39)"
+  },
+  "originalExit": {
+    "code": 1,
+    "signal": null,
+    "at": "2026-10-21T04:06:12.118Z"
+  },
+  "ownedPids": [
+    61508,
+    61510,
+    61511,
+    61521,
+    61523,
+    61524,
+    80321
+  ],
+  "ps": {
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  "lsof": {
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  "allRecordedPidsAbsent": true,
+  "allRecordedPidFdsAbsent": true,
+  "scope": {
+    "original": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/tmp/wanxiangshu-pty-vZ6JJq",
+    "removed": true,
+    "preserved": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/retained-scope-before-cleanup",
+    "files": [
+      {
+        "name": "anchor-eba83ba6-af4b-45d7-907f-17c487b500ef",
+        "bytes": 164,
+        "sha256": "de271c129c6e7b24f9999e83d01870a6c8431a9ae74d4876501365b81b481592"
+      },
+      {
+        "name": "execute",
+        "bytes": 2,
+        "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+      },
+      {
+        "name": "request",
+        "bytes": 318,
+        "sha256": "7e29141473614e8e05e143f019e5898f8b7cd4cc81ce6dabcdeca6366b2722ea"
+      },
+      {
+        "name": "started",
+        "bytes": 83,
+        "sha256": "04f37173d57ede001420eaa019fa3a0740217d2af3b4f135dbd393ff47161932"
+      },
+      {
+        "name": "target-exit",
+        "bytes": 78,
+        "sha256": "55a0bbc7c70147b1671ce8504912c2f5fd352b369465f5e748de2324f69f590f"
+      },
+      {
+        "name": "target-ready",
+        "bytes": 66,
+        "sha256": "ddbe27795ff287fef0a84801beb63b4add258dc837d58aee77ad696ccd5f00a0"
+      }
+    ]
+  },
+  "controlEndpoint": {
+    "path": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/tmp/wxs-pty-bvRXNn/control",
+    "staleSocketAfterForcedKill": true,
+    "removed": true,
+    "parentRemoved": true
+  },
+  "terminalReceiptExists": false,
+  "retainedDurableRecoveryFiles": [
+    "available",
+    "claim",
+    "request"
+  ],
+  "remainingTmp": [
+    "bun"
+  ],
+  "limits": "No terminal close proof was obtained. Absence of owned processes is independently verified after fallback signals, not inferred from a stop request. Durable files and Bun cache retained as evidence."
+}

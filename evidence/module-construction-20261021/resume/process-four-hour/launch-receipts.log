@@ -1,0 +1,1 @@
+{"process":{"root":"/private/tmp/vibe-fs-physical-soak-20261021-b","pid":61126,"expectedEnd":"2026-10-21T06:04:44.678Z"},"pty":{"root":"/private/tmp/vibe-fs-pty-soak-gen106-20261021-b","controller":61508,"harness":61510,"owned":[61511,61521,61523,61524],"activeStarted":"2026-10-21T02:05:51.582Z","expectedEnd":"2026-10-21T04:05:51.582Z"}}

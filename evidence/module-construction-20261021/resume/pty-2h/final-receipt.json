@@ -1,0 +1,267 @@
+{
+  "state": "Failed; active duration and finite observations verified, final recovery/closure contract did not pass",
+  "at": "2026-10-21T04:09:48.429Z",
+  "generation": 106,
+  "immutableArtifacts": {
+    "files": 833,
+    "manifestSha256": "331e32dd1401edcedccef5f93dc5d2a03676b96267b6e06c1e2ccf1705df4d17",
+    "receipt": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/copied-artifact-receipt.json",
+    "sourceFreshness": "Gen106 was built before later tracked pause evidence changed loop-detector corpus. This copied artifact receipt does not assert aad HEAD is build-fresh."
+  },
+  "originalCommand": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/controller.mjs > /private/tmp/vibe-fs-pty-soak-gen106-20261021-b/runner.log 2>&1",
+  "actualExit": {
+    "code": 1,
+    "signal": null,
+    "at": "2026-10-21T04:06:12.118Z"
+  },
+  "active": {
+    "startedAt": "2026-10-21T02:05:51.582Z",
+    "elapsedMs": 7200000.237209,
+    "requests": 120,
+    "controlRefusalChecks": 24,
+    "actualOutputBytes": 16559,
+    "actualOutputSha256": "dd15579213fa02a4517d7c8b05d2ad38fb5e9e91c60a1260610a72973e95f034",
+    "allOutputMatchesIndependentExpectedLines": true,
+    "actualStdinEof": {
+      "bytes": 8780,
+      "sha256": "e19b0e64a4be8638c92b84d92d9d9db97190ef726b7bade9c1cf1c22dfe2536a",
+      "witness": {
+        "pid": 61523,
+        "descendant": 80321,
+        "count": 120,
+        "inputHash": "e19b0e64a4be8638c92b84d92d9d9db97190ef726b7bade9c1cf1c22dfe2536a",
+        "at": "2026-10-21T04:05:51.737Z"
+      },
+      "matchesAllAcknowledgedInputLines": true
+    }
+  },
+  "targetExit": {
+    "incarnation": "9a1e9128-e1a8-4c81-9904-ed57a0d2cd96",
+    "code": 23,
+    "signal": null
+  },
+  "finiteUnknown": {
+    "reason": "PTY owner startup acknowledgement timed out",
+    "elapsedMs": 5018.469790999778,
+    "terminalAbsent": true
+  },
+  "failure": {
+    "message": "HARNESS_BOUND: Stale recovery controller detach",
+    "stack": "Error: HARNESS_BOUND: Stale recovery controller detach\n    at <anonymous> (/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/pty-soak.mjs:66:9)\n    at processTicksAndRejections (native:7:39)"
+  },
+  "failedStage": "After SIGCONT, a control connection remained admitted for the 15-second detach observation. Public fallback drain also rejected live control connection. Which socket owned the slot is not identified by original logs.",
+  "boundaries": [
+    "No terminal receipt was produced",
+    "Final normal recovery TERM/KILL and preserved exit23 terminal proof were not verified",
+    "No universal resource-leak claim",
+    "A later diagnostic does not turn this original exit1 into pass"
+  ],
+  "resources": {
+    "samples": 241,
+    "first": "2026-10-21T02:05:51.576Z",
+    "last": "2026-10-21T04:05:51.835Z",
+    "harnessRssBytes": {
+      "min": 17367040,
+      "max": 54575104,
+      "last": 28934144
+    },
+    "lastOwnedCpuRssState": "61510 61508 61508  28192   0:55.17 S    /opt/homebrew/bin/bun\n61511 61510 61511  19952   7:14.30 Ss   /opt/homebrew/Cellar/bun/1.3.14/bin/bun\n61521 61511 61521  24464   1:05.17 Ss   /opt/homebrew/Cellar/bun/1.3.14/bin/bun\n61524 61521 61523    624   0:00.04 S+   sh\n",
+    "rawOwnPidAndFdLog": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/resources.jsonl"
+  },
+  "cleanup": {
+    "at": "2026-10-21T04:08:32.088Z",
+    "outcome": "Failed original PTY endurance experiment; owned cleanup verified, no retry",
+    "originalState": "Failed",
+    "originalError": {
+      "message": "HARNESS_BOUND: Stale recovery controller detach",
+      "stack": "Error: HARNESS_BOUND: Stale recovery controller detach\n    at <anonymous> (/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/pty-soak.mjs:66:9)\n    at processTicksAndRejections (native:7:39)"
+    },
+    "originalExit": {
+      "code": 1,
+      "signal": null,
+      "at": "2026-10-21T04:06:12.118Z"
+    },
+    "ownedPids": [
+      61508,
+      61510,
+      61511,
+      61521,
+      61523,
+      61524,
+      80321
+    ],
+    "ps": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "lsof": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "allRecordedPidsAbsent": true,
+    "allRecordedPidFdsAbsent": true,
+    "scope": {
+      "original": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/tmp/wanxiangshu-pty-vZ6JJq",
+      "removed": true,
+      "preserved": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/retained-scope-before-cleanup",
+      "files": [
+        {
+          "name": "anchor-eba83ba6-af4b-45d7-907f-17c487b500ef",
+          "bytes": 164,
+          "sha256": "de271c129c6e7b24f9999e83d01870a6c8431a9ae74d4876501365b81b481592"
+        },
+        {
+          "name": "execute",
+          "bytes": 2,
+          "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+        },
+        {
+          "name": "request",
+          "bytes": 318,
+          "sha256": "7e29141473614e8e05e143f019e5898f8b7cd4cc81ce6dabcdeca6366b2722ea"
+        },
+        {
+          "name": "started",
+          "bytes": 83,
+          "sha256": "04f37173d57ede001420eaa019fa3a0740217d2af3b4f135dbd393ff47161932"
+        },
+        {
+          "name": "target-exit",
+          "bytes": 78,
+          "sha256": "55a0bbc7c70147b1671ce8504912c2f5fd352b369465f5e748de2324f69f590f"
+        },
+        {
+          "name": "target-ready",
+          "bytes": 66,
+          "sha256": "ddbe27795ff287fef0a84801beb63b4add258dc837d58aee77ad696ccd5f00a0"
+        }
+      ]
+    },
+    "controlEndpoint": {
+      "path": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/tmp/wxs-pty-bvRXNn/control",
+      "staleSocketAfterForcedKill": true,
+      "removed": true,
+      "parentRemoved": true
+    },
+    "terminalReceiptExists": false,
+    "retainedDurableRecoveryFiles": [
+      "available",
+      "claim",
+      "request"
+    ],
+    "remainingTmp": [
+      "bun"
+    ],
+    "limits": "No terminal close proof was obtained. Absence of owned processes is independently verified after fallback signals, not inferred from a stop request. Durable files and Bun cache retained as evidence."
+  },
+  "completeHarnessSources": [
+    {
+      "path": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/controller.mjs",
+      "sha256": "7adcb8336f2365c5b18154b42dd28065bcc6df56e88391061cbbf9d0184f552e"
+    },
+    {
+      "path": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/pty-soak.mjs",
+      "sha256": "4511c919d41538aa77fd6ebd0276151252dfb95127e8833a0eaf64c6d100b32f"
+    },
+    {
+      "path": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/target.mjs",
+      "sha256": "eb16388897d0ced02b54537306f156da937b257986670b1635f9e5b47bf3ca9f"
+    }
+  ],
+  "originalSetupFailure": {
+    "root": "/private/tmp/vibe-fs-pty-soak-gen106-20261021",
+    "outcome": "Initial setup omitted physical cwd; failed before owner creation, no test duration counted; original files retained"
+  },
+  "rootIndependentGen107Continuity": {
+    "path": "/private/tmp/vibe-fs-pty-gen106-to-gen107-artifact-comparison.json",
+    "attribution": "Reported by root, separate from this run: all 833 fixed consumer files unchanged; compared with gen107, 811 raw-equal plus 22 wanxiangli JS equal only after exact generated PID-comment normalization. Not 833 raw-equal and not a source-freshness assertion."
+  },
+  "artifacts": {
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/launch.json": {
+      "bytes": 5473,
+      "sha256": "da167b58c23afab37284c9939d35dd6dcd4acbdcd102af18596cf0bf86abee64"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/preflight-receipt.json": {
+      "bytes": 1923,
+      "sha256": "5a2b2810b5f3634192fb4b66d5528927fcb344bbf9df125d2c9a779e8574a648"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/copied-artifact-receipt.json": {
+      "bytes": 150653,
+      "sha256": "832bf37ddbf6eced82928498a558637447ed712b37f1a6ec4753bbb4d0464580"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/gen106-build-manifest.json": {
+      "bytes": 871941,
+      "sha256": "331e32dd1401edcedccef5f93dc5d2a03676b96267b6e06c1e2ccf1705df4d17"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/harness-sha256.txt": {
+      "bytes": 264,
+      "sha256": "0e81af136239334aac97e5d04964f7595ef9e1f199321358eba4afbe6dd559cd"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/controller.mjs": {
+      "bytes": 1541,
+      "sha256": "7adcb8336f2365c5b18154b42dd28065bcc6df56e88391061cbbf9d0184f552e"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/pty-soak.mjs": {
+      "bytes": 14325,
+      "sha256": "4511c919d41538aa77fd6ebd0276151252dfb95127e8833a0eaf64c6d100b32f"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/target.mjs": {
+      "bytes": 2340,
+      "sha256": "eb16388897d0ced02b54537306f156da937b257986670b1635f9e5b47bf3ca9f"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/package.json": {
+      "bytes": 67,
+      "sha256": "457be271e8f915d317ec5d1940a0c2b272e33847e433cfaf202fa45a6065215c"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/status.json": {
+      "bytes": 1308,
+      "sha256": "b525b4475128984810778d175976540a73af4f11a778af897607c8183f05dc3f"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/controller.json": {
+      "bytes": 71,
+      "sha256": "8f95dfb35a145b8d58b58162a7ccc3a38f54f6126571db416d6ef35a1135ffed"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/controller-exit.json": {
+      "bytes": 56,
+      "sha256": "ac966e52c0da1b05197bd87a13a8048bb7b22360982cb7e1f8cc0efe5f5ad2f0"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/runner.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/events.jsonl": {
+      "bytes": 1741,
+      "sha256": "961a83f2c8ac171ed43de66985fb7ac49e860ec4f5e33b04db15c4c5102b1cf2"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/resources.jsonl": {
+      "bytes": 223657,
+      "sha256": "f44e07ac79ff9faf8b8567db3f521d8a18ed037de3e9420c6bf10bf99433a082"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/output.jsonl": {
+      "bytes": 22217,
+      "sha256": "65ce8f38102313b506cf70f8676626cfb5fc1ac2b904894da6b7a75a9c497670"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/physical/target-input.jsonl": {
+      "bytes": 12130,
+      "sha256": "6bebab561eae6a7a1ec76d21a7d0441b7307482b0167f90b223dc5b1f4a88f56"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/physical/target-eof.json": {
+      "bytes": 155,
+      "sha256": "4f90b39554e8aa7ace79d171e418ef34f9c8027a4b59d99c97e54e869edf6dd4"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/observed-target-exit.json": {
+      "bytes": 78,
+      "sha256": "55a0bbc7c70147b1671ce8504912c2f5fd352b369465f5e748de2324f69f590f"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/cleanup-receipt.json": {
+      "bytes": 2639,
+      "sha256": "df456b9bc935aefcb21f107f115b4dc3a2a92ce6dc349a3c86702f8661f0ca69"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/cleanup.log": {
+      "bytes": 2639,
+      "sha256": "df456b9bc935aefcb21f107f115b4dc3a2a92ce6dc349a3c86702f8661f0ca69"
+    }
+  }
+}

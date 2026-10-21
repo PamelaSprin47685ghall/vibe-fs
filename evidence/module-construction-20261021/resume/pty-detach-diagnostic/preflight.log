@@ -1,0 +1,39 @@
+{
+  "kind": "One authorized finite detach-precondition diagnostic; not a new two-hour run or matrix",
+  "at": "2026-10-21T04:11:03.260Z",
+  "fixedGeneration": 106,
+  "consumerFilesRawEqualToOriginal": 833,
+  "sourceReceipt": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/copied-artifact-receipt.json",
+  "productionBytesModified": false,
+  "originalFailureUnchanged": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b",
+  "minimumActiveMs": 1000,
+  "maximumEnvelopeMs": 90000,
+  "controllerCancelAtMs": 60000,
+  "controllerForceAtMs": 80000,
+  "addedPrecondition": "After creator.dispose and the original 100ms delay, require the original invalid-secret attach to observe credentials mismatch within 3 seconds before SIGSTOP. Record first and subsequent refusal. If not observed, fail and clean all owned resources; no retry.",
+  "keptAssertions": [
+    "real EOF and target exit23",
+    "descendant retained scope",
+    "5-second startup Unknown with terminal absent",
+    "independent 12-second SIGCONT fallback",
+    "CONT and stale recovery detach",
+    "final TERM/KILL drain",
+    "HMAC/exact exit/owned native cleanup",
+    "live-controller refusal"
+  ],
+  "completeHarnessSources": [
+    {
+      "path": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/controller.mjs",
+      "sha256": "bcbda87de1dad4f4ba5b627fa65128f79712d6c8cb085c2542ba948cf78e635a"
+    },
+    {
+      "path": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/pty-soak.mjs",
+      "sha256": "2a95b4f41bf404e76a1f0d378531d54803cd9a8717dda7b60a0595f68dccb8dd"
+    },
+    {
+      "path": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/target.mjs",
+      "sha256": "eb16388897d0ced02b54537306f156da937b257986670b1635f9e5b47bf3ca9f"
+    }
+  ],
+  "command": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/controller.mjs > /private/tmp/vibe-fs-pty-detach-diagnostic-20261021/runner.log 2>&1"
+}

@@ -1,0 +1,24 @@
+{"head": "a6e3917caf6111e025b167e7124eea0cbfc2bd90", "base": "148adbb42b28969c23c336b54e4d05533edca7b4", "counts": {"blob": 228, "tree": 74, "commit": 5}, "publish": true}
+{"verifiedObjects": 20}
+{"verifiedObjects": 40}
+{"verifiedObjects": 60}
+{"verifiedObjects": 80}
+{"verifiedObjects": 100}
+{"verifiedObjects": 120}
+{"verifiedObjects": 140}
+{"verifiedObjects": 160}
+{"verifiedObjects": 180}
+{"verifiedObjects": 200}
+{"verifiedObjects": 220}
+{"verifiedObjects": 240}
+{"verifiedCommit": "764e6778e99d485ed2dafa97072e1f6711b74161"}
+{"verifiedObjects": 260}
+{"verifiedCommit": "aad92fa0b476e5a8777c505a64656fec0d1fd2d0"}
+{"verifiedCommit": "a5d2844b60c87d24e4d559cffc04a1b33788930e"}
+{"verifiedCommit": "e34d0c2c4e3728c0bf8f69486933c1128ded14ca"}
+{"verifiedObjects": 280}
+{"verifiedObjects": 300}
+{"verifiedCommit": "a6e3917caf6111e025b167e7124eea0cbfc2bd90"}
+{"fastForwardedRef": "master", "sha": "a6e3917caf6111e025b167e7124eea0cbfc2bd90", "force": false}
+{"fastForwardedRef": "codex/upstream-plan-20261020", "sha": "a6e3917caf6111e025b167e7124eea0cbfc2bd90", "force": false}
+{"complete": true, "head": "a6e3917caf6111e025b167e7124eea0cbfc2bd90", "verifiedObjects": 307, "published": true, "journal": "/private/tmp/vibe-fs-exact-publication-a6e3917caf6111e025b167e7124eea0cbfc2bd90.json"}

@@ -1,0 +1,61 @@
+{
+  "at": "2026-10-21T04:05:42.788144+00:00",
+  "publishedHead": "a6e3917caf6111e025b167e7124eea0cbfc2bd90",
+  "refs": [
+    "refs/heads/master",
+    "refs/heads/codex/upstream-plan-20261020"
+  ],
+  "method": "GitHub Git Database API through configured gh credentials; all307 immutable objects including5 original commits SHA-verified, both references force=false fast-forward. No history rewrite.",
+  "publicationEvidence": [
+    "publication-a6.json",
+    "publication-a6.log"
+  ],
+  "pullRequest": {
+    "url": "https://github.com/PamelaSprin47685ghall/vibe-fs/pull/62",
+    "head": "a6e3917caf6111e025b167e7124eea0cbfc2bd90",
+    "draft": true,
+    "mergeable": false,
+    "title": "Align upstream model and receive extracted module owners",
+    "bodyUpdated": true
+  },
+  "ci": {
+    "id": 39539917238,
+    "url": "https://github.com/dyx13/vibe-fs/actions/runs/39539917238",
+    "event": "push",
+    "head": "a6e3917caf6111e025b167e7124eea0cbfc2bd90",
+    "status": "completed",
+    "conclusion": "success",
+    "verificationSeconds": 1198.2,
+    "unit": {
+      "pass": 4440,
+      "fail": 0,
+      "files": 757,
+      "drained": 757,
+      "skip": 207,
+      "todo": 277,
+      "reclaimedAccepted": true
+    },
+    "integration": {
+      "pass": 709,
+      "fail": 0,
+      "files": 40,
+      "drained": 40,
+      "skip": 23,
+      "todo": 7,
+      "reclaimedAccepted": true
+    },
+    "format": true,
+    "static": true,
+    "fableBuild": true,
+    "e2e": true,
+    "package": true,
+    "policy": "Existing CI WXS_ACCEPT_TODO=1; skip/TODO are not passes.",
+    "rawLog": {
+      "path": "ci-a6-full.log",
+      "sha256": "6f549612155f837da3289a22354822e51019989ad345d05621d23e35dcbfdaaf",
+      "bytes": 4094665
+    }
+  },
+  "runtimeCheckout": "Unchanged8db33b342 with original3 stashes; no deployment.",
+  "longTests": "Process2h phase completed; full4h and PTY final receipts still awaited. No total-duration acceptance claimed here."
+}

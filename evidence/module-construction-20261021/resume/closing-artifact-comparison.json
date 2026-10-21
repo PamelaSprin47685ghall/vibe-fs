@@ -1,0 +1,15 @@
+{
+  "oldGeneration": 108,
+  "newGeneration": 109,
+  "oldOutputs": 783,
+  "newOutputs": 783,
+  "changed": [],
+  "added": [],
+  "removed": [],
+  "actualCurrentOutputsRawHashVerified": true,
+  "compilerInputDigest": "4f18f7819bfb250791fba47e21a70725a902e1f14c543ebe41e690b48f6f300b",
+  "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225",
+  "oldGeneratedDigest": "b05d8a07e24a94bddcedeaf27a7769747d2291e61d2bd2d687ce03bd7bdcb794",
+  "newGeneratedDigest": "b97be4666bf7cd5ece44b27adedb6325b575481f4133c1286e4a903f243fe008",
+  "scope": "Only manifest.outputs; package validation and library source identity reported separately."
+}

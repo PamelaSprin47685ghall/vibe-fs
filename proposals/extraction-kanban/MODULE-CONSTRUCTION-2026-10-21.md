@@ -187,7 +187,22 @@ MF-05暂保留capacity/queue：pure capacity没有独立生产消费者，现有
 | 候选接入阻断 | B通用投影会拒class命令、调用toJSON；onExit忽略值等原语义尚未按用途迁移 | 原始正反控与设计已存；不影响本批已验主仓，不继续扩展D |
 | P2 | Casebook旧32位hash碰撞可能取错答案；legacy/series活动选材、外部同inode历史改写与热cache差异、prefix旧观测 | 保留可复现记录，不在本批更换持久格式或扩大扫描 |
 | P2 | 164KiB Git完整stdout被mixed spool安全围栏拒绝；旧target两字段均含冒号无法唯一逆解；borrowed_surface边界 | 不猜合并输出为stdout，不绕预算；分别留后续包 |
+| P2 | custodian暂停期间recover请求先超时，恢复后旧合法recover连接持续占位，阻止后续drain | 原2h交互/EOF/hash成立但整体exit1；唯一23秒短例先证明creator已实际detach再复现，普通creator断开正常。不归因Bun或某个具体event，不放宽live guard，本批记录不修 |
 | P3/有限候选边界 | 无效resume预算会先消费site；nextOffer终局前先取队列；复杂getter/formatter精确次数、极端时钟变化 | 只记录，非生产公开入口；不继续加反射框架或边缘测试 |
 | P3/无已测收益 | readLatestTail全扫但无生产调用；capacity/queue/projection/convergence同构或桥增加分配 | 暂保留原owner，不为模块数迁移 |
 
 提交成功、本地检查通过、远端CI通过与部署分别报告；连接失败不会改写为PR已更新。后续验收结果优先写JSON/log收据，避免为同一结论反复改corpus后重跑全量。
+
+### 发布和长测阶段收据
+
+正常Git传输不可达后，已通过现有gh凭证访问GitHub官方Git对象API：逐对象核对307项原SHA（含5个原提交），两分支以force=false快进至`a6e3917ca`，未改写历史。现有Draft PR #62标题与描述已同步0.11.0/routing范围。[该精确候选完整Linux CI](https://github.com/dyx13/vibe-fs/actions/runs/39539917238)已成功，1198.2秒；unit4440/0、757/757排空回收，integration709/0、40/40排空回收，格式、静态、Fable构建、E2E与包通过。Linux unit207 skip/277旧TODO、integration23 skip/7旧TODO仍单列；原运行目录及部署不变。见[发布及CI收据](../../evidence/module-construction-20261021/resume/publication-and-ci-a6.json)。
+
+新Process两lane各满2h自然EOF/exit0，720帧、每路3164466字节及最终hash/尾部/120次stdin阶段检查成立，已进入原Supervision第二相位；完整4h尚未结束。PTY实际满7200000.237ms、120应答/24控制检查、输出16559字节、真实stdin EOF8780字节及target exit23均经过，但暂停custodian后的Unknown恢复占位失败，原exit1保留，不称两小时整体验收通过。唯一有限定位先实际观察creator无controller，才暂停并复现同一恢复失败，按用户要求只记上述P2。两次实验各七个记录PID及FD均不存在，own stale socket/scope保全后清理，terminal absent如实保留。原失败、定位、源码与逐项字节审计见[归档核验](../../evidence/module-construction-20261021/resume/pty-archive-audit.json)；不继续trace或长跑矩阵。
+
+### 本批流程验收收尾
+
+2026-10-21T06:04:45Z，新的Process/Supervision四小时实验完成，协调进程、Node22和Bun两lane均真实exit0。Node两阶段分别7200149.249ms和7200303.361ms，Bun分别7200156.182ms和7200217.224ms；各阶段720帧。每lane实际输出12657899字节：Process的stdout/stderr各3164466，Supervision分别3164484/3164483。原harness的实际流hash、字节数、UTF8尾部、stdin EOF、目标自然exit0及监管目标exit23、后代仍活时Draining、TERM后等待超时、KILL后真实Closed和Wait0均通过。两独立keeper分别14400052.661ms、14400037.571ms且exitWon=false，旧取消实验不计入时长。
+
+MF-03B转REVIEW仅对应上述实际组合；PTY暂停恢复占位仍为P2、原整体失败保留，不能据此关闭整个PTY或历史GAP。摘要字段区分实际流经过原harness断言与事后按保留frames重算的期望值，不冒称另一次采集。固定源码、逐阶段收据、资源回收与原始日志见[本轮收尾证据](../../evidence/module-construction-20261021/resume/README.md)。生产源码和库未再修改；后续只做归档输入的正常构建、必要验收和发布。扣除暂停后，累计施工已超过原五小时要求；按用户流程优先指示在本节点收尾，不追加边缘修复。
+
+最终独立ps/lsof核对：13个记录PID及其FD均不存在，两条lane的原生scope/pipe临时目录均不存在；Bun自身cache不冒充进程泄漏。125项实验固定文件共4584598字节已逐项核对原字节和SHA256后归档，不含包、node_modules或生成dist。原运行目录三个stash和新增用户未跟踪文档原样保留，未部署。

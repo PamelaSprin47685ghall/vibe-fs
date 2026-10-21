@@ -1,0 +1,7 @@
+{"at":"2026-10-21T02:04:44.931Z","elapsedMs":35.243457999999976,"event":"phase-started","name":"process","target":61141,"supervised":false}
+{"at":"2026-10-21T02:04:46.998Z","elapsedMs":2102.8911660000003,"event":"physical-backpressure-observed","name":"process","pausedMs":2000,"burstBytesPerChannel":3145728}
+{"at":"2026-10-21T04:04:45.093Z","elapsedMs":7200156.182124999,"event":"phase-completed","name":"process","frames":720,"bytes":{"stdout":3164466,"stderr":3164466},"inputBytes":3850,"inputStages":120,"exit":{"code":0,"signal":null}}
+{"at":"2026-10-21T04:04:45.492Z","elapsedMs":7200589.426375,"event":"phase-started","name":"supervision","target":79884,"supervised":true}
+{"at":"2026-10-21T04:04:47.674Z","elapsedMs":7202771.57725,"event":"physical-backpressure-observed","name":"supervision","pausedMs":2000,"burstBytesPerChannel":3145728}
+{"at":"2026-10-21T06:04:45.108Z","elapsedMs":14400037.5705,"event":"owned-keeper-completed","exitWon":false}
+{"at":"2026-10-21T06:04:45.413Z","elapsedMs":7200217.223875,"event":"phase-completed","name":"supervision","frames":720,"bytes":{"stdout":3164484,"stderr":3164483},"inputBytes":4330,"inputStages":120,"exit":{"code":23,"signal":null}}

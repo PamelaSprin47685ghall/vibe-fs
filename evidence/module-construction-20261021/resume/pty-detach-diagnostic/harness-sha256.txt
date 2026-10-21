@@ -1,0 +1,3 @@
+bcbda87de1dad4f4ba5b627fa65128f79712d6c8cb085c2542ba948cf78e635a  /private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/controller.mjs
+2a95b4f41bf404e76a1f0d378531d54803cd9a8717dda7b60a0595f68dccb8dd  /private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/pty-soak.mjs
+eb16388897d0ced02b54537306f156da937b257986670b1635f9e5b47bf3ca9f  /private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/target.mjs

@@ -1,0 +1,63 @@
+{
+  "state": "Running; fresh restart, launch receipt only, no 120-minute acceptance yet",
+  "generation": 106,
+  "manifestSha256": "331e32dd1401edcedccef5f93dc5d2a03676b96267b6e06c1e2ccf1705df4d17",
+  "artifactReceipt": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/copied-artifact-receipt.json",
+  "artifacts": "833 byte-equal copied files: full gen106 dist, actual bun-pty 0.4.10 including native libraries, and actual installed wanxiangli 0.11.0 runtime outputs/resources/package.json. No symlinks or fallback into main. Gen106 build predates tracked pause evidence; no claim of aad HEAD build freshness.",
+  "consumer": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer",
+  "runtime": "Bun 1.3.14; independent Node22 controller",
+  "controllerPid": 61508,
+  "harnessPid": 61510,
+  "execSession": 77963,
+  "activeStartedAt": "2026-10-21T02:05:51.582Z",
+  "minimumRealActiveMilliseconds": 7200000,
+  "expectedActiveEnd": "2026-10-21T04:05:51.582Z",
+  "command": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-pty-soak-gen106-20261021-b/consumer/controller.mjs > /private/tmp/vibe-fs-pty-soak-gen106-20261021-b/runner.log 2>&1",
+  "publicEntry": "Copied gen106 Process Surface ptyRecoveryOpen/ptyRecoveryDrain, real public PTY scope and bun-pty",
+  "onePhysicalPty": {
+    "custodian": 61511,
+    "scopeOwner": 61521,
+    "target": 61523,
+    "anchor": 61524,
+    "scopeIncarnation": "9a1e9128-e1a8-4c81-9904-ed57a0d2cd96",
+    "extraDescendant": "Only at final EOF/cancellation phase; recorded before target exits"
+  },
+  "activeContract": {
+    "input": "A JSON line approximately each minute includes a UTF8 BOM, CJK, emoji and escaped CRLF in its value. Real target parses it and reports sequence, exact UTF8 byte length, SHA256 and base64. Every response is compared to an independently prepared expected line.",
+    "terminal": "Explicit canonical mode and Ctrl-D EOF, echo disabled, output CRLF expansion disabled. This experiment validates the onData text API and application-level input bytes; it does not invent a raw terminal byte API.",
+    "output": "Raw onData text callbacks preserved in output.jsonl; final complete received prefix hash checked independently. Expected total below 128 KiB.",
+    "control": "Every five minutes a separate invalid-secret recover attachment must explicitly reject due to the live creator connection and then close; it never takes the active reader.",
+    "sampling": "Every 30 seconds only known owned PID tree/PGID, RSS, cumulative CPU time and FD identifiers. No process command arguments or unrelated process data are logged.",
+    "meaning": "Responses, polls and samples are observations, not separately counted passing tests. Resource trends only cover this finite run."
+  },
+  "closingContract": [
+    "After at least 120 real minutes, send Ctrl-D on empty canonical input and require a target EOF witness with complete actual stdin digest",
+    "The target creates one same-group descendant, then exits 23; observe exact target-exit receipt while scope-ended/terminal remain absent and descendant lives",
+    "Dispose the creator, pause only the custodian with SIGSTOP, and require public recovery drain to reject in its own finite bound without a terminal outcome",
+    "Keep an independent 12-second SIGCONT timer around the pause; always resume in finally; external controller also has bounded SIGCONT/SIGKILL cleanup",
+    "After resuming and confirming the prior connection detached, public recovery performs TERM then KILL against the same physical scope; descendant TERM witness must exist",
+    "Require a verified HMAC terminal receipt for the exact key/incarnation, Ended with original target exit 23 and stopped=true",
+    "Require all recorded custodian/scope/anchor/target/descendant PIDs not live and control endpoint removed"
+  ],
+  "failurePolicy": "Any observed failure aborts the experiment, resumes a paused custodian, attempts public cleanup then SIGCONT/SIGKILL for all recorded owned PIDs, and retains all logs. External controller kills at 120 minutes plus 2 minutes, with final forced stop after another 30 seconds.",
+  "status": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/status.json",
+  "controllerStatus": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/controller-exit.json",
+  "statusCadence": "30-second sampling plus each request and phase; controller-exit.json is the authoritative outer process result if an uncaught harness error prevents a final status save",
+  "notClaimed": [
+    "Universal absence of resource leaks",
+    "PTY output as a new raw binary channel contract",
+    "Input acknowledgement as target consumption without matching the response/hash",
+    "A stop request, short wait or Unknown result as physical closure",
+    "A model, provider cache or complete cold-host business recovery proof",
+    "Any main source or dist modification"
+  ],
+  "cloneAndPreflightReceipt": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/preflight-receipt.json",
+  "previousRun": {
+    "root": "/private/tmp/vibe-fs-pty-soak-gen100-20261021",
+    "state": "Canceled by user; incomplete, zero completed phases; not resumed or added to this clock."
+  },
+  "firstSetupAttempt": {
+    "root": "/private/tmp/vibe-fs-pty-soak-gen106-20261021",
+    "state": "Failed before owner creation: physical cwd absent; 0 requests, ownedPids empty. Original logs retained. This second directory was prepared before launch."
+  }
+}

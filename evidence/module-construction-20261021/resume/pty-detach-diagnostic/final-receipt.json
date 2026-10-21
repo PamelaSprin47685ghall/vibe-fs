@@ -1,0 +1,265 @@
+{
+  "kind": "One finite boundary diagnostic, not a replacement for the original failed two-hour endurance experiment",
+  "at": "2026-10-21T04:12:41.257Z",
+  "state": "Failed, exit1; classified P2 and deferred by root per user workflow priority",
+  "originalFailure": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/final-receipt.json",
+  "fixedProductionArtifacts": {
+    "generation": 106,
+    "rawEqualFiles": 833,
+    "modified": false
+  },
+  "elapsedMs": 23081.359999999997,
+  "activeMs": 1026.5730409999999,
+  "firstDetachObservation": {
+    "at": "2026-10-21T04:11:08.746Z",
+    "elapsedMs": 2939.920209,
+    "event": "creator-detach-observation",
+    "reason": "PTY owner credentials do not match",
+    "observation": 1,
+    "elapsedSince100msWait": 0.6382499999999709
+  },
+  "creatorDetach": {
+    "observations": 1,
+    "elapsedSince100msWait": 1.102458000000297
+  },
+  "eof": {
+    "pid": 82413,
+    "descendant": 82432,
+    "count": 2,
+    "inputHash": "da1e9073d25f3daea67c317d633538346adc374683bdc1428622a54a10ac7a4c",
+    "at": "2026-10-21T04:11:08.618Z"
+  },
+  "targetExit": {
+    "incarnation": "566f3b8b-cb36-415a-8378-98f59d58b637",
+    "code": 23,
+    "signal": null
+  },
+  "actualOutput": {
+    "bytes": 379,
+    "sha256": "fe1f5a07d3b9e8e1c72fae7eb1eb37f0fa758c600a187afc495b4181a6ac9d41"
+  },
+  "unknown": {
+    "reason": "PTY owner startup acknowledgement timed out",
+    "elapsedMs": 5020.402,
+    "terminalAbsent": true
+  },
+  "failure": {
+    "message": "HARNESS_BOUND: Stale recovery controller detach",
+    "stack": "Error: HARNESS_BOUND: Stale recovery controller detach\n    at <anonymous> (/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/pty-soak.mjs:66:9)\n    at processTicksAndRejections (native:7:39)"
+  },
+  "rootDecision": "Record P2 and do not fix, trace, retry or expand the matrix in this batch.",
+  "conclusion": "A real credentials-mismatch response established that ordinary creator detach had completed before the custodian was stopped. This same failed scenario therefore narrows to a timed-out recover attachment/control ownership cleanup boundary after pause/resume. It neither identifies a particular socket event nor assigns responsibility to Bun, and does not establish that ordinary recovery always fails.",
+  "cleanup": {
+    "at": "2026-10-21T04:11:54.797Z",
+    "outcome": "Failed original PTY endurance experiment; owned cleanup verified, no retry",
+    "originalState": "Failed",
+    "originalError": {
+      "message": "HARNESS_BOUND: Stale recovery controller detach",
+      "stack": "Error: HARNESS_BOUND: Stale recovery controller detach\n    at <anonymous> (/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/pty-soak.mjs:66:9)\n    at processTicksAndRejections (native:7:39)"
+    },
+    "originalExit": {
+      "code": 1,
+      "signal": null,
+      "at": "2026-10-21T04:11:28.891Z"
+    },
+    "ownedPids": [
+      82401,
+      82403,
+      82404,
+      82412,
+      82413,
+      82414,
+      82432
+    ],
+    "ps": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "lsof": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "allRecordedPidsAbsent": true,
+    "allRecordedPidFdsAbsent": true,
+    "scope": {
+      "original": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/tmp/wanxiangshu-pty-cRdtUJ",
+      "removed": true,
+      "preserved": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/retained-scope-before-cleanup",
+      "files": [
+        {
+          "name": "anchor-1649b54c-993d-4104-953a-e6075468d303",
+          "bytes": 164,
+          "sha256": "7265c2cd96b8f32cc4034b6eb27ae18e62c8471f8aa2a07528a7705cd804c278"
+        },
+        {
+          "name": "execute",
+          "bytes": 2,
+          "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+        },
+        {
+          "name": "request",
+          "bytes": 326,
+          "sha256": "dc30f3d6aaa2f3b51e2b8a39dda619c7ae63796ee94c27df36cfe1f4cc0eec94"
+        },
+        {
+          "name": "started",
+          "bytes": 83,
+          "sha256": "dec594d3b23c8f8bcd6337287435971b42b18c5dd2c23fb1c7c698a536fb8927"
+        },
+        {
+          "name": "target-exit",
+          "bytes": 78,
+          "sha256": "d897fb70db160be7b0ec0781aebffab8936ef67a10f95ec17173e3e1a6c8884b"
+        },
+        {
+          "name": "target-ready",
+          "bytes": 66,
+          "sha256": "4fa58ced7fbc7d2a9e05d9a9ab831e24a5191fca791f0e28e89b6cbc8b2fed57"
+        }
+      ]
+    },
+    "controlEndpoint": {
+      "path": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/tmp/wxs-pty-ssPmUd/control",
+      "staleSocketAfterForcedKill": true,
+      "removed": true,
+      "parentRemoved": true
+    },
+    "terminalReceiptExists": false,
+    "retainedDurableRecoveryFiles": [
+      "available",
+      "claim",
+      "request"
+    ],
+    "remainingTmp": [
+      "bun"
+    ],
+    "limits": "No terminal close proof was obtained. Absence of owned processes is independently verified after fallback signals, not inferred from a stop request. Durable files and Bun cache retained as evidence."
+  },
+  "launch": {
+    "kind": "One authorized finite detach-precondition diagnostic; not a new two-hour run or matrix",
+    "at": "2026-10-21T04:11:03.260Z",
+    "fixedGeneration": 106,
+    "consumerFilesRawEqualToOriginal": 833,
+    "sourceReceipt": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/copied-artifact-receipt.json",
+    "productionBytesModified": false,
+    "originalFailureUnchanged": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b",
+    "minimumActiveMs": 1000,
+    "maximumEnvelopeMs": 90000,
+    "controllerCancelAtMs": 60000,
+    "controllerForceAtMs": 80000,
+    "addedPrecondition": "After creator.dispose and the original 100ms delay, require the original invalid-secret attach to observe credentials mismatch within 3 seconds before SIGSTOP. Record first and subsequent refusal. If not observed, fail and clean all owned resources; no retry.",
+    "keptAssertions": [
+      "real EOF and target exit23",
+      "descendant retained scope",
+      "5-second startup Unknown with terminal absent",
+      "independent 12-second SIGCONT fallback",
+      "CONT and stale recovery detach",
+      "final TERM/KILL drain",
+      "HMAC/exact exit/owned native cleanup",
+      "live-controller refusal"
+    ],
+    "completeHarnessSources": [
+      {
+        "path": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/controller.mjs",
+        "sha256": "bcbda87de1dad4f4ba5b627fa65128f79712d6c8cb085c2542ba948cf78e635a"
+      },
+      {
+        "path": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/pty-soak.mjs",
+        "sha256": "2a95b4f41bf404e76a1f0d378531d54803cd9a8717dda7b60a0595f68dccb8dd"
+      },
+      {
+        "path": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/target.mjs",
+        "sha256": "eb16388897d0ced02b54537306f156da937b257986670b1635f9e5b47bf3ca9f"
+      }
+    ],
+    "command": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/controller.mjs > /private/tmp/vibe-fs-pty-detach-diagnostic-20261021/runner.log 2>&1"
+  },
+  "artifacts": {
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/launch.json": {
+      "bytes": 2002,
+      "sha256": "7cdc1bb77d5940b6d2fd170a1bc18807df2655d1de5730abc40ec4f1500a6284"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/harness-sha256.txt": {
+      "bytes": 420,
+      "sha256": "a86e093f188f85651b4eade8623dd233f4caf198021a809cd19683c59bda7c8d"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/preflight.log": {
+      "bytes": 2002,
+      "sha256": "7cdc1bb77d5940b6d2fd170a1bc18807df2655d1de5730abc40ec4f1500a6284"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/controller.json": {
+      "bytes": 71,
+      "sha256": "c1347244203cf860b532151ea90fe91e8e238103ccfa5abbbcfe82ed1dba7651"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/status.json": {
+      "bytes": 1385,
+      "sha256": "b6493c4e39ebdc5ca8225d1e6c6804ab2d305fa502cbfc6b0e1c6ca80fca6c35"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/controller-exit.json": {
+      "bytes": 56,
+      "sha256": "ac3847b7436c356c8b7d65f792f4ac8d8b0c13631556e04dc57174fd79c193fd"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/events.jsonl": {
+      "bytes": 2110,
+      "sha256": "f6686c1334c4d2a8fa1dd0f6525bdf782e1d762ce0c3306b938ab3e9f0249493"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/resources.jsonl": {
+      "bytes": 925,
+      "sha256": "e20b5715525c980000ba88f6d13421ac39cda5fa48f69dce381d993e40094b55"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/output.jsonl": {
+      "bytes": 609,
+      "sha256": "2378ac985fd062045c48fd5a0f81229ab9301bb8ee56ecd0c22e77955f705c6b"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/runner.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/physical/target-input.jsonl": {
+      "bytes": 200,
+      "sha256": "23f4a2a66fdebbae1e7dcc85bf8a7c35296d15a146f62812cca54bad6c66044f"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/physical/target-eof.json": {
+      "bytes": 153,
+      "sha256": "647d605c42cb28bb6542d7f086158c52b379e12a5b666b5ff82385fb98e68642"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/observed-target-exit.json": {
+      "bytes": 78,
+      "sha256": "d897fb70db160be7b0ec0781aebffab8936ef67a10f95ec17173e3e1a6c8884b"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/cleanup-receipt.json": {
+      "bytes": 2655,
+      "sha256": "5930a3df8bd8d77639933c0280644e92cb54fbc93c2de0256201df82dcf8f9dd"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/cleanup.log": {
+      "bytes": 2655,
+      "sha256": "5930a3df8bd8d77639933c0280644e92cb54fbc93c2de0256201df82dcf8f9dd"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/controller.mjs": {
+      "bytes": 1509,
+      "sha256": "bcbda87de1dad4f4ba5b627fa65128f79712d6c8cb085c2542ba948cf78e635a"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/pty-soak.mjs": {
+      "bytes": 15124,
+      "sha256": "2a95b4f41bf404e76a1f0d378531d54803cd9a8717dda7b60a0595f68dccb8dd"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/target.mjs": {
+      "bytes": 2340,
+      "sha256": "eb16388897d0ced02b54537306f156da937b257986670b1635f9e5b47bf3ca9f"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/package.json": {
+      "bytes": 71,
+      "sha256": "7dcf0487539a29f2bd1833d5aa25d5fdc44d6718a9b46f98ca114331e0e8b2a8"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/copied-artifact-receipt.json": {
+      "bytes": 150653,
+      "sha256": "832bf37ddbf6eced82928498a558637447ed712b37f1a6ec4753bbb4d0464580"
+    },
+    "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/gen106-build-manifest.json": {
+      "bytes": 871941,
+      "sha256": "331e32dd1401edcedccef5f93dc5d2a03676b96267b6e06c1e2ccf1705df4d17"
+    }
+  }
+}

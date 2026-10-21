@@ -1,0 +1,88 @@
+{
+  "at": "2026-10-21T04:11:54.797Z",
+  "outcome": "Failed original PTY endurance experiment; owned cleanup verified, no retry",
+  "originalState": "Failed",
+  "originalError": {
+    "message": "HARNESS_BOUND: Stale recovery controller detach",
+    "stack": "Error: HARNESS_BOUND: Stale recovery controller detach\n    at <anonymous> (/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/pty-soak.mjs:66:9)\n    at processTicksAndRejections (native:7:39)"
+  },
+  "originalExit": {
+    "code": 1,
+    "signal": null,
+    "at": "2026-10-21T04:11:28.891Z"
+  },
+  "ownedPids": [
+    82401,
+    82403,
+    82404,
+    82412,
+    82413,
+    82414,
+    82432
+  ],
+  "ps": {
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  "lsof": {
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  "allRecordedPidsAbsent": true,
+  "allRecordedPidFdsAbsent": true,
+  "scope": {
+    "original": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/tmp/wanxiangshu-pty-cRdtUJ",
+    "removed": true,
+    "preserved": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/retained-scope-before-cleanup",
+    "files": [
+      {
+        "name": "anchor-1649b54c-993d-4104-953a-e6075468d303",
+        "bytes": 164,
+        "sha256": "7265c2cd96b8f32cc4034b6eb27ae18e62c8471f8aa2a07528a7705cd804c278"
+      },
+      {
+        "name": "execute",
+        "bytes": 2,
+        "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+      },
+      {
+        "name": "request",
+        "bytes": 326,
+        "sha256": "dc30f3d6aaa2f3b51e2b8a39dda619c7ae63796ee94c27df36cfe1f4cc0eec94"
+      },
+      {
+        "name": "started",
+        "bytes": 83,
+        "sha256": "dec594d3b23c8f8bcd6337287435971b42b18c5dd2c23fb1c7c698a536fb8927"
+      },
+      {
+        "name": "target-exit",
+        "bytes": 78,
+        "sha256": "d897fb70db160be7b0ec0781aebffab8936ef67a10f95ec17173e3e1a6c8884b"
+      },
+      {
+        "name": "target-ready",
+        "bytes": 66,
+        "sha256": "4fa58ced7fbc7d2a9e05d9a9ab831e24a5191fca791f0e28e89b6cbc8b2fed57"
+      }
+    ]
+  },
+  "controlEndpoint": {
+    "path": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/tmp/wxs-pty-ssPmUd/control",
+    "staleSocketAfterForcedKill": true,
+    "removed": true,
+    "parentRemoved": true
+  },
+  "terminalReceiptExists": false,
+  "retainedDurableRecoveryFiles": [
+    "available",
+    "claim",
+    "request"
+  ],
+  "remainingTmp": [
+    "bun"
+  ],
+  "limits": "No terminal close proof was obtained. Absence of owned processes is independently verified after fallback signals, not inferred from a stop request. Durable files and Bun cache retained as evidence."
+}

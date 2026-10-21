@@ -1,0 +1,10 @@
+{"at":"2026-10-21T04:11:05.808Z","elapsedMs":2.1131670000000042,"event":"artifacts-selected","manifest":"../gen106-build-manifest.json","runtime":"1.3.14","installedBunPty":"file:///private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/node_modules/bun-pty/src/index.ts","installedProcess":"file:///private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/node_modules/wanxiangli/dist/process/ProcessSession.js"}
+{"at":"2026-10-21T04:11:07.562Z","elapsedMs":1756.4907500000002,"event":"long-pty-started","minimumRealMs":1000,"ownedPids":[82404,82412,82413,82414]}
+{"at":"2026-10-21T04:11:08.589Z","elapsedMs":2783.09225,"event":"long-pty-interval-ended","requests":2,"activeElapsedMs":1026.5730409999999}
+{"at":"2026-10-21T04:11:08.644Z","elapsedMs":2837.631417,"event":"target-exited-scope-retained","targetExit":{"incarnation":"566f3b8b-cb36-415a-8378-98f59d58b637","code":23,"signal":null},"descendant":82432}
+{"at":"2026-10-21T04:11:08.644Z","elapsedMs":2838.141334,"event":"creator-detached-fault","reason":"PTY owner connection was lost"}
+{"at":"2026-10-21T04:11:08.746Z","elapsedMs":2939.920209,"event":"creator-detach-observation","reason":"PTY owner credentials do not match","observation":1,"elapsedSince100msWait":0.6382499999999709}
+{"at":"2026-10-21T04:11:08.746Z","elapsedMs":2940.383625,"event":"creator-detach-confirmed-before-pause","observations":1,"elapsedSince100msWait":1.102458000000297}
+{"at":"2026-10-21T04:11:13.767Z","elapsedMs":5020.402,"event":"paused-custodian-recovery-remained-unknown","reason":"PTY owner startup acknowledgement timed out","terminalAbsent":true}
+{"at":"2026-10-21T04:11:28.777Z","elapsedMs":22970.764375,"event":"failed","message":"HARNESS_BOUND: Stale recovery controller detach","stack":"Error: HARNESS_BOUND: Stale recovery controller detach\n    at <anonymous> (/private/tmp/vibe-fs-pty-detach-diagnostic-20261021/consumer/pty-soak.mjs:66:9)\n    at processTicksAndRejections (native:7:39)"}
+{"at":"2026-10-21T04:11:28.873Z","elapsedMs":23067.034249999997,"event":"cleanup-recovery-error","message":"PTY owner still has a live control connection"}

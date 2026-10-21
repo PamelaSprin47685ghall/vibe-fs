@@ -1,0 +1,63 @@
+{
+  "at": "2026-10-21T04:14:55.941216+00:00",
+  "archives": [
+    {
+      "original": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b",
+      "archive": "pty-2h",
+      "verified": [
+        "pty-2h/launch.json",
+        "pty-2h/preflight-receipt.json",
+        "pty-2h/copied-artifact-receipt.json",
+        "pty-2h/gen106-build-manifest.json",
+        "pty-2h/harness-sha256.txt",
+        "pty-2h/consumer/controller.mjs",
+        "pty-2h/consumer/pty-soak.mjs",
+        "pty-2h/consumer/target.mjs",
+        "pty-2h/consumer/package.json",
+        "pty-2h/status.json",
+        "pty-2h/controller.json",
+        "pty-2h/controller-exit.json",
+        "pty-2h/runner.log",
+        "pty-2h/events.jsonl",
+        "pty-2h/resources.jsonl",
+        "pty-2h/output.jsonl",
+        "pty-2h/physical/target-input.jsonl",
+        "pty-2h/physical/target-eof.json",
+        "pty-2h/observed-target-exit.json",
+        "pty-2h/cleanup-receipt.json",
+        "pty-2h/cleanup.log"
+      ],
+      "receiptSha256": "aa9411766f8ab7e59238ce31ade1299058933d8755bde09b417fa4563a2771e9"
+    },
+    {
+      "original": "/private/tmp/vibe-fs-pty-detach-diagnostic-20261021",
+      "archive": "pty-detach-diagnostic",
+      "verified": [
+        "pty-detach-diagnostic/launch.json",
+        "pty-detach-diagnostic/harness-sha256.txt",
+        "pty-detach-diagnostic/preflight.log",
+        "pty-detach-diagnostic/controller.json",
+        "pty-detach-diagnostic/status.json",
+        "pty-detach-diagnostic/controller-exit.json",
+        "pty-detach-diagnostic/events.jsonl",
+        "pty-detach-diagnostic/resources.jsonl",
+        "pty-detach-diagnostic/output.jsonl",
+        "pty-detach-diagnostic/runner.log",
+        "pty-detach-diagnostic/physical/target-input.jsonl",
+        "pty-detach-diagnostic/physical/target-eof.json",
+        "pty-detach-diagnostic/observed-target-exit.json",
+        "pty-detach-diagnostic/cleanup-receipt.json",
+        "pty-detach-diagnostic/cleanup.log",
+        "pty-detach-diagnostic/consumer/controller.mjs",
+        "pty-detach-diagnostic/consumer/pty-soak.mjs",
+        "pty-detach-diagnostic/consumer/target.mjs",
+        "pty-detach-diagnostic/consumer/package.json",
+        "pty-detach-diagnostic/copied-artifact-receipt.json",
+        "pty-detach-diagnostic/gen106-build-manifest.json"
+      ],
+      "receiptSha256": "577c6b0c8b4b93478433eb3617aea281a5340ca5982a5a64951953a36e862b45"
+    }
+  ],
+  "setupFailure": "Pre-start cwd failure has no harness-sha256.txt; three original mjs sources and available metadata/logs preserved in pty-setup-failed. No missing pre-start manifest is invented.",
+  "bounds": "Only fixed harness source, declared metadata and final logs archived; not a complete833-file runtime distribution. Retired per-test control material applies only to now-removed owned endpoints."
+}

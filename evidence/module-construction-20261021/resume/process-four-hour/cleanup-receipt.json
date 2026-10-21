@@ -1,0 +1,33 @@
+{
+  "at": "2026-10-21T06:07:43.402Z",
+  "ownedPids": [
+    61126,
+    61128,
+    61133,
+    61134,
+    79879,
+    79867,
+    4823,
+    61129,
+    61139,
+    61141,
+    79884,
+    79873,
+    4825
+  ],
+  "ps": {
+    "command": "/bin/ps -p <only recorded owned PIDs> -o pid=,ppid=,pgid=,rss=,stat=,comm=",
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  "lsof": {
+    "exitCode": 1,
+    "stdout": "",
+    "stderr": ""
+  },
+  "allRecordedPidsAbsent": true,
+  "allRecordedPidFdsAbsent": true,
+  "ownNativeScopeAndPipeDirectoriesAbsent": true,
+  "remainingBunCache": "Only own Bun cache may remain; all logs and witnesses retained."
+}

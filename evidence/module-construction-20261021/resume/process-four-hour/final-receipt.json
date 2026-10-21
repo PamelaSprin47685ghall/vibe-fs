@@ -1,0 +1,690 @@
+{
+  "state": "Passed finite four-hour Node22 and Bun Process/Supervision experiments",
+  "at": "2026-10-21T06:07:43.407Z",
+  "startedAt": "2026-10-21T02:04:44.678Z",
+  "endedAt": "2026-10-21T06:04:45.450Z",
+  "sourceCommit": "45849f51778f6a12dcafbc12ce1c8c7f7f65502b",
+  "packageInputFingerprint": {
+    "version": "0.11.0",
+    "path": "/private/tmp/vibe-fs-routing-public-pack/wanxiangli-0.11.0.tgz",
+    "sha256": "687cf81f702a2f229f7924442b9c454d9a96576e61a3ccd819323e0e716d3b93",
+    "packageAndNodeModulesExcludedFromArchiveList": true
+  },
+  "runtimes": {
+    "node22": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node v22.13.0",
+    "bun": "/opt/homebrew/bin/bun 1.3.14"
+  },
+  "originalCommand": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-physical-soak-20261021-b/consumer/coordinator.mjs > /private/tmp/vibe-fs-physical-soak-20261021-b/coordinator.log 2>&1",
+  "actualCoordinatorAndLaneExitCodes": [
+    {
+      "lane": "node22",
+      "code": 0,
+      "signal": null
+    },
+    {
+      "lane": "bun",
+      "code": 0,
+      "signal": null
+    }
+  ],
+  "actualCoordinatorExecExitCode": 0,
+  "lanes": {
+    "node22": {
+      "totalElapsedMs": 14400552.629916,
+      "actualObservedOutputBytes": 12657899,
+      "phases": [
+        {
+          "name": "process",
+          "elapsedMs": 7200149.248833,
+          "actualObserved": {
+            "bytes": {
+              "stdout": 3164466,
+              "stderr": 3164466
+            },
+            "frames": 720,
+            "inputStages": 120,
+            "exit": {
+              "code": 0,
+              "signal": null
+            },
+            "eofWitness": {
+              "frames": 720,
+              "inputBytes": 4210,
+              "inputHash": "c68c1b5ef70712ae1724f580b8de32b7c01354d5462d3a281800039633555ffd",
+              "descendant": null
+            }
+          },
+          "actualStreamAssertionsPassedInOriginalHarness": {
+            "contiguousChannelOffsets": true,
+            "maximumChunkBytes": 65536,
+            "streamShaEqualsExpected": true,
+            "exact4096ByteTail": true,
+            "validUtf8SuffixText": true,
+            "closedWithNoCaptureFailure": true,
+            "nativeTargetGone": true,
+            "waitRegistryEmpty": true,
+            "source": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+            "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5",
+            "lineAnchors": {
+              "actualEofAndInputDigest": 166,
+              "actualStreamSha": 189,
+              "actualTail": 190,
+              "actualPhysicalClosed": 181,
+              "nativeGone": 194,
+              "waitRegistryEmpty": 200
+            }
+          },
+          "postHocRecomputedExpectedOutput": {
+            "stdout": {
+              "bytes": 3164466,
+              "sha256": "340b1ff59d83136ed91c20b0392288628474d05eb4c438c5ce8b95801e502438"
+            },
+            "stderr": {
+              "bytes": 3164466,
+              "sha256": "57825f8be72f113bde5f2e2cefb71d52cf047460c317630cee08e07fce5fb1d1"
+            }
+          },
+          "digestProvenance": "Expected hashes above were recomputed offline from retained witness.frames and fixed payload code. The original runtime compared each actual stream hash to its expected hash before writing phase-completed. No second capture or separately persisted original output digest is claimed.",
+          "backpressure": {
+            "at": "2026-10-21T02:04:46.925Z",
+            "elapsedMs": 2178.080208,
+            "event": "physical-backpressure-observed",
+            "name": "process",
+            "pausedMs": 2000,
+            "burstBytesPerChannel": 3145728
+          },
+          "supervisedClosure": null
+        },
+        {
+          "name": "supervision",
+          "elapsedMs": 7200303.361375,
+          "actualObserved": {
+            "bytes": {
+              "stdout": 3164484,
+              "stderr": 3164483
+            },
+            "frames": 720,
+            "inputStages": 121,
+            "exit": {
+              "code": 23,
+              "signal": null
+            },
+            "eofWitness": {
+              "frames": 720,
+              "inputBytes": 4730,
+              "inputHash": "b73dcd36caf97eef87add3be31e95c96987d94786dcc5ed578a884aa99621aba",
+              "descendant": 4823
+            }
+          },
+          "actualStreamAssertionsPassedInOriginalHarness": {
+            "contiguousChannelOffsets": true,
+            "maximumChunkBytes": 65536,
+            "streamShaEqualsExpected": true,
+            "exact4096ByteTail": true,
+            "validUtf8SuffixText": true,
+            "closedWithNoCaptureFailure": true,
+            "nativeTargetGone": true,
+            "waitRegistryEmpty": true,
+            "source": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+            "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5",
+            "lineAnchors": {
+              "actualEofAndInputDigest": 166,
+              "actualStreamSha": 189,
+              "actualTail": 190,
+              "actualPhysicalClosed": 181,
+              "nativeGone": 194,
+              "waitRegistryEmpty": 200
+            }
+          },
+          "postHocRecomputedExpectedOutput": {
+            "stdout": {
+              "bytes": 3164484,
+              "sha256": "6407386964c2ab21c63f1a917eeb802308bd70eb0f11124400871163b6b88a5b"
+            },
+            "stderr": {
+              "bytes": 3164483,
+              "sha256": "c876364eaf88582686b9e844f40d7beba91f49552bc3c880816675ff5d673468"
+            }
+          },
+          "digestProvenance": "Expected hashes above were recomputed offline from retained witness.frames and fixed payload code. The original runtime compared each actual stream hash to its expected hash before writing phase-completed. No second capture or separately persisted original output digest is claimed.",
+          "backpressure": {
+            "at": "2026-10-21T04:04:47.512Z",
+            "elapsedMs": 7202757.597208,
+            "event": "physical-backpressure-observed",
+            "name": "supervision",
+            "pausedMs": 2000,
+            "burstBytesPerChannel": 3145728
+          },
+          "supervisedClosure": {
+            "sourceAssertionsAtLines": [
+              172,
+              173,
+              174,
+              175,
+              176,
+              177,
+              178,
+              179,
+              195,
+              196,
+              197,
+              198
+            ],
+            "preservedTargetExit": {
+              "code": 23,
+              "signal": null
+            },
+            "termWitness": "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/supervision/term-seen",
+            "descendant": 4823,
+            "meaning": "Real target exit23 while descendant holds pipes; Draining with supervisor alive; TERM witnessed and 25ms wait TimedOut; group KILL; Closed capture; descendant and supervisor absent."
+          }
+        }
+      ],
+      "actualOwnedKeeperReceipt": {
+        "exitWon": false,
+        "elapsedMs": 14400052.660708
+      },
+      "exitCode": 0,
+      "activeWaitsAtEnd": 0,
+      "remainingTmp": [],
+      "resourceSummary": {
+        "samples": 481,
+        "firstAt": "2026-10-21T02:04:44.778Z",
+        "lastAt": "2026-10-21T06:04:45.399Z",
+        "harnessRssBytes": {
+          "min": 12369920,
+          "max": 50954240,
+          "last": 40124416
+        },
+        "ownProcessSamples": {
+          "61128": {
+            "samples": 481,
+            "firstAt": "2026-10-21T02:04:44.778Z",
+            "maxRssKiB": 49744,
+            "minNumericFds": 23,
+            "maxNumericFds": 29,
+            "maxObservedCpuSeconds": 141.89,
+            "lastAt": "2026-10-21T06:04:45.399Z",
+            "lastObservedState": "S"
+          },
+          "61133": {
+            "samples": 479,
+            "firstAt": "2026-10-21T02:05:14.852Z",
+            "maxRssKiB": 37264,
+            "minNumericFds": 14,
+            "maxNumericFds": 14,
+            "maxObservedCpuSeconds": 0.1,
+            "lastAt": "2026-10-21T06:04:15.877Z",
+            "lastObservedState": "Ss"
+          },
+          "61134": {
+            "samples": 239,
+            "firstAt": "2026-10-21T02:05:14.852Z",
+            "maxRssKiB": 40928,
+            "minNumericFds": 15,
+            "maxNumericFds": 15,
+            "maxObservedCpuSeconds": 1.15,
+            "lastAt": "2026-10-21T04:04:15.641Z",
+            "lastObservedState": "Ss"
+          },
+          "79867": {
+            "samples": 240,
+            "firstAt": "2026-10-21T04:04:45.823Z",
+            "maxRssKiB": 43936,
+            "minNumericFds": 20,
+            "maxNumericFds": 20,
+            "maxObservedCpuSeconds": 1.13,
+            "lastAt": "2026-10-21T06:04:15.877Z",
+            "lastObservedState": "Ss"
+          },
+          "79879": {
+            "samples": 240,
+            "firstAt": "2026-10-21T04:04:45.823Z",
+            "maxRssKiB": 54800,
+            "minNumericFds": 15,
+            "maxNumericFds": 15,
+            "maxObservedCpuSeconds": 1.07,
+            "lastAt": "2026-10-21T06:04:15.877Z",
+            "lastObservedState": "S"
+          }
+        },
+        "limitation": "Only finite own-PID observations. Max sampled RSS/CPU and numeric FD counts are not universal leak guarantees or new production limits."
+      }
+    },
+    "bun": {
+      "totalElapsedMs": 14400440.8375,
+      "actualObservedOutputBytes": 12657899,
+      "phases": [
+        {
+          "name": "process",
+          "elapsedMs": 7200156.182124999,
+          "actualObserved": {
+            "bytes": {
+              "stdout": 3164466,
+              "stderr": 3164466
+            },
+            "frames": 720,
+            "inputStages": 120,
+            "exit": {
+              "code": 0,
+              "signal": null
+            },
+            "eofWitness": {
+              "frames": 720,
+              "inputBytes": 3850,
+              "inputHash": "a4f85589289dbfe822216d2a0c0f48bc89a77984fab7d7c117d68004e5f8ac55",
+              "descendant": null
+            }
+          },
+          "actualStreamAssertionsPassedInOriginalHarness": {
+            "contiguousChannelOffsets": true,
+            "maximumChunkBytes": 65536,
+            "streamShaEqualsExpected": true,
+            "exact4096ByteTail": true,
+            "validUtf8SuffixText": true,
+            "closedWithNoCaptureFailure": true,
+            "nativeTargetGone": true,
+            "waitRegistryEmpty": true,
+            "source": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+            "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5",
+            "lineAnchors": {
+              "actualEofAndInputDigest": 166,
+              "actualStreamSha": 189,
+              "actualTail": 190,
+              "actualPhysicalClosed": 181,
+              "nativeGone": 194,
+              "waitRegistryEmpty": 200
+            }
+          },
+          "postHocRecomputedExpectedOutput": {
+            "stdout": {
+              "bytes": 3164466,
+              "sha256": "340b1ff59d83136ed91c20b0392288628474d05eb4c438c5ce8b95801e502438"
+            },
+            "stderr": {
+              "bytes": 3164466,
+              "sha256": "57825f8be72f113bde5f2e2cefb71d52cf047460c317630cee08e07fce5fb1d1"
+            }
+          },
+          "digestProvenance": "Expected hashes above were recomputed offline from retained witness.frames and fixed payload code. The original runtime compared each actual stream hash to its expected hash before writing phase-completed. No second capture or separately persisted original output digest is claimed.",
+          "backpressure": {
+            "at": "2026-10-21T02:04:46.998Z",
+            "elapsedMs": 2102.8911660000003,
+            "event": "physical-backpressure-observed",
+            "name": "process",
+            "pausedMs": 2000,
+            "burstBytesPerChannel": 3145728
+          },
+          "supervisedClosure": null
+        },
+        {
+          "name": "supervision",
+          "elapsedMs": 7200217.223875,
+          "actualObserved": {
+            "bytes": {
+              "stdout": 3164484,
+              "stderr": 3164483
+            },
+            "frames": 720,
+            "inputStages": 120,
+            "exit": {
+              "code": 23,
+              "signal": null
+            },
+            "eofWitness": {
+              "frames": 720,
+              "inputBytes": 4330,
+              "inputHash": "dd44f70cb2fb8ac879524d1ded755e30d077194588dd2415f61dd4301a3bfa40",
+              "descendant": 4825
+            }
+          },
+          "actualStreamAssertionsPassedInOriginalHarness": {
+            "contiguousChannelOffsets": true,
+            "maximumChunkBytes": 65536,
+            "streamShaEqualsExpected": true,
+            "exact4096ByteTail": true,
+            "validUtf8SuffixText": true,
+            "closedWithNoCaptureFailure": true,
+            "nativeTargetGone": true,
+            "waitRegistryEmpty": true,
+            "source": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+            "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5",
+            "lineAnchors": {
+              "actualEofAndInputDigest": 166,
+              "actualStreamSha": 189,
+              "actualTail": 190,
+              "actualPhysicalClosed": 181,
+              "nativeGone": 194,
+              "waitRegistryEmpty": 200
+            }
+          },
+          "postHocRecomputedExpectedOutput": {
+            "stdout": {
+              "bytes": 3164484,
+              "sha256": "6407386964c2ab21c63f1a917eeb802308bd70eb0f11124400871163b6b88a5b"
+            },
+            "stderr": {
+              "bytes": 3164483,
+              "sha256": "c876364eaf88582686b9e844f40d7beba91f49552bc3c880816675ff5d673468"
+            }
+          },
+          "digestProvenance": "Expected hashes above were recomputed offline from retained witness.frames and fixed payload code. The original runtime compared each actual stream hash to its expected hash before writing phase-completed. No second capture or separately persisted original output digest is claimed.",
+          "backpressure": {
+            "at": "2026-10-21T04:04:47.674Z",
+            "elapsedMs": 7202771.57725,
+            "event": "physical-backpressure-observed",
+            "name": "supervision",
+            "pausedMs": 2000,
+            "burstBytesPerChannel": 3145728
+          },
+          "supervisedClosure": {
+            "sourceAssertionsAtLines": [
+              172,
+              173,
+              174,
+              175,
+              176,
+              177,
+              178,
+              179,
+              195,
+              196,
+              197,
+              198
+            ],
+            "preservedTargetExit": {
+              "code": 23,
+              "signal": null
+            },
+            "termWitness": "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/supervision/term-seen",
+            "descendant": 4825,
+            "meaning": "Real target exit23 while descendant holds pipes; Draining with supervisor alive; TERM witnessed and 25ms wait TimedOut; group KILL; Closed capture; descendant and supervisor absent."
+          }
+        }
+      ],
+      "actualOwnedKeeperReceipt": {
+        "exitWon": false,
+        "elapsedMs": 14400037.5705
+      },
+      "exitCode": 0,
+      "activeWaitsAtEnd": 0,
+      "remainingTmp": [
+        "bun"
+      ],
+      "resourceSummary": {
+        "samples": 481,
+        "firstAt": "2026-10-21T02:04:44.919Z",
+        "lastAt": "2026-10-21T06:04:45.436Z",
+        "harnessRssBytes": {
+          "min": 19988480,
+          "max": 55066624,
+          "last": 46891008
+        },
+        "ownProcessSamples": {
+          "61129": {
+            "samples": 481,
+            "firstAt": "2026-10-21T02:04:44.919Z",
+            "maxRssKiB": 53504,
+            "minNumericFds": 9,
+            "maxNumericFds": 14,
+            "maxObservedCpuSeconds": 446.17,
+            "lastAt": "2026-10-21T06:04:45.436Z",
+            "lastObservedState": "S"
+          },
+          "61139": {
+            "samples": 479,
+            "firstAt": "2026-10-21T02:05:14.965Z",
+            "maxRssKiB": 30448,
+            "minNumericFds": 4,
+            "maxNumericFds": 4,
+            "maxObservedCpuSeconds": 2.39,
+            "lastAt": "2026-10-21T06:04:15.505Z",
+            "lastObservedState": "Ss"
+          },
+          "61141": {
+            "samples": 239,
+            "firstAt": "2026-10-21T02:05:14.965Z",
+            "maxRssKiB": 35664,
+            "minNumericFds": 6,
+            "maxNumericFds": 6,
+            "maxObservedCpuSeconds": 12.32,
+            "lastAt": "2026-10-21T04:04:15.295Z",
+            "lastObservedState": "Ss"
+          },
+          "79873": {
+            "samples": 239,
+            "firstAt": "2026-10-21T04:05:15.360Z",
+            "maxRssKiB": 22336,
+            "minNumericFds": 12,
+            "maxNumericFds": 12,
+            "maxObservedCpuSeconds": 138.66,
+            "lastAt": "2026-10-21T06:04:15.505Z",
+            "lastObservedState": "Ss"
+          },
+          "79884": {
+            "samples": 239,
+            "firstAt": "2026-10-21T04:05:15.360Z",
+            "maxRssKiB": 20608,
+            "minNumericFds": 6,
+            "maxNumericFds": 6,
+            "maxObservedCpuSeconds": 18.4,
+            "lastAt": "2026-10-21T06:04:15.505Z",
+            "lastObservedState": "S"
+          }
+        },
+        "limitation": "Only finite own-PID observations. Max sampled RSS/CPU and numeric FD counts are not universal leak guarantees or new production limits."
+      }
+    }
+  },
+  "cleanup": {
+    "at": "2026-10-21T06:07:43.402Z",
+    "ownedPids": [
+      61126,
+      61128,
+      61133,
+      61134,
+      79879,
+      79867,
+      4823,
+      61129,
+      61139,
+      61141,
+      79884,
+      79873,
+      4825
+    ],
+    "ps": {
+      "command": "/bin/ps -p <only recorded owned PIDs> -o pid=,ppid=,pgid=,rss=,stat=,comm=",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "lsof": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "allRecordedPidsAbsent": true,
+    "allRecordedPidFdsAbsent": true,
+    "ownNativeScopeAndPipeDirectoriesAbsent": true,
+    "remainingBunCache": "Only own Bun cache may remain; all logs and witnesses retained."
+  },
+  "boundaries": [
+    "Only these finite 4h queues on these runtimes; no universal absence of leaks",
+    "No PTY success is implied; separate 2h PTY overall exit1 is recorded as P2",
+    "Post-hoc expected hashes are separate from original actual-stream assertions; no raw complete output recording is invented",
+    "No new tests or matrix were run during finalization"
+  ],
+  "completeHarnessSources": [
+    {
+      "path": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/coordinator.mjs",
+      "sha256": "573235636462f48589a0f7000b287f2e36fef1c1ff38768c2a95f05b44a53994"
+    },
+    {
+      "path": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs",
+      "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5"
+    },
+    {
+      "path": "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/worker.mjs",
+      "sha256": "7ee45b10f9efbee9d5b43b3a192fc9777236720ebae1c83f5905b9c6bb90ef31"
+    }
+  ],
+  "artifacts": {
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/launch.json": {
+      "bytes": 4662,
+      "sha256": "41b7102649bdf801a69dfb8f4d6ca4f416dbaa40b494e0e414d74c16a002c570"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/preflight-receipt.json": {
+      "bytes": 3242,
+      "sha256": "60228810d2be1feb0ba640636baef29cbcd569e79cfe8f17fbff47b3beabe0cb"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/harness-sha256.txt": {
+      "bytes": 261,
+      "sha256": "f1a7ed5d09952fde76d44598c39237348972e91c41536c35c3bd05b22fba38c7"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/source-continuity.diff": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/install.log": {
+      "bytes": 75,
+      "sha256": "fce8480a9a45a340e6258aa25eb364011be89f7cb47f296d7bc618774a253fd2"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/preflight.log": {
+      "bytes": 603,
+      "sha256": "7c7c7b2d9b938e7c3bd987abcf755a4fd65fbd6acbc778dcacb6ea3c534fa4b9"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/status.json": {
+      "bytes": 2368,
+      "sha256": "2acb762597e30de6bd5b031ad2e32827fd7f5ef7eade139781837c3779b133f5"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/exit": {
+      "bytes": 1,
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/coordinator.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/coordinator.mjs": {
+      "bytes": 2602,
+      "sha256": "573235636462f48589a0f7000b287f2e36fef1c1ff38768c2a95f05b44a53994"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/lane.mjs": {
+      "bytes": 13404,
+      "sha256": "a3c62b5234105fa111abc143cd490e54c3cb60bed51442a85074d4f2f933b7f5"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/worker.mjs": {
+      "bytes": 3137,
+      "sha256": "7ee45b10f9efbee9d5b43b3a192fc9777236720ebae1c83f5905b9c6bb90ef31"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/package.json": {
+      "bytes": 160,
+      "sha256": "60463c676b6c2fe1e2bf52778e3452be98969a5c2651ee30ae476e1e886e2343"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/consumer/package-lock.json": {
+      "bytes": 603,
+      "sha256": "b47a1a97cf2d742ebe74bf5f36a812235d1a014b29e6f5ca7141d80e253df878"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/cleanup-receipt.json": {
+      "bytes": 642,
+      "sha256": "d67d02f1cddc6c395a404180b6a96b802dd6e664b0314ea9f7601381106d7c5a"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/status.json": {
+      "bytes": 1019,
+      "sha256": "6e4456abc3c5320b60b8856f7740ba3859b54a341a5d16bc55044cf0ec1dcbbf"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/exit": {
+      "bytes": 1,
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/events.jsonl": {
+      "bytes": 1188,
+      "sha256": "d2de48c7318cae839f625a0356ab391e4a2c8d2515f807ff6fac4dbbac3d3c24"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/resources.jsonl": {
+      "bytes": 574355,
+      "sha256": "d18de030135e25100208b71e319ee746d462e9977ee4b1c99c7a6879d7feae6e"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/runner.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/process/writer.ready": {
+      "bytes": 5,
+      "sha256": "f48fa9f11924ad3f29dc5f3b28c38a0fd2a49309ae6efc82223b41f711d8e8d9"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/process/writer.burst-done": {
+      "bytes": 4,
+      "sha256": "a4c3ed04a95a3da14a9d235c83d868bed7c0f45cf7f3faa751ee8f50598d2211"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/process/witness.json": {
+      "bytes": 129,
+      "sha256": "88bfc9607fd0752521541eb5800f945ef786258d573a6f01dfbbc27707c2f9a5"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/supervision/writer.ready": {
+      "bytes": 5,
+      "sha256": "a067167637c3fafb8cc65e365b3cfe003015abbadd639e42137a3d23a20e3f63"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/supervision/writer.burst-done": {
+      "bytes": 4,
+      "sha256": "a4c3ed04a95a3da14a9d235c83d868bed7c0f45cf7f3faa751ee8f50598d2211"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/supervision/witness.json": {
+      "bytes": 129,
+      "sha256": "015fa7531fe7023daf83c9c112548bd17a53061365f2db944ac255fbb90c2b13"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/node22/supervision/term-seen": {
+      "bytes": 4,
+      "sha256": "7208794c984ea1c75d13877c7427336fe98722c41a056eeee4f37360ec367123"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/status.json": {
+      "bytes": 1000,
+      "sha256": "a37f659cb8569d1b61c1b1d9a879037d05c692fc9375f9a5587953867c2ff808"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/exit": {
+      "bytes": 1,
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/events.jsonl": {
+      "bytes": 1193,
+      "sha256": "9a366a510a80a850ffa94a73b411505c53e85a0d98c5aa0fffe5ba50fb3e8ca3"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/resources.jsonl": {
+      "bytes": 387682,
+      "sha256": "b50559d2d6403d9cfcc9666dc02d15e73c25c209c52e8347fc6a01a5a6325088"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/runner.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/process/writer.ready": {
+      "bytes": 5,
+      "sha256": "78d5f8adf91db8e955ad74da47b192207b3f315c9c7af550edec3ba37d4b145d"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/process/writer.burst-done": {
+      "bytes": 4,
+      "sha256": "a4c3ed04a95a3da14a9d235c83d868bed7c0f45cf7f3faa751ee8f50598d2211"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/process/witness.json": {
+      "bytes": 129,
+      "sha256": "f57e71ed6716ce8185d3faaaa59c004154c859b32266078a0313d39acb59bc2a"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/supervision/writer.ready": {
+      "bytes": 5,
+      "sha256": "01884d956a75e4929b9042ca1d2d4e475a939c423af963073045921a4c730e7a"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/supervision/writer.burst-done": {
+      "bytes": 4,
+      "sha256": "a4c3ed04a95a3da14a9d235c83d868bed7c0f45cf7f3faa751ee8f50598d2211"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/supervision/witness.json": {
+      "bytes": 129,
+      "sha256": "41e6c16ea308fc547ca4d47bae2815c1519be69be05718637cd2a333ce6d7487"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-b/bun/supervision/term-seen": {
+      "bytes": 4,
+      "sha256": "7208794c984ea1c75d13877c7427336fe98722c41a056eeee4f37360ec367123"
+    }
+  }
+}
