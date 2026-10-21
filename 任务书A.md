@@ -502,6 +502,19 @@ dotnet tool run fantomas src/Wanxiangshu
 - 第一批回归：`node --test requirements/work/tests/011.test.mjs requirements/work/tests/026.test.mjs requirements/capability-enforcement/tests/025.test.mjs` → `tests 48 / pass 48 / fail 0 / todo 0`。
 - 第二批回归：同上一组 → `tests 48 / pass 48 / fail 0 / todo 0`；`node --test requirements/execution-model-routing/tests/` → `tests 123 / pass 115 / fail 0 / todo 8`（8 条 todo 均为既有 GAP 项）。
 
+#### 十·二·七 交付测试迁到真实围栏交付格（suite-reds，两批）
+
+**第一批**（sync delegate 中断结算）：`requirements/delegation/tests/023.test.mjs`、`requirements/knowledge-reuse/tests/010.test.mjs`、`requirements/managed-session-lifecycle/tests/004.test.mjs`（commit `519ae7b1b`）。夹具在 settle 之前用 `runtimeSurface.recordFencedDeliveredView(child, runId, callId, { prefixUntil: 0, thenMap: { 0: answer } })` 写入**带围栏的交付格**，复用例例自身的真实 run identity；**不伪造 durable 见证**。`knowledge-reuse/010` 删除了退役的 `deliver(value)` DTO 断言，改为按 [054] 断言本次 answer、末条散文存在、前轮身份不重复、真实 Casebook 归档材料。
+
+**第二批**（recovery 夹具与 014）：`requirements/delegation/tests/025.test.mjs` + `requirements/delegation/tests/support/{recovery-process,guard-recovery-process,repair-recovery-process}.fixture.mjs` + `requirements/managed-session-lifecycle/tests/014.test.mjs`。三份 recovery 夹具在 settle 前同样写入**test-only 的围栏交付格**，复用每个 case 的真实 run identity，同样**不伪造 durable 见证**。
+
+**实测**：
+
+- `node scripts/build.mjs` → `[build] build ok`；`js-surface-manifest: OK — 151 registered surfaces`；`js-module-linkage: OK — 724 emitted modules linked and loaded`。
+- 第一批：`node --test requirements/delegation/tests/023.test.mjs requirements/knowledge-reuse/tests/010.test.mjs requirements/managed-session-lifecycle/tests/004.test.mjs` → `tests 18 / pass 16 / fail 0 / cancelled 0 / todo 2`（两条 todo 为既有 GAP-160）。
+- 第二批：`node --test requirements/delegation/tests/025.test.mjs requirements/managed-session-lifecycle/tests/014.test.mjs` → `tests 33 / pass 32 / fail 0 / cancelled 0 / todo 1`（todo 为既有 GAP 项）。**无 cancelled**。
+- `node scripts/checks/js-boundary-gate.mjs` → `OK — 0 debt line(s) across 0 file(s)`；针对这五个文件 grep 计数 = **0**（未新增边界欠账）。
+
 ### 十·三 R3 套件实测
 
 | 套件 | pass | fail | 判定 |

@@ -4,6 +4,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as SyncDelegateSurface from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 const owner = 'managed-session-owner'
 
@@ -20,6 +21,15 @@ const admit = async (runtime, count) => {
 const invokeAndSettle = async (runtime, charge, answer, promptCount, runId) => {
   const pending = SyncDelegateSurface.invoke(runtime, owner, 'Engineer', charge)
   await admit(runtime, promptCount)
+  // The turn carries a delivery, not only prose: the fenced cell is what the
+  // sync reader consumes to settle the call. Without it the turn is
+  // "completed without a delivered view" and the obligation stays open.
+  runtimeSurface.recordFencedDeliveredView(
+    SyncDelegateSurface.child(runtime, owner, 'Engineer'),
+    runId,
+    `call-${runId}`,
+    { prefixUntil: 0, thenMap: { 0: answer } },
+  )
   assert.equal(await SyncDelegateSurface.settle(runtime, owner, 'Engineer', answer, runId), true)
   const result = await pending
   assert.equal(result.ok, true)

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import * as sync from '../../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 import * as dispatch from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as runtimeSurface from '../../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 const [directory, scenario, receiptPath] = process.argv.slice(2)
 const owner = `recovery-owner-${scenario}`
@@ -9,6 +10,17 @@ const pendingAfterTurn = promise => Promise.race([
   promise.then(() => 'settled'),
   new Promise(resolve => setImmediate(() => resolve('pending'))),
 ])
+
+// The delivered view is the settlement: a terminal that carries no fenced
+// delivery is observation only and the obligation stays open. The harness
+// registers the delivery of the exact provider run it is about to settle.
+const deliverTo = (sessionId, providerRun, material) =>
+  runtimeSurface.recordFencedDeliveredView(
+    sessionId,
+    providerRun,
+    `call-${providerRun}`,
+    { prefixUntil: 0, thenMap: { 0: material } },
+  )
 
 for (const name of ['createForProviderRecovery', 'confirmManagedPromptPhysical', 'observeProviderFailureStop', 'observeExactProviderFailure', 'recoveryStopSnapshot']) {
   assert.equal(typeof sync[name], 'function', `missing recovery fixture capability: ${name}`)
@@ -54,6 +66,7 @@ try {
   let successor
   let result
   if (lateAcceptance) {
+    deliverTo(initial.sessionId, 'initial-completion-provider-run', 'INITIAL-COMPLETES')
     assert.equal(await sync.settleExactTerminal(runtime, initial.sessionId, initial.physicalUserMessageId,
       initial.authorityRootUserMessageId, 'initial-completion-provider-run', 'INITIAL-COMPLETES', ''), true)
     result = await completion
@@ -72,6 +85,7 @@ try {
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2, 'Accepted recovery reentry preserves the original PromptKey')
     assert.deepEqual(sync.promptIdentity(runtime, owner, 'Engineer', 1), retryPrompt)
 
+    deliverTo(successor.sessionId, 'actual-retry-provider-run', 'RECOVERY-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, successor.sessionId, successor.physicalUserMessageId,
       successor.authorityRootUserMessageId, 'actual-retry-provider-run', 'RECOVERY-FORMAL-ANSWER', ''), true)
     result = await completion
@@ -127,6 +141,7 @@ try {
     assert.equal(secondSuccessor.ok, true, JSON.stringify(secondSuccessor))
     assert.notEqual(secondSuccessor.physicalUserMessageId, secondAccepted.physicalUserMessageId)
     assert.equal(secondSuccessor.origin, 'ProviderRetryAttempt')
+    deliverTo(secondSuccessor.sessionId, 'second-provider-run', 'SECOND-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, secondSuccessor.sessionId, secondSuccessor.physicalUserMessageId,
       secondSuccessor.authorityRootUserMessageId, 'second-provider-run', 'SECOND-FORMAL-ANSWER', ''), true)
     const secondResult = await secondCompletion
