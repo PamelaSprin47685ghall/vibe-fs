@@ -4,9 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
-open Wanxiangshu.OpenCode.Host
 
 /// The observed allocation origin of a Companion child. The core's `Origin` is the
 /// single source; this is its Companion-facing name.
