@@ -1,5 +1,13 @@
 # Changelog — 版本历史
 
+## Unreleased — fission lane 的材料不再手工搬进 owner 的交付格
+
+- **修复：takeover 完成时不再把 lane 的交付视图写进 owner 的交付格**。`Execution/Fission/OpenCode/Host.fs` 的 `CompleteOwner` 分支此前读出最终 lane 的交付视图声明，再 `recordView` 到 owner 会话自己的交付格——一次**跨 session 的手工搬运**。owner 交付格没有正当的生产消费者：`deliveredView` / `tryPeekRendered` 按**读者自己**的 anchor ledger 渲染，把 lane 的锚点声明放进 owner 的格子里，只会让 owner 的编号重新解释那些锚点——这正是缺陷本身。lane 的材料经 `aggregateView`（已含各 lane 的 `FissionLaneMaterialized` work blob）进入接管 prompt，不需要第二个可见交付格。
+- **保留的消费者行为不变**：本次只删掉那处跨 session 写入；`tryPeekRendered`（`materializeCompletedLane` 用）、`peekView` / `recordView` 本身都没动，`intra-participant-parallelism/WHAT.md` 的措辞已同步。
+- **验证的边界（如实记录）**：`requirements/intra-participant-parallelism/tests/014.test.mjs` 走真实准入与真实交付路径，断言 owner 交付格在 owner 自己交付前为空、交付后只含 owner 自己的锚点与材料、不含任何 lane 锚点或 lane 材料。**但真实 takeover 链在夹具里仍不可达**（lane turn 不结算为稳定 `TurnCompleted`，故无 `FissionLaneMaterialized`、无接管 prompt），因此**没有** takeover 分支的 failing-before/passing-after 动态回归；该缺口仍是 `GAP-158`。同批曾带一条「读源码文本」的结构性守卫，因其以源码文本而非行为为证据，**已删除**；剩下的 owner-cell 用例进不到该分支、改动前后都通过，**不作为本次改动的证明**。
+- **改动文件**：`src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs`、`requirements/intra-participant-parallelism/tests/014.test.mjs`、`requirements/intra-participant-parallelism/WHAT.md`。
+- **验收**：`intra-participant-parallelism/014` → tests 3 / pass 2 / fail 0 / todo 1（`GAP-158` 的 todo 原样保留）；全 `intra-participant-parallelism` 套件 → **46 tests / 31 pass / 0 fail / 0 cancelled / 15 todo**。
+
 ## Unreleased — 已证明的终态必须结算（见证在、活格没了，也照样结算）
 
 - **修复：durable 交付见证存在、但进程内交付格已丢失（或视图读取故障）时，运行不再永远挂着**。`Execution/Delegation/Fork/Host/RunLifecycle.fs` 的 `complete` 在命中围栏匹配的 durable 见证后，只认「活格 / 视图读取」这一路材料；活格被别的读者取走、或视图读取故障时该路为空，于是走 LC-004 的「只观察、不结算」分支——**交付明明已被证明**，父侧的 `this.join()` 却永远等不到结算，工作单元停在 `Active`。
