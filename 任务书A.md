@@ -665,3 +665,22 @@ dotnet tool run fantomas src/Wanxiangshu
 - `scripts/build.mjs` 产物存在性判据 —— **已闭合**（`c6e42613a`）：判据按 manifest 产物全集查盘，缺失即强制重编。
 
 **已闭项，不再列为未修**（历史条目见十·四）：B1、B4、B9（十·二·三已记）、C2（十·二·二已记）、anchor 声明单一规则与 JS-native 回执（`2dd501d2e`）、委派旧 root 归属与 029 窄能力（`507d68d01`）、parked source 执行点换算（`f6010b688`）、Fission 死链删除（`ad13783c9`）、交付已证明轮次发布终态与 024 迁移（`5df09d1d0`）、构建产物存在性判据（`c6e42613a`）。
+
+### 十·七 交付围栏、R6 层向与 harness 迁移（integration 实测，2026-10-21）
+
+**已推送批次**
+
+| 批次 | commit | build | 实测 |
+|---|---|---|---|
+| 交付格按完整围栏消费（B5） | `6f39cd156` | `build ok`；149 surfaces；715 modules | `repository-programming/059`（新增永久回归：同 run 另一调用不得取走该格，错取返回 null、围栏不变、returned 未推进，正确调用随后可取；该用例在只比 run 的旧实现下为红）+ `delegation/007\|008\|009\|010\|011\|012\|023\|025\|033` → **54 tests / 49 pass / 0 fail / 0 cancelled / 5 todo** |
+| 交付登记挂在 durable 提交点（R6，host→app 反向边消失） | `5e76cb4a4` | `build ok`；149 surfaces；715 modules | `subsystems.mjs` → `OK — 25 subsystems, 240 compile shards, 646 sources, 1954 refs, shard DAG, largest subsystem cycle=10`（改前 1955 refs / cycle=16）；**host → application-composition 边 = 0**；回归 `effect-accounting/013` + `semantic-trace/013` + `work/011` → **24/24 pass / 0 fail** |
+| 027 与生命周期用例迁真实交付路径 | `2d35b2ef0` | `build ok (generation 14)`；149 surfaces；715 modules | `delegation/024` + `027` + `managed-session-lifecycle/006\|007\|008` → **62 tests / 60 pass / 0 fail / 0 cancelled / 2 skipped**（2 个 `integrationTest` 按 tier 门禁 skip） |
+
+**B5 的事实**（此前记作「同 run 内被别 call 先取无害」，**该说法已证伪并修正**）：交付格记的是产生它那次调用的完整围栏（provider run + tool call id），而旧消费面只比 provider run；同一 run 的第二次交付会**覆盖**第一次的格子，于是只持 run 的终态会取走**另一次调用**的材料并推进 returned 游标，真正拥有该交付的调用随后拿不到材料——是真实错取。实测：同 run `call-1`/`call-2` 两次交付后，`call-1` 的终态取走了 `call-2` 的材料，格子被清空。
+
+**仍未闭合**
+
+- **C3 材料搬运**：fission lane 的材料仍靠手工跨 session 搬运；应收敛到 `FissionLaneMaterialized` 的 `ViewRef/ViewDigest` 与 takeover 的 `AggregateViewRef/AggregateViewDigest`。
+- **MSL 013/015/022/028** 与 **effect-accounting/002**：旧 harness 从不提交围栏匹配的 durable 见证，须逐个迁到真实交付路径；**不得伪造见证**。
+- **附件读取无可注入缝**（生产缺口）：真实路径的 `childViewForRun` 恒为 `fun _ _ -> Task.FromResult None`，attachment 准备读的是 `viewForSession`，没有可阻塞的缝，所以「attachment 准备期间阻塞、指引尚未发出」这一中间态在真实路径无法注入。已改为断言最终可观测事实，并在 CHANGELOG 记为缺口。
+- **R6 的新回归未写**：commit 失败不登记、成功登记可观察 transition（`DeliveryAttemptLedger.tryFindEstablished` 命中后 transform 判 `StopDelivery`）——须在真实交付路径上写，commit 失败走「同围栏异材料」的既有拒交路径。
