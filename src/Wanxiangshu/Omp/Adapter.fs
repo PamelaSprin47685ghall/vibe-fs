@@ -1090,10 +1090,19 @@ module Adapter =
                     SignalSubscription listeners listener :> IDisposable }
 
         let paths: IHostPaths =
+            // The workspace is read once, so the three members cannot
+            // disagree if the context changes between reads.
+            let workspace = ctxCwd (context ())
+
             { new IHostPaths with
-                member _.StateRoot = WorkspacePath(sprintf "%s/.wanxiangshu" (ctxCwd (context ())))
-                member _.ProjectRoot = WorkspacePath(ctxCwd (context ()))
-                member _.ProjectId = ctxCwd (context ()) }
+                // omp exposes no host data directory; the product resolves
+                // its own state root from the workspace
+                // (`RuntimePath.forWorkspace`), so this member is not a
+                // journal root and must not be treated as one. The adapter
+                // must not invent a product-private directory name here.
+                member _.StateRoot = WorkspacePath(workspace)
+                member _.ProjectRoot = WorkspacePath(workspace)
+                member _.ProjectId = workspace }
 
         let diagnostics: IDiagnosticSink =
             { new IDiagnosticSink with
