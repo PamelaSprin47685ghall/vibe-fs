@@ -9,10 +9,29 @@ Architect lane: eng-host-arch. Registry of every port and its owner: [REGISTRY.m
 
 ## 1. Rules
 
-1. **Home.** Ports live in `src/Wanxiangshu/Host/Ports/<Family>.fs(i)`, namespace **`Wanxiangshu.Host.Ports`** (not `Wanxiangshu.Host`:
-   the main build is one Fable compilation and many adapter files `open Wanxiangshu.Host` for `CanonicalJson`/`HostDigest`,
-   so port names there would shadow `OpenCode.HostSignal`, `SessionMessage`, …), one file per family
-   (subfolder `Host/Ports/` so lane-owned domain ports in `Host/*.fs` never collide by path).
+1. **Home — two tiers, one namespace each.** `src/Wanxiangshu/Host/` holds exactly two tiers, and a file's
+   folder and its namespace can never drift apart (gate ⑬, HNI-11):
+   * **tier A — neutral ports**: `src/Wanxiangshu/Host/Ports/<Family>.fs(i)`, namespace **`Wanxiangshu.Host.Ports`**
+     (not `Wanxiangshu.Host`: the main build is one Fable compilation and many adapter files `open Wanxiangshu.Host`
+     for `CanonicalJson`/`HostDigest`, so port names there would shadow `OpenCode.HostSignal`, `SessionMessage`, …),
+     one file per family. Tier A is mirrorable to the TypeScript port surface.
+   * **tier B — domain seams**: `src/Wanxiangshu/Host/Domain/<Name>.fs(i)`, namespace **`Wanxiangshu.Host.Domain`**.
+     A tier-B file is a lane's *own* seam, not a neutral port: it may name product types, it is never mirrored to
+     the TypeScript port surface, and the adapters' references to it are ratcheted so the seam cannot spread.
+
+   *Tier-B admission rule.* A type belongs in tier B only if **the domain speaks it** *and* **a host must supply
+   it**. Anything no host supplies is product code and does not belong under `Host/` at all; anything the product
+   core needs *from* a host in neutral vocabulary belongs in tier A. `CommandDeclaration` (P-13) is the weakest
+   fit: slash commands and TUI rendering are out of scope (DESIGN §4), so the shape a host registers is currently
+   speculative — it stays in tier B for now, and it moves out to a product module (or is deleted) if the command
+   surface is ever dropped from scope. `DelegationCaller` / `DelegationCommand` (P-14/P-15) are composition seams
+   (D-03) and `PairGuidance` (P-16) is a product transcript — none of them is a neutral host port, which is exactly
+   why they belong in tier B rather than tier A.
+
+   *Known asymmetry.* Three of the four files that carried the shadowing `Wanxiangshu.Host` namespace (D-05) were
+   moved to tier B; `Host/FissionPort.fs(i)` (P-17) already declared the safe `Wanxiangshu.Host.Ports` namespace
+   and only its **location** is wrong — that move is tracked on HNI-14 and is the one exemption of gate ⑬'s
+   location rule.
 2. **No host vocabulary in a port.** No `OpenCode`/`Opencode`/`omp`/`pi` in a port name, member, field, or
    type. No `obj`, no raw JSON object, no `part`/`message.updated`/`chat.params` wire terms. Raw payloads stay in
    the adapter; the port takes and returns records/DUs. Opaque host identifiers travel as typed ids (`SessionId`,
@@ -317,3 +336,7 @@ acceptance criteria.
 
 ## 4. Out of scope
 Rendering of TUI widgets, slash commands, keybindings (omp-only UI) — the product has no need for them.
+
+The tier-B domain seams (P-13 command declaration, P-14 delegation caller, P-15 delegation command, P-16 pair
+guidance) are **not** ports in the sense of this document: they are a lane's own seam, kept in
+`Host/Domain/` and never mirrored to the TypeScript port surface. See §1.1.

@@ -24,19 +24,23 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 | P-12 | `IDiagnosticSink` | `Host/Ports/Diagnostics.fs(i)` | plugin-host | `client.app.log` call sites | DECLARED, SKELETON-OMP |
 | P-00 | `HostError`, `HostResult`, `HostCapability`, `WorkspacePath`, `AgentRole`, `CanonicalJsonText`, `JsonSchema`, `HostFailure`, `TurnTerminal` (shared vocabulary; ids `SessionId`/`ToolCallId`/`PromptKey`/`TranscriptMessageAddress` come from `Foundation.Identity`) | `Host/Ports/Vocabulary.fs(i)` | arch | `string` error channels on host ports | DECLARED, SKELETON-OMP |
 
-## Lane-declared domain ports (namespace `Wanxiangshu.Host`, files `Host/*.fs(i)`) — ID reservations
+## Lane-declared domain seams (tier B, namespace `Wanxiangshu.Host.Domain`, files `Host/Domain/*.fs(i)`) — ID reservations
 
-Domain lanes declare seams their domain needs from a host in `src/Wanxiangshu/Host/<Name>.fs(i)`. IDs are reserved here
-so parallel lanes never collide (HNI-11 found two `P-13`s). Use the ID below in your row; next free ID: **P-19**.
+Domain lanes declare seams their domain needs from a host in `src/Wanxiangshu/Host/Domain/<Name>.fs(i)`
+(DESIGN §1.1, tier B). IDs are reserved here so parallel lanes never collide (HNI-11 found two `P-13`s).
+Use the ID below in your row; next free ID: **P-19**. A tier-B file is **not** a neutral port: it is never
+mirrored to the TypeScript port surface, and the adapters' references to it are ratcheted (gate ⑬).
 
-**The fork lane's ports (P-13/P-14/P-15) are on `master`.** `Host/CommandDeclaration.fs(i)`,
-`Host/DelegationCaller.fs(i)` and `Host/DelegationCommand.fs(i)` landed on `master` through the fork lane's six
+**The fork lane's ports (P-13/P-14/P-15) are on `master`.** `Host/Domain/CommandDeclaration.fs(i)`,
+`Host/Domain/DelegationCaller.fs(i)` and `Host/Domain/DelegationCommand.fs(i)` landed on `master` through the fork lane's six
 commits `58660d4d9`, `2e9d5025d`, `6c6b8cfdf`, `a4222e3fb`, `e16e72c34` (slice A) and `aa43d3455` (slice B,
 `Fork/JoinRules`). The fork lane's branches `origin/wip/hni-fork` and `origin/wip/hni-fork-next` are **deleted**
 (their content is on `master`).
-The other lanes' ports are **not all still off `master`**: P-16 (`Host/PairGuidance.fs(i)`) lives on
-`origin/wip/hni-plugin` and P-18 (`Host/Tools.fs(i)`) on `origin/wip/hni-tools` — both branches still exist on the
-remote (measured 2026-10-21). **P-17 (`Host/FissionPort.fs(i)`) is now on `master`**: the fission lane landed
+The other lanes' ports are **not all still off `master`**: P-16 (`Host/Domain/PairGuidance.fs(i)`) is on
+`master` (landed by the plugin-host lane through `3e2f12213`, whose subject line says "P-13" — the **reserved
+id is P-16**, see drift **D-01**) and P-18 (`Host/Tools.fs(i)`) is still on `origin/wip/hni-tools` — that
+branch still exists on the remote (measured 2026-10-21).
+**P-17 (`Host/FissionPort.fs(i)`) is now on `master`**: the fission lane landed
 `2680bc07d` ("Fission launch runs behind the host-neutral FissionHostPort (P-17)"), `0287a2349` ("P-17 FissionPort
 moves to `Wanxiangshu.Host.Ports`, journal leaves the port") and `9894b1e0c` ("the fission host call sites use the
 short FissionHost form"), and `origin/wip/hni-fission` is **deleted**.
@@ -48,8 +52,10 @@ ISessionPort") — plus `Execution/Fission/Launch.fs`, `Execution/Fission/Launch
 neutral families are still *declared* types, and whether a port is actually wired is decided per row, not by the
 presence of an `open`. Measured at `31a5a2426`, only **P-01** of P-01..P-12 has an implementation in `src/`
 (`SdkSessionPort`/`HttpSessionPort` in `OpenCode/Host/SessionSnapshotPort.fs`); P-02..P-12 have none.
-Namespace note: the lane ports use `Wanxiangshu.Host`, while the
-neutral ports use `Wanxiangshu.Host.Ports` (see DESIGN §1.1 and drift **D-05**).
+Namespace note: the lane seams are **tier B** and use `Wanxiangshu.Host.Domain` under `Host/Domain/`, while the
+neutral ports are **tier A** and use `Wanxiangshu.Host.Ports` under `Host/Ports/` (see DESIGN §1.1 and drift
+**D-05**). Every seam file carries its `HNI P-xx` marker as a **plain `//` comment above the `namespace` line**
+(drift **D-06**).
 
 **No compile/test evidence for the fork lane.** The fork lane was pushed under the owner's "no build before push"
 rule: only the non-compiling gates were run (`architecture.mjs`, `adapter-thinness.mjs`, `provider-leak-gate.mjs`).
@@ -57,12 +63,12 @@ The delivery team must build master at `aa43d3455` or later to get compile/test 
 
 | ID | Port | File | Owner lane | Notes (HNI-11 review) |
 |---|---|---|---|---|
-| P-13 | `CommandDeclaration`, `CommandArgument`, `ArgumentShape`, `ICommandArguments` | `Host/CommandDeclaration.fs(i)` | fork | Neutral and product-shaped. Converges with P-04: `ArgumentShape` is what a `ToolSpec.Schema` is generated from. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
-| P-14 | `IDelegationCallerHost`, `DelegationCaller` | `Host/DelegationCaller.fs(i)` | fork | D-03: carries `AgentJournal` (product persistence) and fork runtime — a composition seam, not a host port. Status: WIRED-OC, **on `master`** (`58660d4d9`). Convergence (HNI-14): the interface splits — `DelegationCaller` (the host's contribution: session / provider run / tool-call ids) stays a neutral record in `Host/Domain/`; everything else becomes the product record `DelegationEnvironment` (`Execution/Delegation/Fork/`, not under `Host/`). |
-| P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. Status: WIRED-OC, **on `master`** (`58660d4d9`). Convergence (HNI-14): **no member of P-15 is host-supplied** — it is dissolved into the product record `DelegationEnvironment`; the two host-typed members (`ManagerCapabilityFactsFor`, `CallerRole`) are product types, and the interface file is deleted rather than kept. |
-| P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. Status: **on `master`** (`3e2f12213` — the commit subject says "P-13", the reserved id is **P-16**, see D-01). | Status **WIRED-OC**: the OpenCode adapter (`OpenCode/Host/PairProgrammingThoughtTransform`) decodes the transcript and renders only; the product owner is `Interaction/PairGuidance/Occurrences` (ledger, ordinal, placement, commit order) | Convergence (HNI-14): split by ownership — `PairGuidanceTranscript` stays a decoded host fact in `Host/Domain/`; `PairGuidanceOccurrence` + `PairGuidanceLedger` move to the product (`Interaction/PairGuidance/`), and `Append`'s error becomes a **product** error DU, not `HostError` (it writes the product's own journal). |
-| P-17 | `FissionHostPort`, `FissionOwnerRuns`, `FissionPtyCompletion`, `FissionPtyStatus`, `FissionSessionPort`, `FissionEventPort` | `Host/FissionPort.fs(i)` | fission | WIRED-OC. Declared in namespace `Wanxiangshu.Host.Ports` (drift **D-05**) but the file stays outside `Host/Ports/`, so gate ⑫ does not treat it as a neutral family. D-03 partly resolved: `AgentJournal` left the port (it is threaded into the launch call instead); the legacy `ISessionHostPort` / `IEventObservationPort` remain until P-01 / P-07 land. S3 (2026-10-22): the Fission lane now speaks its **own** names — `FissionSessionPort` and `FissionEventPort` — and the legacy Foundation types are reachable only through those two **transitional** aliases, which are the migration seam P-01 / P-07 will re-point. `FissionHostPort.Sessions` / `.Events` and the whole `Execution/Fission/Convergence` seam use the Fission-owned names; the aliases are transparent, so behaviour is unchanged. S4 (2026-10-22): the `fission` tool's **product policy** left the adapter — the prose vocabulary, the prose rendering and the office-entitlement predicate now live in the product lane (`Execution/Fission/ToolPolicy.fs(i)`, `FissionToolPolicy`); the adapter keeps only the wire mapping (rejection → semantic path) and the wire encoding. No port shape changed. Status: **on `master`** (`2680bc07d`, `0287a2349` — the port moved into the `Wanxiangshu.Host.Ports` namespace — `9894b1e0c`, and the S3 / S4 slices); `origin/wip/hni-fission` is **deleted**. Convergence (HNI-14): `FissionHostPort` shrinks to the two neutral ports P-01 / P-07 and is then deleted; `DirectoryFor` is absorbed by P-01 (`SessionInfo.Workspace`), `WorkspaceDirectory` by P-10 (`IHostPaths`); the rest becomes product composition inputs. **No typed `PtyId` is introduced** — a PTY id is minted by the product's run registry, not the host. |
-| P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). **D-07: this file name collides with P-04's `Host/Ports/Tools.fs(i)` — rename before moving it under `Host/Ports/`.** Status: **not on `master`** — the file lives on `origin/wip/hni-tools` (branch still exists, measured 2026-10-21). Convergence (HNI-14): **P-18 is voided and its id is retired (not reused)** — `HostToolContext` folds into P-04 `ToolInvocation`, `ToolAdmission` into `ToolSpec.Admission`, `ToolResultText` into a product module; the branch file is deleted, so D-07 disappears with it. |
+| P-13 | `CommandDeclaration`, `CommandArgument`, `ArgumentShape`, `ICommandArguments` | `Host/Domain/CommandDeclaration.fs(i)` | fork | **Tier B** (domain seam, namespace `Wanxiangshu.Host.Domain`). Neutral and product-shaped. Converges with P-04: `ArgumentShape` is what a `ToolSpec.Schema` is generated from. Status: WIRED-OC, **on `master`** (`58660d4d9`).
+| P-14 | `IDelegationCallerHost`, `DelegationCaller` | `Host/Domain/DelegationCaller.fs(i)` | fork | **Tier B**. D-03: carries `AgentJournal` (product persistence) and fork runtime — a composition seam, not a host port. Status: WIRED-OC, **on `master`** (`58660d4d9`). Convergence (HNI-14): the interface splits — `DelegationCaller` (the host's contribution: session / provider run / tool-call ids) stays a neutral record in `Host/Domain/`; everything else becomes the product record `DelegationEnvironment` (`Execution/Delegation/Fork/`, not under `Host/`).
+| P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/Domain/DelegationCommand.fs(i)` | fork | **Tier B**. D-03 as P-14. Status: WIRED-OC, **on `master`** (`58660d4d9`). Convergence (HNI-14): **no member of P-15 is host-supplied** — it is dissolved into the product record `DelegationEnvironment`; the two host-typed members (`ManagerCapabilityFactsFor`, `CallerRole`) are product types, and the interface file is deleted rather than kept.
+| P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/Domain/PairGuidance.fs(i)` | plugin-host | **Tier B**. Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. Status: **on `master`** (`3e2f12213` — the commit subject says "P-13", the reserved id is **P-16**; the branch `origin/wip/hni-plugin` still exists but the file has landed). Status **WIRED-OC**: the OpenCode adapter (`OpenCode/Host/PairProgrammingThoughtTransform`) decodes the transcript and renders only; the product owner is `Interaction/PairGuidance/Occurrences` (ledger, ordinal, placement, commit order) Convergence (HNI-14): split by ownership — `PairGuidanceTranscript` stays a decoded host fact in `Host/Domain/`; `PairGuidanceOccurrence` + `PairGuidanceLedger` move to the product (`Interaction/PairGuidance/`), and `Append`'s error becomes a **product** error DU, not `HostError` (it writes the product's own journal).
+| P-17 | `FissionHostPort`, `FissionOwnerRuns`, `FissionPtyCompletion`, `FissionPtyStatus`, `FissionSessionPort`, `FissionEventPort` | `Host/FissionPort.fs(i)` | fission | WIRED-OC. Declared in namespace `Wanxiangshu.Host.Ports` (drift **D-05**) but the file stays outside `Host/Ports/`, so gate ⑫ does not treat it as a neutral family. D-03 partly resolved: `AgentJournal` left the port (it is threaded into the launch call instead); the legacy `ISessionHostPort` / `IEventObservationPort` remain until P-01 / P-07 land. S3 (2026-10-22): the Fission lane now speaks its **own** names — `FissionSessionPort` and `FissionEventPort` — and the legacy Foundation types are reachable only through those two **transitional** aliases, which are the migration seam P-01 / P-07 will re-point. `FissionHostPort.Sessions` / `.Events` and the whole `Execution/Fission/Convergence` seam use the Fission-owned names; the aliases are transparent, so behaviour is unchanged. S4 (2026-10-22): the `fission` tool's **product policy** left the adapter — the prose vocabulary, the prose rendering and the office-entitlement predicate now live in the product lane (`Execution/Fission/ToolPolicy.fs(i)`, `FissionToolPolicy`); the adapter keeps only the wire mapping (rejection → semantic path) and the wire encoding. No port shape changed. Status: **on `master`** (`2680bc07d`, `0287a2349` — the port moved into the `Wanxiangshu.Host.Ports` namespace — `9894b1e0c`, and the S3 / S4 slices); `origin/wip/hni-fission` is **deleted**. **No typed `PtyId` is introduced** — a PTY id is minted by the product's run registry, not the host.
+| P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). **D-07: this file name collides with P-04's `Host/Ports/Tools.fs(i)` — rename before moving it under `Host/Ports/`.** Status: **not on `master`** — the file lives on `origin/wip/hni-tools` (branch still exists, measured 2026-10-21). Convergence (HNI-14): **P-18 is voided and its id is retired (not reused)** — `HostToolContext` folds into P-04 `ToolInvocation`, `ToolAdmission` into `ToolSpec.Admission`, `ToolResultText` into a product module; the branch file is deleted, so D-07 disappears with it.
 
 ### Drift findings (HNI-11, 2026-10-21) and the convergence target
 - **D-01** ID collision (`P-13` used by fork and plugin-host) → plugin-host pair guidance is **P-16**.
@@ -85,13 +91,21 @@ The delivery team must build master at `aa43d3455` or later to get compile/test 
   of scope. Measured population: 7 declarations (`evidence/hni14-convergence.md` §2.5), converted by the §3.2–§3.4 steps.
 - **D-05** lane ports declare `namespace Wanxiangshu.Host`, the same namespace many adapter files `open` for `CanonicalJson`/`HostDigest`.
   The neutral ports were moved to `Wanxiangshu.Host.Ports` for exactly that reason (DESIGN §1.1); the lane ports should move to a
-  namespace that is not `open`ed by adapters (e.g. `Wanxiangshu.Host.Domain.<Lane>`) or the same shadowing risk applies to them.
+  namespace that is not `open`ed by adapters (e.g. `Wanxiangshu.Host.Domain`) or the same shadowing risk applies to them.
+  **Status: RESOLVED (2026-10-22).** P-13/P-14/P-15/P-16 moved to `Host/Domain/` with namespace `Wanxiangshu.Host.Domain`;
+  gate ⑬ keeps the two tiers apart. P-17 already used the safe `Wanxiangshu.Host.Ports` namespace — only its **location**
+  remains open (HNI-14).
 - **D-06** the lane port files (`Host/*.fs(i)`) carry no `HNI P-xx` header marker. The TS mirror generator
   discovers the port families from `src/Wanxiangshu/Host/Ports/*.fsi` and keys on that marker; a family without one
   is a **hard error**, not a silent skip. The lane files sit directly under `Host/` today, so they are not
   discovered — but the moment a lane moves one under `Host/Ports/` (which HNI-14 intends) the mirror generation
   fails until the file declares its reserved id. A lane that lands a new family must add the `HNI P-xx` marker to
   the file header.
+  **Status: PARTLY RESOLVED (2026-10-22).** Every tier-B file now carries its `HNI P-xx` marker as a **plain `//`
+  comment above the `namespace` line** (a `///` doc comment between `namespace` and `open` would be FS3390 and would
+  be dropped). A tier-B file is *not* discovered by the mirror generator (it reads `Host/Ports/*.fsi` only), so the
+  marker is documentation plus the seam's identity, not a mirror requirement — but a seam that later moves into
+  tier A must keep the marker and satisfy the mirror generator.
 - **D-07** the tools lane's `Host/Tools.fs(i)` has the **same file name** as P-04's `Host/Ports/Tools.fs(i)`.
   Today the two live in different directories, so nothing breaks; but the moment the tools lane moves its file
   under `Host/Ports/` (which HNI-14 intends) it **overwrites P-04** — the registration port — and the
@@ -99,37 +113,50 @@ The delivery team must build master at `aa43d3455` or later to get compile/test 
   file (e.g. `Host/Ports/ToolContext.fs(i)`) before it moves it. No type name collides today: the tools lane
   declares `HostToolContext`/`ToolAdmission`, P-04 declares `ToolInvocation`/`ToolOutcome`; the **file name**
   is the collision, not the type name.
-- Lane domain ports are not under gate ⑪ (port-purity covers `Host/Ports/` only); HNI-14 moves them there once D-03 is resolved.
+- Lane domain seams are not under gate ⑪ (port-purity covers `Host/Ports/` only) and are not under the TS
+  mirror generator (it reads `Host/Ports/*.fsi` only). Gate ⑬ covers them instead: it checks that a tier-B
+  file declares `Wanxiangshu.Host.Domain` and lives under `Host/Domain/`, and it ratchets the adapter files
+  that reference the seam.
 
-### What a lane must do when it lands a domain port (the D-05/D-06/D-07 checklist)
+### What a lane must do when it lands a domain seam (the D-05/D-06/D-07 checklist)
 
-These are the concrete steps, so a lane does not have to re-derive them:
+These are the concrete steps, so a lane does not have to re-derive them. **Step 0 decides the tier**:
 
-1. **Move the file under `src/Wanxiangshu/Host/Ports/`** — that directory is what the mirror generator and
-   gate ⑪ (port-purity) both look at. A file left directly under `Host/` is invisible to both.
-2. **Rename the file if its base name is taken** by a neutral family. The names already taken are
+0. **Choose the tier first (DESIGN §1.1).** A type belongs in **tier A** (`Host/Ports/`,
+   `Wanxiangshu.Host.Ports`) only if the product core needs it *from* a host in neutral vocabulary — that is
+   what the TS mirror and the omp adapter consume. A type that is **the lane's own seam** — the domain speaks
+   it and a host must supply it, but it is not a neutral vocabulary — belongs in **tier B** (`Host/Domain/`,
+   `Wanxiangshu.Host.Domain`). A type that no host supplies is product code and does not belong under `Host/`
+   at all.
+1. **Tier A only: move the file under `src/Wanxiangshu/Host/Ports/`** — that directory is what the mirror
+   generator and gate ⑪ (port-purity) both look at. A tier-A file left directly under `Host/` is invisible to
+   both, and gate ⑬ reports it. **Tier B: put the file under `src/Wanxiangshu/Host/Domain/`.**
+2. **Tier A only: rename the file if its base name is taken** by a neutral family. The names already taken are
    `Vocabulary`, `Sessions`, `Prompts`, `Transcript`, `Tools`, `ToolGates`, `TurnTransforms`, `Signals`,
    `ModelRouting`, `Compaction`, `Storage`, `Lifecycle`, `Diagnostics` (**D-07**). The family name is the
    `.fsi` base name, so it is also the TS mirror section name.
 3. **Declare the reserved id in the header**: a line containing `HNI P-xx` where `xx` is your reserved id from
    the table above (P-13 … P-18). The generator matches `/\bHNI (P-\d{2})\b/` anywhere in the header; a family
-   without one is a **hard error**, not a silent skip. Put it in the file's leading doc comment, e.g.
-   `/// HNI P-18: product tool contribution — what one product tool call knows about its invocation.`
-4. **Use a namespace that adapters do not `open`**: `Wanxiangshu.Host` is `open`ed by **95 files** under
-   `src/Wanxiangshu/` (measured at `31a5a2426`; mostly for `CanonicalJson`/`HostDigest`), so a type named e.g.
-   `Digest` in that namespace shadows the real one at every one of those call sites. Use
-   `Wanxiangshu.Host.Domain.<Lane>` (**D-05**). The neutral families use `Wanxiangshu.Host.Ports`, which had
-   **zero** openers when it was created; the openers it has today were each added deliberately (the first four by
-   `4403f579b`, the fission ones by the HNI-05 lane). The risk **D-05** guards against is therefore not "some file
-   `open`s the namespace" but "a **pre-existing** namespace with 90+ openers": port names placed in
-   `Wanxiangshu.Host` would shadow real types across every one of those call sites, whereas a namespace nothing
-   opened before is safe to add to. **An `open` is not an implementation** — see the status column for whether a
-   port is actually wired.
+   without one is a **hard error**, not a silent skip. Put it in a **plain `//` comment above the `namespace`
+   line** — a `///` doc comment between `namespace` and the first `open` is FS3390 and is dropped, e.g.
+   `// HNI P-18: product tool contribution — what one product tool call knows about its invocation.`
+4. **Use the namespace of the tier you chose**: `Wanxiangshu.Host.Ports` for tier A, `Wanxiangshu.Host.Domain`
+   for tier B. `Wanxiangshu.Host` is `open`ed by **75 files** under `src/Wanxiangshu/` (measured 2026-10-22;
+   81 `open` lines, mostly for `CanonicalJson`/`HostDigest`), so a type named e.g. `Digest` in that namespace
+   shadows the real one at every one of those call sites. Gate ⑬ rejects a tier namespace declared outside its
+   tier folder (**D-05**). `Wanxiangshu.Host.Ports` had **zero** openers when it was created and the openers it
+   has today (9 files) were each added deliberately; `Wanxiangshu.Host.Domain` has 12 (the seam's own
+   consumers) and the tier-B ratchet stops that set from growing. The risk **D-05** guards against is
+   therefore not "some file `open`s the namespace" but "a **pre-existing** namespace with 70+ openers": port
+   names placed in `Wanxiangshu.Host` would shadow real types across every one of those call sites, whereas a
+   namespace nothing opened before is safe to add to. **An `open` is not an implementation** — see the status
+   column for whether a port is actually wired.
 5. **Reuse the neutral vocabulary** (DESIGN §2): `HostResult<_>`/`HostError` instead of `Result<_, string>`
    (**D-04**), and `SessionId`/`ToolCallId`/`PromptKey`/`TranscriptMessageAddress`/`ModelRoute`/`AgentRole`/
    `CanonicalJsonText` from `Host/Ports/Vocabulary.fs(i)` instead of `string`.
 6. **Do not hand-edit** `adapters/omp/ports.ts`; it is generated. Run `adapters/omp/check.sh` — it regenerates
-   the mirror and fails on any byte difference.
+   the mirror and fails on any byte difference. A tier-B file is **not** mirrored, so it never changes the
+   generated file.
 7. **Update your row** in the table above (Status, Replaces) in the same commit.
 
 ## Adapter folders (implementations, not ports)
@@ -282,6 +309,26 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   **No compile/test evidence** (owner's no-build-before-push rule) — the delivery team must build master and run the
   session requirement suites.
 
+
+- 2026-10-22 eng-host-arch: **the two Host/ namespace tiers are now separate directories.** P-13
+  (`CommandDeclaration`), P-14 (`DelegationCaller`), P-15 (`DelegationCommand`) and P-16 (`PairGuidance`) moved
+  from `src/Wanxiangshu/Host/` to `src/Wanxiangshu/Host/Domain/` and now declare
+  `namespace Wanxiangshu.Host.Domain` (tier B); the twelve consumers that used them now `open
+  Wanxiangshu.Host.Domain` instead of `Wanxiangshu.Host`. **Drift D-05 is resolved, D-06 partly resolved**
+  (each seam file carries its `HNI P-xx` marker as a plain `//` comment above the `namespace` line). P-17
+  (`Host/FissionPort.fs(i)`) already declared the safe `Wanxiangshu.Host.Ports` namespace and is **not**
+  moved — only its location is open, tracked on HNI-14. New **gate ⑬** (namespace-tier integrity) in
+  `scripts/checks/adapter-thinness.mjs`: a tier-A file must declare `Wanxiangshu.Host.Ports`, a tier-B file
+  `Wanxiangshu.Host.Domain`, no file directly under `Host/` may claim either namespace, and the adapter files
+  that reference the tier-B seam are ratcheted by `scripts/checks/domain-seam-baseline.json` (4 files). The
+  tier-B ratchet records existing debt; it does not forbid the seam from being used. Also corrected here:
+  the P-16 row said "not on `master`" (it **is** on `master`, via `3e2f12213`), the paragraph above the table
+  said P-16 lives on `origin/wip/hni-plugin` (the file has landed), the "95 files `open Wanxiangshu.Host`"
+  figure is now **75 files / 81 `open` lines** (measured 2026-10-22), and the checklist grew a tier choice as
+  step 0. **No compile/test evidence** (owner's no-build-before-push rule) — the delivery team must build
+  master and run the requirement suites. Gates: architecture OK, adapter-thinness 139 files / 33133 lines,
+  product-reference 595 (baseline 689), without-port 137 (baseline 150); `node --test
+  requirements/host-boundary/tests/034.test.mjs` 9/9.
 
 - 2026-10-21 eng-hni-plugin-goose (HNI-08): P-16 pair guidance is WIRED-OC — the guideline fold moved out of
   `OpenCode/Host/PairProgramming` into the domain owner `Interaction/PairGuidance/Occurrences`; the OpenCode transform
