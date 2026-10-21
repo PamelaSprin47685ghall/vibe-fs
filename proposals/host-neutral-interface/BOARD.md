@@ -30,6 +30,20 @@ recorded as a fact only: it touches the HNI-08 (plugin-host) and HNI-09 (leftove
 but it claims no card and changes no card state. The legacy `ISessionSnapshotPort` / `SessionMessage` contract
 stays live and no consumer was cut over; routing them onto P-03 is the next slice.
 
+P-01 progress (eng-hni-host, 2026-10-22): the OpenCode adapter's `ISessionPort` implementation is WIRED-OC for all
+seven verbs (`Create`, `Parent`, `Children`, `Abort`, `Interrupt`, `Close`, `FindByTitle`) in both `SdkSessionPort` and
+`HttpSessionPort` (`OpenCode/Host/SessionSnapshotPort.fs`). Every failure is mapped into the neutral error
+vocabulary (`HostError.NotFound` / `Refused` / `Transport`); no `Result<_, string>` channel and no raw host payload
+escapes the adapter. Two wire defects were corrected: the HTTP `Close` called `POST /session/{id}/abort` and now
+calls `DELETE /session/{id}`, and the SDK `Close` now sends the route payload the SDK expects. `Interrupt` is not a
+capability downgrade — the host API generation this adapter speaks (v1) has one stop action per session
+(`POST /session/{id}/abort`) and no attempt-scoped interrupt route; the host's `session.interrupt` belongs to the v2
+API generation, which this adapter does not speak, so the attempt-scoped stop maps onto that same `session.abort`
+verb the product already uses. No verb is left `Unsupported`. `Host/Ports/*` is unchanged (gate ⑪ intact, `omp: n/a`),
+so the next free port id stays **P-19**. Still open (not this slice): the product call sites in
+`OpenCode/Host/Sessions.fs` and `Foundation/HostSessionPort.fs` still use the legacy `ISessionHostPort` — routing
+them onto P-01 is a separate consumer cutover.
+
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 
 ## Gate ⑩/⑪/⑫ (HNI-04) — `scripts/checks/adapter-thinness.mjs`, run inside `architecture.mjs`

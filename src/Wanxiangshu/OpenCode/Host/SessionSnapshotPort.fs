@@ -474,6 +474,100 @@ module SessionSnapshotPort =
             | None -> Ok None
             | Some parent -> Ok(Some(SessionId.create parent))
 
+    /// The HTTP status a transport response carries, when the transport
+    /// exposes one. The SDK envelope keeps the raw response under `response`.
+    let private responseStatus (response: obj) : int option =
+        if isNull response then
+            None
+        elif not (isNull response?response) && not (isNull response?response?status) then
+            Some(unbox<int> response?response?status)
+        elif not (isNull response?status) then
+            Some(unbox<int> response?status)
+        elif not (isNull response?error) && not (isNull response?error?status) then
+            Some(unbox<int> response?error?status)
+        else
+            None
+
+    /// A transport status expressed in the port's error vocabulary.
+    let private hostErrorOfStatus (status: int) (verb: string) : HostError =
+        if status = 404 then
+            HostError.NotFound(sprintf "%s: session not found (HTTP %d)" verb status)
+        elif status >= 400 && status < 500 then
+            HostError.Refused(sprintf "%s: host refused the request (HTTP %d)" verb status)
+        else
+            HostError.Transport(sprintf "%s: transport failure (HTTP %d)" verb status)
+
+    /// The message a failed host response carries, when it carries one.
+    let private failureMessage (response: obj) : string option =
+        let error = if isNull response then null else response?error
+
+        if isNull error then
+            None
+        elif not (isNull error?data?message) then
+            readString error?data?message
+        else
+            readString error?message
+
+    /// The failure a host response carries, expressed in the port's error
+    /// vocabulary. The host payload itself never leaves the adapter.
+    let private hostErrorOfResponse (response: obj) (verb: string) : HostError =
+        let detail =
+            match failureMessage response with
+            | Some message -> message
+            | None -> sprintf "%s failed" verb
+
+        match responseStatus response with
+        | Some status when status = 404 ->
+            HostError.NotFound(sprintf "%s: %s" verb detail)
+        | Some status when status >= 400 && status < 500 ->
+            HostError.Refused(sprintf "%s: %s" verb detail)
+        | Some status ->
+            HostError.Transport(sprintf "%s: %s (HTTP %d)" verb detail status)
+        | None -> HostError.Refused(sprintf "%s: %s" verb detail)
+
+    /// The failure a transport status carries, when the status is a failure.
+    let private statusFailure (response: obj) (verb: string) : HostError option =
+        match responseStatus response with
+        | Some status when status < 200 || status >= 300 ->
+            Some(hostErrorOfStatus status verb)
+        | _ -> None
+
+    /// The failure an SDK response envelope carries, if it carries one. The
+    /// SDK client reports a non-2xx answer as an error envelope rather than
+    /// as a thrown exception.
+    let private sdkFailure (response: obj) (verb: string) : HostError option =
+        if isNull response then
+            None
+        elif not (isNull response?error) then
+            Some(hostErrorOfResponse response verb)
+        else
+            statusFailure response verb
+
+    /// The outcome of an SDK call: the host's failure, or the mapped answer.
+    let private sdkOr (response: obj) (verb: string) (ok: unit -> Result<'T, HostError>) : Result<'T, HostError> =
+        match sdkFailure response verb with
+        | Some failure -> Error failure
+        | None -> ok ()
+
+    /// One SDK call, with any transport failure expressed in the port's
+    /// error vocabulary.
+    let private sdkInvoke (sessObj: obj) (fn: obj) (payload: obj) : Task<Result<obj, HostError>> =
+        taskResult {
+            try
+                let! response = unbox<Task<obj>> (fn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                return! Ok response
+            with ex ->
+                return! Error(HostError.Transport ex.Message)
+        }
+
+    /// The SDK client's session-removal method: `session.delete` when the
+    /// client exposes it, `session.close` otherwise.
+    let private closeMethod (sessObj: obj) : obj =
+        if isNull sessObj?delete then
+            sessObj?close
+        else
+            sessObj?delete
+
     type SdkSessionPort(client: obj, workspaceDirectory: string option) =
         let headersObj (directory: string option) =
             match directory with
@@ -483,187 +577,189 @@ module SessionSnapshotPort =
         interface ISessionPort with
             member _.FindByTitle(title) =
                 taskResult {
-                    try
-                        let sessObj = client?session
-                        let listFn = sessObj?list
+                    let sessObj = client?session
+                    let listFn = sessObj?list
 
-                        do!
-                            Result.requireFalse
-                                (HostError.Transport "session.list unavailable on SDK client")
-                                (isNull listFn)
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "session.list unavailable on SDK client")
+                            (isNull listFn)
 
+                    let queryFields =
+                        [ "roots", box true; "search", box title; "limit", box 2 ]
+                        @ (workspaceDirectory
+                           |> Option.map (fun dir -> [ "directory", box dir ])
+                           |> Option.defaultValue [])
 
-                        let queryFields =
-                            [ "roots", box true; "search", box title; "limit", box 2 ]
-                            @ (workspaceDirectory
-                               |> Option.map (fun dir -> [ "directory", box dir ])
-                               |> Option.defaultValue [])
+                    let payload =
+                        createObj
+                            [ "query", box (createObj queryFields)
+                              "headers", box (headersObj workspaceDirectory) ]
 
-                        let payload =
-                            createObj
-                                [ "query", box (createObj queryFields)
-                                  "headers", box (headersObj workspaceDirectory) ]
+                    let! response = sdkInvoke sessObj listFn payload
 
-                        let! response = unbox<Task<obj>> (listFn?call (sessObj, payload)) |> TaskResultCE.ofTask
-
-                        return! discoveredSessions title response
-                    with ex ->
-                        return! Error(HostError.Transport ex.Message)
+                    return!
+                        match response with
+                        | Ok raw -> sdkOr raw "session.list" (fun () -> discoveredSessions title raw)
+                        | Error failure -> Error failure
                 }
 
             member _.Create(parent, spec) =
                 taskResult {
-                    try
-                        let sessObj = client?session
-                        let createFn = sessObj?create
+                    let sessObj = client?session
+                    let createFn = sessObj?create
 
-                        do!
-                            Result.requireFalse
-                                (HostError.Transport "session.create unavailable on SDK client")
-                                (isNull createFn)
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "session.create unavailable on SDK client")
+                            (isNull createFn)
 
-                        let bodyFields =
-                            (parent
-                             |> Option.map (fun p -> [ "parentID", box (SessionId.value p) ])
-                             |> Option.defaultValue [])
-                            @ (spec.Title
-                               |> Option.map (fun title -> [ "title", box title ])
-                               |> Option.defaultValue [])
-                            @ (spec.Role
-                               |> Option.map (fun (AgentRole role) -> [ "agent", box role ])
-                               |> Option.defaultValue [])
+                    let bodyFields =
+                        (parent
+                         |> Option.map (fun p -> [ "parentID", box (SessionId.value p) ])
+                         |> Option.defaultValue [])
+                        @ (spec.Title
+                           |> Option.map (fun title -> [ "title", box title ])
+                           |> Option.defaultValue [])
+                        @ (spec.Role
+                           |> Option.map (fun (AgentRole role) -> [ "agent", box role ])
+                           |> Option.defaultValue [])
 
-                        let directory =
-                            spec.Workspace
-                            |> Option.map (fun (WorkspacePath dir) -> dir)
-                            |> Option.orElse workspaceDirectory
+                    let directory =
+                        spec.Workspace
+                        |> Option.map (fun (WorkspacePath dir) -> dir)
+                        |> Option.orElse workspaceDirectory
 
-                        let payload =
-                            createObj (
-                                [ "body", box (createObj bodyFields); "headers", box (headersObj directory) ]
-                                @ bodyFields
-                            )
+                    let payload =
+                        createObj (
+                            [ "body", box (createObj bodyFields); "headers", box (headersObj directory) ]
+                            @ bodyFields
+                        )
 
-                        let! response = unbox<Task<obj>> (createFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                    let! response = sdkInvoke sessObj createFn payload
 
-                        let created = objectPayload response
+                    return!
+                        match response with
+                        | Ok raw ->
+                            sdkOr raw "session.create" (fun () ->
+                                let created = objectPayload raw
 
-                        return!
-                            readString created?id
-                            |> Option.map SessionId.create
-                            |> Result.requireSome (HostError.Transport "Missing session id in response")
-                    with ex ->
-                        return! Error(HostError.Transport ex.Message)
+                                readString created?id
+                                |> Option.map SessionId.create
+                                |> Result.requireSome (HostError.Transport "Missing session id in response"))
+                        | Error failure -> Error failure
                 }
 
             member _.Parent(session) =
                 taskResult {
-                    try
-                        let sessObj = client?session
-                        let getFn = sessObj?get
+                    let sessObj = client?session
+                    let getFn = sessObj?get
 
-                        do!
-                            Result.requireFalse
-                                (HostError.Transport "session.get unavailable on SDK client")
-                                (isNull getFn)
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "session.get unavailable on SDK client")
+                            (isNull getFn)
 
-                        let sId = SessionId.value session
+                    let sId = SessionId.value session
 
-                        let payload =
-                            createObj
-                                [ "path", box (createObj [ "id", box sId ])
-                                  "sessionID", box sId
-                                  "headers", box (headersObj workspaceDirectory) ]
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box sId ])
+                              "sessionID", box sId
+                              "headers", box (headersObj workspaceDirectory) ]
 
-                        let! response = unbox<Task<obj>> (getFn?call (sessObj, payload)) |> TaskResultCE.ofTask
-                        return! parentOfPayload response
-                    with ex ->
-                        return! Error(HostError.Transport ex.Message)
+                    let! response = sdkInvoke sessObj getFn payload
+
+                    return!
+                        match response with
+                        | Ok raw -> sdkOr raw "session.get" (fun () -> parentOfPayload raw)
+                        | Error failure -> Error failure
                 }
 
             member _.Children(parent) =
                 taskResult {
-                    try
-                        let sessObj = client?session
-                        let childrenFn = sessObj?children
+                    let sessObj = client?session
+                    let childrenFn = sessObj?children
 
-                        do!
-                            Result.requireFalse
-                                (HostError.Transport "session.children unavailable on SDK client")
-                                (isNull childrenFn)
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "session.children unavailable on SDK client")
+                            (isNull childrenFn)
 
-                        let pId = SessionId.value parent
+                    let pId = SessionId.value parent
 
-                        let payload =
-                            createObj
-                                [ "path", box (createObj [ "id", box pId ])
-                                  "headers", box (headersObj workspaceDirectory) ]
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box pId ])
+                              "headers", box (headersObj workspaceDirectory) ]
 
-                        let! response = unbox<Task<obj>> (childrenFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                    let! response = sdkInvoke sessObj childrenFn payload
 
-                        return sessionInfosOfRows (unwrapPayload response)
-                    with ex ->
-                        return! Error(HostError.Transport ex.Message)
+                    return!
+                        match response with
+                        | Ok raw -> sdkOr raw "session.children" (fun () -> Ok(sessionInfosOfRows (unwrapPayload raw)))
+                        | Error failure -> Error failure
                 }
 
             member _.Abort(session) =
                 taskResult {
-                    try
-                        let sessObj = client?session
-                        let abortFn = sessObj?abort
+                    let sessObj = client?session
+                    let abortFn = sessObj?abort
 
-                        do!
-                            Result.requireFalse
-                                (HostError.Transport "session.abort unavailable on SDK client")
-                                (isNull abortFn)
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "session.abort unavailable on SDK client")
+                            (isNull abortFn)
 
-                        let sId = SessionId.value session
+                    let sId = SessionId.value session
 
-                        let payload =
-                            createObj
-                                [ "path", box (createObj [ "id", box sId ])
-                                  "headers", box (headersObj workspaceDirectory) ]
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box sId ])
+                              "headers", box (headersObj workspaceDirectory) ]
 
-                        let! response = unbox<Task<obj>> (abortFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                    let! response = sdkInvoke sessObj abortFn payload
 
-                        if not (isNull response) && not (isNull response?error) then
-                            return! Error(HostError.Refused "Host rejected session abort")
-                        else
-                            return ()
-                    with ex ->
-                        return! Error(HostError.Transport ex.Message)
+                    return!
+                        match response with
+                        | Ok raw -> sdkOr raw "session.abort" (fun () -> Ok())
+                        | Error failure -> Error failure
                 }
 
-            // The host exposes one stop action per session; the attempt-scoped
-            // stop the product asks for is that same action, applied to the
-            // session that owns the attempt.
+            // The OpenCode host (API v1) exposes exactly one stop action per
+            // session: `session.abort` (POST /session/{id}/abort). It has no
+            // attempt-scoped interrupt route — the only `session.interrupt`
+            // in the host belongs to the v2 API generation, which this
+            // adapter's client does not speak. The product's own
+            // attempt-interrupt path already calls `session.abort` for the
+            // session that owns the attempt (see OpenCodePort.fs), so the
+            // attempt-scoped stop maps onto that same wire verb.
             member this.Interrupt(session) = (this :> ISessionPort).Abort session
 
             member _.Close(session) =
                 taskResult {
-                    try
-                        let sessObj = client?session
+                    let sessObj = client?session
+                    let closeFn = closeMethod sessObj
 
-                        let closeFn =
-                            if isNull sessObj?delete then
-                                sessObj?close
-                            else
-                                sessObj?delete
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "No close/delete session method on SDK client")
+                            (isNull closeFn)
 
-                        do!
-                            Result.requireFalse
-                                (HostError.Transport "No close/delete session method on SDK client")
-                                (isNull closeFn)
+                    let sId = SessionId.value session
 
-                        let sId = SessionId.value session
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box sId ])
+                              "sessionID", box sId
+                              "headers", box (headersObj workspaceDirectory) ]
 
-                        let! _ =
-                            unbox<Task<obj>> (closeFn?call (sessObj, {| sessionID = sId |}))
-                            |> TaskResultCE.ofTask
+                    let! response = sdkInvoke sessObj closeFn payload
 
-                        return ()
-                    with ex ->
-                        return! Error(HostError.Transport ex.Message)
+                    return!
+                        match response with
+                        | Ok raw -> sdkOr raw "session.delete" (fun () -> Ok())
+                        | Error failure -> Error failure
                 }
 
     type HttpSessionPort(baseUrl: string) =
@@ -676,71 +772,127 @@ module SessionSnapshotPort =
         [<Emit("fetch($0, $1)")>]
         let jsFetch (url: string) (init: obj) : Task<obj> = jsNative
 
-        let readJson (url: string) : Task<Result<obj, HostError>> =
+        /// A response body, parsed when it can be parsed.
+        let private tryParse (text: string) : obj =
+            try
+                JS.JSON.parse text
+            with _ ->
+                null
+
+        /// The message a parsed error body carries, when it carries one.
+        let private messageOf (parsed: obj) : string option =
+            if not (isNull parsed?data) && not (isNull parsed?data?message) then
+                readString parsed?data?message
+            elif not (isNull parsed?message) then
+                readString parsed?message
+            else
+                None
+
+        /// The message a failed response body carries, when it carries one.
+        let private detailOfBody (text: string) : string option =
+            let parsed = if String.IsNullOrWhiteSpace text then null else tryParse text
+
+            if isNull parsed then
+                None
+            else
+                messageOf parsed
+
+        /// The detail a failed call reports, when the body carries none.
+        let private failureDetail (verb: string) (text: string) : string =
+            match detailOfBody text with
+            | Some message -> message
+            | None -> sprintf "%s failed" verb
+
+        /// A failed HTTP status expressed in the port's error vocabulary.
+        let private httpError (verb: string) (status: int) (detail: string) : HostError =
+            if status = 404 then
+                HostError.NotFound(sprintf "%s: %s" verb detail)
+            elif status >= 400 && status < 500 then
+                HostError.Refused(sprintf "%s: %s" verb detail)
+            else
+                HostError.Transport(sprintf "%s: %s (HTTP %d)" verb detail status)
+
+        /// The body of a successful HTTP answer.
+        let private httpBody (text: string) : Result<obj, HostError> =
+            let candidate = if String.IsNullOrWhiteSpace text then createObj [] else tryParse text
+            let usable = if isNull candidate then None else Some candidate
+
+            match usable with
+            | Some body -> Ok body
+            | None -> Error(HostError.Transport "Host returned a body that is not valid JSON")
+
+        /// One HTTP call, with its failure expressed in the port's error
+        /// vocabulary. The raw host payload never leaves the adapter.
+        let private httpOutcome (verb: string) (status: int) (text: string) : Result<obj, HostError> =
+            if status < 200 || status >= 300 then
+                Error(httpError verb status (failureDetail verb text))
+            else
+                httpBody text
+
+        /// The request payload of one HTTP call.
+        let private httpInit (method: string) (body: obj option) : obj =
+            match body with
+            | Some payload ->
+                createObj
+                    [ "method", box method
+                      "headers", box (createObj [ "Content-Type", box "application/json" ])
+                      "body", box (JS.JSON.stringify payload) ]
+            | None -> createObj [ "method", box method ]
+
+        /// The raw answer of one HTTP call: its status and its body text.
+        let private fetchRaw (url: string) (init: obj) : Task<Result<int * string, HostError>> =
             taskResult {
                 try
-                    let! response = jsFetch url (createObj [ "method", box "GET" ]) |> TaskResultCE.ofTask
+                    let! response = jsFetch url init |> TaskResultCE.ofTask
                     let status = unbox<int> response?status
-
-                    do!
-                        Result.requireTrue
-                            (HostError.Transport(sprintf "HTTP %d" status))
-                            (status >= 200 && status < 300)
-
-                    let! body = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
-                    return JS.JSON.parse body
-                with ex ->
-                    return! Error(HostError.Transport ex.Message)
-            }
-
-        let postJson (endpoint: string) (body: obj) : Task<Result<obj, HostError>> =
-            taskResult {
-                try
-                    let init =
-                        createObj
-                            [ "method", box "POST"
-                              "headers", box (createObj [ "Content-Type", box "application/json" ])
-                              "body", box (JS.JSON.stringify body) ]
-
-                    let! response = jsFetch (cleanBase + endpoint) init |> TaskResultCE.ofTask
-                    let status = unbox<int> response?status
-
-                    do!
-                        Result.requireTrue
-                            (HostError.Transport(sprintf "HTTP %d" status))
-                            (status >= 200 && status < 300)
-
                     let! text = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
-
-                    if String.IsNullOrWhiteSpace text then
-                        return createObj []
-                    else
-                        return JS.JSON.parse text
+                    return! Ok((status, text))
                 with ex ->
                     return! Error(HostError.Transport ex.Message)
             }
+
+        /// One HTTP request, with its failure expressed in the port's error
+        /// vocabulary. The raw host payload never leaves the adapter.
+        let private requestJson
+            (verb: string)
+            (method: string)
+            (url: string)
+            (body: obj option)
+            : Task<Result<obj, HostError>> =
+            let init = httpInit method body
+
+            taskResult {
+                let! raw = fetchRaw url init
+
+                return!
+                    match raw with
+                    | Ok(status, text) -> httpOutcome verb status text
+                    | Error failure -> Error failure
+            }
+
+        let private readJson (verb: string) (url: string) : Task<Result<obj, HostError>> =
+            requestJson verb "GET" url None
+
+        let private postJson (verb: string) (endpoint: string) (body: obj) : Task<Result<obj, HostError>> =
+            requestJson verb "POST" (cleanBase + endpoint) (Some body)
+
+        /// The host's session-removal verb: `DELETE /session/{id}`.
+        let private deleteSession (session: SessionId) : Task<Result<obj, HostError>> =
+            requestJson
+                "session.delete"
+                "DELETE"
+                (sprintf "%s/session/%s" cleanBase (SessionId.value session))
+                None
 
         interface ISessionPort with
             member _.FindByTitle(title) =
                 taskResult {
-                    try
-                        let url =
-                            sprintf "%s/session?roots=true&limit=2&search=%s" cleanBase (encodeURIComponent title)
+                    let url =
+                        sprintf "%s/session?roots=true&limit=2&search=%s" cleanBase (encodeURIComponent title)
 
-                        let! response = jsFetch url (createObj [ "method", box "GET" ]) |> TaskResultCE.ofTask
-                        let status = unbox<int> response?status
+                    let! data = requestJson "session.list" "GET" url None
 
-                        do!
-                            Result.requireTrue
-                                (HostError.Transport(sprintf "HTTP %d" status))
-                                (status >= 200 && status < 300)
-
-
-                        let! body = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
-
-                        return! discoveredSessions title (JS.JSON.parse body)
-                    with ex ->
-                        return! Error(HostError.Transport ex.Message)
+                    return! discoveredSessions title data
                 }
 
             member _.Create(parent, spec) =
@@ -756,7 +908,7 @@ module SessionSnapshotPort =
                            |> Option.map (fun (AgentRole role) -> [ "agent", box role ])
                            |> Option.defaultValue [])
 
-                    let! data = postJson "/session" (createObj bodyFields)
+                    let! data = postJson "session.create" "/session" (createObj bodyFields)
 
                     return!
                         readString (objectPayload data)?id
@@ -766,34 +918,46 @@ module SessionSnapshotPort =
 
             member _.Parent(session) =
                 taskResult {
-                    let! data = readJson (sprintf "%s/session/%s" cleanBase (SessionId.value session))
+                    let! data = readJson "session.get" (sprintf "%s/session/%s" cleanBase (SessionId.value session))
                     return! parentOfPayload data
                 }
 
             member _.Children(parent) =
                 taskResult {
-                    let! data = readJson (sprintf "%s/session/%s/children" cleanBase (SessionId.value parent))
+                    let! data =
+                        readJson
+                            "session.children"
+                            (sprintf "%s/session/%s/children" cleanBase (SessionId.value parent))
 
                     return sessionInfosOfRows (unwrapPayload (objectPayload data))
                 }
 
             member _.Abort(session) =
                 taskResult {
-                    let! _ = postJson (sprintf "/session/%s/abort" (SessionId.value session)) (createObj [])
+                    let! _ =
+                        postJson
+                            "session.abort"
+                            (sprintf "/session/%s/abort" (SessionId.value session))
+                            (createObj [])
+
                     return ()
                 }
 
-            // The host exposes one stop action per session; the attempt-scoped
-            // stop the product asks for is that same action, applied to the
-            // session that owns the attempt.
+            // The OpenCode host (API v1) exposes exactly one stop action per
+            // session: `POST /session/{id}/abort`. It has no attempt-scoped
+            // interrupt route — the only `session.interrupt` in the host
+            // belongs to the v2 API generation, which this adapter does not
+            // speak. The product's own attempt-interrupt path already calls
+            // `session.abort` for the session that owns the attempt (see
+            // OpenCodePort.fs), so the attempt-scoped stop maps onto that
+            // same wire verb.
             member this.Interrupt(session) = (this :> ISessionPort).Abort session
 
             member _.Close(session) =
                 taskResult {
-                    let! _ = postJson (sprintf "/session/%s/abort" (SessionId.value session)) (createObj [])
+                    let! _ = deleteSession session
                     return ()
                 }
-
 
     type HttpSnapshotPort(baseUrl: string) =
         let cleanBase =

@@ -10,7 +10,7 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 
 | ID | Port (namespace `Wanxiangshu.Host.Ports`) | File | Owner lane | Replaces (legacy) | Status |
 |---|---|---|---|---|---|
-| P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Ports/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo` | DECLARED, WIRED-OC, SKELETON-OMP |
+| P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Ports/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo` | DECLARED, WIRED-OC, SKELETON-OMP — all seven verbs (`Create`, `Parent`, `Children`, `Abort`, `Interrupt`, `Close`, `FindByTitle`) implemented in the OpenCode adapter (`SdkSessionPort` / `HttpSessionPort`, `OpenCode/Host/SessionSnapshotPort.fs`); every verb reports failures as `HostError`, and no verb is left `Unsupported` |
 | P-02 | `IPromptPort`, `PromptRequest`, `DeliveryVerdict` | `Host/Ports/Prompts.fs(i)` | fission (+ Interaction/Dispatch) | `OpenCode.IPromptPort`, `OpenCodePromptOptions`, `DetachedSendVerdict` | DECLARED, SKELETON-OMP |
 | P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` (both still live; cutover pending) | DECLARED, WIRED-OC, SKELETON-OMP |
 | P-04 | `IToolRegistrar`, `ToolSpec`, `ToolInvocation`, `ToolOutcome` | `Host/Ports/Tools.fs(i)` | tools | `OpenCode/Tools/ToolContext` `Tool`/`ToolContext`/`ToolOutput` | DECLARED, SKELETON-OMP |
@@ -265,6 +265,23 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   product-reference 596 (baseline 689), without-port 137 (baseline 150), provider-leak-gate OK.
   **No compile/test evidence** (owner's no-build-before-push rule; the compile slot gave up with exit 75 because the
   machine was heavily loaded) — the delivery team must build master and run the session requirement suites.
+- 2026-10-22 eng-hni-host (P-01 corrective): the OpenCode adapter's P-01 session port now reports **every** failure
+  as `HostError` — 404 → `HostError.NotFound`, other 4xx → `HostError.Refused`, 5xx → `HostError.Transport`, a thrown
+  exception → `HostError.Transport`. The mapping is applied twice, once on the SDK envelope path (a non-2xx answer
+  arrives as an error envelope, not as a throw) and once on the raw-HTTP path; the host payload itself never leaves
+  the adapter. Two verbs were wrong before this change and are corrected: the HTTP `Close` called
+  `POST /session/{id}/abort` (a copy of `Abort`) and now calls the host's removal verb `DELETE /session/{id}`, and the
+  SDK `Close` now sends the route payload the SDK expects (`path.id` plus the session id). `Interrupt` is **not** a
+  capability downgrade: the OpenCode host API generation this adapter speaks (v1) exposes exactly one stop action per
+  session, `POST /session/{id}/abort`, and no attempt-scoped interrupt route — the host's `session.interrupt` belongs to
+  the v2 API generation (`POST /api/session/{sessionID}/interrupt`), which this adapter does not speak. The
+  product's own attempt-interrupt path already calls `client.session.abort` for the session that owns the attempt
+  (`OpenCode/Host/Sessions.fs` → `OpenCode/Host/OpenCodePort.fs`), so `Interrupt` maps onto that same wire verb and is
+  stated as such in the code. **No verb is left `Unsupported`.** No new port: P-01 (`Host/Ports/Sessions.fs(i)`) is
+  unchanged, so the next free port id stays **P-19** and the generated TS mirror is unaffected (`omp: n/a`).
+  **No compile/test evidence** (owner's no-build-before-push rule) — the delivery team must build master and run the
+  session requirement suites.
+
 
 - 2026-10-21 eng-hni-plugin-goose (HNI-08): P-16 pair guidance is WIRED-OC — the guideline fold moved out of
   `OpenCode/Host/PairProgramming` into the domain owner `Interaction/PairGuidance/Occurrences`; the OpenCode transform
