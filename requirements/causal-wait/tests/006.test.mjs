@@ -273,7 +273,15 @@ test('WHAT[causal-wait-006] CAUSAL_006_history_default_capacity_is_256', () => {
     test(`WHAT[causal-wait-006] ${failureAt} failure records failure, cancels the unused deadline and cannot revive the wait`, async () => {
       const registry = causal.createRegistry()
       const timer = temporal.createVirtualTimer()
-      const deadline = temporal.timerDelay(timer, 100)
+      const inner = temporal.timerDelay(timer, 100)
+      let cancellations = 0
+      const deadline = Object.freeze({
+        Delay: inner.Delay,
+        Cancel() {
+          cancellations += 1
+          inner.Cancel()
+        },
+      })
       const fail = () => { throw new Error(`controlled ${failureAt} failure`) }
       try {
         await assert.rejects(causal.untilSignalOrDeadline(registry, descriptor, deadline,
@@ -282,7 +290,7 @@ test('WHAT[causal-wait-006] CAUSAL_006_history_default_capacity_is_256', () => {
         const ended = causal.snapshot(registry)
         assert.equal(ended.active.length, 0)
         assert.equal(ended.history.at(-1).exit, 'WaitFailed')
-        assert.equal(deadline.cancelCount, 1)
+        assert.equal(cancellations, 1)
         temporal.timerAdvance(timer, 1000)
         await new Promise(resolve => setImmediate(resolve))
         assert.deepEqual(causal.snapshot(registry), ended)

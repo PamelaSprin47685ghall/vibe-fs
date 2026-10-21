@@ -114,6 +114,18 @@ const { default: test } = await import("node:test");
 const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
 const process = await import('../../../dist/Process/Surface.js')
 const STALE = 5_000
+const observeDeadline = (handle, readOnlyCounter = false) => {
+  let cancellations = 0
+  const deadline = {
+    Delay: handle.Delay,
+    Cancel() {
+      cancellations += 1
+      handle.Cancel()
+    },
+  }
+  if (readOnlyCounter) Object.defineProperty(deadline, 'cancelCount', { value: 91, writable: false })
+  return { deadline: Object.freeze(deadline), cancellations: () => cancellations }
+}
 const descriptor = () =>
   causal.createWait({
     waitKind: 'until-signal-or-deadline',
@@ -135,7 +147,8 @@ const enteredLeft = (snapshot) => {
 test('WHAT[causal-wait-005] thousands of immediate stale wakes still form one observation and cancel the deadline on success', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
-  const handle = process.timerDelay(timer, 60_000)
+  const observed = observeDeadline(process.timerDelay(timer, 60_000))
+  const handle = observed.deadline
   let reads = 0
   let wakes = 0
   const pending = causal.untilSignalOrDeadline(
@@ -156,20 +169,21 @@ test('WHAT[causal-wait-005] thousands of immediate stale wakes still form one ob
   assert.deepEqual(await pending, { ok: true, value: 'material' })
   assert.equal(wakes, STALE)
   assert.equal(reads, STALE + 1)
-  assert.equal(handle.cancelCount, 1)
+  assert.equal(observed.cancellations(), 1)
   assert.equal(enteredLeft(causal.snapshot(registry)), 'WaitResolved')
 
   // Quiescence: firing the (cancelled) deadline afterwards revives nothing.
   process.timerAdvance(timer, 120_000)
   assert.equal(causal.snapshot(registry).active.length, 0)
   assert.equal(causal.snapshot(registry).history.length, 2)
-  assert.equal(handle.cancelCount, 1)
+  assert.equal(observed.cancellations(), 1)
   process.timerDispose(timer)
 })
 test('WHAT[causal-wait-005] stale wakes stop re-reading after deadline termination', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
-  const handle = process.timerDelay(timer, 250)
+  const observed = observeDeadline(process.timerDelay(timer, 250))
+  const handle = observed.deadline
   let reads = 0
   let wakes = 0
   const pending = causal.untilSignalOrDeadline(
@@ -193,7 +207,7 @@ test('WHAT[causal-wait-005] stale wakes stop re-reading after deadline terminati
   assert.deepEqual(await pending, { ok: false, reason: 'WaitTimedOut' })
   assert.equal(wakes, 3)
   assert.equal(reads, 3)
-  assert.equal(handle.cancelCount, 0)
+  assert.equal(observed.cancellations(), 0)
   assert.equal(enteredLeft(causal.snapshot(registry)), 'WaitTimedOut')
 
   // Quiescence: no lease, no pending deadline arm, no re-read after the exit.
@@ -204,4 +218,42 @@ test('WHAT[causal-wait-005] stale wakes stop re-reading after deadline terminati
   assert.equal(reads, 3)
   process.timerDispose(timer)
 })
+
+for (const readOnlyCounter of [false, true]) {
+  for (const mode of ['immediate', 'signal', 'expiry']) {
+    test(`WHAT[causal-wait-005] ${mode} consumes a ${readOnlyCounter ? 'read-only counter' : 'frozen'} caller deadline without writes`, async () => {
+      const registry = causal.createRegistry()
+      const timer = process.createVirtualTimer()
+      const observed = observeDeadline(process.timerDelay(timer, 20), readOnlyCounter)
+      const { deadline } = observed
+      const keys = Reflect.ownKeys(deadline)
+      let ready = mode === 'immediate'
+      let release
+      const signal = new Promise((resolve) => { release = resolve })
+      try {
+        const pending = causal.untilSignalOrDeadline(registry, descriptor(), deadline,
+          () => ready ? 'material' : null, () => signal)
+        if (mode === 'signal') {
+          ready = true
+          release()
+        }
+        if (mode === 'expiry') process.timerAdvance(timer, 20)
+        assert.deepEqual(await pending, mode === 'expiry'
+          ? { ok: false, reason: 'WaitTimedOut' }
+          : { ok: true, value: 'material' })
+        assert.equal(observed.cancellations(), mode === 'expiry' ? 0 : 1)
+        assert.deepEqual(Reflect.ownKeys(deadline), keys)
+        if (readOnlyCounter) assert.equal(deadline.cancelCount, 91)
+        const ended = causal.snapshot(registry)
+        assert.equal(enteredLeft(ended), mode === 'expiry' ? 'WaitTimedOut' : 'WaitResolved')
+        process.timerAdvance(timer, 100)
+        await new Promise((resolve) => setImmediate(resolve))
+        assert.deepEqual(causal.snapshot(registry), ended)
+        assert.equal(observed.cancellations(), mode === 'expiry' ? 0 : 1)
+      } finally {
+        process.timerDispose(timer)
+      }
+    })
+  }
+}
 }
