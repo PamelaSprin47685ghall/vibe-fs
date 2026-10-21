@@ -1161,6 +1161,10 @@ Execution/Delegation/Fork/JoinRules.fs
 Execution/Delegation/Fork/OpenCode/JoinTool.fsi
 Execution/Delegation/Fork/OpenCode/JoinTool.fs
 
+Host/FissionPort.fsi
+Host/FissionPort.fs
+Execution/Fission/Launch.fsi
+Execution/Fission/Launch.fs
 Execution/Fission/OpenCode/Tool.fsi
 Execution/Fission/OpenCode/Tool.fs
 OpenCode/Tools/ToolRuntimeScopeSurface.fsi
