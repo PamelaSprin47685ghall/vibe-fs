@@ -32,20 +32,28 @@ module HostPlugin =
     /// to the same default rather than to a hand-written document.
     let private defaultRole = Role.Engineer
 
+    /// A parsed role that still carries a product prompt. A retired role is
+    /// rejected by the product's role resource lookup; those fall back to
+    /// the default role.
+    let private liveRole (role: Role) : Role =
+        try
+            PromptResources.systemForRole ProviderLanguage.English role |> ignore
+            role
+        with _ ->
+            defaultRole
+
+    /// A role label that the product's role vocabulary still knows.
+    /// An unknown label uses the product default role.
+    let private parsedRole (label: string) : Role =
+        match Roles.tryParseRole label with
+        | Some role -> liveRole role
+        | None -> defaultRole
+
     /// The role of the turn context, resolved to the product's role law.
     /// An unknown or retired role label uses the product default role.
     let private roleOf (context: TurnContext) : Role =
         match context.Role with
-        | Some (AgentRole label) ->
-            match Roles.tryParseRole label with
-            | Some role ->
-                try
-                    // `roleSemanticPath` rejects retired roles; those fall back.
-                    PromptResources.systemForRole ProviderLanguage.English role |> ignore
-                    role
-                with _ ->
-                    defaultRole
-            | None -> defaultRole
+        | Some(AgentRole label) -> parsedRole label
         | None -> defaultRole
 
     /// The paired-bilingual tool description. The English and the Chinese
@@ -54,7 +62,7 @@ module HostPlugin =
     let private bilingualDescription () : string =
         let tryRead (language: ProviderLanguage) (semanticPath: string) =
             try
-                Some (ProviderResources.readText language semanticPath).Trim()
+                Some((ProviderResources.readText language semanticPath).Trim())
             with _ ->
                 None
 
@@ -63,8 +71,14 @@ module HostPlugin =
         let chosen =
             candidates
             |> List.tryPick (fun semanticPath ->
-                match tryRead ProviderLanguage.English semanticPath, tryRead ProviderLanguage.SimplifiedChinese semanticPath with
-                | Some english, Some chinese when not (String.IsNullOrWhiteSpace english) && not (String.IsNullOrWhiteSpace chinese) ->
+                match
+                    tryRead ProviderLanguage.English semanticPath,
+                    tryRead ProviderLanguage.SimplifiedChinese semanticPath
+                with
+                | Some english, Some chinese when
+                    not (String.IsNullOrWhiteSpace english)
+                    && not (String.IsNullOrWhiteSpace chinese)
+                    ->
                     Some(english, chinese)
                 | _ -> None)
 
@@ -88,22 +102,194 @@ module HostPlugin =
     let private workIdOf (seed: string) : string =
         "host2-" + (HostDigest.sha256Hex seed).Substring(0, 32)
 
+    /// The text body of one transcript message.
+    let private messageBody (message: TranscriptMessage) : string =
+        message.Parts
+        |> List.collect (fun part ->
+            match part with
+            | TranscriptPart.Text value -> [ value ]
+            | _ -> [])
+        |> String.concat ""
+
     /// The assistant reply of a child session: the last assistant message
     /// that carries a terminal state and non-empty text.
     let private assistantReply (messages: TranscriptMessage list) : string option =
         messages
         |> List.filter (fun message -> message.Role = TranscriptRole.Assistant && message.Terminal.IsSome)
         |> List.tryPick (fun message ->
-            let text =
-                message.Parts
-                |> List.collect (fun part ->
-                    match part with
-                    | TranscriptPart.Text value -> [ value ]
-                    | _ -> [])
-                |> String.concat ""
-                |> fun value -> value.Trim()
+            let text = messageBody message |> fun value -> value.Trim()
 
             if String.IsNullOrWhiteSpace text then None else Some text)
+
+    /// A failed product tool outcome.
+    let private failureOutcome (text: string) : ToolOutcome =
+        { Text = text
+          Truncated = false
+          IsError = true
+          Details = None }
+
+    /// A successful product tool outcome.
+    let private successOutcome (text: string) : ToolOutcome =
+        { Text = text
+          Truncated = false
+          IsError = false
+          Details = None }
+
+    /// The text of a delivery request, read from the raw invocation payload.
+    /// A malformed payload carries no text.
+    let private textFieldOf (raw: string) : string =
+        try
+            jsonTextField (parseJson raw)
+        with _ ->
+            ""
+
+    /// The text a tool invocation asks to deliver.
+    let private invocationText (invocation: ToolInvocation) : string =
+        match invocation.Args with
+        | CanonicalJsonText raw -> textFieldOf raw
+        | _ -> ""
+
+    /// The observation of the child's transcript: what was seen, and the
+    /// terminal reply if the transcript already carries one.
+    let private observeTranscript (messages: Result<TranscriptMessage list, HostError>) : string * string option =
+        match messages with
+        | Ok observed ->
+            ("observed "
+             + string observed.Length
+             + " message(s) in the child transcript; no terminal assistant reply yet",
+             assistantReply observed)
+        | Error error -> ("the child transcript could not be read: " + string error, None)
+
+    /// The terminal outcome of one transcript observation, if the wait for
+    /// the child's reply is over.
+    let private terminalOutcome
+        (reply: string option)
+        (observation: string)
+        (deadline: DateTimeOffset)
+        : ToolOutcome option =
+        reply
+        |> Option.map successOutcome
+        |> Option.defaultWith (fun () ->
+            if DateTimeOffset.UtcNow >= deadline then
+                Some(
+                    failureOutcome (
+                        "wxs_deliver timed out after 120s waiting for the child session's terminal reply; "
+                        + observation
+                    )
+                )
+            else
+                None)
+
+    /// The wait for the child's terminal reply: the child's transcript is
+    /// polled until it carries a terminal reply or the deadline is reached.
+    let private pollTranscript
+        (ports: HostPorts)
+        (childSession: SessionId)
+        (deadline: DateTimeOffset)
+        : Task<ToolOutcome> =
+        let rec poll () : Task<ToolOutcome> =
+            task {
+                let! messages = ports.Transcript.Messages childSession
+
+                let observation, reply = observeTranscript messages
+
+                let terminal = terminalOutcome reply observation deadline
+
+                match terminal with
+                | Some outcome -> return outcome
+                | None ->
+                    do! Task.Delay 250
+                    return! poll ()
+            }
+
+        poll ()
+
+    /// The child's terminal reply, or the timeout outcome when it never
+    /// arrives.
+    let private awaitChildReply (ports: HostPorts) (childSession: SessionId) : Task<ToolOutcome> =
+        task {
+            let deadline = DateTimeOffset.UtcNow.AddSeconds 120.0
+            let! outcome = pollTranscript ports childSession deadline
+            return outcome
+        }
+
+    /// The delivery of one message to the child session.
+    let private sendToChild (ports: HostPorts) (childSession: SessionId) (text: string) : Task<ToolOutcome> =
+        task {
+            let! sent =
+                ports.Prompts.Send(
+                    childSession,
+                    { Text = text
+                      Route = None
+                      Role = None
+                      Workspace = None
+                      Correlation = None
+                      ToolPolicy = None },
+                    None
+                )
+
+            match sent with
+            | Outcome.Fatal reason -> return failureOutcome ("wxs_deliver could not deliver the message: " + reason)
+            | Outcome.Retryable reason -> return failureOutcome ("wxs_deliver could not deliver the message: " + reason)
+            | Outcome.AcceptanceUnknown reason ->
+                return failureOutcome ("wxs_deliver could not confirm the delivery: " + reason)
+            | _ -> return! awaitChildReply ports childSession
+        }
+
+    /// The child session's own durable work, derived from its session id so
+    /// it is deterministic.
+    let private openChildWork (stateRoot: string) (root: string) (childWorkId: string) : Result<unit, string> =
+        DurableWorkHost.ensureOpened
+            stateRoot
+            childWorkId
+            (childWorkId + ":open:0")
+            root
+            (DurableWorkHost.planSequence ())
+            childWorkId
+            0.0
+        |> Result.map ignore
+
+    /// The delivery to a child session whose durable work is already open.
+    let private deliverToChildSession
+        (ports: HostPorts)
+        (stateRoot: string)
+        (root: string)
+        (text: string)
+        (childSession: SessionId)
+        : Task<ToolOutcome> =
+        task {
+            let childWorkId = workIdOf (Identity.SessionId.value childSession)
+
+            match openChildWork stateRoot root childWorkId with
+            | Error reason ->
+                return failureOutcome ("wxs_deliver could not open the child session's durable work: " + reason)
+            | Ok() -> return! sendToChild ports childSession text
+        }
+
+    /// The child session that carries the delivery.
+    let private createChild (ports: HostPorts) (parent: SessionId option) : HostResult<SessionId> =
+        ports.Sessions.Create(
+            parent,
+            { Title = Some "wxs_deliver"
+              Role = None
+              Workspace = None }
+        )
+
+    /// The delivery of one message to a newly created child session.
+    let private deliverToChild
+        (ports: HostPorts)
+        (stateRoot: string)
+        (root: string)
+        (text: string)
+        (parent: SessionId option)
+        : Task<ToolOutcome> =
+        task {
+            let! child = createChild ports parent
+
+            match child with
+            | Error error -> return failureOutcome ("wxs_deliver could not create the child session: " + string error)
+            | Ok childSession -> return! deliverToChildSession ports stateRoot root text childSession
+        }
 
     /// The plugin value. `Activate` performs the durable product wiring and
     /// returns the product hooks for the second host.
@@ -124,12 +310,20 @@ module HostPlugin =
                     let! root = GitSubject.revParseShowToplevel workspace
 
                     if String.IsNullOrWhiteSpace root then
-                        return Error (HostError.Transport "the second host activation failed: Git did not identify a worktree root")
+                        return
+                            Error(
+                                HostError.Transport
+                                    "the second host activation failed: Git did not identify a worktree root"
+                            )
 
                     let! stateRoot = RuntimePath.stateRoot root
 
                     if String.IsNullOrWhiteSpace stateRoot then
-                        return Error (HostError.Transport "the second host activation failed: the machine state directory is missing")
+                        return
+                            Error(
+                                HostError.Transport
+                                    "the second host activation failed: the machine state directory is missing"
+                            )
 
                     let workId = workIdOf (ports.Paths.ProjectId + "|" + root)
                     let ownerId = workId
@@ -148,9 +342,13 @@ module HostPlugin =
                             0.0
                     with
                     | Error reason ->
-                        return Error (HostError.Transport ("the second host activation failed to open its durable work: " + reason))
-                    | Ok _ ->
-                        ()
+                        return
+                            Error(
+                                HostError.Transport(
+                                    "the second host activation failed to open its durable work: " + reason
+                                )
+                            )
+                    | Ok _ -> ()
 
                     // A real Ownership fact: the activation scope is opened in
                     // the durable ownership registry, so the scope that owns
@@ -163,10 +361,7 @@ module HostPlugin =
                             stateRoot
                             registryId
                             (scopeId + ":open")
-                            (DurableWorkHost.ownershipMessage
-                                "OpenScope"
-                                [ "scopeId", box scopeId
-                                  "parentId", null ])
+                            (DurableWorkHost.ownershipMessage "OpenScope" [ "scopeId", box scopeId; "parentId", null ])
 
                     let committed =
                         receipt.Status = "Committed"
@@ -177,11 +372,14 @@ module HostPlugin =
 
                     if not committed then
                         return
-                            Error (
-                                HostError.Transport (
+                            Error(
+                                HostError.Transport(
                                     "the second host activation failed to open its ownership scope: "
                                     + receipt.Status
-                                    + (if String.IsNullOrWhiteSpace receipt.Reason then "" else " (" + receipt.Reason + ")")
+                                    + (if String.IsNullOrWhiteSpace receipt.Reason then
+                                           ""
+                                       else
+                                           " (" + receipt.Reason + ")")
                                 )
                             )
 
@@ -191,165 +389,24 @@ module HostPlugin =
                         { Name = "wxs_deliver"
                           Description = bilingualDescription ()
                           Schema =
-                            JsonSchema (
+                            JsonSchema(
                                 "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}},"
                                 + "\"required\":[\"text\"]}"
                             )
                           Execute =
                             fun invocation ->
                                 task {
-                                    let text =
-                                        match invocation.Args with
-                                        | CanonicalJsonText raw ->
-                                            try
-                                                jsonTextField (parseJson raw)
-                                            with _ ->
-                                                ""
-                                        | _ -> ""
+                                    let text = invocationText invocation
 
                                     if String.IsNullOrWhiteSpace text then
-                                        return
-                                            { Text = "wxs_deliver requires a non-empty `text` field."
-                                              Truncated = false
-                                              IsError = true
-                                              Details = None }
+                                        return failureOutcome "wxs_deliver requires a non-empty `text` field."
                                     else
-                                        let! child = ports.Sessions.Create(Some invocation.Session, { Title = Some "wxs_deliver"; Role = None; Workspace = None })
-
-                                        match child with
-                                        | Error error ->
-                                            return
-                                                { Text = "wxs_deliver could not create the child session: " + string error
-                                                  Truncated = false
-                                                  IsError = true
-                                                  Details = None }
-                                        | Ok childSession ->
-                                            // The child session's own durable
-                                            // work, derived from its session
-                                            // id so it is deterministic.
-                                            let childWorkId = workIdOf (Identity.SessionId.value childSession)
-
-                                            match
-                                                DurableWorkHost.ensureOpened
-                                                    stateRoot
-                                                    childWorkId
-                                                    (childWorkId + ":open:0")
-                                                    root
-                                                    (DurableWorkHost.planSequence ())
-                                                    childWorkId
-                                                    0.0
-                                            with
-                                            | Error reason ->
-                                                return
-                                                    { Text = "wxs_deliver could not open the child session's durable work: " + reason
-                                                      Truncated = false
-                                                      IsError = true
-                                                      Details = None }
-                                            | Ok _ ->
-                                                let! sent =
-                                                    ports.Prompts.Send(
-                                                        childSession,
-                                                        { Text = text
-                                                          Route = None
-                                                          Role = None
-                                                          Workspace = None
-                                                          Correlation = None
-                                                          ToolPolicy = None },
-                                                        None
-                                                    )
-
-                                                match sent with
-                                                | Outcome.Fatal reason ->
-                                                    return
-                                                        { Text = "wxs_deliver could not deliver the message: " + reason
-                                                          Truncated = false
-                                                          IsError = true
-                                                          Details = None }
-                                                | Outcome.Retryable reason ->
-                                                    return
-                                                        { Text = "wxs_deliver could not deliver the message: " + reason
-                                                          Truncated = false
-                                                          IsError = true
-                                                          Details = None }
-                                                | Outcome.AcceptanceUnknown reason ->
-                                                    return
-                                                        { Text = "wxs_deliver could not confirm the delivery: " + reason
-                                                          Truncated = false
-                                                          IsError = true
-                                                          Details = None }
-                                                | _ ->
-                                                    // Poll the child's transcript
-                                                    // for its terminal reply.
-                                                    let deadline = DateTimeOffset.UtcNow.AddSeconds 120.0
-                                                    let mutable lastObservation = "no transcript observation yet"
-
-                                                    let rec poll () : Task<string option> =
-                                                        task {
-                                                            let! messages = ports.Transcript.Messages childSession
-
-                                                            match messages with
-                                                            | Ok observed ->
-                                                                let observedText =
-                                                                    observed
-                                                                    |> List.map (fun message ->
-                                                                        let body =
-                                                                            message.Parts
-                                                                            |> List.collect (fun part ->
-                                                                                match part with
-                                                                                | TranscriptPart.Text value -> [ value ]
-                                                                                | _ -> [])
-                                                                            |> String.concat ""
-
-                                                                        body)
-
-                                                                lastObservation <-
-                                                                    "observed "
-                                                                    + string observed.Length
-                                                                    + " message(s) in the child transcript; no terminal assistant reply yet"
-
-                                                                match assistantReply observed with
-                                                                | Some reply -> return Some reply
-                                                                | None ->
-                                                                    if DateTimeOffset.UtcNow >= deadline then
-                                                                        return None
-                                                                    else
-                                                                        do! Task.Delay 250
-                                                                        return! poll ()
-                                                            | Error error ->
-                                                                lastObservation <-
-                                                                    "the child transcript could not be read: " + string error
-
-                                                                if DateTimeOffset.UtcNow >= deadline then
-                                                                    return None
-                                                                else
-                                                                    do! Task.Delay 250
-                                                                    return! poll ()
-                                                        }
-
-                                                    let! reply = poll ()
-
-                                                    match reply with
-                                                    | Some text ->
-                                                        return
-                                                            { Text = text
-                                                              Truncated = false
-                                                              IsError = false
-                                                              Details = None }
-                                                    | None ->
-                                                        return
-                                                            { Text =
-                                                                "wxs_deliver timed out after 120s waiting for the child session's terminal reply; "
-                                                                + lastObservation
-                                                              Truncated = false
-                                                              IsError = true
-                                                              Details = None }
+                                        return! deliverToChild ports stateRoot root text (Some invocation.Session)
                                 } }
 
                     match ports.Tools.Register [ deliverSpec ] with
-                    | Error error ->
-                        return Error error
-                    | Ok () ->
-                        ()
+                    | Error error -> return Error error
+                    | Ok() -> ()
 
                     let turn: ITurnTransform =
                         { new ITurnTransform with
@@ -422,7 +479,8 @@ module HostPlugin =
                             ports.Diagnostics.Emit(
                                 "second-host-signal-unmapped",
                                 [ "signal", string signal
-                                  "reason", "no product command kind exists for host tool/attempt facts in the second host" ]
+                                  "reason",
+                                  "no product command kind exists for host tool/attempt facts in the second host" ]
                             )
                         }
 
@@ -440,5 +498,4 @@ module HostPlugin =
                               Spawn = None
                               OnSignal = onSignal
                               Dispose = dispose }
-                }
-        }
+                } }
