@@ -3,6 +3,8 @@ namespace Wanxiangshu.Execution.Delegation.Advisor
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -150,6 +152,20 @@ module AdvisorSeat =
                 seat.ChildTask <- Some pending
                 pending)
 
+    [<AllowNullLiteral>]
+    type private AdvisorAnswerLaw =
+        abstract answer: messages: obj array -> string
+
+    [<Import("AdvisorLaw", "wanxiangli/advisor")>]
+    let private advisorLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : AdvisorAnswerLaw = jsNative
+
+    /// The read-back law (last non-blank assistant prose, role case-insensitive) is owned by
+    /// `wanxiangli/advisor` (CUT-39); this host only flattens Host message parts to text.
+    let private answerLaw = construct advisorLawClass
+
     let private nonBlank (text: string) : string option =
         if String.IsNullOrWhiteSpace text then None else Some text
 
@@ -163,17 +179,15 @@ module AdvisorSeat =
                 | _ -> None)
             |> String.concat ""
 
-    let private assistantProse (message: SessionMessage) : string option =
-        if String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) then
-            textOfParts message.Parts |> nonBlank
-        else
-            None
-
     /// advisor-[030]: prose read-back after the fenced terminal. Only this
     /// consult's own terminal has been processed when this runs, so the last
     /// non-blank assistant message of the child is this consult's answer.
     let private latestAssistantProse (messages: SessionMessage list) : string option =
-        messages |> List.rev |> List.tryPick assistantProse
+        messages
+        |> List.map (fun message -> createObj [ "role" ==> message.Role; "text" ==> textOfParts message.Parts ])
+        |> List.toArray
+        |> answerLaw.answer
+        |> Option.ofObj
 
     let private snapshotProseOf (snapshot: ISessionSnapshotPort) (childId: SessionId) : Task<string option> =
         task {

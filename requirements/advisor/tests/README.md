@@ -13,3 +13,5 @@
 - `005`（无授权副作用）：运行时 capability 与 journal/authority 的观察口不在本包用例内。
 
 `plan`/游标的用例只证明纯规划与进程内游标：它们不证明 view 与 intent 真的以两条独立 prompt 到达顾问，也不证明散文真的从真实 terminal 读回——这两件事归 001/004 的缺口。002 覆盖 en 与 zh-CN 的实际记录渲染；资源成对性仍由 language parity 门禁与 provider-language 承担。
+
+纯规则本身（材料身份、增量、账本、读回）另由 wanxiangli `src/advisor/tests/001.test.mjs` 证明。本包 002/003 经主仓 dist 走的是同一个库实现（CUT-39 接线变异证据见 `proposals/extraction-kanban/evidence/CUT-39/`）。

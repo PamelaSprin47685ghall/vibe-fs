@@ -1,37 +1,41 @@
 namespace Wanxiangshu.Execution.Delegation.Advisor
 
-open System.Collections.Generic
+open Fable.Core
 
 /// Process-live record of material successfully delivered to each advisor seat.
-/// Repeated representatives can carry new summaries, so identity includes the
-/// representative and the exact rendered material.
+/// The ledger law (per-caller isolation, monotone record, identity = representative plus
+/// exact rendered material) is owned by `wanxiangli/advisor` (CUT-39); this host keeps the
+/// one process-live instance.
 module Cursor =
 
-    // DSL-MUTABLE: resource — callerSessionId → delivered material identities
-    let private cursors = Dictionary<string, HashSet<string>>()
+    [<AllowNullLiteral>]
+    type private AdvisorLedger =
+        abstract delivered: callerSessionId: string -> string array
+        abstract record: callerSessionId: string * keys: string array -> unit
+        abstract clear: callerSessionId: string -> unit
+        abstract clearAll: unit -> unit
 
-    let private cursorOf (callerSessionId: string) : HashSet<string> =
-        match cursors.TryGetValue callerSessionId with
-        | true, existing -> existing
-        | false, _ ->
-            let fresh = HashSet<string>()
-            cursors.[callerSessionId] <- fresh
-            fresh
+    [<AllowNullLiteral>]
+    type private AdvisorLedgerLaw =
+        abstract ledger: unit -> AdvisorLedger
+
+    [<Import("AdvisorLaw", "wanxiangli/advisor")>]
+    let private advisorLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : AdvisorLedgerLaw = jsNative
+
+    // DSL-MUTABLE: resource — the process-live ledger; its state is owned by wanxiangli/advisor
+    let private ledger = (construct advisorLawClass).ledger ()
 
     /// Material identities already delivered to this caller session's advisor.
     let delivered (callerSessionId: string) : Set<string> =
-        match cursors.TryGetValue callerSessionId with
-        | true, existing -> existing |> Set.ofSeq
-        | false, _ -> Set.empty
+        ledger.delivered callerSessionId |> Set.ofArray
 
     /// Record only material confirmed as delivered. The record is monotone.
     let record (callerSessionId: string) (anchors: string list) : unit =
-        if not (List.isEmpty anchors) then
-            let cursor = cursorOf callerSessionId
+        ledger.record (callerSessionId, List.toArray anchors)
 
-            anchors |> List.iter (fun anchor -> cursor.Add anchor |> ignore)
+    let clear (callerSessionId: string) : unit = ledger.clear callerSessionId
 
-    let clear (callerSessionId: string) : unit =
-        cursors.Remove callerSessionId |> ignore
-
-    let clearAll () : unit = cursors.Clear()
+    let clearAll () : unit = ledger.clearAll ()
