@@ -90,3 +90,21 @@ CUT-12、CUT-13 已 DONE，接续卡片顺序第 2–4 步。
   675 项，504 通过，4 失败，23 skip，53 todo（`integration-targeted-summary.txt`）。失败文件逐个隔离重跑：候选 95 项 not ok 与基线 95 项**名字完全相同**
   （`integration-failures-{candidate,baseline}.txt`，comm 为空）：delegation 006/024/026/027/029/031/032、effect-accounting 002、managed-session-lifecycle 006–028 的 master 既有失败。
 - `scripts/checks/architecture.mjs` OK。
+
+## 子范围③：Git 动词收口与收卡（2026-10-21，eng-cut25i-goose 做、eng-cut25j-goose 落地收卡）
+
+- 882dc531c：工作树根查询只剩 `GitSubject` 一个动词（`Mission/Manager/Workflow.fs`、`OpenCode/Plugin/PlanWorkOpenWiring.fs` 不再各拼一份）；
+  `Git/Operations.fs`、`Git/WorktreeResource.fs` 与 `Change/Host/GitAdapter.fs` 都通过 `GitSubject.Executable` 拼写可执行文件。
+- 落地验证（落在 master 507d68d01 上全量构建，之后 master 仅不相交移动到 ad13783c9，重跑 pre-push 检查）：定向 847 项，677 通过，1 失败，23 skip，54 todo；
+  失败文件逐个隔离重跑，未出现基线之外的新失败（delegation 006/024/026/027/031/032、effect-accounting 002、managed-session-lifecycle 006–028 为 master 既有）。
+  `scripts/checks/architecture.mjs` OK。日志 `/workspace/vfs-cut/wt/logs-cut25i/land23c.out`。
+
+### 退出条件核对
+
+- Git 命令与路径校验不再跨 Change/Process/Host 重复：`src/` 中 `Git/` 之外再无 `"git"` 字面量启动进程；`Change/Host/GitAdapter.fs` 是 Orchestrator 这个 C 的 I/O 端口，
+  只经 `ProcessRunner` + `GitSubject.Executable` 执行，porcelain 读法归 git-porcelain，`Persistence/Journal/RuntimePath.fs` 经 `GitSubject.execIn`。
+- 业务发布状态不留两份：发布/准入/冲突/重入判定只在 wanxiangli/integration。
+- 保留在宿主（不是规律、而是物理资源或夹在 I/O 中间）：`Git/IntegrationGate`（proper-lockfile 跨进程锁）、`OrchestratorProgram` 三处一行等值守卫。
+- 没有修好也没有弄坏任何既有测试；破坏性 Git 场景沿用各套件的临时仓夹具，本卡未新增对开发主仓的操作。
+
+卡片 DONE。
