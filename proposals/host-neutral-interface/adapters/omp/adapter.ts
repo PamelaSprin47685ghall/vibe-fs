@@ -38,6 +38,8 @@ const ok = <T>(value: T): P.Result<T, P.HostError> => ({ ok: true, value });
 const err = <T>(error: P.HostError): P.Result<T, P.HostError> => ({ ok: false, error });
 const sid = (s: string) => s as P.SessionId;
 const transport = (e: unknown): P.HostError => ({ tag: "Transport", reason: e instanceof Error ? e.message : String(e) });
+/** The human-readable cause of a thrown value, kept verbatim. */
+const why = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 const notFound = (what: string): P.HostError => ({ tag: "NotFound", what });
 const unsupported = (capability: P.HostCapability): P.HostError => ({ tag: "Unsupported", capability });
 /**
@@ -176,14 +178,12 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
 
   const prompts: P.IPromptPort = {
     async Send(s, request, late) {
+      // Phase 1 (preparation): everything that happens BEFORE the host is
+      // asked to accept the prompt. A failure here means the prompt was never
+      // offered to the host, so acceptance is not unknown: it is a definite
+      // failure (`Fatal` = definitely not sent).
       try {
         if (request.Correlation !== undefined) pi.appendEntry("wxs.prompt-key", { session: s, key: request.Correlation });
-        if (isOwnChild(s)) {
-          const accepted = await children.prompt(s, request.Text);
-          if (!accepted) return { tag: "Retryable", reason: "omp refused prompt" };
-          if (late) await late({ tag: "OwnedSettled" });
-          return { tag: "AdmittedWithReceipt", value: P.transportReceipt(`omp:${s}`) };
-        }
         // The host session is the one the extension is running in: role, route,
         // workspace and tool policy are not expressible through
         // `sendUserMessage`, so they are reported as unsupported instead of
@@ -197,11 +197,26 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
           if (late) await late({ tag: "Refused", reason: `omp cannot carry ${unsupportedFields.join(", ")}` });
           return { tag: "Fatal", reason: `omp cannot carry ${unsupportedFields.join(", ")}` };
         }
+      } catch (e) {
+        // Our own encode path or the correlation write failed: the host never
+        // saw the prompt. Reporting this as `AcceptanceUnknown` would hide an
+        // adapter bug behind an ambiguous host state.
+        return { tag: "Fatal", reason: why(e) };
+      }
+      // Phase 2 (delivery): the point of no return. The host may already have
+      // taken the prompt when this throws, so acceptance is genuinely unknown.
+      try {
+        if (isOwnChild(s)) {
+          const accepted = await children.prompt(s, request.Text);
+          if (!accepted) return { tag: "Retryable", reason: "omp refused prompt" };
+          if (late) await late({ tag: "OwnedSettled" });
+          return { tag: "AdmittedWithReceipt", value: P.transportReceipt(`omp:${s}`) };
+        }
         pi.sendUserMessage(request.Text, { deliverAs: "followUp" });
         if (late) await late({ tag: "OwnedSettled" });
         return { tag: "AdmittedWithReceipt", value: P.transportReceipt(`omp:${s}`) };
       } catch (e) {
-        return { tag: "AcceptanceUnknown", reason: transport(e).tag };
+        return { tag: "AcceptanceUnknown", reason: why(e) };
       }
     },
   };
@@ -267,7 +282,7 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
 }
 
 // ---------------------------------------------------------------- ProductHooks -> omp registrations
-export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s: P.HostSignal) => Promise<void>): void {
+export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s: P.HostSignal) => Promise<void>): (s: P.HostSignal) => Promise<void> {
   const turnContext = (c: ExtensionContext): P.TurnContext => ({
     Session: sid(c.sessionManager.getSessionId()), Workspace: P.workspacePath(c.cwd),
     Route: c.model ? { Provider: c.model.provider, Model: c.model.id } : undefined,
@@ -294,6 +309,10 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
       const role = decodeRole(m); return role ? [{ Role: role, Parts: decodeParts(m) }] : [];
     }));
     if (edit.tag === "Keep") return undefined;
+    // One stamp for the whole edit: every message this handler produces
+    // belongs to the same replacement, so mixed provenance (some stamped,
+    // some not) would make the transcript order ambiguous to the product.
+    const stamp = Date.now();
     const messages: AgentMessage[] = [];
     for (const m of edit.messages) {
       const content = encodeParts(m.Parts);
@@ -301,8 +320,8 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
       // would silently lose content the product asked to keep.
       if (content === undefined) return undefined;
       messages.push(m.Role === "User"
-        ? { role: "user", content, timestamp: Date.now() } as AgentMessage
-        : { role: "assistant", content } as unknown as AgentMessage);
+        ? { role: "user", content, timestamp: stamp } as AgentMessage
+        : { role: "assistant", content, timestamp: stamp } as unknown as AgentMessage);
     }
     return { messages };
   });
@@ -332,17 +351,20 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
     const v = await hooks.Compaction.AutoContinue(sid(c.sessionManager.getSessionId()));
     return v.tag === "Deny" ? { continue: false, reason: v.reason } : undefined;
   });
-  if (hooks.Spawn) {
+  // `before_subagent_spawn` is ALWAYS registered: the adapter advertises the
+  // `SubagentRouting` capability, so the host must be able to reach the
+  // product's routing decision even when the product later drops the hook.
+  // Without a hook there is nothing to route, so the spawn is allowed through
+  // unchanged (`undefined`).
+  pi.on("before_subagent_spawn", async (e, c) => {
     const spawn = hooks.Spawn;
-    pi.on("before_subagent_spawn", async (e, c) => {
-      const r = await spawn({ Parent: sid(c.sessionManager.getSessionId()), Role: P.agentRole(e.agent), SpawnKey: e.spawnKey,
-        Candidates: e.patterns.flatMap((p) => { const [prov, ...rest] = p.split("/"); return rest.length ? [{ Provider: prov, Model: rest.join("/") }] : []; }) });
-      if (r.tag === "Refuse") return { block: true, reason: r.reason };
-      if (r.tag === "Route") return { model: r.routes.map((x) => `${x.Provider}/${x.Model}`) };
-      return undefined;
-    });
-  }
-  pi.on("session_start", async (_e, c) => signal({ tag: "SessionCreated", info: { Id: sid(c.sessionManager.getSessionId()) } }));
+    if (!spawn) return undefined;
+    const r = await spawn({ Parent: sid(c.sessionManager.getSessionId()), Role: P.agentRole(e.agent), SpawnKey: e.spawnKey,
+      Candidates: e.patterns.flatMap((p) => { const [prov, ...rest] = p.split("/"); return rest.length ? [{ Provider: prov, Model: rest.join("/") }] : []; }) });
+    if (r.tag === "Refuse") return { block: true, reason: r.reason };
+    if (r.tag === "Route") return { model: r.routes.map((x) => `${x.Provider}/${x.Model}`) };
+    return undefined;
+  });
   pi.on("turn_start", async (_e, c) => signal({ tag: "AttemptStarted", attempt: { Session: sid(c.sessionManager.getSessionId()) } }));
   pi.on("turn_end", async (e, c) => {
     const t = decodeTerminal(e.message);
@@ -353,6 +375,7 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
     Session: sid(c.sessionManager.getSessionId()), Attempt: e.attempt, Failure: decodeFailure(e.errorMessage, false) } }));
   pi.on("tool_execution_start", async (e, c) => signal({ tag: "ToolStarted", call: { Session: sid(c.sessionManager.getSessionId()), CallId: e.toolCallId as P.ToolCallId, Tool: e.toolName } }));
   pi.on("session_shutdown", async () => { await hooks.Dispose(); });
+  return signal;
 }
 
 /** omp extension entry: `omp -e <bundle>` loads `export default (pi) => …`. */
@@ -364,7 +387,12 @@ export function activateOnOmp(pi: OmpApi, plugin: P.IHostPlugin, children: OmpCh
     latest = c;
     const r = await plugin.Activate(ports);
     if (!r.ok) { pi.logger.error("wanxiangshu activation failed", { error: r.error }); return; }
-    registerProductHooks(pi, r.value, emit);
+    const signal = registerProductHooks(pi, r.value, emit);
+    // The `SessionCreated` signal is emitted HERE, not from a `session_start`
+    // listener registered by `registerProductHooks`: omp snapshots the
+    // listener list when it starts emitting `session_start`, so a listener
+    // registered during that emission is never called for this session.
+    await signal({ tag: "SessionCreated", info: { Id: sid(c.sessionManager.getSessionId()) } });
   });
 }
 

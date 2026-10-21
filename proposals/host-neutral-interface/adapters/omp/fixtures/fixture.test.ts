@@ -14,11 +14,16 @@ const tools: { name: string; execute: Function }[] = [];
 const sent: string[] = [];
 const entries: unknown[] = [];
 const on = ((event: string, handler: Handler) => { handlers.set(event, [...(handlers.get(event) ?? []), handler]); }) as ExtensionAPI["on"];
+// Fault injection for the two prompt-port phases: the correlation write is
+// part of the PREPARATION phase (the host never saw the prompt), the user
+// message is the DELIVERY phase (acceptance becomes unknown).
+let sendFault: Error | undefined;
+let appendFault: Error | undefined;
 const pi: OmpApi = {
   on,
   registerTool: ((t: { name: string; execute: Function }) => { tools.push(t); }) as ExtensionAPI["registerTool"],
-  sendUserMessage: (text) => { sent.push(String(text)); },
-  appendEntry: (_type, data) => { entries.push(data); },
+  sendUserMessage: (text) => { if (sendFault) throw sendFault; sent.push(String(text)); },
+  appendEntry: (_type, data) => { if (appendFault) throw appendFault; entries.push(data); },
   setModel: async () => true,
   setActiveTools: async () => {},
   logger: { debug() {}, info() {}, warn() {}, error() {} } as unknown as ExtensionAPI["logger"],
@@ -58,7 +63,11 @@ const product: P.IHostPlugin = {
       Turn: {
         AdmitTurn: async (r) => (r.Text === "forbidden" ? { tag: "Refuse", reason: "no" } : { tag: "Admit" }),
         SystemPrompt: async (_c, s) => [...s, "PRODUCT-SYSTEM"],
-        ContextMessages: async () => ({ tag: "Keep" }),
+        ContextMessages: async (_c, msgs) => (msgs.some((m) => m.Parts.some((p) => p.tag === "Text" && p.text === "REPLACE-ME"))
+          ? { tag: "Replace", messages: [
+              { Role: "User", Parts: [{ tag: "Text", text: "synth-user" }] },
+              { Role: "Assistant", Parts: [{ tag: "Text", text: "synth-assistant" }] }] }
+          : { tag: "Keep" }),
         ProviderParams: async () => ({ tag: "Accept" }),
       },
       Compaction: { OnCompacting: async (s) => { compactionSession = s; return { tag: "Context", lines: ["keep ledger"] }; },
@@ -70,8 +79,10 @@ const product: P.IHostPlugin = {
 };
 
 const fire = async (name: string, event: unknown) => {
+  // omp snapshots the listener list per event pass: a listener registered
+  // DURING the emission of an event is not called for that pass.
   let last: unknown;
-  for (const h of handlers.get(name) ?? []) last = await h(event, ctx);
+  for (const h of [...(handlers.get(name) ?? [])]) last = await h(event, ctx);
   return last;
 };
 let failures = 0;
@@ -85,6 +96,25 @@ await fire("session_start", { type: "session_start" });
 expect("product tool registered", tools.map((t) => t.name), ["wxs_echo"]);
 expect("tool execute encodes ToolOutcome", await tools[0].execute("call-1", { a: 1 }, undefined, undefined, ctx),
   { content: [{ type: "text", text: 'echo {"a":1}' }], isError: false });
+expect("SessionCreated is delivered for the first session", signals[0], { tag: "SessionCreated", info: { Id: "root" } });
+expect("before_subagent_spawn is registered even without a product Spawn hook",
+  [handlers.has("before_subagent_spawn"), await fire("before_subagent_spawn", { type: "before_subagent_spawn", agent: "coder", spawnKey: "sk-1", patterns: [] })],
+  [true, undefined]);
+appendFault = new Error("appendEntry exploded");
+expect("a failure in the preparation phase is Fatal, with the original message",
+  await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go", Correlation: P.promptKey("pk-2") }, undefined),
+  { tag: "Fatal", reason: "appendEntry exploded" });
+appendFault = undefined;
+sendFault = new Error("host refused the message");
+expect("a failure in the delivery phase is AcceptanceUnknown, with the original message",
+  await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go" }, undefined),
+  { tag: "AcceptanceUnknown", reason: "host refused the message" });
+sendFault = undefined;
+const ctxEdit = await fire("context", { type: "context", messages: [{ role: "user", content: [{ type: "text", text: "REPLACE-ME" }], timestamp: 1 }] });
+const stamps = (ctxEdit as { messages: { timestamp?: number }[] }).messages.map((m) => m.timestamp);
+expect("both synthesized messages carry the same numeric timestamp",
+  [stamps.length, stamps.every((t) => typeof t === "number"), new Set(stamps).size],
+  [2, true, 1]);
 expect("tool_call refuse -> block", await fire("tool_call", events.toolCallBash), { block: true, reason: "product says no" });
 expect("tool_call allow -> undefined", await fire("tool_call", events.toolCallRead), undefined);
 expect("tool_result replace", await fire("tool_result", events.toolResultSecret), { content: [{ type: "text", text: "[redacted]" }], isError: false });
