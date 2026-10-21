@@ -5,7 +5,6 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Authority
 
 type IPromptJournal =

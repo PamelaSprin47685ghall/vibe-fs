@@ -4,7 +4,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
