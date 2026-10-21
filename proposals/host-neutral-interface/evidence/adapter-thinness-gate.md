@@ -26,19 +26,35 @@ editing the gate. Current measurement: **0 violations.**
 adapter files without a port. A run fails when
 
 - the product-reference **total** rose,
-- a **baselined file** grew,
-- a **newly added** adapter file carries product-domain references at all, or
+- a **baselined file** grew, or
 - the number of adapter files without a neutral port rose.
+
+A file that is **not** in the baseline is allowed to carry product-domain references while the totals stay within
+the baseline. A lane that moves or splits a baselined adapter file therefore never has to edit the baseline
+(PROTOCOL: the lanes never edit the baseline). The per-file rule still fires for a baselined file that grows, so
+the growth of one file cannot be hidden by the shrinkage of another.
 
 The baseline may only be **written on a clean run**: `--write-baseline` computes the decision
 (`baselineWritePlan`) and refuses to touch the file when any violation exists, printing the violations and
 `… was NOT modified`. A regression therefore cannot raise the ratchet, and the arch lane tightens the baseline
 only when the tree is clean.
 
-Regression test: `requirements/host-boundary/tests/034.test.mjs` (4 assertions) — a violation refuses the
+An **unreadable port file is a hard error**: the gate reads every port file it scans, so a file that cannot be
+read aborts the run instead of silently shrinking the neutral-port vocabulary and hiding the file from the scope.
+
+Regression test: `requirements/host-boundary/tests/034.test.mjs` (5 tests) — a violation refuses the
 baseline write and leaves the baseline file byte-identical; a new port family is discovered from the sources and
-covered by the purity scope; a per-file product-reference growth is reported even when the total is flat; the
-CLI refuses `--write-baseline` on a regression.
+covered by the purity scope; a per-file product-reference growth is reported even when the total is flat; an
+adapter file that is not in the baseline is allowed while the totals stay within the baseline; the CLI refuses
+`--write-baseline` on a regression.
+
+## The TypeScript mirror cannot fall behind
+
+`proposals/host-neutral-interface/adapters/omp/ports.ts` is **generated** from the F# port signatures by
+`gen-ports.mjs` and verified by `mirror-check.mjs`. The port families are **discovered** from
+`src/Wanxiangshu/Host/Ports/*.fsi`; each family's reserved port id is the `HNI P-xx` marker in its header, and a
+family without that marker is a hard error. A family another lane lands therefore shows up in the mirror (or
+fails the check) instead of silently escaping it — there is no hand-maintained family list any more.
 
 ## Honest limits of the heuristic
 

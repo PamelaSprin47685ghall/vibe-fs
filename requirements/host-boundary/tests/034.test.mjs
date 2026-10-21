@@ -1,6 +1,7 @@
 // WHAT[host-boundary-034] gate ⑩/⑪ adapter-thinness: the baseline write is refused on any violation,
-// the port purity scope and the neutral-port vocabulary are discovered from the sources, and a per-file
-// product-reference growth is reported even when the aggregate total stays flat.
+// the port purity scope and the neutral-port vocabulary are discovered from the sources, a per-file
+// product-reference growth is reported even when the aggregate total stays flat, and an adapter file that
+// is not in the baseline is allowed while the totals stay within the baseline (moves and splits).
 import test from 'node:test'
 
 {
@@ -61,12 +62,12 @@ test('WHAT[host-boundary-034] a violation refuses the baseline write and leaves 
     ].join('\n'))
 
     const baseline = JSON.parse(baselineText)
-    const { violations } = scanAdapterThinness([...fx.files.keys()], fx.read, { baseline })
+    const { violations } = scanAdapterThinness([...fx.files.keys()], fx.read, { baseline, root: fx.dir })
 
     assert.ok(violations.length > 0, 'the planted growth must be a violation')
     assert.ok(violations.some((v) => v.gate === 'adapter-thinness'))
 
-    const plan = baselineWritePlan(violations, measure([...fx.files.keys()], fx.read), baseline)
+    const plan = baselineWritePlan(violations, measure([...fx.files.keys()], fx.read, fx.dir), baseline)
     assert.equal(plan.allowed, false)
     assert.match(plan.reason, /refusing to write/)
     assert.equal(plan.content, null)
@@ -74,7 +75,7 @@ test('WHAT[host-boundary-034] a violation refuses the baseline write and leaves 
     let written = null
     const result = applyBaselineWrite({
       violations,
-      measurement: measure([...fx.files.keys()], fx.read),
+      measurement: measure([...fx.files.keys()], fx.read, fx.dir),
       prior: baseline,
       write: (content) => { written = content },
     })
@@ -108,11 +109,12 @@ test('WHAT[host-boundary-034] a new port family is discovered from the sources a
     assert.equal(isPortFile('src/Wanxiangshu/Host/Ports/NeutralFission.fs'), true)
     assert.equal(isPortFile('src/Wanxiangshu/Host/Ports/NeutralFission.fsi'), true)
 
-    const names = portTypeNames(fx.read, files)
+    const names = portTypeNames(fx.read, files, fx.dir)
     assert.ok(names.has('FissionPort'), 'the new signature must contribute its type name')
 
     const { violations } = scanAdapterThinness(files, fx.read, {
       baseline: { productReference: {}, withoutPort: [] },
+      root: fx.dir,
     })
     const purity = violations.filter((v) => v.gate === 'port-purity')
     assert.equal(purity.length, 1, 'exactly the new port file violates purity')
@@ -148,10 +150,10 @@ test('WHAT[host-boundary-034] a per-file product-reference growth is reported ev
       withoutPort: ['src/Wanxiangshu/OpenCode/Grown.fs', 'src/Wanxiangshu/OpenCode/Shrunk.fs'],
     }
     const files = [...fx.files.keys()]
-    const now = measure(files, fx.read)
+    const now = measure(files, fx.read, fx.dir)
     assert.equal(now.productReferenceTotal, 4, 'the aggregate total is unchanged')
 
-    const { violations } = scanAdapterThinness(files, fx.read, { baseline })
+    const { violations } = scanAdapterThinness(files, fx.read, { baseline, root: fx.dir })
     assert.equal(violations.length, 1, 'exactly one per-file violation')
     assert.equal(violations[0].gate, 'adapter-thinness')
     assert.match(violations[0].message, /Grown\.fs: product-domain references rose 2 -> 3/)
@@ -160,7 +162,41 @@ test('WHAT[host-boundary-034] a per-file product-reference growth is reported ev
   }
 })
 
-// (d) the CLI refuses to write the baseline on a planted regression and leaves the file byte-identical.
+// (d) an adapter file that is NOT in the baseline is allowed while the totals stay within the baseline:
+// a lane that moves or splits a baselined adapter file never has to edit the baseline.
+test('WHAT[host-boundary-034] an adapter file that is not in the baseline is allowed while the totals stay within the baseline', () => {
+  const fx = fixture()
+  try {
+    // A baselined file is split into two: one part keeps the old name and shrinks, the other part is
+    // a new file. The total is unchanged, so no baseline edit is needed.
+    fx.write('src/Wanxiangshu/OpenCode/Moved.fs', [
+      'namespace Wanxiangshu.OpenCode',
+      'open Wanxiangshu.Execution.Delegation',
+      'open Wanxiangshu.Interaction.Dispatch',
+      '',
+    ].join('\n'))
+    fx.write('src/Wanxiangshu/OpenCode/Old.fs', [
+      'namespace Wanxiangshu.OpenCode',
+      'open Wanxiangshu.Execution.Delegation',
+      '',
+    ].join('\n'))
+
+    const baseline = {
+      productReference: { 'src/Wanxiangshu/OpenCode/Old.fs': 3 },
+      withoutPort: ['src/Wanxiangshu/OpenCode/Old.fs', 'src/Wanxiangshu/OpenCode/Moved.fs'],
+    }
+    const files = [...fx.files.keys()]
+    const now = measure(files, fx.read, fx.dir)
+    assert.equal(now.productReferenceTotal, 3, 'the aggregate total is unchanged')
+
+    const { violations } = scanAdapterThinness(files, fx.read, { baseline, root: fx.dir })
+    assert.equal(violations.length, 0, `a move or split must not need a baseline edit: ${JSON.stringify(violations)}`)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+// (e) the CLI refuses to write the baseline on a planted regression and leaves the file byte-identical.
 test('WHAT[host-boundary-034] the CLI refuses --write-baseline on a regression and leaves the baseline byte-identical', () => {
   const fx = fixture()
   try {

@@ -33,7 +33,7 @@
 // equivalence:
 //   System.Threading.CancellationToken -> AbortSignal   (host cancellation handle)
 //   System.IDisposable                 -> IDisposableHandle ({ dispose(): void })
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -41,22 +41,25 @@ const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '../../../..')
 const portRoot = resolve(repoRoot, 'src/Wanxiangshu/Host/Ports')
 
-// Family -> reserved port id, in the order the generated file lists them.
-export const FAMILIES = [
-  ['Vocabulary', 'P-00'],
-  ['Sessions', 'P-01'],
-  ['Prompts', 'P-02'],
-  ['Transcript', 'P-03'],
-  ['Tools', 'P-04'],
-  ['ToolGates', 'P-05'],
-  ['TurnTransforms', 'P-06'],
-  ['Signals', 'P-07'],
-  ['ModelRouting', 'P-08'],
-  ['Compaction', 'P-09'],
-  ['Storage', 'P-10'],
-  ['Lifecycle', 'P-11'],
-  ['Diagnostics', 'P-12'],
-]
+// Port families are DISCOVERED from the sources, never listed here: every
+// src/Wanxiangshu/Host/Ports/*.fsi is a family, and its reserved port id is the
+// `HNI P-xx` marker in its header. A family another lane lands is therefore
+// mirrored automatically — it cannot silently escape the TS mirror.
+const familyIdPattern = /\bHNI (P-\d{2})\b/
+
+export function discoverPortFamilies() {
+  const files = readdirSync(portRoot).filter((name) => name.endsWith('.fsi')).sort()
+  const families = files.map((name) => {
+    const text = readFileSync(resolve(portRoot, name), 'utf8')
+    const marker = text.match(familyIdPattern)
+    if (!marker) {
+      throw new Error(`port family ${name} declares no reserved port id: add an \`HNI P-xx\` marker to its header`)
+    }
+    return { family: name.replace(/\.fsi$/, ''), id: marker[1] }
+  })
+  families.sort((a, b) => a.id.localeCompare(b.id))
+  return families
+}
 
 // Foundation ids the ports use, mapped to opaque branded TS strings.
 const FOUNDATION_OPAQUE = [
@@ -374,6 +377,7 @@ function readFoundationOpaqueNames() {
 
 export function generate() {
   const opaqueFoundation = readFoundationOpaqueNames()
+  const families = discoverPortFamilies()
   const sections = []
   const emitted = new Set()
 
@@ -381,7 +385,7 @@ export function generate() {
   const outcomeModule = outcomeText.slice(outcomeText.indexOf('module Outcome ='))
   const outcomeDecls = parseFsi(outcomeModule).filter((d) => d.name === 'SendOutcome')
 
-  for (const [family, id] of FAMILIES) {
+  for (const { family, id } of families) {
     const text = readFileSync(resolve(portRoot, `${family}.fsi`), 'utf8')
     const decls = parseFsi(text)
     const blocks = []
@@ -406,9 +410,11 @@ export function generate() {
 
   const header = [
     '// GENERATED FILE — do not edit by hand.',
-    '// Source of truth: src/Wanxiangshu/Host/Ports/*.fsi (HNI P-00..P-12), plus',
+    `// Source of truth: src/Wanxiangshu/Host/Ports/*.fsi (HNI ${families.map((f) => f.id).join(', ')}), plus`,
     '// src/Wanxiangshu/Foundation/{Identity,Outcome}.fsi for the opaque ids and',
     '// Outcome.SendOutcome.',
+    '// The port families are discovered from the sources, so a family another lane lands shows up',
+    '// here and the mirror check fails until the mirror is regenerated.',
     '// Regenerate:  node proposals/host-neutral-interface/adapters/omp/gen-ports.mjs --write',
     '// Verify:      node proposals/host-neutral-interface/adapters/omp/mirror-check.mjs',
     '//',

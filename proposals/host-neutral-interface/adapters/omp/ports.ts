@@ -1,7 +1,9 @@
 // GENERATED FILE — do not edit by hand.
-// Source of truth: src/Wanxiangshu/Host/Ports/*.fsi (HNI P-00..P-12), plus
+// Source of truth: src/Wanxiangshu/Host/Ports/*.fsi (HNI P-00, P-01, P-02, P-03, P-04, P-05, P-06, P-07, P-08, P-09, P-10, P-11, P-12), plus
 // src/Wanxiangshu/Foundation/{Identity,Outcome}.fsi for the opaque ids and
 // Outcome.SendOutcome.
+// The port families are discovered from the sources, so a family another lane lands shows up
+// here and the mirror check fails until the mirror is regenerated.
 // Regenerate:  node proposals/host-neutral-interface/adapters/omp/gen-ports.mjs --write
 // Verify:      node proposals/host-neutral-interface/adapters/omp/mirror-check.mjs
 //

@@ -7,8 +7,10 @@
 //      is taking product decisions instead of calling a neutral port / ProductHooks.
 //   b) without-port: adapter files that reference no host-neutral port type (a type declared by a port
 //      signature under src/Wanxiangshu/Host/Ports/**).
-//   The ratchet may only go DOWN. Baselined files may not exceed their baseline count, a newly added adapter
-//   file may not carry product-domain references at all, and the totals may not grow. Improvements never
+//   The ratchet may only go DOWN. Totals may not grow, a baselined file may not exceed its baseline, and
+//   the number of adapter files without a neutral port may not grow. An adapter file that is NOT in the
+//   baseline may carry product-domain references as long as the totals stay within the baseline, so a
+//   lane that moves or splits a baselined adapter file never has to edit the baseline. Improvements never
 //   fail; the arch lane tightens the baseline (`--write-baseline`, and only on a clean run).
 // ⑪ port-purity (strict): every file under src/Wanxiangshu/Host/Ports/** (.fs and .fsi) references no adapter
 //   namespace and no product domain — only Foundation, Wanxiangshu.Host and System. The scope is discovered
@@ -24,18 +26,13 @@
 // Usage: node scripts/checks/adapter-thinness.mjs [--report] [--write-baseline]
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 export const THINNESS_BASELINE = 'scripts/checks/adapter-thinness-baseline.json'
 export const PORT_ROOT = `${PRODUCTION_ROOT}/Host/Ports`
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-// Legacy list, kept for compatibility with anything that imported it. It is NOT the discovery source any
-// more: port files and port type names are discovered from the sources under PORT_ROOT.
-export const PORT_FAMILIES = ['Vocabulary', 'Diagnostics', 'Storage', 'ModelRouting', 'Sessions', 'Prompts', 'Transcript',
-  'Tools', 'ToolGates', 'Signals', 'TurnTransforms', 'Compaction', 'Lifecycle']
 export const PRODUCT_DOMAINS = ['Ablation', 'Change', 'Composition', 'Context', 'Execution', 'Git', 'Interaction',
   'Mission', 'Participant', 'Persistence', 'Process', 'Repository', 'Sphinx', 'Verification']
 
@@ -75,22 +72,22 @@ export function productReferences(text) {
 }
 
 // Signature files that declare the neutral port vocabulary, discovered from the sources.
-const portSignatureFiles = (productionFiles) => {
+// The disk fallback is relative to `root` (the tree being scanned), not to this file, so the gate
+// also works on a tree other than the repository it lives in.
+const portSignatureFiles = (productionFiles, root = process.cwd()) => {
   const list = (productionFiles ?? []).map(norm).filter((f) => isPortFile(f) && f.endsWith('.fsi'))
   if (list.length) return [...new Set(list)].sort()
-  // Fallback for callers that hand in `.fs` files only (e.g. architecture.mjs): discover the signatures on disk.
-  try {
-    return walk(join(REPO_ROOT, PORT_ROOT), ['.fsi']).map((p) => norm(relative(REPO_ROOT, p))).sort()
-  } catch {
-    return []
-  }
+  const base = join(root, PORT_ROOT)
+  if (!existsSync(base)) return []
+  return walk(base, ['.fsi']).map((p) => norm(relative(root, p))).sort()
 }
 
-export function portTypeNames(read, productionFiles) {
+export function portTypeNames(read, productionFiles, root) {
   const names = new Set()
-  for (const file of portSignatureFiles(productionFiles)) {
-    let text
-    try { text = read(file) } catch { continue }
+  for (const file of portSignatureFiles(productionFiles, root)) {
+    // An unreadable port file is a hard error: silently skipping it would shrink the neutral-port
+    // vocabulary and hide the file from the scope.
+    const text = read(file)
     for (const m of text.matchAll(/^type\s+(\w+)/gm)) names.add(m[1])
   }
   return names
@@ -119,10 +116,10 @@ export function referencesPort(text, names, distinctive = names) {
 export const readThinnessBaseline = () =>
   existsSync(THINNESS_BASELINE) ? JSON.parse(readFileSync(THINNESS_BASELINE, 'utf8')) : null
 
-export function measure(productionFiles, read) {
+export function measure(productionFiles, read, root = process.cwd()) {
   const files = (productionFiles ?? []).map(norm)
   const fsFiles = files.filter((f) => f.endsWith('.fs'))
-  const names = portTypeNames(read, files)
+  const names = portTypeNames(read, files, root)
   const distinctive = distinctivePortNames(names, fsFiles, read)
   const adapters = fsFiles.filter(isAdapterFile).sort()
   const productReference = {}
@@ -140,27 +137,26 @@ export function measure(productionFiles, read) {
 }
 
 // The strict purity scope: every file under the port root, implementation and signature alike.
-const purityScope = (productionFiles) => {
+const purityScope = (productionFiles, root = process.cwd()) => {
   const list = (productionFiles ?? []).map(norm).filter(isPortFile)
   if (list.some((f) => f.endsWith('.fsi'))) return [...new Set(list)].sort()
-  try {
-    const onDisk = walk(join(REPO_ROOT, PORT_ROOT), ['.fs', '.fsi']).map((p) => norm(relative(REPO_ROOT, p)))
-    return [...new Set([...list, ...onDisk])].sort()
-  } catch {
-    return [...new Set(list)].sort()
-  }
+  const base = join(root, PORT_ROOT)
+  if (!existsSync(base)) return [...new Set(list)].sort()
+  const onDisk = walk(base, ['.fs', '.fsi']).map((p) => norm(relative(root, p)))
+  return [...new Set([...list, ...onDisk])].sort()
 }
 
 export function scanAdapterThinness(productionFiles, read, options) {
   const violations = []
   const fail = (gate, message) => violations.push({ gate, message })
+  const root = options?.root ?? process.cwd()
   const files = (productionFiles ?? []).map(norm).filter((f) => f.endsWith('.fs') || f.endsWith('.fsi'))
   const fsFiles = files.filter((f) => f.endsWith('.fs'))
 
   // ⑪ port purity — scope discovered from the sources, so new port families are covered automatically.
-  for (const file of purityScope(files)) {
-    let body
-    try { body = code(read(file)) } catch { continue }
+  for (const file of purityScope(files, root)) {
+    // An unreadable port file is a hard error: skipping it would hide the file from the scope.
+    const body = code(read(file))
     const bad = [...body.matchAll(/\bWanxiangshu\.([A-Z]\w*)/g)].map((m) => m[1]).filter((ns) => ns !== 'Foundation' && ns !== 'Host')
     if (/\bOpenCode\b|\bOpencode\w*|\bomp\b/i.test(body.replace(/\/\/\/.*$/gm, ''))) bad.push('host vocabulary')
     if (bad.length) fail('port-purity', `${file}: neutral port references ${[...new Set(bad)].join(', ')}`)
@@ -168,7 +164,7 @@ export function scanAdapterThinness(productionFiles, read, options) {
 
   // ⑩ adapter thinness ratchet
   const baseline = options?.baseline ?? readThinnessBaseline()
-  const now = measure(files, read)
+  const now = measure(files, read, root)
   if (!baseline) {
     fail('adapter-thinness', `${THINNESS_BASELINE} missing`)
     return { violations, measurement: now, baselineTotals: { productReference: 0, withoutPort: 0 } }
@@ -179,12 +175,11 @@ export function scanAdapterThinness(productionFiles, read, options) {
     const grown = Object.entries(now.productReference).filter(([f, n]) => n > (base[f] ?? 0)).map(([f, n]) => `${f} ${base[f] ?? 0}->${n}`)
     fail('adapter-thinness', `product-domain references in adapter files rose ${baseTotal} -> ${now.productReferenceTotal}: ${grown.join('; ')}`)
   }
-  // Per-file: a baselined file may not grow, and a newly added adapter file may not carry product references
-  // at all — so a rename/move cannot hide a growth behind a flat aggregate.
+  // Per-file: a baselined file may not grow. A file that is not in the baseline is allowed to carry
+  // product-domain references while the totals stay within the baseline, so a lane that moves or splits
+  // a baselined adapter file never has to edit the baseline (PROTOCOL: lanes never edit the baseline).
   for (const [file, n] of Object.entries(now.productReference)) {
-    if (!(file in base)) {
-      fail('adapter-thinness', `${file}: new adapter file references ${n} product-domain namespace(s) (not in ${THINNESS_BASELINE})`)
-    } else if (n > base[file]) {
+    if (file in base && n > base[file]) {
       fail('adapter-thinness', `${file}: product-domain references rose ${base[file]} -> ${n}`)
     }
   }
@@ -198,9 +193,8 @@ export function scanAdapterThinness(productionFiles, read, options) {
 
 // --- baseline writing ---------------------------------------------------------------------------
 // Pure decision function: a baseline may only be written on a clean run. Any violation (product-reference
-// total rose, a baselined file grew, a new adapter file carries product references, adapter files without a
-// port rose, or a port-purity violation) refuses the write, so the ratchet can never be raised by a
-// regression.
+// total rose, a baselined file grew, adapter files without a port rose, or a port-purity violation) refuses
+// the write, so the ratchet can never be raised by a regression.
 export function baselineWritePlan(violations, measurement, prior) {
   const list = violations ?? []
   if (list.length > 0) {
@@ -242,8 +236,8 @@ function runCli() {
   const root = process.cwd()
   const files = walk(join(root, PRODUCTION_ROOT), ['.fs', '.fsi']).map((p) => norm(relative(root, p)))
   const read = (p) => readFileSync(p, 'utf8')
-  const { violations, measurement, baselineTotals } = scanAdapterThinness(files, read)
-  const m = measurement ?? measure(files.filter((f) => f.endsWith('.fs')), read)
+  const { violations, measurement, baselineTotals } = scanAdapterThinness(files, read, { root })
+  const m = measurement ?? measure(files.filter((f) => f.endsWith('.fs')), read, root)
   if (process.argv.includes('--write-baseline')) {
     const prior = readThinnessBaseline()
     const result = applyBaselineWrite({

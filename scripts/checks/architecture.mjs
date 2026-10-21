@@ -47,7 +47,7 @@ const HOST_SDK_CLIENT = /\?client\b|\bclient\s*(?:\?|\.(?:session|event|app|conf
 const norm = (path) => path.replace(/\\/g, '/')
 const isFs = (path) => path.endsWith('.fs')
 
-export function scanArchitecture(productionFiles, read) {
+export function scanArchitecture(productionFiles, read, options) {
   const violations = []
   const fail = (gate, message) => violations.push({ gate, message })
 
@@ -186,7 +186,7 @@ export function scanArchitecture(productionFiles, read) {
   }
 
   // ⑩ adapter-thinness ratchet and ⑪ port-purity (HNI-04): see scripts/checks/adapter-thinness.mjs.
-  for (const v of scanAdapterThinness(productionFs, read).violations) violations.push(v)
+  for (const v of scanAdapterThinness(productionFs, read, { root: options?.root }).violations) violations.push(v)
 
   return { violations, productionFsCount: productionFs.length }
 }
@@ -214,7 +214,7 @@ export function check(context) {
   const productionFiles = context?.sourceFiles
     ? context.sourceFiles()
     : walk(join(root, PRODUCTION_ROOT), ['.fs', '.fsproj']).map((p) => relative(root, p))
-  const { violations } = scanArchitecture(productionFiles, read)
+  const { violations } = scanArchitecture(productionFiles, read, { root })
 
   const issues = violations.map(({ gate, message }) => ({
     code: gate,
