@@ -1,6 +1,15 @@
 # Changelog — 版本历史
 
 
+
+## Unreleased — 委派 026 的准入用例改走真实插件接线（case 1 移植 red-unit `defa8641f`）
+
+- **`requirements/delegation/tests/026.test.mjs` 的 case 1（`RESUME_synchronous_admission`）改走真实插件路径**（`support/real-fork.mjs`），用例正文**逐字移植自 red-unit 的 `defa8641f`**（同一份内容，只差一个空行），并只取该提交在 `requirements/verification-system/tests/support/plugin-fixture.mjs` 里的 `nextPromptReceiptOnly` 片段，别无他物。`real-fork.mjs` 未改。
+- **cases 2–5 的无界 await 收敛为有界 join**：新增 `boundedJoin` 助手（1500 ms 窗口，**永不放宽**，timer 在 `finally` 清理）。case 2 保留原有六条断言并各加一条有界 join 断言；case 3 原本无界的 join 改为有界；cases 4/5 换掉各自内联的 `Promise.race` 与不清理的 timer。
+- **case 6（`RESTART_PENDING_CHILD_WORK`）一字未动**，仍属既有产品缺口。
+- **验收**：正式 runner（`requirements/verification-system/tests/run.mjs` + `TESTS_MJS_FILES`，`UNIT_VERDICT_SILENCE_MS=30000`）下 `delegation/026` → **pass 5 / fail 1**，唯一失败是 case 6（既有缺口，非本轮引入）；改动前该文件 case 1 挂到 60 s 上限并连累后续 case 取消。回归 `024` → 全绿，`032` → 3/3，`027` → 5 pass / 4 fail（与本批无关的既存失败）。
+- **改动文件**：`requirements/delegation/tests/026.test.mjs`、`requirements/verification-system/tests/support/plugin-fixture.mjs`。
+
 ## Unreleased — 委派 032 迁到真实交付路径（跨角色差遣在角色边界上被拒，不落到别的门）
 
 - **`requirements/delegation/tests/032.test.mjs` 迁到真实插件路径**：跨角色差遣那一条不再走旧 fork harness 的 `executeManagerFork` / `settle`（隔离的进程内 runtime，**不是**生产的差遣入口），改为真实 `todowrite-for-manager` 的 `this.fork` 成员（生产裁决放行与拒绝）。原来的两条（角色→权限投影、SyncDelegate 词汇）**原样保留**。
@@ -8,6 +17,7 @@
 - **对照证明拒绝来自角色边界而不是别的门**：同一条 DevOps 差遣在评估未落时停在 `code = "assessment-pending-for-devops"`（生命周期门），评估经生产命令面落盘后改停在 `unknown-calling`（角色门）。同一调用、两个不同的码 ⇒ 后一次确实是角色边界。
 - **原断言集全部保留**：被拒的跨角色差遣不建子会话（`createdIds` 不变）、不发 prompt（prompt 计数不变、charge 不落在任何会话）、不留 durable 把手（**冷** journal 折出的工作单元只有 Engineer 那一个）。
 - **证据无伪造**：评估由生产的 `seedReviewAs` → `work?execute` 命令面落下（`Mission/Lifecycle/Surface.fs` / `DurableWorkHost.fs`），交付见证由生产的 settle 侧落下；测试与 smoke 只**读** durable 事实（冷工作快照、`TaskDeliveryCommitted`）。本批不写任何 durable 见证。
+- **验收（本 clone 自建 dist，`[build] build ok` + `.fable-build/build-manifest.json`）**：正式 runner（`requirements/verification-system/tests/run.mjs` + `TESTS_MJS_FILES`，`UNIT_VERDICT_SILENCE_MS=30000`）下 `delegation/032` → **3 passed / 0 failed**；`node --test` 直跑同文件 → tests 3 / pass 3 / fail 0 / cancelled 0（约 20 s）。**基线对照**：同一 dist 上 origin 版 `032.test.mjs` → tests 3 / pass 2 / fail 0 / **cancelled 1**（挂到 300 s 上限，即本批要修的真实红）。
 - **改动文件**：`requirements/delegation/tests/032.test.mjs`（生产路径 smoke 脚本不入仓：它是本轮的一次性取证脚本，不是被测资产）。
 
 ## Unreleased — fission lane 的材料不再手工搬进 owner 的交付格
