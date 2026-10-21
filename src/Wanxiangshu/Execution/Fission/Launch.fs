@@ -6,7 +6,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Execution.Session
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -473,13 +473,21 @@ module FissionLaunch =
         else
             dispatchTerminalOutcome port durable profile groupId owner lanes childId completionId outcome
 
-    let private ptyCompletionPayload (item: PtyJoinItem) =
-        match item with
-        | PtyJoinItem.PtyExited exit -> exit.Outcome
-        | PtyJoinItem.PtyFailed failure ->
-            String.concat "\n" [ "status=failed"; "code=" + failure.Code; "error=" + failure.Message ]
-        | PtyJoinItem.PtyAborted aborted ->
-            String.concat "\n" [ "status=aborted"; "code=" + aborted.Code; "error=" + aborted.Message ]
+    let private ptyCompletionPayload (item: FissionPtyCompletion) =
+        match item.Status with
+        | FissionPtyStatus.Exited -> item.Outcome
+        | FissionPtyStatus.Failed ->
+            String.concat
+                "\n"
+                [ "status=failed"
+                  "code=" + (item.Code |> Option.defaultValue "")
+                  "error=" + (item.Message |> Option.defaultValue "") ]
+        | FissionPtyStatus.Aborted ->
+            String.concat
+                "\n"
+                [ "status=aborted"
+                  "code=" + (item.Code |> Option.defaultValue "")
+                  "error=" + (item.Message |> Option.defaultValue "") ]
 
     let private installAgentBroadcasts
         (eventPort: IEventObservationPort)
@@ -509,9 +517,9 @@ module FissionLaunch =
         (owner: SessionId)
         (lanes: FissionStartedLane list)
         (wanted: Set<string>)
-        (item: PtyJoinItem)
+        (item: FissionPtyCompletion)
         =
-        let ptyId = PtyJoinItem.ptyId item
+        let ptyId = item.PtyId
 
         if not (Set.contains ptyId wanted) then
             ()
@@ -622,7 +630,7 @@ module FissionLaunch =
         task {
             port.LaneStarted laneId profile.CanonicalRole directory
 
-            match! XTraceCapture.captureOpeningWithReceipt port.Journal laneId startup [] with
+            match! XTraceCapture.captureOpeningWithReceipt (Some durable) laneId startup [] with
             | Error _ -> return Error "fission_trace_capture_failed"
             | Ok _ ->
                 let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
@@ -871,41 +879,53 @@ module FissionLaunch =
 
     let private executeParsed
         (port: FissionHostPort)
+        (journal: AgentJournal option)
         (request: FissionLaunchRequest)
         (caller: SessionId)
         (parsed: ParsedFissionPrompts)
         =
         task {
-            match request.ToolCallId, port.Journal with
+            match request.ToolCallId, journal with
             | None, _
             | _, None -> return Error FissionLaunchRejection.ContextUnavailable
             | Some toolCallId, Some durable -> return! executeWithJournal port request caller parsed toolCallId durable
         }
 
-    let private executeForSubsession (port: FissionHostPort) (request: FissionLaunchRequest) (caller: SessionId) =
+    let private executeForSubsession
+        (port: FissionHostPort)
+        (journal: AgentJournal option)
+        (request: FissionLaunchRequest)
+        (caller: SessionId)
+        =
         task {
             match FissionPrompt.parse request.Prompts with
             | Error FissionRejectReason.TooFewLanes
             | Error(FissionRejectReason.EmptyLanePrompt _) -> return Error FissionLaunchRejection.LanePromptsInvalid
             | Error reason -> return Error(FissionLaunchRejection.PromptsRejected reason)
-            | Ok parsed -> return! executeParsed port request caller parsed
+            | Ok parsed -> return! executeParsed port journal request caller parsed
         }
 
-    let private executeForCaller (port: FissionHostPort) (request: FissionLaunchRequest) (caller: SessionId) =
+    let private executeForCaller
+        (port: FissionHostPort)
+        (journal: AgentJournal option)
+        (request: FissionLaunchRequest)
+        (caller: SessionId)
+        =
         task {
             match! port.Sessions.TryGetParentSession caller with
             | Error reason -> return Error(FissionLaunchRejection.ParentLookupFailed reason)
             | Ok None -> return Error FissionLaunchRejection.NotSubsession
-            | Ok(Some _) -> return! executeForSubsession port request caller
+            | Ok(Some _) -> return! executeForSubsession port journal request caller
         }
 
     let launch
         (port: FissionHostPort)
+        (journal: AgentJournal option)
         (request: FissionLaunchRequest)
         : Task<Result<FissionLaunched, FissionLaunchRejection>> =
         task {
             if String.IsNullOrWhiteSpace request.CallerSessionId then
                 return Error FissionLaunchRejection.MissingCaller
             else
-                return! executeForCaller port request (SessionId.create request.CallerSessionId)
+                return! executeForCaller port journal request (SessionId.create request.CallerSessionId)
         }

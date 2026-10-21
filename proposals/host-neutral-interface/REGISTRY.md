@@ -120,7 +120,7 @@ These are the concrete steps, so a lane does not have to re-derive them:
 | Lane | Scope | Ports it may extend |
 |---|---|---|
 | arch (eng-host-arch) | DESIGN/REGISTRY/BOARD, P-00, P-10, omp skeleton, thinness gate, drift review | all (review) |
-| fission | `Execution/Fission/OpenCode` | P-02 (+ P-01 read-only use) |
+| fission | `Execution/Fission/OpenCode` | P-02 (+ P-01 read-only use), P-17 |
 | fork | `Execution/Delegation/Fork/OpenCode` + other `Execution/*/OpenCode` | P-01, P-03, P-13, P-14, P-15 |
 | tools | `OpenCode/Tools` ToolRegistry/ToolRuntimeScope + `OpenCode/Codec` | P-04, P-05 |
 | plugin-host | `OpenCode/Plugin` + `OpenCode/Host` | P-06, P-07, P-08, P-09, P-11, P-12 |

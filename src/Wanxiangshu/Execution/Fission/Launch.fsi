@@ -2,7 +2,7 @@ namespace Wanxiangshu.Execution.Fission
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 
 /// Same-participant physical replacement, host-neutral (HNI fission lane).
 /// Fission never calls the host session fork endpoint: it creates fresh
@@ -48,4 +48,7 @@ module FissionLaunch =
         | AdmissionRejected of FissionRejectReason
 
     val launch:
-        port: FissionHostPort -> request: FissionLaunchRequest -> Task<Result<FissionLaunched, FissionLaunchRejection>>
+        port: FissionHostPort ->
+        journal: Wanxiangshu.Persistence.Journal.AgentJournal option ->
+        request: FissionLaunchRequest ->
+            Task<Result<FissionLaunched, FissionLaunchRejection>>

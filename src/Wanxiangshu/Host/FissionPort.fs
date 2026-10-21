@@ -1,12 +1,25 @@
-namespace Wanxiangshu.Host
+namespace Wanxiangshu.Host.Ports
 
 open System
-open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.TerminalSignal
-open Wanxiangshu.Persistence.Journal
+
+/// HNI port (fission lane): how a delegated PTY run ended, as Fission sees it.
+/// The host runtime's own join item stays in the product domain; the port
+/// carries the neutral facts Fission broadcasts to its lanes.
+type FissionPtyStatus =
+    | Exited
+    | Failed
+    | Aborted
+
+type FissionPtyCompletion =
+    { PtyId: string
+      Status: FissionPtyStatus
+      Outcome: string
+      Code: string option
+      Message: string option }
 
 /// HNI port (fission lane): the delegated runs a Fission owner still has
 /// outstanding at admission. Fission broadcasts each pre-Fission completion to
@@ -19,7 +32,7 @@ type FissionOwnerRuns =
         /// Outstanding PTY runs by PTY id.
         OutstandingPtyRuns: unit -> string list
         /// Observe PTY completions until the returned resource is disposed.
-        SubscribePtyCompletion: (PtyJoinItem -> unit) -> IDisposable
+        SubscribePtyCompletion: (FissionPtyCompletion -> unit) -> IDisposable
     }
 
 /// HNI port (fission lane): everything a host supplies so Fission can replace
@@ -30,8 +43,6 @@ type FissionHostPort =
     {
         /// Session lifecycle: sibling creation, parent lookup, abort, interrupt, prompts.
         Sessions: ISessionHostPort
-        /// The durable journal, when the host runs with one.
-        Journal: AgentJournal option
         /// Terminal observation, when the host publishes it.
         Events: IEventObservationPort option
         /// The working directory a session runs in, if the host knows it.

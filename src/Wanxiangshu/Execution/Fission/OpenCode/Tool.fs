@@ -3,11 +3,12 @@ namespace Wanxiangshu.Execution.Fission.OpenCode
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork.Host
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Fission.FissionLaunch
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.ToolHostCodec
 open Wanxiangshu.Participant.Provider
@@ -46,10 +47,32 @@ module FissionTool =
           LaneCount: int
           Lanes: (int * string) list }
 
+    let private ptyCompletionOf (item: PtyJoinItem) : FissionPtyCompletion =
+        match item with
+        | PtyJoinItem.PtyExited exit ->
+            { PtyId = exit.PtyId
+              Status = FissionPtyStatus.Exited
+              Outcome = exit.Outcome
+              Code = None
+              Message = None }
+        | PtyJoinItem.PtyFailed failure ->
+            { PtyId = failure.PtyId
+              Status = FissionPtyStatus.Failed
+              Outcome = failure.Outcome
+              Code = Some failure.Code
+              Message = Some failure.Message }
+        | PtyJoinItem.PtyAborted aborted ->
+            { PtyId = aborted.PtyId
+              Status = FissionPtyStatus.Aborted
+              Outcome = aborted.Outcome
+              Code = Some aborted.Code
+              Message = Some aborted.Message }
+
     let private ownerRunsOf (runtime: HostForkRuntime) : FissionOwnerRuns =
         { OutstandingAgentRuns = runtime.SnapshotOutstandingAgentRuns
           OutstandingPtyRuns = runtime.SnapshotOutstandingPtyRuns
-          SubscribePtyCompletion = runtime.SubscribePtyCompletion }
+          SubscribePtyCompletion =
+            fun listener -> runtime.SubscribePtyCompletion(fun item -> listener (ptyCompletionOf item)) }
 
     let private registerLane (scope: ToolRuntimeScope) laneId physicalParent directory =
         scope.RegisterPhysicalParent(laneId, physicalParent)
@@ -59,7 +82,6 @@ module FissionTool =
 
     let private hostPort (scope: ToolRuntimeScope) (ctx: HostToolContext) : FissionHostPort =
         { Sessions = scope.Sessions
-          Journal = scope.Journal
           Events = scope.EventPort
           DirectoryFor = fun sessionId -> scope.DirectoryFor(SessionId.value sessionId)
           WorkspaceDirectory = scope.WorkspaceDirectory
@@ -98,7 +120,9 @@ module FissionTool =
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (ctx: HostToolContext) =
         task {
             let language = ProviderLanguageBinding.forSessionText ctx.SessionId
-            let! launched = FissionLaunch.launch (hostPort scope ctx) (requestOf ctx (args.Texts "prompts"))
+
+            let! launched =
+                FissionLaunch.launch (hostPort scope ctx) scope.Journal (requestOf ctx (args.Texts "prompts"))
 
             match launched with
             | Error rejection -> return consequence language (toolResultPath rejection)
@@ -166,7 +190,10 @@ module FissionTool =
         : Task<Result<FissionReceipt, string>> =
         task {
             let! launched =
-                FissionLaunch.launch (hostPort scope context) (requestOf context (decodePromptsForReceipt args))
+                FissionLaunch.launch
+                    (hostPort scope context)
+                    scope.Journal
+                    (requestOf context (decodePromptsForReceipt args))
 
             return launched |> Result.map receiptOf |> Result.mapError receiptCode
         }
