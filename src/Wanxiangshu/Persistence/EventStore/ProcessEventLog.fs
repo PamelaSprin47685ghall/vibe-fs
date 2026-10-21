@@ -829,46 +829,49 @@ module ProcessEventLog =
             stopped <- true
             None
 
+        let enterSizedFile path size =
+            let fd = openSync path "r"
+            opened.Add fd
+
+            let endsWithLf =
+                tryPhysical (fun () -> (readExactAt fd (size - 1) 1).[0] = 10uy) (fun _ -> false)
+
+            if endsWithLf then
+                cursor <- TailCursor.InsideFile(fd, path, size - 1)
+                Some()
+            else
+                stop ()
+
         let enterFile path =
             match nonEmptyFileSize path with
             | None -> stop ()
-            | Some size ->
-                let fd = openSync path "r"
-                opened.Add fd
+            | Some size -> enterSizedFile path size
 
-                let endsWithLf =
-                    tryPhysical (fun () -> (readExactAt fd (size - 1) 1).[0] = 10uy) (fun _ -> false)
+        let enterNextFile () =
+            match files with
+            | [] -> stop ()
+            | path :: rest ->
+                files <- rest
+                enterFile path
 
-                if endsWithLf then
-                    cursor <- TailCursor.InsideFile(fd, path, size - 1)
-                    Some()
-                else
-                    stop ()
+        let cursorBefore fd path (lineStart: int) =
+            if lineStart > 0 then
+                TailCursor.InsideFile(fd, path, lineStart - 1)
+            else
+                TailCursor.BetweenFiles
+
+        let readLineBefore fd path lineEnd : string option =
+            match tryPhysical (fun () -> readCompleteLineBefore fd path lineEnd) (fun ex -> Error ex.Message) with
+            | Error _ -> stop ()
+            | Ok line ->
+                cursor <- cursorBefore fd path line.Start
+                Some line.Text
 
         let rec pull () : string option =
-            if stopped then
-                None
-            else
-                match cursor with
-                | TailCursor.BetweenFiles ->
-                    match files with
-                    | [] -> stop ()
-                    | path :: rest ->
-                        files <- rest
-                        enterFile path |> Option.bind pull
-                | TailCursor.InsideFile(fd, path, lineEnd) ->
-                    match
-                        tryPhysical (fun () -> readCompleteLineBefore fd path lineEnd) (fun ex -> Error ex.Message)
-                    with
-                    | Error _ -> stop ()
-                    | Ok line ->
-                        cursor <-
-                            if line.Start > 0 then
-                                TailCursor.InsideFile(fd, path, line.Start - 1)
-                            else
-                                TailCursor.BetweenFiles
-
-                        Some line.Text
+            match stopped, cursor with
+            | true, _ -> None
+            | false, TailCursor.BetweenFiles -> enterNextFile () |> Option.bind pull
+            | false, TailCursor.InsideFile(fd, path, lineEnd) -> readLineBefore fd path lineEnd
 
         let next () : obj =
             match pull () with
@@ -879,8 +882,7 @@ module ProcessEventLog =
             try
                 retention?lastActivity (iterableOfNext next)
             finally
-                for fd in opened do
-                    closeSync fd
+                opened |> Seq.iter (fun fd -> closeSync fd)
 
         if isNull verdict then
             paths |> List.map (fun path -> statSync path |> fileActivityMs) |> List.max

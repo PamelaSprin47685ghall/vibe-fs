@@ -263,17 +263,11 @@ module PlanTools =
         (retired: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement)
         : string =
         let rec after (remaining: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement list) (found: bool) =
-            match remaining with
-            | [] ->
-                if found then
-                    work.ActiveId |> Option.defaultValue ""
-                else
-                    ""
-            | retirement :: rest ->
-                if found then
-                    retirement.IncumbencyId
-                else
-                    after rest (retirement.RetirementId = retired.RetirementId)
+            match remaining, found with
+            | [], true -> work.ActiveId |> Option.defaultValue ""
+            | [], false -> ""
+            | retirement :: _, true -> retirement.IncumbencyId
+            | retirement :: rest, false -> after rest (retirement.RetirementId = retired.RetirementId)
 
         after work.Retirements false
 
@@ -875,6 +869,32 @@ module PlanTools =
                           Message = "Plan delivered" }
         }
 
+    /// The fresh session is prompted only after its observed binding is durable.
+    let private promptBoundFreshExecution
+        (gitCommonDir: string)
+        (workId: string)
+        (operationId: string)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        (content: string)
+        (digest: string)
+        (path: string)
+        (execSessionId: string)
+        : Task<Result<DeliverResult, string>> =
+        match bindObservedExecutionSession gitCommonDir workId operationId execSessionId with
+        | Error reason -> Task.FromResult(Error reason)
+        | Ok() ->
+            promptFreshExecution
+                gitCommonDir
+                workId
+                operationId
+                promptSession
+                discardSession
+                content
+                digest
+                path
+                execSessionId
+
     let private createAndPromptFreshExecution
         (gitCommonDir: string)
         (workId: string)
@@ -893,20 +913,109 @@ module PlanTools =
 
                 return Error reason
             | Ok execSessionId ->
-                match bindObservedExecutionSession gitCommonDir workId operationId execSessionId with
-                | Error reason -> return Error reason
-                | Ok() ->
-                    return!
-                        promptFreshExecution
-                            gitCommonDir
-                            workId
-                            operationId
-                            promptSession
-                            discardSession
-                            content
-                            digest
-                            path
-                            execSessionId
+                return!
+                    promptBoundFreshExecution
+                        gitCommonDir
+                        workId
+                        operationId
+                        promptSession
+                        discardSession
+                        content
+                        digest
+                        path
+                        execSessionId
+        }
+
+    /// The pending delivery's own operation, digest and path; an already bound
+    /// execution session is a replay of that delivery.
+    let private pendingDeliveryEvidence
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        : Result<string * string * string, string> =
+        match work.PendingOperationId, work.PendingExecSessionId, work.PendingDigest, work.PendingPath with
+        | Some operationId, None, Some digest, Some path -> Ok(operationId, digest, path)
+        | Some _, Some bound, Some digest, Some path -> Ok("replay:" + bound, digest, path)
+        | _ -> Error "pending delivery evidence is incomplete"
+
+    let private pendingDeliveryOf (gitCommonDir: string) (workId: string) : Result<string * string * string, string> =
+        match lifecycleWorkOf gitCommonDir workId with
+        | None -> Error "lifecycle work is missing"
+        | Some work -> pendingDeliveryEvidence work
+
+    /// LC-020: only the exact reserved plan bytes may reach a fresh execution.
+    let private deliverReservedPlan
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (createSession: string -> string -> Task<Result<string, string>>)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        (operationId: string)
+        (digest: string)
+        (path: string)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            match readAndValidatePlan root workId with
+            | Error err -> return Error err
+            | Ok(content, currentDigest, currentPath) when currentDigest = digest && currentPath = path ->
+                return!
+                    createAndPromptFreshExecution
+                        gitCommonDir
+                        workId
+                        operationId
+                        createSession
+                        promptSession
+                        discardSession
+                        content
+                        digest
+                        path
+            | Ok _ ->
+                let! _ =
+                    refuseDelivery
+                        gitCommonDir
+                        workId
+                        operationId
+                        "Cannot deliver: plan artifact changed after delivery reservation"
+                    |> Task.FromResult
+
+                return Error "Cannot deliver: plan artifact changed after delivery reservation"
+        }
+
+    let private startPendingDelivery
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (createSession: string -> string -> Task<Result<string, string>>)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            match pendingDeliveryOf gitCommonDir workId with
+            | Error err -> return Error err
+            | Ok(operationId, digest, path) when operationId.StartsWith "replay:" ->
+                return
+                    Ok
+                        { Ok = true
+                          Relayed = false
+                          Delivered = true
+                          RetiredIncumbencyId = ""
+                          RetirementOutcome = "Delivered"
+                          Digest = digest
+                          Path = path
+                          ExecSessionId = operationId.Substring("replay:".Length)
+                          NextIncumbencyId = ""
+                          Message = "Delivered" }
+            | Ok(operationId, digest, path) ->
+                return!
+                    deliverReservedPlan
+                        gitCommonDir
+                        root
+                        workId
+                        createSession
+                        promptSession
+                        discardSession
+                        operationId
+                        digest
+                        path
         }
 
     /// LC-020: the fresh handoff runs against the pending delivery's own
@@ -926,57 +1035,7 @@ module PlanTools =
             if not (Array.isEmpty blockers) then
                 return Error "Cannot deliver: live resources block starting execution"
             else
-                let pending =
-                    match lifecycleWorkOf gitCommonDir workId with
-                    | None -> Error "lifecycle work is missing"
-                    | Some work ->
-                        match
-                            work.PendingOperationId, work.PendingExecSessionId, work.PendingDigest, work.PendingPath
-                        with
-                        | Some operationId, None, Some digest, Some path -> Ok(operationId, digest, path)
-                        | Some _, Some bound, Some digest, Some path -> Ok("replay:" + bound, digest, path)
-                        | _ -> Error "pending delivery evidence is incomplete"
-
-                match pending with
-                | Error err -> return Error err
-                | Ok(operationId, digest, path) when operationId.StartsWith "replay:" ->
-                    return
-                        Ok
-                            { Ok = true
-                              Relayed = false
-                              Delivered = true
-                              RetiredIncumbencyId = ""
-                              RetirementOutcome = "Delivered"
-                              Digest = digest
-                              Path = path
-                              ExecSessionId = operationId.Substring("replay:".Length)
-                              NextIncumbencyId = ""
-                              Message = "Delivered" }
-                | Ok(operationId, digest, path) ->
-                    match readAndValidatePlan root workId with
-                    | Error err -> return Error err
-                    | Ok(content, currentDigest, currentPath) when currentDigest = digest && currentPath = path ->
-                        return!
-                            createAndPromptFreshExecution
-                                gitCommonDir
-                                workId
-                                operationId
-                                createSession
-                                promptSession
-                                discardSession
-                                content
-                                digest
-                                path
-                    | Ok _ ->
-                        let! _ =
-                            refuseDelivery
-                                gitCommonDir
-                                workId
-                                operationId
-                                "Cannot deliver: plan artifact changed after delivery reservation"
-                            |> Task.FromResult
-
-                        return Error "Cannot deliver: plan artifact changed after delivery reservation"
+                return! startPendingDelivery gitCommonDir root workId createSession promptSession discardSession
         }
 
     let private reviewAndDeliverReopenedPostS3

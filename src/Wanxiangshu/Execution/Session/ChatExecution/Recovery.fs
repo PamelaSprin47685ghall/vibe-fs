@@ -143,24 +143,32 @@ module ChatExecutionRecovery =
         | ProviderPhysicalObservation.ReceiptAmbiguous
         | ProviderPhysicalObservation.ProviderAbsent _ -> None
 
+    /// Which failure resolution the policy chose, and whether it addresses exactly
+    /// this execution's recorded provider start (or key).
+    let private resolutionMatch
+        (evidence: ChatExecutionRecoveryEvidence)
+        (started: ProviderStartedEvidence option)
+        (resolution: ExecutionFailureResolution)
+        : string * bool =
+        match resolution with
+        | ExecutionFailureResolution.RetryFreshAttempt authorization ->
+            "RetryFreshAttempt",
+            started
+            |> Option.exists (fun started ->
+                authorization.LogicalRun = started.Accepted.LogicalRunId
+                && authorization.ProviderRun = started.ProviderRun
+                && authorization.RequestKind = started.RequestKind)
+        | ExecutionFailureResolution.TerminalizeProviderStarted(key, _) ->
+            "TerminalizeProviderStarted", key = evidence.ExecutionState.key
+        | ExecutionFailureResolution.PreserveCurrentFact -> "PreserveCurrentFact", false
+        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ -> "AwaitAcceptanceReconciliation", false
+        | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ -> "TerminalizeAcceptedPreProvider", false
+
     let private policyInput (evidence: ChatExecutionRecoveryEvidence) : obj =
         match evidence.FailureDecisionEvidence, evidence.ExecutionState.startedEvidence with
         | RecoveryPolicyEvidence.NoFailureDecision, _ -> null
         | RecoveryPolicyEvidence.FailureDecision decision, started ->
-            let resolution, matches =
-                match decision.Resolution with
-                | ExecutionFailureResolution.RetryFreshAttempt authorization ->
-                    "RetryFreshAttempt",
-                    started
-                    |> Option.exists (fun started ->
-                        authorization.LogicalRun = started.Accepted.LogicalRunId
-                        && authorization.ProviderRun = started.ProviderRun
-                        && authorization.RequestKind = started.RequestKind)
-                | ExecutionFailureResolution.TerminalizeProviderStarted(key, _) ->
-                    "TerminalizeProviderStarted", key = evidence.ExecutionState.key
-                | ExecutionFailureResolution.PreserveCurrentFact -> "PreserveCurrentFact", false
-                | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ -> "AwaitAcceptanceReconciliation", false
-                | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ -> "TerminalizeAcceptedPreProvider", false
+            let resolution, matches = resolutionMatch evidence started decision.Resolution
 
             createObj [ "resolution" ==> resolution; "matches" ==> matches ]
 
@@ -222,39 +230,63 @@ module ChatExecutionRecovery =
     let private unexpected (what: string) : 'T =
         invalidOp ("wanxiangli/chat-execution recover returned " + what)
 
+    let private ignoreReasonOf (value: obj) : IgnoreReason =
+        match unbox<string> value with
+        | "DurableTerminalAlreadySettled" -> IgnoreReason.DurableTerminalAlreadySettled
+        | "ProviderStillAlive" -> IgnoreReason.ProviderStillAlive
+        | "RecoveryAlreadyCommitted" -> IgnoreReason.RecoveryAlreadyCommitted
+        | "ProviderRecoveryOwned" -> IgnoreReason.ProviderRecoveryOwned
+        | "StalePhysicalEvidence" -> IgnoreReason.StalePhysicalEvidence
+        | "StalePolicyEvidence" -> IgnoreReason.StalePolicyEvidence
+        | other -> unexpected ("an unknown ignore reason " + other)
+
+    /// A settled durable terminal is ignored under the observed resource's key;
+    /// every other ignore keeps the execution's own key.
+    let private ignoreDecision (evidence: ChatExecutionRecoveryEvidence) (reason: IgnoreReason) =
+        let key =
+            match reason with
+            | IgnoreReason.DurableTerminalAlreadySettled -> resourceKey evidence.ResourceObservation
+            | _ -> evidence.ExecutionState.key
+
+        ChatExecutionRecoveryDecision.Ignore(key, reason)
+
+    let private manualReasonOf (value: obj) : ManualInterventionReason =
+        match unbox<string> value with
+        | "MissingExternalReceipt" -> ManualInterventionReason.MissingExternalReceipt
+        | "AmbiguousExternalReceipt" -> ManualInterventionReason.AmbiguousExternalReceipt
+        | "PhysicalOutcomeUnknown" -> ManualInterventionReason.PhysicalOutcomeUnknown
+        | "PersistenceOutcomeUnknown" -> ManualInterventionReason.PersistenceOutcomeUnknown
+        | "NoAuthorizedProviderDisposition" -> ManualInterventionReason.NoAuthorizedProviderDisposition
+        | other -> unexpected ("an unknown manual reason " + other)
+
+    let private persistProviderStarted (observation: ProviderPhysicalObservation) =
+        match observation with
+        | ProviderPhysicalObservation.ProviderAlive started ->
+            ChatExecutionRecoveryDecision.ReconcilePhysical(
+                PhysicalReconciliationRequest.PersistProviderStarted started
+            )
+        | _ -> unexpected "persistProviderStarted without a live provider"
+
+    let private persistProviderStartedAndTerminal (observation: ProviderPhysicalObservation) =
+        match observation with
+        | ProviderPhysicalObservation.ProviderTerminal(started, disposition) ->
+            ChatExecutionRecoveryDecision.ReconcilePhysical(
+                PhysicalReconciliationRequest.PersistProviderStartedAndTerminal(started, disposition)
+            )
+        | _ -> unexpected "persistProviderStartedAndTerminal without a terminal provider"
+
+    let private finalizeByPolicy started (resolution: ExecutionFailureResolution) =
+        match resolution with
+        | ExecutionFailureResolution.TerminalizeProviderStarted(_, disposition) -> finalize started disposition
+        | _ -> unexpected "a policy finalize without a provider-started terminalization"
+
     let decide (evidence: ChatExecutionRecoveryEvidence) : ChatExecutionRecoveryDecision =
         let state = evidence.ExecutionState
         let verdict: obj = law?recover (recoveryInput evidence)
 
         match unbox<string> verdict?decision with
-        | "ignore" ->
-            let reason =
-                match unbox<string> verdict?reason with
-                | "DurableTerminalAlreadySettled" -> IgnoreReason.DurableTerminalAlreadySettled
-                | "ProviderStillAlive" -> IgnoreReason.ProviderStillAlive
-                | "RecoveryAlreadyCommitted" -> IgnoreReason.RecoveryAlreadyCommitted
-                | "ProviderRecoveryOwned" -> IgnoreReason.ProviderRecoveryOwned
-                | "StalePhysicalEvidence" -> IgnoreReason.StalePhysicalEvidence
-                | "StalePolicyEvidence" -> IgnoreReason.StalePolicyEvidence
-                | other -> unexpected ("an unknown ignore reason " + other)
-
-            let key =
-                match reason, evidence.ResourceObservation with
-                | IgnoreReason.DurableTerminalAlreadySettled, resource -> resourceKey resource
-                | _ -> state.key
-
-            ChatExecutionRecoveryDecision.Ignore(key, reason)
-        | "manual" ->
-            let reason =
-                match unbox<string> verdict?reason with
-                | "MissingExternalReceipt" -> ManualInterventionReason.MissingExternalReceipt
-                | "AmbiguousExternalReceipt" -> ManualInterventionReason.AmbiguousExternalReceipt
-                | "PhysicalOutcomeUnknown" -> ManualInterventionReason.PhysicalOutcomeUnknown
-                | "PersistenceOutcomeUnknown" -> ManualInterventionReason.PersistenceOutcomeUnknown
-                | "NoAuthorizedProviderDisposition" -> ManualInterventionReason.NoAuthorizedProviderDisposition
-                | other -> unexpected ("an unknown manual reason " + other)
-
-            manual reason evidence
+        | "ignore" -> ignoreDecision evidence (ignoreReasonOf verdict?reason)
+        | "manual" -> manual (manualReasonOf verdict?reason) evidence
         | "releaseTerminalResource" ->
             let terminalEvidence, disposition = terminalOf state
 
@@ -269,20 +301,8 @@ module ChatExecutionRecovery =
             ChatExecutionRecoveryDecision.ResumePreProvider
                 { ExecutionKey = state.key
                   AcceptedEvidence = state.acceptedEvidence }
-        | "persistProviderStarted" ->
-            match evidence.ProviderObservation with
-            | ProviderPhysicalObservation.ProviderAlive started ->
-                ChatExecutionRecoveryDecision.ReconcilePhysical(
-                    PhysicalReconciliationRequest.PersistProviderStarted started
-                )
-            | _ -> unexpected "persistProviderStarted without a live provider"
-        | "persistProviderStartedAndTerminal" ->
-            match evidence.ProviderObservation with
-            | ProviderPhysicalObservation.ProviderTerminal(started, disposition) ->
-                ChatExecutionRecoveryDecision.ReconcilePhysical(
-                    PhysicalReconciliationRequest.PersistProviderStartedAndTerminal(started, disposition)
-                )
-            | _ -> unexpected "persistProviderStartedAndTerminal without a terminal provider"
+        | "persistProviderStarted" -> persistProviderStarted evidence.ProviderObservation
+        | "persistProviderStartedAndTerminal" -> persistProviderStartedAndTerminal evidence.ProviderObservation
         | "finalize" ->
             match
                 unbox<string> verdict?from,
@@ -293,8 +313,6 @@ module ChatExecutionRecovery =
             | "observation", Some started, ProviderPhysicalObservation.ProviderTerminal(_, disposition), _ ->
                 finalize started disposition
             | "policy", Some started, _, RecoveryPolicyEvidence.FailureDecision decision ->
-                match decision.Resolution with
-                | ExecutionFailureResolution.TerminalizeProviderStarted(_, disposition) -> finalize started disposition
-                | _ -> unexpected "a policy finalize without a provider-started terminalization"
+                finalizeByPolicy started decision.Resolution
             | _ -> unexpected "finalize without its started evidence and disposition"
         | other -> unexpected ("an unknown decision " + other)

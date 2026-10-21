@@ -352,13 +352,14 @@ module PairProgrammingThoughtTransform =
 
             let clonedParts = Array.copy parts
 
-            for index in indices do
+            indices
+            |> Array.iter (fun index ->
                 let originalPart = parts.[index]
                 let clonedState = emitJsExpr originalPart?state "Object.assign({}, $0)"
                 applyGuidanceSuffix suffix originalPart clonedState
                 let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
                 clonedPart?state <- clonedState
-                clonedParts.[index] <- clonedPart
+                clonedParts.[index] <- clonedPart)
 
             let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
             clonedMessage?parts <- box clonedParts
@@ -493,8 +494,8 @@ module PairProgrammingThoughtTransform =
         if not (Array.isEmpty indices) then
             let clonedParts = Array.copy parts
 
-            for index in indices do
-                clonedParts.[index] <- stripKnownCursorSuffixes suffixTexts parts.[index]
+            indices
+            |> Array.iter (fun index -> clonedParts.[index] <- stripKnownCursorSuffixes suffixTexts parts.[index])
 
             let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
             clonedMessage?parts <- box clonedParts
@@ -1146,6 +1147,38 @@ module PairProgrammingThoughtTransform =
     [<Emit("({ info: { id: 'anchor-zero#summary', role: 'user', synthetic: true, source: 'anchor-summary' }, parts: [{ type: 'text', text: $0 }] })")>]
     let private openingSummary (summary: string) : obj = jsNative
 
+    /// A user message carries the anchor marker on its first text part (or a new
+    /// leading text part); any other message carries it on its terminal result.
+    let private markedUserAnchorParts (marker: string) (parts: obj array) : obj =
+        let index =
+            parts
+            |> Array.tryFindIndex (fun part ->
+                not (isNull part) && isString part?text && partTypeKind part = Some "text")
+
+        match index with
+        | Some index ->
+            let projected = Array.copy parts
+            let part = emitJsExpr parts.[index] "Object.assign({}, $0)"
+            part?text <- box (marker + unbox<string> parts.[index]?text)
+            projected.[index] <- part
+            box projected
+        | None ->
+            let part = createObj [ "type", box "text"; "text", box marker ]
+            box (Array.append [| part |] parts)
+
+    let private markedAnchorParts (marker: string) (raw: obj) : obj =
+        let parts = rawParts raw
+
+        if messageRole raw = "user" then
+            markedUserAnchorParts marker parts
+        else
+            let index =
+                parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.head
+
+            let projected = Array.copy parts
+            projected.[index] <- mapTerminalResultText (fun text -> marker + text) parts.[index]
+            box projected
+
     /// Selection applies on every request: a consumed declaration states this
     /// turn's statement (protected prefix, new summaries), while the summaries
     /// already recorded are permanent and outlive the declaration that made them.
@@ -1159,32 +1192,7 @@ module PairProgrammingThoughtTransform =
                 + cursorGuidanceSeparator
 
             let cloned = emitJsExpr raw "Object.assign({}, $0)"
-            let parts = rawParts raw
-
-            if messageRole raw = "user" then
-                let index =
-                    parts
-                    |> Array.tryFindIndex (fun part ->
-                        not (isNull part) && isString part?text && partTypeKind part = Some "text")
-
-                match index with
-                | Some index ->
-                    let projected = Array.copy parts
-                    let part = emitJsExpr parts.[index] "Object.assign({}, $0)"
-                    part?text <- box (marker + unbox<string> parts.[index]?text)
-                    projected.[index] <- part
-                    cloned?parts <- box projected
-                | None ->
-                    let part = createObj [ "type", box "text"; "text", box marker ]
-                    cloned?parts <- box (Array.append [| part |] parts)
-            else
-                let index =
-                    parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.head
-
-                let projected = Array.copy parts
-                projected.[index] <- mapTerminalResultText (fun text -> marker + text) parts.[index]
-                cloned?parts <- box projected
-
+            cloned?parts <- markedAnchorParts marker raw
             cloned
 
     let private applyDeclaredAnchorView
@@ -1289,9 +1297,9 @@ module PairProgrammingThoughtTransform =
                 markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored
 
                 let marked =
-                    match projectionSessionIdOpt with
-                    | Some sessionId -> newMessages |> List.map (markAnchor sessionId)
-                    | None -> newMessages
+                    projectionSessionIdOpt
+                    |> Option.map (fun sessionId -> newMessages |> List.map (markAnchor sessionId))
+                    |> Option.defaultValue newMessages
 
                 HostMessageProjection.replaceMessagesInPlace outObj marked
             | Error reason -> do! failClosedInject terminateSession projectionSessionIdOpt reason
