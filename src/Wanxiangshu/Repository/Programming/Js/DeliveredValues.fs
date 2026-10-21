@@ -83,7 +83,7 @@ module JsDeliveredValues =
     let peekCached (sessionId: string) : obj = owner.peekCached sessionId
 
     let private declarationOf raw =
-        match Anchor.AnchorSurface.parseDeclaration raw with
+        match Anchor.AnchorDeclarationRule.parse raw with
         | Ok parsed -> parsed
         | Error failure -> invalidOp (JsFailure.code failure + ": " + JsFailure.reason failure)
 

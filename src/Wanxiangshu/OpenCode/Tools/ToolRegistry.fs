@@ -420,16 +420,43 @@ module ToolRegistry =
     /// The report material a delegate receives: the caller's report mapping
     /// rendered as `<anchor>: <text>` lines, one per entry, newline-joined.
     /// No entries means no material at all.
-    let private reportMaterialText (sessionId: string) (mapping: obj) : Result<string option, JsFailure> =
-        AnchorSurface.reportMaterial sessionId mapping
-        |> Result.map (fun entries ->
-            entries
-            |> List.map (fun (anchor, text) -> sprintf "%d: %s" anchor text)
-            |> fun lines ->
+    ///
+    /// The projection answers with the plain-JS receipt of
+    /// `AnchorSurface.reportMaterial`; the refusal travels as the same
+    /// `{ code, reason }` bytes the failure receipt carries.
+    let private reportMaterialText (sessionId: string) (mapping: obj) : obj =
+        let receipt = AnchorSurface.reportMaterial sessionId mapping
+        let ok: bool = receipt?ok
+
+        if not ok then
+            receipt
+        else
+            let material: obj array = receipt?material
+
+            let lines =
+                material
+                |> Array.toList
+                |> List.map (fun entry ->
+                    let anchor: int = entry?anchor
+                    let text: string = entry?text
+                    sprintf "%d: %s" anchor text)
+
+            let record: obj =
                 if List.isEmpty lines then
-                    None
+                    null
                 else
-                    Some(String.concat "\n" lines))
+                    box (String.concat "\n" lines)
+
+            createObj [ "ok" ==> true; "record" ==> record ]
+
+    /// The rendered record of a material receipt, or no record at all.
+    let private recordOfReceipt (receipt: obj) : string option =
+        let record = receipt?record
+
+        if isNullish record then
+            None
+        else
+            Some(string record)
 
     /// The delegate payload keeps every field the program sent and gains the
     /// report material under `commissioner_record`. The payload is normalized
@@ -461,8 +488,12 @@ module ToolRegistry =
     /// The advisor consult accepts the report mapping only — a mapping of
     /// anchor numbers to summaries, equivalent to a `prefixUntil = 0`
     /// declaration. There is no lenient empty declaration.
+    ///
+    /// The advisor seat needs the typed declaration itself, so it reads the
+    /// shared typed rule (`AnchorDeclarationRule`) — the very same decision the
+    /// plain-JS receipt of `AnchorSurface.parseReportMapping` reports.
     let private advisorDeclarationOf (reportMapping: obj) =
-        AnchorSurface.parseReportMapping reportMapping
+        AnchorDeclarationRule.parseReportMapping reportMapping
 
     /// The transform's own wire text over a decoded snapshot part: the advisor
     /// reads exactly what the caller's request carried, tool calls included.
@@ -877,16 +908,17 @@ module ToolRegistry =
                                     fun name payload mapping ->
                                         task {
                                             let material = reportMaterialText ctx.SessionId mapping
+                                            let materialOk: bool = material?ok
 
                                             match name with
                                             | "fork" | "commission" ->
-                                                match material with
-                                                | Error failure ->
+                                                if not materialOk then
                                                     return
                                                         refusalWithReason
-                                                            (JsFailure.code failure)
-                                                            (JsFailure.reason failure)
-                                                | Ok record ->
+                                                            (string material?code)
+                                                            (string material?reason)
+                                                else
+                                                    let record = recordOfReceipt material
                                                     let raw = payloadWithRecord payload record
 
                                                     let! receipt =
@@ -904,13 +936,13 @@ module ToolRegistry =
                                                                   "outcome" ==> placed.Outcome ]
                                                         | Error code -> refusal code
                                             | "resume" ->
-                                                match material with
-                                                | Error failure ->
+                                                if not materialOk then
                                                     return
                                                         refusalWithReason
-                                                            (JsFailure.code failure)
-                                                            (JsFailure.reason failure)
-                                                | Ok record ->
+                                                            (string material?code)
+                                                            (string material?reason)
+                                                else
+                                                    let record = recordOfReceipt material
                                                     let raw = payloadWithRecord payload record
 
                                                     let! receipt =
@@ -928,13 +960,13 @@ module ToolRegistry =
                                                                   "outcome" ==> placed.Outcome ]
                                                         | Error code -> refusal code
                                             | "devops" ->
-                                                match material with
-                                                | Error failure ->
+                                                if not materialOk then
                                                     return
                                                         refusalWithReason
-                                                            (JsFailure.code failure)
-                                                            (JsFailure.reason failure)
-                                                | Ok record ->
+                                                            (string material?code)
+                                                            (string material?reason)
+                                                else
+                                                    let record = recordOfReceipt material
                                                     let! gitCommonDir = askGitCommonDir workspaceDirectory
 
                                                     if String.IsNullOrWhiteSpace gitCommonDir then

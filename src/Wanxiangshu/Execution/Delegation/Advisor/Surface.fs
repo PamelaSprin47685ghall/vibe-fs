@@ -12,7 +12,7 @@ module Surface =
 
     let private requestOf (value: obj) : AdvisorViewRequest =
         let declaration =
-            match AnchorSurface.parseDeclaration value?declaration with
+            match AnchorDeclarationRule.parse value?declaration with
             | Ok parsed -> parsed
             | Error failure -> invalidOp (JsFailure.code failure + ": " + JsFailure.reason failure)
 
