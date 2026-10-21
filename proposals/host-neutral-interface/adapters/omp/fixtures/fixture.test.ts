@@ -2,7 +2,7 @@
 // events; a fake product plugin answers. No model, no network, no omp process.
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
 import { activateOnOmp, type AgentMessage, type OmpApi, type OmpChildSessions } from "../adapter";
-import type * as P from "../ports";
+import * as P from "../ports";
 import events from "./events.json" with { type: "json" };
 
 type Handler = (event: any, ctx: ExtensionContext) => unknown;
@@ -38,7 +38,7 @@ let portsSeen: P.HostPorts | undefined;
 const product: P.IHostPlugin = {
   async Activate(ports) {
     portsSeen = ports;
-    ports.Tools.Register([{ Name: "wxs_echo", Description: "echo", Schema: JSON.stringify({ type: "object" }),
+    ports.Tools.Register([{ Name: "wxs_echo", Description: "echo", Schema: P.jsonSchema(JSON.stringify({ type: "object" })),
       Execute: async (call) => ({ Text: `echo ${call.Args}`, Truncated: false, IsError: false }) }]);
     return { ok: true, value: {
       ToolGate: {
@@ -70,7 +70,7 @@ const expect = (label: string, actual: unknown, expected: unknown) => {
   if (a !== e) { failures++; console.log(`not ok - ${label}\n  actual:   ${a}\n  expected: ${e}`); } else console.log(`ok - ${label}`);
 };
 
-activateOnOmp(pi, product, children, [{ Role: "coder" }]);
+activateOnOmp(pi, product, children, [{ Role: P.agentRole("coder") }]);
 await fire("session_start", { type: "session_start" });
 expect("product tool registered", tools.map((t) => t.name), ["wxs_echo"]);
 expect("tool execute encodes ToolOutcome", await tools[0].execute("call-1", { a: 1 }, undefined, undefined, ctx),
@@ -90,7 +90,7 @@ expect("transcript decode", tr.ok ? tr.value.map((m) => [m.Role, m.Parts.map((p)
   [["User", ["Text"], null], ["Assistant", ["Reasoning", "Text", "ToolUse"], "Completed"]]);
 expect("child session create", await portsSeen!.Sessions.Create("root" as P.SessionId, { Title: "t" }), { ok: true, value: "child-of-root" });
 expect("model apply unknown -> Transport error", (await portsSeen!.Models.Apply("root" as P.SessionId, { Provider: "x", Model: "y" })).ok, false);
-expect("prompt correlation echoed as entry", [await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go", Correlation: "pk-1" as P.PromptKey }, undefined), entries, sent],
-  [{ tag: "AdmittedWithReceipt", receipt: "omp:root" }, [{ session: "root", key: "pk-1" }], ["go"]]);
+expect("prompt correlation echoed as entry", [await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go", Correlation: P.promptKey("pk-1") }, undefined), entries, sent],
+  [{ tag: "AdmittedWithReceipt", value: "omp:root" }, [{ session: "root", key: "pk-1" }], ["go"]]);
 console.log(failures === 0 ? "# fixture: all ok" : `# fixture: ${failures} failed`);
 if (failures) process.exit(1);

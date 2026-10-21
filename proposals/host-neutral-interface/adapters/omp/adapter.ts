@@ -1,8 +1,16 @@
 // omp (oh-my-pi 18.12.4) adapter skeleton for the host-neutral ports (HNI-03).
 // Thin by construction: decode omp payloads into port shapes, encode port results into omp results,
 // register handlers. No product decision is taken here: every verdict comes from ProductHooks.
+//
+// Honesty rules this file follows:
+//   * A port request the host cannot honour is answered with a typed `HostError`
+//     (usually `Unsupported`), never with a silent success and never by dropping
+//     part of the caller's request.
+//   * Port shapes are taken from the GENERATED mirror (ports.ts), which is
+//     derived from the F# signatures; mismatches are fixed here, not in the
+//     generator.
+import * as P from "./ports";
 import type { ExtensionAPI, ExtensionContext, ContextEvent } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import type * as P from "./ports";
 
 export type AgentMessage = ContextEvent["messages"][number];
 export type OmpApi = Pick<ExtensionAPI, "on" | "registerTool" | "sendUserMessage" | "appendEntry" | "setModel" | "setActiveTools" | "logger">;
@@ -23,11 +31,18 @@ const ok = <T>(value: T): P.Result<T, P.HostError> => ({ ok: true, value });
 const err = <T>(error: P.HostError): P.Result<T, P.HostError> => ({ ok: false, error });
 const sid = (s: string) => s as P.SessionId;
 const transport = (e: unknown): P.HostError => ({ tag: "Transport", reason: e instanceof Error ? e.message : String(e) });
-async function guard<T>(f: () => Promise<T>): P.HostResult<T> {
-  try { return ok(await f()); } catch (e) { return err(transport(e)); }
+const notFound = (what: string): P.HostError => ({ tag: "NotFound", what });
+const unsupported = (capability: P.HostCapability): P.HostError => ({ tag: "Unsupported", capability });
+
+/** Raised when a session id is unknown to the host; mapped to `HostError.NotFound`. */
+export class UnknownSessionError extends Error {
+  readonly what: string;
+  constructor(what: string) { super(`unknown session ${what}`); this.what = what; }
 }
 
-// ---------------------------------------------------------------- decode (omp -> ports)
+async function guard<T>(f: () => Promise<T>): P.HostResult<T> {
+  try { return ok(await f()); } catch (e) { return err(e instanceof UnknownSessionError ? notFound(e.what) : transport(e)); }
+}
 export function decodeParts(m: AgentMessage): P.TranscriptPart[] {
   const content = (m as { content?: unknown }).content;
   if (typeof content === "string") return [{ tag: "Text", text: content }];
@@ -37,7 +52,7 @@ export function decodeParts(m: AgentMessage): P.TranscriptPart[] {
       case "text": return { tag: "Text", text: String(c.text) };
       case "thinking": return { tag: "Reasoning", text: String(c.thinking) };
       case "toolCall": return { tag: "ToolUse", call: {
-        CallId: String(c.id) as P.ToolCallId, Tool: String(c.name), Input: JSON.stringify(c.arguments ?? {}), State: "Pending" } };
+        CallId: String(c.id) as P.ToolCallId, Tool: String(c.name), Input: P.canonicalJsonText(JSON.stringify(c.arguments ?? {})), State: "Pending" } };
       case "image": return { tag: "File", mime: String(c.mimeType ?? "image/*"), uri: "inline:" };
       default: return { tag: "Other", kind: c.type };
     }
@@ -74,8 +89,19 @@ export function decodeMessage(m: AgentMessage, index: number): P.TranscriptMessa
   };
 }
 
-function encodeParts(parts: P.TranscriptPart[]): { type: "text"; text: string }[] {
-  return parts.flatMap((p) => (p.tag === "Text" ? [{ type: "text" as const, text: p.text }] : []));
+/**
+ * Encode port parts back into omp message content.
+ * Returns `undefined` when a part has no omp representation: the caller then
+ * leaves the original message untouched rather than silently dropping content.
+ */
+export function encodeParts(parts: P.TranscriptPart[]): { type: "text"; text: string }[] | undefined {
+  const out: { type: "text"; text: string }[] = [];
+  for (const p of parts) {
+    if (p.tag === "Text") { out.push({ type: "text", text: p.text }); continue; }
+    // Reasoning, tool calls and file parts have no plain-text omp encoding here.
+    return undefined;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- HostPorts over omp
@@ -88,12 +114,24 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
   const registered: P.ToolSpec[] = [];
 
   const sessions: P.ISessionPort = {
-    Create: (parent, spec) => guard(async () => sid(await children.create(parent, spec.Title, spec.Workspace))),
-    Parent: (s) => guard(async () => { const p = isOwnChild(s) ? children.parentOf(s) : ctx().sessionManager.getHeader()?.parentSession; return p ? sid(p) : undefined; }),
+    Create: (parent, spec) => guard(async () => {
+      // The host owns the workspace of the session it creates; a request for a
+      // different workspace is refused rather than silently ignored.
+      if (spec.Workspace !== undefined && spec.Workspace !== P.workspacePath(ctx().cwd)) {
+        throw new Error(`omp cannot create a session in workspace ${spec.Workspace}`);
+      }
+      return sid(await children.create(parent, spec.Title, spec.Workspace));
+    }),
+    Parent: (s) => guard(async () => {
+      const p = isOwnChild(s) ? children.parentOf(s) : ctx().sessionManager.getHeader()?.parentSession;
+      return p ? sid(p) : undefined;
+    }),
     Children: (s) => guard(async () => children.childrenOf(s).map((c) => ({ Id: sid(c.id), Parent: s, Title: c.title }))),
     Abort: (s) => guard(async () => { if (isOwnChild(s)) await children.abort(s); else ctx().abort(); }),
     Interrupt: (s) => guard(async () => { if (isOwnChild(s)) await children.abort(s); else ctx().abort(); }),
-    Close: (s) => isOwnChild(s) ? guard(() => children.close(s)) : Promise.resolve(err({ tag: "Refused", reason: "cannot close the host's own session" })),
+    Close: (s) => isOwnChild(s)
+      ? guard(() => children.close(s))
+      : Promise.resolve(err({ tag: "Refused", reason: "cannot close the host's own session" })),
     FindByTitle: (t) => guard(async () => (await children.findByTitle(t)).map(sid)),
   };
 
@@ -103,11 +141,26 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
         if (request.Correlation !== undefined) pi.appendEntry("wxs.prompt-key", { session: s, key: request.Correlation });
         if (isOwnChild(s)) {
           const accepted = await children.prompt(s, request.Text);
-          return accepted ? { tag: "AdmittedWithReceipt", receipt: `omp:${s}` } : { tag: "Retryable", reason: "omp refused prompt" };
+          if (!accepted) return { tag: "Retryable", reason: "omp refused prompt" };
+          if (late) await late({ tag: "OwnedSettled" });
+          return { tag: "AdmittedWithReceipt", value: P.transportReceipt(`omp:${s}`) };
+        }
+        // The host session is the one the extension is running in: role, route,
+        // workspace and tool policy are not expressible through
+        // `sendUserMessage`, so they are reported as unsupported instead of
+        // being dropped.
+        const unsupportedFields: string[] = [];
+        if (request.Role !== undefined) unsupportedFields.push("Role");
+        if (request.Route !== undefined) unsupportedFields.push("Route");
+        if (request.Workspace !== undefined) unsupportedFields.push("Workspace");
+        if (request.ToolPolicy !== undefined) unsupportedFields.push("ToolPolicy");
+        if (unsupportedFields.length > 0) {
+          if (late) await late({ tag: "Refused", reason: `omp cannot carry ${unsupportedFields.join(", ")}` });
+          return { tag: "Fatal", reason: `omp cannot carry ${unsupportedFields.join(", ")}` };
         }
         pi.sendUserMessage(request.Text, { deliverAs: "followUp" });
         if (late) await late({ tag: "OwnedSettled" });
-        return { tag: "AdmittedWithReceipt", receipt: `omp:${s}` };
+        return { tag: "AdmittedWithReceipt", value: P.transportReceipt(`omp:${s}`) };
       } catch (e) {
         return { tag: "AcceptanceUnknown", reason: transport(e).tag };
       }
@@ -125,7 +178,11 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
 
   const models: P.IModelCatalog = {
     Available: () => guard(async () => ctx().modelRegistry.getAvailable().map((m) => ({ Provider: m.provider, Model: m.id }))),
-    Apply: (_s, route) => guard(async () => {
+    Apply: (s, route) => guard(async () => {
+      // omp can only change the model of the session the extension runs in, so a
+      // request for a different session is refused rather than applied to the
+      // wrong session.
+      if (s !== current()) throw new Error(`omp cannot set the model of session ${s}`);
       const model = ctx().modelRegistry.find(route.Provider, route.Model);
       if (!model) throw new Error(`model not found: ${route.Provider}/${route.Model}`);
       if (!(await pi.setModel(model))) throw new Error("omp rejected model");
@@ -141,11 +198,14 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
           parameters: JSON.parse(spec.Schema),
           async execute(toolCallId, params, signal, onUpdate, c) {
             const r = await spec.Execute({
-              Session: sid(c.sessionManager.getSessionId()), CallId: toolCallId as P.ToolCallId, Workspace: c.cwd,
-              Args: JSON.stringify(params), Cancellation: signal ?? new AbortController().signal,
+              Session: sid(c.sessionManager.getSessionId()), CallId: toolCallId as P.ToolCallId,
+              Workspace: P.workspacePath(c.cwd),
+              Args: P.canonicalJsonText(JSON.stringify(params)),
+              Cancellation: signal ?? new AbortController().signal,
               Progress: onUpdate ? (line) => onUpdate({ content: [{ type: "text", text: line }], details: undefined }) : undefined,
             });
-            return { content: [{ type: "text", text: r.Text }], details: r.Details === undefined ? undefined : JSON.parse(r.Details), isError: r.IsError };
+            return { content: [{ type: "text", text: r.Text }],
+                     details: r.Details === undefined ? undefined : JSON.parse(r.Details), isError: r.IsError };
           },
         });
       }
@@ -156,10 +216,13 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
   const ports: P.HostPorts = {
     Sessions: sessions, Prompts: prompts, Transcript: transcript, Models: models, Tools: tools,
     Signals: { Subscribe: (l) => { listeners.add(l); return { dispose: () => void listeners.delete(l) }; } },
-    Paths: { get StateRoot() { return `${ctx().cwd}/.wanxiangshu`; }, get ProjectRoot() { return ctx().cwd; }, get ProjectId() { return ctx().cwd; } },
+    Paths: { get StateRoot() { return P.workspacePath(`${ctx().cwd}/.wanxiangshu`); },
+             get ProjectRoot() { return P.workspacePath(ctx().cwd); },
+             get ProjectId() { return ctx().cwd; } },
     Diagnostics: { Emit: (op, fields) => pi.logger.debug(op, Object.fromEntries(fields)) },
     Agents: { Roles: () => agents },
-    Capabilities: { HostName: "omp", Supports: new Set<P.HostCapability>(["ChildSessions", "SessionDiscovery", "Interrupt", "SubagentRouting", "ProviderParams", "StreamDeltas"]) },
+    // Only capabilities this adapter actually wires are advertised.
+    Capabilities: { HostName: "omp", Supports: new Set<P.HostCapability>(["ChildSessions", "SessionDiscovery", "Interrupt", "SubagentRouting"]) },
   };
   return { ports, emit };
 }
@@ -167,16 +230,24 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
 // ---------------------------------------------------------------- ProductHooks -> omp registrations
 export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s: P.HostSignal) => Promise<void>): void {
   const turnContext = (c: ExtensionContext): P.TurnContext => ({
-    Session: sid(c.sessionManager.getSessionId()), Workspace: c.cwd,
+    Session: sid(c.sessionManager.getSessionId()), Workspace: P.workspacePath(c.cwd),
     Route: c.model ? { Provider: c.model.provider, Model: c.model.id } : undefined,
   });
   const view = (c: ExtensionContext, id: string, tool: string, input: unknown): P.ToolCallView =>
-    ({ Session: sid(c.sessionManager.getSessionId()), CallId: id as P.ToolCallId, Tool: tool, Args: JSON.stringify(input ?? {}) });
+    ({ Session: sid(c.sessionManager.getSessionId()), CallId: id as P.ToolCallId, Tool: tool,
+       Args: P.canonicalJsonText(JSON.stringify(input ?? {})) });
   const signal = (s: P.HostSignal) => Promise.all([emit(s), hooks.OnSignal(s)]).then(() => undefined);
 
   pi.on("input", async (e, c) => {
     const verdict = await hooks.Turn.AdmitTurn({ Context: turnContext(c), Text: e.text });
-    return verdict.tag === "Refuse" ? { handled: true } : undefined;
+    if (verdict.tag === "Refuse") return { handled: true };
+    // An admitted turn may carry a route; apply it to this session's model.
+    if (verdict.route) {
+      const model = c.modelRegistry.find(verdict.route.Provider, verdict.route.Model);
+      if (!model) return { handled: true };
+      if (!(await pi.setModel(model))) return { handled: true };
+    }
+    return undefined;
   });
   pi.on("before_agent_start", async (e, c) => ({ systemPrompt: await hooks.Turn.SystemPrompt(turnContext(c), e.systemPrompt) }));
   pi.on("context", async (e, c) => {
@@ -184,9 +255,17 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
       const role = decodeRole(m); return role ? [{ Role: role, Parts: decodeParts(m) }] : [];
     }));
     if (edit.tag === "Keep") return undefined;
-    return { messages: edit.messages.map((m): AgentMessage => m.Role === "User"
-      ? { role: "user", content: encodeParts(m.Parts), timestamp: Date.now() } as AgentMessage
-      : { role: "assistant", content: encodeParts(m.Parts) } as unknown as AgentMessage) };
+    const messages: AgentMessage[] = [];
+    for (const m of edit.messages) {
+      const content = encodeParts(m.Parts);
+      // A message that cannot be represented in omp is left alone: dropping it
+      // would silently lose content the product asked to keep.
+      if (content === undefined) return undefined;
+      messages.push(m.Role === "User"
+        ? { role: "user", content, timestamp: Date.now() } as AgentMessage
+        : { role: "assistant", content } as unknown as AgentMessage);
+    }
+    return { messages };
   });
   pi.on("tool_call", async (e, c) => {
     const a = await hooks.ToolGate.BeforeTool(view(c, e.toolCallId, e.toolName, e.input));
@@ -196,7 +275,8 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
   });
   pi.on("tool_result", async (e, c) => {
     const text = e.content.flatMap((x) => (x.type === "text" ? [x.text] : [])).join("\n");
-    const edit = await hooks.ToolGate.AfterTool(view(c, e.toolCallId, e.toolName, e.input), { Text: text, Truncated: false, IsError: e.isError });
+    const edit = await hooks.ToolGate.AfterTool(view(c, e.toolCallId, e.toolName, e.input),
+      { Text: text, Truncated: false, IsError: e.isError });
     if (edit.tag === "Keep") return undefined;
     return { content: [{ type: "text", text: edit.result.Text }], isError: edit.result.IsError };
   });
@@ -211,7 +291,7 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
   if (hooks.Spawn) {
     const spawn = hooks.Spawn;
     pi.on("before_subagent_spawn", async (e, c) => {
-      const r = await spawn({ Parent: sid(c.sessionManager.getSessionId()), Role: e.agent, SpawnKey: e.spawnKey,
+      const r = await spawn({ Parent: sid(c.sessionManager.getSessionId()), Role: P.agentRole(e.agent), SpawnKey: e.spawnKey,
         Candidates: e.patterns.flatMap((p) => { const [prov, ...rest] = p.split("/"); return rest.length ? [{ Provider: prov, Model: rest.join("/") }] : []; }) });
       if (r.tag === "Refuse") return { block: true, reason: r.reason };
       if (r.tag === "Route") return { model: r.routes.map((x) => `${x.Provider}/${x.Model}`) };
@@ -243,3 +323,5 @@ export function activateOnOmp(pi: OmpApi, plugin: P.IHostPlugin, children: OmpCh
     registerProductHooks(pi, r.value, emit);
   });
 }
+
+export { unsupported, notFound };
