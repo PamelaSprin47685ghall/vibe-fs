@@ -57,6 +57,12 @@ neutral ports use `Wanxiangshu.Host.Ports` (see DESIGN §1.1 and drift **D-05**)
 - **D-05** lane ports declare `namespace Wanxiangshu.Host`, the same namespace many adapter files `open` for `CanonicalJson`/`HostDigest`.
   The neutral ports were moved to `Wanxiangshu.Host.Ports` for exactly that reason (DESIGN §1.1); the lane ports should move to a
   namespace that is not `open`ed by adapters (e.g. `Wanxiangshu.Host.Domain.<Lane>`) or the same shadowing risk applies to them.
+- **D-06** the lane port files (`Host/*.fs(i)`) carry no `HNI P-xx` header marker. The TS mirror generator
+  discovers the port families from `src/Wanxiangshu/Host/Ports/*.fsi` and keys on that marker; a family without one
+  is a **hard error**, not a silent skip. The lane files sit directly under `Host/` today, so they are not
+  discovered — but the moment a lane moves one under `Host/Ports/` (which HNI-14 intends) the mirror generation
+  fails until the file declares its reserved id. A lane that lands a new family must add the `HNI P-xx` marker to
+  the file header.
 - Lane domain ports are not under gate ⑪ (port-purity covers `Host/Ports/` only); HNI-14 moves them there once D-03 is resolved.
 
 ## Adapter folders (implementations, not ports)
