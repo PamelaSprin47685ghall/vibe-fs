@@ -165,3 +165,13 @@
 CUT-38 不能只跑 grep 验证旧符号为零。每个实际删除/保留文件都要留下：原 owner、承接卡、新公开能力或明确保留位置、剩余调用者、读取旧格式的义务、该条删除/保留的证据。grep 零命中只是辅助，动态注册、反射、包 exports、持久数据和宿主入口另查。
 
 新增源码域、资源族、工具入口或需求包，在所属卡 PR 中同步更新本表。没有归属就不进入最终候选；需要暂留就如实写暂留，别把它算成“已经抽干”。
+
+<a id="final-accounting"></a>
+## 7. 终局现状注记（CUT-38，2026-10-21）
+
+上面 §1–§3 保留建板时的盘点原样，不改写历史。终局现状如下，逐项去向见 [cards/CUT-38.md §7](cards/CUT-38.md)。
+
+- **需求包**：现行 49 包。建板时的 `behavior-diagnosis`、`guidance-delivery`、`speculative-investigation`、`work-record`（仓主 `584c30c61`/`6eef89d1e`）和 `requirement-grounding`（`da42898c4`）已整包删除，记 REMOVED，不记为抽取。建板后新增的 `advisor`（`131a79106`）尚无主责卡，登记为后继项 F38-01（建议 CUT-39，挂 delegation 泳道）。
+- **源码顶层目录**：现存 18 个。`Enforcer`、`Strength`（`6eef89d1e`）和 `Requirement`（`da42898c4`）已删除。
+- **独立库**：wanxiangli 0.62.0 共 52 个模块、51 个 exports，主仓消费了除 `host-omp`（CUT-36 草稿）之外的全部模块。§3 是 0.5.2 时的草稿表，已过时。
+- **未闭合项**：F38-01…F38-09 与 OPTIONAL 的 CUT-36，均不计入“抽干”。
