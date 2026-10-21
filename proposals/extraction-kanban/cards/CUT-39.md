@@ -70,13 +70,13 @@
 
 另外，注释写的是“接受 fence 之后第一个 Completed”，代码却是“只接受等于 fence 的那个”，比较方向也是反的。这个缺陷由仓主 `60812f575`（看板外）引入。
 
-本卡不修，原因有两条：
+当时本卡不修（**已由 `b9772a9f5` 修复，见下**），原因有两条：
 1. 要判定哪个 Completed 回答本次 intent，需要把 PromptKey 对应到物理 user message，再对应到 provider run，这是宿主派发语义；而 view prompt 与 intent prompt 在宿主上是一个 run 还是两个 run，本机无法观察。
 2. advisor 包本身登记了证明缺口：001/004 没有 `Seat.consult` 用例（`requirements/advisor/tests/README.md`）。在没有宿主观察口的情况下改围栏，只能靠猜。
 
-建议的方向（交 owner 裁决）：fence 记录**已结算的那个 Completed 的 ProviderRun**（assistant id）；新咨询接受第一个满足两个条件的 Completed：ProviderRun 与上次结算的不同，且其 authority root 或物理 user message 与本次 intent 被接受的那条一致。同时补上 001/004 的宿主替身用例。
+当时的建议方向（已被 `b9772a9f5` 采纳，见下）：fence 记录**已结算的那个 Completed 的 ProviderRun**（assistant id）；新咨询接受第一个满足两个条件的 Completed：ProviderRun 与上次结算的不同，且其 authority root 或物理 user message 与本次 intent 被接受的那条一致。同时补上 001/004 的宿主替身用例。
 
-**由谁接**：advisor 包 owner（delegation 泳道，CUT-13 后继）。
+**由谁接**：advisor 包 owner（delegation 泳道，CUT-13 后继）。**已由 eng-f39-goose 接手并修复（`b9772a9f5`）。**
 
 ### F39-01 修复记录（eng-f39-goose / eng-f39b-goose，2026-10-21）
 
