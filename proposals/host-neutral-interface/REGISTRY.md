@@ -279,7 +279,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   `SessionMessage` contract is deliberately still live** — many consumers remain, and routing them onto P-03 is
   the next slice; no consumer was cut over in this commit. **No new port** — P-03 (`Host/Ports/Transcript.fs(i)`)
   is unchanged, so the next free id stays **P-19**; `omp: n/a` (the family `.fsi` did not change, so the
-  generated TS mirror is unaffected). Gates: architecture OK, adapter-thinness 139 files / 32830 lines,
+  generated TS mirror is unaffected). Gates: architecture OK, adapter-thinness 139 files / 32831 lines,
   product-reference 595 (baseline 689), without-port 136 (baseline 149), fsharp-control-pyramid 5 findings — all
   pre-existing in `OpenCode/Host/SessionSnapshotPort.fs`, 0 in the new file. **No compile/test evidence** (owner's
   no-build-before-push rule) — the delivery team must build master and run the transcript requirement suites.
