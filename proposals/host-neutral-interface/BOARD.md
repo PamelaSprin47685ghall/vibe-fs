@@ -20,6 +20,8 @@ land rebase + ff. Ratchets (architecture ⑧, ⑨, HNI-04 thinness) only go down
 | HNI-14 | Converge lane domain ports (D-02, D-03, D-04 in REGISTRY.md): split P-14/P-15/P-17 into neutral HostPorts + Composition inputs; merge P-18 `HostToolContext` with `ToolInvocation`; move `ToolResultText` to a product module | arch + owning lanes | 05–08 | — | BACKLOG |
 | HNI-12 | Final accounting: every REGISTRY row WIRED-OC + WIRED-OMP or explicitly RETAINED with reason; gate counts | arch | all | — | BACKLOG |
 
+
+HNI-05 progress (eng-hni-fission, 2026-10-21): S0 landed the transitional P-17 port on `hni/fission` (not pushed). S1 done: the fission tool-visibility decision is product-owned in `Execution/Fission/Visibility.fs(i)` (`FissionToolVisibility`); the adapters keep only the wire write. S2–S4 (canaries out of the adapter, Fission-owned convergence vocabulary, tool product policy) still open.
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 
 ## Gate ⑩/⑪/⑫ (HNI-04) — `scripts/checks/adapter-thinness.mjs`, run inside `architecture.mjs`

@@ -319,6 +319,8 @@ Interaction/Attempt/AttemptExecutionProfile.fsi
 Interaction/Attempt/AttemptExecutionProfile.fs
 Execution/Fission/Model.fsi
 Execution/Fission/Model.fs
+Execution/Fission/Visibility.fsi
+Execution/Fission/Visibility.fs
 Participant/Provider/Attempt/Failure.fsi
 Participant/Provider/Attempt/Failure.fs
 Participant/Provider/Attempt/FailureSurface.fsi

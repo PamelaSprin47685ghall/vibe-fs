@@ -20,7 +20,7 @@ module FissionHostRequestProjection =
         if isNull message?tools then createObj [] else message?tools
 
     let private projectVisibility hasPhysicalParent output =
-        if FissionRequestProjection.apply hasPhysicalParent then
+        if FissionToolVisibility.hidesByOrigin hasPhysicalParent then
             let message = requireOutputMessage output
             let tools = ensureToolsObject message
             tools?fission <- box false

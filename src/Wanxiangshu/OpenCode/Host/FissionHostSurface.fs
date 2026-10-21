@@ -25,9 +25,11 @@ module FissionHostSurface =
     /// intra-participant-parallelism-013: expose the exact request-local
     /// provider tool projection without exposing Host session registries.
     let projectFissionToolVisibility (hasPhysicalParent: bool) (tools: obj) : obj =
-        if not (AblationGate.fissionVisible (AblationGate.registry ())) then
-            tools?fission <- box false
-        elif FissionRequestProjection.apply hasPhysicalParent then
+        if
+            FissionToolVisibility.hidesFissionTool
+                hasPhysicalParent
+                (AblationGate.fissionVisible (AblationGate.registry ()))
+        then
             tools?fission <- box false
 
         tools

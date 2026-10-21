@@ -52,7 +52,7 @@ The delivery team must build master at `aa43d3455` or later to get compile/test 
 | P-14 | `IDelegationCallerHost`, `DelegationCaller` | `Host/DelegationCaller.fs(i)` | fork | D-03: carries `AgentJournal` (product persistence) and fork runtime — a composition seam, not a host port. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
 | P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. Status: WIRED-OC, **on `master`** (`58660d4d9`). |
 | P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. |
-| P-17 | `FissionHostPort`, `FissionOwnerRuns` | `Host/FissionPort.fs(i)` | fission | D-03: carries `AgentJournal`, legacy `ISessionHostPort`, `Execution.Session` types. |
+| P-17 | `FissionHostPort`, `FissionOwnerRuns`, `FissionPtyCompletion`, `FissionPtyStatus` | `Host/FissionPort.fs(i)` | fission | WIRED-OC. Declared in namespace `Wanxiangshu.Host.Ports` (drift **D-05**) but the file stays outside `Host/Ports/`, so gate ⑫ does not treat it as a neutral family. D-03 partly resolved: `AgentJournal` left the port (it is threaded into the launch call instead); the legacy `ISessionHostPort` / `IEventObservationPort` remain until P-01 / P-07 land. |
 | P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). **D-07: this file name collides with P-04's `Host/Ports/Tools.fs(i)` — rename before moving it under `Host/Ports/`.** |
 
 ### Drift findings (HNI-11, 2026-10-21) and the convergence target
@@ -151,6 +151,8 @@ These are the concrete steps, so a lane does not have to re-derive them:
   `origin/wip/hni-fission`, `origin/wip/hni-tools` — all three branches still exist). Recorded that the fork lane has
   **no compile/test evidence** (owner's no-build-before-push rule): the delivery team must build master at
   `aa43d3455` or later. No id, name or port shape changed; next free id stays **P-19**.
+- 2026-10-21 eng-hni-fission: P-17 `FissionHostPort` declared and wired to the OpenCode fission adapter (transitional: still carries Foundation `ISessionHostPort` / `IEventObservationPort`).
+- 2026-10-21 eng-hni-fission: S1 — the fission tool-visibility decision moved out of the adapter folders into the product lane (`Execution/Fission/Visibility.fs(i)`, `FissionToolVisibility`); no port change (P-17 unchanged).
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.
