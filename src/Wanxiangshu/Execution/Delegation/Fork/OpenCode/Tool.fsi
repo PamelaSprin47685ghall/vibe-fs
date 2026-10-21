@@ -23,3 +23,9 @@ module ForkTool =
         context: HostToolContext ->
         args: HostToolArguments ->
             Task<Result<ForkReceipt, string>>
+
+    /// The placement receipt a fork or a resume hands back. It is aliased here,
+    /// in the adapter namespace, under a name of its own, so that a caller
+    /// outside the delegation shard can name the receipt without reaching into
+    /// the product namespace.
+    type PlacementReceipt = ForkReceipt

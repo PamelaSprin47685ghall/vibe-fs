@@ -124,3 +124,9 @@ module ForkTool =
 
     let executeResumeReceipt (scope: ToolRuntimeScope) (context: HostToolContext) (args: HostToolArguments) =
         ForkCommand.resumeReceipt (host scope context) (arguments args)
+
+    /// The placement receipt a fork or a resume hands back. It is aliased here,
+    /// in the adapter namespace, under a name of its own, so that a caller
+    /// outside the delegation shard can name the receipt without reaching into
+    /// the product namespace.
+    type PlacementReceipt = ForkReceipt

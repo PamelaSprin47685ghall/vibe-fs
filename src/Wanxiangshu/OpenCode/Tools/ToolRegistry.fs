@@ -972,15 +972,13 @@ module ToolRegistry =
                                 | Ok fields -> envelopeOk fields
                                 | Error code -> refusal code
 
-                            let placedFields
-                                (placed: Wanxiangshu.Execution.Delegation.Fork.ForkReceipt)
-                                : (string * obj) list =
+                            let placedFields (placed: ForkTool.PlacementReceipt) : (string * obj) list =
                                 [ "name" ==> placed.Name
                                   "agentId" ==> placed.AgentId
                                   "outcome" ==> placed.Outcome ]
 
                             let placedDelegate
-                                (execute: _ -> Task<Result<Wanxiangshu.Execution.Delegation.Fork.ForkReceipt, string>>)
+                                (execute: _ -> Task<Result<ForkTool.PlacementReceipt, string>>)
                                 (payload: obj)
                                 (record: string option)
                                 : Task<obj> =
@@ -990,7 +988,7 @@ module ToolRegistry =
                                     return receipt |> Result.map placedFields |> envelopeOrRefusal
                                 }
 
-                            let devopsAnswer (outcome: Result<Wanxiangshu.Mission.Planning.AskResult, string>) : obj =
+                            let devopsAnswer (outcome: Result<AskResult, string>) : obj =
                                 match outcome with
                                 | Ok answer ->
                                     envelopeOk
