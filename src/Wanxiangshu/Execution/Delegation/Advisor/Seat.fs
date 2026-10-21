@@ -58,31 +58,30 @@ module AdvisorSeat =
     /// AGENT-001: the managed agent this seat's child runs as.
     let private advisorAgent = ManagedAgent.nameOf Role.Advisor
 
-    /// advisor-[030] consult fence: the latest terminal identity a consult
-    /// observed. A consult only accepts the terminal of the intent prompt it
-    /// sent, never an older Completed that was already live when the consult
-    /// started.
+    /// advisor-[030] consult fence. A consult answers exactly the intent prompt it sent, so
+    /// the fence is bound to that prompt's identity (F39-01). A terminal names the provider
+    /// run that reached it (HOST-010/011: the Host assistant message id); the run answers the
+    /// physical user message that is its parent, and that message carries the `PromptKey`
+    /// the dispatcher stamped on it (snapshot metadata, else the journal's physical landing).
+    /// `PriorRun` is the run the previous consult on this child settled on, so a replayed or
+    /// re-delivered Completed of an earlier consult is refused even before attribution.
     type private ConsultFence =
-        { ProviderRun: ProviderRunIdentity
-          ConsultId: string }
+        { ChildId: SessionId
+          PriorRun: ProviderRunIdentity option }
 
-    /// DSL-MUTABLE: resource — child session id → fence of the consult whose
-    /// intent prompt most recently reached the child. Process-live; the seat
-    /// registry below has the same lifetime.
-    let private consultFences = Dictionary<string, ConsultFence>()
+    /// DSL-MUTABLE: resource — child session id → provider run of the Completed the most
+    /// recent consult on that child settled on. Process-live; the seat registry below has
+    /// the same lifetime.
+    let private settledRuns = Dictionary<string, ProviderRunIdentity>()
 
-    let private recordFence (childId: SessionId) (providerRun: ProviderRunIdentity) (consultId: string) : unit =
-        consultFences.[SessionId.value childId] <-
-            { ProviderRun = providerRun
-              ConsultId = consultId }
+    let private recordSettled (childId: SessionId) (providerRun: ProviderRunIdentity) : unit =
+        lock settledRuns (fun () -> settledRuns.[SessionId.value childId] <- providerRun)
 
-    /// The provider run a new consult must outdate. It is the previous
-    /// consult's terminal run, so an older Completed — including a sticky
-    /// one replayed at subscribe time — can never answer the new consult.
     let private priorRun (childId: SessionId) : ProviderRunIdentity option =
-        match consultFences.TryGetValue(SessionId.value childId) with
-        | true, fence -> Some fence.ProviderRun
-        | false, _ -> None
+        lock settledRuns (fun () ->
+            match settledRuns.TryGetValue(SessionId.value childId) with
+            | true, run -> Some run
+            | false, _ -> None)
 
     /// DSL-MUTABLE: single-flight — memoized advisor child create task for one caller session.
     /// DSL-MUTABLE: resource — create-failure latch, cleared by the next consult.
@@ -227,16 +226,81 @@ module AdvisorSeat =
             | None -> return Error DidNotAnswer
         }
 
-    /// advisor-[030]: settle only the fenced terminal. A Completed from an
-    /// older provider run (a sticky terminal or the view prompt finishing
-    /// first) is observation only; the first Completed after the fence is
-    /// this consult's terminal, older or repeated ones never answer.
-    let private settleTerminal (fence: ConsultFence) (outcome: TerminalOutcome) : Result<unit, string> option =
-        match outcome with
-        | Completed result when result.ProviderRun = fence.ProviderRun -> Some(Ok())
-        | Completed _ -> None
-        | Aborted _
-        | Failed _ -> Some(Error DidNotAnswer)
+    /// The prompt a physical user message carries: the dispatcher's key stamped in the Host
+    /// snapshot first, the journal's accepted physical landing as its fallback.
+    let private promptOfUserMessage
+        (journal: AgentJournal)
+        (childId: SessionId)
+        (messages: SessionMessage list)
+        (userMessageId: string)
+        : string option =
+        let stamped =
+            messages
+            |> List.tryFind (fun message -> message.Id = userMessageId)
+            |> Option.bind (fun message -> message.PromptKey)
+
+        let landed () =
+            (AgentJournal.snapshot journal).AgentProjections.Sessions
+            |> Map.tryFind childId
+            |> Option.bind (fun session -> session.PromptAuthority)
+            |> Option.bind (fun authority ->
+                Map.tryFind (PhysicalUserMessageId.create userMessageId) authority.PhysicalLandings)
+            |> Option.map (fun landing -> PromptKey.value landing.PromptKey)
+
+        stamped |> Option.orElseWith landed
+
+    let private isAssistantRun (runId: string) (message: SessionMessage) : bool =
+        message.Id = runId
+        && String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+
+    /// HOST-010/011 attribution: the prompt key of the user message the run's assistant
+    /// message answers, or `None` when the Host gives no such evidence.
+    let private promptAnsweredBy
+        (journal: AgentJournal)
+        (childId: SessionId)
+        (messages: SessionMessage list)
+        (run: ProviderRunIdentity)
+        : string option =
+        messages
+        |> List.tryFind (isAssistantRun (ProviderRunIdentity.value run))
+        |> Option.bind (fun message -> message.ParentId)
+        |> Option.bind (promptOfUserMessage journal childId messages)
+
+    let private okValue (result: Result<'value, 'error>) : 'value option =
+        match result with
+        | Ok value -> Some value
+        | Error _ -> None
+
+    let private attributeRun
+        (deps: AdvisorSeatDeps)
+        (journal: AgentJournal)
+        (childId: SessionId)
+        (run: ProviderRunIdentity)
+        : Task<string option> =
+        match deps.Snapshot with
+        | None -> Task.FromResult None
+        | Some snapshot ->
+            task {
+                let! messages = snapshot.GetMessages childId
+
+                return
+                    okValue messages
+                    |> Option.bind (fun messages -> promptAnsweredBy journal childId messages run)
+            }
+
+    /// advisor-[030]: does an attributed Completed answer this consult's intent? A run that
+    /// answers another prompt (this consult's view, an earlier consult's intent) never does.
+    /// Without Host attribution the first fresh Completed after the intent was accepted is
+    /// taken, which is the only order evidence left.
+    let private answersIntent (intentKey: PromptKey) (attributed: string option) (afterIntent: bool) : bool =
+        match attributed with
+        | Some key -> key = PromptKey.value intentKey
+        | None -> afterIntent
+
+    /// advisor-[030]: a Completed of the run an earlier consult already settled on — a
+    /// sticky replay or a duplicate delivery — is never this consult's terminal.
+    let private isStaleRun (fence: ConsultFence) (result: AgentRunResult) : bool =
+        fence.PriorRun |> Option.exists (fun prior -> prior = result.ProviderRun)
 
     let private settledAdvice
         (deps: AdvisorSeatDeps)
@@ -266,22 +330,6 @@ module AdvisorSeat =
                 return Error DidNotAnswer
         }
 
-    /// advisor-[002]: two physical prompts — the caller's view, then this consult's intent.
-    let private sendThenAwait
-        (deps: AdvisorSeatDeps)
-        (childId: SessionId)
-        (fence: ConsultFence)
-        (completion: TaskCompletionSource<Result<unit, string>>)
-        (send: string -> Task<Result<PromptKey, string>>)
-        (viewPrompt: string)
-        (intent: string)
-        : Task<Result<string, string>> =
-        taskResult {
-            let! _ = send viewPrompt
-            let! _ = send intent
-            return! awaitAdvisorProse deps childId fence completion
-        }
-
     let private runConsult
         (deps: AdvisorSeatDeps)
         (journal: AgentJournal)
@@ -303,54 +351,124 @@ module AdvisorSeat =
             let completion =
                 TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-            // advisor-[030]: consult fence. The fence starts at the prior
-            // consult's recorded provider run (empty for the first consult)
-            // and advances to the intent prompt's own run once its send is
-            // accepted, so a consult only ever accepts the terminal of the
-            // intent it sent — never a sticky terminal or an older consult's.
             let fence =
-                { ProviderRun = priorRun childId |> Option.defaultValue (ProviderRunIdentity.create "")
-                  ConsultId = Guid.NewGuid().ToString("N") }
+                { ChildId = childId
+                  PriorRun = priorRun childId }
 
-            // DSL-MUTABLE: subscription — the terminal listener's read of the intent receipt's run, written once when that send is accepted.
-            let mutable intentRun = None
+            // DSL-MUTABLE: resource — consult-local fence state. `armed` turns on just before
+            // the first send, so the subscribe-time sticky replay (an earlier consult's
+            // terminal) is observation only; `intentKey` is the accepted intent prompt;
+            // `early` holds fresh Completeds seen before the intent key was known.
+            let armed = ref false
+            let intentKey: PromptKey option ref = ref None
+            let early = ResizeArray<AgentRunResult>()
+
+            let settle (result: AgentRunResult) (key: PromptKey) (afterIntent: bool) : Task<unit> =
+                task {
+                    let! attributed = attributeRun deps journal childId result.ProviderRun
+
+                    if
+                        answersIntent key attributed afterIntent
+                        && AsyncSupport.trySetResult completion (Ok())
+                    then
+                        recordSettled childId result.ProviderRun
+                }
+
+            let admitCompleted (result: AgentRunResult) : unit =
+                match intentKey.Value with
+                | Some key -> settle result key true |> ignore
+                | None -> lock early (fun () -> early.Add result)
+
+            let observeCompleted (result: AgentRunResult) : unit =
+                if armed.Value && not (isStaleRun fence result) then
+                    admitCompleted result
 
             // AG-LISTENER-BEFORE-SEND: the Host port refuses a prompt for a session with no
             // live terminal listener, and the listener must outlive both sends.
             let onTerminal _ outcome =
-                match intentRun with
-                | Some providerRun -> recordFence childId providerRun fence.ConsultId
-                | None -> ()
-
-                match settleTerminal fence outcome with
-                | Some verdict -> AsyncSupport.trySetResult completion verdict |> ignore
-                | None -> ()
+                match outcome with
+                | Completed result -> observeCompleted result
+                | Aborted _
+                | Failed _ when armed.Value -> AsyncSupport.trySetResult completion (Error DidNotAnswer) |> ignore
+                | Aborted _
+                | Failed _ -> ()
 
             use _subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
 
             let send text =
                 dispatcher.SendManagedAssignment port childId text issueIdentitySeed deps.Directory None
 
-            let! sent =
-                taskResult {
-                    let! _ = send viewPrompt
-                    let! key = send intent
+            // DSL-MUTABLE: resource — acceptance subscriptions the root send attaches; disposed
+            // with the consult.
+            let acceptance = ResizeArray<IDisposable>()
 
-                    // The intent receipt is the fence's run identity: the
-                    // terminal answering this prompt carries it.
-                    intentRun <- Some(ProviderRunIdentity.create (PromptKey.value key))
+            let acceptanceObserver: ContinuationAcceptanceObserver =
+                { Notify = ignore
+                  AttachDisposable = fun subscription -> lock acceptance (fun () -> acceptance.Add subscription) }
 
-                    return! awaitAdvisorProse deps childId fence completion
+            // advisor-[002] on a fresh seat (F39-01): the view opens the child's Authority Root,
+            // so the dispatcher must see that root accepted before the intent is sent. A
+            // detached root send returns before the Host admits it, and the intent would then be
+            // claimed as a second AgentOwnerRoot, which chat admission rejects
+            // (ActiveRunIdentityConflict). The root send therefore awaits physical acceptance,
+            // as the fork's first prompt does; a seat with a live run appends both prompts as
+            // continuations.
+            let sendRootView () : Task<Result<PromptKey, string>> =
+                match issueIdentitySeed () with
+                | Error reason -> Task.FromResult(Error reason)
+                | Ok identitySeed ->
+                    dispatcher.SendAgentOwnerRoot
+                        port
+                        childId
+                        viewPrompt
+                        identitySeed
+                        deps.Directory
+                        PromptDispatcher.AwaitMode.Await
+                        (Some acceptanceObserver)
+
+            let sendView () : Task<Result<PromptKey, string>> =
+                match (dispatcher.ProjectionFor childId).ActiveLogicalRun with
+                | Some _ -> send viewPrompt
+                | None -> sendRootView ()
+
+            /// A Host that never admits the view must not hang the caller's turn either.
+            let boundedView () : Task<Result<PromptKey, string>> =
+                task {
+                    let viewSend = sendView ()
+                    let! admitted = NodeTiming.raceExit (viewSend :> Task) ConsultTimeoutMs
+
+                    if admitted then
+                        return! viewSend
+                    else
+                        return Error DidNotAnswer
                 }
 
-            // advisor-[030]: the recorded run advances only after the intent
-            // send was accepted, so a later consult beats exactly the terminal
-            // this consult awaited.
-            match intentRun with
-            | Some providerRun -> recordFence childId providerRun fence.ConsultId
-            | None -> ()
+            let disposeAcceptance () =
+                let subscriptions = lock acceptance (fun () -> Seq.toList acceptance)
 
-            return sent
+                for subscription in subscriptions do
+                    subscription.Dispose()
+
+            let acceptIntent (key: PromptKey) : unit =
+                intentKey.Value <- Some key
+                let seen = lock early (fun () -> Seq.toList early)
+                // A Completed seen before the intent was accepted answers it only on Host
+                // attribution (the view prompt's own run finishes first in that window).
+                for result in seen do
+                    settle result key false |> ignore
+
+            armed.Value <- true
+
+            try
+                return!
+                    taskResult {
+                        let! _ = boundedView ()
+                        let! key = send intent
+                        acceptIntent key
+                        return! awaitAdvisorProse deps childId fence completion
+                    }
+            finally
+                disposeAcceptance ()
         }
 
     let private requireJournal (deps: AdvisorSeatDeps) : Result<AgentJournal, string> =
