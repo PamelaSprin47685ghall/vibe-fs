@@ -1,5 +1,20 @@
 # Changelog — 版本历史
 
+## Unreleased — 构建的 up-to-date 判据要看产物是否真的在盘上
+
+- **修复：产物缺失不再被报成「build up-to-date (no-op)」**。构建的「已是最新」判定此前只看**编译快照**（编译器输入摘要、生成语料摘要、产物语料摘要），这份快照说的是「源码没变」，不是「产物还在」。于是 `dist/` 被清空、被部分删除、或只复制了一半时，编译缓存仍会命中，构建日志照样打印 `build up-to-date (no-op)`，而磁盘上的产物已经缺失或不全——一次「构建绿」什么也没产出。
+- **判据改为「快照一致 **且** 产物齐全」**。新增 `checkArtifactsPresent`：按构建自己的产物清单（manifest 的 `outputs` 全集）逐条检查每个产物是否**真的在磁盘上**，少一条即判缺失。清单取自构建自己的 manifest，不硬编码任何文件数或路径列表。
+- **缺失即重编**。`determineBuildDecision` 在 `outputsValid` 之外再加一道 `artifactsPresent` 门：产物缺失时 reason 为 `artifacts-missing`，mode 强制 `full`（重编），不再复用缓存。
+- **改动文件**：`scripts/build.mjs`（新增 `checkArtifactsPresent` 导出函数 + 决定函数里的一道门；既有行为零改动，正常路径仍是 no-op）。
+- **验收**（隔离 worktree 副本，未动共享 dist）：产物齐全 → `[build] build up-to-date (no-op)`；单独删掉一个中间依赖 `dist/Execution/Fission/OpenCode/Host.js` → `[build] Compiling F# (full)...` / `[build] compiled full impact (1308 items in 52103ms)` / `[build] build ok (generation 107)`，该文件回到且 `.js` 计数 724 与删除前一致；再跑一次 → `[build] build up-to-date (no-op)`。回归：`requirements/distribution/tests/005.test.mjs` → tests 18 / pass 17 / fail 0 / todo 1；`requirements/verification-system/tests/008.test.mjs` → tests 9 / pass 9 / fail 0。
+
+## Unreleased — 交付已证明的轮次发布真实终态（委派 join 不再永远等不到结算）
+
+- **修复：已交付的一轮不再因「有交付见证」而跳过终态发布**。`Composition/Turn/OrdinaryTurnWorkflow.fs` 的 `longWorkGate` 此前把「生命周期已结算」与「本轮有围栏匹配的 durable 交付见证」并成一条早退，两种情形都判 `Wait`。于是恰恰是**已经证明交付**的那一轮永远走不到 `completeAgent`（`TerminalReporter.completeWithEvidence`），共享终端端口上不出现任何终态：父侧的 `this.join()` 一直挂着，子运行停在 `Active`——交付明明发生了，父侧却拿不到结算。
+- **判据分开**。`settled`（生命周期已结算）仍判 `Wait`；`hasDeliveryEvidence` 改为按角色分类：Manager / Plan 仍判 `Wait`（它们各有自己的生命周期所有权，不因一次交付被复活），其余角色且本轮 `TurnCompleted` 走 `Ordinary`——复用既有的完成所有者（`TerminalReporter`），不新增任何层、模块或端口。未交付的一轮没有见证，仍走原来的 `Continue` / nudge 路径；显式等待与过期轮次的 `Wait` 判定不变。
+- **验收**（真实插件路径，无伪造 durable 见证）：`requirements/delegation/tests/024.test.mjs` 全部 5 个 case 绿（tests 5 / pass 5 / fail 0 / cancelled 0）——其中三个 fork 侧 case 已迁到真实接线（`this.fork` / `this.resume` / `this.join` / `this.deliver` + 生产的 `message.updated` → `session.idle` 终态发布），两个 sync 侧 case 保持原样。对照证据：修复前同一真实路径 `join` 挂起且共享端口终态数为 0；修复后终态真实发布、`join` 返回 `status = "completed"` 且视图含交付材料；未交付对照仍无终态、工作单元仍 `Active`、`join` 仍 not-ready。
+- **改动文件**：`src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs`（净增 14 行，无新模块、无新分层）、`requirements/delegation/tests/024.test.mjs`。
+
 ## Unreleased — parked source 的执行点标记按程序脚本位置换算
 
 - **修复：parked 载荷的 `source` 不再丢失执行点标记**。`Process/JsSandbox.fs` 的栈换算此前取 `evalmachine.<anonymous>:` 之后的数字；沙箱以 `new Function` 求值程序后，V8 把程序帧渲染为 `at Js.run (eval at <runner> (evalmachine.<anonymous>:226:19), <anonymous>:150:33)`，那个数字是 runner 自身源码的行、恒定落在程序行范围之外，于是每个帧都被判为不在范围内，标记退化为整篇 ` | `，没有一行带 `>| `。现在取程序帧尾随的 `<anonymous>` 位置，并按程序在脚本中的起始行（基类行数 + 4）换算到模型行。

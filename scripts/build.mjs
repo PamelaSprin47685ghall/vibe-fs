@@ -236,6 +236,26 @@ export function checkOutputsValid(existingManifest, targetDist) {
   )
 }
 
+/**
+ * The compilation snapshot proves the sources did not change; it does not
+ * prove the emitted artifacts are still on disk. A missing manifest output
+ * must force a full recompile, or the build reports "up-to-date" while
+ * shipping a tree whose products are gone.
+ */
+export function checkArtifactsPresent(existingManifest, targetDist) {
+  if (!fs.existsSync(targetDist)) return false
+
+  const recordedOutputs = existingManifest?.outputs ?? {}
+  const recordedKeys = Object.keys(recordedOutputs)
+  if (recordedKeys.length === 0) return false
+
+  for (const rel of recordedKeys) {
+    if (!fs.existsSync(path.join(targetDist, rel))) return false
+  }
+
+  return true
+}
+
 export function determineBuildDecision({
   clean = false,
   existingManifest,
@@ -266,11 +286,17 @@ export function determineBuildDecision({
 
   const outputsValid = hasValidManifest && checkOutputsValid(existingManifest, targetDist)
 
-  if (!hasValidManifest || !outputsValid) {
+  // The snapshot can be perfectly consistent while the artifacts it names are
+  // gone; missing artifacts must force a recompile.
+  const artifactsPresent = hasValidManifest && checkArtifactsPresent(existingManifest, targetDist)
+
+  if (!hasValidManifest || !outputsValid || !artifactsPresent) {
     const reason = missingDist
       ? 'dist-missing'
       : !hasValidManifest
         ? 'manifest-missing-or-invalid'
+        : !artifactsPresent
+          ? 'artifacts-missing'
         : 'output-hash-mismatch'
     return {
       mode: 'full',
