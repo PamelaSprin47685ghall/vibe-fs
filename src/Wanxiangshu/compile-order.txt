@@ -87,11 +87,6 @@ Sphinx/V2/Runtime/Decision.fsi
 Sphinx/V2/Plugins/Questionnaire/Model.fsi
 Sphinx/V2/Plugins/Questionnaire/Design.fsi
 Sphinx/V2/Plugins/Questionnaire/Decode.fsi
-Sphinx/V2/Plugins/Ordinal/Model.fsi
-Sphinx/V2/Plugins/Ordinal/Pairwise.fsi
-Sphinx/V2/Plugins/Ordinal/Ranking.fsi
-Sphinx/V2/Plugins/Ordinal/DesignCheck.fsi
-Sphinx/V2/Plugins/Ordinal/Fit.fsi
 Sphinx/V2/Plugins/Ordinal/Surface.fsi
 Sphinx/V2/Plugins/Bayes/Exact.fsi
 Sphinx/V2/Plugins/Bayes/Surface.fsi
@@ -135,11 +130,6 @@ Sphinx/V2/Plugins/Probes/Catalog.fsi
 Sphinx/V2/Plugins/Probes/Catalog.fs
 Sphinx/V2/Plugins/Probes/Prompts.fsi
 Sphinx/V2/Plugins/Probes/Prompts.fs
-Sphinx/V2/Plugins/Ordinal/Model.fs
-Sphinx/V2/Plugins/Ordinal/Pairwise.fs
-Sphinx/V2/Plugins/Ordinal/Ranking.fs
-Sphinx/V2/Plugins/Ordinal/DesignCheck.fs
-Sphinx/V2/Plugins/Ordinal/Fit.fs
 Sphinx/V2/Plugins/Ordinal/Surface.fs
 Sphinx/V2/Plugins/Bayes/Exact.fs
 Sphinx/V2/Plugins/Bayes/Surface.fs

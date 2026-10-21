@@ -30,11 +30,6 @@
     <Compile Include="Sphinx/V2/Plugins/Questionnaire/Decode.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Decode.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Probes/Catalog.fsi"/><Compile Include="Sphinx/V2/Plugins/Probes/Catalog.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Probes/Prompts.fsi"/><Compile Include="Sphinx/V2/Plugins/Probes/Prompts.fs"/>
-    <Compile Include="Sphinx/V2/Plugins/Ordinal/Model.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Model.fs"/>
-    <Compile Include="Sphinx/V2/Plugins/Ordinal/Pairwise.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Pairwise.fs"/>
-    <Compile Include="Sphinx/V2/Plugins/Ordinal/Ranking.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Ranking.fs"/>
-    <Compile Include="Sphinx/V2/Plugins/Ordinal/DesignCheck.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/DesignCheck.fs"/>
-    <Compile Include="Sphinx/V2/Plugins/Ordinal/Fit.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Fit.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Ordinal/Surface.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Surface.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Bayes/Exact.fsi"/><Compile Include="Sphinx/V2/Plugins/Bayes/Exact.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Bayes/Surface.fsi"/><Compile Include="Sphinx/V2/Plugins/Bayes/Surface.fs"/>
