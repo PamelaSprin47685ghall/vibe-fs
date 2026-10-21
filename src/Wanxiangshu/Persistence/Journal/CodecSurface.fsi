@@ -33,6 +33,3 @@ module JournalCodecSurface =
 
     /// K-way merge of multiple JS-native envelope streams.
     val kWayMerge: streams: obj array -> obj array
-
-/// Decode one JS-native event object into a normalized journal envelope.
-/// Decode one JS-native event object into a normalized journal envelope.
