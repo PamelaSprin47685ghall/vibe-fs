@@ -204,9 +204,9 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
 | arch (eng-host-arch) | DESIGN/REGISTRY/BOARD, P-00, P-10, omp skeleton, thinness gate, drift review | all (review) |
 | fission | `Execution/Fission/OpenCode` | P-02 (+ P-01 read-only use), P-17 |
 | fork | `Execution/Delegation/Fork/OpenCode` + other `Execution/*/OpenCode` | P-01, P-03, P-13, P-14, P-15 |
-| tools | `OpenCode/Tools` ToolRegistry/ToolRuntimeScope + `OpenCode/Codec` | P-04, P-05 |
+| tools (eng-hni-tools-goose) | `OpenCode/Tools` ToolRegistry/ToolRuntimeScope + `OpenCode/Codec`; claimed leftovers: tool bindings in `Mission/Work/OpenCode` and `Repository/**/OpenCode` | P-04, P-05 |
 | plugin-host | `OpenCode/Plugin` + `OpenCode/Host` | P-06, P-07, P-08, P-09, P-11, P-12 |
-| unclaimed | `Mission/Work/OpenCode`, `Repository/**/OpenCode`, `Sphinx/V2/Hosts/OpenCode`, `Context/Prefix/OpenCode`, `Interaction/Dispatch/OpenCode` | claim here (edit this row) |
+| unclaimed | `Sphinx/V2/Hosts/OpenCode`, `Context/Prefix/OpenCode`, `Interaction/Dispatch/OpenCode` (Mission/Work and Repository tool bindings: tools lane) | claim here (edit this row) |
 
 ## Change log
 - 2026-10-21 eng-host-arch: initial registry (P-00..P-12 PLANNED).
@@ -499,3 +499,4 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
    sources (each `Host/Ports/*.fsi` declares its reserved id in an `HNI P-xx` header marker), so a new family
    is mirrored automatically.
 5. Update the row (Status, Replaces) in the same commit. Mark WIRED-OC when the OpenCode adapter implements it.
+- 2026-10-21 eng-hni-tools-goose: P-18 (`Host/Tools.fs(i)`, `HostToolContext`/`ToolAdmission`/`ToolResultText`) is **DISSOLVED** — D-02 convergence. The neutral call type is `Host/Ports/Tools.fs(i)` `ToolInvocation` (extended in place: no `PromptText`/`AttachAbort`); `ToolAdmission` (a tool's declared authority) converges into `Host/Ports/ToolGates.fs(i)`; `ToolResultText` (TOML product rendering) moves to a product module, not a host port. The admission TABLE stays product-owned and is resolved through one product entry point; the registry adapter is the only adapter that consults it. P-05 verdict renamed `ToolCallVerdict` to avoid the `ToolAdmission` clash.
