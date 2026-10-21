@@ -55,6 +55,21 @@ observed at runtime, it says so.
 never synthesises `omp:<index>`, and an entry with no usable id fails the read with `HostError.Transport`
 carrying the reason instead of returning an unstable address.
 
+**The child path uses the same entry ids.** The rule covers the child path as well as the host path. The child's
+transcript is read from the child's **own** `AgentSession.sessionManager.getEntries()` — the same `SessionEntry`
+union and the same ids — and `session.messages` **must not** be used as an address source: it yields
+`AgentMessage` objects that carry no entry id (`AgentSession.messages` returns `this.agent.state.messages`,
+`src/session/agent-session.ts:6946-6948`), so an adapter reading it cannot produce an entry-id address at all.
+The skeleton's child seam has the same shape today — `OmpChildSessions.messages` returns `AgentMessage[]`
+(`sdk-children.ts:62`) — while the `AgentSession` itself already holds the session manager
+(`AgentSession.sessionManager`, `src/session/agent-session.ts:840`; already used by the skeleton at
+`sdk-children.ts:44`), so the child path can read entry ids without any new omp API.
+
+**State of the reference skeleton.** The skeleton in `adapters/omp/` **predates this rule**: it still uses a
+positional address (`decodeMessage(m, index)` emits `Id: \`omp:${index}\``, `adapter.ts:126-136`). The rule is
+authoritative and the skeleton is what changes — it is being aligned to this rule in this lane (a follow-up
+commit by another worker). This paragraph states the present state honestly; it does not weaken the rule.
+
 **Why.** `SessionEntryBase.id` is a **required** `string` (`src/session/session-entries.ts:79-97`, interface
 `SessionEntryBase`; the union `SessionEntry` at `:328` is built from it), so every entry omp persists has an id
 by construction; ids are minted by `generateId` (`src/session/session-migrations.ts:5`) and legacy v1 sessions
@@ -72,6 +87,10 @@ must be stable across reads.
 2. An entry whose `id` is missing/empty produces a typed refusal (`HostError.Transport` with the reason), never
    a fabricated address — and the refusal names the entry's position so the failure is diagnosable.
 3. No adapter source contains the literal `omp:` prefix in an address.
+4. **A child session's transcript addresses are also entry ids** (the child's `sessionManager.getEntries()`),
+   and the same stability check (acceptance 1) holds for a child. The positional `session.messages` path
+   **cannot** satisfy acceptance 1: it exposes no entry ids, so an address derived from it is positional by
+   construction.
 
 **Re-open trigger.** omp changes the entry identity model (e.g. `SessionEntryBase.id` becomes optional or
 composite) so that one entry has several stable ids.
@@ -165,7 +184,8 @@ specified as follows.
    continues.
 4. Firing `session_shutdown` calls `hooks.Dispose` exactly once.
 5. A review rule (gate) rejects any product decision appearing in the entry module: the entry module contains
-   no admission/refusal/retry/budget/prose logic and imports no product module.
+   no admission/refusal/retry/budget/prose logic and imports no product module. **No such gate exists today** —
+   `cut36-omp-2` must add it as part of this rule's implementation.
 
 **Re-open trigger.** omp changes the extension entry contract (a different factory shape, an explicit
 activation event, or a host-provided plugin slot) — or the product's `IHostPlugin` shape changes such that
@@ -176,6 +196,12 @@ activation event, or a host-provided plugin slot) — or the product's `IHostPlu
 **Decision.** A path-shaped `parentSession` is resolved through the host's own session-file lookup; when it
 does not resolve, the port call fails with `HostError.NotFound` whose reason contains the **raw** recorded
 value; the adapter never returns a path as a `SessionId` and never guesses "no parent".
+
+**State of the reference skeleton.** The skeleton in `adapters/omp/` **predates this rule**: it maps an
+unresolvable parent to `HostError.Refused` (the offline fixture asserts exactly that,
+`fixtures/fixture.test.ts:192-194`), where this rule says `HostError.NotFound`. The rule is authoritative and
+the skeleton is what changes — it is being aligned to this rule in this lane (a follow-up commit by another
+worker).
 
 **Why.** omp records the parent **verbatim** and does not normalise its kind: `SessionHeader.parentSession?: string`
 (`src/session/session-entries.ts:52`) — a bare `string` with no id/path distinction. omp's own callers put
