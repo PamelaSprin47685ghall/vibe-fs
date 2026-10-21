@@ -322,7 +322,10 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
         ? children.entries(s)
         : ctx().sessionManager.getEntries()
             .flatMap((e) => (e.type === "message" ? [{ id: e.id, message: e.message as AgentMessage }] : []));
-      if (raw === undefined) throw new Error(`unknown session ${s}`);
+      // An unknown session is a MISSING session, not a transport failure:
+      // `UnknownSessionError` is what the guard maps to `HostError.NotFound`
+      // (the same shape `Abort`/`Close` produce for an unknown session).
+      if (raw === undefined) throw new UnknownSessionError(s);
       return raw.flatMap((e, position) => {
         // An entry with no usable id cannot be addressed: the read fails
         // with `HostError.Transport` naming the entry's position, rather

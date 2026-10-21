@@ -194,6 +194,10 @@ entryList.pop();
 const ctr = await portsSeen!.Transcript.Messages("child-of-root" as P.SessionId);
 expect("a child session's transcript addresses are entry ids",
   ctr.ok ? ctr.value.map((m) => m.Id) : ctr, ["c-1", "c-2"]);
+// An unknown session is a MISSING session, not a transport failure.
+expect("reading the transcript of an unknown child session is NotFound",
+  await portsSeen!.Transcript.Messages("child-x" as P.SessionId),
+  { ok: false, error: { tag: "NotFound", what: "child-x" } });
 expect("child session create", await portsSeen!.Sessions.Create("root" as P.SessionId, { Title: "t" }), { ok: true, value: "child-of-root" });
 expect("model apply unknown -> Transport error", (await portsSeen!.Models.Apply("root" as P.SessionId, { Provider: "x", Model: "y" })).ok, false);
 expect("prompt correlation echoed as entry", [await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go", Correlation: P.promptKey("pk-1") }, undefined), entries, sent],
