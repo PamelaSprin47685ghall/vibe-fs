@@ -115,22 +115,23 @@ module JsToolsData =
 
     let isDelivered (json: string) = json.StartsWith deliveredPrefix
 
+    let private presentView (view: obj) : Result<obj, JsFailure> =
+        if isNull view then
+            Error JsFailure.InvalidReturnValue
+        else
+            Ok view
+
+    let private outcomeView (json: string) : Result<obj, JsFailure> =
+        try
+            presentView ((JS.JSON.parse json)?view)
+        with _ ->
+            Error JsFailure.InvalidReturnValue
+
     /// One decode for both endings: a delivered program's value is the view
     /// declaration it handed over. The declaration is validated as a view
     /// at the deliver gate; a deliver without a view is not a delivery.
     let parseOutcome (json: string) : Result<obj, JsFailure> =
-        if not (isDelivered json) then
-            parse json
-        else
-            try
-                let view = (JS.JSON.parse json)?view
-
-                if isNull view then
-                    Error JsFailure.InvalidReturnValue
-                else
-                    Ok view
-            with _ ->
-                Error JsFailure.InvalidReturnValue
+        if isDelivered json then outcomeView json else parse json
 
 /// The task a delivery serves. The durable witness names the same three
 /// references; this layer states them in its own vocabulary because it runs
@@ -344,6 +345,41 @@ module JsToolWorkflow =
         else
             parseRawView json |> Result.bind decodeViewDeclaration
 
+    let private parkedDeliveryFailure (sessionId: string) : JsFailure option =
+        let parkedHandles = JsParkedSites.handlesForSession sessionId
+
+        if List.isEmpty parkedHandles then
+            None
+        else
+            let handles = System.String.Join(", ", parkedHandles)
+
+            Some(
+                JsFailure.ProgramFailed(
+                    sprintf "delivery is blocked while this session has unresolved parked handles: %s" handles
+                )
+            )
+
+    let private captureDelivered
+        (deliveredJson: string option ref)
+        (json: string)
+        (parsed: Result<obj, JsFailure>)
+        : Result<obj, JsFailure> =
+        match deliveredView json with
+        | Error failure -> Error failure
+        | Ok _ ->
+            deliveredJson.Value <- Some json
+            parsed
+
+    let private gateDelivered
+        (deliveredJson: string option ref)
+        (sessionId: string)
+        (json: string)
+        (parsed: Result<obj, JsFailure>)
+        : Result<obj, JsFailure> =
+        match parkedDeliveryFailure sessionId with
+        | Some failure -> Error failure
+        | None -> captureDelivered deliveredJson json parsed
+
     /// Algorithm G1: the deliver hard gate. A program cannot deliver while
     /// its own session still has unresolved parked sites; an unrelated
     /// session's park never blocks this delivery. On success the delivered
@@ -358,22 +394,7 @@ module JsToolWorkflow =
         if not (JsToolsData.isDelivered json) then
             parsed
         else
-            let parkedHandles = JsParkedSites.handlesForSession sessionId
-
-            if not (List.isEmpty parkedHandles) then
-                let handles = System.String.Join(", ", parkedHandles)
-
-                Error(
-                    JsFailure.ProgramFailed(
-                        sprintf "delivery is blocked while this session has unresolved parked handles: %s" handles
-                    )
-                )
-            else
-                match deliveredView json with
-                | Error failure -> Error failure
-                | Ok _ ->
-                    deliveredJson.Value <- Some json
-                    parsed
+            gateDelivered deliveredJson sessionId json parsed
 
     /// Clear only what this call produced (deliver clause 6). A delivery
     /// another call of the same session made is evidence and stays: a later
@@ -384,11 +405,12 @@ module JsToolWorkflow =
             // Without a call fence the cell cannot be attributed to this
             // call, so nothing may be cleared on its behalf.
             ()
-        | Some(providerRun, toolCallId) ->
-            match JsDeliveredValues.peekFence sessionId with
-            | Some cellFence when cellFence.ProviderRun = providerRun && cellFence.ToolCallId = toolCallId ->
-                JsDeliveredValues.clear sessionId
-            | _ -> ()
+        | Some(providerRun, toolCallId) when
+            JsDeliveredValues.peekFence sessionId
+            |> Option.exists (fun cellFence -> cellFence.ProviderRun = providerRun && cellFence.ToolCallId = toolCallId)
+            ->
+            JsDeliveredValues.clear sessionId
+        | Some _ -> ()
 
     /// The declared view as text: the exact declaration the program handed
     /// over, so the witness states the view and not a paraphrase of it.
@@ -407,6 +429,37 @@ module JsToolWorkflow =
     /// over. Every field comes from one of those three sources — nothing
     /// here is invented, and what the settle point cannot know is missing
     /// rather than filled in.
+    let private fencedDeliveryWitness
+        (sessionId: string)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId)
+        (attribution: DeliveryAttribution)
+        (view: obj)
+        : Result<DeliveryWitness, JsFailure> =
+        let declaration = declarationText view
+        let material = materializedView sessionId view
+
+        let incomplete =
+            System.String.IsNullOrWhiteSpace attribution.FormalText
+            || System.String.IsNullOrWhiteSpace declaration
+            || System.String.IsNullOrWhiteSpace material
+
+        if incomplete then
+            Error(JsFailure.DeliveryNotEstablished("the attributed prose or the materialized view is empty"))
+        else
+            Ok
+                { SessionId = SessionId.create sessionId
+                  LogicalRunId = attribution.LogicalRunId
+                  AuthorityRoot = attribution.AuthorityRoot
+                  PhysicalUserMessageId = attribution.PhysicalUserMessageId
+                  ProviderRun = providerRun
+                  ToolCallId = toolCallId
+                  Task = attribution.Task
+                  FormalText = attribution.FormalText
+                  ViewDeclaration = declaration
+                  View = material
+                  RetirementId = attribution.RetirementId }
+
     let private deliveryWitness
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
@@ -415,30 +468,75 @@ module JsToolWorkflow =
         : Result<DeliveryWitness, JsFailure> =
         match fence with
         | None -> Error(JsFailure.DeliveryNotEstablished("the delivering call has no fence to own the witness"))
+        | Some(providerRun, toolCallId) -> fencedDeliveryWitness sessionId providerRun toolCallId attribution view
+
+    let private recordDeliveredView
+        (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
+        (view: obj)
+        : unit =
+        match fence with
         | Some(providerRun, toolCallId) ->
-            let declaration = declarationText view
-            let material = materializedView sessionId view
+            JsDeliveredValues.recordFencedView sessionId providerRun toolCallId (Some view)
+        | None -> JsDeliveredValues.recordView sessionId (Some view)
 
-            let incomplete =
-                System.String.IsNullOrWhiteSpace attribution.FormalText
-                || System.String.IsNullOrWhiteSpace declaration
-                || System.String.IsNullOrWhiteSpace material
+    let private commitWitness
+        (record: unit -> unit)
+        (attributed: DeliverySettlement)
+        (witness: DeliveryWitness)
+        : Task<Result<unit, JsFailure>> =
+        task {
+            let! committed = attributed.Writer.CommitDeliveryWitness witness
 
-            if incomplete then
-                Error(JsFailure.DeliveryNotEstablished("the attributed prose or the materialized view is empty"))
-            else
-                Ok
-                    { SessionId = SessionId.create sessionId
-                      LogicalRunId = attribution.LogicalRunId
-                      AuthorityRoot = attribution.AuthorityRoot
-                      PhysicalUserMessageId = attribution.PhysicalUserMessageId
-                      ProviderRun = providerRun
-                      ToolCallId = toolCallId
-                      Task = attribution.Task
-                      FormalText = attribution.FormalText
-                      ViewDeclaration = declaration
-                      View = material
-                      RetirementId = attribution.RetirementId }
+            match committed with
+            | Ok() ->
+                record ()
+
+                return Ok()
+            | Error reason ->
+                return
+                    Error(
+                        JsFailure.DeliveryNotEstablished(
+                            "the durable delivery witness was not committed (" + reason + ")"
+                        )
+                    )
+        }
+
+    let private commitAttributedDelivery
+        (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
+        (record: unit -> unit)
+        (attributed: DeliverySettlement)
+        (view: obj)
+        : Task<Result<unit, JsFailure>> =
+        task {
+            match deliveryWitness sessionId fence attributed.Attribution view with
+            | Error failure -> return Error failure
+            | Ok witness -> return! commitWitness record attributed witness
+        }
+
+    let private settleView
+        (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
+        (settlement: DeliverySettlement option)
+        (view: obj)
+        : Task<Result<unit, JsFailure>> =
+        task {
+            let record () =
+                recordDeliveredView sessionId fence view
+
+            match settlement with
+            | None ->
+                record ()
+
+                // No durable store behind this call: there is no host
+                // attribution, hence no physical input to fence a ledger
+                // record with, so nothing is registered. The delivery
+                // itself still stands on its own process-live cell.
+
+                return Ok()
+            | Some attributed -> return! commitAttributedDelivery sessionId fence record attributed view
+        }
 
     /// The delivery settlement of one settled call (deliver clauses 3 and 6).
     ///
@@ -462,41 +560,54 @@ module JsToolWorkflow =
             match deliveredView json with
             | Error failure -> return Error failure
             | Ok None -> return Error(JsFailure.ViewDeclarationInvalid "the delivered view declaration is empty")
-            | Ok(Some view) ->
-                let record () =
-                    match fence with
-                    | Some(providerRun, toolCallId) ->
-                        JsDeliveredValues.recordFencedView sessionId providerRun toolCallId (Some view)
-                    | None -> JsDeliveredValues.recordView sessionId (Some view)
+            | Ok(Some view) -> return! settleView sessionId fence settlement view
+        }
 
-                match settlement with
-                | None ->
-                    record ()
+    /// A successful run that delivered: it stands only once the delivered
+    /// view settled. A delivery that did not establish presents as not
+    /// established and leaves no success evidence behind (clause 6).
+    let private settleDeliveredSuccess
+        (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
+        (settlement: DeliverySettlement option)
+        (json: string)
+        value
+        rewritten
+        created
+        removed
+        moved
+        : Task<JsToolOutcome> =
+        task {
+            let! deliveryOutcome = settleDeliveredView sessionId fence settlement json
 
-                    // No durable store behind this call: there is no host
-                    // attribution, hence no physical input to fence a ledger
-                    // record with, so nothing is registered. The delivery
-                    // itself still stands on its own process-live cell.
+            match deliveryOutcome with
+            | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
+            | Error failure ->
+                clearOwnDelivery sessionId fence
+                return Failed(failure, rewritten, created, removed, moved)
+        }
 
-                    return Ok()
-                | Some attributed ->
-                    match deliveryWitness sessionId fence attributed.Attribution view with
-                    | Error failure -> return Error failure
-                    | Ok witness ->
-                        let! committed = attributed.Writer.CommitDeliveryWitness witness
-
-                        match committed with
-                        | Ok() ->
-                            record ()
-
-                            return Ok()
-                        | Error reason ->
-                            return
-                                Error(
-                                    JsFailure.DeliveryNotEstablished(
-                                        "the durable delivery witness was not committed (" + reason + ")"
-                                    )
-                                )
+    /// The delivered cell is written only after the tool settled
+    /// successfully: a failed observation or ledger must not leave a cell
+    /// that could pass as a delivery.
+    let private settleDeliveryOf
+        (sessionId: string)
+        (fence: (ProviderRunIdentity * ToolCallId) option)
+        (settlement: DeliverySettlement option)
+        (deliveredJson: string option ref)
+        (settled: JsToolOutcome)
+        : Task<JsToolOutcome> =
+        task {
+            match settled, deliveredJson.Value with
+            | Succeeded(value, rewritten, created, removed, moved), None ->
+                // An ordinary return is not a delivery (clause 1) and
+                // leaves no delivery evidence of its own.
+                return Succeeded(value, rewritten, created, removed, moved)
+            | Succeeded(value, rewritten, created, removed, moved), Some json ->
+                return! settleDeliveredSuccess sessionId fence settlement json value rewritten created removed moved
+            | _ ->
+                clearOwnDelivery sessionId fence
+                return settled
         }
 
 
@@ -877,27 +988,7 @@ module JsToolWorkflow =
                 // The delivered cell is written only after the tool settled
                 // successfully: a failed observation or ledger must not leave
                 // a cell that could pass as a delivery.
-                match settled with
-                | Succeeded(value, rewritten, created, removed, moved) ->
-                    match deliveredJson.Value with
-                    | None ->
-                        // An ordinary return is not a delivery (clause 1) and
-                        // leaves no delivery evidence of its own.
-                        return Succeeded(value, rewritten, created, removed, moved)
-                    | Some json ->
-                        let! deliveryOutcome = settleDeliveredView sessionId fence settlement json
-
-                        match deliveryOutcome with
-                        | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
-                        | Error failure ->
-                            // The delivery did not establish: it presents as
-                            // not established and leaves no success evidence
-                            // behind (clause 6).
-                            clearOwnDelivery sessionId fence
-                            return Failed(failure, rewritten, created, removed, moved)
-                | _ ->
-                    clearOwnDelivery sessionId fence
-                    return settled
+                return! settleDeliveryOf sessionId fence settlement deliveredJson settled
         }
 
     /// The generated-surface api factory: bindings own the file members and
@@ -1042,24 +1133,7 @@ module JsToolWorkflow =
                 let! ledgerOutcome = settleLedger site.Ledger
                 let settled = settleResumedExecutionOutcome ledgerOutcome value
 
-                match settled with
-                | Succeeded(value, rewritten, created, removed, moved) ->
-                    match deliveredJson.Value with
-                    | None ->
-                        // An ordinary return is not a delivery (clause 1) and
-                        // leaves no delivery evidence of its own.
-                        return Succeeded(value, rewritten, created, removed, moved)
-                    | Some json ->
-                        let! deliveryOutcome = settleDeliveredView site.SessionId fence settlement json
-
-                        match deliveryOutcome with
-                        | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
-                        | Error failure ->
-                            clearOwnDelivery site.SessionId fence
-                            return Failed(failure, rewritten, created, removed, moved)
-                | _ ->
-                    clearOwnDelivery site.SessionId fence
-                    return settled
+                return! settleDeliveryOf site.SessionId fence settlement deliveredJson settled
         }
 
     /// Abandon a parked site (algorithm F): reject the deferred promise with
@@ -1108,12 +1182,10 @@ module JsToolWorkflow =
         if isNull input then
             []
         else
-            [ if isPresent (input?program) then
-                  ("program", input?program)
-              if isPresent (input?unpark) then
-                  ("unpark", input?unpark)
-              if isPresent (input?abandon) then
-                  ("abandon", input?abandon) ]
+            [ "program"; "unpark"; "abandon" ]
+            |> List.choose (fun key ->
+                let value = input?(key)
+                if isPresent value then Some(key, value) else None)
 
     /// Why a js-* input is contradictory: it carries more than one of
     /// program / unpark / abandon. The reason names the conflicting states.

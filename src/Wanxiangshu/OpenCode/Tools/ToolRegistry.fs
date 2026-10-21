@@ -429,30 +429,30 @@ module ToolRegistry =
     /// The projection answers with the plain-JS receipt of
     /// `AnchorSurface.reportMaterial`; the refusal travels as the same
     /// `{ code, reason }` bytes the failure receipt carries.
+    let private recordOfLines (lines: string list) : obj =
+        if List.isEmpty lines then
+            null
+        else
+            box (String.concat "\n" lines)
+
+    let private materialRecord (receipt: obj) : obj =
+        let material: obj array = receipt?material
+
+        let lines =
+            material
+            |> Array.toList
+            |> List.map (fun entry ->
+                let anchor: int = entry?anchor
+                let text: string = entry?text
+                sprintf "%d: %s" anchor text)
+
+        createObj [ "ok" ==> true; "record" ==> recordOfLines lines ]
+
     let private reportMaterialText (sessionId: string) (mapping: obj) : obj =
         let receipt = AnchorSurface.reportMaterial sessionId mapping
         let ok: bool = receipt?ok
 
-        if not ok then
-            receipt
-        else
-            let material: obj array = receipt?material
-
-            let lines =
-                material
-                |> Array.toList
-                |> List.map (fun entry ->
-                    let anchor: int = entry?anchor
-                    let text: string = entry?text
-                    sprintf "%d: %s" anchor text)
-
-            let record: obj =
-                if List.isEmpty lines then
-                    null
-                else
-                    box (String.concat "\n" lines)
-
-            createObj [ "ok" ==> true; "record" ==> record ]
+        if not ok then receipt else materialRecord receipt
 
     /// The rendered record of a material receipt, or no record at all.
     let private recordOfReceipt (receipt: obj) : string option =
@@ -769,18 +769,126 @@ module ToolRegistry =
                         |> Option.map AgentHandleId.value
                         |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
 
-                    match agentHandle with
-                    | Some handle -> Some handle
-                    | None ->
-                        if String.IsNullOrWhiteSpace record.TargetAgent then
-                            None
-                        else
-                            Some record.TargetAgent)
+                    agentHandle
+                    |> Option.orElse (
+                        Some record.TargetAgent
+                        |> Option.filter (fun target -> not (String.IsNullOrWhiteSpace target))
+                    ))
 
             match lifecycleTask, childHandle with
             | Some task, _ -> task
             | None, Some handle -> DeliveryTaskReference.ChildWork handle, None
             | None, None -> DeliveryTaskReference.Invocation toolCallIdText, None
+
+        let witnessSettlement
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (providerRun: ProviderRunIdentity)
+            (toolCallId: ToolCallId)
+            logicalRunId
+            authorityRoot
+            physical
+            (formalText: string)
+            work
+            : DeliverySettlement =
+            let deliveryTask, retirementId =
+                deliveryTaskOf durable sessionId providerRun toolCallId work
+
+            { Attribution =
+                { LogicalRunId = logicalRunId
+                  AuthorityRoot = authorityRoot
+                  PhysicalUserMessageId = physical
+                  Task = deliveryTask
+                  RetirementId = retirementId
+                  FormalText = formalText }
+              Writer =
+                DeliveryWitnessWriter.create durable (fun witness ->
+                    // The durable witness is committed by now: the
+                    // registration only records the committed attempt, so the
+                    // transform hook's delivery adjudication can stop it.
+                    DeliveryAttemptLedger.recordEstablished
+                        { SessionId = witness.SessionId
+                          ProviderRun = witness.ProviderRun
+                          CallId = witness.ToolCallId }
+                        (Some witness.PhysicalUserMessageId)) }
+
+        /// The formal prose and the physical input of the assistant message
+        /// that made the call; either missing leaves the call unattributed.
+        let messageAttribution
+            (ctx: HostToolContext)
+            (providerRun: ProviderRunIdentity)
+            (messages: SessionMessage list)
+            : (string * PhysicalUserMessageId) option =
+            owningAssistantMessage messages providerRun
+            |> Option.bind (fun message ->
+                formalTextOf message
+                |> Option.bind (fun formalText ->
+                    physicalUserMessageOf messages message (currentPhysicalUserMessage ctx.SessionId)
+                    |> Option.map (fun physical -> formalText, physical)))
+
+        let attributedSettlement
+            (ctx: HostToolContext)
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (providerRun: ProviderRunIdentity)
+            (toolCallId: ToolCallId)
+            logicalRunId
+            authorityRoot
+            (messages: SessionMessage list)
+            : Task<DeliverySettlement option> =
+            match messageAttribution ctx providerRun messages with
+            | None -> Task.FromResult None
+            | Some(formalText, physical) ->
+                task {
+                    // The lifecycle work is read only for a
+                    // call that already has its attribution:
+                    // the work journal is a durable read and
+                    // must not be paid for calls that never
+                    // get a witness.
+                    let! work = runtime.LifecycleWorkFor ctx.SessionId
+
+                    return
+                        Some(
+                            witnessSettlement
+                                durable
+                                sessionId
+                                providerRun
+                                toolCallId
+                                logicalRunId
+                                authorityRoot
+                                physical
+                                formalText
+                                work
+                        )
+                }
+
+        let loadedSettlement
+            (ctx: HostToolContext)
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (providerRun: ProviderRunIdentity)
+            (toolCallId: ToolCallId)
+            (loadMessages: unit -> Task<Result<SessionMessage list, 'error>>)
+            logicalRunId
+            authorityRoot
+            : Task<DeliverySettlement option> =
+            task {
+                let! loaded = loadMessages ()
+
+                match loaded with
+                | Error _ -> return None
+                | Ok messages ->
+                    return!
+                        attributedSettlement
+                            ctx
+                            durable
+                            sessionId
+                            providerRun
+                            toolCallId
+                            logicalRunId
+                            authorityRoot
+                            messages
+            }
 
         /// The delivery settlement of one js-* call: the host's attribution of
         /// the call and the durable place its witness goes.
@@ -793,74 +901,26 @@ module ToolRegistry =
             | Some durable, Some snapshotPort, Some providerRun, Some toolCallId ->
                 let sessionId = SessionId.create ctx.SessionId
 
-                let activeProfile =
-                    Wanxiangshu.Interaction.Authority.PromptAuthorityProjectionQueries.activeProfile
-                        sessionId
-                        (AgentJournal.snapshot durable).AgentProjections
-
-                match activeProfile with
-                | None -> Task.FromResult None
-                | Some profile ->
-                    let logicalRunId = profile.LogicalRunId
-                    let authorityRoot = profile.AuthorityRootUserMessageId
-
-                    if
+                Wanxiangshu.Interaction.Authority.PromptAuthorityProjectionQueries.activeProfile
+                    sessionId
+                    (AgentJournal.snapshot durable).AgentProjections
+                |> Option.map (fun profile -> profile.LogicalRunId, profile.AuthorityRootUserMessageId)
+                |> Option.filter (fun (logicalRunId, authorityRoot) ->
+                    not (
                         String.IsNullOrWhiteSpace(LogicalRunId.value logicalRunId)
                         || String.IsNullOrWhiteSpace(AuthorityRootUserMessageId.value authorityRoot)
-                    then
-                        Task.FromResult None
-                    else
-                        task {
-                            let! loaded = snapshotPort.GetMessages sessionId
-
-                            match loaded with
-                            | Error _ -> return None
-                            | Ok messages ->
-                                match owningAssistantMessage messages providerRun with
-                                | None -> return None
-                                | Some message ->
-                                    match formalTextOf message with
-                                    | None -> return None
-                                    | Some formalText ->
-                                        let physical =
-                                            physicalUserMessageOf
-                                                messages
-                                                message
-                                                (currentPhysicalUserMessage ctx.SessionId)
-
-                                        match physical with
-                                        | None -> return None
-                                        | Some physical ->
-                                            // The lifecycle work is read only for a
-                                            // call that already has its attribution:
-                                            // the work journal is a durable read and
-                                            // must not be paid for calls that never
-                                            // get a witness.
-                                            let! work = runtime.LifecycleWorkFor ctx.SessionId
-
-                                            let deliveryTask, retirementId =
-                                                deliveryTaskOf durable sessionId providerRun toolCallId work
-
-                                            return
-                                                Some
-                                                    { Attribution =
-                                                        { LogicalRunId = logicalRunId
-                                                          AuthorityRoot = authorityRoot
-                                                          PhysicalUserMessageId = physical
-                                                          Task = deliveryTask
-                                                          RetirementId = retirementId
-                                                          FormalText = formalText }
-                                                      Writer =
-                                                        DeliveryWitnessWriter.create durable (fun witness ->
-                                                            // The durable witness is committed by now: the
-                                                            // registration only records the committed attempt, so the
-                                                            // transform hook's delivery adjudication can stop it.
-                                                            DeliveryAttemptLedger.recordEstablished
-                                                                { SessionId = witness.SessionId
-                                                                  ProviderRun = witness.ProviderRun
-                                                                  CallId = witness.ToolCallId }
-                                                                (Some witness.PhysicalUserMessageId)) }
-                        }
+                    ))
+                |> Option.map (fun (logicalRunId, authorityRoot) ->
+                    loadedSettlement
+                        ctx
+                        durable
+                        sessionId
+                        providerRun
+                        toolCallId
+                        (fun () -> snapshotPort.GetMessages sessionId)
+                        logicalRunId
+                        authorityRoot)
+                |> Option.defaultWith (fun () -> Task.FromResult None)
             | _ -> Task.FromResult None
 
         let generatedJsSpecFor (role: Role) =
@@ -907,107 +967,122 @@ module ToolRegistry =
                             let refusalWithReason (code: string) (reason: string) : obj =
                                 createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
 
+                            let envelopeOrRefusal (fields: Result<(string * obj) list, string>) : obj =
+                                match fields with
+                                | Ok fields -> envelopeOk fields
+                                | Error code -> refusal code
+
+                            let placedFields
+                                (placed: Wanxiangshu.Execution.Delegation.Fork.ForkReceipt)
+                                : (string * obj) list =
+                                [ "name" ==> placed.Name
+                                  "agentId" ==> placed.AgentId
+                                  "outcome" ==> placed.Outcome ]
+
+                            let placedDelegate
+                                (execute: _ -> Task<Result<Wanxiangshu.Execution.Delegation.Fork.ForkReceipt, string>>)
+                                (payload: obj)
+                                (record: string option)
+                                : Task<obj> =
+                                task {
+                                    let raw = payloadWithRecord payload record
+                                    let! receipt = execute (ToolHostCodec.argumentsOfRaw raw)
+                                    return receipt |> Result.map placedFields |> envelopeOrRefusal
+                                }
+
+                            let devopsAnswer (outcome: Result<Wanxiangshu.Mission.Planning.AskResult, string>) : obj =
+                                match outcome with
+                                | Ok answer ->
+                                    envelopeOk
+                                        [ "kind" ==> answer.Kind; "status" ==> answer.Status; "view" ==> answer.View ]
+                                | Error reason ->
+                                    refusalWithReason "devops-failed" (sprintf "devops failed: %s" reason)
+
+                            let askDevops (payload: obj) (record: string option) (gitCommonDir: string) : Task<obj> =
+                                task {
+                                    let raw = payloadWithRecord payload record
+                                    let intentText = devopsIntentText payload raw
+
+                                    let intent =
+                                        record
+                                        |> Option.map (fun text -> intentText + "\n\n" + text)
+                                        |> Option.defaultValue intentText
+
+                                    let delegateTo = devopsDelegateOf syncDelegateRuntime ctx
+
+                                    let! outcome =
+                                        Wanxiangshu.Mission.Planning.PlanTools.executeAsk
+                                            gitCommonDir
+                                            ctx.SessionId
+                                            intent
+                                            delegateTo
+
+                                    return devopsAnswer outcome
+                                }
+
+                            let devopsDelegate (payload: obj) (record: string option) : Task<obj> =
+                                task {
+                                    let! gitCommonDir = askGitCommonDir workspaceDirectory
+
+                                    if String.IsNullOrWhiteSpace gitCommonDir then
+                                        return
+                                            refusalWithReason
+                                                "devops-failed"
+                                                "devops failed: git common directory is missing"
+                                    else
+                                        return! askDevops payload record gitCommonDir
+                                }
+
+                            /// A delegate runs only on report material that rendered; a refused
+                            /// mapping answers with the refusal it carries.
+                            let materialGated (material: obj) (run: string option -> Task<obj>) : Task<obj> =
+                                let materialOk: bool = material?ok
+
+                                if not materialOk then
+                                    Task.FromResult(refusalWithReason (string material?code) (string material?reason))
+                                else
+                                    run (recordOfReceipt material)
+
+                            // The commit-side fact of a delivery: the live cell
+                            // carries this call's exact fence, so THIS call
+                            // established the delivery and the ledger may
+                            // record it. A cell of another fence, or no cell
+                            // at all, is no delivery of this call.
+                            let registerOwnDelivery () =
+                                match ctx.ProviderRunId, ctx.ToolCallId with
+                                | Some providerRun, Some toolCallId when
+                                    JsDeliveredValues.peekFence ctx.SessionId
+                                    |> Option.exists (fun fence ->
+                                        fence.ProviderRun = providerRun && fence.ToolCallId = toolCallId)
+                                    ->
+                                    runtime.RegisterEstablishedDelivery(
+                                        SessionId.create ctx.SessionId,
+                                        providerRun,
+                                        toolCallId
+                                    )
+                                | _ -> ()
+
                             let host: JsDelegationHost =
                                 { Delegate =
                                     fun name payload mapping ->
                                         task {
                                             let material = reportMaterialText ctx.SessionId mapping
-                                            let materialOk: bool = material?ok
 
                                             match name with
                                             | "fork"
                                             | "commission" ->
-                                                if not materialOk then
-                                                    return
-                                                        refusalWithReason
-                                                            (string material?code)
-                                                            (string material?reason)
-                                                else
-                                                    let record = recordOfReceipt material
-                                                    let raw = payloadWithRecord payload record
-
-                                                    let! receipt =
-                                                        ForkTool.executeReceipt
-                                                            runtime
-                                                            ctx
-                                                            (ToolHostCodec.argumentsOfRaw raw)
-
-                                                    return
-                                                        match receipt with
-                                                        | Ok placed ->
-                                                            envelopeOk
-                                                                [ "name" ==> placed.Name
-                                                                  "agentId" ==> placed.AgentId
-                                                                  "outcome" ==> placed.Outcome ]
-                                                        | Error code -> refusal code
+                                                return!
+                                                    materialGated
+                                                        material
+                                                        (placedDelegate (ForkTool.executeReceipt runtime ctx) payload)
                                             | "resume" ->
-                                                if not materialOk then
-                                                    return
-                                                        refusalWithReason
-                                                            (string material?code)
-                                                            (string material?reason)
-                                                else
-                                                    let record = recordOfReceipt material
-                                                    let raw = payloadWithRecord payload record
-
-                                                    let! receipt =
-                                                        ForkTool.executeResumeReceipt
-                                                            runtime
-                                                            ctx
-                                                            (ToolHostCodec.argumentsOfRaw raw)
-
-                                                    return
-                                                        match receipt with
-                                                        | Ok placed ->
-                                                            envelopeOk
-                                                                [ "name" ==> placed.Name
-                                                                  "agentId" ==> placed.AgentId
-                                                                  "outcome" ==> placed.Outcome ]
-                                                        | Error code -> refusal code
-                                            | "devops" ->
-                                                if not materialOk then
-                                                    return
-                                                        refusalWithReason
-                                                            (string material?code)
-                                                            (string material?reason)
-                                                else
-                                                    let record = recordOfReceipt material
-                                                    let! gitCommonDir = askGitCommonDir workspaceDirectory
-
-                                                    if String.IsNullOrWhiteSpace gitCommonDir then
-                                                        return
-                                                            refusalWithReason
-                                                                "devops-failed"
-                                                                "devops failed: git common directory is missing"
-                                                    else
-                                                        let raw = payloadWithRecord payload record
-                                                        let intentText = devopsIntentText payload raw
-
-                                                        let intent =
-                                                            match record with
-                                                            | Some text -> intentText + "\n\n" + text
-                                                            | None -> intentText
-
-                                                        let delegateTo = devopsDelegateOf syncDelegateRuntime ctx
-
-                                                        let! outcome =
-                                                            Wanxiangshu.Mission.Planning.PlanTools.executeAsk
-                                                                gitCommonDir
-                                                                ctx.SessionId
-                                                                intent
-                                                                delegateTo
-
-                                                        return
-                                                            match outcome with
-                                                            | Ok answer ->
-                                                                envelopeOk
-                                                                    [ "kind" ==> answer.Kind
-                                                                      "status" ==> answer.Status
-                                                                      "view" ==> answer.View ]
-                                                            | Error reason ->
-                                                                refusalWithReason
-                                                                    "devops-failed"
-                                                                    (sprintf "devops failed: %s" reason)
+                                                return!
+                                                    materialGated
+                                                        material
+                                                        (placedDelegate
+                                                            (ForkTool.executeResumeReceipt runtime ctx)
+                                                            payload)
+                                            | "devops" -> return! materialGated material (devopsDelegate payload)
                                             | _ -> return refusal "unknown-delegate"
                                         }
                                   Join =
@@ -1092,24 +1167,7 @@ module ToolRegistry =
                                 try
                                     let! outcome = spec.Execute args ctx
 
-                                    // The commit-side fact of a delivery: the live cell
-                                    // carries this call's exact fence, so THIS call
-                                    // established the delivery and the ledger may
-                                    // record it. A cell of another fence, or no cell
-                                    // at all, is no delivery of this call.
-                                    match ctx.ProviderRunId, ctx.ToolCallId with
-                                    | Some providerRun, Some toolCallId ->
-                                        match JsDeliveredValues.peekFence ctx.SessionId with
-                                        | Some fence when
-                                            fence.ProviderRun = providerRun && fence.ToolCallId = toolCallId
-                                            ->
-                                            runtime.RegisterEstablishedDelivery(
-                                                SessionId.create ctx.SessionId,
-                                                providerRun,
-                                                toolCallId
-                                            )
-                                        | _ -> ()
-                                    | _ -> ()
+                                    registerOwnDelivery ()
 
                                     return outcome
                                 finally
