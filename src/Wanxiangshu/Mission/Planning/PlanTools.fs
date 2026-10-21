@@ -1159,6 +1159,14 @@ module PlanTools =
                         activeId
         }
 
+    /// A remembered fence names its operation; an operation that already bound
+    /// an execution session resolves to that session.
+    let private rememberedExecution (key: string) : string =
+        if executionFences.ContainsKey key then
+            executionFences[key]
+        else
+            key
+
     let private dispatchPostS3Execution
         (gitCommonDir: string)
         (root: string)
@@ -1191,12 +1199,7 @@ module PlanTools =
                 discardSession
         elif executionFences.ContainsKey(providerRunId + ":" + toolCallId) then
             let remembered =
-                let key = executionFences[providerRunId + ":" + toolCallId]
-
-                if executionFences.ContainsKey key then
-                    executionFences[key]
-                else
-                    key
+                rememberedExecution executionFences[providerRunId + ":" + toolCallId]
 
             Task.FromResult(
                 Ok
