@@ -1,27 +1,58 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { admit, assertCold, forkTool, withForkRuntime } from '../../delegation/tests/support/scoped-work.mjs'
+import {
+  agentIdOf,
+  childTurn,
+  forkCall,
+  joinCall,
+  observeTerminals,
+  resumeCall,
+  workLifecycleOf,
+  withRealFork,
+} from '../../delegation/tests/support/real-fork.mjs'
 
 test('WHAT[managed-session-lifecycle-006] exact admission resumes the road without reviving its consumed work', async () => {
   const owner = 'scope-retired-road'
-  await withForkRuntime(owner, async (runtime, directory) => {
-    const a = await admit(runtime, owner, 1, 'WORK-A')
-    assert.equal(await forkTool.settle(runtime, owner, 'ANSWER-A', 'provider-a'), true)
-    const consumed = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')
-    assert.equal(consumed.ok, true)
-    assert.match(consumed.view, /ANSWER-A/)
-    const tombstone = forkTool.workSnapshot(runtime, owner)
-    assert.equal(tombstone[0].lifecycle, 'Retired')
-    assert.equal((await forkTool.replayBinding(runtime, owner, 'Ada')).ok, true)
-    assert.deepEqual(forkTool.workSnapshot(runtime, owner), tombstone)
-    await assertCold(runtime, directory, owner)
-    const b = await admit(runtime, owner, 2, 'WORK-B')
-    assert.notEqual(b.root, a.root)
-    assert.equal(b.handle, a.handle)
-    assert.equal(b.child, a.child)
-    assert.equal(forkTool.workSnapshot(runtime, owner).find(work => work.root === a.root).lifecycle, 'Retired')
-    await assertCold(runtime, directory, owner)
-    assert.equal(await forkTool.settle(runtime, owner, 'ANSWER-B', 'provider-b'), true)
+  await withRealFork(owner, async ({ hooks, createdIds, runtime }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      // The first admission: one real accepted work on this road.
+      const first = await forkCall(hooks, owner, 'Ada', 'WORK-A')
+      assert.match(first, /Ada/)
+      const agentId = agentIdOf(first)
+      const child = createdIds[0]
+      const rootA = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, rootA), 'Active')
+
+      // The work delivers for real, and the parent consumes it: the join hands
+      // the view over and retires the consumed work into a tombstone.
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE A', 'ANSWER-A', terminals.awaitRun)
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, rootA), 'CompletedAwaitingJoin')
+      const consumed = await joinCall(hooks, owner)
+      assert.match(consumed, /ANSWER-A/)
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, rootA), 'Retired')
+
+      // The tombstone stays: re-binding the same Byname does not revive the
+      // consumed work, and it does not change the retired record.
+      const tombstone = workLifecycleOf(runtime, owner, agentId, child, rootA)
+      assert.equal(tombstone, 'Retired')
+
+      // The second admission: a new root on the same handle and the same
+      // physical child — the road continues, the consumed work does not.
+      const second = await resumeCall(hooks, owner, 'Ada', 'WORK-B')
+      assert.match(second, /Ada/)
+      assert.equal(createdIds.length, 1, 'the same Byname keeps the same physical child')
+      const rootB = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      assert.notEqual(rootB, rootA)
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, rootA), 'Retired')
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, rootB), 'Active')
+
+      // The resumed work completes for real too.
+      await childTurn(hooks, runtime, child, `run-${child}-2`, 'PROSE B', 'ANSWER-B', terminals.awaitRun)
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, rootB), 'CompletedAwaitingJoin')
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
