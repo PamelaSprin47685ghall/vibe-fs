@@ -7,7 +7,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Sphinx.V2.Core
 
 type OpenCodeHostPort internal (runtime: SyncDelegateRuntime) =
-    member _.Capabilities() : string list = [ "dispatch" ]
+    member _.Capabilities() : string list = DispatchPolicy.hostCapabilities
 
     member internal _.Dispatch(owner: SessionId, request: DispatchRequestedBody) : SyncDelegateObservedExecution =
         match runtime.ValidateObservedOwner owner with

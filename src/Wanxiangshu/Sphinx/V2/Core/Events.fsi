@@ -158,3 +158,9 @@ module SphinxV2EventTypes =
     val strictTransition: string
     val all: string list
     val isKnown: string -> bool
+
+[<RequireQualifiedAccess>]
+module DispatchPolicy =
+    val hostCapabilities: string list
+    val notDispatchRequestedReason: string
+    val admit: InquiryEventBody -> Result<DispatchRequestedBody, string>

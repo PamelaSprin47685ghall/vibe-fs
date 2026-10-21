@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Sphinx.V2.Hosts.OpenCode
 
-open Wanxiangshu.Sphinx.V2.Hosts
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation.SyncDelegate
@@ -33,11 +32,13 @@ module Surface =
               Completion = Task.FromResult(Error reason) }
 
         match Codec.decodeBody request with
-        | Ok(InquiryEventBody.DispatchRequested request) ->
-            SyncDelegateSurface.withHostRuntime probe.Harness (fun runtime _ ->
-                OpenCodeHostPort(runtime).Dispatch(probe.Owner, request))
-            |> box
-        | Ok _ -> refused "expected DispatchRequested" |> box
+        | Ok body ->
+            match DispatchPolicy.admit body with
+            | Ok request ->
+                SyncDelegateSurface.withHostRuntime probe.Harness (fun runtime _ ->
+                    OpenCodeHostPort(runtime).Dispatch(probe.Owner, request))
+                |> box
+            | Error reason -> refused reason |> box
         | Error fault -> refused fault.Message |> box
 
     let dispatchAdmission (execution: obj) =
