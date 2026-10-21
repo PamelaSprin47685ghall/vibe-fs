@@ -10,7 +10,7 @@ land rebase + ff. Ratchets (architecture ⑧, ⑨, HNI-04 thinness) only go down
 | HNI-03 | omp 18.12.4 feasibility evidence + omp adapter skeleton type-checked against the ports with offline fixtures | arch | 01 | eng-host-arch-goose | DONE (evidence/omp-feasibility.md; open O-1..O-5) |
 | HNI-04 | Architecture gate: adapter thinness (product decisions in adapter folders; adapter files with no neutral port) + honest baseline | arch | 01 | eng-host-arch-goose | DONE (gate ⑩ 695 / 151, ⑪ 0, ⑫ 0) |
 | HNI-05 | Fission: move product logic out of `Execution/Fission/OpenCode` behind P-02 | fission | 02 | (fission lane) | DOING |
-| HNI-06 | Fork/children: `Execution/Delegation/Fork/OpenCode` + `Execution/*/OpenCode` behind P-01/P-03 | fork | 02 | (fork lane) | DOING |
+| HNI-06 | Fork/children: `Execution/Delegation/Fork/OpenCode` + `Execution/*/OpenCode` behind P-01/P-03 (+ P-13..P-15) | fork | 02 | eng-hni-fork-goose | DOING |
 | HNI-07 | Tools: ToolRegistry/ToolRuntimeScope/Codec behind P-04/P-05 | tools | 02 | (tools lane) | DOING |
 | HNI-08 | Plugin host: Plugin/Host behind P-06..P-09, P-11, P-12; product = `HostPorts -> ProductHooks` | plugin-host | 02 | (plugin-host lane) | DOING |
 | HNI-09 | Leftovers: Mission/Work, Repository, Sphinx V2 hosts, Context/Prefix, Interaction/Dispatch `OpenCode` folders | domains (this lane) | 02 | domain-cores | DOING |

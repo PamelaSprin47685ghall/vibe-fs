@@ -47,10 +47,14 @@
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fsi"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fs"/>
-    <Compile Include="Execution/Delegation/OpenCode/DelegatedToolEstimate.fsi"/>
-    <Compile Include="Execution/Delegation/OpenCode/DelegatedToolEstimate.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs"/>
+    <Compile Include="Host/CommandDeclaration.fsi"/>
+    <Compile Include="Host/CommandDeclaration.fs"/>
+    <Compile Include="Host/DelegationCommand.fsi"/>
+    <Compile Include="Host/DelegationCommand.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Command.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Command.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fsi"/>

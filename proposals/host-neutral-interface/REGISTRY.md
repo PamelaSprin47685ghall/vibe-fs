@@ -37,9 +37,9 @@ neutral ports use `Wanxiangshu.Host.Ports` (see DESIGN §1.1 and drift **D-05**)
 
 | ID | Port | File | Owner lane | Notes (HNI-11 review) |
 |---|---|---|---|---|
-| P-13 | `CommandDeclaration`, `CommandArgument`, `ArgumentShape`, `ICommandArguments` | `Host/CommandDeclaration.fs(i)` | fork | Neutral and product-shaped. Converges with P-04: `ArgumentShape` is what a `ToolSpec.Schema` is generated from. |
-| P-14 | `IDelegationCallerHost`, `DelegationCaller` | `Host/DelegationCaller.fs(i)` | fork | D-03: carries `AgentJournal` (product persistence) and fork runtime — a composition seam, not a host port. |
-| P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. |
+| P-13 | `CommandDeclaration`, `CommandArgument`, `ArgumentShape`, `ICommandArguments` | `Host/CommandDeclaration.fs(i)` | fork | Neutral and product-shaped. Converges with P-04: `ArgumentShape` is what a `ToolSpec.Schema` is generated from. Status: WIRED-OC. |
+| P-14 | `IDelegationCallerHost`, `DelegationCaller` | `Host/DelegationCaller.fs(i)` | fork | D-03: carries `AgentJournal` (product persistence) and fork runtime — a composition seam, not a host port. Status: WIRED-OC. |
+| P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. Status: WIRED-OC. |
 | P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. |
 | P-17 | `FissionHostPort`, `FissionOwnerRuns` | `Host/FissionPort.fs(i)` | fission | D-03: carries `AgentJournal`, legacy `ISessionHostPort`, `Execution.Session` types. |
 | P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). **D-07: this file name collides with P-04's `Host/Ports/Tools.fs(i)` — rename before moving it under `Host/Ports/`.** |
@@ -110,7 +110,7 @@ These are the concrete steps, so a lane does not have to re-derive them:
 |---|---|---|
 | arch (eng-host-arch) | DESIGN/REGISTRY/BOARD, P-00, P-10, omp skeleton, thinness gate, drift review | all (review) |
 | fission | `Execution/Fission/OpenCode` | P-02 (+ P-01 read-only use) |
-| fork | `Execution/Delegation/Fork/OpenCode` + other `Execution/*/OpenCode` | P-01, P-03 |
+| fork | `Execution/Delegation/Fork/OpenCode` + other `Execution/*/OpenCode` | P-01, P-03, P-13, P-14, P-15 |
 | tools | `OpenCode/Tools` ToolRegistry/ToolRuntimeScope + `OpenCode/Codec` | P-04, P-05 |
 | plugin-host | `OpenCode/Plugin` + `OpenCode/Host` | P-06, P-07, P-08, P-09, P-11, P-12 |
 | unclaimed | `Mission/Work/OpenCode`, `Repository/**/OpenCode`, `Sphinx/V2/Hosts/OpenCode`, `Context/Prefix/OpenCode`, `Interaction/Dispatch/OpenCode` | claim here (edit this row) |
@@ -121,6 +121,10 @@ These are the concrete steps, so a lane does not have to re-derive them:
   (types only, no consumers yet); omp skeleton conforms (SKELETON-OMP = generated mirror byte-identical to the F# signatures, type-checked against the omp 18.12.4 types, offline fixture green; **not** wired to a running host, not shipped).
   Renamed before any consumer existed: `ToolCall`→`ToolInvocation`, `ToolResult`→`ToolOutcome`, transcript part `ToolCall`→`ToolUse`
   (the old names collide with existing union cases and trip shard-edge-audit). No port is WIRED-OC yet.
+- 2026-10-21 eng-hni-fork: P-13..P-15 WIRED-OC. Consumers: `Execution/Delegation/Fork/Command` (`ForkCommand`: fork/resume/commission
+  rules, prose, receipts, argument declarations) and `Execution/Session/HorizonRoster` (horizon prose + data). Their members still answer
+  `Result<_, string>` (the `HostForkRuntime`/`OrchestratorHost` error channel); moving to `HostError` waits for P-00.
+  `DelegationCaller.Session` is `SessionId option` (rule 2): the OpenCode adapter maps a blank `sessionID` to None.
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.

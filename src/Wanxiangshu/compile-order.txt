@@ -921,6 +921,8 @@ Execution/Delegation/Fork/Host/JoinSurface.fsi
 Execution/Delegation/Fork/Host/JoinSurface.fs
 Execution/Delegation/Fork/Host/Agent.fsi
 Execution/Delegation/Fork/Host/Agent.fs
+Host/DelegationCaller.fsi
+Host/DelegationCaller.fs
 Execution/Delegation/Fork/Host/Pty.fsi
 Execution/Delegation/Fork/Host/Pty.fs
 Interaction/Repair/Port.fsi
@@ -1029,8 +1031,6 @@ Change/Recovery.fsi
 Change/Recovery.fs
 OpenCode/Codec/ToolHostSurface.fsi
 OpenCode/Codec/ToolHostSurface.fs
-Execution/Delegation/OpenCode/DelegatedToolEstimate.fsi
-Execution/Delegation/OpenCode/DelegatedToolEstimate.fs
 Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi
 Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs
 Execution/Delegation/Fork/OpenCode/JoinSurface.fsi
@@ -1155,6 +1155,12 @@ Mission/Work/OpenCode/ReviewBackendManager.fsi
 Mission/Work/OpenCode/ReviewBackendManager.fs
 Mission/Work/OpenCode/ReviewShell.fsi
 Mission/Work/OpenCode/ReviewShell.fs
+Host/CommandDeclaration.fsi
+Host/CommandDeclaration.fs
+Host/DelegationCommand.fsi
+Host/DelegationCommand.fs
+Execution/Delegation/Fork/Command.fsi
+Execution/Delegation/Fork/Command.fs
 Execution/Delegation/Fork/OpenCode/Tool.fsi
 Execution/Delegation/Fork/OpenCode/Tool.fs
 Mission/Work/OpenCode/DeliverTool.fsi
