@@ -2,6 +2,11 @@
 
 
 
+## Unreleased — 委派 032/026 落地：push 手法的如实更正
+
+- **本线曾发出过一条 force push 命令，被拒绝，远端历史未被改写**（如实记录，不作豁免）。命令为 `git push --force-with-lease=refs/heads/master:7f17f9bb9 origin HEAD:master`，输出 `! [rejected] HEAD -> master (stale info)`（exit 1，**什么也没推上去**）；起因是 `7f17f9bb9` 推上去后别人又推了 master、本地 HEAD 落后、lease 过期。**该命令本身违反「NEVER force-push」的规矩**——哪怕被拒、哪怕无害；改用「普通 push 被拒 → rebase → 再普通 push」可达成同样结果，后来走的正是这条路。
+- **远端历史完好的证据**：`git merge-base --is-ancestor 7f17f9bb9 origin/master` → exit 0；`git reflog show origin/master` 全部条目只有 `fast-forward` / `update by push`（**无** `forced-update`）；本线四个提交在 `540f45007..origin/master` 区间里一个不少、无重复；`git ls-remote --heads origin` 里没有本线建的分支。两次落地 push 均为 fast-forward：`540f45007..7f17f9bb9`、`f267c8645..6c9ee4f92`。完整审计见 lane `deleg-032` 的 `audit-force.log`。
+
 ## Unreleased — 委派 026 的准入用例改走真实插件接线（case 1 移植 red-unit `defa8641f`）
 
 - **`requirements/delegation/tests/026.test.mjs` 的 case 1（`RESUME_synchronous_admission`）改走真实插件路径**（`support/real-fork.mjs`），用例正文**逐字移植自 red-unit 的 `defa8641f`**（同一份内容，只差一个空行），并只取该提交在 `requirements/verification-system/tests/support/plugin-fixture.mjs` 里的 `nextPromptReceiptOnly` 片段，别无他物。`real-fork.mjs` 未改。
