@@ -228,20 +228,11 @@ const recordRealEffect = async (runtime, directory) => {
 // 台账是呈现面事实：它让 transform 钩子的交付裁决能停掉这一 attempt。
 // 它与 durable 见证同生同灭：提交被拒 → 台账没有任何登记。
 // 读法与 transform 钩子完全一致（同一份台账、同一把读法）。
-const { DeliveryAttemptLedger_tryFindEstablished } = await import(
-  '../../../dist/OpenCode/Tools/ToolRuntimeScope.js'
-)
-const {
-  SessionIdModule_create,
-  PhysicalUserMessageIdModule_create,
-  ToolCallIdModule_value,
-} = await import('../../../dist/Foundation/Identity.js')
+const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
 
+// The tool call id of the established attempt on that physical input, or null.
 const establishedIn = (session, physical) =>
-  DeliveryAttemptLedger_tryFindEstablished(
-    SessionIdModule_create(session),
-    PhysicalUserMessageIdModule_create(physical),
-  )?.[0] ?? null
+  ToolRuntimeScopeSurface.establishedDeliveryCallId(session, physical) ?? null
 
 // provider 请求：交付裁决读的是本次请求携带的物理用户消息。
 const providerRequest = (session, physical, run) => ({
@@ -449,7 +440,7 @@ test('WHAT[effect-accounting-013] a refused delivery commit registers nothing, a
     const fence = establishedIn(session, 'root-registration-1')
     assert.ok(fence, 'a committed delivery registers the established attempt in the ledger')
     assert.equal(
-      ToolCallIdModule_value(fence.CallId),
+      fence,
       'call-effect-013-registration',
       'the registration names the exact attempt that delivered',
     )
@@ -501,7 +492,7 @@ test('WHAT[effect-accounting-013] a refused delivery commit registers nothing, a
     const afterRefusal = establishedIn(session, 'root-registration-1')
     assert.ok(afterRefusal, 'the committed delivery stays registered')
     assert.equal(
-      ToolCallIdModule_value(afterRefusal.CallId),
+      afterRefusal,
       'call-effect-013-registration',
       'a refused commit registers nothing of its own: the ledger still names the committed attempt',
     )

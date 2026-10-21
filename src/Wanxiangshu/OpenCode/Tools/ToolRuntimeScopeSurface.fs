@@ -333,6 +333,16 @@ type ToolRuntimeScopeSurface =
                        engineerAfter = engineerAfter |}
         }
 
+    /// Read-back of the process-live delivery attempt ledger: the tool call id of the latest
+    /// established delivery of this session on this physical input (the same read the transform
+    /// hook's delivery adjudication uses), or None when nothing is established there.
+    [<CompiledName("establishedDeliveryCallId")>]
+    static member establishedDeliveryCallId(sessionId: string, physicalUserMessageId: string) : string option =
+        DeliveryAttemptLedger.tryFindEstablished
+            (SessionId.create sessionId)
+            (Some(PhysicalUserMessageId.create physicalUserMessageId))
+        |> Option.map (fun (fence, _) -> ToolCallId.value fence.CallId)
+
     [<CompiledName("verifyOwnershipRetirementContract")>]
     static member verifyOwnershipRetirementContract(scenario: obj) : Task<obj> =
         task {
