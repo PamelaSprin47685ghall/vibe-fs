@@ -3,7 +3,6 @@ namespace Wanxiangshu.Context.Companion
 open System
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
@@ -12,8 +11,7 @@ type CompanionHost
     (
         primaryId: SessionId,
         sessions: ISessionHostPort,
-        ?durable: ICompanionDurablePort,
-        ?satelliteRuntime: CompanionLeaseRuntime
+        ?durable: ICompanionDurablePort
     ) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
 
