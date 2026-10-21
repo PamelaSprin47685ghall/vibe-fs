@@ -13,9 +13,6 @@ open Wanxiangshu.Participant.Provider.Attempt
 /// role predicate; callers provide labels and receive only a boolean decision.
 module ToolRegistrySurface =
 
-    [<Emit("$0===undefined||$0===null")>]
-    let private isUndefined (value: obj) : bool = jsNative
-
     /// Unknown role and unknown tool both fail closed.
     let rolePredicate (toolName: string) (roleLabel: string) : bool =
         match Roles.tryParseRole roleLabel with
@@ -56,36 +53,6 @@ module ToolRegistrySurface =
             |> List.sort
             |> List.toArray
         | _ -> [||]
-
-    /// The Plan programming surface, executed under one exact call. The
-    /// provider run (`messageID`) and the tool call (`callID`) of that call
-    /// are the fence the delivery carries; a delivery without both is only a
-    /// staged view, never delivery evidence.
-    let runJsPlan
-        (gitCommonDir: string)
-        (root: string)
-        (workId: string)
-        (program: string)
-        (messageId: string)
-        (callId: string)
-        : System.Threading.Tasks.Task<string> =
-        let prose =
-            Wanxiangshu.Repository.Programming.Js.OpenCode.JsDescriptionAssets.load (
-                ProviderLanguageBinding.readGlobalPreference ()
-            )
-
-        let fence =
-            if isUndefined messageId || isUndefined callId then
-                None
-            elif String.IsNullOrWhiteSpace messageId || String.IsNullOrWhiteSpace callId then
-                None
-            else
-                Some(
-                    Identity.ProviderRunIdentity.create messageId,
-                    Identity.ToolCallId.create callId
-                )
-
-        ToolRegistry.runPlanProgram prose gitCommonDir root workId program fence
 
     let jsPlanDescription (language: string) : string =
         let parsed = ProviderLanguage.parse language

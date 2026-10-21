@@ -21,15 +21,6 @@ module ToolRegistrySurface =
     /// Provider tool names projected from the same capability set as the gate.
     val capabilityToolNames: roleLabel: string -> requestKindLabel: string -> string array
 
-    val runJsPlan:
-        gitCommonDir: string ->
-        root: string ->
-        workId: string ->
-        program: string ->
-        messageId: string ->
-        callId: string ->
-            System.Threading.Tasks.Task<string>
-
     val jsPlanDescription: language: string -> string
 
     /// The existing tool-name lookup. Role decides a shared verb; catalog order does not.

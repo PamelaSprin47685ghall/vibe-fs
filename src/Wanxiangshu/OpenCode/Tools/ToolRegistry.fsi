@@ -47,15 +47,6 @@ module ToolRegistry =
     /// sessionId is the tool call's Host session.
     val rolePredicate: specName: string -> sessionId: string -> (Role -> bool)
 
-    val runPlanProgram:
-        prose: JsCanonicalDescription.Prose ->
-        gitCommonDir: string ->
-        root: string ->
-        sessionId: string ->
-        program: string ->
-        fence: (ProviderRunIdentity * ToolCallId) option ->
-            Task<string>
-
     val create:
         toolModule: obj ->
         sessionPort: ISessionHostPort ->

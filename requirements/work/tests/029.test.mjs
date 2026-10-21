@@ -1,24 +1,12 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as registry from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
-import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
-import * as workspaceEvents from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
-
-// The sandbox resolves the active tenure from the unified lifecycle work, so the
-// store is a real workspace store with one opened plan work.
-const openPlanStore = async (root, workId) => {
-  execFileSync('git', ['init', '--quiet', root])
-  const store = workspaceEvents.acquire(await journalSurface.JournalSurface_initializeStateRoot(root))
-  const opened = await lifecycle.seedOpen(store, 'plan', workId, root, 1n)
-  assert.equal(opened.ok, true, opened.error)
-  return store
-}
+import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 test('WHAT[work-029] Plan path derivation resolves deterministically and rejects path traversal', () => {
   const root = '/workspace/test-repo/.Herdchestra/wanxiangshu'
@@ -97,18 +85,35 @@ test('WHAT[work-029] P is read, rewritten atomically with exclusive temp file, a
 })
 
 test('WHAT[work-029] shared Plan interface permits only PLAN_PATH and rejects retired members', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-surface-'))
-  const workId = 'plan-shared-path'
-  try {
-    surface.PlanningSurface.rewritePlanAtomic(root, workId, '# Draft')
-    const store = await openPlanStore(root, workId)
-    const run = body => registry.runJsPlan(store.gitCommonDir, root, workId,
-      `class Js extends JsProgram { async run() { ${body} } }`)
-    assert.match(await run('return { text: await this.cat(PLAN_PATH), retired: [typeof this.file, typeof this.edit, typeof this.rewrite] };'), /# Draft/)
-    assert.match(await run('return { retired: typeof this.file };'), /undefined/)
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true })
-  }
+  // The shared Plan interface is exercised through the REAL Plan programming
+  // surface (`todowrite-for-plan`), which is the only Plan entry the host
+  // registers. The retired legacy Plan entry is gone, so this is also the
+  // proof that the live surface carries the same interface.
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const sessionID = 'ses-work-029-plan-surface'
+    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
+    await openIncumbency(runtime, sessionID, 'inc-work-029', 'S1')
+
+    const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
+    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, directory, sessionID, 0n)
+    assert.equal(opened.ok, true, opened.error)
+
+    const run = body => hooks.tool['todowrite-for-plan'].execute(
+      { program: `class Js extends JsProgram { async run() { ${body} } }` },
+      { sessionID, agent: 'plan', callID: 'call-work-029', messageID: 'run-work-029', providerRunID: 'run-work-029' },
+    )
+
+    // The draft P lives at the live surface's own plan path.
+    const draft = path.join(directory, 'plan.md')
+    fs.writeFileSync(draft, '# Draft')
+
+    const read = String(await run('return { text: await this.cat(PLAN_PATH), retired: [typeof this.file, typeof this.edit, typeof this.rewrite] };'))
+    assert.match(read, /# Draft/)
+    assert.match(read, /undefined/)
+
+    const retired = String(await run('return { retired: typeof this.file };'))
+    assert.match(retired, /undefined/)
+  })
 })
 
 test('WHAT[work-029] localized Plan pseudocode describes the same shared interface', () => {

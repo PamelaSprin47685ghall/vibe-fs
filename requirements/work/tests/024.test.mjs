@@ -6,12 +6,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
-import { runJsPlan } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { rolePermissionRules, toolSpecNames } from '../../../dist/OpenCode/Tools/ToolSurface.js'
 import { generateRole } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
-import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -87,18 +86,29 @@ test('WHAT[work-024] the Plan devops member refuses an unusable report mapping a
 })
 
 test('WHAT[work-024] an unreviewed tenure may read the draft', async () => {
-  await withStore(async (store, root) => {
-    const opened = await surface.seedOpen(store, 'plan', 'work-24', root, 0n)
+  // The real Plan programming surface is the only Plan entry the host
+  // registers; an unreviewed tenure may still READ the draft through it.
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const sessionID = 'ses-work-024-unreviewed'
+    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
+    await openIncumbency(runtime, sessionID, 'inc-work-024', 'S1')
+
+    const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
+    const opened = await planning.PlanningSurface.ensurePlanWorkOpened(commonDir, directory, sessionID, 0n)
     assert.equal(opened.ok, true, opened.error)
-    const before = surface.workView(store, 'work-24')
+
+    const before = surface.workView(workspace.acquire(commonDir), sessionID)
     assert.equal(before.reviewed, '')
 
-    const read = await runJsPlan(store.gitCommonDir, root, 'work-24', `class Js extends JsProgram {
+    const read = await hooks.tool['todowrite-for-plan'].execute(
+      { program: `class Js extends JsProgram {
       async run() {
         return { ok: true };
       }
-    }`)
-    assert.match(read, /# ok/)
+    }` },
+      { sessionID, agent: 'plan', callID: 'call-work-024', messageID: 'run-work-024', providerRunID: 'run-work-024' },
+    )
+    assert.match(String(read), /# ok/)
   })
 })
 

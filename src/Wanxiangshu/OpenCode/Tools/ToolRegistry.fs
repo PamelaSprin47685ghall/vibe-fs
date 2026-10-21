@@ -458,53 +458,6 @@ module ToolRegistry =
         else
             (ToolHostCodec.argumentsOfRaw normalizedPayload).Text "intent"
 
-    /// The Plan programming surface runs under one exact call: the provider
-    /// run that asked for it and the tool call that carries it. A delivery
-    /// the program makes is evidence only when it carries that fence, so the
-    /// fence travels with the execution and is handed to the workflow as-is.
-    /// Without a fence the delivery lands as a render cache — presentable,
-    /// but never a delivery.
-    let runPlanProgram
-        (prose: JsCanonicalDescription.Prose)
-        (gitCommonDir: string)
-        (root: string)
-        (sessionId: string)
-        (program: string)
-        (fence: (ProviderRunIdentity * ToolCallId) option)
-        : Task<string> =
-        task {
-            // Plan is unified: uses the standard JsToolWorkflow.execute with
-            // the Plan role's projected capabilities. The working directory
-            // is the plan work's assigned directory (root/plan/sessionId).
-            let planRoot =
-                match Wanxiangshu.Mission.Planning.PlanPath.resolvePlanPath root sessionId with
-                | Ok fullPath ->
-                    let idx = fullPath.LastIndexOf('/')
-                    if idx >= 0 then fullPath.Substring(0, idx) else root
-                | Error _ -> root
-
-            let capabilities =
-                JsCapability.ofToolCapabilities (OfficeCapability.permissions Role.Plan)
-            let baseClass = JsCanonicalDescription.runtimeBaseClass prose capabilities
-            let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
-            let input = createObj [ "program" ==> program ]
-            let! outcome =
-                JsToolWorkflow.execute
-                    sessionId
-                    fence
-                    capabilities
-                    planRoot
-                    baseClass
-                    input
-                    10000
-                    deadlineEpochMs
-                    (1 <<< 20)
-                    None
-                    None
-                    None
-            return JsToolsResult.render outcome
-        }
-
     /// The advisor consult accepts the report mapping only — a mapping of
     /// anchor numbers to summaries, equivalent to a `prefixUntil = 0`
     /// declaration. There is no lenient empty declaration.
