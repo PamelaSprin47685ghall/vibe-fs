@@ -702,6 +702,14 @@ module HostForkRunLifecycle =
             // last effort (the same reason the `Aborted` branch observes only).
             // Observation only — keep pending run Active for a later proven terminal.
             Task.FromResult(())
+        | Failed stop when not (stopBelongsToRun run stop) ->
+            // WHAT[delegation-025] / [031]: a rooted stop only settles the work
+            // unit whose own admitted Authority Root it addresses. A stop that
+            // carries another (older) work unit's root is a foreign terminal:
+            // it must not claim this run's completion cell and must not write
+            // this run's completion evidence. An authority-less session-wide
+            // stop still addresses the run (the live-path allowance).
+            Task.FromResult(())
         | Failed stop -> deliverFailedCompletion gate pendingRuns journal parentId run stop.Reason
 
     let private recoverFailedSettlement
