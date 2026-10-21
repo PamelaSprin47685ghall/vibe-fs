@@ -1,6 +1,23 @@
 namespace Wanxiangshu.Execution.Fission
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
+
+/// CUT-28: the Fission topology and settlement laws are wanxiangli/fission-group's.
+/// This file keeps the typed vocabulary and the container values; the rules
+/// below only translate to and from the library.
+module internal FissionGroupLaw =
+    [<Import("FissionGroupLaw", "wanxiangli/fission-group")>]
+    let private lawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (_cls: obj) : obj = jsNative
+
+    let law: obj = construct lawClass
+
+    let ints (value: obj) : int list =
+        unbox<int array> value |> Array.toList
 
 [<RequireQualifiedAccess>]
 type FissionRejectReason =
@@ -21,19 +38,17 @@ type ParsedFissionPrompts =
 
 module FissionPrompt =
 
-    let private validateLanePrompts prompts =
-        match prompts |> List.tryFindIndex String.IsNullOrWhiteSpace with
-        | Some index -> Error(FissionRejectReason.EmptyLanePrompt index)
-        | None -> Ok()
-
     let parse (prompts: string list) : Result<ParsedFissionPrompts, FissionRejectReason> =
-        if List.length prompts < 2 then
-            Error FissionRejectReason.TooFewLanes
-        else
-            validateLanePrompts prompts
-            |> Result.map (fun () ->
-                { Count = List.length prompts
-                  Lanes = prompts |> List.mapi (fun index prompt -> { Index = index; Prompt = prompt }) })
+        let verdict: obj = FissionGroupLaw.law?parsePrompts (List.toArray prompts)
+
+        match unbox<string option> verdict?rejection with
+        | Some "TooFewLanes" -> Error FissionRejectReason.TooFewLanes
+        | Some "EmptyLanePrompt" -> Error(FissionRejectReason.EmptyLanePrompt(unbox<int> verdict?index))
+        | Some other -> invalidOp ("wanxiangli/fission-group returned an unknown lane request rejection: " + other)
+        | None ->
+            Ok
+                { Count = unbox<int> verdict?lanes
+                  Lanes = prompts |> List.mapi (fun index prompt -> { Index = index; Prompt = prompt }) }
 
 [<RequireQualifiedAccess>]
 type FissionCompletionAffinity =
@@ -49,11 +64,13 @@ module FissionExternalId =
 
 module FissionCompletionRouting =
 
-    let targets laneCount affinity =
-        match affinity with
-        | FissionCompletionAffinity.PreFissionBroadcast -> [ 0 .. laneCount - 1 ]
-        | FissionCompletionAffinity.Lane index when index >= 0 && index < laneCount -> [ index ]
-        | FissionCompletionAffinity.Lane _ -> []
+    let targets (laneCount: int) affinity =
+        let lane: obj =
+            match affinity with
+            | FissionCompletionAffinity.PreFissionBroadcast -> null
+            | FissionCompletionAffinity.Lane index -> box index
+
+        FissionGroupLaw.ints (FissionGroupLaw.law?routeCompletion (createObj [ "laneCount" ==> laneCount; "lane" ==> lane ]))
 
 [<RequireQualifiedAccess>]
 type FissionDeliveryError = InvalidLane of int
@@ -125,25 +142,28 @@ module FissionRing =
     /// Canonical ring fold. The order is a property of the topology, not of
     /// callback arrival. Keeping this tiny makes arrival-order convergence
     /// literally unrepresentable in the domain model.
-    let mergeOrder laneCount =
-        if laneCount < 2 then [] else [ 0 .. laneCount - 1 ]
+    let mergeOrder (laneCount: int) =
+        FissionGroupLaw.ints (FissionGroupLaw.law?mergeOrder laneCount)
 
     /// V1 closes the canonical ring at N-1. Every valid group therefore has one
     /// deterministic physical present that may receive the final takeover.
-    let finalLane laneCount = mergeOrder laneCount |> List.tryLast
+    let finalLane (laneCount: int) : int option =
+        let lane: obj = FissionGroupLaw.law?finalLane laneCount
+        if isNull lane then None else Some(unbox<int> lane)
 
     /// Ring transport is derived from lane index/count. Closed successors are
     /// skipped mechanically until the next live present; when every lane is
     /// closed the durable group finalizer owns the bundle.
-    let successor laneCount laneIndex closedLanes =
-        if laneCount < 2 || laneIndex < 0 || laneIndex >= laneCount then
-            None
-        else
-            let closed = Set.ofList closedLanes
+    let successor (laneCount: int) (laneIndex: int) (closedLanes: int list) : int option =
+        let lane: obj =
+            FissionGroupLaw.law?successor (
+                createObj
+                    [ "laneCount" ==> laneCount
+                      "laneIndex" ==> laneIndex
+                      "closed" ==> List.toArray closedLanes ]
+            )
 
-            [ 1..laneCount ]
-            |> List.map (fun offset -> (laneIndex + offset) % laneCount)
-            |> List.tryFind (fun candidate -> not (Set.contains candidate closed))
+        if isNull lane then None else Some(unbox<int> lane)
 
 [<RequireQualifiedAccess>]
 type FissionSettlementObservation =
@@ -171,34 +191,61 @@ type FissionTakeoverSettlementDecision =
 /// successors must settle first; Fission only consumes the stable completion.
 module FissionSettlement =
 
+    let private decide (stage: string) observation =
+        let name, reason =
+            match observation with
+            | FissionSettlementObservation.OngoingExecution -> "OngoingExecution", ""
+            | FissionSettlementObservation.NeedsContinuation -> "NeedsContinuation", ""
+            | FissionSettlementObservation.ProviderFailed -> "ProviderFailed", ""
+            | FissionSettlementObservation.DegenerationInterrupted -> "DegenerationInterrupted", ""
+            | FissionSettlementObservation.ExternalAbort reason -> "ExternalAbort", reason
+            | FissionSettlementObservation.Completed -> "Completed", ""
+
+        let verdict: obj =
+            FissionGroupLaw.law?settle (createObj [ "stage" ==> stage; "observation" ==> name ])
+
+        unbox<string> verdict?decision, reason
+
     let decideLane observation =
-        match observation with
-        | FissionSettlementObservation.OngoingExecution
-        | FissionSettlementObservation.NeedsContinuation
-        | FissionSettlementObservation.ProviderFailed
-        | FissionSettlementObservation.DegenerationInterrupted -> FissionLaneSettlementDecision.YieldToTurnWorkflow
-        | FissionSettlementObservation.ExternalAbort reason -> FissionLaneSettlementDecision.FailGroup reason
-        | FissionSettlementObservation.Completed -> FissionLaneSettlementDecision.MaterializeLane
+        match decide "lane" observation with
+        | "yield", _ -> FissionLaneSettlementDecision.YieldToTurnWorkflow
+        | "fail", reason -> FissionLaneSettlementDecision.FailGroup reason
+        | "materialize", _ -> FissionLaneSettlementDecision.MaterializeLane
+        | other, _ -> invalidOp ("wanxiangli/fission-group returned an unknown lane settlement: " + other)
 
     let decideTakeover observation =
-        match observation with
-        | FissionSettlementObservation.OngoingExecution
-        | FissionSettlementObservation.NeedsContinuation
-        | FissionSettlementObservation.ProviderFailed
-        | FissionSettlementObservation.DegenerationInterrupted -> FissionTakeoverSettlementDecision.YieldToTurnWorkflow
-        | FissionSettlementObservation.ExternalAbort reason -> FissionTakeoverSettlementDecision.FailGroup reason
-        | FissionSettlementObservation.Completed -> FissionTakeoverSettlementDecision.CompleteOwner
+        match decide "takeover" observation with
+        | "yield", _ -> FissionTakeoverSettlementDecision.YieldToTurnWorkflow
+        | "fail", reason -> FissionTakeoverSettlementDecision.FailGroup reason
+        | "complete", _ -> FissionTakeoverSettlementDecision.CompleteOwner
+        | other, _ -> invalidOp ("wanxiangli/fission-group returned an unknown takeover settlement: " + other)
 
 module FissionConvergence =
 
-    let ready laneCount preFissionCompletionIds bundle delivery =
-        let completeLaneSet = FissionWorkBundle.keys bundle = [ 0 .. laneCount - 1 ]
+    /// The same convergence precondition the durable projection uses
+    /// (wanxiangli/fission-group `convergenceReady`), read off the live bundle
+    /// and delivery. Only in-range lanes count as delivered, and a group needs
+    /// at least two lanes.
+    let ready (laneCount: int) (preFissionCompletionIds: string list) bundle (delivery: FissionDelivery) =
+        let delivered completionId =
+            delivery.Delivered
+            |> Map.tryFind completionId
+            |> Option.defaultValue Set.empty
+            |> Set.filter (fun lane -> lane >= 0 && lane < delivery.LaneCount)
+            |> Set.toArray
 
-        let allBroadcastsDelivered =
-            preFissionCompletionIds
-            |> List.forall (fun completionId -> FissionDelivery.pendingTargets completionId delivery |> List.isEmpty)
-
-        laneCount >= 2 && completeLaneSet && allBroadcastsDelivered
+        laneCount >= 2
+        && laneCount = delivery.LaneCount
+        && unbox<bool> (
+            FissionGroupLaw.law?convergenceReady (
+                createObj
+                    [ "laneCount" ==> laneCount
+                      "progress"
+                      ==> createObj
+                              [ "workedLanes" ==> (FissionWorkBundle.keys bundle |> List.toArray)
+                                "deliveries" ==> (preFissionCompletionIds |> List.map delivered |> List.toArray) ] ]
+            )
+        )
 
 [<RequireQualifiedAccess>]
 module FissionRequestProjection =
