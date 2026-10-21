@@ -22,8 +22,6 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
-open Wanxiangshu.Git
-open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -51,8 +49,6 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Interaction.Admission
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 
 
