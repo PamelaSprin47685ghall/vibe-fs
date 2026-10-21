@@ -1,0 +1,82 @@
+{
+  "schema": "module-construction-acceptance-v1",
+  "sourceCommit": "a5d2844b60c87d24e4d559cffc04a1b33788930e",
+  "libraryCommit": "45849f51778f6a12dcafbc12ce1c8c7f7f65502b",
+  "libraryVersion": "0.11.0",
+  "generation": 107,
+  "entry": "npm run verify:release",
+  "runtime": "Node.js 22.13.0 / darwin-arm64",
+  "policy": {
+    "NODE_TEST_CONCURRENCY": "4",
+    "UNIT_VERDICT_SILENCE_MS": "30000",
+    "SUITE_BACKSTOP_MS": "900000",
+    "WXS_VERIFICATION_WORKER_DIAGNOSTICS": "0",
+    "WXS_ACCEPT_TODO": "1",
+    "changedFromExistingCiPolicy": false,
+    "todoCountsAsPass": false
+  },
+  "result": {
+    "exitCode": 0,
+    "elapsedSeconds": 983.7,
+    "format": "passed",
+    "staticChecks": "passed",
+    "fableBuild": "passed",
+    "unit": {
+      "passed": 4537,
+      "failed": 0,
+      "skipped": 110,
+      "todo": 277,
+      "completedFiles": 757,
+      "plannedFiles": 757,
+      "elapsedSeconds": 286.4,
+      "postExitGroupReclamationAccepted": true
+    },
+    "integration": {
+      "passed": 725,
+      "failed": 0,
+      "skipped": 7,
+      "todo": 7,
+      "completedFiles": 40,
+      "plannedFiles": 40,
+      "elapsedSeconds": 577.4,
+      "postExitGroupReclamationAccepted": true
+    },
+    "e2e": "passed",
+    "package": "passed"
+  },
+  "rawLog": {
+    "path": "evidence/module-construction-20261021/resume/release08-full.log",
+    "sha256": "b9e4613d871b3cb3ff1094269d2310848a6b20596c3f4f1e65fa3b3eb1facf03"
+  },
+  "freshness": {
+    "reasonForRebuild": "New tracked source/document archives changed the loop-detector generated-input corpus. The checker and archive bytes were retained.",
+    "assertBuildFresh": "passed after normal build",
+    "compilerInputDigest": "4f18f7819bfb250791fba47e21a70725a902e1f14c543ebe41e690b48f6f300b",
+    "generatedInputDigest": "e0021acdbc4dec32778657413ea92483a05f4ecc4f1377a7531001793a4324e5",
+    "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225",
+    "gen106Comparison": {
+      "referenceManifest": "/private/tmp/vibe-fs-pty-soak-gen106-20261021-b/gen106-build-manifest.json",
+      "comparedMainOutputMembers": 783,
+      "changedSha256": 0,
+      "added": 0,
+      "removed": 0,
+      "scope": "The manifest's main outputs only. This is not the separate 833-member installed-consumer snapshot proof or a long-test duration receipt."
+    }
+  },
+  "deliveryBoundary": {
+    "remoteHeadLastVerified": "148adbb42b28969c23c336b54e4d05533edca7b4",
+    "newHeadPush": "pending network recovery",
+    "newHeadRemoteCi": "not observed",
+    "pr": "https://github.com/PamelaSprin47685ghall/vibe-fs/pull/62",
+    "prDraft": true,
+    "upstreamBase": "2e99d58a11bb742c600a2daac999ce6491e9a461",
+    "upstreamMergeableLastObserved": false,
+    "deployed": false
+  },
+  "remaining": [
+    "MF01 independent guest candidate is not production reception; full Host, Callable, ledger and memory-limit obligations remain.",
+    "MF02A needs an external Host atomic exact-attempt cancellation capability.",
+    "Fresh Process/Supervision four-hour and PTY two-hour experiments are running in new directories from zero; no long phase has passed at receipt time.",
+    "Historical skipped/TODO/GAP claims and recorded P2/P3 bounds remain open."
+  ]
+}
