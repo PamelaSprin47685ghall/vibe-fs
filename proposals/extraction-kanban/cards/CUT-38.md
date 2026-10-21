@@ -253,12 +253,12 @@ wanxiangli 0.62.0 共 52 个模块、51 个 exports。主仓消费了除 `host-o
 | F38-02 | 8 个内核文件（`Mission/Manager/Workflow`、`Interaction/Repair/InteractionRepair`、`Interaction/Dispatch/{Send,Ingress,Dispatcher}`、`Participant/Provider/Attempt/Fallback/Workflow`、`Composition/Turn/OrdinaryTurnWorkflow`、`Composition/Durable/AgentJournalPortAdapter`），另有 8 个 Surface，仍 `open` 域内适配子命名空间 `*.OpenCode`。门禁 ⑧ 只统计顶层 `Wanxiangshu.OpenCode` | CUT-40（已登记 BACKLOG） | 需要先定棘轮口径并逐文件判定 A/B/C，属于 CUT-34 的边界工作 |
 | F38-03 | `CompanionLeaseRuntime`/`AttachmentLeaseRegistry` 在生产中已无持有者（CUT-35 删了只写不读的插槽），只有测试面 `SatelliteSurface` 还在构造。生产的 companion 生命周期走 `PluginSessionScope.Companions` — **已裁决并处置（`938b966ff`）**：核查后两者仍是活的（`AttachmentLeaseRegistry` 在 `AttachedRuntime.fs:36` 被构造，`CompanionLeaseRuntime` 支撑 `AttachmentSurface.fs:235` 的共享 owner 伴生类型断言与 `managed-session-lifecycle-001`），因此**保留**二者；同批删掉 `CompanionHost` 上无人传入、函数体内也不读取的死参数 `?satelliteRuntime` | 已处置（`938b966ff`） | 裁决结论：运行时与注册表是活的，不能删；只删了确证无用的参数 |
 | F38-04 | `node scripts/check.mjs` 在 master 上红：`fsharp-control-pyramid` 117–137 条（随仓主提交浮动，主要来自看板外的 `6f39cd156`、`5e76cb4a4`、`2d35b2ef0` 系列 delivery 重构）。本卡的候选没有新增条目。**已闭合（静态测量）**：`RED-check-land` 分支的提交把 pyramid 拉平到 **137 → 0**、js-boundary **1 → 0**（静态口径：候选上 `node scripts/check.mjs` exit 0、0 issues；同 base 上 master 为 138 issues = pyramid 137 + js-boundary 1） | 仓主当前的 delivery 重构批次（CUT-32 门禁 owner 复核） | 不是看板引入，也不改门禁来伪造全绿（D-06）。本分支未改门禁、未加白名单、未改基线 JSON。**未做 focused-build 验证**：按仓主规则（12022）dev 不要求提交前编译/跑测试，交付团队后续构建 |
-| F38-05 | shard-edge-audit 的 2 条 high。**已闭合（静态测量）**：master 上实际的 2 条 high 是 js-capability 边（`action-affordance.opencode-tools-statictools` → `repository-programming-js-capability`、`delegation.execution-delegation-advisor-seat` → `repository-programming-js-capability`），**不是**卡片原文写的 `AgentJournal`/`TaskDelivery` 边；后者已由 `d49df9d9f` + `507d68d01` 在 master 上先行修掉（`delegation-journal-port` shard 声明 `AgentJournalPort`，具体持久读下沉为 `DeliveryWitnessReader` 能力）。本分支给上述两个 shard 补上真实的 `repository-programming-js-capability` ProjectReference，shard-edge high **2 → 0**（静态口径：`scripts/checks/shard-edge-audit.mjs`，master 262 findings/high 2，候选 259 findings/high 0，按边身份比对无新增条目） | CUT-13 后继 | **未给 `delegation-recovery-runtime` 加任何 ProjectReference**（PROTOCOL 地雷：delegation-028 闭包必须排除 `ChatExecution/Acceptance.fs`/`Settlement.fs`，ratchet 66）。未改门禁、未加白名单。**未做 focused-build 验证**（仓主规则 12022） |
+| F38-05 | shard-edge-audit 的 2 条 high。**已闭合（静态测量）**：master 上实际的 2 条 high 是 js-capability 边（`action-affordance.opencode-tools-statictools` → `repository-programming-js-capability`、`delegation.execution-delegation-advisor-seat` → `repository-programming-js-capability`），**不是**卡片原文写的 `AgentJournal`/`TaskDelivery` 边；后者已由 `d49df9d9f` + `507d68d01` 在 master 上先行修掉（`delegation-journal-port` shard 声明 `AgentJournalPort`，具体持久读下沉为 `DeliveryWitnessReader` 能力）。本分支给上述两个 shard 补上真实的 `repository-programming-js-capability` ProjectReference，shard-edge high **2 → 0**（静态口径：`scripts/checks/shard-edge-audit.mjs`，master 263 findings/high 2，候选 260 findings/high 0，按边身份比对无新增条目） | CUT-13 后继 | **未给 `delegation-recovery-runtime` 加任何 ProjectReference**（PROTOCOL 地雷：delegation-028 闭包必须排除 `ChatExecution/Acceptance.fs`/`Settlement.fs`，ratchet 66）。未改门禁、未加白名单。**未做 focused-build 验证**（仓主规则 12022） |
 | F38-06 | GAP 台账：13 条单值 OPEN/PARTIAL、144 条叙述状态行未归一，另有挂在已删包上的条目（speculative-investigation、work-record、requirement-grounding） — **部分处置（`1d8b66d1d`）**：19 行状态归一（归档 18 / 关闭 53 / 开放 11 / 部分 112 / 退役 9，共 203 行保留），其余叙述状态行未动 | requirement-system（CUT-26 后继）—— 剩余行仍未处置 | 不通过删改 GAP 关闭债务（卡 §2 明确不做） |
 | F38-07 | `scripts/checks/owner-impact-corpus.json` 是历史快照，仍列着已删文件（ToolSchemaJson、Recovery/Coordinator、Change/Prompts 等） — **已处置（`6109ed096`）**：按当前树重新测量语料并记录基线时间 | 已处置（`6109ed096`） | 它是报告语料，不是门禁；重新生成需要先定基线口径 |
 | F38-08 | 余下可收窄的导出：14 个成员、9 个同文件重名值，以及 Surface 模块里只给测试用的导出。收益很小 | 按需（不另开卡） | 继续收窄的收益已经很低，本卡止于此 |
 | F38-09 | 发布门禁在 base 上就是红的（§7.7）：wanxiangli `build-001` sandbox、64 个文件 format:check、pyramid 122 条、`run.mjs` 在 `repository-programming-032/036` 停住（580/765）、集成 `durable-events-022` 超过 300 s 兜底，以及各自的既有失败用例 | 发布 owner（CUT-32 后继） | 都不是本卡引入的；本卡只报告结果，不修改门禁 |
-| F38-10 | rebase 到最新 master 后新出现的门禁 ⑩ `adapter-thinness` 棘轮回归：候选 `src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs` 的 product-domain 引用由基线 24 升到 26（全仓 695 → 697），门禁红。**已闭合**：`ForkReceipt` 改由适配层命名空间 `ForkTool.PlacementReceipt` 别名导出，`AskResult` 用既有的 `open Wanxiangshu.Mission.Planning` 非限定引用，两处 product 引用回到 24 / 全仓 695 | 已闭合 | 未改 `scripts/checks/adapter-thinness-baseline.json`，未加豁免（D-06）。新增的 shard-edge 类型名选 `PlacementReceipt` 而非 `Receipt`，以免引入 14 条同名 low 边 |
+| F38-10 | rebase 到最新 master 后新出现的门禁 ⑩ `adapter-thinness` 棘轮回归：候选 `src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs` 的 product-domain 引用由基线 24 升到 26（全仓 695 → 697），门禁红。**已闭合**：`ForkReceipt` 改由适配层命名空间 `ForkTool.PlacementReceipt` 别名导出，`AskResult` 用既有的 `open Wanxiangshu.Mission.Planning` 非限定引用，两处 product 引用回到 24 / 全仓 695（在 base `2702b0058` 上，master 基线已被 `3cd7432da` 收到 689，候选实测 596，仍在基线之下） | 已闭合 | 未改 `scripts/checks/adapter-thinness-baseline.json`，未加豁免（D-06）。新增的 shard-edge 类型名选 `PlacementReceipt` 而非 `Receipt`，以免引入 14 条同名 low 边 |
 | CUT-36 | 第二宿主真实 canary | OPTIONAL，解除条件见 cards/CUT-36.md §6 | 需要用户指定宿主，并花真实模型额度 |
 
 ### 7.7 验证（README §9：同输入、同环境的 base 与候选）
@@ -277,7 +277,24 @@ wanxiangli 0.62.0 共 52 个模块、51 个 exports。主仓消费了除 `host-o
 | `requirements/verification-system/tests/integration/run.mjs` | exit 1：`suites` 在 `durable-events-022`（真实 Fable 编译）处超过 300 s 物理兜底，37 个文件中完成 36 个；失败 8 个用例名；package 与 harness（288/288）通过 | exit 1：在同一位置、同样超过兜底；同样 8 个用例名，名单完全一致 | 既有 |
 | `node scripts/verify-package.mjs` | exit 0 | — | 通过 |
 
-日志：`wt/logs-cut38/rel/`（候选）和 `wt/logs-cut38c/`（base 与 master 复跑、format 与 check 比对）。发布门禁里红的几项都不是本卡引入的，所以不能说“全绿”。运行器停住和集成兜底超时列入 F38-09，交发布 owner。
+日志：`wt/logs-cut38/rel/`（候选）和 `wt/logs-cut38c/`（base 与 master 复跑、format 与 check 比对）。发布门禁里红的几项都不是本卡引入的，所以不能说"全绿"。运行器停住和集成兜底超时列入 F38-09，交发布 owner。
+
+### 7.7.1 `RED-check-land` 分支的静态复核（base `2702b0058`）
+
+`RED-check-land` 分支 rebase 到 `origin/master` `2702b0058` 之后，**只做静态门禁测量**（按仓主规则 12022，dev 侧不要求提交前编译或跑测试套件）。before / after：
+
+| 指标 | before（master `2702b0058`） | after（候选） |
+|---|---|---|
+| `fsharp-control-pyramid` | 137 | **0** |
+| `js-boundary-gate` | 1 | **0** |
+| `node scripts/check.mjs` | exit 1，**138 issues** | exit 0，**0 issues** |
+| `scripts/checks/shard-edge-audit.mjs` | **263 findings / high 2 / medium 0** | **260 findings / high 0 / medium 0**（按边身份比对：0 条新增、1 条移除，即 `JsCapability` 那条 high 边消失） |
+| `scripts/checks/adapter-thinness.mjs` | 基线 689 product 引用 | **596**（基线之下；`ToolRegistry.fs` 24 = 基线） |
+| `scripts/checks/architecture.mjs` | — | **OK**（exit 0） |
+
+本分支带走一处**非门禁**的漂移修复与一处搬家适配：HNI-06 在删掉 `Execution/Delegation/OpenCode/DelegatedToolEstimate.fsi` / `.fs` 时漏删 `src/Wanxiangshu/compile-order.txt` 里的两行，导致 `scripts/lib/compile-shards.mjs` throw、`check.mjs` 在 **master 自己身上** fatal-error（没有这道修复，任何门禁都测不出来）——本分支先前自行删掉那 2 行，上游随后以 `3cd7432da` 落了同样的修复，rebase 后本分支不再携带该改动；以及 HNI-05 把 `FissionHost` 搬进 `Execution/Fission/Convergence.fs`、把投递追加搬进 `Execution/Fission/Launch.fs` 之后，batch 2 的 pyramid 拉平按新布局重新落位（`Convergence.fs` 4 个提取、`Launch.fs` 2 个提取）。**没有改任何基线 JSON、棘轮或断言。**
+
+**未验证**：本分支的树**从未编译**，**没有跑过任何测试套件**（`build-slot` 3 分钟排队/编译上限）。`requirements/delegation/tests/028.test.mjs` / `029.test.mjs` 只在早期 rebase 前跑过一次（6 pass / 0 fail / 2 todo），最终树上未重跑；结构论证是本分支不触碰 `delegation-recovery-runtime` 的任何源文件或 fsproj。effect-accounting-013 的改动与 wanxiangli 子模块构建同样未验证。
 
 ### 7.8 结论
 
