@@ -185,7 +185,8 @@ export function scanArchitecture(productionFiles, read, options) {
     }
   }
 
-  // ⑩ adapter-thinness ratchet and ⑪ port-purity (HNI-04): see scripts/checks/adapter-thinness.mjs.
+  // ⑩ adapter-thinness ratchet, ⑪ port-purity and ⑫ port-family integrity (HNI-04, HNI-11):
+  // see scripts/checks/adapter-thinness.mjs.
   for (const v of scanAdapterThinness(productionFs, read, { root: options?.root }).violations) violations.push(v)
 
   return { violations, productionFsCount: productionFs.length }

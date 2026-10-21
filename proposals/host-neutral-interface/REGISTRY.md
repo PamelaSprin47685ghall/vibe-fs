@@ -42,7 +42,7 @@ neutral ports use `Wanxiangshu.Host.Ports` (see DESIGN §1.1 and drift **D-05**)
 | P-15 | `IDelegationCommandHost`, `DelegationReply` | `Host/DelegationCommand.fs(i)` | fork | D-03 as P-14. |
 | P-16 | `PairGuidanceTranscript`, `PairGuidanceLedger`, `PairGuidanceOccurrence` | `Host/PairGuidance.fs(i)` | plugin-host | Was proposed as "P-13" (collision D-01). Feeds P-06 `ContextMessages`. |
 | P-17 | `FissionHostPort`, `FissionOwnerRuns` | `Host/FissionPort.fs(i)` | fission | D-03: carries `AgentJournal`, legacy `ISessionHostPort`, `Execution.Session` types. |
-| P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). |
+| P-18 | `HostToolContext`, `ToolAdmission` (declared authority: `OfficeRole` \| `PrivateAttachment`); `ToolResultText` is a **module** (product prose), not a type | `Host/Tools.fs(i)` | tools | Was proposed as a redefinition of "P-04" (D-02). P-04 stays the registration port in `Host/Ports/Tools.fs`; P-05's call verdict is `ToolCallVerdict` (renamed to match the tools lane). **D-07: this file name collides with P-04's `Host/Ports/Tools.fs(i)` — rename before moving it under `Host/Ports/`.** |
 
 ### Drift findings (HNI-11, 2026-10-21) and the convergence target
 - **D-01** ID collision (`P-13` used by fork and plugin-host) → plugin-host pair guidance is **P-16**.
@@ -63,7 +63,39 @@ neutral ports use `Wanxiangshu.Host.Ports` (see DESIGN §1.1 and drift **D-05**)
   discovered — but the moment a lane moves one under `Host/Ports/` (which HNI-14 intends) the mirror generation
   fails until the file declares its reserved id. A lane that lands a new family must add the `HNI P-xx` marker to
   the file header.
+- **D-07** the tools lane's `Host/Tools.fs(i)` has the **same file name** as P-04's `Host/Ports/Tools.fs(i)`.
+  Today the two live in different directories, so nothing breaks; but the moment the tools lane moves its file
+  under `Host/Ports/` (which HNI-14 intends) it **overwrites P-04** — the registration port — and the
+  `Tools.fs`/`Tools.fsi` pair the mirror generator reads would be the wrong one. The tools lane must rename its
+  file (e.g. `Host/Ports/ToolContext.fs(i)`) before it moves it. No type name collides today: the tools lane
+  declares `HostToolContext`/`ToolAdmission`, P-04 declares `ToolInvocation`/`ToolOutcome`; the **file name**
+  is the collision, not the type name.
 - Lane domain ports are not under gate ⑪ (port-purity covers `Host/Ports/` only); HNI-14 moves them there once D-03 is resolved.
+
+### What a lane must do when it lands a domain port (the D-05/D-06/D-07 checklist)
+
+These are the concrete steps, so a lane does not have to re-derive them:
+
+1. **Move the file under `src/Wanxiangshu/Host/Ports/`** — that directory is what the mirror generator and
+   gate ⑪ (port-purity) both look at. A file left directly under `Host/` is invisible to both.
+2. **Rename the file if its base name is taken** by a neutral family. The names already taken are
+   `Vocabulary`, `Sessions`, `Prompts`, `Transcript`, `Tools`, `ToolGates`, `TurnTransforms`, `Signals`,
+   `ModelRouting`, `Compaction`, `Storage`, `Lifecycle`, `Diagnostics` (**D-07**). The family name is the
+   `.fsi` base name, so it is also the TS mirror section name.
+3. **Declare the reserved id in the header**: a line containing `HNI P-xx` where `xx` is your reserved id from
+   the table above (P-13 … P-18). The generator matches `/\bHNI (P-\d{2})\b/` anywhere in the header; a family
+   without one is a **hard error**, not a silent skip. Put it in the file's leading doc comment, e.g.
+   `/// HNI P-18: product tool contribution — what one product tool call knows about its invocation.`
+4. **Use a namespace that adapters do not `open`**: `Wanxiangshu.Host` is `open`ed by 76 files under
+   `src/Wanxiangshu/` (mostly for `CanonicalJson`/`HostDigest`), so a type named e.g. `Digest` in that namespace
+   shadows the real one at every one of those call sites. Use `Wanxiangshu.Host.Domain.<Lane>` (**D-05**). The
+   neutral families use `Wanxiangshu.Host.Ports`, which nothing `open`s.
+5. **Reuse the neutral vocabulary** (DESIGN §2): `HostResult<_>`/`HostError` instead of `Result<_, string>`
+   (**D-04**), and `SessionId`/`ToolCallId`/`PromptKey`/`TranscriptMessageAddress`/`ModelRoute`/`AgentRole`/
+   `CanonicalJsonText` from `Host/Ports/Vocabulary.fs(i)` instead of `string`.
+6. **Do not hand-edit** `adapters/omp/ports.ts`; it is generated. Run `adapters/omp/check.sh` — it regenerates
+   the mirror and fails on any byte difference.
+7. **Update your row** in the table above (Status, Replaces) in the same commit.
 
 ## Adapter folders (implementations, not ports)
 

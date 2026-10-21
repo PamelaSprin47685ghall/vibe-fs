@@ -1,4 +1,4 @@
-# HNI-04 — the adapter-thinness gate (⑩) and the port-purity gate (⑪)
+# HNI-04 — the adapter-thinness gate (⑩), the port-purity gate (⑪) and the port-family gate (⑫)
 
 Source: `scripts/checks/adapter-thinness.mjs`, run inside `scripts/checks/architecture.mjs`.
 Baseline: `scripts/checks/adapter-thinness-baseline.json`.
@@ -56,6 +56,27 @@ adapter file that is not in the baseline is allowed while the totals stay within
 family without that marker is a hard error. A family another lane lands therefore shows up in the mirror (or
 fails the check) instead of silently escaping it — there is no hand-maintained family list any more.
 
+## What gate ⑫ measures (port-family integrity)
+
+The mirror generator keys on two things a port family carries: the `HNI P-xx` marker in its header and the
+family's **file name** (the `.fsi` base name is the family, and it is also the TS mirror section name). Gate ⑫
+checks both, so a drift is reported by the gate instead of by a failing build or a silently overwritten file:
+
+- every family signature under `Host/Ports/` declares **exactly one** reserved id in an `HNI P-xx` header marker
+  (the generator matches `/\bHNI (P-\d{2})\b/` and hard-errors on a family without one);
+- **no two families claim the same id**;
+- **no file directly under `Host/` takes the base name of a neutral family.** The tools lane's `Host/Tools.fs(i)`
+  is the live case (drift D-07): it shares its name with P-04's `Host/Ports/Tools.fs(i)`, and the moment the lane
+  moves it under `Host/Ports/` it overwrites the registration port. The lane must rename it first.
+
+The scope is discovered from the sources, so a family another lane lands is covered without editing the gate.
+Current measurement: **0 violations.**
+
+Gate ⑫ does **not** check the namespace (drift D-05): a lane file that declares `namespace Wanxiangshu.Host`
+is reported by nobody, because the namespace half of that drift needs the lane's own decision about which
+namespace it should use (`Wanxiangshu.Host.Domain.<Lane>`), not a rule the gate can apply on its own. The
+requirement is written down in `REGISTRY.md` instead.
+
 ## Honest limits of the heuristic
 
 The gate is a **proxy**, not a proof. It does **not** establish that an adapter takes no product decision.
@@ -74,6 +95,8 @@ The gate is a **proxy**, not a proof. It does **not** establish that an adapter 
   ports. Card HNI-14 tracks their convergence.
 - `src/Wanxiangshu/Host/**` outside `Host/Ports/` is neutral/product host code, not adapter code, so it is not
   counted as "adapter" either; a future neutral-host adapter folder convention is not covered by this gate yet.
+- Gate ⑫ checks the **identity** of a port family (its reserved id and its file name), not its content. It does
+  not verify that a family declares the types its reserved id promises, nor that the id matches its REGISTRY row.
 
 The counts are therefore a **downward-only tripwire** for the lanes: they catch the obvious regressions and
 nothing more. They are not a measurement of adapter purity in general.

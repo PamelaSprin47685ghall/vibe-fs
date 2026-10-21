@@ -22,6 +22,7 @@ const {
   isPortFile,
   baselineWritePlan,
   applyBaselineWrite,
+  scanPortFamilies,
 } = await import(GATE)
 
 const fixture = () => {
@@ -221,6 +222,64 @@ test('WHAT[host-boundary-034] the CLI refuses --write-baseline on a regression a
     assert.notEqual(run.status, 0, 'the CLI must exit non-zero')
     assert.match(run.stderr, /refusing to write/)
     assert.equal(readFileSync(baselinePath).equals(before), true, 'baseline bytes must be unchanged')
+  } finally {
+    fx.cleanup()
+  }
+})
+
+// (f) port-family integrity: a family that claims no reserved id, a family that claims an id another
+// family already holds, and a lane file whose base name collides with a neutral family are all
+// reported (HNI-11 drift D-06 / D-07). The mirror generator hard-errors on a family without a
+// marker and reads the family by file name, so both are checked here rather than by a failing build.
+test('WHAT[host-boundary-034] a port family without a marker, a duplicated id and a colliding file name are reported', () => {
+  const fx = fixture()
+  try {
+    fx.write('src/Wanxiangshu/Host/Ports/Tools.fsi', [
+      'namespace Wanxiangshu.Host.Ports',
+      '/// HNI P-04: product tools contributed to a host.',
+      'type ToolInvocation = { Name: string }',
+      '',
+    ].join('\n'))
+    fx.write('src/Wanxiangshu/Host/Ports/Unmarked.fsi', [
+      'namespace Wanxiangshu.Host.Ports',
+      '/// A family that never declared its reserved id.',
+      'type Unmarked = { X: int }',
+      '',
+    ].join('\n'))
+    fx.write('src/Wanxiangshu/Host/Ports/Duplicate.fsi', [
+      'namespace Wanxiangshu.Host.Ports',
+      '/// HNI P-04: a second family claiming an id that is already taken.',
+      'type Duplicate = { Y: int }',
+      '',
+    ].join('\n'))
+    // The tools lane's own file: same base name as the neutral P-04 family, different directory.
+    fx.write('src/Wanxiangshu/Host/Tools.fsi', [
+      'namespace Wanxiangshu.Host',
+      '/// P-04 tool contribution port.',
+      'type HostToolContext = { SessionId: string }',
+      '',
+    ].join('\n'))
+
+    const files = [...fx.files.keys()]
+    const { violations, families } = scanPortFamilies(files, fx.read, { root: fx.dir })
+    const messages = violations.map((v) => v.message)
+
+    assert.ok(
+      messages.some((m) => /Unmarked\.fsi: declares no reserved port id/.test(m)),
+      `a family without an HNI P-xx marker must be reported: ${JSON.stringify(messages)}`,
+    )
+    assert.ok(
+      messages.some((m) => /reserved port id P-04 is already claimed/.test(m)),
+      `a duplicated reserved id must be reported: ${JSON.stringify(messages)}`,
+    )
+    assert.ok(
+      messages.some((m) => /Host\/Tools\.fsi: base name 'Tools' is already used/.test(m)),
+      `a file name that collides with a neutral family must be reported: ${JSON.stringify(messages)}`,
+    )
+    assert.ok(violations.every((v) => v.gate === 'port-family'))
+
+    // The one family that is well-formed is reported with its id.
+    assert.deepEqual(families, [['P-04', 'src/Wanxiangshu/Host/Ports/Tools.fsi']])
   } finally {
     fx.cleanup()
   }

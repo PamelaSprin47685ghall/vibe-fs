@@ -15,6 +15,10 @@
 // ⑪ port-purity (strict): every file under src/Wanxiangshu/Host/Ports/** (.fs and .fsi) references no adapter
 //   namespace and no product domain — only Foundation, Wanxiangshu.Host and System. The scope is discovered
 //   from the sources, so a port family added by another lane (any name) is covered without editing this file.
+// ⑫ port-family integrity: every family under Host/Ports/ declares exactly one reserved id in an
+//   `HNI P-xx` header marker, no two families claim the same id, and no file directly under Host/ takes
+//   the base name of a neutral family. The mirror generator keys on the marker and reads the family by
+//   file name, so both are checked here instead of by a failing build.
 //
 // Honest scope notes (see proposals/host-neutral-interface/evidence/adapter-thinness-gate.md):
 //   * The legacy composition seams (P-14 delegation-caller / P-15 delegation-command / P-17 fission port
@@ -146,6 +150,81 @@ const purityScope = (productionFiles, root = process.cwd()) => {
   return [...new Set([...list, ...onDisk])].sort()
 }
 
+// ⑫ port-family integrity (HNI-11, drift D-06/D-07): the port families under Host/Ports/ must be
+// self-describing, because the TS mirror generator and the file layout both key on them.
+//   * every family signature declares exactly one reserved id in an `HNI P-xx` header marker — the
+//     generator matches /\bHNI (P-\d{2})\b/ and hard-errors on a family without one;
+//   * no two families claim the same reserved id;
+//   * a family's file base name is unique across Host/Ports/ and Host/ — a lane file that shares a base
+//     name with a neutral family (drift D-07: the tools lane's Host/Tools.fs vs P-04's
+//     Host/Ports/Tools.fs) would silently overwrite it the moment the lane moves its file under
+//     Host/Ports/ (drift D-05 is the namespace half of the same problem).
+// The check reads the sources, so a family another lane lands is covered without editing this file.
+export const PORT_FAMILY_ID = /\bHNI (P-\d{2})\b/g
+export const PORT_FAMILY_ROOT = `${PRODUCTION_ROOT}/Host`
+
+export function scanPortFamilies(productionFiles, read, options) {
+  const violations = []
+  const fail = (gate, message) => violations.push({ gate, message })
+  const root = options?.root ?? process.cwd()
+  const files = (productionFiles ?? []).map(norm).filter((f) => f.endsWith('.fs') || f.endsWith('.fsi'))
+
+  // The family root: every .fs/.fsi under Host/, whether it sits in Host/Ports/ or directly under Host/.
+  // A lane file that is still directly under Host/ is NOT a port family yet (it is a domain seam, and
+  // HNI-14 moves it), but its base name still must not collide with a neutral family.
+  const familyFiles = files.filter((f) => {
+    const path = norm(f)
+    return path.startsWith(`${PORT_FAMILY_ROOT}/`) && (path.endsWith('.fs') || path.endsWith('.fsi'))
+  })
+  if (familyFiles.length === 0) {
+    const base = join(root, PORT_FAMILY_ROOT)
+    if (!existsSync(base)) return { violations }
+    familyFiles.push(...walk(base, ['.fs', '.fsi']).map((p) => norm(relative(root, p))))
+  }
+
+  // Base names already taken by a neutral family (under Host/Ports/).
+  const neutralBases = new Map()
+  for (const file of familyFiles) {
+    if (!isPortFile(file)) continue
+    const base = file.slice(file.lastIndexOf('/') + 1).replace(/\.fsi?$/, '')
+    if (!neutralBases.has(base)) neutralBases.set(base, file)
+  }
+
+  // A file directly under Host/ must not take a neutral family's base name.
+  for (const file of familyFiles) {
+    if (isPortFile(file)) continue
+    const base = file.slice(file.lastIndexOf('/') + 1).replace(/\.fsi?$/, '')
+    const taken = neutralBases.get(base)
+    if (taken) {
+      fail('port-family', `${file}: base name '${base}' is already used by the neutral family ${taken}; rename before moving it under ${PORT_ROOT}/`)
+    }
+  }
+
+  // Every neutral family signature declares exactly one reserved id; no id is claimed twice.
+  const claims = new Map()
+  for (const file of familyFiles) {
+    if (!isPortFile(file) || !file.endsWith('.fsi')) continue
+    const text = read(file)
+    const ids = [...new Set([...text.matchAll(PORT_FAMILY_ID)].map((m) => m[1]))]
+    if (ids.length === 0) {
+      fail('port-family', `${file}: declares no reserved port id; add an \`HNI P-xx\` marker to its header`)
+      continue
+    }
+    if (ids.length > 1) {
+      fail('port-family', `${file}: declares ${ids.length} reserved port ids (${ids.join(', ')}); a family declares exactly one`)
+      continue
+    }
+    const id = ids[0]
+    if (claims.has(id)) {
+      fail('port-family', `${file}: reserved port id ${id} is already claimed by ${claims.get(id)}`)
+      continue
+    }
+    claims.set(id, file)
+  }
+
+  return { violations, families: [...claims.entries()].sort() }
+}
+
 export function scanAdapterThinness(productionFiles, read, options) {
   const violations = []
   const fail = (gate, message) => violations.push({ gate, message })
@@ -161,6 +240,10 @@ export function scanAdapterThinness(productionFiles, read, options) {
     if (/\bOpenCode\b|\bOpencode\w*|\bomp\b/i.test(body.replace(/\/\/\/.*$/gm, ''))) bad.push('host vocabulary')
     if (bad.length) fail('port-purity', `${file}: neutral port references ${[...new Set(bad)].join(', ')}`)
   }
+
+  // ⑫ port-family integrity — the mirror generator keys on the `HNI P-xx` marker and on the family
+  // file name, so both are checked here rather than discovered by a failing build.
+  violations.push(...scanPortFamilies(files, read, { root }).violations)
 
   // ⑩ adapter thinness ratchet
   const baseline = options?.baseline ?? readThinnessBaseline()
