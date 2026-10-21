@@ -7,7 +7,7 @@ const policy = await import("../../../dist/Execution/Failure/Surface.js");
 const recovery = await import("../../../dist/Execution/Session/ChatExecution/RecoveryRuntimeSurface.js");
 const hostSignals = await import("../../../dist/OpenCode/Host/HostSignalSurface.js");
 const hooks = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
-const transaction = await import("../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js");
+const transaction = await import("../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js");
 
 const executionKey = {
   sessionId: 'ses-cancel-retry-stream',

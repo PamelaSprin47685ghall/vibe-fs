@@ -18,8 +18,8 @@
 /src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
 /src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
 /src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/TransactionSurface.fs
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionTransaction.fs
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionTransactionSurface.fs
 /src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs
 /src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs

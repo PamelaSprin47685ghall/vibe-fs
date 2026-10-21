@@ -11,7 +11,7 @@
 /src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
 /src/Wanxiangshu/Interaction/Admission/ChatAdmissionIntent.fs
 /src/Wanxiangshu/Interaction/Admission/ChatAdmissionIntent.fsi
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionIntentSurface.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs

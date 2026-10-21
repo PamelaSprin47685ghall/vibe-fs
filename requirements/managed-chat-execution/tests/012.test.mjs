@@ -5,7 +5,7 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const lifecycle = await import("../../../dist/Execution/Session/ChatExecution/Surface.js");
 const recovery = await import("../../../dist/Execution/Session/ChatExecution/RecoveryRuntimeSurface.js");
-const transaction = await import("../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js");
+const transaction = await import("../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js");
 
 const evidence = (cut) => ({
   sessionId: `ses-crash-${cut}`,
@@ -105,7 +105,7 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const lifecycle = await import("../../../dist/Execution/Session/ChatExecution/Surface.js");
 const recovery = await import("../../../dist/Execution/Session/ChatExecution/RecoveryRuntimeSurface.js");
-const transaction = await import("../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js");
+const transaction = await import("../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js");
 
 const CUTS = [...'BCDEFGHI']
 const rotations = (values) => values.map((_, index) => [...values.slice(index), ...values.slice(0, index)])

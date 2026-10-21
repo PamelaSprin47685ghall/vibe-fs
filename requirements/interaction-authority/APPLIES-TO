@@ -9,6 +9,7 @@
 /src/Wanxiangshu/Execution/Delegation/Fork/JoinGuard.fs
 /src/Wanxiangshu/Composition/Durable/Fold.fs
 /src/Wanxiangshu/OpenCode/Host/ChatAdmission/**
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionTransaction*.fs
 /src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs
 /src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs
 /src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs
@@ -17,7 +18,7 @@
 /src/Wanxiangshu/Composition/Turn/TurnObservationPort.fsi
 /src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
 /src/Wanxiangshu/Interaction/Admission/ChatAdmissionIntent.fs
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionIntentSurface.fs
 /src/Wanxiangshu/Interaction/Authority/Child.fs
 /src/Wanxiangshu/Interaction/Authority/Fact.fs
 /src/Wanxiangshu/Interaction/Authority/Facts.fs

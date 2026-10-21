@@ -3,7 +3,7 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
+const intent = await import("../../../dist/Interaction/Admission/ChatAdmissionIntentSurface.js");
 
 test('WHAT[interaction-authority-008] HostInternal_companion_carrier_marks_internal', () => {
   assert.equal(intent.hostInternal({}), false)
@@ -130,7 +130,7 @@ test('WHAT[interaction-authority-008] IA_008_accepted_continuation_outranks_comp
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
+const intent = await import("../../../dist/Interaction/Admission/ChatAdmissionIntentSurface.js");
 
 const message = (overrides = {}) => ({
   sessionId: 'ses-chat',

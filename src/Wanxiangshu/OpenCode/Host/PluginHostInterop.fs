@@ -50,6 +50,7 @@ open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Interaction.Admission
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider

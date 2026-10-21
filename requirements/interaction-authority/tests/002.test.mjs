@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import * as intent from '../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js'
+import * as intent from '../../../dist/Interaction/Admission/ChatAdmissionIntentSurface.js'
 import { withJournal, acceptOwner, hostPort } from './support/authority.mjs'
 
 test('WHAT[interaction-authority-002] identical identifier text grants different authority only through typed receipt or physical evidence', async () => {
