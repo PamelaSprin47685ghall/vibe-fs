@@ -89,8 +89,7 @@ module Diagnostic =
     let private stringify (value: obj) : string = jsNative
 
     let private shouldEmit operation =
-        validateOperation operation
-        && diagnosticsVisible ()
+        validateOperation operation && diagnosticsVisible ()
 
     let private emitWhenVisible operation (project: unit -> obj) =
         if shouldEmit operation then

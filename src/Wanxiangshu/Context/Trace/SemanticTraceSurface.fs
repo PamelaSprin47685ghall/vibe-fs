@@ -104,7 +104,10 @@ module SemanticTraceSurface =
             )
         | "tool-result"
         | "tool_result" ->
-            Wanxiangshu.Foundation.HostSession.MessagePart.ToolResult(text (field value "callId"), text (field value "result"))
+            Wanxiangshu.Foundation.HostSession.MessagePart.ToolResult(
+                text (field value "callId"),
+                text (field value "result")
+            )
         | "activity" -> Wanxiangshu.Foundation.HostSession.MessagePart.Activity(text (field value "activity"))
         | other -> failwith $"SemanticTraceSurface: unknown capture part '{other}'"
 

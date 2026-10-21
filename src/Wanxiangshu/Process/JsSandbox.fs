@@ -69,8 +69,7 @@ module JsSandbox =
     [<Import("Sandbox", "wanxiangli/sandbox")>]
     let private SandboxFactory: unit -> obj = jsNative
 
-    let private sandboxLaw: obj =
-        emitJsExpr (SandboxFactory) "$0()"
+    let private sandboxLaw: obj = emitJsExpr (SandboxFactory) "$0()"
 
     /// Start the model program under wanxiangli/sandbox (DONT_CONTEXTIFY +
     /// realm membrane + afterEvaluate driver). Returns host DeadlineRef and
@@ -269,6 +268,7 @@ module JsSandbox =
         let digits = if colon >= 0 then rest.Substring(0, colon) else rest
         let firstEvalAt = frame.IndexOf "eval at"
         let lastEvalAt = frame.LastIndexOf "eval at"
+
         let isProgramFrame =
             frame.StartsWith "at "
             && at >= 0
@@ -315,6 +315,7 @@ module JsSandbox =
     /// stack degrades to ` | ` on every line, never to a failed park.
     let sourceWithExecutionMarker (baseClassSource: string) (modelSource: string) (stack: string) : string =
         let lines = modelSource.Split('\n')
+
         let currentLine =
             locateSuspendedLine (baseClassSource.Split('\n').Length) lines.Length stack
 

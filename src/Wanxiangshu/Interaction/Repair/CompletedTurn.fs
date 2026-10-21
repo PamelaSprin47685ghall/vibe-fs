@@ -206,7 +206,9 @@ module CompletedTurnClassifier =
 
     let roleOfAgent (agent: string option) (fallback: Role option) =
         match agent with
-        | Some value -> Wanxiangshu.Participant.ManagedAgents.AgentRole.roleOf value |> Option.orElse fallback
+        | Some value ->
+            Wanxiangshu.Participant.ManagedAgents.AgentRole.roleOf value
+            |> Option.orElse fallback
         | None -> fallback
 
     let buildTurn

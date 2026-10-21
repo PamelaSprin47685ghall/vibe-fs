@@ -33,7 +33,8 @@ module Surface =
         createObj
             [ "observationId" ==> factor.ObservationId
               "dependencyKey" ==> factor.DependencyKey
-              "likelihoods" ==> createObj (factor.Likelihoods |> Map.toList |> List.map (fun (k, v) -> k ==> v))
+              "likelihoods"
+              ==> createObj (factor.Likelihoods |> Map.toList |> List.map (fun (k, v) -> k ==> v))
               "qualified" ==> factor.Qualified ]
 
     let private text (value: obj) (name: string) : string = unbox<string> (field value name)

@@ -179,10 +179,7 @@ module WorktreeCommands =
                 // `git branch` marks a branch checked out in ANOTHER worktree with
                 // `+` (an owned job's branch arrives as `+ manager/<job>`); the
                 // marker is stripped by the porcelain law so `isStale` sees the name.
-                return
-                    GitPorcelain.branches stdout
-                    |> List.map WorktreeIdentity.create
-                    |> Ok
+                return GitPorcelain.branches stdout |> List.map WorktreeIdentity.create |> Ok
         }
 
     let deleteBranch (runner: Command -> Task<int * string * string>) repo (identity: WorktreeIdentity) =

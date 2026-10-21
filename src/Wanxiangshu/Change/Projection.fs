@@ -135,7 +135,8 @@ module ChangeIntegrationLaw =
             | None -> null
             | Some job ->
                 Fable.Core.JsInterop.createObj
-                    [ "terminal", box job.Terminal.IsSome; "claimed", box job.PublishClaimed.IsSome ]
+                    [ "terminal", box job.Terminal.IsSome
+                      "claimed", box job.PublishClaimed.IsSome ]
 
         ask "resume" [ "record", wire ] |> code "step"
 
@@ -186,10 +187,14 @@ module ChangeIntegrationLaw =
                   "expectedHead", text (CommitHash.value expectedHead)
                   "rebased", rebasedWire rebased ]
 
-        if unbox<bool> (field answer "ok") then "Ok" else code "code" answer
+        if unbox<bool> (field answer "ok") then
+            "Ok"
+        else
+            code "code" answer
 
     let rebaseFailed (conflictFiles: string list) : string =
-        ask "rebaseFailed" [ "conflictFiles", box (List.toArray conflictFiles) ] |> code "step"
+        ask "rebaseFailed" [ "conflictFiles", box (List.toArray conflictFiles) ]
+        |> code "step"
 
     let checkPublication jobId jobTargetRef evidenceJobId evidenceTargetRef evidenceExpectedHead current : string =
         let answer =
@@ -204,7 +209,10 @@ module ChangeIntegrationLaw =
                         "expectedHead", text (CommitHash.value evidenceExpectedHead) ]
                   "current", text (CommitHash.value current) ]
 
-        if unbox<bool> (field answer "ok") then "Ok" else code "code" answer
+        if unbox<bool> (field answer "ok") then
+            "Ok"
+        else
+            code "code" answer
 
     let ffMerge (merge: Result<CommitHash, string>) (candidate: CommitHash) (targetMovedError: string) : string =
         let wire =

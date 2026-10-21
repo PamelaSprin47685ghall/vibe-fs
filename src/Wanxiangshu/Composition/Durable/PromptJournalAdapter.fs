@@ -113,7 +113,8 @@ module UserQuestionJournal =
                         None)))
 
     let pending journal sessionId =
-        pendingQuestion journal sessionId |> Option.map (fun question -> question.Request)
+        pendingQuestion journal sessionId
+        |> Option.map (fun question -> question.Request)
 
     let suppressesTurn journal sessionId authorityRoot providerRun =
         authority journal sessionId

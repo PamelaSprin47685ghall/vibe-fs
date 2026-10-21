@@ -201,7 +201,9 @@ module OrchestratorProgram =
         : Result<CommitHash option, OrchestratorVerdict> =
         // wanxiangli/integration `ffMerge` (CUT-23 ②): only the pinned candidate lands;
         // the declared target-moved error is a retryable miss.
-        match ChangeIntegrationLaw.ffMerge merge evidence.CandidateCommit OrchestratorConstants.targetRefMovedError, merge with
+        match
+            ChangeIntegrationLaw.ffMerge merge evidence.CandidateCommit OrchestratorConstants.targetRefMovedError, merge
+        with
         | "TargetMoved", _ -> Ok None
         | "Failed", Error error -> Error(failed job (sprintf "FF merge failed: %s" error))
         | "LandedMismatch", Ok landed ->
@@ -758,7 +760,12 @@ module OrchestratorProgram =
             let record = currentRecord deps job
 
             match
-                ChangeIntegrationLaw.reenterClaim job.TargetRef claim.TargetRef claim.RebasedCommit claim.ExpectedHead record
+                ChangeIntegrationLaw.reenterClaim
+                    job.TargetRef
+                    claim.TargetRef
+                    claim.RebasedCommit
+                    claim.ExpectedHead
+                    record
             with
             | "TargetMismatch" -> return failed job "Publish claim target mismatch; refusing publish recovery"
             | "MissingRecord" -> return failed job "No record found for publish claim reentry"

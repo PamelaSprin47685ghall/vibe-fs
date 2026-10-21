@@ -176,10 +176,7 @@ module internal AuthorityLaw =
             | other -> Error(sprintf "closure RootKind is unknown: %s" other)
 
     /// The canonical witness of a completed Manager life: its delivered S4 retirement.
-    let managerLifeWitness
-        (profile: PromptAuthority.AuthorityExecutionProfile)
-        (retirementId: string)
-        : string option =
+    let managerLifeWitness (profile: PromptAuthority.AuthorityExecutionProfile) (retirementId: string) : string option =
         match expectedClosureKind profile with
         | Some "HumanRootManagerLife" ->
             Some(
