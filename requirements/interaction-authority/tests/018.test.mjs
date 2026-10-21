@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -8,7 +8,7 @@ import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
-import { withJournal, acceptOwner, rootSelection as durableRootSelection } from './support/authority.mjs'
+import { withJournal, withSharedJournal, acceptOwner, rootSelection as durableRootSelection } from './support/authority.mjs'
 
 const hash = (value) => `H(${value})`
 
@@ -242,6 +242,85 @@ test('WHAT[interaction-authority-018] a refused closure append keeps the active 
     assert.equal(coldView.activeLogicalRun.authorityRoot, original.authorityRoot)
     const coldFresh = await dispatch.acceptHumanRootSelection(cold, session, 'cold-fresh-' + session, durableRootSelection('manager'))
     assert.equal(coldFresh.ok, false)
+  })
+})
+
+
+// CUT-09-b: the closure of a HumanRoot Manager life carries the canonical
+// LifeCompleted(life, retirement) witness, and durable replay admits a closure
+// only with the exact source witness of the active root's expected kind.
+const closedManagerLife = async (handle, directory, session) => {
+  const store = journal.JournalSurface_eventStore(handle)
+  const owner = await acceptOwner(handle, session)
+  mustOk(await lifecycle.seedOpen(store, 'S4', session, directory, 1n))
+  mustOk(await lifecycle.seedReview(store, session, 'Promoted'))
+  mustOk(await lifecycle.seedDeliver(store, session, 'run-witness', 'call-first', 2n))
+  mustOk(await lifecycle.seedDeliver(store, session, 'run-witness', 'call-second', 3n))
+  return owner
+}
+
+const rewriteClosureWitness = (directory, rewrite) => {
+  const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
+  let rewritten = 0
+  for (const name of readdirSync(events).filter((file) => file.endsWith('.ndjson'))) {
+    const path = join(events, name)
+    const lines = readFileSync(path, 'utf8').split('\n').map((line) => {
+      if (!line.includes('"AuthorityLogicalRunClosed"')) return line
+      const event = JSON.parse(line)
+      const payload = event.payload.Fact[1][1][1]
+      payload.ClosureWitness = rewrite(payload)
+      rewritten += 1
+      return JSON.stringify(event)
+    })
+    writeFileSync(path, lines.join('\n'))
+  }
+  assert.equal(rewritten, 1, 'exactly one durable closure was written')
+}
+
+test('WHAT[interaction-authority-018] a delivered S4 retirement closes the Manager life with the canonical LifeCompleted witness', async () => {
+  await withSharedJournal('witness-canonical', async (handle, reopen, directory) => {
+    const session = 'witness-canonical'
+    const owner = await closedManagerLife(handle, directory, session)
+    let witness
+    rewriteClosureWitness(directory, (payload) => {
+      assert.equal(payload.RootKind, 'HumanRoot')
+      assert.equal(payload.LogicalRunId[1], owner.logicalRun)
+      witness = payload.ClosureWitness
+      return witness
+    })
+    const [kind, life, fact] = JSON.parse(witness)
+    assert.deepEqual([kind, life], ['LifeCompleted', session], 'the Manager life is the session whose S4 retirement delivered')
+    assert.match(fact, /\S/, 'the witness names the exact delivered retirement')
+    const cold = await reopen()
+    assert.equal(journal.JournalSurface_snapshot(cold).sessionProjections[session].promptAuthority.activeLogicalRun, null)
+  })
+})
+
+for (const [label, rewrite] of [
+  ['another closure kind', (payload) => JSON.stringify(['ManagedLogicalRunTerminal', payload.LogicalRunId[1], JSON.parse(payload.ClosureWitness)[2]])],
+  ['another Manager life', (payload) => JSON.stringify(['LifeCompleted', 'another-session', JSON.parse(payload.ClosureWitness)[2]])],
+  ['a malformed witness', () => '["LifeCompleted"'],
+]) {
+  test(`WHAT[interaction-authority-018] a durable closure carrying ${label} does not release the active run on replay`, async () => {
+    await withSharedJournal('witness-foreign', async (handle, reopen, directory) => {
+      const session = 'witness-foreign'
+      const owner = await closedManagerLife(handle, directory, session)
+      rewriteClosureWitness(directory, rewrite)
+      const cold = await reopen()
+      const active = journal.JournalSurface_snapshot(cold).sessionProjections[session].promptAuthority.activeLogicalRun
+      assert.notEqual(active, null, 'only the exact source witness may close the run')
+      assert.equal(active.logicalRun, owner.logicalRun)
+    })
+  })
+}
+
+test('WHAT[interaction-authority-018] a pre-CUT-09-b closure with a bare retirement id still closes the Manager life it was written for', async () => {
+  await withSharedJournal('witness-legacy', async (handle, reopen, directory) => {
+    const session = 'witness-legacy'
+    await closedManagerLife(handle, directory, session)
+    rewriteClosureWitness(directory, (payload) => JSON.parse(payload.ClosureWitness)[2])
+    const cold = await reopen()
+    assert.equal(journal.JournalSurface_snapshot(cold).sessionProjections[session].promptAuthority.activeLogicalRun, null)
   })
 })
 

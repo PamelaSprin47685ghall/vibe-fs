@@ -410,18 +410,23 @@ module JournalSurface =
                             session
                             (AgentJournal.snapshot journal).AgentProjections
 
-                    match active with
-                    | Some profile when
-                        profile.CanonicalRole = Role.Manager
-                        && profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-                        ->
+                    // interaction-authority-018: only a root whose expected closure kind is
+                    // HumanRootManagerLife is closed by a delivered S4 retirement; the witness
+                    // is the canonical LifeCompleted(life, retirement) (wanxiangli/authority).
+                    match
+                        active
+                        |> Option.bind (fun profile ->
+                            PromptAuthorityRun.managerLifeClosureWitness profile retirementId
+                            |> Option.map (fun witness -> profile, witness))
+                    with
+                    | Some(profile, witness) ->
                         let fact =
                             PromptFact.AuthorityLogicalRunClosed
                                 { SessionId = session
                                   LogicalRunId = profile.LogicalRunId
                                   AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
                                   RootKind = "HumanRoot"
-                                  ClosureWitness = retirementId }
+                                  ClosureWitness = witness }
 
                         let! result = AgentJournal.appendAgent (StreamId.Session session) None fact journal
 

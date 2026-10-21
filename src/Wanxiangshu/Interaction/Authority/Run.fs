@@ -19,6 +19,9 @@ module internal AuthorityLaw =
             active: obj * activeIsManager: bool * last: obj * logicalRunId: string * rootId: string -> string
 
         abstract resolveOrigin: input: obj -> obj
+        abstract expectedClosureKind: rootKind: string * isManager: bool * agentOwnerLife: obj -> obj
+        abstract encodeClosureWitness: witness: obj -> string
+        abstract admitClosure: closing: obj * recordedRootKind: string * witnessText: string -> obj
 
     [<Import("Authority", "wanxiangli/authority")>]
     let private authorityClass: obj = jsNative
@@ -128,6 +131,66 @@ module internal AuthorityLaw =
                   "activeKind" ==> (activeKind |> Option.map kindLabel |> Option.toObj) ]
         )
         |> originOfView
+
+    /// interaction-authority-018 (CUT-09-b): the closure kind the accepted root
+    /// expects. AgentOwnerRoot lifecycles are not recorded by the host yet, so an
+    /// AgentOwnerRoot has no kind here and no closure of it can be admitted.
+    let expectedClosureKind (profile: PromptAuthority.AuthorityExecutionProfile) : string option =
+        law.expectedClosureKind (kindLabel profile.AuthorityKind, profile.CanonicalRole = Role.Manager, null)
+        |> Option.ofObj
+        |> Option.map unbox<string>
+
+    let private closing (profile: PromptAuthority.AuthorityExecutionProfile) (kind: string) : obj =
+        let sessionId = SessionId.value profile.SessionId
+
+        createObj
+            [ "kind" ==> kind
+              "sessionId" ==> sessionId
+              "logicalRunId" ==> LogicalRunId.value profile.LogicalRunId
+              "rootId" ==> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+              "ownerLogicalRunId"
+              ==> (PromptAuthority.identitySeedOwner profile.IdentitySeed
+                   |> Option.map (fun (_, ownerRun, _) -> LogicalRunId.value ownerRun)
+                   |> Option.toObj)
+              // A Manager life is the life of the Manager's own session.
+              "lifeId" ==> (if kind = "HumanRootManagerLife" then sessionId else null) ]
+
+    /// Admit a closure (new or durably replayed) for exactly this accepted root.
+    let admitClosure
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (recordedRootKind: string)
+        (witness: string)
+        : Result<unit, string> =
+        match expectedClosureKind profile with
+        | None -> Error "the accepted root has no expected closure kind"
+        | Some kind ->
+            match recordedRootKind with
+            | "HumanRoot"
+            | "AgentOwnerRoot" ->
+                let verdict = law.admitClosure (closing profile kind, recordedRootKind, witness)
+
+                if unbox<bool> verdict?ok then
+                    Ok()
+                else
+                    Error(sprintf "%s closure refused: %s" kind (unbox<string> verdict?reason))
+            | other -> Error(sprintf "closure RootKind is unknown: %s" other)
+
+    /// The canonical witness of a completed Manager life: its delivered S4 retirement.
+    let managerLifeWitness
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (retirementId: string)
+        : string option =
+        match expectedClosureKind profile with
+        | Some "HumanRootManagerLife" ->
+            Some(
+                law.encodeClosureWitness (
+                    createObj
+                        [ "kind" ==> "LifeCompleted"
+                          "lifeId" ==> SessionId.value profile.SessionId
+                          "factId" ==> retirementId ]
+                )
+            )
+        | _ -> None
 
 /// Pure authority-run lifecycle transitions. Types and identity rules live in
 /// PromptAuthority; this module owns claim / run / projection transitions only.
@@ -446,16 +509,32 @@ module PromptAuthorityRun =
     let replayLogicalRunClosed
         (logicalRunId: LogicalRunId)
         (authorityRoot: AuthorityRootUserMessageId)
+        (rootKind: string)
+        (closureWitness: string)
         (projection: PromptAuthority.PromptAuthorityProjection)
         : Result<PromptAuthority.PromptAuthorityProjection option, string> =
         match
             AuthorityLaw.close projection.ActiveLogicalRun projection.LastAuthorityProfile logicalRunId authorityRoot,
             projection.ActiveLogicalRun
         with
-        | "close", Some _ -> closeAuthority logicalRunId authorityRoot projection |> Result.map Some
+        | "close", Some active ->
+            // interaction-authority-018: only the exact source witness of this
+            // root's closure kind may close it (wanxiangli/authority, CUT-09-b).
+            AuthorityLaw.admitClosure active rootKind closureWitness
+            |> Result.bind (fun () -> closeAuthority logicalRunId authorityRoot projection)
+            |> Result.map Some
         | ("already-closed" | "no-authority"), None -> Ok None
         | "mismatch", Some _ -> Error "AuthorityLogicalRunClosed conflicts with the active logical run"
         | decision, _ -> failwithf "wanxiangli/authority returned an inconsistent closure %s" decision
+
+    /// interaction-authority-018: the canonical closure witness of a completed
+    /// Manager life (its delivered S4 retirement), or `None` when the active
+    /// root does not expect a Manager-life closure.
+    let managerLifeClosureWitness
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (retirementId: string)
+        : string option =
+        AuthorityLaw.managerLifeWitness profile retirementId
 
     /// Register a claim and consume its ClaimSequence.
     ///

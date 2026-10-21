@@ -65,11 +65,20 @@ module PromptAuthorityRun =
 
     /// Durable replay of `AuthorityLogicalRunClosed`: `Ok None` when there is no
     /// active run, the closed projection when it names the active run, an error otherwise.
+    /// The closure must carry the exact source witness of the active root's
+    /// expected closure kind (interaction-authority-018); otherwise it is rejected.
     val replayLogicalRunClosed:
         logicalRunId: LogicalRunId ->
         authorityRoot: AuthorityRootUserMessageId ->
+        rootKind: string ->
+        closureWitness: string ->
         projection: PromptAuthority.PromptAuthorityProjection ->
             Result<PromptAuthority.PromptAuthorityProjection option, string>
+
+    /// interaction-authority-018: the canonical closure witness of a completed
+    /// Manager life, or `None` when the root does not expect a Manager-life closure.
+    val managerLifeClosureWitness:
+        profile: PromptAuthority.AuthorityExecutionProfile -> retirementId: string -> string option
 
     val registerClaim:
         claim: PromptAuthority.PromptClaim ->
