@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>host-neutral-ports</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>host-neutral-ports</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
+    <Compile Include="Host/Ports/Vocabulary.fsi"/>
+    <Compile Include="Host/Ports/Vocabulary.fs"/>
+    <Compile Include="Host/Ports/Diagnostics.fsi"/>
+    <Compile Include="Host/Ports/Diagnostics.fs"/>
+    <Compile Include="Host/Ports/Storage.fsi"/>
+    <Compile Include="Host/Ports/Storage.fs"/>
+    <Compile Include="Host/Ports/ModelRouting.fsi"/>
+    <Compile Include="Host/Ports/ModelRouting.fs"/>
+    <Compile Include="Host/Ports/Sessions.fsi"/>
+    <Compile Include="Host/Ports/Sessions.fs"/>
+    <Compile Include="Host/Ports/Prompts.fsi"/>
+    <Compile Include="Host/Ports/Prompts.fs"/>
+    <Compile Include="Host/Ports/Transcript.fsi"/>
+    <Compile Include="Host/Ports/Transcript.fs"/>
+    <Compile Include="Host/Ports/Tools.fsi"/>
+    <Compile Include="Host/Ports/Tools.fs"/>
+    <Compile Include="Host/Ports/ToolGates.fsi"/>
+    <Compile Include="Host/Ports/ToolGates.fs"/>
+    <Compile Include="Host/Ports/Signals.fsi"/>
+    <Compile Include="Host/Ports/Signals.fs"/>
+    <Compile Include="Host/Ports/TurnTransforms.fsi"/>
+    <Compile Include="Host/Ports/TurnTransforms.fs"/>
+    <Compile Include="Host/Ports/Compaction.fsi"/>
+    <Compile Include="Host/Ports/Compaction.fs"/>
+    <Compile Include="Host/Ports/Lifecycle.fsi"/>
+    <Compile Include="Host/Ports/Lifecycle.fs"/>
+  </ItemGroup>
+</Project>

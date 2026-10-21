@@ -7,21 +7,21 @@ adapter implements it) · WIRED-OMP (omp adapter skeleton conforms) · LEGACY-GO
 
 ## Ports
 
-| ID | Port (namespace `Wanxiangshu.Host`) | File | Owner lane | Replaces (legacy) | Status |
+| ID | Port (namespace `Wanxiangshu.Host.Ports`) | File | Owner lane | Replaces (legacy) | Status |
 |---|---|---|---|---|---|
-| P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo`, `ISessionDiscoveryPort` | PLANNED |
-| P-02 | `IPromptPort`, `PromptRequest`, `DeliveryVerdict` | `Host/Prompts.fs(i)` | fission (+ Interaction/Dispatch) | `OpenCode.IPromptPort`, `OpenCodePromptOptions`, `DetachedSendVerdict` | PLANNED |
-| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` | PLANNED |
-| P-04 | `IToolRegistrar`, `ToolSpec`, `ToolCall`, `ToolResult` | `Host/Tools.fs(i)` | tools | `OpenCode/Tools/ToolContext` `Tool`/`ToolContext`/`ToolOutput` | PLANNED |
-| P-05 | `IToolGate`, `ToolAdmission`, `ToolResultEdit`, `ToolDefinitionEdit` | `Host/ToolGates.fs(i)` | tools | `tool.execute.before/after`, `tool.definition` handling in `OpenCode/Plugin/PluginHooks` | PLANNED |
-| P-06 | `ITurnTransform`, `TurnAdmission`, `ContextEdit`, `ParamsVerdict` | `Host/TurnTransforms.fs(i)` | plugin-host | `OpenCode/Plugin/PluginTransforms`, `ChatParamsHook`, `ProviderSystemTransform` entry points | PLANNED |
-| P-07 | `ISignalSource`, `HostSignal`, `TurnTerminal` | `Host/Signals.fs(i)` | plugin-host | `OpenCode/Signals/HostSignal`, `HostEventCodec` terminal types | PLANNED |
-| P-08 | `IModelCatalog`, `ModelRoute`, `SpawnRoute` | `Host/ModelRouting.fs(i)` | plugin-host | `OpencodeModel` (Foundation), `ModelRoutingSurface` host calls | PLANNED |
-| P-09 | `ICompactionGate`, `CompactionContribution`, `ContinueVerdict` | `Host/Compaction.fs(i)` | plugin-host | `HostCompactionGate` hook entry | PLANNED |
-| P-10 | `IHostPaths` | `Host/Storage.fs(i)` | arch | ad-hoc `input.directory`/`project` reads | PLANNED |
-| P-11 | `IHostPlugin`, `HostPorts`, `ProductHooks`, `HostCapabilities`, `IAgentCatalog` | `Host/Lifecycle.fs(i)` | plugin-host | `OpenCode/Plugin/Plugin`, `PluginBoot`, `ManagedAgentConfig` host side | PLANNED |
-| P-12 | `IDiagnosticSink` | `Host/Diagnostics.fs(i)` | plugin-host | `client.app.log` call sites | PLANNED |
-| P-00 | `HostError`, `WorkspacePath`, `AgentRole`, `PromptKey`, `HostMessageId` (shared vocabulary) | `Host/Vocabulary.fs(i)` | arch | `string` error channels on host ports | PLANNED |
+| P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Ports/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo`, `ISessionDiscoveryPort` | DECLARED, WIRED-OMP |
+| P-02 | `IPromptPort`, `PromptRequest`, `DeliveryVerdict` | `Host/Ports/Prompts.fs(i)` | fission (+ Interaction/Dispatch) | `OpenCode.IPromptPort`, `OpenCodePromptOptions`, `DetachedSendVerdict` | DECLARED, WIRED-OMP |
+| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` | DECLARED, WIRED-OMP |
+| P-04 | `IToolRegistrar`, `ToolSpec`, `ToolInvocation`, `ToolOutcome` | `Host/Ports/Tools.fs(i)` | tools | `OpenCode/Tools/ToolContext` `Tool`/`ToolContext`/`ToolOutput` | DECLARED, WIRED-OMP |
+| P-05 | `IToolGate`, `ToolAdmission`, `ToolResultEdit`, `ToolDefinitionEdit` | `Host/Ports/ToolGates.fs(i)` | tools | `tool.execute.before/after`, `tool.definition` handling in `OpenCode/Plugin/PluginHooks` | DECLARED, WIRED-OMP |
+| P-06 | `ITurnTransform`, `TurnAdmission`, `ContextEdit`, `ParamsVerdict` | `Host/Ports/TurnTransforms.fs(i)` | plugin-host | `OpenCode/Plugin/PluginTransforms`, `ChatParamsHook`, `ProviderSystemTransform` entry points | DECLARED, WIRED-OMP |
+| P-07 | `ISignalSource`, `HostSignal`, `TurnTerminal` | `Host/Ports/Signals.fs(i)` | plugin-host | `OpenCode/Signals/HostSignal`, `HostEventCodec` terminal types | DECLARED, WIRED-OMP |
+| P-08 | `IModelCatalog`, `ModelRoute`, `SpawnRoute` | `Host/Ports/ModelRouting.fs(i)` | plugin-host | `OpencodeModel` (Foundation), `ModelRoutingSurface` host calls | DECLARED, WIRED-OMP |
+| P-09 | `ICompactionGate`, `CompactionContribution`, `ContinueVerdict` | `Host/Ports/Compaction.fs(i)` | plugin-host | `HostCompactionGate` hook entry | DECLARED, WIRED-OMP |
+| P-10 | `IHostPaths` | `Host/Ports/Storage.fs(i)` | arch | ad-hoc `input.directory`/`project` reads | DECLARED, WIRED-OMP |
+| P-11 | `IHostPlugin`, `HostPorts`, `ProductHooks`, `HostCapabilities`, `IAgentCatalog` | `Host/Ports/Lifecycle.fs(i)` | plugin-host | `OpenCode/Plugin/Plugin`, `PluginBoot`, `ManagedAgentConfig` host side | DECLARED, WIRED-OMP |
+| P-12 | `IDiagnosticSink` | `Host/Ports/Diagnostics.fs(i)` | plugin-host | `client.app.log` call sites | DECLARED, WIRED-OMP |
+| P-00 | `HostError`, `HostResult`, `HostCapability`, `WorkspacePath`, `AgentRole`, `CanonicalJsonText`, `JsonSchema`, `HostFailure`, `TurnTerminal` (shared vocabulary; ids `SessionId`/`ToolCallId`/`PromptKey`/`TranscriptMessageAddress` come from `Foundation.Identity`) | `Host/Ports/Vocabulary.fs(i)` | arch | `string` error channels on host ports | DECLARED, WIRED-OMP |
 
 ## Adapter folders (implementations, not ports)
 
@@ -43,3 +43,16 @@ adapter implements it) · WIRED-OMP (omp adapter skeleton conforms) · LEGACY-GO
 
 ## Change log
 - 2026-10-21 eng-host-arch: initial registry (P-00..P-12 PLANNED).
+- 2026-10-21 eng-host-arch (HNI-02/03): all families DECLARED in shard `Wanxiangshu.Owner.host-boundary.host-neutral-ports.fsproj`
+  (types only, no consumers yet); omp skeleton conforms (WIRED-OMP = type-checked + offline fixture, not shipped).
+  Renamed before any consumer existed: `ToolCall`→`ToolInvocation`, `ToolResult`→`ToolOutcome`, transcript part `ToolCall`→`ToolUse`
+  (the old names collide with existing union cases and trip shard-edge-audit). No port is WIRED-OC yet.
+
+## How to add or change a port (domain lanes)
+1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.
+2. Port files reference only `Wanxiangshu.Foundation*`, `Wanxiangshu.Host*`, `System*` (gate ⑪ port-purity, strict).
+3. Reuse vocabulary: `HostResult<_>`/`HostError` for host round trips, `SessionId`/`ToolCallId`/`PromptKey`/`TranscriptMessageAddress`
+   ids, `ModelRoute`, `AgentRole`, `CanonicalJsonText`. No `obj`, no `string` error channel, no host wire term.
+4. Add the type/member to `proposals/host-neutral-interface/adapters/omp/ports.ts` too (`adapters/omp/check.sh` fails on drift), or
+   leave it out and note "omp: n/a" here — the arch lane then completes the mirror.
+5. Update the row (Status, Replaces) in the same commit. Mark WIRED-OC when the OpenCode adapter implements it.
