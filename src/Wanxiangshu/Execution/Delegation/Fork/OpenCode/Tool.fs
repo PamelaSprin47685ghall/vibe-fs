@@ -102,7 +102,6 @@ module ForkTool =
         { Name = declaration.Name
           Description = declaration.Description
           Arguments = declaration.Arguments |> List.map (schema factory)
-          Admission = ToolAdmission.OfficeRole(fun _ role -> ForkCommand.admits command role)
           Execute =
             fun args context ->
                 task {

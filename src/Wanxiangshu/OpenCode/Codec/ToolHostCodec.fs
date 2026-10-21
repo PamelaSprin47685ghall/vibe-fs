@@ -272,7 +272,6 @@ type ToolSpec =
     { Name: string
       Description: string
       Arguments: (string * HostSchema) list
-      Admission: ToolAdmission
       Execute: HostToolArguments -> HostToolContext -> Task<string> }
 
 /// The only dynamic JS boundary used by tool definitions and invocations.

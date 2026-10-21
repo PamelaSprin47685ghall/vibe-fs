@@ -6,7 +6,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 open ToolHostCodec
-open Wanxiangshu.Execution.Tool
 
 /// Coder-visible bash honeypot: no parameters, no shell, only a hard denial.
 /// Host's real `bash` stays denied for every managed role (AGENT-007); this tool
@@ -39,5 +38,4 @@ module BashHoneypotTool =
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
-          Admission = ToolAdmissions.bashHoneypot
           Execute = execute }

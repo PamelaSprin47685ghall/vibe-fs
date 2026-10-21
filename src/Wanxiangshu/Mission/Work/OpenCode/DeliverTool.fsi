@@ -5,7 +5,6 @@ open Wanxiangshu.OpenCode
 
 module DeliverTool =
     val description: unit -> string
-    val admission: ToolAdmission
 
     /// Algorithm E1.1: the state one deliver fence already recorded, if the work
     /// settled it. The recorded outcome travels with the result, so a replay

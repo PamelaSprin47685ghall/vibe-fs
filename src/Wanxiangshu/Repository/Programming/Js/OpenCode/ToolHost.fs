@@ -8,7 +8,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Execution.Tool
 
 /// JS-073/JS-074: a generated js-* tool spec — the dynamic counterpart of the
 /// static baseSpecs. Built from a generated surface (JS-002); execution goes
@@ -258,7 +257,6 @@ module JsToolSpec =
               "abandon", abandonSchema
               "prefixUntil", ToolHostCodec.optionalNumberSchema factory
               "thenMap", mappingSchema ]
-          Admission = ToolAdmissions.programmingFor surface.RoleName
           Execute =
             fun args ctx ->
                 task {

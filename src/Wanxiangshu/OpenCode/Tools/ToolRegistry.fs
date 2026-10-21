@@ -1186,7 +1186,6 @@ module ToolRegistry =
                 { Name = "deliver"
                   Description = ProviderProse.render providerLanguage "tool/deliver" Map.empty
                   Arguments = [ "note", ToolHostCodec.optionalStringSchema factory ]
-                  Admission = ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
                   Execute =
                     fun _ ctx ->
                         task {
@@ -1208,7 +1207,6 @@ module ToolRegistry =
                 }
 
             { managerSpec with
-                Admission = ToolAdmissions.deliver
                 Execute =
                     fun args ctx ->
                         task {
@@ -1283,7 +1281,6 @@ module ToolRegistry =
 
             let gated: GatedTool<HostToolArguments> =
                 { Name = spec.Name
-                  Admission = spec.Admission
                   Execute = spec.Execute }
 
             fun args (ctx: HostToolContext) -> ToolExecuteGate.execute gateFacts gated managerPermission args ctx

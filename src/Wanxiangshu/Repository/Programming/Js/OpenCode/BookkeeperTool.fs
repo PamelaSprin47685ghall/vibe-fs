@@ -12,7 +12,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Process
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Execution.Tool
 
 /// Bookkeeper provider verb: one JavaScript program atomically reshapes the
 /// staged question/answer Case. The sandbox has no filesystem capability.
@@ -329,5 +328,4 @@ module JsBookkeeperTool =
         { Name = "todowrite-for-bookkeeper"
           Description = assembleDescription language
           Arguments = [ "program", ToolHostCodec.stringSchemaDescribed (prose language Path.ArgProgram) factory ]
-          Admission = ToolAdmissionTable.bookkeeper
           Execute = execute }

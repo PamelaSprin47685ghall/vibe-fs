@@ -3,7 +3,6 @@ namespace Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Execution.Tool
 
 /// A cognitive commitment point.
 ///
@@ -40,5 +39,4 @@ module AssumeTool =
           Arguments =
             [ "assumption",
               ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgAssumption Map.empty) factory ]
-          Admission = ToolAdmissions.assume
           Execute = execute }

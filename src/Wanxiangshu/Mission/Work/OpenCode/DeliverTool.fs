@@ -549,12 +549,9 @@ module DeliverTool =
 
     let description () = text Path.Description
 
-    let admission =
-        ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Finality)
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "deliver"
           Description = text Path.Description
           Arguments = []
-          Admission = admission
           Execute = execute scope }

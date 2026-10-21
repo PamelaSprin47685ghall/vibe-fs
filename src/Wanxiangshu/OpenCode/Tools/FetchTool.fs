@@ -6,7 +6,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Execution.Tool
 
 /// Conditional Casebook read. Provider identity is a public shelfmark; durable
 /// session identity, freshness state and maintenance machinery remain internal.
@@ -153,7 +152,6 @@ module FetchTool =
         { Name = "fetch"
           Description = prose (ProviderLanguageBinding.readGlobalPreference ()) Path.Description
           Arguments = [ "shelfmark", ToolHostCodec.stringSchema factory ]
-          Admission = ToolAdmissions.fetch
           Execute =
             fun args ctx ->
                 task {

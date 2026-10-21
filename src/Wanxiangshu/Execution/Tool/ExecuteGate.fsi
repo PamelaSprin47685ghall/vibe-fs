@@ -5,12 +5,12 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 
-/// The part of a product tool the execute gate reads: its product name, its
-/// declared authority, and its body. The argument carrier stays opaque so any
-/// host adapter's decoded arguments pass through untouched.
+/// The part of a product tool the execute gate reads: its product name and its
+/// body. The admission is not carried here; the gate resolves it from the
+/// product admission table by tool name. The argument carrier stays opaque so
+/// any host adapter's decoded arguments pass through untouched.
 type GatedTool<'args> =
     { Name: string
-      Admission: ToolAdmission
       Execute: 'args -> HostToolContext -> Task<string> }
 
 /// capability-enforcement-005/010/025: the exact session facts the execute
@@ -42,9 +42,9 @@ type ToolGateFacts =
 /// refusal prose and the stage order live here, never in the adapter.
 module ToolExecuteGate =
 
-    /// Provider-step boundary, accounting, ablation, then the declared
-    /// admission (office Role + Manager facts, or private attachment), then
-    /// the tool body.
+    /// Provider-step boundary, accounting, ablation, then the admission the
+    /// product table declares for this tool name (office Role + Manager facts,
+    /// or private attachment), then the tool body.
     val execute:
         gate: ToolGateFacts ->
         spec: GatedTool<'args> ->

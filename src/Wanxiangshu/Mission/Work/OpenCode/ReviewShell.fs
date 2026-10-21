@@ -9,10 +9,9 @@ open Wanxiangshu.Mission.Work.Review
 open Wanxiangshu.Mission.Planning
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Execution.Tool
 
 /// work-038: the shared `review` shell. Owns the one ToolSpec
-/// (name, description, findings schema, admission) and dispatches by caller
+/// (name, description, findings schema) and dispatches by caller
 /// role: Plan goes to the plan backend (ReviewPlanBackend), every other
 /// admitted caller goes to the Manager backend (ReviewBackendManager). The
 /// shell renders the plan backend's result; the Manager backend keeps its own
@@ -160,5 +159,4 @@ module ReviewShell =
         { Name = "review"
           Description = providerText Path.Description Map.empty
           Arguments = [ "findings", findingsSchema; noteArgument ]
-          Admission = ToolAdmissions.review
           Execute = dispatch }

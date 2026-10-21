@@ -10,7 +10,6 @@ open Wanxiangshu.Host.Domain
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Execution.Tool
 
 /// OpenCode adapter for horizon(): binds `IDelegationCallerHost` to one tool
 /// call and puts `HorizonRoster` on the OpenCode wire.
@@ -129,5 +128,4 @@ module HorizonTool =
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
-          Admission = ToolAdmissions.horizon
           Execute = execute runtimeCtx }

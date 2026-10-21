@@ -9,12 +9,12 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider
 
-/// The part of a product tool the execute gate reads: its product name, its
-/// declared authority, and its body. The argument carrier stays opaque so any
-/// host adapter's decoded arguments pass through untouched.
+/// The part of a product tool the execute gate reads: its product name and its
+/// body. The admission is not carried here; the gate resolves it from the
+/// product admission table by tool name. The argument carrier stays opaque so
+/// any host adapter's decoded arguments pass through untouched.
 type GatedTool<'args> =
     { Name: string
-      Admission: ToolAdmission
       Execute: 'args -> HostToolContext -> Task<string> }
 
 /// capability-enforcement-005/010/025: the exact session facts the execute
@@ -282,9 +282,14 @@ module ToolExecuteGate =
         (args: 'args)
         (ctx: HostToolContext)
         : Task<string> =
-        match spec.Admission with
-        | ToolAdmission.OfficeRole officeAdmission -> officeStage gate spec managerPermission officeAdmission args ctx
-        | ToolAdmission.PrivateAttachment attachmentAdmission -> attachmentStage spec attachmentAdmission args ctx
+        match ToolAdmissionTable.tryAdmission spec.Name with
+        | Some(ToolAdmission.OfficeRole officeAdmission) ->
+            officeStage gate spec managerPermission officeAdmission args ctx
+        | Some(ToolAdmission.PrivateAttachment attachmentAdmission) -> attachmentStage spec attachmentAdmission args ctx
+        | None ->
+            // An unknown tool name is refused exactly like an office-role
+            // denial: same prose, same substitutions, no authority.
+            officeStage gate spec managerPermission (fun _ _ -> false) args ctx
 
     let private runAfterAblation
         (gate: ToolGateFacts)

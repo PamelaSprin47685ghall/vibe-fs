@@ -20,7 +20,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
-open Wanxiangshu.Execution.Tool
 
 /// join() waits for the owning runtime's next physical completion batch.
 /// Orchestrator join routes to ManagerJob verdict mailbox by authority role.
@@ -309,7 +308,6 @@ module JoinTool =
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
-          Admission = ToolAdmissions.join
           Execute = execute scope }
 
     let private mapResultsAvailable

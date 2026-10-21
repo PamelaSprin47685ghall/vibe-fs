@@ -127,7 +127,6 @@ module FissionTool =
         { Name = "fission"
           Description = FissionToolPolicy.describe (ProviderLanguageBinding.readGlobalPreference ())
           Arguments = [ "prompts", ToolHostCodec.stringArraySchema factory ]
-          Admission = ToolAdmissions.fission
           Execute = execute scope }
 
     let private isLaneStartFailure (message: string) =

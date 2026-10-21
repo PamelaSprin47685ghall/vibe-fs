@@ -31,7 +31,6 @@ type ToolSpec =
     { Name: string
       Description: string
       Arguments: (string * HostSchema) list
-      Admission: ToolAdmission
       Execute: HostToolArguments -> HostToolContext -> Task<string> }
 
 module ToolHostCodec =

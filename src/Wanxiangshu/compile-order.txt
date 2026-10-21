@@ -733,8 +733,6 @@ Execution/Routing/ModelCapacity/Surface.fsi
 Execution/Routing/ModelCapacity/Surface.fs
 Execution/Routing/ModelRouting.fsi
 Execution/Routing/ModelRouting.fs
-Execution/Tool/ExecuteGate.fsi
-Execution/Tool/ExecuteGate.fs
 OpenCode/Host/ExternalToolNamespace.fsi
 OpenCode/Host/ExternalToolNamespace.fs
 OpenCode/Host/ManagedAgentConfig.fsi
@@ -1130,6 +1128,8 @@ Repository/Knowledge/Casebook/BookkeeperRuntime.fsi
 Repository/Knowledge/Casebook/BookkeeperRuntime.fs
 Execution/Tool/AdmissionTable.fsi
 Execution/Tool/AdmissionTable.fs
+Execution/Tool/ExecuteGate.fsi
+Execution/Tool/ExecuteGate.fs
 Repository/Knowledge/Casebook/Workflow.fsi
 Repository/Knowledge/Casebook/Workflow.fs
 Repository/Knowledge/Casebook/Index.fsi
