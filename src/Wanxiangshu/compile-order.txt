@@ -1054,6 +1054,8 @@ Execution/Session/OpenCode/HorizonSurface.fsi
 Execution/Session/OpenCode/HorizonSurface.fs
 Execution/Session/OpenCode/HorizonCalibrationSurface.fsi
 Execution/Session/OpenCode/HorizonCalibrationSurface.fs
+Execution/Delegation/SyncDelegate/Batching.fsi
+Execution/Delegation/SyncDelegate/Batching.fs
 Execution/Delegation/SyncDelegate/OpenCode/Batching.fsi
 Execution/Delegation/SyncDelegate/OpenCode/Batching.fs
 OpenCode/Tools/BashHoneypotTool.fsi
