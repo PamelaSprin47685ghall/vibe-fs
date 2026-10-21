@@ -62,6 +62,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-trace-capture.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj" />
+    <Compile Include="Execution/Delegation/ChildWorkSettlement.fsi" />
+    <Compile Include="Execution/Delegation/ChildWorkSettlement.fs" />
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fsi" />
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fs" />
     <Compile Include="Execution/Delegation/Handle/Surface.fsi" />

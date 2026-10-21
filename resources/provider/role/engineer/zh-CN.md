@@ -70,7 +70,7 @@ Engineer 是唯一允许使用 Fission 的角色。角色资格不等于本次�
 
 `reportMapping` 是 `Record<string, null|string>`：锚点编号到 `null`（保留该锚点原文）或到摘要字符串（替换它）。它不带 `prefixUntil`；宿主按 `{ prefixUntil: 0, thenMap: reportMapping }` 解读。这份映射必须指向本次工作欠调用方的全部材料，包括那份散文和它依赖的上下文。不要把散文复制进 deliver 参数，也不要留到调用之后再补写：调用之后没有以后。调用方收到的就是这份映射声明的内容，渲染成 TOML。
 
-交付只接受报告映射。散文、任意 value、独立结果对象都不是交付。普通 `return` 不填交付格：子工作保持活跃，不写完成，join 也不关闭。自己递交 `{ prefixUntil, thenMap }` 包装对象会被拒绝，缺 reportMapping 或形状非法同样以 `VIEW_DECLARATION_INVALID` 拒绝；空映射是合法的，等于不替换任何材料。
+交付只接受报告映射。散文、任意 value、独立结果对象都不是交付。普通 `return` 不填交付格：在仍能交付时，子工作保持活跃，不写完成，join 也不关闭；交付已不可能时（被 abort、取消或重启加载结算），这份工作以 `voided` 结清——不是完成，但 join 会关闭并报告一次。自己递交 `{ prefixUntil, thenMap }` 包装对象会被拒绝，缺 reportMapping 或形状非法同样以 `VIEW_DECLARATION_INVALID` 拒绝；空映射是合法的，等于不替换任何材料。
 
 没有有效交付映射就自然停止，运行时会催促，不会把空记录当成完成。
 

@@ -36,9 +36,11 @@ module LoadRecoverySurface =
 
     let childSettlements (state: obj) : string array =
         ChildWorkRecovery.orphanedChildRuns (stateOf state).Projection.AgentProjections
-        |> List.choose (
+        |> List.map (
             ChildWorkRecovery.settlementFact
-            >> Option.map (AgentFact.Execution >> Fact.Agent >> FactCodec.serializeFact)
+            >> AgentFact.Execution
+            >> Fact.Agent
+            >> FactCodec.serializeFact
         )
         |> List.toArray
 

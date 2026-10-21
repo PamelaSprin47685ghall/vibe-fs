@@ -15,6 +15,7 @@ module JournalSurface =
         | "ParentCancelled" -> Ok HandleAbandonReason.ParentCancelled
         | "DeadlineExceeded" -> Ok HandleAbandonReason.DeadlineExceeded
         | "HostSessionGone" -> Ok HandleAbandonReason.HostSessionGone
+        | "Voided" -> Ok HandleAbandonReason.Voided
         | other -> Error $"unknown abandon reason '{other}'"
 
     let private workId agent child root : HandleWorkId =

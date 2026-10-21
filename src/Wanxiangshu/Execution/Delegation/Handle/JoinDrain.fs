@@ -38,6 +38,7 @@ module JoinDrain =
         | HandleAbandonReason.ParentCancelled -> "ParentCancelled"
         | HandleAbandonReason.DeadlineExceeded -> "DeadlineExceeded"
         | HandleAbandonReason.HostSessionGone -> "HostSessionGone"
+        | HandleAbandonReason.Voided -> "Voided"
 
     let private afterConsumeCas
         (runIdPrefix: string)

@@ -119,7 +119,13 @@ module ExecutionFactFold =
                 true
                 (HandleProjection.abandonWork p.Work p.Reason)
         | ExecutionFactCases.ChildWorkVoided p ->
-            foldWork sessionState p.ParentSessionId p.Work "ChildWorkVoided" true (HandleProjection.voidWork p.Work)
+            foldWork
+                sessionState
+                p.ParentSessionId
+                p.Work
+                "ChildWorkVoided"
+                true
+                (HandleProjection.abandonWork p.Work HandleAbandonReason.Voided)
         | ExecutionFactCases.HandleLinked payload ->
             let byname = canonicalByname payload.Byname payload.TargetAgent
             let priorState = sessionState payload.ParentSessionId

@@ -249,8 +249,11 @@ receives what this mapping declares, rendered as TOML.
 
 Delivery takes a report mapping only. Prose, an arbitrary value, or a
 standalone result object is not a delivery. A plain `return` leaves the
-delivery cell empty: the work stays active, no completion is written and the
-join never closes. Handing over a `{ prefixUntil, thenMap }` wrapper yourself
+delivery cell empty: while delivery is still possible the work stays active,
+no completion is written and the join never closes; once delivery became
+impossible (aborted, cancelled, or settled at restart load) that work is
+settled as `voided` — not a completion, but the join closes and reports it
+once. Handing over a `{ prefixUntil, thenMap }` wrapper yourself
 is refused with `VIEW_DECLARATION_INVALID`, as is a missing reportMapping or
 one of an illegal shape; an empty mapping is legal and replaces nothing.
 

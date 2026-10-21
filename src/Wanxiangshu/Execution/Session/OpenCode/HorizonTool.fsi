@@ -27,6 +27,9 @@ module HorizonTool =
         val DidNotReturn: string = "tool/horizon/did-not-return"
 
         [<Literal>]
+        val Voided: string = "tool/horizon/voided"
+
+        [<Literal>]
         val RemainsOpen: string = "tool/horizon/remains-open"
 
         [<Literal>]

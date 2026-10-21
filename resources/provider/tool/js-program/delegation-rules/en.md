@@ -57,7 +57,7 @@ const { records, byName } = await this.join();
 ```
 
 - Result: `{ ok: true, records: [{ name, agentId, role, status, view }], byName: { [name]: record } }`.
-- `status` is `completed` | `failed` | `abandoned`; a child only enters the records after it ends with `this.deliver(reportMapping)` — a child that has not delivered is not settled: it stays active, the join does not close, and you may keep waiting or re-delegate. `view` is the child's delivered TOML view from `this.deliver` (empty when `failed` or `abandoned`).
+- `status` is `completed` | `failed` | `abandoned` | `voided`; a member becomes `completed` only when two things hold: there is a causally proven terminal, and the member ended with `this.deliver(reportMapping)` — delivery alone does not prove completion. A child that has not delivered but can still deliver is not settled: it stays active, the join does not close, and you may keep waiting or re-delegate. A child whose delivery became impossible (aborted, cancelled, or settled at restart load) enters the records as `voided`: a void is not a completion (`view` is empty), but it settles the outstanding obligation, closes the join, and you will not see a second report of it. `view` is the child's delivered TOML view from `this.deliver` (empty when `failed`, `abandoned`, or `voided`).
 - Membership-scoped: it collects the children this session created. Refusal codes: `context-unavailable`, `not-ready`, `nothing-to-join`, `join-in-progress`, `interrupted`, `abandoned`.
 
 ## fission

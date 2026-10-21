@@ -248,12 +248,14 @@ module ChildRecovery =
         | HandleAbandonReason.ParentCancelled -> "ParentCancelled"
         | HandleAbandonReason.DeadlineExceeded -> "DeadlineExceeded"
         | HandleAbandonReason.HostSessionGone -> "HostSessionGone"
+        | HandleAbandonReason.Voided -> "Voided"
 
     let private reasonOf (name: string) =
         match name with
         | "ParentCancelled" -> HandleAbandonReason.ParentCancelled
         | "DeadlineExceeded" -> HandleAbandonReason.DeadlineExceeded
         | "HostSessionGone" -> HandleAbandonReason.HostSessionGone
+        | "Voided" -> HandleAbandonReason.Voided
         | other -> invalidOp ("wanxiangli/handle-lifecycle returned an unknown abandon reason: " + other)
 
     let private observationName (observation: HostObservation) =

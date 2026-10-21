@@ -33,6 +33,9 @@ module JoinResultRenderer =
         let PtyEnded = "tool/join/pty-ended"
 
         [<Literal>]
+        let AgentVoided = "tool/join/agent-voided"
+
+        [<Literal>]
         let PtyInterrupted = "tool/join/pty-interrupted"
 
         [<Literal>]
@@ -207,9 +210,19 @@ module JoinResultRenderer =
         (resolveAgentName: string -> string)
         (agentId: string)
         (agentNameRaw: string)
+        (reason: string)
         : LlmFacing.Document =
         let name = byname lang resolveAgentName agentId agentNameRaw
-        entry [ bynameLine lang Path.AgentDidNotReturn name ] []
+
+        // A voided child is settled, not completed: the parent must learn the
+        // obligation is closed rather than that the charge succeeded.
+        let path =
+            if reason = "Voided" then
+                Path.AgentVoided
+            else
+                Path.AgentDidNotReturn
+
+        entry [ bynameLine lang path name ] []
 
     let private renderPtyEnded
         (lang: ProviderLanguage)
@@ -231,7 +244,8 @@ module JoinResultRenderer =
         match item with
         | AgentCompletedItem payload -> renderAgentCompleted lang resolveAgentName completion payload
         | AgentFailedItem payload -> renderAgentFailed lang resolveAgentName completion payload
-        | AgentAbandonedItem(agentId, _) -> renderAgentAbandoned lang resolveAgentName agentId completion.AgentName
+        | AgentAbandonedItem(agentId, reason) ->
+            renderAgentAbandoned lang resolveAgentName agentId completion.AgentName reason
 
     let private renderPtyJoinItem
         (lang: ProviderLanguage)

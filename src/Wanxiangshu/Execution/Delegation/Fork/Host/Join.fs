@@ -58,12 +58,24 @@ module HostForkJoin =
     /// the previous process's handles; join must not consume them and the horizon
     /// roster must not present them. Join admission and HorizonTool share this
     /// one predicate so the two surfaces cannot disagree.
+    ///
+    /// Voided is the one exception: a void settles the obligation (the owner
+    /// ruling — an undelivered child is never completed, it is voided), and the
+    /// settled consequence must still be reported exactly once by whoever reads
+    /// the journal next. A restarted process owns nobody, so the voided child
+    /// would otherwise be invisible to BOTH horizon and join and the report
+    /// would never happen. The widening is voided-only: a cancelled
+    /// (ParentCancelled) child of the previous process stays invisible after a
+    /// restart, as participant-horizon-011 requires.
     let currentProcessHandle (runtime: HostForkRuntime) (record: HandleRecord) =
-        match HandleId.tryAgent record.Handle with
-        | None -> false
-        | Some handleId ->
-            let agentId = AgentHandleId.value handleId
-            runtime.OwnsAgent agentId || runtime.EstablishedByProcess agentId
+        match record.Lifecycle with
+        | HandleLifecycle.Abandoned HandleAbandonReason.Voided -> true
+        | _ ->
+            match HandleId.tryAgent record.Handle with
+            | None -> false
+            | Some handleId ->
+                let agentId = AgentHandleId.value handleId
+                runtime.OwnsAgent agentId || runtime.EstablishedByProcess agentId
 
     let private neverCompleting<'T> () : Task<'T> =
         (TaskCompletionSource<'T>(TaskCreationOptions.RunContinuationsAsynchronously))

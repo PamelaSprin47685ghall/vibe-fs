@@ -20,6 +20,7 @@ type HandleAbandonReason =
     | ParentCancelled
     | DeadlineExceeded
     | HostSessionGone
+    | Voided
 
 [<RequireQualifiedAccess>]
 type FalseCompletionReason = | LegacyAbortWasObservation

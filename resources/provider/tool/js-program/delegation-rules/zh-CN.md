@@ -57,7 +57,7 @@ const { records, byName } = await this.join();
 ```
 
 - 结果：`{ ok: true, records: [{ name, agentId, role, status, view }], byName: { [name]: record } }`。
-- `status` 为 `completed` | `failed` | `abandoned`；子工作只有以 `this.deliver(reportMapping)` 结束才进入记录——未交付的子工作不结算：保持活跃，join 不关闭，你可以继续等待或重派。`view` 是子工作经 `this.deliver` 交回的 TOML 视图（`failed` 或 `abandoned` 时为空）。
+- `status` 为 `completed` | `failed` | `abandoned` | `voided`；成员成为 `completed` 需要两件事同时成立：有因果上证明的终态，并且以 `this.deliver(reportMapping)` 有效交付——只有交付不证明完成。未交付且仍可能交付的子工作不结算：保持活跃，join 不关闭，你可以继续等待或重派。交付已不可能（被 abort、取消或重启加载结算）的子工作以 `voided` 进入记录：作废不是完成（`view` 为空），但它结清这份未解除义务，join 关闭，之后你不会再收到它的第二次报告。`view` 是子工作经 `this.deliver` 交回的 TOML 视图（`failed`、`abandoned` 或 `voided` 时为空）。
 - 按成员归属收拢：收的是本会话创建的子工作。拒绝码：`context-unavailable`、`not-ready`、`nothing-to-join`、`join-in-progress`、`interrupted`、`abandoned`。
 
 ## fission

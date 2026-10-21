@@ -333,10 +333,10 @@ module PluginRecoveryWiring =
         scope.AttachDurabilityActivation(fun () ->
             scope.RunBackground(fun () ->
                 task {
-                    // crash-reconciliation-020: orphaned child runs maintain visible
-                    // obligations on restart rather than being voided or closed.
-                    // The active child work stays observable to the road, preserving
-                    // unfulfilled obligations across process restart without hiding them.
+                    // crash-reconciliation-020: the child work the previous process
+                    // left behind can no longer be delivered, so it is voided
+                    // (Abandoned(Voided)) — the obligation stays visible until
+                    // join reports the void once and retires it.
                     match boot.Journal with
                     | Some journal -> do! ChildWorkRecovery.settleOrphanedChildRuns journal
                     | None -> ()

@@ -561,6 +561,7 @@ module ForkToolSurface =
                 )
 
             scope.AttachCurrentProcessJoinMode "ready"
+            do! ChildWorkSettlement.settleOrphanedChildRuns journal
 
             return box (ForkHarness(journal, scope, sessionPort, ownerAgents))
         }

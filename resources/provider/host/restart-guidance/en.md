@@ -5,5 +5,5 @@ The Wanxiangshu process has just restarted. Process-local state is gone, but dur
 This means:
 
 - Tool calls that were running in the previous process are treated as interrupted: they stay failed in visible history and are never replayed or completed implicitly.
-- Active child work left over by the previous runtime has been voided; both `horizon` and `join` are empty for it, and a direct `resume` is the correct sequence.
+- Active child work left over by the previous runtime can no longer be delivered, so it is voided rather than completed: `horizon` shows it as voided and `join` reports it once, then it retires.
 - This process has already re-normalized from durable facts. Continue from the current real facts and do not assume the previous process's temporary state still exists.

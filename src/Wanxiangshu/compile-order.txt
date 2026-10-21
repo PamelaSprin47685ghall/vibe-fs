@@ -765,6 +765,8 @@ OpenCode/Host/HookPolicy.fsi
 OpenCode/Host/HookPolicy.fs
 Foundation/Diagnostic.fsi
 Foundation/Diagnostic.fs
+Execution/Delegation/ChildWorkSettlement.fsi
+Execution/Delegation/ChildWorkSettlement.fs
 OpenCode/Host/ReliabilityDiagnostics.fsi
 OpenCode/Host/ReliabilityDiagnostics.fs
 OpenCode/Host/ReliabilityDiagnosticsSurface.fsi

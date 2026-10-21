@@ -23,6 +23,7 @@ module HorizonSurface =
         let statusPath =
             match status with
             | "returned" -> HorizonTool.Path.Returned
+            | "voided" -> HorizonTool.Path.Voided
             | "abandoned" -> HorizonTool.Path.DidNotReturn
             | _ -> HorizonTool.Path.StillAway
 

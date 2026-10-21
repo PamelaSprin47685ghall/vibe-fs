@@ -21,6 +21,9 @@ module JoinResultRenderer =
         val AgentFailed: string = "tool/join/agent-failed"
 
         [<Literal>]
+        val AgentVoided: string = "tool/join/agent-voided"
+
+        [<Literal>]
         val TerminalLabel: string = "tool/join/terminal-label"
 
         [<Literal>]

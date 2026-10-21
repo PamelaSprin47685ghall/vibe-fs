@@ -55,6 +55,7 @@ module FactCodecSurface =
         | "ParentCancelled" -> HandleAbandonReason.ParentCancelled
         | "DeadlineExceeded" -> HandleAbandonReason.DeadlineExceeded
         | "HostSessionGone" -> HandleAbandonReason.HostSessionGone
+        | "Voided" -> HandleAbandonReason.Voided
         | other -> failwith $"FactCodecSurface: unknown abandon reason '{other}'"
 
     let private roleOf (value: obj) =
