@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -69,8 +70,43 @@ export function buildSourceDependency(directory = root) {
   if (!fs.existsSync(installed) || fs.realpathSync(installed) !== fs.realpathSync(source)) {
     throw new Error('Run npm ci to replace the old installed tarball with the wanxiangli source link')
   }
-  npmCommand(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], source)
+  installSourceToolchain(source)
   execFileSync(process.execPath, ['scripts/build.mjs'], { cwd: source, stdio: 'inherit' })
+}
+
+// npm ci 每次都会删掉并重装 wanxiangli/node_modules。只有安装输入（锁文件里除库自身版本号外的全部内容、
+// Node 主版本）变了，或已装的包缺失时才需要重装：成功的 npm ci 之后在 node_modules 里记下输入摘要，下次一致即跳过。
+// WANXIANGLI_FORCE_CI=1 强制重装。
+const toolchainStamp = '.wanxiangshu-lock-stamp'
+function sourceLockDigest(lock) {
+  // 每次发版只改库自身版本号，不改依赖；版本号不参与摘要，免得每个新版本都白白重装一次。
+  const { version: _, ...rest } = lock
+  const { version: __, ...self } = lock.packages?.[''] ?? {}
+  const inputs = { ...rest, packages: { ...lock.packages, '': self } }
+  return createHash('sha256').update(`node${process.versions.node.split('.')[0]}\0`).update(JSON.stringify(inputs)).digest('hex')
+}
+
+export function installSourceToolchain(source) {
+  const stamp = path.join(source, 'node_modules', toolchainStamp)
+  const lock = JSON.parse(fs.readFileSync(path.join(source, 'package-lock.json'), 'utf8'))
+  const digest = sourceLockDigest(lock)
+  const required = Object.entries(lock.packages ?? {})
+    .filter(([name, entry]) => name.startsWith('node_modules/') && !entry.optional)
+  const intact = required.every(([name, entry]) => {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(source, name, 'package.json'), 'utf8')).version === entry.version
+    } catch {
+      return false
+    }
+  })
+  if (process.env.WANXIANGLI_FORCE_CI !== '1' && intact && fs.existsSync(stamp)
+    && fs.readFileSync(stamp, 'utf8').trim() === digest) {
+    console.log('[wanxiangli] node_modules matches package-lock.json; skipping npm ci')
+    return false
+  }
+  npmCommand(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], source)
+  fs.writeFileSync(stamp, `${digest}\n`)
+  return true
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
