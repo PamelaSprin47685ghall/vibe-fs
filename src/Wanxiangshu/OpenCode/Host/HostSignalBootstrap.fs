@@ -292,7 +292,7 @@ module HostSignalBootstrap =
 
                     reconciler.NotifyProjectionChanged(observation.SessionId, observation.PhysicalUserMessageId)
 
-                    FissionHost.observePhysicalExecutionEnd
+                    Wanxiangshu.Execution.Fission.FissionHost.observePhysicalExecutionEnd
                         reconciler.TryPhysicalUserMessage
                         journal
                         (fun sid -> reconciler.Kick(sid, ReconcileProgram.ReconcileWake.RetryWake))
@@ -317,7 +317,7 @@ module HostSignalBootstrap =
                     ProviderAttemptStopFence.shared.Observe(observation.SessionId, observation.ProviderRun)
                     scope.Sessions.Quiescence.RevokeCurrentAttempt(observation.SessionId)
 
-                    FissionHost.routeAttemptAborted observation.SessionId ignore ignore
+                    Wanxiangshu.Execution.Fission.FissionHost.routeAttemptAborted observation.SessionId ignore ignore
 
                 | _ -> ()
 

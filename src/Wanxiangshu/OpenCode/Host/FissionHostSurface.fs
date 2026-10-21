@@ -6,7 +6,6 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome

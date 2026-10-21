@@ -1011,6 +1011,8 @@ OpenCode/Host/PluginRecoveryScopeSurface.fsi
 OpenCode/Host/PluginRecoveryScopeSurface.fs
 OpenCode/Host/TurnRuntimePreparation.fsi
 OpenCode/Host/TurnRuntimePreparation.fs
+Execution/Fission/Convergence.fsi
+Execution/Fission/Convergence.fs
 Execution/Fission/OpenCode/Host.fsi
 Execution/Fission/OpenCode/Host.fs
 Execution/Fission/Surface.fsi
