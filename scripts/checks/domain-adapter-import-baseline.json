@@ -1,5 +1,5 @@
 {
-  "_note": "CUT-40 ratchet (gate 9): production files outside the adapter area (top-level OpenCode/, Host/, any …/OpenCode/ folder) that still open or qualify an in-domain Wanxiangshu.<Domain>.OpenCode namespace. Kernel, Composition/ and *Surface.fs are all counted. Entries may only be removed; see scripts/checks/architecture.mjs gate 9. Start: 16 (8 kernel incl. Composition, 8 Surface) at 7e2635c25.",
+  "_note": "CUT-40 ratchet (gate 9): production files outside the adapter area (top-level OpenCode/, Host/, any …/OpenCode/ folder) that still open or qualify an in-domain Wanxiangshu.<Domain>.OpenCode namespace. Kernel, Composition/ and *Surface.fs are all counted. Entries may only be removed; see scripts/checks/architecture.mjs gate 9. Start: 16 (8 kernel incl. Composition, 8 Surface) at 7e2635c25. F40-03: .fsi files scanned too (0 added).",
   "files": [
     "src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs",
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",

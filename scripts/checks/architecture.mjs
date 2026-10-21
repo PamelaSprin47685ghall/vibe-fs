@@ -25,7 +25,8 @@ const isKernelFile = (file) =>
   !file.startsWith(`${PRODUCTION_ROOT}/OpenCode/`) &&
   !file.startsWith(`${PRODUCTION_ROOT}/Composition/`) &&
   !file.includes('/OpenCode/') &&
-  !file.endsWith('Surface.fs')
+  !file.endsWith('Surface.fs') &&
+  !file.endsWith('Surface.fsi')
 const referencesOpenCode = (text) =>
   text.split('\n').some((line) => !/^\s*\/\//.test(line) && /\bWanxiangshu\.OpenCode\b/.test(line))
 export const readOpenCodeImportBaseline = () =>
@@ -46,12 +47,15 @@ const HOST_SDK_CLIENT = /\?client\b|\bclient\s*(?:\?|\.(?:session|event|app|conf
 
 const norm = (path) => path.replace(/\\/g, '/')
 const isFs = (path) => path.endsWith('.fs')
+const isFsi = (path) => path.endsWith('.fsi')
 
 export function scanArchitecture(productionFiles, read, options) {
   const violations = []
   const fail = (gate, message) => violations.push({ gate, message })
 
   const productionFs = productionFiles.filter(isFs).map(norm)
+  // Gates ⑧/⑨ (CUT-40 F40-03) also read signature files: an `open` in a .fsi is a dependency too.
+  const productionSources = productionFs.concat(productionFiles.filter(isFsi).map(norm))
 
   // ① sole F# source root under src/
   {
@@ -148,7 +152,7 @@ export function scanArchitecture(productionFiles, read, options) {
   {
     const baseline = new Set(readOpenCodeImportBaseline())
     const seen = new Set()
-    for (const file of productionFs) {
+    for (const file of productionSources) {
       if (!isKernelFile(file)) continue
       if (!referencesOpenCode(read(file))) continue
       seen.add(file)
@@ -170,7 +174,7 @@ export function scanArchitecture(productionFiles, read, options) {
   {
     const baseline = new Set(readDomainAdapterImportBaseline())
     const seen = new Set()
-    for (const file of productionFs) {
+    for (const file of productionSources) {
       if (isAdapterArea(file)) continue
       if (!referencesDomainAdapter(read(file))) continue
       seen.add(file)
@@ -214,7 +218,7 @@ export function check(context) {
 
   const productionFiles = context?.sourceFiles
     ? context.sourceFiles()
-    : walk(join(root, PRODUCTION_ROOT), ['.fs', '.fsproj']).map((p) => relative(root, p))
+    : walk(join(root, PRODUCTION_ROOT), ['.fs', '.fsi', '.fsproj']).map((p) => relative(root, p))
   const { violations } = scanArchitecture(productionFiles, read, { root })
 
   const issues = violations.map(({ gate, message }) => ({
