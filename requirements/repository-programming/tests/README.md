@@ -24,7 +24,7 @@
 - 049 同时核对生成工具声明 `program/unpark/abandon/prefixUntil/thenMap` 五个参数：三态参数全部可选（一次调用只发其中之一），unpark.value 自由、abandon 只有 handle、prefixUntil 是可选 number、thenMap 是可选 record；旧的 `view` 包装参数已退役。
 - 054 真实运行 deliver：报告映射（无 prefixUntil）结束程序并按 `{ prefixUntil: 0, thenMap: reportMapping }` 解读、空映射合法、映射缺参以 VIEW_DECLARATION_INVALID 拒绝、自己递交 view 包装对象被拒、哨兵被捕获后程序存活、每个生成面携带 deliver 成员。
 - 055 真实运行 vm 并行边界：Promise.all 并行读写、allSettled 兄弟失败不撤销已落盘写、十六路 cat 批处理。
-- 056 委托原语端到端：fork/join/fission 返回数据信封（缺名派生、拒绝信封不抛、无宿主 DELEGATION_UNAVAILABLE）、`dag` 波次推进与依赖记录传递、节点失败 park 后注入 `"skip"` 收尾。
+- 056 委托原语端到端：fork/join/fission 返回数据信封（缺名派生、拒绝信封不抛、无宿主 DELEGATION_UNAVAILABLE）、`dag` 波次推进与依赖记录传递、节点失败 park 后注入 `"skip"` 收尾。056 另见证作废分支：一个已作废的子工作在 join 记录里以 `status = "voided"` 出现（`view` 为空，既非 `completed` 也非 `undelivered`），并让 `dag` 以 `code = "node-voided"` 挂起——作废结清了这份义务，父方据此自行决定重试、跳过或替换。
 - 057 真实运行 ls 的 ignore 语义（逐级 `.gitignore`、否定模式、嵌套规则、根 `.git/info/exclude`）与 glob/grep 退役后的组合写法（walk + `cat` + `whereAll`）。
 - 059 真实运行 `this.deliver` 的视图记录与增量去重：交付的 reportMapping 记为一份 `prefixUntil: 0` 声明并结束程序、后续语句不执行；交付格按会话隔离，并以 `(providerRun, toolCallId)` 围栏限定消费者——别的 run 取不走也窥不到该格；已交付内容只返回一次（重复身份不再返回），普通 return 不填交付格；永久压缩不因后续受保护交接而回退，锚点消失后隐式 0 仍可覆盖开头区间。
 - 063 真实运行顶层上下文整理参数的扁平形态：`prefixUntil` 与 `thenMap` 两个扁平顶层参数被接受并捕获为待消费视图；残留 `view` 包装对象以 `VIEW_DECLARATION_INVALID` 拒绝且 reason 点名改用扁平参数；两者都不给则不设任何声明；`prefixUntil` 为负数或小数、`thenMap` 的值非字符串或空白、键为负数编号等非法形状同样以 `VIEW_DECLARATION_INVALID` 拒绝且不留下任何视图。
