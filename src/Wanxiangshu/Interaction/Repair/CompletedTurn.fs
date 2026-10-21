@@ -22,7 +22,6 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 
 /// Pure classification of a fully-loaded assistant message.
@@ -207,7 +206,7 @@ module CompletedTurnClassifier =
 
     let roleOfAgent (agent: string option) (fallback: Role option) =
         match agent with
-        | Some value -> HostSessionContext.roleOf value |> Option.orElse fallback
+        | Some value -> Wanxiangshu.Participant.ManagedAgents.AgentRole.roleOf value |> Option.orElse fallback
         | None -> fallback
 
     let buildTurn

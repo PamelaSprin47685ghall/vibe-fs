@@ -835,6 +835,8 @@ Interaction/Dispatch/OpenCode/IngressCodec.fsi
 Interaction/Dispatch/OpenCode/IngressCodec.fs
 OpenCode/Codec/ProviderProjectionSurface.fsi
 OpenCode/Codec/ProviderProjectionSurface.fs
+Participant/Persona/AgentRole.fsi
+Participant/Persona/AgentRole.fs
 OpenCode/Host/HostSessionContext.fsi
 OpenCode/Host/HostSessionContext.fs
 OpenCode/Host/HostBoundarySurface.fsi

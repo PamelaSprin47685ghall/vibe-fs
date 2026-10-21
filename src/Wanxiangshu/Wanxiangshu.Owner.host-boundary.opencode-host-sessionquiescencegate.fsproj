@@ -29,6 +29,8 @@
     <Compile Include="OpenCode/Host/QuiescenceSurface.fs"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fsi"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fs"/>
+    <Compile Include="Participant/Persona/AgentRole.fsi"/>
+    <Compile Include="Participant/Persona/AgentRole.fs"/>
     <Compile Include="OpenCode/Host/HostSessionContext.fsi"/>
     <Compile Include="OpenCode/Host/HostSessionContext.fs"/>
     <Compile Include="OpenCode/Host/HostBoundarySurface.fsi"/>
