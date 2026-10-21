@@ -12,6 +12,5 @@
 /src/Wanxiangshu/Persistence/Journal/FactCodec.fs
 /src/Wanxiangshu/Interaction/Dispatch/**
 /src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs*
-/src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs*
 /src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
 /src/Wanxiangshu/Context/Companion/Facts.*

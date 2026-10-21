@@ -1384,14 +1384,6 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.js',
-    owner: 'effect-accounting',
-    laws: ['EFFECT-ACCOUNTING-002'],
-    source: 'src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs',
-    representation: 'opaque-capability',
-    kind: 'resource',
-  },
-  {
     module: 'Execution/Delegation/Fork/Host/HostForkPtySurface.js',
     owner: 'delegation',
     laws: ['MANAGED-SESSION-012'],

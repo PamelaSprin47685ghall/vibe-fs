@@ -1317,8 +1317,6 @@ OpenCode/Plugin/PluginLifecycleSurface.fsi
 OpenCode/Plugin/PluginLifecycleSurface.fs
 Context/Trace/SemanticTraceSurface.fsi
 Context/Trace/SemanticTraceSurface.fs
-Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fsi
-Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs
 Change/Host/Surface.fsi
 Change/Host/Surface.fs
 Foundation/OutcomeSurface.fsi

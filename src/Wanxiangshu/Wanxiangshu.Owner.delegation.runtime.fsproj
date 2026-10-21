@@ -91,7 +91,5 @@
     <Compile Include="Execution/Delegation/SyncDelegate/Surface.fs" />
     <Compile Include="Execution/Delegation/Handle/JournalSurface.fsi" />
     <Compile Include="Execution/Delegation/Handle/JournalSurface.fs" />
-    <Compile Include="Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fsi" />
-    <Compile Include="Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs" />
   </ItemGroup>
 </Project>
