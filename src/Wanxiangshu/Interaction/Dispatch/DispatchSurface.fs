@@ -14,7 +14,6 @@ open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Admission
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 
@@ -124,28 +123,6 @@ module DispatchSurface =
         Outcome.SendOutcome.AcceptanceUnknown reason
 
     let fatal (reason: string) : Outcome.SendOutcome = Outcome.SendOutcome.Fatal reason
-
-    let decodePhysicalUserMessageId (input: obj) (output: obj) : obj =
-        PromptIngressCodec.decodeWith input output
-        |> fun decoded -> decoded.PhysicalUserMessageId
-        |> Option.map PhysicalUserMessageId.value
-        |> Option.map box
-        |> Option.toObj
-
-    let decodeIngress (input: obj) (output: obj) : obj =
-        let decoded = PromptIngressCodec.decodeWith input output
-
-        box
-            {| sessionId = decoded.SessionId |> Option.map SessionId.value |> Option.toObj
-               physicalUserMessageId =
-                decoded.PhysicalUserMessageId
-                |> Option.map PhysicalUserMessageId.value
-                |> Option.toObj
-               explicitAgent = decoded.ExplicitAgent |> Option.toObj
-               promptKey = decoded.PromptKey |> Option.map PromptKey.value |> Option.toObj
-               isHostCompaction = decoded.IsHostCompaction
-               isHostSynthetic = decoded.IsHostSynthetic
-               text = decoded.Text |> Option.toObj |}
 
     let private appendResult result =
         match result with

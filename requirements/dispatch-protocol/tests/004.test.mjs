@@ -47,7 +47,9 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 
-const physicalIdentity = (input, output) => dispatch.decodePhysicalUserMessageId(input, output)
+// CUT-40: physical identity is read through the OpenCode codec surface (same PromptIngressCodec.decodeWith).
+const ingressCodec = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
+const physicalIdentity = (input, output) => ingressCodec.decodeIngress(input, output).physicalUserMessageId
 
 test('WHAT[dispatch-protocol-004] ingress_accepts_the_exact_nonblank_Host_identity', () => {
   assert.equal(physicalIdentity({ messageID: 'msg-input' }, {}), 'msg-input')
