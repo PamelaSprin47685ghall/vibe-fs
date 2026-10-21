@@ -1,5 +1,13 @@
 # Changelog — 版本历史
 
+## Unreleased — 生命周期 022 迁到真实交付路径（Engineer 的完成必须是一次真实交付，父侧才拿得到草稿）
+
+- **`requirements/managed-session-lifecycle/tests/022.test.mjs` 迁到真实插件路径**：`finalize prerequisite uses the original plugin scope for Manager admission, attached Engineer completion and its production draft` 与 `original child and owner deletion archive the completed Engineer and same-scope dispose awaits actual Bookkeeper completion` 此前只在 harness 里把文本 push 进 assistant 消息，**从未发生一次真实交付**——生产因此看不到 durable 交付见证，父侧的 `await` 永不结算（实测：缺见证时 `this.deliver` 直接报 `AcceptedExecutionMissing`），整条 case 挂起。现在交付改为真实 `this.deliver`（`hooks.tool['todowrite-for-engineer'].execute`），由生产落唯一那条 durable 交付见证，随后照旧 `message.updated` → `session.idle` 发布终态。
+- **断言口径换成真实事实**：交付后 `invokeEngineer` 立刻返回 `ok = true` 且 view 含交付原文；`semanticTrace.terminalEvidenceForProviderRun` 给出 `blobs/<sha256>` 且其 payload 恰为交付原文；`takeEngineerDraft` 一次取到 `{ sessionId: child, turns: [{ question: charge, answer: view }] }`、第二次取到 `null`（草稿是消费式的，不是只读窥视）；删除 child 与 owner 后，同作用域 dispose 内的真实 Bookkeeper `SendPrompt` 收到原始 charge/answer，`EngineerCaseCaptured` 恰好两条且 identity 为该 child、canonical Q/A 正确、canonical 前缀逐字节保留、decoy 未被改写，冷子进程复核 `verified = true`。
+- **其余 case 原样保留**：三条 casebook finalize 归档（未提交不发布、只提交一次、空草稿不建 Bookkeeper 子会话）本就在真实插件路径上，不依赖旧 harness。
+- **验收**：`022` → tests 6 / pass 5 / fail 0 / cancelled 0 / todo 1（原有 GAP-133 `test.todo` 原样保留）。
+- **改动文件**：`requirements/managed-session-lifecycle/tests/022.test.mjs`。
+
 ## Unreleased — 生命周期 013 / 015 迁到真实交付路径（跨实例消费由 durable 墓碑仲裁，绑定跨重启不变）
 
 - **`requirements/managed-session-lifecycle/tests/013.test.mjs` 迁到真实插件路径**：`a stale-projection consumer is arbitrated by the durable consumption tombstone, not its own fold` 不再用 harness 的 `settle`（从不下落围栏匹配的 durable 见证，因而永远等不到结算），交付改为真实 `this.deliver` + 生产的 `message.updated` → `session.idle` 终态发布。冷消费（另一个写者 + 重放）先消费成功并交出载荷；旧运行时随后消费时**不交出任何载荷**（`ok = false`），durable 面上该格为 `Retired`、再次冷消费得到 `AlreadyRetired`、总交付次数恒为 1。**不比较错误码**是有意的：生产 join 报 `nothing-to-join`、旧 harness 报 `AlreadyRetired`，二者同义（没有可交出的载荷），所以仲裁这一事实断言在耐久面（冷读 `Retired` / 冷消费 `AlreadyRetired` / 交付次数不增）上，比断言文案更贴切。
