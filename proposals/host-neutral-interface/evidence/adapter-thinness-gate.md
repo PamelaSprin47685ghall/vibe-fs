@@ -97,9 +97,10 @@ from the wrong folder. The scope is discovered from the sources, so a seam anoth
 editing the gate. Current measurement: **0 violations.**
 
 The tier-B half is a **ratchet** over the adapter files that reference `Wanxiangshu.Host.Domain`, recorded in
-`scripts/checks/domain-seam-baseline.json` (**4 files** at the slice commit): the set may not gain a file, and a
-baselined file that stops referencing the seam must leave the baseline, so the ratchet never loosens. It records
-**existing debt** — it does not forbid the seam from being used.
+`scripts/checks/domain-seam-baseline.json` (**4 files** at the slice commit; **3 files** now, measured on
+`origin/master` 2026-10-22): the set may not gain a file, and a baselined file that stops referencing the seam
+must leave the baseline, so the ratchet never loosens. It records **existing debt** — it does not forbid the seam
+from being used.
 
 One **exemption** is recorded explicitly: `Host/FissionPort.fs(i)` (P-17) already declares the safe
 `Wanxiangshu.Host.Ports` namespace and only its *location* is wrong; that move is tracked on HNI-14, so the gate

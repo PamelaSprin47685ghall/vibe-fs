@@ -149,14 +149,15 @@ These are the concrete steps, so a lane does not have to re-derive them. **Step 
    the table above (P-13 … P-18). The generator matches `/\bHNI (P-\d{2})\b/` anywhere in the header; a family
    without one is a **hard error**, not a silent skip. Put it in a **plain `//` comment above the `namespace`
    line** — a `///` doc comment between `namespace` and the first `open` is FS3390 and is dropped, e.g.
-   `// HNI P-18: product tool contribution — what one product tool call knows about its invocation.`
+   `// HNI P-13: the command vocabulary a host registers (tier B; never mirrored).`
 4. **Use the namespace of the tier you chose**: `Wanxiangshu.Host.Ports` for tier A, `Wanxiangshu.Host.Domain`
    for tier B. `Wanxiangshu.Host` is `open`ed by **75 files** under `src/Wanxiangshu/` (measured 2026-10-22;
    81 `open` lines, mostly for `CanonicalJson`/`HostDigest`), so a type named e.g. `Digest` in that namespace
    shadows the real one at every one of those call sites. Gate ⑬ rejects a tier namespace declared outside its
    tier folder (**D-05**). `Wanxiangshu.Host.Ports` had **zero** openers when it was created and the openers it
-   has today (9 files) were each added deliberately; `Wanxiangshu.Host.Domain` has 12 (the seam's own
-   consumers) and the tier-B ratchet stops that set from growing. The risk **D-05** guards against is
+   has today (**14 files**, measured on `origin/master` 2026-10-22) were each added deliberately;
+   `Wanxiangshu.Host.Domain` has **11 files** (the seam's own consumers, measured on `origin/master`
+   2026-10-22), and the tier-B ratchet stops that set from growing. The risk **D-05** guards against is
    therefore not "some file `open`s the namespace" but "a **pre-existing** namespace with 70+ openers": port
    names placed in `Wanxiangshu.Host` would shadow real types across every one of those call sites, whereas a
    namespace nothing opened before is safe to add to. **An `open` is not an implementation** — see the status
