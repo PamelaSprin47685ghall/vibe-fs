@@ -159,7 +159,20 @@ expect("transcript decode", tr.ok ? tr.value.map((m) => [m.Role, m.Parts.map((p)
 expect("child session create", await portsSeen!.Sessions.Create("root" as P.SessionId, { Title: "t" }), { ok: true, value: "child-of-root" });
 expect("model apply unknown -> Transport error", (await portsSeen!.Models.Apply("root" as P.SessionId, { Provider: "x", Model: "y" })).ok, false);
 expect("prompt correlation echoed as entry", [await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go", Correlation: P.promptKey("pk-1") }, undefined), entries, sent],
-  [{ tag: "AdmittedWithReceipt", value: "omp:root" }, [{ session: "root", key: "pk-1" }], ["go"]]);
+  [{ tag: "AdmittedWithReceipt", value: "accepted-omp-root" }, [{ session: "root", key: "pk-1" }], ["go"]]);
+// The transport receipt must be ADMISSION-shaped, i.e. it must look like an
+// `accepted-*` admission receipt. The F# contract says so in
+// `src/Wanxiangshu/Foundation/Identity.fs` ("Host admission ids are
+// `accepted-*`"), and every host the product itself drives emits that shape
+// (`accepted-<session>` for OpenCode, `accepted-detached-<promptKey>` for a
+// detached send). A receipt that does not look like one means the Host
+// returned something else and the caller must decide, so the adapter must
+// not invent a private `omp:` namespace.
+const admissionShaped = await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go" }, undefined);
+expect("the transport receipt is admission-shaped",
+  admissionShaped.tag === "AdmittedWithReceipt" && String(admissionShaped.value).startsWith("accepted-"), true);
+expect("the admission receipt names the session it was issued for",
+  admissionShaped.tag === "AdmittedWithReceipt" ? String(admissionShaped.value) : "", "accepted-omp-root");
 // The `late` callback runs AFTER delivery settled. A throw from the caller's
 // own callback must not be reported as `AcceptanceUnknown`: the host already
 // accepted the prompt, so acceptance is NOT unknown. The throw propagates to

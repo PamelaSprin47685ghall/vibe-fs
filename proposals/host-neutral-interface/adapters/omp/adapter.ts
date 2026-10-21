@@ -40,6 +40,22 @@ const sid = (s: string) => s as P.SessionId;
 const transport = (e: unknown): P.HostError => ({ tag: "Transport", reason: e instanceof Error ? e.message : String(e) });
 /** The human-readable cause of a thrown value, kept verbatim. */
 const why = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+/**
+ * The transport receipt the adapter hands back when the host accepted a
+ * prompt. The F# contract says a receipt is ADMISSION-shaped: the Host
+ * prompt-send endpoint hands back an `accepted-*` admission receipt
+ * (`src/Wanxiangshu/Foundation/Identity.fs`), and every host the product
+ * itself drives emits that shape (`accepted-<session>` for OpenCode,
+ * `accepted-detached-<promptKey>` for a detached send). A receipt that
+ * does not look like one means the Host returned something else and the
+ * caller must decide, so the adapter emits the same shape its peers emit
+ * rather than a private `omp:` namespace.
+ *
+ * The receipt is a DETACHED admission receipt: it says the host took the
+ * prompt, not that a physical message id exists. It is deliberately NOT
+ * usable as a message identity.
+ */
+const admissionReceipt = (s: string): P.TransportReceipt => P.transportReceipt(`accepted-omp-${s}`);
 const notFound = (what: string): P.HostError => ({ tag: "NotFound", what });
 const unsupported = (capability: P.HostCapability): P.HostError => ({ tag: "Unsupported", capability });
 /**
@@ -225,12 +241,25 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
       // `AcceptanceUnknown` there would lie about a settled delivery.
       const deliver = async (): Promise<{ tag: "AdmittedWithReceipt"; value: P.TransportReceipt } | { tag: "Retryable"; reason: string }> => {
         if (isOwnChild(s)) {
+          // The CHILD path is observable: `children.prompt` resolves to a
+          // boolean that says whether the host took the prompt, and it
+          // rejects if the call itself failed. A `false` is a refusal, so
+          // the prompt was never accepted.
           const accepted = await children.prompt(s, request.Text);
           if (!accepted) return { tag: "Retryable", reason: "omp refused prompt" };
-          return { tag: "AdmittedWithReceipt", value: P.transportReceipt(`omp:${s}`) };
+          return { tag: "AdmittedWithReceipt", value: admissionReceipt(s) };
         }
+        // The HOST path is NOT observable. `ExtensionAPI.sendUserMessage`
+        // returns `void`: omp hands the text to the host session and does
+        // not report back. A rejected delivery is swallowed by omp itself
+        // (it logs it internally), so the adapter cannot distinguish
+        // "enqueued" from "enqueued and then failed". The receipt therefore
+        // asserts that the host took the prompt for delivery, NOT that a
+        // message was delivered. This limit is stated in the adapter README
+        // as well; it is a property of the omp extension API, not of this
+        // adapter, and it is not papered over with a synthetic check.
         pi.sendUserMessage(request.Text, { deliverAs: "followUp" });
-        return { tag: "AdmittedWithReceipt", value: P.transportReceipt(`omp:${s}`) };
+        return { tag: "AdmittedWithReceipt", value: admissionReceipt(s) };
       };
       let outcome: { tag: "AdmittedWithReceipt"; value: P.TransportReceipt } | { tag: "Retryable"; reason: string };
       try {

@@ -40,8 +40,52 @@ equivalence:
 A port request the host cannot honour is answered with a typed `HostError` (`Unsupported`, `Refused`, `NotFound`),
 never with a silent success and never by dropping part of the caller's request. Examples: `Models.Apply` refuses a
 session that is not the host's own (omp can only set the current session's model); `Prompts.Send` refuses
-`Role`/`Route`/`Workspace`/`ToolPolicy` for the host session because `sendUserMessage` cannot carry them; the
+`Role`/`Route`/`Workspace`/`ToolPolicy` on **both** delivery paths, because neither omp delivery call can carry
+them (`sendUserMessage` for the host session, `children.prompt` for a child — the latter takes text only); the
 context hook leaves a message untouched when a part has no plain-text omp encoding.
+
+The `Prompts.Send` refusal is **path-scoped**: the reason names the path that cannot carry the field
+(`omp child prompts carry text only: cannot carry Role` vs `omp cannot carry Role`), so a child refusal is never
+read as a host-session refusal.
+
+`Prompts.Send` is split into two phases, because the two phases have different failure meanings:
+
+- **Preparation** (the unsupported-field check, then the `wxs.prompt-key` correlation entry) happens before the
+  host is asked to accept the prompt. A failure here is `Fatal` — definitely not sent. The unsupported-field
+  check runs *before* the correlation write, so a prompt that is refused never leaves a phantom correlation
+  entry in the session log.
+- **Delivery** is the point of no return: a throw there is `AcceptanceUnknown`, because the host may already
+  have taken the prompt.
+
+The `late` callback is invoked **outside** the delivery `try`, so a throw from the caller's own callback cannot
+make a settled delivery look ambiguous — it propagates to the caller unchanged. `late({ OwnedSettled })` fires
+**only** for an `AdmittedWithReceipt` outcome: a `Retryable` outcome (the host refused) fires no late verdict at
+all, because nothing was settled.
+
+## The transport receipt is admission-shaped
+
+`Prompts.Send` returns `AdmittedWithReceipt` with a receipt of the form `accepted-omp-<sessionId>`.
+
+This is a contract, not a cosmetic choice. The F# side says a transport receipt is **admission-shaped**: the Host
+prompt-send endpoint hands back an `accepted-*` admission receipt, and a receipt that does not look like one
+means the Host returned something else and the caller must decide
+(`src/Wanxiangshu/Foundation/Identity.fs`; the same rule is restated in `src/Wanxiangshu/Foundation/Outcome.fs`).
+Every host the product itself drives already emits that shape — `accepted-<sessionId>` for the OpenCode host and
+`accepted-detached-<promptKey>` for a detached send — so the omp adapter emits the same shape rather than a
+private `omp:` namespace.
+
+What the receipt asserts, and what it does not:
+
+- It asserts the host **took the prompt for delivery**. It is deliberately *not* a message identity: the F# keeps
+  receipts in their own type precisely so that an `accepted-*` receipt can never be mistaken for a physical
+  message id and promoted to an authority root.
+- The **child** path is observable: `children.prompt` resolves to a boolean that says whether the host took the
+  prompt (`false` → `Retryable`), and rejects if the call itself failed.
+- The **host** path is **not** observable. `ExtensionAPI.sendUserMessage` returns `void` — omp hands the text to
+  the host session and does not report back, and a rejected delivery is swallowed by omp itself (it logs it
+  internally). The adapter therefore cannot distinguish "enqueued" from "enqueued and then failed", and the
+  receipt does not claim more than "the host took it". This is a limit of the omp extension API, not of this
+  adapter, and it is stated here rather than papered over with a synthetic check.
 
 `Sessions.Parent` is one more: omp records `SessionHeader.parentSession` **verbatim**, and its own callers pass
 either a session id or a session **file path**. A path-shaped value is resolved through the host's own
