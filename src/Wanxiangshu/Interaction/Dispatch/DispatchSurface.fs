@@ -10,6 +10,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Admission
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Authority
@@ -24,14 +25,14 @@ open Wanxiangshu.Persistence.Journal
 module DispatchSurface =
 
     type private PlainSessionPort(raw: obj) =
-        let typed = unbox<Wanxiangshu.OpenCode.ISessionHostPort> raw
+        let typed = unbox<Wanxiangshu.Foundation.HostSession.ISessionHostPort> raw
         let sendPrompt = raw?``SendPrompt``
         // DSL-MUTABLE: resource — latest physical send observation for the JS result
         let mutable lastObservation: obj = null
 
         member _.LastObservation = lastObservation
 
-        interface Wanxiangshu.OpenCode.ISessionHostPort with
+        interface Wanxiangshu.Foundation.HostSession.ISessionHostPort with
             member _.SubscribeTerminal(sessionId, listener) =
                 typed.SubscribeTerminal(sessionId, listener)
 
@@ -79,22 +80,22 @@ module DispatchSurface =
         member this.DispatchPort: Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort =
             { new Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort with
                 member _.SendPrompt(sessionId, text, options) =
-                    (this :> Wanxiangshu.OpenCode.ISessionHostPort)
+                    (this :> Wanxiangshu.Foundation.HostSession.ISessionHostPort)
                         .SendPrompt(sessionId, text, options)
 
                 member _.SubscribeTerminal(sessionId, listener) =
-                    (this :> Wanxiangshu.OpenCode.ISessionHostPort)
+                    (this :> Wanxiangshu.Foundation.HostSession.ISessionHostPort)
                         .SubscribeTerminal(sessionId, listener)
 
                 member _.SubscribeFutureTerminal(sessionId, listener) =
-                    (this :> Wanxiangshu.OpenCode.ISessionHostPort)
+                    (this :> Wanxiangshu.Foundation.HostSession.ISessionHostPort)
                         .SubscribeFutureTerminal(sessionId, listener) }
 
-    let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort =
-        PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort
+    let internal sessionPort (port: obj) : Wanxiangshu.Foundation.HostSession.ISessionHostPort =
+        PlainSessionPort(port) :> Wanxiangshu.Foundation.HostSession.ISessionHostPort
 
-    let internal rootWorkspaceReader (directory: obj) : Wanxiangshu.OpenCode.IRootWorkspaceReader =
-        { new Wanxiangshu.OpenCode.IRootWorkspaceReader with
+    let internal rootWorkspaceReader (directory: obj) : Wanxiangshu.Foundation.HostSession.IRootWorkspaceReader =
+        { new Wanxiangshu.Foundation.HostSession.IRootWorkspaceReader with
             member _.TryRead() =
                 if isNull directory then None else Some(string directory) }
 
@@ -104,7 +105,7 @@ module DispatchSurface =
         (session: string)
         (title: string)
         (agent: string)
-        : Result<Wanxiangshu.OpenCode.OpenCodeChildInfo list, string> =
+        : Result<Wanxiangshu.Foundation.HostSession.OpenCodeChildInfo list, string> =
         Ok
             [ { SessionId = SessionId.create session
                 ParentSessionId = None

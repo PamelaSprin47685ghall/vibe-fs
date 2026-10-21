@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Foundation.HostSession
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation

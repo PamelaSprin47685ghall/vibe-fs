@@ -2,6 +2,7 @@ namespace Wanxiangshu.Interaction.Dispatch
 
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 

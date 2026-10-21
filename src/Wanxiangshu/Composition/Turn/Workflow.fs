@@ -11,6 +11,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal

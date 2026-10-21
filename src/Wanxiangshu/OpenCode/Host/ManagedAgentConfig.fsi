@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open Wanxiangshu.Participant.ManagedAgents
 
 /// Managed agent Host-config gate. This owns catalog projection and Wanxiangshu-owned

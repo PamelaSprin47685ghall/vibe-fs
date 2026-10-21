@@ -16,6 +16,7 @@ open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider

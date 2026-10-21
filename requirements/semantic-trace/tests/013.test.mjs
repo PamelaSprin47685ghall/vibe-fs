@@ -10,7 +10,7 @@
 //     captureTerminalText —— provider stop 只是材料，本身不构成见证。
 //
 // 被删除的内部表示断言（原先直接 import dist/Host/Facts.js、dist/Foundation/
-// Identity.js、dist/Foundation/Roles.js、dist/OpenCode/Host/Message.js、
+// Identity.js、dist/Foundation/Roles.js、dist/Foundation/HostMessage.js、
 // dist/Composition/Turn/{Program,Observation}.js、dist/Context/Trace/
 // TerminalReporter.js、dist/Composition/Durable/{DelegationJournalAdapter,
 // HostFactFold}.js、dist/Persistence/Journal/AgentJournal.js）：

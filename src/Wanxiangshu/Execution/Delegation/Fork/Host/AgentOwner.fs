@@ -15,7 +15,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

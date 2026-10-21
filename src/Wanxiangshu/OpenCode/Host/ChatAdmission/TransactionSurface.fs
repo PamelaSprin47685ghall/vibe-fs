@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open Wanxiangshu.Interaction.Admission
 
 open Wanxiangshu.Persistence.Journal.JournalOutcome

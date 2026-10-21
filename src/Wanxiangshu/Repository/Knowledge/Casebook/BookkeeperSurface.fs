@@ -101,7 +101,7 @@ module CasebookBookkeeperSurface =
         match ownerLookup ownerDescriptors with
         | Error error -> box {| ok = false; error = error |}
         | Ok owners ->
-            let sessions = unbox<Wanxiangshu.OpenCode.ISessionHostPort> port
+            let sessions = unbox<Wanxiangshu.Foundation.HostSession.ISessionHostPort> port
 
             let kbPort =
                 { new ICasebookSessionPort with
@@ -124,7 +124,7 @@ module CasebookBookkeeperSurface =
                         task {
                             let exactTools = Map.ofList [ "*", false; "todowrite-for-bookkeeper", true ]
 
-                            let opts: Wanxiangshu.OpenCode.SessionPromptOptions =
+                            let opts: Wanxiangshu.Foundation.HostSession.SessionPromptOptions =
                                 { Model = None
                                   Agent = Some agent
                                   Directory = None

@@ -827,10 +827,10 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
-    module: 'OpenCode/Host/OpenCodeContract.js',
+    module: 'Foundation/HostSendContract.js',
     owner: 'dispatch-protocol',
     laws: ['DISPATCH-PROTOCOL-009'],
-    source: 'src/Wanxiangshu/OpenCode/Host/OpenCodeContract.fs',
+    source: 'src/Wanxiangshu/Foundation/HostSendContract.fs',
     representation: 'json',
     kind: 'pure',
   },

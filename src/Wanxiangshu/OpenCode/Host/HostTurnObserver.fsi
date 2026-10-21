@@ -2,6 +2,8 @@ namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation.HostSession
 
+open Wanxiangshu.Foundation.HostSession
+
 open Wanxiangshu.Foundation.TerminalSignal
 
 open System.Threading.Tasks

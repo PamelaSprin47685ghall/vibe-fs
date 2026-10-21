@@ -7,6 +7,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
 

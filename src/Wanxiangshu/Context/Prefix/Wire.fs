@@ -13,6 +13,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt

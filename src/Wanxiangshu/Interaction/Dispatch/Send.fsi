@@ -7,6 +7,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 
 [<AutoOpen>]
 module PromptDispatcherSend =

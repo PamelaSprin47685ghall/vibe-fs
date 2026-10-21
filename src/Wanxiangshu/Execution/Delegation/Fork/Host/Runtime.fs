@@ -22,7 +22,7 @@ open Fable.Core.JsInterop
 open Microsoft.FSharp.Control
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Foundation.TerminalSignal

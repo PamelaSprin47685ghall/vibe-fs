@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.Advisor
 
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 /// advisor-[001]: the caller-supplied physical handles one consult runs on.

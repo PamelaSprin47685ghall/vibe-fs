@@ -30,8 +30,8 @@ Mission/Work/Review/Surface.fsi
 Mission/Work/Review/Surface.fs
 Host/CanonicalJson.fsi
 Host/CanonicalJson.fs
-OpenCode/Host/Message.fsi
-OpenCode/Host/Message.fs
+Foundation/HostMessage.fsi
+Foundation/HostMessage.fs
 Foundation/HostSession.fsi
 Foundation/HostSession.fs
 OpenCode/Host/SessionQuiescenceGate.fsi
@@ -681,6 +681,8 @@ OpenCode/Tools/StaticTools.fsi
 OpenCode/Tools/StaticTools.fs
 OpenCode/Tools/NodeFs.fsi
 OpenCode/Tools/NodeFs.fs
+Foundation/HostModel.fsi
+Foundation/HostModel.fs
 OpenCode/Codec/OpencodeTypes.fsi
 OpenCode/Codec/OpencodeTypes.fs
 OpenCode/Host/ModelCapacity/Model.fsi
@@ -761,8 +763,8 @@ OpenCode/Host/HostSignalSubscribeSurface.fsi
 OpenCode/Host/HostSignalSubscribeSurface.fs
 Composition/Turn/Observation.fsi
 Composition/Turn/Observation.fs
-OpenCode/Host/SessionSnapshot.fsi
-OpenCode/Host/SessionSnapshot.fs
+Foundation/HostSessionSnapshot.fsi
+Foundation/HostSessionSnapshot.fs
 OpenCode/Host/SessionSnapshotPort.fsi
 OpenCode/Host/SessionSnapshotPort.fs
 OpenCode/Host/ProviderRunBinding.fsi
@@ -771,6 +773,8 @@ OpenCode/Host/SessionSnapshotSurface.fsi
 OpenCode/Host/SessionSnapshotSurface.fs
 OpenCode/Host/ProviderRunBindingSurface.fsi
 OpenCode/Host/ProviderRunBindingSurface.fs
+Foundation/HostSendContract.fsi
+Foundation/HostSendContract.fs
 OpenCode/Host/OpenCodeContract.fsi
 OpenCode/Host/OpenCodeContract.fs
 OpenCode/Host/OpenCodePort.fsi
@@ -779,8 +783,8 @@ OpenCode/Host/SessionExecutionBinding.fsi
 OpenCode/Host/SessionExecutionBinding.fs
 OpenCode/Host/ModelRoutingSurface.fsi
 OpenCode/Host/ModelRoutingSurface.fs
-OpenCode/Host/SessionHostPort.fsi
-OpenCode/Host/SessionHostPort.fs
+Foundation/HostSessionPort.fsi
+Foundation/HostSessionPort.fs
 Execution/Session/Attachment/CompanionLeaseRuntime.fsi
 Execution/Session/Attachment/CompanionLeaseRuntime.fs
 Execution/Session/Attachment/AttachmentSurface.fsi
@@ -919,8 +923,8 @@ Execution/Session/Recovery/Surface.fsi
 Execution/Session/Recovery/Surface.fs
 Execution/Delegation/Join.fsi
 Execution/Delegation/Join.fs
-OpenCode/Host/RootWorkspace.fsi
-OpenCode/Host/RootWorkspace.fs
+Foundation/RootWorkspace.fsi
+Foundation/RootWorkspace.fs
 OpenCode/Host/RootWorkspaceRuntime.fsi
 OpenCode/Host/RootWorkspaceRuntime.fs
 OpenCode/Host/SharedState.fsi

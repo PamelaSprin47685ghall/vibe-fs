@@ -146,10 +146,10 @@ test('WHAT[delegation-028] Delegation contract excludes workflow Host PTY and re
 test('WHAT[delegation-028] recovery Snapshot consumer excludes full Host admission capabilities', () => {
   const { sources } = inspectShard('delegation-recovery-runtime')
   assert.ok(sources.includes('Execution/Delegation/ChildRecoveryWorkflow.fs'))
-  assert.ok(sources.includes('OpenCode/Host/SessionSnapshot.fs'))
+  assert.ok(sources.includes('Foundation/HostSessionSnapshot.fs'))
   for (const forbidden of [
     'Foundation/HostSession.fs',
-    'OpenCode/Host/SessionHostPort.fs',
+    'Foundation/HostSessionPort.fs',
     'OpenCode/Host/SessionRuntimeOwner.fs',
     'Execution/Session/ChatExecution/Acceptance.fs',
     'Execution/Session/ChatExecution/Settlement.fs',

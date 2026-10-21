@@ -10,6 +10,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// Direct-CE reconcile scheduler (FLOW-001 / PR4).
 /// Owns queue / generation / single-flight / clear-session runtime state.

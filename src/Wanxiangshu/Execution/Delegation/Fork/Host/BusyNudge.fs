@@ -9,7 +9,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Trace

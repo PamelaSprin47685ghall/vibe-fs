@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 type RootWorkspaceRuntime() =
     let gate = obj ()
     // DSL-MUTABLE: resource — process-lifetime first-bind cell

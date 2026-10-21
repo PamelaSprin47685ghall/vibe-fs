@@ -2,6 +2,8 @@ namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation.HostSession
 
+open Wanxiangshu.Foundation.HostSession
+
 open Wanxiangshu.Foundation.TerminalSignal
 
 #nowarn "3511"
@@ -131,7 +133,7 @@ module PluginHostWiring =
                                     task {
                                         let exactTools = Map.ofList [ "*", false; "todowrite-for-bookkeeper", true ]
 
-                                        let opts: Wanxiangshu.OpenCode.SessionPromptOptions =
+                                        let opts: Wanxiangshu.Foundation.HostSession.SessionPromptOptions =
                                             { Model = None
                                               Agent = Some agent
                                               Directory = None

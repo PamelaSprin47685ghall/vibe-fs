@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Provider.Attempt
 
 type XWireReconciliationDecision = { Cleared: bool; KeptPlan: bool }

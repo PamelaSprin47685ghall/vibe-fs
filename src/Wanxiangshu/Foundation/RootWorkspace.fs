@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Foundation.HostSession
 
 type IRootWorkspaceReader =
     abstract TryRead: unit -> string option

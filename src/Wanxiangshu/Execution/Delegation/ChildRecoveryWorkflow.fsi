@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 module ChildRecoveryWorkflow =
     /// delegation-029: the recovery runtime consumes a narrow capability, never

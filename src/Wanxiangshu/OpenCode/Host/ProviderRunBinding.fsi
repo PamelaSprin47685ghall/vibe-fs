@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 /// Physical Host binding for the assistant run created for one user message.
 /// This is transport identity only; it carries no Review semantics.
 module ProviderRunBinding =

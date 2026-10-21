@@ -242,7 +242,7 @@ test('WHAT[durable-events-022] Journal outcome contract excludes the store capab
     'Persistence/Journal/Writer.fs',
     'Persistence/Journal/EventStoreJournalWriter.fs',
     'Persistence/Journal/AgentJournal.fs',
-    'OpenCode/Host/SessionHostPort.fs',
+    'Foundation/HostSessionPort.fs',
   ]) {
     assert.ok(!sources.includes(source), `Journal outcome contract must not compile ${source}`)
   }

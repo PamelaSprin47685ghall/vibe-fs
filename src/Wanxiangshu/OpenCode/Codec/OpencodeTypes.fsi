@@ -1,9 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
-type OpencodeModel =
-    { providerID: string
-      modelID: string
-      variant: string option }
+open Wanxiangshu.Foundation.HostSession
 
 type OpencodeTextPart =
     { id: string

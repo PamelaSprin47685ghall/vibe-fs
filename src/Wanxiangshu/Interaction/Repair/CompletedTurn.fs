@@ -23,6 +23,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// Pure classification of a fully-loaded assistant message.
 /// Empty formal text or formal text that contains XML markup (including broken

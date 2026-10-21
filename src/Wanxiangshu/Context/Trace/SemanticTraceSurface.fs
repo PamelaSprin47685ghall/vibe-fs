@@ -93,19 +93,19 @@ module SemanticTraceSurface =
 
     let private messagePartOf value =
         match text (field value "kind") with
-        | "text" -> Wanxiangshu.OpenCode.MessagePart.Text(text (field value "text"))
-        | "reasoning" -> Wanxiangshu.OpenCode.MessagePart.Reasoning(text (field value "text"))
+        | "text" -> Wanxiangshu.Foundation.HostSession.MessagePart.Text(text (field value "text"))
+        | "reasoning" -> Wanxiangshu.Foundation.HostSession.MessagePart.Reasoning(text (field value "text"))
         | "tool-call"
         | "tool_call" ->
-            Wanxiangshu.OpenCode.MessagePart.ToolCall(
+            Wanxiangshu.Foundation.HostSession.MessagePart.ToolCall(
                 text (field value "callId"),
                 text (field value "name"),
                 text (field value "args")
             )
         | "tool-result"
         | "tool_result" ->
-            Wanxiangshu.OpenCode.MessagePart.ToolResult(text (field value "callId"), text (field value "result"))
-        | "activity" -> Wanxiangshu.OpenCode.MessagePart.Activity(text (field value "activity"))
+            Wanxiangshu.Foundation.HostSession.MessagePart.ToolResult(text (field value "callId"), text (field value "result"))
+        | "activity" -> Wanxiangshu.Foundation.HostSession.MessagePart.Activity(text (field value "activity"))
         | other -> failwith $"SemanticTraceSurface: unknown capture part '{other}'"
 
     let private projectionOf value : ProviderSemanticProjection =

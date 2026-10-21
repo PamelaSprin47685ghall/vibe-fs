@@ -1,12 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System
 open Fable.Core
-
-type OpencodeModel =
-    { providerID: string
-      modelID: string
-      variant: string option }
 
 type OpencodeTextPart =
     { id: string

@@ -6,6 +6,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 /// EXEC-016: join-capable roles must join outstanding work before terminal idle.

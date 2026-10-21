@@ -22,6 +22,7 @@
 /src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs
 /src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs
 /src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs
+/src/Wanxiangshu/Foundation/HostModel.fs
 /src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs
 /src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
 /src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs
@@ -48,10 +49,10 @@
 /src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs
-/src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs
+/src/Wanxiangshu/Foundation/RootWorkspace.fs
 /src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs
 /src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs
-/src/Wanxiangshu/OpenCode/Host/SessionSnapshot.fs
+/src/Wanxiangshu/Foundation/HostSessionSnapshot.fs
 /src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs
 /src/Wanxiangshu/OpenCode/Host/SessionSnapshotSurface.fs
 /src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs

@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System
 open System.Collections.Generic

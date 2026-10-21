@@ -8,7 +8,7 @@ open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 /// Restart recovery for linked children. Terminal path: ChildRecoveryWorkflow

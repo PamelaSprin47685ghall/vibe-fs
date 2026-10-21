@@ -4,6 +4,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Execution.Failure
 
 /// DSL-state-combination: domain — this is a single reconciled provider-turn

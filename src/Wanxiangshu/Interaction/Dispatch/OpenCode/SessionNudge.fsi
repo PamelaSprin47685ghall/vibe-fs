@@ -9,6 +9,7 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 module HostSessionNudge =

@@ -19,7 +19,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Microsoft.FSharp.Control
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Process
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

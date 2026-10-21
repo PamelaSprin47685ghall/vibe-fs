@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// Delegation-owned opaque runtime harness. Host sessions, journal writers,
 /// attached-session state and completion turns never cross into JS; callers

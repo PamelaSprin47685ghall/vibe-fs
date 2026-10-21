@@ -13,6 +13,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider

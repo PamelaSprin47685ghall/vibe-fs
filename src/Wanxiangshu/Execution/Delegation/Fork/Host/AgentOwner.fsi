@@ -3,7 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 

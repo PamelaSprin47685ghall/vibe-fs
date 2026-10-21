@@ -63,8 +63,8 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
   const sources = productionSources(plan)
 
   assert.ok(sources.includes('Foundation/HostSession.fs'), 'host-session-contract must include SessionContract.fs')
-  assert.ok(sources.includes('OpenCode/Host/SessionHostPort.fs'), 'host-session-contract must include SessionHostPort.fs')
-  assert.ok(sources.includes('OpenCode/Host/SessionSnapshot.fs'), 'host-session-contract must include SessionSnapshot.fs')
+  assert.ok(sources.includes('Foundation/HostSessionPort.fs'), 'host-session-contract must include SessionHostPort.fs')
+  assert.ok(sources.includes('Foundation/HostSessionSnapshot.fs'), 'host-session-contract must include SessionSnapshot.fs')
   const forbidden = [
     'OpenCode/Codec/ToolHostCodec.fs',
     'OpenCode/Codec/ToolHostSurface.fs',
@@ -109,7 +109,7 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
   for (const consumer of ['opencode-host-opencodeport', 'strength-policy']) {
     const consumerSources = productionSources(planShard(consumer).plan)
     assert.ok(consumerSources.includes('OpenCode/Codec/OpencodeTypes.fs'))
-    for (const unrelated of ['Foundation/TerminalSignal.fs', 'OpenCode/Host/Message.fs']) {
+    for (const unrelated of ['Foundation/TerminalSignal.fs', 'Foundation/HostMessage.fs']) {
       assert.ok(!consumerSources.includes(unrelated), `${consumer} must not acquire ${unrelated}`)
     }
   }
@@ -118,7 +118,7 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
 
   for (const consumer of ['host-signal-contract', 'delegation-sync-runtime', 'host-diagnostics-runtime', 'opencode-host-messagevisibility']) {
     const consumerSources = productionSources(planShard(consumer).plan)
-    for (const unrelated of ['Host/Digest.fs', 'OpenCode/Codec/OpencodeTypes.fs', 'OpenCode/Host/Message.fs']) {
+    for (const unrelated of ['Host/Digest.fs', 'OpenCode/Codec/OpencodeTypes.fs', 'Foundation/HostMessage.fs']) {
       assert.ok(!consumerSources.includes(unrelated), `${consumer} must not acquire ${unrelated}`)
     }
   }
@@ -131,7 +131,7 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
   for (const required of ['Execution/Failure/Model.fs', 'Execution/Session/ChatExecution/Facts.fs', 'Persistence/Journal/RuntimePath.fs']) {
     assert.ok(adapterSources.includes(required), `signal adapter must compile its actual dependency ${required}`)
   }
-  for (const unrelated of ['OpenCode/Codec/OpencodeTypes.fs', 'OpenCode/Host/Message.fs']) {
+  for (const unrelated of ['OpenCode/Codec/OpencodeTypes.fs', 'Foundation/HostMessage.fs']) {
     assert.ok(!adapterSources.includes(unrelated), `signal adapter must not acquire ${unrelated}`)
   }
 })
@@ -139,7 +139,7 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
   const hostSources = [
     // TerminalSignal (formerly EventContract) was retagged to runtime-platform next to Digest/Quiescence; physical
     // host boundary ownership only applies to protocol/codec/adapter sources.
-    'OpenCode/Host/Message.fs',
+    'Foundation/HostMessage.fs',
     'OpenCode/Codec/ToolHostCodec.fs',
     'OpenCode/Codec/ToolHostSurface.fs',
     'OpenCode/Host/Diagnostic.fs',
@@ -186,20 +186,20 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
     sessionContract.compile.sort(),
     [
       'Foundation/HostSession.fs',
-      'OpenCode/Host/SessionHostPort.fs',
+      'Foundation/HostSessionPort.fs',
       'OpenCode/Host/SessionRuntimeOwner.fs',
     ].sort(),
   )
 
   const snapshotContract = requireShard('host-session-snapshot-contract')
-  assert.deepEqual(snapshotContract.compile, ['OpenCode/Host/SessionSnapshot.fs'])
-  const snapshotOwner = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'OpenCode/Host/SessionSnapshot.fs'))
+  assert.deepEqual(snapshotContract.compile, ['Foundation/HostSessionSnapshot.fs'])
+  const snapshotOwner = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'Foundation/HostSessionSnapshot.fs'))
   assert.equal(snapshotOwner.projectPath, snapshotContract.path, 'Snapshot has its own unique contract owner')
   assert.equal(snapshotContract.subsystem, 'provider')
   const snapshotSources = productionSources(planShard('host-session-snapshot-contract').plan)
   for (const unrelated of [
     'Foundation/HostSession.fs',
-    'OpenCode/Host/SessionHostPort.fs',
+    'Foundation/HostSessionPort.fs',
     'OpenCode/Host/SessionRuntimeOwner.fs',
     'Execution/Session/ChatExecution/Acceptance.fs',
     'Execution/Session/ChatExecution/Settlement.fs',
