@@ -11,7 +11,6 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Provider.Attempt.Fallback

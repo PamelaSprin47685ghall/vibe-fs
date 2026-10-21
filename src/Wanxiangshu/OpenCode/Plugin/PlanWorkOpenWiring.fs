@@ -20,7 +20,7 @@ module PlanWorkOpenWiring =
             with
             | Ok() -> ()
             | Error err ->
-                Diagnostic.emit "plan-work-open-failed" [ "work_id", sid; "error", err ]
+                Wanxiangshu.Foundation.Diagnostic.emit "plan-work-open-failed" [ "work_id", sid; "error", err ]
                 invalidOp ("Plan lifecycle opening failed: " + err)
         }
 
@@ -60,6 +60,6 @@ module PlanWorkOpenWiring =
                 let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.initializeStateRoot root
                 do! runPlanWorkOpen commonDir root sid observedHead
             | Error reason ->
-                Diagnostic.emit "plan-work-open-directory-unavailable" [ "work_id", sid ]
+                Wanxiangshu.Foundation.Diagnostic.emit "plan-work-open-directory-unavailable" [ "work_id", sid ]
                 invalidOp ("Plan lifecycle opening failed: " + reason)
         }

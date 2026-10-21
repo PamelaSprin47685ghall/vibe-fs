@@ -14,5 +14,5 @@ module ManagerConfig =
         match ManagedAgentConfig.configureFromHostConfig config with
         | Ok inventory -> inventory
         | Error err ->
-            Diagnostic.fatal "managed-agent-config-invalid" [ "result", err ]
-            failwith ("unreachable after Diagnostic.fatal: " + err)
+            Wanxiangshu.Foundation.Diagnostic.fatal "managed-agent-config-invalid" [ "result", err ]
+            failwith ("unreachable after Wanxiangshu.Foundation.Diagnostic.fatal: " + err)

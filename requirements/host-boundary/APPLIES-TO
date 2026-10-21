@@ -27,7 +27,7 @@
 /src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
 /src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs
 /src/Wanxiangshu/OpenCode/Host/ChatParamsSurface.fs
-/src/Wanxiangshu/OpenCode/Host/Diagnostic.fs
+/src/Wanxiangshu/Foundation/Diagnostic.fs
 /src/Wanxiangshu/OpenCode/Host/Events.fs
 /src/Wanxiangshu/OpenCode/Host/EventsSurface.fs
 /src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs

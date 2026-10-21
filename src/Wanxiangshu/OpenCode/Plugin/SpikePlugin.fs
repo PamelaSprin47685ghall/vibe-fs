@@ -47,7 +47,7 @@ module SpikePlugin =
                 // A partially initialized Wanxiangshu instance is not a degraded
                 // mode. OpenCode may otherwise keep running after a plugin-load
                 // rejection with only half the runtime owners installed.
-                Diagnostic.fatal "plugin-initialization-failed" [ "result", ex.Message ]
+                Wanxiangshu.Foundation.Diagnostic.fatal "plugin-initialization-failed" [ "result", ex.Message ]
                 return raise ex
         }
 

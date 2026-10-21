@@ -220,7 +220,4 @@ module ReliabilityDiagnostics =
               ConflictingFences = capacity.ConflictingFences }
           Recovery = recovery }
 
-    let validateOperation (operation: string) =
-        not (String.IsNullOrWhiteSpace operation)
-        && not (operation.Contains '\n')
-        && not (operation.Contains '\r')
+    let validateOperation (operation: string) = Diagnostic.validateOperation operation

@@ -73,7 +73,7 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
     'OpenCode/Signals/HostSignalSubscribe.fs',
     'OpenCode/Host/Events.fs',
     'OpenCode/Host/SharedTerminalBus.fs',
-    'OpenCode/Host/Diagnostic.fs',
+    'Foundation/Diagnostic.fs',
     'OpenCode/Host/ReliabilityDiagnostics.fs',
     'OpenCode/Host/ReliabilityDiagnosticsSurface.fs',
     'OpenCode/Host/HookPolicy.fs',
@@ -142,7 +142,7 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
     'Foundation/HostMessage.fs',
     'OpenCode/Codec/ToolHostCodec.fs',
     'OpenCode/Codec/ToolHostSurface.fs',
-    'OpenCode/Host/Diagnostic.fs',
+    'Foundation/Diagnostic.fs',
     'OpenCode/Signals/HostSignalAdapter.fs',
     'OpenCode/Host/SessionQuiescenceGate.fs',
   ]
@@ -210,7 +210,7 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
   const diagnosticsRuntime = requireShard('host-diagnostics-runtime')
   assert.ok(diagnosticsRuntime.compile.includes('OpenCode/Host/HookPolicy.fs'))
   assert.ok(diagnosticsRuntime.compile.includes('OpenCode/Host/ReliabilityDiagnostics.fs'))
-  assert.ok(diagnosticsRuntime.compile.includes('OpenCode/Host/Diagnostic.fs'))
+  assert.ok(diagnosticsRuntime.compile.includes('Foundation/Diagnostic.fs'))
 
   const signalAdapter = requireShard('host-signal-adapter')
   assert.ok(signalAdapter.compile.includes('OpenCode/Signals/HostSignalAdapter.fs'))

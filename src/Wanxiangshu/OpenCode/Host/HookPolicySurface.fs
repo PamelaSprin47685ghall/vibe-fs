@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 
 module HookPolicySurface =
 

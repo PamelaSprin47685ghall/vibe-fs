@@ -17,12 +17,12 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <Compile Include="OpenCode/Host/HookPolicy.fsi"/>
     <Compile Include="OpenCode/Host/HookPolicy.fs"/>
+    <Compile Include="Foundation/Diagnostic.fsi"/>
+    <Compile Include="Foundation/Diagnostic.fs"/>
     <Compile Include="OpenCode/Host/ReliabilityDiagnostics.fsi"/>
     <Compile Include="OpenCode/Host/ReliabilityDiagnostics.fs"/>
     <Compile Include="OpenCode/Host/ReliabilityDiagnosticsSurface.fsi"/>
     <Compile Include="OpenCode/Host/ReliabilityDiagnosticsSurface.fs"/>
-    <Compile Include="OpenCode/Host/Diagnostic.fsi"/>
-    <Compile Include="OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="OpenCode/Host/HookPolicySurface.fsi"/>
     <Compile Include="OpenCode/Host/HookPolicySurface.fs"/>
   </ItemGroup>

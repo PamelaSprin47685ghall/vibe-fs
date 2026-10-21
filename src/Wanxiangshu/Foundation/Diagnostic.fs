@@ -1,9 +1,8 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Foundation
 
+open System
+open System.Text.RegularExpressions
 open Fable.Core
-open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
-open Wanxiangshu.OpenCode.Host
 
 /// CTX-014 / HOST-007 runtime diagnostics — two severities only:
 ///
@@ -58,6 +57,31 @@ module Diagnostic =
               "weighted_distinct_token_count"
               "detector_step" ]
 
+    /// An operation name is one non-blank line (moved from `ReliabilityDiagnostics`, CUT-34).
+    let validateOperation (operation: string) =
+        not (String.IsNullOrWhiteSpace operation)
+        && not (operation.Contains '\n')
+        && not (operation.Contains '\r')
+
+    /// `WANXIANGSHU_DIAG=1` makes expected diagnostics observable (moved from `ReliabilityDiagnosticsSurface`, CUT-34).
+    let diagnosticsVisible () : bool =
+        Environment.GetEnvironmentVariable "WANXIANGSHU_DIAG" = "1"
+
+    /// One line, credentials and absolute paths redacted (moved from `ReliabilityDiagnosticsSurface`, CUT-34).
+    let redactText (value: string) =
+        let oneLine = Regex.Replace(value, "[\\r\\n].*$", "")
+
+        oneLine
+        |> fun text -> Regex.Replace(text, "\\bBearer\\s+[^\\s]+", "Bearer [REDACTED]", RegexOptions.IgnoreCase)
+        |> fun text ->
+            Regex.Replace(
+                text,
+                "\\b(api[_-]?key|token|password|cookie|credential)\\s*[:=]\\s*[^\\s,;]+",
+                "$1=[REDACTED]",
+                RegexOptions.IgnoreCase
+            )
+        |> fun text -> Regex.Replace(text, "(?:[A-Za-z]:\\\\|/)(?:[^\\s/\\\\]+[/\\\\])+[^\\s,;]+", "[REDACTED]")
+
     [<Emit("console.error($0)")>]
     let private error (message: string) : unit = jsNative
 
@@ -65,8 +89,8 @@ module Diagnostic =
     let private stringify (value: obj) : string = jsNative
 
     let private shouldEmit operation =
-        ReliabilityDiagnostics.validateOperation operation
-        && ReliabilityDiagnosticsSurface.diagnosticsVisible ()
+        validateOperation operation
+        && diagnosticsVisible ()
 
     let private emitWhenVisible operation (project: unit -> obj) =
         if shouldEmit operation then
@@ -91,7 +115,7 @@ module Diagnostic =
 
     let private payload (operation: string) (fields: (string * string) list) : obj =
         fields
-        |> List.map (fun (name, value) -> [| name; ReliabilityDiagnosticsSurface.redactText value |])
+        |> List.map (fun (name, value) -> [| name; redactText value |])
         |> List.toArray
         |> payloadObject operation
 
@@ -107,12 +131,6 @@ module Diagnostic =
         try
             validate fields
             emitWhenVisible operation (fun () -> payload operation fields)
-        with _ ->
-            ()
-
-    let emitCausal (record: CausalDiagnosticRecord) : unit =
-        try
-            emitWhenVisible record.Operation (fun () -> ReliabilityDiagnosticsSurface.projectTyped record)
         with _ ->
             ()
 

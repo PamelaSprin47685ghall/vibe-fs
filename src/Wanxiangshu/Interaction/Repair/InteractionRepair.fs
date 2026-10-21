@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Interaction.Repair
 
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal

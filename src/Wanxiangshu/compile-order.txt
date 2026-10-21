@@ -725,12 +725,12 @@ Process/Surface.fsi
 Process/Surface.fs
 OpenCode/Host/HookPolicy.fsi
 OpenCode/Host/HookPolicy.fs
+Foundation/Diagnostic.fsi
+Foundation/Diagnostic.fs
 OpenCode/Host/ReliabilityDiagnostics.fsi
 OpenCode/Host/ReliabilityDiagnostics.fs
 OpenCode/Host/ReliabilityDiagnosticsSurface.fsi
 OpenCode/Host/ReliabilityDiagnosticsSurface.fs
-OpenCode/Host/Diagnostic.fsi
-OpenCode/Host/Diagnostic.fs
 OpenCode/Host/HookPolicySurface.fsi
 OpenCode/Host/HookPolicySurface.fs
 Context/Companion/CompressionSurface.fsi
