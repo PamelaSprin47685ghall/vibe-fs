@@ -1199,8 +1199,6 @@ Repository/Programming/Js/OpenCode/BookkeeperTool.fsi
 Repository/Programming/Js/OpenCode/BookkeeperTool.fs
 Repository/Programming/Js/OpenCode/ToolHost.fsi
 Repository/Programming/Js/OpenCode/ToolHost.fs
-Mission/Work/ProjectionSurface.fsi
-Mission/Work/ProjectionSurface.fs
 OpenCode/Host/WorkspaceSharedJournal.fsi
 OpenCode/Host/WorkspaceSharedJournal.fs
 OpenCode/Host/DeliveryWitnessWriter.fsi
