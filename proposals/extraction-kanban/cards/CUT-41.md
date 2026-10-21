@@ -13,8 +13,8 @@ GAP-088、GAP-075、GAP-123、GAP-015、GAP-005、GAP-050。
 - **B 实现缺失见证**：生产代码落 durable 事实，用例只读回。
 - **C 精确重定向**：把台账行指向**当前实际管辖**的 requirement 包与条款，并写清剩余未闭合工作。
 
-本轮按用户最新指示（"Retarget valid open gaps instead of broad runtime implementation"）**只做 C**，
-不实施宿主运行时改造（尤其不做 GAP-123 的四类 durable source terminal 事实）。
+本轮**只做 C**。GAP-123 的宿主见证（四类 durable source terminal fact + `ExpectedClosureKind` 原子记录）
+属**产品运行时工作**，超出本审计 lane 的范围，故不在本切片内实施；该行状态保持 **OPEN**，**不作豁免**。
 
 ## 2. 依据
 
