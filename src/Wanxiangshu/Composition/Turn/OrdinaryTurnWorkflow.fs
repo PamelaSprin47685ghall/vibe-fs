@@ -117,6 +117,17 @@ module OrdinaryTurnWorkflow =
     let private classifyManagedTurnGate settled context =
         if settled then Wait else classifyManagerOrPlanTurn context
 
+    /// A turn whose delivery is proven by a durable witness is this turn's own
+    /// terminal: the owner of that delivery waits for a terminal fact, so the
+    /// terminal must be published. A turn without such a witness keeps the
+    /// Continue/nudge path (the obligation is still open), and Manager / Plan
+    /// turns keep their own lifecycle ownership.
+    let private classifyDeliveredTurn (turn: ReconciledTurn) =
+        match turn.Role, turn.Outcome with
+        | (Some Role.Manager | Some Role.Plan), _ -> Wait
+        | _, ReconcileProgram.TurnCompleted -> Ordinary
+        | _, _ -> Wait
+
     let private longWorkGate (journal: AgentJournal option) (context: ReconciledTurnContext) : Task<LongWorkGate> =
         task {
             let turn = context.Turn
@@ -137,8 +148,10 @@ module OrdinaryTurnWorkflow =
             else
                 let! settled = isTurnWorkSettled turn
 
-                if settled || hasDeliveryEvidence journal turn then
+                if settled then
                     return Wait
+                elif hasDeliveryEvidence journal turn then
+                    return classifyDeliveredTurn turn
                 else
                     return classifyManagerOrPlanTurn context
         }

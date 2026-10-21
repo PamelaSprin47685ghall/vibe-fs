@@ -3,53 +3,220 @@ import assert from 'node:assert/strict'
 import { withForkRuntime, toolModule } from './support/fork-runtime.mjs'
 import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import * as eventsSurface from '../../../dist/OpenCode/Host/EventsSurface.js'
+import * as handleJournal from '../../../dist/Execution/Delegation/Handle/JournalSurface.js'
+
+// The provider language is a global preference; this file mixes the real
+// plugin path (which boots the plugin and refreshes that preference) with the
+// sync path, so the file pins one language for every member.
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
+// 真实插件路径下的委派：fork / resume / join 都走生产接线，交付走
+// `this.deliver`（它落唯一一条 durable 交付见证），终态走生产的
+// `message.updated` + `session.idle` → 终态发布。夹具只负责把宿主消息
+// 摆成真实顺序（物理 user 消息 → assistant 消息 → 交付 → 终态事件），
+// 不伪造任何 durable 事实。
+
+/** The Host's physical user message of one child turn (the last one the child received). */
+const physicalUserMessageOf = (runtime, child) => {
+  const physical = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1)
+  assert.ok(physical, `the child ${child} must have received a physical user message`)
+  return physical
+}
+
+/**
+ * One real child turn: the assistant message, its delivery, and its terminal.
+ * A turn without a material delivers nothing — the turn still completes, but
+ * it owes the parent no delivery.
+ */
+const deliverChildTurn = async (hooks, runtime, child, run, prose, material, awaitTerminal) => {
+  const physical = physicalUserMessageOf(runtime, child)
+  const assistant = {
+    info: {
+      id: run,
+      role: 'assistant',
+      sessionID: child,
+      parentID: physical.id,
+      agent: 'engineer',
+      providerID: 'provider',
+      modelID: 'engineer-model',
+      time: { created: 2 },
+    },
+    parts: [{ type: 'text', text: prose }],
+  }
+  runtime.pushHostMessage(child, assistant)
+  const user = {
+    info: {
+      id: physical.id,
+      role: 'user',
+      sessionID: child,
+      agent: 'engineer',
+      model: { providerID: 'provider', modelID: 'engineer-model' },
+      time: { created: 1 },
+    },
+    parts: physical.parts ?? [],
+  }
+  await hooks['experimental.chat.messages.transform']({ sessionID: child }, { messages: [user] })
+  if (material !== null) {
+    await hooks.tool['todowrite-for-engineer'].execute(
+      {
+        program: `class Js extends JsProgram { async run() { await this.deliver({ 0: ${JSON.stringify(material)} }); } }`,
+      },
+      { sessionID: child, agent: 'engineer', callID: `call-${run}`, messageID: run },
+    )
+  }
+  assistant.info.time.completed = 3
+  assistant.info.finish = 'stop'
+  await hooks.event({ event: { type: 'message.updated', properties: { info: assistant.info } } })
+  await hooks.event({ event: { type: 'session.idle', properties: { sessionID: child } } })
+  await awaitTerminal(child, run)
+}
+
+/**
+ * The shared terminal port is where the production terminal publication
+ * lands. The test observes it (it publishes nothing itself) and waits for the
+ * exact run's terminal — the child turn is not finished until the parent can
+ * hear about it.
+ */
+const terminalObserver = async (runtime) => {
+  const port = await runtime.terminalPort
+  const seen = []
+  const subscription = eventsSurface.subscribe(port, (sessionId, outcome) => {
+    seen.push({ sessionId, outcome })
+  })
+  return {
+    seen,
+    dispose: () => eventsSurface.dispose(subscription),
+    awaitRun: async (child, run) => {
+      const deadline = Date.now() + 15000
+      while (Date.now() < deadline) {
+        const published = seen.some(
+          (entry) => entry.sessionId === child && entry.outcome?.kind === 'Completed' && entry.outcome?.providerRun === run,
+        )
+        if (published) return
+        await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+      assert.fail(`the child ${child} never published its terminal for ${run}`)
+    },
+  }
+}
+
+/** The join records block — the byName index below it is a lookup mirror of the same records. */
+const joinRecordsOf = (result) => {
+  const start = result.indexOf('[[data.records]]')
+  assert.notEqual(start, -1, 'the join result must carry its records block')
+  const end = result.indexOf('[data.byName.', start)
+  return end === -1 ? result.slice(start) : result.slice(start, end)
+}
 
 test('WHAT[delegation-024] pre-join resume preserves both public join delivered views', async () => {
-  const owner = 'prejoin-retained-delivery'
-  await withForkRuntime(owner, async runtime => {
-    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'FIRST')
-    await forkTool.awaitPromptCount(runtime, 1)
-    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
-    assert.match(await first, /Ada/)
-    const child = forkTool.child(runtime)
-    runtimeSurface.recordFencedDeliveredView(child, 'provider-a', 'call-a', { prefixUntil: 0, thenMap: { 0: 'DELIVERED-A' } })
-    assert.equal(await forkTool.settle(runtime, owner, 'RETAINED-ANSWER-A', 'provider-a'), true)
-    const second = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'SECOND')
-    await forkTool.awaitPromptCount(runtime, 2)
-    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
-    assert.match(await second, /Ada/)
-    assert.equal(forkTool.child(runtime), child)
-    runtimeSurface.recordFencedDeliveredView(child, 'provider-b', 'call-b', { prefixUntil: 0, thenMap: { 0: 'DELIVERED-B' } })
-    assert.equal(await forkTool.settle(runtime, owner, 'RETAINED-ANSWER-B', 'provider-b'), true)
-    const result = await forkTool.executeJoin(runtime, owner)
-    assert.match(result, /DELIVERED-A/)
-    assert.match(result, /DELIVERED-B/)
-    assert.equal((result.match(/text = "DELIVERED-A"/g) ?? []).length, 1)
-    assert.equal((result.match(/text = "DELIVERED-B"/g) ?? []).length, 1)
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    const owner = 'prejoin-retained-delivery'
+    await acceptAuthorityRoot(runtime, owner, 'manager')
+    await openIncumbency(runtime, owner)
+
+    const first = await hooks.tool['todowrite-for-manager'].execute(
+      {
+        program: 'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "FIRST" }, { 1: null }); } }',
+      },
+      { sessionID: owner, agent: 'manager', callID: 'call-fork', messageID: 'msg-fork' },
+    )
+    assert.match(first, /Ada/)
+    assert.equal(createdIds.length, 1)
+    const child = createdIds[0]
+
+    const terminals = await terminalObserver(runtime)
+    try {
+      await deliverChildTurn(hooks, runtime, child, `run-${child}-1`, 'WORK REPORT A', 'DELIVERED-A', terminals.awaitRun)
+
+      const second = await hooks.tool['todowrite-for-manager'].execute(
+        {
+          program: 'class Js extends JsProgram { async run() { return await this.resume({ name: "Ada", charge: "SECOND" }, { 1: null }); } }',
+        },
+        { sessionID: owner, agent: 'manager', callID: 'call-resume', messageID: 'msg-resume' },
+      )
+      assert.match(second, /Ada/)
+      assert.equal(createdIds.length, 1, 'the same Byname must reuse the same physical child')
+
+      await deliverChildTurn(hooks, runtime, child, `run-${child}-2`, 'WORK REPORT B', 'DELIVERED-B', terminals.awaitRun)
+
+      const result = await hooks.tool['todowrite-for-manager'].execute(
+        { program: 'class Js extends JsProgram { async run() { return await this.join(); } }' },
+        { sessionID: owner, agent: 'manager', callID: 'call-join', messageID: 'msg-join' },
+      )
+      assert.match(result, /DELIVERED-A/)
+      assert.match(result, /DELIVERED-B/)
+      const records = joinRecordsOf(result)
+      // The delivered view of each turn reaches the join records once, as the
+      // returned body of that turn (the view names the material twice: as the
+      // anchor id and as its text).
+      assert.equal((records.match(/text = \\"DELIVERED-A\\"/g) ?? []).length, 1)
+      assert.equal((records.match(/text = \\"DELIVERED-B\\"/g) ?? []).length, 1)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
 test('WHAT[delegation-024] an undelivered Completed terminal does not close the child and join stays not-ready', async () => {
-  const owner = 'delivered-and-undelivered-join'
-  await withForkRuntime(owner, async runtime => {
-    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'DELIVER-CHARGE')
-    await forkTool.awaitPromptCount(runtime, 1)
-    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
-    assert.match(await first, /Ada/)
-    const childSession = forkTool.child(runtime)
-    runtimeSurface.recordFencedDeliveredView(childSession, 'provider-delivered', 'call-1', { prefixUntil: 1, thenMap: { 0: 'DELIVERED-RECORD with files = 2' } })
-    assert.equal(await forkTool.settle(runtime, owner, 'RAW-PROSE-IGNORED', 'provider-delivered'), true)
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    const owner = 'delivered-and-undelivered-join'
+    await acceptAuthorityRoot(runtime, owner, 'manager')
+    await openIncumbency(runtime, owner)
 
-    const second = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'UNDELIVERED-CHARGE')
-    await forkTool.awaitPromptCount(runtime, 2)
-    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
-    assert.match(await second, /Ada/)
+    const first = await hooks.tool['todowrite-for-manager'].execute(
+      {
+        program: 'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "DELIVER-CHARGE" }, { 1: null }); } }',
+      },
+      { sessionID: owner, agent: 'manager', callID: 'call-fork', messageID: 'msg-fork' },
+    )
+    assert.match(first, /Ada/)
+    const agentId = /agentId = "([^"]+)"/.exec(first)?.[1]
+    assert.ok(agentId, 'the fork receipt must name the delegated agent')
+    const child = createdIds[0]
+    const deliveredRoot = physicalUserMessageOf(runtime, child).id
 
-    // 空 view 的 Completed 不写完成、join 不关闭、child 仍活跃
-    await forkTool.settleUndelivered(runtime, owner, 'PLAIN-RETURN-NO-DELIVER', 'provider-undelivered')
-    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
-    const joinReceipt = await forkTool.executeJoinReceipt(runtime, owner)
-    assert.equal(joinReceipt.ok, true)
+    const terminals = await terminalObserver(runtime)
+    try {
+      await deliverChildTurn(
+        hooks,
+        runtime,
+        child,
+        `run-${child}-1`,
+        'WORK REPORT DELIVERED',
+        'DELIVERED-RECORD with files = 2',
+        terminals.awaitRun,
+      )
+
+      const second = await hooks.tool['todowrite-for-manager'].execute(
+        {
+          program: 'class Js extends JsProgram { async run() { return await this.resume({ name: "Ada", charge: "UNDELIVERED-CHARGE" }, { 1: null }); } }',
+        },
+        { sessionID: owner, agent: 'manager', callID: 'call-resume', messageID: 'msg-resume' },
+      )
+      assert.match(second, /Ada/)
+      const undeliveredRoot = physicalUserMessageOf(runtime, child).id
+      assert.notEqual(undeliveredRoot, deliveredRoot, 'the resumed turn roots a new physical input')
+
+      // A Completed turn without a delivery does not write a completion: the
+      // work unit stays Active and no terminal reaches the parent.
+      await deliverChildTurn(hooks, runtime, child, `run-${child}-2`, 'PLAIN-RETURN-NO-DELIVER', null, () => {})
+
+      const lifecycle = handleJournal.snapshot(runtime.journal, owner, agentId, child, undeliveredRoot)
+      assert.equal(lifecycle.record?.lifecycle, 'Active')
+
+      // The join still reports the delivered turn, and nothing of the
+      // undelivered one: the undelivered turn left the child open.
+      const joinReceipt = await hooks.tool['todowrite-for-manager'].execute(
+        { program: 'class Js extends JsProgram { async run() { return await this.join(); } }' },
+        { sessionID: owner, agent: 'manager', callID: 'call-join', messageID: 'msg-join' },
+      )
+      assert.match(joinReceipt, /DELIVERED-RECORD with files = 2/)
+      assert.doesNotMatch(joinReceipt, /PLAIN-RETURN-NO-DELIVER/)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
@@ -85,68 +252,59 @@ const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
 test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-reuse-'))
-  const owner = 'manager-reuse'
-  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    const owner = 'manager-reuse'
+    await acceptAuthorityRoot(runtime, owner, 'manager')
+    await openIncumbency(runtime, owner)
 
-  try {
-    const first = forkTool.executeManagerFork(
-      runtime,
-      toolModule,
-      owner,
-      'engineer',
-      'Ada',
-      'FIRST-FORK-CHARGE',
-    )
-    await waitForPromptCount(runtime, 1)
-    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
-    assert.equal(forkTool.childCount(runtime), 1)
-    const child = forkTool.child(runtime)
-    assert.notEqual(child, null)
-    assert.match(forkTool.prompt(runtime, 0), /FIRST-FORK-CHARGE/)
-    assert.match(await first, /Ada/)
+    const terminals = await terminalObserver(runtime)
+    try {
+      const first = await hooks.tool['todowrite-for-manager'].execute(
+        {
+          program: 'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "FIRST-FORK-CHARGE" }, { 1: null }); } }',
+        },
+        { sessionID: owner, agent: 'manager', callID: 'call-fork', messageID: 'msg-fork' },
+      )
+      assert.equal(createdIds.length, 1)
+      const child = createdIds[0]
+      assert.notEqual(child, null)
+      assert.match(first, /Ada/)
+      const agentId = /agentId = "([^"]+)"/.exec(first)?.[1]
+      assert.ok(agentId, 'the fork receipt must name the delegated agent')
 
-    runtimeSurface.recordFencedDeliveredView(child, 'fork-run-1', 'call-1', { prefixUntil: 0, thenMap: { 0: 'FIRST-FORK-ANSWER' } })
-    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-FORK-ANSWER', 'fork-run-1'), true)
+      await deliverChildTurn(hooks, runtime, child, `run-${child}-1`, 'REPORT ONE', 'FIRST-FORK-ANSWER', terminals.awaitRun)
+      const firstRoot = physicalUserMessageOf(runtime, child).id
 
-    const second = forkTool.executeManagerResume(
-      runtime,
-      toolModule,
-      owner,
-      '',
-      'Ada',
-      'SECOND-FORK-CHARGE',
-    )
+      const second = await hooks.tool['todowrite-for-manager'].execute(
+        {
+          program: 'class Js extends JsProgram { async run() { return await this.resume({ name: "Ada", charge: "SECOND-FORK-CHARGE" }, { 1: null }); } }',
+        },
+        { sessionID: owner, agent: 'manager', callID: 'call-resume', messageID: 'msg-resume' },
+      )
+      assert.match(second, /Ada/)
+      assert.equal(createdIds.length, 1, 'same Byname must reuse the same physical child')
+      assert.doesNotMatch(second, /SECOND-FORK-ANSWER/)
+      assert.doesNotMatch(second, /FIRST-FORK-ANSWER/)
 
-    await waitForPromptCount(runtime, 2)
-    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
-    assert.equal(forkTool.child(runtime), child, 'same Byname must reuse the same physical child')
-    assert.equal(forkTool.childCount(runtime), 1)
+      const secondRoot = physicalUserMessageOf(runtime, child).id
+      assert.notEqual(secondRoot, firstRoot, 'the reused child received a new physical input')
+      assert.equal(
+        handleJournal.snapshot(runtime.journal, owner, agentId, child, secondRoot).record?.lifecycle,
+        'Active',
+        'fork return must not imply that the reused child already completed',
+      )
 
-    const secondPrompt = forkTool.prompt(runtime, 1)
-    assert.match(secondPrompt, /SECOND-FORK-CHARGE/)
-
-    const secondResult = await second
-    assert.match(secondResult, /Ada/)
-    assert.doesNotMatch(secondResult, /SECOND-FORK-ANSWER/)
-    assert.doesNotMatch(secondResult, /FIRST-FORK-ANSWER/)
-
-    assert.equal(
-      forkTool.durableLifecycleByname(runtime, owner, 'Ada'),
-      'Active',
-      'fork return must not imply that the reused child already completed',
-    )
-
-    runtimeSurface.recordFencedDeliveredView(child, 'fork-run-2', 'call-2', { prefixUntil: 0, thenMap: { 0: 'SECOND-FORK-ANSWER' } })
-    assert.equal(await forkTool.settle(runtime, owner, 'SECOND-FORK-ANSWER', 'fork-run-2'), true)
-    assert.equal(
-      forkTool.durableLifecycleByname(runtime, owner, 'Ada'),
-      'CompletedAwaitingJoin',
-      'completion remains a separately consumable join fact',
-    )
-  } finally {
-    forkTool.disposeRuntime(runtime)
-  }
+      await deliverChildTurn(hooks, runtime, child, `run-${child}-2`, 'REPORT TWO', 'SECOND-FORK-ANSWER', terminals.awaitRun)
+      const thirdRoot = physicalUserMessageOf(runtime, child).id
+      assert.equal(
+        handleJournal.snapshot(runtime.journal, owner, agentId, child, thirdRoot).record?.lifecycle,
+        'CompletedAwaitingJoin',
+        'completion remains a separately consumable join fact',
+      )
+    } finally {
+      terminals.dispose()
+    }
+  })
 })
 }
 
