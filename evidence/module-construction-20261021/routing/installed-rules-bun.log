@@ -1,0 +1,20 @@
+bun test v1.3.14 (d1632b29)
+
+002.test.mjs:
+(pass) SPEC[routing-1] admit accepts the protocol-2 shape and returns a frozen policy [0.53ms]
+(pass) SPEC[routing-1] admit fails closed on a missing or non-function default export [0.22ms]
+(pass) SPEC[routing-1] the protocol version is an exact number, not an enable switch [0.39ms]
+(pass) SPEC[routing-1] counterexample: a module without hasTheoreticalCapacity is refused, not given infinite capacity [0.03ms]
+(pass) SPEC[routing-1] an exported markProviderFailed must be a function [0.02ms]
+(pass) SPEC[routing-2] route is called with exactly role, running, previous and returns a decoded target [0.22ms]
+(pass) SPEC[routing-2] the scheduler receives copies and cannot rewrite the caller ledger [0.05ms]
+(pass) SPEC[routing-2] undefined from the scheduler is waiting, like null [0.01ms]
+(pass) SPEC[routing-2] Promise, throw and illegal targets fail closed [0.20ms]
+(pass) SPEC[routing-3] counterexample: an async capacity query is not theoretical capacity [0.09ms]
+(pass) SPEC[routing-3] the capacity query answers per role with one argument [0.02ms]
+(pass) SPEC[routing-4] durable road targets decode with the same field rules [0.11ms]
+(pass) SPEC[routing-4] decodeTarget and providerOf [0.05ms]
+
+ 13 pass
+ 0 fail
+Ran 13 tests across 1 file. [19.00ms]

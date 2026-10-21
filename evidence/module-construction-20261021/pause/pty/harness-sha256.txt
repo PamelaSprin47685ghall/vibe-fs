@@ -1,0 +1,3 @@
+eb16388897d0ced02b54537306f156da937b257986670b1635f9e5b47bf3ca9f  consumer/target.mjs
+2027dbdcb9b93b8124ec94e18ed9bf0cbd17a6f98c83d90c9cb86e5701ffeecd  consumer/pty-soak.mjs
+fec7e063cec97dbf0b7b1ad9638e7e9aded57a90accca524ad044fdfec425aff  consumer/controller.mjs

@@ -1,0 +1,34 @@
+# Routing candidate
+
+- Fixed source: library `202a41ab`; source-only candidate `d360c50`, based on the published permit metadata `9c88393`.
+- Library write set: `src/routing/RoutingProtocol.fs`, `index.d.ts`, `AGENTS.md`, `Wanxiangli.Routing.fsproj`, `tests/002.test.mjs`.
+- Main candidate write set: `ModelRouting.fs`, requirement tests `001`, `002`, `019`. No ledger, queue, custody, IO, receipt, or purpose ownership change.
+- Node 22 Fable single-module build: exit 0, no warnings. Node 22 rules 13 pass / 0 fail; Bun 1.3.14 rules 13 pass / 0 fail. These read actual local emitted module, and do not prove the pending public package export or tarball consumption.
+- Main actual gen102 base-red: the 10 selected new tests all fail (0 pass / 10 fail); log `/private/tmp/vibe-fs-routing-main-base-red.log`. Three invalid configured module shapes, five invalid capacity results through loader and real admission, exact 3/1 arguments with true/false controls, and a durable model colon through the actual runtime.
+- A later attempt to run all three test files overlapped root clean build and found dist absent. `/private/tmp/vibe-fs-routing-main-base-all.log` records `ERR_MODULE_NOT_FOUND`; this is not a functional test count and is not candidate acceptance.
+- Main candidate has only been formatted and JS syntax checked. It has not been compiled or formally run. Parent owns main source application, unified build, metadata, and public package proof.
+
+## Remaining boundary
+
+P2: the legacy durable string `provider/model:reasoning` does not escape either field. If both a model and its reasoning contain colons, no parser can uniquely recover the original pair. The fixed upstream last-colon rule restores the real model-tag case when reasoning has no colon. `decodeTarget` still accepts any nonempty reasoning. This candidate does not prove arbitrary target round trips, impose a new variant whitelist, or migrate historical ambiguous records.
+
+The in-memory proof constructor retains its missing-query default of true. A configured module loaded through the production loader must supply the query and can never obtain this fallback. A query that is present is strictly validated at invocation, before any fresh-demand scheduling, enqueue, or incumbent replacement.
+
+## Standard package verification
+
+- Root added the real `0.11.0` metadata and all 22 exports in the candidate. This verification did not edit source, metadata, scripts, or the main checkout. The three root-owned dirty files remain the same.
+- All 22 modules built from this same tree with local copies of the same development dependency versions. Exit 0; the full tree emitted 156 warnings, while routing itself emitted none. Log: `/private/tmp/vibe-fs-routing-all22-localdeps-build.log`.
+- The inventory's real `scripts/tests/exports-package.test.mjs` packed and installed the tarball outside the workspace and verified every declared module/type, absence of compiler dependencies, and all 22 imports on Node 22 and Bun. Result: 3 pass / 0 fail / 0 skipped / 0 TODO, exit 0. Log: `/private/tmp/vibe-fs-routing-all22-package-localcache.log`.
+- Routing rules after this full build: Node 22 13 pass / 0 fail, Bun 13 pass / 0 fail, both exit 0. Logs: `/private/tmp/vibe-fs-routing-all22-rules-{node,bun}.log`.
+- Continuity against clean baseline HEAD `9c88393f2f898330ff095064dcc623117be80d2c`: all 21 previous JS exports match after normalizing only the numeric PID in generated `// .build/<module>-<PID>/<file>` comments. None are raw-byte-identical because the PID changed. All 21 declaration files are byte-identical. Per-export raw and normalized SHA-256 values: `/private/tmp/vibe-fs-routing-continuity.json`; comparison harness: `/private/tmp/vibe-fs-routing-continuity.mjs`.
+- Initial environment failures remain recorded: default npm cache write permission failure in `/private/tmp/vibe-fs-routing-all22-package.log`; dependency soft-link paths changed esbuild comments and failed strict continuity. Dependencies were copied locally and the tree rebuilt rather than expanding normalization. No code or metadata change was used to obtain the successful result.
+- This proves the standard package inventory and runtime imports. Independent TypeScript positive/negative consumption and dedicated routing behavior through the installed package are still separate follow-up checks.
+
+## Integration failures retained
+
+- The first main build failed FS3218 because the overlay renamed the public `invokeScheduler` parameter `purpose` to `_purpose` while its `.fsi` retained `purpose`. Root repaired the implementation to keep `purpose` and explicitly ignore it, leaving the public contract unchanged. Original failure: `/private/tmp/vibe-fs-gen104-build.log`. Source review and isolated library builds did not prove main Fable compilation.
+- Release06/gen104 failed at 4337 pass / 190 fail with 757/757 files drained, recorded by root in `/private/tmp/vibe-fs-module-release-06-gen104.log`. A shared valid routing fixture lacked mandatory `hasTheoreticalCapacity`, causing actual Plugin initialization to stop. The prior limited direct loader scan was incomplete: actual Plugin initialization also consumes configuration written by shared support helpers.
+- The three support repairs add only an explicit `() => true` query to the prior implicitly-true valid configurations: `verification-system/tests/support/routing-home.mjs`, `execution-model-routing/tests/support/process-shared-routing.mjs`, and `knowledge-reuse/tests/support/boot-capture-physical-child.mjs`. Invalid-config tests and production loader strictness remain intact. Parent owns the separate four non-support fixture corrections and the next full formal run.
+- Gen104 raw targeted checks after the support repair: actual two-Plugin shared multiset 1/0, representative shared plugin fixture (`host-provider-failure-ownership/001`) 1/0. Logs: `/private/tmp/vibe-fs-routing-support-multishared003-gen104.log`, `/private/tmp/vibe-fs-routing-support-plugin-gen104.log`.
+- Four actual Boot owner cases first failed in the ordinary sandbox at the outer owned-tool probe despite retained successful Capture/fatal settlement evidence; that raw result remains `/private/tmp/vibe-fs-routing-support-boot013-gen104.log`. The same four original tests with native-process inspection permission passed 4/0, exit 0, no skipped/TODO, with real native and independent cold-reader PIDs and fatal SIGKILL receipts: `/private/tmp/vibe-fs-routing-support-boot013-native-gen104.log`. No test assertion, timeout, release check, or fatal evidence was relaxed.
+- Complete `knowledge-reuse/013` raw file after repair: 31 pass / 0 fail / 0 skipped / 1 existing GAP-160 TODO, exit 0. Log: `/private/tmp/vibe-fs-routing-support-knowledge013-full-gen104.log`. This is the raw Node runner result, not a strict release-wide all-green claim or GAP-160 closure.

@@ -1,0 +1,8 @@
+negative.ts(5,10): error TS2540: Cannot assign to 'version' because it is a read-only property.
+negative.ts(6,7): error TS2322: Type '2' is not assignable to type '3'.
+negative.ts(7,28): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+negative.ts(8,41): error TS2741: Property 'reasoning' is missing in type '{ model: string; }' but required in type 'ModelTarget'.
+negative.ts(9,30): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+negative.ts(10,8): error TS2540: Cannot assign to 'route' because it is a read-only property.
+negative.ts(11,8): error TS2540: Cannot assign to 'model' because it is a read-only property.
+negative.ts(12,46): error TS2322: Type 'number' is not assignable to type 'string'.

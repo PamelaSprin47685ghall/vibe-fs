@@ -1,0 +1,1 @@
+{"receipt":{"version":1,"key":"2d9048d1-e30d-4a3d-96e6-7980f3399f7b","incarnation":"b3146534-23f5-414b-b311-67a2d90d21ee","result":{"kind":"Ended","exit":{"code":null,"signal":"SIGTERM"},"stopped":true}},"proof":"c13e3b0d051d727dbaded4ccc1ef96882e5da30253fc5f0089af49c5c878fdcd"}

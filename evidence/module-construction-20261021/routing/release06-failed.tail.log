@@ -1,0 +1,5 @@
+}
+--- [unit] 完整日志见: .fable-build/verify-logs/2026-10-21T00-40-18-145Z/unit.log ---
+
+  unit           FAIL(1)  218.8s
+FAIL  verify release  298.3s

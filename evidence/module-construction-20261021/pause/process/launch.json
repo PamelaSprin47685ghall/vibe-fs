@@ -1,0 +1,48 @@
+{
+  "state": "Running; this is a launch receipt, not acceptance",
+  "startedAt": "2026-10-20T23:01:54.366Z",
+  "sourceCommit": "3db7b439283779f6037244d57cf05e6ec3e7ab31",
+  "package": "/private/tmp/vibe-fs-module-baseline-20261021/final18/wanxiangli-0.9.0.tgz",
+  "packageSha256": "2b7ce8d4c96bc5563e807e4c082c7dc4fa049afe7caf6432d4e25fece7292da7",
+  "consumer": "/private/tmp/vibe-fs-physical-soak-20261021-a/consumer",
+  "command": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-physical-soak-20261021-a/consumer/coordinator.mjs",
+  "coordinatorPid": 84197,
+  "execSession": 79797,
+  "runtimes": { "node22": "v22.13.0", "bun": "1.3.14" },
+  "status": "/private/tmp/vibe-fs-physical-soak-20261021-a/status.json",
+  "statusCadence": "15-second coordinator aggregation; 30-second per-lane physical sampling; stdin state also saves once per minute",
+  "phasesPerLane": [
+    { "name": "process", "minimumRealMilliseconds": 7200000, "outputMode": "Capture", "end": "Actual stdin EOF, exact input digest, natural exit 0" },
+    { "name": "supervision", "minimumRealMilliseconds": 7200000, "outputMode": "Capture", "end": "Actual stdin EOF, target exit 23, same-group descendant retains pipes, TERM observed while wait times out, KILL closes group" }
+  ],
+  "ownedKeeperPerLane": "Separate target imports only the installed public NodeTime and awaits raceExitKeepingAlive(never, 14400000); stdin EOF sent. The target has no other referenced timer or input consumer. It must print false after the real duration and exit cleanly.",
+  "payloadPerPhase": {
+    "initialBurstBytesPerChannel": 3145728,
+    "initialConsumerPauseMs": 2000,
+    "burst": "Repeated UTF8 BOM + CJK + emoji + CRLF; deliberate one-byte splits in header",
+    "pacedOutput": "One numbered UTF8/BOM/CRLF frame per channel every 10 seconds until actual input EOF",
+    "stdin": "A numbered UTF8/BOM/CRLF input write approximately each minute; target receipt hashes actual bytes, not just forwarding acknowledgement",
+    "validation": "Contiguous per-channel capture offsets, maximum 65536-byte chunks, independent expected byte counts/SHA-256, exact final 4096-byte raw tails and valid UTF8 suffix text"
+  },
+  "safetyEnvelope": {
+    "observedOutputBytesPerLaneMaximum": 16777216,
+    "expectedTotalOutput": "Less than 26 MiB across both lanes; hard per-lane limits total 32 MiB",
+    "retainedOutputPerChannel": 4096,
+    "targetInputWriteMaximum": 2048,
+    "globalDuration": "4 hours plus at most 3 minutes before coordinator requests cancellation",
+    "onFailure": "Reject current lane, request cancellation of both lanes, kill owned sessions/PIDs and preserve all logs",
+    "concurrency": "Each lane one owned keeper plus one queue target; Supervision adds one group leader; only final cancellation briefly adds one descendant"
+  },
+  "observations": {
+    "scope": "Only this experiment's known PIDs; ps fields exclude command arguments, lsof emits only PID/FD identifiers",
+    "fields": ["PID/PPID/PGID", "RSS", "cumulative CPU time", "process state", "FD identifiers/counts", "harness process memory", "runtime active resource categories when exposed", "actual process/capture state and observed/retained channel bytes"],
+    "meaning": "CPU/RSS/FD trends are measured finite-run evidence, not invented production thresholds or a universal no-leak guarantee",
+    "nativeCleanup": "Require actual target, descendant and supervisor not live after Closed; require own supervision temporary directories absent"
+  },
+  "limits": [
+    "Only the two finite runtime queues and this wall-clock interval are exercised",
+    "No PTY, daemonized or reparented escape, host crash recovery, disk power-loss or model integration proof",
+    "No main source/build or library source changes",
+    "Polls, output frames and resource samples are not counted as individual passing tests"
+  ]
+}

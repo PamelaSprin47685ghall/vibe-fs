@@ -1,0 +1,3 @@
+{"at":"2026-10-20T23:01:54.449Z","elapsedMs":33.392832999999996,"event":"phase-started","name":"process","target":84209,"supervised":false}
+{"at":"2026-10-20T23:01:56.518Z","elapsedMs":2102.119875,"event":"physical-backpressure-observed","name":"process","pausedMs":2000,"burstBytesPerChannel":3145728}
+{"at":"2026-10-21T00:57:20.809Z","elapsedMs":6926352.438416,"event":"failed","message":"Coordinator requested cancellation","stack":"Error: Coordinator requested cancellation\n    at <anonymous> (/private/tmp/vibe-fs-physical-soak-20261021-a/consumer/lane.mjs:25:34)"}

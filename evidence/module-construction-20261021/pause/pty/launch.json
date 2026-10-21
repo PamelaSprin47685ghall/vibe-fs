@@ -1,0 +1,54 @@
+{
+  "state": "Running; launch receipt only, no 120-minute acceptance yet",
+  "generation": 100,
+  "manifestSha256": "44ee86790fc57398105f36b03b6f736949ea5c00babd0e7b291d48b924514ea0",
+  "artifactReceipt": "copied-artifact-receipt.json",
+  "artifacts": "831 byte-equal copied files: full dist, actual bun-pty 0.4.10 including native libraries, and actual installed wanxiangli runtime package outputs/resources. No symlinks or fallback into main.",
+  "consumer": "/private/tmp/vibe-fs-pty-soak-gen100-20261021/consumer",
+  "runtime": "Bun 1.3.14; independent Node22 controller",
+  "controllerPid": 84967,
+  "harnessPid": 84982,
+  "execSession": 69451,
+  "activeStartedAt": "2026-10-20T23:28:41.999Z",
+  "minimumRealActiveMilliseconds": 7200000,
+  "expectedActiveEnd": "2026-10-21T01:28:42Z",
+  "command": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-pty-soak-gen100-20261021/consumer/controller.mjs",
+  "publicEntry": "Copied gen100 Process Surface ptyRecoveryOpen/ptyRecoveryDrain; Recovery itself uses the real public PTY scope implementation and bun-pty",
+  "onePhysicalPty": {
+    "custodian": 85012,
+    "scopeOwner": 85054,
+    "target": 85057,
+    "anchor": 85059,
+    "scopeIncarnation": "6dd30771-478c-41d4-b916-f37db9fd805b",
+    "extraDescendant": "Only at final EOF/cancellation phase; recorded before target exits"
+  },
+  "activeContract": {
+    "input": "A JSON line approximately each minute includes a UTF8 BOM, CJK, emoji and escaped CRLF in its value. Real target parses it and reports sequence, exact UTF8 byte length, SHA256 and base64. Every response is compared to an independently prepared expected line.",
+    "terminal": "Explicit canonical mode and Ctrl-D EOF, echo disabled, output CRLF expansion disabled. This experiment validates the onData text API and application-level input bytes; it does not invent a raw terminal byte API.",
+    "output": "Raw onData text callbacks preserved in output.jsonl; final complete received prefix hash checked independently. Expected total below 128 KiB.",
+    "control": "Every five minutes a separate invalid-secret recover attachment must explicitly reject due to the live creator connection and then close; it never takes the active reader.",
+    "sampling": "Every 30 seconds only known owned PID tree/PGID, RSS, cumulative CPU time and FD identifiers. No process command arguments or unrelated process data are logged.",
+    "meaning": "Responses, polls and samples are observations, not separately counted passing tests. Resource trends only cover this finite run."
+  },
+  "closingContract": [
+    "After at least 120 real minutes, send Ctrl-D on empty canonical input and require a target EOF witness with complete actual stdin digest",
+    "The target creates one same-group descendant, then exits 23; observe exact target-exit receipt while scope-ended/terminal remain absent and descendant lives",
+    "Dispose the creator, pause only the custodian with SIGSTOP, and require public recovery drain to reject in its own finite bound without a terminal outcome",
+    "Keep an independent 12-second SIGCONT timer around the pause; always resume in finally; external controller also has bounded SIGCONT/SIGKILL cleanup",
+    "After resuming and confirming the prior connection detached, public recovery performs TERM then KILL against the same physical scope; descendant TERM witness must exist",
+    "Require a verified HMAC terminal receipt for the exact key/incarnation, Ended with original target exit 23 and stopped=true",
+    "Require all recorded custodian/scope/anchor/target/descendant PIDs not live and control endpoint removed"
+  ],
+  "failurePolicy": "Any observed failure aborts the experiment, resumes a paused custodian, attempts public cleanup then SIGCONT/SIGKILL for all recorded owned PIDs, and retains all logs. External controller kills at 120 minutes plus 2 minutes, with final forced stop after another 30 seconds.",
+  "status": "/private/tmp/vibe-fs-pty-soak-gen100-20261021/status.json",
+  "controllerStatus": "/private/tmp/vibe-fs-pty-soak-gen100-20261021/controller-exit.json",
+  "statusCadence": "30-second sampling plus each request and phase; controller-exit.json is the authoritative outer process result if an uncaught harness error prevents a final status save",
+  "notClaimed": [
+    "Universal absence of resource leaks",
+    "PTY output as a new raw binary channel contract",
+    "Input acknowledgement as target consumption without matching the response/hash",
+    "A stop request, short wait or Unknown result as physical closure",
+    "A model, provider cache or complete cold-host business recovery proof",
+    "Any main source or dist modification"
+  ]
+}

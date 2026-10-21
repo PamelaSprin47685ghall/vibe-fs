@@ -1,0 +1,174 @@
+TAP version 13
+# Subtest: WHAT[knowledge-reuse-013] controlled malformed payload Refresh committed refuses a normal fetch answer after actual cut settlement and cold reopen
+ok 1 - WHAT[knowledge-reuse-013] controlled malformed payload Refresh committed refuses a normal fetch answer after actual cut settlement and cold reopen
+  ---
+  duration_ms: 232.502583
+  ...
+# Subtest: WHAT[knowledge-reuse-013] controlled malformed payload Refresh CurrentCommitUnknown refuses a normal fetch answer after actual cut settlement and cold reopen
+ok 2 - WHAT[knowledge-reuse-013] controlled malformed payload Refresh CurrentCommitUnknown refuses a normal fetch answer after actual cut settlement and cold reopen
+  ---
+  duration_ms: 210.615667
+  ...
+# Subtest: WHAT[knowledge-reuse-013] controlled malformed payload Access committed refuses a normal fetch answer after actual cut settlement and cold reopen
+ok 3 - WHAT[knowledge-reuse-013] controlled malformed payload Access committed refuses a normal fetch answer after actual cut settlement and cold reopen
+  ---
+  duration_ms: 198.690583
+  ...
+# Subtest: WHAT[knowledge-reuse-013] controlled malformed payload Access CurrentCommitUnknown refuses a normal fetch answer after actual cut settlement and cold reopen
+ok 4 - WHAT[knowledge-reuse-013] controlled malformed payload Access CurrentCommitUnknown refuses a normal fetch answer after actual cut settlement and cold reopen
+  ---
+  duration_ms: 192.452041
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Refresh success preserves its settlement boundary
+ok 5 - WHAT[knowledge-reuse-013] actual fetch Refresh success preserves its settlement boundary
+  ---
+  duration_ms: 22.668958
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Refresh CurrentCommitUnknown preserves its settlement boundary
+ok 6 - WHAT[knowledge-reuse-013] actual fetch Refresh CurrentCommitUnknown preserves its settlement boundary
+  ---
+  duration_ms: 14.510625
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Refresh AppendNotAttempted preserves its settlement boundary
+ok 7 - WHAT[knowledge-reuse-013] actual fetch Refresh AppendNotAttempted preserves its settlement boundary
+  ---
+  duration_ms: 9.698791
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Refresh NoNewWriteReleaseFailed preserves its settlement boundary
+ok 8 - WHAT[knowledge-reuse-013] actual fetch Refresh NoNewWriteReleaseFailed preserves its settlement boundary
+  ---
+  duration_ms: 9.319375
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Refresh cut-callback-throws preserves its settlement boundary
+ok 9 - WHAT[knowledge-reuse-013] actual fetch Refresh cut-callback-throws preserves its settlement boundary
+  ---
+  duration_ms: 13.968625
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Access success preserves its settlement boundary
+ok 10 - WHAT[knowledge-reuse-013] actual fetch Access success preserves its settlement boundary
+  ---
+  duration_ms: 10.967375
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Access CurrentCommitUnknown preserves its settlement boundary
+ok 11 - WHAT[knowledge-reuse-013] actual fetch Access CurrentCommitUnknown preserves its settlement boundary
+  ---
+  duration_ms: 12.230917
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Access AppendNotAttempted preserves its settlement boundary
+ok 12 - WHAT[knowledge-reuse-013] actual fetch Access AppendNotAttempted preserves its settlement boundary
+  ---
+  duration_ms: 5.993542
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Access NoNewWriteReleaseFailed preserves its settlement boundary
+ok 13 - WHAT[knowledge-reuse-013] actual fetch Access NoNewWriteReleaseFailed preserves its settlement boundary
+  ---
+  duration_ms: 7.048708
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Access cut-callback-throws preserves its settlement boundary
+ok 14 - WHAT[knowledge-reuse-013] actual fetch Access cut-callback-throws preserves its settlement boundary
+  ---
+  duration_ms: 13.326792
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual fetch Access ordinary-observer-throws preserves its settlement boundary
+ok 15 - WHAT[knowledge-reuse-013] actual fetch Access ordinary-observer-throws preserves its settlement boundary
+  ---
+  duration_ms: 12.189167
+  ...
+# Subtest: WHAT[knowledge-reuse-013] the native owner requires its capability and rejects an incident descriptor without an original settled carrier
+ok 16 - WHAT[knowledge-reuse-013] the native owner requires its capability and rejects an incident descriptor without an original settled carrier
+  ---
+  duration_ms: 0.147084
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual Lifecycle Capture valid payload committed preserves the original settlement and durable projection
+ok 17 - WHAT[knowledge-reuse-013] actual Lifecycle Capture valid payload committed preserves the original settlement and durable projection
+  ---
+  duration_ms: 11.92825
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual Lifecycle Capture valid payload CurrentCommitUnknown preserves the original settlement and durable projection
+ok 18 - WHAT[knowledge-reuse-013] actual Lifecycle Capture valid payload CurrentCommitUnknown preserves the original settlement and durable projection
+  ---
+  duration_ms: 10.489459
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual Lifecycle Capture controlled malformed payload committed preserves the original settlement and durable projection
+ok 19 - WHAT[knowledge-reuse-013] actual Lifecycle Capture controlled malformed payload committed preserves the original settlement and durable projection
+  ---
+  duration_ms: 192.077625
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual Lifecycle Capture controlled malformed payload CurrentCommitUnknown preserves the original settlement and durable projection
+ok 20 - WHAT[knowledge-reuse-013] actual Lifecycle Capture controlled malformed payload CurrentCommitUnknown preserves the original settlement and durable projection
+  ---
+  duration_ms: 195.072292
+  ...
+# Subtest: WHAT[knowledge-reuse-013] original Host finalization helper refuses controlled malformed Capture committed with returning owner after real Bookkeeper settlement
+ok 21 - WHAT[knowledge-reuse-013] original Host finalization helper refuses controlled malformed Capture committed with returning owner after real Bookkeeper settlement
+  ---
+  duration_ms: 14.58475
+  ...
+# Subtest: WHAT[knowledge-reuse-013] original Host finalization helper refuses controlled malformed Capture CurrentCommitUnknown with returning owner after real Bookkeeper settlement
+ok 22 - WHAT[knowledge-reuse-013] original Host finalization helper refuses controlled malformed Capture CurrentCommitUnknown with returning owner after real Bookkeeper settlement
+  ---
+  duration_ms: 12.646959
+  ...
+# Subtest: WHAT[knowledge-reuse-013] original Host finalization helper refuses controlled malformed Capture committed with throwing owner after real Bookkeeper settlement
+ok 23 - WHAT[knowledge-reuse-013] original Host finalization helper refuses controlled malformed Capture committed with throwing owner after real Bookkeeper settlement
+  ---
+  duration_ms: 12.944333
+  ...
+# Subtest: WHAT[knowledge-reuse-013] original Host finalization helper refuses controlled malformed Capture CurrentCommitUnknown with throwing owner after real Bookkeeper settlement
+ok 24 - WHAT[knowledge-reuse-013] original Host finalization helper refuses controlled malformed Capture CurrentCommitUnknown with throwing owner after real Bookkeeper settlement
+  ---
+  duration_ms: 14.078
+  ...
+# Subtest: WHAT[knowledge-reuse-013] original Host finalization success without cuts retains the ordinary settlement after actual Capture
+ok 25 - WHAT[knowledge-reuse-013] original Host finalization success without cuts retains the ordinary settlement after actual Capture
+  ---
+  duration_ms: 8.628375
+  ...
+# Subtest: WHAT[knowledge-reuse-013] original Host finalization CurrentCommitUnknown without cuts retains the ordinary settlement after actual Capture
+ok 26 - WHAT[knowledge-reuse-013] original Host finalization CurrentCommitUnknown without cuts retains the ordinary settlement after actual Capture
+  ---
+  duration_ms: 8.795041
+  ...
+# Subtest: WHAT[knowledge-reuse-013] original Host finalization observer-throws without cuts retains the ordinary settlement after actual Capture
+ok 27 - WHAT[knowledge-reuse-013] original Host finalization observer-throws without cuts retains the ordinary settlement after actual Capture
+  ---
+  duration_ms: 7.852833
+  ...
+# Subtest: WHAT[knowledge-reuse-013] actual Boot owner valid reports and terminates its own native process only after original Host Capture settlement
+ok 28 - WHAT[knowledge-reuse-013] actual Boot owner valid reports and terminates its own native process only after original Host Capture settlement
+  ---
+  duration_ms: 797.033916
+  ...
+# {"scenario":"valid","nativePid":75032,"coldPid":75041,"terminal":0,"originalBootPhysicalAndCold":true}
+# Subtest: WHAT[knowledge-reuse-013] actual Boot owner valid-unknown reports and terminates its own native process only after original Host Capture settlement
+ok 29 - WHAT[knowledge-reuse-013] actual Boot owner valid-unknown reports and terminates its own native process only after original Host Capture settlement
+  ---
+  duration_ms: 772.710875
+  ...
+# {"scenario":"valid-unknown","nativePid":75045,"coldPid":75055,"terminal":0,"originalBootPhysicalAndCold":true}
+# Subtest: WHAT[knowledge-reuse-013] actual Boot owner malformed reports and terminates its own native process only after original Host Capture settlement
+ok 30 - WHAT[knowledge-reuse-013] actual Boot owner malformed reports and terminates its own native process only after original Host Capture settlement
+  ---
+  duration_ms: 800.13625
+  ...
+# {"scenario":"malformed","nativePid":75061,"coldPid":75071,"terminal":"SIGKILL","originalBootPhysicalAndCold":true}
+# Subtest: WHAT[knowledge-reuse-013] actual Boot owner malformed-unknown reports and terminates its own native process only after original Host Capture settlement
+ok 31 - WHAT[knowledge-reuse-013] actual Boot owner malformed-unknown reports and terminates its own native process only after original Host Capture settlement
+  ---
+  duration_ms: 792.762917
+  ...
+# {"scenario":"malformed-unknown","nativePid":75075,"coldPid":75084,"terminal":"SIGKILL","originalBootPhysicalAndCold":true}
+# Subtest: WHAT[knowledge-reuse-013] GAP-160: actual Casebook semantic conflict commits or settles its failure cut before a mandatory injected fuse reports and kills once without modifying its projection
+ok 32 - WHAT[knowledge-reuse-013] GAP-160: actual Casebook semantic conflict commits or settles its failure cut before a mandatory injected fuse reports and kills once without modifying its projection # TODO
+  ---
+  duration_ms: 0.061791
+  ...
+1..32
+# tests 32
+# suites 0
+# pass 31
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 1
+# duration_ms 4893.388875

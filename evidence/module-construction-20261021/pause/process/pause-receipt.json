@@ -1,0 +1,297 @@
+{
+  "state": "PausedByUser; incomplete experiments, not duration acceptance",
+  "at": "2026-10-21T00:58:40.744Z",
+  "reason": "User revoked the minimum five-hour continuation and requested pause at a suitable saved point.",
+  "interpretation": "Original immutable harness records Failed/exit1 for requested cancellation. No product assertion had failed before cancellation. These original statuses are retained without relabeling.",
+  "process": {
+    "source": "3db7b439283779f6037244d57cf05e6ec3e7ab31",
+    "completedPhases": [],
+    "lanes": {
+      "node22": {
+        "elapsedMs": 6926376.019292,
+        "observedBytes": 6327476,
+        "channelState": {
+          "phase": "Closed",
+          "pid": 84211,
+          "exit": {
+            "code": null,
+            "signal": "SIGKILL"
+          },
+          "failure": null,
+          "stdin": "Closed",
+          "stdout": {
+            "observed": 3163738,
+            "retained": 4096
+          },
+          "stderr": {
+            "observed": 3163738,
+            "retained": 4096
+          }
+        },
+        "inputWriteBytes": 4066,
+        "inputWriteStages": 116,
+        "backpressureWitness": {
+          "at": "2026-10-20T23:01:56.549Z",
+          "elapsedMs": 2119.7308749999997,
+          "event": "physical-backpressure-observed",
+          "name": "process",
+          "pausedMs": 2000,
+          "burstBytesPerChannel": 3145728
+        },
+        "completedPhases": [],
+        "exitCode": 1,
+        "cancellation": "Coordinator requested cancellation",
+        "resourceSummary": {
+          "samples": 231,
+          "first": "2026-10-20T23:01:54.450Z",
+          "last": "2026-10-21T00:56:55.001Z",
+          "harnessRssBytes": {
+            "minimum": 12517376,
+            "maximum": 51118080,
+            "last": 18120704
+          },
+          "limitation": "Finite sampled observations; no general absence-of-leaks claim. Raw own-PID CPU and FD samples remain in resources.jsonl."
+        }
+      },
+      "bun": {
+        "elapsedMs": 6926386.017375001,
+        "observedBytes": 6327476,
+        "channelState": {
+          "phase": "Closed",
+          "pid": 84209,
+          "exit": {
+            "code": null,
+            "signal": "SIGKILL"
+          },
+          "failure": null,
+          "stdin": "Closed",
+          "stdout": {
+            "observed": 3163738,
+            "retained": 4096
+          },
+          "stderr": {
+            "observed": 3163738,
+            "retained": 4096
+          }
+        },
+        "inputWriteBytes": 3718,
+        "inputWriteStages": 116,
+        "backpressureWitness": {
+          "at": "2026-10-20T23:01:56.518Z",
+          "elapsedMs": 2102.119875,
+          "event": "physical-backpressure-observed",
+          "name": "process",
+          "pausedMs": 2000,
+          "burstBytesPerChannel": 3145728
+        },
+        "completedPhases": [],
+        "exitCode": 1,
+        "cancellation": "Coordinator requested cancellation",
+        "resourceSummary": {
+          "samples": 231,
+          "first": "2026-10-20T23:01:54.440Z",
+          "last": "2026-10-21T00:56:54.717Z",
+          "harnessRssBytes": {
+            "minimum": 17268736,
+            "maximum": 55066624,
+            "last": 25313280
+          },
+          "limitation": "Finite sampled observations; no general absence-of-leaks claim. Raw own-PID CPU and FD samples remain in resources.jsonl."
+        }
+      }
+    },
+    "unavailableEvidence": "The collector retained running SHA state only in memory; cancellation bypassed normal final digest materialization. No actual complete-channel digest or target stdin EOF digest is claimed. The byte counts and contiguous chunk checks were observed before cancellation; expected synthetic bytes must not stand in for actual captured digests.",
+    "uncompleted": [
+      "Two-hour Process natural stdin EOF/exit0 and final channel hash/tail checks",
+      "Entire two-hour Supervision phase, descendant retained-pipe TERM/KILL assertions and temp cleanup at its normal close",
+      "Four-hour owned keepalive completion",
+      "Zero active Wait registry after natural closure; final cancellation snapshot still has one active descriptor per terminated harness"
+    ],
+    "originalExit": 1,
+    "restartCommand": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-physical-soak-20261021-a/consumer/coordinator.mjs",
+    "restartCondition": "Use a fresh directory and adjust the three explicit harness root constants before restart; existing witness directories and logs must be retained, not reused as a fresh run."
+  },
+  "pty": {
+    "generation": 100,
+    "elapsedFromHarnessStartMs": 5320320.878,
+    "observedActiveMs": 5319124,
+    "completedPhases": [],
+    "requests": 89,
+    "liveControlChecks": 18,
+    "observedOutputBytes": 12200,
+    "actualOutputSha256": "6cc2ee49119f1b58119ebe8af84d836a9dead2fc682be6ea6ef4f757f121f812",
+    "outputMatchesAllAcknowledgedExpectedLines": true,
+    "generatedAcknowledgedInputSha256": "4f3dfc15dda6217cc12ad1a80ffdab73c1b31427a5475049ccd022cfc152f4e4",
+    "inputDigestLimitation": "All response payload hashes and sequences matched; the target was canceled before a real stdin EOF aggregate witness. The generated input digest is not a target EOF receipt.",
+    "originalExit": {
+      "code": 1,
+      "signal": null,
+      "at": "2026-10-21T00:57:21.148Z"
+    },
+    "cancellation": "External cancellation requested",
+    "cleanupTerminal": {
+      "version": 1,
+      "key": "2d9048d1-e30d-4a3d-96e6-7980f3399f7b",
+      "incarnation": "b3146534-23f5-414b-b311-67a2d90d21ee",
+      "result": {
+        "kind": "Ended",
+        "exit": {
+          "code": null,
+          "signal": "SIGTERM"
+        },
+        "stopped": true
+      }
+    },
+    "cleanupTerminalHmacVerified": true,
+    "resourceSummary": {
+      "samples": 178,
+      "first": "2026-10-20T23:28:41.992Z",
+      "last": "2026-10-21T00:57:12.356Z",
+      "harnessRssBytes": {
+        "minimum": 19316736,
+        "maximum": 58212352,
+        "last": 25821184
+      },
+      "limitation": "Finite sampled observations; no general absence-of-leaks claim. Raw own-PID CPU and FD samples remain in resources.jsonl."
+    },
+    "uncompleted": [
+      "120-minute active interval",
+      "Real canonical stdin EOF aggregate witness and original target exit23",
+      "Descendant retained-scope observation",
+      "Paused custodian Unknown bounded recovery",
+      "Resume then TERM/KILL descendant recovery preserving target exit23"
+    ],
+    "restartCommand": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-pty-soak-gen100-20261021/consumer/controller.mjs",
+    "restartCondition": "Use a fresh directory and adjust explicit root constants; do not reuse the durable claim/terminal or overwrite this experiment."
+  },
+  "cleanup": {
+    "ownedPids": [
+      84197,
+      84198,
+      84210,
+      84211,
+      84199,
+      84207,
+      84209,
+      84967,
+      84982,
+      85012,
+      85054,
+      85057,
+      85059
+    ],
+    "ps": {
+      "command": "/bin/ps -p <only recorded owned PIDs> -o pid=,ppid=,pgid=,rss=,stat=,comm=",
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "lsof": {
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "allRecordedPidsAbsent": true,
+    "allRecordedPidFdListsAbsent": true,
+    "physicalDirectories": {
+      "processNode": [],
+      "processBun": [
+        "bun"
+      ],
+      "ptyScopeExists": false,
+      "ptyEndpointExists": false,
+      "ptyRemainingTmp": [
+        "bun"
+      ],
+      "ptyDurableRecoveryEvidence": [
+        "available",
+        "claim",
+        "request",
+        "terminal"
+      ]
+    },
+    "limitation": "Durable recovery claim/request/available/terminal and own Bun cache directory are retained as evidence/cache, not live process resources."
+  },
+  "artifacts": {
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/launch.json": {
+      "bytes": 3903,
+      "sha256": "076b5cda728068455cae082e3b7f198e16925df111b438f3e480c30857fe30d8"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/harness-sha256.txt": {
+      "bytes": 261,
+      "sha256": "a450c57542a41082b4441143b113408e0797cc4f40b80f04fde79cadcf1a208a"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/status.json": {
+      "bytes": 2436,
+      "sha256": "25bbdc145c869832f75d05aebc6bd4eada912fb20c9a76fc0efa81e6bf1b8f8c"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/node22/events.jsonl": {
+      "bytes": 627,
+      "sha256": "91a3b6f526d52ea0d72e56c1134486e58294685ae9fe90a37108fbb8536e24f1"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/node22/resources.jsonl": {
+      "bytes": 246497,
+      "sha256": "c1f731a0fcf89bb9a67bd73e65e3e9b6cd909ebaebb1617a64c8ebf46c5ff031"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/node22/runner.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/node22/status.json": {
+      "bytes": 1077,
+      "sha256": "390523017582c564fb313f0d67ab16e736f6ab23a4c4f26f9e32b5210ab75473"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/bun/events.jsonl": {
+      "bytes": 572,
+      "sha256": "c60c3645e45f91f0ca9873c8c78aeb9ad4f135d917aa62e01d96daac8a395e2d"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/bun/resources.jsonl": {
+      "bytes": 165018,
+      "sha256": "0753cd2e940646c7a6694a3fedcd30c7b633d6972c7178994e4a8f15d5d03fca"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/bun/runner.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "/private/tmp/vibe-fs-physical-soak-20261021-a/bun/status.json": {
+      "bytes": 966,
+      "sha256": "f445be236ead30f62b51cd4ef6261413ed22f33ebaa52b9737d804b11c6bb87a"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen100-20261021/launch.json": {
+      "bytes": 4716,
+      "sha256": "37823b91081ba9e9045fd82b032721be951d8facafef682eb6be2796f95103c2"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen100-20261021/copied-artifact-receipt.json": {
+      "bytes": 149993,
+      "sha256": "8e668c8deec0e8dbaf04a92773968cf6f2aa7fa0128483bc0bf7039924c37691"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen100-20261021/harness-sha256.txt": {
+      "bytes": 264,
+      "sha256": "bb68d1102de62566157181d6864799debea6ecd3594534de88fb57f0aa33f66b"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen100-20261021/status.json": {
+      "bytes": 897,
+      "sha256": "4c05b859c59b0f9c5de806c204b29dc170b32f2826b2b614e44c744b4556e73c"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen100-20261021/events.jsonl": {
+      "bytes": 824,
+      "sha256": "b2e181cc81a18ca78e9963559fb744d2963886aa158d8be2799c7ae143f8cafc"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen100-20261021/resources.jsonl": {
+      "bytes": 165424,
+      "sha256": "4347a9e4b5b263574d9990502d37da2a4b15d8316c0c51c664112d3b894c716a"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen100-20261021/output.jsonl": {
+      "bytes": 16340,
+      "sha256": "8bfc49d221deffe583d4212d7725e13860c19040ea0681c342dd3caeef2133e0"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen100-20261021/controller-exit.json": {
+      "bytes": 56,
+      "sha256": "c3a4dfe057995fdf11b3b18d12c37e128a2dd07052e74a7ec96533d68b9f7623"
+    },
+    "/private/tmp/vibe-fs-pty-soak-gen100-20261021/physical/recovery/terminal": {
+      "bytes": 279,
+      "sha256": "a14c455a8193538382488aff7fe33dbf94904f92e76c8e40bbd7570050f82458"
+    }
+  }
+}

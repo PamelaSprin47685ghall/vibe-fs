@@ -1,0 +1,230 @@
+{
+  "reason": "User requested save and pause; end early without claiming one-hour pass",
+  "handledAt": "2026-10-21T00:57:03.697Z",
+  "originalStoppedState": {
+    "scope": "one Node22 POSIX ProcessSession pause primitive, not sandbox/Host/deadline acceptance",
+    "nonce": "9d719c85-cd7e-41ac-ab85-381baae93b31",
+    "harnessPid": 29064,
+    "targetPid": 29066,
+    "phase": "Stopped",
+    "startedAt": "2026-10-21T00:37:44.601Z",
+    "durationMs": 3600000,
+    "intervalMs": 60000,
+    "identity": {
+      "pid": 29066,
+      "ppid": 29064,
+      "pgid": 29066,
+      "birth": "Wed Oct 21 08:37:44 2026"
+    },
+    "stoppedAt": "2026-10-21T00:37:44.700Z",
+    "plannedResumeAt": "2026-10-21T01:37:44.700Z",
+    "baseline": {
+      "pid": 29066,
+      "ppid": 29064,
+      "pgid": 29066,
+      "status": "Ts",
+      "cpu": "0:00.05",
+      "rssKiB": 43024,
+      "birth": "Wed Oct 21 08:37:44 2026",
+      "fdCount": 15,
+      "fds": [
+        "0",
+        "1",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ]
+    },
+    "sampleCount": 20,
+    "rssRangeKiB": {
+      "min": 4096,
+      "max": 43024
+    },
+    "queued": {
+      "bytes": 76,
+      "at": "2026-10-21T00:37:44.701Z",
+      "firstHopWritten": true,
+      "applicationReceipt": false,
+      "id": "9d719c85-cd7e-41ac-ab85-381baae93b31"
+    },
+    "elapsedStoppedMs": 1140635.9313329998,
+    "lastSample": {
+      "pid": 29066,
+      "ppid": 29064,
+      "pgid": 29066,
+      "status": "Ts",
+      "cpu": "0:00.05",
+      "rssKiB": 4112,
+      "birth": "Wed Oct 21 08:37:44 2026",
+      "fdCount": 15,
+      "fds": [
+        "0",
+        "1",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ]
+    }
+  },
+  "lastStoppedIdentity": "29066 29064 29066 Ts   Wed Oct 21 08:37:44 2026",
+  "ownerCommand": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-mf01-long-park.mjs",
+  "continuedAt": "2026-10-21T00:57:30.550Z",
+  "stoppedWallMs": 1185850,
+  "oneHourCompleted": false,
+  "applicationReceipt": {
+    "at": "2026-10-21T00:57:30.577Z",
+    "kind": "child-frame",
+    "frame": {
+      "kind": "resumed",
+      "pid": 29066,
+      "parentPid": 29064,
+      "nonce": "9d719c85-cd7e-41ac-ab85-381baae93b31",
+      "keep": 42,
+      "messageCount": 1,
+      "messages": [
+        {
+          "id": "9d719c85-cd7e-41ac-ab85-381baae93b31",
+          "value": "queued-once-汉🔥"
+        }
+      ]
+    }
+  },
+  "targetGoneBeforeOwnerCancel": true,
+  "ownerCancelledAt": "2026-10-21T00:57:30.597Z",
+  "harnessGone": true,
+  "targetGone": true,
+  "completedAt": "2026-10-21T00:57:30.623Z",
+  "ownerFinalState": {
+    "scope": "one Node22 POSIX ProcessSession pause primitive, not sandbox/Host/deadline acceptance",
+    "nonce": "9d719c85-cd7e-41ac-ab85-381baae93b31",
+    "harnessPid": 29064,
+    "targetPid": 29066,
+    "phase": "Failed",
+    "startedAt": "2026-10-21T00:37:44.601Z",
+    "durationMs": 3600000,
+    "intervalMs": 60000,
+    "identity": {
+      "pid": 29066,
+      "ppid": 29064,
+      "pgid": 29066,
+      "birth": "Wed Oct 21 08:37:44 2026"
+    },
+    "stoppedAt": "2026-10-21T00:37:44.700Z",
+    "plannedResumeAt": "2026-10-21T01:37:44.700Z",
+    "baseline": {
+      "pid": 29066,
+      "ppid": 29064,
+      "pgid": 29066,
+      "status": "Ts",
+      "cpu": "0:00.05",
+      "rssKiB": 43024,
+      "birth": "Wed Oct 21 08:37:44 2026",
+      "fdCount": 15,
+      "fds": [
+        "0",
+        "1",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ]
+    },
+    "sampleCount": 20,
+    "rssRangeKiB": {
+      "min": 4096,
+      "max": 43024
+    },
+    "queued": {
+      "bytes": 76,
+      "at": "2026-10-21T00:37:44.701Z",
+      "firstHopWritten": true,
+      "applicationReceipt": false,
+      "id": "9d719c85-cd7e-41ac-ab85-381baae93b31"
+    },
+    "elapsedStoppedMs": 1140635.9313329998,
+    "lastSample": {
+      "pid": 29066,
+      "ppid": 29064,
+      "pgid": 29066,
+      "status": "Ts",
+      "cpu": "0:00.05",
+      "rssKiB": 4112,
+      "birth": "Wed Oct 21 08:37:44 2026",
+      "fdCount": 15,
+      "fds": [
+        "0",
+        "1",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ]
+    },
+    "nativeClosed": {
+      "phase": "Closed",
+      "pid": 29066,
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "failure": null,
+      "stdin": "Closed",
+      "stdout": {
+        "observed": 317,
+        "retained": 317
+      },
+      "stderr": {
+        "observed": 0,
+        "retained": 0
+      }
+    },
+    "failedAt": "2026-10-21T00:57:30.604Z",
+    "error": {
+      "message": "The operation was aborted",
+      "stack": "AbortError: The operation was aborted\n    at Timeout.cancelListenerHandler (node:timers/promises:49:12)\n    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:827:20)\n    at AbortSignal.dispatchEvent (node:internal/event_target:762:26)\n    at runAbort (node:internal/abort_controller:447:10)\n    at abortSignal (node:internal/abort_controller:433:3)\n    at AbortController.abort (node:internal/abort_controller:466:5)\n    at stop (file:///private/tmp/vibe-fs-mf01-long-park.mjs:55:14)\n    at interrupted (file:///private/tmp/vibe-fs-mf01-long-park.mjs:58:31)\n    at process.onTerm (file:///private/tmp/vibe-fs-mf01-long-park.mjs:59:22)\n    at Object.onceWrapper (node:events:639:26)"
+    },
+    "cleanup": {
+      "closed": "Closed",
+      "at": "2026-10-21T00:57:30.605Z",
+      "targetGone": true
+    }
+  }
+}

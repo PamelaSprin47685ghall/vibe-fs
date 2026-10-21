@@ -1,0 +1,7 @@
+PASS invalid namespace capacity query is refused without invoking route or fabricating capacity
+PASS illegal query return cannot be interpreted as available or waiting and never dispatches route
+PASS route receives exactly 3 arguments and capacity query exactly 1, with trimmed role and preserved duplicate cells
+PASS invalid route inputs do not execute route; asynchronous or invalid results are never guessed
+PASS admitted frozen policy keeps exact user functions without invoking them
+PASS durable model colon is preserved and uses the same strict target decoder
+{"runtime":"bun","checks":6,"publicImports":22,"sourceAbsent":true,"compilerAbsent":true}

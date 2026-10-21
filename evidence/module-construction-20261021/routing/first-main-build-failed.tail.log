@@ -1,0 +1,6 @@
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Host/ModelRouting.fs(112,10): (112,18) error FSHARP: The argument names in the signature 'purpose' and implementation '_purpose' do not match. The argument name from the signature file will be used. This may cause problems when debugging or profiling. (code 3218)
+[39m[22m[31mCompilation failed
+[39m[22m[31m════════════════════════════════════════════════════════════════════════════════
+  BUILD FAILED
+════════════════════════════════════════════════════════════════════════════════[0m
+Fable compilation failed with exit code 1

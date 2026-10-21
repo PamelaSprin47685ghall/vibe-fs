@@ -114,3 +114,33 @@ routing候选只接严格ABI、target解码和理论容量查询，不接ledger/
 `87c997de0`实际GitHub CI [39519297669](https://github.com/dyx13/vibe-fs/actions/runs/39519297669)失败：格式、静态、Fable构建通过，单元4421/6，757/757排空并回收；207 skip/277旧TODO单列。六项均为新增native crash夹具在Linux四位PID下构造`cold-reader-<PID>`，撞到既有WriterId的`-dddd`保留后缀。修夹具并加确定性PID边界正反例，不放宽生产解析。本机gen102通过不覆盖该远端失败。
 
 gen103已通过原静态门禁和Fable构建。permit相关八文件正式验收104/0、8/8排空回收；两项旧TODO使严格入口退出1，同候选按既有CI的WXS_ACCEPT_TODO政策退出0，不能把未证明项算通过。独立实际编译插件三组通过，证明durable Accepted/ProviderStarted、旧A终态不改B的token/ledger/custody、B exact终态持久Completed后释放；这是受控SDK/Host组合，不声称真实provider网络执行。详见[gen103收据](../../evidence/module-construction-20261021/permit/gen103-receipt.json)。routing候选及最终完整发行另验。
+
+### MF-05：routing接收候选
+
+库`45849f51778f6a12dcafbc12ce1c8c7f7f65502b`/0.11.0/22入口已正常推自有main并核对确切SHA。全22模块同树构建成功；独立真实包SHA256为`687cf81f702a2f229f7924442b9c454d9a96576e61a3ccd819323e0e716d3b93`，Node22/Bun各13条规则、22公开入口和六组独立行为通过，strict TS正例及八个拒绝负例通过。旧21入口声明字节相同，JS仅生成PID注释差异，归一该PID后相同。
+
+主仓仅移出loader导出形状/协议版本、严格同步3/1参数、target与理论容量结果解码；磁盘配置加载、共享账本、借用、队列及purpose身份仍由原owner持有。001/002合法配置夹具补已明确要求的mandatory查询，新增十项实际入口反例在gen102全部失败；候选统一重建后另验。`provider/model:reasoning`旧字符串未转义，两字段同时含冒号无法唯一逆解；本包只恢复无冒号reasoning下的模型tag，不宣称任意target圆环保证或迁移旧记录。
+
+convergence暂不接：现有算法本来已有heap/parentWaiters，上游桥还需逐事件DTO、parents/refs数组及Map回投；没有测得性能收益。上游拒绝重复writer而本地Map.ofList覆盖确有差异，但实际reader已按WriterId聚合，尚无生产重复输入反例。本轮只保存调用路径与分配来源审查，不把代码形状当计时结果，也不因模块数迁移。详见[接收决定](../../evidence/module-construction-20261021/routing/vibe-fs-convergence-receive-decision.md)。
+
+首次routing主仓构建因实现参数`_purpose`与既有`.fsi`的`purpose`不符报FS3218；已恢复原参数名并显式ignore，未更改公共签名。gen104构建及五文件定向27/0通过，5/5排空回收、两项旧GAP129 TODO单列。
+
+release-06实际重建为gen105（日志名保留启动时的gen104），格式/静态/构建通过，单元4337/190、757/757排空，218.8秒，发行出口1。多数实际插件初始化失败来自七处旧合法配置夹具缺少已在WHAT002要求的mandatory容量查询；仅在这些配置显式补`hasTheoreticalCapacity = () => true`，保留原隐式true语义、生产严格loader及新缺查询负例，不降低门禁。共享support三处、各自临时HOME的直接配置四处均手工局部修改。gen104 raw复验双插件共享1/0、插件代表1/0、knowledge013为31/0/一旧TODO；Boot原生四项正常、Unknown及fatal物理结算仍保留。普通沙箱的Boot探针失败与原生权限下通过分别留档，不相互覆盖。修后统一完整发行待验，不能把定向27/0写成整批通过。
+
+<a id="pause-20261021"></a>
+## 用户要求暂停：保存与恢复
+
+用户在本轮施工中明确要求到合适节点保存后暂停，并再次确认“暂停”。因此停止原至少五小时的持续施工安排，不把本次写成完成五小时或全部工作包已完成。所有subagent已停止施工；长期实验已主动取消、保存原始exit1并核实回收。本节为当前恢复入口，前文“运行中/待验”保存其历史时点含义。
+
+**可恢复源码提交：`764e6778e`**，工作树`/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs`，分支`codex/upstream-plan-20261020`。库`45849f51778f6a12dcafbc12ce1c8c7f7f65502b`/0.11.0/22入口已正常推自有main。原运行目录仍在`8db33b3429a70d5cdbea30e393363666b3649573`，三个stash保留；未部署。
+
+release-07/gen106完整本地验收已通过，929.2秒：格式、静态、Fable构建通过；单元4537/0、757/757排空；集成725/0、40/40排空，E2E及发行包通过。unit 110 skip/277旧TODO继续单列，按原CI政策接纳，未降低门禁。完整原始日志为[release07-full.log](../../evidence/module-construction-20261021/release07-full.log)，SHA256 `de6bd8d04bf22174d5c6fdad9fa39143c31cb3302fbf885b1048fc59accb4c20`。此前已推`148adbb42`的[完整GitHub CI](https://github.com/dyx13/vibe-fs/actions/runs/39521661757)通过：Linux unit4430/0、integration709/0，平台skip与旧TODO单列；它不替代新routing提交的远端检查。暂停时不再等待或追加新测试，新head的CI由恢复时核对。
+
+暂停证据与全部harness源码已归档在[evidence/pause](../../evidence/module-construction-20261021/pause/README.md)，不只留/tmp路径。Process Node/Bun各约115.44分钟、各6327476字节；PTY约88.65分钟、89应答/18控制检查；一小时park实验实际停止19分45.850秒，恢复后同闭包41→42、唯一回执及正常退出成立。上述均未达到请求时长，不能标为长测通过。Process最终通道digest/EOF、后续Supervision相位、PTY最终故障恢复序列未验。15个登记测试PID均已退出，PTY socket/scope已消失，原始取消状态保留。
+
+恢复后按顺序：
+
+1. 先读本节、看板与暂停收据；核对Git状态、库gitlink及最新远端CI，不重做已通过且源码未变的验收。现有[PR #62](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/62)保持Draft，描述尚待补本批最终收据；上游base `2e99d58a`已确认dirty冲突，不能称可直接合入。
+2. 优先处理两个功能P1：MF-01的Bun异步硬期限/完整物理owner协议；MF-02A的Host原子exact-attempt中断合同。受控SDK竞态反例只证明B已Accepted时仍发送session级abort，未证明真实B provider被杀。
+3. 长测需新目录、从零开始，先按新授权确定范围和时长。归档脚本含原绝对路径，不能直接在旧证据目录运行或覆盖旧记录。按交接重装真实包或重建并绑定新产物指纹，不冒称复原未保存的旧bundle字节。
+4. 小问题仍按原优先级留档：P2为Casebook旧hash碰撞、legacy/series活动选材、外部同inode历史改写热cache差异、prefix旧观测、大Git输出及borrowed_surface边界。convergence/degeneration/ablation同构纯包暂不为入口数量迁移；其余MF-05协议单独认领，局部验收不关闭整卡或历史GAP。

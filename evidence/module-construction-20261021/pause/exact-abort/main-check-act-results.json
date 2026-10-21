@@ -1,0 +1,51 @@
+{
+  "generation": 102,
+  "scope": "Actual compiled plugin and durable admission; controlled SDK Host transport, not a live provider",
+  "reports": [
+    {
+      "racing": false,
+      "abortedIds": [
+        "exact-abort-same"
+      ],
+      "transport": [
+        {
+          "payload": {
+            "path": {
+              "id": "exact-abort-same"
+            },
+            "headers": {
+              "x-opencode-directory": "%2Fprivate%2Fvar%2Ffolders%2Fg_%2F3ydzn7kx5lg9ylq8fd9p_13r0000gn%2FT%2Fwxs-plugin-exec-mmiwCk"
+            }
+          },
+          "hostPhysicalAtEffect": "physical-a"
+        }
+      ],
+      "bAccepted": null
+    },
+    {
+      "racing": true,
+      "abortedIds": [
+        "exact-abort-racing"
+      ],
+      "transport": [
+        {
+          "payload": {
+            "path": {
+              "id": "exact-abort-racing"
+            },
+            "headers": {
+              "x-opencode-directory": "%2Fprivate%2Fvar%2Ffolders%2Fg_%2F3ydzn7kx5lg9ylq8fd9p_13r0000gn%2FT%2Fwxs-plugin-exec-m6vBEa"
+            }
+          },
+          "hostPhysicalAtEffect": "physical-b"
+        }
+      ],
+      "bAccepted": {
+        "accepted": true,
+        "disposition": null,
+        "providerStarted": false,
+        "terminal": false
+      }
+    }
+  ]
+}
