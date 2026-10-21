@@ -237,6 +237,23 @@ applied by the core wrapper around `ProductHooks`, not re-implemented per adapte
 `Emit : operation: string * fields: (string * string) list -> unit`. OpenCode: `client.app.log`; omp: `pi.logger`.
 Ownership: plugin-host lane.
 
+### Domain seams (tier B) — where they converge
+
+Rule: a seam belongs under `src/Wanxiangshu/Host/` only if a host supplies it — tier A (`Host/Ports/`, a verb the
+product calls) or tier B (`Host/Domain/`, a fact the host *said*); anything no host supplies is product and does
+not live under `Host/` at all.
+
+| ID | Seam | Host supplies | Product supplies | After convergence |
+|---|---|---|---|---|
+| P-13 | `CommandDeclaration` | `ICommandArguments` (decoded args) | the declaration shapes | stays tier B in `Host/Domain/CommandDeclaration.fs(i)` |
+| P-14 | `DelegationCaller` | session / provider-run / tool-call ids | — | one neutral record in `Host/Domain/` |
+| P-15 | delegation command host | nothing | runtime, orchestrator, roles, ids | dissolved into the product record `DelegationEnvironment` |
+| P-16 | `PairGuidance` | the transcript (decoded) | the ledger and its append | split: transcript tier B, ledger to `Interaction/PairGuidance/` |
+| P-17 | `FissionPort` | sessions, events | lane registry, PTY runs | shrinks to P-01 / P-07, then `FissionHostPort` is deleted |
+| P-18 | `Tools` | — | the call context | voided: folds into P-04 `ToolInvocation` / `ToolSpec.Admission` |
+
+Evidence and the ordered landing steps: `evidence/hni14-convergence.md` (HNI-14, 2026-10-22).
+
 ## 3. Feasibility summary (omp 18.12.4)
 
 Checked offline against `@oh-my-pi/pi-coding-agent@18.12.4` sources
