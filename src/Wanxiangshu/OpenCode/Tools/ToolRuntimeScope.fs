@@ -1294,8 +1294,9 @@ type ToolRuntimeScope
                 question.ToolCallId = callId
                 && question.ProviderRunId = providerRun
                 && currentPhysicalUserMessage (SessionId.value sessionId) = Some(
-                    PhysicalUserMessageId.value question.PhysicalUserMessageId
-                )
+                                                                                PhysicalUserMessageId.value
+                                                                                    question.PhysicalUserMessageId
+                                                                            )
                 && questionInterrupts.Add(sessionId, question.ProviderRunId, callId)
                 ->
                 return! this.RunQuestionInterrupt(sessionId, question, (sessionId, question.ProviderRunId, callId))
