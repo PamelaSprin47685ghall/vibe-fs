@@ -744,6 +744,20 @@ module HostForkRunLifecycle =
                         | Some resolution -> resolution ()
                         | None -> Task.FromResult None
 
+                    // The durable witness is the delivery proof and it
+                    // carries the material of that very delivery. The
+                    // process-live cell is only a cache of it: when the
+                    // cell was lost (another reader took it) or the view
+                    // read faulted, the proven material is still on the
+                    // durable side. A proven terminal must therefore always
+                    // yield an observable settlement — otherwise the parent's
+                    // join waits on a journal revision that never comes.
+                    let durableView =
+                        if System.String.IsNullOrWhiteSpace witness.View then
+                            None
+                        else
+                            Some witness.View
+
                     match resolved with
                     | Some completedView when not (System.String.IsNullOrWhiteSpace completedView) ->
                         let prose =
@@ -785,6 +799,39 @@ module HostForkRunLifecycle =
                                 result
                                 taken
                                 (Some completedView)
+                    | _ when durableView.IsSome ->
+                        // The cell is gone or unreadable, but the delivery
+                        // itself is proven: settle with the material the
+                        // durable witness carries. Nothing is invented here
+                        // — this is the material that was delivered.
+                        let prose =
+                            if System.String.IsNullOrWhiteSpace result.TerminalText then
+                                None
+                            else
+                                Some result.TerminalText
+
+                        let taken =
+                            match witness.Fence.ToolCallId with
+                            | toolCallId ->
+                                JsDeliveredValues.tryTakeRenderedForCall
+                                    (SessionId.value run.ChildId)
+                                    result.ProviderRun
+                                    toolCallId
+                                    prose
+
+                        return!
+                            settleCompletedView
+                                gate
+                                pendingRuns
+                                journal
+                                parentId
+                                run
+                                childId
+                                runId
+                                handle
+                                result
+                                taken
+                                durableView
                     | _ ->
                         // LC-004: An asynchronous child that completed its physical turn without
                         // delivering a view has not delivered its obligation. Do not settle or

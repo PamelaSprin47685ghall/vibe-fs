@@ -1,5 +1,14 @@
 # Changelog — 版本历史
 
+## Unreleased — 已证明的终态必须结算（见证在、活格没了，也照样结算）
+
+- **修复：durable 交付见证存在、但进程内交付格已丢失（或视图读取故障）时，运行不再永远挂着**。`Execution/Delegation/Fork/Host/RunLifecycle.fs` 的 `complete` 在命中围栏匹配的 durable 见证后，只认「活格 / 视图读取」这一路材料；活格被别的读者取走、或视图读取故障时该路为空，于是走 LC-004 的「只观察、不结算」分支——**交付明明已被证明**，父侧的 `this.join()` 却永远等不到结算，工作单元停在 `Active`。
+- **判据：见证自带材料**。durable 见证（`TaskDeliveryWitness`）本来就携带那次交付的 `View`（物化后的交付物）、`ViewDeclaration`、`FormalText` 与 `MaterialDigest`。因此当活格与视图读取都拿不到材料时，改用**见证所携带的那份材料**结算——不伪造任何事实，这正是已交付的那份材料。见证为空（无证明）时行为不变：仍不结算。
+- **`requirements/managed-session-lifecycle/tests/028.test.mjs` 迁到真实插件路径**：三条 case 不再用旧 harness 的 `settle` / `prepareTerminalDelivery` / `injectPendingPersistFailure`（前者从不下落围栏匹配的 durable 见证，整文件挂起），改为真实 `this.fork` / 真实 `this.deliver`（生产落唯一那条 durable 见证）/ 生产的 `message.updated` → `session.idle` 终态发布 / 真实 `this.join`。唯一注入的故障是**真实的 append 失败**：把 durable 事件日志置为只读，由写者自己的 EACCES 打穿结算，不写任何伪造事实。
+- **断言口径换成真实事实**：交付格丢失时，已证明的终态仍结算为 `CompletedAwaitingJoin`，join 返回 `ok = true` 且视图含交付原文；结算期 append 失败时 join **及时返回** `ok = false` / `code = "not-ready"`（不挂起），durable 工作单元仍是 `CompletedAwaitingJoin`（失败不释放材料）；结算期 append 失败且终态本身无法落盘时，父侧 join 同样及时返回 `ok = false` / `code = "not-ready"`，durable 工作单元**仍是 `Active`**——未知的持久提交既不放行新工作，也不冒充成功。
+- **验收**：`node --test requirements/managed-session-lifecycle/tests/028.test.mjs` → tests 3 / pass 3 / fail 0 / cancelled 0（改动前整文件挂起）；`024` / `027` / `006` / `007` / `008` / `013` / `015` / `022` / `028` 合跑 tests 91 / pass 85 / fail 2 / cancelled 0 / skipped 2 / todo 2（那 2 个 fail 是 `delegation-027` 的「prepared busy guidance」，在该基线上单跑同样失败，与本次改动无关）。
+- **改动文件**：`src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs`（净增 47 行，无新模块、无新分层、无测试专属入口）、`requirements/managed-session-lifecycle/tests/028.test.mjs`。
+
 ## Unreleased — 生命周期 022 迁到真实交付路径（Engineer 的完成必须是一次真实交付，父侧才拿得到草稿）
 
 - **`requirements/managed-session-lifecycle/tests/022.test.mjs` 迁到真实插件路径**：`finalize prerequisite uses the original plugin scope for Manager admission, attached Engineer completion and its production draft` 与 `original child and owner deletion archive the completed Engineer and same-scope dispose awaits actual Bookkeeper completion` 此前只在 harness 里把文本 push 进 assistant 消息，**从未发生一次真实交付**——生产因此看不到 durable 交付见证，父侧的 `await` 永不结算（实测：缺见证时 `this.deliver` 直接报 `AcceptedExecutionMissing`），整条 case 挂起。现在交付改为真实 `this.deliver`（`hooks.tool['todowrite-for-engineer'].execute`），由生产落唯一那条 durable 交付见证，随后照旧 `message.updated` → `session.idle` 发布终态。
