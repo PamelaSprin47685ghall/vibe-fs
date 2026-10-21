@@ -35,6 +35,20 @@
 - **本次实测的连带取消复现**：`TESTS_MJS_FILES=requirements/knowledge-reuse/tests/011.test.mjs,...,016.test.mjs node requirements/verification-system/tests/run.mjs --skip-staleness-check` → **exit 1**，日志 `WATCHDOG: 'tests/unit' silent for 5006ms (limit 5000ms); 0 blocking progress update(s)`（load 90–96）。**该症状在本次改动后依旧存在**——如实记录，不作豁免。
 - **改动文件**：`requirements/knowledge-reuse/tests/support/boot-capture-physical-child.mjs`、`requirements/knowledge-reuse/tests/support/bookkeeper-session-support.mjs`、`requirements/knowledge-reuse/tests/support/canonical.mjs`（新增）、`CHANGELOG.md`。
 
+## Unreleased — effect-accounting-002 的「保持 pending」改到真实 fork 路径上证明
+
+- **问题**：`requirements/effect-accounting/tests/002.test.mjs` 整文件挂起。它在伪造面 `HostForkRunLifecycleSurface` 上等一个**永远不会 settle** 的完成 cell：该面的 `complete` 恒以 `journal = None` 调生产，其 `Completed` 分支找不到围栏匹配的 durable 见证，于是走 LC-004 的「只观察、不结算」分支（空白 view 不是结算），既不 `HandleCompleted` 也不 `run.Source.SetResult`——`await lifecycle.completion(run)` 永远不返回。
+- **改法（混合形状）**：
+  - **pending 的两条 case 迁到真实 fork 路径**（`requirements/delegation/tests/support/real-fork.mjs`）：真实 `this.fork`、真实子会话、真实共享终端端口。`MISSING_FINAL_REPORT` 的停止由 `eventsSurface.notifyForAuthority` 以该 work 自己的 admitted authority root 发布到共享端口（生产收它、只观察不结算）；「空 Completed」由一次**无交付**的子 turn 表达。两条 case 只断言**不等待**的 durable 事实：工作单元仍是 `Active`，且**从未接受过任何完成**（`lifecycleKind` / `completionRef` / `completionDigest` 全为 `null`）——不 await 任何可能不 settle 的 cell，也不做定时的重复断言（只取一次 durable 快照）。
+  - **失败与单次赋值的三条 case 留在伪造面**：`Failed` 的结算**不经过 durable 见证**（`deliverFailedCompletion` 直接以停止原因为失败结算），所以伪造面是断言 owner 真实 Failed 路径的诚实位置；每条 case 上方都写明了这一理由。
+  - **单次赋值的「Completed 在前」一半也搬到真实路径**：settled 的 `Completed` 必须携带**真正交付的材料**，而伪造面既无 journal 也无见证，其 Completed 分支按 LC-004 永不结算——旧断言里的 `view: ''` 因此**不是一个可被真实路径产出的结局**，已删除；改为断言真实交付的材料与 durable 完成身份（`lifecycleKind = "Terminal"` + 非空 `completionDigest`），以及后来的陈旧失败不能二次占用该 cell。
+- **恢复走同一个已准入的工作单元（不是新根）**：pending 的两条 case 里「后来的已证明交付」用新增的夹具原语 `deliverIntoOpenWork`（`requirements/delegation/tests/support/real-fork.mjs`）表达——它在**同一个物理输入**下交付，因而落在**同一个 authority root**、结算**原来那个**工作单元；该物理输入已用掉它唯一一次 provider step（同一物理消息上的第二次 provider step 会以 EMR-010 失败关闭），所以这次交付不再进入 provider，而是直接交付进那个仍然开着的 work。`resume` 会新起一个物理输入、准入**另一个**工作单元，只能证明一个新义务，因此**没有**用它。
+- **join 只在结算之后调用**：对仍然开着、仍可交付的工作单元调用 join 是**合法地等待**，所以 pending 的断言阶段不调用 join；join 在工作单元结算之后才调用。
+- **新增的公开观察面**：`Execution/Delegation/Handle/JournalSurface.fs` 的 `recordView` 增加 `lifecycleKind`（该 work 最后接受的那次完成的种类：Terminal / SendFailure / Cancelled）、`completionRef`、`completionDigest`（该次完成的 durable 身份）。这三项在 work 尚未接受任何完成时为 `null`——这正是「保持 pending」所需的**非等待**观察面。`snapshot` 的既有字段与字节输出不变。
+- **断言口径没有放宽**：pending 仍然断言「没有结算、没有被判为失败」，且新增「从未接受过完成」这一更强的 durable 事实；交付材料改为断言**真实交付的那份**（含在 join 回执里），而不是空白。
+- **仍未关闭的缺口（如实记录）**：伪造面 `HostForkRunLifecycleSurface` 的 `journal` 恒为 `None`，它的 `Completed` API 因此是一个**假 API**——生产在 journal-less 分支拿不到围栏匹配的见证，LC-004 让它只观察、永不结算。本文件**不再**对它断言任何 Completed 结算。要彻底清退该面，需要给它接上真实 journal，或把它的最后一条 case 也迁到真实路径；两者都超出本次交付范围。伪造面文件本身**未删除**（本文件仍导入它）。
+- **改动文件**：`src/Wanxiangshu/Execution/Delegation/Handle/JournalSurface.fs`、`requirements/effect-accounting/tests/002.test.mjs`、`requirements/delegation/tests/support/real-fork.mjs`。
+
 ## Unreleased — fission lane 的材料不再手工搬进 owner 的交付格
 
 - **修复：takeover 完成时不再把 lane 的交付视图写进 owner 的交付格**。`Execution/Fission/OpenCode/Host.fs` 的 `CompleteOwner` 分支此前读出最终 lane 的交付视图声明，再 `recordView` 到 owner 会话自己的交付格——一次**跨 session 的手工搬运**。owner 交付格没有正当的生产消费者：`deliveredView` / `tryPeekRendered` 按**读者自己**的 anchor ledger 渲染，把 lane 的锚点声明放进 owner 的格子里，只会让 owner 的编号重新解释那些锚点——这正是缺陷本身。lane 的材料经 `aggregateView`（已含各 lane 的 `FissionLaneMaterialized` work blob）进入接管 prompt，不需要第二个可见交付格。

@@ -107,6 +107,46 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
   if (awaitTerminal) await awaitTerminal(child, run)
 }
 
+/**
+ * A later delivery into an ALREADY admitted work unit, under the SAME
+ * physical input (hence the same authority root).
+ *
+ * The physical input has already spent its single provider step, so this
+ * delivery does not re-enter the provider: it delivers into the open work
+ * unit directly, and the turn's own terminal publication (message.updated →
+ * session.idle) reports the proven completion of that same work unit.
+ *
+ * A new physical input (a resume) would admit a DIFFERENT work unit under a
+ * different root — that proves a new obligation, not this one.
+ */
+export const deliverIntoOpenWork = async (hooks, runtime, child, run, prose, material, role = 'engineer') => {
+  const physical = physicalUserMessageOf(runtime, child)
+  const assistant = {
+    info: {
+      id: run,
+      role: 'assistant',
+      sessionID: child,
+      parentID: physical.id,
+      agent: role,
+      providerID: 'provider',
+      modelID: 'engineer-model',
+      time: { created: 4 },
+    },
+    parts: [{ type: 'text', text: prose }],
+  }
+  runtime.pushHostMessage(child, assistant)
+  await hooks.tool[`todowrite-for-${role}`].execute(
+    {
+      program: `class Js extends JsProgram { async run() { await this.deliver({ 0: ${JSON.stringify(material)} }); } }`,
+    },
+    { sessionID: child, agent: role, callID: `call-${run}`, messageID: run },
+  )
+  assistant.info.time.completed = 5
+  assistant.info.finish = 'stop'
+  await hooks.event({ event: { type: 'message.updated', properties: { info: assistant.info } } })
+  await hooks.event({ event: { type: 'session.idle', properties: { sessionID: child } } })
+}
+
 /** `this.fork` through the real plugin surface. */
 export const forkCall = (hooks, owner, name, charge, callID = 'call-fork') =>
   hooks.tool['todowrite-for-manager'].execute(
