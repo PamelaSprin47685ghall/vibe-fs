@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 import * as index from '../../../dist/Repository/Knowledge/Casebook/IndexSurface.js'
+import { sandbox, parse } from './support/casebook.mjs'
 
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
+
+const oldShelfmarks = JSON.parse(readFileSync(new URL('./fixtures/host-shelfmarks.json', import.meta.url), 'utf8'))
 
 const caseRec = (sessionId, q, a, observations = []) => ({
   sessionId,
@@ -82,6 +85,40 @@ test('WHAT[knowledge-reuse-012] CASEBOOK_visible_set_change_advances_epoch', asy
     const after = await index.refresh(local.handle, 10)
     assert.equal(after.epoch > empty.epoch, true)
     assert.equal(after.cases.some((entry) => entry.question === 'A new canonical question'), true)
+  } finally {
+    local.close()
+  }
+})
+
+test('WHAT[knowledge-reuse-012] CASEBOOK_preserves_160_old_hash_vectors_and_fetches_an_old_locator', async () => {
+  assert.equal(oldShelfmarks.length, 160)
+  for (const [identity, question, shelfmark] of oldShelfmarks) {
+    assert.equal(index.shelfmarkFor(identity, question), shelfmark, JSON.stringify([identity, question]))
+  }
+  const local = sandbox()
+  try {
+    const baseline = await casebook.freezeCompletionState(local.store, local.dir, [])
+    const result = await casebook.finalizeEngineerCase(local.store, 'ses_1', 'legacy-locator-trace', 'Question?', 'Legacy answer', [], baseline)
+    assert.equal(result.kind, 'finalized')
+    assert.equal(parse(await local.fetch('Question? · aa739210')).answer, 'Legacy answer')
+  } finally {
+    local.close()
+  }
+})
+
+test('WHAT[knowledge-reuse-012] CASEBOOK_public_unicode_locator_survives_UTF8_and_fetches_the_same_case', async () => {
+  const local = sandbox()
+  try {
+    const question = 'a'.repeat(70) + '😀 tail of a long question'
+    const baseline = await casebook.freezeCompletionState(local.store, local.dir, [])
+    const result = await casebook.finalizeEngineerCase(local.store, 'unicode-locator-case', 'unicode-locator-trace', question, 'Unicode answer', [], baseline)
+    assert.equal(result.kind, 'finalized')
+    const snapshot = await index.refresh(local.store, 256)
+    const shelfmark = snapshot.cases.find(entry => entry.question === question).shelfmark
+    const transported = Buffer.from(shelfmark, 'utf8').toString('utf8')
+    assert.equal(parse(await local.fetch(transported)).answer, 'Unicode answer')
+    assert.equal(transported, shelfmark)
+    assert.equal(shelfmark.isWellFormed(), true)
   } finally {
     local.close()
   }

@@ -1,7 +1,8 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
-open System
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Persistence.EventStore
 
 /// Process-local Casebook index frozen for the current provider epoch.
@@ -13,7 +14,10 @@ module CasebookIndex =
 
     type Snapshot = { Epoch: int64; Cases: Entry list }
 
-    type private ResolvedEntry = { Public: Entry; Case: Case }
+    [<Import("CasebookIndexLaw", "wanxiangli/casebook")>]
+    let private indexLawConstructor: obj = jsNative
+
+    let private indexLaw: obj = createNew indexLawConstructor ()
 
     let private gate = obj ()
     // DSL-MUTABLE: resource
@@ -26,94 +30,50 @@ module CasebookIndex =
     /// Force the next successful refresh to advance epoch (Captured/Refreshed/Evicted).
     let invalidate () : unit = lock gate (fun () -> dirty <- true)
 
-    let private compactTitle (question: string) =
-        let firstLine =
-            if String.IsNullOrWhiteSpace question then
-                "Untitled case"
-            else
-                question.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
-                |> Array.tryFind (String.IsNullOrWhiteSpace >> not)
-                |> Option.defaultValue "Untitled case"
-
-        let cleaned = firstLine.Trim().TrimStart([| '#'; '-'; '*'; ' '; '\t' |]).Trim()
-
-        let words =
-            cleaned.Split([| ' '; '\t' |], StringSplitOptions.RemoveEmptyEntries)
-            |> String.concat " "
-
-        let title =
-            if String.IsNullOrWhiteSpace words then
-                "Untitled case"
-            else
-                words
-
-        if title.Length <= 72 then
-            title
-        else
-            title.Substring(0, 71).TrimEnd() + "…"
-
-    let private fnv1aDigest (text: string) : string =
-        // DSL-MUTABLE: algorithm-scratch — FNV-1a rolling hash accumulator
-        let mutable hash = 2166136261u
-
-        for i = 0 to text.Length - 1 do
-            let c = uint32 text.[i]
-            hash <- hash ^^^ (c &&& 0xFFu)
-            hash <- hash * 16777619u
-            hash <- hash ^^^ (c >>> 8)
-            hash <- hash * 16777619u
-
-        sprintf "fnv1a:%08x" hash
-
     /// Stable public locator. The suffix is a one-way catalog discriminator,
     /// never the durable session identity itself.
     let shelfmarkFor (sessionId: string) (canonicalQuestion: string) : string =
-        let digest = fnv1aDigest sessionId
+        indexLaw?shelfmarkFor (sessionId, canonicalQuestion) |> unbox<string>
 
-        let discriminator =
-            let colon = digest.IndexOf(':')
-
-            if colon >= 0 && colon + 1 < digest.Length then
-                digest.Substring(colon + 1)
-            else
-                digest
-
-        sprintf "%s · %s" (compactTitle canonicalQuestion) discriminator
-
-    let private resolvedEntries (cases: Map<string, Case>) : ResolvedEntry list =
+    let private caseViews (cases: (string * Case) array) : obj array =
         cases
-        |> Map.toList
-        |> List.map (fun (sessionId, case) ->
-            { Public =
-                { Shelfmark = shelfmarkFor sessionId case.Q
-                  Question = case.Q }
-              Case = case })
-        |> List.sortBy (fun entry -> entry.Public.Shelfmark)
+        |> Array.map (fun (identity, case) -> createObj [ "sessionId" ==> identity; "question" ==> case.Q ])
+
+    let private entryView (entry: Entry) : obj =
+        createObj [ "shelfmark" ==> entry.Shelfmark; "question" ==> entry.Question ]
 
     let private publicEntries (cases: Map<string, Case>) =
-        resolvedEntries cases |> List.map (fun entry -> entry.Public)
+        let views = cases |> Map.toArray |> caseViews
+
+        indexLaw?entries (views)
+        |> unbox<obj array>
+        |> Array.map (fun entry ->
+            { Shelfmark = unbox<string> entry?shelfmark
+              Question = unbox<string> entry?question })
+        |> Array.toList
 
     let private frozenOrEmpty () =
         match frozen with
         | Some snapshot -> snapshot
         | None -> { Epoch = 0L; Cases = [] }
 
-    let private visibleChange entries =
-        match frozen with
-        | None -> true
-        | Some snapshot -> snapshot.Cases <> entries
-
-    let private epochAfterRefresh previousEpoch visibleChanged =
-        if dirty || visibleChanged then
-            previousEpoch + 1L
-        else
-            previousEpoch
-
     let private freezeEntries entries =
         let previousEpoch =
             frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
 
-        let epoch = epochAfterRefresh previousEpoch (visibleChange entries)
+        let previous =
+            frozen
+            |> Option.map (fun snapshot -> snapshot.Cases |> List.map entryView |> List.toArray |> box)
+            |> Option.defaultValue null
+
+        let next = entries |> List.map entryView |> List.toArray
+
+        let epoch =
+            if indexLaw?advancesEpoch (previous, dirty, next) |> unbox<bool> then
+                previousEpoch + 1L
+            else
+                previousEpoch
+
         dirty <- false
 
         let snapshot = { Epoch = epoch; Cases = entries }
@@ -129,19 +89,16 @@ module CasebookIndex =
             Ok cases
 
     /// Resolve a public shelfmark to its internal Case without exposing the
-    /// durable session key. The generated shelfmark is collision-free for the
-    /// process identity inputs because it carries the full 32-bit discriminator.
+    /// durable session key. Historical hash collisions select the first namesake.
     let resolve (store: IEventStore) (capacity: int) (shelfmark: string) : Task<Result<Case option, string>> =
         task {
             match project store capacity with
             | Error error -> return Error error
             | Ok cases ->
-                return
-                    Ok(
-                        resolvedEntries cases
-                        |> List.tryFind (fun entry -> entry.Public.Shelfmark = shelfmark)
-                        |> Option.map (fun entry -> entry.Case)
-                    )
+                let ordered = Map.toArray cases
+                let position = indexLaw?locate (caseViews ordered, shelfmark) |> unbox<int>
+
+                return Ok(ordered |> Array.tryItem position |> Option.map snd)
         }
 
     /// Rebuild from the unified EventStore projection. Epoch advances when the
