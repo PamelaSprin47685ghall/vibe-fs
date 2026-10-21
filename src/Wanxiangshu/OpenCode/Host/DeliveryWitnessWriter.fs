@@ -24,8 +24,7 @@ module DeliveryWitnessWriter =
         match task with
         | DeliveryTaskReference.ChildWork handle -> TaskDeliveryTask.ChildWork handle
         | DeliveryTaskReference.Invocation invocationId -> TaskDeliveryTask.Invocation invocationId
-        | DeliveryTaskReference.Lifecycle(workId, incumbencyId) ->
-            TaskDeliveryTask.Lifecycle(workId, incumbencyId)
+        | DeliveryTaskReference.Lifecycle(workId, incumbencyId) -> TaskDeliveryTask.Lifecycle(workId, incumbencyId)
 
     /// The durable witness of one delivery: the js witness's fence and
     /// material, plus the digest that seals the material it states.

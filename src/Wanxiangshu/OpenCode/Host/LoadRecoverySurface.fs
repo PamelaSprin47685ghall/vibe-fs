@@ -38,10 +38,7 @@ module LoadRecoverySurface =
         ChildWorkRecovery.orphanedChildRuns (stateOf state).Projection.AgentProjections
         |> List.choose (
             ChildWorkRecovery.settlementFact
-            >> Option.map (
-                AgentFact.Execution
-                >> Fact.Agent
-                >> FactCodec.serializeFact)
+            >> Option.map (AgentFact.Execution >> Fact.Agent >> FactCodec.serializeFact)
         )
         |> List.toArray
 

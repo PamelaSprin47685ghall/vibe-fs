@@ -97,8 +97,7 @@ module ChildWorkRecovery =
 
     /// Orphaned child runs maintain active obligations across restart without being voided.
     /// settlementFact returns None so no ChildWorkVoided/ChildRunVoided fact is written.
-    let settlementFact (orphaned: OrphanedChildRun) : ExecutionFactCases option =
-        None
+    let settlementFact (orphaned: OrphanedChildRun) : ExecutionFactCases option = None
 
     let private parentOf =
         function

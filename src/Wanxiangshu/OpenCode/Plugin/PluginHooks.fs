@@ -97,10 +97,8 @@ module PluginHooks =
                 Some(prefixUntil, thenMap)
 
         fields
-        |> Option.filter (fun (prefixUntil, thenMap) ->
-            not (isUndefined prefixUntil && isUndefined thenMap))
-        |> Option.map (fun (prefixUntil, thenMap) ->
-            createObj [ "prefixUntil" ==> prefixUntil; "thenMap" ==> thenMap ])
+        |> Option.filter (fun (prefixUntil, thenMap) -> not (isUndefined prefixUntil && isUndefined thenMap))
+        |> Option.map (fun (prefixUntil, thenMap) -> createObj [ "prefixUntil" ==> prefixUntil; "thenMap" ==> thenMap ])
 
     /// A declaration counts only when it is valid: an invalid one never
     /// committed a view, so it must never commit a checkpoint.

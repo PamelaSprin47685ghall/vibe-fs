@@ -136,11 +136,7 @@ module PluginTransforms =
           SanitizeMessages: obj -> unit
           AdjudicateDelivery: string option -> obj -> Task<DeliveryAdjudication>
           StopAfterDelivery:
-              string option
-                  -> PhysicalUserMessageId option
-                  -> DeliveryAttemptLedger.Fence
-                  -> obj
-                  -> Task<unit> }
+              string option -> PhysicalUserMessageId option -> DeliveryAttemptLedger.Fence -> obj -> Task<unit> }
 
     type TransformBranchCapabilities = { RegisterOwned: string -> unit }
 
@@ -679,12 +675,7 @@ module PluginTransforms =
             match DeliveryAttemptLedger.tryFindEstablished sessionId physical with
             | Some(fence, _) -> DeliveryAdjudication.StopDelivery fence
             | None ->
-                match
-                    DeliveryAttemptLedger.tryFindDurableEstablished
-                        journal
-                        sessionId
-                        physical
-                with
+                match DeliveryAttemptLedger.tryFindDurableEstablished journal sessionId physical with
                 | Some fence -> DeliveryAdjudication.StopDelivery fence
                 | None -> DeliveryAdjudication.ContinueDelivery
 
@@ -727,8 +718,7 @@ module PluginTransforms =
 
                     Diagnostic.emit
                         "delivery-interrupt-observed"
-                        [ "session_id", sessionText
-                          "result", deliveryInterruptResultName outcome ]
+                        [ "session_id", sessionText; "result", deliveryInterruptResultName outcome ]
             }
 
         /// 退休 attempt 的精确围栏：被退休的那次 deliver 的 provider run 与
@@ -758,10 +748,7 @@ module PluginTransforms =
             | Some exact -> DeliveryAttemptLedger.recordInterruptIssued exact issued
             | None -> ()
 
-        let recordRetiredInterruptObserved
-            (fence: DeliveryAttemptLedger.Fence option)
-            (outcome: Result<unit, string>)
-            =
+        let recordRetiredInterruptObserved (fence: DeliveryAttemptLedger.Fence option) (outcome: Result<unit, string>) =
             match fence with
             | Some exact -> DeliveryAttemptLedger.recordInterruptObserved exact outcome
             | None -> ()
@@ -785,10 +772,7 @@ module PluginTransforms =
         /// 只抑制下一次 provider step，不发中断。同一退休 attempt 的第二次
         /// 请求仍须被抑制（本次请求不得放行），但不得再发一次旧任期的会话
         /// 中止（条款 011 禁止后果）。
-        let suppressRetiredProviderStepOnly
-            (exactSessionId: SessionId)
-            (physical: PhysicalUserMessageId)
-            =
+        let suppressRetiredProviderStepOnly (exactSessionId: SessionId) (physical: PhysicalUserMessageId) =
             ModelRouting.suppressProviderStep exactSessionId physical
 
         /// 停止（条款 4/6）：抑制下一次 provider step + 发出本次 attempt 的中断。
@@ -807,16 +791,11 @@ module PluginTransforms =
                 let alreadyIssued = retiredInterruptIssued fence
 
                 match physicalUserMessageId with
-                | None ->
-                    Diagnostic.emit
-                        "retired-attempt-stop-skipped-no-physical-fence"
-                        [ "session_id", sessionText ]
+                | None -> Diagnostic.emit "retired-attempt-stop-skipped-no-physical-fence" [ "session_id", sessionText ]
                 | Some physical when alreadyIssued ->
                     suppressRetiredProviderStepOnly exactSessionId physical
 
-                    Diagnostic.emit
-                        "retired-attempt-stop-already-issued"
-                        [ "session_id", sessionText ]
+                    Diagnostic.emit "retired-attempt-stop-already-issued" [ "session_id", sessionText ]
                 | Some physical ->
                     let interrupt = requestRetiredAttemptInterrupt exactSessionId
 
@@ -849,9 +828,7 @@ module PluginTransforms =
                             workspaceDirectory
                             (Some sessionText)
 
-                    Diagnostic.emit
-                        "retired-attempt-successor-dispatched"
-                        [ "session_id", sessionText ]
+                    Diagnostic.emit "retired-attempt-successor-dispatched" [ "session_id", sessionText ]
                 with ex ->
                     Diagnostic.emit
                         "retired-attempt-successor-dispatch-failed"
@@ -1055,8 +1032,7 @@ module PluginTransforms =
                         // 1) 抑制下一次 provider step：LLM 不会再收到包含 deliver
                         //    回复的下一次请求。
                         physicalUserMessageId
-                        |> Option.iter (fun physical ->
-                            ModelRouting.suppressProviderStep exactSessionId physical)
+                        |> Option.iter (fun physical -> ModelRouting.suppressProviderStep exactSessionId physical)
 
                         // 2) 发出本次 attempt 的中断。
                         do! issueDeliveryInterrupt exactSessionId sessionText fence

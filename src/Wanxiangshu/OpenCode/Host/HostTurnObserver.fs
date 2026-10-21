@@ -137,11 +137,7 @@ module HostTurnObserver =
                 // await（异常不被吞掉），未结算的那个由其发起方各自结算。
                 // Fable has no Task.WhenAny; Promise.race is the established
                 // pattern (Await.fs / ToolWorkflow.fs).
-                do!
-                    (Fable.Core.JsInterop.emitJsExpr
-                        (guard, delivery)
-                        "Promise.race([$0, $1])"
-                        : Task)
+                do! (Fable.Core.JsInterop.emitJsExpr (guard, delivery) "Promise.race([$0, $1])": Task)
         }
 
     let private observeApplicationTurn

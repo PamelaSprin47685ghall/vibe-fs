@@ -248,10 +248,7 @@ module PluginHostWiring =
                 // missing list is not an empty list, so an open work is never
                 // terminated here.
                 match workOpt with
-                | Some work when
-                    work.Sequence = [ "S1"; "S2"; "S3" ]
-                    && (work.Delivered || work.PendingDelivery)
-                    ->
+                | Some work when work.Sequence = [ "S1"; "S2"; "S3" ] && (work.Delivered || work.PendingDelivery) ->
                     true
                 | Some work -> work.Delivered && activeRoot.IsNone
                 | None -> false

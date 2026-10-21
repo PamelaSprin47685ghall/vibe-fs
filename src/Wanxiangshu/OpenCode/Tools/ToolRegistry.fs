@@ -255,7 +255,8 @@ module ToolRegistry =
             Task.FromResult(
                 ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId) "tool/ask-waiting" Map.empty
             )
-        elif role = Role.Manager && spec.Name <> "todowrite-for-manager" then managerFactsStage gate spec managerPermission args ctx
+        elif role = Role.Manager && spec.Name <> "todowrite-for-manager" then
+            managerFactsStage gate spec managerPermission args ctx
         else
             spec.Execute args ctx
 
@@ -457,10 +458,7 @@ module ToolRegistry =
     let private recordOfReceipt (receipt: obj) : string option =
         let record = receipt?record
 
-        if isNullish record then
-            None
-        else
-            Some(string record)
+        if isNullish record then None else Some(string record)
 
     /// The delegate payload keeps every field the program sent and gains the
     /// report material under `commissioner_record`. The payload is normalized
@@ -759,10 +757,7 @@ module ToolRegistry =
                         retirement.Fence.ProviderRunId = providerRunId
                         && retirement.Fence.ToolCallId = toolCallIdText)
                     |> Option.map (fun retirement ->
-                        DeliveryTaskReference.Lifecycle(
-                            SessionId.value sessionId,
-                            retirement.IncumbencyId
-                        ),
+                        DeliveryTaskReference.Lifecycle(SessionId.value sessionId, retirement.IncumbencyId),
                         Some retirement.RetirementId))
 
             let childHandle =
@@ -809,8 +804,10 @@ module ToolRegistry =
                     let logicalRunId = profile.LogicalRunId
                     let authorityRoot = profile.AuthorityRootUserMessageId
 
-                    if String.IsNullOrWhiteSpace(LogicalRunId.value logicalRunId)
-                       || String.IsNullOrWhiteSpace(AuthorityRootUserMessageId.value authorityRoot) then
+                    if
+                        String.IsNullOrWhiteSpace(LogicalRunId.value logicalRunId)
+                        || String.IsNullOrWhiteSpace(AuthorityRootUserMessageId.value authorityRoot)
+                    then
                         Task.FromResult None
                     else
                         task {
@@ -842,12 +839,7 @@ module ToolRegistry =
                                             let! work = runtime.LifecycleWorkFor ctx.SessionId
 
                                             let deliveryTask, retirementId =
-                                                deliveryTaskOf
-                                                    durable
-                                                    sessionId
-                                                    providerRun
-                                                    toolCallId
-                                                    work
+                                                deliveryTaskOf durable sessionId providerRun toolCallId work
 
                                             return
                                                 Some
@@ -859,17 +851,15 @@ module ToolRegistry =
                                                           RetirementId = retirementId
                                                           FormalText = formalText }
                                                       Writer =
-                                                        DeliveryWitnessWriter.create
-                                                            durable
-                                                            (fun witness ->
-                                                                // The durable witness is committed by now: the
-                                                                // registration only records the committed attempt, so the
-                                                                // transform hook's delivery adjudication can stop it.
-                                                                DeliveryAttemptLedger.recordEstablished
-                                                                    { SessionId = witness.SessionId
-                                                                      ProviderRun = witness.ProviderRun
-                                                                      CallId = witness.ToolCallId }
-                                                                    (Some witness.PhysicalUserMessageId)) }
+                                                        DeliveryWitnessWriter.create durable (fun witness ->
+                                                            // The durable witness is committed by now: the
+                                                            // registration only records the committed attempt, so the
+                                                            // transform hook's delivery adjudication can stop it.
+                                                            DeliveryAttemptLedger.recordEstablished
+                                                                { SessionId = witness.SessionId
+                                                                  ProviderRun = witness.ProviderRun
+                                                                  CallId = witness.ToolCallId }
+                                                                (Some witness.PhysicalUserMessageId)) }
                         }
             | _ -> Task.FromResult None
 
@@ -909,8 +899,7 @@ module ToolRegistry =
                 { spec with
                     Execute =
                         fun args ctx ->
-                            let envelopeOk (fields: (string * obj) list) : obj =
-                                createObj (("ok" ==> true) :: fields)
+                            let envelopeOk (fields: (string * obj) list) : obj = createObj (("ok" ==> true) :: fields)
 
                             let refusal (code: string) : obj =
                                 createObj [ "ok" ==> false; "code" ==> code ]
@@ -926,7 +915,8 @@ module ToolRegistry =
                                             let materialOk: bool = material?ok
 
                                             match name with
-                                            | "fork" | "commission" ->
+                                            | "fork"
+                                            | "commission" ->
                                                 if not materialOk then
                                                     return
                                                         refusalWithReason
@@ -1037,8 +1027,7 @@ module ToolRegistry =
                                                               "view" ==> record.View ]
 
                                                     envelopeOk
-                                                        [ "records"
-                                                          ==> (records |> List.map toObj |> Array.ofList)
+                                                        [ "records" ==> (records |> List.map toObj |> Array.ofList)
                                                           "byName"
                                                           ==> createObj
                                                                   [ for record in records ->
@@ -1092,12 +1081,12 @@ module ToolRegistry =
                                             ))
                                             horizonContext
                                             ctx
-                                  Advisor =
-                                    fun intent reportMapping ->
-                                        advisorConsult runtime ctx intent reportMapping }
+                                  Advisor = fun intent reportMapping -> advisorConsult runtime ctx intent reportMapping }
 
                             JsDelegationBridge.install ctx.SessionId host
-                            JsDelegationBridge.installAsk ctx.SessionId (fun question -> runtime.AskUser(ctx, question))
+
+                            JsDelegationBridge.installAsk ctx.SessionId (fun question ->
+                                runtime.AskUser(ctx, question))
 
                             task {
                                 try
@@ -1111,9 +1100,9 @@ module ToolRegistry =
                                     match ctx.ProviderRunId, ctx.ToolCallId with
                                     | Some providerRun, Some toolCallId ->
                                         match JsDeliveredValues.peekFence ctx.SessionId with
-                                        | Some fence
-                                            when fence.ProviderRun = providerRun
-                                                 && fence.ToolCallId = toolCallId ->
+                                        | Some fence when
+                                            fence.ProviderRun = providerRun && fence.ToolCallId = toolCallId
+                                            ->
                                             runtime.RegisterEstablishedDelivery(
                                                 SessionId.create ctx.SessionId,
                                                 providerRun,
@@ -1280,8 +1269,7 @@ module ToolRegistry =
             : PhysicalUserMessageId option =
             let parentBound =
                 messages
-                |> List.tryFind (fun message ->
-                    message.Id = owningMessageId && message.Role = "assistant")
+                |> List.tryFind (fun message -> message.Id = owningMessageId && message.Role = "assistant")
                 |> Option.bind (fun message -> physicalUserMessageOf messages message None)
 
             parentBound
@@ -1297,20 +1285,14 @@ module ToolRegistry =
                 match deliverPorts runtime, deliverOwnership ctx with
                 | Ok(snapshotPort, journal), Ok(owningMessageId, owningCallId) ->
                     let! exchange =
-                        readOwningExchange
-                            snapshotPort
-                            (SessionId.create ctx.SessionId)
-                            owningMessageId
-                            owningCallId
+                        readOwningExchange snapshotPort (SessionId.create ctx.SessionId) owningMessageId owningCallId
 
                     let boundPhysical =
                         exchange
-                        |> Result.map (fun messages ->
-                            boundPhysicalFor runtime ctx messages owningMessageId)
+                        |> Result.map (fun messages -> boundPhysicalFor runtime ctx messages owningMessageId)
                         |> Result.defaultValue None
 
-                    let! cursor =
-                        captureOrPropagate journal (SessionId.create ctx.SessionId) exchange
+                    let! cursor = captureOrPropagate journal (SessionId.create ctx.SessionId) exchange
 
                     return cursor |> Result.map (fun value -> value, boundPhysical)
                 | Error err, _ -> return Error err
@@ -1343,8 +1325,7 @@ module ToolRegistry =
             =
             let established =
                 match outcome with
-                | Ok res ->
-                    res.RetirementOutcome = "PostS3" || res.RetirementOutcome = "Delivered"
+                | Ok res -> res.RetirementOutcome = "PostS3" || res.RetirementOutcome = "Delivered"
                 | Error _ -> false
 
             match established, boundPhysical, ctx.ProviderRunId, ctx.ToolCallId with

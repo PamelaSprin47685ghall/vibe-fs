@@ -60,7 +60,10 @@ module ToolRegistrySurface =
         let prose =
             Wanxiangshu.Repository.Programming.Js.OpenCode.JsDescriptionAssets.load parsed
 
-        Wanxiangshu.Repository.Programming.Js.JsToolGenerator.generate "plan" (OfficeCapability.permissions Role.Plan) prose
+        Wanxiangshu.Repository.Programming.Js.JsToolGenerator.generate
+            "plan"
+            (OfficeCapability.permissions Role.Plan)
+            prose
         |> Option.map (fun s -> s.Description)
         |> Option.defaultValue ""
 

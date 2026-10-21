@@ -1328,7 +1328,8 @@ module PairProgrammingThoughtTransform =
 
             let resolveLanguage =
                 match journal, projectionSessionIdOpt with
-                | Some _, Some sessionId -> Wanxiangshu.Participant.Provider.ProviderLanguageBinding.forSessionText sessionId
+                | Some _, Some sessionId ->
+                    Wanxiangshu.Participant.Provider.ProviderLanguageBinding.forSessionText sessionId
                 | _ -> ProviderLanguage.SimplifiedChinese
 
             let parkedHint =
