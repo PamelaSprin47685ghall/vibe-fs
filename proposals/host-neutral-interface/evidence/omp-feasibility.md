@@ -48,4 +48,7 @@ binary `~/.local/bin/omp` reports `omp/18.12.4`. Extension entry: `omp -e <file>
 - O-4 `SessionHeader.parentSession` is recorded verbatim by omp and may hold a session **file path** rather than a
   session id. The adapter resolves a path-shaped value through `readSessionInfo` and refuses it when the file does
   not resolve; a real binding must decide whether an unresolvable parent path is an error or a legitimately
-  deleted parent session.
+  deleted parent session. omp's own listing layer surfaces the very same field as
+  `SessionInfo.parentSessionPath` (`session/session-listing.ts:488`), i.e. omp itself does not know whether the
+  recorded value is an id or a path — so the ambiguity is the host's, not the adapter's, and the adapter must not
+  guess.
