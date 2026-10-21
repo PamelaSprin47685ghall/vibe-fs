@@ -2,6 +2,7 @@ namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Repository.Programming.Js
 
 /// One declaration protects the prefix and states the remaining anchors' actions.
 type AnchorViewDeclaration =
@@ -124,3 +125,18 @@ module AnchorViewDeclaration =
 
     let plan (anchors: int list) (history: AnchorReplacement list) (declaration: AnchorViewDeclaration) =
         AnchorCoverage.plan anchors history declaration
+
+/// The single declaration rule every caller shares: the coverage law decides
+/// the shape, the host maps the first violation onto its stable failure code.
+/// F# callers use this typed core directly; the JS boundary in
+/// `AnchorSurface` answers with the plain-JS receipt of the same decision.
+[<RequireQualifiedAccess>]
+module AnchorDeclarationRule =
+    /// Strict `{ prefixUntil, thenMap }` shape, judged by the coverage law.
+    let parse (value: obj) : Result<AnchorViewDeclaration, JsFailure> =
+        AnchorCoverage.parse value |> Result.mapError JsFailure.ViewDeclarationInvalid
+
+    /// A report mapping is exactly a declaration with `prefixUntil = 0`, so it
+    /// is judged by the same rule.
+    let parseReportMapping (mapping: obj) : Result<AnchorViewDeclaration, JsFailure> =
+        parse (createObj [ "prefixUntil" ==> 0; "thenMap" ==> mapping ])

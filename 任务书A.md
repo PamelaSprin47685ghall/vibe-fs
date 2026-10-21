@@ -617,3 +617,18 @@ dotnet tool run fantomas src/Wanxiangshu
 - **D1** 仍调用退役宿主工具的用例迁移 —— 未做（`work-021`/`work-024`/`intra-participant-parallelism-018` 即属此类）。
 - **D2** `delegation-029` 词法审计与 `js-semantic-surface-002` 边界门禁 —— 未核。
 - **D3** 补回归用例 —— 仅第一项（三态冲突 + handle 未被消费，`repository-programming/064`）已写；**其余四项仍未写**：交付→见证落盘→transform 停住该 attempt（条款 3/4 的核心闭环）、提交/呈现/中断三件事分别取证、fork 侧重复读取同一终态不掏空交付格、sync delegate 被中断后仍以交付视图结算调用。
+
+### 十·五 锚声明批次（integration 实测，2026-10-21）
+
+**范围**：`Repository/Programming/Js/Anchor/{AnchorModel,AnchorSurface}.fs/.fsi`、`Execution/Delegation/Advisor/Surface.fs`、`Repository/Programming/Js/{DeliveredValues,ToolsBindings}.fs`、`OpenCode/Tools/ToolRegistry.fs`（8 文件，单独推送，不夹带 marker/delegation/fission/build 其它改动）。
+
+**语义**：typed `AnchorDeclarationRule` 为单一 core；公开面 `parseDeclaration` / `parseReportMapping` / `reportMaterial` 返回 JS-native 回执（`{ ok: true, prefixUntil, thenMap }` / `{ ok: false, code, reason }`；材料回执 `{ ok, material }`）；`thenMap` 为 record（非数组）；无 `toJSON` 深度解析。
+
+**实测**：
+- `node scripts/build.mjs` → `[build] build ok (generation 104)`；`js-surface-manifest: OK — 151 registered surfaces`；`js-module-linkage: OK — 724 emitted modules linked and loaded`；`dist/` 724 个 .js，`dist/OpenCode/Plugin/Plugin.js`、`dist/Sphinx/V2/ServeEntry.js` 均存在。
+- 锚批：`context-compression/031|032`、`repository-programming/059|063|064`、`work/020|034`、`delegation/033`、`advisor/006` → **tests 68 / pass 68 / fail 0 / cancelled 0 / skipped 0 / todo 0**。
+- 另跑：`delegation/029`、`managed-session-lifecycle/018`、`repository-programming/048` → **tests 13 / pass 11 / fail 0 / cancelled 0 / todo 2**（todo 为用例内 `test.todo`，非失败）。
+
+**过程记录**：首轮 build 红在 `ToolRegistry.fs`（`:445` Unmatched `[` / `:447` Unmatched `(` / `:448` unit-null / `:449` incomplete structured construct），根因是 `createObj` 与参数列表分行同缩进导致 offside 失配；已改为 `createObj [ ... ]` 并把 if/else 提成 `let record: obj`，语义不变，重跑 build 绿。
+
+**仍未闭合（不在本批）**：R6 ledger 反向边；B5 完整 ToolCallId 围栏消费；C3 材料搬运；`Execution/Fission/OpenCode/Host.fs` 的 -186 行死链（属已结束的 build-doctor，不在本批，也未做 Tool.fs rename——`Tool.fs` 另有活跃 `deliverOneLane` 交付）。

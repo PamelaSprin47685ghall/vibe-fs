@@ -1048,7 +1048,7 @@ module JsToolsBindings =
                     "reportMapping is required: pass the anchor mapping the delegate must report through"
             )
         else
-            match AnchorSurface.parseReportMapping reportMapping with
+            match AnchorDeclarationRule.parseReportMapping reportMapping with
             | Error failure -> Some failure
             | Ok _ -> None
 

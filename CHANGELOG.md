@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — 锚声明：单一 typed 规则，公开面改回 JS-native 回执
+
+- **重构：锚声明的判定收敛为一条 typed 规则**。`AnchorDeclarationRule`（`Repository/Programming/Js/Anchor/AnchorModel.fs`）成为唯一的声明形状判定核心：覆盖律决定形状，宿主把首个违规映射到稳定失败码。F# 调用方直接消费这个 typed core，JS 边界只是同一判定的回执出口，不再各自复述一份解析。
+- **公开面改为 JS-native 回执**。`AnchorSurface.parseDeclaration` / `parseReportMapping` / `reportMaterial` 现在返回普通 JS 回执：`{ ok: true, prefixUntil, thenMap }` 或 `{ ok: false, code, reason }`；材料回执带 `{ ok, material }`。`thenMap` 保持 record 形态（不是数组），无 `toJSON` 深度解析。`AnchorSurface.fsi` 的签名同步改为 `obj`。
+- **改动文件**：`Repository/Programming/Js/Anchor/AnchorModel.fs` / `.fsi`、`Repository/Programming/Js/Anchor/AnchorSurface.fs` / `.fsi`、`Execution/Delegation/Advisor/Surface.fs`、`Repository/Programming/Js/DeliveredValues.fs`、`Repository/Programming/Js/ToolsBindings.fs`、`OpenCode/Tools/ToolRegistry.fs`。
+- **验收**：`node scripts/build.mjs` → `[build] build ok (generation 104)`（`js-surface-manifest: OK — 151 registered surfaces`、`js-module-linkage: OK — 724 emitted modules linked and loaded`）；`context-compression/031|032`、`repository-programming/059|063|064`、`work/020|034`、`delegation/033`、`advisor/006` → tests 68 / pass 68 / fail 0 / cancelled 0；`delegation/029`、`managed-session-lifecycle/018`、`repository-programming/048` → tests 13 / pass 11 / fail 0 / cancelled 0 / todo 2。
+
 ## Unreleased — 前缀世代重新由已提交事实推进（CUT-15）
 
 - **修复：宿主压缩与任期交接不再反复重锚**。cutover（6eef89d1e）之后，持久投影折叠 `ContextReanchored` / `TenureReanchored` 时只清检查点、退休辅助呈现，不再推进 `PrefixEpoch`：世代永远停在 0，已处理的压缩 run 也不入账。于是 `HostCompactionGate` 每次核对都对同一次压缩再写一行 0→1，每一行都把会话此后重建的 view 检查点清空、把 guidance 可见性再退休一次。现在折叠经前缀 owner 提交：只有被接受的推进才清检查点与退休可见性；重放行与重复观察被吸收、什么都不改；非后继世代照旧报 PERSIST-010。
