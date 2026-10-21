@@ -18,7 +18,7 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.Anchor

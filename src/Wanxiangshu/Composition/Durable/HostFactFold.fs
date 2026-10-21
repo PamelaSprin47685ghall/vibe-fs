@@ -2,7 +2,7 @@ namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 

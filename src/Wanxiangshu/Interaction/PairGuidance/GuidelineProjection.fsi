@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode.Host.PairProgramming
+namespace Wanxiangshu.Interaction.PairGuidance
 
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation

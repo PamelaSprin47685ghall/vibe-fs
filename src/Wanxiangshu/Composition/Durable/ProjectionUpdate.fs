@@ -3,7 +3,7 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Foundation
 
 /// Shared session-scoped projection-update algebra for the fold families

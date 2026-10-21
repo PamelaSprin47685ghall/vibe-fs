@@ -10,7 +10,7 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 

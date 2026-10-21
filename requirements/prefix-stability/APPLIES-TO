@@ -4,6 +4,6 @@
 
 /src/Wanxiangshu/Context/Prefix/**
 /src/Wanxiangshu/Participant/Provider/Projection/**
-/src/Wanxiangshu/OpenCode/Host/PairProgramming/**
+/src/Wanxiangshu/Interaction/PairGuidance/**
 /src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
 /src/Wanxiangshu/Composition/Durable/Fold.fs
