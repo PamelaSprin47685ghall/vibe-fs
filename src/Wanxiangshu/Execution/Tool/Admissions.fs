@@ -34,6 +34,16 @@ module ToolAdmissions =
     let fetch: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
 
+    /// fork is the manager's own delegation tool; resume also answers the plan
+    /// role, and commission is the orchestrator's hand-off.
+    let fork: ToolAdmission = ToolAdmission.OfficeRole(fun _ r -> r = Role.Manager)
+
+    let resume: ToolAdmission =
+        ToolAdmission.OfficeRole(fun _ r -> r = Role.Manager || r = Role.Plan)
+
+    let commission: ToolAdmission =
+        ToolAdmission.OfficeRole(fun _ r -> r = Role.Orchestrator)
+
     let programmingFor (roleName: string) : ToolAdmission =
         // Same predicate as StaticTools.jsPermission and JsToolGenerator: the
         // role's office permissions must project a non-empty programming surface

@@ -21,6 +21,9 @@ module ToolAdmissionTable =
           "bash-honeypot", ToolAdmissions.bashHoneypot
           "assume", ToolAdmissions.assume
           "fetch", ToolAdmissions.fetch
+          "fork", ToolAdmissions.fork
+          "resume", ToolAdmissions.resume
+          "commission", ToolAdmissions.commission
           "todowrite-for-bookkeeper", bookkeeper ]
 
     let private tryAdmissionFor (specName: string) : ToolAdmission option =
