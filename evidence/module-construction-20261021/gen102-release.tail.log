@@ -1,0 +1,80 @@
+integration:suites: worker cost {"version":1,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","enabled":false,"pid":null,"status":"disabled","reason":"Worker diagnostics disabled","preImport":null,"exit":null,"interval":null}
+
+[test-summary] 40 file(s), 725 passed, 0 failed, 7 skipped, 7 todo (517.76s wall, 1897.73s test time)
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/action-affordance/tests/001.test.mjs:WHAT[action-affordance-001] every nontrivial action description answers all five semantic questions; nonempty descriptions are only a prerequisite (GAP-078) — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/action-affordance/tests/009.test.mjs:WHAT[action-affordance-009] all calling choices explain their actual responsibilities without implying new permissions; one retired-choice regression is not semantic completeness (GAP-078) — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/crash-reconciliation/tests/020.test.mjs:WHAT[crash-reconciliation-020] actual plugin activation durably settles orphan child work before ordinary execution, preserves exact live flights, and refuses append failure (GAP-149) — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/crash-reconciliation/tests/020.test.mjs:WHAT[crash-reconciliation-020] a real interrupted run and PTY input are not replayed after restart while unique DevOps authority and durable model Persona binding are retained (GAP-149; GAP-129; GAP-132) — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/host-provider-failure-ownership/tests/002.test.mjs:WHAT[host-provider-failure-ownership-002] installed Host makes one upstream request for one failed physical run with production retry configuration — GAP-144: installed 1.18.29 retries despite the zero configuration
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/host-provider-failure-ownership/tests/002.test.mjs:WHAT[host-provider-failure-ownership-002] full plugin recovery opens only licensed fresh runs after Host failure without duplicate upstream requests (GAP-143) — reason not supplied
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] a selected wrapper cannot borrow SDK Base Path or runtimes from a live installation — No explicitly selected live SDK is available for this physical provenance counterexample
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] exact repository Git inputs install through a selected npm 11.12.1 bundle and real JavaScript consumers — reason not supplied
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] a complete selected SDK archive resolves the captured repository global.json and reclaims its owned roots — reason not supplied
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] selected complete SDK restores original repository local tools from explicitly identified NuGet archives — reason not supplied
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] selected complete Git source and SDK restore the original foundation identity project through a fresh-cache locked NuGet graph — reason not supplied
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] four selected input owners compile the original foundation identity project with Fable into isolated outputs — reason not supplied
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] mac readonly views protect actual original-project Fable inputs and restore all prepared owners — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] a mutation restored within one step still invalidates the run — D2: fixed isolated inputs selected; current runner still uses mutable inputs and step-boundary hashes miss this counterexample
+integration:suites: post-exit group verification/reclamation: pid=91502; elapsedMs=22.997; accepted=true
+integration:suites: 739 test(s), 1897.7s of test time; max 234713ms, p90 5391ms, median 170ms
+integration:suites:   234713ms  WHAT[durable-events-022] each actual bounded locality compiles as one flat project and a reversed dependency is rejected
+integration:suites:   133295ms  WHAT[process-execution-012] an isolated Fable consumer uses request and PTY contracts but cannot reach physical adapters
+integration:suites:   62875ms  WHAT[durable-events-023] isolated compilation rejects aggregate authority in domain folds
+integration:suites:   44820ms  WHAT[semantic-trace-005] independently compile a consumer and reject access to opaque trace state, cursor and append refs
+integration:suites:   42036ms  WHAT[durable-events-022] dispatch-runtime compiles its complete flat closure
+
+integration:suites: 725 passed, 0 failed; 40/40 planned file(s) completed
+integration:suites: partial evidence; 7 skipped, 7 TODO; excluded cases are not passes
+integration:suites: pending proof accepted under WXS_ACCEPT_TODO override (7 TODO)
+  integration    OK  533.0s
+[mock-req] POST /v1/chat/completions
+(node:21281) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=ses_ea4409a00ffeJtd41mj9q6Qd3F
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+[mock-req] POST /v1/chat/completions
+  e2e            OK  12.2s
+  package        OK  5.3s
+PASS  verify release  849.3s

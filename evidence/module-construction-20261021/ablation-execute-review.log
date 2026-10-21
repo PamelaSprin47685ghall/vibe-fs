@@ -1,0 +1,3 @@
+{"unconfigured":{"work":"active","review":true}}
+{"borrowed":{"work":"borrowed","declaredSurface":[],"review":true,"schema":true,"manager":false}}
+{"realExecuteGate":{"rejectedBeforeProgramParse":true,"result":"# This capability is ablated for the current inspection profile.\n"}}

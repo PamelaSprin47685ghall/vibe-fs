@@ -1,0 +1,20 @@
+{"control":"Real compiled OrchestratorGit createRunner with git --version","accepted":true,"stdout":"git version 2.50.1 (Apple Git-155)"}
+{"case":"Real git diff --no-index through actual OrchestratorGit createRunner","nativeExit":1,"nativeStdoutBytes":164109,"nativeStderrBytes":0,"rawSpoolPreservedBytes":164109,"adapterResult":"Error","description":"Process end: Confirmed (Exited 1); stop: undefined; output: mixed-channel spool cannot supply separate text streams; fault: undefined","spoolDeleted":true}
+node:internal/modules/run_main:122
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: A complete native Git text result should be consumable without losing stdout/stderr semantics
+
+1 !== 0
+
+    at file:///private/tmp/vibe-fs-spool-review-20261021/git-output-probe.mjs:44:8
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual'
+}
+
+Node.js v22.13.0

@@ -1,0 +1,121 @@
+{
+  "purpose": "MF-06 narrow pure Casebook reception; not main integration acceptance",
+  "worktree": "/private/tmp/wanxiangli-mf06-casebook-20261021",
+  "branch": "codex/mf06-casebook-20261021",
+  "base": "3db7b439283779f6037244d57cf05e6ec3e7ab31",
+  "fixedUpstream": "202a41ab",
+  "commit": "40434d4d03f60f0d3dbee46d41affe6af7e458a1",
+  "cleanAfterCommit": true,
+  "pushed": false,
+  "version": "0.9.1",
+  "writeSet": [
+    "src/casebook/**",
+    "package.json",
+    "package-lock.json",
+    "scripts/tests/exports-package.test.mjs"
+  ],
+  "implementation": "Fixed upstream CasebookIndexLaw.fs received unchanged; frozen input/returned alias and known collision tests added; declaration guarantee narrowed to well-formed input; preserved P2 collision documented",
+  "runtime": {
+    "node": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node v22.13.0",
+    "bun": "/opt/homebrew/bin/bun v1.3.14",
+    "typescript": "7.0.2"
+  },
+  "evidence": {
+    "dependencyInstall": {
+      "command": "npm ci --ignore-scripts --cache /private/tmp/vibe-fs-mf06-review-20261021/npm-cache",
+      "initialLog": "library-npm-ci.log",
+      "initialExit": 1,
+      "initialFailure": "Sandbox DNS ENOTFOUND for registry.npmjs.org; no toolchain fallback",
+      "networkRetryLog": "library-npm-ci-network.log",
+      "networkRetryExit": 0
+    },
+    "singleModuleBuild": {
+      "command": "node scripts/build.mjs casebook",
+      "log": "library-casebook-build.log",
+      "exit": 0
+    },
+    "nodeCasebook": {
+      "command": "node --test src/casebook/tests/008.test.mjs src/casebook/tests/012.test.mjs",
+      "log": "library-casebook-node22.log",
+      "exit": 0,
+      "pass": 8,
+      "fail": 0,
+      "skipOrTodo": 0,
+      "frozenHistoricalVectors": 160
+    },
+    "bunCasebook": {
+      "command": "bun test src/casebook/tests/008.test.mjs src/casebook/tests/012.test.mjs",
+      "log": "library-casebook-bun.log",
+      "exit": 0,
+      "pass": 8,
+      "fail": 0
+    },
+    "fullArtifactBuild": {
+      "command": "node scripts/build.mjs",
+      "log": "library-all19-build.log",
+      "exit": 0,
+      "modules": 19,
+      "scope": "All package artifacts built from this worktree; no full old-module test run"
+    },
+    "pack": {
+      "command": "npm pack --ignore-scripts --json --cache /private/tmp/vibe-fs-mf06-review-20261021/npm-cache --pack-destination /private/tmp/vibe-fs-mf06-review-20261021",
+      "log": "pack.json",
+      "stderr": "pack.stderr.log",
+      "exit": 0,
+      "artifact": "wanxiangli-0.9.1.tgz",
+      "bytes": 297226,
+      "members": 48,
+      "sha256": "9a24e34f321aba5775fb3ba59e8d19d8b2a1e80aafca6c4f96ad334bef24b509"
+    },
+    "installedConsumer": {
+      "directory": "consumer",
+      "installCommand": "npm install --ignore-scripts --omit=dev --no-audit --no-fund --cache /private/tmp/vibe-fs-mf06-review-20261021/npm-cache /private/tmp/vibe-fs-mf06-review-20261021/wanxiangli-0.9.1.tgz",
+      "installLog": "consumer-install.log",
+      "nodeCommand": "node --test /private/tmp/vibe-fs-mf06-review-20261021/consumer/consume.mjs",
+      "nodeLog": "consumer-node22.log",
+      "nodePass": 3,
+      "bunCommand": "bun test /private/tmp/vibe-fs-mf06-review-20261021/consumer/consume.mjs",
+      "bunLog": "consumer-bun.log",
+      "bunPass": 3,
+      "scope": "Public package vectors, UTF8 locator-to-input lookup, aliases, epoch, retained first-namesake behavior; not main EventStore/fetch"
+    },
+    "typescript": {
+      "command": "node /private/tmp/wanxiangli-mf06-casebook-20261021/node_modules/typescript/bin/tsc --strict --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext /private/tmp/vibe-fs-mf06-review-20261021/consumer/consume.ts",
+      "log": "consumer-typescript.log",
+      "exit": 0,
+      "scope": "Strict positive declarations and four @ts-expect-error negative uses against installed package"
+    },
+    "allExportsAcceptance": {
+      "command": "PATH=/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin:/opt/homebrew/bin:/usr/bin:/bin npm_config_cache=/private/tmp/vibe-fs-mf06-review-20261021/npm-cache node --test scripts/tests/exports-package.test.mjs",
+      "log": "exports-package-node22.log",
+      "exit": 0,
+      "pass": 3,
+      "scope": "19 public imports on Node and Bun; all installed bytes and package member boundaries"
+    },
+    "byteCheck": {
+      "command": "node /private/tmp/vibe-fs-mf06-review-20261021/check-package.mjs",
+      "log": "package-byte-check.log",
+      "exit": 0,
+      "previousExportsUnchanged": 18,
+      "allInstalledBytesMatchSource": true,
+      "compilerInConsumer": false
+    }
+  },
+  "mainPreparationOnly": {
+    "overlay": "main-overlay",
+    "patches": ["main-index-bridge.patch", "main-012-tests.patch"],
+    "fixture": "main-overlay/requirements/knowledge-reuse/tests/fixtures/host-shelfmarks.json",
+    "mainWrites": false,
+    "mainBuildOrGreenTests": false,
+    "redEvidence": "main-index-roundtrip-red.log",
+    "redControls": "160 actual main vectors and old locator real fetch pass before Unicode UTF8 fetch fails",
+    "ownerBoundaries": "Index retains EventStore, capacity selection, frozen snapshot/dirty/int64 epoch; selection/read/settlement retained by their owners"
+  },
+  "remaining": [
+    "P2 historical 32-bit hash collision remains; both fixed upstream and local resolve first namesake",
+    "Pre-existing lone surrogates in question input are not normalized",
+    "Main Index bridge and numbered test overlay are not compiled or installed while main is frozen",
+    "No casebook-access or casebook-maintenance reception",
+    "No production logical-work closure, external model answer, or unknown-settlement proof claimed"
+  ]
+}

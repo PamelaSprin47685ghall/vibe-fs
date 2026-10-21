@@ -1,0 +1,169 @@
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+Exception {
+  message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',
+  innerException: undefined
+}
+
+Node.js v26.6.0
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+Exception {
+  message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',
+  innerException: undefined
+}
+
+Node.js v26.6.0
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+Exception {
+  message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',
+  innerException: undefined
+}
+
+Node.js v26.6.0
+▶ WHAT[durable-events-005] interrupted_line_continuation_resumes_after_each_complete_copied_prefix
+  ✖ 1 copied legacy lines across segment boundaries (131.876625ms)
+  ✖ 2 copied legacy lines across segment boundaries (119.891042ms)
+  ✖ 3 copied legacy lines across segment boundaries (123.273291ms)
+✖ WHAT[durable-events-005] interrupted_line_continuation_resumes_after_each_complete_copied_prefix (375.482459ms)
+✔ WHAT[durable-events-005] copied_legacy_identity_with_different_bytes_still_refuses_without_writes (29.891791ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 1
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 566.214
+
+✖ failing tests:
+
+test at requirements/durable-events/tests/005.test.mjs:454:13
+✖ 1 copied legacy lines across segment boundaries (131.876625ms)
+  Error: Command failed: /opt/homebrew/Cellar/node/26.6.0/bin/node --input-type=module -e 
+              const eventStore = await import(process.argv[1]);
+              const store = eventStore.create(process.argv[2], 'resume-observer');
+              try {
+                console.log(JSON.stringify({
+                  events: process.argv.slice(4).map(id => eventStore.read(store, id)),
+                  heads: eventStore.heads(store, process.argv[3]),
+                }));
+              } finally { eventStore.dispose(store); }
+             file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Persistence/EventStore/Surface.js /var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-segcap-l19Pxy/.Herdchestra proof/segment-cap 0000000000000000000000000000000000000001 0000000000000000000000000000000000000002 0000000000000000000000000000000000000051 0000000000000000000000000000000000000052 0000000000000000000000000000000000000053
+  
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  Exception {
+    message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',
+    innerException: undefined
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at checkExecSyncError (node:child_process:942:11)
+      at execFileSync (node:child_process:978:15)
+      at observe (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:476:26)
+      at file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:489:9
+      at withRepo (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:211:15)
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:455:13)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25) {
+    status: 1,
+    signal: null,
+    output: [ null, '', `\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',\n  innerException: undefined\n}\n\nNode.js v26.6.0\n` ],
+    pid: 65213,
+    stdout: '',
+    stderr: `\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',\n  innerException: undefined\n}\n\nNode.js v26.6.0\n`
+  }
+
+test at requirements/durable-events/tests/005.test.mjs:454:13
+✖ 2 copied legacy lines across segment boundaries (119.891042ms)
+  Error: Command failed: /opt/homebrew/Cellar/node/26.6.0/bin/node --input-type=module -e 
+              const eventStore = await import(process.argv[1]);
+              const store = eventStore.create(process.argv[2], 'resume-observer');
+              try {
+                console.log(JSON.stringify({
+                  events: process.argv.slice(4).map(id => eventStore.read(store, id)),
+                  heads: eventStore.heads(store, process.argv[3]),
+                }));
+              } finally { eventStore.dispose(store); }
+             file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Persistence/EventStore/Surface.js /var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-segcap-adYKQh/.Herdchestra proof/segment-cap 0000000000000000000000000000000000000001 0000000000000000000000000000000000000002 0000000000000000000000000000000000000051 0000000000000000000000000000000000000052 0000000000000000000000000000000000000053
+  
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  Exception {
+    message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',
+    innerException: undefined
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at checkExecSyncError (node:child_process:942:11)
+      at execFileSync (node:child_process:978:15)
+      at observe (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:476:26)
+      at file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:489:9
+      at withRepo (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:211:15)
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:455:13)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25) {
+    status: 1,
+    signal: null,
+    output: [ null, '', `\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',\n  innerException: undefined\n}\n\nNode.js v26.6.0\n` ],
+    pid: 65217,
+    stdout: '',
+    stderr: `\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',\n  innerException: undefined\n}\n\nNode.js v26.6.0\n`
+  }
+
+test at requirements/durable-events/tests/005.test.mjs:454:13
+✖ 3 copied legacy lines across segment boundaries (123.273291ms)
+  Error: Command failed: /opt/homebrew/Cellar/node/26.6.0/bin/node --input-type=module -e 
+              const eventStore = await import(process.argv[1]);
+              const store = eventStore.create(process.argv[2], 'resume-observer');
+              try {
+                console.log(JSON.stringify({
+                  events: process.argv.slice(4).map(id => eventStore.read(store, id)),
+                  heads: eventStore.heads(store, process.argv[3]),
+                }));
+              } finally { eventStore.dispose(store); }
+             file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Persistence/EventStore/Surface.js /var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-segcap-wzfqUa/.Herdchestra proof/segment-cap 0000000000000000000000000000000000000001 0000000000000000000000000000000000000002 0000000000000000000000000000000000000051 0000000000000000000000000000000000000052 0000000000000000000000000000000000000053
+  
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  Exception {
+    message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',
+    innerException: undefined
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at checkExecSyncError (node:child_process:942:11)
+      at execFileSync (node:child_process:978:15)
+      at observe (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:476:26)
+      at file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:489:9
+      at withRepo (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:211:15)
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:455:13)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25) {
+    status: 1,
+    signal: null,
+    output: [ null, '', `\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',\n  innerException: undefined\n}\n\nNode.js v26.6.0\n` ],
+    pid: 65221,
+    stdout: '',
+    stderr: `\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")',\n  innerException: undefined\n}\n\nNode.js v26.6.0\n`
+  }

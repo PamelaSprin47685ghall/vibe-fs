@@ -1,0 +1,100 @@
+[verification-tool-phase] {"phase":"monitor-spawned","pid":8862,"parentPid":85871,"at":1792537935170,"monitorPid":30601,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-tool-phase] {"phase":"tool-spawned","pid":30601,"parentPid":8862,"at":1792537935216,"toolPid":30602,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-tool-phase] {"phase":"tool-exited","pid":30601,"parentPid":8862,"at":1792537935326,"toolPid":30602,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"group-drained","pid":30601,"parentPid":8862,"at":1792537935347,"toolPid":30602}
+[verification-tool-phase] {"phase":"monitor-closed","pid":8862,"parentPid":85871,"at":1792537935349,"monitorPid":30601,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"monitor-spawned","pid":8862,"parentPid":85871,"at":1792537935350,"monitorPid":30604,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-tool-phase] {"phase":"tool-spawned","pid":30604,"parentPid":8862,"at":1792537935393,"toolPid":30605,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-fixture-phase] {"phase":"npm:registry-request","pid":8862,"parentPid":85871,"elapsedMs":182228.739375,"root":"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8","method":"GET","path":"/wxs-fixture-leaf/-/wxs-fixture-leaf-1.0.0.tgz"}
+[verification-fixture-phase] {"phase":"npm:registry-request","pid":8862,"parentPid":85871,"elapsedMs":182229.032792,"root":"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8","method":"GET","path":"/wxs-fixture-parent/-/wxs-fixture-parent-1.0.0.tgz"}
+[verification-tool-phase] {"phase":"tool-exited","pid":30604,"parentPid":8862,"at":1792537935749,"toolPid":30605,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"group-drained","pid":30604,"parentPid":8862,"at":1792537935771,"toolPid":30605}
+[verification-tool-phase] {"phase":"monitor-closed","pid":8862,"parentPid":85871,"at":1792537935772,"monitorPid":30604,"exitCode":0,"signal":null}
+[verification-fixture-phase] {"phase":"npm:fixture-dispose-enter","pid":8862,"parentPid":85871,"elapsedMs":182423.43175,"root":"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8"}
+[verification-fixture-phase] {"phase":"npm:fixture-disposed","pid":8862,"parentPid":85871,"elapsedMs":182424.015333,"root":"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8"}
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"WHAT[verification-system-016] npm installation rejects real registry bytes that violate the selected lock integrity and reclaims all installation resources","fullName":"WHAT[verification-system-016] npm installation rejects real registry bytes that violate the selected lock integrity and reclaims all installation resources"}
+[verification-fixture-phase] {"phase":"npm:version-enter","pid":8862,"parentPid":85871,"elapsedMs":182449.93525,"npmCli":"/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/lib/node_modules/npm/bin/npm-cli.js"}
+runner: suite exceeded the 300000ms physical backstop
+runner: file streams: 755 drained, 1 active, 0 queued
+runner: active file requirements/verification-system/tests/016.test.mjs; waiting for stream drain; last verdict: test:complete:WHAT[verification-system-016] npm installation uses the selected real CLI and two locked registry packages without lifecycle scripts or ambient launcher configuration
+runner: worker cost {"version":1,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","enabled":true,"pid":8862,"status":"missing","reason":"Exit observation not received","preImport":{"version":1,"phase":"pre-import","sequence":0,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","pid":8862,"parentPid":85871,"monotonicMs":12.775667,"cpuUserMicros":37639,"cpuSystemMicros":3674},"exit":null,"interval":null}
+runner: current native wait {"invocations":[{"name":"WHAT[verification-system-016] npm installation rejects real registry bytes that violate the selected lock integrity and reclaims all installation resources","occurrence":461,"nesting":0}],"physical":null}
+runner: last runtime test start {"name":"WHAT[verification-system-016] npm installation uses the selected real CLI and two locked registry packages without lifecycle scripts or ambient launcher configuration","file":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","line":123,"column":1,"nesting":0,"pid":85871,"parentPid":85844}
+runner: post-exit group verification/reclamation: pid=85871; elapsedMs=21.947; accepted=true
+
+runner: verdict counts unavailable; no authoritative summary; 755/756 planned file(s) completed
+Error: runner: supervised suite failed (exit 1)
+    at fail (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:224:25)
+    at superviseOwnedNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:524:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async superviseNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:197:14)
+    at async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/run.mjs:94:1 {
+  exitCode: 1,
+  [cause]: undefined
+}
+
+--- [unit] 错误诊断日志转储 (最后 60 行) ---
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"WHAT[verification-system-016] Fable namespace missing root under a replaced parent cannot claim completed disposal","fullName":"WHAT[verification-system-016] Fable namespace missing root under a replaced parent cannot claim completed disposal"}
+[verification-tool-phase] {"phase":"monitor-spawned","pid":8862,"parentPid":85871,"at":1792537930692,"monitorPid":30278,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-fable-project-test-srEqv7/sdk/dotnet-sdk/dotnet"}
+[verification-tool-phase] {"phase":"tool-spawned","pid":30278,"parentPid":8862,"at":1792537930734,"toolPid":30279,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-fable-project-test-srEqv7/sdk/dotnet-sdk/dotnet"}
+[verification-tool-phase] {"phase":"tool-exited","pid":30278,"parentPid":8862,"at":1792537931657,"toolPid":30279,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"group-drained","pid":30278,"parentPid":8862,"at":1792537931679,"toolPid":30279}
+[verification-tool-phase] {"phase":"monitor-closed","pid":8862,"parentPid":85871,"at":1792537931680,"monitorPid":30278,"exitCode":0,"signal":null}
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"WHAT[verification-system-016] compiled JavaScript revalidation rejects bytes, mode, added and missing output members","fullName":"WHAT[verification-system-016] compiled JavaScript revalidation rejects bytes, mode, added and missing output members"}
+[verification-tool-phase] {"phase":"monitor-spawned","pid":8862,"parentPid":85871,"at":1792537931871,"monitorPid":30450,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-fable-project-test-TIFh6Z/sdk/dotnet-sdk/dotnet"}
+[verification-tool-phase] {"phase":"tool-spawned","pid":30450,"parentPid":8862,"at":1792537931917,"toolPid":30451,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-fable-project-test-TIFh6Z/sdk/dotnet-sdk/dotnet"}
+[verification-tool-phase] {"phase":"tool-exited","pid":30450,"parentPid":8862,"at":1792537932859,"toolPid":30451,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"group-drained","pid":30450,"parentPid":8862,"at":1792537932883,"toolPid":30451}
+[verification-tool-phase] {"phase":"monitor-closed","pid":8862,"parentPid":85871,"at":1792537932885,"monitorPid":30450,"exitCode":0,"signal":null}
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"bytes","fullName":"WHAT[verification-system-016] compiled JavaScript revalidation rejects bytes, mode, added and missing output members > bytes"}
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"mode","fullName":"WHAT[verification-system-016] compiled JavaScript revalidation rejects bytes, mode, added and missing output members > mode"}
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"added","fullName":"WHAT[verification-system-016] compiled JavaScript revalidation rejects bytes, mode, added and missing output members > added"}
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"missing","fullName":"WHAT[verification-system-016] compiled JavaScript revalidation rejects bytes, mode, added and missing output members > missing"}
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"WHAT[verification-system-016] verification results retain the full input digest on success and failure","fullName":"WHAT[verification-system-016] verification results retain the full input digest on success and failure"}
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"WHAT[verification-system-016] npm installation uses the selected real CLI and two locked registry packages without lifecycle scripts or ambient launcher configuration","fullName":"WHAT[verification-system-016] npm installation uses the selected real CLI and two locked registry packages without lifecycle scripts or ambient launcher configuration"}
+[verification-fixture-phase] {"phase":"npm:version-enter","pid":8862,"parentPid":85871,"elapsedMs":179672.177333,"npmCli":"/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/lib/node_modules/npm/bin/npm-cli.js"}
+[verification-fixture-phase] {"phase":"npm:version-completed","pid":8862,"parentPid":85871,"elapsedMs":179795.655542,"npmCli":"/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/lib/node_modules/npm/bin/npm-cli.js","version":"10.9.2"}
+[verification-fixture-phase] {"phase":"npm:registry-listening","pid":8862,"parentPid":85871,"elapsedMs":179796.515833,"root":"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8","registry":"http://127.0.0.1:53195"}
+[verification-tool-phase] {"phase":"monitor-spawned","pid":8862,"parentPid":85871,"at":1792537933540,"monitorPid":30598,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-tool-phase] {"phase":"tool-spawned","pid":30598,"parentPid":8862,"at":1792537933589,"toolPid":30599,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-tool-phase] {"phase":"tool-exited","pid":30598,"parentPid":8862,"at":1792537935129,"toolPid":30599,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"group-drained","pid":30598,"parentPid":8862,"at":1792537935167,"toolPid":30599}
+[verification-tool-phase] {"phase":"monitor-closed","pid":8862,"parentPid":85871,"at":1792537935169,"monitorPid":30598,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"monitor-spawned","pid":8862,"parentPid":85871,"at":1792537935170,"monitorPid":30601,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-tool-phase] {"phase":"tool-spawned","pid":30601,"parentPid":8862,"at":1792537935216,"toolPid":30602,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-tool-phase] {"phase":"tool-exited","pid":30601,"parentPid":8862,"at":1792537935326,"toolPid":30602,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"group-drained","pid":30601,"parentPid":8862,"at":1792537935347,"toolPid":30602}
+[verification-tool-phase] {"phase":"monitor-closed","pid":8862,"parentPid":85871,"at":1792537935349,"monitorPid":30601,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"monitor-spawned","pid":8862,"parentPid":85871,"at":1792537935350,"monitorPid":30604,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-tool-phase] {"phase":"tool-spawned","pid":30604,"parentPid":8862,"at":1792537935393,"toolPid":30605,"executable":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8/candidates/verification-npm-install-bu9wWe/tools/node"}
+[verification-fixture-phase] {"phase":"npm:registry-request","pid":8862,"parentPid":85871,"elapsedMs":182228.739375,"root":"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8","method":"GET","path":"/wxs-fixture-leaf/-/wxs-fixture-leaf-1.0.0.tgz"}
+[verification-fixture-phase] {"phase":"npm:registry-request","pid":8862,"parentPid":85871,"elapsedMs":182229.032792,"root":"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8","method":"GET","path":"/wxs-fixture-parent/-/wxs-fixture-parent-1.0.0.tgz"}
+[verification-tool-phase] {"phase":"tool-exited","pid":30604,"parentPid":8862,"at":1792537935749,"toolPid":30605,"exitCode":0,"signal":null}
+[verification-tool-phase] {"phase":"group-drained","pid":30604,"parentPid":8862,"at":1792537935771,"toolPid":30605}
+[verification-tool-phase] {"phase":"monitor-closed","pid":8862,"parentPid":85871,"at":1792537935772,"monitorPid":30604,"exitCode":0,"signal":null}
+[verification-fixture-phase] {"phase":"npm:fixture-dispose-enter","pid":8862,"parentPid":85871,"elapsedMs":182423.43175,"root":"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8"}
+[verification-fixture-phase] {"phase":"npm:fixture-disposed","pid":8862,"parentPid":85871,"elapsedMs":182424.015333,"root":"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/verification-npm-fixture-uFIFC8"}
+[verification-test-start] {"pid":8862,"parentPid":85871,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","name":"WHAT[verification-system-016] npm installation rejects real registry bytes that violate the selected lock integrity and reclaims all installation resources","fullName":"WHAT[verification-system-016] npm installation rejects real registry bytes that violate the selected lock integrity and reclaims all installation resources"}
+[verification-fixture-phase] {"phase":"npm:version-enter","pid":8862,"parentPid":85871,"elapsedMs":182449.93525,"npmCli":"/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/lib/node_modules/npm/bin/npm-cli.js"}
+runner: suite exceeded the 300000ms physical backstop
+runner: file streams: 755 drained, 1 active, 0 queued
+runner: active file requirements/verification-system/tests/016.test.mjs; waiting for stream drain; last verdict: test:complete:WHAT[verification-system-016] npm installation uses the selected real CLI and two locked registry packages without lifecycle scripts or ambient launcher configuration
+runner: worker cost {"version":1,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","enabled":true,"pid":8862,"status":"missing","reason":"Exit observation not received","preImport":{"version":1,"phase":"pre-import","sequence":0,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","pid":8862,"parentPid":85871,"monotonicMs":12.775667,"cpuUserMicros":37639,"cpuSystemMicros":3674},"exit":null,"interval":null}
+runner: current native wait {"invocations":[{"name":"WHAT[verification-system-016] npm installation rejects real registry bytes that violate the selected lock integrity and reclaims all installation resources","occurrence":461,"nesting":0}],"physical":null}
+runner: last runtime test start {"name":"WHAT[verification-system-016] npm installation uses the selected real CLI and two locked registry packages without lifecycle scripts or ambient launcher configuration","file":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs","line":123,"column":1,"nesting":0,"pid":85871,"parentPid":85844}
+runner: post-exit group verification/reclamation: pid=85871; elapsedMs=21.947; accepted=true
+
+runner: verdict counts unavailable; no authoritative summary; 755/756 planned file(s) completed
+Error: runner: supervised suite failed (exit 1)
+    at fail (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:224:25)
+    at superviseOwnedNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:524:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async superviseNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:197:14)
+    at async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/run.mjs:94:1 {
+  exitCode: 1,
+  [cause]: undefined
+}
+--- [unit] 完整日志见: .fable-build/verify-logs/2026-10-20T23-06-01-631Z/unit.log ---
+
+  unit           FAIL(1)  300.5s
+FAIL  verify release  374.9s

@@ -1,0 +1,45 @@
+{
+  "candidateBase": "8fa662c9e883ec092a528c3325aaa802b810dd24",
+  "library": "c4bc2caf00d3ef8229e95efacb9f73fe130657f9",
+  "generation": 102,
+  "visibleInputDigestPrefix": "3148ee428fdfe520",
+  "command": "NODE_TEST_CONCURRENCY=4 UNIT_VERDICT_SILENCE_MS=30000 SUITE_BACKSTOP_MS=900000 WXS_VERIFICATION_WORKER_DIAGNOSTICS=0 WXS_ACCEPT_TODO=1 npm run verify:release",
+  "profile": "Existing .github/workflows/ci.yml environment, unchanged by this batch",
+  "runtime": "Node 22.13.0, macOS; real installed Bun 1.3.14 and OpenCode 1.18.29 where the tests require them",
+  "exit": 0,
+  "seconds": 849.3,
+  "stages": {
+    "formatCheck": "passed",
+    "staticCheck": "passed with existing report-only shard findings",
+    "build": { "passed": true, "seconds": 66.9 },
+    "unit": { "passed": 4524, "failed": 0, "skipped": 110, "todo": 277, "filesDrained": 757, "filesPlanned": 757, "seconds": 220.3, "groupReclamationAccepted": true },
+    "integration": {
+      "seconds": 533.0,
+      "groupsPassed": 3,
+      "suite": { "passed": 725, "failed": 0, "skipped": 7, "todo": 7, "filesDrained": 40, "filesPlanned": 40, "groupReclamationAccepted": true },
+      "distributionChild": "passed",
+      "harness": { "passed": 291, "failed": 0 }
+    },
+    "e2e": { "passed": true, "seconds": 12.2 },
+    "package": { "passed": true, "seconds": 5.3, "members": 1376, "bytes": 11838557, "tarballSha256": "9e5c218b7c3300eb1671af6abae1d74425370172f7002e99cca6aa4b69807068" }
+  },
+  "ablationStrictSelection": {
+    "command": "TESTS_MJS_FILES=requirements/feature-ablation/tests/001.test.mjs,requirements/feature-ablation/tests/002.test.mjs,requirements/feature-ablation/tests/003.test.mjs,requirements/feature-ablation/tests/004.test.mjs NODE_TEST_CONCURRENCY=4 node requirements/verification-system/tests/run.mjs",
+    "ordinarySilenceMs": 5000,
+    "passed": 22,
+    "failed": 0,
+    "skipped": 1,
+    "todo": 0,
+    "filesDrained": 4,
+    "filesPlanned": 4,
+    "groupReclamationAccepted": true,
+    "skip": "Existing actual execute-gate case belongs to integration tier; this is not a new skip"
+  },
+  "fullLog": "/private/tmp/vibe-fs-module-release-05-ci-profile.log",
+  "fullLogSha256": "8908cf5e8969d1939461b9791060e5a243e49b76a73dffd0280fcdf9bd875fe0",
+  "rawExcerpts": ["gen102-unit-summary.log", "gen102-integration-summary.log", "gen102-package.log", "gen102-release.tail.log", "gen102-ablation-strict.log"],
+  "review": "ablation-execute-review.log proves invalid profile rejection through the actual ToolRegistry before parsing the intentionally invalid body, with controlled runtime and no Host startup",
+  "excludedClaims": ["Existing TODOs are passes", "Deployment", "New upstream mergeability", "Bun sandbox reception", "Permit reception", "Completed long soaks", "Whole GAP-151 or GAP-160 closure"],
+  "longSoaks": "Still running at acceptance time; final physical results require their own receipts",
+  "remainingP2Addition": "borrowed_surface is decoded but not generally enforced by Gate; existing profiles use explicit slice modes. The absent-mode fix does not close this separate boundary."
+}

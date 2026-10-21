@@ -1,0 +1,124 @@
+{
+  "recordedAt": "2026-10-20T22:40:17.915621+00:00",
+  "sourceCommit": "3db7b439283779f6037244d57cf05e6ec3e7ab31",
+  "repository": "/private/tmp/wanxiangli-module-delivery-20261021",
+  "workingTree": "clean before and after build/verification",
+  "version": "0.9.0",
+  "runtimes": {
+    "node": "v22.13.0",
+    "bun": "1.3.14",
+    "typescript": "Version 7.0.2"
+  },
+  "artifactBuild": {
+    "command": "PATH=/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin:$PATH node scripts/build.mjs",
+    "log": "build-final.log",
+    "exit": 0,
+    "modules": 18,
+    "scope": "All artifacts rebuilt from this clean source; old modules were compiled, their runtime suites not repeated.",
+    "cwd": "/private/tmp/wanxiangli-module-delivery-20261021"
+  },
+  "tests": {
+    "nodeContracts": {
+      "command": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node --test --test-concurrency=1 src/prefix/tests/*.test.mjs src/compression/tests/*.test.mjs src/delivery/tests/*.test.mjs",
+      "pass": 73,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0,
+      "log": "node-contracts.log",
+      "exit": 0,
+      "cwd": "/private/tmp/wanxiangli-module-delivery-20261021"
+    },
+    "bunContracts": {
+      "command": "/opt/homebrew/bin/bun test src/prefix/tests src/compression/tests src/delivery/tests",
+      "pass": 73,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0,
+      "log": "bun-contracts.log",
+      "exit": 0,
+      "cwd": "/private/tmp/wanxiangli-module-delivery-20261021"
+    },
+    "independentNode": {
+      "command": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node --test /private/tmp/vibe-fs-module-baseline-20261021/delivery-independent-acceptance.test.mjs",
+      "pass": 6,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0,
+      "log": "independent-node.log",
+      "exit": 0,
+      "cwd": "/private/tmp/wanxiangli-module-delivery-20261021"
+    },
+    "independentBun": {
+      "command": "/opt/homebrew/bin/bun test /private/tmp/vibe-fs-module-baseline-20261021/delivery-independent-acceptance.test.mjs",
+      "pass": 6,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0,
+      "log": "independent-bun.log",
+      "exit": 0,
+      "cwd": "/private/tmp/wanxiangli-module-delivery-20261021"
+    }
+  },
+  "pack": {
+    "command": "PATH=/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin:$PATH npm --cache /private/tmp/vibe-fs-module-baseline-20261021/npm-cache pack --ignore-scripts --json --pack-destination /private/tmp/vibe-fs-module-baseline-20261021/final18",
+    "exit": 0,
+    "archive": "/private/tmp/vibe-fs-module-baseline-20261021/final18/wanxiangli-0.9.0.tgz",
+    "sha256": "2b7ce8d4c96bc5563e807e4c082c7dc4fa049afe7caf6432d4e25fece7292da7",
+    "entries": 46,
+    "size": 293946,
+    "unpackedSize": 1442979,
+    "metadata": "pack.json",
+    "members": "member-check.json",
+    "cwd": "/private/tmp/wanxiangli-module-delivery-20261021"
+  },
+  "install": {
+    "directory": "/private/tmp/vibe-fs-module-baseline-20261021/final18/consumer",
+    "command": "PATH=/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin:$PATH npm --cache /private/tmp/vibe-fs-module-baseline-20261021/npm-cache install --ignore-scripts --omit=dev --no-audit --no-fund /private/tmp/vibe-fs-module-baseline-20261021/final18/wanxiangli-0.9.0.tgz",
+    "exit": 0,
+    "log": "install.log",
+    "noWorkspaceLinksOrFallback": true,
+    "cwd": "/private/tmp/vibe-fs-module-baseline-20261021/final18/consumer"
+  },
+  "publicConsumers": {
+    "node": {
+      "command": "env -u NODE_PATH -u NODE_OPTIONS /private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/vibe-fs-module-baseline-20261021/final18/consumer/consumer.mjs",
+      "log": "node-consumer.log",
+      "exit": 0,
+      "cwd": "/private/tmp"
+    },
+    "bun": {
+      "command": "env -u NODE_PATH -u NODE_OPTIONS /opt/homebrew/bin/bun /private/tmp/vibe-fs-module-baseline-20261021/final18/consumer/consumer.mjs",
+      "log": "bun-consumer.log",
+      "exit": 0,
+      "cwd": "/private/tmp"
+    },
+    "typescript": {
+      "command": "/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node /private/tmp/wanxiangli-module-delivery-20261021/node_modules/typescript/bin/tsc --noEmit --strict --target es2022 --module nodenext consumer.ts",
+      "log": "types.log",
+      "exit": 0,
+      "positiveAndExpectedNegativeCases": true,
+      "cwd": "/private/tmp/vibe-fs-module-baseline-20261021/final18/consumer"
+    }
+  },
+  "preFixEvidence": {
+    "source": "32ff0da2411bd0f33727835037b0b7fbea85b86f",
+    "buildManifest": "../final18-candidate-build.json",
+    "probes": "../delivery-independent-probes.log",
+    "confirmedAndFixed": [
+      "Exact fenced deliver could reset and reseal the same material",
+      "Null material could advance keys that were never handed off",
+      "Key array accessor ran caller code",
+      "Blank seal/restore boundaries disagreed"
+    ],
+    "invalidRedLabel": "../delivery-independent-red.log contains a green run after an artifact hash guard showed the old artifact was replaced. It is not used as red proof."
+  },
+  "preservedBoundary": "A peek ticket issued before seal remains a nonadvancing claim snapshot. It cannot change sealed bytes or advance keys; no ticket-revocation framework is claimed.",
+  "unverified": [
+    "Main repository Host/Journal/Join integration and physical durable witnesses",
+    "Independent process restart and multi-consumer durable result sharing",
+    "Model cache hits",
+    "Old 15 module runtime regression suites"
+  ],
+  "repositoryFilesModified": false,
+  "pushed": false
+}

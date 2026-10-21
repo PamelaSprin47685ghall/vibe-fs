@@ -1,0 +1,11 @@
+runner: 4911 test(s), 782.6s of test time; max 42104ms, p90 417ms, median 3ms
+runner:   42104ms  WHAT[verification-system-016] npm tool archive installation owns selected complete tools and locked dependencies through publication
+runner:   23954ms  WHAT[verification-system-016] selected Node and complete npm bundle preparation binds actual probes without borrowing ambient configuration
+runner:    8381ms  WHAT[process-execution-003] a durable PTY owner survives Host SIGKILL, refuses input replay and seals only its exact native outcome
+runner:    6929ms  WHAT[verification-system-016] npm tool archive rejects new tool member changed during a real held install and reclaims unpublished dependencies
+runner:    6821ms  WHAT[verification-system-016] two actual locked registry packages preserve modes use the selected bundle layout and bind its complete identity after tools cleanup
+
+runner: 4524 passed, 0 failed; 757/757 planned file(s) completed
+runner: partial evidence; 110 skipped, 277 TODO; excluded cases are not passes
+runner: pending proof accepted under WXS_ACCEPT_TODO override (277 TODO)
+  unit           OK  220.3s

@@ -1,0 +1,6 @@
+{"name":"same fenced deliver after seal","value":{"first":true,"second":true,"material":"rewritten material"}}
+{"name":"empty sealed material with keys","value":{"material":null,"returned":["not-returned"]}}
+{"name":"sparse sealed keys","threw":true,"message":"key must be a non-empty string"}
+{"name":"accessor sealed keys","value":{"sealed":true,"reads":1}}
+{"name":"ticket issued before seal","value":{"ticketSealed":false,"late":[{"key":"late","text":"late material"},{"key":"prose:s:10:late prose","text":"late prose"}],"material":"sealed material","returned":[]}}
+{"name":"empty sealed string restore","threw":true,"message":"material must be a non-empty string"}

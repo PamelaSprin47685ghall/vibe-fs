@@ -1,0 +1,86 @@
+{
+  "scope": "Third module reception batch and cross-review; final candidate acceptance is recorded separately",
+  "library": {
+    "commit": "c4bc2caf00d3ef8229e95efacb9f73fe130657f9",
+    "version": "0.9.2",
+    "exports": 20,
+    "publishedToOwnMain": true,
+    "remoteExactShaVerified": true,
+    "casebookPredecessor": "40434d4d03f60f0d3dbee46d41affe6af7e458a1",
+    "producerReceipts": ["casebook-library-receipt.json", "retention-library-receipt.json"],
+    "producerReceiptTiming": "Their pushed=false and main preparation fields describe the earlier isolated handoff. Root subsequently published each exact commit, then integrated its gitlink and main bridge.",
+    "retentionNode": { "passed": 14, "failed": 0, "skipped": 0, "todo": 0 },
+    "retentionBunPure": { "passed": 11, "failed": 0 },
+    "retentionPublic20Exports": { "passed": 3, "failed": 0 },
+    "casebookNodeAndBunEach": { "passed": 8, "failed": 0, "frozenHistoricalVectors": 160 },
+    "excludedClaims": ["All old module suites rerun", "Whole library proof closure", "Main production deployment"]
+  },
+  "nativeCrash": {
+    "newCutCases": 6,
+    "realSigkills": 7,
+    "mainGen101UnitContainsCases": true,
+    "cuts": ["first native append", "first native fsync", "second Unicode append", "before unlink", "after unlink", "copied-series fsync during resumed recovery"],
+    "method": "Worker invokes the real filesystem operation, reports the exact boundary, then blocks. Parent checks the actual lock owner PID before SIGKILL. Independent OS processes cold-read, materialize and recover again through the public writerEventIds DTO.",
+    "limits": ["Not power-loss proof", "Not arbitrary partial write proof", "Not concurrent-writer matrix", "Not GAP-151 closure"]
+  },
+  "release02": {
+    "exit": 1,
+    "generation": 99,
+    "filesDrained": 755,
+    "filesPlanned": 756,
+    "authoritativeCounts": null,
+    "failure": "300000ms suite backstop; verification-system/016 was serially processing owned fixtures",
+    "fullLogSha256": "009fa6247ed831187beb51105ddd5e5f38c33f941111d126d27153f92bb9e6fe",
+    "tail": "release02-failed.tail.log"
+  },
+  "release03": {
+    "exit": 1,
+    "generation": 100,
+    "unit": { "passed": 4519, "failed": 2, "filesDrained": 760, "filesPlanned": 760, "seconds": 240.8 },
+    "failures": ["delegation/031 injected a null child after cancellation", "requirement-system/017 rejected multiple files for clause 016"],
+    "disposition": "Capture the actual child before cancellation; revert the file split without weakening clause ownership",
+    "fullLogSha256": "455c3f7217f4e1e0c27ff21ed1713895a4b52bbbdd2d9734f3d9686bb2200515",
+    "tail": "release03-failed.tail.log"
+  },
+  "release04": {
+    "exit": 1,
+    "generation": 101,
+    "formatCheckBuild": "passed",
+    "unit": { "passed": 4521, "failed": 0, "skipped": 110, "todo": 277, "filesDrained": 757, "filesPlanned": 757, "seconds": 219.3, "groupReclamationAccepted": true },
+    "integrationSuite": { "filesDrained": 38, "filesPlanned": 40, "authoritativeCounts": null, "backstopMs": 300000, "residualGroupReclaimed": true, "groupReclamationAccepted": false },
+    "integrationChildren": { "distribution": "passed", "harnessPassed": 291, "harnessFailed": 0 },
+    "e2eAndTopLevelPackage": "not reached",
+    "fullLogSha256": "358e3098c0979071ecb6f9203d1152706110c83b65667ec24a670c5af3d1af42",
+    "tail": "release04-failed.tail.log"
+  },
+  "finalCandidate": {
+    "state": "Pending build and acceptance after the narrow ablation repair",
+    "existingCiProfile": { "UNIT_VERDICT_SILENCE_MS": 30000, "SUITE_BACKSTOP_MS": 900000, "WXS_VERIFICATION_WORKER_DIAGNOSTICS": 0, "NODE_TEST_CONCURRENCY": 4, "WXS_ACCEPT_TODO": 1 },
+    "profileSource": ".github/workflows/ci.yml; unchanged by this batch",
+    "scheduling": "Unit auto-discovery starts larger files first; explicit file selections preserve their order. Size is a scheduling heuristic, never a verdict or a progress event.",
+    "ablationBaseRed": { "passed": 4, "failed": 3, "skipped": 0, "todo": 0 },
+    "ablationChange": "An absent mapped node mode defaults to Ablated. A valid unconfigured registry still explicitly activates all declared nodes, and unmapped tags retain their own policy."
+  },
+  "sandbox": {
+    "state": "Blocked isolated candidate; neither exported nor integrated",
+    "node": { "passed": 20, "failed": 0 },
+    "bun": { "passed": 18, "failed": 2 },
+    "failure": "Bun post-await loops and an async Callable callback require external termination",
+    "patch": "sandbox-isolated-candidate.patch",
+    "patchNote": "Includes later comment corrections identifying the Bun blocker. No published library source uses this patch.",
+    "broaderLimits": ["Not a general isolation certificate", "Main park/unpark/abandon and real Host chain not received"]
+  },
+  "longExperiments": {
+    "state": "Running, not accepted",
+    "processSupervision": { "startedAt": "2026-10-20T23:01:54.366Z", "hoursPerRuntime": 4, "runtimes": ["Node22", "Bun"], "source": "3db7b439283779f6037244d57cf05e6ec3e7ab31" },
+    "pty": { "activeStartedAt": "2026-10-20T23:28:41.999Z", "hours": 2, "runtime": "Bun", "isolatedMainGeneration": 100 },
+    "sourceContinuity": "git diff 3db7b43..c4bc2ca is empty for process/supervision/time/time-node/time-testing/native-process and scripts/build.mjs"
+  },
+  "remaining": {
+    "P1": ["Bun sandbox async hard deadline", "Host has no atomic expected-physical interruption contract", "Active colleague protocol surfaces still need handoff"],
+    "P2": ["Historical Casebook hash collision", "Legacy/series retention activity selection", "Same-inode historical rewrite versus hot cache", "Descending unhandled prefix observations", "Large complete Git text rejected by mixed-spool boundary"],
+    "P3": ["Unused linear full-file tail reader", "Pre-seal ticket snapshot lifetime", "Native crash helper abort(null) loses the original reason but still fails", "Duplicate ablation slice IDs and undeclared ghost endpoint cycle", "Degeneration NaN classification without a production trigger"]
+  },
+  "originalRuntimeCheckoutChanged": false,
+  "deployed": false
+}

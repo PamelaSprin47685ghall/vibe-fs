@@ -1,0 +1,89 @@
+{
+  "node": "v24.3.0",
+  "bun": "1.3.14",
+  "formal": false,
+  "result": [
+    {
+      "name": "real installed manifest has unique ids, declared edge endpoints and accepts registry",
+      "passed": true,
+      "observed": {
+        "nodes": 52,
+        "edges": 991,
+        "nodeCount": 52
+      }
+    },
+    {
+      "name": "real public loader rejects same-name primary omission and cycle",
+      "passed": true,
+      "observed": null
+    },
+    {
+      "name": "shared edge debt: duplicate slice identity is accepted by current loader",
+      "passed": true,
+      "observed": {
+        "nodeCount": 3,
+        "distinctModeKeys": 2
+      }
+    },
+    {
+      "name": "shared edge debt: cycle made solely of undeclared endpoints is accepted",
+      "passed": true,
+      "observed": {
+        "ok": true,
+        "modes": {
+          "a": "active"
+        }
+      }
+    },
+    {
+      "name": "main detector finite boundaries, fresh instances and empty push",
+      "passed": true,
+      "observed": {
+        "constants": {
+          "centralProbability": 0.975,
+          "halfLife": 256,
+          "lambda": 0.9972960560854701,
+          "lowerQuantileProbability": 0.025,
+          "maximumWeightedDistinctCount": 260.85746810004025,
+          "minimumWeightedDistinctCount": 81.15417744486325,
+          "normalWeightedDistinctCount": 155.1239201679736,
+          "upperQuantileProbability": 1,
+          "vocabularySize": 200006
+        },
+        "stepAfterOneSmallText": 11
+      }
+    },
+    {
+      "name": "public proof input edge: NaN classifies Normal; production stream is not a NaN input",
+      "passed": true,
+      "observed": {
+        "classified": "Normal",
+        "productionExposure": "No trigger found: internal recurrence receives valid tokenizer ids and tracked finite repository envelope."
+      }
+    },
+    {
+      "name": "production-consumer debt: an invalid profile leaves mapped gates open through denied fallback",
+      "passed": true,
+      "observed": {
+        "load": {
+          "error": "audit-nonexistent-profile",
+          "kind": "UnknownProfile",
+          "ok": false
+        },
+        "registry": {
+          "manifestFingerprint": "000000000000",
+          "manifestVersion": "ablation-v1",
+          "modes": {},
+          "nodeCount": 0,
+          "ok": true,
+          "profile": null
+        },
+        "mappedTool": true,
+        "mappedToolSchema": true,
+        "mappedFact": true,
+        "manager": true,
+        "fission": true
+      }
+    }
+  ]
+}

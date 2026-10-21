@@ -1,0 +1,59 @@
+{
+  "node": "v24.3.0",
+  "scope": "independent pure in-process probes, not formal runner or native physical proof",
+  "rows": [
+    {
+      "name": "delivery exact seal, alias isolation, and run replay",
+      "status": "passed",
+      "observed": null
+    },
+    {
+      "name": "delivery restore preserves bytes and no fabricated cursor",
+      "status": "passed",
+      "observed": null
+    },
+    {
+      "name": "delivery pre-seal ticket can still select after sealing: isolated lifecycle boundary",
+      "status": "passed",
+      "observed": {
+        "oldTicketSelected": [
+          {
+            "key": "late",
+            "text": "bytes-late"
+          },
+          {
+            "key": "prose:s:10:late prose",
+            "text": "late prose"
+          }
+        ],
+        "currentCellMaterial": "sealed bytes",
+        "returned": []
+      }
+    },
+    {
+      "name": "compression each final failure cannot be reopened by any later settlement",
+      "status": "passed",
+      "observed": null
+    },
+    {
+      "name": "compression release retries then commits and skips every late terminal",
+      "status": "passed",
+      "observed": null
+    },
+    {
+      "name": "prefix pure exact epochs across safe-number and Int64 boundaries",
+      "status": "passed",
+      "observed": null
+    },
+    {
+      "name": "main prefix exact commit/propose/late replay without unsafe Number",
+      "status": "passed",
+      "observed": null
+    },
+    {
+      "name": "main sealed handoff survives late Anchor and old run without cursor pollution",
+      "status": "passed",
+      "observed": null
+    }
+  ]
+}

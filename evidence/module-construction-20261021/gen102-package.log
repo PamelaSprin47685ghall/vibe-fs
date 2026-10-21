@@ -1,0 +1,6 @@
+[verify-package] OK: package verified successfully
+  generation:    102
+  members:       1376
+  totalBytes:    11838557
+  tarballDigest: 9e5c218b7c3300eb1671af6abae1d74425370172f7002e99cca6aa4b69807068
+  artifactPath:  /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/.fable-build/verify-logs/package/wanxiangshu-0.9.0.tgz

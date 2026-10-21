@@ -1,0 +1,78 @@
+TAP version 13
+# Subtest: WHAT[repository-programming-059] staging presentation cannot downgrade an exact fenced delivery
+not ok 1 - WHAT[repository-programming-059] staging presentation cannot downgrade an exact fenced delivery
+  ---
+  duration_ms: 4.283666
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/059.test.mjs:135:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + null
+    - {
+    -   providerRun: 'owned-run',
+    -   toolCallId: 'owned-call'
+    - }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    providerRun: 'owned-run'
+    toolCallId: 'owned-call'
+  actual: ~
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/059.test.mjs:142:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: WHAT[repository-programming-059] a sealed empty delivery cannot acquire late material or prose
+not ok 2 - WHAT[repository-programming-059] a sealed empty delivery cannot acquire late material or prose
+  ---
+  duration_ms: 0.8055
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/059.test.mjs:149:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + null
+    - {
+    -   providerRun: 'empty-run',
+    -   toolCallId: 'empty-call'
+    - }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    providerRun: 'empty-run'
+    toolCallId: 'empty-call'
+  actual: ~
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/059.test.mjs:158:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[repository-programming-059] sealing requires the exact call and cannot rewrite already captured material
+ok 3 - WHAT[repository-programming-059] sealing requires the exact call and cannot rewrite already captured material
+  ---
+  duration_ms: 1.463583
+  ...
+# Subtest: WHAT[repository-programming-059] restored durable material remains opaque and invents no cursor keys
+ok 4 - WHAT[repository-programming-059] restored durable material remains opaque and invents no cursor keys
+  ---
+  duration_ms: 0.203917
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 2
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 349.783584

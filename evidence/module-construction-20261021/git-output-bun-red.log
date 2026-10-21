@@ -1,0 +1,22 @@
+{"control":"Real compiled OrchestratorGit createRunner with git --version","accepted":true,"stdout":"git version 2.50.1 (Apple Git-155)"}
+{"case":"Real git diff --no-index through actual OrchestratorGit createRunner","nativeExit":1,"nativeStdoutBytes":164109,"nativeStderrBytes":0,"rawSpoolPreservedBytes":164109,"adapterResult":"Error","description":"Process end: Confirmed (Exited 1); stop: undefined; output: mixed-channel spool cannot supply separate text streams; fault: undefined","spoolDeleted":true}
+39 | assert.deepEqual(captured.bytes, native.stdout)
+40 | assert.equal(native.stderr.length, 0)
+41 | assert.equal(existsSync(captured.path), false, 'Real Git adapter deletes its spool after rejecting machine text')
+42 | console.log(JSON.stringify({ case: 'Real git diff --no-index through actual OrchestratorGit createRunner', nativeExit: native.code, nativeStdoutBytes: native.stdout.length, nativeStderrBytes: native.stderr.length, rawSpoolPreservedBytes: captured.bytes.length, adapterResult: actual.tag === 0 ? 'Ok' : 'Error', description: captured.description, spoolDeleted: true }))
+43 | assert.deepEqual(artifacts.map(digest), before, 'Compiled artifacts changed during probe')
+44 | assert.equal(actual.tag, 0, 'A complete native Git text result should be consumable without losing stdout/stderr semantics')
+            ^
+AssertionError: A complete native Git text result should be consumable without losing stdout/stderr semantics
+
+1 !== 0
+
+ generatedMessage: false,
+     actual: 1,
+   expected: 0,
+   operator: "strictEqual",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/vibe-fs-spool-review-20261021/git-output-probe.mjs:44:8
+
+Bun v1.3.14 (macOS arm64)

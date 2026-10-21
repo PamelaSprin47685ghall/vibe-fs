@@ -1,0 +1,74 @@
+bun test v1.3.14 (d1632b29)
+
+src/sandbox/tests/001.test.mjs:
+(pass) SPEC[sandbox-001] naive runner: returned array constructor reaches host process (base-red) [0.58ms]
+(pass) SPEC[sandbox-001] membrane denies escape via returned array constructor [4.79ms]
+(pass) SPEC[sandbox-001] membrane denies escape via global api / globalThis / missing deadline ref [0.91ms]
+(pass) SPEC[sandbox-001] membrane cannot write outside the workspace via escape [0.63ms]
+(pass) SPEC[sandbox-001] membrane still returns normal ls data [0.31ms]
+
+src/sandbox/tests/003.test.mjs:
+(pass) SPEC[sandbox-003] membrane: patched WeakMap.prototype.has cannot observe a host value [0.50ms]
+(pass) SPEC[sandbox-003] membrane: patched WeakMap.prototype.set cannot observe a host value [0.36ms]
+(pass) SPEC[sandbox-003] membrane still returns normal ls data after intrinsic churn [0.29ms]
+
+src/sandbox/tests/002.test.mjs:
+(pass) SPEC[sandbox-002] sync infinite loop dies under the vm timeout [211.96ms]
+39 |   `
+40 |   const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+41 |     encoding: 'utf8',
+42 |     timeout: 10000,
+43 |   })
+44 |   assert.equal(r.status, 0, r.stderr || r.stdout || 'child failed')
+              ^
+AssertionError: child failed
+
+null !== 0
+
+ generatedMessage: false,
+     actual: null,
+   expected: 0,
+   operator: "strictEqual",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/wanxiangli-module-sandbox-20261021/src/sandbox/tests/002.test.mjs:44:10
+      at fn (node:test:215:18)
+(fail) SPEC[sandbox-002] post-await sync loop dies under the driven timeout [10006.56ms]
+  ^ this test timed out after 5000ms, before its done callback was called. If a done callback was not intended, remove the last parameter from the test callback function
+
+src/sandbox/tests/004.test.mjs:
+(pass) SPEC[sandbox-004] host method receivers retain their own instance [0.69ms]
+(pass) SPEC[sandbox-004] a host can construct a program class and await its callbacks [0.56ms]
+(pass) SPEC[sandbox-004] typed host failures retain the minimum output budget [0.33ms]
+(pass) SPEC[sandbox-004] the public runner has no unisolated alternate entry [0.01ms]
+(pass) SPEC[sandbox-004] host callback invocation preserves the supplied receiver [0.29ms]
+
+src/sandbox/tests/005.test.mjs:
+(pass) SPEC[sandbox-005] a host-invoked Callable constructor remains under its deadline [128.33ms]
+(pass) SPEC[sandbox-005] a host-invoked Callable getter remains under its deadline [124.65ms]
+(pass) SPEC[sandbox-005] a host-invoked Callable method remains under its deadline [125.38ms]
+(pass) SPEC[sandbox-005] a host-invoked Callable return getter remains under its deadline [125.40ms]
+33 |       }
+34 |     `
+35 |     const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+36 |       encoding: 'utf8', timeout: 2500, killSignal: 'SIGKILL',
+37 |     })
+38 |     assert.equal(child.status, 0, JSON.stringify({ error: child.error?.code, signal: child.signal, stdout: child.stdout, stderr: child.stderr }))
+                ^
+AssertionError: {"error":"ETIMEDOUT","signal":"SIGKILL","stdout":"","stderr":""}
+
+null !== 0
+
+ generatedMessage: false,
+     actual: null,
+   expected: 0,
+   operator: "strictEqual",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/wanxiangli-module-sandbox-20261021/src/sandbox/tests/005.test.mjs:38:12
+      at fn (node:test:215:18)
+(fail) SPEC[sandbox-005] a host-invoked Callable async method remains under its deadline [2505.87ms]
+
+ 18 pass
+ 2 fail
+Ran 20 tests across 5 files. [13.29s]

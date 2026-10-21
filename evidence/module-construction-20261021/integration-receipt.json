@@ -1,0 +1,87 @@
+{
+  "library": "3db7b439283779f6037244d57cf05e6ec3e7ab31",
+  "libraryPushed": true,
+  "libraryPublicEntries": 18,
+  "librarySuites": {
+    "Node22": 73,
+    "Bun": 73,
+    "independentNode22": 6,
+    "independentBun": 6,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "gen96": {
+    "prefixStorage": {
+      "files": 6,
+      "passed": 48
+    },
+    "ptyWait": {
+      "files": 3,
+      "passed": 42
+    },
+    "deliveryCompression": {
+      "files": 2,
+      "passed": 23
+    },
+    "coldJoin": {
+      "files": 2,
+      "passed": 16
+    },
+    "allFailed": 0,
+    "allSkipped": 0,
+    "allTodo": 0,
+    "allDrained": true,
+    "allReclamationAccepted": true
+  },
+  "ptyRecovery": {
+    "before": {
+      "generation": 96,
+      "passed": 59,
+      "failed": 1
+    },
+    "fix": "Use an independent existing workspace cwd in the old probe; preserve the real control directory, SIGKILL and receipts.",
+    "after": {
+      "generation": 97,
+      "passed": 60,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "exit": 0,
+      "filesDrained": "1/1",
+      "reclamationAccepted": true
+    }
+  },
+  "fullRelease01": {
+    "generation": 97,
+    "exit": 1,
+    "format": "passed",
+    "check": "passed",
+    "cleanBuild": "passed",
+    "unit": {
+      "authoritativeSummary": false,
+      "filesDrained": 337,
+      "filesPlanned": 756,
+      "silenceMs": 5000,
+      "blockingFile": "host-boundary/023",
+      "terminationObservation": "initial ps ETIMEDOUT; final post-exit group accepted=true; independent observation found no remaining group74441"
+    },
+    "integration": "not run",
+    "e2e": "not run",
+    "package": "not run"
+  },
+  "firstCI": {
+    "url": "https://github.com/dyx13/vibe-fs/actions/runs/39508771344",
+    "head": "8fa662c9e883ec092a528c3325aaa802b810dd24",
+    "conclusion": "failure",
+    "reason": "Four control-pyramid issues, fixed without gate or baseline changes."
+  },
+  "deployed": false,
+  "limits": [
+    "Complete local release has not passed; no aggregate test counts after watchdog failure.",
+    "No claim of real provider execution or OS full Host restart from cold-journal tests.",
+    "Quarantine consumer retained: exact failure guard is stronger than fixed upstream.",
+    "Sandbox remains isolated; native Bun async timeout is a blocker.",
+    "Spool, full physical lifecycle, routing/session handoff and remaining modules are not closed."
+  ]
+}

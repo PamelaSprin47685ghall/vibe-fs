@@ -1,0 +1,49 @@
+{
+  "repository": "wanxiangli",
+  "worktree": "/private/tmp/wxl-retention-092",
+  "branch": "codex/retention-pure-092",
+  "base": "40434d4d03f60f0d3dbee46d41affe6af7e458a1",
+  "commit": "c4bc2caf00d3ef8229e95efacb9f73fe130657f9",
+  "version": "0.9.2",
+  "fixedUpstreamRetention": "202a41ab",
+  "pushed": false,
+  "workingTreeClean": true,
+  "selectedBuild": "retention",
+  "otherBaseArtifacts": "19 existing module artifacts copied from the same 40434d4 source dependency; byte comparison has only the new retention directory",
+  "node": {
+    "version": "22.13.0",
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "exit": 0,
+    "scope": "11 pure rule tests plus actual tarball parent test and its Node/Bun consumer subtests"
+  },
+  "bun": { "version": "1.3.14", "passed": 11, "failed": 0, "exit": 0, "scope": "pure rule tests" },
+  "publicExportInventory": { "exports": 20, "passed": 3, "failed": 0, "exit": 0, "runtimes": ["node", "bun"] },
+  "installedRetentionConsumer": {
+    "tarball": "wanxiangli-0.9.2.tgz",
+    "integrity": "sha512-HL3N3PvaHhbK+q4olJ/DWZm1Ji1kYUrVzbf9PLpGvBULg8Mr7fA+o5N+c4QjWnnD2y+0/B3C1IOqv6eg3cCWRQ==",
+    "workspaceLink": false,
+    "sourceAbsent": true,
+    "compilerAbsent": true,
+    "siblingModulesRemoved": true,
+    "typescriptPositiveAndNegative": true,
+    "runtimes": ["node", "bun"]
+  },
+  "firstAttempt": "npm pack hit EPERM in the host default npm cache. Original log retained. The test now owns a temporary cache; no host cache or install policy was changed.",
+  "nullTailFinding": "Falsified: gen98 already falls back on JSON null tails and rejects retained malformed bytes with typed StorageInvalid; it is not a claimed fix.",
+  "main": {
+    "modified": false,
+    "candidateLocation": "/private/tmp/vibe-fs-mf04-retention-probe/main-candidate",
+    "candidate011BaseRed": { "generation": 98, "passed": 5, "failed": 4, "exit": 1 },
+    "controlPyramidIssues": 0,
+    "formalAcceptance": "pending integration and root build"
+  },
+  "excludedClaims": ["physical deletion", "power loss", "concurrent writer convergence", "remote history", "GAP151 closure"],
+  "logs": [
+    "library-092-build.log", "library-092-node.log", "library-092-node-final.log",
+    "library-092-bun.log", "library-092-exports.log", "library-092-base-artifacts.diff",
+    "current-gen98-probe.log", "main-011-base-red.log", "main-control-check.log"
+  ]
+}

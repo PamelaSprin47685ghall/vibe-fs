@@ -1,0 +1,71 @@
+{
+  "scope": "Read-only MF-03B spool performance and machine-channel investigation; only temporary source copies, fixture data, probes and logs written",
+  "mainRepository": "/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs",
+  "mainHead": "8fa662c9e883ec092a528c3325aaa802b810dd24",
+  "mainWorkingTree": "Integration changes owned by root; no source changes made by this investigation",
+  "fixedUpstream": "202a41ab",
+  "upstreamProbe": "Exact Native.fs, OutputSpool.fs and fsproj from fixed Git objects copied to /tmp and single-module Fable-compiled. This is a direct source probe, not installed/public-package acceptance.",
+  "findings": {
+    "mainTail": {
+      "file": "src/Wanxiangshu/Process/Spool.fs:115",
+      "actualImplementation": "readLatestTail calls readChunks; NodeProcessHost.readFileAsyncChunks uses createReadStream with a 204800-byte highWaterMark. It scans the complete file asynchronously and keeps a small tail, not readFileSync of the complete file.",
+      "callFrequency": "Zero in-tree callers found across src, requirements and scripts; only .fs implementation and .fsi declaration. The benchmark invokes it directly. No current high-frequency production claim is justified.",
+      "classification": "P3 latent linear-read cost; no measured active production bottleneck"
+    },
+    "upstreamTail": {
+      "file": "src/spool/Native.fs readEnd",
+      "actualImplementation": "FileHandle.stat, start=size-min(size,limit), position-based FileHandle.read; only requested tail bytes are read.",
+      "scope": "Measured on stable completed fixture files. Concurrent external truncation/growth semantics and host live-spool ownership are not proved."
+    },
+    "machineChannels": {
+      "files": ["src/Wanxiangshu/Process/ProcessOutput.fs:37", "src/Wanxiangshu/Process/ProcessRequest.fs:87", "src/Wanxiangshu/Change/Host/GitAdapter.fs:19"],
+      "actualImplementation": "Combined arrival chunks are put in one file at min(estimated output,204800). Git estimates 65536 bytes. requireText correctly refuses this mixed spool; the real adapter deletes the spool then returns the typed Error.",
+      "confirmedConsequence": "Native git diff --no-index returns complete 164109-byte stdout, empty stderr and legitimate diff exit 1. Actual compiled OrchestratorGit.createRunner rejects the result on Node22 and Bun solely because it spooled. Small git --version controls pass.",
+      "priority": "P2 existing availability boundary; preserve the safety refusal. It is not a reason to reinterpret mixed bytes as stdout.",
+      "upstreamDoesNotFixIt": "Fixed upstream spool File result is also a raw merged stream with no channel metadata. Two different stdout/stderr assignments produce byte-identical files and result metadata, so a reader cannot recover both channels."
+    }
+  },
+  "benchmark": {
+    "command": "node --expose-gc /private/tmp/vibe-fs-spool-review-20261021/benchmark.mjs",
+    "runtime": "Node v22.13.0",
+    "exit": 0,
+    "rawLog": "benchmark.log",
+    "fullRecords": "benchmark-results.json",
+    "method": "One warmup then three measured reads per size/reader; 4096-byte tail. Main stream bytesRead and upstream FileHandle positioned reads are observed directly; returned hashes match. Main artifact SHA stayed unchanged within the run.",
+    "warmCacheMedianMilliseconds": [
+      { "fileMiB": 1, "main": 0.380667, "upstream": 0.209875 },
+      { "fileMiB": 16, "main": 3.792916, "upstream": 0.262542 },
+      { "fileMiB": 64, "main": 14.485208, "upstream": 0.179125 }
+    ],
+    "bytesActuallyRead": "Main reads the complete 1/16/64 MiB each time; upstream reads exactly 4096 bytes at file size minus 4096. Both return 4094 bytes after valid UTF8 alignment.",
+    "limits": "This host and warm local page cache only. RSS is sampled in a shared benchmark process and must not be used as a fresh-process memory comparison or a leak proof."
+  },
+  "counterexamples": {
+    "actualGitNode": { "script": "git-output-probe.mjs", "log": "git-output-red.log", "exit": 1, "meaning": "True failed usability assertion after small-command positive control and exact raw native/spool byte comparison" },
+    "actualGitBun": { "script": "git-output-probe.mjs", "log": "git-output-bun-red.log", "exit": 1, "meaning": "Same true failed usability assertion on Bun 1.3.14" },
+    "upstreamChannelLossNode": { "script": "channel-loss-probe.mjs", "log": "channel-loss.log", "exit": 0, "meaning": "Green probe confirms information loss, not correct dual-channel machine consumption" },
+    "upstreamChannelLossBun": { "script": "channel-loss-probe.mjs", "log": "channel-loss-bun.log", "exit": 0, "meaning": "Same information-loss proof on Bun" }
+  },
+  "narrowRecommendation": {
+    "firstPackage": "Receive pure spool and replace only already single-channel capture storage: JsCallLoop owns distinct StdoutCapture/StderrCapture; JsSearch also creates separate stdout/stderr collectors. Keep one independent spool instance per existing channel owner. Do not merge these owners when crossing to File.",
+    "preserve": [
+      "ProcessResult public end/stop/fault protocol and strict requireText refusal of mixed spools",
+      "Actual ReadOutput authority before file consumption",
+      "Complete machine output for parsing: never use readTail to parse Git stdout, rg JSON or NUL path lists",
+      "JsSearch existing 1 MiB capture failure bound and structured Host result budget",
+      "Current EOF, cancellation/deadline, Unknown and custodian cleanup semantics"
+    ],
+    "tail": "Do not alter shared readChunks to seek, because its live callers need complete bytes. An isolated readLatestTail-to-positioned-reader replacement is possible but unused; do not prioritize or claim a hot-path improvement without a real caller.",
+    "gitAvailabilityFollowup": "Treat larger machine text as its own bounded output policy. Within the existing process owner, keep separate stdout/stderr spools and materialize complete channel text at the machine boundary only after confirmed closure; return existing InMemory text only when the complete conversion succeeds. Keep cancellation, deadline, fault and Unknown checks. A real caller-specific maximum text budget must be explicit; no silent limit, tail parsing, stdout guess, or new public process lifecycle protocol is needed.",
+    "whyNotDoMoreNow": "Current mixed result has already lost channel facts. A change only to requireText/GitAdapter cannot reconstruct them. Merely increasing EstimatedOutput also fails above the independent 204800 memory ceiling. A bounded machine materialization policy needs an explicit contract and focused work package, not a hidden change during pure spool reception.",
+    "likelyWriteSet": [
+      "Independent library src/spool/** plus public package metadata",
+      "Main ProcessOutput.fs/.fsi storage adaptation",
+      "Main Spool.fs/.fsi and minimal NodeProcessHost fs I/O helpers only where redundant implementation can actually exit",
+      "JsCallLoop.fs and JsSearch.fs only if existing collector accessor adaptation is required",
+      "Numbered process-execution tests for per-channel overflow, raw bytes/BOM/CRLF, invalid UTF8 refusal where already required, file failures, authority and physical cleanup"
+    ],
+    "doNotIncludeWithoutSeparateApproval": "Changing CapturedOutput/ProcessResult public union or making GitAdapter treat a merged File result as stdout"
+  },
+  "soak": "The separate four-hour 3db7 package experiment remains running. Benchmark files/logs do not count as soak output or passing soak phases."
+}

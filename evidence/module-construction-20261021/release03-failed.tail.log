@@ -1,0 +1,80 @@
+runner:    8184ms  WHAT[process-execution-003] a durable PTY owner survives Host SIGKILL, refuses input replay and seals only its exact native outcome
+runner:    6202ms  WHAT[verification-system-016] two actual locked registry packages preserve modes use the selected bundle layout and bind its complete identity after tools cleanup
+runner:    6186ms  WHAT[verification-system-016] selected npm tools replaced during the actual runtime probe cannot start the next version probe
+
+runner: 4519 passed, 2 failed; 760/760 planned file(s) completed
+Error: runner: supervised suite failed (exit 1)
+    at fail (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:224:25)
+    at superviseOwnedNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:520:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async superviseNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:197:14)
+    at async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/run.mjs:94:1 {
+  exitCode: 1,
+  [cause]: undefined
+}
+
+--- [unit] 错误诊断日志转储 (最后 60 行) ---
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/sphinx-v2/tests/034.test.mjs:WHAT[sphinx-v2-034] actual Host receipts bind work identity and cancel awaits real child resource termination while late results cannot enter semantic state — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/003.test.mjs:WHAT[structured-workflow-003] actual retirement recovery re-enters its workflow from durable facts without a saved continuation address — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/006.test.mjs:WHAT[structured-workflow-006] actual retirement freezes admissions and drains resources before completing its owning workflow — GAP-197: pure tool-registry predicate does not start Manager retirement runtime; actual retirement freeze and resource drain lifecycle is verified in relay-retirement
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] Mac nested mounted output resets under immutable input and cleanup preserves the original callback failure — integration tier not enabled
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/sphinx-v2/tests/036.test.mjs:WHAT[sphinx-v2-036] registered writable MCP tools drive durable creation, work claim, result admission and authorized goal amendment through the single runtime — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/sphinx-v2/tests/036.test.mjs:WHAT[sphinx-v2-036] status/export over real stdio read an existing inquiry without creating leases, calling models or changing business state; receipts and dispatch observers need positive controls — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/018.test.mjs:WHAT[structured-workflow-018] actual workflow admission and settlement require real registered behavior proofs; test-local tables and simulators do not establish them — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/time-capability/tests/007.test.mjs:WHAT[time-capability-007] first actual prompt samples and durably binds the injected clock before later prompts — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/time-capability/tests/007.test.mjs:WHAT[time-capability-007] a restarted session reuses its origin and replays stored marker bytes without resampling — reason not supplied
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] real Fable compiles a focused Controller change with its declared Snapshot contracts — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] compile-impact CLI compiles a focused production implementation change — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] switching focused closures in one output directory emits the newly selected module — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] compile-impact CLI emits fresh output into a scratch output dir and never writes a success manifest — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] compile-impact CLI re-emits reverse consumers for inline body changes — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] deleting a source purges its stale JS from dist — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] independent Fable checks enforce compile-shard input boundaries — integration tier not enabled
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/time-capability/tests/008.test.mjs:WHAT[time-capability-008] actual compilation rejects implementation access from pure consumers and runtime requires injected time capabilities — reason not supplied
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] build failure preserves prior valid manifest and does not delete it (integration: compiler failure) — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/structured-workflow/tests/012.test.mjs:WHAT[structured-workflow-012] flat closure compilation compiles transitive closure green and keeps unreferenced sources red — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/014.test.mjs:WHAT[verification-system-014] Long Stroke 真实物理验收环境 — release tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] a real readonly mount protects original role paths and rejects foreign or expired view capabilities — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] a paused actual Node consumer keeps four readonly namespaces intact through valid write add delete rename and new symlink attempts — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] an actual same UID nonforce detach makes a successful readonly consumer insufficient for scope success and preserves an independent foreign device — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] an early Error action failure drains its actual Node consumer before readonly device recovery — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] actual readonly mount cleanup preserves Error operation failure and restores every original directory — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] cancellation of an attached readonly scope preserves Error and removes only its owned image — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] an early null action failure drains its actual Node consumer before readonly device recovery — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] actual readonly mount cleanup preserves null operation failure and restores every original directory — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] cancellation of an attached readonly scope preserves null and removes only its owned image — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] a successful action omitting await drains and rejects its actual Node consumer before readonly device recovery — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] a normal action return cannot conceal an independently failed actual readonly Node consumer — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] the original Error action failure remains the cause alongside an independently failed actual readonly Node consumer — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] the original null action failure remains the cause alongside an independently failed actual readonly Node consumer — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] exact repository Git inputs install through a selected npm 11.12.1 bundle and real JavaScript consumers — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] a complete selected SDK archive resolves the captured repository global.json and reclaims its owned roots — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] selected complete SDK restores original repository local tools from explicitly identified NuGet archives — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] selected complete Git source and SDK restore the original foundation identity project through a fresh-cache locked NuGet graph — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] four selected input owners compile the original foundation identity project with Fable into isolated outputs — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] mac readonly views protect actual original-project Fable inputs and restore all prepared owners — integration tier not enabled
+  skip: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/dotnet-inputs/016.test.mjs:WHAT[verification-system-016] a selected wrapper cannot borrow SDK Base Path or runtimes from a live installation — No explicitly selected live SDK is available for this physical provenance counterexample
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/016.test.mjs:WHAT[verification-system-016] a mutation restored within one step still invalidates the run — D2: fixed isolated inputs selected; current runner still uses mutable inputs and step-boundary hashes miss this counterexample
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/011.test.mjs:WHAT[work-011] a controlled in-flight Host interrupt prevents successor dispatch until exact provider-step release and physical interruption complete — reason not supplied
+runner: post-exit group verification/reclamation: pid=32831; elapsedMs=22.898; accepted=true
+runner: 4908 test(s), 800.9s of test time; max 38366ms, p90 410ms, median 3ms
+runner:   38366ms  WHAT[verification-system-016] npm tool archive installation owns selected complete tools and locked dependencies through publication
+runner:   24360ms  WHAT[verification-system-016] selected Node and complete npm bundle preparation binds actual probes without borrowing ambient configuration
+runner:    8184ms  WHAT[process-execution-003] a durable PTY owner survives Host SIGKILL, refuses input replay and seals only its exact native outcome
+runner:    6202ms  WHAT[verification-system-016] two actual locked registry packages preserve modes use the selected bundle layout and bind its complete identity after tools cleanup
+runner:    6186ms  WHAT[verification-system-016] selected npm tools replaced during the actual runtime probe cannot start the next version probe
+
+runner: 4519 passed, 2 failed; 760/760 planned file(s) completed
+Error: runner: supervised suite failed (exit 1)
+    at fail (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:224:25)
+    at superviseOwnedNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:520:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async superviseNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:197:14)
+    at async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/run.mjs:94:1 {
+  exitCode: 1,
+  [cause]: undefined
+}
+--- [unit] 完整日志见: .fable-build/verify-logs/2026-10-20T23-18-39-458Z/unit.log ---
+
+  unit           FAIL(1)  240.8s
+FAIL  verify release  317.7s

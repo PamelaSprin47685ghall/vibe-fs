@@ -1,0 +1,1 @@
+{"status":"rejected","preservesNull":false,"errorName":"AssertionError","errorCode":"ERR_ASSERTION","message":"Expected values to be strictly equal:\n\nnull !== 0\n\nNative crash evidence retained at /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-native-crash-EcLFgH"}

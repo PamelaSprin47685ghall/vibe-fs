@@ -1,0 +1,12 @@
+integration:suites:   62875ms  WHAT[durable-events-023] isolated compilation rejects aggregate authority in domain folds
+integration:suites:   44820ms  WHAT[semantic-trace-005] independently compile a consumer and reject access to opaque trace state, cursor and append refs
+integration:suites:   42036ms  WHAT[durable-events-022] dispatch-runtime compiles its complete flat closure
+
+integration:suites: 725 passed, 0 failed; 40/40 planned file(s) completed
+integration:suites: partial evidence; 7 skipped, 7 TODO; excluded cases are not passes
+integration:suites: pending proof accepted under WXS_ACCEPT_TODO override (7 TODO)
+✓ suites (40 files, 517.9s)
+✓ package/run.mjs (distribution) (1.9s)
+✓ harness/run.mjs (verification-system) (12.2s, 291 passed, 0 failed (12.0s))
+
+integration: 3 groups passed (533.0s)

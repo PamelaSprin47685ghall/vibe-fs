@@ -1,0 +1,834 @@
+diff --git a/src/sandbox/AGENTS.md b/src/sandbox/AGENTS.md
+new file mode 100644
+index 0000000..b30c7a3
+--- /dev/null
++++ b/src/sandbox/AGENTS.md
+@@ -0,0 +1,37 @@
++# sandbox — 受限 JS 执行膜
++
++隔离候选，尚未发布或接入主仓。拟定入口 `wanxiangli/sandbox`，导出工厂 `Sandbox()`。不得 import 宿主 SDK；不持有跨调用状态；不读文件或环境变量。
++
++来源：宿主仓 `proposals/extraction-kanban/cards/CUT-25.md`；现行需求 `requirements/repository-programming/WHAT.md` [006]。能力投影、基类生成、park/unpark 产品协议、JsFailure 解码留在宿主组合者。
++
++# AXIOM
++
++1. [使用者] 模型程序不得获得文件系统、网络、进程或环境变量。
++    - 理由：repository-programming [006]；node:vm 文档明确不是安全机制，必须自行切断宿主 realm 可达路径。
++2. [使用者] 执行有硬性超时；超时后终止并清理。
++    - 理由：同 [006]；`runInContext` 的 timeout 只覆盖同步段，await 之后的死循环要靠 afterEvaluate 驱动排水。
++
++# LEMMA
++
++1. [AXIOM 1] 上下文用 `createContext(Object.create(null), { microtaskMode: 'afterEvaluate' })` 创建；Bun 1.3.14 的 `DONT_CONTEXTIFY` 实测会暴露宿主构造器路径，不能使用。宿主值须复制或包装成 sandbox-realm 值。
++2. [AXIOM 1] membrane 与模型程序同 realm：membrane 用到的内建方法（WeakMap/Reflect/数组拷贝）在模型代码运行前捕获引用，经捕获的 Reflect.apply 调用；模型改写原型不影响 membrane。
++3. [AXIOM 1] 期限检查用宿主时钟，不读可被程序改写的 sandbox `Date.now`。
++4. [AXIOM 2] Node 宿主侧驱动循环在每次 `runInContext('void 0')` 上施加剩余 timeout。Bun 1.3.14 的 await 后死循环仍绕过此期限；这条义务尚未成立。
++
++# SPEC
++
++1. [LEMMA 1] 下列逃逸在 membrane 下均拿不到宿主 `process`，且不能在 workspace 外写文件；在 naive 实现上会成功（base-red）。
++    - 全局 `api` / `__deadlineRef` / `globalThis.constructor` / `this.ls` 返回值的 `constructor.constructor`
++    - 证明：`tests/001.test.mjs`
++2. [LEMMA 4] 同步死循环与 await 之后的死循环须在 deadlineMs 量级内以超时结束。目前只在 Node 成立，Bun 仍失败。
++    - 证明：`tests/002.test.mjs`（await 路径在子进程中跑，避免 node:test async_hooks 与 afterEvaluate 冲突）
++3. 正常 api 往返仍返回 sandbox 数据（例如 `ls` 的 entries 数组）。
++    - 证明：`tests/001.test.mjs` normal ls
++4. [LEMMA 2] 模型改写 `WeakMap.prototype.has` / `.set` 不能观察到 membrane 传入的宿主值（0.23.1 上会泄漏宿主对象并拿到 `process`）。
++    - 证明：`tests/003.test.mjs`
++
++## 本轮边界
++
++`tests/004.test.mjs` 验证真实 Host receiver、Callable 与预算错误字段。`tests/005.test.mjs` 在独立子进程验证 Host 异步唤起的 Callable 构造、getter、方法、返回 getter 和 async 方法。Node22 合计20/0；Bun1.3.14为18/2，async方法及原await路径均需外部强杀，不能记作期限成功。
++
++尚未证明全部异步膜回调与序列化都在期限内；不因这些有限用例通过就宣称通用隔离成立。主仓park/unpark/abandon及真实Host全链仍未接收。
+diff --git a/src/sandbox/Sandbox.fs b/src/sandbox/Sandbox.fs
+new file mode 100644
+index 0000000..d2f1fc3
+--- /dev/null
++++ b/src/sandbox/Sandbox.fs
+@@ -0,0 +1,380 @@
++module Wanxiangli.Sandbox.Sandbox
++
++open Fable.Core
++open Fable.Core.JsInterop
++
++/// Independent JS sandbox runner: null-prototype context + realm membrane.
++/// Host supplies api / base class / model source. Values crossing into the
++/// program are copied or wrapped into the sandbox realm so
++/// constructor.constructor cannot reach the real Node process. The returned
++/// Node drains afterEvaluate microtasks under the vm timeout. Bun 1.3.14 does
++/// not bound post-await loops; this candidate must remain isolated.
++
++[<Import("createContext", "node:vm")>]
++let private createContext: obj = jsNative
++
++[<Import("runInContext", "node:vm")>]
++let private runInContext: obj = jsNative
++
++let private installSource =
++    """
++(function () {
++  "use strict";
++  var Object = globalThis.Object;
++  var Array = globalThis.Array;
++  var Promise = globalThis.Promise;
++  var Error = globalThis.Error;
++  var Proxy = globalThis.Proxy;
++  var Reflect = globalThis.Reflect;
++  var WeakMap = globalThis.WeakMap;
++  var String = globalThis.String;
++  var Number = globalThis.Number;
++  var isSafeInteger = Number.isSafeInteger;
++  var JSON = globalThis.JSON;
++  var isArray = Array.isArray;
++  var getOwnNames = Object.getOwnPropertyNames;
++  var defineProperty = Object.defineProperty;
++  function own(target, key, value) {
++    defineProperty(target, key, { value: value, enumerable: true, writable: true, configurable: true });
++  }
++  // Capture intrinsic methods before any model code runs, and invoke them via
++  // the captured Reflect.apply. The membrane shares its realm with the model
++  // program, so a model that monkeypatches e.g.
++  // WeakMap.prototype.has would otherwise see the raw host value the membrane
++  // passes to that method. Holding direct references defeats later tampering.
++  var ReflectApply = Reflect.apply;
++  var ReflectGet = Reflect.get;
++  var ReflectConstruct = Reflect.construct;
++  var WeakMapHas = WeakMap.prototype.has;
++  var WeakMapGet = WeakMap.prototype.get;
++  var WeakMapSet = WeakMap.prototype.set;
++  function mapHas(m, k) { return ReflectApply(WeakMapHas, m, [k]); }
++  function mapGet(m, k) { return ReflectApply(WeakMapGet, m, [k]); }
++  function mapSet(m, k, v) { ReflectApply(WeakMapSet, m, [k, v]); }
++  function argsToArray(a) { var out = []; for (var i = 0; i < a.length; i++) own(out, i, a[i]); return out; }
++  function mapArray(arr, fn) { var out = []; for (var i = 0; i < arr.length; i++) own(out, i, fn(arr[i])); return out; }
++  var slot = null;
++  var invocation = null;
++  globalThis.__put = function (v) { slot = v; };
++  globalThis.__take = function () { var s = slot; slot = null; return s; };
++  globalThis.__putInvocation = function (value) { invocation = value; };
++  defineProperty(globalThis, "__runInvocation", {
++    value: function () {
++      var next = invocation;
++      invocation = null;
++      if (next === null) return undefined;
++      return next();
++    },
++    enumerable: false,
++    configurable: false,
++    writable: false
++  });
++  globalThis.__makeRunner = function (hostApi, hostDeadlineRef, hostNow, baseClassSource, modelSource, hostValues) {
++    var hostToGuest = new WeakMap();
++    var guestToHost = new WeakMap();
++    function isPrimitive(v) {
++      return v === null || (typeof v !== "object" && typeof v !== "function");
++    }
++    function copyError(hostErr) {
++      var g = new Error(String(hostErr && hostErr.message != null ? hostErr.message : hostErr));
++      if (hostErr && typeof hostErr.name === "string") g.name = hostErr.name;
++      if (hostErr && hostErr.__jsFailure && typeof hostErr.__jsFailure === "object") {
++        g.__jsFailure = {
++          code: String(hostErr.__jsFailure.code || ""),
++          reason: String(hostErr.__jsFailure.reason || hostErr.__jsFailure.code || ""),
++        };
++        var minimum = hostErr.__jsFailure.minimumOutputBudgetBytes;
++        if (isSafeInteger(minimum) && minimum > 0) g.__jsFailure.minimumOutputBudgetBytes = minimum;
++      }
++      if (hostErr && hostErr.__jsAbandoned) g.__jsAbandoned = true;
++      if (hostErr && hostErr.__jsDelivered) g.__jsDelivered = wrap(hostErr.__jsDelivered);
++      if (hostErr && hostErr.code === "ERR_SCRIPT_EXECUTION_TIMEOUT") {
++        g.__jsFailure = { code: "PROGRAM_TIMEOUT", reason: "program exceeded its deadline" };
++      }
++      return g;
++    }
++    function looksLikeError(v) {
++      return (
++        v &&
++        typeof v === "object" &&
++        typeof v.message === "string" &&
++        (typeof v.name === "string" || v.__jsFailure || v.__jsAbandoned || v.__jsDelivered)
++      );
++    }
++    function bridgeInstance(guestInst) {
++      if (mapHas(guestToHost, guestInst)) return mapGet(guestToHost, guestInst);
++      var proxy = new Proxy(guestInst, {
++        get: function (target, prop) {
++          if (prop === "constructor") return undefined;
++          var v = hostValues.invoke(function () { return ReflectGet(target, prop, target); });
++          if (typeof v !== "function") {
++            if (isPrimitive(v)) return v;
++            return hostValues.invoke(function () { return unwrap(v); });
++          }
++          return function () {
++            var hostArgs = argsToArray(arguments);
++            var guestArgs = mapArray(hostArgs, wrap);
++            return hostValues.invoke(function () {
++              try {
++                return unwrap(ReflectApply(v, target, guestArgs));
++              } catch (e) {
++                throw unwrap(e);
++              }
++            });
++          };
++        },
++        set: function () { return false; },
++        defineProperty: function () { return false; },
++        deleteProperty: function () { return false; },
++        getPrototypeOf: function () { return null; },
++      });
++      mapSet(guestToHost, guestInst, proxy);
++      mapSet(hostToGuest, proxy, guestInst);
++      return proxy;
++    }
++    function wrap(hostValue) {
++      if (isPrimitive(hostValue)) return hostValue;
++      if (mapHas(hostToGuest, hostValue)) return mapGet(hostToGuest, hostValue);
++      if (looksLikeError(hostValue)) {
++        var ge = copyError(hostValue);
++        mapSet(hostToGuest, hostValue, ge);
++        mapSet(guestToHost, ge, hostValue);
++        return ge;
++      }
++      if (typeof hostValue.then === "function") {
++        var gp = new Promise(function (resolve, reject) {
++          hostValue.then(
++            function (v) { resolve(wrap(v)); },
++            function (e) { reject(wrap(e)); }
++          );
++        });
++        mapSet(hostToGuest, hostValue, gp);
++        mapSet(guestToHost, gp, hostValue);
++        return gp;
++      }
++      if (typeof hostValue === "function") {
++        var guestFn = function () {
++          if (hostNow() > Number(hostDeadlineRef.current)) {
++            var err = new Error("program exceeded its deadline");
++            err.__jsFailure = { code: "PROGRAM_TIMEOUT", reason: "program exceeded its deadline" };
++            throw err;
++          }
++          var guestArgs = argsToArray(arguments);
++          var hostArgs = mapArray(guestArgs, unwrap);
++          try {
++            return wrap(ReflectApply(hostValue, unwrap(this), hostArgs));
++          } catch (e) {
++            throw wrap(e);
++          }
++        };
++        mapSet(hostToGuest, hostValue, guestFn);
++        mapSet(guestToHost, guestFn, hostValue);
++        return guestFn;
++      }
++      if (isArray(hostValue)) {
++        var ga = [];
++        mapSet(hostToGuest, hostValue, ga);
++        mapSet(guestToHost, ga, hostValue);
++        for (var i = 0; i < hostValue.length; i++) own(ga, i, wrap(hostValue[i]));
++        return ga;
++      }
++      var go = {};
++      mapSet(hostToGuest, hostValue, go);
++      mapSet(guestToHost, go, hostValue);
++      var names = getOwnNames(hostValue);
++      for (var j = 0; j < names.length; j++) {
++        var k = names[j];
++        try { own(go, k, wrap(hostValue[k])); } catch (_e) {}
++      }
++      return go;
++    }
++    function unwrap(guestValue) {
++      if (isPrimitive(guestValue)) return guestValue;
++      if (mapHas(guestToHost, guestValue)) return mapGet(guestToHost, guestValue);
++      if (typeof guestValue === "function") {
++        var hostFn = function () {
++          var hostArgs = argsToArray(arguments);
++          var guestArgs = mapArray(hostArgs, wrap);
++          var constructing = new.target !== undefined;
++          var receiver = this;
++          return hostValues.invoke(function () {
++            try {
++              if (constructing) {
++                var inst = ReflectConstruct(guestValue, guestArgs, guestValue);
++                return bridgeInstance(inst);
++              }
++              return unwrap(ReflectApply(guestValue, wrap(receiver), guestArgs));
++            } catch (e) {
++              throw unwrap(e);
++            }
++          });
++        };
++        mapSet(guestToHost, guestValue, hostFn);
++        mapSet(hostToGuest, hostFn, guestValue);
++        return hostFn;
++      }
++      if (typeof guestValue.then === "function") {
++        var hp = hostValues.promise(function (resolve, reject) {
++          guestValue.then(
++            function (v) { resolve(unwrap(v)); },
++            function (e) { reject(unwrap(e)); }
++          );
++        });
++        mapSet(guestToHost, guestValue, hp);
++        mapSet(hostToGuest, hp, guestValue);
++        return hp;
++      }
++      if (isArray(guestValue)) {
++        var ha = hostValues.array();
++        mapSet(guestToHost, guestValue, ha);
++        mapSet(hostToGuest, ha, guestValue);
++        for (var i2 = 0; i2 < guestValue.length; i2++) own(ha, i2, unwrap(guestValue[i2]));
++        return ha;
++      }
++      var ho = hostValues.record();
++      mapSet(guestToHost, guestValue, ho);
++      mapSet(hostToGuest, ho, guestValue);
++      var gnames = getOwnNames(guestValue);
++      for (var j2 = 0; j2 < gnames.length; j2++) {
++        var gk = gnames[j2];
++        try { own(ho, gk, unwrap(guestValue[gk])); } catch (_e2) {}
++      }
++      return ho;
++    }
++    var api = wrap(hostApi);
++    var body =
++      "(async () => {\n" +
++      baseClassSource +
++      "\n" +
++      modelSource +
++      "\n" +
++      "let __result;\n" +
++      "try { __result = await new Js(api).run(); }\n" +
++      "catch (__e) {\n" +
++      "  if (__e && __e.__jsFailure && typeof __e.__jsFailure.code === 'string') {\n" +
++      "    return JSON.stringify({\n" +
++      "      __jsHostFailed: true,\n" +
++      "      code: __e.__jsFailure.code,\n" +
++      "      reason: String(__e.__jsFailure.reason || __e.__jsFailure.code),\n" +
++      "      minimumOutputBudgetBytes: __e.__jsFailure.minimumOutputBudgetBytes\n" +
++      "    });\n" +
++      "  }\n" +
++      "  if (__e && __e.__jsAbandoned) {\n" +
++      "    return JSON.stringify({ __jsAbandoned: true });\n" +
++      "  }\n" +
++      "  if (__e && __e.__jsDelivered) {\n" +
++      "    return JSON.stringify({ __jsDelivered: true, view: __e.__jsDelivered.view });\n" +
++      "  }\n" +
++      "  return JSON.stringify({ __jsProgramFailed: true, message: String((__e && __e.message) || __e) });\n" +
++      "}\n" +
++      "try {\n" +
++      "  const __json = JSON.stringify(__result);\n" +
++      "  return typeof __json === 'string' ? __json : JSON.stringify({ __jsInvalidReturn: true });\n" +
++      "}\n" +
++      "catch (__e2) { return JSON.stringify({ __jsInvalidReturn: true }); }\n" +
++      "})()";
++    var runBody = new Function("api", "JSON", "return (" + body + ");");
++    return runBody(api, JSON);
++  };
++})();
++"""
++
++let private launch
++    (api: obj)
++    (deadlineMs: float)
++    (deadlineEpochMs: float)
++    (baseClassSource: string)
++    (modelSource: string)
++    : obj =
++    emitJsExpr
++        (createContext, runInContext, installSource, api, deadlineMs, deadlineEpochMs, baseClassSource, modelSource)
++        """
++(function(createContext, runInContext, INSTALL, api, deadlineMs, deadlineEpochMs, baseClass, model) {
++  var ctx = createContext(Object.create(null), { microtaskMode: "afterEvaluate" });
++  runInContext(INSTALL, ctx, { timeout: 5000 });
++  var deadlineRef = { current: Number(deadlineEpochMs) };
++  var paused = false;
++  var resumeWaiter = null;
++  function pause() { paused = true; }
++  function resume() {
++    paused = false;
++    if (resumeWaiter !== null) {
++      var wake = resumeWaiter;
++      resumeWaiter = null;
++      wake();
++    }
++  }
++  var hostNow = function () { return Date.now(); };
++  var put = runInContext("__put", ctx);
++  var putInvocation = runInContext("__putInvocation", ctx);
++  runInContext("delete globalThis.__putInvocation", ctx);
++  function invoke(action) {
++    var remaining = Math.max(1, Math.min(Number(deadlineMs), Number(deadlineRef.current) - Date.now()));
++    putInvocation(action);
++    return runInContext("__runInvocation()", ctx, { timeout: remaining });
++  }
++  var hostValues = Object.freeze({
++    record: function () { return {}; },
++    array: function () { return []; },
++    promise: function (executor) { return new Promise(executor); },
++    invoke: invoke
++  });
++  put({ api: api, deadlineRef: deadlineRef, hostNow: hostNow, base: baseClass, model: model, values: hostValues });
++  var progPromise;
++  try {
++    progPromise = runInContext(
++      "(function(){ var t = __take(); var make = __makeRunner; delete globalThis.__put; delete globalThis.__take; delete globalThis.__makeRunner; return make(t.api, t.deadlineRef, t.hostNow, t.base, t.model, t.values); })()",
++      ctx,
++      { timeout: Number(deadlineMs) }
++    );
++  } catch (e) {
++    return { deadlineRef: deadlineRef, programPromise: Promise.reject(e), pause: pause, resume: resume };
++  }
++  var box = { done: false, value: null, error: null, failed: false };
++  var register = runInContext(
++    "(function(p, box){ Promise.resolve(p).then(function(v){ box.done = true; box.value = v; }, function(e){ box.done = true; box.failed = true; box.error = e; }); })",
++    ctx
++  );
++  register(progPromise, box);
++  var driven = (async function () {
++    while (!box.done) {
++      if (paused) {
++        await new Promise(function (resolve) { resumeWaiter = resolve; });
++        continue;
++      }
++      var now = Date.now();
++      var deadlineNow = Number(deadlineRef.current);
++      if (now > deadlineNow) {
++        var err = new Error("Script execution timed out");
++        err.code = "ERR_SCRIPT_EXECUTION_TIMEOUT";
++        throw err;
++      }
++      var remaining = Math.max(1, Math.min(Number(deadlineMs), deadlineNow - now));
++      try {
++        runInContext("void 0", ctx, { timeout: remaining });
++      } catch (e2) {
++        if (e2 && e2.code === "ERR_SCRIPT_EXECUTION_TIMEOUT") throw e2;
++        throw e2;
++      }
++      if (box.done) break;
++      await new Promise(function (r) { setImmediate(r); });
++    }
++    if (box.failed) throw box.error;
++    return box.value;
++  })();
++  return { deadlineRef: deadlineRef, programPromise: driven, pause: pause, resume: resume };
++})($0, $1, $2, $3, $4, $5, $6, $7)
++"""
++
++type SandboxMessages =
++    abstract run: api: obj * deadlineMs: float * deadlineEpochMs: float * baseClassSource: string * modelSource: string -> obj
++    abstract resetDeadline: deadlineRef: obj * epochMs: float -> unit
++
++/// Realm-membrane sandbox. Each call is independent; the factory holds no state.
++let Sandbox () : SandboxMessages =
++    { new SandboxMessages with
++        member _.run(api, deadlineMs, deadlineEpochMs, baseClassSource, modelSource) =
++            launch api deadlineMs deadlineEpochMs baseClassSource modelSource
++
++        member _.resetDeadline(deadlineRef, epochMs) =
++            (emitJsExpr (deadlineRef, epochMs) "$0.current = Number($1)" : unit) }
+diff --git a/src/sandbox/Wanxiangli.Sandbox.fsproj b/src/sandbox/Wanxiangli.Sandbox.fsproj
+new file mode 100644
+index 0000000..c36244e
+--- /dev/null
++++ b/src/sandbox/Wanxiangli.Sandbox.fsproj
+@@ -0,0 +1,10 @@
++<Project Sdk="Microsoft.NET.Sdk">
++  <PropertyGroup>
++    <TargetFramework>net8.0</TargetFramework>
++    <!-- Fable-only compilation unit. No dotnet build; see AGENTS.md. -->
++    <IsPackable>false</IsPackable>
++  </PropertyGroup>
++  <ItemGroup>
++    <Compile Include="Sandbox.fs" />
++  </ItemGroup>
++</Project>
+diff --git a/src/sandbox/index.d.ts b/src/sandbox/index.d.ts
+new file mode 100644
+index 0000000..754d880
+--- /dev/null
++++ b/src/sandbox/index.d.ts
+@@ -0,0 +1,25 @@
++/** Handle returned by `run`. The Host owns suspension and deadline changes. */
++export interface SandboxRunHandle {
++  readonly programPromise: Promise<string>
++  readonly deadlineRef: { current: number }
++  pause(): void
++  resume(): void
++}
++
++export interface SandboxMessages {
++  /**
++   * Run modelSource in a context with no Host prototype and a realm membrane.
++   * `programPromise` resolves to the wrapper JSON string (sentinels included).
++   */
++  run(
++    api: object,
++    deadlineMs: number,
++    deadlineEpochMs: number,
++    baseClassSource: string,
++    modelSource: string,
++  ): SandboxRunHandle
++
++  resetDeadline(deadlineRef: { current: number }, epochMs: number): void
++}
++
++export function Sandbox(): SandboxMessages
+diff --git a/src/sandbox/tests/001.test.mjs b/src/sandbox/tests/001.test.mjs
+new file mode 100644
+index 0000000..055a926
+--- /dev/null
++++ b/src/sandbox/tests/001.test.mjs
+@@ -0,0 +1,107 @@
++import test from 'node:test'
++import assert from 'node:assert/strict'
++import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { createContext, runInContext } from 'node:vm'
++import { Sandbox } from './support.mjs'
++
++const law = Sandbox()
++const BASE = `class JsProgram {
++  constructor(api) { this._api = api; }
++  async ls(path) { return await this._api.ls(path); }
++  async cat(path) { return await this._api.cat(path); }
++}`
++
++async function runMembrane(body, api, deadlineMs = 2000, deadlineEpochMs = Date.now() + 60_000) {
++  const src = `class Js extends JsProgram { async run() { ${body} } }`
++  const handle = law.run(api, deadlineMs, deadlineEpochMs, BASE, src)
++  try {
++    const json = await handle.programPromise
++    if (typeof json === 'string' && json.includes('__jsProgramFailed')) {
++      return { ok: false, json: JSON.parse(json) }
++    }
++    return { ok: true, value: JSON.parse(json) }
++  } catch (e) {
++    return { ok: false, timeout: e && e.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT', err: String(e && e.message || e) }
++  }
++}
++
++async function runNaive(body, api, deadlineMs = 2000) {
++  const src = `class Js extends JsProgram { async run() { ${body} } }`
++  const context = createContext({ api })
++  const code = `(async () => { ${BASE}\n${src}\nreturn JSON.stringify(await new Js(api).run()); })()`
++  const handle = { programPromise: runInContext(code, context, { timeout: deadlineMs }) }
++  try {
++    const json = await handle.programPromise
++    if (typeof json === 'string' && json.includes('__jsProgramFailed')) {
++      return { ok: false, json: JSON.parse(json) }
++    }
++    return { ok: true, value: JSON.parse(json) }
++  } catch (e) {
++    return { ok: false, err: String(e && e.message || e) }
++  }
++}
++
++const reach = (expr) =>
++  `const p = (${expr}); return { pid: typeof (p && p.pid), canFs: typeof (p && p.getBuiltinModule) };`
++
++const api = {
++  ls: async () => ['a.txt', 'sub/'],
++  cat: async () => 'hello',
++}
++
++test('SPEC[sandbox-001] naive runner: returned array constructor reaches host process (base-red)', async () => {
++  const result = await runNaive(
++    `const r = await this.ls('.'); ${reach('r.constructor.constructor("return process")()')}`,
++    api,
++  )
++  assert.equal(result.ok, true, JSON.stringify(result))
++  assert.equal(result.value.pid, 'number')
++  assert.equal(result.value.canFs, 'function')
++})
++
++test('SPEC[sandbox-001] membrane denies escape via returned array constructor', async () => {
++  const result = await runMembrane(
++    `const r = await this.ls('.'); ${reach('r.constructor.constructor("return process")()')}`,
++    api,
++  )
++  assert.equal(result.ok, false)
++  assert.match(String(result.json?.message || result.err || ''), /process is not defined/)
++})
++
++test('SPEC[sandbox-001] membrane denies escape via global api / globalThis / missing deadline ref', async () => {
++  for (const body of [
++    reach(`api.constructor.constructor('return process')()`),
++    reach(`globalThis.constructor.constructor('return process')()`),
++    reach(`__deadlineRef.constructor.constructor('return process')()`),
++  ]) {
++    const result = await runMembrane(body, api)
++    assert.equal(result.ok, false, body)
++  }
++})
++
++test('SPEC[sandbox-001] membrane cannot write outside the workspace via escape', async () => {
++  const dir = mkdtempSync(join(tmpdir(), 'wxl-sandbox-'))
++  const outside = join(dir, '..', 'wxl-sandbox-escaped-' + process.pid)
++  try {
++    const result = await runMembrane(
++      `const r = await this.ls('.');
++       const p = r.constructor.constructor('return process')();
++       if (p && p.getBuiltinModule) p.getBuiltinModule('fs').writeFileSync(${JSON.stringify(outside)}, 'x');
++       return { wrote: !!(p && p.getBuiltinModule) };`,
++      api,
++    )
++    assert.equal(result.ok, false)
++    assert.equal(existsSync(outside), false)
++  } finally {
++    rmSync(outside, { force: true })
++    rmSync(dir, { recursive: true, force: true })
++  }
++})
++
++test('SPEC[sandbox-001] membrane still returns normal ls data', async () => {
++  const result = await runMembrane(`return { entries: await this.ls('.') };`, api)
++  assert.equal(result.ok, true)
++  assert.deepEqual(result.value.entries, ['a.txt', 'sub/'])
++})
+diff --git a/src/sandbox/tests/002.test.mjs b/src/sandbox/tests/002.test.mjs
+new file mode 100644
+index 0000000..06a71a2
+--- /dev/null
++++ b/src/sandbox/tests/002.test.mjs
+@@ -0,0 +1,45 @@
++import test from 'node:test'
++import assert from 'node:assert/strict'
++import { spawnSync } from 'node:child_process'
++import { fileURLToPath } from 'node:url'
++import { Sandbox } from './support.mjs'
++
++const law = Sandbox()
++const BASE = `class JsProgram {
++  constructor(api) { this._api = api; }
++  async cat(path) { return await this._api.cat(path); }
++}`
++
++test('SPEC[sandbox-002] sync infinite loop dies under the vm timeout', async () => {
++  const src = `class Js extends JsProgram { async run() { while (true) {} } }`
++  const t0 = Date.now()
++  const handle = law.run({ cat: async () => 'x' }, 200, Date.now() + 2000, BASE, src)
++  await assert.rejects(() => handle.programPromise, (e) => e && e.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT')
++  assert.ok(Date.now() - t0 < 5000)
++})
++
++test('SPEC[sandbox-002] post-await sync loop dies under the driven timeout', async () => {
++  // afterEvaluate + node:test async_hooks: run the probe in a child process.
++  const dist = fileURLToPath(new URL('../../../dist/sandbox/Sandbox.js', import.meta.url))
++  const script = `
++    import { Sandbox } from ${JSON.stringify(dist)};
++    const law = Sandbox();
++    const BASE = ${JSON.stringify(BASE)};
++    const src = 'class Js extends JsProgram { async run() { await this.cat(\\'a\\'); while (true) {} } }';
++    const t0 = Date.now();
++    const handle = law.run({ cat: async () => 'x' }, 200, Date.now() + 2000, BASE, src);
++    try {
++      await handle.programPromise;
++      process.exit(3);
++    } catch (e) {
++      if (!e || e.code !== 'ERR_SCRIPT_EXECUTION_TIMEOUT') process.exit(4);
++      if (Date.now() - t0 >= 5000) process.exit(5);
++      process.exit(0);
++    }
++  `
++  const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
++    encoding: 'utf8',
++    timeout: 10000,
++  })
++  assert.equal(r.status, 0, r.stderr || r.stdout || 'child failed')
++})
+diff --git a/src/sandbox/tests/003.test.mjs b/src/sandbox/tests/003.test.mjs
+new file mode 100644
+index 0000000..623a2a2
+--- /dev/null
++++ b/src/sandbox/tests/003.test.mjs
+@@ -0,0 +1,69 @@
++import test from 'node:test'
++import assert from 'node:assert/strict'
++import { Sandbox } from './support.mjs'
++
++// SPEC[sandbox-003]: the membrane shares its realm with the model program, so a
++// model that monkeypatches a built-in method the membrane relies on must not be
++// able to observe the raw host values the membrane feeds those methods. The
++// confirmed route was WeakMap.prototype.has/.set: wrap()/unwrap() pass the real
++// host object to the map, so a patched method receives it and can reach the host
++// process through constructor.constructor. The membrane must call these methods
++// through references captured before any model code runs.
++// Base-red: these cases report leaked=true on the 0.23.1 membrane (library
++// d2a9f3b); see host evidence/CUT-25/membrane-0.23.1-red-intrinsics.json.
++
++const law = Sandbox()
++const BASE = `class JsProgram {
++  constructor(api) { this._api = api; }
++  async ls(path) { return await this._api.ls(path); }
++  async cat(path) { return await this._api.cat(path); }
++}`
++const api = { ls: async () => ['a.txt', 'sub/'], cat: async () => 'hello' }
++
++async function runMembrane(body, deadlineMs = 2000) {
++  const src = `class Js extends JsProgram { async run() { ${body} } }`
++  const handle = law.run(api, deadlineMs, Date.now() + 60_000, BASE, src)
++  try {
++    const json = await handle.programPromise
++    if (typeof json === 'string' && json.includes('__jsProgramFailed')) return { ok: false, json: JSON.parse(json) }
++    return { ok: true, value: JSON.parse(json) }
++  } catch (e) { return { ok: false, err: String(e && e.message || e) } }
++}
++
++const PROC = `const isProc = (p) => !!(p && typeof p.pid === 'number' && typeof p.getBuiltinModule === 'function');`
++const patchHas = `${PROC}
++  let leaked = false;
++  const original = WeakMap.prototype.has;
++  WeakMap.prototype.has = function (key) {
++    try { const p = key && key.constructor && key.constructor.constructor('return process')(); if (isProc(p)) leaked = true; } catch (_) {}
++    return original.call(this, key);
++  };
++  try { await this.ls('.'); } finally { WeakMap.prototype.has = original; }
++  return { leaked };`
++const patchSet = `${PROC}
++  let leaked = false;
++  const original = WeakMap.prototype.set;
++  WeakMap.prototype.set = function (key, value) {
++    try { const p = key && key.constructor && key.constructor.constructor('return process')(); if (isProc(p)) leaked = true; } catch (_) {}
++    return original.call(this, key, value);
++  };
++  try { await this.ls('.'); } finally { WeakMap.prototype.set = original; }
++  return { leaked };`
++
++test('SPEC[sandbox-003] membrane: patched WeakMap.prototype.has cannot observe a host value', async () => {
++  const r = await runMembrane(patchHas)
++  assert.equal(r.ok, true, JSON.stringify(r))
++  assert.equal(r.value.leaked, false)
++})
++
++test('SPEC[sandbox-003] membrane: patched WeakMap.prototype.set cannot observe a host value', async () => {
++  const r = await runMembrane(patchSet)
++  assert.equal(r.ok, true, JSON.stringify(r))
++  assert.equal(r.value.leaked, false)
++})
++
++test('SPEC[sandbox-003] membrane still returns normal ls data after intrinsic churn', async () => {
++  const r = await runMembrane(`const o = WeakMap.prototype.has; WeakMap.prototype.has = o; return { entries: await this.ls('.') };`)
++  assert.equal(r.ok, true, JSON.stringify(r))
++  assert.deepEqual(r.value.entries, ['a.txt', 'sub/'])
++})
+diff --git a/src/sandbox/tests/004.test.mjs b/src/sandbox/tests/004.test.mjs
+new file mode 100644
+index 0000000..716aca4
+--- /dev/null
++++ b/src/sandbox/tests/004.test.mjs
+@@ -0,0 +1,58 @@
++import test from 'node:test'
++import assert from 'node:assert/strict'
++import { Sandbox } from './support.mjs'
++
++const base = 'class JsProgram { constructor(api) { this.api = api; } }'
++const run = async (api, body) => {
++  const source = `class Js extends JsProgram { async run() { ${body} } }`
++  return JSON.parse(await Sandbox().run(api, 1000, Date.now() + 2000, base, source).programPromise)
++}
++
++test('SPEC[sandbox-004] host method receivers retain their own instance', async () => {
++  const api = { value: 42, read() { return this.value } }
++  assert.deepEqual(await run(api, 'return { value: this.api.read() };'), { value: 42 })
++})
++
++test('SPEC[sandbox-004] a host can construct a program class and await its callbacks', async () => {
++  const observations = []
++  const api = {
++    async call(Callable) {
++      const instance = new Callable()
++      const first = await instance.next({ root: '/fixture', step: 0 })
++      const accepted = await instance.watch({ stdout: 'ready', step: 1 })
++      observations.push(first, accepted)
++      return { first, accepted }
++    },
++  }
++  const result = await run(api, `
++    class Work {
++      async next(input) { return { command: input.root, step: input.step }; }
++      async watch(input) { return input.stdout === 'ready'; }
++    }
++    return await this.api.call(Work);
++  `)
++  assert.deepEqual(result, { first: { command: '/fixture', step: 0 }, accepted: true })
++  assert.deepEqual(observations, [{ command: '/fixture', step: 0 }, true])
++})
++
++test('SPEC[sandbox-004] typed host failures retain the minimum output budget', async () => {
++  const failure = Object.assign(new Error('output budget is too small'), {
++    __jsFailure: { code: 'CALL_OUTPUT_BUDGET_TOO_SMALL', reason: 'output budget is too small', minimumOutputBudgetBytes: 4096 },
++  })
++  const result = await run({ read() { throw failure } }, 'return this.api.read();')
++  assert.deepEqual(result, {
++    __jsHostFailed: true,
++    code: 'CALL_OUTPUT_BUDGET_TOO_SMALL',
++    reason: 'output budget is too small',
++    minimumOutputBudgetBytes: 4096,
++  })
++})
++
++test('SPEC[sandbox-004] the public runner has no unisolated alternate entry', () => {
++  assert.equal('runNaive' in Sandbox(), false)
++})
++
++test('SPEC[sandbox-004] host callback invocation preserves the supplied receiver', async () => {
++  const api = { call(callback) { return callback.call({ value: 41 }, 1) } }
++  assert.deepEqual(await run(api, 'return { value: this.api.call(function (step) { return this.value + step; }) };'), { value: 42 })
++})
+diff --git a/src/sandbox/tests/005.test.mjs b/src/sandbox/tests/005.test.mjs
+new file mode 100644
+index 0000000..59396fa
+--- /dev/null
++++ b/src/sandbox/tests/005.test.mjs
+@@ -0,0 +1,41 @@
++import test from 'node:test'
++import assert from 'node:assert/strict'
++import { spawnSync } from 'node:child_process'
++import { fileURLToPath } from 'node:url'
++
++const entry = fileURLToPath(new URL('../../../dist/sandbox/Sandbox.js', import.meta.url))
++const methods = {
++  constructor: 'constructor() { while (true) {} } next() { return 1; }',
++  getter: 'get next() { while (true) {} }',
++  method: 'next() { while (true) {} }',
++  'return getter': "next() { return Object.defineProperty({}, 'value', { enumerable: true, get() { while (true) {} } }); }",
++  'async method': 'async next() { await Promise.resolve(); while (true) {} }',
++}
++
++for (const [kind, methodsSource] of Object.entries(methods)) {
++  test(`SPEC[sandbox-005] a host-invoked Callable ${kind} remains under its deadline`, () => {
++    const script = `
++      import { Sandbox } from ${JSON.stringify(entry)};
++      const api = { async call(Callable) {
++        await new Promise(resolve => setImmediate(resolve));
++        return await new Callable().next({ step: 0 });
++      } };
++      const handle = Sandbox().run(api, 100, Date.now() + 500,
++        'class JsProgram { constructor(api) { this.api = api; } }',
++        ${JSON.stringify(`class Js extends JsProgram { async run() { class Work { ${methodsSource} } return await this.api.call(Work); } }`)});
++      try {
++        const result = JSON.parse(await handle.programPromise);
++        console.log(JSON.stringify(result));
++        process.exitCode = result.__jsHostFailed === true && result.code === 'PROGRAM_TIMEOUT' ? 0 : 3;
++      } catch (error) {
++        console.log(JSON.stringify({ code: error.code, message: error.message }));
++        process.exitCode = error.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT' ? 0 : 4;
++      }
++    `
++    const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
++      encoding: 'utf8', timeout: 2500, killSignal: 'SIGKILL',
++    })
++    assert.equal(child.status, 0, JSON.stringify({ error: child.error?.code, signal: child.signal, stdout: child.stdout, stderr: child.stderr }))
++    assert.equal(child.signal, null, 'the runner must classify the timeout before external cleanup')
++  })
++}
+diff --git a/src/sandbox/tests/support.mjs b/src/sandbox/tests/support.mjs
+new file mode 100644
+index 0000000..66709c7
+--- /dev/null
++++ b/src/sandbox/tests/support.mjs
+@@ -0,0 +1,2 @@
++import { Sandbox } from '../../../dist/sandbox/Sandbox.js'
++export { Sandbox }

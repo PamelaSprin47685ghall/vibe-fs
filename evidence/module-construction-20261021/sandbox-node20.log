@@ -1,0 +1,110 @@
+TAP version 13
+# Subtest: SPEC[sandbox-001] naive runner: returned array constructor reaches host process (base-red)
+ok 1 - SPEC[sandbox-001] naive runner: returned array constructor reaches host process (base-red)
+  ---
+  duration_ms: 1.180458
+  ...
+# Subtest: SPEC[sandbox-001] membrane denies escape via returned array constructor
+ok 2 - SPEC[sandbox-001] membrane denies escape via returned array constructor
+  ---
+  duration_ms: 2.276459
+  ...
+# Subtest: SPEC[sandbox-001] membrane denies escape via global api / globalThis / missing deadline ref
+ok 3 - SPEC[sandbox-001] membrane denies escape via global api / globalThis / missing deadline ref
+  ---
+  duration_ms: 2.794667
+  ...
+# Subtest: SPEC[sandbox-001] membrane cannot write outside the workspace via escape
+ok 4 - SPEC[sandbox-001] membrane cannot write outside the workspace via escape
+  ---
+  duration_ms: 1.904
+  ...
+# Subtest: SPEC[sandbox-001] membrane still returns normal ls data
+ok 5 - SPEC[sandbox-001] membrane still returns normal ls data
+  ---
+  duration_ms: 1.485
+  ...
+# Subtest: SPEC[sandbox-002] sync infinite loop dies under the vm timeout
+ok 6 - SPEC[sandbox-002] sync infinite loop dies under the vm timeout
+  ---
+  duration_ms: 203.329917
+  ...
+# Subtest: SPEC[sandbox-002] post-await sync loop dies under the driven timeout
+ok 7 - SPEC[sandbox-002] post-await sync loop dies under the driven timeout
+  ---
+  duration_ms: 249.035333
+  ...
+# Subtest: SPEC[sandbox-003] membrane: patched WeakMap.prototype.has cannot observe a host value
+ok 8 - SPEC[sandbox-003] membrane: patched WeakMap.prototype.has cannot observe a host value
+  ---
+  duration_ms: 3.275208
+  ...
+# Subtest: SPEC[sandbox-003] membrane: patched WeakMap.prototype.set cannot observe a host value
+ok 9 - SPEC[sandbox-003] membrane: patched WeakMap.prototype.set cannot observe a host value
+  ---
+  duration_ms: 1.030333
+  ...
+# Subtest: SPEC[sandbox-003] membrane still returns normal ls data after intrinsic churn
+ok 10 - SPEC[sandbox-003] membrane still returns normal ls data after intrinsic churn
+  ---
+  duration_ms: 1.424625
+  ...
+# Subtest: SPEC[sandbox-004] host method receivers retain their own instance
+ok 11 - SPEC[sandbox-004] host method receivers retain their own instance
+  ---
+  duration_ms: 2.732542
+  ...
+# Subtest: SPEC[sandbox-004] a host can construct a program class and await its callbacks
+ok 12 - SPEC[sandbox-004] a host can construct a program class and await its callbacks
+  ---
+  duration_ms: 3.32
+  ...
+# Subtest: SPEC[sandbox-004] typed host failures retain the minimum output budget
+ok 13 - SPEC[sandbox-004] typed host failures retain the minimum output budget
+  ---
+  duration_ms: 0.941709
+  ...
+# Subtest: SPEC[sandbox-004] the public runner has no unisolated alternate entry
+ok 14 - SPEC[sandbox-004] the public runner has no unisolated alternate entry
+  ---
+  duration_ms: 0.083792
+  ...
+# Subtest: SPEC[sandbox-004] host callback invocation preserves the supplied receiver
+ok 15 - SPEC[sandbox-004] host callback invocation preserves the supplied receiver
+  ---
+  duration_ms: 1.009458
+  ...
+# Subtest: SPEC[sandbox-005] a host-invoked Callable constructor remains under its deadline
+ok 16 - SPEC[sandbox-005] a host-invoked Callable constructor remains under its deadline
+  ---
+  duration_ms: 152.226916
+  ...
+# Subtest: SPEC[sandbox-005] a host-invoked Callable getter remains under its deadline
+ok 17 - SPEC[sandbox-005] a host-invoked Callable getter remains under its deadline
+  ---
+  duration_ms: 154.274708
+  ...
+# Subtest: SPEC[sandbox-005] a host-invoked Callable method remains under its deadline
+ok 18 - SPEC[sandbox-005] a host-invoked Callable method remains under its deadline
+  ---
+  duration_ms: 151.889542
+  ...
+# Subtest: SPEC[sandbox-005] a host-invoked Callable return getter remains under its deadline
+ok 19 - SPEC[sandbox-005] a host-invoked Callable return getter remains under its deadline
+  ---
+  duration_ms: 149.547333
+  ...
+# Subtest: SPEC[sandbox-005] a host-invoked Callable async method remains under its deadline
+ok 20 - SPEC[sandbox-005] a host-invoked Callable async method remains under its deadline
+  ---
+  duration_ms: 149.438709
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 831.23625

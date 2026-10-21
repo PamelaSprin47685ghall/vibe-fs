@@ -10,7 +10,7 @@
 - 上游库最新只读参照：`202a41ab39460980ba053e55a9b3780bbaf411ca`（0.40.0，36入口）；dispatch尚未在上述主仓完成接线，单列待交接。
 - 原运行目录`/Users/yuanxi/Workwork/vibe-fs`保持`8db33b3429a70d5cdbea30e393363666b3649573`，既有stash保留。施工不等于部署。
 
-上游同事仍持有CUT-10/11/12/17/25的后续编辑面。本地只对已固定源码做隔离修正，不修改同事的工作树或向其发消息。公开接口、包元数据、锁、gitlink、构建图与最终集成由root串行处理。
+固定上游快照将CUT-10/11/12/17/25标为DOING，但这不是实时同事状态；后续核对发现其中已有完成子范围，不能由整卡状态阻止独立接收。本地只对已固定源码做隔离修正，不修改同事的工作树或向其发消息。公开接口、包元数据、锁、gitlink、构建图与最终集成由root串行处理。
 
 ## 工作包和验收
 
@@ -59,6 +59,44 @@ MF-02A与MF-03A的统一候选经gen95正式入口验证：durable-events/005、
 
 续接修复仅承认完整规范字节一致的series后缀/legacy前缀；重复旧ID、同ID异字节、分叉和半行继续拒绝。跨段、Unicode、独立冷读与二次恢复已验；完整native write/fsync故障切点矩阵仍未完成。
 
+### 第二组候选
+
+库`3db7b439283779f6037244d57cf05e6ec3e7ab31`已普通推自有main并核对远端确切SHA。18模块同源构建，prefix/compression/delivery在Node22与Bun各73/0，独立反证各6/0；完整tarball的18个JS/types入口与安装后字节一致，公开导入及strict TypeScript正反消费通过。临时包不入Git。
+
+主仓gen96与原检查器/债务基线通过。目标正式集合为：prefix/Host/存储6文件48/0；PTY cwd与wait 3文件42/0；compression/delivery 2文件23/0；冷journal/Join 2文件16/0。均零skip/TODO、排空并回收通过。冷journal重开不等于真实provider/OS全链重启；后续完整发行及新候选的精确结果另记。
+
+首组完整CI在`8fa662c9e`因ProcessEventLog四处控制流嵌套失败；本轮已提取窄helper并在gen96重建后验证续接48项集合，未更改检查器或基线。PTY相邻003为59/1：旧probe把尚未创建的control目录当cwd，新拒绝合同正确阻止启动，夹具需改用独立已存在workspace；原失败保留，不能记全绿。
+
+quarantine当前只有Integrator一个消费者，本地已有exact FailedEventId guard。固定上游纯包加consumer实测会被旧cut解除新故障；本轮补021独立OS冷重放保护，不为模块数量接弱wrapper。wait只删除proof Surface对caller deadline的计数字段写入；生产Await行为与库相同，保留现状。
+
+隔离sandbox又复现Host异步调用Callable.next中的死循环在Node22/Bun均需外部SIGKILL（2500ms），所以Node基础14/0不构成完整期限证书。Bun文档的afterEvaluate声明与本机1.3.14实测不一致；候选继续隔离，不能通过skip或降低旧Host功能来接收。
+
 先反例、合同、实现，再独立产物与主仓组合。程序代码手工局部编辑；只用Fable正式构建入口，不运行dotnet build。库提交先验证并普通推自有main、核对可获取SHA，再更新主仓确切gitlink；主仓按包普通推master，禁止force push。临时tarball不入Git。
+
+### 第三组候选与交叉复核
+
+库`40434d4`接收Casebook纯索引规则，`c4bc2ca`接收retention，均已普通推自有main并核对确切SHA，最终0.9.2为20个公开入口。Casebook保留160个旧hash向量，修正截断Unicode造成的UTF8 locator/fetch断链；主仓继续持有实际Case、容量、dirty/frozen状态和int64 epoch。retention只接UTC日/活动时间与尾行分类；数值ObservedAt不再经Date.parse强转，无法解释的尾行仍回退producer mtime，保留原磁盘反扫、跨段、锁与canonical拒绝。
+
+durable-events/005新增六个实际write/fsync/unlink故障切点：原生调用成功后通过IPC停在真实worker，父进程核对锁owner再SIGKILL；独立OS进程冷读、恢复及二次幂等，合计七次真实强杀。public writerEventIds DTO走完整readStreams，不消费Fable内部tuple。证据只支持这些进程崩溃切点，不支持断电、任意半字节写入、多writer完整收敛或GAP-151销项。
+
+交叉复核保留P2：Casebook既有32位hash碰撞可令第二locator取第一答案；合法legacy为series前缀时，旧legacy活动可能覆盖series的新活动；同inode历史等长重写与热cache差异；最新未处理prefix candidate可依次选择较旧观测；164KiB真实Git完整stdout因mixed spool安全围栏不可用。上游合流spool不能恢复丢失的通道，不能把它猜成stdout。readLatestTail虽为全文件异步扫描，但当前零生产调用，64MiB温缓存约14.5ms只是P3潜在成本，不改为热路径优化。小边界暂记，不扩大本批。
+
+degeneration递推/阈值与主仓同构，生产token和包络仍来自仓库唯一源；ablation纯DAG规则亦同构，主仓还须持有registry/profile/环境与借用面。本轮不为模块数增加适配。另已复现无效profile加载失败后空registry缺项默认Active的真实放行链；已落实已映射feature缺项拒绝的窄修，保住无配置全Active及未映射tag行为，待最终验收。
+
+### 发行入口与门禁记录
+
+release-02在755/756文件排空时撞本机300秒兜底，没有总通过数；016并非卡死，184次工具启动均观察到退出/排空。曾尝试拆分016，但requirement-system/018要求同条款在单文件，release-03如实报4519/2，760/760排空；拆分已撤回，结构门禁未放松。改为自动发现时按静态文件体积优先调度，显式文件选择保序；这只是启发，不把体积或调度当作因果推进。
+
+OpenCode 023改用owned有限物理等待，原5秒普通静默不变，gen98正式2/0、1/1排空回收，真实canary约5.5秒。npm版本探测补现有5秒截止；持有CLI反例红转绿、正常版本断言保留。delegation/031迟到完成夹具在取消前保存真实child，禁止给null session伪造交付。
+
+release-04/gen101的格式、静态、构建通过；单元4521/0、757/757排空回收，219.3秒，另110 skip/277既有TODO由原政策单列。集成suite在38/40文件排空时达到本机300秒总兜底，022编译证明与016工具夹具仍活跃，没有总通过数；残留组被回收但accepted=false，不能算通过。distribution子检查通过，harness为291/0。最终候选按`.github/workflows/ci.yml`原有CI环境（静默30000ms、总兜底900000ms、WXS_ACCEPT_TODO=1）重验，预算表与工作流不因本轮改变。原本机失败保留。
+
+两项长时物理验收运行中，尚未验收：固定3db7包的Node22/Bun各2h Process Capture接2h Supervised Capture；gen100隔离复制产物的真实Bun PTY持续2h，完成后验证EOF、Unknown与恢复回收。后续c4bc2ca未改process/supervision/time/native源码或构建脚本；不能用监测快照或一次存活冒充长测通过。
+
+本组原始收据、交叉审查、失败尾部及完整日志摘要见[补充收据](../../evidence/module-construction-20261021/supplemental-receipt.json)。其中producer收据的未推送/待接线字段保留交接时原状，由root收据另记之后的确切发布和集成，不能把不同时刻混作同一验收。
+
+release-05/gen102按原有CI配置完整通过，849.3秒：单元4524/0、757/757排空；集成suite725/0、40/40排空，distribution子检查及harness291/0，e2e与最终包验证通过。既有unit 110 skip/277 TODO、integration 7 skip/7 TODO单列，不算已验事实。消融四条需求另以原5秒静默取得22/0/1既有integration skip、4/4排空回收；独立真实ToolRegistry在解析错误body之前拒绝无效profile。细节见[完整发行收据](../../evidence/module-construction-20261021/gen102-release-acceptance.json)。这不代表部署、新上游可合并或长测完成。
+
+MF-05已转交接前准备：CUT-10的routing/permit/capacity/queue存在固定已合入子范围，borrowing另列；CUT-11库dispatch先行不等于固定主仓已接；CUT-12没有独立execution-session入口，现有session实为Ownership；CUT-17有完成子范围可独立审；CUT-25还余完整基类/generator。permit下一子包可完整移走旧许可lifecycle owner，但上游float桥会缩窄本地Int64 credit/fence，须先补exact bigint合同、独立包及主仓邻域证据，不能只为入口数量迁移。
 
 各包完成追加实际证据和剩余范围。批次末做统一CI及PR状态核对；部署另列。本轮新上游差异不自动扩大固定输入，也不关闭历史GAP或把局部修复算作全系统验收。

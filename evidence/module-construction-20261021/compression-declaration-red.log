@@ -1,0 +1,33 @@
+TAP version 13
+# Subtest: WHAT[obligation-ledger-005] malformed flat view declarations never establish a checkpoint
+not ok 1 - WHAT[obligation-ledger-005] malformed flat view declarations never establish a checkpoint
+  ---
+  duration_ms: 611.027708
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/tier-gate.mjs:26:12'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    5 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 5
+  operator: 'strictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/obligation-ledger/tests/005.test.mjs:137:12
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/obligation-ledger/tests/005.test.mjs:119:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 756.198083

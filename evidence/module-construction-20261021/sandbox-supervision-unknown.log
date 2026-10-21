@@ -1,0 +1,28 @@
+node:internal/modules/run_main:122
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ {
++   code: 'UNKNOWN_TARGET_EXIT',
++   message: 'Supervisor ended without a target exit receipt',
++   operation: 'supervision'
++ }
+- null
+
+    at file:///private/tmp/vibe-fs-mf01-sync-transport-probe.mjs:46:18
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    operation: 'supervision',
+    code: 'UNKNOWN_TARGET_EXIT',
+    message: 'Supervisor ended without a target exit receipt'
+  },
+  expected: null,
+  operator: 'strictEqual'
+}
+
+Node.js v22.13.0

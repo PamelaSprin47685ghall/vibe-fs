@@ -1,0 +1,114 @@
+TAP version 13
+# Subtest: WHAT[feature-ablation-004] every declared profile loads its configured modes through the public surface
+ok 1 - WHAT[feature-ablation-004] every declared profile loads its configured modes through the public surface
+  ---
+  duration_ms: 191.559833
+  ...
+# Subtest: WHAT[feature-ablation-004] a valid explicit mode overrides the selected profile
+ok 2 - WHAT[feature-ablation-004] a valid explicit mode overrides the selected profile
+  ---
+  duration_ms: 2.927166
+  ...
+# Subtest: WHAT[feature-ablation-004] an override cannot bypass DAG validation
+not ok 3 - WHAT[feature-ablation-004] an override cannot bypass DAG validation
+  ---
+  duration_ms: 7.393167
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:64:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    execution: fork
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    assertMappedAdmission (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:14:12)
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:73:5
+    withAblationEnv (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/support/ablation-fixture.mjs:16:12)
+    withEnv (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:33:12)
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:65:3)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+  ...
+# Subtest: WHAT[feature-ablation-004] an unknown profile is rejected
+not ok 4 - WHAT[feature-ablation-004] an unknown profile is rejected
+  ---
+  duration_ms: 4.932833
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:77:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    execution: fork
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    assertMappedAdmission (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:14:12)
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:83:5
+    withAblationEnv (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/support/ablation-fixture.mjs:16:12)
+    withEnv (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:33:12)
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:78:3)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+  ...
+# Subtest: WHAT[feature-ablation-004] an invalid configured mode leaves every mapped gate denied after rejection
+not ok 5 - WHAT[feature-ablation-004] an invalid configured mode leaves every mapped gate denied after rejection
+  ---
+  duration_ms: 2.214709
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:87:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    execution: fork
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    assertMappedAdmission (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:14:12)
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:91:5
+    withAblationEnv (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/support/ablation-fixture.mjs:16:12)
+    withEnv (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:33:12)
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/feature-ablation/tests/004.test.mjs:88:3)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+  ...
+# Subtest: WHAT[feature-ablation-004] no configuration explicitly activates all known nodes and gates
+ok 6 - WHAT[feature-ablation-004] no configuration explicitly activates all known nodes and gates
+  ---
+  duration_ms: 97.3555
+  ...
+# Subtest: WHAT[feature-ablation-004] an explicitly supplied valid registry controls gates without reading invalid ambient configuration
+ok 7 - WHAT[feature-ablation-004] an explicitly supplied valid registry controls gates without reading invalid ambient configuration
+  ---
+  duration_ms: 1.293791
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 4
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 388.829083
