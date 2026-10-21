@@ -120,7 +120,7 @@ module HostSignalBootstrap =
                 let recovery =
                     SessionRecoveryHost(
                         durable,
-                        snapshot,
+                        TranscriptPort.HostTranscriptPort(snapshot),
                         scope.Recovery,
                         None,
                         Some(fun sessionId outcome -> eventPort.NotifyTerminal sessionId outcome |> ignore)

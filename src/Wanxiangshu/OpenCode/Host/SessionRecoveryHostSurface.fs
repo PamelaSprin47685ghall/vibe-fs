@@ -17,6 +17,8 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Host.Ports
+
 
 /// JS semantic boundary over the compiled session recovery host.
 ///
@@ -162,11 +164,11 @@ module SessionRecoveryHostSurface =
                 let journalHandle: JournalHandle = opened?journal
                 let scope = PluginRecoveryScope(None)
 
-                let snapshot =
-                    { new ISessionSnapshotPort with
-                        member _.GetMessages _ = Task.FromResult(Ok []) }
+                let transcript =
+                    { new ITranscriptPort with
+                        member _.Messages _ = Task.FromResult(Ok []) }
 
-                let host = SessionRecoveryHost(journalHandle.Journal, snapshot, scope, port, None)
+                let host = SessionRecoveryHost(journalHandle.Journal, transcript, scope, port, None)
 
                 let plainGate =
                     TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -462,11 +464,11 @@ module SessionRecoveryHostSurface =
                 | Ok journal ->
                     let scope = PluginRecoveryScope(None)
 
-                    let snapshot =
-                        { new ISessionSnapshotPort with
-                            member _.GetMessages _ = Task.FromResult(Ok []) }
+                    let transcript =
+                        { new ITranscriptPort with
+                            member _.Messages _ = Task.FromResult(Ok []) }
 
-                    let host = SessionRecoveryHost(journal, snapshot, scope, port, None)
+                    let host = SessionRecoveryHost(journal, transcript, scope, port, None)
 
                     return
                         { Journal = JournalHandle.Create(journal, None)

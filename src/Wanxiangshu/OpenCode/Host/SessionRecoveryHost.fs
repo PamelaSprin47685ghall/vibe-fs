@@ -14,6 +14,8 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Host.Ports
+
 
 /// Optional Host capability bound to exact already-accepted physical material.
 /// Absence is not permission to create a replacement PromptClaim or resend text.
@@ -23,7 +25,7 @@ type ExactAcceptedMessageRecoveryPort =
 type SessionRecoveryHost
     (
         journal: AgentJournal,
-        snapshot: ISessionSnapshotPort,
+        transcript: ITranscriptPort,
         scope: PluginRecoveryScope,
         acceptedMessageRecovery: ExactAcceptedMessageRecoveryPort option,
         notifyTerminal: (SessionId -> TerminalOutcome -> unit) option
@@ -86,26 +88,27 @@ type SessionRecoveryHost
             |> Option.map (fun key -> ChatExecutionProjection.byKey key projection |> Option.toList)
             |> Option.defaultWith (fun () -> ChatExecutionProjection.current projection)
 
-    let classifyProviderSnapshot (state: ChatExecutionState) (messages: SessionMessage list) =
+    let classifyProviderSnapshot (state: ChatExecutionState) (messages: TranscriptMessage list) =
         let matches =
             messages
             |> List.filter (fun message ->
-                message.Role = "assistant"
-                && message.ParentId = Some(PhysicalUserMessageId.value state.key.PhysicalUserMessageId))
+                message.Role = TranscriptRole.Assistant
+                && message.Parent
+                   = Some(TranscriptMessageAddress.create(PhysicalUserMessageId.value state.key.PhysicalUserMessageId)))
 
         match matches, state.startedEvidence with
         | [], _ -> ProviderPhysicalObservation.ProviderAbsent state.key
         | [ message ], Some started when
-            message.Id = ProviderRunIdentity.value started.ProviderRun
+            TranscriptMessageAddress.value message.Id = ProviderRunIdentity.value started.ProviderRun
             && not message.Completed
             ->
             ProviderPhysicalObservation.ProviderAlive started
         // ProviderPhysicalObservation.ReceiptAmbiguous -> fail closed to manual intervention
         | _ -> ProviderPhysicalObservation.ReceiptAmbiguous
 
-    let providerFromSnapshot (state: ChatExecutionState) =
+    let providerFromTranscript (state: ChatExecutionState) =
         task {
-            match! snapshot.GetMessages state.key.SessionId with
+            match! transcript.Messages state.key.SessionId with
             | Error _ -> return ProviderPhysicalObservation.ReceiptMissing
             | Ok messages -> return classifyProviderSnapshot state messages
         }
@@ -118,7 +121,7 @@ type SessionRecoveryHost
             Task.FromResult(ProviderPhysicalObservation.ProviderTerminal(started, disposition))
         | ChatExecutionRecoveryLifecycleEvent.SessionDeleted _ ->
             Task.FromResult(ProviderPhysicalObservation.ProviderAbsent state.key)
-        | _ -> providerFromSnapshot state
+        | _ -> providerFromTranscript state
 
     let lifecycleCancellation (event: ChatExecutionRecoveryLifecycleEvent) =
         match event with
