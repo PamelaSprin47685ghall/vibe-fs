@@ -464,6 +464,14 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Repository/Knowledge/Casebook/OpenCode/BookkeeperToolSurface.js',
+    owner: 'knowledge-reuse',
+    laws: ['KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-010'],
+    source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/BookkeeperToolSurface.fs',
+    representation: 'json',
+    kind: 'resource',
+  },
+  {
     module: 'Repository/Knowledge/Casebook/LifecycleSurface.js',
     owner: 'knowledge-reuse',
     laws: ['KNOWLEDGE-REUSE-006', 'KNOWLEDGE-REUSE-010', 'KNOWLEDGE-REUSE-013'],

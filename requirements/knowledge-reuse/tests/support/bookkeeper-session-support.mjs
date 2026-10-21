@@ -1,3 +1,4 @@
+import * as bookkeeperTool from '../../../../dist/Repository/Knowledge/Casebook/OpenCode/BookkeeperToolSurface.js' // CUT-40: tool-binding entries split from BookkeeperSurface
 import assert from 'node:assert/strict'
 import * as casebook from '../../../../dist/Repository/Knowledge/Casebook/Surface.js'
 import * as bookkeeper from '../../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
@@ -34,7 +35,7 @@ export const scriptedBookkeeperPort = () => {
       const sid = bookkeeper.sessionValue(childSession)
       const tx = bookkeeper.txIdFor(sid)
       assert.notEqual(tx, '', 'SendPrompt must run against a bound Bookkeeper tx')
-      const out = await bookkeeper.runProgram(
+      const out = await bookkeeperTool.runProgram(
         sid,
         `class Js extends JsProgram { async run() { this.setQuestion(${JSON.stringify(CANONICAL_Q)}); this.setAnswer(${JSON.stringify(CANONICAL_A)}); return { changed: true }; } }`,
       )

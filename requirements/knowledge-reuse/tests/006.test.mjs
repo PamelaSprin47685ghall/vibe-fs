@@ -1,3 +1,4 @@
+import * as bookkeeperTool from '../../../dist/Repository/Knowledge/Casebook/OpenCode/BookkeeperToolSurface.js' // CUT-40: tool-binding entries split from BookkeeperSurface
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as casebookState from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
@@ -173,7 +174,7 @@ const scriptedBookkeeperPort = () => {
       const sid = bookkeeper.sessionValue(childSession)
       const tx = bookkeeper.txIdFor(sid)
       assert.notEqual(tx, '', 'SendPrompt must run against a bound Bookkeeper tx')
-      const out = await bookkeeper.runProgram(
+      const out = await bookkeeperTool.runProgram(
         sid,
         `class Js extends JsProgram { async run() { this.setQuestion(${JSON.stringify(CANONICAL_Q)}); this.setAnswer(${JSON.stringify(CANONICAL_A)}); return { changed: true }; } }`,
       )
@@ -320,7 +321,7 @@ const fakeSchema = {
 const factory = { tool: { schema: fakeSchema } }
 
 test('WHAT[knowledge-reuse-006] CASE006_bookkeeper_provider_contract_is_one_program', () => {
-  const tool = bookkeeper.contract(factory)
+  const tool = bookkeeperTool.contract(factory)
   assert.equal(tool.name, 'todowrite-for-bookkeeper')
   assert.deepEqual(tool.argumentNames, ['program'])
   assert.match(tool.description, /one atomic JavaScript transformation|用一次原子的 JavaScript transformation/i)
@@ -345,7 +346,7 @@ const fakeSchema = {
   enum: (values) => schemaNode('enum', { values }),
 }
 const factory = { tool: { schema: fakeSchema } }
-const run = (sessionId, program) => bookkeeper.runProgram(sessionId, program)
+const run = (sessionId, program) => bookkeeperTool.runProgram(sessionId, program)
 const current = (txId) => {
   const staged = bookkeeper.snapshot(txId)
   assert.equal(staged.ok, true)
@@ -354,7 +355,7 @@ const current = (txId) => {
 const currentCase = (question, answer) => [question, answer]
 
 test('WHAT[knowledge-reuse-006] js_bookkeeper_surface_is_program_only_and_has_case_sdk', () => {
-  const tool = bookkeeper.contract(factory)
+  const tool = bookkeeperTool.contract(factory)
   assert.equal(tool.name, 'todowrite-for-bookkeeper')
   assert.deepEqual(tool.argumentNames, ['program'])
   assert.match(tool.description, /question\(matches = \[\]\)/)
@@ -555,7 +556,7 @@ test('WHAT[knowledge-reuse-006] successful zero-setter maintenance advances the 
       prompts.push(prompt)
       const session = bookkeeper.sessionValue(child)
       assert.notEqual(bookkeeper.txIdFor(session), '', 'the real runtime binds the transaction before dispatch')
-      const output = await bookkeeper.runProgram(session, `class Js extends JsProgram {
+      const output = await bookkeeperTool.runProgram(session, `class Js extends JsProgram {
         async run() {
           return { changed: false, question: this.question().text(), answer: this.answer().text() };
         }
@@ -642,7 +643,7 @@ test('WHAT[knowledge-reuse-006] duplicate answer setter rolls back both staged f
   bookkeeper.beginTransaction(tx, 'Q', 'A')
   bookkeeper.bindSession(session, tx, 'owner')
   try {
-    const result = await bookkeeper.runProgram(session, 'class Js extends JsProgram { async run() { this.setQuestion("changed Q"); this.setAnswer("one"); this.setAnswer("two"); } }')
+    const result = await bookkeeperTool.runProgram(session, 'class Js extends JsProgram { async run() { this.setQuestion("changed Q"); this.setAnswer("one"); this.setAnswer("two"); } }')
     assert.match(String(result), /setAnswer/)
     assert.deepEqual(bookkeeper.snapshot(tx).value, ['Q', 'A'])
   } finally { bookkeeper.abort(tx); bookkeeper.resetRuntime() }

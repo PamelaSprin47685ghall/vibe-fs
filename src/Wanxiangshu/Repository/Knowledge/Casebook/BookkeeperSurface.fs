@@ -13,7 +13,6 @@ open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 module CasebookBookkeeperSurface =
 
@@ -185,32 +184,6 @@ module CasebookBookkeeperSurface =
 
     let take (txId: string) : obj =
         BookkeeperStaging.take txId |> stagedToJs
-
-    let runProgram (sessionId: string) (program: string) : Task<string> =
-        let args =
-            Wanxiangshu.OpenCode.HostToolArguments(createObj [ "program" ==> program ])
-
-        let context: Wanxiangshu.OpenCode.HostToolContext =
-            { SessionId = sessionId
-              Agent = None
-              ToolCallId = None
-              ProviderRunId = None
-              PromptText = None
-              AttachAbort = fun _ -> fun () -> () }
-
-        task {
-            let! result = JsBookkeeperTool.execute args context
-            return ToolResultBound.bound result
-        }
-
-    let contract (toolModule: obj) : obj =
-        let spec =
-            JsBookkeeperTool.spec (Wanxiangshu.OpenCode.ToolHostCodec.factory toolModule)
-
-        box
-            {| name = spec.Name
-               description = spec.Description
-               argumentNames = spec.Arguments |> List.map fst |> List.toArray |}
 
     let sessionId (value: string) : obj = box (SessionId.create value)
 
