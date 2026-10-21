@@ -1044,8 +1044,10 @@ Mission/Work/RelayProjection.fs
 Mission/Work/OpenCode/NarrativeTransform.fsi
 Mission/Work/OpenCode/NarrativeTransform.fs
 
-Execution/Session/OpenCode/HorizonCalibration.fsi
-Execution/Session/OpenCode/HorizonCalibration.fs
+Execution/Session/HorizonCalibration.fsi
+Execution/Session/HorizonCalibration.fs
+Execution/Session/HorizonRoster.fsi
+Execution/Session/HorizonRoster.fs
 Execution/Session/OpenCode/HorizonTool.fsi
 Execution/Session/OpenCode/HorizonTool.fs
 Execution/Session/OpenCode/HorizonSurface.fsi

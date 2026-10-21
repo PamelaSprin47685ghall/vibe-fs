@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Execution.Session.OpenCode
+namespace Wanxiangshu.Execution.Session
 
 /// Horizon calibration: the four numbers a caller prices a participant with.
 [<RequireQualifiedAccess>]

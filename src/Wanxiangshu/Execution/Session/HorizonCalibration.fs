@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Execution.Session.OpenCode
+namespace Wanxiangshu.Execution.Session
 
 open Wanxiangshu.Participant.Provider
 

@@ -18,8 +18,10 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
-    <Compile Include="Execution/Session/OpenCode/HorizonCalibration.fsi"/>
-    <Compile Include="Execution/Session/OpenCode/HorizonCalibration.fs"/>
+    <Compile Include="Execution/Session/HorizonCalibration.fsi"/>
+    <Compile Include="Execution/Session/HorizonCalibration.fs"/>
+    <Compile Include="Execution/Session/HorizonRoster.fsi"/>
+    <Compile Include="Execution/Session/HorizonRoster.fs"/>
     <Compile Include="Execution/Session/OpenCode/HorizonTool.fsi"/>
     <Compile Include="Execution/Session/OpenCode/HorizonTool.fs"/>
     <Compile Include="Execution/Session/OpenCode/HorizonSurface.fsi"/>

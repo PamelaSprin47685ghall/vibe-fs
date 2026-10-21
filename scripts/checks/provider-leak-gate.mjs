@@ -18,6 +18,7 @@ const norm = (p) => p.replace(/\\/g, '/')
 export const PROVIDER_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs',
   'src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs',
+  'src/Wanxiangshu/Execution/Session/HorizonRoster.fs',
   'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs',
   'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs',
   'src/Wanxiangshu/Execution/Delegation/Fork/Command.fs',

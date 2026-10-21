@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Session.OpenCode
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 
@@ -21,9 +22,9 @@ module HorizonSurface =
 
         let statusPath =
             match status with
-            | "returned" -> HorizonTool.Path.Returned
-            | "abandoned" -> HorizonTool.Path.DidNotReturn
-            | _ -> HorizonTool.Path.StillAway
+            | "returned" -> HorizonRoster.Path.Returned
+            | "abandoned" -> HorizonRoster.Path.DidNotReturn
+            | _ -> HorizonRoster.Path.StillAway
 
         let workPath = text (value?work)
 
@@ -32,10 +33,10 @@ module HorizonSurface =
             | "latest" ->
                 ProviderProse.render
                     language
-                    HorizonTool.Path.LatestWork
+                    HorizonRoster.Path.LatestWork
                     (Map [ "label", label; "record", text (value?record) ])
-            | "unavailable" -> line language HorizonTool.Path.LatestWorkUnavailable label
-            | _ -> line language HorizonTool.Path.NoWorkYet label
+            | "unavailable" -> line language HorizonRoster.Path.LatestWorkUnavailable label
+            | _ -> line language HorizonRoster.Path.NoWorkYet label
 
         [ line language statusPath label; work ]
 
@@ -51,13 +52,13 @@ module HorizonSurface =
             |> List.sortBy (fun value -> text (value?ptyId))
             |> List.map (fun value ->
                 let label = text (value?command)
-                line language HorizonTool.Path.RemainsOpen label)
+                line language HorizonRoster.Path.RemainsOpen label)
 
         let lines = List.append agentLines ptyLines
 
         if List.isEmpty lines then
             ToolHostCodec.tomlObjectWithInstructions
-                (ProviderProse.instructionLines language HorizonTool.Path.EmptyRoster Map.empty)
+                (ProviderProse.instructionLines language HorizonRoster.Path.EmptyRoster Map.empty)
                 []
         else
             ToolHostCodec.tomlObjectWithInstructions lines []
@@ -66,7 +67,7 @@ module HorizonSurface =
         ToolHostCodec.tomlObjectWithInstructions
             [ ProviderProse.render
                   (ProviderLanguageBinding.readGlobalPreference ())
-                  HorizonTool.Path.UnavailableFromContext
+                  HorizonRoster.Path.UnavailableFromContext
                   Map.empty ]
             []
 
@@ -74,9 +75,9 @@ module HorizonSurface =
         ToolHostCodec.tomlObjectWithInstructions
             [ ProviderProse.render
                   (ProviderLanguageBinding.readGlobalPreference ())
-                  HorizonTool.Path.CannotBeSeen
+                  HorizonRoster.Path.CannotBeSeen
                   Map.empty ]
             []
 
     let description () : string =
-        ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) HorizonTool.Path.Description Map.empty
+        ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) HorizonRoster.Path.Description Map.empty
