@@ -7,10 +7,10 @@ open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Foundation
 
 /// Shared session-scoped projection-update algebra for the fold families
-/// (formerly private helpers of `Fold`). `prefixOutcome` is shared by the
-/// Context family and the Cognition envelope branch; the `apply*` appliers at
-/// the end assemble the single-field fact families whose decision lives in the
-/// owning domain fold.
+/// (formerly private helpers of `Fold`). `prefixOutcome` serves the Context
+/// family bridge (the legacy Cognition branch is a fold no-op tombstone); the
+/// `apply*` appliers at the end assemble the single-field fact families whose
+/// decision lives in the owning domain fold.
 module ProjectionUpdate =
 
     let private reject = FoldRejection.reject
