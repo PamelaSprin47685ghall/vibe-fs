@@ -12,6 +12,9 @@ implementable on a second host and keeps the TS mirror honest.
   caught. It does not compare names only.
 - `adapter.ts` — `createOmpHostPorts` (omp → `HostPorts`), `registerProductHooks` (`ProductHooks` → `pi.on`/`registerTool`), `activateOnOmp`.
 - `sdk-children.ts` — child sessions through the omp SDK (`createAgentSession`, `SessionManager`).
+- `session-files.ts` — the one place that binds omp's own session-file lookup (`readSessionInfo`) to the reader
+  `sdk-children.ts` needs. It is a separate module so the offline fixture can import `sdk-children.ts` without
+  pulling the omp package into the process.
 - `fixtures/` — offline events and a fake `ExtensionAPI`.
 
 ## What is actually proven
@@ -44,6 +47,25 @@ context hook leaves a message untouched when a part has no plain-text omp encodi
 either a session id or a session **file path**. A path-shaped value is resolved through the host's own
 session-file lookup (`readSessionInfo`); when the file does not resolve, the request is refused with
 `HostError.Refused` rather than returning a path masquerading as a `SessionId`.
+
+## Which session id is the neutral `SessionId`
+
+omp has **two** session ids and they are not always the same:
+
+- the **persisted** id — `SessionManager.getSessionId()`, the id of the session file. It is the one
+  `parentSession`, the session listings and the session files refer to.
+- the **provider** id — `AgentSession.sessionId`, which is `#activeProviderSessionId()`: it prefers a fresh
+  or inherited provider id over the session manager's, so it can differ from the persisted one.
+
+The neutral `SessionId` is always the **persisted** id. The adapter therefore takes the id from
+`sessionManager.getSessionId()` everywhere — including for the `session.compacting` and `session_stop` events,
+whose own `sessionId` / `session_id` fields carry the *provider* id, and for a child session's own id, which
+omp exposes as `AgentSession.sessionId`. Using the provider id would make the same session appear under two
+different ids in the product, and would break the link to the `parentSession` a child was created with.
+
+The offline fixture covers this: the events and the fake child session carry a provider id
+(`provider-session-id`) that differs from the persisted one (`root` / `persisted-session-id`), and the fixture
+asserts that the product sees the persisted id.
 
 Run: `./check.sh` (needs the omp-task vibe install for the types, a TypeScript compiler — set `TSC` or let the
 script discover one — and `bun`). No omp process, no model calls.

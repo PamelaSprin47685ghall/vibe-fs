@@ -19,7 +19,7 @@ cat > "$TMP" <<JSON
 { "extends": "./tsconfig.json",
   "compilerOptions": { "resolveJsonModule": true,
     "paths": { "@oh-my-pi/pi-coding-agent/*": ["$OMP_PKG/dist/types/*"] } },
-  "files": ["$PWD/ports.ts", "$PWD/adapter.ts", "$PWD/sdk-children.ts", "$PWD/fixtures/fixture.test.ts"] }
+  "files": ["$PWD/ports.ts", "$PWD/adapter.ts", "$PWD/sdk-children.ts", "$PWD/session-files.ts", "$PWD/fixtures/fixture.test.ts"] }
 JSON
 trap 'rm -f "$TMP"' EXIT
 echo "== tsc --noEmit against $OMP_PKG"; "$TSC" -p "$TMP"; echo "tsc: ok"

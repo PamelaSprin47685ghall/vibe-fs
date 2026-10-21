@@ -1,7 +1,10 @@
 // Offline conformance fixture (HNI-03): a fake omp ExtensionAPI drives the adapter with recorded-shape
 // events; a fake product plugin answers. No model, no network, no omp process.
+import type { CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
+import type { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
 import { activateOnOmp, type AgentMessage, type OmpApi, type OmpChildSessions } from "../adapter";
+import { sdkChildSessions } from "../sdk-children";
 import * as P from "../ports";
 import events from "./events.json" with { type: "json" };
 
@@ -20,8 +23,12 @@ const pi: OmpApi = {
   setActiveTools: async () => {},
   logger: { debug() {}, info() {}, warn() {}, error() {} } as unknown as ExtensionAPI["logger"],
 };
-let recordedParentSession: string | undefined;
 const history: AgentMessage[] = events.history as unknown as AgentMessage[];
+let recordedParentSession: string | undefined;
+// The session id the product sees for the compaction hooks; the omp events
+// carry a *provider* session id, so this asserts which id the adapter passes
+// on (it must be the persisted one).
+let compactionSession: string | undefined;
 const ctx = {
   cwd: "/tmp/fixture", model: { provider: "fx", id: "m1" }, isIdle: () => true, abort() {},
   sessionManager: { getSessionId: () => "root", getHeader: () => ({ parentSession: recordedParentSession }),
@@ -54,7 +61,8 @@ const product: P.IHostPlugin = {
         ContextMessages: async () => ({ tag: "Keep" }),
         ProviderParams: async () => ({ tag: "Accept" }),
       },
-      Compaction: { OnCompacting: async () => ({ tag: "Context", lines: ["keep ledger"] }), AutoContinue: async () => ({ tag: "Deny", reason: "product owns continuation" }) },
+      Compaction: { OnCompacting: async (s) => { compactionSession = s; return { tag: "Context", lines: ["keep ledger"] }; },
+                    AutoContinue: async (s) => { compactionSession = s; return { tag: "Deny", reason: "product owns continuation" }; } },
       OnSignal: async (s) => { signals.push(s); },
       Dispose: async () => {},
     } };
@@ -82,8 +90,10 @@ expect("tool_call allow -> undefined", await fire("tool_call", events.toolCallRe
 expect("tool_result replace", await fire("tool_result", events.toolResultSecret), { content: [{ type: "text", text: "[redacted]" }], isError: false });
 expect("input refuse -> handled", await fire("input", { type: "input", text: "forbidden", source: "interactive" }), { handled: true });
 expect("system prompt append", await fire("before_agent_start", { type: "before_agent_start", prompt: "hi", systemPrompt: ["base"] }), { systemPrompt: ["base", "PRODUCT-SYSTEM"] });
-expect("compacting context", await fire("session.compacting", { type: "session.compacting", sessionId: "root", messages: [] }), { context: ["keep ledger"] });
-expect("auto-continue deny", await fire("session_stop", events.sessionStop), { continue: false, reason: "product owns continuation" });
+expect("compacting context", await fire("session.compacting", { type: "session.compacting", sessionId: "provider-session-id", messages: [] }), { context: ["keep ledger"] });
+expect("compacting passes the persisted session id, not the provider one", compactionSession, "root");
+expect("auto-continue deny", await fire("session_stop", { ...events.sessionStop, session_id: "provider-session-id" }), { continue: false, reason: "product owns continuation" });
+expect("auto-continue passes the persisted session id, not the provider one", compactionSession, "root");
 await fire("turn_end", events.turnEndError);
 expect("turn_end error -> AttemptFinished Failed", signals.at(-1), { tag: "AttemptFinished", attempt: { Session: "root" },
   terminal: { tag: "Failed", failure: { Kind: "Provider", Message: "overloaded" } } });
@@ -104,5 +114,35 @@ expect("parent recorded as an unresolvable file path is refused",
   await portsSeen!.Sessions.Parent("root" as P.SessionId),
   { ok: false, error: { tag: "Refused", reason: "omp recorded the parent session as a file path that does not resolve to a session id: /tmp/sessions/gone.jsonl" } });
 recordedParentSession = undefined;
+
+// The neutral `SessionId` of a child is the PERSISTED id, not omp's provider
+// session id: `AgentSession.sessionId` prefers a fresh or inherited provider
+// id, so it can differ from the id the session file, `parentSession` and the
+// session listings use.
+// The stub is typed, not `any`: the fake session manager is the only part
+// `sdk-children.ts` reads besides the session's own methods.
+const fakeSessionManager = {
+  getSessionId: () => "persisted-session-id",
+  setSessionName: async (_name: string) => {},
+};
+const fakeAgentSession = {
+  sessionId: "provider-session-id",
+  sessionManager: fakeSessionManager,
+  prompt: async (_text: string) => true,
+  abort: async () => {},
+  dispose: async () => {},
+  messages: [],
+};
+const sdkChildren = sdkChildSessions(
+  async () => ({ session: fakeAgentSession } as unknown as CreateAgentSessionResult),
+  () => ({ newSession: async () => {} } as unknown as SessionManager),
+  async () => [],
+  async (file) => (file === "/tmp/sessions/parent.jsonl" ? { id: "parent-session-id" } : undefined),
+  "/tmp/fixture",
+);
+expect("child session id is the persisted id, not the provider one",
+  await sdkChildren.create("root", "t", "/tmp/fixture"), "persisted-session-id");
+expect("the provider session id is not registered as the child",
+  await sdkChildren.parentOf("provider-session-id"), undefined);
 console.log(failures === 0 ? "# fixture: all ok" : `# fixture: ${failures} failed`);
 if (failures) process.exit(1);

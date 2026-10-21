@@ -23,7 +23,7 @@ binary `~/.local/bin/omp` reports `omp/18.12.4`. Extension entry: `omp -e <file>
 | P-12 Diagnostics | `pi.logger` | Implementable. |
 
 ## Conformance evidence (`adapters/omp/check.sh`)
-1. `tsc --noEmit` (strict) of `ports.ts`, `adapter.ts`, `sdk-children.ts` and the fixture against omp's own
+1. `tsc --noEmit` (strict) of `ports.ts`, `adapter.ts`, `sdk-children.ts`, `session-files.ts` and the fixture against omp's own
    `dist/types` — passes. The compiler is the repo-local TypeScript **7.0.2** (`node_modules/.bin/tsc`); the earlier
    "TypeScript 5.9.3" claim in this document was wrong. Mutation check: returning `{ block: 3 }` from `tool_call` and
    reading `e.sessionIdX` from `session_stop` both fail type-check (TS2769, TS2551), so the check really binds to
@@ -34,11 +34,12 @@ binary `~/.local/bin/omp` reports `omp/18.12.4`. Extension entry: `omp -e <file>
    lost `option`, a missing or extra union case or a changed member signature all break it — the earlier
    name-only comparison could not see any of those.
 3. `fixtures/fixture.test.ts` (bun, offline): a fake `ExtensionAPI` replays recorded-shape omp events
-   (`fixtures/events.json`) through the adapter to a fake product; 17 assertions (tool registration and execution
+   (`fixtures/events.json`) through the adapter to a fake product; 21 assertions (tool registration and execution
    encode, refuse→block, rewrite/allow, result replace, input refuse, system prompt, compaction context,
    auto-continue deny, turn_end error → `AttemptFinished Failed`, transcript decode, child create, model apply
-   error, prompt correlation, and the three parent-session forms: session id, resolvable file path, unresolvable
-   file path → refusal).
+   error, prompt correlation, the three parent-session forms: session id, resolvable file path, unresolvable
+   file path → refusal, and the provider-vs-persisted session id: the compaction hooks and a child session must
+   carry the persisted id, and the provider id must not be registered as a session).
 
 ## Open items (tracked on BOARD.md)
 - O-1 use omp `SessionEntry.id` for `TranscriptMessageAddress` instead of positional ids.
@@ -52,3 +53,13 @@ binary `~/.local/bin/omp` reports `omp/18.12.4`. Extension entry: `omp -e <file>
   `SessionInfo.parentSessionPath` (`session/session-listing.ts:488`), i.e. omp itself does not know whether the
   recorded value is an id or a path — so the ambiguity is the host's, not the adapter's, and the adapter must not
   guess.
+- O-5 omp exposes **two** session ids and they are not always the same. `AgentSession.sessionId` is
+  `#activeProviderSessionId()` (`session/agent-session.ts:5707`, getter at `:7074`) — it prefers a fresh or
+  inherited provider id over the session manager's, so it can differ from the persisted id
+  `SessionManager.getSessionId()` returns (`session/session-manager.ts:3159`; the id of the session file, the one
+  `parentSession` and the session listings refer to). The `session.compacting` and `session_stop` events carry the
+  **provider** id (`session-maintenance.ts:3655` uses `host.sessionId()`, `agent-session.ts:5428` uses
+  `this.sessionId`), and a child session's own id is exposed as `AgentSession.sessionId`. The neutral `SessionId`
+  must therefore be the **persisted** id everywhere; the adapter takes it from `sessionManager.getSessionId()`
+  and the fixture covers the case where the two differ. A real binding must keep this rule: the provider id is
+  omp's internal routing identity (prompt cache, account pool), not a session identity.

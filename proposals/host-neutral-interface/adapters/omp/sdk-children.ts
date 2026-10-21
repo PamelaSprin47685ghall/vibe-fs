@@ -7,15 +7,20 @@
 // caller believe a child was stopped when it never was.
 import type { CreateAgentSessionOptions, CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
 import type { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { readSessionInfo } from "@oh-my-pi/pi-coding-agent/session/session-listing";
 import { UnknownSessionError, type AgentMessage, type OmpChildSessions } from "./adapter";
 
 type AgentSession = CreateAgentSessionResult["session"];
+
+/** The part of omp's session listing this module needs: the id of the session a file holds. */
+export interface SessionFileReader {
+  (file: string): Promise<{ id: string } | undefined>;
+}
 
 export function sdkChildSessions(
   createAgentSession: (o: CreateAgentSessionOptions) => Promise<CreateAgentSessionResult>,
   createManager: (cwd: string) => SessionManager,
   listSessions: (cwd: string) => Promise<{ id: string; title?: string }[]>,
+  readSessionFile: SessionFileReader,
   defaultCwd: string,
 ): OmpChildSessions {
   const live = new Map<string, { session: AgentSession; parent?: string; title?: string }>();
@@ -31,8 +36,14 @@ export function sdkChildSessions(
       await sessionManager.newSession({ parentSession: parent });
       const { session } = await createAgentSession({ cwd: dir, sessionManager });
       if (title) await session.sessionManager.setSessionName?.(title);
-      live.set(session.sessionId, { session, parent, title });
-      return session.sessionId;
+      // The neutral `SessionId` must be the PERSISTED session id — the one
+      // `parentSession`, the session listings and the session files refer to.
+      // `AgentSession.sessionId` is omp's *provider* session id (it prefers a
+      // fresh or inherited provider id over the session manager's), so it can
+      // differ from the persisted id and must not be used as the neutral id.
+      const persistedId = session.sessionManager.getSessionId();
+      live.set(persistedId, { session, parent, title });
+      return persistedId;
     },
     prompt: async (id, text) => require_(id).session.prompt(text),
     abort: async (id) => { await require_(id).session.abort(); },
@@ -45,7 +56,7 @@ export function sdkChildSessions(
     // listing (which knows the id of a session file); when the file cannot be
     // read, the value is not guessable and the caller is told so.
     resolveSessionIdByPath: async (path) => {
-      const info = await readSessionInfo(path);
+      const info = await readSessionFile(path);
       return info?.id;
     },
     messages: (id) => live.get(id)?.session.messages as AgentMessage[] | undefined,

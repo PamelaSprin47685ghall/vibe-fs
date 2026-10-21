@@ -319,12 +319,17 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
     if (edit.tag === "Keep") return undefined;
     return { content: [{ type: "text", text: edit.result.Text }], isError: edit.result.IsError };
   });
-  pi.on("session.compacting", async (e) => {
-    const r = await hooks.Compaction.OnCompacting(sid(e.sessionId));
+  pi.on("session.compacting", async (_e, c) => {
+    // The event's `sessionId` is omp's *provider* session id, which is not
+    // necessarily the persisted one. The neutral `SessionId` is always the
+    // persisted id (`sessionManager.getSessionId()`), the one `parentSession`
+    // and the session listings refer to.
+    const r = await hooks.Compaction.OnCompacting(sid(c.sessionManager.getSessionId()));
     return r.tag === "Context" ? { context: r.lines } : r.tag === "ReplacePrompt" ? { prompt: r.prompt } : undefined;
   });
-  pi.on("session_stop", async (e) => {
-    const v = await hooks.Compaction.AutoContinue(sid(e.session_id));
+  pi.on("session_stop", async (_e, c) => {
+    // Same as above: the event's `session_id` is the provider session id.
+    const v = await hooks.Compaction.AutoContinue(sid(c.sessionManager.getSessionId()));
     return v.tag === "Deny" ? { continue: false, reason: v.reason } : undefined;
   });
   if (hooks.Spawn) {
