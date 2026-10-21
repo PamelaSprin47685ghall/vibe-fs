@@ -312,6 +312,7 @@ module AdvisorSeat =
                 { ProviderRun = priorRun childId |> Option.defaultValue (ProviderRunIdentity.create "")
                   ConsultId = Guid.NewGuid().ToString("N") }
 
+            // DSL-MUTABLE: subscription — the terminal listener's read of the intent receipt's run, written once when that send is accepted.
             let mutable intentRun = None
 
             // AG-LISTENER-BEFORE-SEND: the Host port refuses a prompt for a session with no
