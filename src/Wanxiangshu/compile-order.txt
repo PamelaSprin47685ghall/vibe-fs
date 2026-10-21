@@ -921,8 +921,6 @@ Context/Companion/JournalPort.fsi
 Context/Companion/JournalPort.fs
 Context/Companion/Host.fsi
 Context/Companion/Host.fs
-Execution/Session/Recovery/Coordinator.fsi
-Execution/Session/Recovery/Coordinator.fs
 Execution/Session/Recovery/Surface.fsi
 Execution/Session/Recovery/Surface.fs
 Execution/Delegation/Join.fsi
