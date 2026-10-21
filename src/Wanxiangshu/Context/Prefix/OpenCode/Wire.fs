@@ -3,12 +3,9 @@ namespace Wanxiangshu.Context.Prefix.OpenCode
 open System
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
@@ -16,10 +13,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 
-open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Participant.Provider.Projection
 
 type AttemptPlanCapability =
     { TryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option
