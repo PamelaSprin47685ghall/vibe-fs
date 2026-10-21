@@ -1,18 +1,12 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
 open System
-open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
-/// Process-live delivered-view cell, keyed by session. The cell holds the
-/// view declaration `this.deliver(view)` handed over, or material restored
-/// from a durable delivery witness after a restart. A separate returned
-/// cursor records each representative together with its rendered material,
-/// so identical deliveries are not repeated and changed summaries remain
-/// visible. Restart drops both; the durable witness is written when the
-/// call settles.
+/// The delivery owner holds cells, call fences and returned keys. This composer
+/// selects Anchor material and renders the bytes captured at settlement.
 module JsDeliveredValues =
 
     /// The exact tool invocation that produced this cell. A terminal from an
@@ -23,45 +17,43 @@ module JsDeliveredValues =
         { ProviderRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity
           ToolCallId: Wanxiangshu.Foundation.Identity.ToolCallId }
 
-    type private DeliveredCell =
-        { View: obj option
-          Material: string option
-          MaterialKeys: string list
-          Fence: DeliveryFence option }
-
     type ReturnedPiece = { Key: string; Text: string }
 
-    // DSL-MUTABLE: resource — sessionId → delivered view or restored material
-    let private delivered = Dictionary<string, DeliveredCell>()
+    [<AllowNullLiteral>]
+    type private DeliveryMessages =
+        abstract stage: sessionId: string * view: obj -> unit
+        abstract deliver: sessionId: string * fence: obj * view: obj -> unit
+        abstract seal: sessionId: string * fence: obj * material: string * keys: string array -> bool
+        abstract restore: sessionId: string * fence: obj * material: string -> unit
+        abstract peekCached: sessionId: string -> obj
+        abstract fence: sessionId: string -> obj
+        abstract returned: sessionId: string -> string array
+        abstract claim: sessionId: string * request: obj -> obj
+        abstract handOff: ticket: obj * candidates: obj array * assistant: string -> obj array
+        abstract clear: sessionId: string -> unit
+        abstract clearReturned: sessionId: string -> unit
+        abstract clearAll: unit -> unit
 
-    // DSL-MUTABLE: resource — sessionId → identities already handed back
-    let private returned = Dictionary<string, HashSet<string>>()
+    [<Import("Delivery", "wanxiangli/delivery")>]
+    let private createDelivery: unit -> DeliveryMessages = jsNative
 
-    let private returnedSet (sessionId: string) =
-        match returned.TryGetValue sessionId with
-        | true, existing -> existing
-        | false, _ ->
-            let fresh = HashSet<string>()
-            returned.[sessionId] <- fresh
-            fresh
+    let private owner = createDelivery ()
 
-    let alreadyReturned (sessionId: string) : Set<string> =
-        match returned.TryGetValue sessionId with
-        | true, existing -> existing |> Seq.toList |> Set.ofList
-        | false, _ -> Set.empty
+    let private optionalView (value: obj) : obj option =
+        if isNull value || jsTypeof value = "undefined" then
+            None
+        else
+            Some value
 
-    let private markReturned (sessionId: string) (keys: string list) =
-        let set = returnedSet sessionId
-        keys |> List.iter (fun key -> set.Add key |> ignore)
+    let private fenceValue providerRun toolCallId =
+        createObj
+            [ "providerRun" ==> Identity.ProviderRunIdentity.value providerRun
+              "toolCallId" ==> Identity.ToolCallId.value toolCallId ]
 
-    /// `view` is the validated view declaration handed over by
-    /// `this.deliver(view)`. The live delivery path always starts here.
+    let alreadyReturned (sessionId: string) : Set<string> = owner.returned sessionId |> Set.ofArray
+
     let recordView (sessionId: string) (view: obj option) : unit =
-        delivered.[sessionId] <-
-            { View = view
-              Material = None
-              MaterialKeys = []
-              Fence = None }
+        owner.stage (sessionId, Option.toObj view)
 
     /// Record a delivery with the exact call fence that produced it. The
     /// settled tool call owns this cell; another run cannot take it.
@@ -71,53 +63,20 @@ module JsDeliveredValues =
         (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId)
         (view: obj option)
         : unit =
-        delivered.[sessionId] <-
-            { View = view
-              Material = None
-              MaterialKeys = []
-              Fence =
-                Some
-                    { ProviderRun = providerRun
-                      ToolCallId = toolCallId } }
+        owner.deliver (sessionId, fenceValue providerRun toolCallId, Option.toObj view)
 
     /// Restore the cell from a durable delivery witness's material (crash
     /// recovery) or from a harness that stands in for a real delivery. This
     /// is the only entry that accepts ready-made material.
     let restoreMaterial (sessionId: string) (text: string) : unit =
         if not (String.IsNullOrWhiteSpace text) then
-            delivered.[sessionId] <-
-                { View = None
-                  Material = Some text
-                  MaterialKeys = []
-                  Fence = None }
+            owner.restore (sessionId, null, text)
 
     let restoreFencedMaterial sessionId providerRun toolCallId text =
         if not (String.IsNullOrWhiteSpace text) then
-            delivered.[sessionId] <-
-                { View = None
-                  Material = Some text
-                  MaterialKeys = []
-                  Fence =
-                    Some
-                        { ProviderRun = providerRun
-                          ToolCallId = toolCallId } }
+            owner.restore (sessionId, fenceValue providerRun toolCallId, text)
 
-    let private cellMaterial (cell: DeliveredCell) : obj =
-        match cell.Material with
-        | Some material -> box material
-        | None -> cell.View |> Option.map box |> Option.defaultValue null
-
-    let take (sessionId: string) : obj =
-        match delivered.TryGetValue sessionId with
-        | true, cell ->
-            delivered.Remove sessionId |> ignore
-            cellMaterial cell
-        | false, _ -> null
-
-    let peek (sessionId: string) : obj =
-        match delivered.TryGetValue sessionId with
-        | true, cell -> cellMaterial cell
-        | false, _ -> null
+    let peek (sessionId: string) : obj = owner.peekCached sessionId
 
     let private renderNonBlank (text: string) : string option =
         if String.IsNullOrWhiteSpace text then None else Some text
@@ -181,89 +140,52 @@ module JsDeliveredValues =
             (LlmFacing.empty |> LlmFacing.withData prose |> LlmFacing.render).TrimEnd('\n')
             |> renderNonBlank
 
-    let private proseKey (sessionId: string) (text: string) =
-        "prose:"
-        + sessionId
-        + ":"
-        + string text.Length
-        + ":"
-        + text.Substring(0, min 24 text.Length)
+    let private selectTicket sessionId (ticket: obj) assistant =
+        let candidates =
+            select sessionId (optionalView ticket?view) Set.empty
+            |> List.map (fun piece -> createObj [ "key" ==> piece.Key; "text" ==> piece.Text ])
+            |> List.toArray
 
-    /// The last assistant prose is handed back only when this deliver carried a
-    /// view. The cursor key is the session plus the prose itself, not a guess
-    /// about some other text: a later deliver that still names the same prose
-    /// does not return it again.
-    let private withAssistant
-        (sessionId: string)
-        (view: obj option)
-        (pieces: ReturnedPiece list)
-        (assistant: string option)
-        =
-        match view, assistant with
-        | Some _, Some text when not (String.IsNullOrWhiteSpace text) ->
-            let key = proseKey sessionId text
-
-            if
-                alreadyReturned sessionId |> Set.contains key
-                || pieces |> List.exists (fun piece -> piece.Key = key)
-            then
-                pieces
-            else
-                pieces @ [ { Key = key; Text = text } ]
-        | _ -> pieces
-
-    let private renderSelectedHandoff sessionId view advance assistant =
-        let pieces =
-            select sessionId view (alreadyReturned sessionId)
-            |> fun selected -> withAssistant sessionId view selected assistant
-
-        if advance then
-            markReturned sessionId (pieces |> List.map _.Key)
-
-        renderPieces pieces
+        owner.handOff (ticket, candidates, Option.toObj assistant)
+        |> Array.map (fun piece -> { Key = piece?key; Text = piece?text })
+        |> Array.toList
 
     let sealFencedView sessionId providerRun toolCallId assistant =
-        let fence =
-            { ProviderRun = providerRun
-              ToolCallId = toolCallId }
+        let request =
+            createObj
+                [ "mode" ==> "fence"
+                  "providerRun" ==> Identity.ProviderRunIdentity.value providerRun
+                  "toolCallId" ==> Identity.ToolCallId.value toolCallId ]
 
-        match delivered.TryGetValue sessionId with
-        | true, cell when cell.Fence = Some fence && cell.View.IsSome ->
-            let pieces =
-                select sessionId cell.View (alreadyReturned sessionId)
-                |> fun selected -> withAssistant sessionId cell.View selected assistant
-
+        match owner.claim (sessionId, request) with
+        | null -> None
+        | ticket when unbox<bool> ticket?``sealed`` || isNull ticket?view -> None
+        | ticket ->
+            let pieces = selectTicket sessionId ticket assistant
             let material = renderPieces pieces
 
-            delivered.[sessionId] <-
-                { cell with
-                    View = None
-                    Material = material
-                    MaterialKeys = pieces |> List.map _.Key }
+            if
+                owner.seal (
+                    sessionId,
+                    fenceValue providerRun toolCallId,
+                    Option.toObj material,
+                    pieces |> List.map _.Key |> List.toArray
+                )
+            then
+                material
+            else
+                None
 
-            material
-        | _ -> None
-
-    let private handoff
-        (sessionId: string)
-        (cell: DeliveredCell)
-        (advance: bool)
-        (assistant: string option)
-        : string option =
-        match cell.Material, advance with
-        | Some material, true ->
-            markReturned sessionId cell.MaterialKeys
-            renderNonBlank material
-        | Some material, false -> renderNonBlank material
-        | None, _ -> renderSelectedHandoff sessionId cell.View advance assistant
+    let private handoff sessionId request assistant =
+        match owner.claim (sessionId, request) with
+        | null -> None
+        | ticket when unbox<bool> ticket?``sealed`` ->
+            owner.handOff (ticket, [||], null) |> ignore
+            Option.ofObj (unbox<string> ticket?material)
+        | ticket -> selectTicket sessionId ticket assistant |> renderPieces
 
     let tryTakeRenderedWith (sessionId: string) (assistant: string option) : string option =
-        match delivered.TryGetValue sessionId with
-        | false, _ -> None
-        | true, cell when cell.Fence.IsNone ->
-            delivered.Remove sessionId |> ignore
-            handoff sessionId cell true assistant
-        | true, _ -> None
+        handoff sessionId (createObj [ "mode" ==> "cache" ]) assistant
 
     /// Take the cell only when it belongs to this exact provider run. An old
     /// terminal that arrives after a newer delivery cannot consume it.
@@ -272,43 +194,40 @@ module JsDeliveredValues =
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
         (assistant: string option)
         : string option =
-        match delivered.TryGetValue sessionId with
-        | false, _ -> None
-        | true, cell when cell.Fence |> Option.exists (fun fence -> fence.ProviderRun = providerRun) ->
-            delivered.Remove sessionId |> ignore
-            handoff sessionId cell true assistant
-        | true, _ -> None
+        let request =
+            createObj
+                [ "mode" ==> "run"
+                  "providerRun" ==> Identity.ProviderRunIdentity.value providerRun ]
+
+        handoff sessionId request assistant
 
     let tryTakeRendered (sessionId: string) : string option = tryTakeRenderedWith sessionId None
 
     /// Snapshot of the handoff. Does not consume the cell and does not advance
     /// the returned cursor — showing the latest delivery is not itself a return.
     let tryPeekRendered (sessionId: string) : string option =
-        match delivered.TryGetValue sessionId with
-        | false, _ -> None
-        | true, cell -> handoff sessionId cell false None
+        handoff sessionId (createObj [ "mode" ==> "peek" ]) None
 
     /// Peek with the pre-call assistant prose included, without consuming.
     let tryPeekRenderedWith (sessionId: string) (assistant: string option) : string option =
-        match delivered.TryGetValue sessionId with
-        | false, _ -> None
-        | true, cell -> handoff sessionId cell false assistant
+        handoff sessionId (createObj [ "mode" ==> "peek" ]) assistant
 
     /// The raw view declaration of the current cell, without consuming it.
     let peekView (sessionId: string) : obj option =
-        match delivered.TryGetValue sessionId with
-        | true, cell -> cell.View
-        | false, _ -> None
+        match owner.claim (sessionId, createObj [ "mode" ==> "peek" ]) with
+        | null -> None
+        | ticket -> optionalView ticket?view
 
     let peekFence (sessionId: string) : DeliveryFence option =
-        match delivered.TryGetValue sessionId with
-        | true, cell -> cell.Fence
-        | false, _ -> None
+        match owner.fence sessionId with
+        | null -> None
+        | fence ->
+            Some
+                { ProviderRun = Identity.ProviderRunIdentity.create fence?providerRun
+                  ToolCallId = Identity.ToolCallId.create fence?toolCallId }
 
-    let clear (sessionId: string) : unit = delivered.Remove sessionId |> ignore
+    let clear (sessionId: string) : unit = owner.clear sessionId
 
-    let clearReturned (sessionId: string) : unit = returned.Remove sessionId |> ignore
+    let clearReturned (sessionId: string) : unit = owner.clearReturned sessionId
 
-    let clearAll () : unit =
-        delivered.Clear()
-        returned.Clear()
+    let clearAll () : unit = owner.clearAll ()

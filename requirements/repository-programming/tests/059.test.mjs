@@ -11,6 +11,7 @@ import {
 } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { applyView, clearAll, numberMessage, setView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 import { verifyPrepareFailure, verifyCommitFailure } from './support/delivery-settlement.mjs'
+import { recordDeliveredValue as restoreDeliveredMaterial } from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
 test('WHAT[repository-programming-059] prepare failure leaves delivery empty and preserves actual file effects', verifyPrepareFailure)
 test('WHAT[repository-programming-059] commit failure leaves delivery empty and preserves actual file effects', verifyCommitFailure)
@@ -129,6 +130,68 @@ test('WHAT[repository-programming-059] a sealed view advances only its captured 
   recordFencedDeliveredView(id, 'run-next', 'call-next', declaration(0, {}))
   assert.equal(takeDeliveredHandoffFor(id, 'run-next', 'pre-call prose'), null)
   clearDeliveredReturned(id)
+})
+
+test('WHAT[repository-programming-059] staging presentation cannot downgrade an exact fenced delivery', () => {
+  const id = 'fenced-stage'
+  clearDeliveredReturned(id)
+  seed(id, ['owned material'])
+  const owned = declaration(0, {})
+  recordFencedDeliveredView(id, 'owned-run', 'owned-call', owned)
+  recordDeliveredView(id, declaration(0, { 0: 'unowned presentation' }))
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'owned-run', toolCallId: 'owned-call' })
+  assert.deepEqual(deliveredViewOf(id), owned)
+  assert.equal(takeDeliveredHandoff(id), null)
+  assert.match(String(takeDeliveredHandoffFor(id, 'owned-run', null)), /owned material/)
+  clearDeliveredReturned(id)
+})
+
+test('WHAT[repository-programming-059] a sealed empty delivery cannot acquire late material or prose', () => {
+  const id = 'sealed-empty'
+  clearDeliveredReturned(id)
+  seed(id, [])
+  recordFencedDeliveredView(id, 'empty-run', 'empty-call', declaration(0, {}))
+  assert.equal(sealFencedDeliveredView(id, 'empty-run', 'empty-call', ''), null)
+  seed(id, ['late material'])
+  assert.equal(sealFencedDeliveredView(id, 'empty-run', 'empty-call', 'late prose'), null)
+  recordDeliveredView(id, declaration(0, { 0: 'late presentation' }))
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'empty-run', toolCallId: 'empty-call' })
+  assert.equal(takeDeliveredHandoffFor(id, 'other-run', 'wrong consumer'), null)
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'empty-run', toolCallId: 'empty-call' })
+  assert.equal(takeDeliveredHandoffFor(id, 'empty-run', 'late prose'), null)
+  assert.deepEqual(deliveredReturned(id), [])
+  assert.equal(deliveredValue(id), null)
+})
+
+test('WHAT[repository-programming-059] sealing requires the exact call and cannot rewrite already captured material', () => {
+  const id = 'sealed-once'
+  clearDeliveredReturned(id)
+  seed(id, ['captured bytes'])
+  recordFencedDeliveredView(id, 'exact-run', 'exact-call', declaration(0, {}))
+  assert.equal(sealFencedDeliveredView(id, 'exact-run', 'other-call', 'wrong call'), null)
+  assert.deepEqual(deliveredReturned(id), [])
+  const sealed = sealFencedDeliveredView(id, 'exact-run', 'exact-call', 'captured prose')
+  seed(id, ['changed bytes'])
+  assert.equal(sealFencedDeliveredView(id, 'exact-run', 'exact-call', 'changed prose'), null)
+  assert.equal(deliveredValue(id), sealed)
+  assert.deepEqual(deliveredReturned(id), [])
+  assert.equal(takeDeliveredHandoffFor(id, 'wrong-run', 'wrong prose'), null)
+  assert.equal(deliveredValue(id), sealed)
+  assert.equal(takeDeliveredHandoffFor(id, 'exact-run', 'changed prose'), sealed)
+  assert.ok(deliveredReturned(id).every(key => !key.includes('changed') && !key.includes('wrong')))
+  clearDeliveredReturned(id)
+})
+
+test('WHAT[repository-programming-059] restored durable material remains opaque and invents no cursor keys', () => {
+  const id = 'restored-material'
+  const material = '  durable bytes\n\n[[returned]]\ntext = "original"\n'
+  clearDeliveredReturned(id)
+  restoreDeliveredMaterial(id, material)
+  seed(id, ['unrelated live context'])
+  assert.equal(deliveredValue(id), material)
+  assert.equal(deliveredViewOf(id), null)
+  assert.equal(takeDeliveredHandoffWith(id, 'late prose'), material)
+  assert.deepEqual(deliveredReturned(id), [])
 })
 
 test('WHAT[repository-programming-059] an ordinary return does not populate the delivered cell', async () => {

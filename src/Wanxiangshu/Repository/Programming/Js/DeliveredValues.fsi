@@ -1,12 +1,6 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
-/// Process-live delivered-view cell, keyed by session. The cell holds the
-/// view declaration `this.deliver(view)` handed over, or material restored
-/// from a durable delivery witness after a restart. A separate returned
-/// cursor records each representative together with its rendered material,
-/// so identical deliveries are not repeated and changed summaries remain
-/// visible. Restart drops both; the durable witness is written when the
-/// call settles.
+/// Compose Anchor selection and rendering with the delivery owner's state.
 module JsDeliveredValues =
 
     /// The exact tool invocation that produced a cell. A terminal from an
@@ -45,7 +39,6 @@ module JsDeliveredValues =
         assistant: string option ->
             string option
 
-    val take: sessionId: string -> obj
     val peek: sessionId: string -> obj
     val select: sessionId: string -> view: obj option -> already: Set<string> -> ReturnedPiece list
     val tryTakeRenderedWith: sessionId: string -> assistant: string option -> string option
