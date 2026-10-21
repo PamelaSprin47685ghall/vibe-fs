@@ -246,6 +246,10 @@ rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INV
 
 parked 载荷的 `source` 字段携带完整程序与执行点标记（[037]）。直接 `park` 与 `where` 歧义都经同一挂起路径产生 source；恢复后再次 park 产生新的 handle 与新的 source。source 行标记按 vm 栈换算，解析失败时降级而不是失败。
 
+标记位置由沙箱栈换算到程序脚本行：沙箱以 `new Function` 求值程序，V8 把程序帧渲染为 `at Js.run (eval at <runner> (evalmachine.<anonymous>:226:19), <anonymous>:150:33)`，尾随的 `<anonymous>` 位置才是程序内的行，前缀里的 `evalmachine.<anonymous>` 位置是 runner 自身源码的行、不是程序的行。
+
+只有程序帧参与换算：经 `eval` 求值字符串的帧其尾随位置是该字符串自身的行号，与程序行号可能数值相同，按数值范围判定会误标到无关的程序行上；这类帧不参与，标记落在程序自身的调用点上。栈缺失、栈不可读、栈中无程序帧时降级为整篇 ` | `，不误标、不让 park 失败。
+
 ## [049] unpark.value 自由值
 
 `unpark.value` 的 host schema 是任意 JSON 值（可选），执行端零校验；注入值的语义由 park 点定义，错误注入由下游自然失败。工具描述与 `tool/js-program/park` 资源明确这一责任边界。
