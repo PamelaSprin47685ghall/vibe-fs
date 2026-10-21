@@ -110,11 +110,15 @@
 
 - **门禁计数（独立复算，不采信分支自带的基线）**：⑨ master = 5 → 分支 = **0**；⑧ master = 3（`Interaction/Dispatch/JournalPort.fsi`、`Mission/Manager/Workflow.fsi`、`Participant/Provider/Attempt/Fallback/Workflow.fsi`）→ 分支 = **0**；⑨b 为新增门禁，在 base `7f17f9bb9` 上实测 6 条违例 → 分支 = **0**。
 - **门禁 ⑩（adapter-thinness）**：product-domain 引用总数 695（基线）→ **651**（分支）；无端口的适配器文件数 151（基线）→ **144**（分支）。**只降不升**，`scripts/checks/adapter-thinness-baseline.json` 未被修改。过程中出现过一次 `JoinResultRendererSurface.fs: product-domain references rose 3 -> 4`，按上文“搬文件不改基线”处置。
+  - *落地时复测*：master 期间并入了 HNI-08 一大批删除，基线随之降到 689/150；在新的 base（`origin/master` `144a488d0`）上复测为 **596 / 137**（vs 基线 689 / 150），仍然只降不升，基线文件与 master 逐字节相同。
 - **`node scripts/checks/architecture.mjs`**：推送前通过，输出 `architecture: OK`。
-- **格式**：`dotnet tool run fantomas --check` 在本卡改动的 32 个 `.fs/.fsi` 上通过。另有 5 个**本卡未触碰**的文件（`Interaction/Authority/Child.fs`、`Interaction/Dispatch/Dispatcher.fs`、`Interaction/Repair/InteractionRepair.fs`、`OpenCode/Host/HostSignalBootstrap.fs`、`OpenCode/Tools/ToolRuntimeScope.fs`）在 master 上就是 fantomas 红的（与 base 逐字节相同）；其中 4 个已在本轮用 fantomas 6.3.0 格式化（纯空白、token 流不变），`HostSignalBootstrap.fs` 本来就干净。
-- **base 对齐（`node scripts/check.mjs`）**：master 的 `fsharp-control-pyramid` 与 `js-boundary-gate`（`requirements/effect-accounting/tests/013.test.mjs` 深层 dist 导入）本来就是红的（F38-04）。因此判定标准是**与 base 的发现集合对比**而不是 exit 0：把 base 工作区（`ac7f6d3cf`）与候选的 `check.mjs` 输出归一化后逐条对比，**候选没有新增任何一条发现**。断言未削弱，棘轮基线未改。
-- **回归修复**：`bb5a52853`（F40-01）改写 `compile-order.txt` 时把 master 已在 `58660d4d9` 删掉的 `Execution/Delegation/OpenCode/DelegatedToolEstimate.fsi/.fs` 又加了回来，导致 `check.mjs` 报 “which no shard compiles”。已由 `727fdc8a7` 删除这两条，恢复 master 状态。
+- **格式**：`dotnet tool run fantomas --check` **全树**（`src/Wanxiangshu` 下所有 `.fs`/`.fsi`）通过。落地时共修了 9 个本卡未触碰的、master 上原本 fantomas 红的文件：
+  - `Interaction/Authority/Child.fs`、`Interaction/Dispatch/Dispatcher.fs`、`Interaction/Repair/InteractionRepair.fs`、`OpenCode/Tools/ToolRuntimeScope.fs`、`Composition/Durable/AgentJournalPortAdapter.fs`、`Context/Companion/Host.fs`、`Context/Companion/Host.fsi`、`Execution/Delegation/LinkageProjection.fs` —— 纯空白改动，**token 流与 master 逐字节相同**（去空白后比对全部相等）。
+  - `Persistence/Journal/CodecSurface.fsi` —— master 的 `f3eb81f27` 删掉 `decodeEventEnvelope` 时把它的文档注释留成了悬空的两行，导致 fantomas 6.3.0 **不收敛**（每跑一次多追加一行，`--check` 永远不可能通过）。已删除那段悬空注释；现在 `--check` 通过且格式化是幂等的。
+- **base 对齐（`node scripts/check.mjs`）**：master 的 `fsharp-control-pyramid` 与 `js-boundary-gate`（`requirements/effect-accounting/tests/013.test.mjs` 深层 dist 导入）本来就是红的（F38-04）。因此判定标准是**与 base 的发现集合对比**而不是 exit 0：把 base 工作区与候选的 `check.mjs` 输出归一化后逐条对比，**候选没有新增任何一条发现**。断言未削弱，棘轮基线未改。
+  - *落地时复测*：base 工作区改为当前 `origin/master`（`144a488d0`）后重跑 —— base 与候选的 `check.mjs` 都是 exit 1，归一化后 **base 123 条 / 候选 123 条，新增 0 条、消失 0 条、fatal error 0 条**。
+- **回归修复**：`bb5a52853`（F40-01）改写 `compile-order.txt` 时把 master 已在 `58660d4d9` 删掉的 `Execution/Delegation/OpenCode/DelegatedToolEstimate.fsi/.fs` 又加了回来，导致 `check.mjs` 报 “which no shard compiles”。master 已在 `3cd7432da` 独立做了同样的修复；rebase 之后本分支的对应提交只承担记账。
 - **落地**：rebase 到 `origin/master` 后，`git push origin HEAD:master` 快进推送成功；推送前 `package-lock.json` 解析通过，`wanxiangli` gitlink 是 `origin/main` 的祖先。证据见 `wt/logs-cut40-fu/logs/land.log` 与同目录 `vibe-fs/logs/{architecture,build,tests,check,fantomas}-land.log`。
-- **未验证项（owner rule，2026-10-21）**：本次交付在本机**没有跑过 F# 编译，也没有跑过测试套件**（编译槽位饱和，且按仓主规则交付不要求本机编译通过）。已做的是静态验证：`architecture.mjs`、`adapter-thinness.mjs`、`fantomas --check`、`compile-order.txt` 与 `fsproj` 的存在性核对、`check.mjs` 的 base 对齐。**交付团队必须自行编译并跑测试。**
+- **未验证项（owner rule，2026-10-21）**：本次交付在本机**没有跑过 F# 编译，也没有跑过测试套件**（编译槽位饱和，且按仓主规则交付不要求本机编译通过）。已做的是静态验证：`architecture.mjs`、`adapter-thinness.mjs`、**全树** `fantomas --check`、`compile-order.txt` 与 `fsproj` 的存在性核对、`check.mjs` 的 base 对齐。**交付团队必须自行编译并跑测试。**
 
 **回退**：每个提交只移动文件、改命名空间或删除无用的 `open`，没有改持久格式，也没有改行为。可以单独 `git revert`；revert 某个移动提交时，要连同它在基线里删掉的条目一起恢复，否则 ⑨ 会报“新引用”。
