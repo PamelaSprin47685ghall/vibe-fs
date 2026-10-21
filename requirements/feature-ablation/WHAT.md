@@ -25,6 +25,8 @@
 
 `resources/ablation/profiles.json` 定义配置集。显式环境变量 `WANXIANGSHU_ABLATION_<node>=ablated|borrowed|active` 覆盖后仍须通过 DAG 校验。
 
+已配置的 profile、模式或 DAG 校验失败时，不得回退为全部启用；没有有效注册表的已映射工具、事实、主代理与 fission 门禁必须拒绝。
+
 ## [005] 只读副本与 Predictor 不是消融可以重新打开的功能
 
 只读副本、Predictor 槽位与 speculative-investigation 不是生产功能，也不是消融节点可以重新打开的开关。研究对照不得把它们注册回当前合同。

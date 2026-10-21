@@ -18,8 +18,8 @@ module AblationResolution =
 
     /// The registry used when the environment cannot supply one.
     ///
-    /// A broken manifest must not open every gate: the safe reading of "unknown" is
-    /// "nothing is allowed", and the audit fields still name what failed.
+    /// A broken manifest must not enable mapped features without a resolved mode.
+    /// Unmapped tool and fact tags keep their own admission policy.
     let denied () : AblationRegistry =
         { Modes = Map.empty
           Audit =
