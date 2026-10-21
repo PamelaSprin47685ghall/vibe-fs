@@ -20,9 +20,6 @@ type PendingAttemptPlanAdmission =
     | PlanConflict of existing: PendingAttemptPlan * attempted: PendingAttemptPlan
 
 module PendingAttemptPlanAdmission =
-    /// Exact equality for immutable admitted request evidence.
-    val areSemanticallyEqual: existing: PendingAttemptPlan -> attempted: PendingAttemptPlan -> bool
-
     /// Same exact physical request identity, independent of its already-frozen projection choice.
     val sameRequestIdentity: existing: PendingAttemptPlan -> attempted: PendingAttemptPlan -> bool
 
