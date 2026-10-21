@@ -2,7 +2,6 @@
   "_note": "HNI-04 gate 10 (adapter-thinness). Totals only go down; tighten with --write-baseline.",
   "productReference": {
     "src/Wanxiangshu/Context/Prefix/OpenCode/Wire.fs": 11,
-    "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs": 6,
     "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs": 12,
     "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs": 13,
     "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs": 13,
@@ -107,7 +106,6 @@
   },
   "withoutPort": [
     "src/Wanxiangshu/Context/Prefix/OpenCode/Wire.fs",
-    "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs",
     "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs",
     "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs",
     "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs",
