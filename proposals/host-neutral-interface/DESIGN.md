@@ -31,10 +31,11 @@ Architect lane: eng-host-arch. Registry of every port and its owner: [REGISTRY.m
 7. **Ownership.** Each port has exactly one owner lane (REGISTRY.md). A domain lane may add a port or member for
    its domain: rebase, read REGISTRY.md, add the row in the same commit as the code, reuse existing type names.
    The architect lane reviews shapes and fixes drift (HNI-11).
-8. **Migration aliasing.** Existing near-neutral contracts in `Foundation/HostSession*` (`ISessionHostPort`,
-   `ISessionSnapshotPort`, `OpenCodePromptOptions`, `OpenCodeChildOptions`, …) are *legacy shapes*. New code uses
-   the `Wanxiangshu.Host` names; legacy names become type aliases of the neutral ones and are deleted when their
-   last consumer moves (ratchet, never re-introduced).
+8. **Clean cutover, no shims.** Existing near-neutral contracts in `Foundation/HostSession*` (`ISessionHostPort`,
+   `ISessionSnapshotPort`, `OpenCodePromptOptions`, `OpenCodeChildOptions`, …) are *legacy shapes*. They are
+   migrated to the `Wanxiangshu.Host.Ports` names and **deleted in the same change**. There are no compatibility
+   type aliases: a legacy name that survives as an alias is a second convention, and the ratchet counts alias
+   re-introduction as a regression.
 
 ## 2. Port families
 
