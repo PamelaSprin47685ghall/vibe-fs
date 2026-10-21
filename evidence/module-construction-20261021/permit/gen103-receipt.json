@@ -1,0 +1,41 @@
+{
+  "scope": "Exact permit owner reception and Linux four-digit-PID crash fixture repair",
+  "library": {
+    "commit": "9c88393f2f898330ff095064dcc623117be80d2c",
+    "version": "0.10.0",
+    "exports": 21,
+    "publishedOwnMainExactShaVerified": true,
+    "actualTarballSha256": "bf27ee68df4d7cb2fbd70b0b4b80f2085f5b6c270a27a9d6c2682a374e75046e",
+    "nodeAndBunRulesEach": { "passed": 15, "failed": 0 },
+    "publicInventoryTest": { "passed": 3, "failed": 0 },
+    "strictTypes": { "positive": "passed", "negativeRejected": 8 },
+    "counterExhaustion": "Static guard-before-mutation evidence only; no seed and no claim of 2^53 dynamic issues"
+  },
+  "main": {
+    "generation": 103,
+    "staticCheck": "passed without baseline changes",
+    "build": "passed through node scripts/build.mjs",
+    "selectedRequirements": ["execution-model-routing/006", "execution-model-routing/010", "execution-model-routing/011", "execution-model-routing/012", "execution-model-routing/013", "execution-model-routing/014", "execution-model-routing/017", "durable-events/005"],
+    "strict": { "exit": 1, "passed": 104, "failed": 0, "skipped": 0, "existingTodo": 2, "filesDrained": 8, "filesPlanned": 8, "reclamationAccepted": true, "reason": "Two preexisting proof TODOs prevent complete strict acceptance" },
+    "existingCiPolicy": { "WXS_ACCEPT_TODO": 1, "exit": 0, "passed": 104, "failed": 0, "existingTodo": 2, "filesDrained": 8, "reclamationAccepted": true },
+    "independentCompiledPlugin": { "passed": 3, "failed": 0, "skipped": 0, "todo": 0, "scope": "Real compiled ChatAdmission and Host adapter over controlled SDK: durable Accepted/ProviderStarted/Completed, opaque token/counters, old A terminal preserves B token/ledger/custody and B exact terminal releases them", "limits": "No real provider network execution claim. Two earlier temporary probe errors retained; no product change made to satisfy the probe." },
+    "fullRelease": "Pending final routing candidate; gen102 full release does not cover this source"
+  },
+  "remoteCiBeforeFixtureRepair": {
+    "head": "87c997de0b3421fb19990a9cf3da437e14b956d0",
+    "url": "https://github.com/dyx13/vibe-fs/actions/runs/39519297669",
+    "exit": 1,
+    "unit": { "passed": 4421, "failed": 6, "skipped": 207, "todo": 277, "filesDrained": 757, "filesPlanned": 757 },
+    "cause": "All six native-crash tests used cold-reader-<four-digit PID>, which correctly violates the existing WriterId reserved segment suffix",
+    "repair": "Use cold-reader-p<PID>; real EventStore accepts deterministic PID digit boundaries and still rejects all old reserved suffix examples",
+    "productionParserChanged": false
+  },
+  "completeLogSha256": {
+    "gen103Build": "892a2b940fb3f9c2512b149f56ea26d1a7c9f270271eea4c82365d7feaf1b41d",
+    "gen103Strict": "249e5c8a1e7ff63f874bf34cc47381866d44c68fa2b4e55ce4802e76ed6ee80b",
+    "gen103CiPolicy": "7b5cb18e24dc4842cf1926297f2447e246d78df7d0d568979731c11ae117b603",
+    "remoteCiFailed": "88473b46bcdc577b08fca823efdf841fd471bdf5105947a9c16518ef5f7864c8",
+    "independentPlugin": "4ad8d8ad26a9604da7e5eb5ec0054b7b0bd2b165552c1d53624a99bd36681ef8"
+  },
+  "deployed": false
+}

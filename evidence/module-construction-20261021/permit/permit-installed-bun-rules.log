@@ -1,0 +1,24 @@
+bun test v1.3.14 (d1632b29)
+
+002.test.mjs:
+(pass) SPEC[permit-5] adjacent bigint credits beyond Number precision remain distinct exact permits [0.96ms]
+(pass) SPEC[permit-5] equivalent number and bigint credits reuse the original frozen handle and encoding [0.26ms]
+(pass) SPEC[permit-5] credit Int64 maximum is accepted and overflow is rejected before mutation [0.26ms]
+(pass) SPEC[permit-5] invalid numeric and bigint credits leave the current permit unchanged [0.11ms]
+(pass) SPEC[permit-5] fence comparison is strict and new issues select their own encoding [0.09ms]
+(pass) SPEC[permit-5] bigint permits reject forged foreign and old-physical receipts without changing the successor [0.12ms]
+
+001.test.mjs:
+(pass) SPEC[permit-1] a repeated issue with the same identity and credit returns the same permit [0.07ms]
+(pass) SPEC[permit-1] a changed identity or credit issues a new permit and the old one becomes stale [0.05ms]
+(pass) SPEC[permit-1] sessions are independent [0.04ms]
+(pass) SPEC[permit-2] counterexample: forged, foreign, null and wrong-fence permits are refused without effect [0.09ms]
+(pass) SPEC[permit-3] pending → committed → released by physical completion [0.09ms]
+(pass) SPEC[permit-3] pending → released before provider excludes physical completion [0.04ms]
+(pass) SPEC[permit-3] pending → released by physical completion without a commit; then before-provider conflicts [0.05ms]
+(pass) SPEC[permit-4] observed identity must match field by field [0.16ms]
+(pass) SPEC[permit-1] malformed input is a caller error [0.53ms]
+
+ 15 pass
+ 0 fail
+Ran 15 tests across 2 files. [26.00ms]

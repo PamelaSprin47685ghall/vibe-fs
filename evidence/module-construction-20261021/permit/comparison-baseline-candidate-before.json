@@ -1,0 +1,28 @@
+[
+  {
+    "name": "baseline",
+    "value": {
+      "commit": "StaleFence",
+      "currentAfterCommit": "Pending",
+      "currentAfterRelease": "Pending",
+      "lifecycle": "Rejected",
+      "originalCommit": "Applied",
+      "release": "StaleFence",
+      "sameProjection": true,
+      "target": "Rejected"
+    }
+  },
+  {
+    "name": "candidate-before",
+    "value": {
+      "commit": "Applied",
+      "currentAfterCommit": "Committed",
+      "currentAfterRelease": "Released",
+      "lifecycle": "Ok",
+      "originalCommit": "Applied",
+      "release": "Applied",
+      "sameProjection": true,
+      "target": "Ok"
+    }
+  }
+]

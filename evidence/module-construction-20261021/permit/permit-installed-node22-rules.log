@@ -1,0 +1,85 @@
+TAP version 13
+# Subtest: SPEC[permit-1] a repeated issue with the same identity and credit returns the same permit
+ok 1 - SPEC[permit-1] a repeated issue with the same identity and credit returns the same permit
+  ---
+  duration_ms: 0.739042
+  ...
+# Subtest: SPEC[permit-1] a changed identity or credit issues a new permit and the old one becomes stale
+ok 2 - SPEC[permit-1] a changed identity or credit issues a new permit and the old one becomes stale
+  ---
+  duration_ms: 0.265792
+  ...
+# Subtest: SPEC[permit-1] sessions are independent
+ok 3 - SPEC[permit-1] sessions are independent
+  ---
+  duration_ms: 0.344709
+  ...
+# Subtest: SPEC[permit-2] counterexample: forged, foreign, null and wrong-fence permits are refused without effect
+ok 4 - SPEC[permit-2] counterexample: forged, foreign, null and wrong-fence permits are refused without effect
+  ---
+  duration_ms: 0.178
+  ...
+# Subtest: SPEC[permit-3] pending → committed → released by physical completion
+ok 5 - SPEC[permit-3] pending → committed → released by physical completion
+  ---
+  duration_ms: 0.216292
+  ...
+# Subtest: SPEC[permit-3] pending → released before provider excludes physical completion
+ok 6 - SPEC[permit-3] pending → released before provider excludes physical completion
+  ---
+  duration_ms: 0.065708
+  ...
+# Subtest: SPEC[permit-3] pending → released by physical completion without a commit; then before-provider conflicts
+ok 7 - SPEC[permit-3] pending → released by physical completion without a commit; then before-provider conflicts
+  ---
+  duration_ms: 0.095625
+  ...
+# Subtest: SPEC[permit-4] observed identity must match field by field
+ok 8 - SPEC[permit-4] observed identity must match field by field
+  ---
+  duration_ms: 0.506
+  ...
+# Subtest: SPEC[permit-1] malformed input is a caller error
+ok 9 - SPEC[permit-1] malformed input is a caller error
+  ---
+  duration_ms: 0.724375
+  ...
+# Subtest: SPEC[permit-5] adjacent bigint credits beyond Number precision remain distinct exact permits
+ok 10 - SPEC[permit-5] adjacent bigint credits beyond Number precision remain distinct exact permits
+  ---
+  duration_ms: 0.680542
+  ...
+# Subtest: SPEC[permit-5] equivalent number and bigint credits reuse the original frozen handle and encoding
+ok 11 - SPEC[permit-5] equivalent number and bigint credits reuse the original frozen handle and encoding
+  ---
+  duration_ms: 0.485
+  ...
+# Subtest: SPEC[permit-5] credit Int64 maximum is accepted and overflow is rejected before mutation
+ok 12 - SPEC[permit-5] credit Int64 maximum is accepted and overflow is rejected before mutation
+  ---
+  duration_ms: 0.271625
+  ...
+# Subtest: SPEC[permit-5] invalid numeric and bigint credits leave the current permit unchanged
+ok 13 - SPEC[permit-5] invalid numeric and bigint credits leave the current permit unchanged
+  ---
+  duration_ms: 0.314417
+  ...
+# Subtest: SPEC[permit-5] fence comparison is strict and new issues select their own encoding
+ok 14 - SPEC[permit-5] fence comparison is strict and new issues select their own encoding
+  ---
+  duration_ms: 0.140458
+  ...
+# Subtest: SPEC[permit-5] bigint permits reject forged foreign and old-physical receipts without changing the successor
+ok 15 - SPEC[permit-5] bigint permits reject forged foreign and old-physical receipts without changing the successor
+  ---
+  duration_ms: 0.176417
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 65.631

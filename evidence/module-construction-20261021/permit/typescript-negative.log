@@ -1,0 +1,9 @@
+consumer-negative.ts(5,23): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number | bigint'.
+consumer-negative.ts(6,22): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number | bigint'.
+consumer-negative.ts(7,37): error TS2345: Argument of type '{}' is not assignable to parameter of type 'number | bigint'.
+consumer-negative.ts(8,8): error TS2540: Cannot assign to 'fence' because it is a read-only property.
+consumer-negative.ts(9,24): error TS2540: Cannot assign to 'model' because it is a read-only property.
+consumer-negative.ts(10,34): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+consumer-negative.ts(11,13): error TS2739: Type '{ sessionId: string; }' is missing the following properties from type 'ExecutionIdentity': physicalUserMessageId, role, participant, target
+consumer-negative.ts(12,7): error TS2322: Type 'number | bigint' is not assignable to type 'number'.
+  Type 'bigint' is not assignable to type 'number'.

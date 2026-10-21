@@ -1,0 +1,19 @@
+TAP version 13
+# Subtest: WHAT[durable-events-005] native crash cold-reader identities stay legal across PID digit boundaries
+not ok 1 - WHAT[durable-events-005] native crash cold-reader identities stay legal across PID digit boundaries
+  ---
+  duration_ms: 81.193166
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs:9:1'
+  failureType: 'testCodeFailure'
+  error: "WriterId must not end with a hyphen and four digits (Parameter 'writerId')"
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 143.47475

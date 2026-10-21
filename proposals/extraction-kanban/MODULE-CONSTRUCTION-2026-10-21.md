@@ -100,3 +100,17 @@ release-05/gen102按原有CI配置完整通过，849.3秒：单元4524/0、757/7
 MF-05已转交接前准备：CUT-10的routing/permit/capacity/queue存在固定已合入子范围，borrowing另列；CUT-11库dispatch先行不等于固定主仓已接；CUT-12没有独立execution-session入口，现有session实为Ownership；CUT-17有完成子范围可独立审；CUT-25还余完整基类/generator。permit下一子包可完整移走旧许可lifecycle owner，但上游float桥会缩窄本地Int64 credit/fence，须先补exact bigint合同、独立包及主仓邻域证据，不能只为入口数量迁移。
 
 各包完成追加实际证据和剩余范围。批次末做统一CI及PR状态核对；部署另列。本轮新上游差异不自动扩大固定输入，也不关闭历史GAP或把局部修复算作全系统验收。
+
+### MF-05：permit公开包与主仓接线候选
+
+库`9c88393f2f898330ff095064dcc623117be80d2c`已正常推自有main并核对远端精确SHA，版本0.10.0/21入口。credit接安全正整数number与正Int64 bigint；等值跨编码重入返回原冻结许可及原编码，fence仍严格匹配原编码。主仓使用原生int64 bigint，不经float。独立实际tarball SHA256为`bf27ee68df4d7cb2fbd70b0b4b80f2085f5b6c270a27a9d6c2682a374e75046e`；Node22/Bun各15条规则、21公开入口加载、独立行为消费和strict TS正例/八个拒绝负例通过。旧20入口/声明原样，JS仅生成注释的构建PID不同，归一该PID后逐字相同，不能称原始产物字节相同。
+
+主仓候选完整退出旧许可lifecycle/当前会话owner，保留capacity ledger、queue、custody、物理执行事实和共享计数；WeakMap只存raw许可到typed引用的表示。第一次候选在内部重造typed wrapper时会错误提交真实许可，隔离F#项目复现后已修引用鉴别；旧实现和修后均拒绝，真许可commit及查询同引用正控通过。身份计数器耗尽只有guard先于mutation的静态顺序证据，未注入seed或冒充执行2^53次。主仓接线尚待统一构建与正式验收。
+
+routing候选只接严格ABI、target解码和理论容量查询，不接ledger/借用。gen102实际调用已复现string/object/Promise(false)容量结果均被当作Acquired；合法false为QueueFull且不调用scheduler，合法true可正常准入。持久`provider/model:v1:high`被错读为model=`provider/model`、reasoning=`v1:high`。按WHAT002保持MJS严格3/1参数，实际配置loader必须有容量函数；proof Surface缺查询的直接构造仍按既有合同处理，非法已存在查询不得宽松降级。候选留/tmp，未算已接收。
+
+### 远端CI补充
+
+`87c997de0`实际GitHub CI [39519297669](https://github.com/dyx13/vibe-fs/actions/runs/39519297669)失败：格式、静态、Fable构建通过，单元4421/6，757/757排空并回收；207 skip/277旧TODO单列。六项均为新增native crash夹具在Linux四位PID下构造`cold-reader-<PID>`，撞到既有WriterId的`-dddd`保留后缀。修夹具并加确定性PID边界正反例，不放宽生产解析。本机gen102通过不覆盖该远端失败。
+
+gen103已通过原静态门禁和Fable构建。permit相关八文件正式验收104/0、8/8排空回收；两项旧TODO使严格入口退出1，同候选按既有CI的WXS_ACCEPT_TODO政策退出0，不能把未证明项算通过。独立实际编译插件三组通过，证明durable Accepted/ProviderStarted、旧A终态不改B的token/ledger/custody、B exact终态持久Completed后释放；这是受控SDK/Host组合，不声称真实provider网络执行。详见[gen103收据](../../evidence/module-construction-20261021/permit/gen103-receipt.json)。routing候选及最终完整发行另验。

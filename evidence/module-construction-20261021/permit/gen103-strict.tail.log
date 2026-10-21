@@ -1,0 +1,32 @@
+[verification-test-start] {"pid":26704,"parentPid":26696,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] a_copied_legacy_prefix_cannot_hide_an_old_series_id_in_its_remaining_suffix","fullName":"WHAT[durable-events-005] a_copied_legacy_prefix_cannot_hide_an_old_series_id_in_its_remaining_suffix"}
+[verification-test-start] {"pid":26704,"parentPid":26696,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] line_continuation_with_a_half_line_still_fails_closed","fullName":"WHAT[durable-events-005] line_continuation_with_a_half_line_still_fails_closed"}
+[verification-test-start] {"pid":26704,"parentPid":26696,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] line_continuation_with_overlapping_ids_still_fails_closed","fullName":"WHAT[durable-events-005] line_continuation_with_overlapping_ids_still_fails_closed"}
+[verification-test-start] {"pid":26704,"parentPid":26696,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] readStreams_reads_line_continuation_as_series_plus_legacy_lines","fullName":"WHAT[durable-events-005] readStreams_reads_line_continuation_as_series_plus_legacy_lines"}
+[verification-test-start] {"pid":26704,"parentPid":26696,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] rolling_a_new_segment_preserves_sealed_local_bytes_without_git_objects","fullName":"WHAT[durable-events-005] rolling_a_new_segment_preserves_sealed_local_bytes_without_git_objects"}
+[verification-worker-cost] {"version":1,"phase":"exit","sequence":1,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","pid":26704,"parentPid":26696,"monotonicMs":5946.72125,"cpuUserMicros":500558,"cpuSystemMicros":247696,"exitCode":0}
+runner: file lifecycle {"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","type":"runner:file-drained","elapsedMs":6214.568625}
+runner: worker cost {"version":1,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","enabled":true,"pid":26704,"status":"complete","reason":null,"preImport":{"version":1,"phase":"pre-import","sequence":0,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","pid":26704,"parentPid":26696,"monotonicMs":13.889167,"cpuUserMicros":40287,"cpuSystemMicros":4355},"exit":{"version":1,"phase":"exit","sequence":1,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/durable-events/tests/005.test.mjs","pid":26704,"parentPid":26696,"monotonicMs":5946.72125,"cpuUserMicros":500558,"cpuSystemMicros":247696,"exitCode":0},"interval":{"clockPid":26704,"wallMs":5932.832082999999,"cpuUserMicros":460271,"cpuSystemMicros":243341}}
+
+[test-summary] 8 file(s), 104 passed, 0 failed, 2 todo (6.17s wall, 9.32s test time)
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/execution-model-routing/tests/011.test.mjs:WHAT[execution-model-routing-011] actual admission proves target resolution, durable Accepted, exact capacity, binding and Host projection order, with zero later effects on failure (GAP-128/131) — reason not supplied
+  todo: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/execution-model-routing/tests/012.test.mjs:WHAT[execution-model-routing-012] compiler rejects fabricated exact opaque capacity fences and direct foreign custody construction (GAP-128: F# type-level opacity proof pending — the runtime fail-closed test above is retained but does not prove compile-time rejection) — reason not supplied
+runner: post-exit group verification/reclamation: pid=26696; elapsedMs=19.581; accepted=true
+runner: 106 test(s), 9.3s of test time; max 2145ms, p90 257ms, median 2ms
+runner:    2145ms  WHAT[execution-model-routing-014] seeded bounded admission soak preserves fairness and exact reconciliation after every operation
+runner:     760ms  WHAT[durable-events-005] interrupted_line_continuation_resumes_after_each_complete_copied_prefix
+runner:     754ms  WHAT[durable-events-005] real OS crash at resume-copied-fsync preserves the complete continuation and resumes idempotently
+runner:     671ms  WHAT[durable-events-005] real OS crash at fsync-first preserves the complete continuation and resumes idempotently
+runner:     648ms  WHAT[durable-events-005] real OS crash at append-first preserves the complete continuation and resumes idempotently
+
+runner: 104 passed, 0 failed; 8/8 planned file(s) completed
+runner: partial evidence; 0 skipped, 2 TODO; excluded cases are not passes
+runner: pending proof prevents complete acceptance
+Error: runner: supervised suite failed (exit 1)
+    at fail (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:224:25)
+    at superviseOwnedNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:578:7)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async superviseNodeTest (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/e2e/support/supervise-node-test.mjs:197:14)
+    at async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/run.mjs:98:1 {
+  exitCode: 1,
+  [cause]: undefined
+}

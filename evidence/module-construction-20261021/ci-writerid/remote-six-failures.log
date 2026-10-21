@@ -1,0 +1,175 @@
+check	Run verification	2026-10-21T00:11:03.7865366Z ✖ failing tests:
+check	Run verification	2026-10-21T00:11:03.7865864Z 
+check	Run verification	2026-10-21T00:11:03.7866720Z test at /home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs:7:3
+check	Run verification	2026-10-21T00:11:03.7869880Z ✖ WHAT[durable-events-005] real OS crash at append-first preserves the complete continuation and resumes idempotently (988.202ms)
+check	Run verification	2026-10-21T00:11:03.7871624Z   AssertionError [ERR_ASSERTION]: 
+check	Run verification	2026-10-21T00:11:03.7894186Z   node:internal/modules/run_main:123
+check	Run verification	2026-10-21T00:11:03.7899250Z       triggerUncaughtException(
+check	Run verification	2026-10-21T00:11:03.7899834Z       ^
+check	Run verification	2026-10-21T00:11:03.7900249Z   Exception {
+check	Run verification	2026-10-21T00:11:03.7901110Z     message: "WriterId must not end with a hyphen and four digits (Parameter 'writerId')",
+check	Run verification	2026-10-21T00:11:03.7902356Z     innerException: undefined
+check	Run verification	2026-10-21T00:11:03.7903199Z   }
+check	Run verification	2026-10-21T00:11:03.7903611Z   
+check	Run verification	2026-10-21T00:11:03.7904082Z   Node.js v22.23.3
+check	Run verification	2026-10-21T00:11:03.7904505Z   
+check	Run verification	2026-10-21T00:11:03.7904816Z   
+check	Run verification	2026-10-21T00:11:03.7905155Z   1 !== 0
+check	Run verification	2026-10-21T00:11:03.7905523Z   
+check	Run verification	2026-10-21T00:11:03.7906562Z       at ChildProcess.<anonymous> (file:///home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/support/native-crash.mjs:218:18)
+check	Run verification	2026-10-21T00:11:03.7907650Z       at Object.onceWrapper (node:events:634:26)
+check	Run verification	2026-10-21T00:11:03.7908258Z       at ChildProcess.emit (node:events:519:28)
+check	Run verification	2026-10-21T00:11:03.7908851Z       at maybeClose (node:internal/child_process:1101:16)
+check	Run verification	2026-10-21T00:11:03.7909551Z       at ChildProcess._handle.onexit (node:internal/child_process:304:5)
+check	Run verification	2026-10-21T00:11:03.7910066Z 
+check	Run verification	2026-10-21T00:11:03.9793932Z [verification-test-start] {"pid":8558,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/sphinx-v2/tests/019.test.mjs","name":"WHAT[sphinx-v2-019] actual store valid preserves Sphinx settlement and cold replay under explicit bad-payload defense","fullName":"WHAT[sphinx-v2-019] actual store valid preserves Sphinx settlement and cold replay under explicit bad-payload defense"}
+check	Run verification	2026-10-21T00:11:04.4545225Z [verification-fixture-phase] {"phase":"npm:archive-install-enter","pid":4638,"parentPid":4381,"elapsedMs":47390.427029,"archivePath":"/tmp/verification-npm-fixture-UWtmCj/tools.tar"}
+check	Run verification	2026-10-21T00:11:04.4749019Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] real OS crash at append-unicode-second preserves the complete continuation and resumes idempotently","fullName":"WHAT[durable-events-005] real OS crash at append-unicode-second preserves the complete continuation and resumes idempotently"}
+check	Run verification	2026-10-21T00:11:04.4756740Z test at /home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs:7:3
+check	Run verification	2026-10-21T00:11:04.4759102Z ✖ WHAT[durable-events-005] real OS crash at fsync-first preserves the complete continuation and resumes idempotently (691.599ms)
+check	Run verification	2026-10-21T00:11:04.4760132Z   AssertionError [ERR_ASSERTION]: 
+check	Run verification	2026-10-21T00:11:04.4760726Z   node:internal/modules/run_main:123
+check	Run verification	2026-10-21T00:11:04.4761333Z       triggerUncaughtException(
+check	Run verification	2026-10-21T00:11:04.4761833Z       ^
+check	Run verification	2026-10-21T00:11:04.4762535Z   Exception {
+check	Run verification	2026-10-21T00:11:04.4763463Z     message: "WriterId must not end with a hyphen and four digits (Parameter 'writerId')",
+check	Run verification	2026-10-21T00:11:04.4764257Z     innerException: undefined
+check	Run verification	2026-10-21T00:11:04.4764730Z   }
+check	Run verification	2026-10-21T00:11:04.4765108Z   
+check	Run verification	2026-10-21T00:11:04.4765508Z   Node.js v22.23.3
+check	Run verification	2026-10-21T00:11:04.4765922Z   
+check	Run verification	2026-10-21T00:11:04.4766285Z   
+check	Run verification	2026-10-21T00:11:04.4766656Z   1 !== 0
+check	Run verification	2026-10-21T00:11:04.4767039Z   
+check	Run verification	2026-10-21T00:11:04.4767995Z       at ChildProcess.<anonymous> (file:///home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/support/native-crash.mjs:218:18)
+check	Run verification	2026-10-21T00:11:04.4768940Z       at Object.onceWrapper (node:events:634:26)
+check	Run verification	2026-10-21T00:11:04.4769575Z       at ChildProcess.emit (node:events:519:28)
+check	Run verification	2026-10-21T00:11:04.4770200Z       at maybeClose (node:internal/child_process:1101:16)
+check	Run verification	2026-10-21T00:11:04.4770943Z       at ChildProcess._handle.onexit (node:internal/child_process:304:5)
+check	Run verification	2026-10-21T00:11:04.4771459Z 
+check	Run verification	2026-10-21T00:11:04.7318450Z [verification-test-start] {"pid":8558,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/sphinx-v2/tests/019.test.mjs","name":"WHAT[sphinx-v2-019] actual store malformed preserves Sphinx settlement and cold replay under explicit bad-payload defense","fullName":"WHAT[sphinx-v2-019] actual store malformed preserves Sphinx settlement and cold replay under explicit bad-payload defense"}
+check	Run verification	2026-10-21T00:11:05.1117658Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] real OS crash at before-unlink preserves the complete continuation and resumes idempotently","fullName":"WHAT[durable-events-005] real OS crash at before-unlink preserves the complete continuation and resumes idempotently"}
+check	Run verification	2026-10-21T00:11:05.1172626Z test at /home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs:7:3
+check	Run verification	2026-10-21T00:11:05.1205210Z ✖ WHAT[durable-events-005] real OS crash at append-unicode-second preserves the complete continuation and resumes idempotently (637.663ms)
+check	Run verification	2026-10-21T00:11:05.1222912Z   AssertionError [ERR_ASSERTION]: 
+check	Run verification	2026-10-21T00:11:05.1243620Z   node:internal/modules/run_main:123
+check	Run verification	2026-10-21T00:11:05.1244273Z       triggerUncaughtException(
+check	Run verification	2026-10-21T00:11:05.1244854Z       ^
+check	Run verification	2026-10-21T00:11:05.1245245Z   Exception {
+check	Run verification	2026-10-21T00:11:05.1245936Z     message: "WriterId must not end with a hyphen and four digits (Parameter 'writerId')",
+check	Run verification	2026-10-21T00:11:05.1246713Z     innerException: undefined
+check	Run verification	2026-10-21T00:11:05.1262201Z   }
+check	Run verification	2026-10-21T00:11:05.1262735Z   
+check	Run verification	2026-10-21T00:11:05.1263459Z   Node.js v22.23.3
+check	Run verification	2026-10-21T00:11:05.1263789Z   
+check	Run verification	2026-10-21T00:11:05.1264055Z   
+check	Run verification	2026-10-21T00:11:05.1264289Z   1 !== 0
+check	Run verification	2026-10-21T00:11:05.1264654Z   
+check	Run verification	2026-10-21T00:11:05.1265623Z       at ChildProcess.<anonymous> (file:///home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/support/native-crash.mjs:218:18)
+check	Run verification	2026-10-21T00:11:05.1266264Z       at Object.onceWrapper (node:events:634:26)
+check	Run verification	2026-10-21T00:11:05.1266641Z       at ChildProcess.emit (node:events:519:28)
+check	Run verification	2026-10-21T00:11:05.1266996Z       at maybeClose (node:internal/child_process:1101:16)
+check	Run verification	2026-10-21T00:11:05.1267413Z       at ChildProcess._handle.onexit (node:internal/child_process:304:5)
+check	Run verification	2026-10-21T00:11:05.1267673Z 
+check	Run verification	2026-10-21T00:11:05.3905682Z [verification-tool-phase] {"phase":"monitor-spawned","pid":4638,"parentPid":4381,"at":1792541465386,"monitorPid":8810,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:05.4305953Z [verification-tool-phase] {"phase":"tool-spawned","pid":8810,"parentPid":4638,"at":1792541465427,"toolPid":8818,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:05.4582178Z [verification-tool-phase] {"phase":"tool-exited","pid":8810,"parentPid":4638,"at":1792541465456,"toolPid":8818,"exitCode":0,"signal":null}
+check	Run verification	2026-10-21T00:11:05.4665632Z [verification-tool-phase] {"phase":"group-drained","pid":8810,"parentPid":4638,"at":1792541465465,"toolPid":8818}
+check	Run verification	2026-10-21T00:11:05.4696750Z [verification-tool-phase] {"phase":"monitor-closed","pid":4638,"parentPid":4381,"at":1792541465468,"monitorPid":8810,"exitCode":0,"signal":null}
+check	Run verification	2026-10-21T00:11:05.4874651Z [verification-test-start] {"pid":8558,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/sphinx-v2/tests/019.test.mjs","name":"WHAT[sphinx-v2-019] actual store valid-release preserves Sphinx settlement and cold replay under explicit bad-payload defense","fullName":"WHAT[sphinx-v2-019] actual store valid-release preserves Sphinx settlement and cold replay under explicit bad-payload defense"}
+check	Run verification	2026-10-21T00:11:05.6575600Z [verification-tool-phase] {"phase":"monitor-spawned","pid":4638,"parentPid":4381,"at":1792541465655,"monitorPid":8858,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:05.7015692Z [verification-tool-phase] {"phase":"tool-spawned","pid":8858,"parentPid":4638,"at":1792541465699,"toolPid":8865,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:05.8010896Z [verification-tool-phase] {"phase":"tool-exited","pid":8858,"parentPid":4638,"at":1792541465799,"toolPid":8865,"exitCode":0,"signal":null}
+check	Run verification	2026-10-21T00:11:05.8113058Z [verification-tool-phase] {"phase":"group-drained","pid":8858,"parentPid":4638,"at":1792541465809,"toolPid":8865}
+check	Run verification	2026-10-21T00:11:05.8175044Z [verification-tool-phase] {"phase":"monitor-closed","pid":4638,"parentPid":4381,"at":1792541465813,"monitorPid":8858,"exitCode":0,"signal":null}
+check	Run verification	2026-10-21T00:11:05.8438967Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] real OS crash at after-unlink preserves the complete continuation and resumes idempotently","fullName":"WHAT[durable-events-005] real OS crash at after-unlink preserves the complete continuation and resumes idempotently"}
+check	Run verification	2026-10-21T00:11:05.8455164Z test at /home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs:7:3
+check	Run verification	2026-10-21T00:11:05.8495731Z ✖ WHAT[durable-events-005] real OS crash at before-unlink preserves the complete continuation and resumes idempotently (728.309ms)
+check	Run verification	2026-10-21T00:11:05.8506216Z   AssertionError [ERR_ASSERTION]: 
+check	Run verification	2026-10-21T00:11:05.8506899Z   node:internal/modules/run_main:123
+check	Run verification	2026-10-21T00:11:05.8507505Z       triggerUncaughtException(
+check	Run verification	2026-10-21T00:11:05.8507891Z       ^
+check	Run verification	2026-10-21T00:11:05.8508166Z   Exception {
+check	Run verification	2026-10-21T00:11:05.8508757Z     message: "WriterId must not end with a hyphen and four digits (Parameter 'writerId')",
+check	Run verification	2026-10-21T00:11:05.8509377Z     innerException: undefined
+check	Run verification	2026-10-21T00:11:05.8509713Z   }
+check	Run verification	2026-10-21T00:11:05.8509925Z   
+check	Run verification	2026-10-21T00:11:05.8510134Z   Node.js v22.23.3
+check	Run verification	2026-10-21T00:11:05.8510358Z   
+check	Run verification	2026-10-21T00:11:05.8510532Z   
+check	Run verification	2026-10-21T00:11:05.8510712Z   1 !== 0
+check	Run verification	2026-10-21T00:11:05.8510905Z   
+check	Run verification	2026-10-21T00:11:05.8511534Z       at ChildProcess.<anonymous> (file:///home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/support/native-crash.mjs:218:18)
+check	Run verification	2026-10-21T00:11:05.8512491Z       at Object.onceWrapper (node:events:634:26)
+check	Run verification	2026-10-21T00:11:05.8513139Z       at ChildProcess.emit (node:events:519:28)
+check	Run verification	2026-10-21T00:11:05.8513708Z       at maybeClose (node:internal/child_process:1101:16)
+check	Run verification	2026-10-21T00:11:05.8514855Z       at ChildProcess._handle.onexit (node:internal/child_process:304:5)
+check	Run verification	2026-10-21T00:11:05.8515285Z 
+check	Run verification	2026-10-21T00:11:06.1503905Z [verification-test-start] {"pid":8558,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/sphinx-v2/tests/019.test.mjs","name":"WHAT[sphinx-v2-019] actual store malformed-release preserves Sphinx settlement and cold replay under explicit bad-payload defense","fullName":"WHAT[sphinx-v2-019] actual store malformed-release preserves Sphinx settlement and cold replay under explicit bad-payload defense"}
+check	Run verification	2026-10-21T00:11:06.1975556Z [verification-tool-phase] {"phase":"monitor-spawned","pid":4638,"parentPid":4381,"at":1792541466195,"monitorPid":8928,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:06.2403532Z [verification-tool-phase] {"phase":"tool-spawned","pid":8928,"parentPid":4638,"at":1792541466236,"toolPid":8940,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:06.2738176Z [verification-tool-phase] {"phase":"tool-exited","pid":8928,"parentPid":4638,"at":1792541466270,"toolPid":8940,"exitCode":0,"signal":null}
+check	Run verification	2026-10-21T00:11:06.2814056Z [verification-tool-phase] {"phase":"group-drained","pid":8928,"parentPid":4638,"at":1792541466280,"toolPid":8940}
+check	Run verification	2026-10-21T00:11:06.2871220Z [verification-tool-phase] {"phase":"monitor-closed","pid":4638,"parentPid":4381,"at":1792541466285,"monitorPid":8928,"exitCode":0,"signal":null}
+check	Run verification	2026-10-21T00:11:06.4622318Z [verification-tool-phase] {"phase":"monitor-spawned","pid":4638,"parentPid":4381,"at":1792541466460,"monitorPid":8959,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:06.4676379Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] real OS crash at resume-copied-fsync preserves the complete continuation and resumes idempotently","fullName":"WHAT[durable-events-005] real OS crash at resume-copied-fsync preserves the complete continuation and resumes idempotently"}
+check	Run verification	2026-10-21T00:11:06.4724181Z test at /home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs:7:3
+check	Run verification	2026-10-21T00:11:06.4749070Z ✖ WHAT[durable-events-005] real OS crash at after-unlink preserves the complete continuation and resumes idempotently (627.238ms)
+check	Run verification	2026-10-21T00:11:06.4773549Z   AssertionError [ERR_ASSERTION]: 
+check	Run verification	2026-10-21T00:11:06.4803586Z   node:internal/modules/run_main:123
+check	Run verification	2026-10-21T00:11:06.4804333Z       triggerUncaughtException(
+check	Run verification	2026-10-21T00:11:06.4829051Z       ^
+check	Run verification	2026-10-21T00:11:06.4829551Z   Exception {
+check	Run verification	2026-10-21T00:11:06.4830309Z     message: "WriterId must not end with a hyphen and four digits (Parameter 'writerId')",
+check	Run verification	2026-10-21T00:11:06.4831085Z     innerException: undefined
+check	Run verification	2026-10-21T00:11:06.4831593Z   }
+check	Run verification	2026-10-21T00:11:06.4831971Z   
+check	Run verification	2026-10-21T00:11:06.4832349Z   Node.js v22.23.3
+check	Run verification	2026-10-21T00:11:06.4832738Z   
+check	Run verification	2026-10-21T00:11:06.4833274Z   
+check	Run verification	2026-10-21T00:11:06.4833659Z   1 !== 0
+check	Run verification	2026-10-21T00:11:06.4834042Z   
+check	Run verification	2026-10-21T00:11:06.4835057Z       at ChildProcess.<anonymous> (file:///home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/support/native-crash.mjs:218:18)
+check	Run verification	2026-10-21T00:11:06.4836169Z       at Object.onceWrapper (node:events:634:26)
+check	Run verification	2026-10-21T00:11:06.4836805Z       at ChildProcess.emit (node:events:519:28)
+check	Run verification	2026-10-21T00:11:06.4837501Z       at maybeClose (node:internal/child_process:1101:16)
+check	Run verification	2026-10-21T00:11:06.4838278Z       at ChildProcess._handle.onexit (node:internal/child_process:304:5)
+check	Run verification	2026-10-21T00:11:06.4838818Z 
+check	Run verification	2026-10-21T00:11:06.5215263Z [verification-tool-phase] {"phase":"tool-spawned","pid":8959,"parentPid":4638,"at":1792541466518,"toolPid":8975,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:06.6395291Z [verification-tool-phase] {"phase":"tool-exited","pid":8959,"parentPid":4638,"at":1792541466637,"toolPid":8975,"exitCode":0,"signal":null}
+check	Run verification	2026-10-21T00:11:06.6509135Z [verification-tool-phase] {"phase":"group-drained","pid":8959,"parentPid":4638,"at":1792541466646,"toolPid":8975}
+check	Run verification	2026-10-21T00:11:06.6526076Z [verification-tool-phase] {"phase":"monitor-closed","pid":4638,"parentPid":4381,"at":1792541466651,"monitorPid":8959,"exitCode":0,"signal":null}
+check	Run verification	2026-10-21T00:11:06.8398401Z [verification-tool-phase] {"phase":"monitor-spawned","pid":4638,"parentPid":4381,"at":1792541466825,"monitorPid":9011,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:06.8679443Z runner: file lifecycle {"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/sphinx-v2/tests/019.test.mjs","type":"runner:file-drained","elapsedMs":52547.923346999996}
+check	Run verification	2026-10-21T00:11:06.8682477Z runner: worker cost {"version":1,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/sphinx-v2/tests/019.test.mjs","enabled":false,"pid":null,"status":"disabled","reason":"Worker diagnostics disabled","preImport":null,"exit":null,"interval":null}
+check	Run verification	2026-10-21T00:11:06.8716843Z runner: file lifecycle {"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/knowledge-reuse/tests/010.test.mjs","runId":"62a71605b1fd1998c83233c4a8a808b6","pid":4381,"parentPid":4371,"type":"runner:file-start","elapsedMs":52550.522279}
+check	Run verification	2026-10-21T00:11:06.8726990Z [verification-tool-phase] {"phase":"tool-spawned","pid":9011,"parentPid":4638,"at":1792541466869,"toolPid":9024,"executable":"/tmp/verification-npm-fixture-UWtmCj/candidates/verification-archive-K7xtBN/toolchain/node/bin/node"}
+check	Run verification	2026-10-21T00:11:07.0769131Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] small_history_stays_one_segment_named_with_seq_suffix","fullName":"WHAT[durable-events-005] small_history_stays_one_segment_named_with_seq_suffix"}
+check	Run verification	2026-10-21T00:11:07.0772012Z test at /home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs:7:3
+check	Run verification	2026-10-21T00:11:07.0774375Z ✖ WHAT[durable-events-005] real OS crash at resume-copied-fsync preserves the complete continuation and resumes idempotently (606.513ms)
+check	Run verification	2026-10-21T00:11:07.0787029Z   AssertionError [ERR_ASSERTION]: 
+check	Run verification	2026-10-21T00:11:07.0787709Z   node:internal/modules/run_main:123
+check	Run verification	2026-10-21T00:11:07.0788265Z       triggerUncaughtException(
+check	Run verification	2026-10-21T00:11:07.0788730Z       ^
+check	Run verification	2026-10-21T00:11:07.0789132Z   Exception {
+check	Run verification	2026-10-21T00:11:07.0789880Z     message: "WriterId must not end with a hyphen and four digits (Parameter 'writerId')",
+check	Run verification	2026-10-21T00:11:07.0790635Z     innerException: undefined
+check	Run verification	2026-10-21T00:11:07.0791095Z   }
+check	Run verification	2026-10-21T00:11:07.0791464Z   
+check	Run verification	2026-10-21T00:11:07.0791863Z   Node.js v22.23.3
+check	Run verification	2026-10-21T00:11:07.0792287Z   
+check	Run verification	2026-10-21T00:11:07.0792616Z   
+check	Run verification	2026-10-21T00:11:07.0793284Z   1 !== 0
+check	Run verification	2026-10-21T00:11:07.0793663Z   
+check	Run verification	2026-10-21T00:11:07.0794677Z       at ChildProcess.<anonymous> (file:///home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/support/native-crash.mjs:218:18)
+check	Run verification	2026-10-21T00:11:07.0795808Z       at Object.onceWrapper (node:events:634:26)
+check	Run verification	2026-10-21T00:11:07.0796449Z       at ChildProcess.emit (node:events:519:28)
+check	Run verification	2026-10-21T00:11:07.0797116Z       at maybeClose (node:internal/child_process:1101:16)
+check	Run verification	2026-10-21T00:11:07.0797863Z       at ChildProcess._handle.onexit (node:internal/child_process:304:5)
+check	Run verification	2026-10-21T00:11:07.0798387Z 
+check	Run verification	2026-10-21T00:11:07.3024211Z [verification-fixture-phase] {"phase":"npm:registry-request","pid":4638,"parentPid":4381,"elapsedMs":50240.233133,"root":"/tmp/verification-npm-fixture-UWtmCj","method":"GET","path":"/wxs-fixture-leaf/-/wxs-fixture-leaf-1.0.0.tgz"}
+check	Run verification	2026-10-21T00:11:07.3801177Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] DURABLE_EVENTS_005_one_process_is_one_segment_series_and_appends_preserve_prior_bytes","fullName":"WHAT[durable-events-005] DURABLE_EVENTS_005_one_process_is_one_segment_series_and_appends_preserve_prior_bytes"}
+check	Run verification	2026-10-21T00:11:07.4305858Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] DURABLE_EVENTS_005_each_process_writer_id_names_a_distinct_segment_series","fullName":"WHAT[durable-events-005] DURABLE_EVENTS_005_each_process_writer_id_names_a_distinct_segment_series"}
+check	Run verification	2026-10-21T00:11:07.4371651Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] append_continues_the_highest_segment_instead_of_opening_a_suffixless_file","fullName":"WHAT[durable-events-005] append_continues_the_highest_segment_instead_of_opening_a_suffixless_file"}
+check	Run verification	2026-10-21T00:11:07.4505306Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] legacy_suffixless_file_is_still_read_as_one_writer_stream","fullName":"WHAT[durable-events-005] legacy_suffixless_file_is_still_read_as_one_writer_stream"}
+check	Run verification	2026-10-21T00:11:07.4529228Z [verification-test-start] {"pid":8635,"parentPid":4381,"entryFile":"/home/runner/work/vibe-fs/vibe-fs/requirements/durable-events/tests/005.test.mjs","name":"WHAT[durable-events-005] appending_past_the_cap_rolls_to_the_next_segment","fullName":"WHAT[durable-events-005] appending_past_the_cap_rolls_to_the_next_segment"}

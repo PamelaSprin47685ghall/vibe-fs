@@ -14,10 +14,10 @@
 | MF-01 | DOING（物理隔离前置） | vm候选Node22为20/0、Bun为18/2，不接入。Process/Worker终止及POSIX暂停恢复原语已实证；同步API回执、Callable句柄、长期park及完整Host链仍待独立协议验收 |
 | MF-02A | REVIEW（限定修复） | gen95目标集合38/0；严格S4夹具已证明持久准入；Host缺原子attempt中断，check到abort窗口仍在 |
 | MF-02B | REVIEW（delivery/prefix/compression） | 库3db7b43及后续c4bc2ca已推；18入口公开包及Node/Bun各73+独立6项通过；gen102完整发行通过，旧TODO另列；projection后续分包审查 |
-| MF-03A | REVIEW（续接恢复） | 新增6个原生write/fsync/unlink切点用例，真实SIGKILL后独立OS冷读及二次恢复，已进gen101单元；不等于断电或完整GAP-151闭合 |
+| MF-03A | REVIEW（续接恢复） | 新增6个原生write/fsync/unlink切点用例，本机gen102发行通过；87c997de0的Linux CI六项因夹具四位PID组成非法WriterId失败，正在修夹具，不放宽生产身份规范；不等于断电或完整GAP-151闭合 |
 | MF-03B | REVIEW（cwd/等待子包） | 12个真实Bun cwd用例通过；旧003夹具修正后gen97为60/0；4h Process/Supervision、2h PTY验收运行中。164KiB Git完整输出被mixed spool拒绝的P2已记，双路spool迁移未做 |
 | MF-04 | REVIEW（retention/防回退） | 库c4bc2ca/0.9.2已推，20入口包消费通过；数值ObservedAt反例已修，主仓9项011进gen101单元；021保住exact cut guard。legacy/series活动选材P2另记，多writer/GAP-151不销项 |
-| MF-05 | PREPARING（permit子包） | 旧DOING来自固定快照，无实时同事状态证据；permit已有稳定合同，隔离候选先保Int64精度再接线；不把Ownership入口当execution-session，不接borrowing未知范围 |
+| MF-05 | DOING（permit接线、routing候选） | permit 9c88393/0.10.0已正常推库main，21入口真实包消费与Node/Bun各15规则通过，typed投影引用鉴别反例已修；待主仓重建验收。routing严格ABI另做隔离候选，不把Ownership入口当execution-session |
 | MF-06 | REVIEW（wait/Casebook/消融窄修） | gen102完整发行通过；消融严格集合22/0/1既有integration skip，4/4回收；独立真实ToolRegistry拒绝无效profile。hash碰撞及borrowed_surface边界P2另记，不为同构纯包增加适配 |
 
 先前N1—N6和UM记录保留历史含义，发行阻断以最终通过CI的精确候选为准，不重复认领已修问题；历史TODO、异常收尾证据和全链缺口不自动销项。
