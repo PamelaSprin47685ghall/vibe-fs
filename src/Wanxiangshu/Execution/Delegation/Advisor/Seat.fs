@@ -31,7 +31,9 @@ type AdvisorSeatDeps =
 /// The first `consult` creates the seat's advisor child through
 /// `ISessionHostPort.CreateChildSession`, so the physical parent is the family root
 /// (HOST-015: a sub-agent's advisor is a sibling of its owner, never a grandchild), and
-/// every later consult appends to that same child.
+/// every later consult reuses that same child but opens a fresh root: a settled (or
+/// voided) consult voids the child's logical run (F39-02), so the next consult's view
+/// prompt is a new authority root rather than a continuation of a finished run.
 ///
 /// The seat registry below is PROCESS-LIVE and owns no durable fact: a restart loses every
 /// seat and the next consult creates a fresh advisor child. The durable link and restart
@@ -40,9 +42,11 @@ type AdvisorSeatDeps =
 ///
 /// A consult sends the view prompt and the intent as two separate managed prompts
 /// (advisor-[002]: never concatenated), waits for the child's terminal, then reads the prose
-/// back. A terminal that never arrives, a terminal that is not a completed run, or an empty
-/// read-back refuses with "advisor did not answer": the seat never fabricates advice
-/// (advisor-[004]).
+/// back. Each prompt of a consult is its own authority run: the view's run is closed as soon
+/// as its own terminal arrives, so the intent prompt roots freshly and owns a committed
+/// model-routing lease of its own (F39-02). A terminal that never arrives, a terminal that is
+/// not a completed run, or an empty read-back refuses with "advisor did not answer": the seat
+/// never fabricates advice (advisor-[004]).
 [<RequireQualifiedAccess>]
 module AdvisorSeat =
 
@@ -54,6 +58,14 @@ module AdvisorSeat =
     /// turn: the seat refuses, and the next consult reuses the same child.
     [<Literal>]
     let private ConsultTimeoutMs = 120_000
+
+
+    /// DSL-MUTABLE: resource — which prompt of the consult is in flight. The view prompt
+    /// runs first and the intent prompt only after the view's own terminal closed its run.
+    [<RequireQualifiedAccess>]
+    type private ConsultPhase =
+        | View
+        | Intent
 
     /// AGENT-001: the managed agent this seat's child runs as.
     let private advisorAgent = ManagedAgent.nameOf Role.Advisor
@@ -330,6 +342,38 @@ module AdvisorSeat =
                 return Error DidNotAnswer
         }
 
+    /// F39-02: close the advisor child's logical run once this consult is over.
+    ///
+    /// The child keeps its identity, but its logical run is finished: a follow-up
+    /// consult must open a fresh root instead of appending to a completed run
+    /// (which has no committed model-routing lease and would fail closed with
+    /// EMR-010). The durable `ChildRunVoided` fact is the existing termination
+    /// evidence; the dispatcher reads the durable projection, so the close has to
+    /// be durable, not process-local.
+    let private voidChildRun
+        (journal: AgentJournal)
+        (callerSessionId: string)
+        (childId: SessionId)
+        : Task<Result<unit, string>> =
+        task {
+            let active = (PromptJournalAdapter.create journal).ProjectionFor childId
+
+            match active.ActiveLogicalRun with
+            | None -> return Ok()
+            | Some _ ->
+                let fact =
+                    Wanxiangshu.Execution.Delegation.ExecutionFact.ChildRunVoided
+                        {| ParentSessionId = SessionId.create callerSessionId
+                           ChildSessionId = childId |}
+
+                let! appended = AgentJournal.appendAgent (StreamId.Session childId) None fact journal
+
+                return
+                    appended
+                    |> Result.map ignore
+                    |> Result.mapError (fun failure -> sprintf "advisor consult could not close its run: %A" failure)
+        }
+
     let private runConsult
         (deps: AdvisorSeatDeps)
         (journal: AgentJournal)
@@ -351,15 +395,23 @@ module AdvisorSeat =
             let completion =
                 TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
+            // F39-02: the view prompt owns a run of its own. Its terminal ends the view
+            // phase; only then is the child's run closed, so the intent prompt roots
+            // freshly with a committed model-routing lease of its own.
+            let viewCompletion =
+                TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+
             let fence =
                 { ChildId = childId
                   PriorRun = priorRun childId }
 
             // DSL-MUTABLE: resource — consult-local fence state. `armed` turns on just before
             // the first send, so the subscribe-time sticky replay (an earlier consult's
-            // terminal) is observation only; `intentKey` is the accepted intent prompt;
-            // `early` holds fresh Completeds seen before the intent key was known.
+            // terminal) is observation only; `phase` says which prompt of the consult is
+            // in flight; `intentKey` is the accepted intent prompt; `early` holds fresh
+            // Completeds seen before the intent key was known.
             let armed = ref false
+            let phase = ref ConsultPhase.View
             let intentKey: PromptKey option ref = ref None
             let early = ResizeArray<AgentRunResult>()
 
@@ -383,19 +435,33 @@ module AdvisorSeat =
                 if armed.Value && not (isStaleRun fence result) then
                     admitCompleted result
 
+            // F39-02: a view-phase terminal ends the view phase; an intent-phase terminal
+            // is the advice candidate. The fence rejects a sticky replay (an earlier
+            // consult's terminal) and any run that did not answer this consult, so it
+            // can neither end the view phase nor answer the intent.
+            let completeAction (result: AgentRunResult) : unit =
+                let acceptable = armed.Value && not (isStaleRun fence result)
+
+                match phase.Value with
+                | ConsultPhase.View when acceptable -> AsyncSupport.trySetResult viewCompletion (Ok()) |> ignore
+                | ConsultPhase.Intent when acceptable -> observeCompleted result
+                | _ -> ()
+
             // AG-LISTENER-BEFORE-SEND: the Host port refuses a prompt for a session with no
             // live terminal listener, and the listener must outlive both sends.
             let onTerminal _ outcome =
                 match outcome with
-                | Completed result -> observeCompleted result
+                | Completed result -> completeAction result
                 | Aborted _
-                | Failed _ when armed.Value -> AsyncSupport.trySetResult completion (Error DidNotAnswer) |> ignore
+                | Failed _ when armed.Value ->
+                    AsyncSupport.trySetResult completion (Error DidNotAnswer) |> ignore
+                    AsyncSupport.trySetResult viewCompletion (Error DidNotAnswer) |> ignore
                 | Aborted _
                 | Failed _ -> ()
 
             use _subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
 
-            let send text =
+            let sendManaged text =
                 dispatcher.SendManagedAssignment port childId text issueIdentitySeed deps.Directory None
 
             // DSL-MUTABLE: resource — acceptance subscriptions the root send attaches; disposed
@@ -411,36 +477,69 @@ module AdvisorSeat =
             // detached root send returns before the Host admits it, and the intent would then be
             // claimed as a second AgentOwnerRoot, which chat admission rejects
             // (ActiveRunIdentityConflict). The root send therefore awaits physical acceptance,
-            // as the fork's first prompt does; a seat with a live run appends both prompts as
-            // continuations.
-            let sendRootView () : Task<Result<PromptKey, string>> =
+            // as the fork's first prompt does.
+            //
+            // F39-02: the same rule governs the intent prompt. The view's run is closed before
+            // the intent is sent, so the intent finds no live logical run and opens a fresh
+            // root of its own — with a committed model-routing lease — instead of continuing a
+            // finished run (EMR-010).
+            let sendRoot (text: string) : Task<Result<PromptKey, string>> =
                 match issueIdentitySeed () with
                 | Error reason -> Task.FromResult(Error reason)
                 | Ok identitySeed ->
                     dispatcher.SendAgentOwnerRoot
                         port
                         childId
-                        viewPrompt
+                        text
                         identitySeed
                         deps.Directory
                         PromptDispatcher.AwaitMode.Await
                         (Some acceptanceObserver)
 
-            let sendView () : Task<Result<PromptKey, string>> =
+            /// A prompt joins the child's live logical run when it has one, and opens a fresh
+            /// root when it has none.
+            let sendPrompt (text: string) : Task<Result<PromptKey, string>> =
                 match (dispatcher.ProjectionFor childId).ActiveLogicalRun with
-                | Some _ -> send viewPrompt
-                | None -> sendRootView ()
+                | Some _ -> sendManaged text
+                | None -> sendRoot text
 
             /// A Host that never admits the view must not hang the caller's turn either.
             let boundedView () : Task<Result<PromptKey, string>> =
                 task {
-                    let viewSend = sendView ()
+                    let viewSend = sendPrompt viewPrompt
                     let! admitted = NodeTiming.raceExit (viewSend :> Task) ConsultTimeoutMs
 
                     if admitted then
                         return! viewSend
                     else
                         return Error DidNotAnswer
+                }
+
+            /// F39-02: the view's own terminal must arrive before the intent is sent, and
+            /// the view's run is closed as soon as it does. A terminal that never arrives
+            /// refuses the consult, exactly like an intent that is never answered.
+            let voidOnViewOutcome (outcome: Result<unit, string>) : Task<Result<unit, string>> =
+                match outcome with
+                | Error reason -> Task.FromResult(Error reason)
+                | Ok() ->
+                    // The close is durable: the dispatcher's projection must not see an
+                    // ActiveLogicalRun, or the intent prompt would append to a finished
+                    // run (EMR-010).
+                    voidChildRun journal callerSessionId childId
+
+            let closeAfterView () : Task<Result<unit, string>> =
+                task {
+                    let! arrived = NodeTiming.raceExit (viewCompletion.Task :> Task) ConsultTimeoutMs
+
+                    // A terminal that never arrives refuses the consult, exactly like an
+                    // intent that is never answered.
+                    let! outcome =
+                        if arrived then
+                            viewCompletion.Task
+                        else
+                            Task.FromResult<Result<unit, string>>(Error DidNotAnswer)
+
+                    return! voidOnViewOutcome outcome
                 }
 
             let disposeAcceptance () =
@@ -463,13 +562,56 @@ module AdvisorSeat =
                 return!
                     taskResult {
                         let! _ = boundedView ()
-                        let! key = send intent
+
+                        // F39-02: the view's run is closed when its own terminal arrives, so
+                        // the intent prompt roots freshly instead of appending to a finished
+                        // run (which has no committed model-routing lease and would fail
+                        // closed with EMR-010).
+                        let! _ = closeAfterView ()
+
+                        phase.Value <- ConsultPhase.Intent
+
+                        let! key = sendPrompt intent
                         acceptIntent key
                         return! awaitAdvisorProse deps childId fence completion
                     }
             finally
                 disposeAcceptance ()
         }
+
+    /// advisor-[004]: an unexpected failure is a refusal like any other — the caller surface
+    /// stays `Result`-valued and no error path ever invents advice.
+    let private attempt (work: unit -> Task<Result<string, string>>) : Task<Result<string, string>> =
+        task {
+            try
+                return! work ()
+            with ex ->
+                return Error(sprintf "advisor consult failed: %s" ex.Message)
+        }
+
+
+    /// One settle point for every consult outcome: a Completed answer, an aborted or
+    /// failed terminal, a timeout, a refused view, a send failure and an unexpected
+    /// exception all leave the child's logical run closed, so no unfinishable run
+    /// stays open and the next consult roots freshly.
+    let private runConsultAndVoid
+        (deps: AdvisorSeatDeps)
+        (journal: AgentJournal)
+        (callerSessionId: string)
+        (childId: SessionId)
+        (intent: string)
+        (viewPrompt: string)
+        : Task<Result<string, string>> =
+        task {
+            let! outcome = attempt (fun () -> runConsult deps journal callerSessionId childId intent viewPrompt)
+
+            let! closed = voidChildRun journal callerSessionId childId
+
+            match closed with
+            | Ok() -> return outcome
+            | Error reason -> return Error reason
+        }
+
 
     let private requireJournal (deps: AdvisorSeatDeps) : Result<AgentJournal, string> =
         match deps.Journal with
@@ -488,7 +630,7 @@ module AdvisorSeat =
 
             match created with
             | Error reason -> return Error reason
-            | Ok childId -> return! runConsult deps journal callerSessionId childId intent viewPrompt
+            | Ok childId -> return! runConsultAndVoid deps journal callerSessionId childId intent viewPrompt
         }
 
     let private consultCore
@@ -503,15 +645,6 @@ module AdvisorSeat =
             | Ok journal -> return! openSeat deps journal callerSessionId intent viewPrompt
         }
 
-    /// advisor-[004]: an unexpected failure is a refusal like any other — the caller surface
-    /// stays `Result`-valued and no error path ever invents advice.
-    let private attempt (work: unit -> Task<Result<string, string>>) : Task<Result<string, string>> =
-        task {
-            try
-                return! work ()
-            with ex ->
-                return Error(sprintf "advisor consult failed: %s" ex.Message)
-        }
 
     let consult
         (deps: AdvisorSeatDeps)

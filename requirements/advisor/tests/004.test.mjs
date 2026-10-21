@@ -115,10 +115,15 @@ test('WHAT[advisor-004] a consult returns the prose of the advisor run that answ
   await withAdvisorOwner(owner, async ({ hooks, createdIds, runtime }) => {
     const pending = advisorCall(hooks, owner, 'is the rewrite safe?', 'call-advisor-1')
     const child = await waitForChild(createdIds)
-    const [view, intent] = await waitForPrompts(runtime, child, 2)
+    const [view] = await waitForPrompts(runtime, child, 1)
+
+    // Each prompt of a consult owns a run of its own: the view's run closes when its
+    // terminal arrives, and only then does the intent prompt root freshly.
+    await advisorRun(hooks, runtime, child, 'run-advisor-view-1', view, 'VIEW-ONE', 10)
+    const [intent] = await waitForPrompts(runtime, child, 2)
     assert.notEqual(keyOf(view), keyOf(intent), 'view and intent are two prompts with their own keys')
 
-    await advisorRun(hooks, runtime, child, 'run-advisor-answer-1', intent, 'ADVICE-ONE: ship it behind a flag', 10)
+    await advisorRun(hooks, runtime, child, 'run-advisor-answer-1', intent, 'ADVICE-ONE: ship it behind a flag', 20)
 
     const result = await within(pending, SETTLE_MS)
     assert.notEqual(result, null, 'the published Completed of the intent run must settle the consult (not the 120 s fallback)')
@@ -130,8 +135,10 @@ test('WHAT[advisor-004] a consult returns the prose of the advisor run that answ
 const firstConsultSettled = async (hooks, createdIds, runtime, owner) => {
   const first = advisorCall(hooks, owner, 'first question', 'call-advisor-a')
   const child = await waitForChild(createdIds)
-  const [, firstIntent] = await waitForPrompts(runtime, child, 2)
-  await advisorRun(hooks, runtime, child, 'run-advisor-a', firstIntent, 'ADVICE-A', 10)
+  const [firstView] = await waitForPrompts(runtime, child, 1)
+  await advisorRun(hooks, runtime, child, 'run-advisor-a-view', firstView, 'VIEW-A', 10)
+  const [firstIntent] = await waitForPrompts(runtime, child, 2)
+  await advisorRun(hooks, runtime, child, 'run-advisor-a', firstIntent, 'ADVICE-A', 20)
   const firstResult = await within(first, SETTLE_MS)
   assert.notEqual(firstResult, null, 'positive control: the first consult settles on its own intent run')
   assert.match(String(firstResult), /ADVICE-A/)
@@ -144,43 +151,43 @@ test('WHAT[advisor-004] the earlier consult\'s sticky Completed never answers a 
     const child = await firstConsultSettled(hooks, createdIds, runtime, owner)
     const second = advisorCall(hooks, owner, 'second question', 'call-advisor-b')
     second.catch(() => {})
-    await waitForPrompts(runtime, child, 4)
+    await waitForPrompts(runtime, child, 3)
     assert.equal(createdIds.length, 1, 'the follow-up reuses the same advisor child')
+
+    const followUpPrompts = await waitForPrompts(runtime, child, 3)
+    await advisorRun(hooks, runtime, child, 'run-advisor-b-view', followUpPrompts[2], 'VIEW-B', 20)
+    const [, followUpIntent] = await waitForPrompts(runtime, child, 4)
+
     // Replayed at subscribe time, the earlier consult's terminal must not answer the new intent.
     assert.equal(await within(second, 300), null, 'an earlier consult\'s Completed never answers the follow-up')
+
+    // The follow-up is left to settle on its own intent run, so nothing stays pending.
+    await advisorRun(hooks, runtime, child, 'run-advisor-b', followUpIntent, 'ADVICE-B', 30)
+    const followUpResult = await within(second, SETTLE_MS)
+    assert.notEqual(followUpResult, null, 'the follow-up settles on its own intent run')
+    assert.match(String(followUpResult), /ADVICE-B/)
   })
 })
 
-// F39-02 (open): on the fixture Host the follow-up's view prompt is appended as a
-// ManagedDelegationAssignment continuation of the child's finished logical run, and its
-// provider step has no committed model-routing lease (EMR-010). Same failure on base
-// c768df811 + this fix, so it is not the master delegation-027 EMR-010 regression.
-// Kept as a running `todo` until the seat opens a new root (or the run is closed) after a
-// settled consult.
-test('WHAT[advisor-004] a follow-up consult ignores the earlier consult and its own view run, and answers on its intent run', { todo: 'F39-02: follow-up view prompt has no committed model-routing lease (EMR-010)' }, async () => {
+test('WHAT[advisor-004] a follow-up consult ignores the earlier consult and its own view run, and answers on its intent run', async () => {
   const owner = `sess-advisor-004s-${Math.random().toString(36).slice(2, 8)}`
   await withAdvisorOwner(owner, async ({ hooks, createdIds, runtime }) => {
-    const first = advisorCall(hooks, owner, 'first question', 'call-advisor-a')
-    const child = await waitForChild(createdIds)
-    const [, firstIntent] = await waitForPrompts(runtime, child, 2)
-    await advisorRun(hooks, runtime, child, 'run-advisor-a', firstIntent, 'ADVICE-A', 10)
-    const firstResult = await within(first, SETTLE_MS)
-    assert.notEqual(firstResult, null, 'positive control: the first consult settles on its own intent run')
-    assert.match(String(firstResult), /ADVICE-A/)
+    const child = await firstConsultSettled(hooks, createdIds, runtime, owner)
 
     const second = advisorCall(hooks, owner, 'second question', 'call-advisor-b')
-    const prompts = await waitForPrompts(runtime, child, 4)
+    const prompts = await waitForPrompts(runtime, child, 3)
     assert.equal(createdIds.length, 1, 'the follow-up reuses the same advisor child')
-    const [secondView, secondIntent] = prompts.slice(2)
+    const secondView = prompts[2]
+
+    // The view prompt's own run finishing first is not this consult's answer either.
+    await advisorRun(hooks, runtime, child, 'run-advisor-b-view', secondView, 'VIEW-ACK', 20)
+    assert.equal(await within(second, 300), null, 'the view prompt\'s run never answers the intent')
 
     // The earlier consult's Completed is still the sticky terminal of this child: replayed at
     // subscribe time it must not answer the new intent.
     assert.equal(await within(second, 300), null, 'an earlier consult\'s Completed never answers the follow-up')
 
-    // The view prompt's own run finishing first is not this consult's answer either.
-    await advisorRun(hooks, runtime, child, 'run-advisor-b-view', secondView, 'VIEW-ACK', 20)
-    assert.equal(await within(second, 500), null, 'the view prompt\'s run never answers the intent')
-
+    const [, secondIntent] = await waitForPrompts(runtime, child, 4)
     await advisorRun(hooks, runtime, child, 'run-advisor-b', secondIntent, 'ADVICE-B', 30)
     const secondResult = await within(second, SETTLE_MS)
     assert.notEqual(secondResult, null, 'the follow-up settles on its own intent run')
