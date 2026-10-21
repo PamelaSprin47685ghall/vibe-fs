@@ -3,7 +3,7 @@
 返回 [看板](../BOARD.md)。来源：[CUT-38 §7.6 F38-01](CUT-38.md)。
 
 - **裁决人**：eng-cut39-goose，2026-10-21，按仓主“完全自主决定”的授权。
-- **裁决**：advisor 是现行产品功能（`todowrite-for-manager` 的 `this.advisor(intent, reportMapping)` 成员，WHAT 001–006），**不删除**。纯规则抽取到 `wanxiangli/advisor`（0.63.0）；角色/权限表、view 生成与渲染、专席 child 与派发留主仓（RETAINED）。审查中发现终态围栏的一个生产缺陷，登记为 F39-01；后由 `b9772a9f5` 修复（首次咨询），follow-up 余项为 F39-02。
+- **裁决**：advisor 是现行产品功能（`todowrite-for-manager` 的 `this.advisor(intent, reportMapping)` 成员，WHAT 001–006），**不删除**。纯规则抽取到 `wanxiangli/advisor`（0.63.0）；角色/权限表、view 生成与渲染、专席 child 与派发留主仓（RETAINED）。审查中发现终态围栏的一个生产缺陷，登记为 F39-01；后由 `b9772a9f5` 修复（首次咨询），follow-up 余项 F39-02 由 `a8f431b` 修复（rebase 到最新 master 后落为 `e11fc96c5`）。
 
 ## A. 范围（亲眼核对，master `e6d490d7a`）
 
@@ -32,7 +32,7 @@
 
 - **按编号去重会吞掉新摘要**：把身份改成只含锚点（变异 M02/W1），advisor-003 的“同锚点新摘要”“锚点 0 新开场”两条，以及 handoff 侧 repository-programming-059 的 4 条立刻变红——证明身份律被两条生产链共用，不能各写一份。
 - **无长度前缀会碰撞**：`1` + `2:x` 与 `12` + `x` 在朴素 `锚点:原文` 编码下相同（库 SPEC 1 显式断言，变异 M01 被抓）。
-- **终态围栏不可能命中（F39-01）**：`b9772a9f5` 已修复首次咨询，余项 F39-02，见下节。
+- **终态围栏不可能命中（F39-01）**：`b9772a9f5` 已修复首次咨询，follow-up 余项 F39-02 已由 `a8f431b` 修复（rebase 到最新 master 后落为 `e11fc96c5`），见下节。
 
 ## D–F. 实现、npm 消费、接回真实链
 
@@ -91,17 +91,37 @@
 - **证据**（`wt/logs-f39/`）：
   - 先红：`requirements/advisor/tests/004.test.mjs` 在 base `c768df811`（只带新测试和 fixture）上红（`base.fail`）。
   - 后绿：候选构建（`land1.build.log`，rebase 到 `d25e69894`、`--clean`）后，137 个文件的 advisor / repository-programming / delegation 等定向套件（`files.txt`）与 base 名单对比：`advisor-004` 首次咨询转绿，`delegation-031` 也已绿（上游修复）；唯一多出的名字是 delegation-027 两条 “prepared busy guidance … original active work”（EMR-010），它们在 master `da790ef5d` 上不带本修复同样失败（`logs-red-integ/integ2.log`），而在 `c768df811` + 本修复上通过（`oldfix.tap`），**不是本修复引入**。
-  - 004 当前：3 tests / 2 pass / 0 fail / 1 todo（`t004.tap`）。拒绝旧 run 的断言单独成一条强制用例：“the earlier consult's sticky Completed never answers a follow-up consult (stale-run rejection)”。
+  - 004 当时（F39-01 落地时，`t004.tap`）：3 tests / 2 pass / 0 fail / 1 todo。拒绝旧 run 的断言单独成一条强制用例：“the earlier consult's sticky Completed never answers a follow-up consult (stale-run rejection)”。**F39-02 落地后**，那条 `todo` 标记已去掉，004 现在是 3 条真实用例（见下节）；**本次没有跑过测试**，此处不给出任何通过/失败计数。
   - `check.mjs`：先 fantomas 后 check，候选与 master 的发现逐条一致（`check.master.out` / `check.cand2.out`，均 132 条，Seat.fs 未新增 pyramid）。`architecture.mjs` 在落地循环里通过。
 - **回退**：`git revert b9772a9f5`。不涉及事件格式、持久数据或资源文本。
 
-### F39-02（未修复）：follow-up 咨询的 view prompt 没有 model-routing lease
+### F39-02（FIXED）：follow-up 咨询的 view prompt 没有 model-routing lease
 
 同一 child 上第二次咨询时，上一次的 logical run 仍是 `ActiveLogicalRun`，所以 `SendManagedAssignment` 把 view 作为 `ManagedDelegationAssignment` continuation 追加到已经结束的 run 上。这个 provider step 没有已提交的 model-routing lease，transform 边界报 EMR-010（`SessionExecutionBinding.enterBoundProviderStep`；`tryContinuationAdmission` 只给 BusyAgentNudge/HumanMessage）。在 `c768df811` + 本修复上同样复现，所以与 master 的 delegation-027 EMR-010 回归无关。
 
-- 用例：004 第三条 “a follow-up consult ignores the earlier consult and its own view run, and answers on its intent run”，标为运行中的 `todo`（`F39-02`），修好后去掉 `todo`。
-- 方向：咨询结算后关闭该 child 的 logical run（`AuthorityRun.closeAuthority`，fork 的 idle resume 就是另起 root），或让 seat 在上一次咨询已结算时另起 root。不要放宽 EMR-010。
+- 用例：004 第三条 “a follow-up consult ignores the earlier consult and its own view run, and answers on its intent run”，原为运行中的 `todo`（`F39-02`），现已去掉 `todo`。
+
+### F39-02 修复记录（eng-f39b-goose，2026-10-21）
+
+- **提交**：`a8f431bd35877c32458e26c43288cd1776786a5b` `fix(advisor): settle each consult prompt as its own closed run (F39-02)`（rebase 前在本地 master 上的提交；rebase 到最新 master 后在 master 上落为 `e11fc96c5bcbf85e635666d4097b38e4a13d368a`；rebase 前的父提交 `9003c2032`；改动文件：`src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs` +161/-28、`requirements/advisor/tests/004.test.mjs` +32/-25）。
+- **做法**：
+  - **每次咨询的每个 prompt 都是自己的 authority run**。view prompt 自己 root 起一个 run（或续上自己的 run）；**它自己的终态**结束 view 阶段；随后 child 的 logical run 被**持久地**关闭——向 child 的 stream 追加既有的 `ExecutionFact.ChildRunVoided`；**只有在这之后**才发送 intent，于是 intent 自己 root 起一个新 run，拥有自己已提交的 model-routing lease。
+  - **顺序是串行的**：view → 关闭 → intent。之所以不能在咨询结算后只补一次关闭，是因为 ModelRouting 每个 session 只保留一个活跃的物理执行，intent 的准入会取代 view 的 lease；此后再去驱动 view 那条消息，按设计就是 EMR-010（打在 view 的消息上）。
+  - **每一种结局都会留下关闭的 run**：Completed、aborted/failed 终态、超时、view 被拒、发送失败、意外异常，都经同一个 settle 点（`runConsultAndVoid`）把 child 的 logical run 关掉，不留无法收尾的 run。
+  - **不采用卡片原先偏好的持久 `AuthorityLogicalRunClosed`**：`Run.fs` 的 `expectedClosureKind` 把 `agentOwnerLife` 硬编码为 `null`，`ClosureLaw.expectedKind` 对 `AgentOwnerRoot, None` 返回 `None`，因此今天任何 AgentOwnerRoot 都无法通过 `admitClosure`；唯一的持久关闭写入方 `Persistence/Journal/Surface.fs` 的 `appendAuthorityLogicalRunClosed` 也只写 HumanRoot。要这样关闭一个 AgentOwnerRoot 属于登记 agent-owner life 的更宽产品变更，**登记为产品变更，不在本卡实现**。
+  - **EMR-010 不变**：`tryContinuationAdmission` 仍只给 `BusyAgentNudge`/`HumanMessage`。修复靠给 follow-up 的 provider step 一条真正已提交的 model-routing lease，而不是让 continuation 蒙混过关。
+  - **F39-01 围栏不变**：`PriorRun`/`settledRuns`/`isStaleRun` 的 stale-run 拒绝照旧；F39-01 的 HOST-010/011 归属与“先开新 root 再发 intent”的顺序不变。
+- **用例**：advisor-004 现在有 3 条真实用例，全部顺序执行：F39-01 的 “a consult returns the prose of the advisor run that answers its own intent”；“the earlier consult's sticky Completed never answers a follow-up consult (stale-run rejection)”；以及原先标 `todo` 的第三条，已去掉 `todo`。
+- **证据（诚实口径：仅静态检查；本机没有跑构建，也没有跑测试）**：
+  - `dotnet tool run fantomas --check src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs` → exit 0。
+  - `node scripts/check.mjs` → exit 1，**5 issues**，全部是 `fsharp-control-pyramid`，都在 `src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs`（444/473/629/648/715），**0 条在 `Seat.fs`**。
+  - 与 base 的对比（base = 本次 rebase 的落点 `origin/master` `cbe198618`，独立 worktree 复测）：`node scripts/check.mjs` → exit 1，**同样 5 issues**，逐条 file:line **完全一致**（pyramid 发现集合 diff 为空）。**没有新增 issue。**
+  - `node scripts/checks/architecture.mjs` → exit 0（architecture: OK）。
+  - **本机没有 `dotnet build`，也没有跑任何测试**：编译槽位不可用（`build-slot node scripts/build.mjs` → exit 75，排队超过 3 分钟），且本 clone 的 `dist/` 是 **F39-02 之前**的陈旧产物（`dist/…/Advisor/Seat.js` 里没有 `closeAfterView`/`ConsultPhase`）。因此**不得**声称任何一次测试通过；上面的结果只是静态检查。
+    - 附带事实（如实记录）：在**陈旧 dist** 上直跑 `node --test requirements/advisor/tests/004.test.mjs` → 3 tests / 0 pass / 3 fail，全部报 `EMR-010: managed provider step … has no committed model-routing lease`。这**不能**作为本修复的验收结论：那份 dist 根本不含本修复的代码。该用例文件里的 `todo` 标记已在 `a8f431bd` 中去掉，源码层面已无可跳过的占位。
+- **回退**：`git revert e11fc96c5bcbf85e635666d4097b38e4a13d368a`（rebase 前写作 `git revert a8f431bd35877c32458e26c43288cd1776786a5b`）。若回退，004 第三条需恢复 `todo` 标记。
+- **不并入 F39-02**：master 上的 delegation-027 “prepared busy guidance … original active work” ×2 仍是**另一条未二分的既存回归**，由 integ-027 跟踪，不属于本卡，也不是本卡的验收项；`requirements/delegation/tests/027.test.mjs` 未被本卡触碰。
 
 ## 状态
 
-CUT-39 `DONE`：纯规则只有 `wanxiangli/advisor` 一个 owner，其余各项已登记 RETAINED，并有后继项 F39-01（已由 `b9772a9f5` 修复）与 F39-02（未修）。这不是“advisor 已抽干”：专席编排与围栏仍在主仓。
+CUT-39 `DONE`：纯规则只有 `wanxiangli/advisor` 一个 owner，其余各项已登记 RETAINED，并有后继项 F39-01（已由 `b9772a9f5` 修复）与 F39-02（已由 `a8f431bd35877c32458e26c43288cd1776786a5b` 修复，rebase 到最新 master 后落为 `e11fc96c5bcbf85e635666d4097b38e4a13d368a`）。这不是“advisor 已抽干”：专席编排与围栏仍在主仓。master 上 delegation-027 prepared-busy-guidance 的 EMR-010 回归仍未二分，另案跟踪，不属于本卡。
