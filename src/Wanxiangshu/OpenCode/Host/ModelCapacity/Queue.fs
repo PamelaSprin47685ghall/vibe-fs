@@ -116,26 +116,36 @@ type internal ExecutionAdmissionQueue(owner: obj, counters: CapacityTransitionCo
             AsyncSupport.trySetResult (AdmissionQueueBinding.demand node).Node.Completion outcome
             |> ignore
 
+    /// The host handle must belong to this queue and be the very node the
+    /// caller holds: a handle from another queue is not this queue's node.
+    let ownedByThisQueue (node: ExecutionAdmissionQueueNode) =
+        match isNull (box node) with
+        | true -> false
+        | false -> obj.ReferenceEquals(node.Owner, owner)
+
+    /// The library node is the session's current demand only when the demand's
+    /// own node handle, node id and fence all name the same node the caller
+    /// holds. Any difference means the session moved on.
+    let isCurrentDemandOf (current: obj) (node: ExecutionAdmissionQueueNode) =
+        let demand = AdmissionQueueBinding.demand current
+
+        obj.ReferenceEquals(demand.Node, node)
+        && demand.Node.NodeId = node.NodeId
+        && demand.Node.Fence = node.Fence
+
     /// The library node whose host handle is exactly `node`, if it is that session's current demand.
     let libraryNodeOf (node: ExecutionAdmissionQueueNode) =
-        if isNull (box node) || not (obj.ReferenceEquals(node.Owner, owner)) then
-            None
-        else
-            let current = queue.current node.SessionId
+        let owned = ownedByThisQueue node
 
-            if isNull current then
-                None
-            else
-                let demand = AdmissionQueueBinding.demand current
+        let found = if owned then queue.current node.SessionId else null
 
-                if
-                    obj.ReferenceEquals(demand.Node, node)
-                    && demand.Node.NodeId = node.NodeId
-                    && demand.Node.Fence = node.Fence
-                then
-                    Some current
-                else
-                    None
+        // `&&` short-circuits, so the demand payload is only read for a node
+        // the library actually holds.
+        let isCurrent = not (isNull found) && isCurrentDemandOf found node
+
+        match isCurrent with
+        | true -> Some found
+        | false -> None
 
     let withdraw outcome sessionId (physicalUserMessageId: string option) =
         let physical: obj =

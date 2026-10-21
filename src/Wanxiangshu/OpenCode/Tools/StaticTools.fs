@@ -107,6 +107,14 @@ module StaticTools =
         else
             "deny"
 
+    /// 工具类的宿主准入：办公能力矩阵直接回答该角色是否被准许使用这个
+    /// 工具。答案只有「准许 / 不准许」两种，所以它是一个命名判定而不是
+    /// 一段嵌在别处的分支。
+    let private utilityPermission (role: Role) (name: string) =
+        match OfficeCapability.admitsUtility role name with
+        | true -> "allow"
+        | false -> "deny"
+
     let private permissionFor (registry: AblationRegistry) allowed role name =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
@@ -116,10 +124,7 @@ module StaticTools =
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "commission", Role.Orchestrator -> "allow"
         | true, name, role when List.contains name OfficeCapability.utilityToolNames ->
-            if OfficeCapability.admitsUtility role name then
-                "allow"
-            else
-                "deny"
+            utilityPermission role name
         | true, "todowrite-for-bookkeeper", _ -> "deny"
         | true, name, _ when name.StartsWith "todowrite-for-" -> jsPermission role name
         | true, _, _ -> defaultPermission allowed role name

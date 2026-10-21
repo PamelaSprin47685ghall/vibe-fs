@@ -482,15 +482,17 @@ module ModelRouting =
         /// scheduler injected without the query (createRuntime test seam) keeps
         /// the old reading of unbounded theoretical capacity; the production
         /// loader refuses such a module.
+        let queriedTheoreticalCapacity (role: string) : bool =
+            try
+                protocol.hasTheoreticalCapacity (hasCapFn, role)
+            with ex ->
+                poison ex
+                raise ex
+
         let hasTheoreticalCapacityLocked (role: string) (_purpose: ModelExecutionPurpose) : bool =
-            if isNull hasCapFn then
-                true
-            else
-                try
-                    protocol.hasTheoreticalCapacity (hasCapFn, role)
-                with ex ->
-                    poison ex
-                    raise ex
+            match isNull hasCapFn with
+            | true -> true
+            | false -> queriedTheoreticalCapacity role
 
         let scheduleOrPoison running (role: Role) previous (purpose: ModelExecutionPurpose) =
             try
