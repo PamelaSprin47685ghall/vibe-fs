@@ -765,8 +765,8 @@ Foundation/HostSessionSnapshot.fsi
 Foundation/HostSessionSnapshot.fs
 OpenCode/Host/SessionSnapshotPort.fsi
 OpenCode/Host/SessionSnapshotPort.fs
-OpenCode/Host/ProviderRunBinding.fsi
-OpenCode/Host/ProviderRunBinding.fs
+Execution/Session/ChatExecution/ProviderRunBinding.fsi
+Execution/Session/ChatExecution/ProviderRunBinding.fs
 OpenCode/Host/SessionSnapshotSurface.fsi
 OpenCode/Host/SessionSnapshotSurface.fs
 OpenCode/Host/ProviderRunBindingSurface.fsi
