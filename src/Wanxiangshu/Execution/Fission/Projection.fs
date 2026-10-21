@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Fission
 
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
@@ -163,21 +164,97 @@ module FissionProjection =
         |> Option.bind (fun (groupId, laneIndex) ->
             Map.tryFind groupId state.Groups |> Option.map (fun group -> group, laneIndex))
 
-    let private allBroadcastsDelivered group =
-        group.PreFissionCompletionIds
-        |> Set.forall (fun completionId ->
-            let delivered =
-                group.CompletionDeliveries
-                |> Map.tryFind completionId
-                |> Option.defaultValue Set.empty
+    /// CUT-28: which Fission facts a group accepts, which are idempotent replays
+    /// and which are refused (and in which order) is wanxiangli/fission-group's
+    /// law, as is the convergence precondition. This module keeps the group
+    /// maps, compares the values it holds (sessions, refs, digests, runs) and
+    /// writes what the law decides.
+    [<Fable.Core.Import("FissionGroupLaw", "wanxiangli/fission-group")>]
+    let private lawClass: obj = Fable.Core.Util.jsNative
 
-            delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
+    [<Fable.Core.Emit("new $0()")>]
+    let private construct (_cls: obj) : obj = Fable.Core.Util.jsNative
 
-    let private convergenceReady group =
-        group.LaneWork.Count = group.LaneCount
-        && (group.LaneWork
-            |> Map.forall (fun laneIndex _ -> laneIndex >= 0 && laneIndex < group.LaneCount))
-        && allBroadcastsDelivered group
+    let private law: obj = construct lawClass
+
+    let private heldOf (value: 'a option) (same: 'a -> bool) : obj =
+        match value with
+        | None -> null
+        | Some v when same v -> box "same"
+        | Some _ -> box "different"
+
+    let private progressOf (group: FissionGroupProjection) =
+        createObj
+            [ "workedLanes" ==> (group.LaneWork |> Map.toList |> List.map fst |> List.toArray)
+              "deliveries"
+              ==> (group.PreFissionCompletionIds
+                   |> Set.toArray
+                   |> Array.map (fun completionId ->
+                       group.CompletionDeliveries
+                       |> Map.tryFind completionId
+                       |> Option.defaultValue Set.empty
+                       |> Set.toArray)) ]
+
+    let private laneSessionOf (group: FissionGroupProjection) laneIndex (laneSessionId: SessionId) =
+        match Map.tryFind laneIndex group.LaneSessions with
+        | Some expected when expected = laneSessionId -> "match"
+        | Some _ -> "mismatch"
+        | None -> "absent"
+
+    let private laneCountOf (group: FissionGroupProjection option) : obj =
+        match group with
+        | Some group -> box group.LaneCount
+        | None -> null
+
+    let private terminalKind (terminal: FissionGroupTerminal) =
+        match terminal with
+        | FissionGroupTerminal.Open -> "Open"
+        | FissionGroupTerminal.Converged _ -> "Converged"
+        | FissionGroupTerminal.Failed _ -> "Failed"
+
+    [<RequireQualifiedAccess>]
+    type private Verdict =
+        | Set
+        | Keep
+        | Reject of string
+
+    let private judge (input: (string * obj) list) =
+        let verdict: obj = law?judge (createObj input)
+
+        match unbox<string> verdict?verdict with
+        | "set" -> Verdict.Set
+        | "keep" -> Verdict.Keep
+        | "reject" -> Verdict.Reject(unbox<string> verdict?rejection)
+        | other -> invalidOp ("wanxiangli/fission-group returned an unknown verdict: " + other)
+
+    let private rejection groupId owner laneIndex (name: string) =
+        match name with
+        | "UnknownGroup" -> FissionProjectionRejection.UnknownGroup groupId
+        | "ConflictingGroup" -> FissionProjectionRejection.ConflictingGroup groupId
+        | "DuplicateOwnerActive" -> FissionProjectionRejection.DuplicateOwnerActive owner
+        | "InvalidLane" -> FissionProjectionRejection.InvalidLane laneIndex
+        | "LaneSessionMismatch" -> FissionProjectionRejection.LaneSessionMismatch laneIndex
+        | "ConflictingLaneWork" -> FissionProjectionRejection.ConflictingLaneWork laneIndex
+        | "ConflictingTakeover" -> FissionProjectionRejection.ConflictingTakeover groupId
+        | "ConvergenceIncomplete" -> FissionProjectionRejection.ConvergenceIncomplete groupId
+        | "TerminalAlreadySet" -> FissionProjectionRejection.TerminalAlreadySet groupId
+        | other -> invalidOp ("wanxiangli/fission-group returned an unknown rejection: " + other)
+
+    /// Apply a verdict: `write` runs only on Set and receives the (known) group.
+    let private apply
+        (state: FissionProjectionState)
+        groupId
+        owner
+        laneIndex
+        (group: FissionGroupProjection option)
+        verdict
+        (write: FissionGroupProjection -> FissionProjectionState)
+        =
+        match verdict, group with
+        | Verdict.Keep, _ -> Ok state
+        | Verdict.Reject name, _ -> Error(rejection groupId owner laneIndex name)
+        | Verdict.Set, Some group -> Ok(write group)
+        | Verdict.Set, None -> invalidOp "wanxiangli/fission-group set a group it was told is unknown"
 
     let private replaceGroup (state: FissionProjectionState) groupId (group: FissionGroupProjection) =
         { state with
@@ -193,11 +270,6 @@ module FissionProjection =
         && existing.OwnerViewRef = payload.OwnerViewRef
         && existing.OwnerViewDigest = payload.OwnerViewDigest
         && existing.PreFissionCompletionIds = Set.ofList payload.PreFissionCompletionIds
-
-    let private admissionPayloadValid (payload: AdmittedPayload) =
-        payload.LaneCount >= 2
-        && List.length payload.LaneSessions = payload.LaneCount
-        && List.length payload.LanePrompts = payload.LaneCount
 
     let private admitFresh (state: FissionProjectionState) (payload: AdmittedPayload) =
         let laneSessions =
@@ -239,115 +311,117 @@ module FissionProjection =
                     state.LaneMembership }
 
     let private foldAdmitted (state: FissionProjectionState) (payload: AdmittedPayload) =
-        match Map.tryFind payload.GroupId state.Groups, Map.tryFind payload.OwnerSessionId state.ActiveByOwner with
-        | Some existing, _ when admissionMatches existing payload -> Ok state
-        | Some _, _ -> Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
-        | None, _ when not (admissionPayloadValid payload) ->
-            Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
-        | None, Some _ -> Error(FissionProjectionRejection.DuplicateOwnerActive payload.OwnerSessionId)
-        | None, None -> Ok(admitFresh state payload)
+        let existing = Map.tryFind payload.GroupId state.Groups
 
-    let private decideLaneMaterialization
-        (state: FissionProjectionState)
-        (payload: LaneMaterializedPayload)
-        (group: FissionGroupProjection)
-        =
-        match
-            Map.tryFind payload.LaneIndex group.LaneSessions,
-            Map.tryFind payload.LaneIndex group.LaneWork,
-            Map.tryFind payload.LaneIndex group.LaneProviderRuns
-        with
-        | Some expected, _, _ when expected <> payload.LaneSessionId ->
-            Error(FissionProjectionRejection.LaneSessionMismatch payload.LaneIndex)
-        | None, _, _ -> Error(FissionProjectionRejection.LaneSessionMismatch payload.LaneIndex)
-        | Some _, Some existing, providerRun when
-            existing = (payload.ViewRef, payload.ViewDigest)
-            && providerRun = Some payload.ProviderRun
-            ->
-            Ok state
-        | Some _, Some _, _ -> Error(FissionProjectionRejection.ConflictingLaneWork payload.LaneIndex)
-        | Some _, None, _ ->
-            let next =
-                { group with
-                    LaneWork = Map.add payload.LaneIndex (payload.ViewRef, payload.ViewDigest) group.LaneWork
-                    LaneProviderRuns = Map.add payload.LaneIndex payload.ProviderRun group.LaneProviderRuns }
+        let verdict =
+            judge
+                [ "event" ==> "admitted"
+                  "existing" ==> heldOf existing (fun group -> admissionMatches group payload)
+                  "laneCount" ==> payload.LaneCount
+                  "sessionCount" ==> List.length payload.LaneSessions
+                  "promptCount" ==> List.length payload.LanePrompts
+                  "ownerActive" ==> Map.containsKey payload.OwnerSessionId state.ActiveByOwner ]
 
-            Ok(replaceGroup state payload.GroupId next)
+        match verdict with
+        | Verdict.Keep -> Ok state
+        | Verdict.Reject name -> Error(rejection payload.GroupId payload.OwnerSessionId 0 name)
+        | Verdict.Set -> Ok(admitFresh state payload)
 
     let private foldLaneMaterialized (state: FissionProjectionState) (payload: LaneMaterializedPayload) =
-        match Map.tryFind payload.GroupId state.Groups with
-        | None -> Error(FissionProjectionRejection.UnknownGroup payload.GroupId)
-        | Some group when payload.LaneIndex < 0 || payload.LaneIndex >= group.LaneCount ->
-            Error(FissionProjectionRejection.InvalidLane payload.LaneIndex)
-        | Some group -> decideLaneMaterialization state payload group
+        let group = Map.tryFind payload.GroupId state.Groups
 
-    let private decideCompletionCapture
-        (state: FissionProjectionState)
-        (payload: CompletionCapturedPayload)
-        (group: FissionGroupProjection)
-        =
-        match Map.tryFind payload.CompletionId group.CapturedCompletions with
-        | Some existing when existing = (payload.PayloadRef, payload.PayloadDigest) -> Ok state
-        | Some _ -> Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
-        | None ->
-            let next =
+        let verdict =
+            judge
+                [ "event" ==> "laneMaterialized"
+                  "laneCount" ==> laneCountOf group
+                  "laneIndex" ==> payload.LaneIndex
+                  "laneSession"
+                  ==> (group
+                       |> Option.map (fun g -> laneSessionOf g payload.LaneIndex payload.LaneSessionId)
+                       |> Option.defaultValue "absent")
+                  "work"
+                  ==> (group
+                       |> Option.bind (fun g -> Map.tryFind payload.LaneIndex g.LaneWork |> Option.map (fun w -> g, w))
+                       |> fun held ->
+                           heldOf held (fun (g, work) ->
+                               work = (payload.ViewRef, payload.ViewDigest)
+                               && Map.tryFind payload.LaneIndex g.LaneProviderRuns = Some payload.ProviderRun)) ]
+
+        apply state payload.GroupId payload.OwnerSessionId payload.LaneIndex group verdict (fun group ->
+            replaceGroup
+                state
+                payload.GroupId
                 { group with
-                    CapturedCompletions =
-                        Map.add
-                            payload.CompletionId
-                            (payload.PayloadRef, payload.PayloadDigest)
-                            group.CapturedCompletions }
-
-            Ok(replaceGroup state payload.GroupId next)
+                    LaneWork = Map.add payload.LaneIndex (payload.ViewRef, payload.ViewDigest) group.LaneWork
+                    LaneProviderRuns = Map.add payload.LaneIndex payload.ProviderRun group.LaneProviderRuns })
 
     let private foldCompletionCaptured (state: FissionProjectionState) (payload: CompletionCapturedPayload) =
-        match Map.tryFind payload.GroupId state.Groups with
-        | None -> Error(FissionProjectionRejection.UnknownGroup payload.GroupId)
-        | Some group when not (Set.contains payload.CompletionId group.PreFissionCompletionIds) ->
-            Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
-        | Some group -> decideCompletionCapture state payload group
+        let group = Map.tryFind payload.GroupId state.Groups
+
+        let verdict =
+            judge
+                [ "event" ==> "completionCaptured"
+                  "laneCount" ==> laneCountOf group
+                  "preFission"
+                  ==> (group
+                       |> Option.exists (fun g -> Set.contains payload.CompletionId g.PreFissionCompletionIds))
+                  "captured"
+                  ==> heldOf
+                          (group |> Option.bind (fun g -> Map.tryFind payload.CompletionId g.CapturedCompletions))
+                          (fun existing -> existing = (payload.PayloadRef, payload.PayloadDigest)) ]
+
+        apply state payload.GroupId payload.OwnerSessionId 0 group verdict (fun group ->
+            replaceGroup
+                state
+                payload.GroupId
+                { group with
+                    CapturedCompletions =
+                        Map.add payload.CompletionId (payload.PayloadRef, payload.PayloadDigest) group.CapturedCompletions })
 
     let private foldCompletionDelivered (state: FissionProjectionState) (payload: CompletionDeliveredPayload) =
-        match Map.tryFind payload.GroupId state.Groups with
-        | None -> Error(FissionProjectionRejection.UnknownGroup payload.GroupId)
-        | Some group when payload.LaneIndex < 0 || payload.LaneIndex >= group.LaneCount ->
-            Error(FissionProjectionRejection.InvalidLane payload.LaneIndex)
-        | Some group when not (Map.containsKey payload.CompletionId group.CapturedCompletions) ->
-            Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
-        | Some group ->
+        let group = Map.tryFind payload.GroupId state.Groups
+
+        let verdict =
+            judge
+                [ "event" ==> "completionDelivered"
+                  "laneCount" ==> laneCountOf group
+                  "laneIndex" ==> payload.LaneIndex
+                  "captured"
+                  ==> (group
+                       |> Option.exists (fun g -> Map.containsKey payload.CompletionId g.CapturedCompletions)) ]
+
+        apply state payload.GroupId payload.OwnerSessionId payload.LaneIndex group verdict (fun group ->
             let current =
                 group.CompletionDeliveries
                 |> Map.tryFind payload.CompletionId
                 |> Option.defaultValue Set.empty
 
-            let next =
+            replaceGroup
+                state
+                payload.GroupId
                 { group with
                     CompletionDeliveries =
-                        Map.add payload.CompletionId (Set.add payload.LaneIndex current) group.CompletionDeliveries }
-
-            Ok(replaceGroup state payload.GroupId next)
-
-    let private decideExternalAffinity
-        (state: FissionProjectionState)
-        (payload: ExternalAffinityPayload)
-        (group: FissionGroupProjection)
-        =
-        match Map.tryFind payload.ExternalId group.ExternalAffinities with
-        | Some existing when existing = payload.LaneIndex -> Ok state
-        | Some _ -> Error(FissionProjectionRejection.ConflictingGroup payload.GroupId)
-        | None ->
-            let next =
-                { group with
-                    ExternalAffinities = Map.add payload.ExternalId payload.LaneIndex group.ExternalAffinities }
-
-            Ok(replaceGroup state payload.GroupId next)
+                        Map.add payload.CompletionId (Set.add payload.LaneIndex current) group.CompletionDeliveries })
 
     let private foldExternalAffinityBound (state: FissionProjectionState) (payload: ExternalAffinityPayload) =
-        match Map.tryFind payload.GroupId state.Groups with
-        | None -> Error(FissionProjectionRejection.UnknownGroup payload.GroupId)
-        | Some group when payload.LaneIndex < 0 || payload.LaneIndex >= group.LaneCount ->
-            Error(FissionProjectionRejection.InvalidLane payload.LaneIndex)
-        | Some group -> decideExternalAffinity state payload group
+        let group = Map.tryFind payload.GroupId state.Groups
+
+        let verdict =
+            judge
+                [ "event" ==> "externalAffinityBound"
+                  "laneCount" ==> laneCountOf group
+                  "laneIndex" ==> payload.LaneIndex
+                  "bound"
+                  ==> heldOf
+                          (group |> Option.bind (fun g -> Map.tryFind payload.ExternalId g.ExternalAffinities))
+                          (fun existing -> existing = payload.LaneIndex) ]
+
+        apply state payload.GroupId payload.OwnerSessionId payload.LaneIndex group verdict (fun group ->
+            replaceGroup
+                state
+                payload.GroupId
+                { group with
+                    ExternalAffinities = Map.add payload.ExternalId payload.LaneIndex group.ExternalAffinities })
 
     let private takeoverMatches
         (existing: FissionTakeoverProjection)
@@ -368,6 +442,7 @@ module FissionProjection =
     let private foldTakeover
         (state: FissionProjectionState)
         groupId
+        owner
         laneIndex
         laneSessionId
         promptKey
@@ -383,32 +458,40 @@ module FissionProjection =
               AggregateViewRef = aggregateViewRef
               AggregateViewDigest = aggregateViewDigest }
 
-        match Map.tryFind groupId state.Groups with
-        | None -> Error(FissionProjectionRejection.UnknownGroup groupId)
-        | Some group when laneIndex < 0 || laneIndex >= group.LaneCount ->
-            Error(FissionProjectionRejection.InvalidLane laneIndex)
-        | Some group when Map.tryFind laneIndex group.LaneSessions <> Some laneSessionId ->
-            Error(FissionProjectionRejection.LaneSessionMismatch laneIndex)
-        | Some group when not (convergenceReady group) ->
-            Error(FissionProjectionRejection.ConvergenceIncomplete groupId)
-        | Some { Takeover = Some existing } when
-            takeoverMatches
-                existing
-                laneIndex
-                laneSessionId
-                promptKey
-                physicalUserMessageId
-                aggregateViewRef
-                aggregateViewDigest
-            ->
-            Ok state
-        | Some { Takeover = Some _ } -> Error(FissionProjectionRejection.ConflictingTakeover groupId)
-        | Some group -> Ok(replaceGroup state groupId { group with Takeover = Some takeover })
+        let group = Map.tryFind groupId state.Groups
+
+        let verdict =
+            judge
+                [ "event" ==> "takeover"
+                  "laneCount" ==> laneCountOf group
+                  "laneIndex" ==> laneIndex
+                  "laneSession"
+                  ==> (group
+                       |> Option.map (fun g -> laneSessionOf g laneIndex laneSessionId)
+                       |> Option.defaultValue "absent")
+                  "progress"
+                  ==> (group
+                       |> Option.map progressOf
+                       |> Option.defaultValue (createObj [ "workedLanes" ==> [||]; "deliveries" ==> [||] ]))
+                  "takeover"
+                  ==> heldOf (group |> Option.bind (fun g -> g.Takeover)) (fun existing ->
+                      takeoverMatches
+                          existing
+                          laneIndex
+                          laneSessionId
+                          promptKey
+                          physicalUserMessageId
+                          aggregateViewRef
+                          aggregateViewDigest) ]
+
+        apply state groupId owner laneIndex group verdict (fun group ->
+            replaceGroup state groupId { group with Takeover = Some takeover })
 
     let private foldTakeoverClaimed (state: FissionProjectionState) (payload: TakeoverClaimedPayload) =
         foldTakeover
             state
             payload.GroupId
+            payload.OwnerSessionId
             payload.LaneIndex
             payload.LaneSessionId
             (Some payload.PromptKey)
@@ -420,6 +503,7 @@ module FissionProjection =
         foldTakeover
             state
             payload.GroupId
+            payload.OwnerSessionId
             payload.LaneIndex
             payload.LaneSessionId
             None
@@ -427,64 +511,67 @@ module FissionProjection =
             payload.AggregateViewRef
             payload.AggregateViewDigest
 
-    let private decideConverged
-        (state: FissionProjectionState)
-        (payload: ConvergedPayload)
-        (group: FissionGroupProjection)
-        =
-        match group.Terminal, group.Takeover with
-        | FissionGroupTerminal.Converged(existingLane, existingRun, existingRef, existingDigest), _ when
-            existingLane = payload.TerminalLaneSessionId
-            && existingRun = payload.TerminalProviderRun
-            && existingRef = payload.AggregateViewRef
-            && existingDigest = payload.AggregateViewDigest
-            ->
-            Ok state
-        | FissionGroupTerminal.Converged _, _
-        | FissionGroupTerminal.Failed _, _ -> Error(FissionProjectionRejection.TerminalAlreadySet payload.GroupId)
-        | FissionGroupTerminal.Open, _ when not (convergenceReady group) ->
-            Error(FissionProjectionRejection.ConvergenceIncomplete payload.GroupId)
-        | FissionGroupTerminal.Open, Some takeover when takeover.LaneSessionId <> payload.TerminalLaneSessionId ->
-            Error(FissionProjectionRejection.ConflictingTakeover payload.GroupId)
-        | FissionGroupTerminal.Open, _ ->
-            let next =
-                { group with
-                    Terminal =
-                        FissionGroupTerminal.Converged(
-                            payload.TerminalLaneSessionId,
-                            payload.TerminalProviderRun,
-                            payload.AggregateViewRef,
-                            payload.AggregateViewDigest
-                        ) }
-
-            Ok
-                { state with
-                    Groups = Map.add payload.GroupId next state.Groups
-                    ActiveByOwner = Map.remove group.OwnerSessionId state.ActiveByOwner }
+    let private close (state: FissionProjectionState) groupId (group: FissionGroupProjection) terminal =
+        { state with
+            Groups = Map.add groupId { group with Terminal = terminal } state.Groups
+            ActiveByOwner = Map.remove group.OwnerSessionId state.ActiveByOwner }
 
     let private foldConverged (state: FissionProjectionState) (payload: ConvergedPayload) =
-        match Map.tryFind payload.GroupId state.Groups with
-        | None -> Error(FissionProjectionRejection.UnknownGroup payload.GroupId)
-        | Some group -> decideConverged state payload group
+        let group = Map.tryFind payload.GroupId state.Groups
 
-    let private decideFailed (state: FissionProjectionState) (payload: FailedPayload) (group: FissionGroupProjection) =
-        match group.Terminal with
-        | FissionGroupTerminal.Failed existing when existing = payload.Reason -> Ok state
-        | FissionGroupTerminal.Open ->
-            let next =
-                { group with
-                    Terminal = FissionGroupTerminal.Failed payload.Reason }
+        let verdict =
+            match group with
+            | None -> judge [ "event" ==> "converged"; "laneCount" ==> null ]
+            | Some g ->
+                judge
+                    [ "event" ==> "converged"
+                      "laneCount" ==> g.LaneCount
+                      "terminal" ==> terminalKind g.Terminal
+                      "terminalSame"
+                      ==> (match g.Terminal with
+                           | FissionGroupTerminal.Converged(lane, run, ref, digest) ->
+                               lane = payload.TerminalLaneSessionId
+                               && run = payload.TerminalProviderRun
+                               && ref = payload.AggregateViewRef
+                               && digest = payload.AggregateViewDigest
+                           | _ -> false)
+                      "progress" ==> progressOf g
+                      "takeoverLane"
+                      ==> (match g.Takeover with
+                           | Some takeover when takeover.LaneSessionId = payload.TerminalLaneSessionId -> box "match"
+                           | Some _ -> box "mismatch"
+                           | None -> null) ]
 
-            Ok
-                { state with
-                    Groups = Map.add payload.GroupId next state.Groups
-                    ActiveByOwner = Map.remove group.OwnerSessionId state.ActiveByOwner }
-        | _ -> Error(FissionProjectionRejection.TerminalAlreadySet payload.GroupId)
+        apply state payload.GroupId payload.OwnerSessionId 0 group verdict (fun group ->
+            close
+                state
+                payload.GroupId
+                group
+                (FissionGroupTerminal.Converged(
+                    payload.TerminalLaneSessionId,
+                    payload.TerminalProviderRun,
+                    payload.AggregateViewRef,
+                    payload.AggregateViewDigest
+                )))
 
     let private foldFailed (state: FissionProjectionState) (payload: FailedPayload) =
-        match Map.tryFind payload.GroupId state.Groups with
-        | None -> Error(FissionProjectionRejection.UnknownGroup payload.GroupId)
-        | Some group -> decideFailed state payload group
+        let group = Map.tryFind payload.GroupId state.Groups
+
+        let verdict =
+            match group with
+            | None -> judge [ "event" ==> "failed"; "laneCount" ==> null ]
+            | Some g ->
+                judge
+                    [ "event" ==> "failed"
+                      "laneCount" ==> g.LaneCount
+                      "terminal" ==> terminalKind g.Terminal
+                      "terminalSame"
+                      ==> (match g.Terminal with
+                           | FissionGroupTerminal.Failed existing -> existing = payload.Reason
+                           | _ -> false) ]
+
+        apply state payload.GroupId payload.OwnerSessionId 0 group verdict (fun group ->
+            close state payload.GroupId group (FissionGroupTerminal.Failed payload.Reason))
 
     let fold (state: FissionProjectionState) (fact: FissionFactCases) =
         match fact with
