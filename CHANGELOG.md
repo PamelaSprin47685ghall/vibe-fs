@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — 生命周期 013 / 015 迁到真实交付路径（跨实例消费由 durable 墓碑仲裁，绑定跨重启不变）
+
+- **`requirements/managed-session-lifecycle/tests/013.test.mjs` 迁到真实插件路径**：`a stale-projection consumer is arbitrated by the durable consumption tombstone, not its own fold` 不再用 harness 的 `settle`（从不下落围栏匹配的 durable 见证，因而永远等不到结算），交付改为真实 `this.deliver` + 生产的 `message.updated` → `session.idle` 终态发布。冷消费（另一个写者 + 重放）先消费成功并交出载荷；旧运行时随后消费时**不交出任何载荷**（`ok = false`），durable 面上该格为 `Retired`、再次冷消费得到 `AlreadyRetired`、总交付次数恒为 1。**不比较错误码**是有意的：生产 join 报 `nothing-to-join`、旧 harness 报 `AlreadyRetired`，二者同义（没有可交出的载荷），所以仲裁这一事实断言在耐久面（冷读 `Retired` / 冷消费 `AlreadyRetired` / 交付次数不增）上，比断言文案更贴切。
+- **`requirements/managed-session-lifecycle/tests/015.test.mjs` 迁到真实插件路径**：`actual admissions and replay retain exact handle child participant binding` 与 `actual recovered fork uses its runtime Agent ID handle and rebinds the same physical child (GAP-133)` 不再用 harness 的 `settle`，改为真实 `this.fork` / `this.resume` / `this.deliver` 与生产终态发布。第一次与第二次准入共享**同一个 handle、同一个物理 child、同一个参与者身份**，只有 root 不同；未被接受的 root 的消费被拒（`WorkNotAdmitted`）且快照不变；未知 Byname 得到有类型的拒绝（`person-unknown`）且**不新建物理 child**、快照不变。**GAP-133 的多进程编排被压缩**为「同一插件运行时 + 一次冷恢复读」——真实路径没有多进程编排，而冷恢复读（新写者 + 全量重放）证明的正是该 case 要证的事：durable 绑定在创建它的写者之外依然成立（同一 handle、同一物理 child）。
+- **验收**：`013` → tests 7 / pass 6 / fail 0 / cancelled 0 / todo 1（原有 `test.todo`）；`015` → tests 11 / pass 11 / fail 0 / cancelled 0；`024` / `027` / `006` / `007` / `008` / `013` / `015` 合跑 tests 80 / pass 77 / fail 0 / cancelled 0 / skipped 2 / todo 1。
+- **改动文件**：`requirements/managed-session-lifecycle/tests/013.test.mjs`、`requirements/managed-session-lifecycle/tests/015.test.mjs`。
+
 ## Unreleased — 委派 027 迁到真实交付路径（旧 root 停机、busy 指引、attachment 绑定）
 
 - **`requirements/delegation/tests/027.test.mjs` 迁到真实插件路径**：三个测试组（2 个 old-root、1 个 busy guidance、6 个 prepared busy guidance）不再走旧 fork harness 的 `settle`（它从不下落围栏匹配的 durable 见证，因此永远等不到结算），改为真实 `this.fork` / `this.resume` / `this.join` / `this.deliver` 与生产的 `message.updated` → `session.idle` 终态发布。测试只**观察**共享终端端口，从不发布终态、从不写 durable 见证。
