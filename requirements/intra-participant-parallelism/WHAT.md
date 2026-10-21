@@ -34,7 +34,7 @@ Fission 只增加同一 logical participant 的并发 execution presents。各 l
 
 ## [009] Single logical completion
 
-全部 lane 自有记录、裂变前广播债权及 lane 亲和任务结算后，group 才可收敛；向逻辑父级只交付一次普通 terminal completion，写回原 participant 的 completion cell。
+全部 lane 自有记录、裂变前广播债权及 lane 亲和任务结算后，group 才可收敛；向逻辑父级只交付一次普通 terminal completion，写回原 participant 的 completion cell。group 的交付已不可能（abort、cancel 或重启加载结算）时，按 delegation 的作废分支结清：作废不是完成，它以一次 `voided` 报告结清父方的未解除义务，不写成 `completed`。
 
 最终接管属于同一 logical lane 生命周期。nudge、provider recovery/AABB 或 degeneration interruption 后的 continuation 仍归该 lane；后继链普通 TurnCompleted 后才可写入 FissionConverged 并发布 logical completion。
 

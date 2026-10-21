@@ -102,9 +102,11 @@ charge 只承载任务本身。背景只作背景：不把其中未竟工作转�
 
 `this.fission(payload)` 不带 reportMapping：它是同身份换执行道，无条件继承本对话衣钵。`this.join()` 与 `this.horizon()` 是拉取动作，不强加 reportMapping。
 
-同步调用等待自己完成，只返回本次 `this.deliver` 交回的 view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自 `this.deliver` 交付格的 view；未交付的子工作不写完成、join 不关闭，保持可见的未解除义务——父方可以继续等待或重派，原子工作保持活跃，不把 undelivered 结算成终态。S1/S2/S3/S4 接力不再主动清除上下文。
+同步调用等待自己完成，只返回本次 `this.deliver` 交回的 view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自 `this.deliver` 交付格的 view。写完成需要两件事同时成立：该 work unit 有因果上证明的终态（proven terminal，见 [025]），并且有经 `this.deliver` 有效交付的材料——只有交付不证明完成。**仍能交付时**，未交付的子工作不写完成、join 不关闭，保持可见的未解除义务——父方可以继续等待或重派，原子工作保持活跃，不把未交付结算成终态（未交付本身不是一种状态）。
 
-同一条规则跨两个委派通道一致：异步 fork/resume 通道与同步 SyncDelegate 通道里，被委托方「完成但未交付」（本次工作没有 `this.deliver` 交付格）都不是终态——不写完成、不结算失败；work unit 保持活跃并留下可见的未解除义务，父方这次等待不被该次完成关闭，可以继续等待或重派。
+当 abort、cancel 或重启加载结算已经使交付不再可能（无存活执行可以继续交付），系统**必须**追加 `ChildWorkVoided` 作废该工作，不得让父方继续等待一个不会到来的交付。作废**不是完成**：它不产生完成交付（既不写完成正文，也不把已有交付视图当作完成凭据），`status` 不是 `completed`。但作废**结清父方的未解除义务**：join 以 `voided` 状态把它报告一次（join 状态只有 `completed | failed | abandoned | voided`，未交付本身不是一种状态），报告之后该工作从名册退役（durable），重启不重复报告。作废在报告之前仍是可见的在场后果，父方据此得知该子工作已被结清，而不是任其消失。交付过一次又被 abort、因而不再可能完成交付的子工作同样走作废分支：交付本身不证明完成，abort 绝不因"曾经交付过"被写成 `completed`。S1/S2/S3/S4 接力不再主动清除上下文。
+
+同一条规则跨两个委派通道一致：异步 fork/resume 通道与同步 SyncDelegate 通道里，被委托方「完成但未交付」（本次工作没有 `this.deliver` 交付格）**在仍能交付时**都不是终态——不写完成、不结算失败；work unit 保持活跃并留下可见的未解除义务，父方这次等待不被该次完成关闭，可以继续等待或重派。两个通道同样适用作废分支：交付已不可能时 `ChildWorkVoided` 必须结清该义务，join 报告一次 `voided` 后退役。
 
 ## [025] Completion 以因果身份认领
 
@@ -120,7 +122,7 @@ run-scoped Completed/Failed/Aborted 均须保留因果身份；只有 session-wi
 
 acceptance unknown 或确认超时时，保留 durable Pending 与原 PromptKey，不伪造失败、不自动重发；返回明确的 `DispatchUncertain`，说明可能已接受、不要重复委托，且不得发布为 join 等待任务。已经发生的 effect 不得被后置失败否认为“未放置”。
 
-Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真实 Host agent 运行经 `PendingRuns`/`PendingCompletionCount`/`PtyRuns` 可见，可 join 的 durable handle 经 journal 投影可见。重启后按 durable handle 重新收养的**空闲伴随句柄**（如 Manager 的 `devops`）只注册其身份、不代表有在跑任务，不得让 Join 误判为有工作而无限等待；无 journal 的纯 PTY 模式才以进程内 active run 计数作为 agent 工作信号。
+Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真实 Host agent 运行经 `PendingRuns`/`PendingCompletionCount`/`PtyRuns` 可见，可 join 的 durable handle 经 journal 投影可见。重启后按 durable handle 重新收养的**空闲伴随句柄**（如 Manager 的 `devops`）只注册其身份、不代表有在跑任务，不得让 Join 误判为有工作而无限等待；无 journal 的纯 PTY 模式才以进程内 active run 计数作为 agent 工作信号。已作废的工作不是"在跑"，join 无须为它等待：它以 `voided` 报告一次后即从名册退役；仍可能交付的未交付工作才是 join 可以等待的那种在跑。
 
 ## [027] Busy nudge 不承载新 assignment
 

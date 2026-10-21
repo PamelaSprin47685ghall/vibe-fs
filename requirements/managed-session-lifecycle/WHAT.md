@@ -22,7 +22,7 @@ Dedicated 绑定键为 `(OwnerReuseScopeId, Role)`。同一 scope 内每个 Role
 
 ## [006] Handle 四态
 
-Handle 仅有 `Active | CompletedAwaitingJoin | Retired | Abandoned` 四态。Retired 与 Abandoned 为持久终态，不可恢复为活动状态。
+Handle 仅有 `Active | CompletedAwaitingJoin | Retired | Abandoned` 四态。Retired 与 Abandoned 为持久终态，不可恢复为活动状态。作废（`ChildWorkVoided`）不是第五个 handle 态：它结清该 handle 的未解除义务，并要求 join 以 `voided` 报告一次。退役不得先于这一次报告发生，否则报告无处送达、父方的义务在名册里静默消失。
 
 ## [007] Completion 单赋值
 
@@ -30,7 +30,7 @@ Handle 仅有 `Active | CompletedAwaitingJoin | Retired | Abandoned` 四态。Re
 
 ## [008] Consume 与 Retire
 
-join 消费完成结果时原子写入 HandleRetired 墓碑；提交未确认不返回 payload。完成事实在重启后仍仅投递一次。
+join 消费完成结果时原子写入 HandleRetired 墓碑；提交未确认不返回 payload。完成事实在重启后仍仅投递一次。作废结算的成员同样只报告一次：join 以 `voided` 报告该次作废，随后退役；已退役则不再报告，重启不重复。
 
 ## [009] 父取消等待子收束
 

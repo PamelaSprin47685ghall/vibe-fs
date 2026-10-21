@@ -23,7 +23,7 @@ Waiting 分支仅代表瞬态等待（例如等待新 turn 或观察稳定），
 ## [006] 没有 fresh evidence 就没有自动 effect
 
 恢复闭合后，所有副作用操作必须持有有效证明：持有 `FamilyRecoveryPermit` 才能执行 join；持有保持 fresh 的 `QuiescencePermit` 才能发送 idle-derived continuation。quiescence 是物理条件的合取：当前 provider attempt 已被 Host 观测为 idle，且该 SessionId 没有仍在执行的 tool body；Host 的 `SessionIdle` 若先于 tool completion 到达，只能建立待静止证据，permit 在最后一个 active tool 结束前不可消费。新的物理用户输入到达时立即幂等撤销旧的静止许可。permit 在物理发送边界被消费；若 Host 明确证明 acceptance 前拒绝、且同一 attempt serial 仍未被更新材料取代，则允许把该 exact permit 从 `IdleConsumed` 原子归还为 `Idle`，使仍未满足的 gate 可重试。任何更新的 provider attempt、物理用户材料或 acceptance-unknown 都使归还失败。
-当前进程 join/admission 凭据仅证明本进程内的准入合法性，跨进程恢复证明已由 crash-reconciliation-017/018 显式续传取代；持有 `FamilyRecoveryPermit` 才能执行 join（保留 exact membership 闭包检查）。
+当前进程 join/admission 凭据仅证明本进程内的准入合法性，跨进程恢复证明由 crash-reconciliation-017/018 的加载归位承担（作废事实落定后重启不遗留未决交付）；持有 `FamilyRecoveryPermit` 才能执行 join（保留 exact membership 闭包检查）。
 ## [007] TurnUnknown 是 reconciliation 私有观测
 
 `TurnUnknown` 仅为 reconciliation 内部观测，严禁作为正式的 `TurnOutcome` 对外发布。
@@ -34,7 +34,7 @@ Host 的 abort 信号解码为类型化的 `AttemptAborted` 控制面事件，�
 
 ## [009] child recovery 没有 Aborted 终态
 
-Child 终态仅包含 `Succeeded | Failed | Abandoned`，不存在 Aborted 终态。单纯的 abort 观察绝不构成 terminal 证据，JoinableCompletion 必须具有真实解码正文。
+Child 终态仅包含 `Succeeded | Failed | Abandoned`，不存在 Aborted 终态。单纯的 abort 观察绝不构成 terminal 证据，JoinableCompletion 必须具有真实解码正文。abort 观察可以证明"交付已不再可能"，但结论只能是作废结清（`ChildWorkVoided`），不能据此写成完成或失败。
 
 ## [010] 恢复结果分支穷尽，Waiting ≠ Blocked
 
@@ -70,7 +70,7 @@ HandleController 的 `recordCompletion` 是提交完成态的唯一入口，采�
 
 进程重启后不存在任何显式续传命令（`/continue` 已移除）。系统在加载阶段自行完成归位，且只做持久记账，不重放任何命令：
 
-- 上一个 runtime 遗留的活跃子 run 被**作废**：已有 scoped 工作须用其实际准入身份追加 `ExecutionFactCases.ChildWorkVoided`；合法的无 scope 历史才使用 `ChildRunVoided`，不得由裸 Root 补造工作准入。作废只关闭对应子会话的逻辑 run，不产生任何“待收交付”；该 run 什么都没产出，就不欠父会话一次 join——`horizon` 与 `join` 对它都为空，直接 `resume` 才是正确时序；
+- 上一个 runtime 遗留的活跃子 run 被**作废**：已有 scoped 工作须用其实际准入身份追加 `ExecutionFactCases.ChildWorkVoided`；合法的无 scope 历史才使用 `ChildRunVoided`，不得由裸 Root 补造工作准入。作废**不是完成**——不产生完成交付（不写完成正文，也不把已有交付视图当作完成凭据）；但作废**结清父方的未解除义务**：该作废工作以 `voided` 状态进入 join 的下一次报告批次，被报告一次后即从名册退役（durable），重启不重复报告。作废在报告之前仍是可见的在场后果，父方不会把它误认作"什么都没发生"；
 - 父子会话的执行绑定与 fission lane 归属按 durable 投影**按需解析**（取 handle 的 `TargetAgent`，不取逻辑 `Byname`），进程本地表只是缓存，装载阶段不做任何预登记扫描；
 - 复用仍由 manager 显式发起；复用门禁、placement、await 一律以 durable handle 为存在性依据。
 
@@ -87,7 +87,7 @@ HandleController 的 `recordCompletion` 是提交完成态的唯一入口，采�
 崩溃前未决的物理命令（`run`、PTY 输入）一律按中断处理，系统严禁在重启后自动重放、补写或隐式续发命令，杜绝物理副作用重复发生。
 恢复流程必须严格沿用道路初始化时持久化的绑定模型（ModelTarget）与 Persona，严禁在恢复或 resume 时切换模型；新会话与恢复只接纳合法新角色集合，历史旧状态不隐式跨边界恢复。
 Load Phase 必须一次性结算上一 runtime 遗留、本进程无法继续持有的 durable 未决工作（仍活跃的子工作 run）。
-该结算是加载归位的首个持久动作：作废事实必须先于下一次交接的身份判定落定，否则新交接会读到仍然活跃的旧根，把已经退休的子会话判成身份冲突。
+该结算是加载归位的首个持久动作：作废事实必须先于下一次交接的身份判定落定，否则新交接会读到仍然活跃的旧根，把已经退休的子会话判成身份冲突。作废结清该工作的未解除义务（join 报告一次 `voided` 后退役），不作废也不结清则父方的未解除义务会跨重启悬空。
 
 ## [021] 进程本地表是缓存，durable 投影是存在性真源
 

@@ -49,7 +49,7 @@
 - **C（顶层组合者：`SpikePlugin`、`PluginBoot`、`PluginRecoveryWiring`、`PluginRuntimeScope`、`TurnWorkflow`）**：
   - **启动与激活次序**：`PluginBoot.create` 完成静态资源与配置装载 → 注册 `AttachDurabilityActivation` 回调 → 首次业务持久化请求触发 `ActivateDurability()` → 后台启动 `PluginRecoveryWiring` 归位流水线。
   - **逐域恢复隔离次序**（`PluginRecoveryWiring.attach`）：
-    1. `ChildWorkRecovery.settleOrphanedChildRuns`：上一进程遗留的活跃子 run **不作废**（crash-reconciliation-017/018/020：义务对父路保持可见，只发 `child-work-orphaned` 诊断，`settlementFact` 恒为 `None`）；仍为 Open 的 Fission 组记 `FissionFailed(process_interrupted)` 并清本进程 owner 缓存。（建板时写的“记为 `ChildWorkVoided`/`ChildRunVoided`”与现行合同不符，已按代码与 WHAT 更正）
+   1. `ChildWorkRecovery.settleOrphanedChildRuns`：上一进程遗留、本进程无法继续持有的活跃子 run 在加载期**作废**（crash-reconciliation-017/018/020：已有 scoped 工作追加 `ExecutionFactCases.ChildWorkVoided`，合法无 scope 历史才走 `ChildRunVoided`，不得由裸 Root 补造准入）。作废不是完成，但它结清父方的未解除义务：join 以 `voided` 报告一次后该工作退役，重启不重复报告。行为侧已接线该事实（回归结果由行为泳道回填，本卡不记绿）；仍为 Open 的 Fission 组记 `FissionFailed(process_interrupted)` 并清本进程 owner 缓存。
     2. `inspectRecoveryWorks`（provider-attempt-recovery-024）：从 `work.sqlite` 读出待核对的 work 及其陈旧请求，单个 work 损坏只记诊断，不阻断其它 work（work-048）；（建板时写的 Blogger 步骤已随 Blogger 退役不复存在）
     3. `reconcilePendingDeliveries`：逐个 work 独立 try/catch 核对挂起的 Plan 交付（已绑定查首条 user prompt 摘要与 `RetirementBlockersFor`，未绑定查精确 title root 会话）；
     4. `SignalChatRecovery(PluginRuntimeReloaded)` 与 `CapacityProjectionReplayed`；
@@ -104,7 +104,7 @@ node scripts/check.mjs
 | `cc59d5de5` | `PluginRuntimeScope`：`AttachSessionCleanup`/`AttachScopeDispose` 从未有调用方，清理与释放循环一直在空表上跑，删除；`AttachmentRegistry` 与 `CompanionLeases` 插槽只写不读，连同 `PluginHostWiring` 里的构造一起删除。`RecordPendingAttemptPlan`/`RecordAttemptPlan`/`TryPeekAttemptPlan` 只能经三个没有测试导入的 Surface 导出到达，删除。另删 `PluginSessionScope.CompanionGate`、`Scheduler.RootBindings`，`PluginTransforms` 三个只给 `create` 用的函数不再导出 |
 | `22f6e8ac5` | `ChildWorkRecovery` 的 Fission 结算三件（原因常量、`orphanedFissionGroups`、`fissionSettlementFact`）与 `FissionRuntime.bindHandleAffinity` 只在本模块内使用，不再导出 |
 
-**验证**（README §9，base 与候选同输入同环境）：每一轮都由落地循环在最新 master 上全量构建（heavy.lock 只包编译），然后跑卡 §8 套件加相邻包，共 66 个文件（`wt/logs-cut35/files.txt`：crash-reconciliation 全部、structured-workflow 全部、managed-session-lifecycle 006–027、provider-attempt-recovery、delegation-028、host-boundary-028、work-048 等）。base 在 `1b50bafbe` 上失败名单 58 条（`wt/logs-cut35/base.fail`）；c35a、c35b、c35c、c35d 各轮候选（c35d 两轮：`144e7d020` 与卡外提交 `5e76cb4a4` 之后各重建一次）都是同样 58 条，无新增失败。`node scripts/checks/architecture.mjs` 每轮推送前通过。`node scripts/check.mjs` 的唯一红灯是 `fsharp-control-pyramid`，红在 master 本身（base 117 条，主要来自卡外提交 `6f39cd156` 改的 `RunLifecycle.fs`），候选没有新增条目。
+**验证**（README §9，base 与候选同输入同环境）：每一轮都由落地循环在最新 master 上全量构建（heavy.lock 只包编译），然后跑卡 §8 套件加相邻包，共 66 个文件（`wt/logs-cut35/files.txt`：crash-reconciliation 全部、structured-workflow 全部、managed-session-lifecycle 006–027、provider-attempt-recovery、delegation-028、host-boundary-028、work-048 等）。当轮的 base/候选对比结果（base 失败名单与候选失败名单相同、无新增）见 `wt/logs-cut35/base.fail`；该结果早于当前作废改动，**未复跑**，不作为当前结论。`node scripts/checks/architecture.mjs` 每轮推送前通过。`node scripts/check.mjs` 的唯一红灯是 `fsharp-control-pyramid`，红在 master 本身（base 117 条，主要来自卡外提交 `6f39cd156` 改的 `RunLifecycle.fs`），候选没有新增条目。
 
 **卡 §6 反例的现状**（正控，不伪造红）：①坏 work 不阻断其它 work 由 work-048、crash-reconciliation-005 覆盖；②卸载不写 `HandleAbandoned`、Journal 最后释放由 managed-session-lifecycle-018 覆盖；③重启后按需从 durable 投影解析由 crash-reconciliation-018/021 覆盖；④`ClearSession`/`DisposeSession` 失败隔离并重抛首个异常由 managed-session-lifecycle-027 覆盖。四者在 base 与候选上结果相同（失败名单里的既有项见 base.fail，不是本卡引入）。
 

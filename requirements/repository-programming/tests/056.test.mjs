@@ -366,19 +366,19 @@ test('WHAT[repository-programming-056] a failed dag node parks and the injected 
   }
 })
 
-test('WHAT[repository-programming-056] an undelivered child reports status undelivered in join and parks dag on node-undelivered', async () => {
+test('WHAT[repository-programming-056] a voided child reports status voided in join and parks dag on node-voided', async () => {
   const { dir, cleanup } = sandbox()
-  const sessionId = `sess-dagundelivered-${Math.random().toString(36).slice(2, 8)}`
+  const sessionId = `sess-dagvoided-${Math.random().toString(36).slice(2, 8)}`
   let implAgentId = null
   try {
     const host = fakeHost()
-    const undeliveredJoin = async () => {
+    const voidedJoin = async () => {
       const records = host.pending.splice(0)
       const mapped = records.map((entry) => ({
         name: entry.name,
         agentId: entry.agentId,
         role: 'engineer',
-        status: entry.name === 'impl' ? 'undelivered' : 'completed',
+        status: entry.name === 'impl' ? 'voided' : 'completed',
         view: entry.name === 'impl' ? '' : `record:${entry.name}`,
       }))
       return {
@@ -387,7 +387,7 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
         byName: Object.fromEntries(mapped.map((r) => [r.name, r])),
       }
     }
-    // 未交付不关闭执行者义务：被委托方保持活跃且未解除义务，父方不得视原子执行者已结束。
+    // 已作废（voided）的子工作已结算：父方被告知一次，自行决定重试、跳过或替换。
     const trackingDelegate = async (name, payload, reportMapping) => {
       const res = await host.delegate(name, payload, reportMapping)
       if (res.ok && res.name === 'impl') {
@@ -395,7 +395,7 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
       }
       return res
     }
-    installDelegationHost(sessionId, trackingDelegate, undeliveredJoin, host.fission, host.horizon, host.advisor)
+    installDelegationHost(sessionId, trackingDelegate, voidedJoin, host.fission, host.horizon, host.advisor)
 
     const joinOutcome = await runProgram(
       dir,
@@ -405,9 +405,9 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
     )
     assert.equal(caseName(joinOutcome), 'Succeeded')
     const joinDoc = render(joinOutcome)
-    assert.match(joinDoc, /status = "undelivered"/)
+    assert.match(joinDoc, /status = "voided"/)
     assert.match(joinDoc, /view = ""/)
-    // join 返回 undelivered 后，原子执行者的义务未解除，不得断言已结束或结算成终态。
+    // voided 表示子工作已作废而非完成：义务已结清，父方被告知一次后决定重试/跳过/替换。
     assert.ok(implAgentId !== null, 'forked agent id must be tracked')
 
     const parked = await runProgram(
@@ -420,7 +420,7 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
     )
     assert.equal(caseName(parked), 'Parked')
     const doc = render(parked)
-    assert.match(doc, /code = "node-undelivered"/)
+    assert.match(doc, /code = "node-voided"/)
     assert.match(doc, /# parked/)
 
     const resumed = await execute(

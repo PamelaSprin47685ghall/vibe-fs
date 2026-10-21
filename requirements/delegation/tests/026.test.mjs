@@ -246,37 +246,84 @@ test('WHAT[delegation-026] RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_
     rmSync(directory, { recursive: true, force: true })
   }
 })
-test('WHAT[delegation-026] RESTART_PENDING_CHILD_WORK_remains_visible_obligation_in_horizon_and_join_stays_open', async () => {
+test('WHAT[delegation-026] RESTART_PENDING_CHILD_WORK_is_voided_at_load_and_join_reports_it_once_without_hang', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-restart-pending-'))
   const owner = 'manager-restart-pending'
-  const first = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
-    const pending = forkTool.executeManagerFork(first, toolModule, owner, 'engineer', 'Ada', 'PENDING-CHARGE')
-    await waitForPromptCount(first, 1)
-    assert.equal(forkTool.acceptPrompt(first, 0), true)
-    await pending
-    assert.equal(forkTool.durableLifecycleByname(first, owner, 'Ada'), 'Active')
+    const first = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+    try {
+      const pending = forkTool.executeManagerFork(first, toolModule, owner, 'engineer', 'Ada', 'PENDING-CHARGE')
+      await waitForPromptCount(first, 1)
+      assert.equal(forkTool.acceptPrompt(first, 0), true)
+      await pending
+      assert.equal(forkTool.durableLifecycleByname(first, owner, 'Ada'), 'Active')
+    } finally {
+      forkTool.disposeRuntime(first)
+    }
+
+    // Restart: the orphaned child work can no longer be delivered, so load
+    // settlement voids it. A void is not a completion, but it settles the
+    // parent's outstanding obligation: it stays visible until it is reported
+    // once, and the handle retires after that report.
+    const restarted = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+    try {
+      // 1. The voided work is visible in the horizon as voided, not as still-away.
+      const horizon = await forkTool.executeHorizon(restarted, owner)
+      assert.match(horizon, /Ada/)
+      assert.match(horizon, /was voided: this charge can no longer be delivered, so it is settled rather than completed\.|已被作废：此项任务已无法交付，因此以作废结清，而非完成。/)
+      assert.match(horizon, /voided|作废/i)
+      assert.doesNotMatch(horizon, /is still away\.|仍在远处/)
+
+      const horizonReceipt = await forkTool.executeHorizonReceipt(restarted, owner)
+      assert.equal(horizonReceipt.ok, true)
+      const voidedRow = horizonReceipt.agents.find((row) => row.label === 'Ada')
+      assert.ok(voidedRow, 'the voided work keeps a row in the horizon roster')
+      assert.equal(voidedRow.status, 'voided')
+
+      // 2. Join reports the void once — it must resolve, never hang.
+      const joinPromise = forkTool.executeJoinReceipt(restarted, owner)
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
+      const joinResult = await Promise.race([joinPromise, timeout])
+      assert.equal(joinResult.ok, true)
+
+      const adaRecord = joinResult.records.find((record) => record.name === 'Ada')
+      assert.ok(adaRecord, 'join reports the voided work by its Byname')
+      assert.equal(adaRecord.status, 'voided')
+      assert.notEqual(adaRecord.status, 'completed')
+      assert.notEqual(adaRecord.status, 'undelivered')
+      assert.equal(joinResult.byName.Ada.status, 'voided')
+
+      // 3. The second join has nothing left to receive: the report happened once.
+      const secondJoinPromise = forkTool.executeJoin(restarted, owner)
+      const secondTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
+      const secondJoin = await Promise.race([secondJoinPromise, secondTimeout])
+      assert.match(secondJoin, /NothingToJoin|无可等待|没有|nothing away to receive/i)
+
+      // 4. Reported work leaves the roster.
+      assert.doesNotMatch(await forkTool.executeHorizon(restarted, owner), /Ada/)
+
+      // 5. The handle retires after the single report.
+      assert.equal(forkTool.durableLifecycleByname(restarted, owner, 'Ada'), 'Retired')
+    } finally {
+      forkTool.disposeRuntime(restarted)
+    }
+
+    // 6. A further process on the same directory does not report the void again.
+    const third = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+    try {
+      const thirdJoinPromise = forkTool.executeJoin(third, owner)
+      const thirdTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
+      const thirdJoin = await Promise.race([thirdJoinPromise, thirdTimeout])
+      assert.match(thirdJoin, /NothingToJoin|无可等待|没有|nothing away to receive/i)
+      assert.doesNotMatch(await forkTool.executeHorizon(third, owner), /Ada/)
+    } finally {
+      forkTool.disposeRuntime(third)
+    }
   } finally {
-    forkTool.disposeRuntime(first)
-  }
-
-  const restarted = await forkTool.createRuntime(directory, ownerDescriptor(owner))
-
-  try {
-    const horizon = await forkTool.executeHorizon(restarted, owner)
-    // horizon sees unfinished obligation (Still-Away)
-    assert.match(horizon, /Ada/)
-    assert.match(horizon, /Away|进行中|away|Still-Away/i)
-
-    // join does not close as NothingToJoin; it remains awaiting until timeout
-    const joinPromise = forkTool.executeJoin(restarted, owner)
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
-    await assert.rejects(Promise.race([joinPromise, timeout]), {
-      message: 'JOIN_HANG_DETECTED',
-    }, 'join does not close with NothingToJoin; it keeps awaiting the open obligation')
-  } finally {
-    forkTool.disposeRuntime(restarted)
     rmSync(directory, { recursive: true, force: true })
   }
 })
