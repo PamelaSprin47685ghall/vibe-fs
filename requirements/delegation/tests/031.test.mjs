@@ -22,8 +22,8 @@ const waitForPromptCount = async (h, owner, role, count) => {
   assert.equal(sync.acceptPrompt(h, owner, role, count - 1), true)
 }
 
-const settle = async (h, owner, role, answer, run = 'run-1') => {
-  runtimeSurface.recordFencedDeliveredView(sync.child(h, owner, role), run, `call-${run}`, {
+const settle = async (h, owner, role, answer, run = 'run-1', child = sync.child(h, owner, role)) => {
+  runtimeSurface.recordFencedDeliveredView(child, run, `call-${run}`, {
     prefixUntil: 0,
     thenMap: {},
   })
@@ -94,6 +94,10 @@ test('WHAT[delegation-031] DELEG_031_parent_supersede_leaves_no_orphan_completio
   try {
     const pending = sync.invoke(h, owner, 'Engineer', 'SUPERSEDED-CHARGE')
     await waitForPromptCount(h, owner, 'Engineer', 1)
+    // The child that received the charge; the late completion below is that
+    // child's own delivery, so it is fenced to this child, not looked up after
+    // the supersede has already released the binding.
+    const child = sync.child(h, owner, 'Engineer')
 
     // Parent supersedes the call before its completion arrives.
     assert.equal(sync.abandonPendingCall(h, owner, 'Engineer'), true)
@@ -102,7 +106,7 @@ test('WHAT[delegation-031] DELEG_031_parent_supersede_leaves_no_orphan_completio
     // call is gone, so settle finds no live call and reports false; the
     // invocation itself already failed with the supersede reason, not with
     // a stale success.
-    assert.equal(await settle(h, owner, 'Engineer', 'LATE-ANSWER', 'run-late'), false)
+    assert.equal(await settle(h, owner, 'Engineer', 'LATE-ANSWER', 'run-late', child), false)
     const result = await pending
     assert.equal(result.ok, false)
   } finally {
