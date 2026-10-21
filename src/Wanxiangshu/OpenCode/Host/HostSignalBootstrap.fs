@@ -18,6 +18,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
+open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.ChatExecution
@@ -27,7 +28,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
@@ -292,7 +292,7 @@ module HostSignalBootstrap =
 
                     reconciler.NotifyProjectionChanged(observation.SessionId, observation.PhysicalUserMessageId)
 
-                    Wanxiangshu.Execution.Fission.FissionHost.observePhysicalExecutionEnd
+                    FissionHost.observePhysicalExecutionEnd
                         reconciler.TryPhysicalUserMessage
                         journal
                         (fun sid -> reconciler.Kick(sid, ReconcileProgram.ReconcileWake.RetryWake))
@@ -317,7 +317,7 @@ module HostSignalBootstrap =
                     ProviderAttemptStopFence.shared.Observe(observation.SessionId, observation.ProviderRun)
                     scope.Sessions.Quiescence.RevokeCurrentAttempt(observation.SessionId)
 
-                    Wanxiangshu.Execution.Fission.FissionHost.routeAttemptAborted observation.SessionId ignore ignore
+                    FissionHost.routeAttemptAborted observation.SessionId ignore ignore
 
                 | _ -> ()
 
