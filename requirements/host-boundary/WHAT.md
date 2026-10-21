@@ -162,3 +162,11 @@ adapter 文件（`src/Wanxiangshu` 下的 `OpenCode/`、`Omp/` 适配面）不�
 中立端口纯度是严格约束：`src/Wanxiangshu/Host/Ports/` 下的每个 `.fs` 与 `.fsi` 文件不得引用适配器命名空间、产品域或宿主词汇，只允许 Foundation、`Wanxiangshu.Host` 与 System。纯度范围从源码发现，不依赖任何硬编码族名：任意名称的新端口族自动纳入范围，其签名文件声明的 `type` 名即成为中立端口词汇表的一部分，词汇表同样从源码发现。端口族完整性由族签名自述：每个端口族签名必须以 `HNI P-xx` 头标记声明恰好一个保留端口 id，不得声明零个或多个；两个族不得声明同一保留 id；直接位于 `src/Wanxiangshu/Host/` 下的文件不得占用某个中立族的基名，否则该族一旦被移入 `Host/Ports/` 就会静默覆盖。
 
 `src/Wanxiangshu/Host/` 承载两层且每层只有一个命名空间：A 层 `Host/Ports/` 必须声明 `Wanxiangshu.Host.Ports`，B 层 `Host/Domain/` 必须声明 `Wanxiangshu.Host.Domain`，直接位于 `Host/` 下的文件两者均不得声明——目录位置与命名空间因此不得各自漂移。B 层适配器棘轮（`scripts/checks/domain-seam-baseline.json`）只许收紧：某个 adapter 新引用 `Wanxiangshu.Host.Domain` 必须报告为违规，基线内某个 adapter 已不再引用该接缝则必须从基线中移除，基线集合本身必须通过。层范围同样从源码发现，新增的族与接缝自动被覆盖。
+
+## [035] omp 入口模块不持有产品决策
+
+omp 入口模块（`src/Wanxiangshu/Composition/Omp/` 下携带 `[<ExportDefault>]` 的那个文件及其 `.fsi`）是手写、无产品决策的接线层：它只建立子会话接缝、调用 `activateOnOmp`，并以普通 `IHostPlugin` 值接收 Fable 编译出的产品。它不得反射产品、不得动态 import 产品内部、不得在运行时查产品符号。
+
+入口模块不得出现任何产品决策：不写准入/拒绝规则、不写重试、不算预算、不渲染产品散文、不保留产品状态；并且不 import 任何产品模块。允许的命名面只有中立端口、omp 适配器与 second-host plugin 取值面（`System`、`Fable.Core`、`Wanxiangshu.Host.Ports`、`Wanxiangshu.Host.SecondHost`、`Wanxiangshu.Omp`），产品散文只存在于产品资源树。
+
+该约束由门禁 `scripts/checks/omp-entry-decision-gate.mjs` 强制：门禁只读取入口模块与其接口，不扫描其他 lane 的文件；入口模块缺失、导出点缺失或歧义时必须 fail closed。门禁自带 planted-violation 自证——每一类禁止项都必须在植入违规后被拒绝，且真实入口模块必须被接受；自证失败本身就是门禁 issue。

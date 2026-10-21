@@ -28,6 +28,7 @@ export const checks = [
   join(root, 'checks/shard-edge-audit.mjs'),
   join(root, 'checks/ablation-manifest.mjs'),
   join(root, 'checks/clean-break-symbols.mjs'),
+  join(root, 'checks/omp-entry-decision-gate.mjs'),
 ]
 
 export async function runChecks(options = {}) {
