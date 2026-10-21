@@ -20,6 +20,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
+open Wanxiangshu.Execution.Tool
 
 /// join() waits for the owning runtime's next physical completion batch.
 /// Orchestrator join routes to ManagerJob verdict mailbox by authority role.
@@ -302,15 +303,13 @@ module JoinTool =
                 return! executeAfterSession scope context language (SessionId.create context.SessionId)
         }
 
-    let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Join)
 
     let spec scope =
         { Name = "join"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
-          Admission = admission
+          Admission = ToolAdmissions.join
           Execute = execute scope }
 
     let private mapResultsAvailable

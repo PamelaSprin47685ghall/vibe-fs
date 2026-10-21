@@ -20,7 +20,6 @@ module FissionTool =
           LaneCount: int
           Lanes: (int * string) list }
 
-    val admission: ToolAdmission
     val spec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
 
     val executeReceipt:

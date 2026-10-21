@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Knowledge.Casebook
+open Wanxiangshu.Execution.Tool
 
 /// Conditional Casebook read. Provider identity is a public shelfmark; durable
 /// session identity, freshness state and maintenance machinery remain internal.
@@ -139,8 +140,6 @@ module FetchTool =
                 fetchInFlight.[key] <- store, work
                 work)
 
-    let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
 
     let spec
         (factory: HostToolFactory)
@@ -154,7 +153,7 @@ module FetchTool =
         { Name = "fetch"
           Description = prose (ProviderLanguageBinding.readGlobalPreference ()) Path.Description
           Arguments = [ "shelfmark", ToolHostCodec.stringSchema factory ]
-          Admission = admission
+          Admission = ToolAdmissions.fetch
           Execute =
             fun args ctx ->
                 task {

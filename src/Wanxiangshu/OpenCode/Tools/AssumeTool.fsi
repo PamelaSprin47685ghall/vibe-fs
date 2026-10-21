@@ -12,5 +12,4 @@ module AssumeTool =
         [<Literal>]
         val Committed: string = "tool/assume/committed"
 
-    val admission: ToolAdmission
     val spec: factory: HostToolFactory -> ToolSpec

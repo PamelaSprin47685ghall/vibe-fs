@@ -10,5 +10,4 @@ open Wanxiangshu.OpenCode
 /// shell renders the plan backend's result; the Manager backend keeps its own
 /// result rendering so its byte behavior is unchanged.
 module ReviewShell =
-    val admission: ToolAdmission
     val spec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec

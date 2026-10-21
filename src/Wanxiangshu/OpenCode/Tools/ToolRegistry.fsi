@@ -25,19 +25,6 @@ type ToolRegistration =
 
 module ToolRegistry =
 
-    /// capability-enforcement-006: the authority the execute gate resolves for a tool, so a
-    /// consumer can tell an office tool from an internal leaf without guessing
-    /// from the tool name.
-    val tryAdmission: specName: string -> ToolAdmission option
-
-    /// capability-enforcement-006: the internal-leaf decision for a session that holds no public
-    /// office profile at all. An office tool is never admitted this way.
-    val privateAttachmentAdmits: specName: string -> sessionId: string -> bool
-
-    /// AGENT-007 role gate, delegates to owner-defined tool admissions.
-    /// sessionId is the tool call's Host session.
-    val rolePredicate: specName: string -> sessionId: string -> (Role -> bool)
-
     val create:
         toolModule: obj ->
         sessionPort: ISessionHostPort ->

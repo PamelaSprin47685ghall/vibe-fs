@@ -9,6 +9,7 @@ open Wanxiangshu.Mission.Work.Review
 open Wanxiangshu.Mission.Planning
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Execution.Tool
 
 /// work-038: the shared `review` shell. Owns the one ToolSpec
 /// (name, description, findings schema, admission) and dispatches by caller
@@ -47,10 +48,6 @@ module ReviewShell =
         | "S3" -> [ providerText Path.PlanS3 Map.empty ]
         | _ -> []
 
-    let admission =
-        ToolAdmission.OfficeRole(fun _ role ->
-            OfficeCapability.isAllowed role ToolPermission.ReviewAssessment
-            || OfficeCapability.isAllowed role ToolPermission.Review)
 
     let private planRejected path =
         ToolResultText.tomlObjectWithInstructions
@@ -163,5 +160,5 @@ module ReviewShell =
         { Name = "review"
           Description = providerText Path.Description Map.empty
           Arguments = [ "findings", findingsSchema; noteArgument ]
-          Admission = admission
+          Admission = ToolAdmissions.review
           Execute = dispatch }

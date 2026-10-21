@@ -12,6 +12,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Process
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Execution.Tool
 
 /// Bookkeeper provider verb: one JavaScript program atomically reshapes the
 /// staged question/answer Case. The sandbox has no filesystem capability.
@@ -322,19 +323,11 @@ module JsBookkeeperTool =
             | Ok value -> return succeeded language value
         }
 
-    /// knowledge-reuse-006 / capability-enforcement-006: the Bookkeeper is an internal leaf whose
-    /// prompt is HostInternal, so its session never holds a public office Role.
-    /// Its authority is the owner-held transaction attachment itself.
-    let admission: ToolAdmission =
-        ToolAdmission.PrivateAttachment(fun ctx ->
-            not (String.IsNullOrWhiteSpace ctx.SessionId)
-            && BookkeeperRuntime.isAttached ctx.SessionId)
-
     let spec (factory: HostToolFactory) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         { Name = "todowrite-for-bookkeeper"
           Description = assembleDescription language
           Arguments = [ "program", ToolHostCodec.stringSchemaDescribed (prose language Path.ArgProgram) factory ]
-          Admission = admission
+          Admission = ToolAdmissionTable.bookkeeper
           Execute = execute }

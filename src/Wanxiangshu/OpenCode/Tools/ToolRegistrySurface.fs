@@ -5,12 +5,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation
+open Wanxiangshu.Execution.Tool
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 
-/// JS-native execution-gate surface. ToolRegistry remains the owner of the
+/// JS-native execution-gate surface. The product ToolAdmissionTable owns the
 /// role predicate; callers provide labels and receive only a boolean decision.
 module ToolRegistrySurface =
 
@@ -18,7 +19,7 @@ module ToolRegistrySurface =
     let rolePredicate (toolName: string) (roleLabel: string) : bool =
         match Roles.tryParseRole roleLabel with
         | None -> false
-        | Some role -> ToolRegistry.rolePredicate toolName "surface-session" role
+        | Some role -> ToolAdmissionTable.rolePredicate toolName "surface-session" role
 
     /// capability-enforcement-006: which authority the execute gate resolves for a tool. `office`
     /// needs the session's established public Role; `private-attachment` is an
@@ -27,7 +28,7 @@ module ToolRegistrySurface =
         Wanxiangshu.Mission.Work.OpenCode.DeliverTool.description ()
 
     let admissionAuthority (toolName: string) : string =
-        match ToolRegistry.tryAdmission toolName with
+        match ToolAdmissionTable.tryAdmission toolName with
         | Some(ToolAdmission.OfficeRole _) -> "office"
         | Some(ToolAdmission.PrivateAttachment _) -> "private-attachment"
         | None -> "unknown"
@@ -35,7 +36,7 @@ module ToolRegistrySurface =
     /// capability-enforcement-006: the internal-leaf decision for a session holding no public
     /// office profile. Office tools always answer false here.
     let privateAttachmentAdmits (toolName: string) (sessionId: string) : bool =
-        ToolRegistry.privateAttachmentAdmits toolName sessionId
+        ToolAdmissionTable.privateAttachmentAdmits toolName sessionId
 
     let private requestKindOf (label: string) : ProviderRequestKind option =
         match label.ToLowerInvariant() with

@@ -25,7 +25,6 @@ module JoinTool =
     /// The join wire record; the rules that produce it live in `JoinRules`.
     type JoinRecord = Wanxiangshu.Execution.Delegation.Fork.JoinRules.JoinRecord
 
-    val admission: ToolAdmission
     val spec: scope: ToolRuntimeScope -> ToolSpec
 
     val executeReceipt: scope: ToolRuntimeScope -> context: HostToolContext -> Task<Result<JoinRecord list, string>>

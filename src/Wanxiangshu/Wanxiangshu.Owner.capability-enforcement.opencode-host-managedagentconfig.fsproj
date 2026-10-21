@@ -7,6 +7,8 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.execution-tool-admissions.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.execution-tool-admission-table.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-filesystem.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.feature-ablation.ablation-kernel.fsproj"/>

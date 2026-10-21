@@ -40,7 +40,7 @@ module StaticTools =
 
     /// JS-001: todowrite-for-* is allowed in the permission matrix exactly when
     /// the role's office permissions project a programming surface. Same
-    /// predicate as JsToolSpec.admissionFor and JsToolGenerator (no second list).
+    /// predicate as ToolAdmissions.programmingFor and JsToolGenerator (no second list).
     let private admitsProgrammingSurface (role: Role) : bool =
         Wanxiangshu.Repository.Programming.Js.JsCapability.admitsProgrammingSurface (OfficeCapability.permissions role)
 

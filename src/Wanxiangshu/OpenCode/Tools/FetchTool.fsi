@@ -25,7 +25,6 @@ module FetchTool =
         [<Literal>]
         val Unavailable: string = "tool/fetch/unavailable"
 
-    val admission: ToolAdmission
 
     val spec:
         factory: HostToolFactory ->

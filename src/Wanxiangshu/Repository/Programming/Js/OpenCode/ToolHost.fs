@@ -8,20 +8,13 @@ open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Execution.Tool
 
 /// JS-073/JS-074: a generated js-* tool spec — the dynamic counterpart of the
 /// static baseSpecs. Built from a generated surface (JS-002); execution goes
 /// through JsToolWorkflow (sandbox → staging → preflight → durable facts →
 /// commit) and the result renders through JsToolsResult (JS-016).
 module JsToolSpec =
-
-    let admissionFor (roleName: string) : ToolAdmission =
-        // Same predicate as StaticTools.jsPermission and JsToolGenerator: the
-        // role's office permissions must project a non-empty programming surface
-        // (JsPlan expands inside ofToolCapabilities). No second permission list.
-        ToolAdmission.OfficeRole(fun _ r ->
-            (string r).ToLowerInvariant() = roleName.ToLowerInvariant()
-            && JsCapability.admitsProgrammingSurface (OfficeCapability.permissions r))
 
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
@@ -265,7 +258,7 @@ module JsToolSpec =
               "abandon", abandonSchema
               "prefixUntil", ToolHostCodec.optionalNumberSchema factory
               "thenMap", mappingSchema ]
-          Admission = admissionFor surface.RoleName
+          Admission = ToolAdmissions.programmingFor surface.RoleName
           Execute =
             fun args ctx ->
                 task {

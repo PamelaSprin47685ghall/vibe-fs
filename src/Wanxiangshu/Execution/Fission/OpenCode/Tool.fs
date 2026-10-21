@@ -12,6 +12,7 @@ open Wanxiangshu.Host.Ports
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.ToolHostCodec
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Execution.Tool
 
 /// OpenCode adapter for Fission (HNI fission lane): decodes the `fission` tool
 /// call into a FissionLaunchRequest, implements FissionHostPort over the
@@ -116,14 +117,12 @@ module FissionTool =
             | Ok group -> return tomlObject [ "status", TString "fissioned"; "lane_count", TInt group.LaneCount ]
         }
 
-    let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> FissionToolPolicy.isAllowedRole r)
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "fission"
           Description = FissionToolPolicy.describe (ProviderLanguageBinding.readGlobalPreference ())
           Arguments = [ "prompts", ToolHostCodec.stringArraySchema factory ]
-          Admission = admission
+          Admission = ToolAdmissions.fission
           Execute = execute scope }
 
     let private isLaneStartFailure (message: string) =

@@ -13,6 +13,5 @@ module BashHoneypotTool =
         [<Literal>]
         val Description: string = "tool/bash-honeypot/description"
 
-    val admission: ToolAdmission
 
     val spec: ToolSpec

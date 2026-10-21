@@ -10,6 +10,7 @@ open Wanxiangshu.Host.Domain
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Execution.Tool
 
 /// OpenCode adapter for horizon(): binds `IDelegationCallerHost` to one tool
 /// call and puts `HorizonRoster` on the OpenCode wire.
@@ -122,13 +123,11 @@ module HorizonTool =
             return receiptOf roster
         }
 
-    let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ role -> HorizonRoster.permits role)
 
     let spec (runtimeCtx: HorizonRuntimeContext) =
         { Name = "horizon"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
-          Admission = admission
+          Admission = ToolAdmissions.horizon
           Execute = execute runtimeCtx }

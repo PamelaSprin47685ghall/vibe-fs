@@ -339,6 +339,8 @@ Participant/Provider/Attempt/PlannerSurface.fsi
 Participant/Provider/Attempt/PlannerSurface.fs
 Repository/Programming/Js/Capability.fsi
 Repository/Programming/Js/Capability.fs
+Execution/Tool/Admissions.fsi
+Execution/Tool/Admissions.fs
 Repository/Programming/Js/Description.fsi
 Repository/Programming/Js/Description.fs
 Repository/Programming/Js/Surface.fsi
@@ -1124,6 +1126,8 @@ Repository/Knowledge/Casebook/BookkeeperStaging.fsi
 Repository/Knowledge/Casebook/BookkeeperStaging.fs
 Repository/Knowledge/Casebook/BookkeeperRuntime.fsi
 Repository/Knowledge/Casebook/BookkeeperRuntime.fs
+Execution/Tool/AdmissionTable.fsi
+Execution/Tool/AdmissionTable.fs
 Repository/Knowledge/Casebook/Workflow.fsi
 Repository/Knowledge/Casebook/Workflow.fs
 Repository/Knowledge/Casebook/Index.fsi

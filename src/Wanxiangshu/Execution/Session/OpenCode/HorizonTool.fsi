@@ -62,7 +62,6 @@ module HorizonTool =
           Journal: AgentJournal option
           EnsureWorkDevOpsBound: SessionId -> Task<unit> }
 
-    val admission: ToolAdmission
     val spec: runtimeCtx: HorizonRuntimeContext -> ToolSpec
 
     /// The same roster as data for `this.horizon()`: every horizon-visible
