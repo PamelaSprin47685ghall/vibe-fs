@@ -1,0 +1,192 @@
+// WHAT[host-boundary-034] gate ⑩/⑪ adapter-thinness: the baseline write is refused on any violation,
+// the port purity scope and the neutral-port vocabulary are discovered from the sources, and a per-file
+// product-reference growth is reported even when the aggregate total stays flat.
+import test from 'node:test'
+
+{
+const { default: assert } = await import('node:assert/strict')
+const { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join, dirname } = await import('node:path')
+const { fileURLToPath } = await import('node:url')
+const { spawnSync } = await import('node:child_process')
+
+const ROOT = dirname(fileURLToPath(import.meta.url))
+const REPO = join(ROOT, '../../..')
+const GATE = join(REPO, 'scripts/checks/adapter-thinness.mjs')
+const {
+  scanAdapterThinness,
+  measure,
+  portTypeNames,
+  isPortFile,
+  baselineWritePlan,
+  applyBaselineWrite,
+} = await import(GATE)
+
+const fixture = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'adapter-thinness-'))
+  const files = new Map()
+  const write = (rel, text) => {
+    const abs = join(dir, rel)
+    mkdirSync(dirname(abs), { recursive: true })
+    writeFileSync(abs, text)
+    files.set(rel, text)
+    return rel
+  }
+  const read = (rel) => {
+    if (files.has(rel)) return files.get(rel)
+    return readFileSync(join(dir, rel), 'utf8')
+  }
+  return { dir, write, read, files, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+// (a) a violation refuses the baseline write; the baseline file on disk stays byte-identical.
+test('WHAT[host-boundary-034] a violation refuses the baseline write and leaves the baseline file untouched', () => {
+  const fx = fixture()
+  try {
+    const baselinePath = join(fx.dir, 'adapter-thinness-baseline.json')
+    const baselineText = JSON.stringify({
+      _note: 'fixture baseline',
+      productReference: { 'src/Wanxiangshu/OpenCode/Adapter.fs': 1 },
+      withoutPort: ['src/Wanxiangshu/OpenCode/Adapter.fs'],
+    }, null, 2) + '\n'
+    writeFileSync(baselinePath, baselineText)
+    const before = readFileSync(baselinePath)
+
+    fx.write('src/Wanxiangshu/OpenCode/Adapter.fs', [
+      'namespace Wanxiangshu.OpenCode',
+      'open Wanxiangshu.Execution.Delegation',
+      'open Wanxiangshu.Interaction.Dispatch',
+      '',
+    ].join('\n'))
+
+    const baseline = JSON.parse(baselineText)
+    const { violations } = scanAdapterThinness([...fx.files.keys()], fx.read, { baseline })
+
+    assert.ok(violations.length > 0, 'the planted growth must be a violation')
+    assert.ok(violations.some((v) => v.gate === 'adapter-thinness'))
+
+    const plan = baselineWritePlan(violations, measure([...fx.files.keys()], fx.read), baseline)
+    assert.equal(plan.allowed, false)
+    assert.match(plan.reason, /refusing to write/)
+    assert.equal(plan.content, null)
+
+    let written = null
+    const result = applyBaselineWrite({
+      violations,
+      measurement: measure([...fx.files.keys()], fx.read),
+      prior: baseline,
+      write: (content) => { written = content },
+    })
+    assert.equal(result.written, false)
+    assert.equal(written, null, 'the write callback must not be reached on a violation')
+    assert.equal(readFileSync(baselinePath).equals(before), true, 'baseline bytes must be unchanged')
+  } finally {
+    fx.cleanup()
+  }
+})
+
+// (b) a port family with a name that was never hardcoded is picked up by the purity scope, and its
+// signature contributes the neutral-port type names.
+test('WHAT[host-boundary-034] a new port family is discovered from the sources and covered by the purity scope', () => {
+  const fx = fixture()
+  try {
+    fx.write('src/Wanxiangshu/Host/Ports/NeutralFission.fs', [
+      'namespace Wanxiangshu.Host.Ports',
+      'open Wanxiangshu.Execution.Delegation',
+      '',
+    ].join('\n'))
+    fx.write('src/Wanxiangshu/Host/Ports/NeutralFission.fsi', [
+      'namespace Wanxiangshu.Host.Ports',
+      '',
+      'type FissionPort =',
+      '    abstract member Fission: unit -> unit',
+      '',
+    ].join('\n'))
+
+    const files = [...fx.files.keys()]
+    assert.equal(isPortFile('src/Wanxiangshu/Host/Ports/NeutralFission.fs'), true)
+    assert.equal(isPortFile('src/Wanxiangshu/Host/Ports/NeutralFission.fsi'), true)
+
+    const names = portTypeNames(fx.read, files)
+    assert.ok(names.has('FissionPort'), 'the new signature must contribute its type name')
+
+    const { violations } = scanAdapterThinness(files, fx.read, {
+      baseline: { productReference: {}, withoutPort: [] },
+    })
+    const purity = violations.filter((v) => v.gate === 'port-purity')
+    assert.equal(purity.length, 1, 'exactly the new port file violates purity')
+    assert.match(purity[0].message, /NeutralFission\.fs/)
+    assert.match(purity[0].message, /Execution/)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+// (c) a per-file growth is reported even when the aggregate total does not grow.
+test('WHAT[host-boundary-034] a per-file product-reference growth is reported even when the total is flat', () => {
+  const fx = fixture()
+  try {
+    fx.write('src/Wanxiangshu/OpenCode/Grown.fs', [
+      'namespace Wanxiangshu.OpenCode',
+      'open Wanxiangshu.Execution.Delegation',
+      'open Wanxiangshu.Interaction.Dispatch',
+      'open Wanxiangshu.Mission.Work',
+      '',
+    ].join('\n'))
+    fx.write('src/Wanxiangshu/OpenCode/Shrunk.fs', [
+      'namespace Wanxiangshu.OpenCode',
+      'open Wanxiangshu.Execution.Delegation',
+      '',
+    ].join('\n'))
+
+    const baseline = {
+      productReference: {
+        'src/Wanxiangshu/OpenCode/Grown.fs': 2,
+        'src/Wanxiangshu/OpenCode/Shrunk.fs': 2,
+      },
+      withoutPort: ['src/Wanxiangshu/OpenCode/Grown.fs', 'src/Wanxiangshu/OpenCode/Shrunk.fs'],
+    }
+    const files = [...fx.files.keys()]
+    const now = measure(files, fx.read)
+    assert.equal(now.productReferenceTotal, 4, 'the aggregate total is unchanged')
+
+    const { violations } = scanAdapterThinness(files, fx.read, { baseline })
+    assert.equal(violations.length, 1, 'exactly one per-file violation')
+    assert.equal(violations[0].gate, 'adapter-thinness')
+    assert.match(violations[0].message, /Grown\.fs: product-domain references rose 2 -> 3/)
+  } finally {
+    fx.cleanup()
+  }
+})
+
+// (d) the CLI refuses to write the baseline on a planted regression and leaves the file byte-identical.
+test('WHAT[host-boundary-034] the CLI refuses --write-baseline on a regression and leaves the baseline byte-identical', () => {
+  const fx = fixture()
+  try {
+    mkdirSync(join(fx.dir, 'scripts/checks'), { recursive: true })
+    const baselinePath = join(fx.dir, 'scripts/checks/adapter-thinness-baseline.json')
+    const baselineText = JSON.stringify({
+      _note: 'fixture baseline',
+      productReference: { 'src/Wanxiangshu/OpenCode/Adapter.fs': 1 },
+      withoutPort: ['src/Wanxiangshu/OpenCode/Adapter.fs'],
+    }, null, 2) + '\n'
+    writeFileSync(baselinePath, baselineText)
+    const before = readFileSync(baselinePath)
+
+    fx.write('src/Wanxiangshu/OpenCode/Adapter.fs', [
+      'namespace Wanxiangshu.OpenCode',
+      'open Wanxiangshu.Execution.Delegation',
+      'open Wanxiangshu.Interaction.Dispatch',
+      '',
+    ].join('\n'))
+
+    const run = spawnSync(process.execPath, [GATE, '--write-baseline'], { cwd: fx.dir, encoding: 'utf8' })
+    assert.notEqual(run.status, 0, 'the CLI must exit non-zero')
+    assert.match(run.stderr, /refusing to write/)
+    assert.equal(readFileSync(baselinePath).equals(before), true, 'baseline bytes must be unchanged')
+  } finally {
+    fx.cleanup()
+  }
+})
+}
