@@ -19,6 +19,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Mission.Work
 
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =

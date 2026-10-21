@@ -541,6 +541,8 @@ Execution/Delegation/Fork/HostJoinGuardJournalPort.fsi
 Execution/Delegation/Fork/HostJoinGuardJournalPort.fs
 Composition/Durable/DelegationJournalAdapter.fsi
 Composition/Durable/DelegationJournalAdapter.fs
+Mission/Work/DeliveryAttemptLedger.fsi
+Mission/Work/DeliveryAttemptLedger.fs
 Composition/Durable/SessionStartedAtJournalAdapter.fsi
 Composition/Durable/SessionStartedAtJournalAdapter.fs
 Composition/Durable/AgentJournalPortAdapter.fsi
