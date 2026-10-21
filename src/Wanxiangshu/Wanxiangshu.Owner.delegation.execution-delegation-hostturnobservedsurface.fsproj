@@ -41,8 +41,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
     <Compile Include="Execution/Delegation/Join.fsi"/>
     <Compile Include="Execution/Delegation/Join.fs"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fsi"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fs"/>
+    <Compile Include="Execution/Delegation/Fork/JoinGuard.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/JoinGuard.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fsi"/>

@@ -118,7 +118,7 @@
     {
       "id": "F08",
       "ownerRequirement": "dispatch-protocol",
-      "sourceSymbol": "Interaction/Dispatch/OpenCode/SessionNudge.fs :: NudgeToDispatchSessionPort — ReportFatalDiagnostic arm removed under W4",
+      "sourceSymbol": "Interaction/Dispatch/SessionNudge.fs :: NudgeToDispatchSessionPort — ReportFatalDiagnostic arm removed under W4",
       "operation": "dynamic (caller-supplied operation string)",
       "triggerBranch": "The continuation-send adapter implements IDispatchSessionPort.ReportFatalDiagnostic by forwarding to FatalProcess.trip,",
       "inputSource": "Continuation/nudge repair sends via toDispatchPort at SessionNudge.fs use sites (idle-gate repair, interaction repair, nudge/AABB sends),",

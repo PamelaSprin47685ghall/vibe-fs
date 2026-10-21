@@ -1,7 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Provider.Projection
 
 /// JS-native provider projection codec owner surface.

@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Interaction.Dispatch.OpenCode
+namespace Wanxiangshu.Interaction.Dispatch
 
 open Wanxiangshu.Foundation.Identity
 

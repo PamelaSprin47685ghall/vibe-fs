@@ -10,7 +10,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Execution.Routing
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession

@@ -35,14 +35,12 @@ open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Host
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation.Handle.OpenCode
 open Wanxiangshu.Execution.Delegation.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart

@@ -24,7 +24,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal

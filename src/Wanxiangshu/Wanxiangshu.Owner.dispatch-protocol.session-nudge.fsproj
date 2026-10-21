@@ -12,7 +12,7 @@
         <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
 <Compile Include="Interaction/Repair/Port.fsi" />
     <Compile Include="Interaction/Repair/Port.fs" />
-    <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fsi" />
-    <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs" />
+    <Compile Include="Interaction/Dispatch/SessionNudge.fsi" />
+    <Compile Include="Interaction/Dispatch/SessionNudge.fs" />
   </ItemGroup>
 </Project>

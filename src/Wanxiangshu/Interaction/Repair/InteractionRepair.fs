@@ -4,7 +4,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Execution.Fission

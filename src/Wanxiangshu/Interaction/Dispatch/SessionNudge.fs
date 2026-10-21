@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Interaction.Dispatch.OpenCode
+namespace Wanxiangshu.Interaction.Dispatch
 
 open System
 open System.Threading.Tasks
@@ -6,7 +6,6 @@ open FsToolkit.ErrorHandling
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Composition.Durable

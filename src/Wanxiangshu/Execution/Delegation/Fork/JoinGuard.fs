@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Fork
 
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -8,8 +8,6 @@ open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal

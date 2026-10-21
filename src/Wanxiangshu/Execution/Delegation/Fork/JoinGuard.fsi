@@ -1,11 +1,10 @@
-namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Fork
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 

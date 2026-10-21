@@ -1,19 +1,10 @@
 {
   "_note": "CUT-40 ratchet (gate 9): production files outside the adapter area (top-level OpenCode/, Host/, any …/OpenCode/ folder) that still open or qualify an in-domain Wanxiangshu.<Domain>.OpenCode namespace. Kernel, Composition/ and *Surface.fs are all counted. Entries may only be removed; see scripts/checks/architecture.mjs gate 9. Start: 16 (8 kernel incl. Composition, 8 Surface) at 7e2635c25.",
   "files": [
-    "src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs",
-    "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
     "src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs",
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
     "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
-    "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
-    "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
-    "src/Wanxiangshu/Interaction/Dispatch/JoinGuardSurface.fs",
-    "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
-    "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs",
-    "src/Wanxiangshu/Mission/Manager/Workflow.fs",
     "src/Wanxiangshu/Mission/Work/ProjectionSurface.fs",
-    "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
     "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs",
     "src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs",
     "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"

@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Fork
 
 open Wanxiangshu.Foundation.Identity
 

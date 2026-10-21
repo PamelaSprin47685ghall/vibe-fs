@@ -3,7 +3,6 @@ namespace Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Interaction.Admission
 open Wanxiangshu.Foundation.HostSession
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Persona
 
 open System

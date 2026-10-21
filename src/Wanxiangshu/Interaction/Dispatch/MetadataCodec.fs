@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Interaction.Dispatch.OpenCode
+namespace Wanxiangshu.Interaction.Dispatch
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
