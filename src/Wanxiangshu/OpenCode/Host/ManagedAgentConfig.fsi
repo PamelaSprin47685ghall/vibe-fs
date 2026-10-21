@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Participant.ManagedAgents
+
 /// Managed agent Host-config gate. This owns catalog projection and Wanxiangshu-owned
 /// non-model fields. Physical model routing is exclusively owned by ModelRouting.
 /// Missing catalog names are created on the live Host config; opencode.json is not

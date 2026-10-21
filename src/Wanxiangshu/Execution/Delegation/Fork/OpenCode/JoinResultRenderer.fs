@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Provider
 
 /// EXEC-004 / EXEC-017 / EXEC-030: LLM-facing join wire — natural language + delivered view only.

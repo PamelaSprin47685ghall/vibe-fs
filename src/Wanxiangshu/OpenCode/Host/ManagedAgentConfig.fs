@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Participant.ManagedAgents
+
 open System
 open Fable.Core
 open Fable.Core.JsInterop

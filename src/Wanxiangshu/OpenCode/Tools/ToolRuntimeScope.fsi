@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Participant.ManagedAgents
+
 open Wanxiangshu.Foundation.TerminalSignal
 
 open System

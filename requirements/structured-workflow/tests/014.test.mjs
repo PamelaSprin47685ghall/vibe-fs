@@ -483,7 +483,7 @@ test('WHAT[structured-workflow-014] NodeFs physical port and tool contracts have
   const managedProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj'
   const staticProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj'
   const nodeFsProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-nodefs.fsproj'
-  assert.deepEqual(compileItems(managedProject), ['OpenCode/Tools/ManagedAgent.fsi', 'OpenCode/Tools/ManagedAgent.fs'])
+  assert.deepEqual(compileItems(managedProject), ['Participant/Persona/ManagedAgent.fsi', 'Participant/Persona/ManagedAgent.fs'])
   assert.deepEqual(compileItems(staticProject), [
     'OpenCode/Tools/ManagerReviewTools.fsi',
     'OpenCode/Tools/StaticTools.fsi',

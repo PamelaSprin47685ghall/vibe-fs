@@ -357,8 +357,8 @@ Mission/Planning/ReviewPlanBackend.fsi
 Mission/Planning/ReviewPlanBackend.fs
 Persistence/EventStore/RetentionSurface.fsi
 Persistence/EventStore/RetentionSurface.fs
-OpenCode/Tools/ManagedAgent.fsi
-OpenCode/Tools/ManagedAgent.fs
+Participant/Persona/ManagedAgent.fsi
+Participant/Persona/ManagedAgent.fs
 OpenCode/Host/ChatAdmission/Intent.fsi
 OpenCode/Host/ChatAdmission/Intent.fs
 OpenCode/Host/ChatAdmission/IntentSurface.fsi
