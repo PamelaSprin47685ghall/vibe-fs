@@ -637,6 +637,8 @@ dotnet tool run fantomas src/Wanxiangshu
 
 ### 十·六 integration 收口会话的投递记录（2026-10-21）
 
+> **本节已被「十·八」取代。** 本节记录的是该时点的快照；其中的「仍未闭合」清单里，R6 与 B5 两项已在「十·八」所列批次中**修完并推送**，不再成立。当前状态一律以「十·八」为准。
+
 本节只记录**已推送并实测**的批次与仍未闭合项。上文一到九节是历史施工书；本节以真实 commit 与实测输出为准。
 
 **已推送到 origin/master 的批次**
@@ -668,6 +670,8 @@ dotnet tool run fantomas src/Wanxiangshu
 
 ### 十·七 交付围栏、R6 层向与 harness 迁移（integration 实测，2026-10-21）
 
+> **本节已被「十·八」取代。** 本节的批次表与未闭合清单是该时点的快照；MSL 006/007/008/013/015/022 与 delegation 027 的迁移在「十·八」中有完整记录，「仍未闭合」里也不再列它们。当前状态以「十·八」为准。
+
 **已推送批次**
 
 | 批次 | commit | build | 实测 |
@@ -684,3 +688,47 @@ dotnet tool run fantomas src/Wanxiangshu
 - **MSL 013/015/022/028** 与 **effect-accounting/002**：旧 harness 从不提交围栏匹配的 durable 见证，须逐个迁到真实交付路径；**不得伪造见证**。
 - **附件读取无可注入缝**（生产缺口）：真实路径的 `childViewForRun` 恒为 `fun _ _ -> Task.FromResult None`，attachment 准备读的是 `viewForSession`，没有可阻塞的缝，所以「attachment 准备期间阻塞、指引尚未发出」这一中间态在真实路径无法注入。已改为断言最终可观测事实，并在 CHANGELOG 记为缺口。
 - **R6 的新回归未写**：commit 失败不登记、成功登记可观察 transition（`DeliveryAttemptLedger.tryFindEstablished` 命中后 transform 判 `StopDelivery`）——须在真实交付路径上写，commit 失败走「同围栏异材料」的既有拒交路径。
+
+### 十·八 当前状态（integration 实测，2026-10-21，`origin/master` = `716876b6a`）
+
+本节只陈述**当前代码状态下的真实事实**：已推送并实测的批次、门禁实测数字，以及仍未闭合的项。上文一到九节是历史施工书；十·六与十·七是该时点的快照，已被本节取代。
+
+**已推送到 origin/master 的批次（全部普通 push，无 force）**
+
+| 批次 | commit | build | 实测 |
+|---|---|---|---|
+| 锚声明：单一 typed 规则 + JS-native 回执 | `2dd501d2e` | `build ok (generation 104)`；151 surfaces；724 modules | `context-compression/031\|032` + `repository-programming/059\|063\|064` + `work/020\|034` + `delegation/033` + `advisor/006` → **68/68 pass / 0 fail / 0 cancelled** |
+| 委派旧 root 归属 + 029 窄能力 | `507d68d01` | `build ok (generation 4)` | `delegation/019\|020\|021\|029` + `managed-session-lifecycle/018` → **21 tests / 17 pass / 0 fail / 0 cancelled / 4 todo**；old-root 探针：外来 `Failed` 后 workSnapshot 逐字节不变、lifecycle 仍 `Active` |
+| parked source 执行点换算 | `f6010b688` | `build ok (generation 106)` | 主树 `065\|048\|002\|028\|029\|030\|031\|032\|047\|049\|056` → **67/67 pass**；重基树 `065\|048` → **4/4 pass** |
+| C3 死链删除（`Execution/Fission/OpenCode/Host.fs` −186） | `ad13783c9` | `build ok (generation 7)` | `intra-participant-parallelism/*` → **45 tests / 30 pass / 0 fail / 0 cancelled / 15 todo** |
+| 交付已证明的轮次发布真实终态 + 024 迁移 | `5df09d1d0` | `build ok (generation 3)` | `delegation/024` → **5/5 pass / 0 fail / 0 cancelled**；真实路径对照：已交付轮次发布终态且 `join` 返回 `status="completed"`；未交付对照 `terminals: []`、工作单元仍 `Active`、`join` 仍 not-ready |
+| 构建产物存在性判据（`scripts/build.mjs`） | `791ee05e6` | `build ok (generation 108)` | `distribution/005` + `verification-system/008` → **27 tests / 26 pass / 0 fail / 0 cancelled / 1 todo**；三态实测：产物齐全 → no-op；单删中间依赖 `dist/Execution/Fission/OpenCode/Host.js` → 全量重编且 `.js` 计数回到 724；再跑 → no-op |
+| **B5：交付格按完整围栏消费** | `6f39cd156` | `build ok`；149 surfaces；715 modules | `repository-programming/059` 新增**永久回归**：同一 run 的另一次调用不得取走该格——错取返回 null、围栏不变、returned 游标未推进，正确调用随后可取自己的材料；该用例在只比 provider run 的旧实现下**为红**。回归 `delegation/007\|008\|009\|010\|011\|012\|023\|025\|033` → **54 tests / 49 pass / 0 fail / 0 cancelled / 5 todo** |
+| **R6：交付登记挂在 durable 提交点**（host→app 反向边消失） | `5e76cb4a4` | `build ok`；149 surfaces；715 modules | `subsystems.mjs` → `OK — 25 subsystems, 240 compile shards, 646 sources, 1954 refs, shard DAG, largest subsystem cycle=10`（改前 1955 refs / cycle=16）；**host → application-composition 边 = 0**；回归 `effect-accounting/013` + `semantic-trace/013` + `work/011` → **24/24 pass / 0 fail** |
+| **delegation 027 + MSL 006/007/008 迁真实交付路径** | `2d35b2ef0` | `build ok (generation 14)`；149 surfaces；715 modules | `delegation/024` + `027` + `managed-session-lifecycle/006\|007\|008` → **62 tests / 60 pass / 0 fail / 0 cancelled / 2 skipped**（2 个 `integrationTest` 按 tier 门禁 skip） |
+| **MSL 013 / 015 迁真实交付路径** | `74e135d6c` | `build ok (generation 15)`；149 surfaces；715 modules | `013` → **7 tests / 6 pass / 0 fail / 1 todo**；`015` → **11/11 pass / 0 fail**；七文件合跑 → **80 tests / 77 pass / 0 fail / 0 cancelled / 2 skipped / 1 todo** |
+| **MSL 022 迁真实交付路径** | `462b79864` | `build ok (generation 17)`；149 surfaces；713 modules | `managed-session-lifecycle/022` → **6 tests / 5 pass / 0 fail / 0 cancelled / 1 todo**（GAP-133 的 `test.todo` 原样保留） |
+
+**B5 的事实**（此前记作「同 run 内被别 call 先取无害」，**该说法已证伪并修正**）：交付格记的是产生它那次调用的完整围栏（provider run + tool call id），旧消费面只比 provider run；同一 run 的第二次交付会**覆盖**第一次的格子，于是只持 run 的终态会取走**另一次调用**的材料并推进 returned 游标，真正拥有该交付的调用随后拿不到材料——是真实错取，不是可接受的降级。实测：同 run `call-1`/`call-2` 两次交付后，`call-1` 的终态取走了 `call-2` 的材料，格子被清空。该事实已由 `059` 的永久回归钉住。
+
+**门禁实测（`origin/master` = `462b79864`，本会话实跑）**
+
+- `node scripts/checks/fsharp-control-pyramid.mjs` → **128** 处；最多的文件：`Repository/Programming/Js/ToolWorkflow.fs` **18**、`OpenCode/Tools/ToolRegistry.fs` **17**、`Repository/Programming/Js/OpenCode/ToolHost.fs` **10**、`Execution/Delegation/Fork/Host/RunLifecycle.fs` **10**、`Mission/Planning/PlanTools.fs` 7。
+- `node scripts/checks/js-boundary-gate.mjs` → `OK — 0 debt line(s) across 0 file(s)`（deep-dist-import 0、du-shape 0）。
+- `node scripts/checks/subsystems.mjs` → `OK — 25 subsystems, 240 compile shards, 645 sources, 1954 refs, shard DAG, largest subsystem cycle=10`。
+- `node scripts/build.mjs` → `[build] build ok`；`js-surface-manifest: OK — 149 registered surfaces`；`js-module-linkage: OK — 713 emitted modules linked and loaded`。
+
+**仍未闭合（如实列出，均为「未修 / 未验」，不作豁免）**
+
+- **C3 材料搬运**：fission lane 的**视图声明仍靠手工跨 session 转发**给 owner 格；应收敛到 `FissionLaneMaterialized` 的 `ViewRef/ViewDigest` 与 takeover 的 `AggregateViewRef/AggregateViewDigest`，由 owner 自己的交付路径建立见证（不 recordFenced 假证、不产生第二个可见交付格）。**尚未落码。**
+- **`effect-accounting/002` 挂起**：该文件在多批改动**前后同样挂起**（`cancelled 1`，240s 超时），不是本轮引入的回归，但**仍未解决**，不记作通过。
+- **MSL 028**：尚未迁到真实交付路径。
+- **`delegation/032` 第三条挂起**：前两条通过（office capability 跨角色拒绝、SyncDelegate 只取标准 Engineer 能力），第三条在 200s 内不返回（`cancelled 1`），挂起点未定位。
+- **GAP 台账重核中**：GAP-123（InternalLeaf/Attached 的 witness 未实现）、GAP-005/050（无机械 oracle）、GAP-015（指向已不存在的 requirement 包）。
+- **附件读取无可注入缝**（生产缺口）：真实路径的 `childViewForRun` 恒为 `fun _ _ -> Task.FromResult None`，attachment 准备读的是 `viewForSession`，没有可阻塞的缝，所以「attachment 准备期间阻塞、指引尚未发出」这一中间态在真实路径无法注入。已改为断言最终可观测事实，并在 CHANGELOG 记为缺口。
+- **R6 的新回归未写**：commit 失败不登记、成功登记可观察 transition（`DeliveryAttemptLedger.tryFindEstablished` 命中后 transform 判 `StopDelivery`）——须在真实交付路径上写，commit 失败走「同围栏异材料」的既有拒交路径。
+
+**两处构建口径教训**（影响后续任何批次的判定）
+
+1. `js-module-linkage: emitted ESM graph is not package-closed`（`Package subpath './integration' is not defined by "exports"`）**不是**源码问题，而是隔离 worktree 的 `wanxiangli` 子模块未同步到父提交 pin 的版本。同步子模块到 pin 后同一次构建即绿。
+2. 共享主树曾被一次违规 `stash pop` + `checkout stash -- <files>` 覆盖，6 个文件被回退到 03:17 的旧 stash 版本（丢失已推的 `DeliveryWitnessReader` / `declarationOf` / `confirmedFence`）。已按「逐文件从 origin/master 写回、blob 逐个核对」恢复，未使用 reset/checkout/restore。**共享树禁止 stash/checkout/restore**。
