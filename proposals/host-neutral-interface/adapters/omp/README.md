@@ -40,5 +40,10 @@ session that is not the host's own (omp can only set the current session's model
 `Role`/`Route`/`Workspace`/`ToolPolicy` for the host session because `sendUserMessage` cannot carry them; the
 context hook leaves a message untouched when a part has no plain-text omp encoding.
 
+`Sessions.Parent` is one more: omp records `SessionHeader.parentSession` **verbatim**, and its own callers pass
+either a session id or a session **file path**. A path-shaped value is resolved through the host's own
+session-file lookup (`readSessionInfo`); when the file does not resolve, the request is refused with
+`HostError.Refused` rather than returning a path masquerading as a `SessionId`.
+
 Run: `./check.sh` (needs the omp-task vibe install for the types, a TypeScript compiler — set `TSC` or let the
 script discover one — and `bun`). No omp process, no model calls.

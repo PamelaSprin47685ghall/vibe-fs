@@ -9,7 +9,7 @@ binary `~/.local/bin/omp` reports `omp/18.12.4`. Extension entry: `omp -e <file>
 
 | Port | omp surface used | Verdict |
 |---|---|---|
-| P-01 Sessions | SDK `createAgentSession({cwd, sessionManager})`, `SessionManager.newSession({parentSession})`, `AgentSession.abort/prompt/dispose/sessionId`, `SessionManager.list`, `getHeader().parentSession`, `ctx.abort()` | Implementable. omp has no host-wide child tree: children = sessions this plugin created (adapter id map in `sdk-children.ts`, wire bookkeeping only). `Interrupt` and `Abort` both map to `abort()` (omp has no finer attempt abort). |
+| P-01 Sessions | SDK `createAgentSession({cwd, sessionManager})`, `SessionManager.newSession({parentSession})`, `AgentSession.abort/prompt/dispose/sessionId`, `SessionManager.list`, `getHeader().parentSession`, `readSessionInfo` (session file → session id), `ctx.abort()` | Implementable. omp has no host-wide child tree: children = sessions this plugin created (adapter id map in `sdk-children.ts`, wire bookkeeping only). `Interrupt` and `Abort` both map to `abort()` (omp has no finer attempt abort). `parentSession` is recorded **verbatim** by omp and its own callers pass either a session id (`session-manager.ts:1272`, `:2466`) or a session **file path** (`agent-session.ts:12416` `previousSessionFile`, `session-manager.ts:3938` `sourceSessionFile`), so a path-shaped value is resolved through `readSessionInfo` and, when it does not resolve, refused with `HostError.Refused` instead of being returned as a `SessionId` (open item O-4). |
 | P-02 Prompts | `pi.sendUserMessage(text, {deliverAs})` (active session), `AgentSession.prompt` (children), `pi.appendEntry` for correlation, `setModel`, `setActiveTools` | Implementable. `sendUserMessage` is fire-and-forget (void): verdict `OwnedSettled` after enqueue; transport exceptions → `AcceptanceUnknown` (never resent). |
 | P-03 Transcript | `ctx.sessionManager.getEntries()` (`type: "message"` → `AgentMessage`), child `session.messages` | Implementable. Message ids are positional (`omp:<index>`); omp entry ids exist (`SessionEntry.id`) and should replace them when wiring for real (open item O-1). |
 | P-04 Tools | `pi.registerTool({name, label, description, parameters, execute(toolCallId, params, signal, onUpdate, ctx)})` | Implementable; `parameters` takes a JSON-schema object (TypeBox `TSchema` is JSON schema). |
@@ -23,18 +23,29 @@ binary `~/.local/bin/omp` reports `omp/18.12.4`. Extension entry: `omp -e <file>
 | P-12 Diagnostics | `pi.logger` | Implementable. |
 
 ## Conformance evidence (`adapters/omp/check.sh`)
-1. `tsc --noEmit` (TypeScript 5.9.3, strict) of `ports.ts`, `adapter.ts`, `sdk-children.ts` and the fixture against omp's
-   own `dist/types` — passes. Mutation check: returning `{ block: 3 }` from `tool_call` and reading `e.sessionIdX` from
-   `session_stop` both fail type-check (TS2769, TS2551), so the check really binds to omp's types.
-2. `mirror-check.mjs`: all 64 F# port types in `src/Wanxiangshu/Host/Ports/*.fsi` have the same record fields / interface members /
-   union cases in `ports.ts` (renaming one field makes it fail).
+1. `tsc --noEmit` (strict) of `ports.ts`, `adapter.ts`, `sdk-children.ts` and the fixture against omp's own
+   `dist/types` — passes. The compiler is the repo-local TypeScript **7.0.2** (`node_modules/.bin/tsc`); the earlier
+   "TypeScript 5.9.3" claim in this document was wrong. Mutation check: returning `{ block: 3 }` from `tool_call` and
+   reading `e.sessionIdX` from `session_stop` both fail type-check (TS2769, TS2551), so the check really binds to
+   omp's types.
+2. `mirror-check.mjs`: `ports.ts` is **generated** from the F# port signatures (`gen-ports.mjs` parses
+   `src/Wanxiangshu/Host/Ports/*.fsi` plus the two foundation signature files) and the check regenerates it and
+   **byte-diffs** the result, failing with the differing lines printed. A renamed field, a changed field type, a
+   lost `option`, a missing or extra union case or a changed member signature all break it — the earlier
+   name-only comparison could not see any of those.
 3. `fixtures/fixture.test.ts` (bun, offline): a fake `ExtensionAPI` replays recorded-shape omp events
-   (`fixtures/events.json`) through the adapter to a fake product; 14 assertions (tool registration and execution encode,
-   refuse→block, rewrite/allow, result replace, input refuse, system prompt, compaction context, auto-continue deny,
-   turn_end error → `AttemptFinished Failed`, transcript decode, child create, model apply error, prompt correlation).
+   (`fixtures/events.json`) through the adapter to a fake product; 17 assertions (tool registration and execution
+   encode, refuse→block, rewrite/allow, result replace, input refuse, system prompt, compaction context,
+   auto-continue deny, turn_end error → `AttemptFinished Failed`, transcript decode, child create, model apply
+   error, prompt correlation, and the three parent-session forms: session id, resolvable file path, unresolvable
+   file path → refusal).
 
 ## Open items (tracked on BOARD.md)
 - O-1 use omp `SessionEntry.id` for `TranscriptMessageAddress` instead of positional ids.
 - O-2 `ProviderParams` encode per provider family (payload shape differs per API).
 - O-3 the real binding needs the product compiled to JS (Fable output) exposing an `IHostPlugin`; the skeleton proves the
   port shapes, not the product wiring (that is HNI-08's `HostPorts -> ProductHooks` refactor).
+- O-4 `SessionHeader.parentSession` is recorded verbatim by omp and may hold a session **file path** rather than a
+  session id. The adapter resolves a path-shaped value through `readSessionInfo` and refuses it when the file does
+  not resolve; a real binding must decide whether an unresolvable parent path is an error or a legitimately
+  deleted parent session.

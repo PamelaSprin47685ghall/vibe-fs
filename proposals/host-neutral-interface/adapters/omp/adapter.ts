@@ -25,6 +25,13 @@ export interface OmpChildSessions {
   childrenOf(parent: string): { id: string; title?: string }[];
   findByTitle(title: string): Promise<string[]>;
   messages(session: string): AgentMessage[] | undefined;
+  /**
+   * Resolve a parent-session *file path* to the session id recorded in that
+   * file. omp stores `SessionHeader.parentSession` verbatim and its own callers
+   * sometimes pass a file path (see the omp feasibility evidence), so a path
+   * shaped value is not a `SessionId` and must not be returned as one.
+   */
+  resolveSessionIdByPath(path: string): Promise<string | undefined>;
 }
 
 const ok = <T>(value: T): P.Result<T, P.HostError> => ({ ok: true, value });
@@ -33,7 +40,22 @@ const sid = (s: string) => s as P.SessionId;
 const transport = (e: unknown): P.HostError => ({ tag: "Transport", reason: e instanceof Error ? e.message : String(e) });
 const notFound = (what: string): P.HostError => ({ tag: "NotFound", what });
 const unsupported = (capability: P.HostCapability): P.HostError => ({ tag: "Unsupported", capability });
+/**
+ * True when a recorded `parentSession` value is a session FILE PATH rather than
+ * a session id. omp's own session ids are UUIDs (`Bun.randomUUIDv7`) and its
+ * session files are `<name>.jsonl` files, so a value carrying a path
+ * separator or the `.jsonl` suffix is a path. Such a value is resolved through
+ * the host's own lookup — never guessed.
+ */
+export function looksLikePath(value: string): boolean {
+  return value.includes("/") || value.includes("\\") || value.endsWith(".jsonl");
+}
 
+/** Raised when the host recorded a parent session it cannot express as a session id. */
+export class ParentUnresolvedError extends Error {
+  readonly reason: string;
+  constructor(reason: string) { super(reason); this.reason = reason; }
+}
 /** Raised when a session id is unknown to the host; mapped to `HostError.NotFound`. */
 export class UnknownSessionError extends Error {
   readonly what: string;
@@ -41,7 +63,13 @@ export class UnknownSessionError extends Error {
 }
 
 async function guard<T>(f: () => Promise<T>): P.HostResult<T> {
-  try { return ok(await f()); } catch (e) { return err(e instanceof UnknownSessionError ? notFound(e.what) : transport(e)); }
+  try {
+    return ok(await f());
+  } catch (e) {
+    if (e instanceof UnknownSessionError) return err(notFound(e.what));
+    if (e instanceof ParentUnresolvedError) return err({ tag: "Refused", reason: e.reason });
+    return err(transport(e));
+  }
 }
 export function decodeParts(m: AgentMessage): P.TranscriptPart[] {
   const content = (m as { content?: unknown }).content;
@@ -123,8 +151,19 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
       return sid(await children.create(parent, spec.Title, spec.Workspace));
     }),
     Parent: (s) => guard(async () => {
-      const p = isOwnChild(s) ? children.parentOf(s) : ctx().sessionManager.getHeader()?.parentSession;
-      return p ? sid(p) : undefined;
+      const raw = isOwnChild(s) ? children.parentOf(s) : ctx().sessionManager.getHeader()?.parentSession;
+      if (!raw) return undefined;
+      // omp records `parentSession` verbatim: its own callers pass a session id
+      // in some paths and a session FILE path in others. A path is not a
+      // session id, so it is resolved through the host's own lookup; when the
+      // host cannot resolve it, the request fails instead of returning a path
+      // masquerading as a `SessionId`.
+      if (looksLikePath(raw)) {
+        const resolved = await children.resolveSessionIdByPath(raw);
+        if (!resolved) throw new ParentUnresolvedError(`omp recorded the parent session as a file path that does not resolve to a session id: ${raw}`);
+        return sid(resolved);
+      }
+      return sid(raw);
     }),
     Children: (s) => guard(async () => children.childrenOf(s).map((c) => ({ Id: sid(c.id), Parent: s, Title: c.title }))),
     Abort: (s) => guard(async () => { if (isOwnChild(s)) await children.abort(s); else ctx().abort(); }),

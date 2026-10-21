@@ -20,10 +20,11 @@ const pi: OmpApi = {
   setActiveTools: async () => {},
   logger: { debug() {}, info() {}, warn() {}, error() {} } as unknown as ExtensionAPI["logger"],
 };
+let recordedParentSession: string | undefined;
 const history: AgentMessage[] = events.history as unknown as AgentMessage[];
 const ctx = {
   cwd: "/tmp/fixture", model: { provider: "fx", id: "m1" }, isIdle: () => true, abort() {},
-  sessionManager: { getSessionId: () => "root", getHeader: () => ({ parentSession: undefined }),
+  sessionManager: { getSessionId: () => "root", getHeader: () => ({ parentSession: recordedParentSession }),
                     getEntries: () => history.map((message) => ({ type: "message", message })) },
   modelRegistry: { getAvailable: () => [{ provider: "fx", id: "m1" }], find: (p: string, m: string) => (p === "fx" && m === "m1" ? { provider: p, id: m } : undefined) },
 } as unknown as ExtensionContext;
@@ -31,6 +32,7 @@ const children: OmpChildSessions = {
   create: async (parent) => `child-of-${parent}`, prompt: async () => true, abort: async () => {}, close: async () => {},
   parentOf: (s) => (s.startsWith("child-of-") ? s.slice(9) : undefined), childrenOf: () => [], findByTitle: async () => [],
   messages: () => [],
+  resolveSessionIdByPath: async (path) => (path === "/tmp/sessions/parent.jsonl" ? "parent-session-id" : undefined),
 };
 
 const signals: P.HostSignal[] = [];
@@ -92,5 +94,15 @@ expect("child session create", await portsSeen!.Sessions.Create("root" as P.Sess
 expect("model apply unknown -> Transport error", (await portsSeen!.Models.Apply("root" as P.SessionId, { Provider: "x", Model: "y" })).ok, false);
 expect("prompt correlation echoed as entry", [await portsSeen!.Prompts.Send("root" as P.SessionId, { Text: "go", Correlation: P.promptKey("pk-1") }, undefined), entries, sent],
   [{ tag: "AdmittedWithReceipt", value: "omp:root" }, [{ session: "root", key: "pk-1" }], ["go"]]);
+recordedParentSession = "parent-session-id";
+expect("parent recorded as a session id", await portsSeen!.Sessions.Parent("root" as P.SessionId), { ok: true, value: "parent-session-id" });
+recordedParentSession = "/tmp/sessions/parent.jsonl";
+expect("parent recorded as a file path resolves to the session id",
+  await portsSeen!.Sessions.Parent("root" as P.SessionId), { ok: true, value: "parent-session-id" });
+recordedParentSession = "/tmp/sessions/gone.jsonl";
+expect("parent recorded as an unresolvable file path is refused",
+  await portsSeen!.Sessions.Parent("root" as P.SessionId),
+  { ok: false, error: { tag: "Refused", reason: "omp recorded the parent session as a file path that does not resolve to a session id: /tmp/sessions/gone.jsonl" } });
+recordedParentSession = undefined;
 console.log(failures === 0 ? "# fixture: all ok" : `# fixture: ${failures} failed`);
 if (failures) process.exit(1);
