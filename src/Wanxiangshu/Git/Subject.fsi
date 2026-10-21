@@ -7,6 +7,8 @@ module GitSubject =
     val Executable: string = "git"
 
     val execIn: directory: string -> arguments: string array -> Task<string>
+    /// `rev-parse --show-toplevel`: the worktree root of `directory`, line terminator removed.
+    val revParseShowToplevel: directory: string -> Task<string>
     val revParseGitCommonDir: workspace: string -> Task<string>
     val diffHeadBinary: directory: string -> Task<string>
     val lsFilesUntracked: directory: string -> Task<string>

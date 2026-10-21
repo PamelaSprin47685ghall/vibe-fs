@@ -12,7 +12,7 @@ open Wanxiangshu.Process
 module GitOperations =
 
     let private command repo args =
-        { FileName = "git"
+        { FileName = GitSubject.Executable
           Arguments = args
           WorkingDirectory = Some repo
           Environment = None

@@ -25,10 +25,7 @@ module PlanWorkOpenWiring =
         }
 
     let private queryWorktreeRoot (workspace: string) : Task<string> =
-        task {
-            let! raw = Wanxiangshu.Git.GitSubject.execIn workspace [| "rev-parse"; "--show-toplevel" |]
-            return raw.TrimEnd('\r', '\n')
-        }
+        Wanxiangshu.Git.GitSubject.revParseShowToplevel workspace
 
     let private resolveWorktreeRoot (workspaceDirectory: string option) : Task<Result<string, string>> =
         task {

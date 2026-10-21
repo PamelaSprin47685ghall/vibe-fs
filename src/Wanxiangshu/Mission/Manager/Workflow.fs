@@ -237,8 +237,7 @@ module ManagerWorkflow =
         task {
             // A plugin may enter from a subdirectory. The work belongs to the
             // actual worktree root, not that entry directory or the common Git dir.
-            let! rawRoot = Wanxiangshu.Git.GitSubject.execIn directory [| "rev-parse"; "--show-toplevel" |]
-            let root = rawRoot.TrimEnd('\r', '\n')
+            let! root = Wanxiangshu.Git.GitSubject.revParseShowToplevel directory
 
             if System.String.IsNullOrWhiteSpace root then
                 invalidOp "Manager lifecycle opening failed: Git did not identify a worktree root"

@@ -28,6 +28,15 @@ module GitSubject =
     let execIn (directory: string) (arguments: string array) : Task<string> =
         execFileAsync execFileJs Executable (Array.append [| "-C"; directory |] arguments) utf8
 
+    // --- worktree root ---
+
+    /// The worktree root of `directory`, not the entry directory and not the common Git dir.
+    let revParseShowToplevel (directory: string) : Task<string> =
+        task {
+            let! raw = execIn directory [| "rev-parse"; "--show-toplevel" |]
+            return raw.TrimEnd('\r', '\n')
+        }
+
     // --- common-dir ---
 
     let revParseGitCommonDir (workspace: string) : Task<string> =

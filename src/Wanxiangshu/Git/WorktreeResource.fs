@@ -100,7 +100,7 @@ module WorktreeCommands =
         WorktreeIdentity.create (GitPorcelain.managerBranchOf (ManagerJobId.value jobId))
 
     let private command cwd args =
-        { FileName = "git"
+        { FileName = GitSubject.Executable
           Arguments = args
           WorkingDirectory = cwd
           Environment = None
