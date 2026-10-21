@@ -77,8 +77,35 @@ module PluginHooks =
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
-    [<Emit("$0 != null && ($0.prefixUntil != null || $0.thenMap != null)")>]
-    let private hasViewDeclaration (value: obj) : bool = jsNative
+    let private hasViewDeclaration (value: obj) : bool =
+        if isNull value then
+            false
+        else
+            createObj [ "prefixUntil" ==> value?prefixUntil; "thenMap" ==> value?thenMap ]
+            |> Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parseDeclaration
+            |> Result.isOk
+
+    [<AllowNullLiteral>]
+    type private CheckpointAdmission =
+        abstract observe: terminal: obj -> string
+        abstract settle: call: obj * outcome: obj -> string
+
+    [<AllowNullLiteral>]
+    type private CompressionCheckpoints =
+        abstract checkpoints: unit -> CheckpointAdmission
+
+    [<Import("Compression", "wanxiangli/compression")>]
+    let private createCompression: unit -> CompressionCheckpoints = jsNative
+
+    let private checkpointCall sessionText (callId: ToolCallId) =
+        createObj [ "session" ==> sessionText; "callId" ==> ToolCallId.value callId ]
+
+    let private appendOutcome =
+        function
+        | JournalAppendFailure.WriterUnavailable _ -> "WriterUnavailable"
+        | JournalAppendFailure.WriteUnknown _ -> "WriteUnknown"
+        | JournalAppendFailure.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
+        | JournalAppendFailure.FactRejected _ -> "FactRejected"
 
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
@@ -145,7 +172,7 @@ module PluginHooks =
             // Programming-surface calls carrying a non-empty `view` argument establish
             // the compression checkpoint. The plugin records one durable compression
             // checkpoint per successfully completed call, keyed by exact call id.
-            let settledViewCheckpoints = HashSet<SessionId * ToolCallId>()
+            let viewCheckpointAdmission = createCompression().checkpoints ()
             // obligation-ledger-005: the in-flight append for each identity, so a
             // concurrent duplicate terminal waits for the same append's final
             // outcome instead of reporting an early success.
@@ -471,41 +498,24 @@ module PluginHooks =
             let removePendingViewCheckpoint key =
                 lock pendingViewCheckpointAppends (fun () -> pendingViewCheckpointAppends.Remove(key) |> ignore)
 
-            let releaseUnattemptedViewCheckpoint key failure =
-                match failure with
-                | JournalAppendFailure.WriterUnavailable _ ->
+            let settleFailedViewCheckpoint key call failure =
+                let outcome = viewCheckpointAdmission.settle (call, appendOutcome failure)
+
+                if outcome = "released" then
                     removePendingViewCheckpoint key
-                    settledViewCheckpoints.Remove(key) |> ignore
-                | JournalAppendFailure.WriteUnknown _
-                | JournalAppendFailure.NoNewWriteReleaseFailed _
-                | JournalAppendFailure.FactRejected _ -> ()
 
             let appendTerminalViewCheckpoint key sessionText callId =
                 task {
+                    let call = checkpointCall sessionText callId
+
                     try
                         do! appendViewCheckpoint (requiredViewJournal ()) sessionText callId
+                        viewCheckpointAdmission.settle (call, "committed") |> ignore
                         removePendingViewCheckpoint key
                     with :? JournalAppendException as appendFailure ->
-                        releaseUnattemptedViewCheckpoint key appendFailure.Failure
+                        settleFailedViewCheckpoint key call appendFailure.Failure
                         return raise appendFailure
                 }
-
-            let startTerminalViewCheckpoint key sessionText callId =
-                lock pendingViewCheckpointAppends (fun () ->
-                    match pendingViewCheckpointAppends.TryGetValue(key) with
-                    | true, pending -> pending
-                    | false, _ ->
-                        let append = appendTerminalViewCheckpoint key sessionText callId
-                        pendingViewCheckpointAppends[key] <- append
-                        append)
-
-            let settleNewViewCheckpointTerminal key sessionText callId status =
-                if not (settledViewCheckpoints.Add(key)) then
-                    Task.FromResult(())
-                elif status = "completed" then
-                    startTerminalViewCheckpoint key sessionText callId
-                else
-                    Task.FromResult(())
 
             /// One durable checkpoint per exact terminal call. A repeated Host
             /// part update for the same call id is a replay, not a second fact.
@@ -520,18 +530,20 @@ module PluginHooks =
             let settleViewCheckpointTerminal (sessionText, callId, status) =
                 let key = SessionId.create sessionText, callId
 
-                // A concurrent duplicate first joins the in-flight append (it
-                // must observe the same final outcome); only a terminal with no
-                // pending append consults the settled mark.
-                let joinPending () =
-                    lock pendingViewCheckpointAppends (fun () ->
-                        match pendingViewCheckpointAppends.TryGetValue(key) with
-                        | true, pending -> Some(pending)
-                        | false, _ -> None)
+                let terminal =
+                    createObj
+                        [ "session" ==> sessionText
+                          "callId" ==> ToolCallId.value callId
+                          "status" ==> status ]
 
-                match joinPending () with
-                | Some pending -> pending
-                | None -> settleNewViewCheckpointTerminal key sessionText callId status
+                match viewCheckpointAdmission.observe terminal with
+                | "append" ->
+                    let start = fun () -> appendTerminalViewCheckpoint key sessionText callId
+                    let append: Task<unit> = emitJsExpr start "Promise.resolve().then($0)"
+                    pendingViewCheckpointAppends[key] <- append
+                    append
+                | "join" -> pendingViewCheckpointAppends[key]
+                | _ -> Task.FromResult(())
 
             let settleViewCheckpointEvent rawInput =
                 viewTerminalObservation rawInput

@@ -115,6 +115,32 @@ integrationTest('WHAT[obligation-ledger-005] the exact completed terminal commit
   })
 })
 
+integrationTest('WHAT[obligation-ledger-005] malformed flat view declarations never establish a checkpoint', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const sessionID = 'ol005-invalid-view'
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+    const invalid = [
+      { prefixUntil: -1, thenMap: {} },
+      { prefixUntil: 1, thenMap: { 0: '   ' } },
+      { prefixUntil: '1', thenMap: {} },
+      { prefixUntil: 1 },
+      { thenMap: {} },
+    ]
+    for (const [index, declaration] of invalid.entries()) {
+      const event = terminalEvent(sessionID, `invalid-${index}`, 'completed')
+      event.event.properties.part.state.input = {
+        program: 'class Js extends JsProgram { async run() { return {}; } }',
+        ...declaration,
+      }
+      await hooks.event(event)
+    }
+    assert.equal(countCheckpointFacts(directory), 0)
+    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, [])
+    await hooks.event(terminalEvent(sessionID, 'valid-after-invalid', 'completed'))
+    assert.equal(countCheckpointFacts(directory), 1)
+  })
+})
+
 integrationTest('WHAT[obligation-ledger-005] an error terminal closes the candidate without a checkpoint and without blocking another call', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ol005-error'
