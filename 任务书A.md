@@ -489,6 +489,19 @@ dotnet tool run fantomas src/Wanxiangshu
 - `WXS_TIER_INTEGRATION=1 node --test requirements/work/tests/026.test.mjs` → `tests 2 / pass 1 / fail 1`。**仍红**，但红的**性质变了**：红点仍在 `026.test.mjs:124`（`assert.deepEqual(runtime.abortedIds, [sessionID], 'post-S3 deliver must interrupt the conversation')`）——该断言挂在**工具事件边界**（`hooks.event` 的 `message.part.updated`）上，而现行契约（`requirements/work/WHAT.md` [026] 与 [003]）规定**中断发生在 transform 钩子的交付裁决**，工具事件钩子只登记「呈现」面事实（`PluginHooks.fs:520-545` `settlePostS3Deliver` 只调 `RecordDeliveryPresented`）。把 `026` 的断言迁到 transform 裁决边界是**下一轮**的工作（B10/work-049 一并处理）。本轮只闭合 C2（登记「已成立」+ 绑定物理输入），未动断言。
 - 回归：`WXS_TIER_INTEGRATION=1 node --test requirements/work/tests/020/022/023/024/025.test.mjs` → `tests 25 / pass 25 / fail 0`；`WXS_TIER_INTEGRATION=1 node --test requirements/obligation-ledger/tests/002.test.mjs` → `tests 2 / pass 2 / fail 0`（含真实 OpenCode Host canary）。
 
+#### 十·二·六 控制金字塔 105 → 100（build-doctor 五文件纯重构，分两批推送）
+
+**第一批** `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs` + `src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs`（commit `cdeecf7dc`）：共享 `InterruptAttempt` 异常→`Error` 纯 helper（`PluginTransforms.fs` 的 `requestRetiredAttemptInterrupt` 上移到使用点之前，两处共用一份），并把 `ToolRuntimeScope.fs` 的围栏复核提为 `confirmedFence` 私有 helper（`tryFindDurableEstablished` 改为「先按 session 过滤、再调 `confirmedFence`」两步，不改判定结果）。
+
+**第二批** `src/Wanxiangshu/OpenCode/Tools/StaticTools.fs` + `src/Wanxiangshu/OpenCode/Host/ModelRouting.fs` + `src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs`（commit `b95da5b3e`）：浅分支提 helper——`StaticTools.fs` 的 `utilityPermission`（办公能力矩阵只回答「准许/不准许」）、`ModelRouting.fs` 的 `queriedTheoreticalCapacity`、`ModelCapacity/Queue.fs` 的 `ownedByThisQueue` 与 `isCurrentDemandOf`。
+
+**实测**：
+
+- `node scripts/checks/fsharp-control-pyramid.mjs` → 本批前（`818441a53`）**105** 处，本批后（`b95da5b3e`）**100** 处，净减 **5**，与「105→100、停止扩范围」一致。两批均为纯结构提取，未改判定语义。
+- `node scripts/build.mjs` → `[build] build ok`；`js-surface-manifest: OK — 151 registered surfaces`；`js-module-linkage: OK — 724 emitted modules linked and loaded`。第二批中 `StaticTools.fs` 单编存在上游既有缺引用（`OfficeCapability` 等符号在单文件编译下不可见），**但完整 build 绿**，不构成豁免。
+- 第一批回归：`node --test requirements/work/tests/011.test.mjs requirements/work/tests/026.test.mjs requirements/capability-enforcement/tests/025.test.mjs` → `tests 48 / pass 48 / fail 0 / todo 0`。
+- 第二批回归：同上一组 → `tests 48 / pass 48 / fail 0 / todo 0`；`node --test requirements/execution-model-routing/tests/` → `tests 123 / pass 115 / fail 0 / todo 8`（8 条 todo 均为既有 GAP 项）。
+
 ### 十·三 R3 套件实测
 
 | 套件 | pass | fail | 判定 |

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { withSyncRuntime } from './support/sync-runtime.mjs'
 
 test('WHAT[delegation-023] transient failure follows the injected retry verdict before delivering success or exhaustion', async () => {
@@ -13,6 +14,16 @@ test('WHAT[delegation-023] transient failure follows the injected retry verdict 
     assert.equal(await sync.observeTurn(runtime, owner, 'Engineer', 'TurnFailed', '', 'run-retry-1'), true)
     assert.equal(sync.retryCalls(runtime), 1)
     assert.equal(sync.dispatchRetryAttempt(runtime, owner, 'Engineer'), true)
+    // The completed turn carries a delivery, not just prose: the fenced cell
+    // is what the sync reader (`tryTakeRenderedFor`) consumes to settle the
+    // call. Without it the turn is "completed without a delivered view" and
+    // the obligation stays open forever.
+    runtimeSurface.recordFencedDeliveredView(
+      sync.child(runtime, owner, 'Engineer'),
+      'run-retry-2',
+      'call-retry-2',
+      { prefixUntil: 0, thenMap: { 0: 'retry delivered view' } },
+    )
     assert.equal(await sync.observeTurn(runtime, owner, 'Engineer', 'TurnCompleted', 'retry delivered view', 'run-retry-2'), true)
     const result = await pending
     assert.equal(result.ok, true)

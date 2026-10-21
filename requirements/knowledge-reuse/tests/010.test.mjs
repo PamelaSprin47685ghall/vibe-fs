@@ -319,6 +319,7 @@ const { parse: parseToml } = await import("smol-toml");
 const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
 const syncDelegate = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
 const jsWorkflow = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
+const runtimeSurface = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 const lifecycle = await import("../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js");
 const bookkeeper = await import("../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js");
@@ -374,21 +375,43 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
         null,
       )
       assert.equal(jsWorkflow.caseName(delivered), 'Succeeded', jsWorkflow.render(delivered))
+      // The program above delivered through the real programming surface, but
+      // the sync reader settles on the fenced cell, not on the raw view: the
+      // delivery is registered with the fence of this exact assistant run so
+      // `tryTakeRenderedFor` can consume it.
+      runtimeSurface.recordFencedDeliveredView(
+        delegateId,
+        `asst_q${i + 1}`,
+        `call_q${i + 1}`,
+        { prefixUntil: 0, thenMap: { 0: deliveredMaterial } },
+      )
       assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', `RAW-PROSE-Q${i + 1}`, `asst_q${i + 1}`), true)
       const text = await pending
-      assert.match(text, /\[data\]/, `Engineer Q${i + 1} must return the delivered LlmFacing.Data record`)
-      assert.match(text, new RegExp(`turn = ${i + 1}`), `Engineer Q${i + 1} must carry its own delivered turn`)
-      assert.match(text, new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-      assert.equal(
-        text.includes(`RAW-PROSE-Q${i + 1}`),
-        false,
-        `Engineer Q${i + 1} must take the explicit this.deliver record rather than raw turn prose`,
+      // 消费者事实：返回的材料里有本轮的答案与本轮该交的散文。
+      // repository-programming [054]：reportMapping 指向本次工作的全部材料，
+      // 含末条 assistant 散文；旧形态（LlmFacing.Data DTO、顶层 turn 字段）
+      // 已退役，不再断言。
+      assert.match(
+        text,
+        new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+        `Engineer Q${i + 1} must return the delivered material carrying this turn's answer`,
       )
+      assert.match(
+        text,
+        new RegExp(`RAW-PROSE-Q${i + 1}`),
+        `Engineer Q${i + 1} must return the assistant prose this deliver owes alongside the material`,
+      )
+      // 前次已返回的身份不重复：上一轮的材料与散文都不再出现。
       for (let prior = 0; prior < i; prior += 1) {
         assert.equal(
           text.includes(QUESTIONS[prior][1]),
           false,
-          `Engineer Q${i + 1} must not leak Q${prior + 1} terminal prose into its bounded record`,
+          `Engineer Q${i + 1} must not repeat the Q${prior + 1} material it already returned`,
+        )
+        assert.equal(
+          text.includes(`RAW-PROSE-Q${prior + 1}`),
+          false,
+          `Engineer Q${i + 1} must not repeat the Q${prior + 1} prose it already returned`,
         )
       }
       assert.equal(parseToml(text).error, undefined)
@@ -406,6 +429,13 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('CaseFinalize')), true)
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q1')), true)
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q3')), true)
+    // 归档事实：交付的材料进了 Casebook draft，finalize 把它作为 transcript 交给 Bookkeeper。
+    const finalizePrompt = bookkeeperPort.prompts.map((text) => String(text)).find((text) => text.includes('CaseFinalize'))
+    assert.ok(finalizePrompt, 'the CaseFinalize prompt must be sent to the Bookkeeper lane')
+    for (const [question, answer] of QUESTIONS) {
+      assert.ok(finalizePrompt.includes(question), `the finalized draft must carry Q: ${question}`)
+      assert.ok(finalizePrompt.includes(answer), `the finalized draft must carry A: ${answer}`)
+    }
 
     const store = eventStore.create(join(dir, '.Herdchestra'), 'g6-engineer-charge-fetch')
     const fetched = await casebook.fetchCase(store, 10, delegateId)
@@ -436,6 +466,7 @@ const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
 const syncDelegate = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
+const runtimeSurface = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 const lifecycle = await import("../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js");
 const bookkeeper = await import("../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js");
@@ -474,6 +505,15 @@ test('WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually
       }
 
       lifecycle.notePrompt(delegateId, question)
+      // The turn carries a delivery, not only prose: the fenced cell is what
+      // the sync reader consumes to settle the call. Without it the turn is
+      // "completed without a delivered view" and the obligation stays open.
+      runtimeSurface.recordFencedDeliveredView(
+        delegateId,
+        `asst_q${i + 1}`,
+        `call_q${i + 1}`,
+        { prefixUntil: 0, thenMap: { 0: answer } },
+      )
       assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', answer, `asst_q${i + 1}`), true)
       const done = await pending
       assert.equal(done.ok, true, done.ok ? '' : done.error)
