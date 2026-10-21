@@ -103,9 +103,17 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
   // physical user message lands and no chat.message hook runs — the receipt
   // without ingress (`nextPromptReceiptOnly`).
   let receiptOnly = 0
+  // Host ingress still running: the chat.message hook of a prompt the stub is
+  // admitting. The Host starts a session's provider loop for a user message only
+  // after that message's chat.message hook returned, so a fixture that drives
+  // the child's provider step first awaits these (`awaitIngress`).
+  const ingress = new Set()
   const self = {
     __nextPromptReceiptOnly: () => {
       receiptOnly += 1
+    },
+    __awaitIngress: async () => {
+      while (ingress.size > 0) await Promise.allSettled([...ingress])
     },
     __pushHostMessage: (sessionId, message) => {
       const perSession = messagesBySession.get(sessionId) ?? []
@@ -199,10 +207,18 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
         }
         const hk = self.__hooks;
         if (hk && hk['chat.message']) {
+          const admitted = (async () => {
+            try {
+              await hk['chat.message']({ sessionID: sessionId, messageID: message.id, agent: args?.body?.agent }, { message, parts: message.parts })
+            } catch (err) {
+              console.log('HOOK CHAT MESSAGE FAILED:', err)
+            }
+          })()
+          ingress.add(admitted)
           try {
-            await hk['chat.message']({ sessionID: sessionId, messageID: message.id, agent: args?.body?.agent }, { message, parts: message.parts })
-          } catch (err) {
-            console.log('HOOK CHAT MESSAGE FAILED:', err)
+            await admitted
+          } finally {
+            ingress.delete(admitted)
           }
         }
         return {}
@@ -280,6 +296,7 @@ export const withExecutablePlugin = async (body, options = {}, createHooks = ini
         abortedIds,
         pushHostMessage: client.__pushHostMessage,
         nextPromptReceiptOnly: client.__nextPromptReceiptOnly,
+        awaitIngress: client.__awaitIngress,
       }
       await body(hooks, directory, createdIds, runtime)
     } finally {
@@ -356,6 +373,7 @@ export const withRestartablePlugin = async (body) => {
       prompts,
       messages,
       pushHostMessage: client.__pushHostMessage,
+      awaitIngress: client.__awaitIngress,
     })
   } finally {
     for (const hooks of [...liveHooks].reverse()) await hooks.dispose()

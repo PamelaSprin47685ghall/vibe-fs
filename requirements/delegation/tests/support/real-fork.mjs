@@ -65,6 +65,11 @@ export const observeTerminals = async (runtime) => {
  * owes the parent no delivery.
  */
 export const childTurn = async (hooks, runtime, child, run, prose, material, awaitTerminal, role = 'engineer') => {
+  // The Host runs the child's provider step only after the chat.message hook of
+  // its latest user message returned. A detached send hands control back to the
+  // tool while that hook may still be admitting the prompt, so the turn waits
+  // for Host ingress first instead of racing it.
+  await runtime.awaitIngress()
   const physical = physicalUserMessageOf(runtime, child)
   const assistant = {
     info: {
