@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as satellites from '../../../dist/OpenCode/Host/SatelliteSurface.js'
+import * as satellites from '../../../dist/Execution/Session/Attachment/SatelliteSurface.js'
 
 test('WHAT[managed-session-lifecycle-003] actual satellite owner reuses an exactly matching supplied journal association', async () => {
   const observed = await satellites.SatelliteSurface_scenario(true, true, false, false)

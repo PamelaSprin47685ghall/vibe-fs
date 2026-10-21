@@ -193,6 +193,21 @@ export function scanArchitecture(productionFiles, read, options) {
   // see scripts/checks/adapter-thinness.mjs.
   for (const v of scanAdapterThinness(productionFs, read, { root: options?.root }).violations) violations.push(v)
 
+  // ⑨b A namespace must not hide its folder (CUT-40 F40-02): ⑨ recognises adapter code by its
+  // `….OpenCode` namespace, so every source under an `OpenCode/` folder declares a namespace with an
+  // `OpenCode` segment, and no source outside one does.
+  for (const file of productionSources) {
+    const decl = /^(?:namespace|module)\s+(?:rec\s+)?([\w.]+)/m.exec(read(file))
+    if (!decl) continue
+    const inFolder = file.startsWith(`${PRODUCTION_ROOT}/OpenCode/`) || file.includes('/OpenCode/')
+    const inNamespace = decl[1].split('.').includes('OpenCode')
+    if (inFolder && !inNamespace) {
+      fail('adapter-namespace-folder', `${file}: lives under an OpenCode/ adapter folder but declares '${decl[1]}'`)
+    } else if (!inFolder && inNamespace) {
+      fail('adapter-namespace-folder', `${file}: declares adapter namespace '${decl[1]}' outside an OpenCode/ folder`)
+    }
+  }
+
   return { violations, productionFsCount: productionFs.length }
 }
 

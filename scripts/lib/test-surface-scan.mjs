@@ -1332,10 +1332,10 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
-    module: 'OpenCode/Host/SatelliteSurface.js',
+    module: 'Execution/Session/Attachment/SatelliteSurface.js',
     owner: 'managed-session-lifecycle',
     laws: ['MANAGED-SESSION-002', 'MANAGED-SESSION-003', 'MANAGED-SESSION-011'],
-    source: 'src/Wanxiangshu/OpenCode/Host/SatelliteSurface.fs',
+    source: 'src/Wanxiangshu/Execution/Session/Attachment/SatelliteSurface.fs',
     representation: 'json',
     kind: 'resource',
   },

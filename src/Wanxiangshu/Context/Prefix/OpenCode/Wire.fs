@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Context.Prefix
+namespace Wanxiangshu.Context.Prefix.OpenCode
 
 open System
 open System.Threading.Tasks
@@ -6,6 +6,7 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation

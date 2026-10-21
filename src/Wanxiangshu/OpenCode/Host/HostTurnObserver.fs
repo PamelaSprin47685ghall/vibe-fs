@@ -11,6 +11,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Context.Prefix.OpenCode
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Foundation

@@ -835,8 +835,8 @@ Repository/Investigation/WarmStart/Runtime.fsi
 Repository/Investigation/WarmStart/Runtime.fs
 Repository/Investigation/WarmStartSurface.fsi
 Repository/Investigation/WarmStartSurface.fs
-OpenCode/Host/SatelliteSurface.fsi
-OpenCode/Host/SatelliteSurface.fs
+Execution/Session/Attachment/SatelliteSurface.fsi
+Execution/Session/Attachment/SatelliteSurface.fs
 Interaction/Dispatch/JournalPort.fsi
 Interaction/Dispatch/JournalPort.fs
 Interaction/Dispatch/DispatchSessionPort.fsi

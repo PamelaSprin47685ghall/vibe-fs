@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Context.Prefix
 
+open Wanxiangshu.Context.Prefix.OpenCode
+
 open System
 open System.Threading.Tasks
 open Fable.Core

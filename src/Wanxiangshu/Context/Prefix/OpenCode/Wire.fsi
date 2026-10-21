@@ -1,7 +1,8 @@
-namespace Wanxiangshu.Context.Prefix
+namespace Wanxiangshu.Context.Prefix.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession

@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Sphinx.V2.Hosts
+namespace Wanxiangshu.Sphinx.V2.Hosts.OpenCode
 
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Foundation.Identity
