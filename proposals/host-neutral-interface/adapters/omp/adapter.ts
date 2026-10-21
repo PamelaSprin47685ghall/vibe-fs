@@ -389,7 +389,32 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
 }
 
 // ---------------------------------------------------------------- ProductHooks -> omp registrations
-export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s: P.HostSignal) => Promise<void>): (s: P.HostSignal) => Promise<void> {
+/**
+ * The slot holding the currently active product hooks.
+ *
+ * The omp handlers are registered exactly ONCE per extension and read the
+ * hooks out of this slot on every event, so the handler list never grows
+ * (omp's `on` only appends and offers no removal) while the hooks behind
+ * it can still be replaced by a later activation.
+ */
+export interface ProductHookSlot {
+  current?: P.ProductHooks;
+}
+
+/**
+ * The neutral signal fan-out: the host port subscribers first, then the
+ * product's own `OnSignal` hook. With no active product the signal is
+ * dropped (there is nothing to deliver it to).
+ */
+export function productSignal(slot: ProductHookSlot, emit: (s: P.HostSignal) => Promise<void>): (s: P.HostSignal) => Promise<void> {
+  return (s: P.HostSignal) => {
+    const hooks = slot.current;
+    if (!hooks) return Promise.resolve();
+    return Promise.all([emit(s), hooks.OnSignal(s)]).then(() => undefined);
+  };
+}
+
+export function registerProductHooks(pi: OmpApi, slot: ProductHookSlot, emit: (s: P.HostSignal) => Promise<void>): void {
   const turnContext = (c: ExtensionContext): P.TurnContext => ({
     Session: sid(c.sessionManager.getSessionId()), Workspace: P.workspacePath(c.cwd),
     Route: c.model ? { Provider: c.model.provider, Model: c.model.id } : undefined,
@@ -397,9 +422,11 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
   const view = (c: ExtensionContext, id: string, tool: string, input: unknown): P.ToolCallView =>
     ({ Session: sid(c.sessionManager.getSessionId()), CallId: id as P.ToolCallId, Tool: tool,
        Args: P.canonicalJsonText(JSON.stringify(input ?? {})) });
-  const signal = (s: P.HostSignal) => Promise.all([emit(s), hooks.OnSignal(s)]).then(() => undefined);
+  const signal = productSignal(slot, emit);
 
   pi.on("input", async (e, c) => {
+    const hooks = slot.current;
+    if (!hooks) return undefined;
     const verdict = await hooks.Turn.AdmitTurn({ Context: turnContext(c), Text: e.text });
     if (verdict.tag === "Refuse") return { handled: true };
     // An admitted turn may carry a route; apply it to this session's model.
@@ -410,8 +437,14 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
     }
     return undefined;
   });
-  pi.on("before_agent_start", async (e, c) => ({ systemPrompt: await hooks.Turn.SystemPrompt(turnContext(c), e.systemPrompt) }));
+  pi.on("before_agent_start", async (e, c) => {
+    const hooks = slot.current;
+    if (!hooks) return undefined;
+    return { systemPrompt: await hooks.Turn.SystemPrompt(turnContext(c), e.systemPrompt) };
+  });
   pi.on("context", async (e, c) => {
+    const hooks = slot.current;
+    if (!hooks) return undefined;
     const edit = await hooks.Turn.ContextMessages(turnContext(c), e.messages.flatMap((m) => {
       const role = decodeRole(m); return role ? [{ Role: role, Parts: decodeParts(m) }] : [];
     }));
@@ -433,12 +466,16 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
     return { messages };
   });
   pi.on("tool_call", async (e, c) => {
+    const hooks = slot.current;
+    if (!hooks) return undefined;
     const a = await hooks.ToolGate.BeforeTool(view(c, e.toolCallId, e.toolName, e.input));
     if (a.tag === "Refuse") return { block: true, reason: a.reason };
     if (a.tag === "Rewrite") return { input: JSON.parse(a.args) };
     return undefined;
   });
   pi.on("tool_result", async (e, c) => {
+    const hooks = slot.current;
+    if (!hooks) return undefined;
     const text = e.content.flatMap((x) => (x.type === "text" ? [x.text] : [])).join("\n");
     const edit = await hooks.ToolGate.AfterTool(view(c, e.toolCallId, e.toolName, e.input),
       { Text: text, Truncated: false, IsError: e.isError });
@@ -446,6 +483,8 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
     return { content: [{ type: "text", text: edit.result.Text }], isError: edit.result.IsError };
   });
   pi.on("session.compacting", async (_e, c) => {
+    const hooks = slot.current;
+    if (!hooks) return undefined;
     // The event's `sessionId` is omp's *provider* session id, which is not
     // necessarily the persisted one. The neutral `SessionId` is always the
     // persisted id (`sessionManager.getSessionId()`), the one `parentSession`
@@ -454,6 +493,8 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
     return r.tag === "Context" ? { context: r.lines } : r.tag === "ReplacePrompt" ? { prompt: r.prompt } : undefined;
   });
   pi.on("session_stop", async (_e, c) => {
+    const hooks = slot.current;
+    if (!hooks) return undefined;
     // Same as above: the event's `session_id` is the provider session id.
     const v = await hooks.Compaction.AutoContinue(sid(c.sessionManager.getSessionId()));
     return v.tag === "Deny" ? { continue: false, reason: v.reason } : undefined;
@@ -464,6 +505,8 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
   // Without a hook there is nothing to route, so the spawn is allowed through
   // unchanged (`undefined`).
   pi.on("before_subagent_spawn", async (e, c) => {
+    const hooks = slot.current;
+    if (!hooks) return undefined;
     const spawn = hooks.Spawn;
     if (!spawn) return undefined;
     const r = await spawn({ Parent: sid(c.sessionManager.getSessionId()), Role: P.agentRole(e.agent), SpawnKey: e.spawnKey,
@@ -481,8 +524,14 @@ export function registerProductHooks(pi: OmpApi, hooks: P.ProductHooks, emit: (s
   pi.on("auto_retry_start", async (e, c) => signal({ tag: "ProviderRetry", notice: {
     Session: sid(c.sessionManager.getSessionId()), Attempt: e.attempt, Failure: decodeFailure(e.errorMessage, false) } }));
   pi.on("tool_execution_start", async (e, c) => signal({ tag: "ToolStarted", call: { Session: sid(c.sessionManager.getSessionId()), CallId: e.toolCallId as P.ToolCallId, Tool: e.toolName } }));
-  pi.on("session_shutdown", async () => { await hooks.Dispose(); });
-  return signal;
+  // Disposal happens EXACTLY ONCE per activation: the slot is emptied first,
+  // so a second `session_shutdown` finds no hooks and disposes nothing.
+  pi.on("session_shutdown", async () => {
+    const hooks = slot.current;
+    if (!hooks) return;
+    slot.current = undefined;
+    await hooks.Dispose();
+  });
 }
 
 /** omp extension entry: `omp -e <bundle>` loads `export default (pi) => …`. */
@@ -490,15 +539,37 @@ export function activateOnOmp(pi: OmpApi, plugin: P.IHostPlugin, children: OmpCh
   let latest: ExtensionContext | undefined;
   const ctx = () => { if (!latest) throw new Error("omp context not yet available"); return latest; };
   const { ports, emit } = createOmpHostPorts(pi, ctx, children, agents);
+  // The activation latch (O-3 rule 6). The product is activated ONCE per
+  // session lifetime and the omp handlers are registered ONCE per extension.
+  // omp's `ExtensionAPI.on` only APPENDS to the extension's handler list
+  // (`loader.ts:210-214`) and offers no removal, so re-registering on a
+  // later `session_start` would make every product hook fire twice per
+  // event. The handlers therefore read the live hooks from `slot`, and the
+  // slot is emptied by `session_shutdown` so that a later `session_start`
+  // activates a FRESH product without registering anything again.
+  const slot: ProductHookSlot = {};
+  let registered = false;
+  const signal = productSignal(slot, emit);
   pi.on("session_start", async (_e, c) => {
     latest = c;
-    const r = await plugin.Activate(ports);
-    if (!r.ok) { pi.logger.error("wanxiangshu activation failed", { error: r.error }); return; }
-    const signal = registerProductHooks(pi, r.value, emit);
+    // The handlers are registered exactly ONCE per extension: they read the
+    // live hooks out of `slot`, so a later activation after a shutdown
+    // re-uses them instead of appending a second copy.
+    if (!registered) {
+      registered = true;
+      registerProductHooks(pi, slot, emit);
+    }
+    if (!slot.current) {
+      const r = await plugin.Activate(ports);
+      if (!r.ok) { pi.logger.error("wanxiangshu activation failed", { error: r.error }); return; }
+      slot.current = r.value;
+    }
     // The `SessionCreated` signal is emitted HERE, not from a `session_start`
     // listener registered by `registerProductHooks`: omp snapshots the
     // listener list when it starts emitting `session_start`, so a listener
     // registered during that emission is never called for this session.
+    // A session was really created, so the signal is emitted for EVERY
+    // `session_start`; only the activation is latched.
     await signal({ tag: "SessionCreated", info: { Id: sid(c.sessionManager.getSessionId()) } });
   });
 }

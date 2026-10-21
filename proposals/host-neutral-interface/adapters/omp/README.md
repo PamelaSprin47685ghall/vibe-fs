@@ -31,6 +31,18 @@ implementable on a second host and keeps the TS mirror honest.
 What is **not** proven: no omp process is started, no model is called, and no behaviour against a real host is
 exercised. The adapter is a type-checked skeleton, not a wired host.
 
+## The activation latch
+
+omp's `ExtensionAPI.on` only **appends** to the extension's handler list and offers no way to remove a
+handler. So the product hooks are registered exactly **once per extension**: `activateOnOmp` keeps a single
+activation latch, and the registered handlers read the live product hooks out of a slot instead of closing
+over one activation's hooks. A second `session_start` therefore does not activate the product again and never
+appends a second copy of the handlers — a second copy would make every product hook fire twice per omp
+event.
+
+`session_shutdown` empties the slot before disposing, so the product is disposed exactly once per
+activation, and a `session_start` after a shutdown activates a fresh product.
+
 ## Deliberate host bindings
 
 Two F# types have no direct TypeScript equivalent; the mapping is a documented binding, not a mechanical

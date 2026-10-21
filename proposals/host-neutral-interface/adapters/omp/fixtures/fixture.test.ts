@@ -63,8 +63,14 @@ const children: OmpChildSessions = {
 
 const signals: P.HostSignal[] = [];
 let portsSeen: P.HostPorts | undefined;
+// Counters for the O-3 activation latch: how often the product was
+// activated, disposed, and how often a product hook was actually reached.
+let activateCount = 0;
+let disposeCount = 0;
+let contextMessagesCount = 0;
 const product: P.IHostPlugin = {
   async Activate(ports) {
+    activateCount++;
     portsSeen = ports;
     ports.Tools.Register([{ Name: "wxs_echo", Description: "echo", Schema: P.jsonSchema(JSON.stringify({ type: "object" })),
       Execute: async (call) => ({ Text: `echo ${call.Args}`, Truncated: false, IsError: false }) }]);
@@ -77,17 +83,20 @@ const product: P.IHostPlugin = {
       Turn: {
         AdmitTurn: async (r) => (r.Text === "forbidden" ? { tag: "Refuse", reason: "no" } : { tag: "Admit" }),
         SystemPrompt: async (_c, s) => [...s, "PRODUCT-SYSTEM"],
-        ContextMessages: async (_c, msgs) => (msgs.some((m) => m.Parts.some((p) => p.tag === "Text" && p.text === "REPLACE-ME"))
-          ? { tag: "Replace", messages: [
-              { Role: "User", Parts: [{ tag: "Text", text: "synth-user" }] },
-              { Role: "Assistant", Parts: [{ tag: "Text", text: "synth-assistant" }] }] }
-          : { tag: "Keep" }),
+        ContextMessages: async (_c, msgs) => {
+          contextMessagesCount++;
+          return msgs.some((m) => m.Parts.some((p) => p.tag === "Text" && p.text === "REPLACE-ME"))
+            ? { tag: "Replace", messages: [
+                { Role: "User", Parts: [{ tag: "Text", text: "synth-user" }] },
+                { Role: "Assistant", Parts: [{ tag: "Text", text: "synth-assistant" }] }] }
+            : { tag: "Keep" };
+        },
         ProviderParams: async () => ({ tag: "Accept" }),
       },
       Compaction: { OnCompacting: async (s) => { compactionSession = s; return { tag: "Context", lines: ["keep ledger"] }; },
                     AutoContinue: async (s) => { compactionSession = s; return { tag: "Deny", reason: "product owns continuation" }; } },
       OnSignal: async (s) => { signals.push(s); },
-      Dispose: async () => {},
+      Dispose: async () => { disposeCount++; },
     } };
   },
 };
@@ -278,5 +287,30 @@ expect("the sdk child seam exposes entries with entry ids",
   sdkChildren.entries("persisted-session-id")?.map((e) => e.id), ["c-1", "c-2"]);
 expect("an unknown child session has no entries",
   sdkChildren.entries("no-such-session"), undefined);
+// ---- O-3 rule 6: the activation latch.
+// A second `session_start` must NOT activate the product again and must NOT
+// register the product hooks a second time. The `ContextMessages` counter is
+// the strong assertion: with a duplicate registration the product hook is
+// reached TWICE for one omp event.
+const contextMessagesBefore = contextMessagesCount;
+await fire("session_start", { type: "session_start" });
+expect("a second session_start does not activate the product again", activateCount, 1);
+await fire("context", { type: "context", messages: [{ role: "user", content: [{ type: "text", text: "hello" }], timestamp: 2 }] });
+expect("a handler-driven event reaches the product exactly once after a second session_start",
+  contextMessagesCount - contextMessagesBefore, 1);
+expect("a second session_start still announces the new session",
+  signals.filter((s) => s.tag === "SessionCreated").length, 2);
+// `session_shutdown` disposes the product ONCE; a second shutdown without
+// an intervening session_start disposes nothing.
+await fire("session_shutdown", { type: "session_shutdown" });
+expect("session_shutdown disposes the product once", disposeCount, 1);
+await fire("session_shutdown", { type: "session_shutdown" });
+expect("a second session_shutdown does not dispose the product again", disposeCount, 1);
+// After the shutdown the latch is open again: a later `session_start`
+// activates a FRESH product.
+await fire("session_start", { type: "session_start" });
+expect("a session_start after a shutdown activates a fresh product", activateCount, 2);
+expect("the fresh session announces exactly one more session",
+  signals.filter((s) => s.tag === "SessionCreated").length, 3);
 console.log(failures === 0 ? "# fixture: all ok" : `# fixture: ${failures} failed`);
 if (failures) process.exit(1);
