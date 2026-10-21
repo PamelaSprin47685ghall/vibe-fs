@@ -15,5 +15,6 @@ module DeliveryWitnessWriter =
 
     /// The writer the settle point uses. A refused commit is reported as a
     /// refused delivery — the caller learns that the delivery is not
-    /// established.
-    val create: journal: AgentJournal -> IDeliveryWitnessWriter
+    /// established. `onCommitted` runs only after the durable commit
+    /// succeeded; a refused commit registers nothing.
+    val create: journal: AgentJournal -> onCommitted: (DeliveryWitness -> unit) -> IDeliveryWitnessWriter

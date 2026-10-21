@@ -1,6 +1,15 @@
 # Changelog — 版本历史
 
 
+## Unreleased — 交付登记不再让宿主反向依赖应用组合层
+
+- **修复：host → application-composition 的反向边消失**。`Repository/Programming/Js/OpenCode/ToolWorkflow.fs` 此前直接引用 `DeliveryAttemptLedger.recordEstablished` 来登记「本次交付已成立」，为此整个 `repository-programming-js-toolbindings`（subsystem = host）必须引用 `managed-session-lifecycle.opencode-tools-toolruntimescope`（subsystem = application-composition）——宿主层反向依赖应用组合层。唯一的符号依赖就是那一次登记。
+- **改法：登记挂在 durable 提交点上**。`DeliveryWitnessWriter.create` 增加一个 `onCommitted` 回调，**只在** `TaskDeliveryJournal.commit` 返回成功之后才调用；提交被拒则一次也不登记（零登记）。`IDeliveryWitnessWriter` **不加任何成员**（仍只有 `CommitDeliveryWitness`），回调没有空默认值，必须显式传；全部调用点已迁（`DeliveryWitnessWriter.create` 全仓仅一处调用，已注入 ledger 登记）。`ToolWorkflow.fs` 里私有的 `registerEstablishedDelivery` 随之删除。
+- **回调抛错不抹除已 durable 的事实**：回调运行时 `TaskDeliveryCommitted` 事实已写入 journal 并已折叠进投影；回调抛错只让本次调用以异常渠道失败（不转成拒绝、不吞异常），已写入的事实既不回滚也不被改写——journal 写入先于回调，回调没有写权限。
+- **改动文件**：`OpenCode/Host/DeliveryWitnessWriter.fs`/`.fsi`、`OpenCode/Tools/ToolRegistry.fs`、`Repository/Programming/Js/OpenCode/ToolWorkflow.fs`、`Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj`（去掉那条 ProjectReference，未新增任何 application-composition 引用）。
+- **验收**：`node scripts/build.mjs` → `[build] build ok`；`js-surface-manifest: OK — 149 registered surfaces`；`js-module-linkage: OK — 715 emitted modules linked and loaded`；`node scripts/checks/subsystems.mjs` → `subsystems: OK — 25 subsystems, 240 compile shards, 646 sources, 1954 refs, shard DAG, largest subsystem cycle=10`（改前 1955 refs / cycle=16）；host → application-composition 边 = 0。回归：`effect-accounting/013` + `semantic-trace/013` + `work/011` → tests 24 / pass 24 / fail 0 / cancelled 0。
+
+
 ## Unreleased — 交付格的消费按完整围栏，不只按 provider run
 
 - **修复：同一 provider run 内另一次调用的交付不会被错取**。交付格记的是产生它的那次调用的完整围栏（provider run + tool call id），而消费面只比 provider run。于是同一 run 里的第二次交付会**覆盖**第一次的格子，而只持 run 的终态会把**另一次调用**的材料取走并推进 returned 游标——真正拥有该交付的那次调用随后拿不到自己的材料。这不是可接受的降级，是一次真实的错取。

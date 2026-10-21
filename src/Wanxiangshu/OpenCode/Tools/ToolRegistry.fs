@@ -858,7 +858,18 @@ module ToolRegistry =
                                                           Task = deliveryTask
                                                           RetirementId = retirementId
                                                           FormalText = formalText }
-                                                      Writer = DeliveryWitnessWriter.create durable }
+                                                      Writer =
+                                                        DeliveryWitnessWriter.create
+                                                            durable
+                                                            (fun witness ->
+                                                                // The durable witness is committed by now: the
+                                                                // registration only records the committed attempt, so the
+                                                                // transform hook's delivery adjudication can stop it.
+                                                                DeliveryAttemptLedger.recordEstablished
+                                                                    { SessionId = witness.SessionId
+                                                                      ProviderRun = witness.ProviderRun
+                                                                      CallId = witness.ToolCallId }
+                                                                    (Some witness.PhysicalUserMessageId)) }
                         }
             | _ -> Task.FromResult None
 

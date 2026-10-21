@@ -6,7 +6,6 @@ open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Process
 
@@ -464,22 +463,6 @@ module JsToolWorkflow =
                       View = material
                       RetirementId = attribution.RetirementId }
 
-    /// Register a committed delivery as an established delivery of this exact
-    /// attempt, so the transform hook's delivery adjudication can stop it.
-    ///
-    /// The fence is the committed witness's own fence (session, provider run,
-    /// tool call) — the exact attempt that delivered. A call without a fence
-    /// owns no witness and is never registered, so it can never be stopped.
-    /// The physical input is the physical user message the host attributed
-    /// the call to: it keeps the record from aiming at a later physical
-    /// input.
-    let private registerEstablishedDelivery (witness: DeliveryWitness) : unit =
-        DeliveryAttemptLedger.recordEstablished
-            ({ SessionId = witness.SessionId
-               ProviderRun = witness.ProviderRun
-               CallId = witness.ToolCallId }: DeliveryAttemptLedger.Fence)
-            (Some witness.PhysicalUserMessageId)
-
     /// The delivery settlement of one settled call (deliver clauses 3 and 6).
     ///
     /// The delivered view is materialized first, then the durable witness is
@@ -528,8 +511,6 @@ module JsToolWorkflow =
 
                         match committed with
                         | Ok() ->
-                            registerEstablishedDelivery witness
-
                             record ()
 
                             return Ok()

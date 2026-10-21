@@ -47,7 +47,22 @@ module DeliveryWitnessWriter =
     /// The writer the settle point uses: it commits the durable witness of
     /// the delivery. A refused commit is reported as a refused delivery — the
     /// caller learns that the delivery is not established.
-    let create (journal: AgentJournal) : IDeliveryWitnessWriter =
+    ///
+    /// `onCommitted` is the process-live registration of a committed
+    /// delivery: it runs only after the durable commit succeeded, so a
+    /// refused delivery registers nothing. The durable fact is already
+    /// written when it runs, so a failure there is reported as a failure and
+    /// never as a refusal — the delivery stands on its durable witness.
+    let create (journal: AgentJournal) (onCommitted: DeliveryWitness -> unit) : IDeliveryWitnessWriter =
         { new IDeliveryWitnessWriter with
             member _.CommitDeliveryWitness(witness: DeliveryWitness) : Task<Result<unit, string>> =
-                TaskDeliveryJournal.commit journal (toWitness witness) }
+                task {
+                    let! committed = TaskDeliveryJournal.commit journal (toWitness witness)
+
+                    match committed with
+                    | Error reason -> return Error reason
+                    | Ok() ->
+                        onCommitted witness
+
+                        return Ok()
+                } }
