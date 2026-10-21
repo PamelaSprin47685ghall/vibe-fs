@@ -359,6 +359,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Execution/Fission/Canaries.js',
+    owner: 'intra-participant-parallelism',
+    laws: ['INTRA-PARTICIPANT-PARALLELISM-009'],
+    source: 'src/Wanxiangshu/Execution/Fission/Canaries.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Foundation/RolesSurface.js',
     owner: 'capability-enforcement',
     laws: ['ENF-002', 'MANAGED-SESSION-023', 'MANAGED-SESSION-024'],

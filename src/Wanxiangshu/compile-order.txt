@@ -1021,6 +1021,8 @@ OpenCode/Host/TurnRuntimePreparation.fsi
 OpenCode/Host/TurnRuntimePreparation.fs
 Execution/Fission/Convergence.fsi
 Execution/Fission/Convergence.fs
+Execution/Fission/Canaries.fsi
+Execution/Fission/Canaries.fs
 Execution/Fission/OpenCode/Host.fsi
 Execution/Fission/OpenCode/Host.fs
 Execution/Fission/Surface.fsi
