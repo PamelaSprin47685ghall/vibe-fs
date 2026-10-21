@@ -10,6 +10,7 @@ import {
 } from '../../../dist/Sphinx/V2/Hosts/Mcp/Tool.js'
 import {capabilities} from '../../../dist/Sphinx/V2/Hosts/OpenCode/Surface.js'
 import {Host, admittedWithReceipt, withHost, hostRequest} from './host-support.mjs'
+import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import {retryable, fatal, acceptanceUnknown} from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 
 const refusalOf = result => {
@@ -167,6 +168,9 @@ test('WHAT[sphinx-v2-034] a transport receipt remains pending until actual manag
     assert.notEqual(accepted.promptKey, hostRequest().payload.dispatchIntentId)
     assert.equal(await Host.settleHostTerminal(probe, prompt.sessionId, 'foreign-physical', physical.authorityRootUserMessageId, 'foreign-run', 'foreign answer'), false)
     assert.deepEqual(await remainsPending(completion), {kind: 'pending'})
+    // The child delivers before its exact terminal (repository-programming [059]):
+    // the fenced delivery cell of that run, as `this.deliver` leaves it.
+    runtimeSurface.recordFencedDeliveredView(prompt.sessionId, 'actual-provider-run', 'call-actual-provider-run', { prefixUntil: 0, thenMap: {} })
     assert.equal(await Host.settleHostTerminal(probe, prompt.sessionId, physical.physicalUserMessageId, physical.authorityRootUserMessageId, 'actual-provider-run', 'actual formal answer'), true)
     assert.deepEqual(await completion, {
       ok: true, value: {
