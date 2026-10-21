@@ -9,7 +9,7 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt.Fallback

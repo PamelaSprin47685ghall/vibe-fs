@@ -17,7 +17,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogramming-guidelineprojection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.pair-guidance-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>

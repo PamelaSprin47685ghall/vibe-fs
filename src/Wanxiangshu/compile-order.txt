@@ -423,10 +423,10 @@ Execution/Session/Association.fsi
 Execution/Session/Association.fs
 Execution/Session/AssociationSurface.fsi
 Execution/Session/AssociationSurface.fs
-OpenCode/Host/PairProgramming/GuidelineProjection.fsi
-OpenCode/Host/PairProgramming/GuidelineProjection.fs
-OpenCode/Host/PairProgramming/GuidelineSurface.fsi
-OpenCode/Host/PairProgramming/GuidelineSurface.fs
+Interaction/PairGuidance/GuidelineProjection.fsi
+Interaction/PairGuidance/GuidelineProjection.fs
+Interaction/PairGuidance/GuidelineSurface.fsi
+Interaction/PairGuidance/GuidelineSurface.fs
 Execution/Fission/Projection.fsi
 Execution/Fission/Projection.fs
 Execution/Delegation/DelegatedToolEstimateProjection.fsi

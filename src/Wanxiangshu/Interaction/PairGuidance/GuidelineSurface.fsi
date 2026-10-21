@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode.Host.PairProgramming
+namespace Wanxiangshu.Interaction.PairGuidance
 
 [<RequireQualifiedAccess>]
 module GuidelineSurface =
