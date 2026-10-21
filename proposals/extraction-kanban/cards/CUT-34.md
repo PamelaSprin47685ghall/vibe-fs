@@ -124,3 +124,25 @@ node scripts/check.mjs
 ### 当前阻塞（DOING + BLOCKED）
 
 - 剩余能力（会话创建/查找/绑定、chat.params 精确租约、tool before/after 同源恢复、AttemptAborted 精确化、基线 28 个内核文件的收窄）分别与 CUT-11（Dispatch 5 个文件）、CUT-12（Session/ChatExecution、`AttemptAborted`）、CUT-25（tool 协议/JS 编程面）、CUT-10（chat.params 租约）相邻，按卡 §1 须待这些卡 DONE 后相邻验收。解除条件：CUT-10/11/12/25 在看板上 DONE。下一检查人：接手本卡的 worker 或协调者。
+
+### 子范围④：终端信号契约移出适配层（棘轮 28 → 26，eng-cut09i-goose）
+
+- 现状：`TerminalStop`、`TerminalOutcome`、`TerminalCompletionListener`、`IEventObservationPort` 只用 Foundation 的身份类型和 `AgentRunResult`，不含任何 SDK 形状，却放在 `OpenCode/Signals/EventContract`。内核文件为了用这四个类型不得不 `open Wanxiangshu.OpenCode`。
+- 改动：文件移到 `Foundation/TerminalSignal.fs(i)`，命名空间改为 `Wanxiangshu.Foundation.TerminalSignal`；shard（`host-signal-contract`，runtime-platform）和编译位置都不变。用到这些类型的文件在原 `open Wanxiangshu.OpenCode` 后加一行新 `open`，保持原来的名字解析次序；限定名引用同步改名。`SyncDelegate/Workflow`、`Trace/TerminalReporter` 因此不再引用适配层，同刀从基线删掉。
+- 路径断言：host-boundary-026/027 里按文件路径写的 shard 归属断言和“不得获得终端词汇”的反向断言改为新路径。不改的话，反向断言会因为旧路径不存在而永远通过，失去作用。WHAT 107 行的名字同步更新。
+
+### 子范围⑤：受管 agent 名册移出适配层（棘轮 26 → 24，eng-cut09i-goose）
+
+- 现状：`ManagedAgent`、`AgentVisibility`、`ManagedAgentParseError`（Role → 名字/可见性、名字解析）是参与者名册，不是宿主协议，却放在 `OpenCode/Tools/ManagedAgent`。
+- 改动：文件移到 `Participant/Persona/ManagedAgent.fs(i)`，命名空间 `Wanxiangshu.Participant.ManagedAgents`，shard（`opencode-tools-managedagent`）不变。`Delegation/PtyPort`、`Fork/Host/Pty` 离开基线。`Process/Surface`（JS 测试面，不受棘轮约束）原来只为 `ManagedAgent` 打开适配层，这次一并删掉这条 `open`，否则 shard-edge-audit 会多出 2 条 high。structured-workflow-014 的 shard 编译项断言和 participant-identity 的 `APPLIES-TO` 跟着改路径。
+
+### 子范围④⑤ 证据
+
+- 两刀都只是移动文件、改命名空间，没有改任何类型定义或函数体。
+- `node scripts/checks/architecture.mjs` OK（棘轮 24 条）。`node scripts/check.mjs` 与 base 在归一行号后逐行相同：shard-edge-audit 258 条，control-pyramid 111 条。
+- 子范围④在 b1b59d6f4 上全量构建通过（`js-module-linkage` 全部链接）。host-boundary、semantic-trace、advisor、intra-participant-parallelism 共 346 例：pass 317，fail 3。3 个失败如下：
+  - host-boundary-023 并发下偶发失败，单独重跑通过。
+  - 026 的“tool registration … terminal bus”子项在未改动的 master 上同样失败（bookkeepertool 的 shard 闭包获得了 HostEventCodec，静态检查，与本刀无关）。
+  - 026 的路径断言已按上条修正。
+- 两刀合并后的落地复验见落地循环 `logs-cut09i/loop34*.out`。
+- 回退：`git revert` 即可，不涉及持久数据。
