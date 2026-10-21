@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Repository.Programming.Js.OpenCode
+namespace Wanxiangshu.Repository.Programming.Js
 
 open System.Threading.Tasks
 open Wanxiangshu.Repository.Programming.Js

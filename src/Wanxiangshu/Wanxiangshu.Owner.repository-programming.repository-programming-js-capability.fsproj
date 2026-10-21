@@ -39,8 +39,8 @@
     <Compile Include="Repository/Programming/Js/Anchor/AnchorSurface.fs"/>
     <Compile Include="Repository/Programming/Js/DeliveredValues.fsi"/>
     <Compile Include="Repository/Programming/Js/DeliveredValues.fs"/>
-    <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fsi"/>
-    <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fs"/>
+    <Compile Include="Repository/Programming/Js/ParkedSites.fsi"/>
+    <Compile Include="Repository/Programming/Js/ParkedSites.fs"/>
     <Compile Include="Repository/Programming/Js/DelegationBridge.fsi"/>
     <Compile Include="Repository/Programming/Js/DelegationBridge.fs"/>
   </ItemGroup>

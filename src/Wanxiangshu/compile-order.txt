@@ -603,8 +603,8 @@ Repository/Programming/Js/Anchor/AnchorSurface.fsi
 Repository/Programming/Js/Anchor/AnchorSurface.fs
 Repository/Programming/Js/DeliveredValues.fsi
 Repository/Programming/Js/DeliveredValues.fs
-Repository/Programming/Js/OpenCode/ParkedSites.fsi
-Repository/Programming/Js/OpenCode/ParkedSites.fs
+Repository/Programming/Js/ParkedSites.fsi
+Repository/Programming/Js/ParkedSites.fs
 Repository/Programming/Js/DelegationBridge.fsi
 Repository/Programming/Js/DelegationBridge.fs
 Process/PtyTypes.fsi
@@ -1149,8 +1149,8 @@ Persistence/EventStore/MergeSurface.fsi
 Persistence/EventStore/MergeSurface.fs
 Repository/Programming/Js/DescriptionAssets.fsi
 Repository/Programming/Js/DescriptionAssets.fs
-Repository/Programming/Js/OpenCode/ToolWorkflow.fsi
-Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+Repository/Programming/Js/ToolWorkflow.fsi
+Repository/Programming/Js/ToolWorkflow.fs
 Repository/Programming/Js/OpenCode/BookkeeperTool.fsi
 Repository/Programming/Js/OpenCode/BookkeeperTool.fs
 Repository/Programming/Js/OpenCode/ToolHost.fsi

@@ -37,11 +37,11 @@ test('WHAT[repository-programming-039] parked sites carry a session owner so ses
 })
 
 test('WHAT[repository-programming-039] the parked-site table is one process-level static module shared by its consumers, not redefined by them', () => {
-  const sites = read(join(SOURCE_ROOT, 'Repository/Programming/Js/OpenCode/ParkedSites.fs'))
+  const sites = read(join(SOURCE_ROOT, 'Repository/Programming/Js/ParkedSites.fs'))
   assert.match(sites, /module JsParkedSites\b/, 'the table is defined once in ParkedSites.fs')
   assert.match(sites, /let concurrencyLimit = 8/, 'the default ceiling is 8')
 
-  const workflow = read(join(SOURCE_ROOT, 'Repository/Programming/Js/OpenCode/ToolWorkflow.fs'))
+  const workflow = read(join(SOURCE_ROOT, 'Repository/Programming/Js/ToolWorkflow.fs'))
   assert.match(workflow, /JsParkedSites\.register/, 'the orchestration layer references the shared table')
 
   const scope = read(join(SOURCE_ROOT, 'OpenCode/Host/PluginSessionScope.fs'))

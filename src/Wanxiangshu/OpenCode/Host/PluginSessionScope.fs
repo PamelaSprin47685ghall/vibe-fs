@@ -37,7 +37,6 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// Per-instance session registry state for one plugin instance (HOST-012):
 /// owned sessions, companions, verdicts, nudges,

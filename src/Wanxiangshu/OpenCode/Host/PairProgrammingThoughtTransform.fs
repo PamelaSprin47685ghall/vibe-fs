@@ -20,7 +20,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Repository.Programming.Js.OpenCode
+open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Participant.Provider.Projection
 

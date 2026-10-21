@@ -3,7 +3,6 @@ namespace Wanxiangshu.Repository.Programming.Js
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// Opaque workflow outcome. The semantic observation functions expose the
 /// commit report and failure algebra without leaking JsToolOutcome's union.

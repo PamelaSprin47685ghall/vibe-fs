@@ -11,7 +11,7 @@ import {
 import {
   handlesForSession,
   clearAll,
-} from '../../../dist/Repository/Programming/Js/OpenCode/ParkedSites.js'
+} from '../../../dist/Repository/Programming/Js/ParkedSites.js'
 import {
   takeView,
   clearAll as clearViews,

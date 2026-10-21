@@ -5,7 +5,6 @@
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
     "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
     "src/Wanxiangshu/Mission/Work/ProjectionSurface.fs",
-    "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs",
-    "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"
+    "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs"
   ]
 }

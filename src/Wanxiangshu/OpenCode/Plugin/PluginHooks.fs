@@ -107,7 +107,7 @@ module PluginHooks =
     /// it is asked, not recounted here.
     let private declaredViewOf (input: obj) : bool =
         let conflictingState =
-            Wanxiangshu.Repository.Programming.Js.OpenCode.JsToolWorkflow.conflictingInputReason input
+            Wanxiangshu.Repository.Programming.Js.JsToolWorkflow.conflictingInputReason input
             |> Option.isSome
 
         if conflictingState then

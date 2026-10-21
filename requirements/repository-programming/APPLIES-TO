@@ -21,7 +21,7 @@
 /src/Wanxiangshu/Repository/Programming/Js/MutationFs.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHostSurface.fs
-/src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+/src/Wanxiangshu/Repository/Programming/Js/ToolWorkflow.fs
 /src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs
 /src/Wanxiangshu/Repository/Programming/Js/Surface.fs
 /src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs

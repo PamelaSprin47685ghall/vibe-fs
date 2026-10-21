@@ -780,10 +780,10 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'Repository/Programming/Js/OpenCode/ParkedSites.js',
+    module: 'Repository/Programming/Js/ParkedSites.js',
     owner: 'repository-programming',
     laws: ['REPOSITORY-PROGRAMMING-031'],
-    source: 'src/Wanxiangshu/Repository/Programming/Js/OpenCode/ParkedSites.fs',
+    source: 'src/Wanxiangshu/Repository/Programming/Js/ParkedSites.fs',
     representation: 'opaque-capability',
     kind: 'resource',
   },
