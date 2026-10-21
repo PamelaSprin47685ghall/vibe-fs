@@ -116,20 +116,24 @@ module FissionHost =
         | Some { Lifecycle = HandleLifecycle.Retired } -> true
         | _ -> false
 
+    /// A refused consume still counts when the handle is already retired;
+    /// otherwise the refusal is reported and the handle stays unconsumed.
+    let private retiredAfterRefusedConsume durable ownerSessionId handle err =
+        let retired = isHandleRetired durable ownerSessionId handle
+
+        if not retired then
+            Diagnostic.emit
+                "fission-handle-consume-failed"
+                [ "session_id", SessionId.value ownerSessionId
+                  "result", sprintf "handle consume failed: %A" err ]
+
+        retired
+
     let private ensureRetiredAfterConsume (durablePort: AgentJournalPort) durable ownerSessionId handle =
         task {
             match! HandleController.consume durablePort ownerSessionId handle with
             | Ok _ -> return true
-            | Error err ->
-                let retired = isHandleRetired durable ownerSessionId handle
-
-                if not retired then
-                    Diagnostic.emit
-                        "fission-handle-consume-failed"
-                        [ "session_id", SessionId.value ownerSessionId
-                          "result", sprintf "handle consume failed: %A" err ]
-
-                return retired
+            | Error err -> return retiredAfterRefusedConsume durable ownerSessionId handle err
         }
 
     let private tryConsumeCompletedHandle (durablePort: AgentJournalPort) durable ownerSessionId handle =
@@ -504,18 +508,20 @@ module FissionHost =
             | Some group -> return! tryConvergeGroup sessionPort durable directoryFor group
         }
 
+    let private reportLaneAbort (group: FissionGroupProjection) (laneSessionId: SessionId) aborted =
+        match aborted with
+        | Ok() -> ()
+        | Error reason ->
+            Diagnostic.emit
+                "fission-lane-abort-failed"
+                [ "session_id", SessionId.value laneSessionId
+                  "result", sprintf "fission lane abort failed: group=%s reason=%s" group.GroupId reason ]
+
     let private abortAllLaneSessions (sessionPort: ISessionHostPort) (group: FissionGroupProjection) =
         task {
             for KeyValue(_, laneSessionId) in group.LaneSessions do
                 let! aborted = sessionPort.AbortSession laneSessionId
-
-                match aborted with
-                | Ok() -> ()
-                | Error reason ->
-                    Diagnostic.emit
-                        "fission-lane-abort-failed"
-                        [ "session_id", SessionId.value laneSessionId
-                          "result", sprintf "fission lane abort failed: group=%s reason=%s" group.GroupId reason ]
+                reportLaneAbort group laneSessionId aborted
         }
 
     let private failOpenGroup
@@ -681,6 +687,24 @@ module FissionHost =
     /// publication appends no FissionConverged fact, so the group is still open
     /// and can be failed, its lanes aborted, the owner notified and the owner
     /// reservation released.
+    let private settleTakeoverConvergence
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        convergence
+        =
+        task {
+            match convergence with
+            | Ok() ->
+                FissionAdmission.releaseOwner group.OwnerSessionId
+                FissionRuntime.clearOwner group.OwnerSessionId
+                return true
+            | Error error ->
+                do! failGroup sessionPort eventPort durable group error
+                return true
+        }
+
     let private publishConvergedTakeover
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -704,15 +728,7 @@ module FissionHost =
                 return true
             | Ok _ ->
                 let! convergence = appendConvergedFromTakeover durable group takeover turn
-
-                match convergence with
-                | Ok() ->
-                    FissionAdmission.releaseOwner group.OwnerSessionId
-                    FissionRuntime.clearOwner group.OwnerSessionId
-                    return true
-                | Error error ->
-                    do! failGroup sessionPort eventPort durable group error
-                    return true
+                return! settleTakeoverConvergence sessionPort eventPort durable group convergence
         }
 
     let private completeTakeover
@@ -874,6 +890,27 @@ module FissionHost =
                 return! writeLaneWorkAndMaterialize sessionPort eventPort durable group laneIndex turn delivered
         }
 
+    let private reportOutstandingExternalNudge (turn: ReconciledTurn) nudge =
+        match nudge with
+        | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+            Diagnostic.emit
+                "fission-join-nudge-failed"
+                [ "session_id", SessionId.value turn.SessionId
+                  "result", sprintf "fission outstanding external nudge failed: %s" reason ]
+        | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
+            Diagnostic.emit
+                "fission-join-nudge-unsent"
+                [ "session_id", SessionId.value turn.SessionId
+                  "result", "fission outstanding external nudge unsent: not-sent" ]
+        | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
+            Diagnostic.emit
+                "fission-join-nudge-unsent"
+                [ "session_id", SessionId.value turn.SessionId
+                  "result", sprintf "fission outstanding external nudge admission rejected: %A" failure ]
+        | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
+        | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding
+        | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()
+
     let private observeOpenLaneCompletion
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
@@ -905,25 +942,7 @@ module FissionHost =
                         turn.ProviderRun
                         turn.Directory
 
-                match nudge with
-                | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                    Diagnostic.emit
-                        "fission-join-nudge-failed"
-                        [ "session_id", SessionId.value turn.SessionId
-                          "result", sprintf "fission outstanding external nudge failed: %s" reason ]
-                | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
-                    Diagnostic.emit
-                        "fission-join-nudge-unsent"
-                        [ "session_id", SessionId.value turn.SessionId
-                          "result", "fission outstanding external nudge unsent: not-sent" ]
-                | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
-                    Diagnostic.emit
-                        "fission-join-nudge-unsent"
-                        [ "session_id", SessionId.value turn.SessionId
-                          "result", sprintf "fission outstanding external nudge admission rejected: %A" failure ]
-                | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
-                | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding
-                | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()
+                reportOutstandingExternalNudge turn nudge
 
                 return true
             | false, _, false ->

@@ -101,6 +101,57 @@ module FissionLaunch =
                    CompletionId = completionId
                    LaneIndex = laneIndex |})
 
+    /// A failed delivered-fact append is reported, not raised: the lane already
+    /// received (or closed before) the completion.
+    let private appendDeliveryReported durable owner groupId completionId laneIndex =
+        task {
+            let! appended = appendDelivery durable owner None groupId completionId laneIndex
+
+            match appended with
+            | Error failure ->
+                Diagnostic.emit
+                    "fission-delivery-fact-append-failed"
+                    [ "session_id", SessionId.value owner
+                      "result",
+                      sprintf
+                          "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
+                          groupId
+                          completionId
+                          laneIndex
+                          failure ]
+            | Ok() -> ()
+        }
+
+    /// A failed captured-fact append is reported, not raised: the completion
+    /// blob is already durable.
+    let private appendCaptureReported durable owner groupId completionId blob =
+        task {
+            let! appended =
+                appendFission
+                    durable
+                    owner
+                    None
+                    (FissionFact.FissionCompletionCaptured
+                        {| GroupId = groupId
+                           OwnerSessionId = owner
+                           CompletionId = completionId
+                           PayloadRef = blob.BlobRef
+                           PayloadDigest = blob.BlobDigest |})
+
+            match appended with
+            | Error failure ->
+                Diagnostic.emit
+                    "fission-capture-fact-append-failed"
+                    [ "session_id", SessionId.value owner
+                      "result",
+                      sprintf
+                          "fission completion captured fact append failed: group=%s completion=%s reason=%s"
+                          groupId
+                          completionId
+                          failure ]
+            | Ok() -> ()
+        }
+
     let private writeAndAppendCapture (durable: AgentJournal) owner groupId completionId payload =
         task {
             match! durable.WriteBlob payload with
@@ -116,33 +167,7 @@ module FissionLaunch =
                           reason ]
 
                 return ()
-            | Ok blob ->
-                let! appended =
-                    appendFission
-                        durable
-                        owner
-                        None
-                        (FissionFact.FissionCompletionCaptured
-                            {| GroupId = groupId
-                               OwnerSessionId = owner
-                               CompletionId = completionId
-                               PayloadRef = blob.BlobRef
-                               PayloadDigest = blob.BlobDigest |})
-
-                match appended with
-                | Error failure ->
-                    Diagnostic.emit
-                        "fission-capture-fact-append-failed"
-                        [ "session_id", SessionId.value owner
-                          "result",
-                          sprintf
-                              "fission completion captured fact append failed: group=%s completion=%s reason=%s"
-                              groupId
-                              completionId
-                              failure ]
-                | Ok() -> ()
-
-                return ()
+            | Ok blob -> do! appendCaptureReported durable owner groupId completionId blob
         }
 
     let private ensureCompletionCaptured (durable: AgentJournal) owner groupId completionId payload =
@@ -213,21 +238,7 @@ module FissionLaunch =
 
                     return ()
                 | Ok _ ->
-                    let! appended = appendDelivery durable owner None groupId completionId lane.Index
-
-                    match appended with
-                    | Error failure ->
-                        Diagnostic.emit
-                            "fission-delivery-fact-append-failed"
-                            [ "session_id", SessionId.value owner
-                              "result",
-                              sprintf
-                                  "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
-                                  groupId
-                                  completionId
-                                  lane.Index
-                                  failure ]
-                    | Ok() -> ()
+                    do! appendDeliveryReported durable owner groupId completionId lane.Index
 
                     return ()
         }
@@ -245,21 +256,7 @@ module FissionLaunch =
         =
         task {
             if laneClosed then
-                let! appended = appendDelivery durable owner None groupId completionId lane.Index
-
-                match appended with
-                | Error failure ->
-                    Diagnostic.emit
-                        "fission-delivery-fact-append-failed"
-                        [ "session_id", SessionId.value owner
-                          "result",
-                          sprintf
-                              "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
-                              groupId
-                              completionId
-                              lane.Index
-                              failure ]
-                | Ok() -> ()
+                do! appendDeliveryReported durable owner groupId completionId lane.Index
 
                 return ()
             else
