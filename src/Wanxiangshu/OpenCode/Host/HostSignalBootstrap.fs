@@ -789,16 +789,27 @@ module HostSignalBootstrap =
             // still uses. It holds no identity, persists nothing, never keeps a
             // lock across capacity waiting, and no same-key serial work waits on
             // it.
-            let admissionInFlight = Dictionary<ChatExecutionKey, ChatAdmissionFlight>()
+            //
+            // The flight is keyed by purpose as well as by exact key: the two
+            // purposes are different admissions of the same physical input. A
+            // `PublishInput` flight only retains a continuation input, while
+            // `EnterProviderStep` must acquire or continue the model-routing
+            // lease for that physical id. Merging them would let the retained
+            // input's flight swallow the provider-step admission, and the
+            // provider step would then run without a committed lease.
+            let admissionInFlight =
+                Dictionary<ChatExecutionKey * ChatAdmissionPurpose, ChatAdmissionFlight>()
+
+            let admissionFlightKey (key: ChatExecutionKey) purpose = (key, purpose)
+
+            let removeAdmissionFlight key purpose flight =
+                lock admissionInFlight (fun () ->
+                    match admissionInFlight.TryGetValue(admissionFlightKey key purpose) with
+                    | true, registered when obj.ReferenceEquals(registered.Work, flight) ->
+                        admissionInFlight.Remove(admissionFlightKey key purpose) |> ignore
+                    | _ -> ())
 
             let admissionSequence = Dictionary<SessionId, Task>()
-
-            let removeAdmissionFlight key flight =
-                lock admissionInFlight (fun () ->
-                    match admissionInFlight.TryGetValue key with
-                    | true, registered when obj.ReferenceEquals(registered.Work, flight) ->
-                        admissionInFlight.Remove(key) |> ignore
-                    | _ -> ())
 
             let projectCommittedAdmission key output =
                 let lease =
@@ -1049,7 +1060,7 @@ module HostSignalBootstrap =
 
             let admissionFlight durable createTransaction purpose intent managed (key: ChatExecutionKey) output =
                 lock admissionInFlight (fun () ->
-                    match admissionInFlight.TryGetValue key with
+                    match admissionInFlight.TryGetValue(admissionFlightKey key purpose) with
                     | true, existing when existing.Phase.Value = ChatAdmissionFlightPhase.Running ->
                         existing.Outputs.Add output
                         existing.Work
@@ -1071,7 +1082,7 @@ module HostSignalBootstrap =
                                 outputs
                                 phase
 
-                        admissionInFlight.[key] <-
+                        admissionInFlight.[admissionFlightKey key purpose] <-
                             { Work = started
                               Outputs = outputs
                               Phase = phase }
@@ -1094,7 +1105,7 @@ module HostSignalBootstrap =
                         let! _ = flight
                         ()
                     finally
-                        removeAdmissionFlight key flight
+                        removeAdmissionFlight key purpose flight
                 }
 
             let rejectedChatMessage failure =
