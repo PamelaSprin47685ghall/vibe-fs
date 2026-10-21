@@ -12,7 +12,7 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 |---|---|---|---|---|---|
 | P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Ports/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo` | DECLARED, WIRED-OC, SKELETON-OMP — all seven verbs (`Create`, `Parent`, `Children`, `Abort`, `Interrupt`, `Close`, `FindByTitle`) implemented in the OpenCode adapter (`SdkSessionPort` / `HttpSessionPort`, `OpenCode/Host/SessionSnapshotPort.fs`); every verb reports failures as `HostError`, and no verb is left `Unsupported` |
 | P-02 | `IPromptPort`, `PromptRequest`, `DeliveryVerdict` | `Host/Ports/Prompts.fs(i)` | fission (+ Interaction/Dispatch) | `OpenCode.IPromptPort`, `OpenCodePromptOptions`, `DetachedSendVerdict` | DECLARED, SKELETON-OMP |
-| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` (both still live; cutover pending) | DECLARED, WIRED-OC, SKELETON-OMP |
+| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` (both still live; cutover pending) | DECLARED, WIRED-OC, SKELETON-OMP — first consumer cut over: `SessionRecoveryHost` now takes `ITranscriptPort` (ctor arg `transcript`), the OpenCode adapter keeps the legacy `ISessionSnapshotPort` alive behind `TranscriptPort.HostTranscriptPort`; the other snapshot consumers are still to be routed |
 | P-04 | `IToolRegistrar`, `ToolSpec`, `ToolInvocation`, `ToolOutcome` | `Host/Ports/Tools.fs(i)` | tools | `OpenCode/Tools/ToolContext` `Tool`/`ToolContext`/`ToolOutput` | DECLARED, SKELETON-OMP |
 | P-05 | `IToolGate`, `ToolCallVerdict`, `ToolResultEdit`, `ToolDefinitionEdit` | `Host/Ports/ToolGates.fs(i)` | tools | `tool.execute.before/after`, `tool.definition` handling in `OpenCode/Plugin/PluginHooks` | DECLARED, SKELETON-OMP |
 | P-06 | `ITurnTransform`, `TurnAdmission`, `ContextEdit`, `ParamsVerdict` | `Host/Ports/TurnTransforms.fs(i)` | plugin-host | `OpenCode/Plugin/PluginTransforms`, `ChatParamsHook`, `ProviderSystemTransform` entry points | DECLARED, SKELETON-OMP |
@@ -356,6 +356,24 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   product-reference 595 (baseline 689), without-port 136 (baseline 149), fsharp-control-pyramid 5 findings — all
   pre-existing in `OpenCode/Host/SessionSnapshotPort.fs`, 0 in the new file. **No compile/test evidence** (owner's
   no-build-before-push rule) — the delivery team must build master and run the transcript requirement suites.
+
+- 2026-10-22 eng-hni-host (P-03 consumer cutover 1): the session recovery host now reads the transcript through
+  the neutral port. `OpenCode/Host/SessionRecoveryHost.fs(i)`: the constructor argument `snapshot: ISessionSnapshotPort`
+  became `transcript: ITranscriptPort`, and the single host read (the provider classification read) moved from
+  `snapshot.GetMessages` to `transcript.Messages`. The classifier keeps its semantics: the role compare is
+  `TranscriptRole.Assistant`, the parent compare is `TranscriptMessageAddress.create/.value`, the provider-run
+  compare is `TranscriptMessageAddress.value message.Id`, and a transcript failure still maps to
+  `ProviderPhysicalObservation.ReceiptMissing`. `OpenCode/Host/SessionRecoveryHostSurface.fs` builds an
+  `ITranscriptPort` stub at both construction sites; `OpenCode/Host/HostSignalBootstrap.fs` adapts its existing
+  snapshot port through `TranscriptPort.HostTranscriptPort` (that file is shared with the signal lane; only the
+  constructor argument changed there). **The legacy `ISessionSnapshotPort` / `SessionMessage` contract stays live**
+  — the adapter wraps it and the other consumers (turn reconcile, prefix wire, delegation advisor, tools,
+  dispatch recovery) are still to be routed. **No new port** — P-03 (`Host/Ports/Transcript.fs(i)`) is unchanged, so
+  the next free id stays **P-19**; `omp: n/a` (the family `.fsi` did not change, so the generated TS mirror is
+  unaffected). Gates: architecture OK, adapter-thinness 139 files / 33000 lines, product-reference 595
+  (baseline 689), without-port 134 (baseline 149), fsharp-control-pyramid 2 findings — both pre-existing in
+  `OpenCode/Host/SessionSnapshotPort.fs`. **NOT BUILD-VERIFIED, NOT TEST-RUN** (owner's no-build-before-push rule) —
+  the delivery team must build master and run the recovery requirement suites.
 
 - 2026-10-22 eng-host-arch (HNI-14): **decision record, design only** — `evidence/hni14-convergence.md` fixes the
   tier rule (a seam belongs under `Host/` only if a host supplies it: tier A `Host/Ports/`, tier B `Host/Domain/`,

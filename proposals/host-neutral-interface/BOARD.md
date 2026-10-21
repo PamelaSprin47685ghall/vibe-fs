@@ -44,6 +44,18 @@ so the next free port id stays **P-19**. Still open (not this slice): the produc
 `OpenCode/Host/Sessions.fs` and `Foundation/HostSessionPort.fs` still use the legacy `ISessionHostPort` — routing
 them onto P-01 is a separate consumer cutover.
 
+P-03 consumer cutover 1 (eng-hni-host, 2026-10-22): the session recovery host now reads the transcript through the
+neutral port. `OpenCode/Host/SessionRecoveryHost.fs(i)`: the constructor argument `snapshot: ISessionSnapshotPort`
+became `transcript: ITranscriptPort`; `OpenCode/Host/SessionRecoveryHostSurface.fs` builds an `ITranscriptPort` stub at
+both construction sites, and `OpenCode/Host/HostSignalBootstrap.fs` adapts its existing snapshot port through
+`TranscriptPort.HostTranscriptPort` (that file is shared with the signal lane; only the constructor argument
+changed there). The legacy `ISessionSnapshotPort` / `SessionMessage` contract stays live — the adapter wraps it and
+the remaining consumers (turn reconcile, prefix wire, delegation advisor, tools, dispatch recovery) are still to be
+routed onto P-03. `Host/Ports/*` is unchanged, so the next free port id stays **P-19**. Gates: architecture OK,
+adapter-thinness 139 files / 33000 lines, product-reference 595 (baseline 689), without-port 134 (baseline 149),
+fsharp-control-pyramid 2 findings (both pre-existing). **NOT BUILD-VERIFIED, NOT TEST-RUN** — the delivery team must
+build master and run the recovery requirement suites.
+
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 
 ## Gate ⑩/⑪/⑫/⑬ (HNI-04, HNI-11) — `scripts/checks/adapter-thinness.mjs`, run inside `architecture.mjs`
