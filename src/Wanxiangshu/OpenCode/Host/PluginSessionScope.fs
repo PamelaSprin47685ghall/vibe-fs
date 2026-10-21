@@ -71,8 +71,6 @@ type PluginSessionScope
     member val SessionParents = SharedState.SessionParents
     // DSL-MUTABLE: resource — per-instance companion registry.
     member val Companions = Dictionary<string, CompanionHost>()
-    // DSL-MUTABLE: resource — lock gate object for companion operations.
-    member val CompanionGate = obj ()
     // DSL-MUTABLE: single-flight — per-instance nudge sent set.
     member val NudgeSent = HashSet<string>()
     // DSL-MUTABLE: single-flight — per-instance join guard nudge set.

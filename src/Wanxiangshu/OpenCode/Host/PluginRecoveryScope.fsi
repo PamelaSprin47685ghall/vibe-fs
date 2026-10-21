@@ -53,10 +53,6 @@ type PluginRecoveryScope =
     member TryPendingAttemptPlan:
         sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> PendingAttemptPlan option
 
-    /// Freezes a pre-inference attempt plan, throwing on conflict.
-    member RecordPendingAttemptPlan:
-        sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> plan: PendingAttemptPlan -> unit
-
     /// Binds the frozen pre-inference decision to the exact assistant run.
     member TryBindAttemptPlan:
         sessionId: SessionId ->
@@ -64,15 +60,10 @@ type PluginRecoveryScope =
         providerRun: ProviderRunIdentity ->
             AttemptPlan option
 
-    /// Records an already-bound attempt plan under the provider run.
-    member RecordAttemptPlan: sessionId: SessionId -> providerRun: ProviderRunIdentity -> plan: AttemptPlan -> unit
-
     /// Consumes the frozen plan exactly once on terminal reconciliation.
     member ConsumeAttemptPlan: sessionId: SessionId -> providerRun: ProviderRunIdentity -> AttemptPlan option
 
-    member TryPeekAttemptPlan: sessionId: SessionId -> providerRun: ProviderRunIdentity -> AttemptPlan option
-
-    /// Read-only peek alias.
+    /// Read-only peek; keeps the plan alive.
     member TryAttemptPlan: sessionId: SessionId -> providerRun: ProviderRunIdentity -> AttemptPlan option
 
     member PublishManualChatIntervention: request: ManualInterventionRequest -> unit

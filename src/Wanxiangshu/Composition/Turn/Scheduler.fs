@@ -532,8 +532,6 @@ module Reconciler =
         member _.TryPhysicalUserMessage(sessionId: SessionId) =
             binding.TryPhysicalUserMessage(sessionId)
 
-        member _.RootBindings = binding.UserMessageBindings
-
         member _.ClearSession(sessionId: SessionId) : unit =
             lock gate (fun () ->
                 let key = SessionId.value sessionId

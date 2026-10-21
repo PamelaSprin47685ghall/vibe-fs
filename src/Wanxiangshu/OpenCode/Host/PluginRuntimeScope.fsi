@@ -5,7 +5,6 @@ open Wanxiangshu.Foundation.HostSession
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation.Identity
@@ -39,25 +38,12 @@ type PluginRuntimeScope =
 
     member MarkRestartGuidanceDelivered: unit -> unit
 
-    member AttachSessionCleanup: cleanup: (string -> unit) -> unit
-
-    member AttachScopeDispose: dispose: (unit -> unit) -> unit
-
 
     /// Composition-of-owners: per-instance session registries live in their own scope.
     member Sessions: PluginSessionScope
 
     /// Composition-of-owners: family recovery + attempt planning live in their own scope.
     member Recovery: PluginRecoveryScope
-
-    /// The single lifecycle owner's registry, shared by every AttachmentKind adapter.
-    member AttachAttachmentRegistry: registry: AttachmentLeaseRegistry -> unit
-
-    member AttachmentRegistry: AttachmentLeaseRegistry
-
-    member AttachCompanionLeases: runtime: CompanionLeaseRuntime -> unit
-
-    member CompanionLeases: CompanionLeaseRuntime
 
     member AttachSyncDelegateRuntime: runtime: SyncDelegateRuntime -> unit
 
@@ -93,16 +79,11 @@ type PluginRuntimeScope =
     /// Revokes the exact manual intervention entry for a terminally settled key.
     member RevokeManualIntervention: key: ChatExecutionKey -> unit
 
-    member RecordPendingAttemptPlan:
-        sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> plan: PendingAttemptPlan -> unit
-
     member TryBindAttemptPlan:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
         providerRun: ProviderRunIdentity ->
             AttemptPlan option
-
-    member RecordAttemptPlan: sessionId: SessionId -> providerRun: ProviderRunIdentity -> plan: AttemptPlan -> unit
 
     member TryAttemptPlan: sessionId: SessionId -> providerRun: ProviderRunIdentity -> AttemptPlan option
 

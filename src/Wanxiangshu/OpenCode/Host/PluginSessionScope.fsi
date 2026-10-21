@@ -33,9 +33,6 @@ type PluginSessionScope =
     /// Per-instance companion registry.
     member Companions: Dictionary<string, CompanionHost>
 
-    /// Lock gate object for companion operations.
-    member CompanionGate: obj
-
     /// Cross-instance verdict session set alias.
     /// Per-instance nudge sent set.
     member NudgeSent: HashSet<string>

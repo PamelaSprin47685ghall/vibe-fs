@@ -110,7 +110,7 @@ type PluginRecoveryScope(journal: AgentJournal option) =
 
     /// DSL-cross-callback-proof: physical single-flight — opaque frozen attempt plan channel.
     /// Owning recovery CE (XWire.reconcileAttempt) consumes via ConsumeAttemptPlan on terminal;
-    /// transform adapter records via RecordAttemptPlan.
+    /// the transform adapter binds via TryBindAttemptPlan.
     /// No stringly-typed TryGet/Clear drives business branching (structured-workflow-017②, structured-workflow-009, provider-attempt-recovery-011).
     // DSL-MUTABLE: single-flight — per-provider-run attempt plan channel (frozen decision, typed handle)
     let attemptPlans = Dictionary<string, AttemptPlan>()
@@ -155,17 +155,6 @@ type PluginRecoveryScope(journal: AgentJournal option) =
             attemptPlans.[key] <- plan
             plan
 
-    let installBoundPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) : unit =
-        let key = providerPlanKey sessionId providerRun
-
-        match attemptPlans.TryGetValue key with
-        | true, established when established = plan -> ()
-        | true, established ->
-            invalidOp (
-                sprintf "HOST-BOUNDARY-008: cannot re-bind provider run %A from %A to %A" providerRun established plan
-            )
-        | false, _ -> attemptPlans.[key] <- plan
-
     let installOrdinaryPendingPlan
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
@@ -197,30 +186,6 @@ type PluginRecoveryScope(journal: AgentJournal option) =
         (plan: PendingAttemptPlan)
         =
         installOrdinaryPendingPlan sessionId physicalUserMessageId plan
-
-    member this.RecordPendingAttemptPlan
-        (sessionId: SessionId)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        (plan: PendingAttemptPlan)
-        =
-        match this.FreezePendingAttemptPlan sessionId physicalUserMessageId plan with
-        | PendingAttemptPlanAdmission.Admitted _ -> ()
-        | PendingAttemptPlanAdmission.ReplayedExisting _ -> ()
-        | PendingAttemptPlanAdmission.IdentityMismatch(expectedSession, expectedPhysical, attempted) ->
-            invalidOp (
-                sprintf
-                    "HOST-BOUNDARY-008: pending attempt plan identity mismatch: expected=(%A, %A) attempted=%A"
-                    expectedSession
-                    expectedPhysical
-                    attempted
-            )
-        | PendingAttemptPlanAdmission.PlanConflict(existing, attempted) ->
-            invalidOp (
-                sprintf
-                    "HOST-BOUNDARY-008: conflicting pending attempt plan: existing=%A attempted=%A"
-                    existing
-                    attempted
-            )
 
     member _.TryPendingAttemptPlan
         (sessionId: SessionId)
@@ -257,38 +222,6 @@ type PluginRecoveryScope(journal: AgentJournal option) =
         | Some _ -> None
         | None -> this.BindPendingAttemptPlan sessionId physicalUserMessageId providerRun
 
-    member this.RecordAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
-        if plan.Profile.SessionId <> sessionId then
-            invalidOp (
-                sprintf
-                    "HOST-BOUNDARY-008: attempt plan session mismatch: expected=%A attempted=%A"
-                    sessionId
-                    plan.Profile.SessionId
-            )
-
-        if plan.Profile.ProviderRun <> providerRun then
-            invalidOp (
-                sprintf
-                    "HOST-BOUNDARY-008: attempt plan run mismatch: expected=%A attempted=%A"
-                    providerRun
-                    plan.Profile.ProviderRun
-            )
-
-        let expectedBound =
-            this.TryPendingAttemptPlan sessionId plan.Profile.PhysicalUserMessageId
-            |> Option.map (AttemptPlanner.bindProviderRun providerRun)
-
-        match expectedBound with
-        | Some expected when expected = plan -> installBoundPlan sessionId providerRun plan
-        | _ ->
-            invalidOp (
-                sprintf
-                    "HOST-BOUNDARY-008: no exact admitted pending plan for session %A physical %A run %A"
-                    sessionId
-                    plan.Profile.PhysicalUserMessageId
-                    providerRun
-            )
-
     /// Owning CE consumes the frozen plan exactly once on terminal reconciliation.
     /// Provisional/unknown turns must use TryAttemptPlan (peek) to keep the plan alive;
     /// only terminal outcomes (TurnCompleted/TurnFailed/TurnAborted) call ConsumeAttemptPlan.
@@ -306,15 +239,12 @@ type PluginRecoveryScope(journal: AgentJournal option) =
             Some plan
         | false, _ -> None
 
-    member this.TryPeekAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
+    member this.TryAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
         let key = providerPlanKey sessionId providerRun
 
         match attemptPlans.TryGetValue key with
         | true, plan -> Some plan
         | false, _ -> None
-
-    member this.TryAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
-        this.TryPeekAttemptPlan sessionId providerRun
 
     member _.PublishManualChatIntervention(request: ManualInterventionRequest) =
         manualChatInterventions.[request.ExecutionState.key] <- request

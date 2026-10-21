@@ -50,6 +50,4 @@ module Reconciler =
 
         member TryPhysicalUserMessage: sessionId: SessionId -> PhysicalUserMessageId option
 
-        member RootBindings: Dictionary<string, PhysicalUserMessageId>
-
         member ClearSession: sessionId: SessionId -> unit
