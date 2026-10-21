@@ -157,22 +157,24 @@ module ChatExecutionPhaseLaw =
         | Some(ChatExecutionState.EndedAfterStart(_, disposition)) ->
             createObj [ "phase" ==> "EndedAfterStart"; "disposition" ==> dispositionName disposition ]
 
+    let private endedBeforeStartOf (next: obj) : ChatExecutionLawFold =
+        match PreStartOutcome.ofDisposition (dispositionOf next?disposition) with
+        | Some outcome -> ChatExecutionLawFold.SetEndedBeforeStart outcome
+        | None -> invalidOp "wanxiangli/chat-execution set a Completed pre-start terminal"
+
+    let private setPhaseOf (next: obj) : ChatExecutionLawFold =
+        match unbox<string> next?phase with
+        | "Accepted" -> ChatExecutionLawFold.SetAccepted
+        | "ProviderStarted" -> ChatExecutionLawFold.SetStarted
+        | "EndedBeforeStart" -> endedBeforeStartOf next
+        | "EndedAfterStart" -> ChatExecutionLawFold.SetEndedAfterStart(dispositionOf next?disposition)
+        | other -> invalidOp ("wanxiangli/chat-execution returned an unknown phase: " + other)
+
     let private foldVerdict (verdict: obj) : ChatExecutionLawFold =
         match unbox<string> verdict?verdict with
         | "keep" -> ChatExecutionLawFold.Keep
         | "reject" -> ChatExecutionLawFold.Reject(unbox<string> verdict?reason)
-        | "set" ->
-            let next: obj = verdict?next
-
-            match unbox<string> next?phase with
-            | "Accepted" -> ChatExecutionLawFold.SetAccepted
-            | "ProviderStarted" -> ChatExecutionLawFold.SetStarted
-            | "EndedBeforeStart" ->
-                match PreStartOutcome.ofDisposition (dispositionOf next?disposition) with
-                | Some outcome -> ChatExecutionLawFold.SetEndedBeforeStart outcome
-                | None -> invalidOp "wanxiangli/chat-execution set a Completed pre-start terminal"
-            | "EndedAfterStart" -> ChatExecutionLawFold.SetEndedAfterStart(dispositionOf next?disposition)
-            | other -> invalidOp ("wanxiangli/chat-execution returned an unknown phase: " + other)
+        | "set" -> setPhaseOf verdict?next
         | other -> invalidOp ("wanxiangli/chat-execution returned an unknown fold verdict: " + other)
 
     let private decision (verdict: obj) : ChatExecutionLawDecision =

@@ -155,25 +155,29 @@ module internal AuthorityLaw =
               // A Manager life is the life of the Manager's own session.
               "lifeId" ==> (if kind = "HumanRootManagerLife" then sessionId else null) ]
 
+    let private admitKnownRootClosure
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (kind: string)
+        (recordedRootKind: string)
+        (witness: string)
+        : Result<unit, string> =
+        let verdict = law.admitClosure (closing profile kind, recordedRootKind, witness)
+
+        if unbox<bool> verdict?ok then
+            Ok()
+        else
+            Error(sprintf "%s closure refused: %s" kind (unbox<string> verdict?reason))
+
     /// Admit a closure (new or durably replayed) for exactly this accepted root.
     let admitClosure
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (recordedRootKind: string)
         (witness: string)
         : Result<unit, string> =
-        match expectedClosureKind profile with
-        | None -> Error "the accepted root has no expected closure kind"
-        | Some kind ->
-            match recordedRootKind with
-            | "HumanRoot"
-            | "AgentOwnerRoot" ->
-                let verdict = law.admitClosure (closing profile kind, recordedRootKind, witness)
-
-                if unbox<bool> verdict?ok then
-                    Ok()
-                else
-                    Error(sprintf "%s closure refused: %s" kind (unbox<string> verdict?reason))
-            | other -> Error(sprintf "closure RootKind is unknown: %s" other)
+        match expectedClosureKind profile, recordedRootKind with
+        | None, _ -> Error "the accepted root has no expected closure kind"
+        | Some kind, ("HumanRoot" | "AgentOwnerRoot") -> admitKnownRootClosure profile kind recordedRootKind witness
+        | Some _, other -> Error(sprintf "closure RootKind is unknown: %s" other)
 
     /// The canonical witness of a completed Manager life: its delivered S4 retirement.
     let managerLifeWitness (profile: PromptAuthority.AuthorityExecutionProfile) (retirementId: string) : string option =
@@ -272,6 +276,69 @@ module PromptAuthorityRun =
           Receipt = None
           ClaimedAtRuntimeStartCount = 0 }
 
+    let private dispatchRequired what (value: 'T option) =
+        value
+        |> Option.defaultWith (fun () -> failwithf "wanxiangli/dispatch asked for %s that the event lacks" what)
+
+    let private landedDispatch
+        (physicalMessageId: PhysicalUserMessageId option)
+        (claim: PromptAuthority.PromptClaim)
+        : PromptAuthority.AcceptedDispatch =
+        { PromptKey = claim.PromptKey
+          SessionId = claim.SessionId
+          Origin = claim.Origin
+          IdentitySeed = claim.IdentitySeed
+          PayloadDigest = claim.PayloadDigest
+          PhysicalUserMessageId =
+            physicalMessageId
+            |> Option.defaultWith (fun () -> failwith "wanxiangli/dispatch landed a claim without a physical id") }
+
+    let private recordContinuationEdit
+        (physicalMessageId: PhysicalUserMessageId option)
+        (claim: PromptAuthority.PromptClaim)
+        (state: PromptAuthority.PromptAuthorityProjection)
+        : PromptAuthority.PromptAuthorityProjection =
+        match claim.Origin with
+        | PromptAuthority.PromptOrigin.Continuation kind ->
+            { state with
+                AcceptedContinuationIds =
+                    Map.add (dispatchRequired "a physical id" physicalMessageId) kind state.AcceptedContinuationIds }
+        | _ -> failwith "wanxiangli/dispatch recorded a continuation for a non-continuation claim"
+
+    let private applyClaimEdit
+        (key: PromptKey)
+        (receipt: TransportReceipt option)
+        (physicalMessageId: PhysicalUserMessageId option)
+        (claim: PromptAuthority.PromptClaim)
+        occasion
+        (state: PromptAuthority.PromptAuthorityProjection)
+        edit
+        : PromptAuthority.PromptAuthorityProjection =
+        match edit with
+        | DispatchLaw.Edit.RecordReceipt ->
+            { state with
+                PendingClaims =
+                    Map.add
+                        key
+                        { claim with
+                            Receipt = Some(dispatchRequired "a receipt" receipt) }
+                        state.PendingClaims }
+        | DispatchLaw.Edit.DropPending ->
+            { state with
+                PendingClaims = Map.remove key state.PendingClaims }
+        | DispatchLaw.Edit.LandOccasion ->
+            { state with
+                AcceptedDispatches = Map.add occasion (landedDispatch physicalMessageId claim) state.AcceptedDispatches }
+        | DispatchLaw.Edit.LandExact ->
+            let physical = dispatchRequired "a physical id" physicalMessageId
+
+            { state with
+                PhysicalLandings = Map.add physical (landedDispatch physicalMessageId claim) state.PhysicalLandings }
+        | DispatchLaw.Edit.RecordContinuation -> recordContinuationEdit physicalMessageId claim state
+        | DispatchLaw.Edit.ClearOccasion ->
+            { state with
+                AcceptedDispatches = Map.remove occasion state.AcceptedDispatches }
+
     /// Apply the ledger edits `wanxiangli/dispatch` settles for one claim event
     /// (CUT-11). A key that is not pending (already landed, abandoned or never
     /// claimed) gets no edits: a landing never regresses and a duplicate receipt
@@ -290,20 +357,6 @@ module PromptAuthorityRun =
             | Some { Origin = PromptAuthority.PromptOrigin.Continuation _ } -> true
             | _ -> false
 
-        let landed (claim: PromptAuthority.PromptClaim) : PromptAuthority.AcceptedDispatch =
-            { PromptKey = claim.PromptKey
-              SessionId = claim.SessionId
-              Origin = claim.Origin
-              IdentitySeed = claim.IdentitySeed
-              PayloadDigest = claim.PayloadDigest
-              PhysicalUserMessageId =
-                physicalMessageId
-                |> Option.defaultWith (fun () -> failwith "wanxiangli/dispatch landed a claim without a physical id") }
-
-        let required what (value: 'T option) =
-            value
-            |> Option.defaultWith (fun () -> failwithf "wanxiangli/dispatch asked for %s that the event lacks" what)
-
         match pending with
         | None ->
             DispatchLaw.settle event false false
@@ -315,42 +368,7 @@ module PromptAuthorityRun =
                 PromptAuthority.acceptedDispatchKey claim.SessionId claim.PayloadDigest
 
             DispatchLaw.settle event true continuation
-            |> List.fold
-                (fun (state: PromptAuthority.PromptAuthorityProjection) edit ->
-                    match edit with
-                    | DispatchLaw.Edit.RecordReceipt ->
-                        { state with
-                            PendingClaims =
-                                Map.add
-                                    key
-                                    { claim with
-                                        Receipt = Some(required "a receipt" receipt) }
-                                    state.PendingClaims }
-                    | DispatchLaw.Edit.DropPending ->
-                        { state with
-                            PendingClaims = Map.remove key state.PendingClaims }
-                    | DispatchLaw.Edit.LandOccasion ->
-                        { state with
-                            AcceptedDispatches = Map.add occasion (landed claim) state.AcceptedDispatches }
-                    | DispatchLaw.Edit.LandExact ->
-                        let physical = required "a physical id" physicalMessageId
-
-                        { state with
-                            PhysicalLandings = Map.add physical (landed claim) state.PhysicalLandings }
-                    | DispatchLaw.Edit.RecordContinuation ->
-                        match claim.Origin with
-                        | PromptAuthority.PromptOrigin.Continuation kind ->
-                            { state with
-                                AcceptedContinuationIds =
-                                    Map.add
-                                        (required "a physical id" physicalMessageId)
-                                        kind
-                                        state.AcceptedContinuationIds }
-                        | _ -> failwith "wanxiangli/dispatch recorded a continuation for a non-continuation claim"
-                    | DispatchLaw.Edit.ClearOccasion ->
-                        { state with
-                            AcceptedDispatches = Map.remove occasion state.AcceptedDispatches })
-                projection
+            |> List.fold (applyClaimEdit key receipt physicalMessageId claim occasion) projection
 
     /// Run boundary (a new root or an exact closure): `wanxiangli/dispatch`
     /// reset decides which dispatch resources survive. Run-scoped claims,

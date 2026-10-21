@@ -146,6 +146,26 @@ module PluginHooks =
 
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
+    let private reportOnError (report: 'e -> unit) (result: Result<unit, 'e>) : unit =
+        match result with
+        | Ok() -> ()
+        | Error reason -> report reason
+
+    /// The admission ledger answers whether a failed append releases the call
+    /// for a real retry; only a release forgets the in-flight append.
+    let private forgetWhenReleased (pending: Dictionary<'K, 'V>) (key: 'K) (outcome: string) : unit =
+        match outcome with
+        | "released" -> pending.Remove(key) |> ignore
+        | _ -> ()
+
+    /// LC-017: the exact (provider run, tool call) fence a replayed ask/deliver carries.
+    let private replayFenceOf toolInput =
+        let ctx = ToolHostCodec.decodeContext toolInput
+
+        match ctx.ProviderRunId, ctx.ToolCallId with
+        | Some run, Some call -> Some(run, call)
+        | _ -> None
+
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
         task {
             let scope = boot.Scope
@@ -505,9 +525,7 @@ module PluginHooks =
                                 callId
                             )
 
-                        match result with
-                        | Ok() -> ()
-                        | Error reason -> reportUserQuestionInterruptUnconfirmed sessionId reason
+                        result |> reportOnError (reportUserQuestionInterruptUnconfirmed sessionId)
                     | Some(sessionId, _, "completed", None), Some registration when
                         registration.Runtime.IsWaitingForUser sessionId
                         ->
@@ -547,9 +565,8 @@ module PluginHooks =
                         viewCheckpointAdmission.settle (call, "committed") |> ignore
                         pendingViewCheckpointAppends.Remove(key) |> ignore
                     with :? JournalAppendException as appendFailure ->
-                        match viewCheckpointAdmission.settle (call, appendOutcome appendFailure.Failure) with
-                        | "released" -> pendingViewCheckpointAppends.Remove(key) |> ignore
-                        | _ -> ()
+                        viewCheckpointAdmission.settle (call, appendOutcome appendFailure.Failure)
+                        |> forgetWhenReleased pendingViewCheckpointAppends key
 
                         return raise appendFailure
                 }
@@ -694,12 +711,7 @@ module PluginHooks =
                                 toolName = "deliver"
                                 || toolName.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
 
-                            let replayFence =
-                                ToolHostCodec.decodeContext toolInput
-                                |> fun ctx ->
-                                    match ctx.ProviderRunId, ctx.ToolCallId with
-                                    | Some run, Some call -> Some(run, call)
-                                    | _ -> None
+                            let replayFence = replayFenceOf toolInput
 
                             isReplayExemptTool
                             && replayFence = registration.Runtime.WaitingQuestionFenceFor sessionId

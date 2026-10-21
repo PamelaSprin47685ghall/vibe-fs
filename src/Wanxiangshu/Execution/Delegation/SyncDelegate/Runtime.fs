@@ -151,6 +151,33 @@ module internal SyncDelegateInternals =
     /// guessed from the parent's tool-call sequence — that sequence is the
     /// parent's, and the delivery is the child's. A cell that does not carry
     /// this turn's run is not taken at all.
+    let private fencedRenderedView (turn: ReconciledTurn) (assistant: string) : string option =
+        match JsDeliveredValues.peekFence (SessionId.value turn.SessionId) with
+        | Some fence when fence.ProviderRun = turn.ProviderRun ->
+            JsDeliveredValues.tryTakeRenderedForCall
+                (SessionId.value turn.SessionId)
+                turn.ProviderRun
+                fence.ToolCallId
+                (if System.String.IsNullOrWhiteSpace assistant then
+                     None
+                 else
+                     Some assistant)
+        | _ -> None
+
+    let private settleExactCall
+        (noteDelegateIfRole: SyncDelegateCall -> SessionId -> string -> unit)
+        (store: SyncDelegateCallStore)
+        (call: SyncDelegateCall)
+        (turn: ReconciledTurn)
+        (record: string)
+        : unit =
+        match store.TryPopExactCall call with
+        | Some exact ->
+            captureResponse exact turn
+            noteDelegateIfRole exact turn.SessionId record
+            AsyncSupport.trySetResult exact.Answer (Ok record) |> ignore
+        | None -> ()
+
     let private settleDeliveredFromParts
         (journal: AgentJournal option)
         (noteDelegateIfRole: SyncDelegateCall -> SessionId -> string -> unit)
@@ -161,32 +188,14 @@ module internal SyncDelegateInternals =
         let assistant = CompletedTurnClassifier.partsSessionText turn.Parts
 
         let resolved =
-            match durableWitnessView journal turn with
-            | Some view -> Some view
-            | None ->
-                match JsDeliveredValues.peekFence (SessionId.value turn.SessionId) with
-                | Some fence when fence.ProviderRun = turn.ProviderRun ->
-                    JsDeliveredValues.tryTakeRenderedForCall
-                        (SessionId.value turn.SessionId)
-                        turn.ProviderRun
-                        fence.ToolCallId
-                        (if System.String.IsNullOrWhiteSpace assistant then
-                             None
-                         else
-                             Some assistant)
-                | _ -> None
+            durableWitnessView journal turn
+            |> Option.orElseWith (fun () -> fencedRenderedView turn assistant)
 
         match resolved with
         | Some record when not (System.String.IsNullOrWhiteSpace record) ->
             // Claim the call before settling it: a concurrent terminal cannot
             // discharge the same work unit twice.
-            match store.TryPopExactCall call with
-            | Some exact ->
-                captureResponse exact turn
-                noteDelegateIfRole exact turn.SessionId record
-                AsyncSupport.trySetResult exact.Answer (Ok record) |> ignore
-            | None -> ()
-
+            settleExactCall noteDelegateIfRole store call turn record
             Some record
         | _ -> None
 

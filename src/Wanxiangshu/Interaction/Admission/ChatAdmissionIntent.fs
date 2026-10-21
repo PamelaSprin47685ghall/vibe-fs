@@ -265,6 +265,47 @@ module ChatAdmissionIntent =
 
         Decision.HostInternal evidence
 
+    let private rejectionOf
+        (message: DecodedMessage)
+        (snapshot: DurableSnapshot)
+        (observed: Observed)
+        (verdict: obj)
+        : Rejection =
+        match unbox<string> verdict?reason with
+        | "malformed-carrier" ->
+            Rejection.MalformedIdentityCarrier(required "malformed-carrier" message.InvalidIdentityCarrier)
+        | "missing-session" -> Rejection.ManagedIntentMissingSessionId
+        | "missing-physical" -> Rejection.ManagedIntentMissingPhysicalUserMessageId
+        | "authority-unavailable" -> Rejection.DurableAuthorityUnavailable
+        | "invalid-explicit-agent" ->
+            Rejection.InvalidExplicitAgent(required "invalid-explicit-agent" message.ExplicitAgent)
+        | "accepted-participant-conflict" ->
+            let accepted =
+                required "accepted-participant-conflict" snapshot.AcceptedExecutionEvidence
+
+            Rejection.AcceptedParticipantConflict(
+                { SessionId = accepted.SessionId
+                  PhysicalUserMessageId = accepted.PhysicalUserMessageId },
+                seedAgent accepted.IdentitySeed,
+                required "accepted-participant-conflict" message.ExplicitAgent
+            )
+        | "prompt-key-not-claimed" -> Rejection.PromptKeyNotClaimed(required "prompt-key-not-claimed" message.PromptKey)
+        | "agent-owner-root-prompt-not-claimed" ->
+            Rejection.AgentOwnerRootPromptNotClaimed(
+                required "agent-owner-root-prompt-not-claimed" message.PromptKey,
+                (required "agent-owner-root-prompt-not-claimed" observed.Active).IdentitySeed
+            )
+        | "claim-session-mismatch" ->
+            Rejection.PromptClaimSessionMismatch(
+                required "claim-session-mismatch" message.SessionId,
+                (required "claim-session-mismatch" observed.Pending).SessionId
+            )
+        | "claim-origin-not-admissible" ->
+            let claim = required "claim-origin-not-admissible" observed.Pending
+            Rejection.PromptClaimOriginNotAdmissible(claim.PromptKey, claim.Origin)
+        | "unknown-origin-while-active" -> Rejection.UnknownOriginWhileActive
+        | other -> failwithf "wanxiangli/authority admit returned an unknown rejection %s" other
+
     let private decide (message: DecodedMessage) (snapshot: DurableSnapshot) (observed: Observed) (verdict: obj) =
         let key () : ChatExecutionKey =
             { SessionId = required "a keyed verdict" message.SessionId
@@ -280,9 +321,9 @@ module ChatAdmissionIntent =
         | "unmanaged" -> Decision.NoManagedExecution NoManagedExecutionReason.UnmanagedMessage
         | "already-accepted" ->
             let origin =
-                match observed.AcceptedContinuation with
-                | Some continuation -> PromptAuthority.PromptOrigin.Continuation continuation
-                | None -> required "already-accepted" observed.Landed
+                observed.AcceptedContinuation
+                |> Option.map PromptAuthority.PromptOrigin.Continuation
+                |> Option.defaultWith (fun () -> required "already-accepted" observed.Landed)
 
             Decision.NoManagedExecution(NoManagedExecutionReason.AlreadyAcceptedHostMessage origin)
         | "host-internal" -> hostInternal message
@@ -314,45 +355,7 @@ module ChatAdmissionIntent =
                   Claim = claim
                   Origin = claim.Origin
                   IdentitySeed = claim.IdentitySeed }
-        | "reject" ->
-            let rejection =
-                match unbox<string> verdict?reason with
-                | "malformed-carrier" ->
-                    Rejection.MalformedIdentityCarrier(required "malformed-carrier" message.InvalidIdentityCarrier)
-                | "missing-session" -> Rejection.ManagedIntentMissingSessionId
-                | "missing-physical" -> Rejection.ManagedIntentMissingPhysicalUserMessageId
-                | "authority-unavailable" -> Rejection.DurableAuthorityUnavailable
-                | "invalid-explicit-agent" ->
-                    Rejection.InvalidExplicitAgent(required "invalid-explicit-agent" message.ExplicitAgent)
-                | "accepted-participant-conflict" ->
-                    let accepted =
-                        required "accepted-participant-conflict" snapshot.AcceptedExecutionEvidence
-
-                    Rejection.AcceptedParticipantConflict(
-                        { SessionId = accepted.SessionId
-                          PhysicalUserMessageId = accepted.PhysicalUserMessageId },
-                        seedAgent accepted.IdentitySeed,
-                        required "accepted-participant-conflict" message.ExplicitAgent
-                    )
-                | "prompt-key-not-claimed" ->
-                    Rejection.PromptKeyNotClaimed(required "prompt-key-not-claimed" message.PromptKey)
-                | "agent-owner-root-prompt-not-claimed" ->
-                    Rejection.AgentOwnerRootPromptNotClaimed(
-                        required "agent-owner-root-prompt-not-claimed" message.PromptKey,
-                        (required "agent-owner-root-prompt-not-claimed" observed.Active).IdentitySeed
-                    )
-                | "claim-session-mismatch" ->
-                    Rejection.PromptClaimSessionMismatch(
-                        required "claim-session-mismatch" message.SessionId,
-                        (required "claim-session-mismatch" observed.Pending).SessionId
-                    )
-                | "claim-origin-not-admissible" ->
-                    let claim = required "claim-origin-not-admissible" observed.Pending
-                    Rejection.PromptClaimOriginNotAdmissible(claim.PromptKey, claim.Origin)
-                | "unknown-origin-while-active" -> Rejection.UnknownOriginWhileActive
-                | other -> failwithf "wanxiangli/authority admit returned an unknown rejection %s" other
-
-            Decision.Reject rejection
+        | "reject" -> Decision.Reject(rejectionOf message snapshot observed verdict)
         | other -> failwithf "wanxiangli/authority admit returned an unknown verdict %s" other
 
     let resolve (message: DecodedMessage) (snapshot: DurableSnapshot) : Decision =

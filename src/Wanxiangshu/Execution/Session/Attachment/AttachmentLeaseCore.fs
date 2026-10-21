@@ -100,6 +100,23 @@ module AttachmentLeaseCore =
         | Reused -> "Reused"
         | Replacement -> "Replacement"
 
+    let private createdOriginOf (value: obj) : Origin =
+        match unbox<string> value with
+        | "Created" -> Created
+        | "Replacement" -> Replacement
+        | other -> invalidOp ("wanxiangli/attachment-lease returned an unknown origin: " + other)
+
+    let private rejectionMessage (kind: AttachmentKind) (ownerText: string) (hash: string) (rejection: obj) : string =
+        match unbox<string> rejection with
+        | "Conflicting" ->
+            sprintf
+                "Conflicting %s recovery for %s: child %s has a different agent or title"
+                (kindKey kind)
+                ownerText
+                hash
+        | "Ambiguous" -> sprintf "Ambiguous %s recovery for %s: duplicate child id %s" (kindKey kind) ownerText hash
+        | other -> invalidOp ("wanxiangli/attachment-lease returned an unknown rejection: " + other)
+
     /// Resolve which child this kind should use. Never guesses: the library decides,
     /// this side creates the child a `create` verdict asks for.
     let private resolve
@@ -151,33 +168,10 @@ module AttachmentLeaseCore =
                 )
             )
         | "create" ->
-            let closeFirst = unbox<bool> verdict?closeReplacedBeforeLink
-
-            match unbox<string> verdict?origin with
-            | "Created" -> create Created closeFirst
-            | "Replacement" -> create Replacement closeFirst
-            | other -> invalidOp ("wanxiangli/attachment-lease returned an unknown origin: " + other)
+            let origin = createdOriginOf verdict?origin
+            create origin (unbox<bool> verdict?closeReplacedBeforeLink)
         | "reject" ->
-            let hash = unbox<string> verdict?child
-
-            match unbox<string> verdict?rejection with
-            | "Conflicting" ->
-                Task.FromResult(
-                    Error(
-                        sprintf
-                            "Conflicting %s recovery for %s: child %s has a different agent or title"
-                            (kindKey spec.Kind)
-                            ownerText
-                            hash
-                    )
-                )
-            | "Ambiguous" ->
-                Task.FromResult(
-                    Error(
-                        sprintf "Ambiguous %s recovery for %s: duplicate child id %s" (kindKey spec.Kind) ownerText hash
-                    )
-                )
-            | other -> invalidOp ("wanxiangli/attachment-lease returned an unknown rejection: " + other)
+            Task.FromResult(Error(rejectionMessage spec.Kind ownerText (unbox<string> verdict?child) verdict?rejection))
         | other -> invalidOp ("wanxiangli/attachment-lease returned an unknown verdict: " + other)
 
     /// A lease that was created or replaced must not survive a failed link: the

@@ -123,6 +123,15 @@ module ChildRecoveryWorkflow =
         | None -> Task.FromResult DurableHandleEvidence.Unknown
         | Some journal -> readDurableFromJournal ports journal
 
+    let private deliveryWitnessed (ports: Ports) (user: SessionMessage) (assistant: SessionMessage) : bool =
+        let authorityRoot =
+            PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id)
+
+        let providerRun = ProviderRunIdentity.create assistant.Id
+
+        ports.DeliveryWitness
+        |> Option.exists (fun reader -> reader ports.ChildSession providerRun authorityRoot)
+
     let private terminalFromMessages
         (ports: Ports)
         (messages: SessionMessage list)
@@ -132,39 +141,28 @@ module ChildRecoveryWorkflow =
         | None -> ChildSnapshotEvidence.Unreadable "host restart: terminal child has no user message"
         | Some user when assistant.ParentId <> Some user.Id ->
             ChildSnapshotEvidence.Unreadable "terminal assistant does not answer the exact accepted physical message"
+        | Some user when not (deliveryWitnessed ports user assistant) ->
+            ChildSnapshotEvidence.Unreadable "restart terminal has no durable delivery witness"
         | Some user ->
-            let authorityRoot =
-                PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id)
+            let runId = "run-restored-" + ports.AgentId
+            let view = textOfParts assistant.Parts
 
-            let providerRun = ProviderRunIdentity.create assistant.Id
+            let agentOutcome =
+                AgentCompletion.completed
+                    ports.AgentId
+                    ports.ChildSession
+                    runId
+                    ports.Role
+                    (PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id))
+                    (ProviderRunIdentity.create assistant.Id)
+                    view
+                    None
 
-            let witnessed =
-                match ports.DeliveryWitness with
-                | None -> false
-                | Some reader -> reader ports.ChildSession providerRun authorityRoot
+            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
 
-            if not witnessed then
-                ChildSnapshotEvidence.Unreadable "restart terminal has no durable delivery witness"
-            else
-                let runId = "run-restored-" + ports.AgentId
-                let view = textOfParts assistant.Parts
-
-                let agentOutcome =
-                    AgentCompletion.completed
-                        ports.AgentId
-                        ports.ChildSession
-                        runId
-                        ports.Role
-                        (PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id))
-                        (ProviderRunIdentity.create assistant.Id)
-                        view
-                        None
-
-                let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
-
-                ChildSnapshotEvidence.Terminal(
-                    TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
-                )
+            ChildSnapshotEvidence.Terminal(
+                TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
+            )
 
     let private snapshotFromMessages (ports: Ports) (messages: SessionMessage list) : ChildSnapshotEvidence =
         match lastByRole messages "assistant" with

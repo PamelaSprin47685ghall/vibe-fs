@@ -1041,6 +1041,11 @@ module JsToolsBindings =
     /// it must arrive with every delegation member, and a missing or
     /// malformed one refuses with VIEW_DECLARATION_INVALID instead of
     /// falling back to an implicit empty mapping.
+    let private failureOfParse (parsed: Result<'T, JsFailure>) : JsFailure option =
+        match parsed with
+        | Error failure -> Some failure
+        | Ok _ -> None
+
     let private reportMappingFailure (reportMapping: obj) : JsFailure option =
         if isUndefined reportMapping then
             Some(
@@ -1048,9 +1053,14 @@ module JsToolsBindings =
                     "reportMapping is required: pass the anchor mapping the delegate must report through"
             )
         else
-            match AnchorDeclarationRule.parseReportMapping reportMapping with
-            | Error failure -> Some failure
-            | Ok _ -> None
+            reportMapping |> AnchorDeclarationRule.parseReportMapping |> failureOfParse
+
+    /// Run a delegation member only once its report mapping is proven; a
+    /// refused mapping answers with its failure envelope instead.
+    let private withReportMapping (reportMapping: obj) (run: unit -> obj) : obj =
+        match reportMappingFailure reportMapping with
+        | Some failure -> box (task { return failureObj failure })
+        | None -> run ()
 
     /// `fork(payload, reportMapping)`, `resume(payload, reportMapping)`,
     /// `commission(payload, reportMapping)` and
@@ -1064,9 +1074,7 @@ module JsToolsBindings =
             match host with
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
             | Some delegation ->
-                match reportMappingFailure reportMapping with
-                | Some failure -> box (task { return failureObj failure })
-                | None -> box (delegation.Delegate name payload reportMapping)
+                withReportMapping reportMapping (fun () -> box (delegation.Delegate name payload reportMapping))
 
     let private makeJoinMember (host: JsDelegationHost option) =
         "join"
@@ -1106,9 +1114,7 @@ module JsToolsBindings =
             match host with
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
             | Some delegation ->
-                match reportMappingFailure reportMapping with
-                | Some failure -> box (task { return failureObj failure })
-                | None -> box (delegation.Advisor intent reportMapping)
+                withReportMapping reportMapping (fun () -> box (delegation.Advisor intent reportMapping))
 
     let private createApiCore
         (capabilities: Set<JsCapability>)
