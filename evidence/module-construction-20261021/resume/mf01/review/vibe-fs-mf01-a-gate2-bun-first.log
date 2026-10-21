@@ -1,0 +1,35 @@
+bun test v1.3.14 (d1632b29)
+
+candidate.test.mjs:
+{"runtime":"Bun","pid":72994,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+(pass) gate2 observed physical park resumes one original continuation with >pipe payload and immediate legitimate sync write [188.14ms]
+{"runtime":"Bun","pid":73015,"phase":"Closed","exit":{"code":null,"signal":"SIGTERM"},"watchdog":false,"transportFaults":[]}
+122 | test('gate2 stopped owner can be killed with pending read; STOP or TERM acknowledgement is never closure', async () => {
+123 |   await withOwner({}, async owner => {
+124 |     await owner.start("await this.park({ stopped: true }); return 1;", 5000)
+125 |     await owner.park()
+126 |     assert.equal(owner.session.signal('SIGTERM').kind, 'Requested')
+127 |     assert.equal((await owner.session.wait(20)).kind, 'TimedOut')
+                 ^
+AssertionError: Expected values to be strictly equal:
++ actual - expected
+
++ 'Closed'
+- 'TimedOut'
+
+ generatedMessage: true,
+     actual: "Closed",
+   expected: "TimedOut",
+   operator: "strictEqual",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/vibe-fs-mf01-vertical-a-20261021/candidate.test.mjs:127:12
+      at withOwner (/private/tmp/vibe-fs-mf01-vertical-a-20261021/candidate.test.mjs:17:9)
+      at /private/tmp/vibe-fs-mf01-vertical-a-20261021/candidate.test.mjs:124:5
+      at processTicksAndRejections (native:7:39)
+(fail) gate2 stopped owner can be killed with pending read; STOP or TERM acknowledgement is never closure [65.83ms]
+
+ 1 pass
+ 4 filtered out
+ 1 fail
+Ran 2 tests across 1 file. [289.00ms]

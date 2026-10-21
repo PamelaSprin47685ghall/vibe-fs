@@ -1,0 +1,40 @@
+bun test v1.3.14 (d1632b29)
+
+callable.test.mjs:
+{"runtime":"Bun","pid":58005,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+(pass) Callable Host explicitly constructs separate proof/execution; raw closure args and receiver remain guest [71.55ms]
+{"runtime":"Bun","pid":58009,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+(pass) Callable readSpec preserves missing/invalid failures without function or Proxy JSON coercion [90.56ms]
+{"runtime":"Bun","pid":58013,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+(pass) Callable proof accepts object veto and evaluates abort getter only inside guest [41.72ms]
+{"runtime":"Bun","pid":58017,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+(pass) Callable stale/forged refs and wrong proof thunks cannot settle a fresh offer [47.99ms]
+{"runtime":"Bun","pid":58021,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+(pass) Callable accepted method with lost reply has one actual mutation and no replay after close [539.87ms]
+{"runtime":"Bun","pid":58025,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":false,"faults":[]}
+{"runtime":"Bun","pid":58029,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+(pass) Callable reference from a closed physical run cannot address a new run using the same local id [91.77ms]
+{"runtime":"Bun","pid":58033,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+(pass) Callable lost finish confirmation consumes the exact offer once and cannot settle its successor [42.41ms]
+{"runtime":"Bun","pid":58037,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+(pass) Callable caught abandon keeps Abandoned and native finally performs actual Host write/rm [66.48ms]
+{"runtime":"Bun","pid":58044,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+(pass) Callable looping finally closes physically without claiming the program settled or cleanup completed [399.95ms]
+{"runtime":"Bun","pid":58051,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+(pass) Callable external owner cuts off guest constructor without blocking Host [390.10ms]
+{"runtime":"Bun","pid":58055,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+(pass) Callable external owner cuts off guest getter without blocking Host [392.48ms]
+{"runtime":"Bun","pid":58071,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+(pass) Callable external owner cuts off guest sanity thunk without blocking Host [389.51ms]
+{"runtime":"Bun","pid":58083,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+(pass) Callable external owner cuts off guest watch abort getter without blocking Host [402.29ms]
+{"runtime":"Bun","pid":58088,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+(pass) Callable external owner cuts off guest after-await method without blocking Host [401.81ms]
+{"runtime":"Bun","pid":58092,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+(pass) Callable external owner cuts off guest thenable assimilation without blocking Host [416.92ms]
+{"runtime":"Bun","pid":58096,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+(pass) Callable external owner cuts off guest toJSON without blocking Host [385.47ms]
+
+ 16 pass
+ 0 fail
+Ran 16 tests across 1 file. [4.20s]

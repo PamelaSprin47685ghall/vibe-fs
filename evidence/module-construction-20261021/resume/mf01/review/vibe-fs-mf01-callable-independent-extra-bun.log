@@ -1,0 +1,24 @@
+bun test v1.3.14 (d1632b29)
+
+../../../../private/tmp/vibe-fs-mf01-callable-independent.test.mjs:
+{"evidence":"owned-cleanup","runtime":"Bun","pid":51238,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+(pass) independent raw sanity array retains holes, function, object identity, undefined, and exact proof receiver [75.89ms]
+{"evidence":"owned-cleanup","runtime":"Bun","pid":51242,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+(pass) independent watch veto uses own non-nullish abort, including falsy values, without inherited-field coercion [59.95ms]
+{"evidence":"owned-cleanup","runtime":"Bun","pid":51246,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+(pass) independent constructor, method getter, thenable and toJSON perform their effects through the real guest RPC [54.59ms]
+{"evidence":"owned-cleanup","runtime":"Bun","pid":51250,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+(pass) independent callback errors and invalid passive results retain their family and do not close a live offer [99.70ms]
+{"evidence":"owned-cleanup","runtime":"Bun","pid":51258,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+{"evidence":"owned-cleanup","runtime":"Bun","pid":51254,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+(pass) independent lost finish remains once and stale or cross-run references cannot consume a successor offer [97.50ms]
+{"evidence":"owned-cleanup","runtime":"Bun","pid":51262,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+(pass) independent onExit callback park retains the original instance and refuses copied or consumed site [60.42ms]
+{"evidence":"real-closing-result","runtime":"Bun","pid":51269,"observed":{"before":"Active","native":"Running","absent":false,"after":"Closing"},"published":"Closed"}
+{"evidence":"owned-cleanup","runtime":"Bun","pid":51269,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+(pass) independent real Closing result ordering is preserved with Callable registration installed [44.24ms]
+{"evidence":"all-owned-absent","runtime":"Bun","owned":[{"pid":51238,"runId":"94aa3fb5-8509-45ad-bed6-38a49db02a0b","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-xvlnb3"},{"pid":51242,"runId":"1cb5f71d-b963-43ca-be0d-68f655105c0d","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-5qb13p"},{"pid":51246,"runId":"db184f09-006f-4017-8d07-f317fa54ac9c","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-DR3n4z"},{"pid":51250,"runId":"d56d4b26-c206-43f0-86b0-3639ca97fbc0","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-RBbX8z"},{"pid":51254,"runId":"83fb6f31-12ff-4035-b2f3-0653718889db","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-3Lr7jH"},{"pid":51258,"runId":"0dbbf1ed-6e64-4209-944f-5653910be73f","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-crtyQ5"},{"pid":51262,"runId":"fde9b17c-81ed-42fd-a93a-dd7fbea88c20","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-GgzjPm"},{"pid":51269,"runId":"15e0a476-b48c-4f1f-8abf-329a69be7c7a","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-cXTogu"}]}
+
+ 7 pass
+ 0 fail
+Ran 7 tests across 1 file. [649.00ms]

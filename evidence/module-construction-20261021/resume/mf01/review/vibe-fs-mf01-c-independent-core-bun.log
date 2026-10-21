@@ -1,0 +1,16 @@
+bun test v1.3.14 (d1632b29)
+
+../../../../private/tmp/vibe-fs-mf01-c-independent.test.mjs:
+{"evidence":"owned-opened","runtime":"Bun","pid":60425,"runId":"4ac89dba-0026-4fdc-a997-9aa34f900ef9","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-c-independent-obnvPw"}
+{"evidence":"buffered-expiry","kind":"callable-offer","pid":60425,"observed":{"phase":"Active","native":"Running","absent":false,"watchdogBefore":false,"commandId":null},"reply":{"error":"OWNER_REVOKED"},"acceptedRecords":[]}
+{"evidence":"owned-cleanup","runtime":"Bun","pid":60425,"state":{"phase":"Closed","pid":60425,"exit":{"code":null,"signal":"SIGKILL"},"failure":null,"stdin":"Closed","stdout":{"observed":442,"retained":442},"stderr":{"observed":0,"retained":0}},"absent":true,"faults":[]}
+(pass) independent actual buffered callable-offer cannot outrun a past reset before the timer callback [55.68ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":60430,"runId":"7e194d13-335a-4739-b609-3bba1a49e93c","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-c-independent-tkLFiP"}
+{"evidence":"buffered-expiry","kind":"callable-reply","pid":60430,"observed":{"phase":"Active","native":"Running","absent":false,"watchdogBefore":false,"commandId":2},"reply":{"error":"OWNER_REVOKED"},"acceptedRecords":[{"operation":"cat","path":"seed","accepted":true},{"operation":"write","path":"write-1","bytes":8,"accepted":true}]}
+{"evidence":"owned-cleanup","runtime":"Bun","pid":60430,"state":{"phase":"Closed","pid":60430,"exit":{"code":null,"signal":"SIGKILL"},"failure":null,"stdin":"Closed","stdout":{"observed":1554,"retained":1554},"stderr":{"observed":0,"retained":0}},"absent":true,"faults":[]}
+(pass) independent actual buffered callable-reply cannot outrun a past reset before the timer callback [53.15ms]
+{"evidence":"all-owned-absent","runtime":"Bun","owned":[{"pid":60425,"runId":"4ac89dba-0026-4fdc-a997-9aa34f900ef9","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-c-independent-obnvPw"},{"pid":60430,"runId":"7e194d13-335a-4739-b609-3bba1a49e93c","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-c-independent-tkLFiP"}]}
+
+ 2 pass
+ 0 fail
+Ran 2 tests across 1 file. [142.00ms]

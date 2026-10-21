@@ -1,0 +1,47 @@
+TAP version 13
+# {"evidence":"legacy-second-authority","hostRemaining":1303,"watchdog":false,"result":{"kind":"GuestFailure","error":{"name":"Error","message":"Script execution timed out","code":"ERR_SCRIPT_EXECUTION_TIMEOUT"}},"callback":{"error":"PROGRAM_SETTLED"}}
+# {"runtime":"22.13.0","pid":54325,"runId":"bf249744-90e8-49f4-a225-81b4427d8b2d","exit":{"code":1,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+# Subtest: baseline Host-only watchdog extension cannot keep the legacy guest epoch alive
+not ok 1 - baseline Host-only watchdog extension cannot keep the legacy guest epoch alive
+  ---
+  duration_ms: 474.34775
+  location: '/private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:59:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    a Host extension must permit the original callback without a guest epoch message
+    + actual - expected
+    
+      {
+    +   error: 'PROGRAM_SETTLED'
+    -   value: {
+    -     calls: 1,
+    -     text: 'actual'
+    -   }
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    value:
+      text: 'actual'
+      calls: 1
+  actual:
+    error: 'PROGRAM_SETTLED'
+  operator: 'deepStrictEqual'
+  stack: |-
+    file:///private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:66:14
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async withOwner (file:///private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:18:5)
+    async TestContext.<anonymous> (file:///private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:60:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 554.784416

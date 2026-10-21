@@ -1,0 +1,43 @@
+bun test v1.3.14 (d1632b29)
+
+deadline.test.mjs:
+killed 1 dangling process
+(fail) single owner legal 61-second async borrow crosses old epoch then writes and restores original budget [5000.19ms]
+  ^ this test timed out after 5000ms, before its done callback was called. If a done callback was not intended, remove the last parameter from the test callback function
+{"evidence":"original-budget-restored","saved":345,"elapsed":355.297458,"acceptedSettled":true}
+{"runtime":"Bun","pid":55734,"runId":"2bbfb56b-fac8-401f-a0ed-649c41711afc","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner final release restores first remaining budget and real guest exhausts it without a second write [1152.78ms]
+{"runtime":"Bun","pid":55747,"runId":"9ac8d337-0217-4044-8833-5457694a4577","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner parallel leases release short then long without a second base snapshot [968.31ms]
+{"runtime":"Bun","pid":55753,"runId":"3d8e3f90-2ea0-4760-bb1d-513c36ad1920","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner parallel leases release long then short without a second base snapshot [951.74ms]
+{"runtime":"Bun","pid":55758,"runId":"16a0134d-9b5a-4e6c-875f-b1f60b3b9ba2","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner reset during borrow replaces only saved base and final release exposes reset budget [853.05ms]
+{"runtime":"Bun","pid":55769,"runId":"25c9b3bf-2277-4094-a2bb-c237bce86344","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner past reset under live lease protects admitted work then expires on final release [360.44ms]
+{"runtime":"Bun","pid":55773,"runId":"698f0d55-8f2f-4041-a4c6-066aee86c176","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner past then future reset in one Host turn re-arms before admission as production 028 permits [49.80ms]
+{"runtime":"Bun","pid":55777,"runId":"23399ae6-11f5-40ca-9e2d-97c6fd98dda5","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner expired reset refuses next capability and Closing cannot be re-armed [43.83ms]
+{"runtime":"Bun","pid":55781,"runId":"336d2a9a-9fb5-48c4-b1c0-bbd767ccce63","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner timer chunks a far future epoch without overflow expiry [91.52ms]
+{"runtime":"Bun","pid":55785,"runId":"54968e43-eddb-4a3f-95d3-482b37ff075f","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner updates while guest CPU loop cannot read any epoch message [493.29ms]
+{"evidence":"buffered-expiry-admission","kind":"request","observed":{"phase":"Active","native":"Running","absent":false,"beforeExpiry":false},"published":"TimedOut"}
+{"runtime":"Bun","pid":55790,"runId":"36172350-4ae7-42bd-a70d-5cc17e8ed209","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner rejects a real buffered request after epoch expires before timer dispatch [39.77ms]
+{"evidence":"buffered-expiry-admission","kind":"result","observed":{"phase":"Active","native":"Running","absent":false,"beforeExpiry":false},"published":"TimedOut"}
+{"runtime":"Bun","pid":55794,"runId":"c81388a1-445a-4e12-af72-903e8629b599","exit":{"code":0,"signal":null},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner rejects a real buffered result after epoch expires before timer dispatch [42.40ms]
+{"runtime":"Bun","pid":55798,"runId":"cdeff937-3ef6-4153-8549-ec756b271a19","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner real T park survives original epoch and resumes original closure under new budget [620.93ms]
+{"runtime":"Bun","pid":55806,"runId":"925729cb-4ec7-4c76-a358-43a82927df6d","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner pre-existing lease releases while physically parked without killing original callback [577.48ms]
+{"runtime":"Bun","pid":55814,"runId":"aa518619-8ab4-4415-8ffc-13c3ae7dbf2f","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner fixed cleanup retires old lease and cleanup borrow cannot extend a looping finally [763.41ms]
+{"runtime":"Bun","pid":55828,"runId":"a31f5f02-a930-4268-b0f2-2296fbf042d4","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner derived membrane keeps constructor reachability and captured WeakMap boundary [48.72ms]
+
+ 15 pass
+ 1 fail
+Ran 16 tests across 1 file. [12.17s]

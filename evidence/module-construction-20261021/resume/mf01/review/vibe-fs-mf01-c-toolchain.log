@@ -1,0 +1,6 @@
+{"fable":"3.8.1","esbuild":"0.28.2","fableLibrary":"2.8.1"}
+7c2375c4963c0a7205999367ffd031ebf4f92dc6f16410fa93f3088ddb655880  node_modules/@fable-org/fable-compiler-js/index.js
+4423e6e6cbdbe153b9688c79881d82d7444fcbb05abe4af6daa50d3f5710d9c1  node_modules/@fable-org/fable-compiler-js/package.json
+61ec0ba144ff93f4bf0e96ad6fab6f430ede0aa13e27ace8063ed63ba416b3cd  node_modules/esbuild/lib/main.js
+9d0bc453f4e791553c4cc2298ba023b409241fd9801e494741666eb0f6051490  node_modules/esbuild/package.json
+9c4c377d94adf1dd304b8e99aee080b158ed0247eb2b004b8eb98039882be355  node_modules/@fable-org/fable-library-js/package.json

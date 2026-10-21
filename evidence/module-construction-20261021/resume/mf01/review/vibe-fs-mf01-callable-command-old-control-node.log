@@ -1,0 +1,22 @@
+TAP version 13
+# {"evidence":"actual-old-compiled-workflow","kind":"class-instance","case":"Succeeded","rendered":"\# ok\\n\\n[data]\\ntoJSONCalls = 0\\n[data.result]\\nok = true\\nstatus = \\"completed\\"\\nexitCode = 0\\nscopeClosed = true\\nendUnconfirmed = false\\noutputComplete = true\\nstdout = \\"\\"\\nstderr = \\"\\"\\ntruncated = false\\nbytes = 0\\ndurationMs = 93\\nsteps = 3\\nnotStarted = false\\ndiagnosticTruncated = false\\noutputNotice = \\"\\"\\n"}
+# Subtest: old compiled Workflow accepts own spawn fields from class-instance without toJSON projection
+ok 1 - old compiled Workflow accepts own spawn fields from class-instance without toJSON projection
+  ---
+  duration_ms: 120.647
+  ...
+# {"evidence":"actual-old-compiled-workflow","kind":"plain-toJSON","case":"Succeeded","rendered":"\# ok\\n\\n[data]\\ntoJSONCalls = 0\\n[data.result]\\nok = true\\nstatus = \\"completed\\"\\nexitCode = 0\\nscopeClosed = true\\nendUnconfirmed = false\\noutputComplete = true\\nstdout = \\"\\"\\nstderr = \\"\\"\\ntruncated = false\\nbytes = 0\\ndurationMs = 82\\nsteps = 3\\nnotStarted = false\\ndiagnosticTruncated = false\\noutputNotice = \\"\\"\\n"}
+# Subtest: old compiled Workflow accepts own spawn fields from plain-toJSON without toJSON projection
+ok 2 - old compiled Workflow accepts own spawn fields from plain-toJSON without toJSON projection
+  ---
+  duration_ms: 89.984417
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 411.140833

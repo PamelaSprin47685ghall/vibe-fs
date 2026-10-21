@@ -1,0 +1,14 @@
+{
+  "oldGeneration": 107,
+  "newGeneration": 108,
+  "oldOutputs": 783,
+  "newOutputs": 783,
+  "changed": [],
+  "added": [],
+  "removed": [],
+  "compilerInputDigestUnchanged": true,
+  "artifactInputDigestUnchanged": true,
+  "oldGeneratedDigest": "e0021acdbc4dec32778657413ea92483a05f4ecc4f1377a7531001793a4324e5",
+  "newGeneratedDigest": "b05d8a07e24a94bddcedeaf27a7769747d2291e61d2bd2d687ce03bd7bdcb794",
+  "scope": "manifest.outputs only; artifact input digest separately, not raw byte equality of all dependency bundles"
+}

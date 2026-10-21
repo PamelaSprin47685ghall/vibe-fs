@@ -1,0 +1,33 @@
+TAP version 13
+# Subtest: gate1 wire keeps absence/undefined and Unicode split bytes, rejects non-data without JSON coercion
+ok 1 - gate1 wire keeps absence/undefined and Unicode split bytes, rejects non-data without JSON coercion
+  ---
+  duration_ms: 2.919709
+  ...
+# {"runtime":"22.13.0","pid":66816,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate1 actual sync Host write and simultaneous async cat preserve complete large Unicode replies
+ok 2 - gate1 actual sync Host write and simultaneous async cat preserve complete large Unicode replies
+  ---
+  duration_ms: 274.300875
+  ...
+# {"runtime":"22.13.0","pid":66821,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+# Subtest: gate1 accepted sync write with lost reply remains once, Host responsive, external deadline witnesses actual close
+ok 3 - gate1 accepted sync write with lost reply remains once, Host responsive, external deadline witnesses actual close
+  ---
+  duration_ms: 325.477916
+  ...
+# {"runtime":"22.13.0","pid":66834,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+# Subtest: gate1 after-await runaway does not block Host and is physically terminated by its external owner
+ok 4 - gate1 after-await runaway does not block Host and is physically terminated by its external owner
+  ---
+  duration_ms: 317.043125
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1053.898875

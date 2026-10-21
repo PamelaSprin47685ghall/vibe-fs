@@ -1,0 +1,66 @@
+TAP version 13
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48839,"runId":"2804ef06-0071-4a7d-96ee-4af8bd8a921d","phase":"Closed","exit":{"code":0,"signal":null},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-xZKr6A"}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48836,"runId":"3cb0e049-5505-49c2-afe2-7501b000e003","phase":"Closed","exit":{"code":0,"signal":null},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-x2LpvW"}
+# Subtest: independent exact park site rejects copied and foreign owner references without consuming the current site
+ok 1 - independent exact park site rejects copied and foreign owner references without consuming the current site
+  ---
+  duration_ms: 148.374708
+  ...
+# {"evidence":"runaway-terminal","name":"synchronous body","runtime":"22.13.0","pid":48851,"result":{"kind":"TimedOut","state":{"phase":"Closed","pid":48851,"exit":{"code":null,"signal":"SIGKILL"},"failure":null,"stdin":"Closed","stdout":{"observed":168,"retained":168},"stderr":{"observed":0,"retained":0}}}}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48851,"runId":"a5b05bd9-3236-46de-a516-1d422428c1c2","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-EjOdCD"}
+# Subtest: independent external owner closes synchronous body runaway while Host remains responsive
+ok 2 - independent external owner closes synchronous body runaway while Host remains responsive
+  ---
+  duration_ms: 308.119041
+  ...
+# {"evidence":"runaway-terminal","name":"after-await returned getter","runtime":"22.13.0","pid":48854,"result":{"kind":"TimedOut","state":{"phase":"Closed","pid":48854,"exit":{"code":null,"signal":"SIGKILL"},"failure":null,"stdin":"Closed","stdout":{"observed":437,"retained":437},"stderr":{"observed":0,"retained":0}}}}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48854,"runId":"9c657764-5357-412e-a502-4e7197f353f8","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-dKFUEu"}
+# Subtest: independent external owner closes after-await returned getter runaway while Host remains responsive
+ok 3 - independent external owner closes after-await returned getter runaway while Host remains responsive
+  ---
+  duration_ms: 311.155
+  ...
+# {"evidence":"runaway-terminal","name":"after-await returned toJSON","runtime":"22.13.0","pid":48865,"result":{"kind":"TimedOut","state":{"phase":"Closed","pid":48865,"exit":{"code":null,"signal":"SIGKILL"},"failure":null,"stdin":"Closed","stdout":{"observed":437,"retained":437},"stderr":{"observed":0,"retained":0}}}}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48865,"runId":"c0db9e0f-fb80-4311-b306-46c2345f1e1b","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-Dywywx"}
+# Subtest: independent external owner closes after-await returned toJSON runaway while Host remains responsive
+ok 4 - independent external owner closes after-await returned toJSON runaway while Host remains responsive
+  ---
+  duration_ms: 321.130209
+  ...
+# {"evidence":"runaway-terminal","name":"after-await thenable getter","runtime":"22.13.0","pid":48871,"result":{"kind":"GuestFailure","error":{"name":"Error","message":"Script execution timed out after 247ms","code":"ERR_SCRIPT_EXECUTION_TIMEOUT"}}}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48871,"runId":"9c12c8ca-2ba4-431b-a562-bed4c4c87af7","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-N7nGmm"}
+# Subtest: independent external owner closes after-await thenable getter runaway while Host remains responsive
+ok 5 - independent external owner closes after-await thenable getter runaway while Host remains responsive
+  ---
+  duration_ms: 307.930375
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48874,"runId":"bf6c10f7-dba5-4190-b29d-6b2ce5fdcc66","phase":"Closed","exit":{"code":0,"signal":null},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-5XQ9y8"}
+# Subtest: independent abandon runs original finally with legitimate synchronous Host effects and refuses another park
+ok 6 - independent abandon runs original finally with legitimate synchronous Host effects and refuses another park
+  ---
+  duration_ms: 83.760625
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48883,"runId":"9f6ebc63-d0e1-4ab8-923f-91049d3b5981","phase":"Closed","exit":{"code":0,"signal":null},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-U4oyCF"}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48880,"runId":"7c9c5dfc-2ffc-46c1-9b70-0139c92a4f6d","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-Ci7Ihs"}
+# Subtest: independent accepted old async reply after close cannot reach a fresh owner with the same request ordinal
+ok 7 - independent accepted old async reply after close cannot reach a fresh owner with the same request ordinal
+  ---
+  duration_ms: 306.429541
+  ...
+# {"evidence":"cancel-before-result-dispatch","runtime":"22.13.0","pid":48886,"observed":{"phaseBefore":"Active","nativeBefore":"Running","absentBefore":false,"value":"complete","phaseAfterCancel":"Closing"},"published":"Closed"}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":48886,"runId":"59ab19e7-7db4-4ffb-8cce-1ec7cfc4e037","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-QwkHID"}
+# {"evidence":"all-owned-absent","runtime":"22.13.0","owned":[{"pid":48836,"runId":"3cb0e049-5505-49c2-afe2-7501b000e003","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-x2LpvW"},{"pid":48839,"runId":"2804ef06-0071-4a7d-96ee-4af8bd8a921d","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-xZKr6A"},{"pid":48851,"runId":"a5b05bd9-3236-46de-a516-1d422428c1c2","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-EjOdCD"},{"pid":48854,"runId":"9c657764-5357-412e-a502-4e7197f353f8","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-dKFUEu"},{"pid":48865,"runId":"c0db9e0f-fb80-4311-b306-46c2345f1e1b","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-Dywywx"},{"pid":48871,"runId":"9c12c8ca-2ba4-431b-a562-bed4c4c87af7","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-N7nGmm"},{"pid":48874,"runId":"bf6c10f7-dba5-4190-b29d-6b2ce5fdcc66","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-5XQ9y8"},{"pid":48880,"runId":"7c9c5dfc-2ffc-46c1-9b70-0139c92a4f6d","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-Ci7Ihs"},{"pid":48883,"runId":"9f6ebc63-d0e1-4ab8-923f-91049d3b5981","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-U4oyCF"},{"pid":48886,"runId":"59ab19e7-7db4-4ffb-8cce-1ec7cfc4e037","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-QwkHID"}]}
+# Subtest: independent a real result chunk observed after owner cancellation cannot publish Result
+ok 8 - independent a real result chunk observed after owner cancellation cannot publish Result
+  ---
+  duration_ms: 53.957667
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1907.359125

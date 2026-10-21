@@ -1,0 +1,265 @@
+TAP version 13
+# {"runtime":"22.13.0","pid":54423,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+# Subtest: Callable Host explicitly constructs separate proof/execution; raw closure args and receiver remain guest
+ok 1 - Callable Host explicitly constructs separate proof/execution; raw closure args and receiver remain guest
+  ---
+  duration_ms: 80.29575
+  ...
+# {"runtime":"22.13.0","pid":54431,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+# Subtest: Callable readSpec preserves missing/invalid failures without function or Proxy JSON coercion
+ok 2 - Callable readSpec preserves missing/invalid failures without function or Proxy JSON coercion
+  ---
+  duration_ms: 65.475
+  ...
+# {"runtime":"22.13.0","pid":54437,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+# Subtest: Callable proof accepts object veto and evaluates abort getter only inside guest
+ok 3 - Callable proof accepts object veto and evaluates abort getter only inside guest
+  ---
+  duration_ms: 60.603625
+  ...
+# {"runtime":"22.13.0","pid":54440,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+# Subtest: Callable stale/forged refs and wrong proof thunks cannot settle a fresh offer
+ok 4 - Callable stale/forged refs and wrong proof thunks cannot settle a fresh offer
+  ---
+  duration_ms: 90.00875
+  ...
+# {"runtime":"22.13.0","pid":54443,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+# Subtest: Callable accepted method with lost reply has one actual mutation and no replay after close
+ok 5 - Callable accepted method with lost reply has one actual mutation and no replay after close
+  ---
+  duration_ms: 567.039333
+  ...
+# {"runtime":"22.13.0","pid":54458,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":false,"faults":[]}
+# {"runtime":"22.13.0","pid":54464,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+# Subtest: Callable reference from a closed physical run cannot address a new run using the same local id
+ok 6 - Callable reference from a closed physical run cannot address a new run using the same local id
+  ---
+  duration_ms: 149.905041
+  ...
+# {"runtime":"22.13.0","pid":54473,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+# Subtest: Callable lost finish confirmation consumes the exact offer once and cannot settle its successor
+ok 7 - Callable lost finish confirmation consumes the exact offer once and cannot settle its successor
+  ---
+  duration_ms: 71.217042
+  ...
+# {"runtime":"22.13.0","pid":54478,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"faults":[]}
+# Subtest: Callable caught abandon keeps Abandoned and native finally performs actual Host write/rm
+ok 8 - Callable caught abandon keeps Abandoned and native finally performs actual Host write/rm
+  ---
+  duration_ms: 90.488625
+  ...
+# {"runtime":"22.13.0","pid":54489,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+# Subtest: Callable looping finally closes physically without claiming the program settled or cleanup completed
+ok 9 - Callable looping finally closes physically without claiming the program settled or cleanup completed
+  ---
+  duration_ms: 425.665042
+  ...
+# {"runtime":"22.13.0","pid":54511,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+# Subtest: Callable external owner cuts off guest constructor without blocking Host
+ok 10 - Callable external owner cuts off guest constructor without blocking Host
+  ---
+  duration_ms: 421.626208
+  ...
+# {"runtime":"22.13.0","pid":54516,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+# Subtest: Callable external owner cuts off guest getter without blocking Host
+ok 11 - Callable external owner cuts off guest getter without blocking Host
+  ---
+  duration_ms: 419.965708
+  ...
+# {"runtime":"22.13.0","pid":54524,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+# Subtest: Callable external owner cuts off guest sanity thunk without blocking Host
+ok 12 - Callable external owner cuts off guest sanity thunk without blocking Host
+  ---
+  duration_ms: 419.269584
+  ...
+# {"runtime":"22.13.0","pid":54539,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+# Subtest: Callable external owner cuts off guest watch abort getter without blocking Host
+ok 13 - Callable external owner cuts off guest watch abort getter without blocking Host
+  ---
+  duration_ms: 407.387625
+  ...
+# {"runtime":"22.13.0","pid":54543,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+# Subtest: Callable external owner cuts off guest after-await method without blocking Host
+ok 14 - Callable external owner cuts off guest after-await method without blocking Host
+  ---
+  duration_ms: 416.420084
+  ...
+# {"runtime":"22.13.0","pid":54546,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+# Subtest: Callable external owner cuts off guest thenable assimilation without blocking Host
+ok 15 - Callable external owner cuts off guest thenable assimilation without blocking Host
+  ---
+  duration_ms: 453.912667
+  ...
+# {"runtime":"22.13.0","pid":54549,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[]}
+# Subtest: Callable external owner cuts off guest toJSON without blocking Host
+ok 16 - Callable external owner cuts off guest toJSON without blocking Host
+  ---
+  duration_ms: 410.542416
+  ...
+# Subtest: gate1 wire keeps absence/undefined and Unicode split bytes, rejects non-data without JSON coercion
+ok 17 - gate1 wire keeps absence/undefined and Unicode split bytes, rejects non-data without JSON coercion
+  ---
+  duration_ms: 2.122542
+  ...
+# {"runtime":"22.13.0","pid":54424,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate1 actual sync Host write and simultaneous async cat preserve complete large Unicode replies
+ok 18 - gate1 actual sync Host write and simultaneous async cat preserve complete large Unicode replies
+  ---
+  duration_ms: 115.474125
+  ...
+# {"runtime":"22.13.0","pid":54434,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+# Subtest: gate1 accepted sync write with lost reply remains once, Host responsive, external deadline witnesses actual close
+ok 19 - gate1 accepted sync write with lost reply remains once, Host responsive, external deadline witnesses actual close
+  ---
+  duration_ms: 309.628292
+  ...
+# {"runtime":"22.13.0","pid":54448,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+# Subtest: gate1 after-await runaway does not block Host and is physically terminated by its external owner
+ok 20 - gate1 after-await runaway does not block Host and is physically terminated by its external owner
+  ---
+  duration_ms: 309.618042
+  ...
+# {"runtime":"22.13.0","pid":54452,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 observed physical park resumes one original continuation with >pipe payload and immediate legitimate sync write
+ok 21 - gate2 observed physical park resumes one original continuation with >pipe payload and immediate legitimate sync write
+  ---
+  duration_ms: 134.758833
+  ...
+# {"runtime":"22.13.0","pid":54461,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 ready-proven TERM-resistant stopped owner requires actual KILL and EOF, never a request-only terminal
+ok 22 - gate2 ready-proven TERM-resistant stopped owner requires actual KILL and EOF, never a request-only terminal
+  ---
+  duration_ms: 108.197583
+  ...
+# {"runtime":"22.13.0","pid":54470,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 an accepted async result settles while stopped and its original response survives resume
+ok 23 - gate2 an accepted async result settles while stopped and its original response survives resume
+  ---
+  duration_ms: 184.406375
+  ...
+# {"runtime":"22.13.0","pid":54486,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 again-park has a new exact site and a consumed old site cannot resume the successor
+ok 24 - gate2 again-park has a new exact site and a consumed old site cannot resume the successor
+  ---
+  duration_ms: 90.764375
+  ...
+# mkfifo: /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-foreign-fifo-Iggx7y/sync-reply: File exists
+# Subtest: boundary startup ENOENT and ready timeout reclaim only their exact process and private FIFO descriptor
+ok 25 - boundary startup ENOENT and ready timeout reclaim only their exact process and private FIFO descriptor
+  ---
+  duration_ms: 247.980791
+  ...
+# Subtest: boundary injected unreadable close receipt retains ClosingUnknown and descriptor until real close can be observed
+ok 26 - boundary injected unreadable close receipt retains ClosingUnknown and descriptor until real close can be observed
+  ---
+  duration_ms: 87.581
+  ...
+# {"evidence":"long-light-interaction","elapsed":61058.781083,"originalEpoch":1792551926549,"beforeBorrow":1497,"restoredRemaining":1497,"pid":54428}
+# {"runtime":"22.13.0","pid":54428,"runId":"8d7fb7cd-576e-4959-8319-8dce15aa48dd","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+# Subtest: single owner legal 61-second async borrow crosses old epoch then writes and restores original budget
+ok 27 - single owner legal 61-second async borrow crosses old epoch then writes and restores original budget
+  ---
+  duration_ms: 61133.822167
+  ...
+# {"evidence":"original-budget-restored","saved":348,"elapsed":350.0246249999982,"acceptedSettled":true}
+# {"runtime":"22.13.0","pid":54789,"runId":"16443d53-9eff-4031-9fcf-030f99b2d6ef","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+# Subtest: single owner final release restores first remaining budget and real guest exhausts it without a second write
+ok 28 - single owner final release restores first remaining budget and real guest exhausts it without a second write
+  ---
+  duration_ms: 1160.415667
+  ...
+# {"runtime":"22.13.0","pid":54792,"runId":"ed8123b6-2e42-43b7-881d-7f57e3f3ebb2","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+# Subtest: single owner parallel leases release short then long without a second base snapshot
+ok 29 - single owner parallel leases release short then long without a second base snapshot
+  ---
+  duration_ms: 968.674709
+  ...
+# {"runtime":"22.13.0","pid":54802,"runId":"77877aaf-26f2-42ac-875f-3cdb6fa0da9b","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+# Subtest: single owner parallel leases release long then short without a second base snapshot
+ok 30 - single owner parallel leases release long then short without a second base snapshot
+  ---
+  duration_ms: 959.4075
+  ...
+# {"runtime":"22.13.0","pid":54805,"runId":"96414630-d9ef-4bc4-87f4-bf061c4cc08c","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+# Subtest: single owner reset during borrow replaces only saved base and final release exposes reset budget
+ok 31 - single owner reset during borrow replaces only saved base and final release exposes reset budget
+  ---
+  duration_ms: 907.887
+  ...
+# {"runtime":"22.13.0","pid":54810,"runId":"2a61f648-bb57-4e31-b321-357bf28245de","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+# Subtest: single owner past reset under live lease protects admitted work then expires on final release
+ok 32 - single owner past reset under live lease protects admitted work then expires on final release
+  ---
+  duration_ms: 423.892833
+  ...
+# {"runtime":"22.13.0","pid":54813,"runId":"30f3c5ab-b994-4543-abaa-69415ee14c33","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+# Subtest: single owner past then future reset in one Host turn re-arms before admission as production 028 permits
+ok 33 - single owner past then future reset in one Host turn re-arms before admission as production 028 permits
+  ---
+  duration_ms: 59.70225
+  ...
+# {"runtime":"22.13.0","pid":54816,"runId":"034ad94c-375e-497e-ac33-3bb2c22793e8","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+# Subtest: single owner expired reset refuses next capability and Closing cannot be re-armed
+ok 34 - single owner expired reset refuses next capability and Closing cannot be re-armed
+  ---
+  duration_ms: 56.8315
+  ...
+# {"runtime":"22.13.0","pid":54819,"runId":"c4186bc3-58c7-4533-bf5e-caf5cb06f9bb","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+# Subtest: single owner timer chunks a far future epoch without overflow expiry
+ok 35 - single owner timer chunks a far future epoch without overflow expiry
+  ---
+  duration_ms: 99.833333
+  ...
+# {"runtime":"22.13.0","pid":54822,"runId":"79c53b75-e673-457b-bbb2-b24f9057dbd4","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+# Subtest: single owner updates while guest CPU loop cannot read any epoch message
+ok 36 - single owner updates while guest CPU loop cannot read any epoch message
+  ---
+  duration_ms: 509.683167
+  ...
+# {"evidence":"buffered-expiry-admission","kind":"request","observed":{"phase":"Active","native":"Running","absent":false,"beforeExpiry":false},"published":"TimedOut"}
+# {"runtime":"22.13.0","pid":54834,"runId":"de484a51-1579-4a00-98b3-d06b5db075b3","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+# Subtest: single owner rejects a real buffered request after epoch expires before timer dispatch
+ok 37 - single owner rejects a real buffered request after epoch expires before timer dispatch
+  ---
+  duration_ms: 68.251833
+  ...
+# {"evidence":"buffered-expiry-admission","kind":"result","observed":{"phase":"Active","native":"Running","absent":false,"beforeExpiry":false},"published":"TimedOut"}
+# {"runtime":"22.13.0","pid":54837,"runId":"7a1ff1f7-25ca-48d4-9f8a-d553ac8ea167","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+# Subtest: single owner rejects a real buffered result after epoch expires before timer dispatch
+ok 38 - single owner rejects a real buffered result after epoch expires before timer dispatch
+  ---
+  duration_ms: 62.486333
+  ...
+# {"runtime":"22.13.0","pid":54840,"runId":"a5abf201-7cda-4ad3-8208-8acc3ee491e4","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+# Subtest: single owner real T park survives original epoch and resumes original closure under new budget
+ok 39 - single owner real T park survives original epoch and resumes original closure under new budget
+  ---
+  duration_ms: 630.821833
+  ...
+# {"runtime":"22.13.0","pid":54847,"runId":"a9c49c41-f8d3-49c8-aceb-bc2bd0379c72","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+# Subtest: single owner pre-existing lease releases while physically parked without killing original callback
+ok 40 - single owner pre-existing lease releases while physically parked without killing original callback
+  ---
+  duration_ms: 575.360333
+  ...
+# {"runtime":"22.13.0","pid":54854,"runId":"d4869c91-20a0-4148-bf97-180c7356be44","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+# Subtest: single owner fixed cleanup retires old lease and cleanup borrow cannot extend a looping finally
+ok 41 - single owner fixed cleanup retires old lease and cleanup borrow cannot extend a looping finally
+  ---
+  duration_ms: 777.162958
+  ...
+# {"runtime":"22.13.0","pid":54862,"runId":"9a633104-d18d-4a20-9e7f-49ddb8629de2","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+# Subtest: single owner derived membrane keeps constructor reachability and captured WeakMap boundary
+ok 42 - single owner derived membrane keeps constructor reachability and captured WeakMap boundary
+  ---
+  duration_ms: 62.545083
+  ...
+1..42
+# tests 42
+# suites 0
+# pass 42
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 68540.007833

@@ -1,0 +1,59 @@
+bun test v1.3.14 (d1632b29)
+
+deadline.test.mjs:
+{"evidence":"owned-opened","runtime":"Bun","pid":57123,"runId":"445f2a91-9850-4234-b5fd-d207931de2f3","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-zYI2tv","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-zYI2tv/sync-reply"}
+{"evidence":"long-light-interaction","elapsed":61060.535041999996,"originalEpoch":1792552368475,"beforeBorrow":1494,"restoredRemaining":1494,"pid":57123}
+{"runtime":"Bun","pid":57123,"runId":"445f2a91-9850-4234-b5fd-d207931de2f3","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner legal 61-second async borrow crosses old epoch then writes and restores original budget [61146.46ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57559,"runId":"95b6b047-3528-43eb-9cc2-0834460a78da","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-qUEhHA","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-qUEhHA/sync-reply"}
+{"evidence":"original-budget-restored","saved":344,"elapsed":349.5687919999982,"acceptedSettled":true}
+{"runtime":"Bun","pid":57559,"runId":"95b6b047-3528-43eb-9cc2-0834460a78da","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner final release restores first remaining budget and real guest exhausts it without a second write [1156.32ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57570,"runId":"0e0bbcf6-7da5-4633-8bbe-8685793492aa","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-zslSry","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-zslSry/sync-reply"}
+{"runtime":"Bun","pid":57570,"runId":"0e0bbcf6-7da5-4633-8bbe-8685793492aa","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner parallel leases release short then long without a second base snapshot [964.53ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57574,"runId":"61864d35-8ae2-4691-b02e-8abb7d499e71","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-tfQi23","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-tfQi23/sync-reply"}
+{"runtime":"Bun","pid":57574,"runId":"61864d35-8ae2-4691-b02e-8abb7d499e71","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner parallel leases release long then short without a second base snapshot [952.62ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57578,"runId":"fd8371dd-4a14-4808-84b2-f525284811df","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-qnUvas","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-qnUvas/sync-reply"}
+{"runtime":"Bun","pid":57578,"runId":"fd8371dd-4a14-4808-84b2-f525284811df","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner reset during borrow replaces only saved base and final release exposes reset budget [851.43ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57596,"runId":"a627619e-ff8b-464f-a1db-74a007d3154d","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-jOfyS4","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-jOfyS4/sync-reply"}
+{"runtime":"Bun","pid":57596,"runId":"a627619e-ff8b-464f-a1db-74a007d3154d","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner past reset under live lease protects admitted work then expires on final release [357.10ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57607,"runId":"997c5c16-86c7-4dd5-8364-13c517c5ddb0","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-ypI7c3","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-ypI7c3/sync-reply"}
+{"runtime":"Bun","pid":57607,"runId":"997c5c16-86c7-4dd5-8364-13c517c5ddb0","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner past then future reset in one Host turn re-arms before admission as production 028 permits [48.76ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57611,"runId":"6fc3262a-bc28-4155-b21e-33f3f1d92797","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-J57ogw","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-J57ogw/sync-reply"}
+{"runtime":"Bun","pid":57611,"runId":"6fc3262a-bc28-4155-b21e-33f3f1d92797","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner expired reset refuses next capability and Closing cannot be re-armed [42.14ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57615,"runId":"14d1a59d-6ea5-426f-a50d-241f5c28be9f","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-CFh2bi","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-CFh2bi/sync-reply"}
+{"runtime":"Bun","pid":57615,"runId":"14d1a59d-6ea5-426f-a50d-241f5c28be9f","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner timer chunks a far future epoch without overflow expiry [89.83ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57620,"runId":"fb1d4fcc-d09b-487c-9672-ba5ff010de28","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-ALVQ8f","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-ALVQ8f/sync-reply"}
+{"runtime":"Bun","pid":57620,"runId":"fb1d4fcc-d09b-487c-9672-ba5ff010de28","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner updates while guest CPU loop cannot read any epoch message [495.38ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57625,"runId":"9b77d4c3-024a-4d7c-a5fc-22f5d35a4191","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-szoaSf","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-szoaSf/sync-reply"}
+{"evidence":"buffered-expiry-admission","kind":"request","observed":{"phase":"Active","native":"Running","absent":false,"beforeExpiry":false},"published":"TimedOut"}
+{"runtime":"Bun","pid":57625,"runId":"9b77d4c3-024a-4d7c-a5fc-22f5d35a4191","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner rejects a real buffered request after epoch expires before timer dispatch [38.42ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57629,"runId":"e87477f4-a831-4edc-bd30-247d736a3d8d","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-CcOsWt","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-CcOsWt/sync-reply"}
+{"evidence":"buffered-expiry-admission","kind":"result","observed":{"phase":"Active","native":"Running","absent":false,"beforeExpiry":false},"published":"TimedOut"}
+{"runtime":"Bun","pid":57629,"runId":"e87477f4-a831-4edc-bd30-247d736a3d8d","exit":{"code":0,"signal":null},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner rejects a real buffered result after epoch expires before timer dispatch [42.96ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57633,"runId":"b8f21e66-75ec-44a0-ad3d-db4d31d75258","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-nl72Jr","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-nl72Jr/sync-reply"}
+{"runtime":"Bun","pid":57633,"runId":"b8f21e66-75ec-44a0-ad3d-db4d31d75258","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner real T park survives original epoch and resumes original closure under new budget [609.43ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57642,"runId":"8bd236d5-4298-41af-b79b-d47a1426e9d1","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-JwhGxO","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-JwhGxO/sync-reply"}
+{"runtime":"Bun","pid":57642,"runId":"8bd236d5-4298-41af-b79b-d47a1426e9d1","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner pre-existing lease releases while physically parked without killing original callback [563.45ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57650,"runId":"a312c03c-4ab1-4b77-b755-e1cc624ee616","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-ux8XlK","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-ux8XlK/sync-reply"}
+{"runtime":"Bun","pid":57650,"runId":"a312c03c-4ab1-4b77-b755-e1cc624ee616","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"faults":[],"businessSettled":false}
+(pass) single owner fixed cleanup retires old lease and cleanup borrow cannot extend a looping finally [757.46ms]
+{"evidence":"owned-opened","runtime":"Bun","pid":57658,"runId":"0e1ecb6b-660c-4abf-88db-bec1d28b9918","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-aMtVig","fifo":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-deadline-aMtVig/sync-reply"}
+{"runtime":"Bun","pid":57658,"runId":"0e1ecb6b-660c-4abf-88db-bec1d28b9918","exit":{"code":0,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+(pass) single owner derived membrane keeps constructor reachability and captured WeakMap boundary [53.16ms]
+
+ 16 pass
+ 0 fail
+Ran 16 tests across 1 file. [68.21s]

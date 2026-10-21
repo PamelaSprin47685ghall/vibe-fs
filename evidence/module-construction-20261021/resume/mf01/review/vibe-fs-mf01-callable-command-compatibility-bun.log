@@ -1,0 +1,76 @@
+bun test v1.3.14 (d1632b29)
+
+../../../../private/tmp/vibe-fs-mf01-callable-command-compatibility.test.mjs:
+{"evidence":"candidate-command-projection","runtime":"Bun","kind":"class-instance","pid":51753,"result":{"error":{"code":"CALL_RESULT_INVALID","family":"JsFailure","message":"Result is not a plain object"}},"records":[]}
+{"evidence":"compatibility-owned-cleanup","kind":"class-instance","pid":51753,"state":{"phase":"Closed","pid":51753,"exit":{"code":null,"signal":"SIGKILL"},"failure":null,"stdin":"Closed","stdout":{"observed":1094,"retained":1094},"stderr":{"observed":0,"retained":0}},"absent":true}
+24 |         return await this.offerCallable(Work);`, 3000)
+25 |       const ref = await bounded(owner.nextOffer(), 1000, 'OFFER_TIMEOUT')
+26 |       const execution = await owner.callable('construct', ref, { role: 'execution' })
+27 |       const result = await owner.callable('callMethod', execution, { method: 'next', context: null }).then(value => ({ value }), error => ({ error: { code: error.code, family: error.family, message: error.message } }))
+28 |       console.log(JSON.stringify({ evidence: 'candidate-command-projection', runtime: process.versions.bun ? 'Bun' : process.versions.node, kind, pid: owner.pid, result, records: owner.apis.records }))
+29 |       assert.deepEqual(result, { value: { name: 'probe', spawn: 'printf OLD_COMMAND > command.marker' } })
+                  ^
+AssertionError: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: {
++     code: 'CALL_RESULT_INVALID',
++     family: 'JsFailure',
++     message: 'Result is not a plain object'
+-   value: {
+-     name: 'probe',
+-     spawn: 'printf OLD_COMMAND > command.marker'
+    }
+  }
+
+ generatedMessage: true,
+     actual: {
+  error: [Object ...],
+},
+   expected: {
+  value: [Object ...],
+},
+   operator: "deepStrictEqual",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/vibe-fs-mf01-callable-command-compatibility.test.mjs:29:14
+      at processTicksAndRejections (native:7:39)
+(fail) production compatibility requires own command fields from class-instance without generic JSON projection [54.92ms]
+{"evidence":"candidate-command-projection","runtime":"Bun","kind":"plain-toJSON","pid":51757,"result":{"value":{"different":1}},"records":[{"operation":"write","path":"toJSON-called","bytes":7,"accepted":true}]}
+{"evidence":"compatibility-owned-cleanup","kind":"plain-toJSON","pid":51757,"state":{"phase":"Closed","pid":51757,"exit":{"code":null,"signal":"SIGKILL"},"failure":null,"stdin":"Closed","stdout":{"observed":1262,"retained":1262},"stderr":{"observed":0,"retained":0}},"absent":true}
+24 |         return await this.offerCallable(Work);`, 3000)
+25 |       const ref = await bounded(owner.nextOffer(), 1000, 'OFFER_TIMEOUT')
+26 |       const execution = await owner.callable('construct', ref, { role: 'execution' })
+27 |       const result = await owner.callable('callMethod', execution, { method: 'next', context: null }).then(value => ({ value }), error => ({ error: { code: error.code, family: error.family, message: error.message } }))
+28 |       console.log(JSON.stringify({ evidence: 'candidate-command-projection', runtime: process.versions.bun ? 'Bun' : process.versions.node, kind, pid: owner.pid, result, records: owner.apis.records }))
+29 |       assert.deepEqual(result, { value: { name: 'probe', spawn: 'printf OLD_COMMAND > command.marker' } })
+                  ^
+AssertionError: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
+    value: {
++     different: 1
+-     name: 'probe',
+-     spawn: 'printf OLD_COMMAND > command.marker'
+    }
+  }
+
+ generatedMessage: true,
+     actual: {
+  value: [Object ...],
+},
+   expected: {
+  value: [Object ...],
+},
+   operator: "deepStrictEqual",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/vibe-fs-mf01-callable-command-compatibility.test.mjs:29:14
+      at processTicksAndRejections (native:7:39)
+(fail) production compatibility requires own command fields from plain-toJSON without generic JSON projection [42.53ms]
+
+ 0 pass
+ 2 fail
+Ran 2 tests across 1 file. [133.00ms]

@@ -1,0 +1,22 @@
+TAP version 13
+# {"runtime":"22.13.0","pid":71571,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 observed physical park resumes one original continuation with >pipe payload and immediate legitimate sync write
+ok 1 - gate2 observed physical park resumes one original continuation with >pipe payload and immediate legitimate sync write
+  ---
+  duration_ms: 223.706167
+  ...
+# {"runtime":"22.13.0","pid":71638,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 stopped owner can be killed with pending read; STOP or TERM acknowledgement is never closure
+ok 2 - gate2 stopped owner can be killed with pending read; STOP or TERM acknowledgement is never closure
+  ---
+  duration_ms: 117.945792
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 445.732541

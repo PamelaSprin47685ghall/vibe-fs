@@ -1,0 +1,22 @@
+TAP version 13
+# {"runtime":"22.13.0","pid":47470,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: terminal gate accepts business outcome once and revokes late result/failure/activated before native close
+ok 1 - terminal gate accepts business outcome once and revokes late result/failure/activated before native close
+  ---
+  duration_ms: 57.697458
+  ...
+# {"runtime":"22.13.0","pid":47473,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: terminal gate caught abandon remains Abandoned after real finally Host write
+ok 2 - terminal gate caught abandon remains Abandoned after real finally Host write
+  ---
+  duration_ms: 65.994625
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 188.983625

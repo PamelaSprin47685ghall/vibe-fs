@@ -1,0 +1,42 @@
+bun test v1.3.14 (d1632b29)
+
+deadline.test.mjs:
+{"evidence":"legacy-second-authority","hostRemaining":1300,"watchdog":false,"result":{"kind":"GuestFailure","error":{"name":"Error","message":"Script execution timed out","code":"ERR_SCRIPT_EXECUTION_TIMEOUT"}},"callback":{"error":"PROGRAM_SETTLED"}}
+{"runtime":"Bun","pid":54378,"runId":"c8acf15f-7b49-4098-a7ad-d91695bd2739","exit":{"code":1,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+61 |       const { offered, instance } = await begin(owner, scratch, 200)
+62 |       owner.arm(Date.now() + 1500)
+63 |       const callback = await bounded(next(owner, instance).then(value => ({ value }), error => ({ error: error.message })), 2000, 'BASELINE_CALLBACK_TIMEOUT')
+64 |       const result = callback.error ? await owner.result.promise : null
+65 |       console.log(JSON.stringify({ evidence: 'legacy-second-authority', hostRemaining: owner.lastDeadline - Date.now(), watchdog: owner.watchdogFired, result, callback }))
+66 |       assert.deepEqual(callback, { value: { text: 'actual', calls: 1 } }, 'a Host extension must permit the original callback without a guest epoch message')
+                  ^
+AssertionError: a Host extension must permit the original callback without a guest epoch message
++ actual - expected
+
+  {
++   error: 'PROGRAM_SETTLED'
+-   value: {
+-     calls: 1,
+-     text: 'actual'
+-   }
+  }
+
+ generatedMessage: false,
+     actual: {
+  error: "PROGRAM_SETTLED",
+},
+   expected: {
+  value: [Object ...],
+},
+   operator: "deepStrictEqual",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:66:14
+      at withOwner (/private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:20:9)
+      at /private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:67:7
+      at processTicksAndRejections (native:7:39)
+(fail) baseline Host-only watchdog extension cannot keep the legacy guest epoch alive [447.17ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [479.00ms]

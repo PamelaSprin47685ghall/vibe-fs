@@ -1,0 +1,55 @@
+TAP version 13
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":51173,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+# Subtest: independent raw sanity array retains holes, function, object identity, undefined, and exact proof receiver
+ok 1 - independent raw sanity array retains holes, function, object identity, undefined, and exact proof receiver
+  ---
+  duration_ms: 69.316875
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":51176,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+# Subtest: independent watch veto uses own non-nullish abort, including falsy values, without inherited-field coercion
+ok 2 - independent watch veto uses own non-nullish abort, including falsy values, without inherited-field coercion
+  ---
+  duration_ms: 61.780542
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":51179,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+# Subtest: independent constructor, method getter, thenable and toJSON perform their effects through the real guest RPC
+ok 3 - independent constructor, method getter, thenable and toJSON perform their effects through the real guest RPC
+  ---
+  duration_ms: 60.906916
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":51182,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+# Subtest: independent callback errors and invalid passive results retain their family and do not close a live offer
+ok 4 - independent callback errors and invalid passive results retain their family and do not close a live offer
+  ---
+  duration_ms: 61.386708
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":51188,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":51185,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+# Subtest: independent lost finish remains once and stale or cross-run references cannot consume a successor offer
+ok 5 - independent lost finish remains once and stale or cross-run references cannot consume a successor offer
+  ---
+  duration_ms: 122.521458
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":51191,"exit":{"code":0,"signal":null},"phase":"Closed","absent":true,"faults":[]}
+# Subtest: independent onExit callback park retains the original instance and refuses copied or consumed site
+ok 6 - independent onExit callback park retains the original instance and refuses copied or consumed site
+  ---
+  duration_ms: 67.746208
+  ...
+# {"evidence":"real-closing-result","runtime":"22.13.0","pid":51197,"observed":{"before":"Active","native":"Running","absent":false,"after":"Closing"},"published":"Closed"}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":51197,"exit":{"code":null,"signal":"SIGKILL"},"phase":"Closed","absent":true,"faults":[]}
+# {"evidence":"all-owned-absent","runtime":"22.13.0","owned":[{"pid":51173,"runId":"4d5db3de-a2c1-4bb0-b0ec-0c73e84397ee","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-ZEt7uo"},{"pid":51176,"runId":"3097eae8-f2e9-4d29-8cbf-b83ac9e703b6","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-xoBEQ4"},{"pid":51179,"runId":"9a427e09-11c6-4588-8fec-83abec7106d6","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-NRtN2b"},{"pid":51182,"runId":"7de1e05e-50e4-4c14-b3ed-3c0163ed33ec","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-QEGkvL"},{"pid":51185,"runId":"05739b72-357e-4c2c-9fa8-35b60c637d06","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-yMO2Yn"},{"pid":51188,"runId":"0f9daa44-aa2b-4fd5-920d-1e8626979ed5","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-FJXJji"},{"pid":51191,"runId":"e365fb30-224e-43b7-9a96-75a23c592129","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-z7bWRW"},{"pid":51197,"runId":"1da34afd-8b1e-4ca0-91e1-8069e5fd7de4","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-callable-independent-TnMVRW"}]}
+# Subtest: independent real Closing result ordering is preserved with Callable registration installed
+ok 7 - independent real Closing result ordering is preserved with Callable registration installed
+  ---
+  duration_ms: 54.585041
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 562.754125

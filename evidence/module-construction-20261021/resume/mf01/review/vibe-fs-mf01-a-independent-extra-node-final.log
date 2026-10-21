@@ -1,0 +1,112 @@
+TAP version 13
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46161,"runId":"f8bf18a1-0e43-4422-801d-adface95157f","phase":"Closed","exit":{"code":0,"signal":null},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-YT1rj7"}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46158,"runId":"66cbce12-f7a5-4cea-b4a7-15646974006e","phase":"Closed","exit":{"code":0,"signal":null},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-lKrXN2"}
+# Subtest: independent exact park site rejects copied and foreign owner references without consuming the current site
+ok 1 - independent exact park site rejects copied and foreign owner references without consuming the current site
+  ---
+  duration_ms: 129.324417
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46172,"runId":"cb46714a-1055-4735-9930-17f08368790f","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-Mltpbx"}
+# Subtest: independent external owner closes synchronous body runaway while Host remains responsive
+ok 2 - independent external owner closes synchronous body runaway while Host remains responsive
+  ---
+  duration_ms: 306.476459
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46175,"runId":"d15b1bf6-d495-4a43-a8cb-aaddc87108cf","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-vrhJPq"}
+# Subtest: independent external owner closes after-await returned getter runaway while Host remains responsive
+not ok 3 - independent external owner closes after-await returned getter runaway while Host remains responsive
+  ---
+  duration_ms: 305.580625
+  location: '/private/tmp/vibe-fs-mf01-a-independent.test.mjs:70:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'GuestFailure'
+    - 'TimedOut'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'TimedOut'
+  actual: 'GuestFailure'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/vibe-fs-mf01-a-independent.test.mjs:81:14)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46185,"runId":"3eff6710-5f28-4436-b345-e9d58e7c44a5","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-scDvjK"}
+# Subtest: independent external owner closes after-await returned toJSON runaway while Host remains responsive
+ok 4 - independent external owner closes after-await returned toJSON runaway while Host remains responsive
+  ---
+  duration_ms: 302.267791
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46188,"runId":"aaceb25c-f0ff-4013-95f1-d702098f19f1","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-swPwUa"}
+# Subtest: independent external owner closes after-await thenable getter runaway while Host remains responsive
+not ok 5 - independent external owner closes after-await thenable getter runaway while Host remains responsive
+  ---
+  duration_ms: 306.500042
+  location: '/private/tmp/vibe-fs-mf01-a-independent.test.mjs:70:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'GuestFailure'
+    - 'TimedOut'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'TimedOut'
+  actual: 'GuestFailure'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/vibe-fs-mf01-a-independent.test.mjs:81:14)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46191,"runId":"3be65265-ddcc-475d-96a0-b97bfb2d2955","phase":"Closed","exit":{"code":0,"signal":null},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-NWk8L1"}
+# Subtest: independent abandon runs original finally with legitimate synchronous Host effects and refuses another park
+ok 6 - independent abandon runs original finally with legitimate synchronous Host effects and refuses another park
+  ---
+  duration_ms: 65.769542
+  ...
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46200,"runId":"9da93cd7-2275-4ed2-9892-a83273c29bd3","phase":"Closed","exit":{"code":0,"signal":null},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-DEvWKQ"}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46197,"runId":"001cded8-9ffa-42b8-8051-4ef0aa677f1d","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-EUcEuI"}
+# Subtest: independent accepted old async reply after close cannot reach a fresh owner with the same request ordinal
+ok 7 - independent accepted old async reply after close cannot reach a fresh owner with the same request ordinal
+  ---
+  duration_ms: 304.494833
+  ...
+# {"evidence":"cancel-before-result-dispatch","runtime":"22.13.0","pid":46203,"observed":{"phaseBefore":"Active","nativeBefore":"Running","absentBefore":false,"value":"complete","phaseAfterCancel":"Closing"},"published":"Result"}
+# {"evidence":"owned-cleanup","runtime":"22.13.0","pid":46203,"runId":"f71f6509-ba4b-4c46-adf2-d83a0abc298d","phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"acceptedRemaining":0,"absent":true,"directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-AAMerI"}
+# {"evidence":"all-owned-absent","runtime":"22.13.0","owned":[{"pid":46158,"runId":"66cbce12-f7a5-4cea-b4a7-15646974006e","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-lKrXN2"},{"pid":46161,"runId":"f8bf18a1-0e43-4422-801d-adface95157f","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-YT1rj7"},{"pid":46172,"runId":"cb46714a-1055-4735-9930-17f08368790f","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-Mltpbx"},{"pid":46175,"runId":"d15b1bf6-d495-4a43-a8cb-aaddc87108cf","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-vrhJPq"},{"pid":46185,"runId":"3eff6710-5f28-4436-b345-e9d58e7c44a5","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-scDvjK"},{"pid":46188,"runId":"aaceb25c-f0ff-4013-95f1-d702098f19f1","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-swPwUa"},{"pid":46191,"runId":"3be65265-ddcc-475d-96a0-b97bfb2d2955","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-NWk8L1"},{"pid":46197,"runId":"001cded8-9ffa-42b8-8051-4ef0aa677f1d","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-EUcEuI"},{"pid":46200,"runId":"9da93cd7-2275-4ed2-9892-a83273c29bd3","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-DEvWKQ"},{"pid":46203,"runId":"f71f6509-ba4b-4c46-adf2-d83a0abc298d","directory":"/private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-independent-AAMerI"}]}
+# Subtest: independent a real result chunk observed after owner cancellation cannot publish Result
+not ok 8 - independent a real result chunk observed after owner cancellation cannot publish Result
+  ---
+  duration_ms: 72.588875
+  location: '/private/tmp/vibe-fs-mf01-a-independent.test.mjs:132:1'
+  failureType: 'testCodeFailure'
+  error: 'owner cancellation precedes dispatch of the actual buffered guest result'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'Result'
+  actual: 'Result'
+  operator: 'notStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/vibe-fs-mf01-a-independent.test.mjs:164:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 5
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1860.139708

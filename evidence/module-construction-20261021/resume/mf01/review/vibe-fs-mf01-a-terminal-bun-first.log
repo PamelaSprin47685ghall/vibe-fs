@@ -1,0 +1,12 @@
+bun test v1.3.14 (d1632b29)
+
+../../../../private/tmp/vibe-fs-mf01-vertical-a-20261021/candidate.test.mjs:
+{"runtime":"Bun","pid":47498,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+(pass) terminal gate accepts business outcome once and revokes late result/failure/activated before native close [42.49ms]
+{"runtime":"Bun","pid":47502,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+(pass) terminal gate caught abandon remains Abandoned after real finally Host write [49.27ms]
+
+ 2 pass
+ 10 filtered out
+ 0 fail
+Ran 2 tests across 1 file. [119.00ms]

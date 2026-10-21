@@ -1,0 +1,33 @@
+bun test v1.3.14 (d1632b29)
+
+deadline.test.mjs:
+{"evidence":"legacy-second-authority","hostRemaining":1304,"watchdog":false,"result":{"kind":"GuestFailure","error":{"name":"Error","message":"Script execution timed out","code":"ERR_SCRIPT_EXECUTION_TIMEOUT"}},"callback":{"error":"PROGRAM_SETTLED"}}
+{"runtime":"Bun","pid":54130,"runId":"fd7f79cc-5ae8-40f2-837a-94fcd11b7a87","exit":{"code":1,"signal":null},"watchdog":false,"faults":[],"businessSettled":true}
+61 |       const { instance } = await begin(owner, scratch, 200)
+62 |       owner.arm(Date.now() + 1500)
+63 |       const callback = next(owner, instance).then(value => ({ value }), error => ({ error: error.message }))
+64 |       const result = await bounded(owner.result.promise, 2000, 'BASELINE_RESULT_TIMEOUT')
+65 |       console.log(JSON.stringify({ evidence: 'legacy-second-authority', hostRemaining: owner.lastDeadline - Date.now(), watchdog: owner.watchdogFired, result, callback: await callback }))
+66 |       assert.equal(result.kind, 'Result', 'a Host extension must be sufficient, without sending an epoch update to guest')
+                  ^
+AssertionError: a Host extension must be sufficient, without sending an epoch update to guest
++ actual - expected
+
++ 'GuestFailure'
+- 'Result'
+
+ generatedMessage: false,
+     actual: "GuestFailure",
+   expected: "Result",
+   operator: "strictEqual",
+       code: "ERR_ASSERTION"
+
+      at /private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:66:14
+      at withOwner (/private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:20:9)
+      at /private/tmp/vibe-fs-mf01-vertical-c-deadline-20261021/deadline.test.mjs:67:8
+      at processTicksAndRejections (native:7:39)
+(fail) baseline Host-only watchdog extension cannot keep the legacy guest epoch alive [462.37ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [580.00ms]

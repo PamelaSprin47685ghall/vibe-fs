@@ -1,0 +1,259 @@
+{
+  "count": 36,
+  "allAbsent": true,
+  "allDirectoriesGone": true,
+  "entries": [
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59003,
+      "runId": "a3a93067-c195-492a-bcc3-9e4069a71162",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59443,
+      "runId": "84155f15-9045-409c-8611-16fedbd51197",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59455,
+      "runId": "e6a6f3ca-e987-4580-aa9a-8015586dd130",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59458,
+      "runId": "13a52c4c-7cdf-4d72-834d-cd5c467a533f",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59474,
+      "runId": "750f0222-adcd-4776-81c1-9d692763d606",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59481,
+      "runId": "d1873039-f536-4be6-bfc4-5b0dadcd8bff",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59484,
+      "runId": "af1d04e0-aaa6-4d4f-a4b9-e6c43061dc43",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59487,
+      "runId": "d483dd32-0bb6-4847-baa3-51079e333c74",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59490,
+      "runId": "314447b9-60ff-48bf-8d6f-38d15acd8012",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59493,
+      "runId": "f7968508-47f4-4255-9163-111de985fa03",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59498,
+      "runId": "9ca75657-4171-4065-adb6-57f822b5333f",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59501,
+      "runId": "73991df4-3796-4abd-8d83-10b5384758fc",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59504,
+      "runId": "0da5f2fd-564c-4d76-88c6-53fcfcfee7e6",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59522,
+      "runId": "b69cc997-628e-42ba-8b83-b5cead0cbf56",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59537,
+      "runId": "75b0fca2-b8f9-497b-ab62-6d0b83eb28a2",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-node.log",
+      "pid": 59545,
+      "runId": "13a0de14-fac0-466d-8f58-0e966bc15a14",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 59719,
+      "runId": "21b95f91-28a0-48df-be9d-6c038f43cbfa",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60000,
+      "runId": "f353ddd7-86d4-4163-8a25-a0148689abc2",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60011,
+      "runId": "535514f2-17b7-4df9-85d8-a442f6d817d2",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60015,
+      "runId": "5e2265e0-b710-4402-82c0-36dc01c0047a",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60019,
+      "runId": "b729b0ec-ab3e-480f-9aa9-b9914a1ce19b",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60032,
+      "runId": "7890265c-3db5-4487-b005-71ddcddd815f",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60038,
+      "runId": "9942da53-71fc-4004-917c-a29dc682e50f",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60042,
+      "runId": "72eb4ea4-8a00-4b3e-b5cf-74570fe4e7de",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60046,
+      "runId": "d842acdb-1539-4544-b430-17dbdc2cdd69",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60050,
+      "runId": "59925382-b050-426c-9efa-c713c55856b3",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60054,
+      "runId": "88e23f60-abb0-481e-9d36-0b5fa3f3bf7b",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60058,
+      "runId": "4cdbc841-b746-4522-b8fc-8b02e3a16516",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60062,
+      "runId": "fc2734d9-45ff-4998-b082-8aa627bea2bb",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60070,
+      "runId": "9b092812-f8f2-4fba-8ed1-a392ca181634",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60079,
+      "runId": "2e406faf-4c10-4a19-b6ab-9672b4112127",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-base-bun.log",
+      "pid": 60104,
+      "runId": "acb12fee-4820-49a1-8151-c7d7d111e75b",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-core-node.log",
+      "pid": 60379,
+      "runId": "cd57b800-bd35-4e5d-9589-f37b781df9dd",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-core-node.log",
+      "pid": 60382,
+      "runId": "69e51b11-a325-41ec-8805-62a167bc7955",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-core-bun.log",
+      "pid": 60425,
+      "runId": "4ac89dba-0026-4fdc-a997-9aa34f900ef9",
+      "absent": true,
+      "directoryGone": true
+    },
+    {
+      "log": "/private/tmp/vibe-fs-mf01-c-independent-core-bun.log",
+      "pid": 60430,
+      "runId": "7e194d13-335a-4739-b609-3bba1a49e93c",
+      "absent": true,
+      "directoryGone": true
+    }
+  ]
+}

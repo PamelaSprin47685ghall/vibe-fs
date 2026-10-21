@@ -1,0 +1,25 @@
+bun test v1.3.14 (d1632b29)
+
+../../../../private/tmp/vibe-fs-mf01-vertical-a-callable-20261021/candidate.test.mjs:
+(pass) gate1 wire keeps absence/undefined and Unicode split bytes, rejects non-data without JSON coercion [2.42ms]
+{"runtime":"Bun","pid":49695,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+(pass) gate1 actual sync Host write and simultaneous async cat preserve complete large Unicode replies [107.92ms]
+{"runtime":"Bun","pid":49701,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+(pass) gate1 accepted sync write with lost reply remains once, Host responsive, external deadline witnesses actual close [289.88ms]
+{"runtime":"Bun","pid":49710,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+(pass) gate1 after-await runaway does not block Host and is physically terminated by its external owner [308.96ms]
+{"runtime":"Bun","pid":49714,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+(pass) gate2 observed physical park resumes one original continuation with >pipe payload and immediate legitimate sync write [133.31ms]
+{"runtime":"Bun","pid":49721,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":false,"transportFaults":[]}
+(pass) gate2 ready-proven TERM-resistant stopped owner requires actual KILL and EOF, never a request-only terminal [88.16ms]
+{"runtime":"Bun","pid":49728,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+(pass) gate2 an accepted async result settles while stopped and its original response survives resume [158.58ms]
+{"runtime":"Bun","pid":49736,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+(pass) gate2 again-park has a new exact site and a consumed old site cannot resume the successor [67.91ms]
+mkfifo: /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-foreign-fifo-p6iZbb/sync-reply: File exists
+(pass) boundary startup ENOENT and ready timeout reclaim only their exact process and private FIFO descriptor [227.11ms]
+(pass) boundary injected unreadable close receipt retains ClosingUnknown and descriptor until real close can be observed [59.55ms]
+
+ 10 pass
+ 0 fail
+Ran 10 tests across 1 file. [1468.00ms]

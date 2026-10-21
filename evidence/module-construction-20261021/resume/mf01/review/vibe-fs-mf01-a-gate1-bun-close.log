@@ -1,0 +1,15 @@
+bun test v1.3.14 (d1632b29)
+
+candidate.test.mjs:
+(pass) gate1 wire keeps absence/undefined and Unicode split bytes, rejects non-data without JSON coercion [2.25ms]
+{"runtime":"Bun","pid":66871,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+(pass) gate1 actual sync Host write and simultaneous async cat preserve complete large Unicode replies [126.52ms]
+{"runtime":"Bun","pid":66878,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+(pass) gate1 accepted sync write with lost reply remains once, Host responsive, external deadline witnesses actual close [311.31ms]
+{"runtime":"Bun","pid":66901,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+(pass) gate1 after-await runaway does not block Host and is physically terminated by its external owner [414.71ms]
+
+ 4 pass
+ 2 filtered out
+ 0 fail
+Ran 4 tests across 1 file. [887.00ms]

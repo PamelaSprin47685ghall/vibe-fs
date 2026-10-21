@@ -1,0 +1,1 @@
+Exact owned timeout residue removed; failed test had not recorded its original PID, so no old-PID ESRCH claim is made.

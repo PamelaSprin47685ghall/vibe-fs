@@ -1,6 +1,6 @@
 # 已拆模块修正与接收施工
 
-本轮由用户于2026-10-21授权，按上一轮模块分析继续施工，允许subagent调查、实现和独立测试。开始于2026-10-20T21:56:35Z；除非下列全部计划提前完成，持续施工至不早于2026-10-21T02:56:35Z。实际投入、等待及验收分别记账，不用空等或重复全量测试代替工作。
+本轮由用户于2026-10-21授权，按上一轮模块分析继续施工，允许subagent调查、实现和独立测试。开始于2026-10-20T21:56:35Z；除非下列全部计划提前完成，累计施工至少五小时。原连续五小时节点为2026-10-21T02:56:35Z，后因用户要求暂停而中断；恢复后不把暂停期间算入施工。实际投入、等待及验收分别记账，不用空等或重复全量测试代替工作。
 
 ## 固定输入
 
@@ -153,3 +153,41 @@ release-07/gen106完整本地验收已通过，929.2秒：格式、静态、Fabl
 恢复后的并行范围：root核对交付状态与MF-05剩余真实消费者；physical_storage_audit只读评估Process暂停请求和capacity/queue边界，不提前发布无人消费接口；delivery_audit复核证据存档/包扫描边界及Host exact-attempt协议；sandbox_audit明确独立guest最小垂直链，并以新目录、零计时重跑已取消的Process/Supervision四小时与PTY两小时验收。固定新产物及精确启动回执后另记实际开始时间，不复用旧计时。共享公共元数据与主仓修改仍由root串行处理，实验不修改被测产物。
 
 本轮继续优先功能P1，但不把单纯允许STOP/CONT、Promise挂起或受控SDK回执称为完整sandbox/Host修复。小边界按原决定留档；固定上游输入、原运行目录及部署边界不变。
+
+### 恢复后的验收与当前阻断
+
+release-08/gen107已在冻结候选`a5d2844b6`完整通过，983.7秒：格式、静态、Fable构建通过，unit4537/0、757/757排空，integration725/0、40/40排空，E2E与包验证通过；两组均回收accepted=true。unit110 skip/277旧TODO、integration7 skip/7旧TODO单列。收据及逐字日志见[release08-receipt.json](../../evidence/module-construction-20261021/resume/release08-receipt.json)。之后只提交JSON/log收据的`e34d0c2c4`仍通过assertBuildFresh；新原型归档和本计划修改会进入正常corpus输入，后续须重建，不借后缀或排除规则绕过。
+
+MF-01改走独立guest物理owner前置，已保存三个有限工作范围：
+
+1. A以独立进程、逐路原生关闭、私有同步回复FIFO与异步stdin提供真实scratch write/cat/rm。Parked须实际观察进程T，同一闭包按exact一次性site恢复；未知close保留owner与FD，实际Closed后才释放。独立反例发现Closing先发生仍发布真实Result的错误，已修单次业务终局准入。修后Node22/Bun原12项、独立8项分别全绿。物理Closed和业务settled分开记，不伪造finally完成。
+2. B把Callable class/instance/thunk及参数数组留在同一guest，保持函数、undefined、稀疏位、receiver与引用身份；Node22/Bun原16项、独立7项分别全绿。但两个runtime均复现合法class命令被拒、无关toJSON被调用并改写命令/多写一次文件。现主仓compiled Workflow的两项实际正控通过、toJSON调用0。此为**接生产P1**，B只作为机制候选接收；不修改旧parser来迁就原型。具体分用途投影与next后准入时序见[独立设计](../../evidence/module-construction-20261021/resume/mf01/review/vibe-fs-mf01-command-projection-design-20261021.md)。
+3. C在新隔离目录验证单一Host期限owner，保持首次借用冻结剩余、并行租约、幂等释放、借用中reset及同一Host turn的past→future reset。旧B只延Host watchdog仍被guest epoch提前终止的实际红例已保留。最终源已独立通过Node22/Bun各C16及核心真实缓冲offer/reply过期准入各2项，四条命令分别exit0；36个记录PID均ESRCH、目录消失，15及含baseline的24输入hash全通过。作者Node42/0对应旧fixture，最终fixture差异与独立结果在[报告](../../evidence/module-construction-20261021/resume/mf01/review/vibe-fs-mf01-c-independent-report.md)分列。61秒async cat只证明长借期跨旧epoch，不是61秒同步CPU正控；固定cleanup期限是候选新政策，不冒称旧生产reset已撤销旧长租约。
+
+以上原始源码、固定依赖、首次失败与独立日志在[MF-01证据入口](../../evidence/module-construction-20261021/resume/mf01/README.md)。实际生产Host权限、ReadOutput、完整sanity诊断、shell owner、Prepared/Committed ledger、启动预算和内存硬限额尚未接线；MF-01仍DOING。旧VM的Bun超时失败没有因物理原型通过而变绿。
+
+MF-02A保留Host外部前置P1：必须由Host原子地捕获exact immutable attempt，并在副作用前验证同一能力；本地重读、mutex或session级abort均不能关闭窗口。受控SDK的B Accepted不等于B provider已执行，更不能写成已杀B。未删掉现有中断功能来制造通过。
+
+MF-03B新实验从零开始：Process/Supervision Node22与Bun于2026-10-21T02:04:44Z启动各2h+2h；独立gen106 PTY于02:05:51Z开始实际2h交互，首个cwd未准备的启动失败另档保留、不计时。最终digest/EOF及Unknown恢复和回收尚待实际阶段完成。PTY固定副本833项与gen107比较为811项原字节相同、22项仅生成PID注释正规化后相同，缺失0；不称833项原字节全同，也不据此称旧aad源码fresh。见[产物比较](../../evidence/module-construction-20261021/resume/vibe-fs-pty-gen106-to-gen107-artifact-comparison.json)。
+
+MF-05暂保留capacity/queue：pure capacity没有独立生产消费者，现有Int64边界不能被safeNumber桥缩窄；admission queue有真实owner可迁，但当前算法相同、float counter桥仍需修，没有测得收益。BorrowedCapacityStepDemandQueue承接F# completion与借用，不能计作已拆独立owner。projection/convergence亦无测得收益，不为入口数增加DTO分配和适配；这些是范围决定，不是整卡完成。
+
+截至本段写入，普通SSH22、HTTPS和SSH443推送均连接失败，远端仍只确认`148adbb42`及其Linux成功CI。现有Draft PR #62仍旧head，不能把新本地routing或原型归档写成已在PR。原运行目录仍`8db33b342`、三个stash不变，未部署。后续正常推送恢复后再核对确切SHA与远端检查，不force push、不重造历史。
+
+### 用户收窄：流程优先，边缘问题先记录
+
+用户随后明确要求“忽略小问题，只要保证流程能跑通就行。把问题先记录起来”。因此本批以现有主仓真实流程、必要正式门禁和已运行长测收尾为准；不为完整兼容证明追加 getter/Proxy/无效trusted输入矩阵。D尚未创建源码目录，仅保存[协议草案](../../evidence/module-construction-20261021/resume/mf01/review/vibe-fs-mf01-d-protocol-static-20261021.md)，不继续实施；C已开始的独立验证正常收尾，未开始的边缘组合不再运行。隔离候选的未接线问题不变成此次主仓PR阻断。
+
+后续问题按影响排序，除流程真实失败外本批只记录：
+
+| 优先级 | 问题及影响 | 本批处置 |
+|---|---|---|
+| P1，后续功能前置 | 主仓Bun VM无法可靠截断异步Callable死循环；生产物理guest接线、启动预算、权限/ledger及内存硬限额尚未完成 | 原主仓路径保留；A/B/C只做隔离证据，不将未完成替换送入生产 |
+| P1，Host外部前置 | session级abort无法原子绑定exact immutable attempt | 记录Host所需能力，保留已修交付归属，不以本地重复检查冒充原子保证 |
+| 候选接入阻断 | B通用投影会拒class命令、调用toJSON；onExit忽略值等原语义尚未按用途迁移 | 原始正反控与设计已存；不影响本批已验主仓，不继续扩展D |
+| P2 | Casebook旧32位hash碰撞可能取错答案；legacy/series活动选材、外部同inode历史改写与热cache差异、prefix旧观测 | 保留可复现记录，不在本批更换持久格式或扩大扫描 |
+| P2 | 164KiB Git完整stdout被mixed spool安全围栏拒绝；旧target两字段均含冒号无法唯一逆解；borrowed_surface边界 | 不猜合并输出为stdout，不绕预算；分别留后续包 |
+| P3/有限候选边界 | 无效resume预算会先消费site；nextOffer终局前先取队列；复杂getter/formatter精确次数、极端时钟变化 | 只记录，非生产公开入口；不继续加反射框架或边缘测试 |
+| P3/无已测收益 | readLatestTail全扫但无生产调用；capacity/queue/projection/convergence同构或桥增加分配 | 暂保留原owner，不为模块数迁移 |
+
+提交成功、本地检查通过、远端CI通过与部署分别报告；连接失败不会改写为PR已更新。后续验收结果优先写JSON/log收据，避免为同一结论反复改corpus后重跑全量。

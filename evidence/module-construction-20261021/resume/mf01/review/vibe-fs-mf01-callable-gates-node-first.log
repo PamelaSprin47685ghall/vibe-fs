@@ -1,0 +1,68 @@
+TAP version 13
+# Subtest: gate1 wire keeps absence/undefined and Unicode split bytes, rejects non-data without JSON coercion
+ok 1 - gate1 wire keeps absence/undefined and Unicode split bytes, rejects non-data without JSON coercion
+  ---
+  duration_ms: 1.490083
+  ...
+# {"runtime":"22.13.0","pid":49601,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate1 actual sync Host write and simultaneous async cat preserve complete large Unicode replies
+ok 2 - gate1 actual sync Host write and simultaneous async cat preserve complete large Unicode replies
+  ---
+  duration_ms: 119.435667
+  ...
+# {"runtime":"22.13.0","pid":49604,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+# Subtest: gate1 accepted sync write with lost reply remains once, Host responsive, external deadline witnesses actual close
+ok 3 - gate1 accepted sync write with lost reply remains once, Host responsive, external deadline witnesses actual close
+  ---
+  duration_ms: 311.537125
+  ...
+# {"runtime":"22.13.0","pid":49614,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":true,"transportFaults":[]}
+# Subtest: gate1 after-await runaway does not block Host and is physically terminated by its external owner
+ok 4 - gate1 after-await runaway does not block Host and is physically terminated by its external owner
+  ---
+  duration_ms: 308.507291
+  ...
+# {"runtime":"22.13.0","pid":49617,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 observed physical park resumes one original continuation with >pipe payload and immediate legitimate sync write
+ok 5 - gate2 observed physical park resumes one original continuation with >pipe payload and immediate legitimate sync write
+  ---
+  duration_ms: 135.287375
+  ...
+# {"runtime":"22.13.0","pid":49623,"phase":"Closed","exit":{"code":null,"signal":"SIGKILL"},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 ready-proven TERM-resistant stopped owner requires actual KILL and EOF, never a request-only terminal
+ok 6 - gate2 ready-proven TERM-resistant stopped owner requires actual KILL and EOF, never a request-only terminal
+  ---
+  duration_ms: 121.916458
+  ...
+# {"runtime":"22.13.0","pid":49629,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 an accepted async result settles while stopped and its original response survives resume
+ok 7 - gate2 an accepted async result settles while stopped and its original response survives resume
+  ---
+  duration_ms: 171.231917
+  ...
+# {"runtime":"22.13.0","pid":49636,"phase":"Closed","exit":{"code":0,"signal":null},"watchdog":false,"transportFaults":[]}
+# Subtest: gate2 again-park has a new exact site and a consumed old site cannot resume the successor
+ok 8 - gate2 again-park has a new exact site and a consumed old site cannot resume the successor
+  ---
+  duration_ms: 74.0755
+  ...
+# mkfifo: /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/mf01-foreign-fifo-H55lKH/sync-reply: File exists
+# Subtest: boundary startup ENOENT and ready timeout reclaim only their exact process and private FIFO descriptor
+ok 9 - boundary startup ENOENT and ready timeout reclaim only their exact process and private FIFO descriptor
+  ---
+  duration_ms: 214.81225
+  ...
+# Subtest: boundary injected unreadable close receipt retains ClosingUnknown and descriptor until real close can be observed
+ok 10 - boundary injected unreadable close receipt retains ClosingUnknown and descriptor until real close can be observed
+  ---
+  duration_ms: 77.997791
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1602.994917
