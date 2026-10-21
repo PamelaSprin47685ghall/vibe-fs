@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Mission.Work.OpenCode
 
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 
 module DeliverTool =

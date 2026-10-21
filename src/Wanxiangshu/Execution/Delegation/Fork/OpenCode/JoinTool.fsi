@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 
 /// join() waits for the owning runtime's next physical completion batch.

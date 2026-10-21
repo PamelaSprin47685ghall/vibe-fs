@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
@@ -245,9 +246,9 @@ module JsToolSpec =
                 Task.FromResult(JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])))
             | None when noState ->
                 Task.FromResult(
-                    ToolHostCodec.tomlObject
+                    ToolResultText.tomlObject
                         [ "error",
-                          ToolHostCodec.TString(
+                          ToolResultText.TString(
                               JsDescriptionAssets.missingProgram (ProviderLanguageBinding.readGlobalPreference ())
                           ) ]
                 )

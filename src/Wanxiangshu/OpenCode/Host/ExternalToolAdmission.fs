@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation.HostSession
 
 open System

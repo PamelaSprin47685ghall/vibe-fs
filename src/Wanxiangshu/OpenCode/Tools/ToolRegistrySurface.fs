@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode.Host

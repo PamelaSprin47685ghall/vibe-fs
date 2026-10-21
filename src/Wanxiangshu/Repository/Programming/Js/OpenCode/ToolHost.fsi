@@ -2,6 +2,7 @@ namespace Wanxiangshu.Repository.Programming.Js.OpenCode
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider

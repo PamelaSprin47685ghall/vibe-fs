@@ -54,15 +54,15 @@ module DeliverTool =
     /// over to a successor or ended it. The instruction alone cannot tell the
     /// two apart, so the recorded outcome travels with it.
     let private retirementResult (outcome: string) =
-        ToolHostCodec.tomlObjectWithInstructions [ text Path.Retired ] [ "outcome", ToolHostCodec.TString outcome ]
+        ToolResultText.tomlObjectWithInstructions [ text Path.Retired ] [ "outcome", ToolResultText.TString outcome ]
 
     /// The first call of the two-stage sequence records the confirmation and
     /// does not finish the work; a second deliver ends it.
     let private confirmationResult () =
-        ToolHostCodec.tomlObjectWithInstructions
+        ToolResultText.tomlObjectWithInstructions
             [ text Path.Confirmation ]
-            [ "finished", ToolHostCodec.TBool false
-              "confirmation_required", ToolHostCodec.TBool true ]
+            [ "finished", ToolResultText.TBool false
+              "confirmation_required", ToolResultText.TBool true ]
 
     /// The one lifecycle work this session owns. Lifecycle storage is the
     /// wanxiangli journal, independent of the workspace EventStore.
@@ -106,21 +106,21 @@ module DeliverTool =
         work.Retirements |> List.tryFind sameFence |> Option.map recordedState
 
     let private blockedResult blockers =
-        ToolHostCodec.tomlObjectWithInstructions
+        ToolResultText.tomlObjectWithInstructions
             [ text Path.Blocked ]
-            [ "finished", ToolHostCodec.TBool false
-              "blocker_count", ToolHostCodec.TInt(List.length blockers)
+            [ "finished", ToolResultText.TBool false
+              "blocker_count", ToolResultText.TInt(List.length blockers)
               "blockers",
-              ToolHostCodec.TTable(
+              ToolResultText.TTable(
                   blockers
-                  |> List.mapi (fun index blocker -> string index, ToolHostCodec.TString blocker)
+                  |> List.mapi (fun index blocker -> string index, ToolResultText.TString blocker)
               ) ]
 
     let private assessmentRequiredResult () =
-        ToolHostCodec.tomlObjectWithInstructions
+        ToolResultText.tomlObjectWithInstructions
             [ text Path.AssessmentRequired ]
-            [ "finished", ToolHostCodec.TBool false
-              "assessment_required", ToolHostCodec.TBool true ]
+            [ "finished", ToolResultText.TBool false
+              "assessment_required", ToolResultText.TBool true ]
 
     /// The second deliver writes the retirement cursor from the XTrace head
     /// observed on the Host snapshot. A head already on the journal is used

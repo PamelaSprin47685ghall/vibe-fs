@@ -93,7 +93,7 @@ module ForkTool =
     let private wire (reply: DelegationReply) =
         match reply with
         | DelegationReply.Placed instruction
-        | DelegationReply.Refused instruction -> ToolHostCodec.tomlObjectWithInstructions [ instruction ] []
+        | DelegationReply.Refused instruction -> ToolResultText.tomlObjectWithInstructions [ instruction ] []
 
     let private spec command (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let declaration =

@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Host
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
@@ -57,7 +58,7 @@ module JoinTool =
         ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private consequence lines =
-        ToolHostCodec.tomlObjectWithInstructions lines []
+        ToolResultText.tomlObjectWithInstructions lines []
 
     let private recoveryBlocked language (_blocks: NonEmpty<RecoveryBlock>) =
         consequence (ProviderProse.instructionLines language Path.RecoveryBlocked Map.empty)

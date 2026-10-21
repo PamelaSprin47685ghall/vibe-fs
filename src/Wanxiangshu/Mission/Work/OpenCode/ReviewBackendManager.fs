@@ -76,9 +76,9 @@ module ReviewBackendManager =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path substitutions
 
     let private rejectedResult failure =
-        ToolHostCodec.tomlObjectWithInstructions
+        ToolResultText.tomlObjectWithInstructions
             [ providerText (failurePath failure) Map.empty ]
-            [ "recorded", ToolHostCodec.TBool false ]
+            [ "recorded", ToolResultText.TBool false ]
 
     let private requireSome error =
         function
@@ -313,9 +313,9 @@ module ReviewBackendManager =
             else
                 Map.empty
 
-        ToolHostCodec.tomlObjectWithInstructions
+        ToolResultText.tomlObjectWithInstructions
             [ providerText instructionPath substitutions ]
-            [ "recorded", ToolHostCodec.TBool true ]
+            [ "recorded", ToolResultText.TBool true ]
 
     /// The write receipt decides the result. A duplicate review is a structured
     /// failure; a committed or replayed write is accepted.

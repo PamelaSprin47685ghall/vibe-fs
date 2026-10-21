@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Fission.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 
 /// Same-participant physical replacement. Fission never calls the Host session

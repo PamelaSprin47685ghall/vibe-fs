@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.EventStore
@@ -45,7 +46,7 @@ module FetchTool =
         ProviderProse.render language path Map.empty
 
     let private answerResult (consequence: string) (answer: string) =
-        ToolHostCodec.tomlObjectWithInstructions [ consequence ] [ "answer", ToolHostCodec.TString answer ]
+        ToolResultText.tomlObjectWithInstructions [ consequence ] [ "answer", ToolResultText.TString answer ]
 
     let private fresh language answer =
         answerResult (prose language Path.Fresh) answer
@@ -57,10 +58,10 @@ module FetchTool =
         answerResult (prose language Path.Stale) answer
 
     let private noCase language =
-        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.NoCase ] []
+        ToolResultText.tomlObjectWithInstructions [ prose language Path.NoCase ] []
 
     let private unavailable language =
-        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unavailable ] []
+        ToolResultText.tomlObjectWithInstructions [ prose language Path.Unavailable ] []
 
     let private observeMutationFailure (owner: CasebookSettlementOwner) (error: CasebookMutationError) =
         match error with
@@ -163,7 +164,7 @@ module FetchTool =
                     if not (CasebookFeature.isEnabled workspaceRoot) then
                         return unavailable language
                     elif String.IsNullOrWhiteSpace shelfmark then
-                        return ToolHostCodec.tomlObjectWithInstructions [ prose language Path.ShelfmarkRequired ] []
+                        return ToolResultText.tomlObjectWithInstructions [ prose language Path.ShelfmarkRequired ] []
                     else
                         return! getOrCreateFlightWork owner language workspaceRoot store shelfmark
                 } }

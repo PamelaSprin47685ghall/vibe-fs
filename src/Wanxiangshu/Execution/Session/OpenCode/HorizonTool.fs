@@ -89,7 +89,7 @@ module HorizonTool =
     let private execute (runtimeCtx: HorizonRuntimeContext) (_args: HostToolArguments) context =
         task {
             let! lines = HorizonRoster.instructions (caller runtimeCtx context)
-            return ToolHostCodec.tomlObjectWithInstructions lines []
+            return ToolResultText.tomlObjectWithInstructions lines []
         }
 
     let private agentRow (agent: HorizonRoster.RosterAgent) : obj =

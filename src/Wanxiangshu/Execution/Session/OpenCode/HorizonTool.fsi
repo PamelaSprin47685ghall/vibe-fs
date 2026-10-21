@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Session.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation.Fork.Host

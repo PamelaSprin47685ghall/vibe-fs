@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork

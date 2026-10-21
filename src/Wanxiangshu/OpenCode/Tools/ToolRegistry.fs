@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation.HostSession
 
 open Wanxiangshu.Participant.ManagedAgents
@@ -82,10 +83,10 @@ module ToolRegistry =
         =
         let fields =
             match code with
-            | Some key -> [ "code", ToolHostCodec.TString key ]
+            | Some key -> [ "code", ToolResultText.TString key ]
             | None -> []
 
-        ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] fields
+        ToolResultText.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] fields
 
     let private denyRole (ctx: HostToolContext) (specName: string) (role: Role) =
         let path =
@@ -1571,13 +1572,13 @@ module ToolRegistry =
                                 let handles = String.Join(", ", parkedHandles)
 
                                 return
-                                    ToolHostCodec.tomlObjectWithInstructions
+                                    ToolResultText.tomlObjectWithInstructions
                                         [ ProviderProse.render
                                               (lang ctx)
                                               Path.DeliverBlockedByParked
                                               (Map [ "handles", handles ]) ]
-                                        [ "code", ToolHostCodec.TString Path.DeliverBlockedByParked
-                                          "parked_handles", ToolHostCodec.TString handles ]
+                                        [ "code", ToolResultText.TString Path.DeliverBlockedByParked
+                                          "parked_handles", ToolResultText.TString handles ]
                             else
                                 return! executeDeliverRoute ctx args
                         } }

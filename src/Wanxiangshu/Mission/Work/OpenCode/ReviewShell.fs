@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Work.OpenCode
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Mission.Work.Review
@@ -52,9 +53,9 @@ module ReviewShell =
             || OfficeCapability.isAllowed role ToolPermission.Review)
 
     let private planRejected path =
-        ToolHostCodec.tomlObjectWithInstructions
+        ToolResultText.tomlObjectWithInstructions
             [ providerText path Map.empty ]
-            [ "recorded", ToolHostCodec.TBool false ]
+            [ "recorded", ToolResultText.TBool false ]
 
     let private rejectionPath (error: PlanReviewError) =
         match error with
@@ -79,7 +80,7 @@ module ReviewShell =
             else
                 [ providerText Path.PlanStayed Map.empty ] @ (review.Gaps |> List.map gapLine)
 
-        ToolHostCodec.tomlObjectWithInstructions instructions [ "recorded", ToolHostCodec.TBool true ]
+        ToolResultText.tomlObjectWithInstructions instructions [ "recorded", ToolResultText.TBool true ]
 
     let private renderPlanReview (result: Result<PlanReviewResult, PlanReviewError>) : string =
         match result with

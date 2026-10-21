@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Mission.Work.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 
 /// work-038: the Manager backend of the shared `review` shell.

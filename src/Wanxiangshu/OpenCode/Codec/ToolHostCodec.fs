@@ -8,6 +8,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
+open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Foundation.Identity
 
@@ -264,34 +265,8 @@ type HostToolArguments internal (raw: obj) =
 
     member _.Raw: obj = raw
 
-/// Typed subset of the OpenCode tool invocation context used by domain tools.
-///
-/// No user-message field. HOST-011: the Host's `ToolContext` carries `sessionID`,
-/// `messageID` and `callID`, and never a user message id — verified against Host
-/// `tool/tool.ts` and the published `@opencode-ai/plugin` types. The old optional
-/// field decoded a key that does not exist, so it was always `None`, and every
-/// `Option.orElse` fallback beside it was unreachable code that read as a working
-/// second source.
-type HostToolContext =
-    { SessionId: string
-      Agent: string option
-      ToolCallId: ToolCallId option
-      ProviderRunId: ProviderRunIdentity option
-      PromptText: string option
-      AttachAbort: (unit -> unit) -> (unit -> unit) }
-
 type HostToolFactory = private HostToolFactory of obj
 type HostSchema = private HostSchema of obj
-
-/// The authority a tool call is admitted under. capability-enforcement-006 keeps the two sources
-/// apart in the type: an office tool is decided by the public Role the Authority
-/// Root established, while an internal leaf tool (Bookkeeper's `todowrite-for-bookkeeper`)
-/// is decided by owner-held attachment evidence because its session is
-/// HostInternal and holds no public authority profile at all.
-[<RequireQualifiedAccess>]
-type ToolAdmission =
-    | OfficeRole of (HostToolContext -> Role -> bool)
-    | PrivateAttachment of (HostToolContext -> bool)
 
 type ToolSpec =
     { Name: string
@@ -435,7 +410,7 @@ module ToolHostCodec =
         |> Option.orElse (contextString raw "prompt")
         |> Option.orElse (contextString raw "input")
 
-    let decodeContext (raw: obj) =
+    let decodeContext (raw: obj) : HostToolContext =
         let callId = contextString raw "callID"
         let messageId = contextString raw "messageID"
 
@@ -573,66 +548,6 @@ module ToolHostCodec =
 
     let hide (registry: obj) name callback =
         defineHidden registry name (box callback)
-
-    /// ARCH-010 data-only TOML value algebra for tool result bodies.
-    type TomlValue =
-        | TString of string
-        | TInt of int
-        | TInt64 of int64
-        | TBool of bool
-        | TTable of (string * TomlValue) list
-
-    let private scalarMember name value =
-        match value with
-        | TString text -> Some(LlmFacing.Data.stringMember name text)
-        | TInt number -> Some(LlmFacing.Data.intMember name number)
-        | TInt64 number -> Some(LlmFacing.Data.int64Member name number)
-        | TBool flag -> Some(LlmFacing.Data.boolMember name flag)
-        | TTable _ -> None
-
-    let rec private blocksForField (name, value) =
-        match value with
-        | TString text -> [ LlmFacing.Data.stringField name text ]
-        | TInt number -> [ LlmFacing.Data.intField name number ]
-        | TInt64 number -> [ LlmFacing.Data.int64Field name number ]
-        | TBool flag -> [ LlmFacing.Data.boolField name flag ]
-        | TTable entries ->
-            let local =
-                entries
-                |> List.choose (fun (fieldName, fieldValue) -> scalarMember fieldName fieldValue)
-
-            let nested = entries |> List.collect nestedBlocksForField
-            LlmFacing.Data.table name local :: nested
-
-    and private nestedBlocksForField (name, value) =
-        match value with
-        | TTable _ -> blocksForField (name, value)
-        | _ -> []
-
-    let private objectBlocks fields = fields |> List.collect blocksForField
-
-    let tomlObject (fields: (string * TomlValue) list) : string =
-        LlmFacing.empty |> LlmFacing.withData (objectBlocks fields) |> LlmFacing.render
-
-    let tomlObjectWithInstructions (instructions: string list) (fields: (string * TomlValue) list) : string =
-        LlmFacing.instructions instructions
-        |> LlmFacing.withData (objectBlocks fields)
-        |> LlmFacing.render
-
-    let private tableMember (name: string, value: TomlValue) =
-        match value with
-        | TString text -> LlmFacing.Data.stringMember name text
-        | TInt number -> LlmFacing.Data.intMember name number
-        | TInt64 number -> LlmFacing.Data.int64Member name number
-        | TBool flag -> LlmFacing.Data.boolMember name flag
-        | TTable _ -> invalidArg "entries" "nested table values are not valid inside a table-array row"
-
-    let tomlTable (name: string) (entries: (string * TomlValue) list list) : string =
-        let blocks =
-            entries
-            |> List.map (fun entry -> LlmFacing.Data.tableArray name (entry |> List.map tableMember))
-
-        LlmFacing.empty |> LlmFacing.withData blocks |> LlmFacing.render
 
     let looksLikeHandleId (value: string) =
         if String.IsNullOrWhiteSpace value then

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 
 type HostSessionObservation =
     { SessionId: SessionId
@@ -23,21 +24,8 @@ type HostToolArguments =
     member OptionalNonNegativeInteger: name: string -> Result<int option, unit>
     member Raw: obj
 
-type HostToolContext =
-    { SessionId: string
-      Agent: string option
-      ToolCallId: ToolCallId option
-      ProviderRunId: ProviderRunIdentity option
-      PromptText: string option
-      AttachAbort: (unit -> unit) -> (unit -> unit) }
-
 type HostToolFactory = private HostToolFactory of obj
 type HostSchema = private HostSchema of obj
-
-[<RequireQualifiedAccess>]
-type ToolAdmission =
-    | OfficeRole of (HostToolContext -> Role -> bool)
-    | PrivateAttachment of (HostToolContext -> bool)
 
 type ToolSpec =
     { Name: string
@@ -92,15 +80,5 @@ module ToolHostCodec =
     val registry: factory: HostToolFactory -> specs: ToolSpec list -> obj
     val hide: registry: obj -> name: string -> callback: 'callback -> unit
 
-    type TomlValue =
-        | TString of string
-        | TInt of int
-        | TInt64 of int64
-        | TBool of bool
-        | TTable of (string * TomlValue) list
-
-    val tomlObject: fields: (string * TomlValue) list -> string
-    val tomlObjectWithInstructions: instructions: string list -> fields: (string * TomlValue) list -> string
-    val tomlTable: name: string -> entries: (string * TomlValue) list list -> string
     val looksLikeHandleId: value: string -> bool
     val digest: text: string -> string

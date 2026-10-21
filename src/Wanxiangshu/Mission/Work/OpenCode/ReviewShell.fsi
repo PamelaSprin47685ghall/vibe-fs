@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Mission.Work.OpenCode
 
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 
 /// work-038: the shared `review` shell. Owns the one ToolSpec

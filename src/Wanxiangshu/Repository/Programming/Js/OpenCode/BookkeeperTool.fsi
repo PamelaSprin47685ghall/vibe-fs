@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Programming.Js.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 
 /// Bookkeeper provider verb: one JavaScript program atomically reshapes the

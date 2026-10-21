@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
@@ -266,7 +267,7 @@ module JsBookkeeperTool =
               "```js\n" + ultraExample + "\n```" ]
 
     let private failed language (reason: string) =
-        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unchanged; reason ] []
+        ToolResultText.tomlObjectWithInstructions [ prose language Path.Unchanged; reason ] []
 
     let private succeeded language (value: obj) =
         LlmFacing.instruction (prose language Path.Accepted)
