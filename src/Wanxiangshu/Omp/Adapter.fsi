@@ -19,7 +19,7 @@ module Adapter =
     /// `agents` is the product's catalogue of managed agent roles, exposed to
     /// the product through the `IAgentCatalog` port.
     val activateOnOmp:
-        pi: obj
-        -> plugin: Wanxiangshu.Host.Ports.IHostPlugin
-        -> agents: Wanxiangshu.Host.Ports.AgentRoleSpec list
-        -> System.Threading.Tasks.Task<unit>
+        pi: obj ->
+        plugin: Wanxiangshu.Host.Ports.IHostPlugin ->
+        agents: Wanxiangshu.Host.Ports.AgentRoleSpec list ->
+            System.Threading.Tasks.Task<unit>

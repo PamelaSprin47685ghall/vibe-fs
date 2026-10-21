@@ -120,3 +120,10 @@
 ### 8.5 下一检查人 / 转 DONE 条件
 
 不变：仍需真实 smoke 跑通 §3 四项，并在 `proposals/extraction-kanban/evidence/CUT-36/` 留下证据后，由协调者把本卡与看板改为 `DONE`；在那之前保持 `DOING`。本节的 8.3 四个缺陷是当前最先需要修的东西。
+
+## 9. 2026-10-22 开放项：omp transcript 的“持久化条目”与“实时会话”是两个视图（O-1 落地时记录）
+
+- **O-1 决定**：`TranscriptMessageAddress` 就是 omp 的**持久化条目 id**（`SessionEntryBase.id`），适配器不再合成 `omp:<index>` 位置地址；没有可用 id 的条目让整次读取以 `HostError.Transport` 失败并报出该条目的位置。
+- **两个视图不是同一个集合**：`sessionManager.getEntries()` 给出的是**持久化条目**；`AgentSession.messages` 给出的是**实时内存会话**（omp `src/session/agent-session.ts:6946-6948` = `this.agent.state.messages`）。omp 在多处只往实时状态追加而不落对应条目（例如 `agent-session.ts:11020` checkpoint reminder、`:4214` interrupted-thinking、`:1804` initial eval context、`:9295`/`:9354` custom message——后者写入的是 `custom_message` 条目类型，本适配器的 `type = "message"` 过滤会丢弃）。因此子会话 transcript 走 `getEntries()` 时，可能缺少实时会话里存在的消息。
+- **失败模式变了**：一条畸形条目现在会让**整次** transcript 读取失败（此前会被跳过），这是对 O-1 验收条款 2 的刻意 fail-closed 读法。
+- **归属**：中性 transcript 究竟指实时会话还是持久化会话，是**产品/端口属主的决定**，不是适配器能定的；本卡只记录该开放项，不在适配层擅自取舍。

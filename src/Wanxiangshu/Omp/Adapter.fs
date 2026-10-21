@@ -174,6 +174,7 @@ module Adapter =
                 Some(TranscriptPart.File(mime, "inline:"))
             | Some other -> Some(TranscriptPart.Other other)
             | None -> None)
+        |> Array.toList
 
     let private decodeRole (message: obj) : TranscriptRole option =
         match optionalString (fieldValue message "role") with
@@ -194,14 +195,20 @@ module Adapter =
                   Variant = None }
         | _ -> None
 
-    let private decodeMessage (message: obj) (index: int) : TranscriptMessage option =
+    /// Decode one omp message into a neutral transcript message.
+    ///
+    /// The address IS the omp entry id (`SessionEntryBase.id`): the adapter
+    /// never synthesises a positional address, because any append would
+    /// shift the later messages' positions and the address would stop
+    /// meaning the same message.
+    let private decodeMessage (message: obj) (id: string) : TranscriptMessage option =
         match decodeRole message with
         | None -> None
         | Some role ->
             let terminal = decodeTerminal message
 
             Some
-                { Id = TranscriptMessageAddress.create (sprintf "omp:%d" index)
+                { Id = TranscriptMessageAddress.create id
                   Role = role
                   Agent = None
                   Route = decodeRoute message
@@ -403,10 +410,6 @@ module Adapter =
         |> Seq.map (fun pair -> (pair.Key, pair.Value.Title))
         |> Seq.toList
 
-    let private messagesOfChild (id: string) : obj list option =
-        match liveChildren.TryGetValue id with
-        | true, child -> tryArray (fieldValue child.Session "messages") |> Array.toList
-        | _ -> None
 
     /// Resolve a parent-session FILE PATH to the session id recorded in that
     /// file. A path is not a session id and is never returned as one.
@@ -799,35 +802,61 @@ module Adapter =
 
     // -- transcript ---------------------------------------------------------------------
 
-    let private decodeTranscript (messages: obj array) : TranscriptMessage list =
-        messages
-        |> Array.mapi (fun index message -> decodeMessage message index)
+    /// The message entries of a session, each paired with its omp entry id.
+    ///
+    /// The id lives on the ENTRY (`SessionEntryBase.id`), not on the message:
+    /// an `AgentMessage` carries no id at all. An entry without a usable id
+    /// fails the read instead of yielding a fabricated address.
+    let private entriesWithIds (entries: obj array) : Result<(string * obj) array, HostError> =
+        let messages =
+            entries
+            |> Array.filter (fun entry -> stringOf (fieldValue entry "type") = "message")
+
+        let missing =
+            messages
+            |> Array.mapi (fun position entry -> (optionalString (fieldValue entry "id"), position))
+            |> Array.tryFind (fun (id, _) -> Option.isNone id)
+
+        match missing with
+        | Some(_, position) -> Error(HostError.Transport(sprintf "omp session entry at position %d has no id" position))
+        | None ->
+            Ok(
+                messages
+                |> Array.map (fun entry -> (stringOf (fieldValue entry "id"), fieldValue entry "message"))
+            )
+
+    /// Decode the message entries into neutral transcript messages. The
+    /// address of each message is the id of the entry that carried it.
+    let private decodeTranscript (entries: (string * obj) array) : TranscriptMessage list =
+        entries
+        |> Array.map (fun (id, message) -> decodeMessage message id)
         |> Array.choose id
         |> Array.toList
 
-    /// The transcript of a child session the adapter created.
+    /// The transcript of a child session the adapter created, read from the
+    /// CHILD's own session manager entries: the same entry ids, the same
+    /// address space as the host path.
     let private childTranscript (id: string) : Result<TranscriptMessage list, HostError> =
-        match messagesOfChild id with
-        | None -> Error(HostError.NotFound id)
-        | Some messages -> Ok(decodeTranscript (Array.ofList messages))
+        match liveChildren.TryGetValue id with
+        | false, _ -> Error(HostError.NotFound id)
+        | true, child ->
+            let manager = fieldValue child.Session "sessionManager"
+            let entries = tryArray (callMethod manager "getEntries" null)
+
+            entriesWithIds entries |> Result.map decodeTranscript
 
     /// The transcript of the host's own session, read from the persisted
     /// session entries.
-    let private hostTranscript (ctx: obj) : TranscriptMessage list =
-        let entries =
-            ctxEntries ctx
-            |> Array.filter (fun entry -> stringOf (fieldValue entry "type") = "message")
-            |> Array.map (fun entry -> fieldValue entry "message")
+    let private hostTranscript (ctx: obj) : Result<TranscriptMessage list, HostError> =
+        entriesWithIds (ctxEntries ctx) |> Result.map decodeTranscript
 
-        decodeTranscript entries
-
-    /// The transcript of a session: the child's own messages when the
+    /// The transcript of a session: the child's own entries when the
     /// adapter created it, the host session's entries otherwise.
     let private transcriptFor (ctx: obj) (id: string) : Result<TranscriptMessage list, HostError> =
         if isOwnChild ctx id then
             childTranscript id
         else
-            Ok(hostTranscript ctx)
+            hostTranscript ctx
 
     let private transcriptOf (ctx: obj) (id: string) : Task<Result<TranscriptMessage list, HostError>> =
         task {
