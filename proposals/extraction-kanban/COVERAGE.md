@@ -111,7 +111,7 @@
 | `src/authority` | 草稿，含与现行证据要求冲突的简化 | CUT-09 / D-01 |
 | `src/capability` | 草稿，角色矩阵与生成形态未定 | CUT-08 |
 | `src/compression` | 草稿，必须补 coverage/原文/checkpoint 等实际义务 | CUT-16 |
-| `src/delegation` | 草稿，不能先删当前 handle/准入保证 | CUT-13 |
+| `src/delegation` | 已退役（wanxiangli `d4ff4fb`）：规则由 `handle-lifecycle`、`delegate-batch` 承接 | CUT-13 |
 | `src/events` | 草稿，不能强行统一不同现行格式 | CUT-18 |
 | `src/failure` | 草稿，决议与精确结算尚未实现 | CUT-14 |
 | `src/host-omp` | 草稿，目标环境和可用能力尚未验证 | CUT-36，当前主线不依赖它 |
