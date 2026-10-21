@@ -37,10 +37,6 @@ module GitSubject =
             return raw.TrimEnd('\r', '\n')
         }
 
-    // --- common-dir ---
-
-    // --- tree-hash ---
-
 module GitPorcelain =
     type private Messages =
         abstract worktrees: output: string -> obj array
