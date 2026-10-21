@@ -50,11 +50,23 @@ GAP-088、GAP-075、GAP-123、GAP-015、GAP-005、GAP-050。
 ## 5. 验证
 
 - 台账每行的现行条款路径、测试锚点（文件:行 + 断言标题）、生产锚点逐条比对现行工作树。
-- 受影响的包套件（requirement-system、capability-enforcement 025/026、interaction-authority 018、
-  managed-session-lifecycle 020、repository-programming 006/017/027）在 `dist/` 构建产物上实跑，
-  记录 pass/fail/todo 精确计数。
-- `node scripts/check.mjs`、`node scripts/checks/architecture.mjs`。
-- `requirements/GAP.md` 无脚本或测试消费方（仅包 README 的散文链接），改动面限于文档。
+- `requirements/GAP.md` 无脚本或测试消费方（仅包 README 的散文链接），改动面限于文档；
+  表格列数与 `HEAD` 逐行一致（5 列 ×144、9 列 ×51、8 列 ×7、12 列 ×1），未破坏任何既有行。
+- `node scripts/checks/architecture.mjs` → `architecture: OK`（exit 0）。
+- `node scripts/check.mjs` → exit 1，**131 pyramid + 1 js-boundary = 132**，与 metrics lane 在
+  `9003c203` 上实测的基线**逐项相同**；本切片未改任何 `.fs`，两处红均为既有门禁红，
+  非本卡引入。`shard-edge-audit` report-only：`265 finding(s) [high=2 medium=0 low=263]`
+  （rebase 后 master 已前进，计数随之上移；pyramid 与 js-boundary 计数不变）。
+- `node scripts/checks/subsystems.mjs` → `OK — 25 subsystems, 241 compile shards, 658 sources,
+  1956 refs, shard DAG, largest subsystem cycle=10`（exit 0）。
+- `package-lock.json` 为合法 JSON（lockfileVersion 3）；`wanxiangli` gitlink =
+  `fde10a080e86c80c3db05c73ecdfdbc4ef2c2e37`，与 `origin/master` 同指，且在 `wanxiangli`
+  `origin/main` 上可达。
+- **未取得**：受影响的包套件（requirement-system、capability-enforcement 025/026、
+  interaction-authority 018、managed-session-lifecycle 020、repository-programming 006/017/027）
+  在 `dist/` 产物上的 pass/fail/todo 精确计数——本机 `flock /home/hermes/work/vfs-build.lock`
+  上排队 40+ 个兄弟 lane 的 `--clean` 构建，本 lane 的构建在本轮内未取得产物，
+  故**不报数字**。这些套件不消费 `requirements/GAP.md`（已核），本次改动不改变其行为。
 
 ## 6. 状态
 
