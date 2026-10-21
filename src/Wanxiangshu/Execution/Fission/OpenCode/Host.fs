@@ -312,21 +312,6 @@ module FissionHost =
         |> Option.orElseWith (fun () ->
             PromptAuthorityProjectionQueries.lastAuthorityProfile ownerSessionId projections)
 
-    let private allLaneWorkPresent (group: FissionGroupProjection) =
-        group.LaneWork.Count = group.LaneCount
-        && group.LaneProviderRuns.Count = group.LaneCount
-
-    let private allSharedCompletionsDelivered (group: FissionGroupProjection) =
-        group.PreFissionCompletionIds
-        |> Set.forall (fun completionId ->
-            let delivered =
-                group.CompletionDeliveries
-                |> Map.tryFind completionId
-                |> Option.defaultValue Set.empty
-
-            Map.containsKey completionId group.CapturedCompletions
-            && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
-
     let private takeoverPrompt aggregate =
         LlmFacing.renderInstructions
             [ "The Fission ring has collected every lane's delivered view and returned the complete handoff to this final present."
@@ -537,7 +522,7 @@ module FissionHost =
         task {
             if group.Takeover.IsSome then
                 return true
-            elif not (allLaneWorkPresent group) || not (allSharedCompletionsDelivered group) then
+            elif not (FissionProjection.convergenceReady group) then
                 return false
             else
                 let! preConsumed = consumePreFissionAgents durable group

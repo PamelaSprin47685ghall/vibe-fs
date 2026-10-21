@@ -195,6 +195,13 @@ module FissionProjection =
                        |> Option.defaultValue Set.empty
                        |> Set.toArray)) ]
 
+    /// The one convergence precondition (wanxiangli/fission-group
+    /// `convergenceReady`) over a folded group: every lane delivered its work
+    /// and every pre-Fission completion reached every lane. Hosts ask this
+    /// instead of re-deriving it from the group maps.
+    let convergenceReady (group: FissionGroupProjection) =
+        unbox<bool> (law?convergenceReady (createObj [ "laneCount" ==> group.LaneCount; "progress" ==> progressOf group ]))
+
     let private laneSessionOf (group: FissionGroupProjection) laneIndex (laneSessionId: SessionId) =
         match Map.tryFind laneIndex group.LaneSessions with
         | Some expected when expected = laneSessionId -> "match"

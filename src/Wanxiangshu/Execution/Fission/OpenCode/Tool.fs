@@ -309,17 +309,8 @@ module FissionTool =
         }
 
     let private readyExceptForRetirement (durable: AgentJournal) groupId =
-        match capturedGroup durable groupId with
-        | None -> false
-        | Some group ->
-            group.LaneWork.Count = group.LaneCount
-            && group.PreFissionCompletionIds
-               |> Set.forall (fun id ->
-                   let delivered =
-                       group.CompletionDeliveries |> Map.tryFind id |> Option.defaultValue Set.empty
-
-                   Map.containsKey id group.CapturedCompletions
-                   && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
+        capturedGroup durable groupId
+        |> Option.exists FissionProjection.convergenceReady
 
     let private convergeWithScope
         (scope: ToolRuntimeScope)
