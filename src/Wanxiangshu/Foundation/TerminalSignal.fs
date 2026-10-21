@@ -1,4 +1,4 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Foundation.TerminalSignal
 
 open System
 open Wanxiangshu.Foundation

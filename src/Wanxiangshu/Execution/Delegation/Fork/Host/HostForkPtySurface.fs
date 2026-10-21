@@ -9,6 +9,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Process
 

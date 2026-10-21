@@ -23,6 +23,7 @@ open Microsoft.FSharp.Control
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Host
 open Wanxiangshu.Process
 open Wanxiangshu.Foundation

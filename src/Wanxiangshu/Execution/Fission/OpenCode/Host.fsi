@@ -6,6 +6,7 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]

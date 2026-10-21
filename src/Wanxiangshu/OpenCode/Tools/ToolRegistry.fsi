@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate

@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
 

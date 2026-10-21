@@ -5,6 +5,7 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 

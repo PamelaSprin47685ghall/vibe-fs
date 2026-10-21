@@ -731,8 +731,8 @@ OpenCode/Host/HookPolicySurface.fsi
 OpenCode/Host/HookPolicySurface.fs
 Context/Companion/CompressionSurface.fsi
 Context/Companion/CompressionSurface.fs
-OpenCode/Signals/EventContract.fsi
-OpenCode/Signals/EventContract.fs
+Foundation/TerminalSignal.fsi
+Foundation/TerminalSignal.fs
 OpenCode/Host/Events.fsi
 OpenCode/Host/Events.fs
 OpenCode/Host/SharedTerminalBus.fsi

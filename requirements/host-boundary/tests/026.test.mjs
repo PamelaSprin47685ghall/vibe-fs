@@ -109,7 +109,7 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
   for (const consumer of ['opencode-host-opencodeport', 'strength-policy']) {
     const consumerSources = productionSources(planShard(consumer).plan)
     assert.ok(consumerSources.includes('OpenCode/Codec/OpencodeTypes.fs'))
-    for (const unrelated of ['OpenCode/Signals/EventContract.fs', 'OpenCode/Host/Message.fs']) {
+    for (const unrelated of ['Foundation/TerminalSignal.fs', 'OpenCode/Host/Message.fs']) {
       assert.ok(!consumerSources.includes(unrelated), `${consumer} must not acquire ${unrelated}`)
     }
   }
@@ -124,7 +124,7 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
   }
   for (const consumer of ['host-diagnostics-runtime', 'opencode-host-messagevisibility']) {
     const consumerSources = productionSources(planShard(consumer).plan)
-    assert.ok(!consumerSources.includes('OpenCode/Signals/EventContract.fs'), `${consumer} must not acquire terminal event vocabulary`)
+    assert.ok(!consumerSources.includes('Foundation/TerminalSignal.fs'), `${consumer} must not acquire terminal event vocabulary`)
   }
 
   const adapterSources = productionSources(planShard('host-signal-adapter').plan)
@@ -137,7 +137,7 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
 })
 test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory and physical boundaries', () => {
   const hostSources = [
-    // EventContract was retagged to runtime-platform next to Digest/Quiescence; physical
+    // TerminalSignal (formerly EventContract) was retagged to runtime-platform next to Digest/Quiescence; physical
     // host boundary ownership only applies to protocol/codec/adapter sources.
     'OpenCode/Host/Message.fs',
     'OpenCode/Codec/ToolHostCodec.fs',
@@ -164,8 +164,8 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
   const digestOwner = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'Host/Digest.fs'))
   assert.ok(digestOwner, 'HostDigest must have a unique production shard')
   assert.equal(subsystemInventory.projects.get(digestOwner.projectPath).subsystem, 'runtime-platform')
-  const eventContractSource = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'OpenCode/Signals/EventContract.fs'))
-  assert.ok(eventContractSource, 'EventContract.fs must have a unique production shard')
+  const eventContractSource = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'Foundation/TerminalSignal.fs'))
+  assert.ok(eventContractSource, 'TerminalSignal.fs (formerly OpenCode/Signals/EventContract.fs) must have a unique production shard')
   assert.equal(
     subsystemInventory.projects.get(eventContractSource.projectPath).subsystem,
     'runtime-platform',

@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 
 /// Sole Application entry for a reconciled turn observation (rabbit §6.5).

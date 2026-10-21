@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.TerminalSignal
+
 #nowarn "3511"
 
 open System
@@ -89,11 +91,11 @@ module PluginHostWiring =
             let scope = boot.Scope
             let workspaceDirectory = boot.WorkspaceDirectory
 
-            let terminalToResult (outcome: Wanxiangshu.OpenCode.TerminalOutcome) =
+            let terminalToResult (outcome: Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome) =
                 match outcome with
-                | Wanxiangshu.OpenCode.TerminalOutcome.Completed _ -> Ok()
-                | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop -> Error stop.Reason
-                | Wanxiangshu.OpenCode.TerminalOutcome.Aborted stop -> Error stop.Reason
+                | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Completed _ -> Ok()
+                | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Failed stop -> Error stop.Reason
+                | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Aborted stop -> Error stop.Reason
 
             let sendResultToUnit (outcome: Wanxiangshu.Foundation.Outcome.SendOutcome) =
                 match outcome with

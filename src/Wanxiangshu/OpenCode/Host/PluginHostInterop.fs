@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.TerminalSignal
+
 #nowarn "3511"
 
 open System

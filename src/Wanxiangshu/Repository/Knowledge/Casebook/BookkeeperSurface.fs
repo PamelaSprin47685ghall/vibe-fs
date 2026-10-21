@@ -113,9 +113,9 @@ module CasebookBookkeeperSurface =
                             (fun id outcome ->
                                 let res =
                                     match outcome with
-                                    | Wanxiangshu.OpenCode.TerminalOutcome.Completed _ -> Ok()
-                                    | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop -> Error stop.Reason
-                                    | Wanxiangshu.OpenCode.TerminalOutcome.Aborted stop -> Error stop.Reason
+                                    | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Completed _ -> Ok()
+                                    | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Failed stop -> Error stop.Reason
+                                    | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Aborted stop -> Error stop.Reason
 
                                 listener id res)
                         )
@@ -230,7 +230,7 @@ module CasebookBookkeeperSurface =
         // descriptor's converged research identity, and this tag only labels
         // the child turn for reconciliation consumers that ignore it.
         box (
-            Wanxiangshu.OpenCode.TerminalOutcome.Completed
+            Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Completed
                 { SessionId = SessionId.create value
                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "bookkeeper"
                   ProviderRun = ProviderRunIdentity.create "bookkeeper"

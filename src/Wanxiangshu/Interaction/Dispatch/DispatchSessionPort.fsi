@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 
 type IDispatchSessionPort =
     abstract SendPrompt: sessionId: SessionId * text: string * opts: OpenCodePromptOptions -> Task<SendOutcome>

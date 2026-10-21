@@ -3,6 +3,7 @@ namespace Wanxiangshu.Composition.Turn
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 
 /// Ordinary turn observation policy (INTERACTION-REPAIR / PROVIDER-RECOVERY / TERMINAL-REPORT).

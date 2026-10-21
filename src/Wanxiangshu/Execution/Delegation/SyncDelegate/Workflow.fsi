@@ -8,7 +8,7 @@ open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 
 module internal SyncDelegateWorkflow =
     type Dependencies =

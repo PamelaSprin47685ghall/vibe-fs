@@ -3,7 +3,7 @@ namespace Wanxiangshu.Context.Trace
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 
 [<RequireQualifiedAccess>]
 type XTraceTerminalCompletion =

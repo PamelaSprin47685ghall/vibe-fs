@@ -59,7 +59,7 @@ test('WHAT[host-boundary-027] production inventory closes Host codec audiences w
   assert.ok(messageSources.has('src/Wanxiangshu/OpenCode/Host/Message.fs'))
   for (const unrelated of [
     'src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs',
-    'src/Wanxiangshu/OpenCode/Signals/EventContract.fs',
+    'src/Wanxiangshu/Foundation/TerminalSignal.fs',
     'src/Wanxiangshu/Host/Digest.fs',
   ])
     assert.ok(!messageSources.has(unrelated), `message codec must not acquire ${unrelated}`)
