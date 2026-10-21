@@ -67,34 +67,12 @@ module Fold =
                 { projection with
                     AgentProjections = agents })
 
+    /// The envelope adds no fold input beyond its fact: the historical runtime
+    /// watermark (`RuntimeStarted`) carries its RuntimeId in the payload, so the
+    /// envelope and fact-only folds are one function.
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
-        match envelope.Fact with
-        | Runtime(RuntimeStarted runtime) ->
-            // Historical workspace runtime watermark. Prompt claims retain the
-            // watermark at registration for audit/backward-compatible replay, but
-            // restart count no longer drives recovery or automatic abandonment.
-            Ok
-                { projection with
-                    RuntimeId = Some runtime.RuntimeId
-                    AgentProjections =
-                        { projection.AgentProjections with
-                            RuntimeStartCount = projection.AgentProjections.RuntimeStartCount + 1 } }
+        foldFact projection envelope.Fact
 
-        | Agent fact ->
-            foldAgentFact projection.AgentProjections fact
-            |> Result.map (fun agents ->
-                { projection with
-                    AgentProjections = agents })
-
-    let isOk (result: Result<'T, 'E>) : bool =
-        match result with
-        | Ok _ -> true
-        | Error _ -> false
-
-    let unwrap (result: Result<'T, 'E>) : 'T =
-        match result with
-        | Ok value -> value
-        | Error err -> failwithf "Fold resulted in error: %A" err
 // Historical enumeration intentionally has no Journal-owned API. Boot and
 // live facts both enter through CanonicalIntegrator, which invokes only
 // foldEnvelope for one already-ordered durable event at a time.

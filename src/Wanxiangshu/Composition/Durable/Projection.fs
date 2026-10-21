@@ -79,9 +79,11 @@ type AgentProjectionSet =
         /// checkpoints it has actually crossed.
         ViewCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
 
+        /// Task-delivery witnesses keyed by (session, provider run, tool call),
+        /// folded from Host facts by `HostFactFold`.
+        Deliveries: Map<SessionId * ProviderRunIdentity * ToolCallId, Wanxiangshu.Host.TaskDeliveryWitness>
         /// Historical count of folded `RuntimeStarted` envelopes. Retained for
         /// audit/backward-compatible projections; it no longer drives recovery.
-        Deliveries: Map<SessionId * ProviderRunIdentity * ToolCallId, Wanxiangshu.Host.TaskDeliveryWitness>
         RuntimeStartCount: int
     }
 
