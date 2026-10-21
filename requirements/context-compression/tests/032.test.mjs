@@ -1,131 +1,166 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  applyView,
-  captureView,
-  clearAll,
-  parseReportMapping,
-  reportMaterial,
-  takeView,
-} from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
-import { JsFailureModule_code } from '../../../dist/Repository/Programming/Js/Failure.js'
+import { applyView, captureView, clearAll, takeView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+
+// WHAT[context-compression-032] 报告材料是只读投影：投影按 reportMapping 渲染
+// 调用方当前会话的可见区间，它不消费待消费的声明，也不写入永久替换；非法形状
+// 以 VIEW_DECLARATION_INVALID 整体拒绝，不抵达委派宿主、不留下部分效果。
+//
+// 取证面全部是已注册的公开边界：
+//   * 真实委派成员 this.fork(payload, reportMapping) —— 报告材料投影的唯一生产
+//     消费者。它把投影结果作为子会话提示词里的 `commissioner_record` 交出去，
+//     并把非法映射作为稳定数据信封 `{ ok: false, code, reason }` 退回。
+//   * dist/Repository/Programming/Js/Anchor/AnchorSurface.js —— 会话可见区间的
+//     公开状态：applyView 渲染可见区间并回报 report.replaced；captureView /
+//     takeView 存取待消费声明。全部是 JS-native 普通值。
+//
+// 被删除的对内部表示的断言（原先深导入 dist/Repository/Programming/Js/Failure.js
+// 取 JsFailureModule_code，并直接读 F# Result 的 union 标签与 fields）：失败码与
+// 投影材料都有公开等价物 —— 真实委派成员返回稳定数据信封，投影材料出现在子会话
+// 收到的 `commissioner_record` 里；本文件不再读取任何 union 表示。
 
 const session = 'report-material'
-const input = (...texts) => texts.map((text, index) => ({ id: String(index + 1), text }))
+const visible = () => [
+  { id: '1', text: 'one' },
+  { id: '2', text: 'two' },
+  { id: '3', text: 'three' },
+]
 
-// The compiled surface hands back an F# `Result`; the payload of a successful
-// report is an F# list of `(anchor, text)` tuples. Both are normalized here so
-// the assertions stay on observable values only.
-const isOk = (result) => result?.tag === 0 || result?.ok === true
-
-const payload = (result) => {
-  if (result?.tag === 0) return result.fields[0]
-  return result?.value ?? result?.material ?? result?.entries ?? null
+// The material the projection handed to the delegate, read off the child
+// prompt the real fork member produced.
+const commissionerRecord = (prompt) => {
+  if (!prompt) return null
+  const text = (prompt.body?.parts ?? []).map((part) => part.text).join('\n')
+  const line = text.split('\n').find((candidate) => candidate.startsWith('commissioner_record = '))
+  if (!line) return null
+  return line.slice('commissioner_record = '.length).replace(/^"|"$/g, '').replace(/\\n/g, '\n')
 }
 
-const failureCode = (result) => {
-  if (!result) return null
-  if (result.tag === 1) return JsFailureModule_code(result.fields[0])
-  if (typeof result.code === 'string') return result.code
-  if (result instanceof Error) return result.code ?? result.message
-  return null
+// One real fork member call: the projection runs on the caller's session and
+// its material reaches the child. The reply is the member's data envelope.
+const withForkMember = async (body) => {
+  await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+    await acceptAuthorityRoot(runtime, session, 'manager', 'phys-report-material')
+    const call = async (mapping, callId) => {
+      const before = created.length
+      const promptsBefore = runtime.prompts.length
+      const reply = await hooks.tool['todowrite-for-manager'].execute(
+        {
+          program:
+            `class Js extends JsProgram { async run() { return await this.fork({ name: "Ada${callId}", charge: "DO THE WORK" }, ${mapping}); } }`,
+        },
+        { sessionID: session, agent: 'manager', callID: callId, messageID: `run-${callId}` },
+      )
+      const child = created.length > before ? created[created.length - 1] : null
+      const prompt =
+        runtime.prompts
+          .slice(promptsBefore)
+          .find((candidate) => candidate.path?.id === child) ?? runtime.prompts[promptsBefore]
+      return { reply: String(reply), child, record: commissionerRecord(prompt) }
+    }
+
+    await body(call)
+  })
 }
-
-const pair = (entry) => (Array.isArray(entry) ? [entry[0], entry[1]] : [entry.anchor, entry.text])
-
-const material = (result) => {
-  const value = payload(result)
-  if (value === null || value === undefined) return []
-  if (Array.isArray(value)) return value.map(pair)
-  const out = []
-  let cell = value
-  while (cell && cell.tail != null) {
-    out.push(pair(cell.head))
-    cell = cell.tail
-  }
-  return out
-}
-
-const texts = (result) => material(result).map(([, text]) => text)
 
 test.beforeEach(() => clearAll())
 
-test('WHAT[context-compression-032] report material is a read-only projection: it repeats and leaves the pending view pending', () => {
-  const messages = input('one', 'two', 'three')
-  applyView(session, messages)
-  assert.equal(captureView(session, { prefixUntil: 1, thenMap: { 1: null } }).ok, true)
+test('WHAT[context-compression-032] a legal report mapping projects the visible interval as the material the delegate receives', async () => {
+  await withForkMember(async (call) => {
+    applyView(session, visible())
 
-  const first = reportMaterial(session, { 2: 'summary-two' })
-  const second = reportMaterial(session, { 2: 'summary-two' })
+    const outcome = await call('{ 2: "summary-two" }', 'cc-032-ok')
 
-  assert.equal(isOk(first), true, 'a legal report mapping must succeed')
-  assert.deepEqual(material(first), material(second), 'the same mapping projects the same material')
-  assert.deepEqual(
-    material(first).find(([, text]) => text === 'summary-two'),
-    [2, 'summary-two'],
-  )
-
-  assert.deepEqual(
-    takeView(session),
-    { prefixUntil: 1, thenMap: { 1: null } },
-    'the pending view is still pending and unchanged after the projection',
-  )
-  assert.equal(takeView(session), null, 'only the take consumes the pending view')
+    assert.match(outcome.reply, /ok = true/, `the member call must succeed, got: ${outcome.reply}`)
+    assert.ok(outcome.child, 'a legal mapping places the child')
+    assert.equal(
+      outcome.record,
+      '1: one\n2: summary-two\n3: three',
+      'the projection renders the visible interval with the declared summary',
+    )
+  })
 })
 
-test('WHAT[context-compression-032] report material writes no permanent compression into the session ledger', () => {
-  const messages = input('one', 'two', 'three')
-  applyView(session, messages)
+test('WHAT[context-compression-032] the same mapping projects the same material on every call', async () => {
+  await withForkMember(async (call) => {
+    applyView(session, visible())
 
-  const projected = reportMaterial(session, { 2: 'summary-two' })
-  assert.equal(isOk(projected), true)
-  assert.deepEqual(
-    material(projected).find(([, text]) => text === 'summary-two'),
-    [2, 'summary-two'],
-  )
+    const first = await call('{ 2: "summary-two" }', 'cc-032-repeat-1')
+    const second = await call('{ 2: "summary-two" }', 'cc-032-repeat-2')
 
-  const after = applyView(session, messages)
-  assert.deepEqual(after.report.replaced, [], 'the projection recorded no replacement')
-  assert.deepEqual(
-    after.entries.map((entry) => (entry.kind === 'kept' ? entry.message.text : entry.summary)),
-    ['one', 'two', 'three'],
-    'the original content survives a projection that showed a summary',
-  )
+    assert.match(first.reply, /ok = true/)
+    assert.match(second.reply, /ok = true/)
+    assert.equal(first.record, second.record, 'the same mapping projects the same material')
+  })
 })
 
-test('WHAT[context-compression-032] an illegal report mapping is refused with VIEW_DECLARATION_INVALID', () => {
+test('WHAT[context-compression-032] an illegal report mapping is refused as a data envelope and places no child', async () => {
   const illegal = [
-    { 1: 7 },
-    { 1: '' },
-    { 1: '   ' },
-    { 1: true },
-    { 1: {} },
-    { '-1': 'summary' },
-    { '1.5': 'summary' },
-    { x: 'summary' },
+    ['a non-string summary', '{ 1: 7 }'],
+    ['an empty summary', '{ 1: "" }'],
+    ['a blank summary', '{ 1: "   " }'],
+    ['a boolean summary', '{ 1: true }'],
+    ['an object summary', '{ 1: {} }'],
+    ['a negative anchor', '{ "-1": "summary" }'],
+    ['a fractional anchor', '{ "1.5": "summary" }'],
+    ['a non-numeric anchor', '{ x: "summary" }'],
   ]
 
-  for (const mapping of illegal) {
-    const result = reportMaterial(session, mapping)
-    assert.equal(isOk(result), false, JSON.stringify(mapping))
-    assert.equal(failureCode(result), 'VIEW_DECLARATION_INVALID', JSON.stringify(mapping))
-  }
+  await withForkMember(async (call) => {
+    applyView(session, visible())
 
-  assert.equal(isOk(parseReportMapping({ 1: 'summary' })), true)
-  assert.equal(isOk(parseReportMapping({ 1: 7 })), false)
-  assert.equal(failureCode(parseReportMapping({ 1: 7 })), 'VIEW_DECLARATION_INVALID')
+    for (const [label, mapping] of illegal) {
+      const outcome = await call(mapping, `cc-032-bad-${label.replace(/\s+/g, '-')}`)
+      assert.match(outcome.reply, /ok = false/, `${label} must be refused, got: ${outcome.reply}`)
+      assert.match(outcome.reply, /code = "VIEW_DECLARATION_INVALID"/, `${label} must carry the refusal code`)
+      assert.match(outcome.reply, /reason = "/, `${label} must carry a reason`)
+      assert.equal(outcome.child, null, `${label} must not reach the delegation host`)
+      assert.equal(outcome.record, null, `${label} must leave no material behind`)
+    }
+  })
 })
 
-test('WHAT[context-compression-032] an empty report mapping is legal and introduces no summary material', () => {
-  const bare = reportMaterial('report-material-empty', {})
-  assert.equal(isOk(bare), true, 'an empty mapping is a legal mapping')
-  assert.deepEqual(material(bare), [], 'an empty mapping projects no material')
+test('WHAT[context-compression-032] an empty report mapping is legal and introduces no summary material', async () => {
+  await withForkMember(async (call) => {
+    applyView(session, visible())
 
-  const messages = input('one', 'two')
-  applyView(session, messages)
-  const projected = reportMaterial(session, {})
-  assert.equal(isOk(projected), true)
-  for (const text of texts(projected)) {
-    assert.ok(['one', 'two'].includes(text), `unexpected material ${text}`)
-  }
+    const outcome = await call('{}', 'cc-032-empty')
+
+    assert.match(outcome.reply, /ok = true/, `an empty mapping must be legal, got: ${outcome.reply}`)
+    assert.ok(outcome.child, 'an empty mapping still places the child')
+    assert.equal(
+      outcome.record,
+      '1: one\n2: two\n3: three',
+      'an empty mapping projects the visible interval unchanged',
+    )
+  })
+})
+
+test('WHAT[context-compression-032] the projection is read-only: it neither consumes the pending declaration nor writes a replacement', async () => {
+  await withForkMember(async (call) => {
+    applyView(session, visible())
+
+    // A pending declaration waits to be consumed by a later take.
+    assert.equal(captureView(session, { prefixUntil: 1, thenMap: { 1: null } }).ok, true)
+
+    const outcome = await call('{ 2: "summary-two" }', 'cc-032-readonly')
+    assert.match(outcome.reply, /ok = true/)
+    assert.equal(outcome.record, '1: one\n2: summary-two\n3: three')
+
+    assert.deepEqual(
+      takeView(session),
+      { prefixUntil: 1, thenMap: { 1: null } },
+      'the projection leaves the pending declaration pending and unchanged',
+    )
+    assert.equal(takeView(session), null, 'only the take consumes the pending declaration')
+
+    const after = applyView(session, visible())
+    assert.deepEqual(after.report.replaced, [], 'the projection wrote no permanent replacement')
+    assert.deepEqual(
+      after.entries.map((entry) => (entry.kind === 'kept' ? entry.message.text : entry.summary)),
+      ['one', 'two', 'three'],
+      'the original content survives a projection that showed a summary',
+    )
+  })
 })
