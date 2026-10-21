@@ -198,8 +198,9 @@ const timingRowValid = (row) => exactKeys(row, ['id', 'raw_milliseconds', 'media
   && [...row.raw_milliseconds].sort((left, right) => left - right)[1] === row.median_milliseconds
 
 const measurementValid = (measurement, expectedIds, timingIds) => measurement === null || (
-  exactKeys(measurement, ['commit', 'environment', 'structural', 'timing'])
+  exactKeys(measurement, ['commit', 'timing_commit', 'environment', 'structural', 'timing'])
   && /^[0-9a-f]{40}$/.test(measurement.commit)
+  && /^[0-9a-f]{40}$/.test(measurement.timing_commit)
   && environmentValid(measurement.environment)
   && Array.isArray(measurement.structural)
   && measurement.structural.every(planRowValid)
@@ -214,7 +215,6 @@ export const validateOwnerImpactCorpusV1 = (corpus) => {
     'schema_version',
     'purpose',
     'baseline_commit',
-    'aggregate_path',
     'project_directory',
     'full_threshold',
     'lockfile_path',
@@ -226,7 +226,7 @@ export const validateOwnerImpactCorpusV1 = (corpus) => {
   ]) || corpus.schema_version !== 1
     || corpus.purpose !== 'm6-owner-impact-report-only'
     || !/^[0-9a-f]{40}$/.test(corpus.baseline_commit)
-    || ![corpus.aggregate_path, corpus.project_directory, corpus.lockfile_path, corpus.tool_manifest_path].every(repositoryPath)
+    || ![corpus.project_directory, corpus.lockfile_path, corpus.tool_manifest_path].every(repositoryPath)
     || corpus.full_threshold !== 0.6
     || !Array.isArray(corpus.stable_cases)
     || !corpus.stable_cases.every(caseValid)
@@ -372,6 +372,13 @@ export const buildOwnerImpactReportV1 = ({ corpus: corpusInput, candidate_commit
     const environmentMatches = timing === null
       || encodeCanonicalJsonV1(timing.environment) === encodeCanonicalJsonV1(baseline.environment)
     if (!environmentMatches) findings.push({ code: 'measurement-environment-mismatch' })
+    if (baseline.timing_commit !== baseline.commit) {
+      findings.push({
+        code: 'baseline-timing-measured-at-other-commit',
+        baseline_commit: baseline.commit,
+        timing_commit: baseline.timing_commit,
+      })
+    }
     const timingComparison = timing === null || !environmentMatches ? [] : timing.timing.map((candidate) => {
       const previous = baseline.timing.find(({ id }) => id === candidate.id)
       const changePercent = ((candidate.median_milliseconds - previous.median_milliseconds) / previous.median_milliseconds) * 100
@@ -391,6 +398,7 @@ export const buildOwnerImpactReportV1 = ({ corpus: corpusInput, candidate_commit
     schema_version: 1,
     report_kind: 'owner-impact-report-only',
     baseline_commit: corpus.baseline_commit,
+    baseline_timing_commit: baseline === null ? null : baseline.timing_commit,
     candidate_commit: candidateCommit,
     structural,
     timing,
@@ -442,6 +450,7 @@ export const writeOwnerImpactBaselineV1 = (corpusPath, {
     ...corpus,
     baseline_measurement: {
       commit: before.commit,
+      timing_commit: before.commit,
       environment: measuredTiming.environment,
       structural,
       timing: measuredTiming.timing,

@@ -998,7 +998,6 @@ const corpus = ({ baseline = null } = {}) => ({
   schema_version: 1,
   purpose: 'm6-owner-impact-report-only',
   baseline_commit: commit('a'),
-  aggregate_path: 'src/Wanxiangshu/Wanxiangshu.fsproj',
   project_directory: 'src/Wanxiangshu',
   full_threshold: 0.6,
   lockfile_path: 'package-lock.json',
@@ -1071,6 +1070,7 @@ test('WHAT[structured-workflow-012] fixed owner impact corpus drives the product
 
     const baselineMeasurement = {
       commit: commit('a'),
+      timing_commit: commit('a'),
       environment: environment(),
       structural: structural(10),
       timing: timing(100),
@@ -1099,6 +1099,7 @@ test('WHAT[structured-workflow-012] owner impact corpus rejects stable-case dele
   const driftedBaseline = corpus({
     baseline: {
       commit: commit('b'),
+      timing_commit: commit('b'),
       environment: environment(),
       structural: structural(10),
       timing: timing(100),
@@ -1113,6 +1114,26 @@ test('WHAT[structured-workflow-012] owner impact corpus rejects stable-case dele
   const changedCommand = corpus()
   changedCommand.timing_commands[0].command = ['npm', 'run', 'format-build-test', '--extra-flag']
   assert.throws(() => validateOwnerImpactCorpusV1(changedCommand), /closed report-only schema/)
+})
+test('WHAT[structured-workflow-012] a baseline whose timing was measured at another commit is labelled, never silently re-dated', () => {
+  const staleTiming = corpus({
+    baseline: {
+      commit: commit('a'),
+      timing_commit: commit('c'),
+      environment: environment(),
+      structural: structural(10),
+      timing: timing(100),
+    },
+  })
+  const report = buildOwnerImpactReportV1({
+    corpus: staleTiming,
+    candidate_commit: commit('b'),
+    structural: structural(10),
+  })
+  assert.equal(report.baseline_timing_commit, commit('c'))
+  assert.deepEqual(report.findings.map(({ code }) => code), [
+    'baseline-timing-measured-at-other-commit',
+  ])
 })
 test('WHAT[structured-workflow-012] baseline writer binds one clean exact commit and refuses overwrite', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'owner-impact-baseline-'))
