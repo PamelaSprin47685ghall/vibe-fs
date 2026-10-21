@@ -19,28 +19,9 @@ open Wanxiangshu.Participant.Provider
 /// OpenCode tool result or the JS-sandbox receipt. No product decision lives here.
 module FissionTool =
 
-    [<RequireQualifiedAccess>]
-    module Path =
-        [<Literal>]
-        let Description = "tool/fission/description"
-
-        [<Literal>]
-        let TooFew = "tool/fission/too-few"
-
-        [<Literal>]
-        let InvalidOrigin = "tool/fission/invalid-origin"
-
-        [<Literal>]
-        let Capacity = "tool/fission/capacity"
-
-        [<Literal>]
-        let AlreadyActive = "tool/fission/already-active"
-
-        [<Literal>]
-        let Unavailable = "tool/fission/unavailable"
-
-        [<Literal>]
-        let Started = "tool/fission/started"
+    /// The product policy of the tool — its prose vocabulary, its prose
+    /// rendering and its office entitlement — lives in the product lane
+    /// (`FissionToolPolicy`). This adapter owns only the wire encoding.
 
     type FissionReceipt =
         { GroupId: string
@@ -96,18 +77,21 @@ module FissionTool =
           ProviderRun = ctx.ProviderRunId
           Prompts = prompts }
 
-    let private consequence language path =
-        tomlObjectWithInstructions (ProviderProse.instructionLines language path Map.empty) []
-
+    /// The wire mapping from a launch rejection to the semantic prose path
+    /// the refusal is reported under. The paths themselves are product
+    /// policy (`FissionToolPolicy.Path`).
     let private toolResultPath =
         function
         | FissionLaunchRejection.NotSubsession
-        | FissionLaunchRejection.AdmissionRejected FissionRejectReason.InvalidOrigin -> Path.InvalidOrigin
-        | FissionLaunchRejection.LanePromptsInvalid -> Path.TooFew
+        | FissionLaunchRejection.AdmissionRejected FissionRejectReason.InvalidOrigin ->
+            FissionToolPolicy.Path.InvalidOrigin
+        | FissionLaunchRejection.LanePromptsInvalid -> FissionToolPolicy.Path.TooFew
         | FissionLaunchRejection.CallerIsLane
         | FissionLaunchRejection.OwnerAlreadyFissioned
-        | FissionLaunchRejection.AdmissionRejected FissionRejectReason.AlreadyFissioned -> Path.AlreadyActive
-        | FissionLaunchRejection.AdmissionRejected FissionRejectReason.CapacityExceeded -> Path.Capacity
+        | FissionLaunchRejection.AdmissionRejected FissionRejectReason.AlreadyFissioned ->
+            FissionToolPolicy.Path.AlreadyActive
+        | FissionLaunchRejection.AdmissionRejected FissionRejectReason.CapacityExceeded ->
+            FissionToolPolicy.Path.Capacity
         | FissionLaunchRejection.MissingCaller
         | FissionLaunchRejection.ParentLookupFailed _
         | FissionLaunchRejection.PromptsRejected _
@@ -115,7 +99,10 @@ module FissionTool =
         | FissionLaunchRejection.AuthorityUnavailable
         | FissionLaunchRejection.RoleNotPermitted
         | FissionLaunchRejection.ObservationUnavailable
-        | FissionLaunchRejection.AdmissionRejected _ -> Path.Unavailable
+        | FissionLaunchRejection.AdmissionRejected _ -> FissionToolPolicy.Path.Unavailable
+
+    let private consequence language path =
+        tomlObjectWithInstructions (FissionToolPolicy.instructions language path) []
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (ctx: HostToolContext) =
         task {
@@ -130,12 +117,11 @@ module FissionTool =
         }
 
     let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fission)
+        ToolAdmission.OfficeRole(fun _ r -> FissionToolPolicy.isAllowedRole r)
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "fission"
-          Description =
-            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
+          Description = FissionToolPolicy.describe (ProviderLanguageBinding.readGlobalPreference ())
           Arguments = [ "prompts", ToolHostCodec.stringArraySchema factory ]
           Admission = admission
           Execute = execute scope }

@@ -663,6 +663,8 @@ Participant/Provider/Prose.fsi
 Participant/Provider/Prose.fs
 Participant/Provider/ProviderLanguageBinding.fsi
 Participant/Provider/ProviderLanguageBinding.fs
+Execution/Fission/ToolPolicy.fsi
+Execution/Fission/ToolPolicy.fs
 Context/Prefix/Surface.fsi
 Context/Prefix/Surface.fs
 Execution/Delegation/PtyPort.fsi

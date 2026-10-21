@@ -21,6 +21,12 @@ Architect lane: eng-host-arch. Registry of every port and its owner: [REGISTRY.m
    into the port's error DU, and fan a host callback into exactly one port call. An adapter may **not**: choose a
    model, admit/deny a turn or tool, decide retry/abort, compute budgets, render product prose, or keep product
    state (journals, ledgers, leases). Gate HNI-04 measures this.
+
+   *HNI-05 example (2026-10-22):* the `fission` tool's adapter
+   (`Execution/Fission/OpenCode/Tool.fs`) neither renders product prose nor admits the tool any more — the prose
+   vocabulary, the prose rendering and the office-entitlement predicate live in the product lane
+   (`Execution/Fission/ToolPolicy.fs(i)`, `FissionToolPolicy`); the adapter keeps only the wire mapping and the
+   wire encoding.
 4. **Capabilities, not version sniffing.** A host declares what it can do in `HostCapabilities` at activation.
    The core degrades on a missing capability explicitly (typed `Unsupported`), never by catching an exception.
 5. **Fail closed is a port contract.** Every hook port result DU has an explicit "refuse" case; adapters map it

@@ -21,7 +21,7 @@ land rebase + ff. Ratchets (architecture ⑧, ⑨, HNI-04 thinness) only go down
 | HNI-12 | Final accounting: every REGISTRY row WIRED-OC + WIRED-OMP or explicitly RETAINED with reason; gate counts | arch | all | — | BACKLOG |
 
 
-HNI-05 progress (eng-hni-fission, 2026-10-21): S0 landed the transitional P-17 port on `hni/fission` (not pushed). S1 done: the fission tool-visibility decision is product-owned in `Execution/Fission/Visibility.fs(i)` (`FissionToolVisibility`); the adapters keep only the wire write. S2–S4 (canaries out of the adapter, Fission-owned convergence vocabulary, tool product policy) still open.
+HNI-05 progress (eng-hni-fission, 2026-10-22): S0 landed the transitional P-17 port. S1 done: the fission tool-visibility decision is product-owned in `Execution/Fission/Visibility.fs(i)` (`FissionToolVisibility`); the adapters keep only the wire write. S2 done: the fission canaries moved to the product lane (`Execution/Fission/Canaries.fs(i)`); `OpenCode/Host/FissionHostSurface.fs` shrank 251 → 46 lines. S3 done: the Fission lane speaks its own convergence vocabulary (`FissionSessionPort` / `FissionEventPort` in `Host/FissionPort.fs(i)`). S4 done: the `fission` tool's product policy (prose vocabulary, prose rendering, office entitlement) is product-owned in `Execution/Fission/ToolPolicy.fs(i)` (`FissionToolPolicy`); the adapter keeps only the wire mapping and encoding. S0–S4 are on `master`.
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 
 ## Gate ⑩/⑪/⑫ (HNI-04) — `scripts/checks/adapter-thinness.mjs`, run inside `architecture.mjs`

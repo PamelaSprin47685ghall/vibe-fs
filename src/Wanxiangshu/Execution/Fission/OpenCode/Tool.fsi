@@ -9,22 +9,10 @@ open Wanxiangshu.OpenCode
 /// physically interrupts the old present without terminating the logical owner.
 module FissionTool =
 
-    [<RequireQualifiedAccess>]
-    module Path =
-        [<Literal>]
-        val Description: string = "tool/fission/description"
-
-        [<Literal>]
-        val InvalidOrigin: string = "tool/fission/invalid-origin"
-
-        [<Literal>]
-        val Capacity: string = "tool/fission/capacity"
-
-        [<Literal>]
-        val Unavailable: string = "tool/fission/unavailable"
-
-        [<Literal>]
-        val Started: string = "tool/fission/started"
+    /// The product policy of the tool — its prose vocabulary, its prose
+    /// rendering and its office entitlement — lives in the product lane
+    /// (`FissionToolPolicy` in `Execution/Fission/ToolPolicy.fs(i)`). This
+    /// adapter owns only the wire encoding.
 
     type FissionReceipt =
         { GroupId: string
