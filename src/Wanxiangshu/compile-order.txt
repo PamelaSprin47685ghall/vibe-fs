@@ -743,6 +743,8 @@ OpenCode/Signals/HostSignal.fsi
 OpenCode/Signals/HostSignal.fs
 OpenCode/Codec/HostEventEnvelope.fsi
 OpenCode/Codec/HostEventEnvelope.fs
+Execution/Session/ChatExecution/ProviderObservation.fsi
+Execution/Session/ChatExecution/ProviderObservation.fs
 OpenCode/Codec/HostEventCodec.fsi
 OpenCode/Codec/HostEventCodec.fs
 OpenCode/Codec/LoopEventCodec.fsi
@@ -821,8 +823,8 @@ Interaction/Dispatch/Dispatcher.fsi
 Interaction/Dispatch/Dispatcher.fs
 Interaction/Admission/ChatAdmissionTransaction.fsi
 Interaction/Admission/ChatAdmissionTransaction.fs
-OpenCode/Host/ChatAdmission/ProviderLifecycle.fsi
-OpenCode/Host/ChatAdmission/ProviderLifecycle.fs
+Execution/Session/ChatExecution/ProviderLifecycle.fsi
+Execution/Session/ChatExecution/ProviderLifecycle.fs
 Interaction/Admission/ChatAdmissionTransactionSurface.fsi
 Interaction/Admission/ChatAdmissionTransactionSurface.fs
 Interaction/Dispatch/Send.fsi

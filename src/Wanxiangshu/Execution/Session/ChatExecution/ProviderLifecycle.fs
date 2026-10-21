@@ -1,10 +1,9 @@
-namespace Wanxiangshu.OpenCode
+namespace Wanxiangshu.Execution.Session.ChatExecution
 
 open System
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

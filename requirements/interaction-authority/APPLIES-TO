@@ -8,7 +8,7 @@
 /src/Wanxiangshu/Interaction/Dispatch/Send.fs
 /src/Wanxiangshu/Execution/Delegation/Fork/JoinGuard.fs
 /src/Wanxiangshu/Composition/Durable/Fold.fs
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/**
+/src/Wanxiangshu/Execution/Session/ChatExecution/ProviderLifecycle.fs
 /src/Wanxiangshu/Interaction/Admission/ChatAdmissionTransaction*.fs
 /src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs
 /src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs

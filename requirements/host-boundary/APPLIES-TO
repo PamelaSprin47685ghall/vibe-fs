@@ -4,6 +4,7 @@
 
 /src/Wanxiangshu/OpenCode/Host/**
 /src/Wanxiangshu/Execution/Session/ChatExecution/ProviderRunBinding.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/ProviderLifecycle.fs
 /src/Wanxiangshu/OpenCode/Codec/**
 /src/Wanxiangshu/OpenCode/Signals/**
 /src/Wanxiangshu/OpenCode/Plugin/**
@@ -20,6 +21,7 @@
 /src/Wanxiangshu/Host/CanonicalJson.fs
 /src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs
 /src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/ProviderObservation.fs
 /src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs
 /src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs
 /src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs
