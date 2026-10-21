@@ -9,6 +9,7 @@ import { gzipSync } from 'node:zlib'
 import { Header } from 'tar'
 import { fixturePhase } from './fixture-phase.mjs'
 import { firstMissingNpmProductionLibrary } from '../../../../scripts/lib/verification-node-tools.mjs'
+import { UNIT_VERDICT_SILENCE_MS } from '../e2e/support/time-budget.js'
 
 const parentName = 'wxs-fixture-parent'
 const leafName = 'wxs-fixture-leaf'
@@ -43,7 +44,9 @@ function selectedNpm() {
       continue
     }
     fixturePhase('npm:version-enter', { npmCli })
-    const version = execFileSync(process.execPath, [npmCli, '--version'], { encoding: 'utf8' }).trim()
+    const version = execFileSync(process.execPath, [npmCli, '--version'], {
+      encoding: 'utf8', timeout: UNIT_VERDICT_SILENCE_MS, killSignal: 'SIGKILL',
+    }).trim()
     fixturePhase('npm:version-completed', { npmCli, version })
     assert.equal(version, manifest.version)
     return { npmCli, expectedNpmVersion: version, npmCliSha256: sha256(fs.readFileSync(npmCli)) }

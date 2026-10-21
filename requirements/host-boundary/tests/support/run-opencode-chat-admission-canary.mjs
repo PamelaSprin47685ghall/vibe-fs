@@ -7,6 +7,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { ProcessHost } from '../../../verification-system/tests/e2e/support/process-host.js'
+import {
+  HOST_START_TIMEOUT_MS, UNIT_VERDICT_SILENCE_MS,
+  SIGTERM_GRACE_MS, SIGKILL_GRACE_MS, SOCKET_CHECK_TIMEOUT_MS, PROCESS_TREE_TIMEOUT_MS,
+} from '../../../verification-system/tests/e2e/support/time-budget.js'
 import { OPENCODE_BIN, initGitWorkspace } from '../../../verification-system/tests/e2e/support/process-host-utils.js'
 import { buildTextChunks, sendJSON, sendSSE } from '../../../verification-system/tests/e2e/support/strict-mock-sse.js'
 import { readRequestBody, startHttpServer, stopHttpServer } from '../../../verification-system/tests/e2e/support/strict-mock-server.js'
@@ -14,8 +18,14 @@ import { readRequestBody, startHttpServer, stopHttpServer } from '../../../verif
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, '../../../..')
 const pluginPath = path.join(here, 'opencode-chat-admission-canary-plugin.mjs')
-const pluginVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, 'node_modules/@opencode-ai/plugin/package.json'), 'utf8')).version
-const opencodeVersion = execFileSync(OPENCODE_BIN, ['--version'], { encoding: 'utf8' }).trim().replace(/^v/, '')
+export const CANARY_PHYSICAL_LIMIT_MS = 30000
+const HOST_RECLAIM_COMMAND_MS = 2000
+const HOST_CLEANUP_RESERVE_MS = SIGTERM_GRACE_MS + SIGKILL_GRACE_MS
+  + 3 * SOCKET_CHECK_TIMEOUT_MS + PROCESS_TREE_TIMEOUT_MS + HOST_RECLAIM_COMMAND_MS
+const PROTOCOL_RESERVE_MS = 2000
+// The old scenario was unbounded. Reserve the known cleanup stages without widening them.
+// Shared process inspection has unbounded native calls, so this is not a complete cleanup proof.
+const SCENARIO_LIMIT_MS = CANARY_PHYSICAL_LIMIT_MS - HOST_CLEANUP_RESERVE_MS - PROTOCOL_RESERVE_MS
 
 const observations = []
 const waiters = []
@@ -27,11 +37,35 @@ const publish = (observation) => {
     waiters.splice(index, 1)[0].resolve(recorded)
   }
 }
-const waitFor = (predicate) => {
+export const waitFor = (predicate, { signal = AbortSignal.timeout(UNIT_VERDICT_SILENCE_MS), label = 'public event' } = {}) => {
+  const missing = () => new Error(`Missing canary observation: ${label}`, { cause: signal.reason })
+  if (signal.aborted) throw missing()
   const existing = observations.find(predicate)
-  return existing ? Promise.resolve(existing) : new Promise((resolve) => waiters.push({ predicate, resolve }))
+  if (existing) return Promise.resolve(existing)
+  return new Promise((resolve, reject) => {
+    const finish = (observation) => {
+      signal.removeEventListener('abort', aborted)
+      resolve(observation)
+    }
+    const waiter = { predicate, resolve: finish }
+    const aborted = () => {
+      const index = waiters.indexOf(waiter)
+      if (index >= 0) waiters.splice(index, 1)
+      signal.removeEventListener('abort', aborted)
+      reject(missing())
+    }
+    waiters.push(waiter)
+    signal.addEventListener('abort', aborted, { once: true })
+  })
 }
 
+async function runCanary() {
+const scenarioSignal = AbortSignal.timeout(SCENARIO_LIMIT_MS)
+const pluginVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, 'node_modules/@opencode-ai/plugin/package.json'), 'utf8')).version
+const opencodeVersion = execFileSync(OPENCODE_BIN, ['--version'], { encoding: 'utf8', timeout: HOST_START_TIMEOUT_MS }).trim().replace(/^v/, '')
+scenarioSignal.throwIfAborted()
+const causalSignal = () => AbortSignal.any([scenarioSignal, AbortSignal.timeout(UNIT_VERDICT_SILENCE_MS)])
+const waitForEvent = (label, predicate) => waitFor(predicate, { label, signal: causalSignal() })
 const collector = http.createServer(async (request, response) => {
   const chunks = []
   for await (const chunk of request) chunks.push(chunk)
@@ -64,11 +98,12 @@ const provider = await startHttpServer(async (request, response) => {
   sendJSON(response, 404, { error: `unexpected ${request.method} ${url.pathname}` })
 })
 
-const request = async (baseUrl, method, pathname, body, expectedStatus) => {
+const request = async (baseUrl, method, pathname, body, expectedStatus, signal = causalSignal()) => {
   const response = await fetch(baseUrl + pathname, {
     method,
     headers: { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
   })
   const text = await response.text()
   if (expectedStatus !== undefined) assert.equal(response.status, expectedStatus, `${method} ${pathname}: ${text}`)
@@ -88,14 +123,20 @@ fs.mkdirSync(workspace, { recursive: true })
 await initGitWorkspace(workspace)
 
 const host = new ProcessHost()
+let stopping
+const stop = () => stopping ??= host.stop()
+const cancelled = () => { void stop().catch(() => {}) }
+scenarioSignal.addEventListener('abort', cancelled, { once: true })
 let sessionID
 try {
+  scenarioSignal.throwIfAborted()
   await host.start({
     scenarioDir,
     providerUrl: `${provider.url}/v1`,
     pluginPaths: [pluginPath],
     extraEnv: { WANXIANGSHU_CHAT_CANARY_COLLECTOR: collectorUrl },
   })
+  scenarioSignal.throwIfAborted()
 
   sessionID = sessionIdOf(await request(host.baseUrl, 'POST', '/api/session', {
     agent: 'engineer',
@@ -105,12 +146,12 @@ try {
 
   const acceptedMessageID = 'msg_chat_canary_accepted'
   await request(host.baseUrl, 'POST', `/session/${sessionID}/prompt_async`, prompt(acceptedMessageID, 'CANARY_ACCEPT'), 204)
-  await waitFor(({ kind }) => kind === 'provider')
-  await waitFor(({ kind, value }) => kind === 'message.updated'
+  await waitForEvent('provider start', ({ kind }) => kind === 'provider')
+  await waitForEvent('accepted assistant message', ({ kind, value }) => kind === 'message.updated'
     && value.info.role === 'assistant'
     && value.info.parentID === acceptedMessageID
     && value.info.id)
-  await waitFor(({ kind, value }) => kind === 'session.idle' && value.properties.sessionID === '<string>')
+  await waitForEvent('accepted session idle', ({ kind, value }) => kind === 'session.idle' && value.properties.sessionID === '<string>')
   const providerDeliveriesBeforeDuplicate = providerRequests.length
   const transformsBeforeDuplicate = observations.filter(({ kind }) => kind === 'experimental.chat.messages.transform').length
 
@@ -131,8 +172,8 @@ try {
     `/session/${sessionID}/prompt_async`,
     prompt(rejectedMessageID, 'CANARY_REJECT'),
   )
-  await waitFor(({ kind }) => kind === 'chat.message.rejection')
-  await waitFor(({ kind }) => kind === 'session.error')
+  await waitForEvent('chat.message rejection', ({ kind }) => kind === 'chat.message.rejection')
+  await waitForEvent('rejected session error', ({ kind }) => kind === 'session.error')
 
   const normalize = (value) => {
     if (Array.isArray(value)) return value.map(normalize)
@@ -169,11 +210,18 @@ try {
     rejection: { responseStatus: rejectedResponse.status },
   }), null, 2)}\n`)
 } finally {
-  if (sessionID && host.baseUrl) {
-    try { await request(host.baseUrl, 'POST', `/session/${sessionID}/abort`, {}, 204) } catch {}
+  scenarioSignal.removeEventListener('abort', cancelled)
+  try {
+    await stop()
+  } finally {
+    try {
+      await stopHttpServer(provider.server)
+    } finally {
+      try { await stopHttpServer(collector) }
+      finally { fs.rmSync(scenarioDir, { recursive: true, force: true }) }
+    }
   }
-  try { await host.stop() } catch {}
-  await stopHttpServer(provider.server)
-  await new Promise((resolve) => collector.close(resolve))
-  fs.rmSync(scenarioDir, { recursive: true, force: true })
 }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await runCanary()

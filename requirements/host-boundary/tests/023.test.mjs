@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { CANARY_PHYSICAL_LIMIT_MS, waitFor } from './support/run-opencode-chat-admission-canary.mjs'
+import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
+import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool-probe.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -25,16 +27,32 @@ const assertPassingVersionEvidence = (versions) => {
   assert.deepEqual(versions, fixture.observedVersions)
 }
 
-const runInstalledCanary = () => {
-  const launched = spawnSync(process.execPath, [runner], { cwd: path.resolve(here, '../../..'), encoding: 'utf8' })
-  assert.equal(launched.status, 0, launched.stderr || launched.stdout)
-  return JSON.parse(launched.stdout)
+const runInstalledCanary = async (t) => {
+  const stdout = await withFinitePhysicalWait(t, { operation: 'OpenCode chat admission public contract canary', limitMs: CANARY_PHYSICAL_LIMIT_MS },
+    () => runVerificationToolProbe(process.execPath, [runner], {
+      cwd: path.resolve(here, '../../..'), env: process.env,
+      signal: AbortSignal.any([t.signal, AbortSignal.timeout(CANARY_PHYSICAL_LIMIT_MS)]),
+    }))
+  return JSON.parse(stdout)
 }
 
 const first = (evidence, kind) => evidence.observations.find((observation) => observation.kind === kind)
 
-test('WHAT[host-boundary-023] installed OpenCode chat admission public contract is observed and version-fenced', () => {
-  const evidence = runInstalledCanary()
+test('WHAT[host-boundary-023] missing public observation fails on cancellation instead of waiting forever', async () => {
+  const controller = new AbortController()
+  const reason = new Error('canary causal deadline expired')
+  controller.abort(reason)
+  assert.throws(() => waitFor(() => false, { signal: controller.signal, label: 'provider start' }),
+    error => /Missing canary observation: provider start/.test(error.message) && error.cause === reason)
+  const pending = new AbortController()
+  const waiting = waitFor(() => false, { signal: pending.signal, label: 'assistant terminal' })
+  pending.abort(reason)
+  await assert.rejects(waiting,
+    error => /Missing canary observation: assistant terminal/.test(error.message) && error.cause === reason)
+})
+
+test('WHAT[host-boundary-023] installed OpenCode chat admission public contract is observed and version-fenced', async (t) => {
+  const evidence = await runInstalledCanary(t)
   assert.deepEqual(evidence.versions, fixture.observedVersions)
   assert.deepEqual(evidence.publicApis.hooks, fixture.publicHooks)
 

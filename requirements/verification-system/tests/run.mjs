@@ -21,6 +21,7 @@
 // UNIT_VERDICT_SILENCE_MS remains the unit budget.
 
 import { dirname, join } from 'node:path'
+import { statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import { UNIT_VERDICT_SILENCE_MS } from './e2e/support/time-budget.js'
@@ -73,6 +74,7 @@ const override = process.env.TESTS_MJS_FILES
 // Long-stroke (tests/e2e/) and integration suites (tests/integration/) own
 // their silence criterion and are excluded here — they run via their own
 // entrypoints (verification-system e2e entry, integration orchestrator).
+// Start larger files first as a scheduling heuristic; explicit selections keep their order.
 const files = override
   ? override
       .split(',')
@@ -81,7 +83,9 @@ const files = override
   : walk(REQUIREMENTS_ROOT, ['.test.mjs']).filter((file) => {
       const rel = file.replace(/\\/g, '/')
       return !rel.includes('/tests/e2e/') && !rel.includes('/tests/integration/')
-    })
+    }).map(file => ({ file, bytes: statSync(file).size }))
+      .sort((left, right) => right.bytes - left.bytes || (left.file < right.file ? -1 : left.file > right.file ? 1 : 0))
+      .map(({ file }) => file)
 
 if (override) console.error(`runner: discovery OVERRIDDEN by TESTS_MJS_FILES (${files.length} file(s))`)
 
