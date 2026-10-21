@@ -29,6 +29,18 @@ const referencesOpenCode = (text) =>
   text.split('\n').some((line) => !/^\s*\/\//.test(line) && /\bWanxiangshu\.OpenCode\b/.test(line))
 export const readOpenCodeImportBaseline = () =>
   existsSync(OPENCODE_IMPORT_BASELINE) ? JSON.parse(readFileSync(OPENCODE_IMPORT_BASELINE, 'utf8')).files : []
+// ⑨ (CUT-40): a domain-local adapter namespace is `Wanxiangshu.<Domain…>.OpenCode` (the code under a
+// `<Domain>/…/OpenCode/` folder). Gate ⑧ only counts the top-level `Wanxiangshu.OpenCode`.
+const DOMAIN_ADAPTER_REF = /\bWanxiangshu\.(?!OpenCode\b)[A-Z]\w*(?:\.[A-Z]\w*)*\.OpenCode\b/
+const DOMAIN_ADAPTER_BASELINE = 'scripts/checks/domain-adapter-import-baseline.json'
+const isAdapterArea = (file) =>
+  HOST_ADAPTER_DIRS.some((dir) => file.startsWith(dir)) ||
+  file.startsWith(`${PRODUCTION_ROOT}/OpenCode/`) ||
+  file.includes('/OpenCode/')
+const referencesDomainAdapter = (text) =>
+  text.split('\n').some((line) => !/^\s*\/\//.test(line) && DOMAIN_ADAPTER_REF.test(line))
+export const readDomainAdapterImportBaseline = () =>
+  existsSync(DOMAIN_ADAPTER_BASELINE) ? JSON.parse(readFileSync(DOMAIN_ADAPTER_BASELINE, 'utf8')).files : []
 const HOST_SDK_CLIENT = /\?client\b|\bclient\s*(?:\?|\.(?:session|event|app|config|tui|find|file|project|path)\b)/
 
 const norm = (path) => path.replace(/\\/g, '/')
@@ -146,6 +158,28 @@ export function scanArchitecture(productionFiles, read) {
     for (const file of baseline) {
       if (!seen.has(file)) {
         fail('adapter-import-ratchet', `${file}: no longer references Wanxiangshu.OpenCode; drop it from ${OPENCODE_IMPORT_BASELINE}`)
+      }
+    }
+  }
+
+  // ⑨ Domain-local adapter imports only shrink (CUT-40): outside the adapter area (top-level OpenCode/,
+  // Host/, any `…/OpenCode/` folder), no production file — kernel, Composition/ or *Surface.fs alike — may
+  // open or qualify an in-domain `Wanxiangshu.<Domain>.OpenCode` namespace unless it is on the recorded
+  // baseline; an entry that no longer references one must be removed so the ratchet never loosens.
+  {
+    const baseline = new Set(readDomainAdapterImportBaseline())
+    const seen = new Set()
+    for (const file of productionFs) {
+      if (isAdapterArea(file)) continue
+      if (!referencesDomainAdapter(read(file))) continue
+      seen.add(file)
+      if (!baseline.has(file)) {
+        fail('domain-adapter-import-ratchet', `${file}: newly references an in-domain *.OpenCode adapter namespace`)
+      }
+    }
+    for (const file of baseline) {
+      if (!seen.has(file)) {
+        fail('domain-adapter-import-ratchet', `${file}: no longer references an in-domain *.OpenCode namespace; drop it from ${DOMAIN_ADAPTER_BASELINE}`)
       }
     }
   }
