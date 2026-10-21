@@ -3,9 +3,9 @@ namespace Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// P-04 tool contribution port (proposals/host-neutral-interface): what one
-/// product tool call knows about its invocation, independent of the host that
-/// decoded it. An OpenCode or omp adapter fills it from its own wire context.
+/// HNI P-18: the tool-call context, what one product tool call knows about its
+/// invocation, independent of the host that decoded it. An OpenCode or omp
+/// adapter fills it from its own wire context.
 ///
 /// No user-message field. HOST-011: a host tool context carries the session,
 /// the provider run and the call, never a user message id.

@@ -292,8 +292,8 @@ Repository/Investigation/WarmStart/Prompt.fsi
 Repository/Investigation/WarmStart/Prompt.fs
 Host/Contract/ToolResultBound.fsi
 Host/Contract/ToolResultBound.fs
-Host/Tools.fsi
-Host/Tools.fs
+Host/ToolContext.fsi
+Host/ToolContext.fs
 Host/Contract/CompactionPolicySurface.fsi
 Host/Contract/CompactionPolicySurface.fs
 Interaction/Dispatch/Nudge.fsi

@@ -3,6 +3,8 @@ namespace Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+/// HNI P-18: the tool-call context, what one product tool call knows about its
+/// invocation, independent of the host that decoded it.
 type HostToolContext =
     { SessionId: string
       Agent: string option
