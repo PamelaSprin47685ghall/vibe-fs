@@ -435,15 +435,48 @@ module SessionSnapshotPort =
     [<Emit("encodeURIComponent($0)")>]
     let private encodeURIComponent (_value: string) : string = jsNative
 
-    /// Host-neutral session verbs. Slice A wires the discovery verb only; the
-    /// remaining verbs stay unsupported until the OpenCode session surface
-    /// moves onto this port.
-    let private unsupported (capability: HostCapability) : Task<Result<'T, HostError>> =
-        Task.FromResult(Error(HostError.Unsupported capability))
+    /// Host-neutral session verbs mapped onto the OpenCode host. The adapter
+    /// owns the host payload shape; the product only ever sees port records.
+    let private sessionInfoOfRow (row: obj) : SessionInfo option =
+        if isNull row || isNull row?id then
+            None
+        else
+            match readString row?id with
+            | None -> None
+            | Some id ->
+                Some
+                    { Id = SessionId.create id
+                      Parent = readString row?parentID |> Option.map SessionId.create
+                      Role = readString row?agent |> Option.map (fun agent -> AgentRole agent)
+                      Title = readString row?title }
+
+    let private sessionInfosOfRows (rows: obj array) : SessionInfo list =
+        rows |> Array.choose sessionInfoOfRow |> Array.toList
+
+    /// A single host object, unwrapped from the SDK's `data` envelopes.
+    let private objectPayload (response: obj) : obj =
+        if isNull response then
+            null
+        elif not (isNull response?data) && not (isNull response?data?data) then
+            response?data?data
+        elif not (isNull response?data) then
+            response?data
+        else
+            response
+
+    let private parentOfPayload (payload: obj) : Result<SessionId option, HostError> =
+        let session = objectPayload payload
+
+        if isNull session then
+            Error(HostError.Transport "Missing session response")
+        else
+            match readString session?parentID with
+            | None -> Ok None
+            | Some parent -> Ok(Some(SessionId.create parent))
 
     type SdkSessionPort(client: obj, workspaceDirectory: string option) =
-        let headersObj () =
-            match workspaceDirectory with
+        let headersObj (directory: string option) =
+            match directory with
             | Some dir -> createObj [ "x-opencode-directory", box (emitJsExpr dir "encodeURIComponent($0)") ]
             | None -> createObj []
 
@@ -467,7 +500,9 @@ module SessionSnapshotPort =
                                |> Option.defaultValue [])
 
                         let payload =
-                            createObj [ "query", box (createObj queryFields); "headers", box (headersObj ()) ]
+                            createObj
+                                [ "query", box (createObj queryFields)
+                                  "headers", box (headersObj workspaceDirectory) ]
 
                         let! response = unbox<Task<obj>> (listFn?call (sessObj, payload)) |> TaskResultCE.ofTask
 
@@ -476,22 +511,160 @@ module SessionSnapshotPort =
                         return! Error(HostError.Transport ex.Message)
                 }
 
-            member _.Create(_parent, _spec) =
-                unsupported HostCapability.ChildSessions
+            member _.Create(parent, spec) =
+                taskResult {
+                    try
+                        let sessObj = client?session
+                        let createFn = sessObj?create
 
-            member _.Parent(_session) =
-                unsupported HostCapability.ChildSessions
+                        do!
+                            Result.requireFalse
+                                (HostError.Transport "session.create unavailable on SDK client")
+                                (isNull createFn)
 
-            member _.Children(_parent) =
-                unsupported HostCapability.ChildSessions
+                        let bodyFields =
+                            (parent
+                             |> Option.map (fun p -> [ "parentID", box (SessionId.value p) ])
+                             |> Option.defaultValue [])
+                            @ (spec.Title
+                               |> Option.map (fun title -> [ "title", box title ])
+                               |> Option.defaultValue [])
+                            @ (spec.Role
+                               |> Option.map (fun (AgentRole role) -> [ "agent", box role ])
+                               |> Option.defaultValue [])
 
-            member _.Abort(_session) =
-                unsupported HostCapability.ChildSessions
+                        let directory =
+                            spec.Workspace
+                            |> Option.map (fun (WorkspacePath dir) -> dir)
+                            |> Option.orElse workspaceDirectory
 
-            member _.Interrupt(_session) = unsupported HostCapability.Interrupt
+                        let payload =
+                            createObj (
+                                [ "body", box (createObj bodyFields); "headers", box (headersObj directory) ]
+                                @ bodyFields
+                            )
 
-            member _.Close(_session) =
-                unsupported HostCapability.ChildSessions
+                        let! response = unbox<Task<obj>> (createFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+
+                        let created = objectPayload response
+
+                        return!
+                            readString created?id
+                            |> Option.map SessionId.create
+                            |> Result.requireSome (HostError.Transport "Missing session id in response")
+                    with ex ->
+                        return! Error(HostError.Transport ex.Message)
+                }
+
+            member _.Parent(session) =
+                taskResult {
+                    try
+                        let sessObj = client?session
+                        let getFn = sessObj?get
+
+                        do!
+                            Result.requireFalse
+                                (HostError.Transport "session.get unavailable on SDK client")
+                                (isNull getFn)
+
+                        let sId = SessionId.value session
+
+                        let payload =
+                            createObj
+                                [ "path", box (createObj [ "id", box sId ])
+                                  "sessionID", box sId
+                                  "headers", box (headersObj workspaceDirectory) ]
+
+                        let! response = unbox<Task<obj>> (getFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                        return! parentOfPayload response
+                    with ex ->
+                        return! Error(HostError.Transport ex.Message)
+                }
+
+            member _.Children(parent) =
+                taskResult {
+                    try
+                        let sessObj = client?session
+                        let childrenFn = sessObj?children
+
+                        do!
+                            Result.requireFalse
+                                (HostError.Transport "session.children unavailable on SDK client")
+                                (isNull childrenFn)
+
+                        let pId = SessionId.value parent
+
+                        let payload =
+                            createObj
+                                [ "path", box (createObj [ "id", box pId ])
+                                  "headers", box (headersObj workspaceDirectory) ]
+
+                        let! response = unbox<Task<obj>> (childrenFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+
+                        return sessionInfosOfRows (unwrapPayload response)
+                    with ex ->
+                        return! Error(HostError.Transport ex.Message)
+                }
+
+            member _.Abort(session) =
+                taskResult {
+                    try
+                        let sessObj = client?session
+                        let abortFn = sessObj?abort
+
+                        do!
+                            Result.requireFalse
+                                (HostError.Transport "session.abort unavailable on SDK client")
+                                (isNull abortFn)
+
+                        let sId = SessionId.value session
+
+                        let payload =
+                            createObj
+                                [ "path", box (createObj [ "id", box sId ])
+                                  "headers", box (headersObj workspaceDirectory) ]
+
+                        let! response = unbox<Task<obj>> (abortFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+
+                        if not (isNull response) && not (isNull response?error) then
+                            return! Error(HostError.Refused "Host rejected session abort")
+                        else
+                            return ()
+                    with ex ->
+                        return! Error(HostError.Transport ex.Message)
+                }
+
+            // The host exposes one stop action per session; the attempt-scoped
+            // stop the product asks for is that same action, applied to the
+            // session that owns the attempt.
+            member this.Interrupt(session) = (this :> ISessionPort).Abort session
+
+            member _.Close(session) =
+                taskResult {
+                    try
+                        let sessObj = client?session
+
+                        let closeFn =
+                            if isNull sessObj?delete then
+                                sessObj?close
+                            else
+                                sessObj?delete
+
+                        do!
+                            Result.requireFalse
+                                (HostError.Transport "No close/delete session method on SDK client")
+                                (isNull closeFn)
+
+                        let sId = SessionId.value session
+
+                        let! _ =
+                            unbox<Task<obj>> (closeFn?call (sessObj, {| sessionID = sId |}))
+                            |> TaskResultCE.ofTask
+
+                        return ()
+                    with ex ->
+                        return! Error(HostError.Transport ex.Message)
+                }
 
     type HttpSessionPort(baseUrl: string) =
         let cleanBase =
@@ -502,6 +675,50 @@ module SessionSnapshotPort =
 
         [<Emit("fetch($0, $1)")>]
         let jsFetch (url: string) (init: obj) : Task<obj> = jsNative
+
+        let readJson (url: string) : Task<Result<obj, HostError>> =
+            taskResult {
+                try
+                    let! response = jsFetch url (createObj [ "method", box "GET" ]) |> TaskResultCE.ofTask
+                    let status = unbox<int> response?status
+
+                    do!
+                        Result.requireTrue
+                            (HostError.Transport(sprintf "HTTP %d" status))
+                            (status >= 200 && status < 300)
+
+                    let! body = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
+                    return JS.JSON.parse body
+                with ex ->
+                    return! Error(HostError.Transport ex.Message)
+            }
+
+        let postJson (endpoint: string) (body: obj) : Task<Result<obj, HostError>> =
+            taskResult {
+                try
+                    let init =
+                        createObj
+                            [ "method", box "POST"
+                              "headers", box (createObj [ "Content-Type", box "application/json" ])
+                              "body", box (JS.JSON.stringify body) ]
+
+                    let! response = jsFetch (cleanBase + endpoint) init |> TaskResultCE.ofTask
+                    let status = unbox<int> response?status
+
+                    do!
+                        Result.requireTrue
+                            (HostError.Transport(sprintf "HTTP %d" status))
+                            (status >= 200 && status < 300)
+
+                    let! text = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
+
+                    if String.IsNullOrWhiteSpace text then
+                        return createObj []
+                    else
+                        return JS.JSON.parse text
+                with ex ->
+                    return! Error(HostError.Transport ex.Message)
+            }
 
         interface ISessionPort with
             member _.FindByTitle(title) =
@@ -526,22 +743,56 @@ module SessionSnapshotPort =
                         return! Error(HostError.Transport ex.Message)
                 }
 
-            member _.Create(_parent, _spec) =
-                unsupported HostCapability.ChildSessions
+            member _.Create(parent, spec) =
+                taskResult {
+                    let bodyFields =
+                        (parent
+                         |> Option.map (fun p -> [ "parentID", box (SessionId.value p) ])
+                         |> Option.defaultValue [])
+                        @ (spec.Title
+                           |> Option.map (fun title -> [ "title", box title ])
+                           |> Option.defaultValue [])
+                        @ (spec.Role
+                           |> Option.map (fun (AgentRole role) -> [ "agent", box role ])
+                           |> Option.defaultValue [])
 
-            member _.Parent(_session) =
-                unsupported HostCapability.ChildSessions
+                    let! data = postJson "/session" (createObj bodyFields)
 
-            member _.Children(_parent) =
-                unsupported HostCapability.ChildSessions
+                    return!
+                        readString (objectPayload data)?id
+                        |> Option.map SessionId.create
+                        |> Result.requireSome (HostError.Transport "Missing session id in response")
+                }
 
-            member _.Abort(_session) =
-                unsupported HostCapability.ChildSessions
+            member _.Parent(session) =
+                taskResult {
+                    let! data = readJson (sprintf "%s/session/%s" cleanBase (SessionId.value session))
+                    return! parentOfPayload data
+                }
 
-            member _.Interrupt(_session) = unsupported HostCapability.Interrupt
+            member _.Children(parent) =
+                taskResult {
+                    let! data = readJson (sprintf "%s/session/%s/children" cleanBase (SessionId.value parent))
 
-            member _.Close(_session) =
-                unsupported HostCapability.ChildSessions
+                    return sessionInfosOfRows (unwrapPayload (objectPayload data))
+                }
+
+            member _.Abort(session) =
+                taskResult {
+                    let! _ = postJson (sprintf "/session/%s/abort" (SessionId.value session)) (createObj [])
+                    return ()
+                }
+
+            // The host exposes one stop action per session; the attempt-scoped
+            // stop the product asks for is that same action, applied to the
+            // session that owns the attempt.
+            member this.Interrupt(session) = (this :> ISessionPort).Abort session
+
+            member _.Close(session) =
+                taskResult {
+                    let! _ = postJson (sprintf "/session/%s/abort" (SessionId.value session)) (createObj [])
+                    return ()
+                }
 
 
     type HttpSnapshotPort(baseUrl: string) =
@@ -588,8 +839,9 @@ module SessionSnapshotPort =
         else
             None
 
-    /// HNI P-01: the OpenCode adapter's session port. Slice A wires the
-    /// discovery verb; the remaining session verbs stay unsupported.
+    /// HNI P-01: the OpenCode adapter's session port. Every session verb is
+    /// mapped onto the OpenCode host; the adapter owns the host payload
+    /// shape and the product only ever sees port records.
     let createSessionPort (input: obj) : ISessionPort option =
         let workDir = directoryOption input
 

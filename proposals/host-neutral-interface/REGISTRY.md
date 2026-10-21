@@ -196,6 +196,22 @@ These are the concrete steps, so a lane does not have to re-derive them:
   requirements import path `dist/Execution/Delegation/Fork/OpenCode/JoinTool.js` is untouched. `omp: n/a` (no port type).
   **No compile/test evidence** (owner's no-build-before-push rule; the compile slot gave up with exit 75 twice) —
   the delivery team must build master and run the join requirement suites.
+- 2026-10-22 eng-hni-fork (slice 2a): the OpenCode adapter's P-01 session port now implements **all seven verbs**
+  (`Create`, `Parent`, `Children`, `Abort`, `Interrupt`, `Close`, `FindByTitle`) instead of the discovery-only
+  skeleton. `OpenCode/Host/SessionSnapshotPort.fs`: `SdkSessionPort` and `HttpSessionPort` map the host payloads
+  (SDK `session.create` / `session.get` / `session.children` / `session.abort` / `session.delete|close`; HTTP
+  `POST /session`, `GET /session/{id}`, `GET /session/{id}/children`, `POST /session/{id}/abort`) onto the neutral
+  port records — host rows become `SessionInfo {Id; Parent; Role; Title}`, the host `agent` field becomes
+  `AgentRole`, and the host payload shape never leaves the adapter. The `Unsupported` stubs for
+  `HostCapability.ChildSessions` / `HostCapability.Interrupt` are gone. `Interrupt` is documented as the host's
+  single session-level stop action (the host exposes no attempt-scoped stop). `SdkSessionPort` / `HttpSessionPort`
+  are now exposed in `SessionSnapshotPort.fsi`. **No new port** — P-01 (`Host/Ports/Sessions.fs(i)`) is unchanged, so
+  the next free id stays **P-19**; `omp: n/a` (the family `.fsi` did not change, so the generated TS mirror is
+  unaffected). The product still consumes the legacy `ISessionHostPort` / `ISessionSnapshotPort`; routing those call
+  sites onto P-01 is the next slice. Gates: architecture OK, adapter-thinness 139 files / 33352 lines,
+  product-reference 596 (baseline 689), without-port 137 (baseline 150), provider-leak-gate OK.
+  **No compile/test evidence** (owner's no-build-before-push rule; the compile slot gave up with exit 75 because the
+  machine was heavily loaded) — the delivery team must build master and run the session requirement suites.
 
 - 2026-10-21 eng-hni-plugin-goose (HNI-08): P-16 pair guidance is WIRED-OC — the guideline fold moved out of
   `OpenCode/Host/PairProgramming` into the domain owner `Interaction/PairGuidance/Occurrences`; the OpenCode transform

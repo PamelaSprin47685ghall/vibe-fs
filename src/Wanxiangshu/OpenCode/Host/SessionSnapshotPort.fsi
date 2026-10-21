@@ -19,5 +19,13 @@ module SessionSnapshotPort =
         new: baseUrl: string -> HttpSnapshotPort
         interface ISessionSnapshotPort
 
+    type SdkSessionPort =
+        new: client: obj * workspaceDirectory: string option -> SdkSessionPort
+        interface ISessionPort
+
+    type HttpSessionPort =
+        new: baseUrl: string -> HttpSessionPort
+        interface ISessionPort
+
     val create: input: obj -> ISessionSnapshotPort option
     val createSessionPort: input: obj -> ISessionPort option
