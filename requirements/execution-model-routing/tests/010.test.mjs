@@ -1014,3 +1014,48 @@ test('WHAT[execution-model-routing-010] EMR_010_provider_step_reentry_with_same_
   releasePhysicalExecution(runtime, 'waiter-2', 'msg-w2')
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+
+// 行为断言（走 dist 公共面）：工具执行门在工具体之前结束本次 provider step，
+// 结束它用的是「本次 run 自己的」物理消息关系，而不是 session 当前绑定的物理消息。
+// 这条断言不读源码：它只走 ModelRoutingSurface 的公共读写面。
+test('WHAT[execution-model-routing-010] EMR_010_provider_step_ends_on_the_runs_own_physical_message_not_the_session_current_one', async () => {
+  const runtime = routing.createRuntime(() => ({ model: 'provider/shared', reasoning: 'none' }));
+
+  // 权威的 Host start 观察写下：run-1 回答的是 msg-run-1。
+  routing.rememberProviderStepIdentity(runtime, 'session-a', 'msg-run-1', 'run-1');
+
+  const observed = routing.tryProviderStepIdentity(runtime, 'run-1');
+  assert.notEqual(observed, null, 'an observed run resolves its own physical message');
+  assert.equal(observed.sessionId, 'session-a');
+  assert.equal(
+    observed.physicalUserMessageId,
+    'msg-run-1',
+    'the run resolves the physical message the Host stated for that run',
+  );
+
+  // 另一个 run 回答另一条物理消息：读取必须精确到 run，绝不退回 session 当前绑定。
+  routing.rememberProviderStepIdentity(runtime, 'session-a', 'msg-run-2', 'run-2');
+  const second = routing.tryProviderStepIdentity(runtime, 'run-2');
+  assert.equal(second.physicalUserMessageId, 'msg-run-2');
+
+  // 本进程从未观察过的 run 读不到任何关系（不是「回退到 session 当前物理消息」）。
+  assert.equal(
+    routing.tryProviderStepIdentity(runtime, 'run-unobserved'),
+    null,
+    'an unobserved run has no step to end and never falls back to a session-current binding',
+  );
+
+  // 结束 provider step：结束的正是该 run 自己的那条关系。
+  routing.endProviderStep(runtime, 'session-a', 'msg-run-1', 'run-1');
+  assert.equal(
+    routing.tryProviderStepIdentity(runtime, 'run-2')?.physicalUserMessageId,
+    'msg-run-2',
+    'ending one run’s step never touches another run’s relation',
+  );
+});
+}

@@ -27,6 +27,9 @@ module DeliveryAttemptLedger =
           Sequence: int }
 
     val recordEstablished: fence: Fence -> physical: PhysicalUserMessageId option -> unit
+
+    /// 有意公开：呈现面事实（工具结果已呈现给模型）由呈现层读取，
+    /// 登记在台账、读取在另一个装配分片，故不能降回模块内部。
     val recordPresented: fence: Fence -> unit
     val tryFindEstablished: sessionId: SessionId -> physical: PhysicalUserMessageId option -> (Fence * Record) option
 
@@ -35,9 +38,10 @@ module DeliveryAttemptLedger =
     val tryFindDurableEstablished:
         journal: AgentJournal option -> sessionId: SessionId -> physical: PhysicalUserMessageId option -> Fence option
 
+    /// 有意公开：本 session 是否存在任何一次进程内成立的交付（快速路径口径）。
     val hasEstablished: sessionId: SessionId -> bool
 
-    /// 本 session 是否存在任何一次已成立的交付（durable 见证口径，不绑定物理输入）。
+    /// 有意公开：durable 见证口径的读取，与进程内快速路径并列。
     val hasDurableEstablished: journal: AgentJournal option -> sessionId: SessionId -> bool
 
     val recordInterruptIssued: fence: Fence -> issued: Task -> unit

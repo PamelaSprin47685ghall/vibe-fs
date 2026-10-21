@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Fission.FissionLaunch
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Host.Ports
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.ToolHostCodec
@@ -103,7 +104,7 @@ module FissionTool =
         | FissionLaunchRejection.AdmissionRejected _ -> FissionToolPolicy.Path.Unavailable
 
     let private consequence language path =
-        tomlObjectWithInstructions (FissionToolPolicy.instructions language path) []
+        ToolResultText.tomlObjectWithInstructions (FissionToolPolicy.instructions language path) []
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (ctx: HostToolContext) =
         task {
@@ -114,7 +115,11 @@ module FissionTool =
 
             match launched with
             | Error rejection -> return consequence language (toolResultPath rejection)
-            | Ok group -> return tomlObject [ "status", TString "fissioned"; "lane_count", TInt group.LaneCount ]
+            | Ok group ->
+                return
+                    ToolResultText.tomlObject
+                        [ "status", ToolResultText.TString "fissioned"
+                          "lane_count", ToolResultText.TInt group.LaneCount ]
         }
 
 

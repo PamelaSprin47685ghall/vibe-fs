@@ -8,7 +8,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
-open ToolHostCodec
+open Wanxiangshu.Host
 
 /// OpenCode binding of the host-neutral `SyncDelegateBatchRules`: the tool
 /// context becomes a `DelegationCaller`, result instructions become the TOML
@@ -17,7 +17,7 @@ open ToolHostCodec
 module SyncDelegateBatching =
 
     let private wire (instruction: string) =
-        tomlObjectWithInstructions [ instruction ] []
+        ToolResultText.tomlObjectWithInstructions [ instruction ] []
 
     let resolve
         (runtime: SyncDelegateRuntime)

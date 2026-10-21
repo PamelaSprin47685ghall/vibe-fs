@@ -27,7 +27,10 @@ module BashHoneypotTool =
 
     let private execute (_args: HostToolArguments) (ctx: HostToolContext) =
         task {
-            return tomlObjectWithInstructions (ProviderProse.instructionLines (languageOf ctx) Path.Denial Map.empty) []
+            return
+                ToolResultText.tomlObjectWithInstructions
+                    (ProviderProse.instructionLines (languageOf ctx) Path.Denial Map.empty)
+                    []
         }
 
 
