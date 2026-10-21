@@ -1,7 +1,6 @@
-namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Fork
 
 open Wanxiangshu.Change
-open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Participant.Provider

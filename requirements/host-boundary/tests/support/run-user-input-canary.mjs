@@ -8,7 +8,7 @@ import { ProcessHost } from '../../../verification-system/tests/e2e/support/proc
 import { OPENCODE_BIN, initGitWorkspace } from '../../../verification-system/tests/e2e/support/process-host-utils.js'
 import { buildTextChunks, buildToolCallChunks, sendJSON, sendSSE } from '../../../verification-system/tests/e2e/support/strict-mock-sse.js'
 import { stopHttpServer } from '../../../verification-system/tests/e2e/support/strict-mock-server.js'
-import { renderInterrupted } from '../../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
+import { renderInterrupted } from '../../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 import { coldWorkSnapshot } from '../../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
 
 const root = path.resolve(import.meta.dirname, '../../../..')

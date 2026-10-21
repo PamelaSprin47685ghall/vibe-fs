@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Fork
 
 open System
 open System.Threading.Tasks
@@ -6,13 +6,11 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Change
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Persona

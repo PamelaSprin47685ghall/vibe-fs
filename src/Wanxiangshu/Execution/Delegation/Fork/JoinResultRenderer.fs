@@ -1,13 +1,11 @@
-namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Fork
 
 open System
 open Wanxiangshu.Change
-open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host.Contract
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Provider
 

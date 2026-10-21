@@ -190,10 +190,10 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
-    module: 'Execution/Delegation/Fork/OpenCode/JoinSurface.js',
+    module: 'Execution/Delegation/Fork/JoinSurface.js',
     owner: 'delegation',
     laws: ['DELEG-013', 'DELEG-015'],
-    source: 'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs',
+    source: 'src/Wanxiangshu/Execution/Delegation/Fork/JoinSurface.fs',
     representation: 'json',
     kind: 'pure',
   },

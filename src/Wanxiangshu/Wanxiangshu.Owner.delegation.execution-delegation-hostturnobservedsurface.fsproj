@@ -47,8 +47,8 @@
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
     <Compile Include="Execution/Delegation/Handle/JoinWake.fsi"/>
     <Compile Include="Execution/Delegation/Handle/JoinWake.fs"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs"/>
+    <Compile Include="Execution/Delegation/Fork/JoinResultRenderer.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/JoinResultRenderer.fs"/>
     <Compile Include="Host/CommandDeclaration.fsi"/>
     <Compile Include="Host/CommandDeclaration.fs"/>
     <Compile Include="Host/DelegationCommand.fsi"/>

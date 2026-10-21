@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
+import * as join from '../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 
 test('WHAT[delegation-005] completed wire presents Byname and record without exposing supplied physical identities', () => {
   for (const language of ['english', 'zh-CN']) {

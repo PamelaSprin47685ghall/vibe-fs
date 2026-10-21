@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
+namespace Wanxiangshu.Execution.Delegation.Fork
 
 /// Delegation-owned join wire surface. Inputs and outputs are plain JavaScript
 /// data; completion and error unions remain inside the renderer owner.

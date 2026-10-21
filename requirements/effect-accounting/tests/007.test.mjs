@@ -44,7 +44,7 @@ test('WHAT[effect-accounting-007] P0_RECOVERY_JOIN_001_durable_completed_awaitin
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const clean = await import("../../../dist/Execution/Delegation/Fork/CleanBreakSurface.js");
-const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js");
+const join = await import("../../../dist/Execution/Delegation/Fork/JoinSurface.js");
 const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
 
 const legacy = () => clean.legacyBody('run-legacy-abort')

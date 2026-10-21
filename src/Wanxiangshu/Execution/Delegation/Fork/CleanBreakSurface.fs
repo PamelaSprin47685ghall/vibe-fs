@@ -4,7 +4,6 @@ open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 

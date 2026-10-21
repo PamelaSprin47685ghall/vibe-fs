@@ -42,7 +42,7 @@ export const RAW_TIME_TOKENS = Object.freeze([
  */
 export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Change/Host/Host.fs',
-  'Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs',
+  'Execution/Delegation/Fork/JoinResultRenderer.fs',
   'Execution/Delegation/Fork/OpenCode/JoinTool.fs',
   'Execution/Delegation/Fork/OpenCode/ToolSurface.fs',
   'Execution/Delegation/SyncDelegate/Surface.fs',

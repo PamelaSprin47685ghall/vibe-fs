@@ -81,8 +81,8 @@
     <Compile Include="Execution/Delegation/Fork/Host/JoinSurface.fs" />
     <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fsi" />
     <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fs" />
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinSurface.fsi" />
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinSurface.fs" />
+    <Compile Include="Execution/Delegation/Fork/JoinSurface.fsi" />
+    <Compile Include="Execution/Delegation/Fork/JoinSurface.fs" />
     <Compile Include="Execution/Delegation/Fork/CleanBreakSurface.fsi" />
     <Compile Include="Execution/Delegation/Fork/CleanBreakSurface.fs" />
     <Compile Include="Execution/Delegation/Fork/OpenCode/ToolSurface.fsi" />
