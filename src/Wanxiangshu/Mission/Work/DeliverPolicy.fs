@@ -4,6 +4,7 @@ open Wanxiangshu.Execution.Tool
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Host
 
 /// The product's delivery decisions: what a `deliver` call is bound to, which
 /// fence may be replayed, what the retirement may commit, and how each
