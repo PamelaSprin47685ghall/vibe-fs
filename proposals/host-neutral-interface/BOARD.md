@@ -86,7 +86,18 @@ product code (a diagnostic must not break a turn). Fact only: it touches the HNI
 board's diagnostics surface, but it claims no card and changes no card state. The product's existing
 diagnostic path is `Foundation/Diagnostic.fs` (`Diagnostic.emit`, a product diagnostic behind the CTX-014
 whitelist and the `WANXIANGSHU_DIAG=1` gate), not the host verb; those call sites stay live and no
-consumer was cut over onto P-12.
+
+P-10 fact (arch lane, 2026-10-22, slice P-10): P-10 now has an OpenCode implementation —
+`OpenCode/Host/PathsPort.fs(i)` implements `IHostPaths`, and the neutral port family
+`Host/Ports/Storage.fs(i)` is unchanged. `StateRoot` is the product's existing durable-state root
+`RuntimePath.stateRoot` (`<primary worktree>/.Herdchestra`, `Persistence/Journal/RuntimePath.fs:86-118`) —
+not a new directory and not host storage; because that resolution is async while the port is a plain
+property, the composition root resolves it once and hands the adapter a memoized thunk. `ProjectRoot` is
+the plugin's `input.directory`; `ProjectId` is the host-supplied `input.project.id` (SDK `Project.id`) with
+the directory as the stable fallback, since no product code keys on a project id today. Fact only: it
+touches the HNI arch board's persistence-touchpoint surface, but it claims no card and changes no card
+state; the live ad-hoc `input.directory` reads (`PluginHost.fs:41-51`, `OpenCodePort.fs:105-120`,
+`SessionSnapshotPort.fs:340-346`, `PluginBoot.fs:64,107`) stay and no consumer was cut over onto P-10.
 
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 

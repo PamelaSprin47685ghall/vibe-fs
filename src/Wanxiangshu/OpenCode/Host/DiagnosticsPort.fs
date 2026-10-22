@@ -49,23 +49,28 @@ module DiagnosticsPort =
               "message", box operation
               "extra", box (extraOf fields) ]
 
+    /// Safely post to the host log, swallowing both synchronous throws and
+    /// promise rejections. A diagnostic must never throw into product code.
+    let private tryPostLog (appObj: obj) (logFn: obj) (operation: string) (fields: (string * string) list) : unit =
+        try
+            let payload = createObj [ "body", box (bodyOf operation fields) ]
+            let promise = logFn?call (appObj, payload)
+            dropRejection promise
+        with _ ->
+            // A diagnostic that cannot be written is dropped: the neutral
+            // port has no error channel, and a failed log must not break
+            // the turn.
+            ()
+
     /// The sink over the OpenCode SDK client (`client.app.log`).
     type SdkDiagnosticSink(client: obj) =
         interface IDiagnosticSink with
             member this.Emit(operation: string, fields: (string * string) list) : unit =
-                try
-                    let appObj = field client "app"
-                    let logFn = field appObj "log"
+                let appObj = field client "app"
+                let logFn = field appObj "log"
 
-                    if not (isNullish logFn) then
-                        let payload = createObj [ "body", box (bodyOf operation fields) ]
-                        let promise = logFn?call (appObj, payload)
-                        dropRejection promise
-                with _ ->
-                    // A diagnostic that cannot be written is dropped: the
-                    // neutral port has no error channel, and a failed log must
-                    // not break the turn.
-                    ()
+                if not (isNullish logFn) then
+                    tryPostLog appObj logFn operation fields
 
     /// The sink for the given host wiring, or `None` when the wiring names no
     /// host that exposes a log verb.
