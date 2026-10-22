@@ -33,6 +33,14 @@ module HostForkRunLifecycle =
         outcome: TerminalOutcome ->
             Task<string option>
 
+    val publishDeliveredReturn:
+        journal: AgentJournal ->
+        port: IEventObservationPort ->
+        sessionId: SessionId ->
+        providerRun: ProviderRunIdentity ->
+        toolCallId: ToolCallId ->
+            unit
+
     val sendAgentOwnerRootObserved:
         sessions: ISessionHostPort ->
         journal: AgentJournal option ->

@@ -314,10 +314,7 @@ module ProviderFailureSurface =
             | None -> false
 
         let closure =
-            AuthorityLifeClassification.deriveClosureKind
-                authorityKind
-                isManager
-                (optionalText (field value "agentOwnerLife"))
+            AuthorityLifeClassification.closureFor authorityKind isManager (optionalText (field value "agentOwnerLife"))
             |> Option.defaultValue ("HumanRootManagedRun", None)
 
         let ownerLogicalRunId =
@@ -388,7 +385,7 @@ module ProviderFailureSurface =
                 | None -> false
 
             let closure =
-                AuthorityLifeClassification.deriveClosureKind
+                AuthorityLifeClassification.closureFor
                     authorityKind
                     isManager
                     (optionalText (field value "agentOwnerLife"))
@@ -401,8 +398,11 @@ module ProviderFailureSurface =
                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
                   AuthorityKind = authorityKind
                   ExpectedClosureKind =
-                    optionalText (field value "expectedClosureKind")
-                    |> Option.defaultValue (fst closure)
+                    AuthorityLifeClassification.recordedClosureKind
+                        authorityKind
+                        isManager
+                        (optionalText (field value "agentOwnerLife"))
+                        (optionalText (field value "expectedClosureKind"))
                   OwnerLogicalRunId = optionalText (field value "ownerLogicalRunId")
                   AgentOwnerLife = optionalText (field value "agentOwnerLife") |> Option.orElse (snd closure)
                   IdentitySeed = identitySeed }

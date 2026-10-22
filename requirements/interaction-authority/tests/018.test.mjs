@@ -486,3 +486,54 @@ test('WHAT[interaction-authority-018] GAP-123 a repeated closure append is idemp
     assert.equal(afterConflict.closedRuns[0].closureWitness, closed.closedRuns[0].closureWitness)
   })
 })
+
+// The recorded closure kind and the recorded authority kind are two fields of
+// one acceptance. The journal refuses an acceptance whose closure kind belongs
+// to another root kind (a semantic cut, fatal to the process). The boundary
+// must therefore have exactly one derivation owner and never forward a
+// mismatched pair. This property covers the whole input space of the law.
+test('WHAT[interaction-authority-018] every acceptance closure kind belongs to its authority kind', async () => {
+  const fc = (await import('fast-check')).default
+  const law = await import('../../../dist/Interaction/Authority/LifeClassification.js')
+
+  const rootKinds = ['HumanRoot', 'AgentOwnerRoot']
+  const lives = ['Child', 'Attached', 'InternalLeaf']
+  const closureKinds = [
+    'HumanRootManagerLife',
+    'HumanRootManagedRun',
+    'AgentOwnerChildWork',
+    'AgentOwnerAttachedWork',
+    'AgentOwnerInternalLeaf',
+  ]
+
+  fc.assert(
+    fc.property(
+      fc.constantFrom(...rootKinds),
+      fc.boolean(),
+      fc.option(fc.constantFrom(...lives), { nil: null }),
+      fc.option(fc.constantFrom(...closureKinds, 'bogus'), { nil: null }),
+      (rootKind, isManager, life, recorded) => {
+        const chosen = law.recordedClosureKind(rootKind, isManager, life, recorded)
+
+        assert.ok(closureKinds.includes(chosen), `unknown closure kind ${chosen}`)
+        assert.equal(law.rootKindOfKind(chosen), rootKind, `${rootKind}/${life}/${recorded} produced ${chosen}`)
+        assert.ok(law.witnessKindOf(chosen), `closure kind ${chosen} has no witness kind`)
+
+        if (rootKind === 'AgentOwnerRoot') {
+          assert.notEqual(
+            law.rootKindOfKind(chosen),
+            'HumanRoot',
+            'an agent-owner root must never close under a HumanRoot kind',
+          )
+        }
+      },
+    ),
+    { seed: 18018, numRuns: 400 },
+  )
+
+  // The exact fatal input: an agent-owner root with no proven life used to
+  // record HumanRootManagedRun. It now records the coarse agent-owner life.
+  const normalized = law.recordedClosureKind('AgentOwnerRoot', false, null, 'HumanRootManagedRun')
+  assert.equal(normalized, 'AgentOwnerChildWork')
+  assert.equal(law.rootKindOfKind(normalized), 'AgentOwnerRoot')
+})

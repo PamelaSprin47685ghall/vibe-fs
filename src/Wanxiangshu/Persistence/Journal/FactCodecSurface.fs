@@ -164,7 +164,7 @@ module FactCodecSurface =
                 | None -> false
 
             let closure =
-                AuthorityLifeClassification.deriveClosureKind
+                AuthorityLifeClassification.closureFor
                     authorityKind
                     isManager
                     (optionalString (payload?AgentOwnerLife)
@@ -181,9 +181,13 @@ module FactCodecSurface =
                             AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
                           AuthorityKind = authorityKind
                           ExpectedClosureKind =
-                            optionalString (payload?ExpectedClosureKind)
-                            |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
-                            |> Option.defaultValue (fst closure)
+                            AuthorityLifeClassification.recordedClosureKind
+                                authorityKind
+                                isManager
+                                (optionalString (payload?AgentOwnerLife)
+                                 |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value)))
+                                (optionalString (payload?ExpectedClosureKind)
+                                 |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value)))
                           OwnerLogicalRunId =
                             optionalString (payload?OwnerLogicalRunId)
                             |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))

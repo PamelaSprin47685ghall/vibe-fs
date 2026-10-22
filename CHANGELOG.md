@@ -1,5 +1,19 @@
 # Changelog — 版本历史
 
+## Unreleased — Authority 接收不再落错 closure kind（journal semantic cut 根因）
+
+- **根因**：`Dispatcher.authorityRootFact` 与三个 wire codec（`CodecSurface`、`FactCodecSurface`、`ProviderFailureSurface`，以及 `TemporalSurface`）在 AgentOwnerRoot 无法证明 life 时，把 `ExpectedClosureKind` 默认成 `HumanRootManagedRun`。该值属于 HumanRoot，`PromptFactCodec` 的校验因此拒绝接收（`ExpectedClosureKind ... does not match AuthorityKind AgentOwnerRoot`），journal 写 semantic cut 并 `FatalProcess.trip`。
+- **SSOT 修复**：closure kind 的推导只有一个 owner——`AuthorityLifeClassification.closureFor` / `recordedClosureKind`。`closureFor` 对无法证明 life 的 AgentOwnerRoot 使用既有 `coarseAgentOwnerLife`（`Child`），永不落到 HumanRoot 类；`recordedClosureKind` 只在记录值与 root kind 相符时保留记录值，否则改用推导值。`Dispatcher` 与四个 codec 全部改为调用这两个函数，删除各自的 `Option.defaultValue ("HumanRootManagedRun", None)` 副本。
+- **不变量与 fast-check**：`requirements/interaction-authority/tests/018.test.mjs` 新增属性测试（seed 18018，400 runs）：任意 root kind / manager 位 / life / 记录值下，最终 closure kind 必须属于同一 root kind 且有 witness kind；AgentOwnerRoot 永不落 HumanRoot 类。固定回归覆盖触发 fatal 的输入（AgentOwnerRoot + 无 life + `HumanRootManagedRun` → `AgentOwnerChildWork`）。
+- **验证**：`node --test requirements/interaction-authority/tests/018.test.mjs` → 14 tests / 11 passed / 3 failed；三个失败均为既有的 GAP-123 `terminalSourceFact` 缺失（`RuntimeSurface` 尚未暴露该入口，先于本改动存在），新增属性测试通过。**注意**：该修复需重启宿主进程才生效；运行中的旧 `dist` 仍会继续 semantic cut。
+
+## Unreleased — 投递后中断仍向父方返回交付（delegation-033）
+
+- **规则**：`deliver` 之后的 attempt 中断保留（模型不应看到 deliver 回复），但中断不得吞掉交付。宿主在发出中断之前，先用已提交的交付见证结算本次投递子运行（`HostForkRunLifecycle.publishDeliveredReturn` 发布与该见证一致的 `Completed`），父方 `join` 因此仍收到该次交付的 view；中断只结束 attempt。Manager/Plan 的生命周期 deliver 没有父 join，行为不变。
+- **`DELIVERY_NOT_ESTABLISHED` 收紧与散文归属**：有 journal 的生产宿主中，交付调用无法归属（交付调用的 assistant 消息没有散文、同一回合的物理输入之后也没有散文、没有物理输入、没有逻辑运行或快照）时不再静默降级为「仅进程内交付格」。`ToolWorkflow` 以 `UnattributedDelivery` 拒绝，调用方看到失败且不留可呈现的交付格；只有无 journal 的 harness 继续走 cell-only 路径。同时，`ToolRegistry` 的交付归属接受**同一回合中本次调用物理输入之后的最近一条 assistant 散文**：交付合同本就要求「先讲散文再 deliver」，provider 常把两步拆成两条 assistant 消息；此前的严格同消息要求让真实交付无法形成见证。这条同时解释了「子代理以为自己 deliver 了，Manager 的 join 永远等不到」的现场：交付从未形成见证。
+- **需求与文档**：新增 `requirements/delegation/WHAT.md` [033]（投递后中断不得吞掉返回）；`repository-programming` [054] 补交付后中断与见证失败规则；`requirements/INDEX.md` delegation 计数 30 → 31；`任务书A.md`、`保姆级交接与展望.md`、`CHANGELOG.md` 同步该口径。
+- **验证**：`node --test requirements/delegation/tests/033.test.mjs` → 2 passed / 0 failed（见证结算发布 Completed；未归属交付被拒且无进程内交付格）。**整树构建仍未闭合**：Fable 编译通过，但 `js-module-linkage` 仍报 8 条陈旧 `dist` 导出不匹配（先于本改动存在），真实 fork 夹具在本机同样超时；installed-Host 回归待 `dist` 重建后由正式 runner 复核。
+
 ## Unreleased — 2026-10-22 文档收口批次（Ledger lane）
 
 - **GAP 台账（`requirements/GAP.md`）**：17 行列形状归一（表 1 GAP-025/038；表 2 GAP-210/077；表 3 GAP-225…GAP-237），0 行形状不一致；203 行 GAP 行一行未删、无重复 id；状态词未改（PARTIAL 113 / CLOSED 53 / ARCHIVED 18 / OPEN 10 / RETIRED 9）。文字实际变化 9 行（GAP-025 转义 `\|`、GAP-038/210/077 并格、GAP-231…237 前缀中性化 + 并格）；GAP-005/GAP-050 维持 `OPEN`（当前合同下无 faithful mechanical oracle，需人工审阅）。本批 register 的 GAP 证据更新：GAP-075、GAP-088、GAP-123 各追加 lane checkpoint 证据注记，**状态维持 PARTIAL**（GapBehavior 为设计态无生产改动；Authority 6 项编译修复已落地但终态生产者未接线）；无 GAP 在本批被标记 CLOSED。

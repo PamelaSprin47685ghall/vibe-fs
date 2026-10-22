@@ -151,7 +151,7 @@
 | 25 | `durable-events` | 28 | durable-events-001 ~ 028 |
 | 26 | `effect-accounting` | 11 | effect-accounting-001 ~ 008、010、012、013（交付成功不是效果） |
 | 27 | `durable-convergence` | 11 | durable-convergence-001 ~ 011 |
-| 28 | `delegation` | 30 | delegation-001 ~ 015、017、019 ~ 032 |
+| 28 | `delegation` | 31 | delegation-001 ~ 015、017、019 ~ 033（033：投递后中断前先以交付见证结算子运行，父方 join 仍收到返回） |
 | 58 | `advisor` | 6 | advisor-001 ~ 006（专席归属与家族根父级、law/view/intent 三材料独立 prompt、view 增量与已交付游标、无工具散文、无授权副作用、`js.advisor` 编程面成员） |
 | 29 | `intra-participant-parallelism` | 17 | intra-participant-parallelism-001 ~ 015、017 ~ 018 |
 | 30 | `process-execution` | 17 | process-execution-001 ~ 017；通用工具结果边界归 host-boundary |

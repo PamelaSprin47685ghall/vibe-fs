@@ -189,7 +189,7 @@
 6. **交付格收紧为两级**：带围栏 cell = 交付证据；无围栏 cell = 渲染缓存；`restoreMaterial`（任意成品字符串入口）已删除。
 7. **见证读取因「同 (session, run) 多条」而丢证据**：`TaskDelivery.tryFind` 改为 `tryFindByFence` / `tryFindByFenceFields` 围栏感知读取；三处调用方（`DelegationJournalAdapter` / `Fission/Host` / `ChildRecoveryWorkflow`）已切。
 8. **见证生产者为零**：`TaskDeliveryJournal.commit` 原本**全仓零调用方**。现由 `ToolRegistry.settlementOf` 装配归属、`OpenCode/Host/DeliveryWitnessWriter.fs`（新 shard `Wanxiangshu.Owner.host-boundary.opencode-host-deliverywitnesswriter`）唯一实现写入器、`ToolWorkflow.settleDeliveredView` 在提交成功后才写交付格。
-9. **交付停止位置错**：原先在 deliver 工具内部 + event 钩子物理中断（user-facing 会话上必被 `MANAGED-SESSION-016` 拒绝）。现改为 **transform 钩子**的 `delivery-adjudication` stage：抑制下一次 provider step + 清空消息 + 中断本次 attempt；「已发出」与「已观察到」分别取证。
+9. **交付停止位置错**：原先在 deliver 工具内部 + event 钩子物理中断（user-facing 会话上必被 `MANAGED-SESSION-016` 拒绝）。现改为 **transform 钩子**的 `delivery-adjudication` stage：抑制下一次 provider step + 清空消息 + 中断本次 attempt；「已发出」与「已观察到」分别取证。**中断前必须先用已提交的交付见证结算本次子运行**（delegation [033]）：中断只结束 attempt，不吞掉交付，父方 `join` 仍收到 view；见证无法建立时投递以 `DELIVERY_NOT_ESTABLISHED` 失败，不得只留进程内交付格。
 10. **SyncDelegate 把「完成但未交付」判成失败**：改为与 fork 侧一致的**未解除义务**（父方可重派）。
 
 ### 测试与文档
@@ -328,7 +328,7 @@ dotnet tool run fantomas src/Wanxiangshu                 # 格式化（阶段末
 - `Repository/Programming/Js/OpenCode/ToolHostSurface.fs`：非宿主测试面传 `settlementOf = None`。
 - `Composition/Turn/OrdinaryTurnWorkflow.fs`：`hasDeliveryEvidence` 只认真实见证（有 journal 时只认 durable witness；无 journal 时只认带围栏的 cell），不再用「存在交付」把会话永久静音。
 - `OpenCode/Tools/ToolRuntimeScope.fs` + `OpenCode/Host/HostTurnObserver.fs`：`DeliveryAttemptLedger` 进程内台账（已成立／已呈现／中断已发出／中断已观察到 分别取证），turn 观察者按精确 run 取自有中断任务。
-- `OpenCode/Plugin/PluginTransforms.fs`：新增 **delivery-adjudication** stage（条款 4）：本次 attempt 存在已成立交付且物理输入未变时，抑制下一次 provider step → 发出本次 attempt 的中断 → 清空本次请求消息，LLM 因此看不到 deliver 回复；`RelayNarrativeTransform.clearRequestMessages` 抽出共用动作；删除重复的 `handleInterruptionError` 死定义；stage-4 注释改为与代码一致（不重写消息集）。
+- `OpenCode/Plugin/PluginTransforms.fs`：新增 **delivery-adjudication** stage（条款 4）：本次 attempt 存在已成立交付且物理输入未变时，**先按交付见证结算本次子运行**（`HostForkRunLifecycle.publishDeliveredReturn`，delegation [033]）→ 抑制下一次 provider step → 发出本次 attempt 的中断 → 清空本次请求消息，LLM 因此看不到 deliver 回复；`RelayNarrativeTransform.clearRequestMessages` 抽出共用动作；删除重复的 `handleInterruptionError` 死定义；stage-4 注释改为与代码一致（不重写消息集）。
 
 ### 4. 交付消费方（fork / fission / sync delegate）
 
@@ -554,7 +554,7 @@ dotnet tool run fantomas src/Wanxiangshu
 |---|---|---|---|---|
 | 1 | 停止与接力混在 `interruptAttempt` 回调里 | **存在** | work [011]：接力路径**不发**终态中断；停止与接力是**两件事**；在途 Host 中断未完成精确的 provider-step 释放与物理中断之前不得派发后继 | `PluginTransforms.fs:796`（旧）、`Mission/Manager/Workflow.fs:352-369` |
 | 2 | 缺 `physicalUserMessageId` → `invalidOp`（钩子失败） | **存在** | work [011]：后任已有新根时「不中止会话，也不因拒绝中断而崩溃」；managed-session-lifecycle [016]：交付裁决只命中「登记时那次物理输入仍是当前物理输入」的交付 | `PluginTransforms.fs:806-812`（旧） |
-| 3 | `staleRetirement` 只匹配 `Outcome = "Relayed"`，终态 `Delivered` 残余不算过时 | **非缺陷** | work [011]：Delivered 的停止**由交付裁决**执行（另一 stage），Relayed 才走接力；CUT-17 的 `relayed` 标志与之一致 | `NarrativeTransform.fs:85`、`PluginTransforms.fs:670`（`adjudicateDelivery`）、`:922`（`StopAfterDelivery`） |
+| 3 | `staleRetirement` 只匹配 `Outcome = "Relayed"`，终态 `Delivered` 残余不算过时 | **非缺陷** | work [011]/delegation [033]：Delivered 的停止**由交付裁决**执行（另一 stage），且中断前先按见证结算子运行；Relayed 才走接力；CUT-17 的 `relayed` 标志与之一致 | `NarrativeTransform.fs:85`、`PluginTransforms.fs:670`（`adjudicateDelivery`）、`:922`（`StopAfterDelivery`）、`Host/RunLifecycle.fs`（`publishDeliveredReturn`） |
 | 4 | `staleRetirement` 取首个 Relayed cut，而 `afterCut`/`cutPresent` 用 `work.ProjectionCut`（末次 cut） | **已由 CUT-17 修** | CUT-17 内部自洽：切点 = 第一条带切点工具调用/结果的消息 | `wanxiangli/src/projection/Projection.fs:381`（`cutIndex` 用 `tryFindIndex`）、`:388-392` |
 | 5 | `acceptedSuccessorRequestFor` 只查 `ChatExecutionProjection.byKey` 是否存在，无逻辑运行/活跃根核对 | **已由 CUT-17 修** | CUT-17 的 `acceptedRun` 把「已接纳消息的根」与「当前逻辑运行的根」逐字比对；`successor` 分支另有 freshRoot / gatePhysical 两条独立判据 | `PluginTransforms.fs:645`（旧）、`wanxiangli/src/projection/Projection.fs:395-400` |
 

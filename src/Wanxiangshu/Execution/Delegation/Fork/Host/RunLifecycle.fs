@@ -288,6 +288,56 @@ module HostForkRunLifecycle =
         | TerminalOutcome.Completed result -> completedOutcomeView childViewForRun run result
         | _ -> Task.FromResult None
 
+    /// The return of a delivered child whose attempt is about to be cut.
+    ///
+    /// The cut ends the delivering attempt, not the delivery. The committed
+    /// witness already carries the material, so the delivering run is settled
+    /// now through the same terminal the ordinary stop path publishes; the
+    /// owner's join then receives that material. Without this, the interrupt
+    /// leaves the child's work unit Active and the parent waits for a terminal
+    /// that never addresses the delivering run.
+    ///
+    /// Only a linked child has an owner waiting on that run. A session with no
+    /// handle (the Manager/Plan lifecycle deliver) has no such return here.
+    let publishDeliveredReturn
+        (journal: AgentJournal)
+        (port: IEventObservationPort)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId)
+        : unit =
+        let handle =
+            (AgentJournal.snapshot journal).AgentProjections.HandleByChildSession
+            |> Map.tryFind sessionId
+
+        let witness =
+            handle
+            |> Option.bind (fun _ ->
+                TaskDeliveryJournal.tryFindByFenceFields
+                    journal
+                    sessionId
+                    providerRun
+                    (Some toolCallId)
+                    None
+                    None
+                    None
+                    None)
+
+        match handle, witness with
+        | Some record, Some witness ->
+            let result: AgentRunResult =
+                { SessionId = sessionId
+                  AuthorityRootUserMessageId = witness.Fence.AuthorityRoot
+                  ProviderRun = witness.Fence.ProviderRun
+                  Role = record.CanonicalRole
+                  Directory = None
+                  TerminalText = witness.View
+                  TurnFormalText = witness.FormalText }
+
+            if result.IsValid then
+                port.NotifyTerminal sessionId (TerminalOutcome.Completed result) |> ignore
+        | _ -> ()
+
     /// The view of one terminal, resolved only when it is asked for.
     ///
     /// The read is deferred so that a terminal which does not address this

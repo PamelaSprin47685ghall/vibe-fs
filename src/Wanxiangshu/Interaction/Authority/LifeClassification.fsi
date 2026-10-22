@@ -32,3 +32,15 @@ module AuthorityLifeClassification =
     /// kind at all, and so admits no closure.
     val deriveClosureKind:
         rootKindLabel: string -> isManager: bool -> agentOwnerLife: string option -> (string * string option) option
+
+    /// The closure kind and agent-owner life to record for an acceptance.
+    ///
+    /// An agent-owner root whose producer could not prove a life records the
+    /// documented coarse life. It must never fall back to a HumanRoot kind.
+    val closureFor:
+        rootKindLabel: string -> isManager: bool -> agentOwnerLife: string option -> (string * string option) option
+
+    /// The closure kind to record: the recorded one only while it belongs to
+    /// this root kind, otherwise the kind the acceptance derives.
+    val recordedClosureKind:
+        rootKindLabel: string -> isManager: bool -> agentOwnerLife: string option -> recorded: string option -> string

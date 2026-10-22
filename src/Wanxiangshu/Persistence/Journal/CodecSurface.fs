@@ -158,10 +158,7 @@ module JournalCodecSurface =
                 | None -> false
 
             let closure =
-                AuthorityLifeClassification.deriveClosureKind
-                    authorityKind
-                    isManager
-                    (optionalText (payload?AgentOwnerLife))
+                AuthorityLifeClassification.closureFor authorityKind isManager (optionalText (payload?AgentOwnerLife))
                 |> Option.defaultValue ("HumanRootManagedRun", None)
 
             Fact.Agent(
@@ -174,7 +171,11 @@ module JournalCodecSurface =
                             AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
                           AuthorityKind = authorityKind
                           ExpectedClosureKind =
-                            optionalText (payload?ExpectedClosureKind) |> Option.defaultValue (fst closure)
+                            AuthorityLifeClassification.recordedClosureKind
+                                authorityKind
+                                isManager
+                                (optionalText (payload?AgentOwnerLife))
+                                (optionalText (payload?ExpectedClosureKind))
                           OwnerLogicalRunId = optionalText (payload?OwnerLogicalRunId)
                           AgentOwnerLife = optionalText (payload?AgentOwnerLife) |> Option.orElse (snd closure)
                           IdentitySeed = identitySeed }

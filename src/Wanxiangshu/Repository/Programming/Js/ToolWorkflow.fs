@@ -179,9 +179,14 @@ type IDeliveryWitnessWriter =
 /// What the settle point needs to attribute a delivery and to make its
 /// evidence durable. A call without a settlement has no durable store behind
 /// it (test/dev harness): the process-live cell is then the only evidence.
+///
+/// A durable host whose call cannot be attributed (no owning assistant prose,
+/// no physical input, no logical run) is NOT the harness case: its delivery
+/// has no witness to stand on, so the call must fail instead of leaving a
+/// process-live cell that no join can receive.
 type DeliverySettlement =
-    { Attribution: DeliveryAttribution
-      Writer: IDeliveryWitnessWriter }
+    | DurableDelivery of DeliveryAttribution * IDeliveryWitnessWriter
+    | UnattributedDelivery of reason: string
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
 /// sandbox execution, staging, preflight, durable prepare, commit and the
@@ -482,11 +487,11 @@ module JsToolWorkflow =
 
     let private commitWitness
         (record: unit -> unit)
-        (attributed: DeliverySettlement)
+        (writer: IDeliveryWitnessWriter)
         (witness: DeliveryWitness)
         : Task<Result<unit, JsFailure>> =
         task {
-            let! committed = attributed.Writer.CommitDeliveryWitness witness
+            let! committed = writer.CommitDeliveryWitness witness
 
             match committed with
             | Ok() ->
@@ -506,13 +511,14 @@ module JsToolWorkflow =
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
         (record: unit -> unit)
-        (attributed: DeliverySettlement)
+        (attribution: DeliveryAttribution)
+        (writer: IDeliveryWitnessWriter)
         (view: obj)
         : Task<Result<unit, JsFailure>> =
         task {
-            match deliveryWitness sessionId fence attributed.Attribution view with
+            match deliveryWitness sessionId fence attribution view with
             | Error failure -> return Error failure
-            | Ok witness -> return! commitWitness record attributed witness
+            | Ok witness -> return! commitWitness record writer witness
         }
 
     let private settleView
@@ -535,7 +541,13 @@ module JsToolWorkflow =
                 // itself still stands on its own process-live cell.
 
                 return Ok()
-            | Some attributed -> return! commitAttributedDelivery sessionId fence record attributed view
+            | Some(UnattributedDelivery reason) ->
+                // A durable host that could not attribute this call has no
+                // witness to commit. The delivery did not happen, and the
+                // caller must see that instead of a success no join can see.
+                return Error(JsFailure.DeliveryNotEstablished reason)
+            | Some(DurableDelivery(attribution, writer)) ->
+                return! commitAttributedDelivery sessionId fence record attribution writer view
         }
 
     /// The delivery settlement of one settled call (deliver clauses 3 and 6).

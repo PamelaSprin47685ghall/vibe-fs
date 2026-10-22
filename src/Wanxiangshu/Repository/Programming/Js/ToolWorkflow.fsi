@@ -55,9 +55,13 @@ type IDeliveryWitnessWriter =
 /// What the settle point needs to attribute a delivery and to make its
 /// evidence durable. A call without a settlement has no durable store behind
 /// it (test/dev harness): the process-live cell is then the only evidence.
+///
+/// A durable host whose call cannot be attributed is NOT the harness case:
+/// `UnattributedDelivery` refuses the delivery because no witness can carry
+/// it to the caller's join.
 type DeliverySettlement =
-    { Attribution: DeliveryAttribution
-      Writer: IDeliveryWitnessWriter }
+    | DurableDelivery of DeliveryAttribution * IDeliveryWitnessWriter
+    | UnattributedDelivery of reason: string
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
 /// sandbox execution, as-is per-write persistence, durable accounting and the

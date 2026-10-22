@@ -94,3 +94,51 @@ module AuthorityLifeClassification =
             expectedClosureKind rootKindLabel isManager agentOwnerLife
             |> Option.map (fun kind -> (kind, agentOwnerLife))
         | _ -> None
+
+    /// The closure kind and agent-owner life to record for an acceptance.
+    ///
+    /// An agent-owner root whose producer could not prove a life records the
+    /// documented coarse life. It must never fall back to a HumanRoot kind:
+    /// that records a closure the root can never close, and the journal
+    /// rejects the acceptance as a semantic cut.
+    let closureFor
+        (rootKindLabel: string)
+        (isManager: bool)
+        (agentOwnerLife: string option)
+        : (string * string option) option =
+        match deriveClosureKind rootKindLabel isManager agentOwnerLife with
+        | Some derived -> Some derived
+        | None when rootKindLabel = "AgentOwnerRoot" ->
+            expectedClosureKind rootKindLabel isManager (Some coarseAgentOwnerLife)
+            |> Option.map (fun kind -> kind, Some coarseAgentOwnerLife)
+        | None -> None
+
+    /// The closure kind to record: the recorded one only while it belongs to
+    /// this root kind, otherwise the kind the acceptance derives.
+    ///
+    /// A recorded kind from another root kind can never be closed by this
+    /// root. Writing it makes the journal reject the acceptance as a semantic
+    /// cut (the whole process dies), so the boundary normalizes it to the
+    /// derived kind instead of forwarding a record no closure can honour.
+    let recordedClosureKind
+        (rootKindLabel: string)
+        (isManager: bool)
+        (agentOwnerLife: string option)
+        (recorded: string option)
+        : string =
+        let derived =
+            closureFor rootKindLabel isManager agentOwnerLife
+            |> Option.map fst
+            |> Option.defaultValue "HumanRootManagedRun"
+
+        match recorded with
+        | Some kind when not (System.String.IsNullOrWhiteSpace kind) ->
+            match
+                (try
+                    Some(rootKindOfKind kind)
+                 with _ ->
+                     None)
+            with
+            | Some rootKind when rootKind = rootKindLabel -> kind
+            | _ -> derived
+        | _ -> derived

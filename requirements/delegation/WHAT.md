@@ -155,3 +155,11 @@ sync invariant 违例由委托 owner 构造 typed incident；先保留已发生 
 ## [032] Engineer 与 DevOps 不相互差遣
 
 Engineer 完成工作或到达需 Manager 决定的边界即返回，不自行组织验证链，不直接、包装或转发任务给 DevOps。DevOps 不创建或差遣其他工程子代理。运行验证和进一步组织工作由 Manager 调度。
+
+## [033] 投递后中断不得吞掉返回
+
+子代理经 `this.deliver` 提交持久交付见证后，宿主按设计中断其后续 attempt，使模型看不到 deliver 回复。中断只结束本次投递 attempt，不改变已经成立的交付：宿主必须在发出中断之前，用同一见证结算投递子工作（与普通终态相同的 Completion 与终态发布），使 owner 的 `join` 收到该次交付的 view。
+
+- 允许后果：投递子工作的终态是 `completed`，join 记录里的 `view` 是本次交付的材料；中断事实（已发出 / 已观察到）独立登记，不推翻交付。
+- 禁止后果：不得因为投递后的中断把子工作留在 Active、等一个不会到来的同 run 终态；不得用 abort / cancel 事实替代交付见证来结算；不得把未交付的后续步骤写成完成。
+- 边界：Manager / Plan 的生命周期 deliver 没有自己的父 join，本条只约束有 handle 链接的子会话。交付见证缺失时不是“已完成”：投递不成立，工具必须报告 `DELIVERY_NOT_ESTABLISHED`，不得只留进程内交付格。

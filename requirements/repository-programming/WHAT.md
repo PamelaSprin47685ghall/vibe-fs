@@ -292,6 +292,8 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 
 ...次工作之前已经返回过的内容，即使本次 reportMapping 中包含，也不再重复返回。程序捕获内部交付哨兵后可以继续存活，此后的 return 值才是结果——捕获即知情取消。subagent 程序必须以 `js.deliver` 显式交付：普通 `return` 保持交付格为空，不写完成；只要该子工作仍可能交付，它就是一条活跃义务，join 保持不关闭；交付已不可能时（被 abort、取消或重启加载结算）该子工作以 `voided` 结清，这不是完成，join 以 `voided` 报告一次。`js.dag` 中非完成记录按 `node-<status>` 挂起（`node-failed`、`node-abandoned`、`node-voided`）。描述与双语资源 `tool/js-program/deliver` 陈述同一契约。
 
+交付成立后宿主按设计中断本次 attempt（见 work [011]），使模型看不到 deliver 回复；这次中断只结束 attempt，不改变已提交的交付。宿主必须先以该交付见证结算本次子运行（写入与普通终态相同的 completion），再发出中断；父方的 `join` 因此仍能收到该次交付的 view。见证无法建立（例如交付调用的 assistant 消息没有散文、没有物理输入或没有逻辑运行）时投递不成立：工具以 `DELIVERY_NOT_ESTABLISHED` 失败，不得只写进程内交付格并声称成功。
+
 ## [055] vm 并行边界
 
 同一程序内 `Promise.all` / `Promise.allSettled` 直接表达 IO 并行，不需要新原语：vm 单线程事件循环天然把每次 api 调用串行化，宿主不加锁、不排队、不互斥。独立分支的效果各自 as-is 落盘；一个分支失败不清除兄弟分支已落地的改动。同一文件的写竞态由程序作者自负（Unix 哲学），宿主只保单笔写原子与写前校验。

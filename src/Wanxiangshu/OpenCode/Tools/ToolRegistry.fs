@@ -444,14 +444,13 @@ module ToolRegistry =
             let deliveryTask, retirementId =
                 deliveryTaskOf durable sessionId providerRun toolCallId work
 
-            { Attribution =
+            DurableDelivery(
                 { LogicalRunId = logicalRunId
                   AuthorityRoot = authorityRoot
                   PhysicalUserMessageId = physical
                   Task = deliveryTask
                   RetirementId = retirementId
-                  FormalText = formalText }
-              Writer =
+                  FormalText = formalText },
                 DeliveryWitnessWriter.create durable (fun witness ->
                     // The durable witness is committed by now: the
                     // registration only records the committed attempt, so the
@@ -460,10 +459,37 @@ module ToolRegistry =
                         { SessionId = witness.SessionId
                           ProviderRun = witness.ProviderRun
                           CallId = witness.ToolCallId }
-                        (Some witness.PhysicalUserMessageId)) }
+                        (Some witness.PhysicalUserMessageId))
+            )
 
         /// The formal prose and the physical input of the assistant message
         /// that made the call; either missing leaves the call unattributed.
+        ///
+        /// The prose may be the immediately preceding assistant text of the
+        /// same turn: the delivery contract tells the model to state the
+        /// result in prose and then call `deliver`, and providers commonly
+        /// split those into two assistant messages. Only text after this
+        /// call's physical input is accepted, so an older turn's prose can
+        /// never attribute a new delivery.
+        let formalTextOfTurn (messages: SessionMessage list) (owner: SessionMessage) (physical: PhysicalUserMessageId) =
+            let beforeOwner = messages |> List.takeWhile (fun message -> message.Id <> owner.Id)
+
+            let boundary =
+                beforeOwner
+                |> List.tryFindIndex (fun message -> message.Id = PhysicalUserMessageId.value physical)
+
+            match boundary with
+            | None -> None
+            | Some index ->
+                beforeOwner
+                |> List.skip (index + 1)
+                |> List.rev
+                |> List.tryPick (fun candidate ->
+                    if candidate.Role = "assistant" then
+                        formalTextOf candidate
+                    else
+                        None)
+
         let messageAttribution
             (ctx: HostToolContext)
             (providerRun: ProviderRunIdentity)
@@ -471,10 +497,11 @@ module ToolRegistry =
             : (string * PhysicalUserMessageId) option =
             owningAssistantMessage messages providerRun
             |> Option.bind (fun message ->
-                formalTextOf message
-                |> Option.bind (fun formalText ->
-                    physicalUserMessageOf messages message (currentPhysicalUserMessage ctx.SessionId)
-                    |> Option.map (fun physical -> formalText, physical)))
+                physicalUserMessageOf messages message (currentPhysicalUserMessage ctx.SessionId)
+                |> Option.bind (fun physical ->
+                    formalTextOf message
+                    |> Option.orElseWith (fun () -> formalTextOfTurn messages message physical)
+                    |> Option.map (fun formalText -> formalText, physical)))
 
         let attributedSettlement
             (ctx: HostToolContext)
@@ -543,35 +570,63 @@ module ToolRegistry =
         /// The delivery settlement of one js-* call: the host's attribution of
         /// the call and the durable place its witness goes.
         ///
-        /// Every field is read from the source the read side reads. A field
-        /// that cannot be read leaves the call without a settlement: no
-        /// witness is invented, and the call keeps its ordinary behaviour.
+        /// Every field is read from the source the read side reads. A durable
+        /// host whose call cannot be attributed refuses the delivery: no
+        /// witness is invented, and a process-live cell alone must never
+        /// present a return the caller's join cannot receive. Only a host
+        /// without a journal is the harness case and keeps the cell-only
+        /// behaviour.
         let settlementOf (ctx: HostToolContext) : Task<DeliverySettlement option> =
-            match journal, runtime.Snapshot, ctx.ProviderRunId, ctx.ToolCallId with
-            | Some durable, Some snapshotPort, Some providerRun, Some toolCallId ->
-                let sessionId = SessionId.create ctx.SessionId
+            match journal with
+            | None -> Task.FromResult None
+            | Some durable ->
+                match runtime.Snapshot, ctx.ProviderRunId, ctx.ToolCallId with
+                | Some snapshotPort, Some providerRun, Some toolCallId ->
+                    let sessionId = SessionId.create ctx.SessionId
 
-                Wanxiangshu.Interaction.Authority.PromptAuthorityProjectionQueries.activeProfile
-                    sessionId
-                    (AgentJournal.snapshot durable).AgentProjections
-                |> Option.map (fun profile -> profile.LogicalRunId, profile.AuthorityRootUserMessageId)
-                |> Option.filter (fun (logicalRunId, authorityRoot) ->
-                    not (
-                        String.IsNullOrWhiteSpace(LogicalRunId.value logicalRunId)
-                        || String.IsNullOrWhiteSpace(AuthorityRootUserMessageId.value authorityRoot)
-                    ))
-                |> Option.map (fun (logicalRunId, authorityRoot) ->
-                    loadedSettlement
-                        ctx
-                        durable
+                    Wanxiangshu.Interaction.Authority.PromptAuthorityProjectionQueries.activeProfile
                         sessionId
-                        providerRun
-                        toolCallId
-                        (fun () -> snapshotPort.GetMessages sessionId)
-                        logicalRunId
-                        authorityRoot)
-                |> Option.defaultWith (fun () -> Task.FromResult None)
-            | _ -> Task.FromResult None
+                        (AgentJournal.snapshot durable).AgentProjections
+                    |> Option.map (fun profile -> profile.LogicalRunId, profile.AuthorityRootUserMessageId)
+                    |> Option.filter (fun (logicalRunId, authorityRoot) ->
+                        not (
+                            String.IsNullOrWhiteSpace(LogicalRunId.value logicalRunId)
+                            || String.IsNullOrWhiteSpace(AuthorityRootUserMessageId.value authorityRoot)
+                        ))
+                    |> Option.map (fun (logicalRunId, authorityRoot) ->
+                        task {
+                            let! attributed =
+                                loadedSettlement
+                                    ctx
+                                    durable
+                                    sessionId
+                                    providerRun
+                                    toolCallId
+                                    (fun () -> snapshotPort.GetMessages sessionId)
+                                    logicalRunId
+                                    authorityRoot
+
+                            return
+                                match attributed with
+                                | Some settlement -> Some settlement
+                                | None ->
+                                    Some(
+                                        UnattributedDelivery
+                                            "the delivering assistant message carries no prose or physical input to own the witness"
+                                    )
+                        })
+                    |> Option.defaultValue (
+                        Task.FromResult(
+                            Some(UnattributedDelivery "the delivery call has no active logical run or authority root")
+                        )
+                    )
+                | _ ->
+                    Task.FromResult(
+                        Some(
+                            UnattributedDelivery
+                                "the delivery call has no provider run, tool call or host snapshot to be attributed"
+                        )
+                    )
 
         let generatedJsSpecFor (role: Role) =
             JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse

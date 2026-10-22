@@ -1030,6 +1030,17 @@ module PluginTransforms =
                     | Some sessionText when not (String.IsNullOrWhiteSpace sessionText) ->
                         let exactSessionId = SessionId.create sessionText
 
+                        // 0) 交付已提交：先用交付见证结算本次子运行，让 owner
+                        //    的 join 拿到返回；随后才中断 attempt。
+                        journal
+                        |> Option.iter (fun durable ->
+                            HostForkRunLifecycle.publishDeliveredReturn
+                                durable
+                                eventPort
+                                exactSessionId
+                                fence.ProviderRun
+                                fence.CallId)
+
                         // 1) 抑制下一次 provider step：LLM 不会再收到包含 deliver
                         //    回复的下一次请求。
                         physicalUserMessageId

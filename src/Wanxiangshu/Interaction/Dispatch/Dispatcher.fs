@@ -52,47 +52,57 @@ module PromptDispatcher =
     /// interaction-authority-018: the closure kind and the agent-owner life of
     /// an accepted root.
     ///
-    /// The life is not guessed: a HumanRoot's kind follows from its own
-    /// recorded role, and an agent-owner root's life is whatever the
-    /// producer proved about it. A producer that cannot prove the life
-    /// admits no agent-owner root at all, because a closure of the wrong
-    /// kind would never be admitted later.
+    /// The life is not guessed from another root kind: a HumanRoot's kind
+    /// follows from its own recorded role, and an agent-owner root's life is
+    /// whatever the producer proved. When the producer proves no life, the
+    /// law's documented coarse agent-owner life is recorded; the acceptance
+    /// never falls back to a HumanRoot kind, which the root could never close.
     let private authorityRootFact
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (agentOwnerLife: string option)
-        : PromptSessionFact =
+        : Result<PromptSessionFact, string> =
         let authorityKind =
             match profile.AuthorityKind with
             | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
             | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
 
         let closure =
-            AuthorityLifeClassification.deriveClosureKind
+            AuthorityLifeClassification.closureFor
                 authorityKind
                 (profile.CanonicalRole = Role.Manager)
                 (if authorityKind = "AgentOwnerRoot" then
                      agentOwnerLife
                  else
                      None)
-            |> Option.defaultValue ("HumanRootManagedRun", None)
 
         let ownerLogicalRunId =
             PromptAuthority.identitySeedOwner profile.IdentitySeed
             |> Option.map (fun (_, ownerRun, _) -> LogicalRunId.value ownerRun)
 
-        PromptSessionFact.AuthorityRootAccepted
-            { SchemaVersion = 3
-              SessionId = profile.SessionId
-              LogicalRunId = profile.LogicalRunId
-              AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
-              AuthorityKind = authorityKind
-              ExpectedClosureKind = fst closure
-              OwnerLogicalRunId = ownerLogicalRunId
-              AgentOwnerLife =
-                match authorityKind with
-                | "AgentOwnerRoot" -> snd closure
-                | _ -> None
-              IdentitySeed = profile.IdentitySeed }
+        match closure with
+        | None ->
+            Error(
+                sprintf
+                    "authority root %s has no derivable expected closure kind (agentOwnerLife=%A)"
+                    authorityKind
+                    agentOwnerLife
+            )
+        | Some(closureKind, closureLife) ->
+            Ok(
+                PromptSessionFact.AuthorityRootAccepted
+                    { SchemaVersion = 3
+                      SessionId = profile.SessionId
+                      LogicalRunId = profile.LogicalRunId
+                      AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                      AuthorityKind = authorityKind
+                      ExpectedClosureKind = closureKind
+                      OwnerLogicalRunId = ownerLogicalRunId
+                      AgentOwnerLife =
+                        match authorityKind with
+                        | "AgentOwnerRoot" -> closureLife
+                        | _ -> None
+                      IdentitySeed = profile.IdentitySeed }
+            )
 
     let private registrationDecision
         (profile: PromptAuthority.AuthorityExecutionProfile)
@@ -112,12 +122,23 @@ module PromptDispatcher =
         | SessionOwnership.Attached(_, _) -> "Attached"
         | SessionOwnership.Root -> "Child"
 
+    type private AuthorityRootAppendFailure =
+        | ClosureKindUnproven of reason: string
+        | JournalRejected of JournalAppendFailure
+
     let private appendAuthorityRoot
         (journal: IPromptJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (agentOwnerLife: string option)
-        : Task<Result<unit, JournalAppendFailure>> =
-        journal.Append profile.SessionId None (authorityRootFact profile agentOwnerLife)
+        : Task<Result<unit, AuthorityRootAppendFailure>> =
+        match authorityRootFact profile agentOwnerLife with
+        | Error reason -> Task.FromResult(Error(ClosureKindUnproven reason))
+        | Ok fact ->
+            task {
+                match! journal.Append profile.SessionId None fact with
+                | Ok result -> return Ok result
+                | Error failure -> return Error(JournalRejected failure)
+            }
 
     let private appendManagedPromptAccepted
         (journal: IPromptJournal)
@@ -348,12 +369,14 @@ module PromptDispatcher =
                     // kind follows from its own recorded role.
                     let! appended = appendAuthorityRoot journal profile None
 
-                    return
-                        appended
-                        |> Result.mapError ManagedChatAcceptance.persistenceError
-                        |> Result.bind (fun () ->
+                    match appended with
+                    | Error(ClosureKindUnproven reason) ->
+                        return Error(ManagedChatAcceptanceError.IntentRejected reason)
+                    | Error(JournalRejected failure) -> return Error(ManagedChatAcceptance.persistenceError failure)
+                    | Ok() ->
+                        return
                             registrationDecision profile (this.ProjectionFor profile.SessionId)
-                            |> Result.mapError ManagedChatAcceptanceError.AuthorityRegistrationRejected)
+                            |> Result.mapError ManagedChatAcceptanceError.AuthorityRegistrationRejected
                 }
 
         member private this.PromptAlreadyAccepted(evidence: ChatAdmissionIntent.PendingPromptEvidence) =
@@ -540,7 +563,17 @@ module PromptDispatcher =
                 task {
                     let! appended = appendAuthorityRoot journal profile agentOwnerLife
 
-                    return completeRegistrationAppend canonical profile (this.ProjectionFor profile.SessionId) appended
+                    match appended with
+                    | Error(ClosureKindUnproven reason) ->
+                        return Error(AuthorityRegistrationFailure.PersistenceRejected reason)
+                    | Error(JournalRejected failure) ->
+                        return
+                            completeRegistrationAppend
+                                canonical
+                                profile
+                                (this.ProjectionFor profile.SessionId)
+                                (Error failure)
+                    | Ok() -> return Ok canonical
                 }
 
         /// PROMPT-002: a human root carries the one identity resolved at the external boundary.

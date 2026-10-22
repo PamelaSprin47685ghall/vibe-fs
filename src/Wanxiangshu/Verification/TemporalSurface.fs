@@ -210,7 +210,7 @@ module TemporalSurface =
                 | None -> false
 
             let closure =
-                AuthorityLifeClassification.deriveClosureKind
+                AuthorityLifeClassification.closureFor
                     authorityKind
                     isManager
                     (match text (payload?AgentOwnerLife) with
@@ -226,9 +226,15 @@ module TemporalSurface =
                       AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
                       AuthorityKind = authorityKind
                       ExpectedClosureKind =
-                        match text (payload?ExpectedClosureKind) with
-                        | "" -> fst closure
-                        | value -> value
+                        AuthorityLifeClassification.recordedClosureKind
+                            authorityKind
+                            isManager
+                            (match text (payload?AgentOwnerLife) with
+                             | "" -> None
+                             | value -> Some value)
+                            (match text (payload?ExpectedClosureKind) with
+                             | "" -> None
+                             | value -> Some value)
                       OwnerLogicalRunId =
                         match text (payload?OwnerLogicalRunId) with
                         | "" -> None

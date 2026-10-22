@@ -6,7 +6,7 @@ WHAT 决定来源、身份与生命周期边界。本目录区分纯转换、真
 - 003/005/006/015：真实 root、owner witness、拒绝/未知发送、活跃用户续行；003 新增 root 与完整 identity 经持久化重开后一同恢复。既有 codec 用例验证 current/legacy 格式，不能替代原子 append 的所有 crash cut。
 - 004/008/009/010/012/013/016/017：纯来源、claim、continuation 与 exact identity。013 比较完整 evidence，017 先建立真实可查的续行再 close；旧的“从未登记 key 在空状态里查不到”不再充当关闭证明。
 - 011 的 chat-params 用例确实执行 Host 适配器，但不是原子 AttemptExecutionProfile 全链证据。014 的资源文本检查仅证明当前提示包含相应说明，不证明 Agent 必会等待后台任务。
-- 018 保留纯 exact-close 的正反例。它没有写入 WHAT 的五类 source witness 或 AuthorityLogicalRunClosed；这些不是已完成能力（GAP-123）。
+- 018 保留纯 exact-close 的正反例，并新增 fast-check 不变量：任意 authority kind / manager 位 / agent-owner life / 记录值下，最终记录的 closure kind 必须属于同一 root kind（AgentOwnerRoot 永不落到 HumanRoot 类），固定复现此前触发 journal semantic cut 的输入（AgentOwnerRoot + 无 life + HumanRootManagedRun → AgentOwnerChildWork）。它没有写入 WHAT 的五类 source witness 或 AuthorityLogicalRunClosed；这些不是已完成能力（GAP-123）。
 - 原 004 的 CompletedTurn 分类测试移至 019：保留正式文本、reasoning、工具活动、终态/在途、当前及历史 role 观测反例，不把旧 role 观察转换当成允许新准入。并发 nudge 测试使用实际所属 session。XML-only 与正文工具标签的现行区分沿用 25-D1 待议，未用测试改合同。
 - 020 删除只验证自造 descriptor 的伪证明，保留实际 settlement → report → kill 与注入边界 TODO。
 - 021 实际 EventStore 关闭重开后保留历史 payload，实际新 ingress 拒绝旧身份。另以正式历史 Inspector fixture 保存事实解码失败反例（GAP-124）；存得下不是完整读得回。
