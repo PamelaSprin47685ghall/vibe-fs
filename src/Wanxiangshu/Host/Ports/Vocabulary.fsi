@@ -4,6 +4,8 @@ open System.Threading.Tasks
 
 /// Host-neutral vocabulary shared by every port family (HNI P-00, proposals/host-neutral-interface).
 /// No host wire terms here: adapters translate host payloads into these shapes.
+/// A host that cannot perform a family's verb does not claim the matching capability, and the
+/// adapter answers `HostError.Unsupported` for it: the degradation is declared, never faked as success.
 [<RequireQualifiedAccess>]
 type HostCapability =
     | ChildSessions
@@ -13,6 +15,10 @@ type HostCapability =
     | SubagentRouting
     | ProviderParams
     | StreamDeltas
+    | ToolRegistration
+    | ModelCatalog
+    | SignalSubscription
+    | AgentCatalog
 
 /// Error channel of every host round trip. Unknown means the outcome is not observable:
 /// callers must not resend or assume loss.

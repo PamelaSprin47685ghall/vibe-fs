@@ -237,14 +237,21 @@ validation, and one disposal.
 ```
 type HostCapabilities = { HostName: string; Supports: Set<HostCapability> }
   // HostCapability = ChildSessions | SessionDiscovery | Interrupt | ToolDefinitionEdit | SubagentRouting | ProviderParams | StreamDeltas
+  //                  | ToolRegistration | ModelCatalog | SignalSubscription | AgentCatalog
 type HostPorts = { Sessions: ISessionPort; Prompts: IPromptPort; Transcript: ITranscriptPort; Models: IModelCatalog;
                    Signals: ISignalSource; Tools: IToolRegistrar; Paths: IHostPaths; Diagnostics: IDiagnosticSink;
-                   Agents: IAgentCatalog; Capabilities: HostCapabilities }
-type ProductHooks = { ToolGate: IToolGate; Turn: ITurnTransform; Compaction: ICompactionGate;
-                      Spawn: SpawnRouting option; OnSignal: HostSignal -> Task; Dispose: unit -> Task }
+                   Agents: IAgentCatalog; Config: IHostConfigPort; Capabilities: HostCapabilities }
+type ProductHooks = { ToolGate: IToolGate option; Turn: ITurnTransform option; Compaction: ICompactionGate;
+                      Spawn: SpawnRouting option; OnSignal: (HostSignal -> Task) option; Dispose: unit -> Task }
 IHostPlugin: Activate : HostPorts -> HostResult<ProductHooks>      // registers product tools via ports.Tools
-IAgentCatalog: Roles : unit -> AgentRoleSpec list                  // validation of the catalog is product logic
+IAgentCatalog: Roles : unit -> HostResult<AgentRoleSpec list>      // absence is an error, not an empty roster
 ```
+Status (2026-10-22, plugin-host lane): **WIRED-OC**. The product side is
+`Composition/Plugin/Activation.fs` (`ProductHostPlugin.Activate`); the OpenCode adapter builds the `HostPorts` in
+`OpenCode/Host/OpenCodeHostPorts.fs` and implements `IHostConfigPort` in `OpenCode/Plugin/OpenCodeHostConfig.fs`.
+Two shape decisions are settled by this implementation: a hook the product does not decide yet is **absent**
+(`option`), never a pass-through shim; and a host capability the adapter does not hold is answered with
+`HostError.Unsupported` for that capability, never with an empty success.
 Semantics: the product is a *function from host ports to product hooks*; an adapter is `host API -> HostPorts`
 plus `ProductHooks -> host registrations`. HookPolicy criticality (fail-closed for Security/Invariant) is
 applied by the core wrapper around `ProductHooks`, not re-implemented per adapter. Ownership: plugin-host lane.

@@ -10,6 +10,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-delivery-attempt-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.chat-admission-transaction.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-neutral-ports.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-dispatch-metadata-codec.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.journal-outcome-contract.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.distribution.resources-enforcercatalogresource.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-runtime.fsproj" />
@@ -87,6 +88,12 @@
   <ItemGroup>
         <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogrammingcalibration.fsproj" />
+    <Compile Include="Composition/Plugin/ConfigPolicy.fsi" />
+    <Compile Include="Composition/Plugin/ConfigPolicy.fs" />
+    <Compile Include="Composition/Plugin/CompactionGate.fsi" />
+    <Compile Include="Composition/Plugin/CompactionGate.fs" />
+    <Compile Include="Composition/Plugin/Activation.fsi" />
+    <Compile Include="Composition/Plugin/Activation.fs" />
 <Compile Include="OpenCode/Host/PluginHostInterop.fsi" />
     <Compile Include="OpenCode/Host/PluginHostInterop.fs" />
     <Compile Include="OpenCode/Host/ProtocolArgumentStash.fsi" />
@@ -104,6 +111,10 @@
     <Compile Include="OpenCode/Plugin/PluginHostWiring.fs" />
     <Compile Include="OpenCode/Plugin/PluginHostWiringSurface.fsi" />
     <Compile Include="OpenCode/Plugin/PluginHostWiringSurface.fs" />
+    <Compile Include="OpenCode/Plugin/OpenCodeHostConfig.fsi" />
+    <Compile Include="OpenCode/Plugin/OpenCodeHostConfig.fs" />
+    <Compile Include="OpenCode/Host/OpenCodeHostPorts.fsi" />
+    <Compile Include="OpenCode/Host/OpenCodeHostPorts.fs" />
     <Compile Include="OpenCode/Plugin/PluginSessionWiring.fsi" />
     <Compile Include="OpenCode/Plugin/PluginSessionWiring.fs" />
     <Compile Include="OpenCode/Host/SessionBindingRecovery.fsi" />

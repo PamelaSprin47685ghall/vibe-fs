@@ -15,35 +15,6 @@ open Wanxiangshu.Persistence.Journal
 /// exercises, which is why the judgement is not inlined here (verification-system-001 Pure laws).
 module HostCompactionGate =
 
-    /// HOST-006 prevention layer: force every required setting off.
-    ///
-    /// Returns the first setting that could not be established, which
-    /// `HostCompactionPolicy.judgeFirstTurn` turns into the startup verdict. The first
-    /// rather than all of them: they share one root cause when the config shape moved,
-    /// and an operator needs one actionable name.
-    val enforceSettings: config: obj -> CompactionSetting option
-
-    /// The `experimental.session.compacting` hook.
-    ///
-    /// The hook cannot veto — its output is `{ context; prompt? }` with no cancel field
-    /// (`plugin/index.ts:305`), and `plugin.trigger` discards the return value. So this
-    /// does the only thing available: leaves the prompt untouched and records that a
-    /// compaction is starting, which is a diagnostic (HOST-007), not a control action.
-    ///
-    /// Registering it anyway matters. Without a registration the plugin would learn of
-    /// a compaction only when its pseudo-run appears in a later snapshot; with one, the
-    /// containment layer has a same-turn signal it can log against, and the absence of
-    /// a cancel field is documented at the boundary rather than inferred.
-    val onSessionCompacting: input: obj -> output: obj -> unit
-
-    /// The `experimental.compaction.autocontinue` hook.
-    ///
-    /// Always `enabled = false` (HOST-006). `compaction.auto = false` already makes the
-    /// replay branch unreachable, so this is belt and braces — but it is the only
-    /// vetoable synthetic-turn injection point, and an unanswered hook relies on an
-    /// upstream default staying harmless.
-    val onCompactionAutoContinue: input: obj -> output: obj -> unit
-
     /// HOST-007 diagnostic for a reanchor that could not be appended.
     ///
     /// A failure here is deliberately not fatal to the turn that just completed.

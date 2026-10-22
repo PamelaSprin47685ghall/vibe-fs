@@ -14,8 +14,10 @@ type AgentRoleSpec =
       Route: ModelRoute option
       ToolPolicy: Map<string, bool> option }
 
+/// The catalog of agent roles the host offers. A host that cannot enumerate roles answers
+/// `HostError.Unsupported` rather than an empty list: absence is typed, not an empty roster.
 type IAgentCatalog =
-    abstract Roles: unit -> AgentRoleSpec list
+    abstract Roles: unit -> HostResult<AgentRoleSpec list>
 
 type HostPorts =
     { Sessions: ISessionPort

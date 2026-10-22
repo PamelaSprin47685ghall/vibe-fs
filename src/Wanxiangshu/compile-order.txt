@@ -276,6 +276,12 @@ Composition/Turn/Program.fsi
 Composition/Turn/Program.fs
 Host/CompactionPolicy.fsi
 Host/CompactionPolicy.fs
+Composition/Plugin/ConfigPolicy.fsi
+Composition/Plugin/ConfigPolicy.fs
+Composition/Plugin/CompactionGate.fsi
+Composition/Plugin/CompactionGate.fs
+Composition/Plugin/Activation.fsi
+Composition/Plugin/Activation.fs
 Participant/Provider/Projection/Model.fsi
 Participant/Provider/Projection/Model.fs
 Participant/Provider/Projection/Intent.fsi
@@ -1357,6 +1363,10 @@ OpenCode/Host/ManagerReviewContract.fs
 # reads HostToolContext, so the flat order puts it after both and before PluginHooks.
 OpenCode/Host/ExternalToolAdmission.fsi
 OpenCode/Host/ExternalToolAdmission.fs
+OpenCode/Plugin/OpenCodeHostConfig.fsi
+OpenCode/Plugin/OpenCodeHostConfig.fs
+OpenCode/Host/OpenCodeHostPorts.fsi
+OpenCode/Host/OpenCodeHostPorts.fs
 OpenCode/Plugin/PluginHooks.fsi
 OpenCode/Plugin/PluginHooks.fs
 OpenCode/Plugin/SpikePlugin.fsi

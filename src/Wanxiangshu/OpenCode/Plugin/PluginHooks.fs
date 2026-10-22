@@ -9,7 +9,6 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation.Fork
@@ -166,7 +165,13 @@ module PluginHooks =
         | Some run, Some call -> Some(run, call)
         | _ -> None
 
-    let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
+    let create
+        (boot: PluginBoot.Boot)
+        (host: PluginHostWiring.Host)
+        (transform: obj -> obj -> Task<unit>)
+        (product: Wanxiangshu.Host.Ports.ProductHooks)
+        (liveConfig: LiveHostConfig)
+        : Task<obj> =
         task {
             let scope = boot.Scope
             let journal = boot.Journal
@@ -786,18 +791,79 @@ module PluginHooks =
                     config?snapshot <- box false
                     syncHostLanguagePreference config
                     ManagerConfig.configureManager config |> ignore
-                    scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
+                    // The host just delivered its config: the shared holder (and
+                    // with it the product's `IHostConfigPort`) now reads the
+                    // live object instead of a stale snapshot.
+                    liveConfig.Accept config
+
+                    let settingGap =
+                        Wanxiangshu.Composition.Plugin.ConfigPolicy.establish (
+                            liveConfig :> Wanxiangshu.Host.Ports.IHostConfigPort
+                        )
+                        |> Option.bind Wanxiangshu.Composition.Plugin.ConfigPolicy.settingOfGap
+
+                    scope.RecordCompactionSettingGap settingGap
                     syncHostToolLimits config
 
             let config = registeredHook HookKey.Config (unaryHook (box configurePluginHost))
 
+            let sessionIdOfHook (input: obj) : SessionId =
+                let idStr =
+                    if isNull input || isNull input?sessionID then
+                        "<unknown>"
+                    else
+                        unbox<string> input?sessionID
+
+                SessionId.create idStr
+
+            let existingContextOf (output: obj) : string array =
+                if isNull output || isNull output?context then
+                    [||]
+                else
+                    unbox<string array> output?context
+
+            let writeOutputField (output: obj) (field: string) (value: obj) : unit =
+                if not (isNull output) then
+                    output?(field) <- value
+
+            let appendCompactionContext (output: obj) (lines: string list) : unit =
+                let combined = Array.append (existingContextOf output) (Array.ofList lines)
+                writeOutputField output "context" (box combined)
+
+            let onSessionCompacting (input: obj) (output: obj) : Task<unit> =
+                task {
+                    let sid = sessionIdOfHook input
+
+                    Diagnostic.emit
+                        "compaction_started"
+                        [ "session_id", SessionId.value sid; "result", "cannot-refuse" ]
+
+                    let! contribution = product.Compaction.OnCompacting sid
+
+                    match contribution with
+                    | Wanxiangshu.Host.Ports.CompactionContribution.Nothing -> ()
+                    | Wanxiangshu.Host.Ports.CompactionContribution.Context lines ->
+                        appendCompactionContext output lines
+                    | Wanxiangshu.Host.Ports.CompactionContribution.ReplacePrompt prompt ->
+                        writeOutputField output "prompt" (box prompt)
+                }
+
+            let onCompactionAutoContinue (input: obj) (output: obj) : Task<unit> =
+                task {
+                    let sid = sessionIdOfHook input
+                    let! verdict = product.Compaction.AutoContinue sid
+
+                    match verdict with
+                    | Wanxiangshu.Host.Ports.ContinueVerdict.Allow -> writeOutputField output "enabled" (box true)
+                    | Wanxiangshu.Host.Ports.ContinueVerdict.Deny _reason ->
+                        writeOutputField output "enabled" (box false)
+                }
+
             let sessionCompacting =
-                registeredHook HookKey.SessionCompacting (pairedHook (box HostCompactionGate.onSessionCompacting))
+                registeredHook HookKey.SessionCompacting (pairedHook (box onSessionCompacting))
 
             let compactionAutoContinue =
-                registeredHook
-                    HookKey.CompactionAutoContinue
-                    (pairedHook (box HostCompactionGate.onCompactionAutoContinue))
+                registeredHook HookKey.CompactionAutoContinue (pairedHook (box onCompactionAutoContinue))
 
             let toolDefinitionRegistration =
                 registeredHook HookKey.ToolDefinition (pairedHook (box toolDefinition))
@@ -855,7 +921,11 @@ module PluginHooks =
             let event = registeredHook HookKey.Event (unaryHook (box observeEvent))
 
             let dispose =
-                let disposeAll () = scope.DisposeAsync()
+                let disposeAll () =
+                    task {
+                        do! product.Dispose()
+                        do! scope.DisposeAsync()
+                    }
 
                 registeredHook HookKey.Dispose (nullaryHook (box disposeAll))
 

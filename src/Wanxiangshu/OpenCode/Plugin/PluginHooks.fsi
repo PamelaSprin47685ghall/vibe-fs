@@ -7,4 +7,9 @@ module PluginHooks =
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
     val create:
-        boot: PluginBoot.Boot -> host: PluginHostWiring.Host -> transform: (obj -> obj -> Task<unit>) -> Task<obj>
+        boot: PluginBoot.Boot ->
+        host: PluginHostWiring.Host ->
+        transform: (obj -> obj -> Task<unit>) ->
+        product: Wanxiangshu.Host.Ports.ProductHooks ->
+        liveConfig: LiveHostConfig ->
+            Task<obj>

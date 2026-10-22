@@ -49,7 +49,11 @@ export type HostCapability =
   | "ToolDefinitionEdit"
   | "SubagentRouting"
   | "ProviderParams"
-  | "StreamDeltas";
+  | "StreamDeltas"
+  | "ToolRegistration"
+  | "ModelCatalog"
+  | "SignalSubscription"
+  | "AgentCatalog";
 
 export type HostError =
   | { tag: "Unsupported"; capability: HostCapability }
@@ -409,7 +413,7 @@ export interface AgentRoleSpec {
 }
 
 export interface IAgentCatalog {
-  Roles(): AgentRoleSpec[]
+  Roles(): HostResult<AgentRoleSpec[]>
 }
 
 export interface HostPorts {
