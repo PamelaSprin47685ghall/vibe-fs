@@ -134,9 +134,11 @@ the edited offside region compiles are all unconfirmed — **the delivery team m
 this file** (shard `…host-boundary.opencode-host-sessionquiescencegate`). Fact only: this claims no HNI card and
 changes no card state. The same lane also produced the precise diagnosis of the still-RED
 `requirements/verification-system` 006 suite (root cause: the supervisor's verdict-silence window is armed
-before the work exists; 46/59 pass, 13 fail, workload dependent; **no assertion, budget or product watchdog was
-changed**; a relaxed 30000 ms window is a diagnostic instrument only and is **not** an acceptance
-configuration) — written up in `evidence/vs-006-root-cause.md`.
+before the work exists; the failure set is timing dependent — 46/59 pass 13 fail in one capture, 43/59 pass
+16 fail in another, 41/59 pass 18 fail in a third; **no assertion, budget or product watchdog was changed**;
+no genuine verdict was lost in the direct-inner and relaxed-window control runs, though that is **not globally
+proved across uninstrumented runs**; a relaxed 30000 ms window is a diagnostic instrument only and is **not** an
+acceptance configuration) — written up in `evidence/vs-006-root-cause.md`.
 
 
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
