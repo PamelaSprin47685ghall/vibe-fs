@@ -419,6 +419,14 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   `OpenCode/Host/SessionSnapshotPort.fs`, 0 in the new file, aggregate-retired OK, subsystems OK.
   **No compile/test evidence** (owner's no-build-before-push rule; the compile slot gave up with exit 75 because the
   machine was heavily loaded) — the delivery team must build master and run the model-routing requirement suites.
+- 2026-10-22 eng-master-red (compile repair): restored the `origin/master` compile surface — five F# compile-error fixes
+  (`4c84009c2` JoinRun `.fsi` literal + `SessionSnapshotPort.fs` list-append, `94218a2be` `Command.fs` typed `Ok handleId` +
+  `SessionsSurface.fs` `TerminalOutcome.*` qualification + `PluginHostWiring.fs` `open`), two malformed-fsproj container fixes
+  (`46cf4cab9`, `d0959adb2`), and one `scripts/suites-manifest.sh` bash-fix (`d55fa1eff`). **No port touched** — no id, name or
+  port shape changed; next free id stays **P-19**; `omp: n/a`. **No compile/test evidence** (owner's no-build-before-push rule;
+  the compile slot gave up at the ~3 min machine cap, exit 124/143) — the delivery team must build master and run the
+  requirement suites; per-fix shard ownership is recorded in CHANGELOG.md.
+
 
 - 2026-10-22 eng-hni-host (P-03 consumer cutover 2 — dispatch recovery): the dispatch recovery path now reads the
   transcript through the neutral port. `Interaction/Dispatch/Recovery.fs(i)`: `PromptRecovery.reconcile` takes
