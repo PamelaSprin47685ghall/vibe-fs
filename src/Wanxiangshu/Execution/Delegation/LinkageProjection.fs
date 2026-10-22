@@ -234,6 +234,7 @@ module HandleProjection =
         | "AlreadyAbandoned" -> AlreadyAbandoned
         | "NotCompleted" -> NotCompleted
         | "WorkNotAdmitted" -> WorkNotAdmitted
+        | "WorkStillActive" -> WorkStillActive
         | "ConsumptionMismatch" -> ConsumptionMismatch
         | "LegacyWorkAmbiguous" -> LegacyWorkAmbiguous
         | other -> invalidOp ("wanxiangli/handle-lifecycle returned an unknown rejection: " + other)
@@ -676,6 +677,11 @@ module HandleProjection =
         && record.TargetAgent = "devops"
         && record.Lifecycle = Active
 
+    let private isHistoricalVoidedBinding (record: HandleRecord) =
+        record.Work.IsNone
+        && match record.Lifecycle with
+           | Abandoned HandleAbandonReason.Voided -> true
+           | _ -> false
     let private horizonRecord current binding =
         let record = summary current binding
 
@@ -693,7 +699,7 @@ module HandleProjection =
         |> Map.toList
         |> List.map (snd >> horizonRecord current)
         |> List.filter (fun record ->
-            (record.Work.IsSome || isIdleFixedDevOpsBinding record)
+            (record.Work.IsSome || isIdleFixedDevOpsBinding record || isHistoricalVoidedBinding record)
             && parentVisible record
             && (match record.Lifecycle with
                 | Retired -> false

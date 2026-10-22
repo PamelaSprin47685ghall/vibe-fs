@@ -79,6 +79,41 @@ module ExecutionFactFold =
         | Error reason -> Error(WorkRejected(factName, reason))
         | Ok updated -> Ok(workChanges parentId work prior terminal updated)
 
+    /// The handle bound to a child session, when that binding exists. The
+    /// historical (work-less) binding is the one a voided child leaves behind.
+    let private handleForChild (handles: AgentLinkageProjection) (childSessionId: SessionId) =
+        handles.Handles
+        |> Map.toList
+        |> List.tryPick (fun (_, record) ->
+            Option.filter (fun _ -> record.ChildSessionId = childSessionId) (Some record.Handle))
+
+    /// A voided child leaves its historical handle Abandoned(Voided) — never
+    /// Active. The abandonment is durable, so the handle is visible and
+    /// reportable exactly once, and the join that reports it retires it.
+    let private foldChildRunVoided
+        (sessionState: SessionId -> DelegationSessionState option)
+        (parentSessionId: SessionId)
+        (childSessionId: SessionId)
+        : Result<DelegationProjectionChange list, DelegationFoldRejection> =
+        let priorState = sessionState parentSessionId
+
+        let handleOpt =
+            priorState
+            |> Option.bind (fun state -> state.Handles)
+            |> Option.bind (fun handles -> handleForChild handles childSessionId)
+
+        match handleOpt with
+        | Some handle ->
+            HandleProjection.abandon
+                handle
+                HandleAbandonReason.Voided
+                (priorState
+                 |> Option.bind (fun state -> state.Handles)
+                 |> Option.defaultValue HandleProjection.empty)
+            |> handleOutcome "ChildRunVoided" parentSessionId handle priorState (Some childSessionId)
+        | None ->
+            Ok [ TerminatedChildHandle(parentSessionId, childSessionId) ]
+
     let fold
         (sessionState: SessionId -> DelegationSessionState option)
         (fact: ExecutionFactCases)
@@ -197,8 +232,7 @@ module ExecutionFactFold =
         // Clean-break: false abort cell → Active only when ref/digest match.
 
         | ExecutionFactCases.ChildRunVoided payload ->
-            Ok [ TerminatedChildHandle(payload.ParentSessionId, payload.ChildSessionId) ]
-
+            foldChildRunVoided sessionState payload.ParentSessionId payload.ChildSessionId
         | ExecutionFactCases.HandleFalseCompletionRejected payload ->
             let priorState = sessionState payload.ParentSessionId
 

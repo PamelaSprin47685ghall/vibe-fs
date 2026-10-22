@@ -32,6 +32,9 @@ module HorizonRoster =
         let DidNotReturn = "tool/horizon/did-not-return"
 
         [<Literal>]
+        let Voided = "tool/horizon/voided"
+
+        [<Literal>]
         let RemainsOpen = "tool/horizon/remains-open"
 
         [<Literal>]
@@ -65,7 +68,7 @@ module HorizonRoster =
     type RosterAgent =
         {
             Label: string
-            /// returned | still-away | did-not-return
+            /// returned | still-away | did-not-return | voided
             Status: string
             Target: string
             /// latest | none
@@ -109,18 +112,21 @@ module HorizonRoster =
         | Returned
         | StillAway
         | DidNotReturn
+        | Voided
 
     let private prosePath status =
         match status with
         | RosterStatus.Returned -> Path.Returned
         | RosterStatus.StillAway -> Path.StillAway
         | RosterStatus.DidNotReturn -> Path.DidNotReturn
+        | RosterStatus.Voided -> Path.Voided
 
     let private wireStatus status =
         match status with
         | RosterStatus.Returned -> "returned"
         | RosterStatus.StillAway -> "still-away"
         | RosterStatus.DidNotReturn -> "did-not-return"
+        | RosterStatus.Voided -> "voided"
 
     let private activeStatus (runtimeRecord: AgentRecord option) : RosterStatus =
         match runtimeRecord with
@@ -131,6 +137,7 @@ module HorizonRoster =
         match handle.Lifecycle with
         | HandleLifecycle.CompletedAwaitingJoin _ -> RosterStatus.Returned
         | HandleLifecycle.Active -> activeStatus runtimeRecord
+        | HandleLifecycle.Abandoned HandleAbandonReason.Voided -> RosterStatus.Voided
         | HandleLifecycle.Abandoned _
         | HandleLifecycle.Retired -> RosterStatus.DidNotReturn
 

@@ -24,6 +24,9 @@ module HorizonRoster =
         val DidNotReturn: string = "tool/horizon/did-not-return"
 
         [<Literal>]
+        val Voided: string = "tool/horizon/voided"
+
+        [<Literal>]
         val RemainsOpen: string = "tool/horizon/remains-open"
 
         [<Literal>]
@@ -57,7 +60,7 @@ module HorizonRoster =
     type RosterAgent =
         {
             Label: string
-            /// returned | still-away | did-not-return
+            /// returned | still-away | did-not-return | voided
             Status: string
             Target: string
             /// latest | none

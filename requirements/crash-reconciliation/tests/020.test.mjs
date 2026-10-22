@@ -56,10 +56,10 @@ test('WHAT[crash-reconciliation-020] production load decision voids the orphaned
     assert.equal(unwrap(payload.ParentSessionId), 'parent')
     assert.equal(unwrap(payload.ChildSessionId), 'child')
     assert.equal(recovery.lookupChild(state, 'parent', 'work', false).session, 'child')
-    // A void is not a completion: the handle stays visible and Active, but the
-    // voided run no longer holds the child's active logical run.
+    // A void is an explicit abandon: the handle becomes Abandoned, stays
+    // horizonVisible, but is no longer Active.
     assert.deepEqual(recovery.childView(state, 'parent', 'child'), {
-      activeRun: '', lifecycle: 'Active', joinable: 0, horizonVisible: 1,
+      activeRun: '', lifecycle: 'Abandoned', joinable: 0, horizonVisible: 1,
     })
   }
 })

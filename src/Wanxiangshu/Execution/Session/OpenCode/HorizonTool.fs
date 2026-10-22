@@ -32,6 +32,9 @@ module HorizonTool =
         let DidNotReturn = "tool/horizon/did-not-return"
 
         [<Literal>]
+        let Voided = "tool/horizon/voided"
+
+        [<Literal>]
         let RemainsOpen = "tool/horizon/remains-open"
 
         [<Literal>]

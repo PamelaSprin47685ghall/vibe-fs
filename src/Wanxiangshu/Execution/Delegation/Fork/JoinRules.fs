@@ -60,11 +60,11 @@ module JoinRules =
               Role = resolveRole payload.AgentId payload.Role
               Status = "failed"
               View = if isNull payload.Message then "" else payload.Message }
-        | JoinItem.AgentItem(AgentAbandonedItem(agentId, _)) ->
+        | JoinItem.AgentItem(AgentAbandonedItem(agentId, reason)) ->
             { Name = resolveName agentId
               AgentId = agentId
               Role = resolveRole agentId None
-              Status = "abandoned"
+              Status = if reason = "Voided" then "voided" else "abandoned"
               View = "" }
         | JoinItem.PtyItem(PtyExited payload) ->
             { Name = resolveLabel payload.PtyId

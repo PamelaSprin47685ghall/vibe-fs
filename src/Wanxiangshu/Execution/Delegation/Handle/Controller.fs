@@ -323,22 +323,82 @@ module HandleController =
         | Ok(_, None) -> Task.FromResult(Error(NotJoinable NotCompleted))
         | Ok(Some _, Some cell) -> appendConsumption journal parentId work cell record
 
+    /// Read the current durable binding of a handle after a refresh.
+    let private refreshBinding
+        (journal: AgentJournalPort)
+        (parentId: SessionId)
+        (handle: HandleId)
+        : Result<HandleRecord option, HandleConsumeRejection> =
+        journal.RefreshProjection()
+        |> Result.mapError AppendFailed
+        |> Result.map (fun () -> HandleProjection.tryBinding handle (journal.HandleProjection parentId))
+
+    /// A voided historical handle is the only work-less handle that may still
+    /// be consumed: it must read Abandoned(Voided). Anything else is refused.
+    let private requireVoidedAbandoned (record: HandleRecord option) : Result<unit, HandleConsumeRejection> =
+        match record with
+        | Some { Lifecycle = Retired } -> Error AlreadyRetired
+        | Some { Lifecycle = Abandoned HandleAbandonReason.Voided } -> Ok()
+        | _ -> Error(NotJoinable NotCompleted)
+
+    /// The retirement receipt is the durable proof that the handle is gone:
+    /// the refreshed projection must read Retired.
+    let private confirmHistoricalRetirement
+        (record: HandleRecord option)
+        : Result<HandleRecord, HandleConsumeRejection> =
+        match record with
+        | Some retired when retired.Lifecycle = Retired -> Ok retired
+        | _ -> Error(AppendFailed "historical retirement receipt was not confirmed")
+
+    let private appendHistoricalRetirement
+        (journal: AgentJournalPort)
+        (parentId: SessionId)
+        (handle: HandleId)
+        : Task<Result<HandleRecord, HandleConsumeRejection>> =
+        task {
+            let! appended =
+                journal.AppendExecutionFact
+                    parentId
+                    (ExecutionFactCases.HandleRetired
+                        {| ParentSessionId = parentId
+                           Handle = handle |})
+
+            match appended with
+            | Error err -> return Error(AppendFailed err)
+            | Ok() ->
+                let refreshed = refreshBinding journal parentId handle
+                return refreshed |> Result.bind confirmHistoricalRetirement
+        }
+
+    /// Retire a voided historical handle. The handle is reported once: the
+    /// retirement is durable, and a second consume sees Retired and refuses.
+    let private consumeHistoricalVoided (journal: AgentJournalPort) parentId (record: HandleRecord) =
+        let precheck =
+            refreshBinding journal parentId record.Handle
+            |> Result.bind requireVoidedAbandoned
+
+        match precheck with
+        | Error reason -> Task.FromResult(Error reason)
+        | Ok() -> appendHistoricalRetirement journal parentId record.Handle
+
     let consumeWork
         (journal: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         : Task<Result<HandleRecord, HandleConsumeRejection>> =
         task {
-            match record.Work with
-            | None ->
+            match record.Work, record.Lifecycle with
+            | None, Abandoned HandleAbandonReason.Voided ->
+                return! consumeHistoricalVoided journal parentId record
+            | None, _ ->
                 return
                     Error(
                         AppendFailed
                             "unscoped historical completion is audit-only; explicit settlement evidence is required"
                     )
-            | Some work when Set.contains work.Handle (journal.HandleProjection parentId).LegacyWorkHandles ->
+            | Some work, _ when Set.contains work.Handle (journal.HandleProjection parentId).LegacyWorkHandles ->
                 return Error(AppendFailed "ambiguous unscoped work history is quarantined")
-            | Some work -> return! consumeAdmittedWork journal parentId work record
+            | Some work, _ -> return! consumeAdmittedWork journal parentId work record
         }
 
     let abandonWork (journal: AgentJournalPort) parentId (work: HandleWorkId) reason =
