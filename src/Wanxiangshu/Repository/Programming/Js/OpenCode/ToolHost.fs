@@ -68,6 +68,11 @@ module JsToolSpec =
                 | Some source -> Some("program" ==> box source)
                 | None -> None
 
+            let nameEntry =
+                match args.OptionalText "name" with
+                | Some name -> Some("name" ==> box name)
+                | None -> None
+
             let unparkEntry =
                 match unpark with
                 | Some unparkValue ->
@@ -82,7 +87,7 @@ module JsToolSpec =
                 | Some abandonValue -> Some("abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ])
                 | None -> None
 
-            [ programEntry; unparkEntry; abandonEntry ] |> List.choose id |> createObj
+            [ programEntry; nameEntry; unparkEntry; abandonEntry ] |> List.choose id |> createObj
 
         // The unpark/abandon arguments are nested objects; the Host schema
         // describes them as plain objects with string handle fields. The value
@@ -181,6 +186,7 @@ module JsToolSpec =
           Description = surface.Description
           Arguments =
             [ "program", ToolHostCodec.optionalStringSchemaDescribed (JsToolPolicy.argProgramProse ()) factory
+              "name", ToolHostCodec.optionalStringSchemaDescribed (JsToolPolicy.argNameProse ()) factory
               "unpark", unparkSchema
               "abandon", abandonSchema
               "prefixUntil", ToolHostCodec.optionalNumberSchema factory

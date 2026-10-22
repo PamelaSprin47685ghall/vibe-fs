@@ -56,6 +56,10 @@ module JsToolPolicy =
     let argProgramProse () : string =
         JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ())
 
+    /// The prose of the required `name` argument.
+    let argNameProse () : string =
+        JsDescriptionAssets.argName (ProviderLanguageBinding.readGlobalPreference ())
+
     /// The prose of the refusal of a call that carries no state at all.
     let missingProgramProse () : string =
         JsDescriptionAssets.missingProgram (ProviderLanguageBinding.readGlobalPreference ())

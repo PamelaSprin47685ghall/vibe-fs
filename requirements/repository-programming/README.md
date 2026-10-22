@@ -32,7 +32,7 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 Exec capability 投影 `this.call(command)`、`this.signal(signal)`、`this.send(input)`。`call` 收一条 shell 字符串；成功结局的 `stdout`/`stderr` 是上一次自动 park 增量之后的新输出。谁让这次程序 park，`signal` 与 `send` 就作用在谁身上；那条命令已经结束时是 `CALL_CHILD_UNKNOWN`。
 
-park 的 handle 是这次工具调用自己带的 `name`。自动 yield park 的载荷带 `{ name, planB, delta: { stdout, stderr } }`。`where` 是字面 `IndexOf`。
+工具参数 `name` 的描述写明每次调用都填。park 的 handle 就是这个 `name`。自动 yield park 的载荷带 `{ name, planB, delta: { stdout, stderr } }`。`where` 是字面 `IndexOf`。
 
 ## 委托原语：fork / join / fission / dag（WHAT[repository-programming-056]）
 

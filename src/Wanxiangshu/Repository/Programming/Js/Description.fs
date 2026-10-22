@@ -100,6 +100,9 @@ module JsCanonicalDescription =
         let ArgProgram = "tool/js-program/arg-program"
 
         [<Literal>]
+        let ArgName = "tool/js-program/arg-name"
+
+        [<Literal>]
         let MissingProgram = "tool/js-program/missing-program"
 
         [<Literal>]

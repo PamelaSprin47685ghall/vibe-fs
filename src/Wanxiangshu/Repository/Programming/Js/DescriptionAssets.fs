@@ -74,6 +74,9 @@ module JsDescriptionAssets =
     let argProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.ArgProgram
 
+    let argName (lang: ProviderLanguage) =
+        text lang JsCanonicalDescription.Path.ArgName
+
     let missingProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.MissingProgram
 

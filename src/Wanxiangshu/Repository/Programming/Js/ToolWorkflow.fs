@@ -1335,7 +1335,11 @@ module JsToolWorkflow =
         | [ ("program", source) ] ->
             let given = input?name
             let name = if isNull given then "" else string given
-            ToolWorkflowInvocation.Program(string source, programPlanB input, name)
+
+            if System.String.IsNullOrWhiteSpace name then
+                ToolWorkflowInvocation.Invalid "name is required"
+            else
+                ToolWorkflowInvocation.Program(string source, programPlanB input, name)
         | [ ("unpark", unpark) ] ->
             ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value, unparkPlanB input)
         | [ ("abandon", abandon) ] -> ToolWorkflowInvocation.Abandon(string (abandon?handle))

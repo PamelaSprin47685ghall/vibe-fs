@@ -260,7 +260,7 @@ Exec capability 投影 `this.call(command)`。`command` 是一条 shell 字符�
 
 成功结局是 `{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }`。`stdout` 与 `stderr` 是上一次自动 park 的 `delta` 之后的新输出。等待就是 `await this.call(command)`。宿主未注入时以 `CALL_HOST_UNAVAILABLE` 失败。
 
-每次工具调用带 `name`。这次调用造成的任何 park 都以这个 name 登记。空名字或同名已挂起以 `INVALID_ARGUMENT` 拒绝。
+工具 schema 带 `name`，描述写明每次调用都填。这次调用造成的任何 park 都以这个 name 登记。缺 name、空名字或同名已挂起以 `INVALID_ARGUMENT` 拒绝，程序不执行。
 
 ## [051] signal / send 作用在让本次 park 的那条 call 上
 
