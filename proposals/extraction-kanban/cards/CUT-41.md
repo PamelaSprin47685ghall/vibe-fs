@@ -71,3 +71,35 @@ GAP-088、GAP-075、GAP-123、GAP-015、GAP-005、GAP-050。
 ## 6. 状态
 
 `DONE`（范围 = 台账核实与重定向本身；GAP-123 等剩余工作按台账登记在各自行内，不在本卡内闭合）。
+
+## 7. 2026-10-22 跟进（gap-075-088 切片）
+
+本卡 §3 登记的两条台账残余已各自落地为**真实独立 oracle**（A 形态的测试侧，不改生产代码）：
+
+- **GAP-075**（`capability-enforcement`）
+  - 真实并发 overlap：`requirements/capability-enforcement/tests/025.test.mjs:422`
+    `P15_concurrent_physical_rg_overlap_with_review_acceptance_admits_inflight_and_refuses_subsequent`
+    ——拦截 `processes.spawn` 的 `rg`，在真实子进程**在飞**时 `SIGSTOP` 暂停（断言 `exitCode`/`signalCode` 均为 `null`），
+    窗口切换前落盘接纳评审，断言重叠的第二次调用返回 `REVIEW_ONLY`；`SIGCONT` 恢复后断言在飞调用被放行
+    （`code === undefined`、`data.exitCode === 0`），随后调用仍 `REVIEW_ONLY`（`spawns === 1`）。
+  - 跨进程能力隔离：`requirements/capability-enforcement/tests/026.test.mjs:371`
+    `D11_cross_process_devops_dispatch_capability_isolation` + 新支撑夹具
+    `requirements/capability-enforcement/tests/support/devops-dispatch-isolation.fixture.mjs`
+    （env `WXS_DEVOPS_ISOLATION_DIRECTORY` / `WXS_DEVOPS_ISOLATION_PHASE`，`produce`/`recover` 两相；
+    夹具复用 `plugin-fixture.mjs` 的 `startPluginIncarnation(directory)` 以在同一工作区上跨进程重开）。
+- **GAP-088**（`repository-programming`）——§3 登记的四条 `test.todo` 全部转为真实测试并附根因：
+  - `006.test.mjs:163` `JS054_3_steady_allocation_loop_is_contained_by_deadline_and_host_survives_for_subsequent_programs`
+    （根因：`node:vm` 进程内执行 → 无内存栅栏，实际约束是 `deadlineEpochMs` → `PROGRAM_TIMEOUT`；断言宿主存活）。
+  - `017.test.mjs:32` `JS017_concurrent_calls_in_one_assistant_turn_commit_in_deterministic_serial_order_without_lost_update`
+    （根因：宿主按消息顺序逐个派发 `tool.execute`，各调用为独立事务 + CAS 新鲜度检查 → 按序串行、无丢失更新）。
+  - `025.test.mjs:325` `JS ${phase} actual EventStore port ${scenario} bad-input defense settles rollback or cut before one injected fatal incident`
+    （根因：结算 owner 是 EventStore append-payload store，追加 `ProjectionCutTail`（`rule: 'JsTransaction'`）→
+    断言结算先于单次注入 fatal、既有文件未被触碰、冷读进程可复核）。
+  - `025.test.mjs:413` `uncertain persistence and interrupted settlement preserve third-party changes across process restart`
+    （根因：事实层从不改写工作区，`Prepared` 收据只是持久证据 → 跨进程冷启后第三方修改逐字保留）。
+
+验证边界（诚实记录）：本轮**只做静态验证**——7 个 `.mjs`（含 2 个新夹具 `support/devops-dispatch-isolation.fixture.mjs`
+与 `support/transaction-cut-child.mjs`）全部 `node --check` 通过；**未**在已编译 `dist/` 上真实运行，
+因主仓缺 `dist/` 且 `build-slot node scripts/build.mjs` 触及 180 s 槽位上限（宿主负载 23.5–28.9），按站规停止编译。
+故 **GAP-075 与 GAP-088 均保持 PARTIAL**，不改记 CLOSED；待有已编译 `dist/` 时以
+`TESTS_MJS_FILES=… node requirements/verification-system/tests/run.mjs` 复核。

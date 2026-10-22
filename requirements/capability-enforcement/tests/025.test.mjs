@@ -418,3 +418,51 @@ test('WHAT[capability-enforcement-025] an admitted physical rg may finish after 
     }
   })
 })
+
+test('WHAT[capability-enforcement-025] P15_concurrent_physical_rg_overlap_with_review_acceptance_admits_inflight_and_refuses_subsequent', { timeout: 5000 }, async () => {
+  const { default: processes } = await import('node:child_process')
+  const { syncBuiltinESMExports } = await import('node:module')
+  await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
+    const sessionID = 'ses-concurrent-inflight-review'
+    await seed(runtime, sessionID, directory)
+    const paused = Promise.withResolvers()
+    const spawn = processes.spawn
+    let spawns = 0
+    let liveChild = null
+    try {
+      processes.spawn = function (...args) {
+        const child = spawn.apply(this, args)
+        if (args[0] !== 'rg') return child
+        spawns += 1
+        // Freeze the live OS process while it is genuinely in flight, so the
+        // review acceptance below overlaps a running rg, not a finished one.
+        process.kill(child.pid, 'SIGSTOP')
+        liveChild = child
+        paused.resolve(child)
+        return child
+      }
+      syncBuiltinESMExports()
+      const pending = execute(hooks, sessionID, reads[3], 'concurrent-inflight-rg')
+      const child = await paused.promise
+      assert.equal(child.exitCode, null, 'the rg child must still be in flight')
+      assert.equal(child.signalCode, null, 'the rg child must not be signalled')
+      await injectAcceptedAssessment(runtime, sessionID)
+      const overlapped = await execute(hooks, sessionID, reads[3], 'overlapped-after-accept')
+      assert.equal(overlapped.code, 'REVIEW_ONLY', JSON.stringify(overlapped))
+      process.kill(child.pid, 'SIGCONT')
+      const admitted = await pending
+      assert.equal(admitted.code, undefined, JSON.stringify(admitted))
+      assert.equal(admitted.data.exitCode, 0)
+      assert.equal((await execute(hooks, sessionID, reads[3], 'subsequent-rg')).code, 'REVIEW_ONLY')
+      assert.equal(spawns, 1)
+    } finally {
+      if (liveChild !== null && liveChild.exitCode === null && liveChild.signalCode === null) {
+        try { process.kill(liveChild.pid, 'SIGCONT') } catch (error) {
+          if (error.code !== 'ESRCH') throw error
+        }
+      }
+      processes.spawn = spawn
+      syncBuiltinESMExports()
+    }
+  })
+})

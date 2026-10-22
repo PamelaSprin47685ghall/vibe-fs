@@ -6,6 +6,8 @@ import { acceptAuthorityRoot, injectAcceptedAssessment, openIncumbency, withExec
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as workspaceEvents from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import { superviseNodeTest } from '../../verification-system/tests/e2e/support/supervise-node-test.mjs'
+import { UNIT_VERDICT_SILENCE_MS } from '../../verification-system/tests/e2e/support/time-budget.js'
 
 // WHAT[capability-enforcement-026]: 在当前迭代的 Review 被系统接纳前，严禁
 // Manager 向绑定的固定 DevOps 派发任何任务；已有只读 Engineer 的合法 resume
@@ -360,6 +362,49 @@ test('WHAT[capability-enforcement-026] D10_promoted_review_refuses_new_devops_di
     assert.equal(createdIds.length, 1)
     assert.equal(runtime.prompts.length, promptsBefore)
   })
+})
+
+// 跨进程隔离：DevOps 派工门的能力不得以进程局部状态跨进程走私。produce 进程
+// 在评审接纳前被拒、接纳后被放行；recover 进程在同一个工作区重新打开时，未评审
+// 的会话仍被 assessment-pending-for-devops 拒绝，已确认的会话被 dispatch-closed
+// 拒绝。两个进程必须真的不同。
+test('WHAT[capability-enforcement-026] D11_cross_process_devops_dispatch_capability_isolation', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { fileURLToPath } = await import('node:url')
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-devops-isolation-'))
+  const fixture = fileURLToPath(new URL('./support/devops-dispatch-isolation.fixture.mjs', import.meta.url))
+  const env = { ...process.env, WXS_DEVOPS_ISOLATION_DIRECTORY: directory, NODE_TEST_CONCURRENCY: '1' }
+  delete env.NODE_TEST_CONTEXT
+  try {
+    const producerSummary = await superviseNodeTest({
+      files: [fixture], label: 'capability-026-producer', logPrefix: 'capability-026-producer',
+      silenceMs: UNIT_VERDICT_SILENCE_MS, env: { ...env, WXS_DEVOPS_ISOLATION_PHASE: 'produce' },
+      throwOnFailure: true,
+    })
+    assert.deepEqual(producerSummary, { passed: 1, failed: 0 })
+    const producer = JSON.parse(readFileSync(join(directory, 'producer.json'), 'utf8'))
+    assert.ok(Number.isSafeInteger(producer.pid) && producer.pid > 0)
+    assert.notEqual(producer.pid, process.pid)
+    assert.equal(producer.session, 'ses-devops-isolation')
+    assert.equal(producer.admittedInProducer, true)
+
+    const successorSummary = await superviseNodeTest({
+      files: [fixture], label: 'capability-026-successor', logPrefix: 'capability-026-successor',
+      silenceMs: UNIT_VERDICT_SILENCE_MS, env: { ...env, WXS_DEVOPS_ISOLATION_PHASE: 'recover' },
+      throwOnFailure: true,
+    })
+    assert.deepEqual(successorSummary, { passed: 1, failed: 0 })
+    const successor = JSON.parse(readFileSync(join(directory, 'successor.json'), 'utf8'))
+    assert.ok(Number.isSafeInteger(successor.pid) && successor.pid > 0)
+    assert.notEqual(successor.pid, process.pid)
+    assert.notEqual(successor.pid, producer.pid,
+      'the successor must be a distinct OS process from the producer')
+    assert.equal(successor.unreviewedRefused, true)
+    assert.equal(successor.confirmedRefused, true)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 const durableSnapshot = (directory) => {

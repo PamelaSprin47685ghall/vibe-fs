@@ -21,6 +21,45 @@
   - 红是**负载相关**的：本机当时 loadavg 21.6/32.4/36.4（4 CPU），裸 `node -e 0` 需 361–748 ms；空闲机器上同 fixture 通过。
   - 完整记录见 `proposals/host-neutral-interface/evidence/vs-006-root-cause.md`（含逐条路径/行号与本地证据路径）。**本条未改任何断言、预算或产品看门狗**，红例仍然敞开。
 
+## Unreleased — GAP-075 / GAP-088 残余清单转真实 oracle（gap-075-088 切片）
+
+- **范围**：把 [CUT-41](proposals/extraction-kanban/cards/CUT-41.md) §3 登记在两条台账行的残余工作落成独立、可单独变红的测试，
+  并在每条测试旁写清**根因**。**未改任何生产代码**（`src/` 与子模块 `wanxiangli` 均未动）。
+- **GAP-075（`capability-enforcement`）**
+  - `requirements/capability-enforcement/tests/025.test.mjs:422`
+    `P15_concurrent_physical_rg_overlap_with_review_acceptance_admits_inflight_and_refuses_subsequent`：
+    拦截 `processes.spawn` 的 `rg`，真实子进程起后 `SIGSTOP` 暂停（断言 `exitCode`/`signalCode` 均为 `null`，即调用确实在飞），
+    窗口切换前落盘接纳评审 → 重叠的第二次调用返回 `REVIEW_ONLY`；`SIGCONT` 恢复 → 在飞调用放行
+    （`code === undefined`、`data.exitCode === 0`）→ 其后调用仍 `REVIEW_ONLY`（`spawns === 1`）。
+  - `requirements/capability-enforcement/tests/026.test.mjs:371`
+    `D11_cross_process_devops_dispatch_capability_isolation` + 新支撑夹具
+    `requirements/capability-enforcement/tests/support/devops-dispatch-isolation.fixture.mjs`
+    （env `WXS_DEVOPS_ISOLATION_DIRECTORY` / `WXS_DEVOPS_ISOLATION_PHASE`，相名 `produce` / `recover`）：
+    produce 相评审接纳前以 `assessment-pending-for-devops` 拒绝且 durable 快照逐字节不变、接纳后放行（`outcome = 'created'`）；
+    recover 相在**另一个 OS 进程**重开同一工作区，未评审会话仍 `assessment-pending-for-devops`、已确认会话 `dispatch-closed`，
+    两者 durable 增量均为零。夹具复用 `plugin-fixture.mjs` 的 `startPluginIncarnation(directory)`。
+- **GAP-088（`repository-programming`）**——原 4 条 `test.todo` 全部转真测试，`006`/`017`/`025`/`027` 现共 **0 条 `test.todo`**：
+  - `006.test.mjs:163` `JS054_3_steady_allocation_loop_is_contained_by_deadline_and_host_survives_for_subsequent_programs`——
+    根因：`JsSandbox` 经 `node:vm` 进程内运行，V8 `resourceLimits` 不生效、无纯内存栅栏，
+    `PROGRAM_RESOURCE_LIMIT`（`JsFailure.ProgramResourceLimit`）无任何生产者；实际约束是 `deadlineEpochMs` → `PROGRAM_TIMEOUT`。
+  - `017.test.mjs:32` `JS017_concurrent_calls_in_one_assistant_turn_commit_in_deterministic_serial_order_without_lost_update`——
+    根因：宿主按助理消息顺序逐个派发 `tool.execute`，各调用为独立事务 + CAS 新鲜度检查 → 按序串行、无丢失更新。
+  - `025.test.mjs:325` `JS ${phase} actual EventStore port ${scenario} bad-input defense settles rollback or cut before one injected fatal incident`——
+    结算 owner 是 EventStore append-payload store，追加 `ProjectionCutTail`（`rule: 'JsTransaction'`）；
+    断言结算先于单次注入致命事件（`js-transaction-semantic-cut`，`SIGKILL`）、既有文件未被触碰、冷读进程可复核。
+  - `025.test.mjs:413` `uncertain persistence and interrupted settlement preserve third-party changes across process restart`——
+    根因：事实层从不改写工作区，`Prepared` 收据只是持久证据；跨进程冷启后第三方修改逐字保留。
+- **验证口径（重要）**：**未在已编译 `dist/` 上真实运行**。主仓缺 `dist/`，
+  `build-slot node scripts/build.mjs` 解析 1404 个源文件后触及 180 s 槽位上限（宿主负载 23.5–28.9），按站规停止编译。
+  已做的全部是静态验证：7 个 `.mjs`（含新夹具 `capability-enforcement/tests/support/devops-dispatch-isolation.fixture.mjs`
+ 与既有 `repository-programming/tests/support/transaction-cut-child.mjs`）全部 `node --check` 通过，
+  `node scripts/checks/architecture.mjs` → `architecture: OK`。
+  故 **GAP-075 与 GAP-088 均保持 PARTIAL**，不改记 CLOSED。
+- **台账与文档同步**：`requirements/GAP.md`（GAP-075 / GAP-088 两行改写为「已落地 oracle + 根因 + 静态验证边界」）、
+  `proposals/extraction-kanban/evidence/GAP-audit-2026-10-21.md`（§1 两节跟进段与汇总表）、
+  `proposals/extraction-kanban/cards/CUT-41.md` §7、`proposals/extraction-kanban/BOARD.md` CUT-41 行、
+  `保姆级交接与展望.md`（2026-10-22 新段）。
+
 ## Unreleased — red-unit 测试线收编：027/006/prefix-stability/065/host-boundary-034
 
 - **收编范围（6 个提交，已落 `origin/master`）**：本线（分支 `land/redunit-034`）把 `origin/wip/redunit`（tip `cec1235db`）上一条面向「发布门禁 unit 26 红」的修复栈逐条裁决后，只落 6 个提交，其余 4 个判为「master 已有更强版本」或「会复活已退休的 fake surface」，一律不落。

@@ -132,7 +132,61 @@ test('WHAT[repository-programming-006] output budget measures UTF-8 bytes and ac
 }
 
 // post-await budget: covered in 006-cut25-escapes.test.mjs (CUT-25 membrane + afterEvaluate driver)
-test.todo('WHAT[repository-programming-006] memory exhaustion is contained without exhausting the Host process')
+// Root cause of the old "memory exhaustion" todo: `JsSandbox` runs the
+// program IN-PROCESS through `node:vm`
+// (src/Wanxiangshu/Process/JsSandbox.fs -> wanxiangli/src/sandbox/Sandbox.fs).
+// There is no separate worker thread, child process or isolate, so V8
+// `resourceLimits` (`maxOldSpaceSize`) never applies and no memory-only fence
+// can exist. `FailureCatalog` still declares `PROGRAM_RESOURCE_LIMIT`
+// (JsFailure.ProgramResourceLimit), but no production code constructs it:
+// the only in-process bounds are the vm `timeout` for the synchronous segment
+// and the injected deadline proxy (`deadlineEpochMs`) checked on every api
+// member call. A steady allocating loop is therefore contained by the
+// DEADLINE fence, not by a memory bound - and the Host process must survive
+// that containment and stay functional for the programs that follow.
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { run } = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
+
+const BASE = `class JsProgram {
+  constructor(api) { this._api = api; }
+  cat(path) { return this._api.cat(path); }
+}`
+const runWrapped = async (
+  program,
+  api,
+  { deadlineMs = 2000, outputBound = 1 << 20, deadlineEpochMs = Date.now() + 60_000 } = {},
+) => run(BASE, program, api, deadlineMs, deadlineEpochMs, outputBound)
+const failureCode = (result) => result.code
+
+test('WHAT[repository-programming-006] JS054_3_steady_allocation_loop_is_contained_by_deadline_and_host_survives_for_subsequent_programs', async () => {
+  const api = { cat: async () => ({ text: 'x' }) }
+  const allocating = `class Js extends JsProgram {
+  async run() {
+    const chunks = [];
+    while (true) {
+      chunks.push('x'.repeat(1024));
+      if (chunks.length > 64) chunks.shift();
+      await this.cat('a.txt');
+    }
+  }
+}`
+  // The steady loop keeps allocating; the only fence that can fire is the
+  // deadline checked by the api proxy on each call.
+  const contained = await runWrapped(allocating, api, { deadlineEpochMs: Date.now() + 50 })
+  assert.equal(contained.ok, false)
+  assert.equal(failureCode(contained), 'PROGRAM_TIMEOUT')
+
+  // The Host process is not exhausted by the contained program: the next
+  // program in the SAME process still runs and still succeeds.
+  const healthy = await runWrapped(`class Js extends JsProgram {
+  async run() { return { sum: 1 + 2 }; }
+}`, api)
+  assert.equal(healthy.ok, true, 'the Host survives the contained program and remains functional')
+  assert.deepEqual(JSON.parse(healthy.value), { sum: 3 })
+})
+}
 
 // Moved from tests/006-cut25-escapes.test.mjs (CUT-25 membrane escapes): clause [006]; the requirement tree only admits NNN.test.mjs.
 {
