@@ -1609,7 +1609,7 @@ module Adapter =
                 | None -> return jsUndefined
                 | Some hooks ->
                     liveHooks := None
-                    do! runActivationStep pi "wanxiangshu disposal failed" (fun () -> dispose hooks :> Task)
+                    do! runActivationStep pi "wanxiangshu disposal failed" (fun () -> dispose hooks)
                     return jsUndefined
             }
             |> unbox<obj>)
