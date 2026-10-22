@@ -4,9 +4,15 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
 /// HNI P-05: product gates around every tool call (product and host built-in tools).
+///
+/// `ProviderRun` is the provider run the host observed for THIS call, the
+/// same evidence the invocation carries. A gate that needs the exact provider
+/// fence (the waiting question's fence, the retried delivery's fence) reads it
+/// here; it is never resolved from the session's current binding.
 type ToolCallView =
     { Session: SessionId
       CallId: ToolCallId
+      ProviderRun: ProviderRunIdentity option
       Tool: string
       Args: CanonicalJsonText
       Role: AgentRole option }

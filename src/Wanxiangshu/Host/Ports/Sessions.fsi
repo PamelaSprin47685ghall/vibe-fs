@@ -10,10 +10,16 @@ type SessionSpec =
       Workspace: WorkspacePath option }
 
 type SessionInfo =
-    { Id: SessionId
-      Parent: SessionId option
-      Role: AgentRole option
-      Title: string option }
+    {
+        Id: SessionId
+        Parent: SessionId option
+        Role: AgentRole option
+        Title: string option
+        /// The session's working directory, when the host reports one. `None`
+        /// means the host does not report a per-session directory, never a
+        /// fabricated path.
+        Workspace: WorkspacePath option
+    }
 
 type ISessionPort =
     abstract Create: parent: SessionId option * spec: SessionSpec -> HostResult<SessionId>

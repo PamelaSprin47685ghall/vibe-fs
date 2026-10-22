@@ -21,11 +21,9 @@ module Diagnostic =
 
     let mutable private activeSink: Sink option = None
 
-    let installSink (sink: Sink) : unit =
-        activeSink <- Some sink
+    let installSink (sink: Sink) : unit = activeSink <- Some sink
 
-    let clearSink () : unit =
-        activeSink <- None
+    let clearSink () : unit = activeSink <- None
 
     /// CTX-014 允许字段清单。新增字段必须同时登记到白名单与
     /// `tests/unit/Context/ctx014.test.mjs` 的正向用例。
@@ -161,6 +159,7 @@ module Diagnostic =
     let emit (operation: string) (fields: (string * string) list) : unit =
         try
             validate fields
+
             emitWhenVisible operation (fun () ->
                 payload operation fields |> stringify |> error
                 routeToSink operation fields)

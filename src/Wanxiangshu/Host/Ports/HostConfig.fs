@@ -15,9 +15,7 @@ type RequiredSetting =
       Value: HostSettingValue }
 
 /// The first required setting the host could not establish.
-type SettingGap =
-    { Path: string list
-      Reason: string }
+type SettingGap = { Path: string list; Reason: string }
 
 /// HNI P-19: actuator for `Wanxiangshu.Host.HostCompactionPolicy.requiredSettings`-style policy.
 ///
