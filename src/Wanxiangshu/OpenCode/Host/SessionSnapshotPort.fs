@@ -438,17 +438,12 @@ module SessionSnapshotPort =
     /// Host-neutral session verbs mapped onto the OpenCode host. The adapter
     /// owns the host payload shape; the product only ever sees port records.
     let private sessionInfoOfRow (row: obj) : SessionInfo option =
-        if isNull row || isNull row?id then
-            None
-        else
-            match readString row?id with
-            | None -> None
-            | Some id ->
-                Some
-                    { Id = SessionId.create id
-                      Parent = readString row?parentID |> Option.map SessionId.create
-                      Role = readString row?agent |> Option.map (fun agent -> AgentRole agent)
-                      Title = readString row?title }
+        sessionIdOfRow row
+        |> Option.map (fun id ->
+            { Id = id
+              Parent = readString row?parentID |> Option.map SessionId.create
+              Role = readString row?agent |> Option.map AgentRole
+              Title = readString row?title })
 
     let private sessionInfosOfRows (rows: obj array) : SessionInfo list =
         rows |> Array.choose sessionInfoOfRow |> Array.toList
@@ -470,9 +465,10 @@ module SessionSnapshotPort =
         if isNull session then
             Error(HostError.Transport "Missing session response")
         else
-            match readString session?parentID with
-            | None -> Ok None
-            | Some parent -> Ok(Some(SessionId.create parent))
+            session?parentID
+            |> readString
+            |> Option.map SessionId.create
+            |> Ok
 
     /// The HTTP status a transport response carries, when the transport
     /// exposes one. The SDK envelope keeps the raw response under `response`.
