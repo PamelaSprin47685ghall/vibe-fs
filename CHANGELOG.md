@@ -27,6 +27,7 @@
   两处原先都写着 `flock /home/hermes/work/vfs-build.lock node scripts/build.mjs --clean` —— 既包含已作废的 `--clean`，又引用了一个**在本仓不存在的外部锁路径**（本仓没有 `locks/` 目录；构建互斥现在由 `scripts/build.mjs` 内部的 `CrossProcessMutex` 持有，锁文件 `.fable-build/build.lock`）。现已改为 `node scripts/build.mjs`，并说明构建自己持锁、无需外部 `flock`。同文件里另外两处提到 `build-slot` / `vfs-build.lock` 的注释一并更正。
 - **实测 smoke（参数路径）**：`bash -n scripts/suites-manifest.sh` 通过；`--help` 输出正常；`REPO` 指向无 `dist` 的目录时打印新的 FATAL 文本并退出 2；`REPO=<本仓> bash scripts/suites-manifest.sh advisor` 正确解析出 4 个 advisor 测试文件并落到 `summary.txt`（该次 group 运行 exit 1 是**运行器自身的陈旧度门**按预期拒绝：`runner: refusing to run. / Compiler inputs changed` —— 当时并发 worker 正在改 `src/`，与本改动无关）。
 - **提交与部署的区别（本条只到「已推」为止）**：**提交成功、已推送 `origin/master`（fast-forward `dc5d98b92..ff0b22f8c`，无 force push）。** 但**尚未部署**、**尚未在合并后的整棵树上通过完整验收**：当前整合树**仍编译不过**（139 个 F# 错误 / 23 个文件），已按文件归属分派给各 owner。`scripts/build.mjs` 的入口修复只保证「构建能启动」，**不构成「构建通过」**。
+- **同批附带修正（`f237b5701`，已推 `origin/master`）**：`scripts/suites-manifest.sh` 原先把 `LOGDIR` 默认成 `$REPO/.test-logs/suites`，那是**把运行数据写进工作树**，违反 AGENTS.md「全部项目运行数据统一放在主工作树的 `.Herdchestra/`，linked worktree 共用这份本机状态」。现改为经**既有的** `scripts/lib/state-root.mjs` 解析主工作树的 state root，落到 `<state root>/takeover/suites`；该 helper 只查询 Git 拓扑，**不写任何 Git 状态**。`LOGDIR` 仍可显式覆盖；解析不出 state root 时是 FATAL 并提示改设 `LOGDIR`，不静默回落到树内路径。实测 `stateRoot()` 在本仓解析为 `/home/kunweiz/Desktop/vibe/wanxiangshu/.Herdchestra`，且树内不再产生 `.test-logs/`。
 
 
 ## Unreleased — vs-006 控制金字塔切片落地（`SessionSnapshotPort.fs` 2 条 match-pyramid 清零）+ 006 红例精确诊断
