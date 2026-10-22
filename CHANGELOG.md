@@ -1,6 +1,25 @@
 # Changelog — 版本历史
 
 
+## Unreleased — red-unit 测试线收编：027/006/prefix-stability/065/host-boundary-034
+
+- **收编范围（6 个提交，已落 `origin/master`）**：本线（分支 `land/redunit-034`）把 `origin/wip/redunit`（tip `cec1235db`）上一条面向「发布门禁 unit 26 红」的修复栈逐条裁决后，只落 6 个提交，其余 4 个判为「master 已有更强版本」或「会复活已退休的 fake surface」，一律不落。
+- **已落地的 6 个提交**：
+  - `50b0d6dfc` test(delegation-027)：子回合在取回自己的 prompt 之前先等待 Host 侧 ingress（`plugin-fixture.mjs` 加 `__awaitIngress`/`admitted`，`real-fork.mjs` 的 `childTurn` 顶部 `await runtime.awaitIngress()`）。
+  - `5413bdf57` test(delegation-006)：placement/resume 用例迁到真实交付路径。
+  - `6ee673640` test(prefix-stability-001)：子方在 `delegation.settle` 之前先 `recordFencedDeliveredView`。
+  - `64f5373ef` test(repository-programming)：删除 `requirements/repository-programming/tests/065.test.mjs`——该包 WHAT 只到 060，065 是无条款的过期重复文件。
+  - `3a02cc040` test(verification-system-006)：被持有的工具在写 ownership marker 之前先观察自己的**同一时刻** live identity（一次 `ps -o pid=,pgid=` 读三份身份，5 ms 步进、2 s 硬顶），取不到就大声失败而非写进 NaN 身份的 partial marker。
+  - `4e7f5e500` spec(host-boundary-034)：补上缺失的 `## [034] adapter 薄度与 Host 命名空间层级的门禁契约` 条款（`requirements/host-boundary/WHAT.md`，3 段规范性文字）并把 `requirements/INDEX.md` 计数 33→34——这是 requirement-system-017 全树扫描报告 `034 is absent` 的根因，条款号 034 永久占用、不复用。
+- **4 个被放弃的提交及理由**（都在 `cec1235db` 上，判为不落）：
+  - delegation-032（`8d4c788d7`）：master `9fa7c1a6c` 更强——稳定的拒绝码 `assessment-pending-for-devops`/`unknown-calling`，分支只断言 `ok = false`。
+  - effect-accounting-013（`cec1235db`）：master `1032521d2` 用 `ToolRuntimeScopeSurface.establishedDeliveryCallId : string option`，分支把整个 surface 换成 `establishedDelivery` record，是降级。
+  - effect-accounting-002（`a4ef9f392`）：master `24dc3dc2b` **故意退役** `HostForkRunLifecycleSurface`（fake `journal=None` surface）；落地分支版会复活该文件并回退 master 的 real-fork 证明（`696afe6be`）。
+  - delegation-026（`defa8641f`）：master `7b3d72464` 重做了同一用例并**保留**分支丢弃的 ghost-run bounded-join 断言；master 更强，无可落内容。
+- **`origin/wip/redunit`（tip `cec1235db`）已归档为本地 tag `archive/wip-redunit-pre-delete`（`cec1235dbf9f3812846a4eea5d852c4c907939d2`），远端分支已删除**。归档是**本地** tag，不 push 到远端（`git ls-remote --tags origin` 无此项）。
+- **逐路径清点（如实记录，非「0 个未合并内容」的强断言）**：`git diff cec1235db origin/master` 计 391 个不同路径（105 A / 9 D / 248 M + 29 处重命名）；`-M -C` 视角下只有 9 个「wip 独占」路径是 `D`（master 已删除）——即 `065.test.mjs` 与 `HostForkRunLifecycleSurface`/`DelegatedToolEstimate` 及 4 个 `*.fsproj`，恰好是被放弃提交会引入/复活的产物。**但**全树（`ls-tree` 逐 blob）视角下 wip 另有约 37 个「wip 独有 blob」路径是 `OpenCode/Host/*`、`OpenCode/Join*` 等已被 CUT-34/40/HNI-08 迁移出 `OpenCode/` 命名空间、blob 内容已留在 master 历史的文件——它们不是本线内容，而是 wip 分支停在被迁移前的旧基线上，所以**不能**简单说「wip 相对 master 只差这 9 条」。收编口径是：本线的 6 条已落，4 条被放弃，分支整体作废归档；不声称两条分支其余内容逐字节一致。
+- **未验证（重要）**：本 lane **没有**跑 F#/Fable 构建、没有重建 `dist/`、没有执行全量 unit 门禁、没有跑 `scripts/check.mjs`。已跑过并得到结果的是：`node --test requirements/requirement-system/tests/017.test.mjs`（2/2 通过）、`node --test requirements/host-boundary/tests/034.test.mjs`（9/9 通过）、`node scripts/checks/architecture.mjs`（`architecture: OK`，exit 0；在推上 tip `4e7f5e500` 的 scratch 分离工作树上、复用仓库 `node_modules` 软链跑的）；`verification-system-006` 也单独跑过，**仍红**（本机 59 用例 44/45 通过、15/14 失败，见《保姆级交接与展望》§2.2 的如实记录），红因是 `silenceMs: 1000` 的 watchdog 与 Node 子进程启动的竞态，非本 lane 引入。其余套件（delegation-006/026/027/032、prefix-stability-001、effect-accounting）本 lane 均未单独跑。绿不绿由正式 runner 给出，本条不把「收编」等同于「门禁转绿」。
+
 ## Unreleased — 2026-10-21 作废裁决：未交付的子工作以作废结清，而非完成
 
 - **裁决全文**：未交付的子工作**永不写完成**，但**可以**写一个作废（void）。作废**像完成一样结清那份义务**。落在实现上是：重启加载时，上一进程遗留、本进程无法继续持有的孤儿子工作在加载期被作废——有 scope 的已准入工作追加 `ChildWorkVoided`（work 单元格转 `Abandoned Voided`），合法但无 scope 的历史用 `ChildRunVoided`；handle 变为 `Abandoned(Voided)`（**绝不**是 `Completed*`）。**作废不是完成**：不写完成正文，也不把已有交付视图当作完成凭据。
