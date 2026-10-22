@@ -78,9 +78,15 @@ module DispatchSurface =
         /// through a dedicated member so AttachMembers never collides.
         member this.DispatchPort: Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort =
             { new Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort with
-                member _.SendPrompt(sessionId, text, options) =
+                member _.SendPrompt(sessionId, request, metadata, late) =
+                    let options =
+                        DispatchSessionPort.toHostOptions
+                            (request: Wanxiangshu.Host.Ports.PromptRequest)
+                            metadata
+                            (late: Wanxiangshu.Host.Ports.LateDeliveryListener option)
+
                     (this :> Wanxiangshu.Foundation.HostSession.ISessionHostPort)
-                        .SendPrompt(sessionId, text, options)
+                        .SendPrompt(sessionId, request.Text, options)
 
                 member _.SubscribeTerminal(sessionId, listener) =
                     (this :> Wanxiangshu.Foundation.HostSession.ISessionHostPort)

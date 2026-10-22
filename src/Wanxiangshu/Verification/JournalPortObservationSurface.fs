@@ -128,7 +128,7 @@ module JournalPortObservationSurface =
 
             let port =
                 { new IDispatchSessionPort with
-                    member _.SendPrompt(_, _, _) =
+                    member _.SendPrompt(_, _, _, _) =
                         Task.FromResult(SendOutcome.AdmittedWithReceipt(TransportReceipt.create "receipt-port-obs"))
 
                     member _.SubscribeFutureTerminal(_, _) =

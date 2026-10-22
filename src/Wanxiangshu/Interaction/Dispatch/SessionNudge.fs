@@ -25,8 +25,8 @@ module HostSessionNudge =
 
     let private toDispatchPort (sessionPort: ISessionHostPort) : IDispatchSessionPort =
         { new IDispatchSessionPort with
-            member _.SendPrompt(sessionId, text, opts) =
-                sessionPort.SendPrompt(sessionId, text, opts)
+            member _.SendPrompt(sessionId, request, metadata, late) =
+                sessionPort.SendPrompt(sessionId, request.Text, DispatchSessionPort.toHostOptions request metadata late)
 
             member _.SubscribeFutureTerminal(sessionId, listener) =
                 sessionPort.SubscribeFutureTerminal(sessionId, listener)

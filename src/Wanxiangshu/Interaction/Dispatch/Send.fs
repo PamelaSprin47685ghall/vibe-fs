@@ -474,17 +474,26 @@ module PromptDispatcherSend =
                 // does, or a fast completion has nobody to deliver to.
                 use _listener = this.SubscribeNoOp port sessionId
 
-                let options =
-                    { Model = None
-                      Agent = Some agent
-                      Directory = directory
-                      Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
-                      Tools = tools
-                      DetachedListener =
-                        match awaitMode with
-                        | PromptDispatcher.AwaitMode.Detached ->
-                            Some(fun verdict -> this.SettleDetachedSend key sessionId verdict onDetachedFailure)
-                        | PromptDispatcher.AwaitMode.Await -> None }
+                let request: Wanxiangshu.Host.Ports.PromptRequest =
+                    { Text = text
+                      Route = None
+                      Role = Some(Wanxiangshu.Host.Ports.AgentRole agent)
+                      Workspace = directory |> Option.map (fun path -> Wanxiangshu.Host.Ports.WorkspacePath path)
+                      Correlation = Some key
+                      ToolPolicy = tools }
+
+                let metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
+
+                let late: Wanxiangshu.Host.Ports.LateDeliveryListener option =
+                    match awaitMode with
+                    | PromptDispatcher.AwaitMode.Detached ->
+                        Some(fun (verdict: Wanxiangshu.Host.Ports.DeliveryVerdict) ->
+                            this.SettleDetachedSend
+                                key
+                                sessionId
+                                (DispatchSessionPort.toDetachedVerdict verdict)
+                                onDetachedFailure)
+                    | PromptDispatcher.AwaitMode.Await -> None
 
                 let registration = registerAcceptance key onAccepted
 
@@ -528,7 +537,7 @@ module PromptDispatcherSend =
                 try
                     let sendTask =
                         invokeObservedHostSend key onSendObserved registration (fun () ->
-                            port.SendPrompt(sessionId, text, options))
+                            port.SendPrompt(sessionId, request, metadata, late))
 
                     let! result = sendClaimedRoot sendTask
                     return result
@@ -614,18 +623,22 @@ module PromptDispatcherSend =
             task {
                 use _listener = this.SubscribeNoOp port sessionId
 
-                let options =
-                    { Model = None
-                      Agent = Some profile.SelectedAgent
-                      Directory = directory
-                      Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
-                      Tools = tools
-                      DetachedListener =
-                        match awaitMode with
-                        | PromptDispatcher.AwaitMode.Detached ->
-                            Some(fun verdict -> this.SettleDetachedSend key sessionId verdict None)
-                        | PromptDispatcher.AwaitMode.Await -> None }
+                let request: Wanxiangshu.Host.Ports.PromptRequest =
+                    { Text = text
+                      Route = None
+                      Role = Some(Wanxiangshu.Host.Ports.AgentRole profile.SelectedAgent)
+                      Workspace = directory |> Option.map (fun path -> Wanxiangshu.Host.Ports.WorkspacePath path)
+                      Correlation = Some key
+                      ToolPolicy = tools }
 
+                let metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
+
+                let late: Wanxiangshu.Host.Ports.LateDeliveryListener option =
+                    match awaitMode with
+                    | PromptDispatcher.AwaitMode.Detached ->
+                        Some(fun (verdict: Wanxiangshu.Host.Ports.DeliveryVerdict) ->
+                            this.SettleDetachedSend key sessionId (DispatchSessionPort.toDetachedVerdict verdict) None)
+                    | PromptDispatcher.AwaitMode.Await -> None
 
                 let registration = registerAcceptance key onAccepted
 
@@ -636,7 +649,8 @@ module PromptDispatcherSend =
                 let sendAdmitted () : Task<PromptDispatcher.SendAttemptOutcome> =
                     task {
                         let sendTask =
-                            observeHostSend key onSendObserved (fun () -> port.SendPrompt(sessionId, text, options))
+                            observeHostSend key onSendObserved (fun () ->
+                                port.SendPrompt(sessionId, request, metadata, late))
 
                         let acceptFn physicalId =
                             this.AcceptContinuation key sessionId physicalId
