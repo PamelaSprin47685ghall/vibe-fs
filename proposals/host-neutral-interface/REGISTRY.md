@@ -10,7 +10,7 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 
 | ID | Port (namespace `Wanxiangshu.Host.Ports`) | File | Owner lane | Replaces (legacy) | Status |
 |---|---|---|---|---|---|
-| P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Ports/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo` | DECLARED, WIRED-OC, SKELETON-OMP — all seven verbs (`Create`, `Parent`, `Children`, `Abort`, `Interrupt`, `Close`, `FindByTitle`) implemented in the OpenCode adapter (`SdkSessionPort` / `HttpSessionPort`, `OpenCode/Host/SessionSnapshotPort.fs`); every verb reports failures as `HostError`, and no verb is left `Unsupported` |
+| P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Ports/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo` (legacy contract and types remain live across Fork, SyncDelegate, Advisor, and OpenCode wiring) | DECLARED, WIRED-OC, SKELETON-OMP — all seven verbs (`Create`, `Parent`, `Children`, `Abort`, `Interrupt`, `Close`, `FindByTitle`) implemented in the OpenCode adapter (`SdkSessionPort` / `HttpSessionPort`, `OpenCode/Host/SessionSnapshotPort.fs`); every verb reports failures as `HostError`, and no verb is left `Unsupported`. Product consumers documented as left on legacy `ISessionHostPort` |
 | P-02 | `IPromptPort`, `PromptRequest`, `DeliveryVerdict` | `Host/Ports/Prompts.fs(i)` | fission (+ Interaction/Dispatch) | `OpenCode.IPromptPort`, `OpenCodePromptOptions`, `DetachedSendVerdict` | DECLARED, SKELETON-OMP |
 | P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` (both still live; cutover in progress) | DECLARED, WIRED-OC, SKELETON-OMP — `SessionRecoveryHost` and the dispatch recovery path (`PromptRecovery` + `RecoverySurface`) now read through `ITranscriptPort`; fork recovery (`ChildRecoveryWorkflow`) deferred due to `ToolRuntimeScope` fanout (24 files) and tool-part dependencies; full 44-file leftover inventory documented in root `保姆级交接与展望.md`; remaining consumers still to be routed |
 | P-04 | `IToolRegistrar`, `ToolSpec`, `ToolInvocation`, `ToolOutcome` | `Host/Ports/Tools.fs(i)` | tools | `OpenCode/Tools/ToolContext` `Tool`/`ToolContext`/`ToolOutput` | DECLARED, SKELETON-OMP |
@@ -461,6 +461,16 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   (baseline 149), fsharp-control-pyramid 2 findings — both pre-existing in `OpenCode/Host/SessionSnapshotPort.fs`.
   **NOT BUILD-VERIFIED, NOT TEST-RUN** (owner's no-build-before-push rule) — the delivery team must build master and run
   the dispatch-protocol / effect-accounting recovery requirement suites.
+- 2026-10-22 eng-hni-host (host-lifecycle leftover audit): documented current lifecycle status across `保姆级交接与展望.md`,
+  `BOARD.md`, and this registry without starting an unverified broad cross-lane migration. The OpenCode adapter
+  implementation of `ISessionPort` (`SessionSnapshotPort.fs`, `00ae8c156`) is complete for all 7 verbs.
+  The legacy `ISessionHostPort` (`Foundation/HostSessionPort.fs(i)`), `OpenCodeChildOptions`, and `OpenCodeChildInfo`
+  (`Foundation/HostSendContract.fs:37-46`) remain actively used and un-retired across four product consumer clusters:
+  (1) Fork (`Execution/Delegation/Fork/Host/Agent.fs`, `HostForkRuntime`), (2) SyncDelegate (`Execution/Delegation/SyncDelegate/Runtime.fs`),
+  (3) Advisor (`Execution/Delegation/Advisor/Seat.fs`), (4) OpenCode host wiring (`OpenCode/Host/Sessions.fs`, `PluginHost.fs`).
+  Documented key semantic mismatches (e.g. `AdvisorSeat`'s need for `SubscribeTerminal` not provided by `ISessionPort`,
+  and `InjectedSessionPort`'s family root resolution). Documentation only: no port family file changed, no id or port shape
+  touched, so the next free id is unaffected (**P-20** — P-19 was declared as `HostConfig` by `93a51ca15`).
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.

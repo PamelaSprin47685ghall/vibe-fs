@@ -40,9 +40,16 @@ capability downgrade — the host API generation this adapter speaks (v1) has on
 (`POST /session/{id}/abort`) and no attempt-scoped interrupt route; the host's `session.interrupt` belongs to the v2
 API generation, which this adapter does not speak, so the attempt-scoped stop maps onto that same `session.abort`
 verb the product already uses. No verb is left `Unsupported`. `Host/Ports/*` is unchanged (gate ⑪ intact, `omp: n/a`),
-so the next free port id stays **P-19**. Still open (not this slice): the product call sites in
-`OpenCode/Host/Sessions.fs` and `Foundation/HostSessionPort.fs` still use the legacy `ISessionHostPort` — routing
-them onto P-01 is a separate consumer cutover.
+so the port family is unchanged and the next free port id is **P-20** (P-19 was declared as `HostConfig` by `93a51ca15`).
+
+Host-lifecycle leftover audit (eng-hni-host, 2026-10-22): the adapter is complete (above), but product lifecycle
+consumers remain on legacy `ISessionHostPort` / `OpenCodeChildOptions` / `OpenCodeChildInfo` across four clusters:
+(1) Fork (`Execution/Delegation/Fork/Host/Agent.fs`, `HostForkRuntime`), (2) SyncDelegate (`Execution/Delegation/SyncDelegate/Runtime.fs`),
+(3) Advisor (`Execution/Delegation/Advisor/Seat.fs`), (4) OpenCode host wiring (`OpenCode/Host/Sessions.fs`, `PluginHost.fs`).
+These consumers are precisely documented as left (in `保姆级交接与展望.md` and `REGISTRY.md`) rather than cut over in an
+unverified cross-lane sweep: `AdvisorSeat` requires terminal event subscription (`SubscribeTerminal`) which `ISessionPort`
+does not provide, `InjectedSessionPort` still manages family roots and process-local ancestry, and `OpenCodeChildOptions`/
+`OpenCodeChildInfo` have 36 live references across 17 files, which prevents retirement at this stage.
 
 P-03 consumer cutover 1 (eng-hni-host, 2026-10-22): the session recovery host now reads the transcript through the
 neutral port. `OpenCode/Host/SessionRecoveryHost.fs(i)`: the constructor argument `snapshot: ISessionSnapshotPort`
