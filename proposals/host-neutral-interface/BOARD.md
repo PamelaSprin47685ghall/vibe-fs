@@ -59,7 +59,7 @@ both construction sites, and `OpenCode/Host/HostSignalBootstrap.fs` adapts its e
 `TranscriptPort.HostTranscriptPort` (that file is shared with the signal lane; only the constructor argument
 changed there). The legacy `ISessionSnapshotPort` / `SessionMessage` contract stays live — the adapter wraps it and
 the remaining consumers (turn reconcile, prefix wire, delegation advisor, tools, dispatch recovery) are still to be
-routed onto P-03. `Host/Ports/*` is unchanged, so the next free port id stays **P-19**. Gates: architecture OK,
+routed onto P-03. `Host/Ports/*` is unchanged, so the next free port id stays **P-20**. Gates: architecture OK,
 adapter-thinness 139 files / 33000 lines, product-reference 595 (baseline 689), without-port 134 (baseline 149),
 fsharp-control-pyramid 2 findings (both pre-existing). **NOT BUILD-VERIFIED, NOT TEST-RUN** — the delivery team must
 build master and run the recovery requirement suites.
@@ -74,7 +74,7 @@ is preserved. The legacy `ISessionSnapshotPort` / `SessionMessage` contract stay
 fanout and lossy reverse projection, fork recovery remains on `ISessionSnapshotPort` until downstream tools complete domain extraction.
 Full leftover inventory (44 files) documented in root `保姆级交接与展望.md`. Remaining consumers (turn reconcile, prefix wire, delegation
 advisor, tools, fork host restart) are still to be routed onto P-03.
-`Host/Ports/*` is unchanged, so the next free port id stays **P-19**. Gates: architecture OK, adapter-thinness 139
+`Host/Ports/*` is unchanged, so the next free port id stays **P-20**. Gates: architecture OK, adapter-thinness 139
 files / 33004 lines, product-reference 589 (baseline 689), without-port 134 (baseline 149), fsharp-control-pyramid 2
 findings (both pre-existing). **NOT BUILD-VERIFIED, NOT TEST-RUN** — the delivery team must build master and run the
 dispatch-protocol / effect-accounting recovery requirement suites.
@@ -99,6 +99,7 @@ product code (a diagnostic must not break a turn). Fact only: it touches the HNI
 board's diagnostics surface, but it claims no card and changes no card state. The product's existing
 diagnostic path is `Foundation/Diagnostic.fs` (`Diagnostic.emit`, a product diagnostic behind the CTX-014
 whitelist and the `WANXIANGSHU_DIAG=1` gate), not the host verb; those call sites stay live and no
+consumer was cut over onto P-12; routing them onto P-12 is the next slice.
 
 P-10 fact (arch lane, 2026-10-22, slice P-10): P-10 now has an OpenCode implementation —
 `OpenCode/Host/PathsPort.fs(i)` implements `IHostPaths`, and the neutral port family
@@ -115,7 +116,7 @@ state; the live ad-hoc `input.directory` reads (`PluginHost.fs:41-51`, `OpenCode
 integ-027-2 fact (2026-10-22): EMR-010 model-routing lease resolution landed (`a38ef7770`, keying `admissionInFlight`
 by `(ChatExecutionKey * ChatAdmissionPurpose)`). Installed-Host canary gap diagnosed as lifecycle fence/abortion
 mismatch (uncompleted join); canary remains unresolved. No HNI port added or changed; claims no card; next free
-port id stays **P-19**; omp mirror n/a.
+port id stays **P-20**; omp mirror n/a.
 
 vs-006 fact (control-pyramid slice, 2026-10-22): the last two `fsharp-control-pyramid` findings in the OpenCode
 session adapter are gone — `src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs` `sessionInfoOfRow` and

@@ -29,7 +29,7 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 
 Domain lanes declare seams their domain needs from a host in `src/Wanxiangshu/Host/Domain/<Name>.fs(i)`
 (DESIGN §1.1, tier B). IDs are reserved here so parallel lanes never collide (HNI-11 found two `P-13`s).
-Use the ID below in your row; next free ID: **P-19**. A tier-B file is **not** a neutral port: it is never
+Use the ID below in your row; next free ID: **P-20**. A tier-B file is **not** a neutral port: it is never
 mirrored to the TypeScript port surface, and the adapters' references to it are ratcheted (gate ⑬).
 
 **The fork lane's ports (P-13/P-14/P-15) are on `master`.** `Host/Domain/CommandDeclaration.fs(i)`,
@@ -225,7 +225,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
 - 2026-10-21 eng-hni-fork (slice B): the join wire rules leave `Fork/OpenCode/JoinTool` for host-neutral `Execution/Delegation/Fork/JoinRules`
   (`JoinRules`: `JoinRecord`, `decideCompletedStatus`, `mapForkError`, `mapJoinItem`, `mapOrchestratorVerdict`). **No new port**: the rules
   consume only product-domain types (`ForkError`, `JoinItem`, `Role`, `ManagerJobId`, `CommitHash`, `OrchestratorVerdict`), and the host capability
-  they need is already bound through `ToolRuntimeScope` + P-14/P-15. Next free id stays **P-19**. The adapter keeps only the wiring
+  they need is already bound through `ToolRuntimeScope` + P-14/P-15. Next free id stays **P-20**. The adapter keeps only the wiring
   (journal read for the manager job name, runtime name/role resolution, window rendering) and re-exports `JoinRecord` so `ToolSurface` and
   `ToolRegistry` are unchanged. `omp: n/a` (no port type, so the omp mirror is untouched).
 - 2026-10-21 eng-hni-fork (bookkeeping): corrected the lane-port status — P-13/P-14/P-15 **are on `master`**
@@ -233,7 +233,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   `origin/wip/hni-fork-next` are deleted. P-16/P-17/P-18 are still branch-only (`origin/wip/hni-plugin`,
   `origin/wip/hni-fission`, `origin/wip/hni-tools` — all three branches still exist). Recorded that the fork lane has
   **no compile/test evidence** (owner's no-build-before-push rule): the delivery team must build master at
-  `aa43d3455` or later. No id, name or port shape changed; next free id stays **P-19**.
+  `aa43d3455` or later. No id, name or port shape changed; next free id stays **P-20**.
 - 2026-10-21 eng-hni-fission: P-17 `FissionHostPort` declared and wired to the OpenCode fission adapter (transitional: still carries Foundation `ISessionHostPort` / `IEventObservationPort`).
 - 2026-10-21 eng-hni-fission: S1 — the fission tool-visibility decision moved out of the adapter folders into the product lane (`Execution/Fission/Visibility.fs(i)`, `FissionToolVisibility`); no port change (P-17 unchanged).
 - 2026-10-22 eng-hni-fission: S3 — the fission lane got its **own** convergence vocabulary. `Host/FissionPort.fs(i)`
@@ -244,7 +244,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   Fission-owned names, so the legacy Foundation names no longer appear in the fission product lane. The aliases are
   transparent: no behaviour changed, and `Host/FissionPort.fs(i)` moved **earlier** in `compile-order.txt` (right after
   `Foundation/HostSessionPort.fs`) because `Convergence.fs` now depends on it. P-01 / P-07 are unchanged, so the next
-  free id stays **P-19**; `omp: n/a` (the file is not under `Host/Ports/`, so the generated TS mirror is unaffected).
+  free id stays **P-20**; `omp: n/a` (the file is not under `Host/Ports/`, so the generated TS mirror is unaffected).
   **No compile/test evidence** (owner's no-build-before-push rule) — the delivery team must build master and run the
   intra-participant-parallelism requirement suites.
 - 2026-10-22 eng-hni-fission: S4 — the `fission` tool's **product policy** left the OpenCode adapter. The prose
@@ -254,7 +254,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   `isAllowedRole`). The adapter (`Execution/Fission/OpenCode/Tool.fs`) keeps only the wire half: the rejection →
   semantic-path mapping and the TOML encoding of the rendered instructions, plus the language binding it reads
   from the host. The unused `tool/fission/started` literal was dropped with the move. No port shape changed, so
-  P-01 / P-07 / P-17 are unchanged and the next free id stays **P-19**; `omp: n/a` (no port type).
+  P-01 / P-07 / P-17 are unchanged and the next free id stays **P-20**; `omp: n/a` (no port type).
   Gates: architecture OK, adapter-thinness 139 files / 33132 lines, product-reference 595 (baseline 689),
   without-port 137 (baseline 150) — the `Execution/Fission/OpenCode/Tool.fs` per-file product-reference count is
   unchanged at 5, provider-leak-gate OK, tool-referential-integrity OK (one `fission` ToolSpec owner site).
@@ -283,7 +283,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   `resolveTerminalLabel`, `windowOf`, `ptyTrackIds`, `mapOrchestratorMailboxError`, `DevOpsJoinTimeoutMs`). **No new port**:
   the rules consume only product-domain types (`Role`, `JoinItem`, `JoinInterruptReason`, `NonEmptyBatch`); the host
   capability they need is supplied by the adapter as one plain record of callbacks (`JoinRun.AgentIdentity`), so the
-  neutral module holds no host capability. Next free id stays **P-19**. The adapter keeps only the wiring (journal/runtime
+  neutral module holds no host capability. Next free id stays **P-20**. The adapter keeps only the wiring (journal/runtime
   identity lookup, mailbox wait, PTY release and buffering, wire rendering) and re-exports `JoinRecord` unchanged, so the
   requirements import path `dist/Execution/Delegation/Fork/OpenCode/JoinTool.js` is untouched. `omp: n/a` (no port type).
   **No compile/test evidence** (owner's no-build-before-push rule; the compile slot gave up with exit 75 twice) —
@@ -298,7 +298,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   `HostCapability.ChildSessions` / `HostCapability.Interrupt` are gone. `Interrupt` is documented as the host's
   single session-level stop action (the host exposes no attempt-scoped stop). `SdkSessionPort` / `HttpSessionPort`
   are now exposed in `SessionSnapshotPort.fsi`. **No new port** — P-01 (`Host/Ports/Sessions.fs(i)`) is unchanged, so
-  the next free id stays **P-19**; `omp: n/a` (the family `.fsi` did not change, so the generated TS mirror is
+  the next free id stays **P-20**; `omp: n/a` (the family `.fsi` did not change, so the generated TS mirror is
   unaffected). The product still consumes the legacy `ISessionHostPort` / `ISessionSnapshotPort`; routing those call
   sites onto P-01 is the next slice. Gates: architecture OK, adapter-thinness 139 files / 33352 lines,
   product-reference 596 (baseline 689), without-port 137 (baseline 150), provider-leak-gate OK.
@@ -317,7 +317,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   product's own attempt-interrupt path already calls `client.session.abort` for the session that owns the attempt
   (`OpenCode/Host/Sessions.fs` → `OpenCode/Host/OpenCodePort.fs`), so `Interrupt` maps onto that same wire verb and is
   stated as such in the code. **No verb is left `Unsupported`.** No new port: P-01 (`Host/Ports/Sessions.fs(i)`) is
-  unchanged, so the next free port id stays **P-19** and the generated TS mirror is unaffected (`omp: n/a`).
+  unchanged, so the next free port id stays **P-20** and the generated TS mirror is unaffected (`omp: n/a`).
   **No compile/test evidence** (owner's no-build-before-push rule) — the delivery team must build master and run the
   session requirement suites.
 
@@ -351,7 +351,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   suspects `6b7ae3a46`/`cf1f0d2a9`/`e058233a3` are not the structural source cause (timing untested); no commit-level
   binary search was run. Installed-Host canary gap is diagnosed as a lifecycle fence/abortion settlement mismatch
   (unimplemented proposed bridge, canary remains unresolved). **No new port** — the HNI port surface is untouched;
-  next free port id remains **P-19**; `omp: n/a`.
+  next free port id remains **P-20**; `omp: n/a`.
 
 - 2026-10-21 eng-hni-plugin-goose (HNI-08): P-16 pair guidance is WIRED-OC — the guideline fold moved out of
   `OpenCode/Host/PairProgramming` into the domain owner `Interaction/PairGuidance/Occurrences`; the OpenCode transform
@@ -384,7 +384,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   constructor argument changed there). **The legacy `ISessionSnapshotPort` / `SessionMessage` contract stays live**
   — the adapter wraps it and the other consumers (turn reconcile, prefix wire, delegation advisor, tools,
   dispatch recovery) are still to be routed. **No new port** — P-03 (`Host/Ports/Transcript.fs(i)`) is unchanged, so
-  the next free id stays **P-19**; `omp: n/a` (the family `.fsi` did not change, so the generated TS mirror is
+  the next free id stays **P-20**; `omp: n/a` (the family `.fsi` did not change, so the generated TS mirror is
   unaffected). Gates: architecture OK, adapter-thinness 139 files / 33000 lines, product-reference 595
   (baseline 689), without-port 134 (baseline 149), fsharp-control-pyramid 2 findings — both pre-existing in
   `OpenCode/Host/SessionSnapshotPort.fs`. **NOT BUILD-VERIFIED, NOT TEST-RUN** (owner's no-build-before-push rule) —
@@ -407,7 +407,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   reverse projection, fork recovery remains on `ISessionSnapshotPort` until downstream tools complete domain extraction. The full
   44-file leftover inventory is documented in root `保姆级交接与展望.md`. Remaining consumers (turn reconcile, prefix wire, delegation
   advisor/seat, tools, fork host restart) are still to be routed. **No new port** — P-03 (`Host/Ports/Transcript.fs(i)`) is unchanged;
-  the next free id stays **P-19**. Gates:
+  the next free id stays **P-20**. Gates:
   architecture OK, adapter-thinness 139 files / 33004 lines, product-reference 589 (baseline 689), without-port 134
   (baseline 149), fsharp-control-pyramid 2 findings — both pre-existing in `OpenCode/Host/SessionSnapshotPort.fs`.
   **NOT BUILD-VERIFIED, NOT TEST-RUN** (owner's no-build-before-push rule) — the delivery team must build master and run
@@ -439,7 +439,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   an execution failure or a retry decision stays product logic. **The legacy `ISessionSnapshotPort` /
   `SessionMessage` contract is deliberately still live** — many consumers remain, and routing them onto P-03 is
   the next slice; no consumer was cut over in this commit. **No new port** — P-03 (`Host/Ports/Transcript.fs(i)`)
-  is unchanged, so the next free id stays **P-19**; `omp: n/a` (the family `.fsi` did not change, so the
+  is unchanged, so the next free id stays **P-20**; `omp: n/a` (the family `.fsi` did not change, so the
   generated TS mirror is unaffected). Gates: architecture OK, adapter-thinness 139 files / 32831 lines,
   product-reference 595 (baseline 689), without-port 136 (baseline 149), fsharp-control-pyramid 5 findings — all
   pre-existing in `OpenCode/Host/SessionSnapshotPort.fs`, 0 in the new file. **No compile/test evidence** (owner's
@@ -472,7 +472,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   `PromptRequest.Route`). The adapter chooses no route; choosing is product logic. **The legacy `OpencodeModel`
   (Foundation) and the `ModelRoutingSurface` host calls are deliberately still live** — retiring them is HNI-10;
   no consumer was cut over in this commit. **No new port** — P-08 (`Host/Ports/ModelRouting.fs(i)`) is unchanged,
-  so the next free id stays **P-19**; `omp: n/a` (the family `.fsi` did not change, so the generated TS mirror is
+  so the next free id stays **P-20**; `omp: n/a` (the family `.fsi` did not change, so the generated TS mirror is
   unaffected). Gates: architecture OK, adapter-thinness 140 files / 33248 lines, product-reference 588
   (baseline 689), without-port 134 (baseline 149), fsharp-control-pyramid 2 findings — both pre-existing in
   `OpenCode/Host/SessionSnapshotPort.fs`, 0 in the new file, aggregate-retired OK, subsystems OK.
@@ -482,7 +482,7 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   (`4c84009c2` JoinRun `.fsi` literal + `SessionSnapshotPort.fs` list-append, `94218a2be` `Command.fs` typed `Ok handleId` +
   `SessionsSurface.fs` `TerminalOutcome.*` qualification + `PluginHostWiring.fs` `open`), two malformed-fsproj container fixes
   (`46cf4cab9`, `d0959adb2`), and one `scripts/suites-manifest.sh` bash-fix (`d55fa1eff`). **No port touched** — no id, name or
-  port shape changed; next free id stays **P-19**; `omp: n/a`. **No compile/test evidence** (owner's no-build-before-push rule;
+  port shape changed; next free id stays **P-20**; `omp: n/a`. **No compile/test evidence** (owner's no-build-before-push rule;
   the compile slot gave up at the ~3 min machine cap, exit 124/143) — the delivery team must build master and run the
   requirement suites; per-fix shard ownership is recorded in CHANGELOG.md.
 
