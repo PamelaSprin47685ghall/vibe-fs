@@ -958,7 +958,12 @@ module PluginTransforms =
                   TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
 
             let wirePort = journal |> Option.map AgentJournalPortAdapter.forWire
-            XWire.applyTransform snapshotOpt wirePort attempts
+
+            XWire.applyTransform
+                (snapshotOpt
+                 |> Option.map (fun s -> TranscriptPort.HostTranscriptPort s :> Wanxiangshu.Host.Ports.ITranscriptPort))
+                wirePort
+                attempts
           FreezeProviderAttemptPlan = freezeProviderAttemptPlan
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->

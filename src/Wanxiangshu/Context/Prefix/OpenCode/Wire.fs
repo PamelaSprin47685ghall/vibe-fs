@@ -4,14 +4,12 @@ open System
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Foundation.HostSession
 
 open Wanxiangshu.Participant.Provider.Attempt
 
@@ -252,7 +250,7 @@ module XWire =
         (port: WireJournalPort)
         (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
-        (_snapshot: ISessionSnapshotPort option)
+        (_snapshot: ITranscriptPort option)
         (output: obj)
         : Task =
         task {
@@ -275,7 +273,7 @@ module XWire =
         }
 
     let applyTransform
-        (snapshot: ISessionSnapshotPort option)
+        (snapshot: ITranscriptPort option)
         (port: WireJournalPort option)
         (attempts: AttemptPlanCapability)
         (output: obj)
