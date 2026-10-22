@@ -11,22 +11,29 @@ open Wanxiangshu.Sphinx.V2.Core
 type OpenCodeHostPort internal (runtime: SyncDelegateRuntime) =
     member _.Capabilities() : string list = DispatchPolicy.hostCapabilities
 
-    /// `workspace` is the neutral workspace the host resolved for this inquiry.
-    /// Sphinx v2 carries it for the omp adapter and does not read it yet.
+    /// `context` is the neutral host turn context resolved for this inquiry:
+    /// it names the session that owns the dispatch and the workspace the
+    /// dispatched prompt belongs to.
     member internal _.Dispatch
-        (owner: SessionId, request: DispatchRequestedBody, _workspace: Wanxiangshu.Host.Ports.WorkspacePath option)
+        (owner: SessionId, request: DispatchRequestedBody, context: Wanxiangshu.Host.Ports.TurnContext)
         : SyncDelegateObservedExecution =
         match runtime.ValidateObservedOwner owner with
         | Error reason ->
             { Admission = Task.FromResult(SyncDelegateObservedAdmission.NotDispatched reason)
               Completion = Task.FromResult(Error reason) }
         | Ok() ->
-            let publicPrompt = request.PublicEnvelope.CanonicalPayload
+            let prompt: Wanxiangshu.Host.Ports.PromptRequest =
+                { Text = request.PublicEnvelope.CanonicalPayload
+                  Route = context.Route
+                  Role = context.Role
+                  Workspace = context.Workspace
+                  Correlation = None
+                  ToolPolicy = None }
 
             runtime.InvokeObservedPrepared(
                 owner,
-                publicPrompt,
-                (fun () -> Task.FromResult(LlmFacing.instruction publicPrompt))
+                prompt.Text,
+                (fun () -> Task.FromResult(LlmFacing.instruction prompt.Text))
             )
 
 /// The host boundary of the Sphinx v2 OpenCode adapter: product admission and the
@@ -48,11 +55,11 @@ module HostPort =
         (runtime: SyncDelegateRuntime)
         (owner: SessionId)
         (body: Result<InquiryEventBody, string>)
-        (workspace: Wanxiangshu.Host.Ports.WorkspacePath option)
+        (context: Wanxiangshu.Host.Ports.TurnContext)
         : SyncDelegateObservedExecution =
         match body with
         | Error reason -> refused reason
         | Ok body ->
             match DispatchPolicy.admit body with
             | Error reason -> refused reason
-            | Ok request -> OpenCodeHostPort(runtime).Dispatch(owner, request, workspace)
+            | Ok request -> OpenCodeHostPort(runtime).Dispatch(owner, request, context)

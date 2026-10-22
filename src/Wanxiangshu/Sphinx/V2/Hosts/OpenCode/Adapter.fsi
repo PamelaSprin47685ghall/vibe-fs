@@ -11,7 +11,7 @@ type OpenCodeHostPort =
     member Capabilities: unit -> string list
 
     member internal Dispatch:
-        owner: SessionId * request: DispatchRequestedBody * workspace: Wanxiangshu.Host.Ports.WorkspacePath option ->
+        owner: SessionId * request: DispatchRequestedBody * context: Wanxiangshu.Host.Ports.TurnContext ->
             SyncDelegateObservedExecution
 
 /// The host boundary of the Sphinx v2 OpenCode adapter: product admission and the
@@ -30,5 +30,5 @@ module HostPort =
         runtime: SyncDelegateRuntime ->
         owner: SessionId ->
         body: Result<InquiryEventBody, string> ->
-        workspace: Wanxiangshu.Host.Ports.WorkspacePath option ->
+        context: Wanxiangshu.Host.Ports.TurnContext ->
             SyncDelegateObservedExecution

@@ -14,20 +14,26 @@ module Surface =
         {
             Harness: obj
             Owner: SessionId
-            /// The neutral workspace the host resolved for this inquiry. The adapter
-            /// does not read it yet; it is carried for the port adoption.
-            Workspace: Wanxiangshu.Host.Ports.WorkspacePath option
+            /// The neutral host turn context for this inquiry: the owner session
+            /// plus the workspace the dispatched prompt belongs to. The adapter
+            /// does not read the workspace yet; it is carried for the port adoption.
+            Context: Wanxiangshu.Host.Ports.TurnContext
         }
 
     let createDispatchProbe (directory: string) (owners: obj) (owner: string) : Task<obj> =
         task {
             let! harness = SyncDelegateSurface.createForHostRecording directory owners
+            let ownerSession = SessionId.create owner
 
             return
                 box
                     { Harness = harness
-                      Owner = SessionId.create owner
-                      Workspace = None }
+                      Owner = ownerSession
+                      Context =
+                        { Session = ownerSession
+                          Role = None
+                          Route = None
+                          Workspace = None } }
         }
 
     let startDispatch (probe: obj) (_inquiry: string) (request: obj) : obj =
@@ -36,7 +42,7 @@ module Surface =
         match Codec.decodeBody request with
         | Ok body ->
             SyncDelegateSurface.withHostRuntime probe.Harness (fun runtime _ ->
-                HostPort.startDispatch runtime probe.Owner (Ok body) probe.Workspace)
+                HostPort.startDispatch runtime probe.Owner (Ok body) probe.Context)
             |> box
         | Error fault -> HostPort.refused fault.Message |> box
 
