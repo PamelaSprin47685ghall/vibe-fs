@@ -14,6 +14,19 @@ open Fable.Core
 /// if the plugin is out of contract, call `fatal`.
 module Diagnostic =
 
+    /// HNI P-12: the neutral diagnostic sink. The product's own diagnostic
+    /// path stays here; the host supplies a sink that receives the same
+    /// records through the neutral `IDiagnosticSink` port.
+    type Sink = string -> (string * string) list -> unit
+
+    let mutable private activeSink: Sink option = None
+
+    let installSink (sink: Sink) : unit =
+        activeSink <- Some sink
+
+    let clearSink () : unit =
+        activeSink <- None
+
     /// CTX-014 允许字段清单。新增字段必须同时登记到白名单与
     /// `tests/unit/Context/ctx014.test.mjs` 的正向用例。
     let AllowedFields =
@@ -91,9 +104,19 @@ module Diagnostic =
     let private shouldEmit operation =
         validateOperation operation && diagnosticsVisible ()
 
-    let private emitWhenVisible operation (project: unit -> obj) =
-        if shouldEmit operation then
-            project () |> stringify |> error
+    let private redactFields (fields: (string * string) list) : (string * string) list =
+        fields |> List.map (fun (name, value) -> name, redactText value)
+
+    /// Route one record to the installed sink, if any. A sink that throws is
+    /// dropped: a diagnostic must never break product code.
+    let private routeToSink (operation: string) (fields: (string * string) list) : unit =
+        match activeSink with
+        | None -> ()
+        | Some sink ->
+            try
+                sink operation (redactFields fields)
+            with _ ->
+                ()
 
     let private validate (fields: (string * string) list) : unit =
         let illegal =
@@ -129,7 +152,9 @@ module Diagnostic =
     let emit (operation: string) (fields: (string * string) list) : unit =
         try
             validate fields
-            emitWhenVisible operation (fun () -> payload operation fields)
+            if shouldEmit operation then
+                payload operation fields |> stringify |> error
+                routeToSink operation fields
         with _ ->
             ()
 

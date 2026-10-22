@@ -97,8 +97,13 @@ so every diagnostic is written at level `info` with the operation as the message
 product code (a diagnostic must not break a turn). Fact only: it touches the HNI-08 (plugin-host)
 board's diagnostics surface, but it claims no card and changes no card state. The product's existing
 diagnostic path is `Foundation/Diagnostic.fs` (`Diagnostic.emit`, a product diagnostic behind the CTX-014
-whitelist and the `WANXIANGSHU_DIAG=1` gate), not the host verb; those call sites stay live and no
-consumer was cut over onto P-12; routing them onto P-12 is the next slice.
+whitelist and the `WANXIANGSHU_DIAG=1` gate), not the host verb. **Cutover (plugin-host lane, 2026-10-22,
+slice A)**: `PluginBoot.create` now installs the `IDiagnosticSink` into `Foundation/Diagnostic.fs`
+(`Diagnostic.installSink` / `clearSink`) from `DiagnosticsPort.create input`, so every `Diagnostic.emit`
+call site routes redacted, CTX-014-validated records to `IDiagnosticSink.Emit` under `WANXIANGSHU_DIAG=1` in
+addition to stderr. `OpenCodeHostPorts.create` takes the real `DiagnosticsPort.create boot.Input` and falls
+back to `DiagnosticSinkPort` only when the host exposes no log verb — in that case boot cleared the sink,
+so there is no loop. `Diagnostic.fatal` is unchanged (stderr + process termination).
 
 P-10 fact (arch lane, 2026-10-22, slice P-10): P-10 now has an OpenCode implementation —
 `OpenCode/Host/PathsPort.fs(i)` implements `IHostPaths`, and the neutral port family

@@ -181,7 +181,9 @@ module OpenCodeHostPorts =
 
             let promptPort = OpenCodePromptPort(host.SessionPort) :> IPromptPort
             let configPort = liveConfig :> IHostConfigPort
-            let diagnosticsPort = DiagnosticSinkPort() :> IDiagnosticSink
+            let diagnosticsPort =
+                DiagnosticsPort.create boot.Input
+                |> Option.defaultWith (fun () -> DiagnosticSinkPort() :> IDiagnosticSink)
 
             let pathsPort =
                 HostPathsPort(projectRootStr, stateRootStr, projectIdOf boot.Input projectRootStr) :> IHostPaths

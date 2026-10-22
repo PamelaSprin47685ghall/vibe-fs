@@ -53,6 +53,13 @@ module PluginBoot =
             // resolve it once at load so the first request already speaks it.
             Wanxiangshu.Participant.Provider.ProviderLanguageBinding.refreshGlobalLanguage ()
 
+            // HNI P-12: route product diagnostics (`Diagnostic.emit`) through the
+            // neutral `IDiagnosticSink` when the host wiring supplies `client.app.log`.
+            // No host log verb means no sink: the product's own stderr path stays.
+            match DiagnosticsPort.create input with
+            | Some sink -> Diagnostic.installSink (fun operation fields -> sink.Emit(operation, fields))
+            | None -> Diagnostic.clearSink ()
+
             // Fail-fast resource load before any consumer (StaticTools / BlogTool / EnforcerHost).
             RuntimeResources.install (RuntimeResourceAssembly.load ())
 
