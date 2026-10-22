@@ -64,7 +64,7 @@ export function discoverPortFamilies() {
 // Foundation ids the ports use, mapped to opaque branded TS strings.
 const FOUNDATION_OPAQUE = [
   'SessionId', 'ToolCallId', 'PromptKey', 'TranscriptMessageAddress',
-  'TransportReceipt', 'PhysicalUserMessageId',
+  'TransportReceipt', 'PhysicalUserMessageId', 'ProviderRunIdentity',
 ]
 
 const PRIMITIVES = {
@@ -124,19 +124,22 @@ export function fsType(text) {
   const s = text.trim()
   if (!s) return { ts: 'unknown', optional: false }
 
-  // function type: `a -> b`
+  // function type: `a -> b`, or the curried form `a -> b -> c`
   const arrow = splitArrow(s)
-  if (arrow.length === 2) {
-    const argument = fsType(arrow[0])
-    const result = fsType(arrow[1])
-    const parameters = argument.ts === 'void' ? '' : `arg: ${argument.ts}`
+  if (arrow.length >= 2) {
+    const result = fsType(arrow[arrow.length - 1])
+    const argumentTypes = arrow.slice(0, -1).map((part) => fsType(part))
+    const parameters = argumentTypes
+      .map((argument, index) => (argument.ts === 'void' ? null : `arg${index === 0 ? '' : index}: ${argument.ts}`))
+      .filter((parameter) => parameter !== null)
+      .join(', ')
     return { ts: `(${parameters}) => ${result.ts}`, optional: false }
   }
 
   if (s.startsWith('(') && s.endsWith(')')) {
     const inner = s.slice(1, -1)
     const innerArrow = splitArrow(inner)
-    if (innerArrow.length === 2) return fsType(inner)
+    if (innerArrow.length >= 2) return fsType(inner)
     const tuple = splitTop(inner, '*')
     if (tuple.length > 1) return { ts: `[${tuple.map((p) => fsType(p).ts).join(', ')}]`, optional: false }
     return fsType(inner)

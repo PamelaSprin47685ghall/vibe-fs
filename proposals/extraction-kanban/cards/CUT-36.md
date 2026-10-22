@@ -140,3 +140,13 @@
 2. **Open Item 2（`ProjectId` 路径与标识键的双重用途）**：
    - `HostPlugin.fs:328` 使用 `workIdOf (ports.Paths.ProjectId + "|" + root)`，同文件 `:357` 使用 `scopeId = "host-activation:" + ports.Paths.ProjectId`。
    - 当前 `ProjectId` 直接采用工作区路径字符串，兼具“路径”与“全局作用域标识”双重职责。未来若对路径做规范化（如大小写、符号链接解析），会隐式改变 work ID 与 scope ID，需端口属主评估是否引入独立的不透明 ProjectId 格式。
+
+
+## 12. Ledger 2026-10-22 closeout note
+
+- **CUT-36 status: stays `DOING`**. No verified real smoke exists in this batch:
+  `.Herdchestra/takeover/secondhost.md` checkpoint is **absent**, so there is no lane-verified
+  smoke conclusion to promote the card. The blocker is the missing checkpoint + the absence of a
+  verified real smoke on omp 18.12.4 (O-3 still open per BOARD row).
+- Any future promotion to `DONE` requires a SecondHost lane checkpoint citing the real smoke
+  command and its output (`.Herdchestra/takeover/secondhost.md`).

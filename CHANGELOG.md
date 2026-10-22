@@ -1,5 +1,13 @@
 # Changelog — 版本历史
 
+## Unreleased — 2026-10-22 文档收口批次（Ledger lane）
+
+- **GAP 台账（`requirements/GAP.md`）**：17 行列形状归一（表 1 GAP-025/038；表 2 GAP-210/077；表 3 GAP-225…GAP-237），0 行形状不一致；203 行 GAP 行一行未删、无重复 id；状态词未改（PARTIAL 113 / CLOSED 53 / ARCHIVED 18 / OPEN 10 / RETIRED 9）。文字实际变化 9 行（GAP-025 转义 `\|`、GAP-038/210/077 并格、GAP-231…237 前缀中性化 + 并格）；GAP-005/GAP-050 维持 `OPEN`（当前合同下无 faithful mechanical oracle，需人工审阅）。本批 register 的 GAP 证据更新：GAP-075、GAP-088、GAP-123 各追加 lane checkpoint 证据注记，**状态维持 PARTIAL**（GapBehavior 为设计态无生产改动；Authority 6 项编译修复已落地但终态生产者未接线）；无 GAP 在本批被标记 CLOSED。
+- **HNI REGISTRY（`proposals/host-neutral-interface/REGISTRY.md`）**：HNI-12 逐行审证追加（A1 `SessionInfo.Workspace` 已落地、A2 产品侧订阅、P-04 `ProviderRun`/`ToolAdmission`、P-14/P-15 `DelegationEnvironment`）；next free port id 仍为 **P-20**（A1 仅增字段，未分配新家族）。OpenCode 侧 P-04/P-05/P-06/P-07 仍无 WIRED-OC（`Unsupported*` 或 omp-only），不标 RETAINED。
+- **BOARD / CUT-36**：CUT-36 维持 `DOING`（`.Herdchestra/takeover/secondhost.md` checkpoint 缺失，无 lane-verified smoke；阻塞原因已写入 card §12）。
+- **交接文（`保姆级交接与展望.md`）**：顶部新增权威段（目标、十一条并行线、已核实事实、本机证据不随 Git 分发）；清除 11 处旧额度/停电/内存紧张措辞（最终扫描 0 命中），历史事实与验证失败保留。
+- **证据来源**：`.Herdchestra/takeover/{authority,tools,hni,domains,gap-behavior,integration-cases,verification}.md`；`fork.md` 与 `secondhost.md` 不存在，已登记为缺失。
+
 
 ## Unreleased — 构建入口修复（`node scripts/build.mjs` 此前对所有调用都失败）+ 验收命令纠正
 

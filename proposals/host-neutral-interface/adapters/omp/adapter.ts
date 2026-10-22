@@ -380,8 +380,17 @@ export function createOmpHostPorts(pi: OmpApi, ctx: () => ExtensionContext, chil
     Paths: { get StateRoot() { return P.workspacePath(`${ctx().cwd}/.wanxiangshu`); },
              get ProjectRoot() { return P.workspacePath(ctx().cwd); },
              get ProjectId() { return ctx().cwd; } },
+    // HNI P-19: omp's extension API exposes no configuration surface, so the
+    // port refuses every call explicitly instead of faking a host that stores
+    // settings.
+    Config: {
+      Read: (_path: string[]): P.Result<P.HostSettingValue | undefined, P.HostError> =>
+        ({ ok: false, error: { tag: "Refused", reason: "omp exposes no configuration surface to an extension" } }),
+      Apply: (_settings: P.RequiredSetting[]): P.Result<P.SettingGap | undefined, P.HostError> =>
+        ({ ok: false, error: { tag: "Refused", reason: "omp exposes no configuration surface to an extension" } }),
+    },
     Diagnostics: { Emit: (op, fields) => pi.logger.debug(op, Object.fromEntries(fields)) },
-    Agents: { Roles: () => agents },
+    Agents: { Roles: () => Promise.resolve(ok(agents)) },
     // Only capabilities this adapter actually wires are advertised.
     Capabilities: { HostName: "omp", Supports: new Set<P.HostCapability>(["ChildSessions", "SessionDiscovery", "Interrupt", "SubagentRouting"]) },
   };
@@ -410,7 +419,12 @@ export function productSignal(slot: ProductHookSlot, emit: (s: P.HostSignal) => 
   return (s: P.HostSignal) => {
     const hooks = slot.current;
     if (!hooks) return Promise.resolve();
-    return Promise.all([emit(s), hooks.OnSignal(s)]).then(() => undefined);
+    // `OnSignal` is optional: the product may not decide what a host fact
+    // means. Absence is declared, so the signal reaches the host subscribers
+    // and nobody else.
+    const onSignal = hooks.OnSignal;
+    if (!onSignal) return emit(s).then(() => undefined);
+    return Promise.all([emit(s), onSignal(s)]).then(() => undefined);
   };
 }
 
@@ -420,14 +434,22 @@ export function registerProductHooks(pi: OmpApi, slot: ProductHookSlot, emit: (s
     Route: c.model ? { Provider: c.model.provider, Model: c.model.id } : undefined,
   });
   const view = (c: ExtensionContext, id: string, tool: string, input: unknown): P.ToolCallView =>
-    ({ Session: sid(c.sessionManager.getSessionId()), CallId: id as P.ToolCallId, Tool: tool,
+    ({ Session: sid(c.sessionManager.getSessionId()), CallId: id as P.ToolCallId,
+       // omp's tool events carry no provider-run identity for the call, so the
+       // view carries none: the fence evidence is absent, never resolved from
+       // the session's current binding.
+       ProviderRun: undefined,
+       Tool: tool,
        Args: P.canonicalJsonText(JSON.stringify(input ?? {})) });
   const signal = productSignal(slot, emit);
 
   pi.on("input", async (e, c) => {
     const hooks = slot.current;
-    if (!hooks) return undefined;
-    const verdict = await hooks.Turn.AdmitTurn({ Context: turnContext(c), Text: e.text });
+    // `Turn` is optional: the product may not decide turn admission, so the
+    // host's own turn runs unchanged.
+    const turn = hooks?.Turn;
+    if (!turn) return undefined;
+    const verdict = await turn.AdmitTurn({ Context: turnContext(c), Text: e.text });
     if (verdict.tag === "Refuse") return { handled: true };
     // An admitted turn may carry a route; apply it to this session's model.
     if (verdict.route) {
@@ -438,14 +460,14 @@ export function registerProductHooks(pi: OmpApi, slot: ProductHookSlot, emit: (s
     return undefined;
   });
   pi.on("before_agent_start", async (e, c) => {
-    const hooks = slot.current;
-    if (!hooks) return undefined;
-    return { systemPrompt: await hooks.Turn.SystemPrompt(turnContext(c), e.systemPrompt) };
+    const turn = slot.current?.Turn;
+    if (!turn) return undefined;
+    return { systemPrompt: await turn.SystemPrompt(turnContext(c), e.systemPrompt) };
   });
   pi.on("context", async (e, c) => {
-    const hooks = slot.current;
-    if (!hooks) return undefined;
-    const edit = await hooks.Turn.ContextMessages(turnContext(c), e.messages.flatMap((m) => {
+    const turn = slot.current?.Turn;
+    if (!turn) return undefined;
+    const edit = await turn.ContextMessages(turnContext(c), e.messages.flatMap((m) => {
       const role = decodeRole(m); return role ? [{ Role: role, Parts: decodeParts(m) }] : [];
     }));
     if (edit.tag === "Keep") return undefined;
@@ -466,18 +488,18 @@ export function registerProductHooks(pi: OmpApi, slot: ProductHookSlot, emit: (s
     return { messages };
   });
   pi.on("tool_call", async (e, c) => {
-    const hooks = slot.current;
-    if (!hooks) return undefined;
-    const a = await hooks.ToolGate.BeforeTool(view(c, e.toolCallId, e.toolName, e.input));
+    const gate = slot.current?.ToolGate;
+    if (!gate) return undefined;
+    const a = await gate.BeforeTool(view(c, e.toolCallId, e.toolName, e.input));
     if (a.tag === "Refuse") return { block: true, reason: a.reason };
     if (a.tag === "Rewrite") return { input: JSON.parse(a.args) };
     return undefined;
   });
   pi.on("tool_result", async (e, c) => {
-    const hooks = slot.current;
-    if (!hooks) return undefined;
+    const gate = slot.current?.ToolGate;
+    if (!gate) return undefined;
     const text = e.content.flatMap((x) => (x.type === "text" ? [x.text] : [])).join("\n");
-    const edit = await hooks.ToolGate.AfterTool(view(c, e.toolCallId, e.toolName, e.input),
+    const edit = await gate.AfterTool(view(c, e.toolCallId, e.toolName, e.input),
       { Text: text, Truncated: false, IsError: e.isError });
     if (edit.tag === "Keep") return undefined;
     return { content: [{ type: "text", text: edit.result.Text }], isError: edit.result.IsError };

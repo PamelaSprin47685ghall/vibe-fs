@@ -40,6 +40,9 @@ export const transportReceipt = (value: string): TransportReceipt => value as Tr
 export type PhysicalUserMessageId = string & { readonly __brand: "PhysicalUserMessageId" };
 /** Construct a PhysicalUserMessageId from its underlying string. */
 export const physicalUserMessageId = (value: string): PhysicalUserMessageId => value as PhysicalUserMessageId;
+export type ProviderRunIdentity = string & { readonly __brand: "ProviderRunIdentity" };
+/** Construct a ProviderRunIdentity from its underlying string. */
+export const providerRunIdentity = (value: string): ProviderRunIdentity => value as ProviderRunIdentity;
 
 // ---- P-00 Vocabulary
 export type HostCapability =
@@ -114,6 +117,7 @@ export interface SessionInfo {
   Parent?: SessionId
   Role?: AgentRole
   Title?: string
+  Workspace?: WorkspacePath
 }
 
 export interface ISessionPort {
@@ -196,6 +200,7 @@ export interface ITranscriptPort {
 export interface ToolInvocation {
   Session: SessionId
   CallId: ToolCallId
+  ProviderRun?: ProviderRunIdentity
   Workspace: WorkspacePath
   Args: CanonicalJsonText
   Cancellation: AbortSignal
@@ -209,10 +214,15 @@ export interface ToolOutcome {
   Details?: CanonicalJsonText
 }
 
+export type ToolAdmission =
+  | { tag: "OfficeRole"; value: (arg: AgentRole) => boolean }
+  | { tag: "PrivateAttachment"; value: (arg: ToolInvocation) => boolean };
+
 export interface ToolSpec {
   Name: string
   Description: string
   Schema: JsonSchema
+  Admission?: ToolAdmission
   Execute: (arg: ToolInvocation) => Promise<ToolOutcome>
 }
 
@@ -224,6 +234,7 @@ export interface IToolRegistrar {
 export interface ToolCallView {
   Session: SessionId
   CallId: ToolCallId
+  ProviderRun?: ProviderRunIdentity
   Tool: string
   Args: CanonicalJsonText
   Role?: AgentRole
