@@ -12,8 +12,8 @@ open Wanxiangshu.Foundation
 /// caller, NOT advanced here — this module holds the record itself. The
 /// durable `ViewCheckpointCommitted` window (context-compression-028) records
 /// which view declarations were committed; what history is kept or replaced is
-/// decided by the model's own ANCHOR `view` declaration (prefixUntil /
-/// thenMap), not by a second copy of the record.
+/// decided by the model's prefixCount and carry declaration,
+/// not by a second copy of the record.
 ///
 /// Bodies live in blobs (PERSIST-007): the journal line carries cursor, kind,
 /// role, digest and reference; the text is resolved at the read boundary, the

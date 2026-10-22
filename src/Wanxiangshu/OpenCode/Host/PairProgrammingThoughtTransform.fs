@@ -1121,31 +1121,80 @@ module PairProgrammingThoughtTransform =
         |> String.concat "\n"
 
     let private anchorMessageId (raw: obj) =
-        if
-            messageRole raw = "user"
-            || (rawParts raw |> Array.mapi terminalGuidanceIndex |> Array.exists Option.isSome)
-        then
+        if messageRole raw = "user" then
             ProviderWireDecode.hostMessageId raw
         else
-            None
+            let parts = rawParts raw
 
-    let private numberHostMessages (sessionId: string) (messages: obj list) =
-        for raw in messages do
-            anchorMessageId raw
-            |> Option.iter (fun messageId -> AnchorLedger.numberMessage sessionId messageId |> ignore)
+            parts
+            |> Array.mapi terminalGuidanceIndex
+            |> Array.choose id
+            |> Array.tryLast
+            |> Option.bind (fun index ->
+                ProviderWireDecode.hostMessageId raw
+                |> Option.map (fun messageId ->
+                    let part = parts.[index]
+                    let callId = tryUnboxString part?callID |> Option.defaultValue (string index)
+                    messageId + ":tool:" + callId))
 
-    let private hashText (anchors: int list) : string =
-        anchors |> List.map (sprintf "#%d") |> String.concat ", "
+    [<Emit("structuredClone($0)")>]
+    let private copyAnchorSource (raw: obj) : obj = jsNative
 
-    /// A replaced anchor's row stands in the request as the model's summary.
-    /// The replacement is not an anchor: it carries a derived id and is marked
-    /// synthetic, so it can never be addressed by a later declaration — which
-    /// is exactly why a later replacement swallows it.
-    [<Emit("({ info: { ...$0.info, id: (($0.info && $0.info.id) ? $0.info.id : ($0.id || 'anchor')) + '#summary', synthetic: true, source: 'anchor-summary' }, parts: [{ type: 'text', text: $1 }] })")>]
-    let private summarizedMessage (raw: obj) (summary: string) : obj = jsNative
+    [<Emit("({ info: { id: $0, role: 'user', synthetic: true, source: 'carry-literal' }, parts: [{ type: 'text', text: $1 }] })")>]
+    let private literalMessage (id: string) (text: string) : obj = jsNative
 
-    [<Emit("({ info: { id: 'anchor-zero#summary', role: 'user', synthetic: true, source: 'anchor-summary' }, parts: [{ type: 'text', text: $0 }] })")>]
-    let private openingSummary (summary: string) : obj = jsNative
+    [<Emit("""(function (previous, current) {
+      if (previous.length === 0) return current;
+      const boundary = previous[previous.length - 1];
+      const identity = row => row?.info?.id ?? row?.id;
+      const boundaryId = identity(boundary);
+      const index = boundaryId === undefined
+        ? previous.length - 1
+        : current.findIndex(row => identity(row) === boundaryId);
+      if (index < 0 || index >= current.length) {
+        throw new Error('The compression request boundary is absent from the Host history');
+      }
+      const oldParts = boundary.parts ?? [];
+      const newParts = current[index].parts ?? [];
+      const added = [];
+      for (let partIndex = 0; partIndex < Math.min(oldParts.length, newParts.length); partIndex++) {
+        const before = oldParts[partIndex];
+        const after = newParts[partIndex];
+        if (JSON.stringify(before) === JSON.stringify(after)) continue;
+        if (typeof before?.text === 'string' && typeof after?.text === 'string'
+            && before.type === after.type && after.text.startsWith(before.text)) {
+          const text = after.text.slice(before.text.length);
+          if (text.length > 0) added.push({ ...after, text });
+        } else {
+          added.push(after);
+        }
+      }
+      added.push(...newParts.slice(oldParts.length));
+      const suffix = current.slice(index + 1);
+      return added.length === 0 ? suffix : [{ ...current[index], parts: added }, ...suffix];
+    })($0, $1)""")>]
+    let private messagesAfterSnapshot (previous: obj array) (current: obj array) : obj array = jsNative
+
+    [<Emit("""(function (raw, messageId, callId, prefixCount, carry) {
+      if ((raw.info?.id ?? raw.id) !== messageId) return raw;
+      let changed = false;
+      const parts = (raw.parts ?? []).map(part => {
+        const state = part?.state;
+        const input = state?.input;
+        if (part?.type !== 'tool' || part.callID !== callId || typeof part.tool !== 'string'
+            || !part.tool.startsWith('todowrite-for-') || state?.status !== 'completed'
+            || input?.prefixCount !== prefixCount || !Array.isArray(input.carry)
+            || input.carry.length !== carry.length
+            || !carry.every((item, index) => Object.is(item, input.carry[index]))) return part;
+        const cleanInput = { ...input };
+        delete cleanInput.carry;
+        changed = true;
+        return { ...part, state: { ...state, input: cleanInput } };
+      });
+      return changed ? { ...raw, parts } : raw;
+    })($0, $1, $2, $3, $4)""")>]
+    let private stripCarry (raw: obj) (messageId: string) (callId: string) (prefixCount: int) (carry: obj) : obj =
+        jsNative
 
     /// A user message carries the anchor marker on its first text part (or a new
     /// leading text part); any other message carries it on its terminal result.
@@ -1166,107 +1215,108 @@ module PairProgrammingThoughtTransform =
             let part = createObj [ "type", box "text"; "text", box marker ]
             box (Array.append [| part |] parts)
 
+    let private markedTerminalAnchorParts (marker: string) (parts: obj array) : obj =
+        match parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.tryLast with
+        | None -> markedUserAnchorParts marker parts
+        | Some index ->
+            let projected = Array.copy parts
+            projected.[index] <- mapTerminalResultText (fun text -> marker + text) parts.[index]
+            box projected
+
     let private markedAnchorParts (marker: string) (raw: obj) : obj =
         let parts = rawParts raw
 
         if messageRole raw = "user" then
             markedUserAnchorParts marker parts
         else
-            let index =
-                parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.head
+            markedTerminalAnchorParts marker parts
 
-            let projected = Array.copy parts
-            projected.[index] <- mapTerminalResultText (fun text -> marker + text) parts.[index]
-            box projected
+    let private markAnchors (messages: obj list) =
+        messages
+        |> List.mapFold
+            (fun count raw ->
+                if isNull raw?__contextAnchor then
+                    raw, count
+                else
+                    let count = count + 1
 
-    /// Selection applies on every request: a consumed declaration states this
-    /// turn's statement (protected prefix, new summaries), while the summaries
-    /// already recorded are permanent and outlive the declaration that made them.
-    let private markAnchor (sessionId: string) (raw: obj) =
-        match anchorMessageId raw with
-        | _ when not (isNull raw?info) && tryUnboxString raw?info?source = Some "anchor-summary" -> raw
-        | None -> raw
-        | Some messageId ->
-            let marker =
-                sprintf "[ANCHOR: %d]" (AnchorLedger.numberMessage sessionId messageId)
-                + cursorGuidanceSeparator
+                    let marker =
+                        sprintf "[ANCHOR: %d; prefixCount: %d]" (unbox<int> raw?__contextAnchor) count
+                        + cursorGuidanceSeparator
 
-            let cloned = emitJsExpr raw "Object.assign({}, $0)"
-            cloned?parts <- markedAnchorParts marker raw
-            cloned
-
-    let private applyDeclaredAnchorView
-        (sessionId: string)
-        (messages: obj list)
-        (declaration: AnchorViewDeclaration option)
-        (replaced: AnchorReplacement list)
-        : obj list * string option =
-        let effective = declaration |> Option.defaultValue AnchorViewDeclaration.empty
-
-        let inputs =
-            messages
-            |> List.map (fun raw ->
-                { AnchorView.AnchorMessage.Id = anchorMessageId raw
-                  AnchorView.AnchorMessage.Text = wireTextOf raw
-                  AnchorView.AnchorMessage.Raw = raw })
-
-        AnchorLedger.remember sessionId (inputs |> List.map (fun message -> message.Id, message.Text))
-
-        let entries, report =
-            AnchorView.apply (AnchorLedger.numberMessage sessionId) AnchorSurface.countTokens replaced effective inputs
-
-        let projected =
-            entries
-            |> List.map (function
-                | AnchorView.Kept message -> message.Raw
-                | AnchorView.Summarized(message, summary) -> summarizedMessage message.Raw summary
-                | AnchorView.OpeningSummary summary -> openingSummary summary)
-
-        let declaredLines =
-            declaration
-            |> Option.map (fun view ->
-                [ sprintf
-                      "ANCHOR view applied: prefixUntil=%d; thenMap=[%s]"
-                      view.PrefixUntil
-                      (view.ThenMap |> List.map fst |> hashText)
-                  sprintf
-                      "this request: kept=%d summarized=%d folded=%d tokens total=%d used=%d cached=%d (anchors below prefixUntil survive in the cache prefix at a fraction of the price; everything else is recomputed every turn)"
-                      report.Kept
-                      report.Summarized
-                      report.Folded
-                      report.Total
-                      report.Used
-                      report.Cached ])
-            |> Option.defaultValue []
-
-        let replacedLines =
-            if List.isEmpty replaced then
-                []
-            else
-                [ sprintf
-                      "replacement history for anchors [%s] is permanent; live anchors represent the latest intervals, including prior summaries; implicit anchor 0 always represents the beginning"
-                      (hashText report.Replaced) ]
-
-        let block = declaredLines @ replacedLines
-
-        projected,
-        (if List.isEmpty block then
-             None
-         else
-             Some(String.concat "\n" block))
+                    let cloned = emitJsExpr raw "Object.assign({}, $0)"
+                    emitJsStatement cloned "delete $0.__contextAnchor"
+                    cloned?parts <- markedAnchorParts marker raw
+                    cloned, count)
+            0
+        |> fst
 
     let private selectAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
-        numberHostMessages sessionId messages
+        let input raw =
+            { AnchorMessage.Id = anchorMessageId raw
+              Text = wireTextOf raw
+              Raw = copyAnchorSource raw }
 
-        applyDeclaredAnchorView
-            sessionId
-            messages
-            (AnchorLedger.takeView sessionId)
-            (AnchorLedger.replacements sessionId)
+        let inputs = messages |> List.map input
+
+        let suffix =
+            match AnchorLedger.checkpointSource sessionId with
+            | None -> messages
+            | Some previous ->
+                messagesAfterSnapshot (previous |> List.map _.Raw |> List.toArray) (List.toArray messages)
+                |> Array.toList
+
+        let suffix =
+            match AnchorLedger.checkpointCall sessionId with
+            | None -> suffix
+            | Some(messageId, callId, declaration) ->
+                let carry = AnchorCarry.toValue declaration.Carry
+
+                suffix
+                |> List.map (fun raw -> stripCarry raw messageId callId declaration.PrefixCount carry)
+
+        let segments = AnchorLedger.project sessionId (suffix |> List.map input)
+        AnchorLedger.remember sessionId inputs segments
+        let declaration = AnchorLedger.takeView sessionId
+
+        let report =
+            AnchorView.report AnchorSurface.countTokens inputs (AnchorLedger.protectedPrefix sessionId) segments
+
+        let projected =
+            segments
+            |> List.collect (fun segment ->
+                segment.Messages
+                |> List.mapi (fun index message ->
+                    let raw =
+                        if isNull message.Raw then
+                            literalMessage (Option.get message.Id) message.Text
+                        else
+                            copyAnchorSource message.Raw
+
+                    if index = 0 then
+                        raw?__contextAnchor <- box segment.Anchor
+
+                    raw))
+
+        let description =
+            declaration
+            |> Option.map (fun _ ->
+                sprintf
+                    "Context updated: prefixCount=%d; visibleSegments=%d; kept=%d inserted=%d dropped=%d; tokens total=%d used=%d cached=%d. The completed turn is retained."
+                    report.PrefixCount
+                    segments.Length
+                    report.Kept
+                    report.Inserted
+                    report.Dropped
+                    report.Total
+                    report.Used
+                    report.Cached)
+
+        projected, description
 
     let applyAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
         let projected, report = selectAnchorView sessionId messages
-        projected |> List.map (markAnchor sessionId), report
+        markAnchors projected, report
 
     let private markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored =
         // crash-reconciliation-018: the restart guidance is delivered
@@ -1298,7 +1348,7 @@ module PairProgrammingThoughtTransform =
 
                 let marked =
                     projectionSessionIdOpt
-                    |> Option.map (fun sessionId -> newMessages |> List.map (markAnchor sessionId))
+                    |> Option.map (fun _ -> markAnchors newMessages)
                     |> Option.defaultValue newMessages
 
                 HostMessageProjection.replaceMessagesInPlace outObj marked

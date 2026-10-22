@@ -37,7 +37,7 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a v
             type: 'tool',
             tool: 'todowrite',
             callID: 'retired-native-call',
-            state: { status: 'completed', input: { todos: [{ content: 'x', status: 'pending' }], prefixUntil: 1, thenMap: {} } },
+            state: { status: 'completed', input: { todos: [{ content: 'x', status: 'pending' }], prefixCount: 0, carry: [] } },
           },
         },
       },
@@ -47,9 +47,9 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a v
     // invalid flat declaration, commits nothing.
     for (const [callID, input] of [
       ['call-no-declaration', { program: 'class Js extends JsProgram { async run() { return 1; } }' }],
-      ['call-prefix-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixUntil: 1 }],
-      ['call-map-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', thenMap: {} }],
-      ['call-invalid-map', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixUntil: 1, thenMap: { 'not-an-anchor': null } }],
+      ['call-prefix-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixCount: 0 }],
+      ['call-carry-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', carry: [] }],
+      ['call-invalid-carry', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixCount: 0, carry: [null] }],
     ]) {
       await hooks.event({
         event: {
@@ -87,8 +87,8 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a v
               status: 'completed',
               input: {
                 program: 'class Js extends JsProgram { async run() { return 1; } }',
-                prefixUntil: 2,
-                thenMap: { 4: 'keep anchor 2' },
+                prefixCount: 0,
+                carry: ['keep the verified context'],
               },
             },
           },

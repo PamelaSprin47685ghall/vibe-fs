@@ -86,7 +86,7 @@ test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empt
       const forked = await hooks.tool['todowrite-for-manager'].execute(
         {
           program:
-            'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "fission owner cell" }, { 1: null }); } }',
+            'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "fission owner cell" }); } }',
         },
         { sessionID: managerSession, agent: 'manager' },
       )
@@ -153,7 +153,7 @@ test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empt
 
         await hooks.tool['todowrite-for-engineer'].execute(
           {
-            program: `class Js extends JsProgram { async run() { await this.deliver({ ${laneAnchor}: "LANE-MATERIAL-${index}" }); } }`,
+            program: `class Js extends JsProgram { async run() { await this.deliver([${laneAnchor}, "LANE-MATERIAL-${index}"]); } }`,
           },
           { sessionID: laneSession, agent: 'engineer', callID: `call-${laneSession}-1`, messageID: `run-${laneSession}-1` },
         )
@@ -162,11 +162,11 @@ test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empt
       // The lanes really delivered: each lane's own cell holds its material.
       for (const [index, laneSession] of laneSessions.entries()) {
         const laneCell = deliveredValue(laneSession)
-        assert.ok(laneCell, `lane ${index} must hold its own delivery`)
-        assert.equal(
-          Object.values(laneCell.thenMap ?? {}).includes(`LANE-MATERIAL-${index}`),
-          true,
-          `lane ${index} must hold its own material`,
+        assert.ok(Array.isArray(laneCell), `lane ${index} must hold its own carry array`)
+        assert.deepEqual(
+          [...laneCell],
+          [laneAnchors[index], `LANE-MATERIAL-${index}`],
+          `lane ${index} must hold only its own selected anchor and literal`,
         )
       }
 
@@ -176,8 +176,7 @@ test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empt
       assert.equal(deliveredViewOf(ownerSession), null, 'the owner delivery cell must hold no view before the owner delivers')
 
       // The owner delivers itself: only now does its cell carry anything, and
-      // what it carries is the owner's own material under the owner's own
-      // anchor.
+      // what it carries is the owner's own anchor and literal material.
       const ownerPhysical = runtime.messages
         .filter((message) => message.id?.startsWith(`msg-${ownerSession}-`) && message.role === 'user')
         .at(-1)
@@ -220,28 +219,27 @@ test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empt
       )
       await hooks.tool['todowrite-for-engineer'].execute(
         {
-          program: `class Js extends JsProgram { async run() { await this.deliver({ ${ownerAnchor}: "OWNER-MATERIAL" }); } }`,
+          program: `class Js extends JsProgram { async run() { await this.deliver([${ownerAnchor}, "OWNER-MATERIAL"]); } }`,
         },
         { sessionID: ownerSession, agent: 'engineer', callID: `call-${ownerSession}-1`, messageID: `run-${ownerSession}-1` },
       )
 
       const ownerCell = deliveredValue(ownerSession)
-      assert.ok(ownerCell, 'the owner cell must hold the owner delivery after the owner delivered')
-      const ownerCellAnchors = Object.keys(ownerCell.thenMap ?? {})
-      assert.equal(
-        ownerCellAnchors.includes(String(ownerAnchor)),
-        true,
-        'the owner cell must hold the owner material under the owner anchor',
+      assert.ok(Array.isArray(ownerCell), 'the owner cell must hold the owner carry array after delivery')
+      assert.deepEqual(
+        [...ownerCell],
+        [ownerAnchor, 'OWNER-MATERIAL'],
+        'the owner cell must hold only its own selected anchor and literal',
       )
       for (const laneAnchor of laneAnchors) {
         assert.equal(
-          ownerCellAnchors.includes(String(laneAnchor)),
+          ownerCell.includes(laneAnchor),
           false,
           `the owner cell must not carry the lane anchor declaration ${laneAnchor}`,
         )
       }
       assert.equal(
-        Object.values(ownerCell.thenMap ?? {}).some((value) => String(value).startsWith('LANE-MATERIAL-')),
+        ownerCell.some((value) => String(value).startsWith('LANE-MATERIAL-')),
         false,
         'the owner cell must not carry a lane delivery as the owner delivery',
       )
@@ -278,7 +276,7 @@ test('WHAT[intra-participant-parallelism-014] the real takeover settles the owne
       const forked = await hooks.tool['todowrite-for-manager'].execute(
         {
           program:
-            'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "fission takeover" }, { 1: null }); } }',
+            'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "fission takeover" }); } }',
         },
         { sessionID: managerSession, agent: 'manager' },
       )
@@ -344,7 +342,7 @@ test('WHAT[intra-participant-parallelism-014] the real takeover settles the owne
         )
         await hooks.tool['todowrite-for-engineer'].execute(
           {
-            program: `class Js extends JsProgram { async run() { await this.deliver({ ${anchor}: "LANE-MATERIAL-${index}" }); } }`,
+            program: `class Js extends JsProgram { async run() { await this.deliver([${anchor}, "LANE-MATERIAL-${index}"]); } }`,
           },
           { sessionID: lane, agent: 'engineer', callID: `call-${run}`, messageID: run },
         )
@@ -357,11 +355,11 @@ test('WHAT[intra-participant-parallelism-014] the real takeover settles the owne
       // The lanes really delivered: each lane's own cell holds its material.
       for (const [index, lane] of laneSessions.entries()) {
         const laneCell = deliveredValue(lane)
-        assert.ok(laneCell, `lane ${index} must hold its own delivery`)
-        assert.equal(
-          Object.values(laneCell.thenMap ?? {}).includes(`LANE-MATERIAL-${index}`),
-          true,
-          `lane ${index} must hold its own material`,
+        assert.ok(Array.isArray(laneCell), `lane ${index} must hold its own carry array`)
+        assert.deepEqual(
+          [...laneCell],
+          [laneAnchors[index], `LANE-MATERIAL-${index}`],
+          `lane ${index} must hold only its own selected anchor and literal`,
         )
       }
 
@@ -421,7 +419,7 @@ test('WHAT[intra-participant-parallelism-014] the real takeover settles the owne
       )
       await hooks.tool['todowrite-for-engineer'].execute(
         {
-          program: `class Js extends JsProgram { async run() { await this.deliver({ ${takeoverAnchor}: "INTEGRATED-MATERIAL" }); } }`,
+          program: `class Js extends JsProgram { async run() { await this.deliver([${takeoverAnchor}, "INTEGRATED-MATERIAL"]); } }`,
         },
         { sessionID: takeoverLane, agent: 'engineer', callID: `call-${takeoverRun}`, messageID: takeoverRun },
       )
@@ -443,13 +441,13 @@ test('WHAT[intra-participant-parallelism-014] the real takeover settles the owne
       assert.equal(deliveredViewOf(ownerSession), null, 'the owner delivery cell must hold no view')
       for (const laneAnchor of laneAnchors) {
         assert.equal(
-          Object.keys(ownerCell?.thenMap ?? {}).includes(String(laneAnchor)),
+          (ownerCell ?? []).includes(laneAnchor),
           false,
           `the owner cell must not carry the lane anchor declaration ${laneAnchor}`,
         )
       }
       assert.equal(
-        Object.values(ownerCell?.thenMap ?? {}).some((value) => String(value).startsWith('LANE-MATERIAL-')),
+        (ownerCell ?? []).some((value) => String(value).startsWith('LANE-MATERIAL-')),
         false,
         'the owner cell must not carry a lane delivery as the owner delivery',
       )
@@ -460,3 +458,4 @@ test('WHAT[intra-participant-parallelism-014] the real takeover settles the owne
     clearAll()
   }
 })
+

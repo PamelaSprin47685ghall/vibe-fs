@@ -1,6 +1,6 @@
 # GAP 台账
 
-> 2026-10-20 view 契约更新：view 契约分两层，两层形状不同、不得混用。顶层上下文整理参数是扁平的两个顶层参数 `prefixUntil: number` 与 `thenMap: record<number, string|null>`；两者都不给则不设声明；旧的 `view` 包装对象已退役，残留 `view` 直接以 `VIEW_DECLARATION_INVALID` 拒绝。成员层报告材料／交付载荷是 `reportMapping` = `Record<string, null|string>`（无 `prefixUntil`），语义等价 prefixUntil=0 的声明；缺失或形状非法一律以 `VIEW_DECLARATION_INVALID` 拒绝（`{ ok: false; code: "VIEW_DECLARATION_INVALID", reason }`）；空映射 `{}` 合法。历史条目（如 GAP-237）中记载的 `extra` 是旧文档漂移，不是当前参数；当前语义以 `context-compression/WHAT.md` [031] 和 `repository-programming/WHAT.md` [053] 为准。历史验证数据仍只证明当时的状态。
+> 2026-10-22 上下文契约更新：三条路径共用 `carry` 数组，整数引用可见历史锚点，字符串表示字面文本。压缩另带顶层 `prefixCount`，先保留指定数量的原样历史区间，再追加数组材料与当前回合。父子传递直接使用可选数组，不传当前回合；子父交付自动带回当前回合，通常先正文报告再 `this.deliver()`。压缩保留的调用记录剥离顶层 `carry`，避免字面材料重复。数组不兼容旧映射形状。现行规则以 `context-compression/WHAT.md` [031]/[032] 与 `repository-programming/WHAT.md` [053]/[054]/[059] 为准；下面历史条目的旧名称与验证数据仅记录当时状态，不证明新实现已通过验收。
 
 > 全仓已知 proof gap 的唯一单轨记录台账（按 [requirement-system-018] 规范和测试的印证：覆盖缺口由
 > requirements/GAP.md 记录）。GAP = 某条 WHAT 命题尚无独立可执行 oracle（机器可红
@@ -288,3 +288,4 @@ GAP-050：公理地位按语义人工审阅，旧关键词最小断言已撤除�
 ## 2026-10-03：upstream b7768f478 增量
 
 上游提交自报全量unit为3706 pass、0 fail；这只说明其提交记录，不是本地合并后的证书。两次普通merge保留上游历史，按现行WHAT保全本地exact准入与墓碑：不接受raw link复活、无scope新abandon、child-only closure、pending claim放行或固定busy DevOps的伪终态。Sphinx保留严格Revision/native MCP，vocabulary改引用Core的@1/@2清单。新增BIRTH/Blogger部分分别记GAP-181/077仍未闭合。原始结果、具体冲突裁决和本地重新验收见[增量记录](../proposals/archive/2026-10-03/Upstream增量-b7768f478-2026-10-03.md)。
+

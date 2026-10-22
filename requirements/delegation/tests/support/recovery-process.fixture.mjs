@@ -19,7 +19,7 @@ const deliverTo = (sessionId, providerRun, material) =>
     sessionId,
     providerRun,
     `call-${providerRun}`,
-    { prefixUntil: 0, thenMap: { 0: material } },
+    [material],
   )
 
 for (const name of ['createForProviderRecovery', 'confirmManagedPromptPhysical', 'observeProviderFailureStop', 'observeExactProviderFailure', 'recoveryStopSnapshot']) {
@@ -157,3 +157,4 @@ try {
 } finally {
   await sync.closeRecovery(runtime)
 }
+

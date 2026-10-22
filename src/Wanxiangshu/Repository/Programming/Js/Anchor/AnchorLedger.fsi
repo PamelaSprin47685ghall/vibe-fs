@@ -1,13 +1,25 @@
 namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
-/// Process-live state. Replacements retain the bounds of the interval they changed.
+open Wanxiangshu.Repository.Programming.Js
+
 module AnchorLedger =
     val numberMessage: sessionId: string -> messageId: string -> int
-    val remember: sessionId: string -> messages: (string option * string) list -> unit
+    val visible: sessionId: string -> AnchorSegment list
     val context: sessionId: string -> (string option * string) list
+    val remember: sessionId: string -> source: AnchorMessage list -> segments: AnchorSegment list -> unit
+    val checkpointSource: sessionId: string -> AnchorMessage list option
+    val checkpointCall: sessionId: string -> (string * string * AnchorViewDeclaration) option
+    val protectedPrefix: sessionId: string -> AnchorSegment list
+    val project: sessionId: string -> suffix: AnchorMessage list -> AnchorSegment list
     val anchors: sessionId: string -> (int * string) list
-    val setView: sessionId: string -> declaration: AnchorViewDeclaration -> unit
+    val validate: sessionId: string -> declaration: AnchorViewDeclaration -> Result<unit, JsFailure>
+
+    val setView:
+        sessionId: string ->
+        callIdentity: (string * string) option ->
+        declaration: AnchorViewDeclaration ->
+            Result<unit, JsFailure>
+
     val takeView: sessionId: string -> AnchorViewDeclaration option
-    val replacements: sessionId: string -> AnchorReplacement list
     val clearSession: sessionId: string -> unit
     val clearAll: unit -> unit

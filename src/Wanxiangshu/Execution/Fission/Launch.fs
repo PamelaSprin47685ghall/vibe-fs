@@ -419,7 +419,21 @@ module FissionLaunch =
         (terminal: AgentRunResult)
         =
         task {
-            let view = JsDeliveredValues.tryPeekRendered (SessionId.value childId)
+            let view =
+                TaskDeliveryJournal.tryFindByFenceFields
+                    durable
+                    childId
+                    terminal.ProviderRun
+                    None
+                    (Some terminal.AuthorityRootUserMessageId)
+                    None
+                    None
+                    None
+                |> Option.map (fun witness -> witness.View)
+                |> Option.orElseWith (fun () ->
+                    JsDeliveredValues.tryPeekMaterialWith (SessionId.value childId) (Some terminal.TerminalText))
+                |> Option.map ReturnedMaterial.render
+
             let payload = payloadFromView view terminal.TerminalText
 
             do! captureAndBroadcast port durable profile groupId owner lanes completionId payload

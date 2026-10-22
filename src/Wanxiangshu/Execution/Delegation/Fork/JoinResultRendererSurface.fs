@@ -21,7 +21,7 @@ module JoinResultRendererSurface =
               Role = Role.Coder
               AuthorityRoot = None
               ProviderRun = None
-              View = view
+              View = ReturnedMaterial.ofTexts [ view ]
               Directory = None }
 
         let batch =

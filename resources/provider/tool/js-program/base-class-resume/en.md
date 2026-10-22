@@ -1,4 +1,6 @@
-  async resume(payload, reportMapping) {
-    // Returns { ok, name, agentId, outcome }: continues one charge on the work that already carries this name — no other office is chosen, no new identity is created, and calling is not accepted here. payload is { charge, name }: name names the road to continue and is required, so a payload without it is refused with `name-required`; charge carries this round's work. reportMapping is required and is a Record<string, null|string> of anchor number to summary or null, with no prefixUntil — the host reads it as { prefixUntil: 0, thenMap: reportMapping }; a missing or invalid mapping is refused with { ok: false, code: "VIEW_DECLARATION_INVALID" }.
-    // Example: await this.resume({ name: "audit-road", charge: "continue the audit" }, { 12: "audit inventory" });
+  async resume(payload, carry = []) {
+    // Returns { ok, name, agentId, outcome }. payload requires { charge, name }. Continues existing work and does not accept calling.
+    // carry adds needed history: integers reference anchors; strings supply literal text. The current turn is not sent. State the task once in charge.
+    // Example: await this.resume({ name: "audit-road", charge: "continue the audit" }, [12]);
   }
+

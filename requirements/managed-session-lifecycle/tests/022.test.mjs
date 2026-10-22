@@ -217,7 +217,7 @@ const withCompletedEngineer = async (action, { beforeCreate } = {}) => {
       // production write the durable delivery witness the parent awaits. The
       // harness used to fake this delivery, so the parent never saw a proven
       // delivery and the case hung.
-      await hooks.tool['todowrite-for-engineer'].execute({ program: `class Js extends JsProgram { async run() { await this.deliver({ 0: ${JSON.stringify(answer)} }); } }` },
+      await hooks.tool['todowrite-for-engineer'].execute({ program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(answer)}]); } }` },
         { sessionID: sent.child, agent: 'engineer', callID: 'd0p-engineer-delivery', messageID: assistant.info.id })
 
       assistant.parts.push({ id: 'd0p-answer-part', type: 'text', text: answer })

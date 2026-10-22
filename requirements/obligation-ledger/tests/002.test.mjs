@@ -16,13 +16,13 @@ integrationTest('WHAT[obligation-ledger-002] programming-surface view declaratio
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
 
     const calls = [
-      { callID: 'view-cp-1', tool: 'todowrite-for-engineer', prefixUntil: 1, thenMap: {} },
-      { callID: 'view-cp-2', tool: 'todowrite-for-devops', prefixUntil: 1, thenMap: {} },
-      { callID: 'view-cp-3', tool: 'todowrite-for-manager', prefixUntil: 3, thenMap: {} },
-      { callID: 'view-cp-4', tool: 'todowrite-for-plan', prefixUntil: 4, thenMap: {} },
+      { callID: 'view-cp-1', tool: 'todowrite-for-engineer', prefixCount: 0, carry: [] },
+      { callID: 'view-cp-2', tool: 'todowrite-for-devops', prefixCount: 0, carry: [] },
+      { callID: 'view-cp-3', tool: 'todowrite-for-manager', prefixCount: 0, carry: [] },
+      { callID: 'view-cp-4', tool: 'todowrite-for-plan', prefixCount: 0, carry: [] },
     ]
 
-    for (const { callID, tool, prefixUntil, thenMap } of calls) {
+    for (const { callID, tool, prefixCount, carry } of calls) {
       await hooks.event({
         event: {
           type: 'message.part.updated',
@@ -34,7 +34,7 @@ integrationTest('WHAT[obligation-ledger-002] programming-surface view declaratio
               callID,
               state: {
                 status: 'completed',
-                input: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixUntil, thenMap },
+                input: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixCount, carry },
               },
             },
           },
@@ -71,7 +71,7 @@ integrationTest('WHAT[obligation-ledger-002] installed OpenCode Host runs todowr
   assert.deepEqual(
     evidence.observed.checkpointsBySession[evidence.sessions.sessionA],
     ['ol002-a-view'],
-    'session A records only the call that declared a non-empty view',
+    'session A records only the call that declared compression',
   )
   assert.deepEqual(
     evidence.observed.checkpointsBySession[evidence.sessions.sessionB],

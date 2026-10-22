@@ -21,7 +21,7 @@ const deliverTo = (sessionId, providerRun, material) =>
     sessionId,
     providerRun,
     `call-${providerRun}`,
-    { prefixUntil: 0, thenMap: { 0: material } },
+    [material],
   )
 
 for (const name of ['createForGuardRecovery', 'observeGuardDelta', 'awaitGuardInterrupt',
@@ -155,3 +155,4 @@ try {
 } finally {
   await sync.closeGuardRecovery(runtime)
 }
+

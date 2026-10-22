@@ -3,44 +3,37 @@ import test from 'node:test'
 import { parse } from 'smol-toml'
 import { plan } from '../../../dist/Execution/Delegation/Advisor/Surface.js'
 
-const messages = [1, 2, 3].map((anchor) => ({ anchor, text: 'material-' + anchor }))
-const request = (prefixUntil, thenMap, history = []) => ({ messages, declaration: { prefixUntil, thenMap }, history })
 const records = (result) => (parse(result.viewPrompt).new_work_to_record ?? []).map((row) => row.record)
+const piece = (anchor, text) => ({ anchor, text })
 
-test('WHAT[advisor-002] an empty mapping passes nothing, whatever prefixUntil says', () => {
-  for (const prefixUntil of [0, 2, 3, 99]) {
-    const result = plan('en', [], request(prefixUntil, {}))
-    assert.deepEqual(records(result), [])
-    assert.deepEqual(result.deliveredAnchors, [])
-    assert.equal(result.hasNewMaterial, true)
-    assert.equal(result.viewPrompt.startsWith('# '), true)
-    assert.equal(result.viewPrompt.endsWith('\n'), true)
+test('WHAT[advisor-002] empty carry sends no history while the independent intent may still be consulted', () => {
+  const result = plan('en', [], [])
+  assert.deepEqual(records(result), [])
+  assert.deepEqual(result.deliveredAnchors, [])
+  assert.equal(result.hasNewMaterial, false)
+  assert.equal(result.viewPrompt.startsWith('# '), true)
+})
+
+test('WHAT[advisor-002] resolved carry keeps exact order, duplicates and literal whitespace', () => {
+  const material = [piece(3, 'third'), piece(null, ''), piece(null, '  '), piece(1, 'first'), piece(3, 'third')]
+  const before = structuredClone(material)
+  const result = plan('en', [], material)
+  assert.deepEqual(records(result), ['third', '', '  ', 'first', 'third'])
+  assert.deepEqual(result.deliveredAnchors, [3, 1])
+  assert.deepEqual(material, before)
+})
+
+test('WHAT[advisor-002] multiline materials are real TOML fields with exact round trips', () => {
+  const texts = ['first\nsecond', 'leading\n', '\ntrailing  ', 'quote """ and slash \\']
+  const result = plan('zh-CN', [], texts.map((text) => piece(null, text)))
+  assert.deepEqual(records(result), texts)
+  assert.match(result.viewPrompt, /record = """\nfirst\nsecond/)
+  assert.doesNotMatch(result.viewPrompt, /first\\nsecond/)
+})
+
+test('WHAT[advisor-002] malformed resolved material is refused rather than coerced', () => {
+  for (const material of [[piece(-1, 'bad')], [piece(1.5, 'bad')], [piece('1', 'bad')], [piece(1, false)], [null]]) {
+    assert.throws(() => plan('en', [], material), /malformed/)
   }
 })
 
-test('WHAT[advisor-002] a written summary replaces, null keeps, and an unlisted anchor is not passed', () => {
-  const result = plan('en', [], request(0, { 2: 'summary-two', 3: null }))
-  assert.deepEqual(records(result), ['summary-two', 'material-3'])
-  assert.deepEqual(result.deliveredAnchors, [2, 3])
-})
-
-test('WHAT[advisor-002] prior compression remains and a later replacement covers the latest interval', () => {
-  const history = [{ anchor: 2, until: 3, summary: 'old-summary-two' }]
-  const preserved = plan('en', [], request(99, { 2: 'forbidden' }, history))
-  assert.deepEqual(records(preserved), ['material-1', 'old-summary-two', 'material-3'])
-  const replaced = plan('en', [], request(1, { 1: 'one-and-two', 3: null }, history))
-  assert.deepEqual(records(replaced), ['one-and-two', 'material-3'])
-  assert.deepEqual(replaced.deliveredAnchors, [1, 3])
-})
-
-test('WHAT[advisor-002] implicit zero remains the opening representative', () => {
-  const history = [{ anchor: 1, until: 2, summary: 'old-summary-one' }]
-  const result = plan('zh-CN', [], request(0, { 0: 'opening', 2: null, 3: null }, history))
-  assert.deepEqual(records(result), ['opening', 'material-2', 'material-3'])
-  assert.deepEqual(result.deliveredAnchors, [0, 2, 3])
-})
-
-test('WHAT[advisor-002] shape errors use the shared view validator', () => {
-  assert.throws(() => plan('en', [], { messages, declaration: { prefixUntil: 1 } }), /VIEW_DECLARATION_INVALID/)
-  assert.throws(() => plan('en', [], request(1, { 2: false })), /VIEW_DECLARATION_INVALID/)
-})

@@ -61,8 +61,8 @@ export const observeTerminals = async (runtime) => {
 
 /**
  * One real child turn: the assistant message, its delivery, and its terminal.
- * A turn without a material delivers nothing — the turn still completes, but it
- * owes the parent no delivery.
+ * Missing material skips deliver so tests can observe an undelivered stop;
+ * any parent obligation remains open.
  */
 export const childTurn = async (hooks, runtime, child, run, prose, material, awaitTerminal, role = 'engineer') => {
   // The Host runs the child's provider step only after the chat.message hook of
@@ -100,7 +100,7 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
   if (material !== null && material !== undefined) {
     await hooks.tool[`todowrite-for-${role}`].execute(
       {
-        program: `class Js extends JsProgram { async run() { await this.deliver({ 0: ${JSON.stringify(material)} }); } }`,
+        program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
       },
       { sessionID: child, agent: role, callID: `call-${run}`, messageID: run },
     )
@@ -142,7 +142,7 @@ export const deliverIntoOpenWork = async (hooks, runtime, child, run, prose, mat
   runtime.pushHostMessage(child, assistant)
   await hooks.tool[`todowrite-for-${role}`].execute(
     {
-      program: `class Js extends JsProgram { async run() { await this.deliver({ 0: ${JSON.stringify(material)} }); } }`,
+      program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
     },
     { sessionID: child, agent: role, callID: `call-${run}`, messageID: run },
   )
@@ -156,7 +156,7 @@ export const deliverIntoOpenWork = async (hooks, runtime, child, run, prose, mat
 export const forkCall = (hooks, owner, name, charge, callID = 'call-fork') =>
   hooks.tool['todowrite-for-manager'].execute(
     {
-      program: `class Js extends JsProgram { async run() { return await this.fork({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)} }, { 1: null }); } }`,
+      program: `class Js extends JsProgram { async run() { return await this.fork({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)} }); } }`,
     },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
@@ -165,7 +165,7 @@ export const forkCall = (hooks, owner, name, charge, callID = 'call-fork') =>
 export const resumeCall = (hooks, owner, name, charge, callID = 'call-resume', attach) =>
   hooks.tool['todowrite-for-manager'].execute(
     {
-      program: `class Js extends JsProgram { async run() { return await this.resume({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)}${attach === undefined ? '' : `, attach: ${JSON.stringify(attach)}`} }, { 1: null }); } }`,
+      program: `class Js extends JsProgram { async run() { return await this.resume({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)}${attach === undefined ? '' : `, attach: ${JSON.stringify(attach)}`} }); } }`,
     },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
@@ -203,12 +203,11 @@ export const withRealFork = async (owner, body) =>
     return body({ hooks, directory, createdIds, runtime })
   })
 
-/** The join records block — the byName index below it is a lookup mirror of the same records. */
+/** The join records block carries each work result and its returned material once. */
 export const joinRecordsOf = (result) => {
   const start = result.indexOf('[[data.records]]')
   assert.notEqual(start, -1, 'the join result must carry its records block')
-  const end = result.indexOf('[data.byName.', start)
-  return end === -1 ? result.slice(start) : result.slice(start, end)
+  return result.slice(start)
 }
 
 /**

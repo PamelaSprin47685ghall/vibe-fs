@@ -1,4 +1,4 @@
   async join() {
-    // Returns { ok, records, byName }: waits for this session's delivered children (completed | failed | abandoned | voided); a child that has not delivered but can still deliver keeps the join open, while a voided one is reported once and then retires.
+    // Returns { ok, records }: each record has name, agentId, role, status, and returned: [{ text }]. Waits for this session's children (completed | failed | abandoned | voided); a child that can still deliver keeps join open, while a voided one is reported once and then retires.
     // Example: const joined = await this.join();
   }

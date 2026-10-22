@@ -37,8 +37,8 @@ const terminalEvent = (sessionID, callID, status) => ({
           status,
           input: {
             program: 'class Js extends JsProgram { async run() { return {}; } }',
-            prefixUntil: 1,
-            thenMap: {},
+            prefixCount: 0,
+            carry: [],
           },
         },
       },
@@ -50,8 +50,8 @@ const todoCall = (hooks, sessionID, callID) => {
   const output = {
     args: {
       program: 'class Js extends JsProgram { async run() { return {}; } }',
-      prefixUntil: 1,
-      thenMap: {},
+      prefixCount: 0,
+      carry: [],
     },
   }
   return hooks['tool.execute.before']({ tool: 'todowrite-for-engineer', sessionID, callID }, output).then(() => output)
@@ -69,7 +69,7 @@ integrationTest('WHAT[obligation-ledger-005] no checkpoint before the exact comp
 
     // after: the Host tool part is still running, so no checkpoint either.
     await hooks['tool.execute.after'](
-      { tool: 'todowrite-for-engineer', sessionID, callID, args: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixUntil: 1, thenMap: {} } },
+      { tool: 'todowrite-for-engineer', sessionID, callID, args: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixCount: 0, carry: [] } },
       { title: 'todowrite-for-engineer', output: 'ok', metadata: {} },
     )
     assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, [], 'after with the part still running commits no checkpoint')
@@ -361,3 +361,4 @@ integrationTest('WHAT[obligation-ledger-005] a WriterUnavailable outcome release
 })
 
 }
+

@@ -343,11 +343,8 @@ module ToolHostCodec =
     [<Emit("$0.schema.array($1).describe($2)")>]
     let private rawArraySchemaOf (tool: obj) (item: obj) (description: string) : obj = jsNative
 
-    [<Emit("$0.schema.record($1, $2).describe($3)")>]
-    let private rawRecordSchemaOf (tool: obj) (key: obj) (value: obj) (description: string) : obj = jsNative
-
-    [<Emit("$0.schema.record($1, $2).describe($3).optional()")>]
-    let private rawOptionalRecordSchemaOf (tool: obj) (key: obj) (value: obj) (description: string) : obj = jsNative
+    [<Emit("$0.schema.array($0.schema.union([$0.schema.number().int().nonnegative(), $0.schema.string()])).describe($1).optional()")>]
+    let private rawOptionalCarrySchema (tool: obj) (description: string) : obj = jsNative
 
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
@@ -447,8 +444,6 @@ module ToolHostCodec =
 
     let stringSchema (HostToolFactory factory) = HostSchema(rawStringSchema factory)
 
-    let nullableStringSchema (HostToolFactory factory) =
-        HostSchema(emitJsExpr factory "$0.schema.string().nullable()")
 
     /// Free-form JSON value: the caller owns the injected value's shape.
     let anySchema (HostToolFactory factory) = HostSchema(rawAnySchema factory)
@@ -515,9 +510,8 @@ module ToolHostCodec =
     let arraySchemaOf (HostSchema item) description (HostToolFactory factory) =
         HostSchema(rawArraySchemaOf factory item description)
 
-    /// Optional open key→value map (zod `record`); the description carries the key shape.
-    let optionalRecordSchemaOf (HostSchema key) (HostSchema value) description (HostToolFactory factory) =
-        HostSchema(rawOptionalRecordSchemaOf factory key value description)
+    let optionalCarrySchema description (HostToolFactory factory) =
+        HostSchema(rawOptionalCarrySchema factory description)
 
     let register (HostToolFactory factory) (spec: ToolSpec) =
         let args =

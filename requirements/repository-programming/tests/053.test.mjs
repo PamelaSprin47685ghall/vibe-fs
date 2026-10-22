@@ -1,148 +1,213 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'node:fs'
+import { setTimeout as delay } from 'node:timers/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { z } from 'zod'
 import { parse as parseToml } from 'smol-toml'
-import { createRegistered, execute } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
+import { createRegistered, execute as executeTool } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
 import { takeView, clearAll } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
+import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
 
-// 顶层上下文整理参数：工具调用面用扁平的 prefixUntil + thenMap，
-// 旧的 `view` 包装对象已退役，非法形状以 VIEW_DECLARATION_INVALID 拒绝。
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-063-view-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
+const program = 'class Js extends JsProgram { async run() { return { ran: true }; } }'
+const execute = (registered, args, context) => executeTool(
+  registered,
+  { name: 'carry-declaration-test', ...args },
+  context,
+)
 
-// 顶层工具的宿主 schema 形状：prefixUntil 是 number，thenMap 是 record。
-// 每个 builder 都能标记 optional，与真实宿主 schema 一致。
-const schemaOf = (state) => ({
-  ...state,
-  optional: () => schemaOf({ ...state, optional: true }),
-  nullable: () => schemaOf({ ...state, nullable: true }),
-  describe: (text) => schemaOf({ ...state, description: text }),
-})
-const toolModule = () => {
+const withTool = async (check, role = 'Coder') => {
+  clearAll()
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-053-carry-'))
   const tool = (definition) => definition
-  tool.schema = {
-    string: () => schemaOf({ type: 'string' }),
-    any: () => schemaOf({ type: 'any' }),
-    number: () => schemaOf({ type: 'number' }),
-    array: (item) => schemaOf({ type: 'array', item }),
-    record: (key, value) => schemaOf({ type: 'record', key, value }),
-    object: (shape) => schemaOf({ type: 'object', shape }),
+  tool.schema = z
+  try {
+    await check(createRegistered({ tool }, role, 'en', dir, null), dir)
+  } finally {
+    clearAll()
+    rmSync(dir, { recursive: true, force: true })
   }
-  return { tool }
 }
-
-const program = `class Js extends JsProgram {
-  async run() {
-    return { ran: true };
-  }
-}`
-
-const register = (dir) => createRegistered(toolModule(), 'Coder', 'en', dir, null)
 
 const failureOf = (result) => {
-  assert.equal(result.startsWith('# failed'), true, `expected a refusal, got: ${result}`)
-  const doc = parseToml(result)
-  assert.equal(typeof doc.reason, 'string')
-  assert.notEqual(doc.reason.length, 0)
-  return doc
+  assert.equal(result.startsWith('# failed'), true, result)
+  const document = parseToml(result)
+  assert.equal(document.code, 'VIEW_DECLARATION_INVALID')
+  assert.ok(document.reason.length > 0)
+  return document
 }
 
-test.beforeEach(() => clearAll())
-
-test('WHAT[repository-programming-053] flat prefixUntil and thenMap are accepted and captured as the pending view', async () => {
-  const { dir, cleanup } = sandbox()
-  const session = 'ses-063-flat'
-  try {
-    const registered = register(dir)
-    const result = await execute(
-      registered,
-      { program, prefixUntil: 0, thenMap: { 0: 'flat summary' } },
-      { sessionID: session },
-    )
-
+test('WHAT[repository-programming-053] prefixCount and carry preserve literal order and exact text', async () => {
+  await withTool(async (registered) => {
+    const declaration = { prefixCount: 0, carry: ['second', 'first\nlast', '', '  '] }
+    const result = await execute(registered, { program, ...declaration }, { sessionID: 'ses-053-order' })
     assert.equal(result.startsWith('# ok'), true, result)
-    assert.deepEqual(
-      takeView(session),
-      { prefixUntil: 0, thenMap: { 0: 'flat summary' } },
-      'the flat declaration is captured for the next request',
-    )
-  } finally {
-    clearAll()
-    cleanup()
-  }
+    assert.deepEqual(takeView('ses-053-order'), declaration)
+  })
 })
 
-test('WHAT[repository-programming-053] the retired view wrapper is refused and points at the flat parameters', async () => {
-  const { dir, cleanup } = sandbox()
-  const session = 'ses-063-view-wrapper'
-  try {
-    const registered = register(dir)
-    const result = await execute(
-      registered,
-      { program, view: { prefixUntil: 0, thenMap: { 0: 'wrapped summary' } } },
-      { sessionID: session },
-    )
-
-    const doc = failureOf(result)
-    assert.equal(doc.code, 'VIEW_DECLARATION_INVALID')
-    assert.match(doc.reason, /prefixUntil/)
-    assert.match(doc.reason, /thenMap/)
-    assert.equal(
-      takeView(session),
-      null,
-      'a refused view wrapper must not leave a pending view behind',
-    )
-  } finally {
-    clearAll()
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-053] a call without prefixUntil and thenMap sets no view at all', async () => {
-  const { dir, cleanup } = sandbox()
-  const session = 'ses-063-no-args'
-  try {
-    const registered = register(dir)
-    const result = await execute(registered, { program }, { sessionID: session })
-
-    assert.equal(result.startsWith('# ok'), true, result)
-    assert.equal(takeView(session), null, 'no declaration means no pending view')
-  } finally {
-    clearAll()
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-053] a malformed prefixUntil or thenMap is refused with VIEW_DECLARATION_INVALID', async () => {
-  const { dir, cleanup } = sandbox()
-  const session = 'ses-063-invalid'
-  try {
-    const registered = register(dir)
-
-    const cases = [
-      { label: 'negative prefixUntil', args: { prefixUntil: -1, thenMap: {} } },
-      { label: 'fractional prefixUntil', args: { prefixUntil: 1.5, thenMap: {} } },
-      { label: 'non-numeric thenMap value', args: { prefixUntil: 0, thenMap: { 0: 42 } } },
-      { label: 'blank thenMap value', args: { prefixUntil: 0, thenMap: { 0: '   ' } } },
-      { label: 'negative thenMap key', args: { prefixUntil: 0, thenMap: { '-1': 'summary' } } },
-    ]
-
-    for (const { label, args } of cases) {
-      const result = await execute(registered, { program, ...args }, { sessionID: session })
-      const doc = failureOf(result)
-      assert.equal(doc.code, 'VIEW_DECLARATION_INVALID', `${label}: ${result}`)
-      assert.equal(
-        takeView(session),
-        null,
-        `${label}: a refused declaration must not leave a pending view behind`,
+test('WHAT[repository-programming-053] retired names are rejected even beside a valid declaration', async () => {
+  await withTool(async (registered) => {
+    for (const legacy of [
+      { view: {} },
+      { prefixUntil: 0 },
+      { thenMap: {} },
+      { reportMapping: {} },
+      { thenMap: null },
+      { thenMap: undefined },
+    ]) {
+      const result = await execute(
+        registered,
+        { program, prefixCount: 0, carry: [], ...legacy },
+        { sessionID: 'ses-053-retired' },
       )
+      const document = failureOf(result)
+      assert.match(document.reason, /prefixCount/)
+      assert.match(document.reason, /carry/)
+      assert.equal(takeView('ses-053-retired'), null)
     }
-  } finally {
-    clearAll()
-    cleanup()
-  }
+  })
 })
+
+test('WHAT[repository-programming-053] a call without a declaration preserves the existing pending view', async () => {
+  await withTool(async (registered) => {
+    const context = { sessionID: 'ses-053-absent' }
+    await execute(registered, { program }, context)
+    assert.equal(takeView(context.sessionID), null)
+    const declaration = { prefixCount: 0, carry: ['keep me'] }
+    await execute(registered, { program, ...declaration }, context)
+    await execute(registered, { program }, context)
+    assert.deepEqual(takeView(context.sessionID), declaration)
+  })
+})
+
+test('WHAT[repository-programming-053] invalid declarations cannot run the program or overwrite a valid pending view', async () => {
+  await withTool(async (registered, dir) => {
+    const context = { sessionID: 'ses-053-invalid' }
+    const cases = [
+      { prefixCount: -1, carry: [] },
+      { prefixCount: 1.5, carry: [] },
+      { prefixCount: Number.MAX_SAFE_INTEGER + 1, carry: [] },
+      { prefixCount: 1, carry: [] },
+      { prefixCount: 0 },
+      { carry: [] },
+      { prefixCount: 0, carry: {} },
+      { prefixCount: 0, carry: null },
+      { prefixCount: 0, carry: [null] },
+      { prefixCount: 0, carry: [true] },
+      { prefixCount: 0, carry: [-1] },
+      { prefixCount: 0, carry: [1.5] },
+      { prefixCount: 0, carry: [999] },
+      { prefixCount: 0, carry: [[]] },
+      { prefixCount: 0, carry: [{ toJSON: () => 'forged literal' }] },
+    ]
+    const probe = 'class Js extends JsProgram { async run() { await this.write("must-not-exist.txt", "ran"); return "ran"; } }'
+    for (const args of cases) {
+      const declaration = { prefixCount: 0, carry: ['saved'] }
+      await execute(registered, { program, ...declaration }, context)
+      failureOf(await execute(registered, { program: probe, ...args }, context))
+      assert.equal(existsSync(join(dir, 'must-not-exist.txt')), false)
+      assert.deepEqual(takeView(context.sessionID), declaration)
+    }
+  })
+})
+
+test('WHAT[repository-programming-053] a failed call cannot inherit a different message or call identity', async () => {
+  await withTool(async (registered) => {
+    const sessionID = 'ses-053-strip-owner'
+    const messageID = 'shared-assistant'
+    const history = [{ info: { id: 'old-user', role: 'user' }, parts: [{ type: 'text', text: 'old evidence' }] }]
+    pair.applyAnchorView(sessionID, history)
+    const accepted = { name: 'carry-declaration-test', program, prefixCount: 0, carry: ['shared literal'] }
+    const refused = {
+      ...accepted,
+      program: 'class Js extends JsProgram { async run() { throw new Error("program failed"); } }',
+    }
+    const succeeded = await execute(registered, accepted, {
+      sessionID, messageID, callID: 'accepted-call', agent: 'engineer',
+    })
+    const failed = await execute(registered, refused, {
+      sessionID, messageID, callID: 'failed-call', agent: 'engineer',
+    })
+    const reusedCall = await execute(registered, refused, {
+      sessionID, messageID: 'later-assistant', callID: 'accepted-call', agent: 'engineer',
+    })
+    assert.equal(succeeded.startsWith('# ok'), true, succeeded)
+    assert.equal(failed.startsWith('# failed'), true, failed)
+    assert.equal(reusedCall.startsWith('# failed'), true, reusedCall)
+    const current = {
+      info: { id: messageID, role: 'assistant' },
+      parts: [
+        { type: 'tool', tool: 'todowrite-for-engineer', callID: 'accepted-call', state: { status: 'completed', input: structuredClone(accepted), output: succeeded } },
+        { type: 'tool', tool: 'todowrite-for-engineer', callID: 'failed-call', state: { status: 'completed', input: structuredClone(refused), output: failed } },
+      ],
+    }
+    const later = {
+      info: { id: 'later-assistant', role: 'assistant' },
+      parts: [
+        { type: 'tool', tool: 'todowrite-for-engineer', callID: 'accepted-call', state: { status: 'completed', input: structuredClone(refused), output: reusedCall } },
+      ],
+    }
+    const expanded = [...history, current, later]
+    const saved = structuredClone(expanded)
+    for (let replay = 0; replay < 2; replay++) {
+      const result = pair.applyAnchorView(sessionID, expanded)
+      const retained = result.messages.find((row) => row.info.id === messageID)
+      assert.equal(Object.hasOwn(retained.parts[0].state.input, 'carry'), false)
+      assert.deepEqual(retained.parts[1].state.input, refused)
+      const laterMessage = result.messages.find((row) => row.info.id === 'later-assistant')
+      assert.deepEqual(laterMessage.parts[0].state.input, refused)
+    }
+    assert.deepEqual(expanded, saved)
+  }, 'Engineer')
+})
+
+test('WHAT[repository-programming-053] an asynchronous call commits the declaration accepted before execution', async () => {
+  await withTool(async (registered, dir) => {
+    const carry = ['accepted literal']
+    const context = { sessionID: 'ses-053-snapshot' }
+    const ready = join(dir, 'admission-ready')
+    const release = join(dir, 'admission-release')
+    const command = `node -e '
+const fs = require("node:fs")
+const interval = setInterval(() => {
+  if (fs.existsSync("admission-release")) {
+    clearInterval(interval)
+    clearTimeout(deadline)
+  }
+}, 5)
+const deadline = setTimeout(() => {
+  clearInterval(interval)
+  process.exitCode = 2
+}, 8000)
+fs.writeFileSync("admission-ready", "ready")
+'`
+    const planB = 'If the admission barrier command cannot run, stop this verification and report that the original carry array could not be mutated while a real admitted program was suspended; preserve the pending declaration and do not replace this check with a synthetic delay.'
+    const pending = execute(registered, {
+      program: 'class Js extends JsProgram { async run() { return await this.call(' + JSON.stringify(command) + ', ' + JSON.stringify(planB) + '); } }',
+      prefixCount: 0,
+      carry,
+    }, context)
+
+    let admitted = false
+    try {
+      for (let attempt = 0; attempt < 1000 && !existsSync(ready); attempt++) {
+        await delay(5)
+      }
+      admitted = existsSync(ready)
+      if (admitted) {
+        carry[0] = 'changed during execution'
+        carry.push('late value')
+      }
+    } finally {
+      writeFileSync(release, 'release')
+    }
+
+    const result = await pending
+    assert.equal(admitted, true, 'the real command must reach the admission barrier: ' + result)
+    assert.equal(result.startsWith('# ok'), true, result)
+    assert.deepEqual(takeView(context.sessionID), { prefixCount: 0, carry: ['accepted literal'] })
+  }, 'DevOps')
+})
+

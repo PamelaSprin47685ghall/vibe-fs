@@ -315,6 +315,21 @@ module LlmFacing =
                         (fun (local, nested) (name, item) ->
                             match item with
                             | Value.Object row -> local, nested @ encodeObject (path @ [ name ]) row
+                            | Value.Array items when
+                                not (List.isEmpty items)
+                                && List.forall
+                                    (function
+                                    | Value.Object _ -> true
+                                    | _ -> false)
+                                    items
+                                ->
+                                let rows =
+                                    items
+                                    |> List.collect (function
+                                        | Value.Object row -> encodeObjectRow (path @ [ name ]) row
+                                        | _ -> [])
+
+                                local, nested @ rows
                             | Value.Null -> local, nested
                             | _ ->
                                 local
@@ -378,6 +393,9 @@ module LlmFacing =
             |> List.map (fun (Field field) -> field)
             |> SyntheticToml.tableArrayEntry name
             |> block
+
+        let textTables name (texts: string list) =
+            texts |> List.map (fun text -> tableArray name [ stringMember "text" text ])
 
         let structuredValue (value: Value) = structuredBlocks value
 

@@ -50,10 +50,11 @@ test('WHAT[dispatch-protocol-003] observed receipt-only send stays unaccepted un
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 0).kind, 'Accepted')
     // The child delivers before its exact terminal (repository-programming [059]):
     // the fenced delivery cell of that run, as `this.deliver` leaves it.
-    runtimeSurface.recordFencedDeliveredView(accepted.sessionId, 'receipt-provider-run', 'call-receipt-provider-run', { prefixUntil: 0, thenMap: {} })
+    runtimeSurface.recordFencedDeliveredView(accepted.sessionId, 'receipt-provider-run', 'call-receipt-provider-run', [])
     assert.equal(await sync.settleExactTerminal(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'receipt-provider-run', 'RECEIPT-FORMAL', ''), true)
     assert.equal((await completion).value.providerRun, 'receipt-provider-run')
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 1)
     assert.equal(sync.terminalListenerCount(runtime), 0)
   })
 })
+

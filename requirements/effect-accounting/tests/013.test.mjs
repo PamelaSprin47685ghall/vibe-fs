@@ -79,7 +79,7 @@ const withRealPlugin = async (body, session = SESSION) => {
     const deliver = async (material, callId = 'call-effect-013') =>
       hooks.tool['todowrite-for-engineer'].execute(
         {
-          program: `class Js extends JsProgram { async run() { await this.deliver({ 0: "${material}" }); } }`,
+          program: `class Js extends JsProgram { async run() { return await this.deliver([${JSON.stringify(material)}]); } }`,
         },
         { sessionID: session, agent: 'engineer', callID: callId, messageID: run },
       )
@@ -307,12 +307,12 @@ test('WHAT[effect-accounting-013] a refused delivery leaves no successful effect
   await withRealPlugin(async ({ directory, runtime, deliver, session }) => {
     const ledger = change.requestWorktree(change.empty(), 'worktree-013', '/repo/worktree-013', 'job-013')
 
-    // 交付未成立：真实的提交入口拒绝这份材料。
-    const refused = await deliver('')
-    assert.match(String(refused), /# failed/, 'a delivery with an invalid view is refused')
+    // 非法元素返回拒绝数据；空串与省略数组是合法交付，不能拿来模拟拒绝。
+    const refused = await deliver(null)
+    assert.match(String(refused), /ok = false/, 'an invalid carry item is refused as data')
     assert.match(
       String(refused),
-      /VIEW_DECLARATION_INVALID|not established/i,
+      /VIEW_DECLARATION_INVALID/,
       'the refusal names why the delivery was not established',
     )
 
@@ -362,8 +362,8 @@ test('WHAT[effect-accounting-013] a committed delivery survives a later failed d
     const first = await deliver('the delivered material')
     assert.match(String(first), /# ok/, 'the first delivery commits')
 
-    // 同一轮里的后续尝试失败了（换了 toolCallId）：提交被拒。
-    const second = await deliver('', 'call-effect-014')
+    // 同一围栏不能改交另一份材料：后续提交被拒，原先的见证保持成立。
+    const second = await deliver('conflicting later material')
     assert.match(String(second), /# failed/, 'the later attempt is refused')
 
     // 已提交的事实没有被后续失败抹掉。
@@ -374,7 +374,7 @@ test('WHAT[effect-accounting-013] a committed delivery survives a later failed d
       1,
       'the failed attempt left no witness of its own and did not erase the committed one',
     )
-    assert.equal(witnesses[0][1][1][1].View, 'the delivered material')
+    assert.equal(witnesses[0][1][1][1].View, JSON.stringify(['the delivered material']))
     assert.equal(
       jsRuntime.deliveredFenceOf(session).toolCallId,
       'call-effect-013',
@@ -426,7 +426,7 @@ test('WHAT[effect-accounting-013] a refused delivery commit registers nothing, a
 
     const deliver = async (material, callId = 'call-effect-013-registration') =>
       hooks.tool['todowrite-for-engineer'].execute(
-        { program: `class Js extends JsProgram { async run() { await this.deliver({ 0: "${material}" }); } }` },
+        { program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }` },
         { sessionID: session, agent: 'engineer', callID: callId, messageID: run },
       )
 

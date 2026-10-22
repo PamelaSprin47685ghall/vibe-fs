@@ -6,14 +6,15 @@ open Wanxiangshu.Repository.Programming.Js
 module AnchorSurface =
     val numberMessage: sessionId: string -> messageId: string -> int
     val anchors: sessionId: string -> obj array
-    /// `{ ok: true, prefixUntil, thenMap }` or `{ ok: false, code, reason }`.
     val parseDeclaration: value: obj -> obj
-    /// `{ ok: true, prefixUntil, thenMap }` or `{ ok: false, code, reason }`.
-    val parseReportMapping: mapping: obj -> obj
-    /// `{ ok: true, material }` or `{ ok: false, code, reason }`.
-    val reportMaterial: sessionId: string -> mapping: obj -> obj
+    val parseCarry: value: obj -> obj
+    val carryMaterial: sessionId: string -> value: obj -> obj
     val parse: declaration: obj -> Result<obj, JsFailure>
-    val setView: sessionId: string -> declaration: obj -> Result<unit, JsFailure>
+    val validateView: sessionId: string -> declaration: obj -> Result<unit, JsFailure>
+
+    val setView:
+        sessionId: string -> callIdentity: (string * string) option -> declaration: obj -> Result<unit, JsFailure>
+
     val captureView: sessionId: string -> declaration: obj -> obj
     val takeView: sessionId: string -> obj
     val countTokens: text: string -> int

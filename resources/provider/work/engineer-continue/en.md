@@ -1,1 +1,2 @@
-This assignment has no delivery yet. Assistant text is not a return by itself. State the outcome as prose, then call this.deliver(reportMapping) with a report mapping covering the full material: what changed, what was established, and what remains. Do not stop.
+This assignment has no delivery yet. State what changed, what was established, and what remains in ordinary text, then call this.deliver() immediately. The current turn returns automatically. Add a carry array only for older evidence still needed. Do not stop.
+

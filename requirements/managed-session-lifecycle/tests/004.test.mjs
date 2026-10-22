@@ -28,7 +28,7 @@ const invokeAndSettle = async (runtime, charge, answer, promptCount, runId) => {
     SyncDelegateSurface.child(runtime, owner, 'Engineer'),
     runId,
     `call-${runId}`,
-    { prefixUntil: 0, thenMap: { 0: answer } },
+    [answer],
   )
   assert.equal(await SyncDelegateSurface.settle(runtime, owner, 'Engineer', answer, runId), true)
   const result = await pending
@@ -66,3 +66,4 @@ test('WHAT[managed-session-lifecycle-004] EXEC_027_cancel_before_completion_fail
   assert.deepEqual(await pending, { ok: false, error: 'Sync delegate call was cancelled' })
   SyncDelegateSurface.dispose(runtime)
 })
+

@@ -170,7 +170,7 @@ module ForkCommand =
           Charge: string
           Keywords: string
           Attach: string option
-          CommissionerRecord: string option
+          CommissionerRecord: string list
           ExpectedToolCalls: int option }
 
     /// The calling session's id text; empty when the host could not name it.
@@ -236,22 +236,17 @@ module ForkCommand =
                   Charge = args.Text "charge"
                   Keywords = args.Text "keywords"
                   Attach = args.OptionalText "attach" |> Option.map (fun value -> value.Trim())
-                  CommissionerRecord =
-                    args.OptionalText "commissioner_record"
-                    |> Option.map (fun value -> value.Trim())
-                    |> Option.filter (fun value -> value <> "")
+                  CommissionerRecord = args.Texts "context"
                   ExpectedToolCalls = expectedToolCalls }
 
     let private consequence (message: string) = DelegationReply.Refused message
 
     let private successInstruction (text: string) = DelegationReply.Placed text
 
-    /// The commissioner record rides with the charge as parent-to-child
-    /// background; without one the charge is the whole prompt.
     let private commissionCharge (request: Request) =
-        match request.CommissionerRecord with
-        | Some record -> request.Charge + "\n\n" + record
-        | None -> request.Charge
+        LlmFacing.instruction request.Charge
+        |> LlmFacing.withData (LlmFacing.Data.textTables "context" request.CommissionerRecord)
+        |> LlmFacing.render
 
     let private personaBinding (role: Role) =
         PersonaCatalog.persona role, ManagedAgent.make role
@@ -346,7 +341,7 @@ module ForkCommand =
                     | None -> TaskResultCE.ofTask (Task.FromResult None)
                     | Some viewForSession -> viewForSession record.ChildSessionId |> TaskResultCE.ofTask
 
-                return view
+                return view |> Option.map (ReturnedMaterial.texts >> String.concat "\n\n")
             }
 
     let private appendFissionAffinity durable (host: DelegationEnvironment) (lane: FissionLaneBinding) handleId =

@@ -12,10 +12,7 @@ test('WHAT[delegation-011] ordinary completion returns delivered view without a 
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
     assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 0), true)
     const child = sync.child(runtime, owner, 'Engineer')
-    runtimeSurface.recordFencedDeliveredView(child, 'ordinary-run', 'call-x', {
-      prefixUntil: 0,
-      thenMap: {},
-    })
+    runtimeSurface.recordFencedDeliveredView(child, 'ordinary-run', 'call-x', [])
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'ordinary delivered view', 'ordinary-run'), true)
     const result = await work
     assert.equal(result.ok, true)
@@ -23,3 +20,4 @@ test('WHAT[delegation-011] ordinary completion returns delivered view without a 
     assert.doesNotMatch(result.value, /PARENT-OPENING-ONLY|CHILD-OPENING-ONLY/)
   })
 })
+

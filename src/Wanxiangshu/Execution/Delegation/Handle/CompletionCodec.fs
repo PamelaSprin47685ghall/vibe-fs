@@ -10,26 +10,29 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// EXEC-009 durable join payload. Written before `HandleCompleted`; join reads
 /// it after a controlled consume. Identity fields that already live on the
 /// handle record (`TargetAgent`, `CanonicalRole`, handle id) are not duplicated.
 ///
-/// Clean-break: encode/decode is schemaVersion=2 with finality completed|failed
-/// only. Legacy abort blobs decode to `LegacyFalseAbort`, never `RunCompletion`.
+/// Clean-break: schemaVersion=3 stores canonical returned material for a
+/// completed run. Older completed blobs are refused; legacy abort blobs
+/// remain classified as `LegacyFalseAbort`, never `RunCompletion`.
 module HandleCompletionCodec =
 
     let private str (value: string) = box value
 
-    /// Encode proven agent terminal as completion blob v2. No aborted branch.
+    /// Encode proven agent terminal as completion blob v3. No aborted branch.
     /// Abandoned is never a durable completion blob (join materialises from lifecycle).
     let encodeOutcome (runId: string) (outcome: AgentCompletionOutcome) : string =
         let fields =
             match outcome with
             | AgentCompleted payload ->
-                [ "schemaVersion", box 2
+                ReturnedMaterial.validate payload.View
+                |> Result.defaultWith (invalidArg "outcome")
+
+                [ "schemaVersion", box 3
                   "finality", str "completed"
                   "run_id", str runId
                   "view", str payload.View
@@ -49,7 +52,7 @@ module HandleCompletionCodec =
                   )
                   "directory", str (payload.Directory |> Option.defaultValue "") ]
             | AgentFailed payload ->
-                [ "schemaVersion", box 2
+                [ "schemaVersion", box 3
                   "finality", str "failed"
                   "run_id", str runId
                   "code", str payload.Code
@@ -57,9 +60,9 @@ module HandleCompletionCodec =
                   "child_session_id",
                   str (payload.ChildSessionId |> Option.map SessionId.value |> Option.defaultValue "") ]
             | AgentAbandoned(agentId, reason) ->
-                // Abandoned is not a durable completion blob; keep a minimal failed v2
+                // Abandoned is not a durable completion blob; keep a minimal failed v3
                 // shape only if a caller mistakenly encodes one (should not reach journal).
-                [ "schemaVersion", box 2
+                [ "schemaVersion", box 3
                   "finality", str "failed"
                   "run_id", str runId
                   "code", str "ABANDONED"
@@ -116,16 +119,21 @@ module HandleCompletionCodec =
               ChildSessionId = field raw "child_session_id"
               RawBody = json }
 
-    let private completedV2 (runId: string) (raw: obj) =
-        Current(
-            CompletedV2
-                { RunId = runId
-                  View = field raw "view"
-                  ChildSessionId = field raw "child_session_id"
-                  AuthorityRoot = field raw "authority_root"
-                  ProviderRun = field raw "provider_run"
-                  Directory = field raw "directory" }
-        )
+    let private completed (runId: string) (raw: obj) =
+        let material = field raw "view"
+
+        match ReturnedMaterial.validate material with
+        | Error reason -> Invalid(CompletionDecodeError.IncompletePayload reason)
+        | Ok() ->
+            Current(
+                CompletedV2
+                    { RunId = runId
+                      View = material
+                      ChildSessionId = field raw "child_session_id"
+                      AuthorityRoot = field raw "authority_root"
+                      ProviderRun = field raw "provider_run"
+                      Directory = field raw "directory" }
+            )
 
     let private failedV2 (runId: string) (raw: obj) =
         Current(
@@ -136,34 +144,25 @@ module HandleCompletionCodec =
                   ChildSessionId = field raw "child_session_id" }
         )
 
-    let private decodePreV2Status (status: string) (runId: string) (raw: obj) =
-        match status with
-        | "completed" -> completedV2 runId raw
-        | "failed" -> failedV2 runId raw
-        | _ -> Invalid(CompletionDecodeError.UnknownFinality status)
-
-    let private decodeV2Finality (finalityField: string option) (runId: string) (raw: obj) (json: string) =
+    let private decodeFinality (finalityField: string option) (runId: string) (raw: obj) (json: string) =
         match finalityField with
         | None -> Invalid CompletionDecodeError.MissingFinality
-        | Some "completed" -> completedV2 runId raw
+        | Some "completed" -> completed runId raw
         | Some "failed" -> failedV2 runId raw
         | Some "aborted" -> legacyAbortPayload runId json raw
         | Some other -> Invalid(CompletionDecodeError.UnknownFinality other)
 
     let private decodeBySchema
         (schemaVersion: string option)
-        (status: string)
         (finalityField: string option)
         (runId: string)
         (raw: obj)
         (json: string)
         =
         match schemaVersion with
-        | None when status = "completed" || status = "failed" || status = "abandoned" ->
-            decodePreV2Status status runId raw
         | None -> Invalid CompletionDecodeError.MissingSchemaVersion
-        | Some version when version <> "2" -> Invalid(CompletionDecodeError.UnknownSchemaVersion version)
-        | Some _ -> decodeV2Finality finalityField runId raw json
+        | Some version when version <> "3" -> Invalid(CompletionDecodeError.UnknownSchemaVersion version)
+        | Some _ -> decodeFinality finalityField runId raw json
 
     let private decodeParsed (raw: obj) (json: string) =
         let schemaVersion = fieldOpt raw "schemaVersion"
@@ -174,9 +173,9 @@ module HandleCompletionCodec =
         if status = "aborted" then
             legacyAbortPayload runId json raw
         else
-            decodeBySchema schemaVersion status finalityField runId raw json
+            decodeBySchema schemaVersion finalityField runId raw json
 
-    /// Decode blob → DurableCompletionDecode (v2 Current | LegacyFalseAbort | Invalid).
+    /// Decode blob → DurableCompletionDecode (v3 Current | LegacyFalseAbort | Invalid).
     /// Never constructs RunCompletion for legacy abort.
     let decodeBody (json: string) : DurableCompletionDecode =
         try
@@ -193,7 +192,7 @@ module HandleCompletionCodec =
             && not (String.IsNullOrWhiteSpace payload.ProviderRun)
         | FailedV2 payload -> payload.ChildSessionId = SessionId.value work.ChildSessionId
 
-    /// Materialise RunCompletion only from Current v2 (or pre-v2 completed/failed).
+    /// Materialise RunCompletion only from a validated Current blob.
     /// `completedAt` is caller-minted — codec must not invent wall time.
     let tryMaterialiseRunCompletion
         (record: HandleRecord)

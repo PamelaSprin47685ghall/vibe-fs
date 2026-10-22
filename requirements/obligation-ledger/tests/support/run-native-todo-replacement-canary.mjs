@@ -1,9 +1,9 @@
 // requirements/obligation-ledger/tests/support/run-native-todo-replacement-canary.mjs
 //
 // Canary for WHAT[obligation-ledger-002]: on the installed OpenCode Host,
-// programming-surface calls (`todowrite-for-engineer`) that declare a non-empty
-// `view` argument commit one durable `ViewCheckpointCommitted` fact per session,
-// while calls without `view` commit no checkpoint, and retired native `todowrite`
+// programming-surface calls (`todowrite-for-engineer`) that declare compression
+// commit one durable `ViewCheckpointCommitted` fact per session,
+// while calls without a declaration commit no checkpoint, and retired native `todowrite`
 // is not advertised on the Engineer provider wire.
 
 import assert from 'node:assert/strict'
@@ -45,8 +45,7 @@ const isTitleRequest = (body) => {
 }
 
 // The current call surface takes the context-compression declaration as two
-// flat top-level arguments: `prefixUntil` and `thenMap`. The retired `view`
-// wrapper is refused with VIEW_DECLARATION_INVALID.
+// flat top-level arguments: `prefixCount` and `carry`.
 const jsViewCall = (id, declaration) =>
   buildToolCallChunks(
     id,
@@ -87,11 +86,11 @@ const provider = await startHttpServer(async (request, response) => {
       return
     }
     if (text.includes('OL002_A_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 100, thenMap: {} }))
+      sendSSE(response, jsViewCall('ol002-a-view', { prefixCount: 0, carry: ['OL002_A_VIEW'] }))
       return
     }
     if (text.includes('OL002_B_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-b-view', { prefixUntil: 100, thenMap: {} }))
+      sendSSE(response, jsViewCall('ol002-b-view', { prefixCount: 0, carry: ['OL002_B_VIEW'] }))
       return
     }
     sendJSON(response, 500, { error: `unexpected prompt text: ${text.slice(0, 200)}` })
@@ -233,3 +232,4 @@ try {
   await stopHttpServer(provider.server)
   fs.rmSync(scenarioDir, { recursive: true, force: true })
 }
+

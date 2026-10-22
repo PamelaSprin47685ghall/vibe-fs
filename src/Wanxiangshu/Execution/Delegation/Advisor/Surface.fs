@@ -1,38 +1,10 @@
 namespace Wanxiangshu.Execution.Delegation.Advisor
 
-open Fable.Core.JsInterop
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Repository.Programming.Js.Anchor
-
-/// JS test/adapter boundary; already-delivered anchors come from the host, not a model declaration.
+/// JS adapter over already-resolved carry material and the host-owned delivery cursor.
 [<RequireQualifiedAccess>]
 module Surface =
-    let private arrayOf (value: obj) : obj array =
-        if isNull value then [||] else unbox value
-
-    let private requestOf (value: obj) : AdvisorViewRequest =
-        let declaration =
-            match AnchorDeclarationRule.parse value?declaration with
-            | Ok parsed -> parsed
-            | Error failure -> invalidOp (JsFailure.code failure + ": " + JsFailure.reason failure)
-
-        { Messages =
-            arrayOf value?messages
-            |> Array.toList
-            |> List.map (fun message ->
-                { Anchor = int (string message?anchor)
-                  Text = string message?text })
-          Declaration = declaration
-          History =
-            arrayOf value?history
-            |> Array.toList
-            |> List.map (fun change ->
-                { Anchor = int (string change?anchor)
-                  Until = int (string change?until)
-                  Summary = string change?summary }) }
-
-    let plan (language: string) (delivered: string array) (request: obj) : obj =
-        let planned = AdvisorView.plan language (Set.ofArray delivered) (requestOf request)
+    let plan (language: string) (delivered: string array) (material: obj array) : obj =
+        let planned = AdvisorView.plan language (Set.ofArray delivered) material
 
         box
             {| viewPrompt = planned.ViewPrompt

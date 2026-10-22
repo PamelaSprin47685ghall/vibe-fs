@@ -17,8 +17,8 @@ open Wanxiangshu.Repository.Programming.Js.Anchor
 [<RequireQualifiedAccess>]
 module JsToolPolicy =
 
-    [<Emit("$0===undefined||$0===null")>]
-    let private isUndefined (value: obj) : bool = jsNative
+    [<Emit("$0 !== null && $0 !== undefined && Object.prototype.hasOwnProperty.call($0, $1)")>]
+    let private hasProperty (value: obj) (name: string) : bool = jsNative
 
     [<Emit("$0 !== null && $0 !== undefined")>]
     let private isPresent (value: obj) : bool = jsNative
@@ -68,13 +68,15 @@ module JsToolPolicy =
     let viewDeclarationExtraProse () : string =
         JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ())
 
-    /// The flat view declaration of a call: the prefix that is protected and
-    /// the map of kept states. A call that declares neither carries none.
+    /// A compression declaration keeps a prefix and appends a carry array.
     let viewDeclarationOf (raw: obj) : obj =
-        if isUndefined (raw?prefixUntil) && isUndefined (raw?thenMap) then
+        if not (hasProperty raw "prefixCount") && not (hasProperty raw "carry") then
             null
         else
-            createObj [ "prefixUntil" ==> raw?prefixUntil; "thenMap" ==> raw?thenMap ]
+            let declaration =
+                createObj [ "prefixCount" ==> raw?prefixCount; "carry" ==> raw?carry ]
+
+            AnchorSurface.parse declaration |> Result.defaultValue declaration
 
     /// Why the declaration is not a valid view declaration, if it is not.
     let parsedDeclarationFailure (declaration: obj) : JsFailure option =
@@ -82,35 +84,46 @@ module JsToolPolicy =
         | Ok _ -> None
         | Error failure -> Some failure
 
-    /// Why this call's view declaration is refused, if it is refused. A call
-    /// that still carries the retired `view` wrapper is refused; a flat
-    /// declaration is validated by the anchor surface.
+    /// Reject retired fields before the program can run.
     let viewFailureOf (raw: obj) (declaration: obj) : JsFailure option =
-        if not (isUndefined (raw?view)) then
-            Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
+        if
+            [ "prefixUntil"; "thenMap"; "view"; "reportMapping" ]
+            |> List.exists (hasProperty raw)
+        then
+            Some(JsFailure.ViewDeclarationInvalid "use prefixCount and carry for compression")
         elif not (isPresent declaration) then
             None
         else
             parsedDeclarationFailure declaration
 
     /// Commit the declaration to the pending view of the session.
-    let commitView (sessionId: string) (declaration: obj) : JsFailure option =
-        match AnchorSurface.setView sessionId declaration with
+    let commitView (sessionId: string) (callIdentity: (string * string) option) (declaration: obj) : JsFailure option =
+        match AnchorSurface.setView sessionId callIdentity declaration with
         | Ok() -> None
         | Error failure -> Some failure
 
     /// Commit the declaration only after the program settled: the pending
     /// view is what the next request projects, and a failed program must
     /// not be able to present anything.
-    let viewCommitFailure (sessionId: string) (declaration: obj) outcome : JsFailure option =
+    let viewCommitFailure
+        (sessionId: string)
+        (callIdentity: (string * string) option)
+        (declaration: obj)
+        outcome
+        : JsFailure option =
         match outcome with
         | JsToolWorkflow.JsToolOutcome.Failed _ -> None
         | JsToolWorkflow.JsToolOutcome.Succeeded _
-        | JsToolWorkflow.JsToolOutcome.Parked _ -> commitView sessionId declaration
+        | JsToolWorkflow.JsToolOutcome.Parked _ -> commitView sessionId callIdentity declaration
 
     /// The rendered result of a settled call, with the view declaration
     /// committed when the program settled.
-    let renderCommitted (sessionId: string) (declaration: obj) outcome : string =
-        match viewCommitFailure sessionId declaration outcome with
+    let renderCommitted
+        (sessionId: string)
+        (callIdentity: (string * string) option)
+        (declaration: obj)
+        outcome
+        : string =
+        match viewCommitFailure sessionId callIdentity declaration outcome with
         | Some failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
         | None -> JsToolsResult.render outcome

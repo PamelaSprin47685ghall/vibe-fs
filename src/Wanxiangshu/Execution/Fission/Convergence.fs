@@ -812,6 +812,74 @@ module FissionHost =
                 return! afterLaneMaterializedAppend sessionPort eventPort durable group (directoryForTurn turn) outcome
         }
 
+    let private nudgeUndeliveredLane
+        (sessionPort: FissionSessionPort)
+        (rootWorkspace: IRootWorkspaceReader)
+        (eventPort: FissionEventPort)
+        (joinGuardNudges: HashSet<string>)
+        (quiescence: ISessionQuiescenceGate)
+        (permit: QuiescencePermit option)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        laneIndex
+        (turn: ReconciledTurn)
+        =
+        task {
+            // A stop without delivery keeps the lane alive in the same run.
+            let! nudge =
+                HostJoinGuard.nudge
+                    sessionPort
+                    rootWorkspace
+                    (Some(AgentJournalPortAdapter.forHostJoinGuard durable))
+                    (Some durable)
+                    joinGuardNudges
+                    (fun () ->
+                        match permit with
+                        | Some idlePermit -> quiescence.TryConsume idlePermit
+                        | None -> Error QuiescencePermitFailure.NoFreshIdle)
+                    (fun () ->
+                        match permit with
+                        | Some idlePermit -> quiescence.TryRelease idlePermit
+                        | None -> Error QuiescencePermitFailure.NoFreshIdle)
+                    turn.SessionId
+                    turn.ProviderRun
+                    turn.Directory
+
+            match nudge with
+            | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+                do!
+                    failGroup
+                        sessionPort
+                        eventPort
+                        durable
+                        group
+                        (sprintf "fission undelivered lane nudge failed: %s" reason)
+            | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
+                Diagnostic.emit
+                    "fission-join-nudge-unsent"
+                    [ "session_id", SessionId.value turn.SessionId
+                      "result",
+                      sprintf
+                          "fission undelivered lane nudge unsent: group=%s lane=%d reason=not-sent"
+                          group.GroupId
+                          laneIndex ]
+            | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
+                Diagnostic.emit
+                    "fission-join-nudge-unsent"
+                    [ "session_id", SessionId.value turn.SessionId
+                      "result",
+                      sprintf
+                          "fission undelivered lane nudge admission rejected: group=%s lane=%d reason=%A"
+                          group.GroupId
+                          laneIndex
+                          failure ]
+            | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
+            | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding
+            | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()
+
+            return true
+        }
+
     let private materializeCompletedLane
         (sessionPort: FissionSessionPort)
         (rootWorkspace: IRootWorkspaceReader)
@@ -826,69 +894,46 @@ module FissionHost =
         (turn: ReconciledTurn)
         =
         task {
-            match
-                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered (SessionId.value turn.SessionId)
-            with
+            let material =
+                TaskDeliveryJournal.tryFindByFenceFields
+                    durable
+                    turn.SessionId
+                    turn.ProviderRun
+                    None
+                    (Some turn.AuthorityRootUserMessageId)
+                    (Some turn.PhysicalUserMessageId)
+                    None
+                    None
+                |> Option.map (fun witness -> witness.View)
+                |> Option.orElseWith (fun () ->
+                    Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekMaterialWith
+                        (SessionId.value turn.SessionId)
+                        (Some(CompletedTurnClassifier.partsSessionText turn.Parts)))
+
+            match material with
             | None ->
-                // LC-010: a lane that stops without a delivered view is not an
-                // infrastructure failure. The lane keeps the group and its
-                // resources; a same-run continuation nudge asks the same logical
-                // participant to continue. Only a nudge that itself failed makes
-                // the stranded group visible.
-                let! nudge =
-                    HostJoinGuard.nudge
+                return!
+                    nudgeUndeliveredLane
                         sessionPort
                         rootWorkspace
-                        (Some(AgentJournalPortAdapter.forHostJoinGuard durable))
-                        (Some durable)
+                        eventPort
                         joinGuardNudges
-                        (fun () ->
-                            match permit with
-                            | Some idlePermit -> quiescence.TryConsume idlePermit
-                            | None -> Error QuiescencePermitFailure.NoFreshIdle)
-                        (fun () ->
-                            match permit with
-                            | Some idlePermit -> quiescence.TryRelease idlePermit
-                            | None -> Error QuiescencePermitFailure.NoFreshIdle)
-                        turn.SessionId
-                        turn.ProviderRun
-                        turn.Directory
-
-                match nudge with
-                | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                    do!
-                        failGroup
-                            sessionPort
-                            eventPort
-                            durable
-                            group
-                            (sprintf "fission undelivered lane nudge failed: %s" reason)
-                | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
-                    Diagnostic.emit
-                        "fission-join-nudge-unsent"
-                        [ "session_id", SessionId.value turn.SessionId
-                          "result",
-                          sprintf
-                              "fission undelivered lane nudge unsent: group=%s lane=%d reason=not-sent"
-                              group.GroupId
-                              laneIndex ]
-                | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
-                    Diagnostic.emit
-                        "fission-join-nudge-unsent"
-                        [ "session_id", SessionId.value turn.SessionId
-                          "result",
-                          sprintf
-                              "fission undelivered lane nudge admission rejected: group=%s lane=%d reason=%A"
-                              group.GroupId
-                              laneIndex
-                              failure ]
-                | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
-                | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding
-                | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()
-
-                return true
+                        quiescence
+                        permit
+                        durable
+                        group
+                        laneIndex
+                        turn
             | Some delivered ->
-                return! writeLaneWorkAndMaterialize sessionPort eventPort durable group laneIndex turn delivered
+                return!
+                    writeLaneWorkAndMaterialize
+                        sessionPort
+                        eventPort
+                        durable
+                        group
+                        laneIndex
+                        turn
+                        (ReturnedMaterial.render delivered)
         }
 
     let private reportOutstandingExternalNudge (turn: ReconciledTurn) nudge =

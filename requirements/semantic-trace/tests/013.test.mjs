@@ -62,7 +62,7 @@ const withRealDelivery = async (body, { callId = 'call_013_a', view = 'materiali
     const deliver = async (material) =>
       hooks.tool['todowrite-for-engineer'].execute(
         {
-          program: `class Js extends JsProgram { async run() { await this.deliver({ 0: "${material}" }); } }`,
+          program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
         },
         { sessionID: SESSION, agent: 'engineer', callID: callId, messageID: RUN },
       )
@@ -135,7 +135,7 @@ const distinctDeliveryWitnesses = (facts) => {
 // 一条见证的围栏：三元组 + 任务 / 逻辑运行 / 任期 / 本次调用。
 const fenceOf = (fact) => fact[1][1][1].Fence
 
-test('WHAT[semantic-trace-013] a real delivery commit writes a durable witness carrying its triple, prose, view declaration and materialized view', async () => {
+test('WHAT[semantic-trace-013] a real delivery commit writes a durable witness carrying its triple, prose, carry declaration and canonical material array', async () => {
   await withRealDelivery(async ({ directory, deliver }) => {
     const result = await deliver('materialized view body')
     assert.match(String(result), /# ok/, 'the real delivery must be established')
@@ -154,10 +154,10 @@ test('WHAT[semantic-trace-013] a real delivery commit writes a durable witness c
     assert.equal(named(fence.AuthorityRoot), `root-${SESSION}`)
     assert.equal(named(fence.PhysicalUserMessageId), `root-${SESSION}`)
 
-    // 交付正文、view 声明与物化后的 view 一并留存。
+    // 报告单独保留；carry 声明和展开后的材料都是无二次格式化的 JSON 数组。
     assert.equal(witness.FormalText, 'the assistant prose of this turn')
-    assert.equal(witness.View, 'materialized view body')
-    assert.equal(witness.ViewDeclaration, '{"prefixUntil":0,"thenMap":{"0":"materialized view body"}}')
+    assert.equal(witness.View, JSON.stringify(['materialized view body']))
+    assert.equal(witness.ViewDeclaration, JSON.stringify(['materialized view body']))
     assert.match(witness.MaterialDigest, /^[0-9a-f]{64}$/)
   })
 })
@@ -171,7 +171,7 @@ test('WHAT[semantic-trace-013] a different fence is a different witness: each st
     const second = await hooks.tool['todowrite-for-engineer'].execute(
       {
         program:
-          'class Js extends JsProgram { async run() { await this.deliver({ 0: "materialized view body of the second call" }); } }',
+          'class Js extends JsProgram { async run() { await this.deliver(["materialized view body of the second call"]); } }',
       },
       { sessionID: SESSION, agent: 'engineer', callID: secondCallId, messageID: RUN },
     )
@@ -183,8 +183,8 @@ test('WHAT[semantic-trace-013] a different fence is a different witness: each st
     const byCall = new Map(witnesses.map((fact) => [named(fenceOf(fact).ToolCallId), fact[1][1][1]]))
     assert.ok(byCall.has('call_013_a'))
     assert.ok(byCall.has('call_013_b'))
-    assert.equal(byCall.get('call_013_a').View, 'materialized view body of the first call')
-    assert.equal(byCall.get('call_013_b').View, 'materialized view body of the second call')
+    assert.equal(byCall.get('call_013_a').View, JSON.stringify(['materialized view body of the first call']))
+    assert.equal(byCall.get('call_013_b').View, JSON.stringify(['materialized view body of the second call']))
     assert.notEqual(byCall.get('call_013_a').View, byCall.get('call_013_b').View)
   })
 })
@@ -217,7 +217,7 @@ test('WHAT[semantic-trace-013] conflicting material under the same fence is reje
 
     const witnesses = distinctDeliveryWitnesses(durableFacts(join(directory, '.Herdchestra')))
     // 被拒的材料没有成为见证；先提交的那条仍在。
-    const stored = witnesses.filter((fact) => fact[1][1][1].View === 'materialized view body')
+    const stored = witnesses.filter((fact) => fact[1][1][1].View === JSON.stringify(['materialized view body']))
     assert.equal(stored.length, 1, 'the original witness survives the refused conflict')
   })
 })
@@ -296,3 +296,4 @@ test('WHAT[semantic-trace-013] the same triple under a different logical run or 
     assert.equal(named(fence.ToolCallId), 'call_013_a')
   })
 })
+

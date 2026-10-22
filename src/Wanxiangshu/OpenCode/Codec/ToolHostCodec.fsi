@@ -42,7 +42,6 @@ module ToolHostCodec =
     val argumentsOfRaw: raw: obj -> HostToolArguments
     val internal schemaValue: schema: HostSchema -> obj
     val stringSchema: factory: HostToolFactory -> HostSchema
-    val nullableStringSchema: factory: HostToolFactory -> HostSchema
     val anySchema: factory: HostToolFactory -> HostSchema
     val stringSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val numberSchema: factory: HostToolFactory -> HostSchema
@@ -71,9 +70,7 @@ module ToolHostCodec =
 
     val arraySchemaOf: item: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
 
-    /// Optional open key→value map (zod `record`); the description carries the key shape.
-    val optionalRecordSchemaOf:
-        key: HostSchema -> value: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
+    val optionalCarrySchema: description: string -> factory: HostToolFactory -> HostSchema
 
     val register: factory: HostToolFactory -> spec: ToolSpec -> obj
     val registry: factory: HostToolFactory -> specs: ToolSpec list -> obj

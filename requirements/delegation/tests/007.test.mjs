@@ -27,10 +27,7 @@ test('WHAT[delegation-007] new sync invocations reject historical Coder and Insp
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
     assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 0), true)
     const child = sync.child(runtime, owner, 'Engineer')
-    runtimeSurface.recordFencedDeliveredView(child, 'run-current', 'call-x', {
-      prefixUntil: 0,
-      thenMap: {},
-    })
+    runtimeSurface.recordFencedDeliveredView(child, 'run-current', 'call-x', [])
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'local facts', 'run-current'), true)
     assert.equal((await work).ok, true)
   } finally {
@@ -40,3 +37,4 @@ test('WHAT[delegation-007] new sync invocations reject historical Coder and Insp
 })
 
 test.todo('WHAT[delegation-007] the Sphinx program invokes standard Engineer through an acyclic managed path with family-root placement and exact terminal identity, without extra DevOps authority (GAP-153)')
+

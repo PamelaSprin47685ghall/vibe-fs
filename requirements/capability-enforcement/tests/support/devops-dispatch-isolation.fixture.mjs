@@ -37,11 +37,11 @@ const storeOf = async (target) => workspaceEvents.acquire(await journalSurface.J
 // 程序内调用 `this.resume`。
 const runManagerProgram = async (hooks, sessionID, body) =>
   await hooks.tool['todowrite-for-manager'].execute(
-    { program: `class Js extends JsProgram { async run() { ${body} } }` },
+    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-dispatch-test' },
     { sessionID, agent: 'manager' },
   )
 
-const resumeCall = (payload) => `return await this.resume(${JSON.stringify(payload)}, { 1: null });`
+const resumeCall = (payload) => `return await this.resume(${JSON.stringify(payload)}, []);`
 
 const rendered = (result) => String(result)
 const envelopeString = (result, field) => {
@@ -109,12 +109,12 @@ if (phase === 'produce') {
         assert.equal(envelopeOk(admitted), true, admitted)
         assert.equal(outcomeOf(admitted), 'created', admitted)
 
-        // 收口确认落盘：后继进程必须读到这一持久事实。
+        // 单笔接力交付落盘：后继进程必须读到后继任期已建立这一持久事实。
         const store = await storeOf(directory)
-        const confirmed = await lifecycle.seedDeliver(store, ISOLATED_SESSION, 'run-devops-isolation', 'call-devops-isolation', 2n)
-        assert.equal(confirmed.ok, true, confirmed.error)
+        const relayed = await lifecycle.seedDeliver(store, ISOLATED_SESSION, 'run-devops-isolation', 'call-devops-isolation', 2n)
+        assert.equal(relayed.ok, true, relayed.error)
         const view = lifecycle.workView(store, ISOLATED_SESSION)
-        assert.equal(view.confirmed, true, 'the producer must leave a durable confirmation')
+        assert.equal(view.active, true, 'the producer relays to a successor tenure')
       })
       writeFileSync(
         join(directory, 'producer.json'),
@@ -145,17 +145,17 @@ if (phase === 'produce') {
         assert.deepEqual(durableSnapshot(directory), durableBefore,
           'the unreviewed dispatch must not append any durable bytes')
 
-        // (b) 已确认的会话在收口窗内被拒：门读的是持久事实，不是进程局部记忆。
+        // (b) 接力后的后继任期在未评审前被拒：门读的是持久事实，不是进程局部记忆。
         const store = await storeOf(directory)
         const view = lifecycle.workView(store, ISOLATED_SESSION)
-        assert.equal(view.confirmed, true,
-          'the successor process must read the durable confirmation the producer left')
+        assert.equal(view.active, true,
+          'the successor process must read the relayed successor tenure the producer left')
         const closed = await runManagerProgram(
           incarnation.hooks,
           ISOLATED_SESSION,
           resumeCall({ name: 'devops', charge: 'CONFIRMED-DEVOPS-CHARGE' }),
         )
-        assert.equal(refusalCode(closed), DISPATCH_CLOSED, closed)
+        assert.equal(refusalCode(closed), REVIEW_PENDING, closed)
         assert.equal(envelopeOk(closed), false, closed)
       })
       writeFileSync(

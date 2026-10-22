@@ -20,11 +20,8 @@ module JsToolsBindings =
 
     val createLedger: persistence: IJsTransactionPersistence option -> JsAsIsLedger
 
-    /// `advisor(intent, reportMapping)`: the `(memberName, member)` pair for
-    /// the advisor consult; the report mapping is mandatory and a missing or
-    /// malformed one refuses with VIEW_DECLARATION_INVALID. It refuses with
-    /// DELEGATION_UNAVAILABLE when no host is installed and returns the host
-    /// closure's envelope verbatim otherwise.
+    /// `advisor(intent, carry)`: validate the carry array, then return the
+    /// installed host's data envelope. A missing host is unavailable.
     val makeAdvisorMember: host: JsDelegationHost option -> (string * obj)
 
     val createApi:

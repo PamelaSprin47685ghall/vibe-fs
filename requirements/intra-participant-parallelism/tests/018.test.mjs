@@ -2,7 +2,7 @@
 //
 // 两条性质：
 // (a) `this.fission(payload)` 的成员签名逐字不变：只有 payload 一个形参，
-//     不带 reportMapping（同身份换执行道，不是委派）。
+//     不带 carry（同身份换执行道，不是委派）。
 // (b) fission 的 lane 无条件继承本对话衣钵：lane 提示里的上下文来源是顶层
 //     整理后的当前会话（AnchorLedger.context），不是旧的交付记录视图
 //     （scope.ViewForSession / JsDeliveredValues）。
@@ -60,11 +60,12 @@ const waitFor = async (read, what, timeoutMs = 2000) => {
   }
 }
 
-test('WHAT[intra-participant-parallelism-018] the fission member takes the payload alone: its signature carries no report mapping', async () => {
+test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone while fork forwards its optional carry array', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-fission-member-'))
   const engineerSession = `ses-fission-member-${Math.random().toString(36).slice(2, 8)}`
   const managerSession = `${engineerSession}-manager`
   const calls = []
+  const forkCalls = []
   try {
     installDelegationHost(
       engineerSession,
@@ -77,7 +78,10 @@ test('WHAT[intra-participant-parallelism-018] the fission member takes the paylo
       notExercised,
       notExercised,
     )
-    installDelegationHost(managerSession, notExercised, notExercised, notExercised, notExercised, notExercised)
+    installDelegationHost(managerSession, async (...args) => {
+      forkCalls.push(args)
+      return { ok: true, name: 'fork-child', agentId: 'fork-agent', outcome: 'created' }
+    }, notExercised, notExercised, notExercised, notExercised)
 
     const engineerOutcome = await execute(
       dir,
@@ -101,27 +105,34 @@ test('WHAT[intra-participant-parallelism-018] the fission member takes the paylo
     assert.match(engineerDoc, /arity = "1"/, 'the fission member declares one parameter: the payload')
     assert.match(engineerDoc, /groupId = "group-fission-member"/, 'the fission receipt reaches the program as data')
 
-    // The host entry is reached with the payload alone — no report mapping crosses.
+    // The fission host receives only the payload.
     assert.equal(calls.length, 1, 'the fission host entry is reached once')
     assert.equal(calls[0].length, 1, 'the fission host entry receives the payload alone')
     assert.equal(calls[0][0].charge, 'explore three designs')
     assert.equal(calls[0][0].lanes, 2)
 
-    // The contrast: a delegation member that does carry a report mapping has two
-    // parameters. Fission is the same identity on another lane, not a delegation.
+    // JavaScript length excludes defaulted parameters. Observe the actual fork
+    // calls as well: defaulted and explicit carry both cross the host boundary.
     const managerOutcome = await execute(
       dir,
       'Manager',
       'en',
       managerSession,
-      { program: program(`    return { forkArity: String(this.fork.length) };`) },
+      { program: program(`    await this.fork("default carry");
+    await this.fork("explicit carry", ["background"]);
+    return { forkArity: String(this.fork.length) };`) },
       3000,
       Date.now() + 60_000,
       1 << 20,
       null,
     )
     assert.equal(caseName(managerOutcome), 'Succeeded')
-    assert.match(render(managerOutcome), /forkArity = "2"/, 'a delegation member declares the report mapping')
+    assert.match(render(managerOutcome), /forkArity = "1"/, 'only the required payload counts toward fork.length')
+    assert.equal(forkCalls.length, 2)
+    assert.equal(forkCalls[0].length, 3, 'the delegate host receives member, payload, and carry')
+    assert.equal(forkCalls[0][0], 'fork')
+    assert.deepEqual([...forkCalls[0][2]], [], 'omitted carry becomes an empty array')
+    assert.deepEqual([...forkCalls[1][2]], ['background'], 'explicit carry is forwarded intact')
   } finally {
     clearDelegationHost(engineerSession)
     clearDelegationHost(managerSession)
@@ -137,11 +148,11 @@ test('WHAT[intra-participant-parallelism-018] a fission lane inherits the curren
       await openIncumbency(runtime, managerSession)
 
       // 派工是编程面成员（宿主 fork 工具已整体退役）：
-      // `this.fork(payload, reportMapping)`。
+      // `this.fork(payload, carry = [])`。
       const forked = await hooks.tool['todowrite-for-manager'].execute(
         {
           program:
-            'class Js extends JsProgram { async run() { return await this.fork({ name: "fission-context", charge: "collect the lane materials" }, { 1: null }); } }',
+            'class Js extends JsProgram { async run() { return await this.fork({ name: "fission-context", charge: "collect the lane materials" }); } }',
         },
         { sessionID: managerSession, agent: 'manager' },
       )
@@ -156,10 +167,7 @@ test('WHAT[intra-participant-parallelism-018] a fission lane inherits the curren
       applyView(engineerSession, [{ id: 'ctx-current', text: CURRENT_CONTEXT }])
       const currentAnchor = anchors(engineerSession).find((entry) => entry.messageId === 'ctx-current')
       assert.ok(currentAnchor, 'the current conversation context must be anchored')
-      recordDeliveredView(engineerSession, {
-        prefixUntil: 0,
-        thenMap: { [currentAnchor.anchor]: DELIVERED_RECORD },
-      })
+      recordDeliveredView(engineerSession, [DELIVERED_RECORD])
 
       const fissioned = await hooks.tool.fission.execute(
         { prompts: ['lane one', 'lane two'] },
@@ -212,3 +220,4 @@ test('WHAT[intra-participant-parallelism-018] a fission lane inherits the curren
     clearAll()
   }
 })
+

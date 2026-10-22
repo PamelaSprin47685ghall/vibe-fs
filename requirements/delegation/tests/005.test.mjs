@@ -7,12 +7,12 @@ test('WHAT[delegation-005] completed wire presents Byname and record without exp
   for (const language of ['english', 'zh-CN']) {
     const wire = join.renderBatch(language, [{
       kind: 'completed', agentId: 'PHYSICAL-AGENT-ID', agentName: 'Ada',
-      role: 'Engineer', runId: 'PHYSICAL-RUN-ID', view: 'entry-local evidence',
+      role: 'Engineer', runId: 'PHYSICAL-RUN-ID', returned: [{ text: 'entry-local evidence' }],
     }])
     assert.match(wire, /Ada/)
     assert.match(wire, /entry-local evidence/)
     assert.doesNotMatch(wire, /PHYSICAL-AGENT-ID|PHYSICAL-RUN-ID/)
-    assert.deepEqual(parseToml(wire), {})
+    assert.deepEqual(parseToml(wire), { returned: [{ text: 'entry-local evidence' }] })
   }
 })
 

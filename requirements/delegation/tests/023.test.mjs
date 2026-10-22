@@ -22,7 +22,7 @@ test('WHAT[delegation-023] transient failure follows the injected retry verdict 
       sync.child(runtime, owner, 'Engineer'),
       'run-retry-2',
       'call-retry-2',
-      { prefixUntil: 0, thenMap: { 0: 'retry delivered view' } },
+      ['retry delivered view'],
     )
     assert.equal(await sync.observeTurn(runtime, owner, 'Engineer', 'TurnCompleted', 'retry delivered view', 'run-retry-2'), true)
     const result = await pending
@@ -42,3 +42,4 @@ test('WHAT[delegation-023] transient failure follows the injected retry verdict 
 })
 
 test.todo('WHAT[delegation-023] actual shared recovery engine exhausts all applicable paths before the parent receives final failure (GAP-153)')
+

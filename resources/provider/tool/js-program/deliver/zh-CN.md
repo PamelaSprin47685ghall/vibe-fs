@@ -1,5 +1,10 @@
-deliver(reportMapping) — 以一份报告映射结束本程序。调用之后程序不再继续：交付会展开调用栈，把这份映射记入本会话的交付格，调用方拿到的交接材料由它渲染而成。宿主把 reportMapping 读作 `{ prefixUntil: 0, thenMap: reportMapping }`：一份 `Record<string, null|string>`，摘要替换该锚点，`null` 原样保留，没写的锚点不传给调用方。自己递交 `{ prefixUntil, thenMap }` 包装对象的形式已撤销：以 `VIEW_DECLARATION_INVALID` 拒绝。subagent 程序必须显式 deliver；普通 `return` 不会写入交付格，也不写完成——只要该子工作仍可能交付，它就是一条活跃义务，join 保持不关闭；交付已不可能时（被 abort、取消或重启加载结算），该子工作以 `voided` 结清：这不是完成，join 会以 `voided` 报告一次。在 `dag` 中，非完成记录按 `node-<status>` 挂起（`node-failed`、`node-abandoned`、`node-voided`）。
+deliver(carry = []) — 交付本次工作并结束程序，后续语句不再执行。
 
-调用之前，先在助手正文写好本次工作的散文：做成了什么、证据是什么、还有什么未决、继任者需要什么。报告映射必须指向本次工作欠调用方的全部材料——包括这份散文和它依赖的上下文。不要把散文复制进 deliver 参数，也不要留到调用之后再写：调用之后没有以后。`deliver(undefined)` 不是交付：缺 reportMapping，或 reportMapping 形状非法，一律被拒绝——调用返回 `{ ok: false, code: "VIEW_DECLARATION_INVALID", reason }`，这份拒绝不构成交付，程序继续运行；空映射 `{}` 是合法的，什么都不传。
+**惯用法：先用助手正文写最终报告，紧接着调用 `this.deliver()`。** 本回合自动回传，包括你刚写的报告，不用为它指定锚点，也不用复制进参数。讲清做成了什么、凭据是什么、还有什么未决即可。
 
-捕获内部交付哨兵会让程序继续存活——之后的 return 值才是结果——所以捕获者是在知情地取消这次交付。
+只有还需要附加旧上下文时才填写 `carry`：整数引用可见锚点的完整历史区间，字符串表示字面文本，按数组顺序展开。例如 `this.deliver([6, "…"])`。没有前缀参数；空数组和省略参数都只交回本回合。宿主把材料展开成可读的 TOML。
+
+普通 `return` 不构成交付。仍能交付的子工作继续保持活跃，`join` 等待；只有交付已不可能时，它才以 `voided` 结清并报告一次。非法 `carry` 返回 `{ ok: false, code: "VIEW_DECLARATION_INVALID", reason }`，程序继续运行，修正后再交付。
+
+捕获内部交付哨兵会取消这次交付并让程序继续运行。
+

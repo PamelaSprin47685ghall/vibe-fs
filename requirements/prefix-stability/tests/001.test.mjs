@@ -120,7 +120,7 @@ test('WHAT[prefix-stability-001] reused delegation completes three questions; se
         child,
         `asst_q${ordinal + 1}`,
         `call_q${ordinal + 1}`,
-        { prefixUntil: 0, thenMap: { 0: answer } },
+        [answer],
       )
       const settled = await delegation.settle(harness, OWNER, 'Engineer', answer, `asst_q${ordinal + 1}`)
       assert.equal(settled, true, `Q${ordinal + 1} completion must be observed`)
@@ -886,3 +886,4 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
   )
 })
 }
+

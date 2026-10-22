@@ -12,6 +12,8 @@ module JoinSurface =
     val renderForkError: languageName: string -> error: string -> string
     val renderOrchestratorBatch: languageName: string -> verdictNames: string array -> string
     val createJoinProbe: unit -> obj
+    val validateDeliveredMaterial: material: string -> obj
+    val joinProbeDeliver: probe: obj -> carry: obj -> report: string -> Task<obj>
     val joinProbeForkPty: probe: obj -> command: string -> Task<obj>
     val joinProbeCompletePty: probe: obj -> ptyId: string -> unit
     val joinProbePulseWake: probe: obj -> unit

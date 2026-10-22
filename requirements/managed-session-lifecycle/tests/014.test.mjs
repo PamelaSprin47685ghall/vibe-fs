@@ -28,7 +28,7 @@ const invokeAndSettle = async (runtime, charge, answer, promptCount, runId) => {
     SyncDelegateSurface.child(runtime, owner, 'Engineer'),
     runId,
     `call-${runId}`,
-    { prefixUntil: 0, thenMap: { 0: answer } },
+    [answer],
   )
   assert.equal(await SyncDelegateSurface.settle(runtime, owner, 'Engineer', answer, runId), true)
   const result = await pending
@@ -52,3 +52,4 @@ test('WHAT[managed-session-lifecycle-014] G6_deleted_delegate_child_retires_live
     SyncDelegateSurface.dispose(runtime)
   }
 })
+

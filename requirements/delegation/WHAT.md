@@ -72,15 +72,15 @@ Join 只在新输入已由 Host 保存、且属于该 owner 的已接纳物理�
 
 ## [019] Typed 首提示词
 
-fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与 CommissionerRecord 只读背景。父到子背景由该次委派必传的 reportMapping 投影进 CommissionerRecord 槽位，用 TOML 数据字段承载；子到父完成项用 `this.deliver` 交回的 view，不得混淆方向。
+fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与只读背景。父到子背景由可选 `carry` 数组选择，保持结构化条目直到 pretty print 成 TOML 的 `[[context]]` 表；不得把拼好的 TOML 再包进字符串字段。父方当前回合不进入背景；子到父完成项则包含 `this.deliver` 自动保留的当前回合，不得混淆方向。
 
 ## [020] 语义不依赖物理工具名
 
 工具改名或替换不改变委托的权能、所有权与生命周期合同。委派成员一律走编程面（`this.fork`/`this.resume`/`this.commission`/`this.devops`/`this.dag`），不再有独立的 Host 工具注册；工具名不变，但调用面、物理注册与工具名都不改变委托语义。
 
-## [021] 只读背景由 reportMapping 承载
+## [021] 只读背景由 carry 承载
 
-父 → 子上下文（包括父已从同伴交回的 view）不再由调用方在 charge 文本里手工拼接。委派必传 reportMapping：形状是 `Record<string, null|string>`（锚点编号字符串 → 摘要或 null），**不带 prefixUntil**，语义等价 prefixUntil=0 的 view 声明。宿主把 reportMapping 投影为子方载荷里的 `commissioner_record` 槽位，作为只读背景数据按父 → 子方向交给子方。
+父 → 子上下文（包括父已从同伴交回的材料）由 `carry` 数组单独承载，默认 `[]`；整数引用可见历史锚点的完整区间，字符串表示字面文本，依 context-compression [032] 按数组顺序展开。传递没有前缀参数，不附加父方当前回合。宿主保留结构化背景，在子方载荷的最终边界统一 pretty print 为 TOML。
 
 charge 只承载任务本身。背景只作背景：不把其中未竟工作转成新任务义务，不克隆 authority。
 
@@ -96,11 +96,11 @@ charge 只承载任务本身。背景只作背景：不把其中未竟工作转�
 
 复用 participant 的每个新工作是独立 direct-CE invocation，不建立 durable Stage/Phase/ActiveWorkUnit 或第二状态机。resume route 由 Byname 标识，SyncDelegate route 由 caller scope + dedicated role 标识；物理 SessionId 不拥有 handoff 连续性。
 
-输入为新 charge 与该次委派必传的 reportMapping。charge 只承载任务本身；父 → 子上下文由 reportMapping 单独承载（形态 `Record<string, null|string>`，无 prefixUntil，等价 prefixUntil=0 的声明），宿主把它投影为子方载荷的 `commissioner_record` 槽位。SyncDelegate 与 dag 同样传 reportMapping，且 dag 的全部节点收到**同一份** reportMapping，节点不得覆盖或另设自己的映射。ANCHOR 编号共享同一进程地址空间；父到子 `DelegationHandoff` delta tracking 已退役。
+输入为新 charge 与可选 `carry`。charge 只承载任务本身；父 → 子背景按 [021] 单独传递。SyncDelegate 与 dag 使用同一规则，dag 的全部节点收到同一份 `carry`，节点不得覆盖或另设数组。ANCHOR 编号共享同一进程地址空间；父到子 `DelegationHandoff` delta tracking 已退役。
 
-委派成员全部走编程面：`this.fork(payload, reportMapping)`、`this.resume(payload, reportMapping)`、`this.commission(payload, reportMapping)`、`this.devops(intent, reportMapping)`；不再有独立的 Host 工具注册，工具名不变但语义不因工具名变化而改变（[020]）。reportMapping 缺失或非法时，数据信封拒绝 `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`，不执行程序、不留下部分效果。
+委派成员全部走编程面：`this.fork(payload, carry)`、`this.resume(payload, carry)`、`this.commission(payload, carry)`、`this.devops(intent, carry)`；不再有独立的 Host 工具注册，语义不因工具名变化而改变（[020]）。省略 `carry` 等同 `[]`；非法数组或引用返回 `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`，不执行该次委派、不留下部分效果。
 
-`this.fission(payload)` 不带 reportMapping：它是同身份换执行道，无条件继承本对话衣钵。`this.join()` 与 `this.horizon()` 是拉取动作，不强加 reportMapping。
+`this.fission(payload)` 不带 `carry`：它是同身份换执行道，无条件继承本对话衣钵。`this.join()` 与 `this.horizon()` 是拉取动作，不强加 `carry`。
 
 同步调用等待自己完成，只返回本次 `this.deliver` 交回的 view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自 `this.deliver` 交付格的 view。写完成需要两件事同时成立：该 work unit 有因果上证明的终态（proven terminal，见 [025]），并且有经 `this.deliver` 有效交付的材料——只有交付不证明完成。**仍能交付时**，未交付的子工作不写完成、join 不关闭，保持可见的未解除义务——父方可以继续等待或重派，原子工作保持活跃，不把未交付结算成终态（未交付本身不是一种状态）。
 
@@ -128,7 +128,7 @@ Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真
 
 同一 logical route 同时至多一个 active work unit。对忙碌 participant 调用 `resume` 时，charge 作为 `BusyAgentNudge` 追加到既有 LogicalRun，在 Host 保存后进入下一次尚未开始准备的 LLM 请求，不中断当前输出或工具。Engineer 与固定 DevOps 均允许此行为；保留原 work 的 Root、身份与完成订阅，不创建新 assignment，不因提示文本与旧 charge 相同而假装发送成功。
 
-忙碌提示仍按委派契约携带本次 `resume` 的 reportMapping，作为只读背景随提示送达；它不因未新建 assignment 而免于携带，也不改写既有 work 的背景。
+忙碌提示仍按委派契约传递本次 `resume` 的 `carry`，作为只读背景随提示送达；省略时为 `[]`。它不改写既有 work 的背景，也不因未新建 assignment 而改变数组语义。
 
 前一 work unit 完成后，`resume` 才承接下一项，不依赖 join 消费或重建 participant。忙碌提示的发送路径不得因异步准备期间任务结束而自动改走新 assignment。
 
@@ -150,7 +150,7 @@ sync invariant 违例由委托 owner 构造 typed incident；先保留已发生 
 
 ## [031] Checkpoint 保留已完成事实
 
-（父到子 `DelegationHandoff` 及其 `HandoffCheckpointSettlement` 已随 charge 与 reportMapping 分离传递、共享 ANCHOR 地址空间退役。）child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交付终值 view，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
+（父到子 `DelegationHandoff` 及其 `HandoffCheckpointSettlement` 已随任务与背景分离传递、共享 ANCHOR 地址空间退役。）child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交付终值 view，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
 
 ## [032] Engineer 与 DevOps 不相互差遣
 
@@ -160,6 +160,7 @@ Engineer 完成工作或到达需 Manager 决定的边界即返回，不自行�
 
 子代理经 `this.deliver` 提交持久交付见证后，宿主按设计中断其后续 attempt，使模型看不到 deliver 回复。中断只结束本次投递 attempt，不改变已经成立的交付：宿主必须在发出中断之前，用同一见证结算投递子工作（与普通终态相同的 Completion 与终态发布），使 owner 的 `join` 收到该次交付的 view。
 
-- 允许后果：投递子工作的终态是 `completed`，join 记录里的 `view` 是本次交付的材料；中断事实（已发出 / 已观察到）独立登记，不推翻交付。
+- 允许后果：投递子工作的终态是 `completed`，join 记录里的 `returned` 是本次交付的结构化材料条目；中断事实（已发出 / 已观察到）独立登记，不推翻交付。
 - 禁止后果：不得因为投递后的中断把子工作留在 Active、等一个不会到来的同 run 终态；不得用 abort / cancel 事实替代交付见证来结算；不得把未交付的后续步骤写成完成。
 - 边界：Manager / Plan 的生命周期 deliver 没有自己的父 join，本条只约束有 handle 链接的子会话。交付见证缺失时不是“已完成”：投递不成立，工具必须报告 `DELIVERY_NOT_ESTABLISHED`，不得只留进程内交付格。
+

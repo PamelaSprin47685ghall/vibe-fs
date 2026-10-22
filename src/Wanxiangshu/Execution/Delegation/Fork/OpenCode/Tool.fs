@@ -19,6 +19,7 @@ module ForkTool =
         { new ICommandArguments with
             member _.Text name = args.Text name
             member _.OptionalText name = args.OptionalText name
+            member _.Texts name = args.Texts name
             member _.OptionalCount name = args.OptionalNonNegativeInteger name }
 
     let private environment (scope: ToolRuntimeScope) (context: HostToolContext) : DelegationEnvironment =

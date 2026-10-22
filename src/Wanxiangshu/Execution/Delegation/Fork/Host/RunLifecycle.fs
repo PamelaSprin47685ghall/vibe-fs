@@ -253,7 +253,7 @@ module HostForkRunLifecycle =
     let private peekDeliveredView (run: PendingHostRun) (result: AgentRunResult) (prose: string option) =
         match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
         | Some fence when fence.ProviderRun = result.ProviderRun ->
-            JsDeliveredValues.tryPeekRenderedWith (SessionId.value run.ChildId) prose
+            JsDeliveredValues.tryPeekMaterialWith (SessionId.value run.ChildId) prose
         | _ -> None
 
     let private completedOutcomeView
@@ -276,7 +276,7 @@ module HostForkRunLifecycle =
             // without the material and strand the run.
             let delivered = peekDeliveredView run result prose
 
-            return chooseView delivered observed
+            return chooseView delivered (observed |> Option.map (fun text -> ReturnedMaterial.ofTexts [ text ]))
         }
 
     let viewForOutcome
@@ -331,7 +331,7 @@ module HostForkRunLifecycle =
                   ProviderRun = witness.Fence.ProviderRun
                   Role = record.CanonicalRole
                   Directory = None
-                  TerminalText = witness.View
+                  TerminalText = witness.FormalText
                   TurnFormalText = witness.FormalText }
 
             port.NotifyTerminal sessionId (TerminalOutcome.Completed result) |> ignore
@@ -634,10 +634,8 @@ module HostForkRunLifecycle =
         (resolved: string option)
         : Task =
         task {
-            match resolved with
-            | Some completedView ->
-                let finalView = taken |> Option.defaultValue completedView
-
+            match taken |> Option.orElse resolved with
+            | Some finalView ->
                 let agentOutcome =
                     AgentCompletion.completed
                         run.AgentId
@@ -720,7 +718,7 @@ module HostForkRunLifecycle =
     let private takeOwnRunCell (run: PendingHostRun) (result: AgentRunResult) (prose: string option) =
         match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
         | Some fence when fence.ProviderRun = result.ProviderRun ->
-            JsDeliveredValues.tryTakeRenderedForCall
+            JsDeliveredValues.tryTakeMaterialForCall
                 (SessionId.value run.ChildId)
                 result.ProviderRun
                 fence.ToolCallId
@@ -757,11 +755,10 @@ module HostForkRunLifecycle =
         (result: AgentRunResult)
         toolCallId
         (witnessView: string)
-        (view: ViewResolution option)
+        (witnessProse: string)
+        (_view: ViewResolution option)
         =
         task {
-            let! resolved = resolveView view
-
             // The durable witness is the delivery proof and it
             // carries the material of that very delivery. The
             // process-live cell is only a cache of it: when the
@@ -774,19 +771,20 @@ module HostForkRunLifecycle =
             // A delivery is form compliance, not content evidence: an empty
             // view is still the return of a delivered run. The witness is the
             // proof, so the settlement must not be withheld for blank material.
-            let completedView = resolved |> Option.defaultValue witnessView
+            let completedView = witnessView
 
             // D2: the delivered cell is consumed exactly once, and only for
             // an admissible outcome. A take that finds nothing (another reader
-            // already consumed the cell) falls back to the peeked view, which
-            // is idempotent. The take is fenced by the whole delivery fence the
+            // already consumed the cell) falls back to the frozen witness.
+            // The take is fenced by the whole delivery fence the
             // witness proved — the provider run AND the tool call id.
             let taken =
-                JsDeliveredValues.tryTakeRenderedForCall
+                JsDeliveredValues.tryTakeWitnessMaterial
                     (SessionId.value run.ChildId)
                     result.ProviderRun
                     toolCallId
-                    (terminalProse result)
+                    witnessView
+                    witnessProse
 
             return!
                 settleCompletedView
@@ -855,6 +853,7 @@ module HostForkRunLifecycle =
                         result
                         witness.Fence.ToolCallId
                         witness.View
+                        witness.FormalText
                         view
         }
 

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Host
 
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
@@ -23,12 +24,15 @@ type TaskDeliveryFence =
       Task: TaskDeliveryTask }
 
 type TaskDeliveryWitness =
-    { Fence: TaskDeliveryFence
-      FormalText: string
-      ViewDeclaration: string
-      View: string
-      MaterialDigest: string
-      RetirementId: string option }
+    {
+        Fence: TaskDeliveryFence
+        FormalText: string
+        ViewDeclaration: string
+        /// Canonical JSON string array owned by ReturnedMaterial.
+        View: string
+        MaterialDigest: string
+        RetirementId: string option
+    }
 
 module TaskDelivery =
     let key (fence: TaskDeliveryFence) =
@@ -59,10 +63,11 @@ module TaskDelivery =
             )
         then
             Error "delivery fence is incomplete"
-        elif sha256 witness.View <> witness.MaterialDigest then
-            Error "delivery material digest mismatch"
         else
-            Ok()
+            match ReturnedMaterial.validate witness.View with
+            | Error reason -> Error reason
+            | Ok() when sha256 witness.View <> witness.MaterialDigest -> Error "delivery material digest mismatch"
+            | Ok() -> Ok()
 
     /// 折叠侧按 (SessionId, ProviderRun, ToolCallId) 三元组存见证，所以同一
     /// (SessionId, ProviderRun) 下并存多条见证是正常状态（同轮重试换了 toolCallId）。
@@ -79,7 +84,7 @@ module TaskDelivery =
             else
                 None)
 
-    /// 交付材料一致（同一份交付物）。散文属于各次尝试，不参与一致判定。
+    /// 交付材料包含按顺序选择的旧内容与本次报告；两者都参与摘要和内容的一致判定。
     let private sameMaterial (a: TaskDeliveryWitness) (b: TaskDeliveryWitness) =
         a.MaterialDigest = b.MaterialDigest && a.View = b.View
 

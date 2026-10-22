@@ -56,19 +56,18 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   assert.equal(surface.baseClassSource.includes('rewrite('), false, 'BaseClass must not declare rewrite')
   assert.equal(surface.baseClassSource.includes('glob('), false, 'BaseClass must not declare retired glob')
   assert.equal(surface.baseClassSource.includes('grep('), false, 'BaseClass must not declare retired grep')
-  // 委派成员一律带 reportMapping（Record<string, null|string>，无 prefixUntil）；
-  // join/horizon 是拉取动作，不带 reportMapping。
-  assert.equal(surface.baseClassSource.includes('this._api.fork(spec, reportMapping)'), true, 'BaseClass fork must forward the report mapping')
-  assert.equal(surface.baseClassSource.includes('this._api.resume(spec, reportMapping)'), true, 'BaseClass resume must forward the report mapping')
-  assert.equal(surface.baseClassSource.includes('this._api.advisor(intent, reportMapping)'), true, 'BaseClass advisor must forward the report mapping')
-  assert.equal(surface.baseClassSource.includes('async dag(spec, reportMapping)'), true, 'BaseClass must declare dag with the report mapping')
-  assert.equal(surface.baseClassSource.includes('this._api.join()'), true, 'BaseClass must declare join without a report mapping')
+  // 委派成员接受 carry 数组，缺省为空；join/horizon 是拉取动作，不带 carry。
+  assert.equal(surface.baseClassSource.includes('this._api.fork(spec, carry)'), true, 'BaseClass fork must forward the carry array')
+  assert.equal(surface.baseClassSource.includes('this._api.resume(spec, carry)'), true, 'BaseClass resume must forward the carry array')
+  assert.equal(surface.baseClassSource.includes('this._api.advisor(intent, carry)'), true, 'BaseClass advisor must forward the carry array')
+  assert.equal(surface.baseClassSource.includes('async dag(spec, carry = [])'), true, 'BaseClass must declare dag with an optional carry array')
+  assert.equal(surface.baseClassSource.includes('this._api.join()'), true, 'BaseClass must declare join without carry')
 
   // 四层同构第 2 层：描述文档不包含写入/修改暗示
   assert.doesNotMatch(surface.description, /edit\(path|rewrite\(path|write\(path,\s*content\)/, 'Description must not advertise write methods')
-  assert.equal(surface.description.includes('fork(payload, reportMapping)'), true, 'Description must show fork(payload, reportMapping)')
-  assert.equal(surface.description.includes('resume(payload, reportMapping)'), true, 'Description must show resume(payload, reportMapping)')
-  assert.equal(surface.description.includes('advisor(intent, reportMapping)'), true, 'Description must show advisor(intent, reportMapping)')
+  assert.equal(surface.description.includes('fork(payload, carry = [])'), true, 'Description must show fork with optional carry')
+  assert.equal(surface.description.includes('resume(payload, carry = [])'), true, 'Description must show resume with optional carry')
+  assert.equal(surface.description.includes('advisor(intent, carry = [])'), true, 'Description must show advisor with optional carry')
 
   // 四层同构第 3 层：示例代码（ultraExample manager 分支）纯只读，无写入调用
   assert.ok(surface.examples.length > 0, 'Manager surface must include ultraExample')
@@ -109,7 +108,7 @@ test('WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mu
     assert.equal(binding.write, undefined)
     assert.deepEqual(
       Object.keys(binding).sort(),
-      ['advisor', 'cat', 'fork', 'horizon', 'join', 'ls', 'resume', 'rg', 'stat', 'where', 'whereAll'],
+      ['advisor', 'cat', 'fork', 'horizon', 'join', 'ls', 'resume', 'rg', 'stat', 'validateCarry', 'where', 'whereAll'],
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -461,24 +460,23 @@ test('WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_amb
   }
 })
 
-// 委派成员全部走编程面 this.xxx，每个都必须携带 reportMapping
-// （形态 Record<string, null|string>，无 prefixUntil）。缺省或非法映射
-// 走数据信封拒绝（VIEW_DECLARATION_INVALID），程序继续运行；join/horizon
-// 是拉取动作，不带 reportMapping。
-test('WHAT[capability-enforcement-025] J13_delegation_members_require_a_report_mapping', async () => {
+// 委派成员全部走编程面 this.xxx，carry 缺省为空数组，整数引用旧锚点，
+// 字符串提供字面值。非法形状走数据信封拒绝（VIEW_DECLARATION_INVALID），
+// 程序继续运行；join/horizon 是拉取动作，不带 carry。
+test('WHAT[capability-enforcement-025] J13_delegation_members_default_to_empty_carry_and_reject_invalid_arrays', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j13-'))
   const sessionId = `wxs-j13-${Math.random().toString(36).slice(2, 8)}`
   const observed = []
   try {
     runtime.installDelegationHost(
       sessionId,
-      async (name, payload, reportMapping) => {
-        observed.push({ member: name, payload, reportMapping })
+      async (name, payload, carry) => {
+        observed.push({ member: name, payload, carry })
         return { ok: true, name: 'child-1', agentId: 'agent-1', outcome: 'created' }
       },
       async () => {
         observed.push({ member: 'join' })
-        return { ok: true, records: [], byName: {} }
+        return { ok: true, records: [] }
       },
       async () => {
         observed.push({ member: 'fission' })
@@ -488,50 +486,51 @@ test('WHAT[capability-enforcement-025] J13_delegation_members_require_a_report_m
         observed.push({ member: 'horizon' })
         return { ok: true, agents: [] }
       },
-      async (intent, reportMapping) => {
-        observed.push({ member: 'advisor', intent, reportMapping })
+      async (intent, carry) => {
+        observed.push({ member: 'advisor', intent, carry })
         return { ok: true, advice: 'host-advice' }
       },
     )
 
     const program = `class Js extends JsProgram {
       async run() {
-        const missing = await this.fork('index the parser module');
+        const defaulted = await this.fork('index the parser module');
         const illegal = await this.fork('index the parser module', { 'not-an-anchor': null });
-        const placed = await this.fork('index the parser module', { 1: null });
-        const resumed = await this.resume({ name: 'audit-road', charge: 'continue the audit' }, { 2: 'audit summary' });
-        const advised = await this.advisor('review this delta', { 1: null });
+        const invalidItem = await this.fork('index the parser module', [null]);
+        const placed = await this.fork('index the parser module', [1, 'parser inventory']);
+        const resumed = await this.resume({ name: 'audit-road', charge: 'continue the audit' }, ['audit summary']);
+        const advised = await this.advisor('review this delta', [1]);
         const joined = await this.join();
-        return { missing, illegal, placed, resumed, advised, joined, continued: true };
+        return { defaulted, illegal, invalidItem, placed, resumed, advised, joined, continued: true };
       }
     }`
 
     const outcome = await execute(dir, 'manager', 'en', sessionId, { program }, 3000, Date.now() + 60_000, 1 << 20, null)
-    assert.equal(caseName(outcome), 'Succeeded', 'a refused report mapping is data, not a failed program')
+    assert.equal(caseName(outcome), 'Succeeded', 'invalid carry is returned as data without failing the program')
 
     const doc = render(outcome)
-    assert.match(doc, /code = "VIEW_DECLARATION_INVALID"/, 'a missing report mapping is refused')
+    assert.match(doc, /code = "VIEW_DECLARATION_INVALID"/, 'malformed carry is refused')
     assert.match(doc, /continued = true/, 'the program keeps running after the refusal')
 
-    // 缺省/非法映射不抵达委派宿主；带映射的调用按 (name, payload, reportMapping) 三参抵达。
+    // 缺省调用以空数组抵达宿主；非法形状被挡住，其余 carry 按原顺序传递。
     assert.deepEqual(
       observed.map(entry => entry.member),
-      ['fork', 'resume', 'advisor', 'join'],
-      'only the calls that carried a report mapping reach the delegation host',
+      ['fork', 'fork', 'resume', 'advisor', 'join'],
+      'defaulted and valid carry reach the host; malformed carry does not',
     )
     assert.equal(observed[0].payload.charge, 'index the parser module')
-    // The program runs in its own `node:vm` realm, so the mapping arrives with
-    // that realm's Object.prototype; compare the contents, not the prototype.
-    assert.deepEqual({ ...observed[0].reportMapping }, { 1: null }, 'the report mapping crosses as the mapping itself')
-    assert.equal('prefixUntil' in observed[0].reportMapping, false, 'the report mapping carries no prefixUntil')
-    assert.equal(observed[1].member, 'resume', 'resume travels the same delegation entry')
-    assert.deepEqual({ ...observed[1].reportMapping }, { 2: 'audit summary' })
-    assert.equal(observed[2].intent, 'review this delta', 'advisor travels the same delegation entry')
-    assert.deepEqual({ ...observed[2].reportMapping }, { 1: null })
-    assert.equal(observed[3].member, 'join', 'join is a pull action and carries no report mapping')
-    assert.equal('reportMapping' in observed[3], false)
+    assert.ok(Array.isArray(observed[0].carry), 'the default is an array')
+    assert.deepEqual([...observed[0].carry], [], 'omitted carry defaults to an empty array')
+    assert.deepEqual([...observed[1].carry], [1, 'parser inventory'], 'carry crosses as the ordered array itself')
+    assert.equal(observed[2].member, 'resume', 'resume travels the same delegation entry')
+    assert.deepEqual([...observed[2].carry], ['audit summary'])
+    assert.equal(observed[3].intent, 'review this delta', 'advisor travels the same delegation entry')
+    assert.deepEqual([...observed[3].carry], [1])
+    assert.equal(observed[4].member, 'join', 'join is a pull action and carries no carry array')
+    assert.equal('carry' in observed[4], false)
   } finally {
     runtime.clearDelegationHost(sessionId)
     rmSync(dir, { recursive: true, force: true })
   }
 })
+

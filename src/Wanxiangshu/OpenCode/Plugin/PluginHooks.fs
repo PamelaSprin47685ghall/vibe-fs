@@ -72,49 +72,18 @@ module PluginHooks =
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
-    [<Emit("$0 === undefined")>]
-    let private isUndefined (value: obj) : bool = jsNative
-
-    /// The top-level context-compression declaration of one js-* call, read
-    /// from the flat arguments `prefixUntil` and `thenMap`. The retired
-    /// `view` wrapper is refused by the call surface, so it is never read
-    /// here. A call carries a declaration iff it gives either key; the
-    /// declaration object is assembled exactly as the call surface
-    /// assembles it, so the same validator decides.
-    let private declarationOf (input: obj) : obj option =
-        let fields =
-            if isNull input then
-                None
-            else
-                let prefixUntil = input?prefixUntil
-                let thenMap = input?thenMap
-
-                Some(prefixUntil, thenMap)
-
-        fields
-        |> Option.filter (fun (prefixUntil, thenMap) -> not (isUndefined prefixUntil && isUndefined thenMap))
-        |> Option.map (fun (prefixUntil, thenMap) -> createObj [ "prefixUntil" ==> prefixUntil; "thenMap" ==> thenMap ])
-
-    /// A declaration counts only when it is valid: an invalid one never
-    /// committed a view, so it must never commit a checkpoint.
-    ///
-    /// The call surface refuses a call that carries more than one of
-    /// program / unpark / abandon; such a call never ran, so it commits no
-    /// checkpoint either. That judgement is the call surface's own law, so
-    /// it is asked, not recounted here.
     let private declaredViewOf (input: obj) : bool =
-        let conflictingState =
-            Wanxiangshu.Repository.Programming.Js.JsToolWorkflow.conflictingInputReason input
-            |> Option.isSome
-
-        if conflictingState then
+        if isNull input then
             false
         else
-            declarationOf input
-            |> Option.map (fun declaration ->
-                Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse declaration
-                |> Result.isOk)
-            |> Option.defaultValue false
+            let declaration =
+                Wanxiangshu.Repository.Programming.Js.JsToolPolicy.viewDeclarationOf input
+
+            not (isNull declaration)
+            && (Wanxiangshu.Repository.Programming.Js.JsToolWorkflow.conflictingInputReason input
+                |> Option.isNone)
+            && (Wanxiangshu.Repository.Programming.Js.JsToolPolicy.viewFailureOf input declaration
+                |> Option.isNone)
 
     /// obligation-ledger-005 / context-compression-028: the view checkpoint
     /// admission law (one append per exact completed call, in-flight duplicates
@@ -324,7 +293,7 @@ module PluginHooks =
                     let deliveredView =
                         Some(fun sessionId ->
                             Task.FromResult(
-                                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered sessionId
+                                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekMaterial sessionId
                             ))
 
                     let childViewForRun = fun _ _ -> Task.FromResult None

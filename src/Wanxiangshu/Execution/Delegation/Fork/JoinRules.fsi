@@ -16,10 +16,7 @@ module JoinRules =
           AgentId: string
           Role: string
           Status: string
-          View: string }
-
-    /// A completed run with no delivered view is not a completed delivery.
-    val decideCompletedStatus: view: string -> string
+          Returned: string list }
 
     /// Join failure → the stable wire code the caller reports.
     val mapForkError: error: ForkError -> string

@@ -4,7 +4,7 @@ open Wanxiangshu.Foundation
 
 type ForkChildAssignment =
     { Assignment: string
-      CommissionerRecord: string option
+      CommissionerRecord: string list
       Attachment: string option
       RootRequirements: string list
       Payload: string option }
@@ -27,7 +27,7 @@ module ForkChildPayload =
     val relay:
         prose: ForkChildInstructions ->
         assignment: string ->
-        commissionerRecord: string option ->
+        commissionerRecord: string list ->
         attachment: string option ->
         requirements: string list ->
         payload: string option ->
@@ -36,7 +36,7 @@ module ForkChildPayload =
     val relayDocument:
         prose: ForkChildInstructions ->
         assignment: string ->
-        commissionerRecord: string option ->
+        commissionerRecord: string list ->
         attachment: string option ->
         requirements: string list ->
         payload: string option ->

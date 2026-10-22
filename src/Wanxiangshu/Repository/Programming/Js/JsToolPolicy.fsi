@@ -31,8 +31,8 @@ module JsToolPolicy =
     /// The localized prose of the flat view declaration's extra field.
     val viewDeclarationExtraProse: unit -> string
 
-    /// The flat view declaration of a call: the protected prefix and the map
-    /// of kept states. A call that declares neither carries none.
+    /// The flat view declaration of a call: the protected prefix and carry
+    /// array. A call that declares neither carries none.
     val viewDeclarationOf: raw: obj -> obj
 
     /// Why the declaration is not a valid view declaration, if it is not.
@@ -41,13 +41,22 @@ module JsToolPolicy =
     /// Why this call's view declaration is refused, if it is refused.
     val viewFailureOf: raw: obj -> declaration: obj -> JsFailure option
 
-    /// Commit the declaration to the pending view of the session.
-    val commitView: sessionId: string -> declaration: obj -> JsFailure option
+    /// Commit the declaration and its owning (message ID, tool call ID) pair.
+    val commitView: sessionId: string -> callIdentity: (string * string) option -> declaration: obj -> JsFailure option
 
     /// Commit the declaration only after the program settled.
     val viewCommitFailure:
-        sessionId: string -> declaration: obj -> outcome: JsToolWorkflow.JsToolOutcome -> JsFailure option
+        sessionId: string ->
+        callIdentity: (string * string) option ->
+        declaration: obj ->
+        outcome: JsToolWorkflow.JsToolOutcome ->
+            JsFailure option
 
     /// The rendered result of a settled call, with the view declaration
     /// committed when the program settled.
-    val renderCommitted: sessionId: string -> declaration: obj -> outcome: JsToolWorkflow.JsToolOutcome -> string
+    val renderCommitted:
+        sessionId: string ->
+        callIdentity: (string * string) option ->
+        declaration: obj ->
+        outcome: JsToolWorkflow.JsToolOutcome ->
+            string

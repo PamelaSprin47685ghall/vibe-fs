@@ -1,1 +1,2 @@
-`commissioner_record` belongs to your Commissioner. It is their history, not yours. Read it for context and records. Unfinished work in that record does not become yours merely because you can see it. Your charge tells you what is yours to carry.
+The `[[context]]` tables contain background selected by your Commissioner. Read their `text` in order and use the separate charge to guide your work. Unfinished work mentioned in that material keeps its own owner; take responsibility for the part assigned by this charge.
+

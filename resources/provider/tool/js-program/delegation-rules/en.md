@@ -1,73 +1,70 @@
-Every delegation member returns **data**, never rendered text. The harness renders your value for you; return values stay JSON.
+Delegation members return data. The host formats results as TOML.
 
-```
-{ ok: true, ... }          success
-{ ok: false, code: "..." } refusal (stable kebab code)
+```js
+{ ok: true, ... }           // success
+{ ok: false, code: "..." }  // refusal
 ```
 
-Every member that hands work to someone else — `fork`, `resume`, `commission`, `devops`, `dag`, `advisor` — carries a **report mapping** as its last argument: a `Record<string, null|string>` a summary replaces that anchor, `null` keeps it as written, and an unlisted anchor is not passed to the child. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`, so a `{ prefixUntil, thenMap }` wrapper is not accepted. The mapping is the context the host projects into the child; a missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`. The pull-side members — `join`, `horizon`, `fission` — take no report mapping.
+The last argument of `fork`, `resume`, `commission`, `devops`, `dag`, and `advisor` is an optional `carry` array, defaulting to `[]`. An integer copies a visible anchor's full history interval; a string supplies literal text. Items are sent in array order. Include only the background the recipient needs.
+
+**The parent's current turn is not sent to the child.** State the task once in `charge` or `intent`; do not repeat it in `carry`. There is no prefix parameter. The recipient receives material as readable TOML tables. An invalid array or an invisible anchor returns `VIEW_DECLARATION_INVALID` before any work is created. `join`, `horizon`, and `fission` take no `carry`.
 
 ## fork
 
 ```js
-await this.fork("index the parser module", { 1: null });                      // charge only
-await this.fork({ charge: "index the parser", name: "parser-index", calling: "engineer" }, { 1: null, 2: "parser inventory" });
+await this.fork("index the parser module");
+await this.fork({ charge: "index the parser", name: "parser-index", calling: "engineer" }, [1, "List public entries only"]);
 ```
 
-- Payload: string (charge) or `{ charge, name?, calling?, keywords? }`. A missing `name` is derived from the charge.
-- `reportMapping` is required: `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
-- Result: `{ ok: true, name, agentId, outcome }` with `outcome` `created` | `nudged` | `commissioned`.
+- Payload: a charge string or `{ charge, name?, calling?, keywords? }`. A missing `name` is derived from the charge.
+- Result: `{ ok: true, name, agentId, outcome }`, with `outcome` `created` | `nudged` | `commissioned`.
 - Refusal codes: `name-required`, `charge-required`, `unknown-calling`, `calling-conflict`, `name-already-belongs`, `warm-start-unavailable`, `context-unavailable`, `not-a-delegation-role`, `placement-failed`, `dispatch-uncertain`.
 
 ## resume
 
 ```js
-const resumed = await this.resume({ name: "audit-road", charge: "continue the audit" }, { 1: null, 4: "audit findings so far" });
+const resumed = await this.resume({ name: "audit-road", charge: "continue the audit" }, [4, "Parser entries have been checked"]);
 ```
 
-- Hand the next charge to a delegated worker that already exists. `resume` takes **no `calling`**: it continues the worker already in place instead of calling out to a role, so a payload carrying `calling` is refused. The payload is `{ charge, name }`: `name` names the road to continue and is required — a payload without it refuses with `name-required`.
-- `reportMapping` is required: `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+- Payload `{ charge, name }` gives the next task to an existing worker. `name` is required. `calling` is not accepted because this call continues existing work.
 - Result: `{ ok: true, name, agentId, outcome }`.
 
 ## commission
 
 ```js
-await this.commission({ charge: "write the interface spec", name: "spec" }, { 1: null });
+await this.commission({ charge: "audit the parser independently", name: "parser-audit" }, [1]);
 ```
 
-- The orchestrator's own way to hand a charge to a worker: an orchestrator commissions the work instead of doing it. Payload is a string (charge) or `{ charge, name?, calling? }` — the same shape as `fork`, without `keywords`. A missing `name` is derived from the charge; `calling` is derived from the role when omitted, and an explicit `calling` that disagrees with the derivation is refused with `unknown-calling`.
-- `reportMapping` is required: `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+- Entrust an independent purpose to a Manager road. Payload is a charge string or `{ charge, name?, calling? }`, without `keywords`. A missing `name` comes from the charge. The role determines an omitted `calling`; an explicit value that disagrees is refused with `unknown-calling`.
 - Result: `{ ok: true, name, agentId, outcome }`.
 
 ## devops
 
 ```js
-const answer = await this.devops("find the flaky test", { 1: null });
+const answer = await this.devops("find the flaky test", [1]);
 ```
 
-- A DevOps consultation that runs synchronously inside this call: the host consults DevOps and hands the answer back right away. There is no child to join and nothing is left running. `intent` is the question to ask — it carries no charge, unlike `fork` and `resume`.
-- `reportMapping` is required: `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
-- Refusal codes: `assessment-pending-for-devops` when the DevOps seat is not bound yet or is already closed.
-- Result: `{ ok: true, record }` — the investigation's record as data.
+- Consult this task's bound DevOps and wait for the investigation result. There is no separate child to `join`. State the question in `intent`.
+- Result: `{ ok, kind, status, returned: [{ text }] }`. An unbound or closed seat refuses with `assessment-pending-for-devops`.
 
 ## join
 
 ```js
-const { records, byName } = await this.join();
+const { records } = await this.join();
 ```
 
-- Result: `{ ok: true, records: [{ name, agentId, role, status, view }], byName: { [name]: record } }`.
-- `status` is `completed` | `failed` | `abandoned` | `voided`; a member becomes `completed` only when two things hold: there is a causally proven terminal, and the member ended with `this.deliver(reportMapping)` — delivery alone does not prove completion. A child that has not delivered but can still deliver is not settled: it stays active, the join does not close, and you may keep waiting or re-delegate. A child whose delivery became impossible (aborted, cancelled, or settled at restart load) enters the records as `voided`: a void is not a completion (`view` is empty), but it settles the outstanding obligation, closes the join, and you will not see a second report of it. `view` is the child's delivered TOML view from `this.deliver` (empty when `failed`, `abandoned`, or `voided`).
-- Membership-scoped: it collects the children this session created. Refusal codes: `context-unavailable`, `not-ready`, `nothing-to-join`, `join-in-progress`, `interrupted`, `abandoned`.
+- Result: `{ ok: true, records: [{ name, agentId, role, status, returned: [{ text }] }] }`.
+- Collects children created by this session. `status` is `completed` | `failed` | `abandoned` | `voided`. Completion requires both valid delivery and a proven terminal. A child that can still deliver remains active and keeps `join` waiting. A child whose delivery has become impossible is settled and reported once as `voided`. Read each record's `returned` items in order; they contain the child's delivered material and current report. Other terminal states return an empty array.
+- Refusal codes: `context-unavailable`, `not-ready`, `nothing-to-join`, `join-in-progress`, `interrupted`, `abandoned`.
 
 ## fission
 
 ```js
 const group = await this.fission({ charge: "explore three designs", lanes: 3 });
-const { records } = await this.join();          // collects the lanes of this group
+const { records } = await this.join();
 ```
 
-- Same identity, several lanes: each lane is this participant over one slice of the charge, and the host converges them.
+- Several lanes share one identity. Each lane takes part of the same charge; the host collects them.
 - Result: `{ ok: true, groupId, lanes: [{ index, sessionId }] }`.
 - Refusal codes: `fission-unavailable`, `lane-start-failed`, `not-ready`, `context-unavailable`, `invalid-prompt`.
 
@@ -75,20 +72,16 @@ const { records } = await this.join();          // collects the lanes of this gr
 
 ```js
 const outcome = await this.dag({ nodes: [
-  { id: "spec",  charge: "write the interface spec" },
-  { id: "impl",  charge: "implement it", deps: ["spec"] },
+  { id: "spec", charge: "write the interface spec" },
+  { id: "impl", charge: "implement it", deps: ["spec"] },
   { id: "probe", charge: "probe two designs", deps: ["spec"], lanes: 2 },
-] }, { 1: null, 2: "parser inventory" });
+] }, [1, "The attached record lists current parser entries"]);
 ```
 
-- Nodes run in dependency waves: every ready node forks, then one `join` collects the wave; a dependent node's prompt carries its dependencies' records.
-- One `reportMapping` goes to every node: the same mapping is handed to all node workers, and a node cannot replace its own copy. It is required — `Record<string, null|string>`, a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on, read by the host as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+- Nodes run in dependency waves. Ready nodes `fork`, then one `join` collects the wave. Dependents receive their prerequisite nodes' records.
+- All nodes receive the same `carry`; a node cannot override it.
 - Result: `{ ok: true, results: { [id]: record }, skipped: [id...] }`.
-- **A node that fails parks the program** — the same recovery channel as `where`. The parked payload is `{ dag, node, code, deps, done, pending }`; the injected value decides:
-  - `"retry"` — run the node again;
-  - `"skip"` — mark it skipped (dependents see `null` for it);
-  - any other value — use it as that node's result and continue;
-  - `{ abort: reason }` — fail the program with that reason.
+- A failed node calls `park` with `{ dag, node, code, deps, done, pending }`. Inject `"retry"` to repeat it, `"skip"` to skip it (dependents see `null`), `{ abort: reason }` to fail the program, or another value to replace that node's result.
 
 ## horizon
 
@@ -96,18 +89,18 @@ const outcome = await this.dag({ nodes: [
 const { agents, ptys } = await this.horizon();
 ```
 
-- Who remains at your horizon, as data: `{ ok: true, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`.
-- `status` is `returned` | `still-away` | `did-not-return`; `workState` is `latest` | `none` | `unavailable`, and `record` carries the latest work text when it is `latest`.
-- The four calibration numbers say what this participant has spent and what it will likely need: turns used and left on its delegator's estimate, wall-clock used, and the time still to come at the pace it has shown. All four are `0` whenever either source is missing.
-- Refusal: `{ ok: false, code: "horizon-unavailable" }`.
+- Result: `{ ok: true, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`.
+- `status` is `returned` | `still-away` | `did-not-return`. `workState` is `latest` | `none` | `unavailable`; `record` contains the latest work text when it is `latest`.
+- The four measures describe turns and time used, and the estimated turns and time remaining. All four are `0` if either source is missing.
+- When unavailable, returns `{ ok: false, code: "horizon-unavailable" }`.
 
 ## advisor
 
 ```js
-const advice = await this.advisor("Is the caching layer's eviction policy sound?", { 1: null });
+const advice = await this.advisor("Is the cache eviction policy sound?", [1, "The current policy is LRU"]);
 ```
 
-- Consult this session's **dedicated advisor** — a reviewer holding no tools that answers in prose — before committing to an approach or declaring work done. The same session always reaches the same advisor, and later calls append only the new material plus the new intent, so it keeps the thread.
-- `intent` is a separate question prompt. `reportMapping` is required and is a `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on; the host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`, the shared view declaration with `prefixUntil` fixed at `0`. Generate the mapping from the current live intervals first, then take the delta against host-owned delivery facts. The first consult receives the complete material; the mapping is not a delivery boundary. A written summary replaces that anchor, `null` keeps it as written, and an unlisted anchor is not passed to the advisor. Mapping and intent remain separate prompts.
-- Result: `{ ok: true, advice }` (prose as data) or `{ ok: false, code: "advisor-unavailable", reason }`; a missing or invalid report mapping refuses with `VIEW_DECLARATION_INVALID`.
-- Treat the answer as guidance: a plan, a correction, or a stop signal. The consult itself writes nothing into your transcript.
+- Consult this session's dedicated advisor. The advisor has no tools and answers in prose. State the question in `intent`; use `carry` for the history needed to judge it.
+- The same session keeps the same advisor. The host appends material not delivered before and the new question; you need not track a delivery cursor.
+- Result: `{ ok: true, advice }` or `{ ok: false, code: "advisor-unavailable", reason }`.
+- Use the answer to inform the next decision. The consultation does not itself rewrite your transcript.

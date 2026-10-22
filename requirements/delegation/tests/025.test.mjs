@@ -17,7 +17,7 @@ const deliverTo = (sessionId, providerRun, material) =>
     sessionId,
     providerRun,
     `call-${providerRun}`,
-    { prefixUntil: 0, thenMap: { 0: material } },
+    [material],
   )
 
 test('WHAT[delegation-025] an invocation completes from its own genuinely accepted production retry successor', async t => {
@@ -322,3 +322,4 @@ test('WHAT[delegation-025] a real Host send promise exception preserves its actu
     assert.equal(sync.terminalListenerCount(runtime), 0)
   })
 })
+

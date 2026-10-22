@@ -23,10 +23,7 @@ const waitForPromptCount = async (h, owner, role, count) => {
 }
 
 const settle = async (h, owner, role, answer, run = 'run-1', child = sync.child(h, owner, role)) => {
-  runtimeSurface.recordFencedDeliveredView(child, run, `call-${run}`, {
-    prefixUntil: 0,
-    thenMap: {},
-  })
+  runtimeSurface.recordFencedDeliveredView(child, run, `call-${run}`, [])
   return sync.settle(h, owner, role, answer, run)
 }
 
@@ -144,3 +141,4 @@ test('WHAT[delegation-031] DELEG_031_completed_and_delete_in_both_orders_settle_
     }
   }
 })
+

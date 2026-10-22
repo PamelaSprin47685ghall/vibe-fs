@@ -54,7 +54,7 @@ module ForkChildPayloadSurface =
         (lang: string)
         (input:
             {| Assignment: string
-               CommissionerRecord: string option
+               CommissionerRecord: string array
                Attachment: string option
                RootRequirements: string array
                Payload: string option |})
@@ -76,7 +76,11 @@ module ForkChildPayloadSurface =
         ForkChildPayload.render
             prose
             { Assignment = assignment
-              CommissionerRecord = input.CommissionerRecord
+              CommissionerRecord =
+                if isNull input.CommissionerRecord || isUndefined input.CommissionerRecord then
+                    []
+                else
+                    List.ofArray input.CommissionerRecord
               Attachment = input.Attachment
               RootRequirements = requirements
               Payload = input.Payload }

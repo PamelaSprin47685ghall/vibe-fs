@@ -32,8 +32,8 @@ type AgentFailurePayload =
 /// assistant message id, and PROMPT-002 makes the root a promoted physical
 /// message. `AssistantMessageId` was a second name for the former.
 ///
-/// `View` holds the final delivered TOML view from this.deliver,
-/// materialised at terminal.
+/// `View` holds canonical returned material (a JSON string array), resolved
+/// at delivery. Presentation boundaries render it through ReturnedMaterial.
 /// DSL-state-combination: domain — optional child/session/provider identities
 /// are evidence facets of one terminal completion payload, not independent
 /// workflow stages.
@@ -45,7 +45,7 @@ type AgentCompletionPayload =
         Role: Role
         AuthorityRoot: AuthorityRootUserMessageId option
         ProviderRun: ProviderRunIdentity option
-        /// The delivered TOML view, materialised at terminal.
+        /// Canonical returned material, never pre-rendered TOML.
         View: string
         /// The worktree this child ran in, when it has one.
         Directory: string option
@@ -102,7 +102,7 @@ type JoinItem =
 module AgentCompletion =
     let text (outcome: AgentCompletionOutcome) =
         match outcome with
-        | AgentCompleted payload -> payload.View
+        | AgentCompleted payload -> ReturnedMaterial.render payload.View
         | AgentFailed payload -> payload.Message
         | AgentAbandoned(_, reason) -> reason
 
@@ -161,8 +161,8 @@ module AgentCompletion =
     /// made "this run has no child session" and "its session id is the empty string"
     /// the same value — the sentinel pattern PROMPT-001 exists to remove.
     ///
-    /// The view is the run's plain text: a PTY has no delivered view, and its completion
-    /// schema stays deliberately minimal (EXEC-004).
+    /// Plain terminal text enters the material representation only here;
+    /// callers never have to guess whether arbitrary text is encoded data.
     let ofSimpleText (agentId: string) (runId: string) (role: Role) (text: string) =
         AgentCompleted
             { AgentId = agentId
@@ -171,7 +171,7 @@ module AgentCompletion =
               Role = role
               AuthorityRoot = None
               ProviderRun = None
-              View = text
+              View = ReturnedMaterial.ofTexts [ text ]
               Directory = None }
 
     let ofSimpleError (agentId: string) (runId: string) (role: Role) (message: string) =

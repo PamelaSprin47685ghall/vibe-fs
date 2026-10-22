@@ -83,13 +83,29 @@ module SyntheticToml =
 
     let private literalSafe (text: string) = literalSafeRange text 0 text.Length
 
-    /// A literal's closing delimiter stays on its own line only when the value
-    /// already ends in LF. Other values use basic escapes without changing data.
+    let private appendMultilineCharacter (sb: StringBuilder) (ch: char) =
+        if ch = '\n' then
+            sb.Append '\n' |> ignore
+        else
+            appendEscaped sb ch
+
+    let private escapeMultiline (text: string) =
+        let sb = StringBuilder()
+
+        for ch in text do
+            appendMultilineCharacter sb ch
+
+        sb.ToString()
+
+    /// A closing delimiter has its own line. A line escape preserves a missing final LF.
     let renderString (raw: string) : string =
         let text = if isNull raw then "" else raw
 
         if text.EndsWith "\n" && literalSafe text then
             "'''\n" + text + "'''"
+        elif text.Contains "\n" then
+            let ending = if text.EndsWith "\n" then "" else "\\\n"
+            "\"\"\"\n" + escapeMultiline text + ending + "\"\"\""
         else
             "\"" + escapeBasic text + "\""
 
@@ -266,10 +282,12 @@ module SyntheticToml =
 
     /// Byte length of `escapeBasic` over `[origin, stop)` without allocating the
     /// escaped string. Arms and UTF-8 pairing must stay in lockstep with `escapeBasic`.
-    let private escapeBasicByteStep (text: string) (index: int) (stop: int) =
+    let private escapeBasicByteStep (multiline: bool) (text: string) (index: int) (stop: int) =
         let code = int text.[index]
 
-        if
+        if multiline && code = 0x0A then
+            1, 1
+        elif
             code = 0x22
             || code = 0x5C
             || code = 0x08
@@ -295,14 +313,14 @@ module SyntheticToml =
         else
             3, 1
 
-    let private escapeBasicByteCountRange (text: string) (origin: int) (stop: int) : int =
+    let private escapeBasicByteCountRange (multiline: bool) (text: string) (origin: int) (stop: int) : int =
         // DSL-MUTABLE: algorithm-scratch — escaped-byte total accumulator
         let mutable total = 0
         // DSL-MUTABLE: algorithm-scratch — escaped-byte index cursor
         let mutable index = origin
 
         while index < stop do
-            let width, advance = escapeBasicByteStep text index stop
+            let width, advance = escapeBasicByteStep multiline text index stop
             total <- total + width
             index <- index + advance
 
@@ -363,9 +381,16 @@ module SyntheticToml =
             + byteCountRange suffix 0 suffix.Length
             + joinAdjustment
         else
-            2
-            + escapeBasicByteCountRange text 0 headLen
-            + escapeBasicByteCountRange suffix 0 suffix.Length
+            let firstNewline = text.IndexOf '\n'
+
+            let multiline =
+                (firstNewline >= 0 && firstNewline < headLen) || suffix.Contains "\n"
+
+            let delimiters = if multiline then (if endsWithNewline then 7 else 9) else 2
+
+            delimiters
+            + escapeBasicByteCountRange multiline text 0 headLen
+            + escapeBasicByteCountRange multiline suffix 0 suffix.Length
             + joinAdjustment
 
     /// UTF-8 byte count of rendered text.

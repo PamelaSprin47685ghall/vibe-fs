@@ -121,7 +121,7 @@ test('WHAT[delegation-027] busy guidance preserves the original work and complet
 
       // The original work completes through its own real delivery.
       await hooks.tool['todowrite-for-engineer'].execute(
-        { program: 'class Js extends JsProgram { async run() { await this.deliver({ 0: "FIRST-DONE" }); } }' },
+        { program: 'class Js extends JsProgram { async run() { await this.deliver(["FIRST-DONE"]); } }' },
         { sessionID: child, agent: 'engineer', callID: `call-run-${child}-1`, messageID: `run-${child}-1` },
       )
       assistant.info.time.completed = 3

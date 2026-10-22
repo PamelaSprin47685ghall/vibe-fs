@@ -81,7 +81,7 @@ const deliverTurn = async (hooks, runtime, child, run, prose, material) => {
   })
   await hooks.tool['todowrite-for-engineer'].execute(
     {
-      program: `class Js extends JsProgram { async run() { await this.deliver({ 0: ${JSON.stringify(material)} }); } }`,
+      program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
     },
     { sessionID: child, agent: 'engineer', callID: `call-${run}`, messageID: run },
   )

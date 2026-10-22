@@ -15,6 +15,7 @@ open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
+open Wanxiangshu.Repository.Programming.Js
 
 /// DSL-class: PhysicalHandle — `Sessions` owns the advisor child and its terminal
 /// subscription, `Journal`/`Snapshot` are the read-back capabilities, `Directory`/
@@ -220,13 +221,31 @@ module AdvisorSeat =
     /// this consult's answer, never an older consult's.
     let private readProse (deps: AdvisorSeatDeps) (childId: SessionId) : Task<string option> =
         task {
+            let! prose = snapshotProse deps childId
+            let sessionId = SessionId.value childId
+
             let delivered =
-                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered (SessionId.value childId)
+                deps.Journal
+                |> Option.bind (fun journal ->
+                    JsDeliveredValues.peekFence sessionId
+                    |> Option.bind (fun fence ->
+                        TaskDeliveryJournal.tryFindByFenceFields
+                            journal
+                            childId
+                            fence.ProviderRun
+                            (Some fence.ToolCallId)
+                            None
+                            None
+                            None
+                            None))
+                |> Option.map (fun witness -> witness.View)
+                |> Option.orElseWith (fun () -> JsDeliveredValues.tryPeekMaterialWith sessionId prose)
+                |> Option.map (ReturnedMaterial.texts >> String.concat "\n\n")
                 |> Option.bind nonBlank
 
             match delivered with
-            | Some prose -> return Some prose
-            | None -> return! snapshotProse deps childId
+            | Some advice -> return Some advice
+            | None -> return prose
         }
 
     let private readAdvice (deps: AdvisorSeatDeps) (childId: SessionId) : Task<Result<string, string>> =

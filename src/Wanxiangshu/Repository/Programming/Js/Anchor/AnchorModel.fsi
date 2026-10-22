@@ -2,65 +2,48 @@ namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
 open Wanxiangshu.Repository.Programming.Js
 
-/// Required prefix boundary and required keep-or-summary map.
+[<RequireQualifiedAccess>]
+type AnchorCarryItem =
+    | Reference of int
+    | Literal of string
+
 type AnchorViewDeclaration =
-    { PrefixUntil: int
-      ThenMap: (int * string option) list }
+    { PrefixCount: int
+      Carry: AnchorCarryItem list }
 
-type AnchorReplacement =
+type AnchorMessage =
+    { Id: string option
+      Text: string
+      Raw: obj }
+
+type AnchorSegment =
     { Anchor: int
-      Until: int
-      Summary: string }
+      Messages: AnchorMessage list }
 
-/// One projected row; `Index` points back at the representative input message.
-[<RequireQualifiedAccess>]
-type AnchorProjectedRow =
-    | Kept of index: int * cached: bool
-    | Summarized of index: int * summary: string * cached: bool
-    | Opening of summary: string * cached: bool
-
-type AnchorProjection =
-    { Rows: AnchorProjectedRow list
+type AnchorViewReport =
+    { Total: int
+      Used: int
+      Cached: int
       Kept: int
-      Summarized: int
-      Folded: int
-      Replaced: int list }
-
-/// Host composer over wanxiangli/compression, the owner of the view coverage law.
-[<RequireQualifiedAccess>]
-module AnchorCoverage =
-    /// Strict `{ prefixUntil, thenMap }` shape; Error carries the first violation verbatim.
-    val parse: value: obj -> Result<AnchorViewDeclaration, string>
-    val live: anchors: int list -> history: AnchorReplacement list -> int list
-
-    val plan:
-        anchors: int list ->
-        history: AnchorReplacement list ->
-        declaration: AnchorViewDeclaration ->
-            AnchorReplacement list
-
-    val project: positions: int list -> history: AnchorReplacement list -> prefixUntil: int -> AnchorProjection
+      Inserted: int
+      Dropped: int
+      PrefixCount: int }
 
 [<RequireQualifiedAccess>]
-module AnchorViewDeclaration =
-    val empty: AnchorViewDeclaration
-    val live: anchors: int list -> history: AnchorReplacement list -> int list
+module AnchorCarry =
+    val toValue: items: AnchorCarryItem list -> obj
 
-    val plan:
-        anchors: int list ->
-        history: AnchorReplacement list ->
-        declaration: AnchorViewDeclaration ->
-            AnchorReplacement list
-
-/// The single declaration rule every caller shares: the coverage law decides
-/// the shape, the host maps the first violation onto its stable failure code.
-/// F# callers use this typed core directly; the JS boundary in
-/// `AnchorSurface` answers with the plain-JS receipt of the same decision.
 [<RequireQualifiedAccess>]
 module AnchorDeclarationRule =
-    /// Strict `{ prefixUntil, thenMap }` shape, judged by the coverage law.
+    val parseCarry: value: obj -> Result<AnchorCarryItem list, JsFailure>
     val parse: value: obj -> Result<AnchorViewDeclaration, JsFailure>
 
-    /// A report mapping is exactly a declaration with `prefixUntil = 0`, so it
-    /// is judged by the same rule.
-    val parseReportMapping: mapping: obj -> Result<AnchorViewDeclaration, JsFailure>
+[<RequireQualifiedAccess>]
+module AnchorHistory =
+    val append:
+        numberOf: (string -> int) -> segments: AnchorSegment list -> messages: AnchorMessage list -> AnchorSegment list
+
+    val select:
+        segments: AnchorSegment list -> items: AnchorCarryItem list -> Result<(int option * string) list, JsFailure>
+
+    val validate: segments: AnchorSegment list -> declaration: AnchorViewDeclaration -> Result<unit, JsFailure>

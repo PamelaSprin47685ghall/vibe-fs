@@ -4,15 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Repository.Programming.Js.Anchor
-
-type AdvisorViewMessage = { Anchor: int; Text: string }
-type AdvisorViewDeclaration = AnchorViewDeclaration
-
-type AdvisorViewRequest =
-    { Messages: AdvisorViewMessage list
-      Declaration: AnchorViewDeclaration
-      History: AnchorReplacement list }
 
 type AdvisorViewPlan =
     { ViewPrompt: string
@@ -20,9 +11,9 @@ type AdvisorViewPlan =
       DeliveredMaterial: string list
       HasNewMaterial: bool }
 
-/// The shared view is generated first. Delivery facts filter its output, never its input.
+/// The caller resolves carry once. Delivery facts filter its output, never its input.
 /// The delta law (filter the generated view by delivered identities, in view order) is owned by
-/// `wanxiangli/advisor` (CUT-39); this host keeps view generation and TOML rendering.
+/// `wanxiangli/advisor` (CUT-39); this host only renders the resulting material.
 [<RequireQualifiedAccess>]
 module AdvisorView =
     [<AllowNullLiteral>]
@@ -45,25 +36,7 @@ module AdvisorView =
             "new_work_to_record"
             [ SyntheticToml.field "record" (SyntheticToml.renderString text) ]
 
-    let plan language (delivered: Set<string>) (request: AdvisorViewRequest) =
-        let messages =
-            request.Messages
-            |> List.sortBy _.Anchor
-            |> List.map (fun message ->
-                { AnchorView.AnchorMessage.Id = Some(string message.Anchor)
-                  AnchorView.AnchorMessage.Text = message.Text
-                  AnchorView.AnchorMessage.Raw = null })
-
-        let numberOf (value: string) = int value
-
-        let entries, _ =
-            AnchorView.generate numberOf (fun _ -> 0) request.History request.Declaration messages
-
-        let material =
-            AnchorView.material numberOf entries
-            |> List.map (fun (anchor, text) -> createObj [ "anchor" ==> anchor; "text" ==> text ])
-            |> List.toArray
-
+    let plan language (delivered: Set<string>) (material: obj array) =
         let planned = law.plan (Set.toArray delivered, material)
         let delta: obj array = planned?delta
         let deliveredAnchors: int array = planned?deliveredAnchors

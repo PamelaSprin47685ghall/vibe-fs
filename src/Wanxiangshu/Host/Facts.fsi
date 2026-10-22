@@ -23,12 +23,15 @@ type TaskDeliveryFence =
       Task: TaskDeliveryTask }
 
 type TaskDeliveryWitness =
-    { Fence: TaskDeliveryFence
-      FormalText: string
-      ViewDeclaration: string
-      View: string
-      MaterialDigest: string
-      RetirementId: string option }
+    {
+        Fence: TaskDeliveryFence
+        FormalText: string
+        ViewDeclaration: string
+        /// Canonical JSON string array owned by ReturnedMaterial.
+        View: string
+        MaterialDigest: string
+        RetirementId: string option
+    }
 
 module TaskDelivery =
     val key: fence: TaskDeliveryFence -> SessionId * ProviderRunIdentity * ToolCallId

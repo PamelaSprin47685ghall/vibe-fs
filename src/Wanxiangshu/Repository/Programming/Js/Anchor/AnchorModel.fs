@@ -4,140 +4,121 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Repository.Programming.Js
 
-/// One declaration protects the prefix and states the remaining anchors' actions.
+[<RequireQualifiedAccess>]
+type AnchorCarryItem =
+    | Reference of int
+    | Literal of string
+
 type AnchorViewDeclaration =
-    { PrefixUntil: int
-      ThenMap: (int * string option) list }
+    { PrefixCount: int
+      Carry: AnchorCarryItem list }
 
-/// Bounds are captured before the map runs; later anchors cannot enter an old replacement.
-type AnchorReplacement =
+type AnchorMessage =
+    { Id: string option
+      Text: string
+      Raw: obj }
+
+type AnchorSegment =
     { Anchor: int
-      Until: int
-      Summary: string }
+      Messages: AnchorMessage list }
 
-/// One projected row; `Index` points back at the representative input message.
-[<RequireQualifiedAccess>]
-type AnchorProjectedRow =
-    | Kept of index: int * cached: bool
-    | Summarized of index: int * summary: string * cached: bool
-    | Opening of summary: string * cached: bool
-
-type AnchorProjection =
-    { Rows: AnchorProjectedRow list
+type AnchorViewReport =
+    { Total: int
+      Used: int
+      Cached: int
       Kept: int
-      Summarized: int
-      Folded: int
-      Replaced: int list }
+      Inserted: int
+      Dropped: int
+      PrefixCount: int }
 
-/// The view coverage law (shape, live partitions, permanent interval replacements and their
-/// causal fold) is owned by wanxiangli/compression; this host keeps numbering, storage,
-/// token metering and rendering.
 [<RequireQualifiedAccess>]
-module AnchorCoverage =
+module AnchorCarry =
+    let toValue (items: AnchorCarryItem list) : obj =
+        items
+        |> List.map (function
+            | AnchorCarryItem.Reference anchor -> box anchor
+            | AnchorCarryItem.Literal text -> box text)
+        |> List.toArray
+        |> box
+
+[<RequireQualifiedAccess>]
+module AnchorDeclarationRule =
     [<AllowNullLiteral>]
     type private CompressionLaw =
         abstract parseView: value: obj -> obj
-        abstract live: anchors: obj * history: obj -> obj
-        abstract plan: anchors: obj * history: obj * view: obj -> obj
-        abstract project: positions: obj * history: obj * prefixUntil: obj -> obj
+        abstract parseCarry: value: obj -> obj
 
     [<Import("Compression", "wanxiangli/compression")>]
     let private createCompression: unit -> CompressionLaw = jsNative
 
     let private law = createCompression ()
 
-    let private intsToJs (values: int list) : obj = values |> List.toArray |> box
+    let private carryOf (value: obj) =
+        (unbox<obj array> value)
+        |> Array.toList
+        |> List.map (fun item ->
+            if jsTypeof item = "number" then
+                AnchorCarryItem.Reference(unbox<int> item)
+            else
+                AnchorCarryItem.Literal(unbox<string> item))
 
-    let private historyToJs (history: AnchorReplacement list) : obj =
-        history
-        |> List.map (fun change ->
-            createObj
-                [ "anchor" ==> change.Anchor
-                  "until" ==> change.Until
-                  "summary" ==> change.Summary ])
-        |> List.toArray
-        |> box
+    let parseCarry (value: obj) : Result<AnchorCarryItem list, JsFailure> =
+        let parsed = law.parseCarry value
 
-    let private viewToJs (declaration: AnchorViewDeclaration) : obj =
-        createObj
-            [ "prefixUntil" ==> declaration.PrefixUntil
-              "thenMap"
-              ==> (declaration.ThenMap
-                   |> List.map (fun (anchor, summary) ->
-                       box [| box anchor; (summary |> Option.map box |> Option.defaultValue null) |])
-                   |> List.toArray) ]
+        if parsed?ok then
+            Ok(carryOf parsed?carry)
+        else
+            Error(JsFailure.ViewDeclarationInvalid parsed?reason)
 
-    let private replacementOf (value: obj) : AnchorReplacement =
-        { Anchor = value?anchor
-          Until = value?until
-          Summary = value?summary }
-
-    let parse (value: obj) : Result<AnchorViewDeclaration, string> =
+    let parse (value: obj) : Result<AnchorViewDeclaration, JsFailure> =
         let parsed = law.parseView value
 
         if parsed?ok then
             let view = parsed?view
 
             Ok
-                { PrefixUntil = view?prefixUntil
-                  ThenMap =
-                    (view?thenMap: obj array)
-                    |> Array.toList
-                    |> List.map (fun pair ->
-                        let items = unbox<obj array> pair
-                        let summary = items.[1]
-                        unbox<int> items.[0], (if isNull summary then None else Some(unbox<string> summary))) }
+                { PrefixCount = view?prefixCount
+                  Carry = carryOf view?carry }
         else
-            Error(parsed?reason: string)
-
-    let live (anchors: int list) (history: AnchorReplacement list) : int list =
-        unbox<int array> (law.live (intsToJs anchors, historyToJs history))
-        |> Array.toList
-
-    let plan (anchors: int list) (history: AnchorReplacement list) (declaration: AnchorViewDeclaration) =
-        unbox<obj array> (law.plan (intsToJs anchors, historyToJs history, viewToJs declaration))
-        |> Array.toList
-        |> List.map replacementOf
-
-    let project (positions: int list) (history: AnchorReplacement list) (prefixUntil: int) : AnchorProjection =
-        let projected =
-            law.project (intsToJs positions, historyToJs history, box prefixUntil)
-
-        { Rows =
-            (projected?entries: obj array)
-            |> Array.toList
-            |> List.map (fun entry ->
-                let cached: bool = entry?cached
-
-                match (entry?kind: string) with
-                | "kept" -> AnchorProjectedRow.Kept(entry?index, cached)
-                | "summarized" -> AnchorProjectedRow.Summarized(entry?index, entry?summary, cached)
-                | _ -> AnchorProjectedRow.Opening(entry?summary, cached))
-          Kept = projected?kept
-          Summarized = projected?summarized
-          Folded = projected?folded
-          Replaced = (projected?replaced: int array) |> Array.toList }
+            Error(JsFailure.ViewDeclarationInvalid parsed?reason)
 
 [<RequireQualifiedAccess>]
-module AnchorViewDeclaration =
-    let empty = { PrefixUntil = 0; ThenMap = [] }
+module AnchorHistory =
+    let append (numberOf: string -> int) (segments: AnchorSegment list) (messages: AnchorMessage list) =
+        let add rows message =
+            match message.Id, rows with
+            | Some id, _ ->
+                { Anchor = numberOf id
+                  Messages = [ message ] }
+                :: rows
+            | None, head :: tail ->
+                { head with
+                    Messages = head.Messages @ [ message ] }
+                :: tail
+            | None, [] -> [ { Anchor = 0; Messages = [ message ] } ]
 
-    let live (anchors: int list) (history: AnchorReplacement list) = AnchorCoverage.live anchors history
+        messages |> List.fold add (List.rev segments) |> List.rev
 
-    let plan (anchors: int list) (history: AnchorReplacement list) (declaration: AnchorViewDeclaration) =
-        AnchorCoverage.plan anchors history declaration
+    let private materialForAnchor (segments: AnchorSegment list) anchor =
+        match segments |> List.tryFind (fun segment -> segment.Anchor = anchor) with
+        | Some segment -> Ok(Some anchor, segment.Messages |> List.map _.Text |> String.concat "\n")
+        | None -> Error(JsFailure.ViewDeclarationInvalid(sprintf "carry references an unavailable anchor: %d" anchor))
 
-/// The single declaration rule every caller shares: the coverage law decides
-/// the shape, the host maps the first violation onto its stable failure code.
-/// F# callers use this typed core directly; the JS boundary in
-/// `AnchorSurface` answers with the plain-JS receipt of the same decision.
-[<RequireQualifiedAccess>]
-module AnchorDeclarationRule =
-    /// Strict `{ prefixUntil, thenMap }` shape, judged by the coverage law.
-    let parse (value: obj) : Result<AnchorViewDeclaration, JsFailure> =
-        AnchorCoverage.parse value |> Result.mapError JsFailure.ViewDeclarationInvalid
+    let select (segments: AnchorSegment list) (items: AnchorCarryItem list) =
+        let selectOne item =
+            match item with
+            | AnchorCarryItem.Literal text -> Ok(None, text)
+            | AnchorCarryItem.Reference anchor -> materialForAnchor segments anchor
 
-    /// A report mapping is exactly a declaration with `prefixUntil = 0`, so it
-    /// is judged by the same rule.
-    let parseReportMapping (mapping: obj) : Result<AnchorViewDeclaration, JsFailure> =
-        parse (createObj [ "prefixUntil" ==> 0; "thenMap" ==> mapping ])
+        let rec loop remaining selected =
+            match remaining with
+            | [] -> Ok(List.rev selected)
+            | item :: tail -> selectOne item |> Result.bind (fun material -> loop tail (material :: selected))
+
+        loop items []
+
+    let validate (segments: AnchorSegment list) (declaration: AnchorViewDeclaration) =
+        if declaration.PrefixCount > List.length segments then
+            Error(JsFailure.ViewDeclarationInvalid "prefixCount exceeds the visible history segment count")
+        else
+            select segments declaration.Carry |> Result.map ignore

@@ -72,7 +72,7 @@ module HostForkAgent =
         Task.FromResult(
             Ok(
                 requirements,
-                ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt None None requirements payload
+                ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt [] None requirements payload
             )
         )
 
@@ -369,7 +369,7 @@ module HostForkAgent =
         match renderedPrompt with
         | Some rendered -> Task.FromResult(Some rendered)
         | None ->
-            Task.FromResult(Some(ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt None None [] None))
+            Task.FromResult(Some(ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt [] None [] None))
 
     let private reuseWithManagedAgent
         (runtime: HostForkRuntime)

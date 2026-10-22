@@ -143,7 +143,7 @@ module SyncDelegateBatchRules =
         (result: Result<SyncDelegateInvocationResult, string>)
         : string =
         match result with
-        | Ok(SyncDelegateInvocationResult.View view) -> view
+        | Ok(SyncDelegateInvocationResult.View view) -> ReturnedMaterial.render view
         | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) -> mergedInstruction language canonicalCall
         | Error err -> sprintf "Engineer charge failed: %s" err
 

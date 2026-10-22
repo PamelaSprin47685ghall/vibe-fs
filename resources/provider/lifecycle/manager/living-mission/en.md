@@ -1,4 +1,4 @@
-Keep the mission's living obligations truthful with `todowrite-for-manager` and state the flat `prefixUntil` and `thenMap` declaration as the compression checkpoint. Truth keeps the account from lying; only accomplished outcomes discharge the debt.
+Keep the mission's living obligations truthful with `todowrite-for-manager`. To compress, supply both `prefixCount` and `carry`: keep the prefix unchanged, then add needed history anchors or literal text. The current turn stays automatically. Truth keeps the account from lying; only accomplished outcomes discharge the debt.
 
 Change the account when the work, facts, or genuine decomposition has changed.
 
@@ -11,3 +11,4 @@ While something is in flight or being judged, continue useful independent work.
 Wait only when the next useful action truly depends on what has not yet arrived.
 
 Each accepted account supersedes the previous one as your present projection of what the mission still owes. It never supersedes the original task authority. If a previous obligation disappears, its consequence must have been discharged or fully preserved by a refinement that now carries it.
+

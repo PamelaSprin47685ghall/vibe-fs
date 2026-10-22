@@ -12,6 +12,7 @@ open Wanxiangshu.Host.Domain
 open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Programming.Js
 
 /// horizon(): who remains at the caller's horizon, as prose or as data.
 /// Host-neutral; a host reaches it through `DelegationEnvironment`.
@@ -146,30 +147,45 @@ module HorizonRoster =
 
     /// Latest delivered view for one participant. Horizon reads the delivered
     /// view as it stands and does not advance the returned cursor.
-    let private deliveredView (handle: HandleRecord) : string option =
-        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered (SessionId.value handle.ChildSessionId)
+    let private deliveredView (journal: AgentJournal) (handle: HandleRecord) : string option =
+        let sessionId = SessionId.value handle.ChildSessionId
+
+        JsDeliveredValues.peekFence sessionId
+        |> Option.bind (fun fence ->
+            TaskDeliveryJournal.tryFindByFenceFields
+                journal
+                handle.ChildSessionId
+                fence.ProviderRun
+                (Some fence.ToolCallId)
+                None
+                None
+                None
+                None)
+        |> Option.map (fun witness -> witness.View)
+        |> Option.orElseWith (fun () -> JsDeliveredValues.tryPeekMaterial sessionId)
 
     let private latestViewForHandle
         language
-        (_journal: AgentJournal)
+        (journal: AgentJournal)
         (_snapshot: ProjectionSet)
         (handle: HandleRecord)
         : Task<string> =
         let label = labelForHandle language handle
 
-        match deliveredView handle with
+        match deliveredView journal handle with
         | None -> Task.FromResult(labeled language Path.NoWorkYet label)
-        | Some text ->
+        | Some material ->
+            let text = ReturnedMaterial.texts material |> String.concat "\n\n"
             Task.FromResult(ProviderProse.render language Path.LatestWork (Map [ "label", label; "record", text ]))
 
     let private viewData
-        (_journal: AgentJournal)
+        (journal: AgentJournal)
         (_snapshot: ProjectionSet)
         (handle: HandleRecord)
         : Task<string * string> =
-        match deliveredView handle with
+        match deliveredView journal handle with
         | None -> Task.FromResult("none", "")
-        | Some text -> Task.FromResult("latest", text)
+        | Some material -> Task.FromResult("latest", ReturnedMaterial.texts material |> String.concat "\n\n")
 
     /// The terminal name a pty is known by, when the runtime snapshot carries
     /// one. The prose line names a generic terminal when it does not; the data

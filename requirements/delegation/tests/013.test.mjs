@@ -4,7 +4,7 @@ import { parse as parseToml } from 'smol-toml'
 import * as join from '../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
-const completed = (name, record) => ({ kind: 'completed', agentId: `physical-${name}`, agentName: name, role: 'Engineer', runId: `run-${name}`, view: record })
+const completed = (name, record) => ({ kind: 'completed', agentId: `physical-${name}`, agentName: name, role: 'Engineer', runId: `run-${name}`, returned: [{ text: record }] })
 
 test('WHAT[delegation-013] renderer preserves entry order and distinguishes completed, failed and abandoned testimony', () => {
   assert.equal(join.renderBatch('english', []), '')
@@ -16,9 +16,12 @@ test('WHAT[delegation-013] renderer preserves entry order and distinguishes comp
   assert.match(wire, /Ada has returned/)
   assert.match(wire, /Bob could not complete/)
   assert.match(wire, /Cal did not return/)
-  assert.ok(wire.indexOf('First evidence.') < wire.indexOf('Second evidence.'))
+  assert.ok(wire.indexOf('Ada has returned') < wire.indexOf('Bob could not complete'))
+  assert.ok(wire.indexOf('Bob could not complete') < wire.indexOf('Second evidence.'))
   assert.ok(wire.indexOf('Second evidence.') < wire.indexOf('Cal'))
-  assert.deepEqual(parseToml(wire), {})
+  // Status and failure reasons stay ordered in the instruction plane. Only
+  // successful deliveries contribute material to the TOML data plane.
+  assert.deepEqual(parseToml(wire), { returned: [{ text: 'First evidence.' }] })
 })
 
 test('WHAT[delegation-013] renderer rejects malformed completion carriers without a success wire', () => {
@@ -26,6 +29,16 @@ test('WHAT[delegation-013] renderer rejects malformed completion carriers withou
   const { role, ...missingRole } = base
   for (const invalid of [missingRole, { ...base, role: 'UnknownRole' }, { ...base, runId: '' }, { ...base, kind: 'unknown' }]) {
     assert.equal(join.renderBatch('english', [invalid]), '')
+  }
+  const { returned, ...withoutReturned } = base
+  for (const invalid of [
+    withoutReturned,
+    { ...withoutReturned, view: 'retired string carrier' },
+    { ...base, returned: null },
+    { ...base, returned: ['unstructured text'] },
+    { ...base, returned: [{ text: 7 }] },
+  ]) {
+    assert.throws(() => join.renderBatch('english', [invalid]), /returned|text string/)
   }
   assert.equal(join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a', agentName: 'Ada', role: 'UnknownRole', reason: 'gone' }]), '')
 })
@@ -38,10 +51,12 @@ test('WHAT[delegation-013] display window retains whole entries and signals rema
     assert.match(wire, /Bob line 799/)
     assert.doesNotMatch(wire, /Cal/)
     assert.match(wire, language === 'english' ? /Remaining completions are available/ : /仍有未展示的完成项/)
+    assert.deepEqual(parseToml(wire), { returned: items.slice(0, 2).map(item => item.returned[0]) })
     const short = join.renderBatch(language, [completed('Ada', 'first'), completed('Bob', 'second')])
     assert.match(short, /first/)
     assert.match(short, /second/)
     assert.doesNotMatch(short, /Remaining completions|仍有未展示/)
+    assert.deepEqual(parseToml(short), { returned: [{ text: 'first' }, { text: 'second' }] })
   }
 })
 
@@ -56,6 +71,7 @@ test('WHAT[delegation-013] display does not truncate the sole large entry suppli
   const wire = join.renderBatch('english', [completed('Ada', record)])
   assert.match(wire, /line 2499/)
   assert.doesNotMatch(wire, /Remaining completions/)
+  assert.deepEqual(parseToml(wire), { returned: [{ text: record }] })
 })
 
 test('WHAT[delegation-013] actual handle completion and retirement each take effect once', () => {

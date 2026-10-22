@@ -20,13 +20,14 @@
 - 050 真实运行 js.call 单进程循环：规格拒绝、前台命令与结构化结局、onExit 退出码派发、check abort 杀死命令、check park 挂起与 unpark 继续、maxDuration 超时。
 - 051 真实运行多进程代数：spawn 后台、waitFor 端口就绪、signal 收割、waitFor 超时与未知后台稳定码、后台崩溃经 backgrounds 观察并 abort。
 - 052 以本地限速 Range 服务器真实驱动 `wget -c`：中断后断点续传、部分文件保留、逐文件 park 汇报、404 退出码 8 分派给 onExit。wget 缺失或网络不可达的环境不适用。
-- 049 同时核对生成工具声明 `program/unpark/abandon/prefixUntil/thenMap` 五个参数：三态参数全部可选（一次调用只发其中之一），unpark.value 自由、abandon 只有 handle、prefixUntil 是可选 number、thenMap 是可选 record；旧的 `view` 包装参数已退役。
-- 054 真实运行 deliver：报告映射（无 prefixUntil）结束程序并按 `{ prefixUntil: 0, thenMap: reportMapping }` 解读、空映射合法、映射缺参以 VIEW_DECLARATION_INVALID 拒绝、自己递交 view 包装对象被拒、哨兵被捕获后程序存活、每个生成面携带 deliver 成员。
+- 049 核对生成工具的 `prefixCount` 与 `carry`：两者都可省略，但一旦声明压缩必须成对提供；前者为区间数量，后者为整数或字符串数组。program/unpark/abandon 仍互斥，unpark.value 自由。
+- 054 真实运行 deliver：省略参数与空数组合法；数组直接交付，不带前缀或包装对象；非法数组拒绝，哨兵被捕获后程序存活，每个生成面携带 deliver 成员。
 - 055 真实运行 vm 并行边界：Promise.all 并行读写、allSettled 兄弟失败不撤销已落盘写、十六路 cat 批处理。
-- 056 委托原语端到端：fork/join/fission 返回数据信封（缺名派生、拒绝信封不抛、无宿主 DELEGATION_UNAVAILABLE）、`dag` 波次推进与依赖记录传递、节点失败 park 后注入 `"skip"` 收尾。056 另见证作废分支：一个已作废的子工作在 join 记录里以 `status = "voided"` 出现（`view` 为空，既非 `completed` 也非 `undelivered`），并让 `dag` 以 `code = "node-voided"` 挂起——作废结清了这份义务，父方据此自行决定重试、跳过或替换。
+- 056 委托原语端到端：fork/join/fission 返回数据信封（缺名派生、拒绝信封不抛、无宿主 DELEGATION_UNAVAILABLE）、`dag` 波次推进与依赖记录传递、节点失败 park 后注入 `"skip"` 收尾。056 另见证作废分支：一个已作废的子工作在 join 记录里以 `status = "voided"` 出现（`returned` 为空数组，既非 `completed` 也非 `undelivered`），并让 `dag` 以 `code = "node-voided"` 挂起——作废结清了这份义务，父方据此自行决定重试、跳过或替换。
 - 057 真实运行 ls 的 ignore 语义（逐级 `.gitignore`、否定模式、嵌套规则、根 `.git/info/exclude`）与 glob/grep 退役后的组合写法（walk + `cat` + `whereAll`）。
-- 059 真实运行 `this.deliver` 的视图记录与增量去重：交付的 reportMapping 记为一份 `prefixUntil: 0` 声明并结束程序、后续语句不执行；交付格按会话隔离，并以 `(providerRun, toolCallId)` 围栏限定消费者——别的 run 取不走也窥不到该格；已交付内容只返回一次（重复身份不再返回），普通 return 不填交付格；永久压缩不因后续受保护交接而回退，锚点消失后隐式 0 仍可覆盖开头区间。
-- 063 真实运行顶层上下文整理参数的扁平形态：`prefixUntil` 与 `thenMap` 两个扁平顶层参数被接受并捕获为待消费视图；残留 `view` 包装对象以 `VIEW_DECLARATION_INVALID` 拒绝且 reason 点名改用扁平参数；两者都不给则不设任何声明；`prefixUntil` 为负数或小数、`thenMap` 的值非字符串或空白、键为负数编号等非法形状同样以 `VIEW_DECLARATION_INVALID` 拒绝且不留下任何视图。
+- 059 真实运行 `this.deliver` 的材料记录与增量去重：数组材料加当前回合，后续语句不执行；交付格按会话及 `(providerRun, toolCallId)` 围栏隔离；跨次旧材料按完整身份去重，同次显式重复保留，新报告不因相同正文前缀被丢弃，普通 return 不填交付格。
+- 063 核对顶层 `prefixCount` 与 `carry` 的捕获：无声明时保持现状，非法区间数量、非法数组元素、缺少其中一个参数或包装对象均以 `VIEW_DECLARATION_INVALID` 拒绝且不留下待应用声明；当前回合在声明之外保留。
 - 064 真实运行调用面三态互斥：同时给出两个状态以 `INVALID_ARGUMENT` 拒绝且 reason 点名冲突字段，程序不跑、不消费被点名的 handle、不留待下一请求消费的视图声明；单状态调用（program / unpark / abandon）各自照常生效，无状态调用报缺少 program。
 
 2026-10-18 交付验证：`node scripts/build.mjs` 构建成功（169 surfaces、813 模块链接闭合），本包 001-059 全套 278 例 0 败 0 跳 7 todo（045-058 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema、js.call 单进程/多进程循环、wget 断点续传剧本、view 声明捕获、deliver 显式终值、vm 并行边界、委托原语信封与 dag park、ls 的 ignore 语义与 walk/search 组合、file/edit/rewrite 退役后的组合替代，以及 js.call 的交互 send 形态）。直连文件工具已整体退役（GAP-235）：005/007/010/016 的旧实现回归删除，020 改走 js `mv`/`rm` 成员，026 改走 `runObserved`。全量 unit 套件同版本 **865 文件 5113 例 0 败**（GAP-231 ~ GAP-237 CLOSED）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护相关 TODO 随退役收窄；未闭合范围见 GAP-088。
+

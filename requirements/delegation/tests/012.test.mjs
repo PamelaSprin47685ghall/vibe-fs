@@ -12,10 +12,7 @@ test('WHAT[delegation-012] only the canonical call receives the delivered view a
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
     assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 0), true)
     const child = sync.child(runtime, owner, 'Engineer')
-    runtimeSurface.recordFencedDeliveredView(child, 'canonical-run', 'call-x', {
-      prefixUntil: 0,
-      thenMap: {},
-    })
+    runtimeSurface.recordFencedDeliveredView(child, 'canonical-run', 'call-x', [])
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'canonical delivered view', 'canonical-run'), true)
     const [canonical, ...siblings] = await Promise.all(calls)
     assert.equal(canonical.kind, 'View')
@@ -27,3 +24,4 @@ test('WHAT[delegation-012] only the canonical call receives the delivered view a
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 1)
   })
 })
+

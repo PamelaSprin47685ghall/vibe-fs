@@ -18,7 +18,7 @@ module ForkChildPayloadSurface =
         lang: string ->
         input:
             {| Assignment: string
-               CommissionerRecord: string option
+               CommissionerRecord: string array
                Attachment: string option
                RootRequirements: string array
                Payload: string option |} ->

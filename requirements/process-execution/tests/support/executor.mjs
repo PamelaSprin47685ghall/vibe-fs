@@ -18,8 +18,10 @@ ${body}
   }
 }`
 
+export const planB = 'If this command has not completed, preserve the running process and report the output collected so far. Check whether the command is still making progress before deciding to wait, interrupt, or retry. Do not infer an exit status from text printed by the child process; wait for the operating system to report its exit.'
+
 export const runProgram = (dir, body, sessionId = 'ses-process-contract') =>
-  execute(dir, 'DevOps', 'en', sessionId, { program: program(body) }, 20_000, Date.now() + 120_000, 1 << 20, null)
+  execute(dir, 'DevOps', 'en', sessionId, { name: 'process-execution-contract', program: program(body), planB }, 20_000, Date.now() + 120_000, 1 << 20, null)
 
 export const runText = async (dir, body, sessionId = 'ses-process-contract') =>
   render(await runProgram(dir, body, sessionId))

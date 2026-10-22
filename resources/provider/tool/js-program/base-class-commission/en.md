@@ -1,4 +1,7 @@
-  async commission(payload, reportMapping) {
-    // Returns { ok, name, agentId, outcome }: hands one charge to a separate Manager road with a destination of its own — commission a road only when the purpose is independent, not merely because the work is large or has moved to a later stage. payload is { charge, name?, calling? }; charge is required, a missing name is derived from the charge, and calling names the office that leads the road (it derives to lead) — omit calling to continue a known road under its own name. reportMapping is required and is a Record<string, null|string> of anchor number to summary or null, with no prefixUntil — the host reads it as { prefixUntil: 0, thenMap: reportMapping }; a missing or invalid mapping is refused with { ok: false, code: "VIEW_DECLARATION_INVALID" }.
-    // Example: await this.commission({ charge: "audit the parser module on its own" }, { 12: "audit inventory" });
+  async commission(payload, carry = []) {
+    // Returns { ok, name, agentId, outcome }. Open a separate Manager road only for an independent purpose, not for more work or a later stage.
+    // payload is { charge, name?, calling? }. A missing name comes from charge; calling defaults to lead. To continue a known road, use its name and omit calling.
+    // carry adds needed history: integers reference anchors; strings supply literal text. The current turn is not sent. State the task once in charge.
+    // Example: await this.commission({ charge: "audit the parser module on its own" }, [12]);
   }
+

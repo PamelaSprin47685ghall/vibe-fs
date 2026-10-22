@@ -48,6 +48,7 @@ module LlmFacing =
         val boolMember: name: string -> value: bool -> Field
         val table: name: string -> fields: Field list -> DataBlock
         val tableArray: name: string -> fields: Field list -> DataBlock
+        val textTables: name: string -> texts: string list -> DataBlock list
         val structuredValue: value: Value -> DataBlock list
         val rootStructuredValue: value: Value -> DataBlock list
         val ofJs: value: obj -> Value

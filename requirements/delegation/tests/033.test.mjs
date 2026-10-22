@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as eventsSurface from '../../../dist/OpenCode/Host/EventsSurface.js'
 import * as runLifecycle from '../../../dist/Execution/Delegation/Fork/Host/RunLifecycle.js'
+import { createJoinProbe, joinProbeDeliver, validateDeliveredMaterial } from '../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 import * as identity from '../../../dist/Foundation/Identity.js'
 import * as deliveryJournal from '../../../dist/Composition/Durable/DelegationJournalAdapter.js'
 import { create as createWriter } from '../../../dist/OpenCode/Host/DeliveryWitnessWriter.js'
@@ -29,6 +30,14 @@ import {
 const material = 'DELIVERED MATERIAL'
 const prose = 'DELIVERED PROSE'
 
+test('WHAT[delegation-033] consuming a delivery before the lazy read still settles a journal-less run', { timeout: 3000 }, async () => {
+  const result = await joinProbeDeliver(createJoinProbe(), ['selected evidence'], 'current report')
+  assert.deepEqual(result, {
+    status: 'completed',
+    returned: [{ text: 'selected evidence' }, { text: 'current report' }],
+  })
+})
+
 test('WHAT[delegation-033] the committed delivery settles the delivering run before the cut', async () => {
   await withExecutablePlugin(async (_hooks, _directory, _createdIds, runtime) => {
     const owner = 'ses-owner-033'
@@ -49,8 +58,8 @@ test('WHAT[delegation-033] the committed delivery settles the delivering run bef
       ToolCallId: identity.ToolCallIdModule_create(call),
       Task: new DeliveryTaskReference(0, ['h-033']),
       FormalText: prose,
-      ViewDeclaration: '{"0":"DELIVERED MATERIAL"}',
-      View: material,
+      ViewDeclaration: '["DELIVERED MATERIAL"]',
+      View: JSON.stringify([material, prose]),
       RetirementId: undefined,
     })
     assert.equal(committed.tag, 0)
@@ -85,7 +94,7 @@ test('WHAT[delegation-033] the committed delivery settles the delivering run bef
         (entry) => entry.sessionId === child && entry.outcome?.kind === 'Completed' && entry.outcome?.providerRun === run,
       )
       assert.ok(completed, 'the delivering run publishes its completed terminal before the cut')
-      assert.equal(completed.outcome.text, witness.View)
+      assert.equal(completed.outcome.text, prose, 'terminal prose never contains encoded or rendered delivery material')
 
       // A fence with no matching witness settles nothing: the return is only
       // what the committed delivery proves.
@@ -125,8 +134,9 @@ test('WHAT[delegation-033] an unattributed durable delivery is refused, not left
       root,
       surface.BaseClassSource,
       {
+        name: 'unattributed-delivery',
         program:
-          'class Js extends JsProgram { async run() { await this.deliver({ 0: "UNATTRIBUTED MATERIAL" }); return { done: true }; } }',
+          'class Js extends JsProgram { async run() { await this.deliver(["UNATTRIBUTED MATERIAL"]); return { done: true }; } }',
       },
       3000,
       Date.now() + 60_000,
@@ -195,8 +205,9 @@ test('WHAT[delegation-033] the turn prose before the deliver call attributes its
 
     const result = await hooks.tool['todowrite-for-engineer'].execute(
       {
+        name: 'deliver-turn-report',
         program:
-          'class Js extends JsProgram { async run() { await this.deliver({ 0: "TURN PROSE MATERIAL" }); return { done: true }; } }',
+          'class Js extends JsProgram { async run() { await this.deliver(); return { done: true }; } }',
       },
       { sessionID: session, agent: 'engineer', callID: call, messageID: run },
     )
@@ -215,6 +226,7 @@ test('WHAT[delegation-033] the turn prose before the deliver call attributes its
     )
     assert.ok(witness, 'the turn prose attributes the delivery witness')
     assert.equal(witness.FormalText, 'THE TURN PROSE')
+    assert.deepEqual(JSON.parse(witness.View), ['THE TURN PROSE'])
   })
 })
 
@@ -223,8 +235,6 @@ test('WHAT[delegation-033] the turn prose before the deliver call attributes its
 // witness carries an empty view and the caller still receives an empty view.
 test('WHAT[delegation-033] an empty delivered view is still an established delivery', async () => {
   const { DeliveryAttribution } = await import('../../../dist/Repository/Programming/Js/ToolWorkflow.js')
-  const { TaskDelivery_validate } = await import('../../../dist/Host/Facts.js')
-  const { sha256Hex } = await import('../../../dist/Host/Digest.js')
   const root = mkdtempSync(join(tmpdir(), 'wxs-033-empty-'))
   const sessionId = 'sess-033-empty'
   try {
@@ -254,7 +264,7 @@ test('WHAT[delegation-033] an empty delivered view is still an established deliv
       surface.Capabilities,
       root,
       surface.BaseClassSource,
-      { program: 'class Js extends JsProgram { async run() { await this.deliver({}); return { done: true }; } }' },
+      { name: 'empty-delivery', program: 'class Js extends JsProgram { async run() { await this.deliver(); return { done: true }; } }' },
       3000,
       Date.now() + 60_000,
       1 << 20,
@@ -265,31 +275,20 @@ test('WHAT[delegation-033] an empty delivered view is still an established deliv
 
     assert.equal(outcome.tag, 0, 'the delivery form is accepted')
     assert.equal(witnessed.length, 1, 'the witness is committed once')
-    assert.equal(witnessed[0].View, '', 'the empty projection is returned as-is')
+    assert.equal(witnessed[0].View, '[]', 'the empty projection is canonical returned material')
     assert.equal(witnessed[0].FormalText, '', 'no prose is invented')
-    assert.equal(witnessed[0].ViewDeclaration, '{"prefixUntil":0,"thenMap":{}}', 'the declaration is captured')
-    // The durable facts codec translates DeliveryTaskReference to TaskDeliveryTask,
-    // and unwraps typed identities for the wire TaskDeliveryFence.
-    const fence = {
-      SessionId: witnessed[0].SessionId,
-      LogicalRunId: witnessed[0].LogicalRunId,
-      AuthorityRoot: witnessed[0].AuthorityRoot,
-      PhysicalUserMessageId: witnessed[0].PhysicalUserMessageId,
-      ProviderRun: witnessed[0].ProviderRun,
-      ToolCallId: witnessed[0].ToolCallId,
-      Task: { tag: 1, fields: [identity.ToolCallIdModule_value(witnessed[0].ToolCallId)] },
-    }
-    const taskWitness = {
-      Fence: fence,
-      FormalText: witnessed[0].FormalText,
-      ViewDeclaration: witnessed[0].ViewDeclaration,
-      View: witnessed[0].View,
-      MaterialDigest: sha256Hex(witnessed[0].View),
-      RetirementId: witnessed[0].RetirementId,
-    }
-    assert.equal(TaskDelivery_validate(sha256Hex, taskWitness).tag, 0, 'the witness is form-valid')
+    assert.equal(witnessed[0].ViewDeclaration, '[]', 'the carry array is captured')
+    assert.deepEqual(
+      validateDeliveredMaterial(witnessed[0].View),
+      { accepted: true, reason: '' },
+      'the durable owner accepts the material produced by delivery',
+    )
+    const rejected = validateDeliveredMaterial('pre-rendered old material')
+    assert.equal(rejected.accepted, false, 'the durable owner rejects old material before presentation')
+    assert.match(rejected.reason, /canonical JSON string array/, 'rejection concerns the material format, not its digest')
   } finally {
     clearDeliveredValue(sessionId)
     rmSync(root, { recursive: true, force: true })
   }
 })
+

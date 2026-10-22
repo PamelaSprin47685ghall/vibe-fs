@@ -16,11 +16,15 @@ import {
 
 const PROMPT_KEY = 'wanxiangshu_prompt_key'
 const SETTLE_MS = 20_000
+const ADVISOR_PLAN_B =
+  'The advisor consultation is still running. Keep waiting for the answer to this consultation’s own intent prompt. Do not treat a view acknowledgement, an earlier consultation, or reuse of the same child session as evidence that the current question is answered. If no answer arrives within the fixture deadline, report the outstanding prompt and run identities instead of returning old prose. The host sends the view and intent as separate prompts; wait for the intent prompt’s completed run before assessing the advice.'
 
 const advisorCall = (hooks, owner, intent, callID) =>
   hooks.tool['todowrite-for-manager'].execute(
     {
-      program: `class Js extends JsProgram { async run() { const advised = await this.advisor(${JSON.stringify(intent)}, {}); return { advised }; } }`,
+      name: `Advisor consultation ${callID}`,
+      planB: ADVISOR_PLAN_B,
+      program: `class Js extends JsProgram { async run() { const advised = await this.advisor(${JSON.stringify(intent)}, []); return { advised }; } }`,
     },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
@@ -120,7 +124,7 @@ test('WHAT[advisor-004] a consult returns the prose of the advisor run that answ
     // Each prompt of a consult owns a run of its own: the view's run closes when its
     // terminal arrives, and only then does the intent prompt root freshly.
     await advisorRun(hooks, runtime, child, 'run-advisor-view-1', view, 'VIEW-ONE', 10)
-    const [intent] = await waitForPrompts(runtime, child, 2)
+    const [, intent] = await waitForPrompts(runtime, child, 2)
     assert.notEqual(keyOf(view), keyOf(intent), 'view and intent are two prompts with their own keys')
 
     await advisorRun(hooks, runtime, child, 'run-advisor-answer-1', intent, 'ADVICE-ONE: ship it behind a flag', 20)
@@ -137,7 +141,7 @@ const firstConsultSettled = async (hooks, createdIds, runtime, owner) => {
   const child = await waitForChild(createdIds)
   const [firstView] = await waitForPrompts(runtime, child, 1)
   await advisorRun(hooks, runtime, child, 'run-advisor-a-view', firstView, 'VIEW-A', 10)
-  const [firstIntent] = await waitForPrompts(runtime, child, 2)
+  const [, firstIntent] = await waitForPrompts(runtime, child, 2)
   await advisorRun(hooks, runtime, child, 'run-advisor-a', firstIntent, 'ADVICE-A', 20)
   const firstResult = await within(first, SETTLE_MS)
   assert.notEqual(firstResult, null, 'positive control: the first consult settles on its own intent run')
@@ -156,7 +160,7 @@ test('WHAT[advisor-004] the earlier consult\'s sticky Completed never answers a 
 
     const followUpPrompts = await waitForPrompts(runtime, child, 3)
     await advisorRun(hooks, runtime, child, 'run-advisor-b-view', followUpPrompts[2], 'VIEW-B', 20)
-    const [, followUpIntent] = await waitForPrompts(runtime, child, 4)
+    const followUpIntent = (await waitForPrompts(runtime, child, 4))[3]
 
     // Replayed at subscribe time, the earlier consult's terminal must not answer the new intent.
     assert.equal(await within(second, 300), null, 'an earlier consult\'s Completed never answers the follow-up')
@@ -187,7 +191,7 @@ test('WHAT[advisor-004] a follow-up consult ignores the earlier consult and its 
     // subscribe time it must not answer the new intent.
     assert.equal(await within(second, 300), null, 'an earlier consult\'s Completed never answers the follow-up')
 
-    const [, secondIntent] = await waitForPrompts(runtime, child, 4)
+    const secondIntent = (await waitForPrompts(runtime, child, 4))[3]
     await advisorRun(hooks, runtime, child, 'run-advisor-b', secondIntent, 'ADVICE-B', 30)
     const secondResult = await within(second, SETTLE_MS)
     assert.notEqual(secondResult, null, 'the follow-up settles on its own intent run')

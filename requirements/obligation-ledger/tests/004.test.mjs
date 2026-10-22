@@ -174,8 +174,8 @@ const terminalEvent = (sessionID, callID, status) => ({
           status,
           input: {
             program: 'class Js extends JsProgram { async run() { return {}; } }',
-            prefixUntil: 1,
-            thenMap: {},
+            prefixCount: 0,
+            carry: [],
           },
         },
       },
@@ -187,8 +187,8 @@ const todoCall = (hooks, sessionID, callID) => {
   const output = {
     args: {
       program: 'class Js extends JsProgram { async run() { return {}; } }',
-      prefixUntil: 1,
-      thenMap: {},
+      prefixCount: 0,
+      carry: [],
     },
   }
   return hooks['tool.execute.before']({ tool: 'todowrite-for-engineer', sessionID, callID }, output).then(() => output)
@@ -270,3 +270,4 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
   })
 })
 }
+

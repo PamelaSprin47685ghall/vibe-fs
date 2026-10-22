@@ -31,8 +31,9 @@ test('WHAT[concern-routing-003] publish is retired from ToolRegistry and provide
   )
 
   assert.match(read('resources/provider/tool/js-plan/en.md'), /\b(?:js|this)\.ask\(question\)/)
-  assert.match(read('resources/provider/tool/js-program/deliver/en.md'), /\bdeliver\(reportMapping\)/)
+  assert.match(read('resources/provider/tool/js-program/deliver/en.md'), /\bdeliver\(carry = \[\]\)/)
   const delegationEn = read('resources/provider/tool/js-program/delegation-rules/en.md')
   assert.match(delegationEn, /\b(?:js|this)\.fork\(/)
   assert.match(delegationEn, /\b(?:js|this)\.join\(/)
 })
+

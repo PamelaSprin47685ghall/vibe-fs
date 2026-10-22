@@ -159,10 +159,7 @@ const waitForPromptCount = async (h, owner, role, count) => {
   assert.equal(sync.acceptPrompt(h, owner, role, count - 1), true)
 }
 const settle = async (h, owner, role, answer, run = 'run-1') => {
-  runtimeSurface.recordFencedDeliveredView(sync.child(h, owner, role), run, `call-${run}`, {
-    prefixUntil: 0,
-    thenMap: {},
-  })
+  runtimeSurface.recordFencedDeliveredView(sync.child(h, owner, role), run, `call-${run}`, [])
   return sync.settle(h, owner, role, answer, run)
 }
 const remainsPending = async (promise) =>
@@ -272,10 +269,7 @@ test('WHAT[delegation-024] an interrupted devops member that already delivered s
     assert.ok(child, 'the devops child session must exist')
 
     // 子会话交付了：真实写入带围栏的交付格。
-    jsRuntime.recordFencedDeliveredView(child, 'devops-run', 'devops-call', {
-      prefixUntil: 0,
-      thenMap: { 0: DELIVERED_VIEW },
-    })
+    jsRuntime.recordFencedDeliveredView(child, 'devops-run', 'devops-call', [DELIVERED_VIEW])
     assert.equal(
       jsRuntime.deliveredFenceOf(child)?.providerRun,
       'devops-run',
@@ -354,3 +348,4 @@ test('WHAT[delegation-024] an interrupted devops member that delivered nothing l
   })
 })
 }
+

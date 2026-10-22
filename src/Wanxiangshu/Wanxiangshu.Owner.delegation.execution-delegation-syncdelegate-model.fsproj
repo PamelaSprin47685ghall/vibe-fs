@@ -12,6 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-syncdelegaterole.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
     <Compile Include="Execution/Delegation/Facts.fsi"/>

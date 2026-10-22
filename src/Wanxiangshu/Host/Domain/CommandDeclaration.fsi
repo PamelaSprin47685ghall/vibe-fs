@@ -38,5 +38,7 @@ type ICommandArguments =
     abstract Text: name: string -> string
     /// The named string; None when absent or blank.
     abstract OptionalText: name: string -> string option
+    /// The named list of strings; empty when absent.
+    abstract Texts: name: string -> string list
     /// Error when the value is present but not a non-negative whole number.
     abstract OptionalCount: name: string -> Result<int option, unit>

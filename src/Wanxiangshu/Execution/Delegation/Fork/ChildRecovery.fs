@@ -6,7 +6,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation.Identity
 
 /// P0-RECOVERY-JOIN-001 + clean-break: Aborted is observation, not durable finality.
-/// Join consumes only JoinableCompletion from decoded v2 terminal; no raw JSON / kind+body.
+/// Join consumes only JoinableCompletion from a decoded current terminal; no raw JSON / kind+body.
 module ChildRecovery =
 
     /// Non-empty list (local; no shared collection dependency).
@@ -45,7 +45,7 @@ module ChildRecovery =
         let failed (agentId: string) (handle: HandleId) (childSession: SessionId) (body: string) : TerminalEvidence =
             ProvenFailed(agentId, handle, childSession, body)
 
-    /// Completion blob v2 finality (schemaVersion=2). No aborted.
+    /// Completion blob finality (schemaVersion=3). No aborted.
     type CompletedPayload =
         { RunId: string
           View: string
@@ -109,7 +109,7 @@ module ChildRecovery =
         let kind (c: JoinableCompletion) = c.Kind
         let body (c: JoinableCompletion) = c.Body
 
-        /// Sole constructor from a decoded v2 terminal. Never touches raw JSON,
+        /// Sole constructor from a decoded current terminal. Never touches raw JSON,
         /// HandleCompletionKind, or an arbitrary body string as proof.
         let fromDecoded
             (agentId: string)

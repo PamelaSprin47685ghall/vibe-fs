@@ -16,8 +16,8 @@ import { UNIT_VERDICT_SILENCE_MS } from '../../verification-system/tests/e2e/sup
 // gate + ForkTool 工具体）生效，状态来自统一 Lifecycle EventStore。
 //
 // 委派动词不再是宿主注册的工具：`fork` / `resume` 是 Manager 编程面的成员，
-// 由 `todowrite-for-manager` 的程序调用（`this.fork(payload, reportMapping)`、
-// `this.resume(payload, reportMapping)`）。成员返回数据信封，不渲染散文：成功
+// 由 `todowrite-for-manager` 的程序调用（`this.fork(payload, carry = [])`、
+// `this.resume(payload, carry = [])`）。成员返回数据信封，不渲染散文：成功
 // 是 `{ ok: true, name, agentId, outcome }`，拒绝是 `{ ok: false, code }`。
 // 拒绝码是稳定的 kebab 码，本文件按码断言，不再匹配散文。
 
@@ -35,13 +35,13 @@ const storeOf = async (directory) => workspaceEvents.acquire(await journalSurfac
 // 程序内调用 `this.fork` / `this.resume`。返回渲染后的 TOML 字符串。
 const runManagerProgram = async (hooks, sessionID, body) =>
   await hooks.tool['todowrite-for-manager'].execute(
-    { program: `class Js extends JsProgram { async run() { ${body} } }` },
+    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'manager-program' },
     { sessionID, agent: 'manager' },
   )
 
-// 载荷与 reportMapping（Record<string, null|string>，无 prefixUntil）。
-const forkCall = (payload) => `return await this.fork(${JSON.stringify(payload)}, { 1: null });`
-const resumeCall = (payload) => `return await this.resume(${JSON.stringify(payload)}, { 1: null });`
+// 载荷与 carry（整数锚点和字面字符串组成的数组，缺省为空）。
+const forkCall = (payload) => `return await this.fork(${JSON.stringify(payload)}, []);`
+const resumeCall = (payload) => `return await this.resume(${JSON.stringify(payload)}, []);`
 
 // 数据信封字段（渲染后的 TOML `[data]` 表）。
 const rendered = (result) => String(result)
@@ -285,7 +285,7 @@ test('WHAT[capability-enforcement-026] D08_repair_window_admits_devops_dispatch_
 
 // 收口窗一：确认已经落盘（Stayed 两段式的第二笔只差收口）。此时再向绑定的固定
 // DevOps 派新任务必须拒绝，且拒绝发生在任何持久化副作用之前。
-test('WHAT[capability-enforcement-026] D09_confirmed_tenure_refuses_new_devops_dispatch_with_zero_side_effects', async () => {
+test('WHAT[capability-enforcement-026] D09_relayed_tenure_refuses_new_devops_dispatch_with_zero_side_effects', async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     const sessionID = 'ses-d09-confirmed'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
@@ -293,11 +293,11 @@ test('WHAT[capability-enforcement-026] D09_confirmed_tenure_refuses_new_devops_d
     await injectAcceptedAssessment(runtime, sessionID) // Stayed
 
     const store = await storeOf(directory)
-    const confirmed = await lifecycle.seedDeliver(store, sessionID, 'run-d09', 'call-d09-first', 2n)
-    assert.equal(confirmed.ok, true, confirmed.error)
+    // Single delivery: Stayed review relays to successor in one deliver call
+    const relayed = await lifecycle.seedDeliver(store, sessionID, 'run-d09', 'call-d09-first', 2n)
+    assert.equal(relayed.ok, true, relayed.error)
     const view = lifecycle.workView(store, sessionID)
-    assert.equal(view.confirmed, true, 'the plugin must read the same confirmation the gate reads')
-    assert.equal(view.active, true)
+    assert.equal(view.active, true, 'relay opened successor tenure')
 
     const createdBefore = createdIds.length
     const promptsBefore = runtime.prompts.length
@@ -308,8 +308,9 @@ test('WHAT[capability-enforcement-026] D09_confirmed_tenure_refuses_new_devops_d
       sessionID,
       resumeCall({ name: 'devops', charge: 'NEW-TASK-AFTER-CONFIRMATION' }),
     )
-    assert.equal(refusalCode(refused), DISPATCH_CLOSED,
-      'the close-out window must refuse new DevOps dispatch')
+    // The unreviewed successor tenure refuses DevOps dispatch until reviewed
+    assert.equal(refusalCode(refused), REVIEW_PENDING,
+      'the unreviewed successor tenure must refuse new DevOps dispatch')
     assert.equal(envelopeOk(refused), false,
       'no handover may be reported in the close-out window')
     assert.equal(createdIds.length, createdBefore, 'the refused close-out dispatch must not place a child')
@@ -426,3 +427,4 @@ const durableSnapshot = (directory) => {
   visit('')
   return snapshot
 }
+

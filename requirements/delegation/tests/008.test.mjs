@@ -18,10 +18,7 @@ test('WHAT[delegation-008] actual batch sends once in supplied Host order despit
     assert.ok(prompt.indexOf('FIRST-CHARGE') < prompt.indexOf('SECOND-CHARGE'))
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 1)
     const child = sync.child(runtime, owner, 'Engineer')
-    runtimeSurface.recordFencedDeliveredView(child, 'batch-run', 'call-first', {
-      prefixUntil: 0,
-      thenMap: {},
-    })
+    runtimeSurface.recordFencedDeliveredView(child, 'batch-run', 'call-first', [])
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'batch result', 'batch-run'), true)
     assert.equal((await first).kind, 'View')
     assert.deepEqual(await second, { kind: 'MergedInto', canonical: 'call-first' })
@@ -29,3 +26,4 @@ test('WHAT[delegation-008] actual batch sends once in supplied Host order despit
 })
 
 test.todo('WHAT[delegation-008] the real Host tool-call collection fixes complete batch membership before invocation without using arrival timing (GAP-153)')
+

@@ -539,7 +539,7 @@ module ForkToolSurface =
                     | Some observe -> do! observe sessionId
                     | None -> ()
 
-                    return Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered sessionId
+                    return Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekMaterial sessionId
                 }
 
             let scope =
@@ -1047,13 +1047,12 @@ module ForkToolSurface =
                               "agentId" ==> record.AgentId
                               "role" ==> record.Role
                               "status" ==> record.Status
-                              "view" ==> record.View ]
+                              "returned"
+                              ==> (record.Returned
+                                   |> List.map (fun text -> createObj [ "text" ==> text ])
+                                   |> Array.ofList) ]
 
-                    createObj
-                        [ "ok" ==> true
-                          "records" ==> (records |> List.map toObj |> Array.ofList)
-                          "byName"
-                          ==> createObj [ for record in records -> record.Name ==> box (toObj record) ] ]
+                    createObj [ "ok" ==> true; "records" ==> (records |> List.map toObj |> Array.ofList) ]
         }
 
     let recordDeliveredValue (sessionId: string) (deliveredValue: obj) : unit =

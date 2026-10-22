@@ -1,1 +1,2 @@
-This charge has no delivery yet. Printed text is not a return. State the outcome as prose, then call this.deliver(reportMapping) with a report mapping covering the full material: what ran, what was seen, what was repaired, and what is still unobserved. Do not stop.
+This charge has no delivery yet. State what ran, what was seen, what was repaired, and what remains unobserved in ordinary text, then call this.deliver() immediately. The current turn returns automatically. Add a carry array only for older evidence still needed. Do not stop.
+

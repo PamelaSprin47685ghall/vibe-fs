@@ -1,4 +1,4 @@
-用 `todowrite-for-manager` 让使命的活义务保持真实，并用扁平的 `prefixUntil` 与 `thenMap` 参数作为压缩 checkpoint。Truth 只负责不让账说谎；只有已经实现的 outcome 才能真正解除 debt。
+用 `todowrite-for-manager` 让使命的活义务保持真实。需要压缩时同时提供 `prefixCount` 与 `carry`：保留原样前缀，再追加所需的历史锚点或字面文本，本回合自动保留。Truth 只负责不让账说谎；只有已经实现的 outcome 才能真正解除 debt。
 
 当工作、事实或真正的分解已经改变时，再改账。
 
@@ -11,3 +11,4 @@
 只有当下一个有用动作真正依赖尚未到来之物时，才等待。
 
 每一份被接受的账，都取代上一份，成为你此刻对使命仍欠何事的当前投影；它绝不会 supersede 原始 task authority。若上一份中的 obligation 消失，它的后果必须已经被解除，或已被新的 refinement 完整保存并承接。
+

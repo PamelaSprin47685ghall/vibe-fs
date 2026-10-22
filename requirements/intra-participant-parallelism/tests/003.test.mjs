@@ -51,11 +51,11 @@ test('WHAT[intra-participant-parallelism-003] actual Host-created Fission lanes 
     await acceptAuthorityRoot(runtime, managerSession, 'manager')
     await openIncumbency(runtime, managerSession)
 
-    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, reportMapping)`。
+    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, carry = [])`。
     const forked = await hooks.tool['todowrite-for-manager'].execute(
       {
         program:
-          'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "investigate seven items" }, { 1: null }); } }',
+          'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "investigate seven items" }); } }',
       },
       { sessionID: managerSession, agent: 'manager' },
     )
@@ -125,3 +125,4 @@ test('WHAT[intra-participant-parallelism-003] actual Host-created Fission lanes 
 })
 
 test.todo('WHAT[intra-participant-parallelism-003] actual Host-created siblings bind the original participant identity and receive its current canonical view (GAP-158)')
+

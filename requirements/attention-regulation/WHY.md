@@ -5,10 +5,11 @@
 现在这些职责收敛到已有原语：
 
 - `enough`（信息已足够）与 `abandon`（放下自建计划或推论）由 `assume(assumption)` 统一表达；
-- 非阻塞旁支与跨步备忘由编程面（`todowrite-for-<role>`）程序控制流、ANCHOR 视图声明的 `view.thenMap` 摘要以及 `assume` 承载，不再维护独立的 `Attention` 持久投影或终点续行呈现。
+- 非阻塞旁支与跨步备忘由编程面（`todowrite-for-<role>`）程序控制流、`carry` 数组及自动保留的当前回合、`assume` 承载，不再维护独立的 `Attention` 持久投影或终点续行呈现。
 
 ## DEPENDS ON
 
 - `participant-identity`
 - `cognitive-environment`
 - `repository-programming`
+

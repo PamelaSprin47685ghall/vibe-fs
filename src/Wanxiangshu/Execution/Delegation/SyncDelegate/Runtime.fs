@@ -134,8 +134,14 @@ module internal SyncDelegateInternals =
                     // deliveryTaskOf 登记）另行核对。
                     None
                     None
-                |> Option.map (fun witness -> witness.View))
-            |> Option.filter (fun view -> not (System.String.IsNullOrWhiteSpace view))
+                |> Option.map (fun witness ->
+                    JsDeliveredValues.tryTakeWitnessMaterial
+                        (SessionId.value turn.SessionId)
+                        witness.Fence.ProviderRun
+                        witness.Fence.ToolCallId
+                        witness.View
+                        witness.FormalText
+                    |> Option.defaultValue witness.View))
 
     /// D2: consume the delivery of this turn and settle the call with it.
     /// `None` means no delivery was found: the obligation is still owed.
@@ -151,14 +157,14 @@ module internal SyncDelegateInternals =
     /// guessed from the parent's tool-call sequence — that sequence is the
     /// parent's, and the delivery is the child's. A cell that does not carry
     /// this turn's run is not taken at all.
-    let private fencedRenderedView (turn: ReconciledTurn) (assistant: string) : string option =
+    let private fencedMaterial (turn: ReconciledTurn) (assistant: string) : string option =
         match JsDeliveredValues.peekFence (SessionId.value turn.SessionId) with
         | Some fence when fence.ProviderRun = turn.ProviderRun ->
-            JsDeliveredValues.tryTakeRenderedForCall
+            JsDeliveredValues.tryTakeMaterialForCall
                 (SessionId.value turn.SessionId)
                 turn.ProviderRun
                 fence.ToolCallId
-                (if System.String.IsNullOrWhiteSpace assistant then
+                (if System.String.IsNullOrEmpty assistant then
                      None
                  else
                      Some assistant)
@@ -174,7 +180,7 @@ module internal SyncDelegateInternals =
         match store.TryPopExactCall call with
         | Some exact ->
             captureResponse exact turn
-            noteDelegateIfRole exact turn.SessionId record
+            noteDelegateIfRole exact turn.SessionId (ReturnedMaterial.render record)
             AsyncSupport.trySetResult exact.Answer (Ok record) |> ignore
         | None -> ()
 
@@ -189,10 +195,10 @@ module internal SyncDelegateInternals =
 
         let resolved =
             durableWitnessView journal turn
-            |> Option.orElseWith (fun () -> fencedRenderedView turn assistant)
+            |> Option.orElseWith (fun () -> fencedMaterial turn assistant)
 
         match resolved with
-        | Some record when not (System.String.IsNullOrWhiteSpace record) ->
+        | Some record ->
             // Claim the call before settling it: a concurrent terminal cannot
             // discharge the same work unit twice.
             settleExactCall noteDelegateIfRole store call turn record

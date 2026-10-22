@@ -80,32 +80,22 @@ final continuation finishes, return one result. A lane's completion is not the
 completion of the whole assignment.
 
 
-## Deliver the report mapping after the prose
+## Write the report, then deliver
 
-First write the closing prose in the assistant body: what was done, what the
-evidence is, what remains open, and what a successor would need. Then end the
-assignment with `this.deliver(reportMapping)`.
+Write the final report in ordinary assistant text: what was done, the evidence,
+and what remains open. Call `this.deliver()` immediately afterward. This is
+the usual delivery pattern. The current turn returns automatically, so the
+report needs neither an anchor nor a copy in the argument.
 
-`reportMapping` is a `Record<string, null|string>`: an anchor number to `null`
-(keep that anchor's text) or to a summary string (replace it). It carries no
-`prefixUntil`; the host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`.
-The mapping must point at everything this work owes the caller, including that
-prose and the context it rests on. Do not copy the prose into the deliver
-argument, and do not leave it for after the call: there is no after. The caller
-receives what this mapping declares, rendered as TOML.
+Fill `carry` only if the caller also needs older context, for example
+`this.deliver([6, "…"])`. An integer copies a visible
+anchor's full history interval; a string supplies literal text. Items appear
+in array order before the current turn. There is no prefix parameter. The
+host formats the material as readable TOML.
 
-Delivery takes a report mapping only. Prose, an arbitrary value, or a
-standalone result object is not a delivery. A plain `return` leaves the
-delivery cell empty: while delivery is still possible the child stays active,
-no completion is written and the join never closes; once delivery became
-impossible (aborted, cancelled, or settled at restart load) that work is
-settled as `voided` — not a completion, but the join closes and reports it
-once. Handing over a `{ prefixUntil, thenMap }` wrapper yourself
-is refused with `VIEW_DECLARATION_INVALID`, as is a missing reportMapping or
-one of an illegal shape; an empty mapping is legal and replaces nothing.
-
-A natural stop without a valid delivered mapping is nudged. An empty record is
-not completion.
+A plain `return` or a natural stop does not deliver. Work stays active while
+delivery is possible, and the runtime will nudge it. If an invalid array is
+refused, correct it and continue to delivery.
 
 If the deliver call returns an explanation instead of settling the work, it
 means the delivery is not established: the explanation states why, which
@@ -137,3 +127,4 @@ for a case, report invented accesses, or wait for bookkeeping. The runtime
 collects substantive file access and the completed work's file state; converged
 lanes belong to one source trace, not separate cases. A later resume is new work,
 not permission to rewrite what this assignment established.
+

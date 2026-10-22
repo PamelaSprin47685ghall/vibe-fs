@@ -3,6 +3,7 @@ import test from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
 import {
@@ -166,17 +167,17 @@ ${body}
 }`
 
 const runProgram = (dir, role, sessionId, body) =>
-  execute(dir, role, 'en', sessionId, { program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
+  execute(dir, role, 'en', sessionId, { name: 'repository-programming-002', program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
 
 // A recording delegation host: every dispatch member travels the single
-// `(name, payload, reportMapping)` entry, so the payload the host receives is
+// `(name, payload, carry)` entry, so the payload the host receives is
 // the payload the member built.
 const recordingHost = () => {
   const calls = []
   return {
     calls,
-    delegate: async (name, payload, reportMapping) => {
-      calls.push({ member: name, payload, reportMapping })
+    delegate: async (name, payload, carry) => {
+      calls.push({ member: name, payload, carry })
       return { ok: true, name: payload?.name ?? '', agentId: 'agent-1', outcome: 'created' }
     },
     join: async () => ({ ok: true, records: [], byName: {} }),
@@ -203,12 +204,13 @@ test('WHAT[repository-programming-002] registered_js_tools_match_js_tool_generat
   }
 })
 
-test('WHAT[repository-programming-002] the delegation verbs are programming-surface members only: no host tool is registered for them', () => {
-  for (const name of ['fork', 'resume', 'commission', 'devops']) {
-    for (const role of allRoleLabels) {
-      assert.equal(rolePredicate(name, role), false, `${name} must not be a host tool for ${role}`)
+test('WHAT[repository-programming-002] the delegation verbs are programming-surface members only: no host tool is registered for them', async () => {
+  await withExecutablePlugin(async (hooks) => {
+    assert.ok(hooks.tool['todowrite-for-manager'], 'the generated programming tool must be registered')
+    for (const name of ['fork', 'resume', 'commission', 'devops']) {
+      assert.equal(Object.hasOwn(hooks.tool, name), false, `${name} must not be a host tool`)
     }
-  }
+  })
 
   // The office that holds the permission carries the member on its own
   // programming surface.
@@ -413,7 +415,7 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
 
     const layers = layersOf(result)
     assert.equal(layers.advisor.binding, 'advisor', `${role}: advisor binding key`)
-    assert.match(result.description, /async advisor\(intent, view\)|async advisor\(intent, reportMapping\)/, `${role}: advisor pseudocode signature`)
+    assert.match(result.description, /async advisor\(intent, carry/, `${role}: advisor pseudocode signature`)
     for (const [member, layer] of Object.entries(layers)) {
       const baseClassMarker = SUGAR_MEMBERS.includes(member)
         ? `async ${member}(`
@@ -449,7 +451,7 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
   }
 })
 
-test('WHAT[repository-programming-002] dispatch members carry a reportMapping; pull members never do', () => {
+test('WHAT[repository-programming-002] dispatch members accept carry; pull members take no selection', () => {
   const manager = surface('Manager', rolePermissions('manager'))
   assert.equal(isSome(manager), true)
 
@@ -457,15 +459,15 @@ test('WHAT[repository-programming-002] dispatch members carry a reportMapping; p
   for (const member of ['fork', 'resume', 'dag', 'advisor']) {
     assert.match(
       manager.baseClassSource,
-      new RegExp(`async ${member}\\([^)]*reportMapping`),
-      `${member} takes a reportMapping`,
+      new RegExp(`async ${member}\\([^)]*carry`),
+      `${member} takes carry`,
     )
     const prose = memberProse(manager.description, member)
     assert.ok(prose, `${member} is documented in the description`)
-    assert.match(prose, /reportMapping/, `${member} documents the reportMapping`)
+    assert.match(prose, /carry/, `${member} documents carry`)
   }
 
-  // Pull members: they gather, they do not report — no reportMapping at all.
+  // Pull members collect completed work without a history selection.
   for (const member of ['join', 'horizon']) {
     assert.match(
       manager.baseClassSource,
@@ -474,14 +476,14 @@ test('WHAT[repository-programming-002] dispatch members carry a reportMapping; p
     )
     const prose = memberProse(manager.description, member)
     assert.ok(prose, `${member} is documented in the description`)
-    assert.equal(/reportMapping/.test(prose), false, `${member} documents no reportMapping`)
+    assert.equal(/carry/.test(prose), false, `${member} documents no carry parameter`)
   }
 
   const engineer = surface('Engineer', rolePermissions('engineer'))
   assert.match(engineer.baseClassSource, /async fission\(payload\)/, 'fission takes its payload only')
   const fissionProse = memberProse(engineer.description, 'fission')
   assert.ok(fissionProse, 'fission is documented in the description')
-  assert.equal(/reportMapping/.test(fissionProse), false, 'fission documents no reportMapping')
+  assert.equal(/carry/.test(fissionProse), false, 'fission documents no carry parameter')
 })
 
 test('WHAT[repository-programming-002] dag is emitted only when Fork and Join both exist, and its body calls no missing member', () => {
@@ -517,7 +519,7 @@ test('WHAT[repository-programming-002] commission derives the name from a single
       dir,
       'Orchestrator',
       commissionSessionId,
-      `    return await this.commission("audit the parser module on its own", { 1: null });`,
+      `    return await this.commission("audit the parser module on its own", [1]);`,
     )
     assert.equal(caseName(commissioned), 'Succeeded')
     const commissionCalls = host.calls.filter((call) => call.member === 'commission')
@@ -543,8 +545,8 @@ test('WHAT[repository-programming-002] resume does not derive the name from a si
       dir,
       'Manager',
       sessionId,
-      `    const derived = await this.resume("resume the audit", { 1: null });
-    const explicit = await this.resume({ charge: "resume the audit", name: "audit-road" }, { 1: null });
+      `    const derived = await this.resume("resume the audit", [1]);
+    const explicit = await this.resume({ charge: "resume the audit", name: "audit-road" }, [1]);
     return { derived, explicit };`,
     )
     assert.equal(caseName(resumed), 'Succeeded')
@@ -562,8 +564,8 @@ test('WHAT[repository-programming-002] resume does not derive the name from a si
     )
     assert.equal(resumeCalls[0].payload.name, undefined, 'the nameless resume carries no name value')
     assert.equal(resumeCalls[1].payload.name, 'audit-road', 'an explicit name is kept')
-    assert.equal(resumeCalls[0].reportMapping['1'], null, 'the report mapping travels unchanged')
-    assert.equal(resumeCalls[1].reportMapping['1'], null, 'the report mapping travels unchanged')
+    assert.deepEqual(resumeCalls[0].carry, [1], 'carry travels unchanged')
+    assert.deepEqual(resumeCalls[1].carry, [1], 'carry travels unchanged')
   } finally {
     clearDelegationHost(sessionId)
     cleanup()
@@ -582,7 +584,7 @@ test('WHAT[repository-programming-002] deliver refuses a second argument and nev
       dir,
       'Engineer',
       sessionId,
-      `    const refusal = await this.deliver({ 0: "final report" }, "second argument");
+      `    const refusal = await this.deliver(["final report"], "second argument");
     return { refusal };`,
     )
     assert.match(render(refused), /VIEW_DECLARATION_INVALID/, 'the second argument is refused')
@@ -594,12 +596,10 @@ test('WHAT[repository-programming-002] deliver refuses a second argument and nev
       dir,
       'Engineer',
       acceptedSessionId,
-      `    await this.deliver({ 0: "final report" });`,
+      `    await this.deliver(["final report"]);`,
     )
     assert.equal(caseName(accepted), 'Succeeded')
-    const view = deliveredViewOf(acceptedSessionId)
-    assert.equal(view.prefixUntil, 0, 'the accepted delivery is read as a prefixUntil 0 declaration')
-    assert.equal(view.thenMap['0'], 'final report', 'the accepted delivery records the report mapping')
+    assert.deepEqual(deliveredViewOf(acceptedSessionId), ['final report'])
   } finally {
     clearDeliveredValue(sessionId)
     clearDeliveredValue(acceptedSessionId)
@@ -607,7 +607,7 @@ test('WHAT[repository-programming-002] deliver refuses a second argument and nev
   }
 })
 
-test('WHAT[repository-programming-002] the devops member documents the { ok, kind, status, view } result shape', () => {
+test('WHAT[repository-programming-002] the devops member documents the { ok, kind, status, returned } result shape', () => {
   const plan = surface('Plan', rolePermissions('plan'))
   assert.equal(isSome(plan), true)
   assert.ok(memberNames(plan).includes('devops'), 'the DevOpsConsultation permission projects the devops member')
@@ -616,8 +616,9 @@ test('WHAT[repository-programming-002] the devops member documents the { ok, kin
   assert.ok(prose, 'the devops member is documented in the description')
   assert.match(
     prose,
-    /\bok\b[\s\S]{0,40}?kind\b[\s\S]{0,40}?status\b[\s\S]{0,40}?view\b/,
-    'the documented devops result names ok, kind, status and view',
+    /\bok\b[\s\S]{0,40}?kind\b[\s\S]{0,40}?status\b[\s\S]{0,40}?returned\b/,
+    'the documented devops result names ok, kind, status and returned',
   )
-  assert.match(plan.baseClassSource, /async devops\(intent, reportMapping\)/, 'devops takes an intent and a reportMapping')
+  assert.match(plan.baseClassSource, /async devops\(intent, carry = \[\]\)/, 'devops takes an intent and optional carry')
 })
+
