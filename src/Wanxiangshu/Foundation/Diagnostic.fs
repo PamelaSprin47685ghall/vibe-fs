@@ -107,16 +107,19 @@ module Diagnostic =
     let private redactFields (fields: (string * string) list) : (string * string) list =
         fields |> List.map (fun (name, value) -> name, redactText value)
 
-    /// Route one record to the installed sink, if any. A sink that throws is
-    /// dropped: a diagnostic must never break product code.
+    /// Decides the sink call itself: a sink that throws is dropped, because a
+    /// diagnostic must never break product code.
+    let private invokeSink (sink: Sink) (operation: string) (fields: (string * string) list) : unit =
+        try
+            sink operation (redactFields fields)
+        with _ ->
+            ()
+
+    /// Route one record to the installed sink, if any.
     let private routeToSink (operation: string) (fields: (string * string) list) : unit =
         match activeSink with
         | None -> ()
-        | Some sink ->
-            try
-                sink operation (redactFields fields)
-            with _ ->
-                ()
+        | Some sink -> invokeSink sink operation fields
 
     let private validate (fields: (string * string) list) : unit =
         let illegal =
@@ -141,6 +144,12 @@ module Diagnostic =
         |> List.toArray
         |> payloadObject operation
 
+    /// Decides whether this record is observable at all: only a valid,
+    /// diagnostics-visible operation reaches the console and the sink.
+    let private emitWhenVisible (operation: string) (render: unit -> unit) : unit =
+        if shouldEmit operation then
+            render ()
+
     /// Expected / best-effort. Validates the CTX-014 whitelist.
     ///
     /// Silent by default, and that default is the clause: HOST-007 forbids a log line from
@@ -152,9 +161,9 @@ module Diagnostic =
     let emit (operation: string) (fields: (string * string) list) : unit =
         try
             validate fields
-            if shouldEmit operation then
+            emitWhenVisible operation (fun () ->
                 payload operation fields |> stringify |> error
-                routeToSink operation fields
+                routeToSink operation fields)
         with _ ->
             ()
 

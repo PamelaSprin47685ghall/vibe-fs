@@ -85,6 +85,16 @@ type LiveHostConfig(config: obj) =
         |> Option.map toSettingGap
         |> Ok
 
+    /// Decides how a rejected config write becomes a port verdict: a host config
+    /// can be frozen or otherwise non-writable, the write then throws instead of
+    /// being ignored, and the round trip did not complete — so the port reports
+    /// it and the product owns the verdict.
+    let private applyToLiveConfig (cfg: obj) (settings: RequiredSetting list) : Result<SettingGap option, HostError> =
+        try
+            applyToObject cfg settings
+        with ex ->
+            Error(HostError.Refused("the host config rejected the write: " + ex.Message))
+
     /// Adopt the config object the host just delivered. The port instance stays
     /// the same, so the product keeps reading the live config.
     member this.Accept(nextConfig: obj) : unit = current <- nextConfig
@@ -100,10 +110,4 @@ type LiveHostConfig(config: obj) =
             if isNull current then
                 Error(HostError.Refused "the host supplied no config object")
             else
-                try
-                    applyToObject current settings
-                with ex ->
-                    // A host config can be frozen or otherwise non-writable; the write
-                    // then throws instead of being ignored. The round trip did not
-                    // complete, so the port reports it and the product owns the verdict.
-                    Error(HostError.Refused("the host config rejected the write: " + ex.Message))
+                applyToLiveConfig current settings

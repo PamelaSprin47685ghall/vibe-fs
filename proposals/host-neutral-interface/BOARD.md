@@ -103,7 +103,7 @@ P-08 fact (arch lane, 2026-10-22, slice P-08): P-08 now has an OpenCode implemen
 enumerated route has `Variant = None`. `Apply` is `HostError.Unsupported HostCapability.ProviderParams`:
 the host binds a model per prompt, never to a session. This is recorded as a fact only: it touches the
 HNI-08 (plugin-host) board's model-routing surface, but it claims no card and changes no card state. The
-legacy `HostModel` (the former `OpencodeModel`) and the `ModelRoutingSurface` host calls stay live (retirement is
+`HostModel` (renamed from `OpencodeModel` by HNI-10 slice C) and the `ModelRoutingSurface` host calls stay live (retirement is
 HNI-10) and no consumer was cut over; routing them onto P-08 is the next slice.
 
 P-08 wiring fact (arch lane, 2026-10-22, slice C): the neutral model catalog is now really wired on OpenCode.
@@ -251,7 +251,8 @@ already unused inside `applyOrdinaryTransform`, so this is a signature-only chan
 (`suppressHostMessagesByIds`, rendered-message insertion) are byte-for-byte unchanged. (4) The dispatch send path
 (`Interaction/Dispatch/Send.fs`, `Interaction/Dispatch/DispatchSessionPort.fs(i)`) now speaks the neutral **P-02**
 shape: `IDispatchSessionPort.SendPrompt` takes `(sessionId, PromptRequest, metadata side channel,
-LateDeliveryListener)`, the legacy `OpenCodePromptOptions` survives only at the JS-facing host boundary where
+LateDeliveryListener)`, the options *record* shape survives only at the JS-facing host boundary (the type
+is now `SessionPromptOptions`), where
 `DispatchSessionPort.toHostOptions` translates back, and the neutral `DeliveryVerdict` crosses the port while the
 legacy `DetachedSendVerdict` stays inside the product. (5) Earlier slices on `master`: the Mission relay-retirement
 decision moved into `Mission/Work` core (`052e1390d`), the Casebook tool contribution decisions moved behind
