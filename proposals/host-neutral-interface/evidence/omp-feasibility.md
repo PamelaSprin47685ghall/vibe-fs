@@ -23,18 +23,31 @@ binary `~/.local/bin/omp` reports `omp/18.12.4`. Extension entry: `omp -e <file>
 | P-12 Diagnostics | `pi.logger` | Implementable. |
 
 ## Conformance evidence (`adapters/omp/check.sh`)
+
+**Current check status (post-O-3, post-P-19).** The historical strict `tsc --noEmit` conformance check listed in
+item 1 passed **before** upstream P-19 added the required `Config` port; the **current** strict check **fails**
+with `TS2741: Property 'Config' is missing in type ... but required in type 'HostPorts'` (see the O-3 blocker
+paragraph below) and no fake `Config` implementation was fabricated. The `mirror-check.mjs` byte-diff (item 2)
+**passes**, and the offline latch fixture (item 3) **passes with 49 assertions**. Only the strict type-check is
+red, and only on the `Config` binding gap.
 1. `tsc --noEmit` (strict) of `ports.ts`, `adapter.ts`, `sdk-children.ts`, `session-files.ts` and the fixture against omp's own
-   `dist/types` — passes. The compiler is the repo-local TypeScript **7.0.2** (`node_modules/.bin/tsc`); the earlier
-   "TypeScript 5.9.3" claim in this document was wrong. Mutation check: returning `{ block: 3 }` from `tool_call` and
-   reading `e.sessionIdX` from `session_stop` both fail type-check (TS2769, TS2551), so the check really binds to
-   omp's types.
+   `dist/types` — **historical (pre-P-19) pass**. At the time this was recorded the strict check was green
+   against omp's own types. The compiler is the repo-local TypeScript **7.0.2** (`node_modules/.bin/tsc`); the
+   earlier "TypeScript 5.9.3" claim in this document was wrong. **Historical** mutation check (also pre-P-19):
+   returning `{ block: 3 }` from `tool_call` and reading `e.sessionIdX` from `session_stop` both failed
+   type-check (TS2769, TS2551), so the check really binds to omp's types. **This check is no longer green:**
+   the current strict run fails on the missing `Config` binding — `TS2741: Property 'Config' is missing in type
+   ... but required in type 'HostPorts'` — because upstream P-19 made `Config: IHostConfigPort` a required
+   `HostPorts` member and omp exposes no configuration-mutation surface to bind it (see the O-3 blocker
+   paragraph). No mock or pass-through `Config` was fabricated.
 2. `mirror-check.mjs`: `ports.ts` is **generated** from the F# port signatures (`gen-ports.mjs` parses
    `src/Wanxiangshu/Host/Ports/*.fsi` plus the two foundation signature files) and the check regenerates it and
    **byte-diffs** the result, failing with the differing lines printed. A renamed field, a changed field type, a
    lost `option`, a missing or extra union case or a changed member signature all break it — the earlier
    name-only comparison could not see any of those.
 3. `fixtures/fixture.test.ts` (bun, offline): a fake `ExtensionAPI` replays recorded-shape omp events
-   (`fixtures/events.json`) through the adapter to a fake product; 34 assertions at the tip of this lane's adapter
+   (`fixtures/events.json`) through the adapter to a fake product; **49 assertions at the current tip**, all of
+   which pass. The **34** enumerated below are the **historical** tip of this lane's earlier adapter
    work (tool registration and execution
    encode, refuse→block, rewrite/allow, result replace, input refuse, system prompt, compaction context,
    auto-continue deny, turn_end error → `AttemptFinished Failed`, transcript decode, child create, model apply
@@ -207,6 +220,22 @@ across two shutdowns, and a `session_start` after the shutdown activates a fresh
 one more session. **Acceptance 5 does not exist**: no gate rejects a product decision in the entry module, and
 the skeleton has **no entry module at all** (only `activateOnOmp`), so `cut36-omp-2` owns both the entry
 module and the gate. The rule was **not** exercised against a running omp host.
+
+**The `Config` binding blocker (exact, unfabricated).** Upstream P-19 declared `Config: IHostConfigPort` as a
+**required** member of `HostPorts` (`src/Wanxiangshu/Host/Ports/HostConfig.fsi`, mirrored into `ports.ts`), so the
+port object the skeleton hands to `Activate` no longer type-checks: `tsc --noEmit` fails with
+`TS2741: Property 'Config' is missing in type ... but required in type 'HostPorts'` (`adapter.ts`, the `ports`
+literal). This is the **only** current strict-check failure, and it is a real missing prerequisite, not a
+rounding error: **omp exposes no configuration-mutation surface to an extension.** `ExtensionAPI`
+(`src/extensibility/extensions/types.ts`) has no settings get/set/write method — the port's
+read-with-provenance and persisted-write semantics have nothing on the omp side to bind to. The only candidate,
+omp's internal settings registry (`@oh-my-pi/pi-coding-agent/config/settings`), is not part of the extension
+surface **and is not loadable in this runtime**: importing it aborts with
+`Cannot find module '.../@oh-my-pi/pi-natives@18.12.5/native/pi_natives.linux-x64-baseline.node'`, i.e. the
+native module the settings layer depends on is absent from the execution environment. Per the rule's own failure
+semantics (rule 7: the adapter must not invent host behaviour), **no mock, no-op, or always-succeed `Config`
+port was fabricated.** The `Config` port therefore remains unbound, and closing it needs either an omp extension
+settings API or a runtime that can load `pi-natives` — a prerequisite this lane cannot satisfy.
 
 **Acceptance (for `cut36-omp-2`).**
 1. A golden-package test loads the **real** entry module with a fake `pi` and a **stub `IHostPlugin`**: the
