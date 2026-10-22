@@ -106,7 +106,7 @@ Host subsystem 的公开 Contract、Runtime 与物理 Adapter 必须保持编译
 - `Host.Session.Contract`（`host-session-contract`）：仅包含会话静止 capability 与纯 `SessionSnapshot` 词汇、端口、定位 decision，不依赖 SDK/HTTP 投影、具体 Host 运行时、进程控制、诊断或 Sphinx MCP。
 - `Host.Signal.Contract`（`host-signal-contract`）：仅发布共享终端词汇 `Foundation.TerminalSignal`（原 `OpenCode/Signals/EventContract`，CUT-34 移出适配层），无状态且零副作用；不得因终端词汇而传递摘要实现、消息词汇、SDK 类型、工具注册或物理启动配置，不作为兼容 umbrella。
 - `Host.Message.Contract`（`host-message-contract`）：独立发布 `Message`/`MessagePart` 消息词汇，不携带 SDK 类型、终端事件或摘要实现。
-- `Host.SDK.Types`（`host-opencode-types`）：独立发布 `OpencodeTypes`/`OpencodeModel` SDK 数据类型，不携带消息词汇、终端事件或物理 Host 能力。
+- `Host.SDK.Types`（`host-opencode-types`）：独立发布 `OpencodeTypes` SDK 数据类型与 `HostModel` 宿主中立模型词汇（原 `OpencodeModel`，HNI-10 于 2026-10-22 就地改名），不携带消息词汇、终端事件或物理 Host 能力。
 - `Host.Event.Envelope`（`host-event-envelope`）：只发布 raw Host envelope unwrap、event type、session identity 与 message-session identity 的唯一无状态公式；不得修改输入对象。
 - `Host.Message.Codec`（`host-message-codec`）：只发布 raw Host message part → `MessagePart` 的无状态 decode；其 bounded audience 只包含实际 message consumer。
 - `Host.Loop.Event.Codec`（`loop-event-codec`）：只发布 loop text-delta decode/query，并单向依赖 `Host.Event.Envelope`；不得获得完整 provider failure/terminal codec。

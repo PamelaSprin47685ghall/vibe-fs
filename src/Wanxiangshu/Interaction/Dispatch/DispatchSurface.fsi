@@ -15,8 +15,8 @@ module DispatchSurface =
     val internal rootWorkspaceReader: directory: obj -> IRootWorkspaceReader
 
     /// JS-safe controlled Host child listing for adapter proofs. The F# Result
-    /// and OpenCodeChildInfo representations stay on this registered surface.
-    val acceptedChild: session: string -> title: string -> agent: string -> Result<OpenCodeChildInfo list, string>
+    /// and ChildSessionInfo representations stay on this registered surface.
+    val acceptedChild: session: string -> title: string -> agent: string -> Result<ChildSessionInfo list, string>
 
     val admittedWithReceipt: value: string -> Outcome.SendOutcome
 

@@ -30,7 +30,7 @@ module TranscriptPort =
     /// provider, the model and the variant, so the neutral route is a direct
     /// reading — nothing is hardcoded and no provider is resolved by guessing.
     /// A message without a model has no route; the adapter never invents one.
-    let private routeOf (model: OpencodeModel option) : ModelRoute option =
+    let private routeOf (model: HostModel option) : ModelRoute option =
         match model with
         | None -> None
         | Some value ->

@@ -71,7 +71,7 @@ module private ExecutionSpawn =
         task {
             let title = sprintf "wanxiangshu-delivery:%s" operationId
 
-            let options: OpenCodeChildOptions =
+            let options: ChildSessionOptions =
                 { Title = Some title
                   Agent = Some agent
                   Directory = None }

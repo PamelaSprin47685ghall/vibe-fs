@@ -148,7 +148,7 @@ module SessionSnapshotPort =
         else
             decodeToolPartsOrEmpty (unbox<obj array> raw?parts)
 
-    let private modelOf (info: obj) : OpencodeModel option =
+    let private modelOf (info: obj) : HostModel option =
         if isNull info then
             None
         elif not (isNull info?providerID) && not (isNull info?modelID) then

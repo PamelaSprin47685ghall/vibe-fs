@@ -36,7 +36,7 @@ type SessionMessage =
       Agent: string option
       Finish: string option
       ErrorName: string option
-      Model: OpencodeModel option
+      Model: HostModel option
       ParentId: string option
       CreatedAt: float option
       Completed: bool

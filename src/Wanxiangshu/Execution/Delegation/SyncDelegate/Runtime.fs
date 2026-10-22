@@ -314,7 +314,7 @@ type SyncDelegateRuntime
         (scope: ReuseScopeId)
         (role: SyncDelegateRole)
         (agentName: string)
-        (children: OpenCodeChildInfo list)
+        (children: ChildSessionInfo list)
         =
         let expectedTitle = SyncDelegatePhysicalIdentity.title scope role agentName
 

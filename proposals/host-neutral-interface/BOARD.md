@@ -14,7 +14,7 @@ land rebase + ff. Ratchets (architecture ⑧, ⑨, HNI-04 thinness) only go down
 | HNI-07 | Tools: ToolRegistry/ToolRuntimeScope/Codec behind P-04/P-05 (+ Mission/Work, Repository tool bindings) | tools | 02 | eng-hni-tools-goose | DONE — landed on `master` as ``14119b211`, `6540a7f68`, `52518bc0a`, `97d524710`, `307d2867f`, `867638544`, `151b4372f`, `efbec4d04`, `ccc7c1273`, `a4fefc897``: the tool execute gate (`Execution/Tool/ExecuteGate.fs`), the per-tool declared admissions (`Execution/Tool/Admissions.fs`) and the name→admission table (`Execution/Tool/AdmissionTable.fs`) left the OpenCode adapter, `DeliveryAttemptLedger` moved to `Mission/Work`, and P-18's file was renamed `Host/Tools.fs(i)` → `Host/ToolContext.fs(i)` (D-07; gate ⑫ 0). Gate ⑩ `product-reference 585 (baseline 689) / without-port 134 (baseline 149)`. Remaining convergence (D-02/D-04/D-05) is HNI-14. |
 | HNI-08 | Plugin host: Plugin/Host behind P-06..P-09, P-11, P-12; product = `HostPorts -> ProductHooks` | plugin-host | 02 | eng-hni-plugin-goose | DOING — **slice 2+3 landed**: P-00, P-02, P-09, P-10, P-11, P-12, P-19 are WIRED-OC (product: `Composition/Plugin/{Activation,CompactionGate,ConfigPolicy}.fs`; OpenCode: `OpenCode/Host/OpenCodeHostPorts.fs`, `OpenCode/Plugin/OpenCodeHostConfig.fs`, `PluginHooks`/`SpikePlugin` cutover). Still open in HNI-08: P-06 (`ITurnTransform` extraction from `PluginTransforms`/`ChatParamsHook`/`ProviderSystemTransform`) and P-07 (`ISignalSource` cutover) — **not build-verified**: the owner Fable compile exited 75 (build-slot queue timeout on an overloaded machine) and verification was done by static analysis instead |
 | HNI-09 | Leftovers: Mission/Work, Repository, Sphinx V2 hosts, Context/Prefix, Interaction/Dispatch `OpenCode` folders | domains (this lane) | 02 | domain-cores | DOING — **landed so far** (all on `master`): `40b9967fd` (the three dispatch-correlation wire literals — `wanxiangshu_prompt_key` / `wanxiangshu_origin` / `wanxiangshu_logical_run` — moved to the neutral `Wanxiangshu.Foundation.PromptMetadataField`, one literal per wire field), `c27056ee6` (the js-* tool product decisions into the product module `Repository/Programming/Js/JsToolPolicy.fs(i)`), `500a47c5c` (**Context/Prefix**: `Context/Prefix/OpenCode/Wire.fs(i)` now takes the neutral **P-03** `ITranscriptPort option` instead of the legacy `ISessionSnapshotPort option`; signature-only, provider edit semantics untouched), `e97ec7b5e` (**Interaction/Dispatch**: `IDispatchSessionPort.SendPrompt` and `Interaction/Dispatch/Send.fs` now speak the neutral **P-02** `PromptRequest` + `DeliveryVerdict`/`LateDeliveryListener`; the legacy `OpenCodePromptOptions` survives only at the JS host boundary), plus earlier `052e1390d` (Mission relay core), `b87ee2e44` (Casebook tool contribution decisions → `Repository/Knowledge/Casebook/ToolPlan.fs(i)`) and `2702b0058` (Sphinx dispatch decision → `Sphinx.V2.Core.DispatchPolicy`). **Still in flight / open**: the Repository js-* adapter files (`Repository/Programming/Js/OpenCode/{ToolHost,ToolHostSurface,BookkeeperTool}.fs`) and the Casebook/Sphinx/Mission adapters still carry product references and are still in the `without-port` list; `Interaction/Dispatch/OpenCode/IngressCodec.fs` still carries one product reference and is still in `without-port` (cutover needs P-03 to carry the `synthetic` flag and the multi-source compaction judgement — out of scope for this lane); P-05 (`IToolGate`) has no HNI-09 consumer yet. **NOT BUILD-VERIFIED / NOT TEST-RUN** — verified by static gates only |
-| HNI-10 | Retire host-shaped Foundation names (`OpenCodePromptOptions`, `OpenCodeChildOptions`, `OpenCodeChildInfo`, `OpencodeModel`, `IOpenCodePort`) via aliases then deletion | arch | 05–08 | — | BACKLOG |
+| HNI-10 | Retire host-shaped Foundation names (`OpenCodePromptOptions`, `OpenCodeChildOptions`, `OpenCodeChildInfo`, `OpencodeModel`, `IOpenCodePort`) via aliases then deletion | arch | 05–08 | — | DOING — **slice C landed (2026-10-22)**: the four Foundation type names were retired *in place* (no alias kept): `OpencodeModel` → `HostModel`, `OpenCodePromptOptions` → `SessionPromptOptions`, `OpenCodeChildOptions` → `ChildSessionOptions`, `OpenCodeChildInfo` → `ChildSessionInfo`; the alias `type SessionPromptOptions = OpenCodePromptOptions` is deleted and `SessionPromptOptions` is now the primary neutral name. The wire field names (`providerID` / `modelID` / `variant`) are byte-identical, so the Fable-emitted JS contract and the frozen manifest modules are untouched. **Still open**: the *types* themselves still live in Foundation (they are not yet `SessionSpec` / `SessionInfo` / `PromptRequest` / `ModelRoute`), and `IOpenCodePort` (12 files / 37 occurrences) stays in `OpenCode/Host/OpenCodeContract.fs(i)` until the P-01/P-02 consumers are cut over |
 | HNI-11 | Drift review of lane port additions (names, shapes, HostError use, registry rows) | arch | 05–08 running | eng-host-arch-goose | DOING (continuous) — D-05/D-06/D-07 recorded in REGISTRY.md; gate ⑫ (port-family identity) added in `f214ece07`; **gate ⑬ (namespace-tier integrity) added 2026-10-22** — `Host/Ports/` declares `Wanxiangshu.Host.Ports`, `Host/Domain/` declares `Wanxiangshu.Host.Domain`, no file directly under `Host/` may claim either, and the tier-B seam's adapter references are ratcheted (`scripts/checks/domain-seam-baseline.json`); the tools lane's `Host/Tools.fs` must be renamed before it moves under `Host/Ports/` (D-07) |
 | HNI-13 | omp open items O-1 (entry ids), O-2 (provider params encode), O-3 (Fable-built product bound to `activateOnOmp`), O-4 (`parentSession` may be a session file path, not an id), O-5 (`AgentSession.sessionId` is the *provider* id, not the persisted one — the neutral `SessionId` is `sessionManager.getSessionId()`) | arch | 08 | cut36-omp-2 | DECIDED — rules O-1..O-5 in evidence/omp-feasibility.md; implementation owned by cut36-omp-2；2026-10-22 进展：O-1（条目 id）、O-4（不可解析的父会话 → NotFound）已落地；O-3 入口门禁在推进（Fable 产物与 activateOnOmp 的真实绑定尚未成立）；O-2 因宿主无可达前提而阻塞（ProviderParams 能力不广告）；真实 smoke 尚未通过，仍不宣称已支持第二宿主 |
 | HNI-14 | Converge lane domain ports (D-02, D-03, D-04 in REGISTRY.md): split P-14/P-15/P-17 into neutral HostPorts + Composition inputs; merge P-18 `HostToolContext` with `ToolInvocation`; move `ToolResultText` to a product module | arch + owning lanes | 05–08 | — | DECIDED (evidence/hni14-convergence.md) — steps S1..S5 owned by the fork/session, fission, tools and arch lanes; shape convergence not implemented; step (a) namespace relocation landed in `51aadb02f`. **D-05 resolved** (2026-10-22: P-13/P-14/P-15/P-16 now live in `Host/Domain/` under `Wanxiangshu.Host.Domain`), **D-06 partly resolved** (each seam file carries its `HNI P-xx` marker). **Remaining**: D-02/D-03/D-04 (the shape convergence above) and P-17's **location** — `Host/FissionPort.fs(i)` already declares the safe `Wanxiangshu.Host.Ports` namespace but still sits directly under `Host/`, so it is the one exemption of gate ⑬'s location rule until the fission lane moves it to `Host/Ports/` |
@@ -43,13 +43,31 @@ verb the product already uses. No verb is left `Unsupported`. `Host/Ports/*` is 
 so the port family is unchanged and the next free port id is **P-20** (P-19 was declared as `HostConfig` by `93a51ca15`).
 
 Host-lifecycle leftover audit (eng-hni-host, 2026-10-22): the adapter is complete (above), but product lifecycle
-consumers remain on legacy `ISessionHostPort` / `OpenCodeChildOptions` / `OpenCodeChildInfo` across four clusters:
+consumers remain on legacy `ISessionHostPort` / `ChildSessionOptions` / `ChildSessionInfo` (renamed in place by HNI-10
+slice C) across four clusters:
 (1) Fork (`Execution/Delegation/Fork/Host/Agent.fs`, `HostForkRuntime`), (2) SyncDelegate (`Execution/Delegation/SyncDelegate/Runtime.fs`),
 (3) Advisor (`Execution/Delegation/Advisor/Seat.fs`), (4) OpenCode host wiring (`OpenCode/Host/Sessions.fs`, `PluginHost.fs`).
 These consumers are precisely documented as left (in `保姆级交接与展望.md` and `REGISTRY.md`) rather than cut over in an
 unverified cross-lane sweep: `AdvisorSeat` requires terminal event subscription (`SubscribeTerminal`) which `ISessionPort`
-does not provide, `InjectedSessionPort` still manages family roots and process-local ancestry, and `OpenCodeChildOptions`/
-`OpenCodeChildInfo` have 36 live references across 17 files, which prevents retirement at this stage.
+does not provide, `InjectedSessionPort` still manages family roots and process-local ancestry, and `ChildSessionOptions`/
+`ChildSessionInfo` have 36 live references across 17 files, which prevents retirement of the *types* at this
+stage (the *names* were retired in place by HNI-10 slice C).
+
+HNI-10 slice C fact (arch lane, 2026-10-22): the *names* were retired without touching the wire. The four
+host-shaped Foundation type names became host-neutral names in place —
+`OpencodeModel` → `HostModel` (`Foundation/HostModel.fs(i)`),
+`OpenCodePromptOptions` → `SessionPromptOptions`, `OpenCodeChildOptions` → `ChildSessionOptions` and
+`OpenCodeChildInfo` → `ChildSessionInfo` (`Foundation/HostSendContract.fs(i)`); the old alias
+`type SessionPromptOptions = OpenCodePromptOptions` in `Foundation/HostSessionPort.fs(i)` is deleted, so
+`SessionPromptOptions` is the primary name and the durable-events requirement probe (which already names
+`SessionPromptOptions` as the `ISessionHostPort.SendPrompt` third parameter type) still matches. The record
+fields of `HostModel` (`providerID` / `modelID` / `variant`) are byte-identical, so the Fable-emitted JS
+property names, the frozen `ModelRoutingSurface` / `ProviderProjectionSurface` manifest modules and the JS
+requirement suites are unaffected. `ModelRouting.toOpenCodeModel` was renamed to `toHostModel` (the F# name
+erases in JS). The *types* are still Foundation-owned and still adapter-shaped: retiring them onto
+`SessionSpec` / `SessionInfo` (P-01), `PromptRequest` (P-02) and `ModelRoute` (P-08) remains blocked on the
+consumer cutovers and on the JS property-name lock. `IOpenCodePort` stays in
+`OpenCode/Host/OpenCodeContract.fs(i)` for the same reason.
 
 P-03 consumer cutover 1 (eng-hni-host, 2026-10-22): the session recovery host now reads the transcript through the
 neutral port. `OpenCode/Host/SessionRecoveryHost.fs(i)`: the constructor argument `snapshot: ISessionSnapshotPort`
@@ -85,8 +103,19 @@ P-08 fact (arch lane, 2026-10-22, slice P-08): P-08 now has an OpenCode implemen
 enumerated route has `Variant = None`. `Apply` is `HostError.Unsupported HostCapability.ProviderParams`:
 the host binds a model per prompt, never to a session. This is recorded as a fact only: it touches the
 HNI-08 (plugin-host) board's model-routing surface, but it claims no card and changes no card state. The
-legacy `OpencodeModel` and the `ModelRoutingSurface` host calls stay live (retirement is HNI-10) and no
-consumer was cut over; routing them onto P-08 is the next slice.
+legacy `HostModel` (the former `OpencodeModel`) and the `ModelRoutingSurface` host calls stay live (retirement is
+HNI-10) and no consumer was cut over; routing them onto P-08 is the next slice.
+
+P-08 wiring fact (arch lane, 2026-10-22, slice C): the neutral model catalog is now really wired on OpenCode.
+`OpenCode/Host/OpenCodeHostPorts.fs` builds the catalog with `ModelCatalogPort.create boot.WorkspaceDirectory
+boot.Input`; when the host input names a catalog source the adapter claims `HostCapability.ModelCatalog` in
+`HostCapabilities.Supports`, and when it does not the capability stays unclaimed and the declared
+`UnsupportedModelCatalog` fallback answers `HostError.Unsupported HostCapability.ModelCatalog` — never a fake
+empty catalog that would read as "this host has no models". The Foundation type `HostModel` still lives in
+`Foundation/HostModel.fs(i)` and is still adapter-shaped; moving it onto `ModelRoute` (P-08) is blocked by the
+Fable JS property-name lock (`providerID` / `modelID` / `variant` vs `Provider` / `Model` / `Variant`) and by the
+shard graph (`HostModel` lives in the leaf shard `host-boundary.host-opencode-types`, `ModelRoute` in
+`host-boundary.host-neutral-ports`; 11 of 15 consuming shards do not reference `host-neutral-ports`).
 
 P-12 fact (arch lane, 2026-10-22, slice P-12): P-12 now has an OpenCode implementation —
 `OpenCode/Host/DiagnosticsPort.fs(i)` implements `IDiagnosticSink` over the host's own log verb
@@ -192,7 +221,9 @@ product is host-neutral: `Composition/Plugin/Activation.fs` turns `HostPorts` in
 contributes nothing; `AutoContinue` denies while `HostCompactionPolicy.autoContinueEnabled` is false) and
 `Composition/Plugin/ConfigPolicy.fs` establishes the required compaction settings over `IHostConfigPort`. The
 OpenCode adapter builds the `HostPorts` in `OpenCode/Host/OpenCodeHostPorts.fs` (prompt/session/transcript/paths/
-diagnostics implemented; models/signals/tools/agents answer `HostError.Unsupported` for a capability the host does
+diagnostics implemented; models are implemented as of slice C through `ModelCatalogPort`, and
+`HostCapability.ModelCatalog` is claimed whenever the host input names a catalog source; signals/tools/agents
+answer `HostError.Unsupported` for a capability the host does
 not hold — absence is declared, never faked), implements `IHostConfigPort` in `OpenCode/Plugin/OpenCodeHostConfig.fs`
 (`LiveHostConfig` over the live host config object), and `OpenCode/Plugin/PluginHooks.fs` now routes the `config`
 hook through `ConfigPolicy` and the two compaction hooks through the neutral `ICompactionGate`;

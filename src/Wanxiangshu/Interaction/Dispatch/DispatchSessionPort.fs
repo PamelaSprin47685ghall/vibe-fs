@@ -24,7 +24,7 @@ type IDispatchSessionPort =
 ///
 /// The send contract is the host-neutral P-02 shape (`PromptRequest` plus a
 /// product-owned metadata side channel plus a `LateDeliveryListener`). The legacy
-/// `OpenCodePromptOptions` only exists at the host boundary, where the adapters
+/// `SessionPromptOptions` only exists at the host boundary, where the adapters
 /// below translate the neutral request into it.
 [<RequireQualifiedAccess>]
 module DispatchSessionPort =
@@ -52,7 +52,7 @@ module DispatchSessionPort =
         (request: PromptRequest)
         (metadata: obj option)
         (late: LateDeliveryListener option)
-        : OpenCodePromptOptions =
+        : SessionPromptOptions =
         { Model = None
           Agent = request.Role |> Option.map (fun (AgentRole role) -> role)
           Directory = request.Workspace |> Option.map (fun (WorkspacePath path) -> path)

@@ -14,10 +14,10 @@ open Wanxiangshu.Foundation.Outcome
 
 module OpenCodePortAdapter =
 
-    let private wireModel (model: OpencodeModel) =
+    let private wireModel (model: HostModel) =
         createObj [ "providerID", box model.providerID; "modelID", box model.modelID ]
 
-    let private modelRequestFields (model: OpencodeModel option) =
+    let private modelRequestFields (model: HostModel option) =
         match model with
         | None -> []
         | Some bound ->

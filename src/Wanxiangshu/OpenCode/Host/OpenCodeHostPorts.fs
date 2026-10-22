@@ -24,7 +24,7 @@ module OpenCodeHostPorts =
             lateOpt
             |> Option.map (fun listener -> fun (verdict: DetachedSendVerdict) -> listener (deliveryVerdictOf verdict))
 
-        let modelOf (routeOpt: ModelRoute option) : OpencodeModel option =
+        let modelOf (routeOpt: ModelRoute option) : HostModel option =
             routeOpt
             |> Option.map (fun r ->
                 { providerID = r.Provider
@@ -39,7 +39,7 @@ module OpenCodeHostPorts =
             member this.Send
                 (session: SessionId, request: PromptRequest, late: LateDeliveryListener option)
                 : Task<SendOutcome> =
-                let opts: OpenCodePromptOptions =
+                let opts: SessionPromptOptions =
                     { Model = modelOf request.Route
                       Agent = request.Role |> Option.map (fun (AgentRole s) -> s)
                       Directory = request.Workspace |> Option.map (fun (WorkspacePath p) -> p)
@@ -160,7 +160,12 @@ module OpenCodeHostPorts =
                 DiagnosticsPort.create boot.Input
                 |> Option.defaultWith (fun () -> DiagnosticSinkPort() :> IDiagnosticSink)
 
-            let modelsPort = UnsupportedModelCatalog() :> IModelCatalog
+            // HNI P-08: the neutral model catalog is wired on OpenCode. The
+            // adapter enumerates the routes the host advertises; an input that
+            // names no catalog source falls back to a declared refusal, never
+            // to an empty catalog that would look like a host without models.
+            let modelsOpt = ModelCatalogPort.create boot.WorkspaceDirectory boot.Input
+            let modelsPort = modelsOpt |> Option.defaultWith (fun () -> UnsupportedModelCatalog() :> IModelCatalog)
             let signalsPort = UnsupportedSignalSource() :> ISignalSource
             let toolsPort = UnsupportedToolRegistrar() :> IToolRegistrar
             let agentsPort = UnsupportedAgentCatalog() :> IAgentCatalog
@@ -169,9 +174,13 @@ module OpenCodeHostPorts =
                 { HostName = "OpenCode"
                   Supports =
                     set
-                        [ HostCapability.ChildSessions
-                          HostCapability.SessionDiscovery
-                          HostCapability.Interrupt ] }
+                        ([ HostCapability.ChildSessions
+                           HostCapability.SessionDiscovery
+                           HostCapability.Interrupt ]
+                         // The catalog capability is claimed only when the
+                         // catalog is really wired; an unclaimed capability
+                         // must answer `HostError.Unsupported`.
+                         @ (if modelsOpt.IsSome then [ HostCapability.ModelCatalog ] else [])) }
 
             return
                 { Sessions = sessionPort

@@ -82,7 +82,7 @@ type internal ChatAdmissionTransactionPorts =
         ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
       Acquire: ManagedChatAcceptanceWitness -> Task<Result<ExecutionAdmissionAcquisition, exn>>
       LeaseTarget: ExecutionAdmissionLease -> Result<ModelRoutingTarget, ExecutionAdmissionRejection>
-      ProjectHost: OpencodeModel -> Result<unit, exn>
+      ProjectHost: HostModel -> Result<unit, exn>
       Commit: ExecutionAdmissionLease -> ExecutionAdmissionExactIdentity -> CapacityTransitionOutcome
       ReleaseBeforeProvider: ExecutionAdmissionLease -> CapacityTransitionOutcome
       SettlePreProvider:
@@ -112,7 +112,7 @@ module internal ChatAdmissionTransaction =
         journal: AgentJournal ->
         acceptManagedIntent:
             (ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>) ->
-        projectHostModel: (OpencodeModel -> Result<unit, exn>) ->
+        projectHostModel: (HostModel -> Result<unit, exn>) ->
             ChatAdmissionTransactionPorts
 
     val execute:

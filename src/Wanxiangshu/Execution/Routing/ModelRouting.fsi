@@ -29,8 +29,8 @@ module ModelRouting =
 
     val configPath: unit -> string
     val bootstrapAndLoadAt: path: string -> template: string -> Task<obj>
-    val toOpenCodeModel: target: ModelRoutingTarget -> OpencodeModel
-    val sameTarget: expected: ModelRoutingTarget -> observed: OpencodeModel -> bool
+    val toHostModel: target: ModelRoutingTarget -> HostModel
+    val sameTarget: expected: ModelRoutingTarget -> observed: HostModel -> bool
 
     type internal ModelRoutingRuntime =
         new: scheduler: obj -> ModelRoutingRuntime
@@ -206,7 +206,7 @@ module ModelRouting =
     val internal tryProviderStepIdentity: providerRun: ProviderRunIdentity -> (SessionId * PhysicalUserMessageId) option
 
     val readExecutionAdmission: key: ChatExecutionKey -> (string * ModelRoutingTarget) option
-    val internal boundDevopsModel: sessionId: SessionId -> OpencodeModel option
+    val internal boundDevopsModel: sessionId: SessionId -> HostModel option
     val internal releaseExecution: sessionId: SessionId -> CapacityTransitionOutcome
 
     val internal releasePhysicalExecution:
@@ -234,4 +234,4 @@ module ModelRouting =
     /// lease is bound to an exact physical message. Read-only.
     val tryActivePhysical: sessionId: string -> string option
 
-    val projectHostModel: output: obj -> model: OpencodeModel -> Result<unit, exn>
+    val projectHostModel: output: obj -> model: HostModel -> Result<unit, exn>

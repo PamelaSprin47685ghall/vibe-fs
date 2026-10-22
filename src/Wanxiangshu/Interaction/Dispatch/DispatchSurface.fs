@@ -105,12 +105,12 @@ module DispatchSurface =
                 if isNull directory then None else Some(string directory) }
 
     /// JS-safe controlled Host child listing for adapter proofs. The F# Result
-    /// and OpenCodeChildInfo representations stay on this registered surface.
+    /// and ChildSessionInfo representations stay on this registered surface.
     let acceptedChild
         (session: string)
         (title: string)
         (agent: string)
-        : Result<Wanxiangshu.Foundation.HostSession.OpenCodeChildInfo list, string> =
+        : Result<Wanxiangshu.Foundation.HostSession.ChildSessionInfo list, string> =
         Ok
             [ { SessionId = SessionId.create session
                 ParentSessionId = None

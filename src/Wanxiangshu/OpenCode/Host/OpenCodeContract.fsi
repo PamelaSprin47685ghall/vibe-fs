@@ -9,16 +9,16 @@ open Wanxiangshu.Foundation.Outcome
 
 type IPromptPort =
     abstract SendPrompt:
-        sessionId: SessionId -> promptText: string -> options: OpenCodePromptOptions -> Task<SendOutcome>
+        sessionId: SessionId -> promptText: string -> options: SessionPromptOptions -> Task<SendOutcome>
 
 type IOpenCodePort =
     inherit IPromptPort
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
 
     abstract CreateSession:
-        parentId: SessionId option -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
+        parentId: SessionId option -> options: ChildSessionOptions -> Task<Result<SessionId, string>>
 
     abstract GetSessionParent: sessionId: SessionId -> Task<Result<SessionId option, string>>
-    abstract CreateChildSession: parentId: SessionId -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
-    abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
+    abstract CreateChildSession: parentId: SessionId -> options: ChildSessionOptions -> Task<Result<SessionId, string>>
+    abstract ListChildren: parentId: SessionId -> Task<Result<ChildSessionInfo list, string>>
     abstract CloseChildSession: childId: SessionId -> Task<Result<unit, string>>

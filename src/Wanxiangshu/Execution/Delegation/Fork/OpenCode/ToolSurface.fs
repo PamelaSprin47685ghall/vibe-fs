@@ -44,7 +44,7 @@ module ForkToolSurface =
           Options: SessionPromptOptions }
 
     type private ForkSessionPort(abortSession: SessionId -> Task<Result<unit, string>>, existingChildIds: Set<string>) =
-        let children = ResizeArray<OpenCodeChildInfo>()
+        let children = ResizeArray<ChildSessionInfo>()
         // DSL-MUTABLE: algorithm-scratch — latest prompted session in the harness
         let mutable latestPromptedSession: SessionId option = None
         // DSL-MUTABLE: algorithm-scratch — pre-accepted prompt count in the harness

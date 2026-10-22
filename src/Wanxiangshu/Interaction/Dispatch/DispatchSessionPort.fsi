@@ -23,6 +23,6 @@ module DispatchSessionPort =
     val toDetachedVerdict: verdict: DeliveryVerdict -> DetachedSendVerdict
 
     val toHostOptions:
-        request: PromptRequest -> metadata: obj option -> late: LateDeliveryListener option -> OpenCodePromptOptions
+        request: PromptRequest -> metadata: obj option -> late: LateDeliveryListener option -> SessionPromptOptions
 
     val ofSessionPort: sessionPort: ISessionHostPort -> IDispatchSessionPort

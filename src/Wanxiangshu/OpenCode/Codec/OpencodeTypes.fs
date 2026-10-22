@@ -29,7 +29,7 @@ type OpencodeUserMessage =
       role: string
       sessionID: string
       agent: string option
-      model: OpencodeModel option
+      model: HostModel option
       parts: obj list }
 
 type OpencodeAssistantMessage =
@@ -48,7 +48,7 @@ type OpencodeHookInput =
     { sessionID: string
       messageID: string option
       agent: string option
-      model: OpencodeModel option }
+      model: HostModel option }
 
 type OpencodeToolExecuteInput =
     { tool: string

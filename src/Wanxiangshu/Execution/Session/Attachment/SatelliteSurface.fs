@@ -16,7 +16,7 @@ type private SatelliteSessionPort(physical: bool, conflict: bool, queryError: bo
     // DSL-MUTABLE: resource — controlled Host child allocation sequence
     let mutable createCount = 0
 
-    let existing: OpenCodeChildInfo list =
+    let existing: ChildSessionInfo list =
         if not physical then
             []
         else

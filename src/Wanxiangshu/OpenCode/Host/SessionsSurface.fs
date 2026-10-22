@@ -160,7 +160,7 @@ module SessionsSurface =
                 InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
                 :> ISessionHostPort
 
-            let options: OpenCodeChildOptions =
+            let options: ChildSessionOptions =
                 { Title = Some "standard Engineer"
                   Agent = Some "engineer"
                   Directory = None }
@@ -221,7 +221,7 @@ module SessionsSurface =
                 let p = SessionId.value parent
                 listParents.Add p
 
-                let children: OpenCodeChildInfo list =
+                let children: ChildSessionInfo list =
                     createdChildren
                     |> Seq.map (fun c ->
                         { SessionId = SessionId.create c
@@ -251,7 +251,7 @@ module SessionsSurface =
                 InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
                 :> ISessionHostPort
 
-            let options: OpenCodeChildOptions =
+            let options: ChildSessionOptions =
                 { Title = Some "restored owner worker"
                   Agent = Some "worker"
                   Directory = None }
@@ -296,7 +296,7 @@ module SessionsSurface =
                 InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
                 :> ISessionHostPort
 
-            let options: OpenCodeChildOptions =
+            let options: ChildSessionOptions =
                 { Title = Some "failing child"
                   Agent = Some "worker"
                   Directory = None }
@@ -336,7 +336,7 @@ module SessionsSurface =
                 InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
                 :> ISessionHostPort
 
-            let options: OpenCodeChildOptions =
+            let options: ChildSessionOptions =
                 { Title = Some "cyclic child"
                   Agent = Some "worker"
                   Directory = None }
@@ -368,7 +368,7 @@ module SessionsSurface =
                 InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
                 :> ISessionHostPort
 
-            let options: OpenCodeChildOptions =
+            let options: ChildSessionOptions =
                 { Title = Some "adapter child"
                   Agent = Some "adapter-proof"
                   Directory = None }
@@ -423,7 +423,7 @@ module SessionsSurface =
                 InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
                 :> ISessionHostPort
 
-            let options: OpenCodeChildOptions =
+            let options: ChildSessionOptions =
                 { Title = Some "adapter rejected child"
                   Agent = Some "adapter-rejection-proof"
                   Directory = None }

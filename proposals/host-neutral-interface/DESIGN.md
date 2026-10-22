@@ -57,7 +57,7 @@ Architect lane: eng-host-arch. Registry of every port and its owner: [REGISTRY.m
    its domain: rebase, read REGISTRY.md, add the row in the same commit as the code, reuse existing type names.
    The architect lane reviews shapes and fixes drift (HNI-11).
 8. **Clean cutover, no shims.** Existing near-neutral contracts in `Foundation/HostSession*` (`ISessionHostPort`,
-   `ISessionSnapshotPort`, `OpenCodePromptOptions`, `OpenCodeChildOptions`, …) are *legacy shapes*. They are
+   `ISessionSnapshotPort`, `SessionPromptOptions`, `ChildSessionOptions`, …) are *legacy shapes*. They are
    migrated to the `Wanxiangshu.Host.Ports` names and **deleted in the same change**. There are no compatibility
    type aliases: a legacy name that survives as an alias is a second convention, and the ratchet counts alias
    re-introduction as a regression.
@@ -128,7 +128,7 @@ type TranscriptMessage = { Id: TranscriptMessageAddress; Role: Role; Agent: Agen
 TranscriptPart = Text | Reasoning | ToolUse of ToolCallRecord | File | Other
 ITranscriptPort: Messages : SessionId -> Task<Result<TranscriptMessage list, HostError>>
 ```
-Ownership: Execution/Session (replaces `ISessionSnapshotPort`/`SessionMessage`, whose `Model: OpencodeModel` and
+Ownership: Execution/Session (replaces `ISessionSnapshotPort`/`SessionMessage`, whose `Model: HostModel` and
 `ErrorName: string` are host-shaped). OpenCode: `session.messages` + `SessionSnapshotPort.projectMessage`.
 omp: `SessionManager` entries (`message` entries with `AgentMessage` content; `custom` entries for correlation).
 
@@ -207,7 +207,7 @@ IModelCatalog:
   Apply     : SessionId * ModelRoute -> Task<Result<unit, HostError>>
 SubagentRouting (hook): SpawnRequest -> Task<SpawnRoute>   // Keep | Route of ModelRoute list | Refuse of reason
 ```
-Ownership: plugin-host lane (port) / Interaction routing (decision). Replaces `OpencodeModel` in Foundation.
+Ownership: plugin-host lane (port) / Interaction routing (decision). Replaces `HostModel` in Foundation.
 - OpenCode: `config.provider` / `chat.message` model field; no spawn hook (spawn = P-01 + P-02 route).
 - omp: `ctx.modelRegistry`/`ctx.models`, `pi.setModel`, `pi.setThinkingLevel`, `before_subagent_spawn`.
 

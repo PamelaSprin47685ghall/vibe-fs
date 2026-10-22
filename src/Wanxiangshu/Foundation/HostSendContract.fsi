@@ -22,9 +22,9 @@ type DetachedSendVerdict =
 /// has no owner for a late verdict.
 type DetachedSendListener = DetachedSendVerdict -> Task
 
-type OpenCodePromptOptions =
+type SessionPromptOptions =
     {
-        Model: OpencodeModel option
+        Model: HostModel option
         Agent: string option
         Directory: string option
         Metadata: obj option
@@ -34,12 +34,12 @@ type OpenCodePromptOptions =
         DetachedListener: DetachedSendListener option
     }
 
-type OpenCodeChildOptions =
+type ChildSessionOptions =
     { Title: string option
       Agent: string option
       Directory: string option }
 
-type OpenCodeChildInfo =
+type ChildSessionInfo =
     { SessionId: SessionId
       ParentSessionId: SessionId option
       Agent: string option

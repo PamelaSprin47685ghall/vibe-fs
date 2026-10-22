@@ -429,7 +429,7 @@ module ModelRoutingSurface =
 
     let private portOf (value: obj) : IOpenCodePort = (unbox<PortHandle> value).Port
 
-    let private modelOf (value: obj) : OpencodeModel option =
+    let private modelOf (value: obj) : HostModel option =
         if isNullish value then
             None
         else
@@ -451,7 +451,7 @@ module ModelRoutingSurface =
             |> Map.ofArray
             |> Some
 
-    let private promptOptionsOf (value: obj) : OpenCodePromptOptions =
+    let private promptOptionsOf (value: obj) : SessionPromptOptions =
         { Model = modelOf (field value [ "model"; "Model" ])
           Agent = optionalText (field value [ "agent"; "Agent" ])
           Directory = optionalText (field value [ "directory"; "Directory" ])

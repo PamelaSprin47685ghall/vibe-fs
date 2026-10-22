@@ -125,7 +125,7 @@ module AdvisorSeat =
 
     let private createAdvisorChild (deps: AdvisorSeatDeps) (callerId: SessionId) : Task<Result<SessionId, string>> =
         task {
-            let options: OpenCodeChildOptions =
+            let options: ChildSessionOptions =
                 { Title = Some advisorAgent
                   Agent = Some advisorAgent
                   Directory = deps.Directory }

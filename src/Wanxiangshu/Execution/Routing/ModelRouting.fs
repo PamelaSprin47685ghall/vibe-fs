@@ -202,7 +202,7 @@ module ModelRouting =
     let bootstrapDefault () =
         bootstrapAndLoadAt (configPath ()) (recommendedTemplate ())
 
-    let toOpenCodeModel (target: ModelRoutingTarget) : OpencodeModel =
+    let toHostModel (target: ModelRoutingTarget) : HostModel =
         let slash = target.Model.IndexOf '/'
 
         { providerID = target.Model.Substring(0, slash)
@@ -215,7 +215,7 @@ module ModelRouting =
         else
             String.Equals(obsReasoning, expectedReasoning, StringComparison.OrdinalIgnoreCase)
 
-    let sameTarget (expected: ModelRoutingTarget) (observed: OpencodeModel) =
+    let sameTarget (expected: ModelRoutingTarget) (observed: HostModel) =
         if
             String.IsNullOrWhiteSpace observed.providerID
             || String.IsNullOrWhiteSpace observed.modelID
@@ -2074,11 +2074,11 @@ module ModelRouting =
         tryReadExecution key
         |> Option.map (fun lease -> lease.Identity.Participant, lease.Identity.Target)
 
-    let internal boundDevopsModel (sessionId: SessionId) : OpencodeModel option =
+    let internal boundDevopsModel (sessionId: SessionId) : HostModel option =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime ->
             runtime.BoundDevopsTarget(SessionId.value sessionId)
-            |> Option.map toOpenCodeModel
+            |> Option.map toHostModel
         | None -> None
 
     /// Seed the fixed DevOps target from a road's durable projection
@@ -2201,7 +2201,7 @@ module ModelRouting =
     /// execution-model-routing-009 Host projection. Routing owns both which outcomes carry a model
     /// and the exact mutable Host field that receives that model; composition
     /// roots only invoke this published projection.
-    let projectHostModel (output: obj) (model: OpencodeModel) =
+    let projectHostModel (output: obj) (model: HostModel) =
         try
             let message = requireOutputMessage output
             message?model <- box model

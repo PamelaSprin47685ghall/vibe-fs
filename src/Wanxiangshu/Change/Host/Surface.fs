@@ -137,7 +137,7 @@ module OrchestratorHostSurface =
         | "Unknown" -> Outcome.SendOutcome.AcceptanceUnknown(stringOf (field value "reason"))
         | _ -> Outcome.SendOutcome.Fatal(stringOf (field value "reason"))
 
-    let private childInfo (value: obj) : OpenCodeChildInfo =
+    let private childInfo (value: obj) : ChildSessionInfo =
         { SessionId = sessionValue (field value "sessionId")
           ParentSessionId = optionalString (field value "parentSessionId") |> Option.map SessionId.create
           Agent = optionalString (field value "agent")

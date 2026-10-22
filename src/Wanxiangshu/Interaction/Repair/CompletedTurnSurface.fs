@@ -23,7 +23,7 @@ module CompletedTurnSurface =
     let private partsOf (value: obj) : MessagePart array =
         arrayOf value |> Array.choose HostMessageCodec.decodePart
 
-    let private optionalModel (value: obj) : OpencodeModel option =
+    let private optionalModel (value: obj) : HostModel option =
         if isNull value then
             None
         else

@@ -29,7 +29,7 @@ type ReconciledTurn =
         Parts: MessagePart array
         Finish: string option
         ErrorName: string option
-        Model: OpencodeModel option
+        Model: HostModel option
         /// Publishable provider-turn classification (HOST-004). Never TurnUnknown.
         Outcome: ReconcileProgram.TurnOutcome
         /// Reconciliation-private finish=None observation. When Some, evidence and

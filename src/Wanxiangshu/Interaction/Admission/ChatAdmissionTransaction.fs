@@ -87,7 +87,7 @@ type internal ChatAdmissionTransactionPorts =
         ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
       Acquire: ManagedChatAcceptanceWitness -> Task<Result<ExecutionAdmissionAcquisition, exn>>
       LeaseTarget: ExecutionAdmissionLease -> Result<ModelRoutingTarget, ExecutionAdmissionRejection>
-      ProjectHost: OpencodeModel -> Result<unit, exn>
+      ProjectHost: HostModel -> Result<unit, exn>
       Commit: ExecutionAdmissionLease -> ExecutionAdmissionExactIdentity -> CapacityTransitionOutcome
       ReleaseBeforeProvider: ExecutionAdmissionLease -> CapacityTransitionOutcome
       SettlePreProvider:
@@ -192,7 +192,7 @@ module internal ChatAdmissionTransaction =
 
     let private modelFromTarget target =
         try
-            Ok(ModelRouting.toOpenCodeModel target)
+            Ok(ModelRouting.toHostModel target)
         with error ->
             Error error
 
@@ -381,7 +381,7 @@ module internal ChatAdmissionTransaction =
         (ports: ChatAdmissionTransactionPorts)
         (witness: ManagedChatAcceptanceWitness)
         (lease: ExecutionAdmissionLease)
-        : Result<ModelRoutingTarget * ExecutionAdmissionExactIdentity * OpencodeModel, TargetPreparationError> =
+        : Result<ModelRoutingTarget * ChatAdmissionExactIdentity * HostModel, TargetPreparationError> =
         readTarget ports lease
         |> Result.bind (fun target ->
             modelFromTarget target
@@ -511,7 +511,7 @@ module internal ChatAdmissionTransaction =
         (journal: AgentJournal)
         (acceptManagedIntent:
             ChatAdmissionIntent.ManagedIntent -> Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>)
-        (projectHostModel: OpencodeModel -> Result<unit, exn>)
+        (projectHostModel: HostModel -> Result<unit, exn>)
         : ChatAdmissionTransactionPorts =
         { Accept = acceptManagedIntent
           Acquire =

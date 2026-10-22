@@ -816,7 +816,7 @@ module HostSignalBootstrap =
                     ModelRouting.tryReadExecution key
                     |> Option.defaultWith (fun () -> invalidOp "managed admission has no exact committed lease")
 
-                ModelRouting.projectHostModel output (ModelRouting.toOpenCodeModel lease.Identity.Target)
+                ModelRouting.projectHostModel output (ModelRouting.toHostModel lease.Identity.Target)
                 |> Result.defaultWith raise
 
             let completeAdmission intent output result =
@@ -831,7 +831,7 @@ module HostSignalBootstrap =
                     projectCommittedAdmission key output
                     continueManagedChatMessage intent output
                 | Ok(ChatAdmissionTransactionOutcome.DeferredInput(_, target)) ->
-                    ModelRouting.projectHostModel output (ModelRouting.toOpenCodeModel target)
+                    ModelRouting.projectHostModel output (ModelRouting.toHostModel target)
                     |> Result.defaultWith raise
 
                     continueManagedChatMessage intent output
@@ -893,7 +893,7 @@ module HostSignalBootstrap =
             let projectAdmissionOutput key result extra =
                 match result with
                 | Ok(ChatAdmissionTransactionOutcome.DeferredInput(_, target)) ->
-                    ModelRouting.projectHostModel extra (ModelRouting.toOpenCodeModel target)
+                    ModelRouting.projectHostModel extra (ModelRouting.toHostModel target)
                     |> Result.defaultWith raise
                 | _ -> projectCommittedAdmission key extra
 

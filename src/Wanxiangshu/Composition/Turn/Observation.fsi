@@ -16,7 +16,7 @@ type ReconciledTurn =
       Parts: MessagePart array
       Finish: string option
       ErrorName: string option
-      Model: OpencodeModel option
+      Model: HostModel option
       Outcome: ReconcileProgram.TurnOutcome
       Observation: ReconcileProgram.SnapshotObservation option }
 

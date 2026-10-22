@@ -186,14 +186,14 @@ module SyncDelegateSurface =
         { SessionId: SessionId
           Index: int
           Text: string
-          Options: OpenCodePromptOptions
+          Options: SessionPromptOptions
           ListenerCount: int }
 
     type private RecordedCreation =
         { Parent: SessionId
           PhysicalParent: SessionId option
           SessionId: SessionId
-          Options: OpenCodeChildOptions }
+          Options: ChildSessionOptions }
 
     /// One session-control call this harness's Host boundary received: the
     /// abort or the interrupt, the session it aimed at, the provider run it
@@ -397,7 +397,7 @@ module SyncDelegateSurface =
                       Options = options
                       ListenerCount = listenerCount sessionId }
 
-        let recordMetadata sessionId (options: OpenCodePromptOptions) =
+        let recordMetadata sessionId (options: SessionPromptOptions) =
             match options.Metadata with
             | None when isHostRecording -> ()
             | _ ->
@@ -997,7 +997,7 @@ module SyncDelegateSurface =
         let harness = hostRecordingHarness value
         useRuntime harness.Runtime (harness.Sessions :> ISessionHostPort)
 
-    let private recordedModel (model: OpencodeModel) =
+    let private recordedModel (model: HostModel) =
         box
             {| providerID = model.providerID
                modelID = model.modelID

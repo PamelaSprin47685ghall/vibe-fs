@@ -306,7 +306,7 @@ type InjectedSessionPort
         (port: IOpenCodePort)
         (sessionId: SessionId)
         (text: string)
-        (sendOptions: OpenCodePromptOptions)
+        (sendOptions: SessionPromptOptions)
         =
         // Pass the outcome through unchanged. This layer knows less about
         // acceptance than the port does; execution identity is handed off by
@@ -348,7 +348,7 @@ type InjectedSessionPort
     let createSiblingSession
         (ownerSessionId: SessionId)
         (physicalParentId: SessionId option)
-        (options: OpenCodeChildOptions)
+        (options: ChildSessionOptions)
         =
         taskResult {
             let! port =
@@ -359,7 +359,7 @@ type InjectedSessionPort
             return! bindSiblingLane port ownerSessionId laneId options.Agent
         }
 
-    let createChildSession (parentId: SessionId) (options: OpenCodeChildOptions) =
+    let createChildSession (parentId: SessionId) (options: ChildSessionOptions) =
         taskResult {
             let! port =
                 underlyingPort
