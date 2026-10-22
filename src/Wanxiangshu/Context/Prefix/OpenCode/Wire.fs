@@ -40,7 +40,7 @@ module XWire =
         )
 
     let private isProviderRetryAttempt (rawMessage: obj) =
-        ProviderWireDecode.promptOriginOfMessage rawMessage = Some providerRetryOrigin
+        AttemptSettlement.requiresRetryPlan (ProviderWireDecode.promptOriginOfMessage rawMessage) providerRetryOrigin
 
     let private isProviderRetryMessageId (messageId: string) (rawMessages: obj list) =
         rawMessages
@@ -51,39 +51,28 @@ module XWire =
     let suppressHostMessagesByIds (rawMessages: obj list) (hostMessageIds: Set<string>) =
         ProjectionMessageEdit.suppressHostMessagesByIds rawMessages hostMessageIds
 
-    let private recordSuccessfulAttempt
-        (port: WireJournalPort)
-        (sessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
-        (plan: AttemptPlan)
-        : Task<Result<unit, string>> =
-        if ProviderRequestKind.clearsFailureCountOnSuccess plan.Profile.RequestKind then
-            port.RecordConfirmedSuccess sessionId providerRun
-        else
-            Task.FromResult(Ok())
-
     let private settleAttemptPlan
         (port: WireJournalPort)
         (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
-        (outcome: AttemptOutcome)
+        (settlement: AttemptSettlement.Settlement)
         (plan: AttemptPlan)
         : Task =
         task {
             let! success =
-                match outcome with
-                | AttemptOutcome.Completed -> recordSuccessfulAttempt port sessionId providerRun plan
-                | AttemptOutcome.CompletedInvalid
-                | AttemptOutcome.Failed
-                | AttemptOutcome.Aborted -> Task.FromResult(Ok())
+                if AttemptSettlement.recordsConfirmedSuccess settlement then
+                    port.RecordConfirmedSuccess sessionId providerRun
+                else
+                    Task.FromResult(Ok())
 
             success
             |> Result.mapError (fun reason -> sprintf "provider success commit failed: %s" reason)
             |> requireOk
             |> ignore
 
-            attempts.ConsumeAttemptPlan sessionId providerRun |> ignore
+            if AttemptSettlement.consumesAttemptPlan settlement then
+                attempts.ConsumeAttemptPlan sessionId providerRun |> ignore
         }
 
     let private toolContinuationBinding
@@ -123,7 +112,14 @@ module XWire =
 
         match plan with
         | None -> Task.FromResult(())
-        | Some plan -> settleAttemptPlan port attempts sessionId providerRun AttemptOutcome.Completed plan
+        | Some plan ->
+            settleAttemptPlan
+                port
+                attempts
+                sessionId
+                providerRun
+                (AttemptSettlement.settleToolContinuation plan.Profile.RequestKind)
+                plan
 
     let private settleVisibleToolContinuations
         (port: WireJournalPort)
@@ -231,8 +227,13 @@ module XWire =
         task {
             let view = port.ReadView sessionId
 
+            let blockers =
+                AttemptSettlement.retryPlanBlockers
+                    (view.ActiveAuthorityProfile |> Option.isSome)
+                    (view.ProviderFailureState |> Option.isSome)
+
             match view.ActiveAuthorityProfile, view.ProviderFailureState with
-            | Some authority, Some _ ->
+            | Some authority, Some _ when blockers |> List.isEmpty ->
                 let existingPlan = pendingPlanForRetry attempts sessionId physical authority
 
                 let! _ = planOrBuildRetry port attempts sessionId physical authority existingPlan
@@ -305,7 +306,14 @@ module XWire =
         let decision = XWireReconciliation.reconciliationDecision true outcome
 
         match outcome, decision.Cleared with
-        | Some settled, true -> settleAttemptPlan port attempts turn.SessionId turn.ProviderRun settled plan
+        | Some settled, true ->
+            settleAttemptPlan
+                port
+                attempts
+                turn.SessionId
+                turn.ProviderRun
+                (AttemptSettlement.settleTerminalOutcome plan.Profile.RequestKind settled)
+                plan
         | _ -> Task.FromResult(())
 
     let private attemptPlanForTurn (attempts: AttemptPlanCapability) (turn: ReconciledTurn) =

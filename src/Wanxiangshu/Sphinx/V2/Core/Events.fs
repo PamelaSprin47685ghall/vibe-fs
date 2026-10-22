@@ -195,7 +195,19 @@ module DispatchPolicy =
     let notDispatchRequestedReason = "expected DispatchRequested"
 
     /// Admits a dispatch request, or refuses it with the product's own reason.
-    let admit (body: InquiryEventBody) : Result<DispatchRequestedBody, string> =
+    let private admit (body: InquiryEventBody) : Result<DispatchRequestedBody, string> =
         match body with
         | InquiryEventBody.DispatchRequested request -> Ok request
         | _ -> Error notDispatchRequestedReason
+
+    /// The whole dispatch decision in one step: a decode failure and an
+    /// admission refusal are the same answer — nothing was dispatched.
+    let decide (body: Result<InquiryEventBody, string>) : Result<DispatchRequestedBody, string> =
+        match body with
+        | Error reason -> Error reason
+        | Ok body -> admit body
+
+    /// The text of the dispatched prompt. A dispatch request carries two
+    /// envelopes: the public one the recipient may read and the private ticket
+    /// the host keeps. The private ticket never reaches a recipient.
+    let dispatchedPromptText (request: DispatchRequestedBody) : string = request.PublicEnvelope.CanonicalPayload

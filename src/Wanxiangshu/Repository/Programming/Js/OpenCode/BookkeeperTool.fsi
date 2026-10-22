@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Programming.Js.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 
@@ -8,4 +9,7 @@ open Wanxiangshu.OpenCode
 /// staged question/answer Case. The sandbox has no filesystem capability.
 module JsBookkeeperTool =
     val spec: factory: HostToolFactory -> ToolSpec
-    val execute: args: HostToolArguments -> context: HostToolContext -> Task<string>
+
+    /// One call. The session is the only fact the tool needs from its caller:
+    /// the staged transaction is bound to it.
+    val execute: args: HostToolArguments -> sessionId: SessionId -> Task<string>

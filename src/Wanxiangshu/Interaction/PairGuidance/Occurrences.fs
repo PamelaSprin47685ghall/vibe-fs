@@ -14,6 +14,28 @@ open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Session
 
+/// HOST-013: one pair-guidance occurrence, what it said and where it sits
+/// on the transcript. Product state: the product owns the occurrence order.
+type PairGuidanceOccurrence =
+    { Ordinal: int64
+      CallId: string
+      MarkerText: string
+      CallGap: TranscriptGap
+      ResultGap: TranscriptGap }
+
+/// Why an occurrence could not be recorded. A product decision about the
+/// product's own durable journal — never a host refusal.
+[<RequireQualifiedAccess>]
+type PairGuidanceAppendError =
+    /// The durable journal refused the anchored-guideline fact.
+    | JournalRejected of reason: string
+
+/// HOST-013: the occurrence ledger of one transcript.
+type PairGuidanceLedger =
+    { History: PairGuidanceOccurrence list
+      Visible: PairGuidanceOccurrence list
+      Append: PairGuidanceOccurrence -> Task<Result<unit, PairGuidanceAppendError>> }
+
 [<RequireQualifiedAccess>]
 module PairGuidanceOccurrences =
 
@@ -61,7 +83,7 @@ module PairGuidanceOccurrences =
         (journal: AgentJournal)
         (sessionId: SessionId)
         (occurrence: PairGuidanceOccurrence)
-        : Task<Result<unit, string>> =
+        : Task<Result<unit, PairGuidanceAppendError>> =
         task {
             let fact =
                 HostFact.PairProgrammingGuidelineAnchored
@@ -74,7 +96,8 @@ module PairGuidanceOccurrences =
 
             match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
             | Ok _ -> return Ok()
-            | Error failure -> return Error(JournalAppendFailure.describe failure)
+            | Error failure ->
+                return Error(PairGuidanceAppendError.JournalRejected(JournalAppendFailure.describe failure))
         }
 
     let private readMemory (key: string) : PairGuidanceOccurrence list =
@@ -82,7 +105,10 @@ module PairGuidanceOccurrences =
         | true, pairs -> pairs |> Seq.toList
         | false, _ -> []
 
-    let private appendMemory (key: string) (occurrence: PairGuidanceOccurrence) : Task<Result<unit, string>> =
+    let private appendMemory
+        (key: string)
+        (occurrence: PairGuidanceOccurrence)
+        : Task<Result<unit, PairGuidanceAppendError>> =
         match memoryLedger.TryGetValue key with
         | true, pairs -> pairs.Add occurrence
         | false, _ ->
@@ -152,6 +178,43 @@ module PairGuidanceOccurrences =
                 (String.Join(", ", orphaned |> List.truncate 3)))
             (List.isEmpty orphaned)
 
+    /// The product's own prose about a failed append.
+    let private describeAppendFailure (failure: PairGuidanceAppendError) =
+        match failure with
+        | PairGuidanceAppendError.JournalRejected reason -> reason
+
+    let private replayOccurrence
+        (render: PairGuidanceOccurrence list -> Result<'Wire, string>)
+        (visible: PairGuidanceOccurrence list)
+        : Task<Result<'Wire * bool, string>> =
+        task {
+            match render visible with
+            | Ok replayed -> return Ok(replayed, false)
+            | Error e -> return Error e
+        }
+
+    let private appendOccurrenceResult
+        (rendered: 'Wire)
+        (ledger: PairGuidanceLedger)
+        (candidate: PairGuidanceOccurrence)
+        : Task<Result<'Wire * bool, string>> =
+        task {
+            let! appendResult = ledger.Append candidate
+
+            match appendResult with
+            | Ok() -> return Ok(rendered, true)
+            | Error failure -> return Error(describeAppendFailure failure)
+        }
+
+    let private commitNewOccurrence
+        (render: PairGuidanceOccurrence list -> Result<'Wire, string>)
+        (ledger: PairGuidanceLedger)
+        (candidate: PairGuidanceOccurrence)
+        : Task<Result<'Wire * bool, string>> =
+        match render (ledger.Visible @ [ candidate ]) with
+        | Error e -> Task.FromResult(Error e)
+        | Ok rendered -> appendOccurrenceResult rendered ledger candidate
+
     let private commitAt
         (ledger: PairGuidanceLedger)
         (sessionId: string option)
@@ -160,24 +223,19 @@ module PairGuidanceOccurrences =
         (callGap: TranscriptGap)
         (resultGap: TranscriptGap)
         : Task<Result<'Wire * bool, string>> =
-        taskResult {
-            if occupied ledger.Visible callGap resultGap || skipRequested () then
-                let! replayed = render ledger.Visible
-                return (replayed, false)
-            else
-                let ordinal = nextOrdinal ledger.History
+        if occupied ledger.Visible callGap resultGap || skipRequested () then
+            replayOccurrence render ledger.Visible
+        else
+            let ordinal = nextOrdinal ledger.History
 
-                let candidate =
-                    { Ordinal = ordinal
-                      CallId = stableCallId sessionId ordinal
-                      MarkerText = markerText
-                      CallGap = callGap
-                      ResultGap = resultGap }
+            let candidate =
+                { Ordinal = ordinal
+                  CallId = stableCallId sessionId ordinal
+                  MarkerText = markerText
+                  CallGap = callGap
+                  ResultGap = resultGap }
 
-                let! rendered = render (ledger.Visible @ [ candidate ])
-                do! ledger.Append candidate
-                return (rendered, true)
-        }
+            commitNewOccurrence render ledger candidate
 
     /// Internal transcripts never carry a new occurrence, whatever the host decoded.
     let private placementOf (internalTranscript: bool) (transcript: PairGuidanceTranscript) =

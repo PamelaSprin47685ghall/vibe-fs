@@ -14,15 +14,6 @@ open Wanxiangshu.Repository.Programming.Js
 /// through JsToolWorkflow (sandbox → staging → preflight → durable facts →
 /// commit) and the result renders through JsToolsResult (JS-016).
 module JsToolSpec =
-
-    /// The directory one session's js-* surface executes in: the path its owner
-    /// registered for that session, else the given fallback. See ToolHost.fs.
-    val rootForSession:
-        sessionDirectories: System.Collections.Generic.Dictionary<string, string> ->
-        fallback: string ->
-        sessionId: string ->
-            string
-
     val create:
         factory: HostToolFactory ->
         surface: JsSurface ->

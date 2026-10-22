@@ -66,7 +66,7 @@ module JsToolHostSurface =
                         fun _ -> workspaceRoot
                     else
                         let map = sessionDirectoryMap sessionDirectories
-                        JsToolSpec.rootForSession map workspaceRoot
+                        JsToolPolicy.rootForSession map workspaceRoot
 
                 // This surface carries no host attribution: the delivery witness
                 // of a call is settled by the host's own tool registration.

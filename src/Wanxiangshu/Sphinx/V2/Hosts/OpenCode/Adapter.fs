@@ -23,7 +23,7 @@ type OpenCodeHostPort internal (runtime: SyncDelegateRuntime) =
               Completion = Task.FromResult(Error reason) }
         | Ok() ->
             let prompt: Wanxiangshu.Host.Ports.PromptRequest =
-                { Text = request.PublicEnvelope.CanonicalPayload
+                { Text = DispatchPolicy.dispatchedPromptText request
                   Route = context.Route
                   Role = context.Role
                   Workspace = context.Workspace
@@ -57,9 +57,10 @@ module HostPort =
         (body: Result<InquiryEventBody, string>)
         (context: Wanxiangshu.Host.Ports.TurnContext)
         : SyncDelegateObservedExecution =
-        match body with
+        // The product decides admission in one step: a decode failure and an
+        // admission refusal are the same kind of answer — nothing was
+        // dispatched — and the adapter only maps that answer to the host's
+        // refusal effect.
+        match DispatchPolicy.decide body with
         | Error reason -> refused reason
-        | Ok body ->
-            match DispatchPolicy.admit body with
-            | Error reason -> refused reason
-            | Ok request -> OpenCodeHostPort(runtime).Dispatch(owner, request, context)
+        | Ok request -> OpenCodeHostPort(runtime).Dispatch(owner, request, context)

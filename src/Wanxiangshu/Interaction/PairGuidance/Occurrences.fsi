@@ -1,8 +1,31 @@
 namespace Wanxiangshu.Interaction.PairGuidance
 
 open System.Threading.Tasks
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Domain
 open Wanxiangshu.Persistence.Journal
+
+/// HOST-013: one pair-guidance occurrence, what it said and where it sits
+/// on the transcript. Product state: the product owns the occurrence order.
+type PairGuidanceOccurrence =
+    { Ordinal: int64
+      CallId: string
+      MarkerText: string
+      CallGap: TranscriptGap
+      ResultGap: TranscriptGap }
+
+/// Why an occurrence could not be recorded. A product decision about the
+/// product's own durable journal — never a host refusal.
+[<RequireQualifiedAccess>]
+type PairGuidanceAppendError =
+    /// The durable journal refused the anchored-guideline fact.
+    | JournalRejected of reason: string
+
+/// HOST-013: the occurrence ledger of one transcript.
+type PairGuidanceLedger =
+    { History: PairGuidanceOccurrence list
+      Visible: PairGuidanceOccurrence list
+      Append: PairGuidanceOccurrence -> Task<Result<unit, PairGuidanceAppendError>> }
 
 /// HOST-013 occurrence owner. It decides whether a request carries a new
 /// pair-guidance occurrence, and in which order the occurrence is rendered

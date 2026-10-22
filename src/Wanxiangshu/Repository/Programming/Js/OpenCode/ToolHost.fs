@@ -3,10 +3,8 @@ namespace Wanxiangshu.Repository.Programming.Js.OpenCode
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
 
 /// JS-073/JS-074: a generated js-* tool spec — the dynamic counterpart of the
@@ -15,35 +13,10 @@ open Wanxiangshu.Repository.Programming.Js
 /// commit) and the result renders through JsToolsResult (JS-016).
 module JsToolSpec =
 
-    [<Emit("$0===undefined||$0===null")>]
-    let private isUndefined (value: obj) : bool = jsNative
-
     /// A Host argument is present when its key holds a value; null and
     /// undefined are absences.
     [<Emit("$0 !== null && $0 !== undefined")>]
     let private isPresent (value: obj) : bool = jsNative
-
-    /// The directory one session's js-* surface executes in.
-    ///
-    /// The Host creates a Manager and her forked children rooted at the directory
-    /// their owner registered — for a Change road that is the job's own worktree
-    /// (`OrchestratorHost.directoryFor` → `HostForkRuntime.CreateChildSession`).
-    /// The surface must execute where its session lives: resolving the plugin's
-    /// project directory instead writes every road mutation into the target's own
-    /// working tree, leaves the job worktree empty, and turns the candidate into a
-    /// no-op commit whose publish rebase cannot conflict.
-    ///
-    /// A registered path is used as given, never existence-checked into the
-    /// fallback: a worktree released under a live session must fail the write
-    /// closed, not silently redirect it onto the target's checkout.
-    let rootForSession
-        (sessionDirectories: System.Collections.Generic.Dictionary<string, string>)
-        (fallback: string)
-        (sessionId: string)
-        : string =
-        match System.String.IsNullOrWhiteSpace sessionId, sessionDirectories.TryGetValue sessionId with
-        | false, (true, path) when not (System.String.IsNullOrWhiteSpace path) -> path
-        | _ -> fallback
 
     /// Build a ToolSpec for one generated surface.
     ///
@@ -130,27 +103,8 @@ module JsToolSpec =
             ToolHostCodec.optionalRecordSchemaOf
                 (ToolHostCodec.stringSchema factory)
                 (ToolHostCodec.nullableStringSchema factory)
-                (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
+                (JsToolPolicy.viewDeclarationExtraProse ())
                 factory
-
-        let viewDeclarationOf (raw: obj) : obj =
-            if isUndefined (raw?prefixUntil) && isUndefined (raw?thenMap) then
-                null
-            else
-                createObj [ "prefixUntil" ==> raw?prefixUntil; "thenMap" ==> raw?thenMap ]
-
-        let parsedDeclarationFailure (declaration: obj) : JsFailure option =
-            match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse declaration with
-            | Ok _ -> None
-            | Error failure -> Some failure
-
-        let viewFailureOf (raw: obj) (declaration: obj) : JsFailure option =
-            if not (isUndefined (raw?view)) then
-                Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
-            elif not (isPresent declaration) then
-                None
-            else
-                parsedDeclarationFailure declaration
 
         let callFenceOf (ctx: HostToolContext) =
             match ctx.ProviderRunId, ctx.ToolCallId with
@@ -164,25 +118,6 @@ module JsToolSpec =
             match fence with
             | None -> Task.FromResult None
             | Some _ -> settlementOf ctx
-
-        let commitView (sessionId: string) (declaration: obj) : JsFailure option =
-            match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView sessionId declaration with
-            | Ok() -> None
-            | Error failure -> Some failure
-
-        // Commit the declaration only after the program settled: the pending
-        // view is what the next request projects, and a failed program must
-        // not be able to present anything.
-        let viewCommitFailure (sessionId: string) (declaration: obj) outcome : JsFailure option =
-            match outcome with
-            | JsToolWorkflow.JsToolOutcome.Failed _ -> None
-            | JsToolWorkflow.JsToolOutcome.Succeeded _
-            | JsToolWorkflow.JsToolOutcome.Parked _ -> commitView sessionId declaration
-
-        let renderCommitted (sessionId: string) (declaration: obj) outcome =
-            match viewCommitFailure sessionId declaration outcome with
-            | Some failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-            | None -> JsToolsResult.render outcome
 
         let runProgramCall (ctx: HostToolContext) (input: obj) (declaration: obj) =
             task {
@@ -214,7 +149,7 @@ module JsToolSpec =
                         lifecyclePersistence
                         (fileAccessObservation |> Option.map (fun observe -> observe ctx))
 
-                return renderCommitted ctx.SessionId declaration outcome
+                return JsToolPolicy.renderCommitted ctx.SessionId declaration outcome
             }
 
         // Clause 6: a failed call must not leave a presentable
@@ -231,28 +166,21 @@ module JsToolSpec =
                 && not (isPresent (input?unpark))
                 && not (isPresent (input?abandon))
 
-            let declaration = viewDeclarationOf args.Raw
+            let declaration = JsToolPolicy.viewDeclarationOf args.Raw
 
-            match viewFailureOf args.Raw declaration with
+            match JsToolPolicy.viewFailureOf args.Raw declaration with
             | Some failure ->
                 Task.FromResult(JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])))
             | None when noState ->
                 Task.FromResult(
-                    ToolResultText.tomlObject
-                        [ "error",
-                          ToolResultText.TString(
-                              JsDescriptionAssets.missingProgram (ProviderLanguageBinding.readGlobalPreference ())
-                          ) ]
+                    ToolResultText.tomlObject [ "error", ToolResultText.TString(JsToolPolicy.missingProgramProse ()) ]
                 )
             | None -> runProgramCall ctx input declaration
 
         { Name = surface.ToolName
           Description = surface.Description
           Arguments =
-            [ "program",
-              ToolHostCodec.optionalStringSchemaDescribed
-                  (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
-                  factory
+            [ "program", ToolHostCodec.optionalStringSchemaDescribed (JsToolPolicy.argProgramProse ()) factory
               "unpark", unparkSchema
               "abandon", abandonSchema
               "prefixUntil", ToolHostCodec.optionalNumberSchema factory

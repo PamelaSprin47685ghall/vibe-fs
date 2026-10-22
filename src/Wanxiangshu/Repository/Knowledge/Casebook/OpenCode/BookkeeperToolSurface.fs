@@ -2,29 +2,22 @@ namespace Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// JS-native adapter boundary for the Bookkeeper's OpenCode tool binding
 /// (`JsBookkeeperTool`). Split out of `CasebookBookkeeperSurface` (CUT-40) so the
 /// runtime/staging surface stays host-neutral; only these two entries touch
-/// `HostToolArguments`/`HostToolContext`/`ToolHostCodec`.
+/// `HostToolArguments`/`ToolHostCodec`.
 module CasebookBookkeeperToolSurface =
 
     let runProgram (sessionId: string) (program: string) : Task<string> =
         let args =
             Wanxiangshu.OpenCode.HostToolArguments(createObj [ "program" ==> program ])
 
-        let context: Wanxiangshu.OpenCode.HostToolContext =
-            { SessionId = sessionId
-              Agent = None
-              ToolCallId = None
-              ProviderRunId = None
-              PromptText = None
-              AttachAbort = fun _ -> fun () -> () }
-
         task {
-            let! result = JsBookkeeperTool.execute args context
+            let! result = JsBookkeeperTool.execute args (SessionId.create sessionId)
             return ToolResultBound.bound result
         }
 
