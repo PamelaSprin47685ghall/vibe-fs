@@ -25,7 +25,7 @@ e1合并的gen77官方510文件与完整36文件integration均0 fail。003实际
 | 019、021 | 生产 typed renderer 的两种语言、敌意 TOML 样本、指令与数据平面分离、空背景省略 | 真正首提示读取最新 durable parent、指定 peer 的材料来源、权限不克隆 |
 | 022 | 完整语言资源选择、estimate fold 的去重与零饱和 | 归零后仍能真实执行、同一 durable estimate 的替换/重开 |
 | 023 | 同步 workflow 消费注入 retry verdict，恢复成功或耗尽后返回 | 真实恢复 engine 各路径与最终失败组合 |
-| 024—026 | 同名/同角色复用、own child delta、因果完成/失败、实际 fork 接收与不确定发送后果；Host event port 保留身份（父到子 `DelegationHandoff` delta tracking 已随显式 charge 传递与共享 ANCHOR 地址空间退役）。026 的重启未交付子工作用例现名 `RESTART_PENDING_CHILD_WORK_is_voided_at_load_and_join_reports_it_once_without_hang`：加载期把上一进程遗留、已无法交付的子工作**作废**（不是完成），horizon 名册把它显示为 `voided`，join 以 `voided` 报告一次后该工作退役并离开名册（scoped 工作退役其工作单元格，底层 handle 绑定保留供复用，`summary` 读出终态），同一目录上再起一个进程不再重复报告 | 所有 terminal 分支、进程 crash cuts、未知接收的后续收敛 |
+| 024—026 | 同名/同角色复用、own child delta、因果完成/失败、实际 fork 接收与不确定发送后果；Host event port 保留身份（父到子 `DelegationHandoff` delta tracking 已随显式 charge 传递与共享 ANCHOR 地址空间退役）。026 的重启未交付子工作用例现名 `RESTART_PENDING_CHILD_WORK_is_voided_at_load_and_join_reports_it_once_without_hang`：加载期把上一进程遗留、已无法交付的子工作**作废**（不是完成），horizon 名册把它显示为 `voided`，join 以 `voided` 报告一次后该工作退役并离开名册（scoped 情形被 abandon 的是工作单元格，底层 handle 绑定仍可复用，`summary` 读出终态），同一目录上再起一个进程不再重复报告 | 所有 terminal 分支、进程 crash cuts、未知接收的后续收敛 |
 | 028、029 | 当前编译清单的直接/传递闭包、额度及反向注入检测；部分源码词形审计 | 各 locality 独立真实编译、类型隔离和实际 capability 行为；路径/词形只是当前结构审计 |
 | 031 | 连续完成复用同一 child 并交付 bounded view、旧 root 拒绝、parent supersede 取消、完成与删除在两种顺序下各结算一次（`HandoffCheckpointSettlement` 已随父到子 `DelegationHandoff` 退役） | 真正重复 terminal；SyncDelegate 不替 fork 证明 |
 
@@ -53,7 +53,7 @@ Join 的条数上限、显示窗口和交付视图本身的有界物化不是同
 
 ## 未交付子工作的作废结清（2026-10-21 裁决）
 
-未交付的子工作**永不写完成**。但「未交付」本身不是一种终态：只要交付仍可能，它保持活跃，join 不关闭，父方可以继续等待或重派。交付已不可能时（被 abort、取消，或重启加载期结算上一进程遗留的孤儿工作），系统追加 `ChildWorkVoided`（合法但无 scope 的历史用 `ChildRunVoided`）——作废针对的是**工作义务生命周期**而非强行退役可复用的参与者身份：对 scoped 工作，具体工作单元格（`Works[exact id]`）转为 `Abandoned(Voided)` 并在报告后退役，底层 handle 绑定保留 `Active` 供复用，`summary` 投影叠盖工作并读出终态；对无 scope 的历史，其 unscoped handle 绑定自身转为 `Abandoned(Voided)` 并在报告后退役。**作废不是完成**：不写完成正文，也不把已有交付视图当作完成凭据；可它**结清父方的未解除义务**：join 以 `voided` 状态报告一次，报告之后该工作退役（durable）并离开名册，重启不重复报告。join 的状态词表因此是 `completed | failed | abandoned | voided`。
+未交付的子工作**永不写完成**。但「未交付」本身不是一种终态：只要交付仍可能，它保持活跃，join 不关闭，父方可以继续等待或重派。交付已不可能时（被 abort、取消，或重启加载期结算上一进程遗留的孤儿工作），系统追加 `ChildWorkVoided`（合法但无 scope 的历史用 `ChildRunVoided`）——**两类作废事实都走 abandon，没有一类是 abandon 规则的例外**，差别只在于被 abandon 的是工作单元格还是 handle 绑定：对 scoped 工作，具体工作单元格（`Works[exact id]`）转为 `Abandoned(Voided)` 并在报告后退役，它承载的那份**工作义务已是终态**；底层 handle 绑定仍**可复用**（它标识可再次参与的参与者身份，不是被作废的那份工作），`summary` 投影叠盖工作并读出终态；对无 scope 的历史，其 unscoped handle 绑定自身转为 `Abandoned(Voided)` 并在报告后退役。**作废不是完成**：不写完成正文，也不把已有交付视图当作完成凭据；可它**结清父方的未解除义务**：join 以 `voided` 状态报告一次，报告之后该工作退役（durable）并离开名册，重启不重复报告。join 的状态词表因此是 `completed | failed | abandoned | voided`。
 
 本包 026 的重启用例正是这条合同的唯一端到端见证：加载期作废 → horizon 显示 `voided` → join 报告一次 `voided`（既非 `completed` 也非 `undelivered`）→ `durableLifecycleByname` 经 `summary` 读出 `Retired`、名册不再列出 → 同一目录上再起一个进程不再报告。crash-reconciliation-018/020 从 journal 侧见证同一结算（每个孤儿一条作废事实、零 completion 事实、重复结算不再追加事实）。**本页只描述合同与见证范围，不记任何测试结论**；这两组用例的通过与否由行为泳道与正式 runner 给出。
 
