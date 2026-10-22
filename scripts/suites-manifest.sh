@@ -49,7 +49,23 @@ if [ -z "${REPO:-}" ]; then
   fi
 fi
 
-LOGDIR="${LOGDIR:-$REPO/.test-logs/suites}"
+if [ -z "${LOGDIR:-}" ]; then
+  # Runtime data belongs to the primary worktree's .Herdchestra (AGENTS.md:
+  # 全部项目运行数据统一放在主工作树的 .Herdchestra/，linked worktree 共用
+  # 这份本机状态). Resolve it through the existing scripts/lib/state-root.mjs
+  # helper so a linked worktree writes to the SAME place as the main tree.
+  # This script only queries Git topology; it writes no Git state.
+  STATE_ROOT="$(node -e "
+    import('$SCRIPT_DIR/lib/state-root.mjs').then(async m => {
+      process.stdout.write(await m.stateRoot('$REPO'));
+    }).catch(() => process.exit(1));
+  ")" || {
+    echo "FATAL: cannot resolve the application state root for $REPO" >&2
+    echo "       Set LOGDIR explicitly to override." >&2
+    exit 2
+  }
+  LOGDIR="$STATE_ROOT/takeover/suites"
+fi
 SUITE_TIMEOUT="${SUITE_TIMEOUT:-1200}"
 RUNNER="requirements/verification-system/tests/run.mjs"
 
