@@ -346,7 +346,11 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   Separates `PublishInput` (purpose 0, no model-routing lease, generates `DeferredInput`) and `EnterProviderStep`
   (purpose 1, requires active model lease continuance) for the same physical user message ID, preventing the
   latter from prematurely joining the former's promise and raising EMR-010 at `SessionExecutionBinding.fs:116`.
-  **No new port** — the HNI port surface is untouched; next free port id remains **P-19**; `omp: n/a`.
+  Static history analysis traces the origin to `48a0bf426` (2026-10-07) and manifestation to `c0246c36d` (2026-10-21);
+  suspects `6b7ae3a46`/`cf1f0d2a9`/`e058233a3` are not the structural source cause (timing untested); no commit-level
+  binary search was run. Installed-Host canary gap is diagnosed as a lifecycle fence/abortion settlement mismatch
+  (unimplemented proposed bridge, canary remains unresolved). **No new port** — the HNI port surface is untouched;
+  next free port id remains **P-19**; `omp: n/a`.
 
 - 2026-10-21 eng-hni-plugin-goose (HNI-08): P-16 pair guidance is WIRED-OC — the guideline fold moved out of
   `OpenCode/Host/PairProgramming` into the domain owner `Interaction/PairGuidance/Occurrences`; the OpenCode transform

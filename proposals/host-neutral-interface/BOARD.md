@@ -104,6 +104,11 @@ touches the HNI arch board's persistence-touchpoint surface, but it claims no ca
 state; the live ad-hoc `input.directory` reads (`PluginHost.fs:41-51`, `OpenCodePort.fs:105-120`,
 `SessionSnapshotPort.fs:340-346`, `PluginBoot.fs:64,107`) stay and no consumer was cut over onto P-10.
 
+integ-027-2 fact (2026-10-22): EMR-010 model-routing lease resolution landed (`a38ef7770`, keying `admissionInFlight`
+by `(ChatExecutionKey * ChatAdmissionPurpose)`). Installed-Host canary gap diagnosed as lifecycle fence/abortion
+mismatch (uncompleted join); canary remains unresolved. No HNI port added or changed; claims no card; next free
+port id stays **P-19**; omp mirror n/a.
+
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 
 ## Gate ⑩/⑪/⑫/⑬ (HNI-04, HNI-11) — `scripts/checks/adapter-thinness.mjs`, run inside `architecture.mjs`
