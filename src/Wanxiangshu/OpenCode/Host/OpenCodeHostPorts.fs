@@ -84,57 +84,13 @@ module OpenCodeHostPorts =
 
     let private resolveTranscriptPort (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : ITranscriptPort =
         host.SnapshotOpt
-        |> Option.orElseWith (fun () -> SessionSnapshotPort.create boot.Input)
+        |> Option.orElseWith (fun () -> SessionSnapshotPort.create boot.WorkspaceDirectory boot.Input)
         |> Option.map (fun snapshotPort -> TranscriptPort.HostTranscriptPort(snapshotPort) :> ITranscriptPort)
         |> Option.defaultWith (fun () -> UnavailableTranscriptPort() :> ITranscriptPort)
 
     let private resolveSessionPort (boot: PluginBoot.Boot) : ISessionPort =
-        SessionSnapshotPort.createSessionPort boot.Input
+        SessionSnapshotPort.createSessionPort boot.WorkspaceDirectory boot.Input
         |> Option.defaultWith (fun () -> UnavailableSessionPort() :> ISessionPort)
-
-    let private tryStringField (source: obj) (name: string) : string option =
-        if isNull source || isNull source?(name) then
-            None
-        else
-            Some(string source?(name))
-
-    let private tryProjectObjectId (project: obj) : string option = tryStringField project "id"
-
-    /// The OpenCode plugin input carries the project as a nested object
-    /// (`input.project.id`); `projectID` / `projectId` are accepted as the flat
-    /// spellings some hosts use. When the host names no project at all, the
-    /// project root is the identity.
-    let private projectIdOf (input: obj) (fallback: string) : string =
-        let nested =
-            if isNull input then
-                None
-            else
-                tryProjectObjectId input?project
-
-        let flatProjectId =
-            if isNull input then
-                None
-            else
-                tryStringField input "projectID"
-
-        let flatProjectIdAlt =
-            if isNull input then
-                None
-            else
-                tryStringField input "projectId"
-
-        nested
-        |> Option.orElse flatProjectId
-        |> Option.orElse flatProjectIdAlt
-        |> Option.defaultValue fallback
-
-    type private HostPathsPort(projectRootStr: string, stateRootStr: string, projectIdStr: string) =
-        interface IHostPaths with
-            member this.StateRoot: WorkspacePath = WorkspacePath stateRootStr
-
-            member this.ProjectRoot: WorkspacePath = WorkspacePath projectRootStr
-
-            member this.ProjectId: string = projectIdStr
 
     type private UnsupportedModelCatalog() =
         interface IModelCatalog with
@@ -171,9 +127,28 @@ module OpenCodeHostPorts =
         task {
             let projectRootStr = boot.WorkspaceDirectory |> Option.defaultValue "."
 
-            // The state root is the runtime's own state directory (`.Herdchestra`
-            // under the primary worktree), not the project directory.
-            let! stateRootStr = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot projectRootStr
+            // HNI P-10: the neutral `IHostPaths` resolved once at boot is the
+            // single authority for the state root, the project root and the
+            // project identity. Only a host that names no workspace at all
+            // falls back to the runtime's own roots.
+            let! pathsPort =
+                task {
+                    match boot.Paths with
+                    | Some paths -> return paths
+                    | None ->
+                        // The state root is the runtime's own state directory
+                        // (`.Herdchestra` under the primary worktree), not the
+                        // project directory.
+                        let! stateRootStr = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot projectRootStr
+
+                        return
+                            PathsPort.HostPaths(
+                                (fun () -> stateRootStr),
+                                projectRootStr,
+                                PathsPort.projectIdOf boot.Input projectRootStr
+                            )
+                            :> IHostPaths
+                }
 
             let sessionPort = resolveSessionPort boot
 
@@ -184,9 +159,6 @@ module OpenCodeHostPorts =
             let diagnosticsPort =
                 DiagnosticsPort.create boot.Input
                 |> Option.defaultWith (fun () -> DiagnosticSinkPort() :> IDiagnosticSink)
-
-            let pathsPort =
-                HostPathsPort(projectRootStr, stateRootStr, projectIdOf boot.Input projectRootStr) :> IHostPaths
 
             let modelsPort = UnsupportedModelCatalog() :> IModelCatalog
             let signalsPort = UnsupportedSignalSource() :> ISignalSource

@@ -105,19 +105,6 @@ module OpenCodePortAdapter =
         else
             Fable.Core.JS.JSON.parse body
 
-    let private tryNonBlankDirectory (input: obj) =
-        let directory = unbox<string> input?directory
-
-        if String.IsNullOrWhiteSpace directory then
-            None
-        else
-            Some directory
-
-    let private tryWorkDirectory (input: obj) =
-        if isNull input || isNull input?directory then
-            None
-        else
-            tryNonBlankDirectory input
 
     let private readResponseTextSafe (response: obj) : Task<string> =
         task {
@@ -491,13 +478,11 @@ module OpenCodePortAdapter =
                     return ()
                 }
 
-    let create (input: obj) : IOpenCodePort option =
-        let workDir = tryWorkDirectory input
-
+    let create (workspaceDirectory: string option) (input: obj) : IOpenCodePort option =
         if isNull input then
             None
         elif not (isNull input?client) && not (isNull input?client?session) then
-            Some(SdkClientPort(input?client, workDir) :> IOpenCodePort)
+            Some(SdkClientPort(input?client, workspaceDirectory) :> IOpenCodePort)
         elif not (isNull input?serverUrl) then
             Some(HttpPort(unbox<string> input?serverUrl) :> IOpenCodePort)
         elif not (isNull input?baseUrl) then

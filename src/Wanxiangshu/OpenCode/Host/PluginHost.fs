@@ -38,17 +38,6 @@ module PluginHost =
     [<Import("pid", "node:process")>]
     let processId: int = jsNative
 
-    let private nonBlankDirectory (directory: string) : string option =
-        if String.IsNullOrWhiteSpace directory then
-            None
-        else
-            Some directory
-
-    let workspaceDirectory (input: obj) : string option =
-        if isNull input || isNull input?directory then
-            None
-        else
-            input?directory |> unbox<string> |> nonBlankDirectory
 
     let private semanticUnavailable reason : Result<AgentJournal option, string> =
         Diagnostic.emit "journal-semantic-unavailable" [ "result", reason ]
@@ -86,12 +75,14 @@ module PluginHost =
     /// Load may read durable bytes, but it never repairs semantic state. Physical
     /// corruption is a load error; a domain fold rejection only disables the journal
     /// capability for this plugin instance.
-    let createJournal (input: obj) : Task<Result<AgentJournal option, string>> =
-        match workspaceDirectory input with
+    let createJournal (workspaceDirectory: string option) : Task<Result<AgentJournal option, string>> =
+        match workspaceDirectory with
         | None -> Task.FromResult(Ok None)
         | Some workspace -> createWorkspaceJournal workspace
 
+
     let createHost
+        (workspaceDirectory: string option)
         (input: obj)
         (portOpt: IOpenCodePort option)
         (familyParent: (SessionId -> SessionId option) option)
@@ -112,7 +103,7 @@ module PluginHost =
             // Completion/output port is process-local per workspace runtime path so
             // root + worktree plugin instances share AwaitAgent / NotifyTerminal.
             // Host SSE remains only a coarse idle/retry/deleted signal source.
-            let! shared = SharedTerminalBus.tryAcquireForWorkspace (workspaceDirectory input)
+            let! shared = SharedTerminalBus.tryAcquireForWorkspace workspaceDirectory
 
             let hostEventPort, terminalKey =
                 match shared with
@@ -130,7 +121,7 @@ module PluginHost =
                     ?isUserQuestionWaiting = isUserQuestionWaiting
                 )
 
-            let snapshotPort = SessionSnapshotPort.create input
+            let snapshotPort = SessionSnapshotPort.create workspaceDirectory input
 
             return Ok(eventPort, sessionPort :> ISessionHostPort, snapshotPort, terminalKey, Some hostEventPort)
         }

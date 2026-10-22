@@ -25,4 +25,4 @@ module ModelCatalogPort =
 
     /// The catalog for the given host wiring, or `None` when the input names
     /// no host the catalog can be built on.
-    val create: input: obj -> IModelCatalog option
+    val create: workspaceDirectory: string option -> input: obj -> IModelCatalog option

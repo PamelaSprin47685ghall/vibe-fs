@@ -112,10 +112,20 @@ P-10 fact (arch lane, 2026-10-22, slice P-10): P-10 now has an OpenCode implemen
 not a new directory and not host storage; because that resolution is async while the port is a plain
 property, the composition root resolves it once and hands the adapter a memoized thunk. `ProjectRoot` is
 the plugin's `input.directory`; `ProjectId` is the host-supplied `input.project.id` (SDK `Project.id`) with
-the directory as the stable fallback, since no product code keys on a project id today. Fact only: it
-touches the HNI arch board's persistence-touchpoint surface, but it claims no card and changes no card
-state; the live ad-hoc `input.directory` reads (`PluginHost.fs:41-51`, `OpenCodePort.fs:105-120`,
-`SessionSnapshotPort.fs:340-346`, `PluginBoot.fs:64,107`) stay and no consumer was cut over onto P-10.
+the directory as the stable fallback, since no product code keys on a project id today. **Cutover (same
+slice, 2026-10-22)**: `PathsPort` is now the *single authority* for the host's workspace field —
+`OpenCode/Host/PathsPort.fs` is the only file under `src/` that reads `input.directory` or
+`input.project`. `PluginBoot.create` resolves the paths once (`Boot.Paths : IHostPaths option`) and
+derives `Boot.WorkspaceDirectory` from them (`PathsPort.projectRootOf`); the workspace directory is then
+threaded as a parameter into `PluginHost` (`createJournal` / `createHost`), `OpenCodePortAdapter.create`,
+`SessionSnapshotPort.create` / `createSessionPort` and `ModelCatalogPort.create` instead of being
+re-read from the raw input. The duplicate readers are deleted: `PluginHost.workspaceDirectory` /
+`nonBlankDirectory`, `OpenCodePort.tryWorkDirectory` / `tryNonBlankDirectory`,
+`SessionSnapshotPort.directoryOption` / `nonBlankDirectory`, `ModelCatalogPort.directoryOption`, and
+`OpenCodeHostPorts.projectIdOf` / `HostPathsPort` (the latter two replaced by `boot.Paths` plus the
+`PathsPort.projectIdOf` helper, which also keeps the flat `projectID` / `projectId` spellings). Fact only:
+it touches the HNI arch board's persistence-touchpoint surface, but it claims no card and changes no card
+state.
 
 integ-027-2 fact (2026-10-22): EMR-010 model-routing lease resolution landed (`a38ef7770`, keying `admissionInFlight`
 by `(ChatExecutionKey * ChatAdmissionPurpose)`). Installed-Host canary gap diagnosed as lifecycle fence/abortion

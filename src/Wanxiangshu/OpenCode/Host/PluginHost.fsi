@@ -13,14 +13,13 @@ module PluginHost =
 
     val processId: int
 
-    val workspaceDirectory: input: obj -> string option
-
     /// Load may read durable bytes, but it never repairs semantic state. Physical
     /// corruption is a load error; a domain fold rejection only disables the journal
     /// capability for this plugin instance.
-    val createJournal: input: obj -> Task<Result<AgentJournal option, string>>
+    val createJournal: workspaceDirectory: string option -> Task<Result<AgentJournal option, string>>
 
     val createHost:
+        workspaceDirectory: string option ->
         input: obj ->
         portOpt: IOpenCodePort option ->
         familyParent: (SessionId -> SessionId option) option ->

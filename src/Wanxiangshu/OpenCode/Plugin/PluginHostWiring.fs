@@ -261,6 +261,7 @@ module PluginHostWiring =
 
             match!
                 PluginHost.createHost
+                    boot.WorkspaceDirectory
                     input
                     boot.PortOpt
                     (Some boot.FamilyParent)

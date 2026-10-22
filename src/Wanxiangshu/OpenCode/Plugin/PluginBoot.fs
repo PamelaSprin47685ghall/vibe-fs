@@ -5,6 +5,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode.Host
@@ -26,6 +27,7 @@ module PluginBoot =
           Timer: ITimerPort
           CasebookSettlements: CasebookSettlementOwner
           WorkspaceDirectory: string option
+          Paths: IHostPaths option
           FamilyParent: SessionId -> SessionId option }
 
     let private bindCasebookSemanticCut (incident: CasebookSemanticCutIncident) =
@@ -67,28 +69,35 @@ module PluginBoot =
             // This may create the missing user config atomically, but performs no Host call.
             do! ModelRouting.initialize ()
 
-            let portOpt = OpenCodePortAdapter.create input
-            let workspaceDirectory = PluginHost.workspaceDirectory input
+            // HNI P-10: `PathsPort` is the single authority for the host's
+            // workspace field. The state root resolution is async while the
+            // port is a plain property, so it is resolved once here and
+            // handed to the adapter as a memoized thunk.
+            let! paths =
+                task {
+                    match PathsPort.workspaceDirectory input with
+                    | Some workspace ->
+                        let! resolvedStateRoot = RuntimePath.stateRoot workspace
+                        return PathsPort.create (fun () -> resolvedStateRoot) input
+                    | None -> return None
+                }
 
-            let! journalResult = PluginHost.createJournal input
+            let workspaceDirectory = PathsPort.projectRootOf paths
+
+            let portOpt = OpenCodePortAdapter.create workspaceDirectory input
+
+            let! journalResult = PluginHost.createJournal workspaceDirectory
 
             let journal =
                 match journalResult with
                 | Ok value -> value
                 | Error err -> raise (InvalidOperationException err)
 
-            let! jsLifecyclePersistence =
-                task {
-                    match workspaceDirectory with
-                    | Some workspace ->
-                        let! commonDir = RuntimePath.stateRoot workspace
-
-                        return
-                            WorkspaceEventStore.tryCurrent commonDir
-                            |> Option.map
-                                Wanxiangshu.Repository.Programming.Js.JsToolsTransactionStore.createLifecyclePersistence
-                    | None -> return None
-                }
+            let jsLifecyclePersistence =
+                PathsPort.stateRootOf paths
+                |> Option.bind WorkspaceEventStore.tryCurrent
+                |> Option.map
+                    Wanxiangshu.Repository.Programming.Js.JsToolsTransactionStore.createLifecyclePersistence
 
             let scope =
                 new PluginRuntimeScope(journal, (fun _ -> false), jsLifecyclePersistence)
@@ -112,5 +121,6 @@ module PluginBoot =
                   Timer = timer
                   CasebookSettlements = casebookSettlements
                   WorkspaceDirectory = workspaceDirectory
+                  Paths = paths
                   FamilyParent = familyParent }
         }

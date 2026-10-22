@@ -16,7 +16,7 @@ open Wanxiangshu.Host.Ports
 ///    `git worktree list --porcelain`), while the port is a plain property, so
 ///    the composition root resolves it once and hands the adapter a thunk.
 ///  - `ProjectRoot` is the plugin's workspace directory, `input.directory`
-///    (the `PluginHost.workspaceDirectory` reading idiom).
+///    (read once here, the single authority for the host's workspace field).
 ///  - `ProjectId` is host-supplied: the plugin input's `input.project.id`
 ///    (node_modules/@opencode-ai/plugin/dist/index.d.ts `PluginInput.project`
 ///    of SDK type `Project { id, worktree, … }`). No product code keys on a
@@ -46,20 +46,47 @@ module PathsPort =
         else
             Some(unbox<string> value)
 
-    /// The workspace directory the plugin runs in (`input.directory`), the same
-    /// reading the product already uses at
-    /// `src/Wanxiangshu/OpenCode/Host/PluginHost.fs:41-51`.
-    let private workspaceDirectory (input: obj) : string option =
+    /// The workspace directory the plugin runs in (`input.directory`). This is
+    /// the single reading of the host's workspace field: every consumer
+    /// receives the value through this port instead of re-reading the raw
+    /// plugin input.
+    let workspaceDirectory (input: obj) : string option =
         if isNullish input then
             None
         else
             readText (field input "directory")
 
+    /// The project root string carried by resolved paths.
+    let projectRootOf (paths: IHostPaths option) : string option =
+        paths
+        |> Option.map (fun p ->
+            let (WorkspacePath root) = p.ProjectRoot
+            root)
+
+    /// The state root string carried by resolved paths.
+    let stateRootOf (paths: IHostPaths option) : string option =
+        paths
+        |> Option.map (fun p ->
+            let (WorkspacePath root) = p.StateRoot
+            root)
+
     /// The host-supplied project identity (`input.project.id`), absent when the
-    /// host wiring carries no project object.
+    /// host wiring carries no project object. `projectID` / `projectId` are
+    /// accepted as the flat spellings some hosts use.
     let private projectId (input: obj) : string option =
-        let projectObj = if isNullish input then null else field input "project"
-        readText (field projectObj "id")
+        if isNullish input then
+            None
+        else
+            let projectObj = field input "project"
+
+            readText (field projectObj "id")
+            |> Option.orElseWith (fun () -> readText (field input "projectID"))
+            |> Option.orElseWith (fun () -> readText (field input "projectId"))
+
+    /// The host-supplied project identity, with the given fallback when the
+    /// host wiring carries no project object.
+    let projectIdOf (input: obj) (fallback: string) : string =
+        projectId input |> Option.defaultValue fallback
 
     /// The durable-state root thunk. `StateRoot` is a plain property (the port
     /// is not async), so the async `RuntimePath.stateRoot` resolution happens

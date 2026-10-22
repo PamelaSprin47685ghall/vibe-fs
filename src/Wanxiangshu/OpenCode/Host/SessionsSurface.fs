@@ -42,7 +42,7 @@ module SessionsSurface =
                    error = hostErrorReason error |}
 
     let observeDeliveryDiscovery (input: obj) (title: string) : Task<obj> =
-        match SessionSnapshotPort.createSessionPort input with
+        match SessionSnapshotPort.createSessionPort (PathsPort.workspaceDirectory input) input with
         | None -> Task.FromResult(discoveryView (Error(HostError.Transport "Session discovery is unavailable")))
         | Some sessions ->
             task {

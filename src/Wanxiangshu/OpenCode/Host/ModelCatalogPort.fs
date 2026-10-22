@@ -49,13 +49,6 @@ module ModelCatalogPort =
         else
             Some(unbox<string> value)
 
-    /// The workspace directory carried by the wiring input.
-    let private directoryOption (input: obj) : string option =
-        if isNullish input then
-            None
-        else
-            readText (field input "directory")
-
     /// The OpenCode SDK encodes this header itself (see
     /// packages/sdk/js/src/client.ts). Raw Unicode paths (e.g. 万象) are
     /// rejected by fetch Headers as invalid.
@@ -225,20 +218,19 @@ module ModelCatalogPort =
 
     /// The catalog for the given host wiring, or `None` when the input names
     /// no host the catalog can be built on.
-    let create (input: obj) : IModelCatalog option =
-        let workDir = directoryOption input
+    let create (workspaceDirectory: string option) (input: obj) : IModelCatalog option =
 
         let client = if isNullish input then null else field input "client"
 
         if isNullish input then
             None
         elif not (isNullish client) && not (isNullish (field client "config")) then
-            Some(SdkModelCatalog(client, workDir) :> IModelCatalog)
+            Some(SdkModelCatalog(client, workspaceDirectory) :> IModelCatalog)
         elif not (isNullish (field input "serverUrl")) then
-            Some(HttpModelCatalog(unbox<string> (field input "serverUrl"), workDir) :> IModelCatalog)
+            Some(HttpModelCatalog(unbox<string> (field input "serverUrl"), workspaceDirectory) :> IModelCatalog)
         elif not (isNullish (field input "baseUrl")) then
-            Some(HttpModelCatalog(unbox<string> (field input "baseUrl"), workDir) :> IModelCatalog)
+            Some(HttpModelCatalog(unbox<string> (field input "baseUrl"), workspaceDirectory) :> IModelCatalog)
         elif not (isNullish (field input "port")) then
-            Some(HttpModelCatalog(sprintf "http://127.0.0.1:%d" (unbox<int> (field input "port")), workDir) :> IModelCatalog)
+            Some(HttpModelCatalog(sprintf "http://127.0.0.1:%d" (unbox<int> (field input "port")), workspaceDirectory) :> IModelCatalog)
         else
             None

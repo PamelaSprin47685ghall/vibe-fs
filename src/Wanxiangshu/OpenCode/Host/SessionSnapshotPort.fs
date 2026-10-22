@@ -332,17 +332,6 @@ module SessionSnapshotPort =
         else
             projectMessages (unwrapPayload (JS.JSON.parse text))
 
-    let private nonBlankDirectory (directory: string) =
-        if String.IsNullOrWhiteSpace directory then
-            None
-        else
-            Some directory
-
-    let private directoryOption (input: obj) =
-        if isNull input || isNull input?directory then
-            None
-        else
-            nonBlankDirectory (unbox<string> input?directory)
 
     type SdkSnapshotPort(client: obj, workspaceDirectory: string option) =
         let headersObj () =
@@ -982,13 +971,12 @@ module SessionSnapshotPort =
                 }
 
 
-    let create (input: obj) : ISessionSnapshotPort option =
-        let workDir = directoryOption input
+    let create (workspaceDirectory: string option) (input: obj) : ISessionSnapshotPort option =
 
         if isNull input then
             None
         elif not (isNull input?client) && not (isNull input?client?session) then
-            Some(SdkSnapshotPort(input?client, workDir) :> ISessionSnapshotPort)
+            Some(SdkSnapshotPort(input?client, workspaceDirectory) :> ISessionSnapshotPort)
         elif not (isNull input?serverUrl) then
             Some(HttpSnapshotPort(unbox<string> input?serverUrl) :> ISessionSnapshotPort)
         elif not (isNull input?baseUrl) then
@@ -1001,13 +989,12 @@ module SessionSnapshotPort =
     /// HNI P-01: the OpenCode adapter's session port. Every session verb is
     /// mapped onto the OpenCode host; the adapter owns the host payload
     /// shape and the product only ever sees port records.
-    let createSessionPort (input: obj) : ISessionPort option =
-        let workDir = directoryOption input
+    let createSessionPort (workspaceDirectory: string option) (input: obj) : ISessionPort option =
 
         if isNull input then
             None
         elif not (isNull input?client) && not (isNull input?client?session) then
-            Some(SdkSessionPort(input?client, workDir) :> ISessionPort)
+            Some(SdkSessionPort(input?client, workspaceDirectory) :> ISessionPort)
         elif not (isNull input?serverUrl) then
             Some(HttpSessionPort(unbox<string> input?serverUrl) :> ISessionPort)
         elif not (isNull input?baseUrl) then
