@@ -886,6 +886,13 @@ module Adapter =
                 return Error(HostError.Transport ex.Message)
         }
 
+    /// The verdict of omp's answer to a requested model switch.
+    let private modelSwitchVerdict (accepted: bool) : Result<unit, HostError> =
+        if accepted then
+            Ok()
+        else
+            Error(HostError.Transport "omp refused the requested model")
+
     /// Ask omp to switch the active session to the requested model.
     let private setRequestedModel (pi: obj) (ctx: obj) (route: ModelRoute) : Task<Result<unit, HostError>> =
         task {
@@ -896,13 +903,9 @@ module Adapter =
 
             if isNull model then
                 return Error(HostError.NotFound(sprintf "%s/%s" route.Provider route.Model))
-
-            let! outcome = awaitObj (call1 (fieldValue pi "setModel") (box model))
-
-            if isTrue outcome then
-                return Ok()
             else
-                return Error(HostError.Transport "omp refused the requested model")
+                let! outcome = awaitObj (call1 (fieldValue pi "setModel") (box model))
+                return modelSwitchVerdict (isTrue outcome)
         }
 
     /// Change the model of the active session to the requested one.
@@ -969,7 +972,8 @@ module Adapter =
                                   update
                                   (createObj
                                       [ "content", box [| createObj [ "type", box "text"; "text", box line ] |]
-                                        "details", box null ]))
+                                        "details", box null ])
+                              |> ignore)
 
                   let invocation =
                       { Session = SessionId.create sid
@@ -1087,7 +1091,7 @@ module Adapter =
             { new ISignalSource with
                 member _.Subscribe(listener) =
                     listeners.Add listener
-                    SignalSubscription listeners listener :> IDisposable }
+                    SignalSubscription(listeners, listener) :> IDisposable }
 
         let paths: IHostPaths =
             // The workspace is read once, so the three members cannot
@@ -1323,7 +1327,7 @@ module Adapter =
         registerEvent pi "before_agent_start" (fun (event: obj) (ctx: obj) ->
             task {
                 let system = stringList (fieldValue event "systemPrompt")
-                let! prompt = hooks.Turn.SystemPrompt (turnContext ctx) system
+                let! prompt = hooks.Turn.SystemPrompt(turnContext ctx, system)
                 return createObj [ "systemPrompt", box (List.toArray prompt) ]
             }
             |> unbox<obj>)
@@ -1336,7 +1340,7 @@ module Adapter =
                     |> Array.choose contextMessageView
                     |> Array.toList
 
-                let! edit = hooks.Turn.ContextMessages (turnContext ctx) messages
+                let! edit = hooks.Turn.ContextMessages(turnContext ctx, messages)
 
                 match contextEditReply edit with
                 | None -> return jsUndefined
@@ -1371,7 +1375,7 @@ module Adapter =
                         match optionalString (fieldValue part "type") with
                         | Some "text" -> Some(stringOf (fieldValue part "text"))
                         | _ -> None)
-                    |> String.Join "\n"
+                    |> String.concat "\n"
 
                 let isError = isTrue (fieldValue event "isError")
 
@@ -1381,12 +1385,12 @@ module Adapter =
                             ctx
                             (fieldValue event "toolCallId")
                             (fieldValue event "toolName")
-                            (fieldValue event "input")
-                    ),
-                    { Text = text
-                      Truncated = false
-                      IsError = isError
-                      Details = None }
+                            (fieldValue event "input"),
+                        { Text = text
+                          Truncated = false
+                          IsError = isError
+                          Details = None }
+                    )
 
                 match edit with
                 | ToolResultEdit.Keep -> return jsUndefined
@@ -1500,48 +1504,117 @@ module Adapter =
             }
             |> unbox<obj>)
 
-        registerEvent pi "session_shutdown" (fun (_event: obj) (_ctx: obj) ->
-            task { do! hooks.Dispose() } |> unbox<obj>)
-
         signal
 
     // ------------------------------------------------------------------
     // omp extension entry
     // ------------------------------------------------------------------
 
-    /// Activate the product on an omp extension. The plugin is asked for its
-    /// hooks when the first session starts, and the `SessionCreated` signal
-    /// is emitted HERE: omp snapshots the listener list when it starts
-    /// emitting `session_start`, so a listener registered during that
-    /// emission is never called for this session.
+    /// Report a failed activation through omp's logger. Never throws: a broken
+    /// logger must not turn a product failure into a host failure (O-3 rule 7).
+    let private logActivationFailure (pi: obj) (message: string) (reason: string) : unit =
+        try
+            call2 (fieldValue (fieldValue pi "logger") "error") (box message) (box (createObj [ "error", box reason ]))
+            |> ignore
+        with _ ->
+            ()
+
+    /// Run an activation step that must not throw into omp: an unexpected
+    /// failure is logged and the session continues (O-3 rule 7).
+    let private runActivationStep (pi: obj) (message: string) (body: unit -> Task) : Task<unit> =
+        task {
+            let! outcome =
+                guardTask (fun () ->
+                    (task {
+                        do! body ()
+                        return Ok()
+                    })
+                    :> Task<Result<unit, HostError>>)
+
+            match outcome with
+            | Error error ->
+                logActivationFailure pi message (reasonOf error)
+                return ()
+            | Ok() -> return ()
+        }
+
+    /// Register the product hooks with omp and announce the session that made
+    /// activation possible. The `SessionCreated` signal is emitted HERE: omp
+    /// snapshots the listener list when it starts emitting `session_start`, so
+    /// a listener registered during that emission is never called for this
+    /// session.
+    let private mountHooks (pi: obj) (emit: HostSignal -> Task<unit>) (hooks: ProductHooks) (ctx: obj) : Task<unit> =
+        task {
+            let signal = registerProductHooks pi hooks emit
+
+            do!
+                signal (
+                    HostSignal.SessionCreated
+                        { Id = SessionId.create (ctxSessionId ctx)
+                          Parent = None
+                          Role = None
+                          Title = None }
+                )
+        }
+
+    /// Activate the product on an omp extension. The host ports are built on
+    /// the first `session_start`, because that is the first moment omp exposes
+    /// a session context and the workspace the paths report is read from it.
     let private startOnOmp (pi: obj) (plugin: IHostPlugin) (agents: AgentRoleSpec list) : Task<unit> =
-        let ports, emit = createOmpHostPorts pi agents
+        // O-3 rule 6: a single activation latch. `session_start` fires for
+        // every session and the product hooks must be registered only once.
+        let activated = ref false
+
+        // O-3 rule 5: the hooks `session_shutdown` disposes. Taking the hooks
+        // is the disposal latch: a second shutdown sees `None`.
+        let liveHooks: ProductHooks option ref = ref None
+
+        let activate (ctx: obj) : Task<unit> =
+            task {
+                let ports, emit = createOmpHostPorts pi agents
+                let! outcome = guardTask (fun () -> plugin.Activate ports)
+
+                match outcome with
+                | Error error ->
+                    logActivationFailure pi "wanxiangshu activation failed" (reasonOf error)
+                    return ()
+                | Ok hooks ->
+                    liveHooks := Some hooks
+
+                    do!
+                        runActivationStep pi "wanxiangshu hook registration failed" (fun () ->
+                            mountHooks pi emit hooks ctx :> Task)
+
+                    return ()
+            }
 
         registerEvent pi "session_start" (fun (_event: obj) (ctx: obj) ->
             task {
                 latestContext := ctx
-                let! outcome = plugin.Activate ports
 
-                match outcome with
-                | Error error ->
-                    call2
-                        (fieldValue (fieldValue pi "logger") "error")
-                        (box "wanxiangshu activation failed")
-                        (box (createObj [ "error", box (reasonOf error) ]))
-                    |> ignore
-                | Ok hooks ->
-                    let signal = registerProductHooks pi hooks emit
-
-                    do!
-                        signal (
-                            HostSignal.SessionCreated
-                                { Id = SessionId.create (ctxSessionId ctx)
-                                  Parent = None
-                                  Role = None
-                                  Title = None }
-                        )
+                if !activated then
+                    return jsUndefined
+                else
+                    activated := true
+                    do! activate ctx
+                    return jsUndefined
             }
             |> unbox<obj>)
+
+        let dispose (hooks: ProductHooks) : Task = hooks.Dispose()
+
+        registerEvent pi "session_shutdown" (fun (_event: obj) (_ctx: obj) ->
+            task {
+                match !liveHooks with
+                | None -> return jsUndefined
+                | Some hooks ->
+                    liveHooks := None
+                    do! runActivationStep pi "wanxiangshu disposal failed" (fun () -> dispose hooks :> Task)
+                    return jsUndefined
+            }
+            |> unbox<obj>)
+
+        Task.FromResult()
 
     /// Activate the product on an omp extension.
     let activateOnOmp (pi: obj) (plugin: IHostPlugin) (agents: AgentRoleSpec list) : Task<unit> =
