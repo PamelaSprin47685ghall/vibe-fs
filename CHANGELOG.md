@@ -99,7 +99,7 @@
 - **文档侧同步**：delegation、crash-reconciliation、participant-horizon、repository-programming 的条款与 `tests/README.md`、模型侧文案（`resources/provider/tool/js-program/**`）、抽吸看板 CUT-35 行、`requirements/GAP.md` GAP-218 与 `proposals/W2-实施-WP-025-horizon泄露重置-2026-10-10.md` 已按此合同改写。
 - **未验证（重要）**：本条只记录**文档合同**，不记任何测试结论。加载期作废接线、void 报告恰好一次、重启后不重复、交付过又被 abort 的子工作报 `voided` 且 join 关闭，这些**行为**结论由行为泳道与正式 runner 给出；本 lane **没有跑 F# 构建、没有重建 dist、没有执行任何 requirement 套件**。
 - **取代的旧口径**：此前「重启后遗留子工作保持活跃、join 跨重启保持打开、`horizon` 与 `join` 对它都为空」的口径**已被本裁决取代**；相关旧段落已在 2026-10-21 的改写中移除或改写，历史条目按 append-only 原则保留原样，只作历史记录。
-- **作废的持久原因已入法律集合（补记）**：`Voided` 是 `HandleAbandonReason` 的**第四个合法构造子**，`wanxiangli/handle-lifecycle` 的 `recoverChild()` 接受的 `durableReason` 全集是 `ParentCancelled`｜`DeadlineExceeded`｜`HostSessionGone`｜`Voided`；**已被 2026-10-21 作废裁决取代的旧口径**是「只有前三项」。库侧已发布 0.66.0（`663ba59`）接受 `Voided`。**但主仓的 `wanxiangli` gitlink 仍指向 0.65.0（`fde10a0`），尚未 bump**——bump 归行为泳道，本条只记录这一未闭合环节，不代做。
+- **作废的持久原因已入法律集合（补记）**：`Voided` 是 `HandleAbandonReason` 的**第四个合法构造子**，`wanxiangli/handle-lifecycle` 的 `recoverChild()` 接受的 `durableReason` 全集是 `ParentCancelled`｜`DeadlineExceeded`｜`HostSessionGone`｜`Voided`；**已被 2026-10-21 作废裁决取代的旧口径**是「只有前三项」。库侧已发布 0.66.0（`663ba59`）接受 `Voided`。**主仓的 `wanxiangli` gitlink 也已随 `cfa8d0dad` 前移到 0.66.0（`663ba59`）**（该 bump 已随行为泳道的 `6ccc761c2` 进入 `origin/master`），落地链上这一环**已闭合**。
 
 ## Unreleased — 委派 032/026：post-rebase 验证缺口已闭合（真编译 + 真跑 runner）
 

@@ -57,6 +57,6 @@ Join 的条数上限、显示窗口和交付视图本身的有界物化不是同
 
 本包 026 的重启用例正是这条合同的唯一端到端见证：加载期作废 → horizon 显示 `voided` → join 报告一次 `voided`（既非 `completed` 也非 `undelivered`）→ `durableLifecycleByname` 读出 `Retired`（**经 `summary` 投影读出的终态**，不是从原始 handle 绑定直接读出的）、名册不再列出 → 同一目录上再起一个进程不再报告。**结算按孤儿幂等**：每个孤儿一生只产生一条作废事实，**重启的进程不得再次作废同一份孤儿工作**（journal 里不会出现第二条作废事实，join 也不再重复报告）。crash-reconciliation-018/020 从 journal 侧见证同一结算（每个孤儿一条作废事实、零 completion 事实、重复结算不再追加事实）。**本页只描述合同与见证范围，不记任何测试结论**；这两组用例的通过与否由行为泳道与正式 runner 给出。
 
-作废的持久原因也是 `HandleAbandonReason` 的第四个合法构造子 `Voided`：`wanxiangli/handle-lifecycle` 的 `recoverChild()` 接受的 `durableReason` 全集是 `ParentCancelled`｜`DeadlineExceeded`｜`HostSessionGone`｜`Voided`。**已被 2026-10-21 作废裁决取代的旧口径**是「只有前三项」，现已作废。库侧 0.66.0 起接受 `Voided`；**主仓的 `wanxiangli` gitlink 仍停在 0.65.0（`fde10a0`），未 bump**——gitlink bump 之前，主仓恢复路径交出去的 `durableReason = "Voided"` 不会被已发布库接受。这是本裁决落地链上**尚未闭合的一环**，不是本裁决之外的另一件事。
+作废的持久原因也是 `HandleAbandonReason` 的第四个合法构造子 `Voided`：`wanxiangli/handle-lifecycle` 的 `recoverChild()` 接受的 `durableReason` 全集是 `ParentCancelled`｜`DeadlineExceeded`｜`HostSessionGone`｜`Voided`。**已被 2026-10-21 作废裁决取代的旧口径**是「只有前三项」，现已作废。库侧 0.66.0 起接受 `Voided`；**主仓的 `wanxiangli` gitlink 也已随 `cfa8d0dad` 前移到 0.66.0（`663ba59`）**，该 gitlink bump 已随行为泳道的 `6ccc761c2` 进入 `origin/master`，主仓恢复路径交出去的 `durableReason = "Voided"` 现在交到的就是已发布并接受它的库版本——落地链上这一环**已闭合**。
 
 本次结果见[迁移记录](../../../proposals/archive/2026-10-03/20模块迁移-恢复与委托-2026-09-28.md)。直接 `node --test` 只用于局部调试；正式结论使用 verification-system runner，TODO 会使它返回未完成。
