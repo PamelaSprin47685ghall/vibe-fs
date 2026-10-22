@@ -18,5 +18,7 @@
 
     <Compile Include="Interaction/Authority/Run.fsi"/>
     <Compile Include="Interaction/Authority/Run.fs"/>
+    <Compile Include="Interaction/Authority/TerminalSource.fsi"/>
+    <Compile Include="Interaction/Authority/TerminalSource.fs"/>
   </ItemGroup>
 </Project>

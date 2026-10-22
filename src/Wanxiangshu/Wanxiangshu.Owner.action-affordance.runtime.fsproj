@@ -18,8 +18,6 @@
 
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
 
-    <Compile Include="OpenCode/Tools/ToolContext.fsi"/>
-    <Compile Include="OpenCode/Tools/ToolContext.fs"/>
     <Compile Include="OpenCode/Tools/ToolSurface.fsi"/>
     <Compile Include="OpenCode/Tools/ToolSurface.fs"/>
   </ItemGroup>

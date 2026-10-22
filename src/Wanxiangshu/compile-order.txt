@@ -212,6 +212,8 @@ Interaction/Authority/Origin.fsi
 Interaction/Authority/Origin.fs
 Interaction/Authority/Facts.fsi
 Interaction/Authority/Facts.fs
+Interaction/Authority/TerminalSource.fsi
+Interaction/Authority/TerminalSource.fs
 Interaction/Authority/LifeClassification.fsi
 Interaction/Authority/LifeClassification.fs
 Interaction/Authority/PromptSessionFact.fsi
@@ -300,6 +302,10 @@ Repository/Investigation/WarmStart/Prompt.fsi
 Repository/Investigation/WarmStart/Prompt.fs
 Host/Contract/ToolResultBound.fsi
 Host/Contract/ToolResultBound.fs
+Execution/Tool/ToolResultText.fsi
+Execution/Tool/ToolResultText.fs
+Execution/Tool/ToolArgs.fsi
+Execution/Tool/ToolArgs.fs
 Host/ToolContext.fsi
 Host/ToolContext.fs
 Host/Contract/CompactionPolicySurface.fsi
@@ -405,6 +411,8 @@ Participant/Persona/ManagedAgent.fsi
 Participant/Persona/ManagedAgent.fs
 Interaction/Admission/ChatAdmissionIntent.fsi
 Interaction/Admission/ChatAdmissionIntent.fs
+Interaction/Admission/HostInternalClassification.fsi
+Interaction/Admission/HostInternalClassification.fs
 Interaction/Admission/ChatAdmissionIntentSurface.fsi
 Interaction/Admission/ChatAdmissionIntentSurface.fs
 Persistence/Journal/PromptFactCodec.fsi
@@ -683,6 +691,8 @@ Participant/Provider/Prose.fsi
 Participant/Provider/Prose.fs
 Participant/Provider/ProviderLanguageBinding.fsi
 Participant/Provider/ProviderLanguageBinding.fs
+Mission/Work/DeliverPolicy.fsi
+Mission/Work/DeliverPolicy.fs
 Execution/Fission/ToolPolicy.fsi
 Execution/Fission/ToolPolicy.fs
 Context/Prefix/Surface.fsi
@@ -719,8 +729,6 @@ Context/Companion/Model.fsi
 Context/Companion/Model.fs
 Context/Companion/Runtime.fsi
 Context/Companion/Runtime.fs
-OpenCode/Tools/ToolContext.fsi
-OpenCode/Tools/ToolContext.fs
 OpenCode/Tools/ManagerReviewTools.fsi
 OpenCode/Tools/ManagerReviewTools.fs
 OpenCode/Tools/StaticTools.fsi
@@ -785,6 +793,8 @@ Context/Companion/CompressionSurface.fsi
 Context/Companion/CompressionSurface.fs
 Foundation/TerminalSignal.fsi
 Foundation/TerminalSignal.fs
+Execution/Session/TerminalRegistry.fsi
+Execution/Session/TerminalRegistry.fs
 OpenCode/Host/Events.fsi
 OpenCode/Host/Events.fs
 OpenCode/Host/SharedTerminalBus.fsi
@@ -959,8 +969,12 @@ Execution/Delegation/Fork/Host/JoinSurface.fsi
 Execution/Delegation/Fork/Host/JoinSurface.fs
 Execution/Delegation/Fork/Host/Agent.fsi
 Execution/Delegation/Fork/Host/Agent.fs
+Execution/Delegation/ChildWorkTerminalSource.fsi
+Execution/Delegation/ChildWorkTerminalSource.fs
 Host/Domain/DelegationCaller.fsi
 Host/Domain/DelegationCaller.fs
+Execution/Delegation/Fork/DelegationEnvironment.fsi
+Execution/Delegation/Fork/DelegationEnvironment.fs
 Execution/Delegation/Fork/Host/Pty.fsi
 Execution/Delegation/Fork/Host/Pty.fs
 Interaction/Repair/Port.fsi
@@ -1041,6 +1055,8 @@ Execution/Delegation/Advisor/Seat.fsi
 Execution/Delegation/Advisor/Seat.fs
 OpenCode/Host/HostCompactionGate.fsi
 OpenCode/Host/HostCompactionGate.fs
+Context/Prefix/AttemptSettlement.fsi
+Context/Prefix/AttemptSettlement.fs
 Context/Prefix/WireReconciliation.fsi
 Context/Prefix/WireReconciliation.fs
 Context/Prefix/OpenCode/Wire.fsi
@@ -1136,6 +1152,8 @@ Repository/Knowledge/Casebook/BookkeeperStaging.fsi
 Repository/Knowledge/Casebook/BookkeeperStaging.fs
 Repository/Knowledge/Casebook/BookkeeperRuntime.fsi
 Repository/Knowledge/Casebook/BookkeeperRuntime.fs
+Repository/Knowledge/Casebook/BookkeeperPolicy.fsi
+Repository/Knowledge/Casebook/BookkeeperPolicy.fs
 Execution/Tool/AdmissionTable.fsi
 Execution/Tool/AdmissionTable.fs
 Execution/Tool/ExecuteGate.fsi
@@ -1156,6 +1174,8 @@ Persistence/EventStore/CanonicalIntegrator.fsi
 Persistence/EventStore/CanonicalIntegrator.fs
 Persistence/Journal/Surface.fsi
 Persistence/Journal/Surface.fs
+Mission/Work/DeliveryFlow.fsi
+Mission/Work/DeliveryFlow.fs
 Mission/Lifecycle/Surface.fsi
 Mission/Lifecycle/Surface.fs
 Execution/Delegation/Fork/Host/HostForkPtySurface.fsi

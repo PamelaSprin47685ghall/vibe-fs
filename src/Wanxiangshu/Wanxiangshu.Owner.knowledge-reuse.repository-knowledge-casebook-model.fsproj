@@ -40,6 +40,8 @@
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperStaging.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperPolicy.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperPolicy.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Workflow.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Workflow.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Index.fsi"/>

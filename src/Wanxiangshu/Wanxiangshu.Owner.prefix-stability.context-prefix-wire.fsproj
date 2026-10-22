@@ -33,6 +33,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-wire-port.fsproj" />
+    <Compile Include="Context/Prefix/AttemptSettlement.fsi" />
+    <Compile Include="Context/Prefix/AttemptSettlement.fs" />
     <Compile Include="Context/Prefix/WireReconciliation.fsi" />
     <Compile Include="Context/Prefix/WireReconciliation.fs" />
     <Compile Include="Context/Prefix/OpenCode/Wire.fsi" />
