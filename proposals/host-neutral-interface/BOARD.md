@@ -59,8 +59,13 @@ P-03 consumer cutover 2 (eng-hni-host, 2026-10-22): the dispatch recovery path n
 neutral port. `Interaction/Dispatch/Recovery.fs(i)` (`PromptRecovery.reconcile` now takes `ITranscriptPort option`) and
 `Interaction/Dispatch/RecoverySurface.fs` (the private snapshot stub became an `ITranscriptPort` stub). The claim law
 is unchanged; a host role outside the neutral vocabulary is carried as `system` so the 50-message recovery tail window
-is preserved. The legacy `ISessionSnapshotPort` / `SessionMessage` contract stays live — the remaining consumers
-(turn reconcile, prefix wire, delegation advisor, tools, fork host restart) are still to be routed onto P-03.
+is preserved. The legacy `ISessionSnapshotPort` / `SessionMessage` contract stays live. Fork recovery (`ChildRecoveryWorkflow.Ports` /
+`Fork/Host/Restart.fs`) was evaluated for cutover but deferred: `HostForkRuntime` and `ToolRuntimeScope` fan out into 24 tool files
+(126 call sites across `JoinTool`, `DeliverTool`, `ReviewBackendManager`), and tools like `ReviewBackendManager` rely on snapshot-specific
+`SessionToolPart` / `ToolParts` / `locateToolCall` absent from neutral `TranscriptPart.ToolUse`. Per HNI policy against broad multi-lane
+fanout and lossy reverse projection, fork recovery remains on `ISessionSnapshotPort` until downstream tools complete domain extraction.
+Full leftover inventory (44 files) documented in root `保姆级交接与展望.md`. Remaining consumers (turn reconcile, prefix wire, delegation
+advisor, tools, fork host restart) are still to be routed onto P-03.
 `Host/Ports/*` is unchanged, so the next free port id stays **P-19**. Gates: architecture OK, adapter-thinness 139
 files / 33004 lines, product-reference 589 (baseline 689), without-port 134 (baseline 149), fsharp-control-pyramid 2
 findings (both pre-existing). **NOT BUILD-VERIFIED, NOT TEST-RUN** — the delivery team must build master and run the

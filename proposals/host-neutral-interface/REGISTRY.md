@@ -12,7 +12,7 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 |---|---|---|---|---|---|
 | P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Ports/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo` | DECLARED, WIRED-OC, SKELETON-OMP — all seven verbs (`Create`, `Parent`, `Children`, `Abort`, `Interrupt`, `Close`, `FindByTitle`) implemented in the OpenCode adapter (`SdkSessionPort` / `HttpSessionPort`, `OpenCode/Host/SessionSnapshotPort.fs`); every verb reports failures as `HostError`, and no verb is left `Unsupported` |
 | P-02 | `IPromptPort`, `PromptRequest`, `DeliveryVerdict` | `Host/Ports/Prompts.fs(i)` | fission (+ Interaction/Dispatch) | `OpenCode.IPromptPort`, `OpenCodePromptOptions`, `DetachedSendVerdict` | DECLARED, SKELETON-OMP |
-| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` (both still live; cutover in progress) | DECLARED, WIRED-OC, SKELETON-OMP — `SessionRecoveryHost` and the dispatch recovery path (`PromptRecovery` + `RecoverySurface`) now read through `ITranscriptPort`; the OpenCode adapter keeps the legacy `ISessionSnapshotPort` alive behind `TranscriptPort.HostTranscriptPort`; the remaining snapshot consumers (turn reconcile, prefix wire, delegation advisor/seat, tools, fork host restart) are still to be routed |
+| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` (both still live; cutover in progress) | DECLARED, WIRED-OC, SKELETON-OMP — `SessionRecoveryHost` and the dispatch recovery path (`PromptRecovery` + `RecoverySurface`) now read through `ITranscriptPort`; fork recovery (`ChildRecoveryWorkflow`) deferred due to `ToolRuntimeScope` fanout (24 files) and tool-part dependencies; full 44-file leftover inventory documented in root `保姆级交接与展望.md`; remaining consumers still to be routed |
 | P-04 | `IToolRegistrar`, `ToolSpec`, `ToolInvocation`, `ToolOutcome` | `Host/Ports/Tools.fs(i)` | tools | `OpenCode/Tools/ToolContext` `Tool`/`ToolContext`/`ToolOutput` | DECLARED, SKELETON-OMP |
 | P-05 | `IToolGate`, `ToolCallVerdict`, `ToolResultEdit`, `ToolDefinitionEdit` | `Host/Ports/ToolGates.fs(i)` | tools | `tool.execute.before/after`, `tool.definition` handling in `OpenCode/Plugin/PluginHooks` | DECLARED, SKELETON-OMP |
 | P-06 | `ITurnTransform`, `TurnAdmission`, `ContextEdit`, `ParamsVerdict` | `Host/Ports/TurnTransforms.fs(i)` | plugin-host | `OpenCode/Plugin/PluginTransforms`, `ChatParamsHook`, `ProviderSystemTransform` entry points | DECLARED, SKELETON-OMP |
@@ -446,8 +446,13 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   The claim law (`DispatchLaw.recover`, role=`user` + `PromptKey` among the newest `RecoveryTailWindow` messages) is
   unchanged; a host role outside the neutral vocabulary is carried as `system` (it could never prove a landing) so the
   tail window width is preserved exactly. **The legacy `ISessionSnapshotPort` / `SessionMessage` contract stays live** —
-  the remaining consumers (turn reconcile, prefix wire, delegation advisor/seat, tools, fork host restart) are still to be
-  routed. **No new port** — P-03 (`Host/Ports/Transcript.fs(i)`) is unchanged; the next free id stays **P-19**. Gates:
+  fork recovery (`ChildRecoveryWorkflow.Ports` / `Fork/Host/Restart.fs`) was evaluated for cutover but deferred: `HostForkRuntime`
+  and `ToolRuntimeScope` fan out into 24 tool files (126 callsites), and upstream tools require snapshot-specific `SessionToolPart` /
+  `ToolParts` / `locateToolCall` absent from neutral `TranscriptPart.ToolUse`; per HNI policy against broad cross-lane fanout and lossy
+  reverse projection, fork recovery remains on `ISessionSnapshotPort` until downstream tools complete domain extraction. The full
+  44-file leftover inventory is documented in root `保姆级交接与展望.md`. Remaining consumers (turn reconcile, prefix wire, delegation
+  advisor/seat, tools, fork host restart) are still to be routed. **No new port** — P-03 (`Host/Ports/Transcript.fs(i)`) is unchanged;
+  the next free id stays **P-19**. Gates:
   architecture OK, adapter-thinness 139 files / 33004 lines, product-reference 589 (baseline 689), without-port 134
   (baseline 149), fsharp-control-pyramid 2 findings — both pre-existing in `OpenCode/Host/SessionSnapshotPort.fs`.
   **NOT BUILD-VERIFIED, NOT TEST-RUN** (owner's no-build-before-push rule) — the delivery team must build master and run
