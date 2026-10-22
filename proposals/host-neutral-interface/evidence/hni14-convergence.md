@@ -2,7 +2,7 @@
 
 Owner lane: eng-host-arch (arch). Date: 2026-10-22. Baseline: `origin/master` `94218a2be` (the tree containing
 `d55fa1eff`). Card: HNI-14. Companions: [DESIGN.md](../DESIGN.md), [REGISTRY.md](../REGISTRY.md),
-[BOARD.md](../BOARD.md). This record is **design only**: nothing implemented, compiled or pushed (§6).
+This record is **design decisions**: shape convergence is not implemented, while step (a) (namespace relocation of P-13..P-16 to `Host/Domain/`) landed in `51aadb02f` (§6).
 
 ## 1. The governing principle
 
@@ -147,9 +147,7 @@ already pattern-match on `Ok`/`Error`. **(d)** Delete the two interfaces from `H
 `new … with` bindings, leaving the adapter constructing only `DelegationCaller`. **(e)** Type `WorkspaceDirectory:
 WorkspacePath option`; do **not** widen the `ViewForSession` / `ManagerCapabilityFactsFor` session ids to `SessionId`
 in the same step — the adapter holds a `string` from the host payload, so that is a separate follow-up.
-**Per-step acceptance** (each step): `node scripts/checks/architecture.mjs` prints `architecture: OK`; gates ⑪ and ⑫
-still 0 (tier B is not under ⑪'s scope); `git grep -c "IDelegationCommandHost"` decreases monotonically; no
-`Result<_, string>` member left in `Host/Domain/`.
+**Per-step acceptance** (each step): `node scripts/checks/architecture.mjs` prints `architecture: OK`; gates ⑪, ⑫, ⑬ pass (tier B is governed by ⑬, not ⑪); `git grep -c "IDelegationCommandHost"` decreases monotonically. Leaving no `Result<_, string>` member in `Host/Domain/` is the final convergence criterion across steps (b)–(e), not a requirement of the initial move step.
 
 ### 3.3 P-16 `PairGuidance` — split by ownership
 
@@ -187,8 +185,7 @@ Answer: **no** — all three have homes. So **P-18 is voided** and the reserved 
 The file is **not on `master`** (measured: `git ls-tree -r origin/master` lists no `src/Wanxiangshu/Host/Tools.fs(i)`);
 it lives on `origin/wip/hni-tools`, which is unmerged. The void therefore **settles that branch's obligation** — the
 branch's `Host/Tools.fs(i)` is deleted rather than renamed, and its "P-04 tool contribution port" header claim
-disappears with it. **If** a future member cannot be folded into P-04/P-05, the fallback is a renamed family
-`Host/Ports/ToolAdmission.fs(i)` with the `HNI P-18` marker — not the target recorded here.
+The retired id `P-18` cannot be reused; any new work requires a fresh registry allocation. The tools lane owns resolving D-07 with no implementation here.
 
 ## 4. D-04, restated precisely
 
@@ -217,6 +214,4 @@ to the parallel arch slice.
 "closed or reduced to precise owner decisions", not "merged". **The owning lanes own their steps**: this card
 decides *what* and *in what order*; the fork/session, fission, tools and arch lanes do the work in their own
 commits. **No baselines are edited** — gate ⑩/⑫ baselines are untouched; a lane landing a step re-measures and only
-lowers. **No compile or test evidence exists on this box** (owner's rule: the delivery team builds); the only
-evidence is static — `git grep` / `git ls-tree` measurements and `node scripts/checks/architecture.mjs` printing
-`architecture: OK`. **No files are moved by this record** — the `Host/Domain/` move is the arch slice's.
+**No F# build or compiled test suites ran on this box** (owner's rule: the delivery team builds); evidence is static — `git grep` / `git ls-tree` measurements and `node scripts/checks/architecture.mjs` printing `architecture: OK`, with the Node gate regression `requirements/host-boundary/tests/034.test.mjs` (9/9) executed. Shape convergence is not implemented here; step (a) (`Host/Domain/` relocation) was landed by the arch slice in `51aadb02f`.
