@@ -341,6 +341,13 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   product-reference 595 (baseline 689), without-port 137 (baseline 150); `node --test
   requirements/host-boundary/tests/034.test.mjs` 9/9.
 
+- 2026-10-22 eng-integ-027-2: **delegation-027 EMR-010 model-routing lease resolution**. Fixed by `a38ef7770`
+  in `HostSignalBootstrap.fs` by keying `admissionInFlight` with `(ChatExecutionKey * ChatAdmissionPurpose)`.
+  Separates `PublishInput` (purpose 0, no model-routing lease, generates `DeferredInput`) and `EnterProviderStep`
+  (purpose 1, requires active model lease continuance) for the same physical user message ID, preventing the
+  latter from prematurely joining the former's promise and raising EMR-010 at `SessionExecutionBinding.fs:116`.
+  **No new port** — the HNI port surface is untouched; next free port id remains **P-19**; `omp: n/a`.
+
 - 2026-10-21 eng-hni-plugin-goose (HNI-08): P-16 pair guidance is WIRED-OC — the guideline fold moved out of
   `OpenCode/Host/PairProgramming` into the domain owner `Interaction/PairGuidance/Occurrences`; the OpenCode transform
   decodes the transcript and renders only. The ID is P-16 (D-01: P-13 is the fork lane's `CommandDeclaration`).

@@ -55,6 +55,14 @@
 - **未验证（重要）**：本提交**只改 `.md`**，会让构建的 generated digest 再次失配 ⇒ 落地后需再跑一次 `build-slot node scripts/build.mjs` 刷新 manifest，正式 runner 才愿意开跑。上面那批数字对的是**本提交之前**的那棵树。
 
 
+## Unreleased — 委派 027：EMR-010 模型路由租约缺失根因修复与 installed-Host 产品缺口定位
+
+- **EMR-010 修复（`a38ef7770`）**：`requirements/delegation/tests/027.test.mjs` 中用例 `prepared busy guidance for Ada/devops stays bound to the original active work` 报错 `EMR-010: managed provider step for physical user message msg-host-child-2-...-2 has no committed model-routing lease`。根因已确认：`HostSignalBootstrap.fs` 原 `admissionInFlight` 仅以 `ChatExecutionKey` 为索引，将针对同一物理消息 ID 的 `PublishInput`（purpose 0，无模型租约，生成 `DeferredInput`）与后续 `EnterProviderStep`（purpose 1，需领取/续签模型租约）合并到了同一个飞行任务中，导致 provider step 直接采纳前者的无租约结果跳过领租，后续在 `SessionExecutionBinding.fs:116` 抛出 EMR-010。
+- **实现改动**：`src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs` 将 `admissionInFlight` 改为由 `(ChatExecutionKey * ChatAdmissionPurpose)` 二元组索引，使两类不同目的的准入飞行独立调度，互不吞没；二度 `Accept` 经由 `Acceptance.fs` 保持幂等。
+- **历史追溯与排查（refuted suspects）**：该缺陷实为 `48a0bf426`（2026-10-07，引入 Dual Admission Purpose 时遗留的飞行表键值设计缺陷）引入的潜伏 Bug，因 `c0246c36d`（2026-10-21，切换到 `real-fork.mjs` 并引入并发第 2 笔 guidance）而被触发暴露。此前二分怀疑的 `6b7ae3a46`（wanxiangli 0.65.0 bump）、`cf1f0d2a9`（测试集自身修改）、`e058233a3`（顾问渲染）均被排除，确认为无关改动。`suite-reds` 报告中将其归为 pre-existing 系相对基线提交 `07173a147` 而言，并非该缺陷本无产品代码根因。
+- **installed-Host 两条 Canaries 缺口定位（GUIDANCE / GUIDANCE_STOP）**：027 中两条 `installed Host releases Manager Join...` 测试在缺少 `INTEGRATION_TIER=1` 时被跳过；在开启集成测试时报 `opencode serve did not output listening line within timeout`。根因包含两层：(1) 环境层：`node_modules/.bin/opencode` 仅为未完成 postinstall 的存根脚本；(2) 产品层：真实子会话投递提交（`TaskDeliveryCommitted`）后被 `DeliverTool.closeAndArmDelivered` 强制中断下一步为 `Cancelled`，而 `RunLifecycle.fs` 要求最末步正常结束才视作完成，导致工作单元永远处于 `Active`、Manager 的 Join 永远不闭合而超时。此为独立产品缺口，测试本身断言无误。
+- **验证与限制**：在打入补丁的 `dist/`（携带 `flightKeyOf` 区分 purpose）上复测，针对性用例 2 条全绿（`pass 2 / fail 0`），全文件测试 9 通过 / 0 失败 / 2 跳过。因机器满载构建保护，未执行全量 1400 源码文件的重新编译；`dist/` 验证仅作为语义行为证据。门禁 `scripts/checks/architecture.mjs` 绿。
+
 ## Unreleased — 013 的 Boot 装配面改为惰性导入（首裁决提前，但 tier 静默窗口的结构性缺口未闭合）
 
 - **修复**：`requirements/knowledge-reuse/tests/013.test.mjs` 顶层静态 import 的 `dist/OpenCode/Plugin/PluginHostWiringSurface.js`（实测静态 import 图 **3340 ms** 的模块求值成本，391 个 dist 模块 / 4,050,480 B）改为**惰性**导入（`let hostFinalizeModule` + `loadHostFinalize()`），只在真正需要它的三个异步用例体内解析。`??=` 只在 `await` 成功后才赋值，故 import 失败不会缓存被拒的 promise，也不会留下半初始化的模块。
