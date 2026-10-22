@@ -1,5 +1,5 @@
 {
-  "status": "ready-for-pr",
+  "status": "pr-open",
   "resume": {
     "requestedByUser": true,
     "delivery": "Open a PR from codex/upstream-merge-20261022 to origin/master; do not directly update master.",
@@ -559,16 +559,27 @@
     "M22-3": "DONE: authority, delivery and recovery regressions passed",
     "M22-4": "DONE: build boundaries, actual Host and Long Stroke passed",
     "M22-5": "DONE for resumed scope: final normal-operation and affected-suite acceptance passed; consolidated CLI history is not relabeled",
-    "M22-6": "DOING: publish PR; exact-head CI remains separate from local acceptance"
+    "M22-6": "PR OPEN: source delivered; exact-head CI is running and is not yet counted as passed"
   },
   "sourceDelivery": {
     "mode": "pull-request",
     "headBranch": "codex/upstream-merge-20261022",
     "baseBranch": "master",
-    "pullRequest": null,
-    "commit": null,
-    "pushed": false,
-    "ci": null
+    "pullRequest": "https://github.com/dyx13/vibe-fs/pull/1",
+    "pullRequestNumber": 1,
+    "commit": "70f8aab03445e99580c38c584910f84478448e36",
+    "pushed": true,
+    "merged": false,
+    "receiptOnlyFollowup": true,
+    "ci": {
+      "status": "in_progress",
+      "checkedSourceCommit": "70f8aab03445e99580c38c584910f84478448e36",
+      "runId": 39841840768,
+      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39841840768",
+      "latestHeadChecks": "https://github.com/dyx13/vibe-fs/pull/1/checks",
+      "passed": false
+    },
+    "creation": "The GitHub connector returned 403 for PR creation; the user's existing local GitHub CLI login created PR 1 successfully. The PR is attached to this task."
   },
   "remainingBoundaries": [
     "Node VM afterEvaluate timeout with enabled async_hooks has a reproduced native execution_async_id failure; isolating the test probe does not fix that product runtime combination.",
