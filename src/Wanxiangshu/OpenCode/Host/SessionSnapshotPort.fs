@@ -9,7 +9,6 @@ open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Host.Ports
 
 module SessionSnapshotPort =
@@ -229,7 +228,7 @@ module SessionSnapshotPort =
         if isNull source || isNull source?metadata then
             None
         else
-            readString source?metadata?(PromptMetadataCodec.PromptKeyField)
+            readString source?metadata?(PromptMetadataField.PromptKeyField)
 
     let private promptKeyFromPart (part: obj) =
         if isNull part then None else promptKeyFromMetadata part

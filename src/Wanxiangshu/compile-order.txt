@@ -20,6 +20,8 @@ Host/Digest.fsi
 Host/Digest.fs
 Foundation/Identity.fsi
 Foundation/Identity.fs
+Foundation/PromptMetadataField.fsi
+Foundation/PromptMetadataField.fs
 Foundation/Quiescence.fsi
 Foundation/Quiescence.fs
 Mission/Work/Contract.fsi

@@ -1,7 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Interaction.Dispatch
-
 open System
 open Fable.Core
 open Fable.Core.JsInterop
@@ -169,7 +167,7 @@ module ProviderWireDecode =
         rawArray (if isNull rawObj then null else rawObj?parts)
 
     /// The `PromptKey` a Host message carries in its metadata (PROMPT-011).
-    /// Reads the field PromptMetadataCodec wrote; single-message variant of
+    /// Reads the field the Foundation module owns; single-message variant of
     /// PromptIngressCodec's input/output pair reader.
     let private nonBlankMetadataText (value: obj) : string option =
         if isNull value then
@@ -194,7 +192,7 @@ module ProviderWireDecode =
         [ fromMetadata info; fromMetadata rawObj; fromParts () ] |> List.tryPick id
 
     let promptKeyOfMessage (rawObj: obj) : PromptKey option =
-        metadataStringOfMessage PromptMetadataCodec.PromptKeyField rawObj
+        metadataStringOfMessage PromptMetadataField.PromptKeyField rawObj
         |> Option.map PromptKey.create
 
     /// Typed Host continuation origin carried out-of-band from provider semantic
@@ -202,7 +200,7 @@ module ProviderWireDecode =
     /// ProviderRetryAttempt transport rows out of durable X); it never enters the
     /// semantic/wire projection itself (COMPANION-012).
     let promptOriginOfMessage (rawObj: obj) : string option =
-        metadataStringOfMessage PromptMetadataCodec.OriginField rawObj
+        metadataStringOfMessage PromptMetadataField.OriginField rawObj
 
     /// Extract the single, unambiguous session id from a transform output's
     /// `messages` array. Used by hooks that need to identify the managed session

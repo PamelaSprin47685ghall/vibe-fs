@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Dispatcher correlation metadata carried on the Host prompt boundary.
@@ -12,24 +13,14 @@ open Wanxiangshu.Foundation.Identity
 /// Metadata is deliberately absent from `ProviderWireDecode.decodePart`, so none of this
 /// enters either provider projection (COMPANION-012).
 module PromptMetadataCodec =
-
-    [<Literal>]
-    let PromptKeyField = "wanxiangshu_prompt_key"
-
-    [<Literal>]
-    let OriginField = "wanxiangshu_origin"
-
-    [<Literal>]
-    let LogicalRunField = "wanxiangshu_logical_run"
-
     let create (key: PromptKey) (origin: string) (logicalRunId: LogicalRunId option) : obj =
         createObj
-            [ PromptKeyField, box (PromptKey.value key)
-              OriginField, box origin
+            [ PromptMetadataField.PromptKeyField, box (PromptKey.value key)
+              PromptMetadataField.OriginField, box origin
               // An Authority Root claim has no run yet: the run id derives from a
               // physical message the Host has not created. Emitting "" would make
               // "no run" and "a run named empty" the same value on the wire.
-              LogicalRunField,
+              PromptMetadataField.LogicalRunField,
               box (
                   match logicalRunId with
                   | Some runId -> LogicalRunId.value runId

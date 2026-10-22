@@ -3,10 +3,10 @@ namespace Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Admission
-open Wanxiangshu.Interaction.Dispatch
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Decodes the raw chat.message hook payload before authority policy sees it.
@@ -253,17 +253,17 @@ module PromptIngressCodec =
             | [ physical ] -> Some(PhysicalUserMessageId.create physical)
             | _ -> None
 
-    /// PROMPT-011: read the anchor back from the field PromptMetadataCodec wrote.
+    /// PROMPT-011: read the anchor back from the field the Foundation module owns.
     ///
     /// The field name comes from that module rather than being spelled again here.
     /// Two independent literals for one wire field is how a rename silently breaks
     /// recovery: the write side moves, the read side keeps matching nothing, and
     /// every plugin prompt starts looking like UnknownOrigin.
     let private promptKeyOf (input: obj) (output: obj) =
-        [ metadataCarrier input PromptMetadataCodec.PromptKeyField
+        [ metadataCarrier input PromptMetadataField.PromptKeyField
           yield!
               parts output
-              |> Array.map (fun part -> metadataCarrier part PromptMetadataCodec.PromptKeyField)
+              |> Array.map (fun part -> metadataCarrier part PromptMetadataField.PromptKeyField)
               |> Array.toList ]
         |> consolidateText
 
