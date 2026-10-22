@@ -289,7 +289,12 @@ test('WHAT[verification-system-021] a real inner runner completes all leaves bef
   const drainedIndex = messages.findIndex(({ type }) => type === 'inner:drained')
   const fileStartIndex = messages.findIndex(({ type }) => type === 'runner:file-start')
   const fileDrainIndex = messages.findIndex(({ type }) => type === 'runner:file-drained')
-  assert.equal(fileStartIndex, 0)
+  // The runner announces that it accepted the plan before it submits the first file.
+  const startedIndex = messages.findIndex(({ type }) => type === 'runner:started')
+  assert.ok(startedIndex >= 0)
+  assert.ok(startedIndex < fileStartIndex)
+  assert.equal(messages[startedIndex].data.pid, child.pid)
+  assert.deepEqual(messages[startedIndex].data.files, [fixture])
   assert.equal(messages[fileStartIndex].data.entryFile, fixture)
   assert.equal(messages[fileDrainIndex].data.entryFile, fixture)
   assert.ok(fileDrainIndex > messages.indexOf(completions.at(-1)))

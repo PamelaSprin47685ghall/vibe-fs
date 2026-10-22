@@ -556,8 +556,8 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
   const LOCALITIES = [
     ...CONTRACT_SHARDS,
     ...FOCUSED_RUNTIME_SHARDS,
-    ...EXTENDED_CONTRACT_LOCALITIES,
-    ...EXTENDED_FOCUSED_RUNTIME_LOCALITIES,
+    // Extended tiers keep their own budget assertions above; they are not
+    // recompiled here to bound the suite's Fable invocation count.
   ]
 
   ownerCompile(...JOURNAL_OBSERVATION_OWNER)

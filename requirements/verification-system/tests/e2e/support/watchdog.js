@@ -23,6 +23,7 @@ export class Watchdog {
     this._label = label || 'canary';
     this._onTimeout = onTimeout || null;
     this._blockingCount = 0;
+    this._transitionCount = 0;
     this._backgroundCount = 0;
     this._lastProgressAt = this._clock.nowMs();
     this._lastProgress = { reason: 'start', lane: 'startup', expectationId: null };
@@ -38,13 +39,19 @@ export class Watchdog {
     const reason = requireText(update.reason, 'reason');
     const lane = requireText(update.lane, 'lane');
     const expectationId = update.expectationId ?? null;
+    const transition = update.transition === true;
     const blocking = resolveBlocking(update.blocking);
-    if (!blocking) {
+    if (!blocking && !transition) {
       this._backgroundCount += 1;
       this._lastBackground = { at: this._clock.nowMs(), reason, lane, expectationId };
       return;
     }
-    this._blockingCount += 1;
+    // A verdict and a lifecycle transition both renew the silence window, but they are
+    // different evidence: a verdict concludes one leaf, a transition moves one planned
+    // unit of work from one state to the next. They are counted apart so the diagnostic
+    // still says how many verdicts — and how many transitions — the run actually observed.
+    if (transition) this._transitionCount += 1;
+    else this._blockingCount += 1;
     this._lastProgressAt = this._clock.nowMs();
     this._lastProgress = { reason, lane, expectationId };
     this._arm();
@@ -79,6 +86,7 @@ export class Watchdog {
     this._diagnostic.write(
       `WATCHDOG: '${this._label}' silent for ${this._clock.nowMs() - this._lastProgressAt}ms ` +
       `(limit ${this._timeoutMs}ms); ${this._blockingCount} blocking progress update(s), ` +
+      `${this._transitionCount} causal transition(s), ` +
       `last progress: ${this._lastProgress.reason} lane=${this._lastProgress.lane} ` +
       `expectation=${this._lastProgress.expectationId || 'none'}`,
     );

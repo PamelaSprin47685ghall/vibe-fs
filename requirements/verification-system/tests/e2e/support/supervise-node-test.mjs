@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { Watchdog } from './watchdog.js'
 import { PROCESS_TREE_TIMEOUT_MS, SIGKILL_GRACE_MS, SUITE_BACKSTOP_MS } from './time-budget.js'
 import { classifyVerdict } from '../../support/verdict-feed.mjs'
+import { createCausalTransitionTracker } from '../../support/causal-transitions.mjs'
 import { isFileCompletionEvent, testEntryFile } from '../../support/test-run-state.mjs'
 import { validateWorkerCostSnapshot } from '../../support/worker-cost-observation.mjs'
 
@@ -267,6 +268,11 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   const outstanding = new Set(plannedFiles)
   const fileWaits = createFileWaitTracker(files)
   const workerCosts = new Map()
+  // Lifecycle transitions of the monitored target. A transition is only admitted after
+  // fileWaits.observe has validated it: that tracker throws for an unplanned entry file
+  // and for a phase that contradicts the protocol, so an unknown file or an out-of-order
+  // event can never reach the tracker and can never renew the silence window.
+  const transitions = createCausalTransitionTracker({ plannedFiles })
   const workerCost = file => workerCosts.get(file) ?? {
     version: 1, entryFile: file, enabled: env.WXS_VERIFICATION_WORKER_DIAGNOSTICS !== '0',
     pid: null, preImport: null, exit: null, interval: null,
@@ -370,13 +376,15 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
       detached: true,
       env,
     })
+    transitions.expectedPid(child.pid)
     // Decode diagnostic output as UTF-8 and forward through this process.
     // Inherited descriptors or raw binary chunks can corrupt an outer
     // node:test result stream. Only IPC carries authoritative verdicts.
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
-    // In a test worker, stdout belongs to its native result protocol.
-    const diagnostics = process.env.NODE_TEST_CONTEXT ? process.stderr : process.stdout
+    // Diagnostic output never shares a stream with a node:test result protocol:
+    // route it to stderr so an outer worker always receives monitor diagnostics.
+    const diagnostics = process.stderr
     child.stdout.pipe(diagnostics, { end: false })
     child.stderr.pipe(process.stderr, { end: false })
   } catch (error) {
@@ -447,6 +455,11 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     }
     if (isFileCompletionEvent(event)) {
       outstanding.delete(resolve(testEntryFile(event)))
+    }
+
+    const transition = transitions.observe(event)
+    if (transition !== null) {
+      watchdog.advance({ reason: transition.reason, lane: transition.lane, transition: true, blocking: false })
     }
 
     const progress = classifyVerdict(event)
