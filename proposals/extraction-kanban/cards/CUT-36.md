@@ -121,9 +121,20 @@
 
 不变：仍需真实 smoke 跑通 §3 四项，并在 `proposals/extraction-kanban/evidence/CUT-36/` 留下证据后，由协调者把本卡与看板改为 `DONE`；在那之前保持 `DOING`。本节的 8.3 四个缺陷是当前最先需要修的东西。
 
-## 9. 2026-10-22 开放项：omp transcript 的“持久化条目”与“实时会话”是两个视图（O-1 落地时记录）
+## 9. 2026-10-22 记录项（O-1 落地权衡与端口属主开放项）
 
-- **O-1 决定**：`TranscriptMessageAddress` 就是 omp 的**持久化条目 id**（`SessionEntryBase.id`），适配器不再合成 `omp:<index>` 位置地址；没有可用 id 的条目让整次读取以 `HostError.Transport` 失败并报出该条目的位置。
-- **两个视图不是同一个集合**：`sessionManager.getEntries()` 给出的是**持久化条目**；`AgentSession.messages` 给出的是**实时内存会话**（omp `src/session/agent-session.ts:6946-6948` = `this.agent.state.messages`）。omp 在多处只往实时状态追加而不落对应条目（例如 `agent-session.ts:11020` checkpoint reminder、`:4214` interrupted-thinking、`:1804` initial eval context、`:9295`/`:9354` custom message——后者写入的是 `custom_message` 条目类型，本适配器的 `type = "message"` 过滤会丢弃）。因此子会话 transcript 走 `getEntries()` 时，可能缺少实时会话里存在的消息。
-- **失败模式变了**：一条畸形条目现在会让**整次** transcript 读取失败（此前会被跳过），这是对 O-1 验收条款 2 的刻意 fail-closed 读法。
-- **归属**：中性 transcript 究竟指实时会话还是持久化会话，是**产品/端口属主的决定**，不是适配器能定的；本卡只记录该开放项，不在适配层擅自取舍。
+### 9.1 O-1 落地权衡备忘（已决规则，非待决开放项）
+
+- **已决规则**：依据 `proposals/host-neutral-interface/evidence/omp-feasibility.md` 之 `### O-1 — TranscriptMessageAddress is the omp entry id`，`TranscriptMessageAddress` 绑定为 omp 的持久化条目 id（`SessionEntryBase.id`），适配器不再合成 `omp:<index>` 位置序号；遇到缺少有效 id 的畸形条目时刻意 fail-closed，以 `HostError.Transport` 拒绝整次读取并指明该条目所在位置。
+- **两视图语义权衡**：`sessionManager.getEntries()` 给出的是**持久化条目**；`AgentSession.messages` 给出的是**实时内存会话**（omp `src/session/agent-session.ts:6946-6948` = `this.agent.state.messages`）。omp 在多处仅往内存会话追加而不落条目（例如 checkpoint reminder、interrupted-thinking、initial eval context、custom message 等），子会话 transcript 读取通过 `sessionManager.getEntries()` 反映持久化视图，已知与内存中可能暂存的消息集合存在差异，此为已接受的适配权衡。
+- **引用源**：`ExtensionContext` 定义见 `types.ts:671-810`（属性 `sessionManager: ReadonlySessionManager` 位于 `types.ts:687`），`ReadonlySessionManager` 接口定义于 `src/session/session-manager.ts:720-744`，选取 `getEntries`。
+
+### 9.2 端口属主开放项（记录供端口泳道研判，不属适配器私有决策）
+
+1. **Open Item 1（`Storage.fsi:3-4` 文档与无宿主数据目录实现之矛盾）**：
+   - `src/Wanxiangshu/Host/Ports/Storage.fsi:3-4` 声明日志/状态根目录位于 `StateRoot`；但 omp 等轻量宿主并不向扩展暴露专有宿主数据目录。
+   - 当前适配器在 `IHostPaths.StateRoot` 中回退提供 workspace 路径；而产品实际日志目录由 `HostPlugin.fs:301-326` 之 `RuntimePath.stateRoot`（经 `GitSubject.revParseShowToplevel` + `.Herdchestra`）解析。
+   - 需端口属主在 `Storage.fsi` 中厘清：无数据目录宿主回退工作区时，`StateRoot` 不作为日志与持久化根的唯一权威依据。
+2. **Open Item 2（`ProjectId` 路径与标识键的双重用途）**：
+   - `HostPlugin.fs:328` 使用 `workIdOf (ports.Paths.ProjectId + "|" + root)`，同文件 `:357` 使用 `scopeId = "host-activation:" + ports.Paths.ProjectId`。
+   - 当前 `ProjectId` 直接采用工作区路径字符串，兼具“路径”与“全局作用域标识”双重职责。未来若对路径做规范化（如大小写、符号链接解析），会隐式改变 work ID 与 scope ID，需端口属主评估是否引入独立的不透明 ProjectId 格式。
