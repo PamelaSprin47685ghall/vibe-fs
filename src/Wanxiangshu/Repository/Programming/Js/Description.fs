@@ -560,8 +560,8 @@ class JsProgram {"""
                       [ "rethrow_host", rethrowHost ]
               if present capabilities "call" then
                   fill
-                      """  async call(command) {
-    return await this._api.call(command);
+                      """  async call(command, planB) {
+    return await this._api.call(command, planB);
   }"""
                       []
               if has capabilities JsCapability.Exec then

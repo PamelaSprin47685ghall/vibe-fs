@@ -52,6 +52,15 @@ module JsToolsBindings =
     [<Emit("Promise.resolve($0).then(function(value) { if (value && value.ok === false) { const err = new Error(value.reason || value.code); err.__jsFailure = { code: value.code, reason: value.reason || value.code }; throw err; } return value; })")>]
     let private rejectCallFailure (promise: obj) : obj = jsNative
 
+    [<Emit("new TextEncoder().encode($0).length * 50")>]
+    let private planBBudgetMs (planB: string) : int = jsNative
+
+    [<Emit("setTimeout($0, $1)")>]
+    let private armYield (callback: unit -> unit) (budgetMs: int) : obj = jsNative
+
+    [<Emit("clearTimeout($0)")>]
+    let private disarmYield (timer: obj) : unit = jsNative
+
     /// A span must cross the vm boundary as a plain JS array, not a typed
     /// array: the parked payload is JSON round-tripped, and a typed array
     /// serializes to an object with numeric keys.
@@ -931,15 +940,49 @@ module JsToolsBindings =
 
     let private makeCallMember (host: JsCallHost option) =
         let settled =
-            fun (command: obj) ->
+            fun (command: obj) (planB: obj) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) ->
                 match host with
+                | Some injected when isNull (box planB) || not (emitJsExpr planB "typeof $0 === 'string'") ->
+                    box (task { return failureObj (JsFailure.CallCommandUnsupported "this.call requires planB") })
                 | Some injected ->
                     match injected.Start command with
-                    | started when unbox<bool> (started?ok) -> box (injected.Wait (started?ticket))
+                    | started when unbox<bool> (started?ok) ->
+                        let planBText = string planB
+                        let budgetMs = planBBudgetMs planBText
+
+                        let timer =
+                            match parkState with
+                            | None -> null
+                            | Some state ->
+                                armYield
+                                    (fun () ->
+                                        if not (isNull state.ParkSignalResolve) && not state.ParkRequested then
+                                            let payload =
+                                                createObj
+                                                    [ "__jsYield" ==> true
+                                                      "planB" ==> planBText
+                                                      "budgetMs" ==> budgetMs
+                                                      "delta" ==> (injected.TakeDelta()) ]
+                                            emitJsExpr (state.ParkSignalResolve, payload) "$0($1)" |> ignore)
+                                    budgetMs
+
+                        let waiting = injected.Wait (started?ticket)
+                        box (
+                            task {
+                                let! value = waiting
+
+                                if not (isNull timer) then
+                                    disarmYield timer
+
+                                return value
+                            }
+                        )
                     | failed -> box (task { return failed })
                 | None -> box (task { return failureObj JsFailure.CallHostUnavailable })
 
-        "call" ==> fun (command: obj) -> rejectCallFailure (settled command)
+        "call"
+        ==> fun (command: obj) (planB: obj) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) ->
+            rejectCallFailure (settled command planB parkState)
 
     let private makeSignalMember (host: JsCallHost option) =
         let settled =

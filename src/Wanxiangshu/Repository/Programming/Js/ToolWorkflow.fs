@@ -1122,8 +1122,8 @@ module JsToolWorkflow =
             persistence
             lifecyclePersistence
             fileAccessObservation
-            (Some(planBYieldBudgetMs planB))
-            (Some planB)
+            None
+            None
             name
             (fun buffers parkState -> bindingsApiFactory reviewCheck sessionId capabilities root buffers parkState)
 
@@ -1341,7 +1341,7 @@ module JsToolWorkflow =
             else
                 ToolWorkflowInvocation.Program(string source, programPlanB input, name)
         | [ ("unpark", unpark) ] ->
-            ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value, unparkPlanB input)
+            ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value, None)
         | [ ("abandon", abandon) ] -> ToolWorkflowInvocation.Abandon(string (abandon?handle))
         | states -> ToolWorkflowInvocation.Invalid(conflictReason states)
 
