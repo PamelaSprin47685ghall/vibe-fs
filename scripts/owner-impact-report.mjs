@@ -271,7 +271,6 @@ export const measureOwnerImpactStructureV1 = (corpusInput, { root = ROOT } = {})
         changedPaths: [resolve(root, row.successor_path)],
         projectDirectory,
         aggregatePath: null,
-        fullThreshold: corpus.full_threshold,
       })
       return {
         id: row.id,

@@ -46,7 +46,7 @@ export function verificationSteps({ root = ROOT, release = false, verbose = fals
     {
       label: 'build',
       cmd: process.execPath,
-      argv: [path.join(root, 'scripts/build.mjs'), ...(release ? ['--clean'] : [])],
+      argv: [path.join(root, 'scripts/build.mjs')],
       env: hostEnv,
     },
     {

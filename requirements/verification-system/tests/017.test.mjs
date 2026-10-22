@@ -64,7 +64,7 @@ test('WHAT[verification-system-017] release adds one Long Stroke and package pro
     })
     assert.equal(result.exitCode, 0)
     assert.deepEqual(calls.map(({ label }) => label), ['format:check', 'check', 'build', 'unit', 'integration', 'e2e', 'package'])
-    assert.ok(calls.find(({ label }) => label === 'build').argv.includes('--clean'))
+    assert.deepEqual(calls.find(({ label }) => label === 'build').argv, [join(root, 'scripts/build.mjs')])
     for (const label of ['e2e', 'package']) assertRealEntry(root, calls.find((call) => call.label === label).argv[0])
   } finally {
     rmSync(directory, { recursive: true, force: true })

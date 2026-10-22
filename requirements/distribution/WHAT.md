@@ -26,7 +26,7 @@ package.json 的 files 白名单固定为 `["dist/", "resources/"]`；这是本�
 
 ## [005] 同一份 Production Bytes
 
-dist 是唯一编译产物。发布须通过 `scripts/build.mjs --clean` 重建，日常使用增量构建；二者产物字节一致。测试直接消费这些产物，并以 manifest 摘要拒绝陈旧构建；发布真实 pack 同一份产物，不在 dist 复制资源。
+dist 是唯一编译产物。发布与日常使用同一条增量构建：只编译变更文件的闭包。全量编译被禁止，它掩盖影响集的错误。测试直接消费这些产物，并以 manifest 摘要拒绝陈旧构建；发布真实 pack 同一份产物，不在 dist 复制资源。
 
 ## [006] 资源读取与缺失
 
