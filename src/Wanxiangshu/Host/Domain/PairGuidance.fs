@@ -1,23 +1,14 @@
-// HNI P-16 (domain seam): the pair-guidance transcript and ledger; tier B,
-// never mirrored to the TypeScript port surface.
+// HNI P-16 (domain seam): the pair-guidance transcript; tier B, never
+// mirrored to the TypeScript port surface.
+//
+// The occurrence ledger is product state, not a host fact: it lives in
+// `Wanxiangshu.Interaction.PairGuidance` (`Interaction/PairGuidance/Occurrences.fs(i)`)
+// together with the product rule that owns the commit order.
 namespace Wanxiangshu.Host.Domain
 
-open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
-
-type PairGuidanceOccurrence =
-    { Ordinal: int64
-      CallId: string
-      MarkerText: string
-      CallGap: TranscriptGap
-      ResultGap: TranscriptGap }
 
 type PairGuidanceTranscript =
     { Carrier: Result<(TranscriptGap * TranscriptGap) option, string>
       SyntheticCallIds: string list
       InternalAuthor: bool }
-
-type PairGuidanceLedger =
-    { History: PairGuidanceOccurrence list
-      Visible: PairGuidanceOccurrence list
-      Append: PairGuidanceOccurrence -> Task<Result<unit, string>> }

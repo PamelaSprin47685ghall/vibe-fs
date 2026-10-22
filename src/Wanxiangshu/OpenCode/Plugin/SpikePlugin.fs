@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 #nowarn "3511"
 
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition
 
 /// Composition root (Wave 3): SpikePlugin only assembles the wiring modules.

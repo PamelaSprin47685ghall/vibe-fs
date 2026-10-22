@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Composition.Durable
 
 open System.Threading.Tasks
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -50,6 +51,30 @@ module PromptJournalAdapter =
 
             member _.HandleForChild(sessionId: SessionId) : Wanxiangshu.Execution.Delegation.HandleRecord option =
                 Map.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections.HandleByChildSession
+
+            /// interaction-authority-018: the durable session-ownership evidence
+            /// of one session, as the association projection records it.
+            ///
+            /// The association is the durable record of what a session is, so a
+            /// restart proves the same agent-owner life the first acceptance
+            /// did.
+            member _.OwnershipEvidenceFor(sessionId: SessionId) : SessionOwnership option =
+                let snapshot = AgentJournal.snapshot journal
+
+                let classified =
+                    SessionOwnershipClassification.tryClassify sessionId snapshot.AgentProjections.Associations
+                    |> Option.bind (fun (_, ownership) -> ownership)
+
+                match classified with
+                | Some ownership -> Some ownership
+                | None ->
+                    // A fork child is recorded by the handle projection rather
+                    // than by a session association: the handle names the
+                    // child session. Root ownership is that evidence.
+                    Map.containsKey sessionId snapshot.AgentProjections.HandleByChildSession
+                    |> function
+                        | true -> Some SessionOwnership.Root
+                        | false -> None
 
             member _.ChatAcceptancePersistence
                 ()

@@ -2076,9 +2076,7 @@ module ModelRouting =
 
     let internal boundDevopsModel (sessionId: SessionId) : HostModel option =
         match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime ->
-            runtime.BoundDevopsTarget(SessionId.value sessionId)
-            |> Option.map toHostModel
+        | Some runtime -> runtime.BoundDevopsTarget(SessionId.value sessionId) |> Option.map toHostModel
         | None -> None
 
     /// Seed the fixed DevOps target from a road's durable projection

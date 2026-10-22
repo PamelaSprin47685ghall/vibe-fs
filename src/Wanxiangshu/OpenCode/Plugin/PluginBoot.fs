@@ -96,8 +96,7 @@ module PluginBoot =
             let jsLifecyclePersistence =
                 PathsPort.stateRootOf paths
                 |> Option.bind WorkspaceEventStore.tryCurrent
-                |> Option.map
-                    Wanxiangshu.Repository.Programming.Js.JsToolsTransactionStore.createLifecyclePersistence
+                |> Option.map Wanxiangshu.Repository.Programming.Js.JsToolsTransactionStore.createLifecyclePersistence
 
             let scope =
                 new PluginRuntimeScope(journal, (fun _ -> false), jsLifecyclePersistence)

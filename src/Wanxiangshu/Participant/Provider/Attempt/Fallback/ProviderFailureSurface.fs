@@ -310,11 +310,14 @@ module ProviderFailureSurface =
                 PromptAuthority.identitySeedParticipantIdentity identitySeed
                 |> ParticipantIdentity.role
             with
-            | Some role -> role = Roles.Manager
+            | Some role -> role = Role.Manager
             | None -> false
 
         let closure =
-            AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+            AuthorityLifeClassification.deriveClosureKind
+                authorityKind
+                isManager
+                (optionalText (field value "agentOwnerLife"))
             |> Option.defaultValue ("HumanRootManagedRun", None)
 
         let ownerLogicalRunId =
@@ -381,11 +384,14 @@ module ProviderFailureSurface =
                     PromptAuthority.identitySeedParticipantIdentity identitySeed
                     |> ParticipantIdentity.role
                 with
-                | Some role -> role = Roles.Manager
+                | Some role -> role = Role.Manager
                 | None -> false
 
             let closure =
-                AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+                AuthorityLifeClassification.deriveClosureKind
+                    authorityKind
+                    isManager
+                    (optionalText (field value "agentOwnerLife"))
                 |> Option.defaultValue ("HumanRootManagedRun", None)
 
             PromptFact.AuthorityRootAccepted

@@ -33,7 +33,7 @@ module PluginHostWiring =
           SnapshotOpt: ISessionSnapshotPort option
           Wired: HostSignalBootstrap.WiredSignals
           SharedTerminalKey: string option
-          SharedTerminalPort: Events.HostEventPort option
+          SharedTerminalPort: ISessionTerminalSource option
           RootWorkspace: IRootWorkspaceReader
 
           CausalWaitObserver: IWaitObserver }

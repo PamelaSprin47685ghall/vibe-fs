@@ -381,7 +381,7 @@ module internal ChatAdmissionTransaction =
         (ports: ChatAdmissionTransactionPorts)
         (witness: ManagedChatAcceptanceWitness)
         (lease: ExecutionAdmissionLease)
-        : Result<ModelRoutingTarget * ChatAdmissionExactIdentity * HostModel, TargetPreparationError> =
+        : Result<ModelRoutingTarget * ExecutionAdmissionExactIdentity * HostModel, TargetPreparationError> =
         readTarget ports lease
         |> Result.bind (fun target ->
             modelFromTarget target

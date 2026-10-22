@@ -158,6 +158,7 @@ module JournalPortObservationSurface =
                     key
                     child
                     (PhysicalUserMessageId.create ("msg-" + SessionId.value child))
+                    None
 
             acceptedChild
             |> Result.defaultWith (fun error -> failwithf "child admission rejected: %s" error)

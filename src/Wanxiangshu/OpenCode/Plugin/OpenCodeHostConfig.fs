@@ -89,7 +89,7 @@ type LiveHostConfig(config: obj) =
     /// can be frozen or otherwise non-writable, the write then throws instead of
     /// being ignored, and the round trip did not complete — so the port reports
     /// it and the product owns the verdict.
-    let private applyToLiveConfig (cfg: obj) (settings: RequiredSetting list) : Result<SettingGap option, HostError> =
+    let applyToLiveConfig (cfg: obj) (settings: RequiredSetting list) : Result<SettingGap option, HostError> =
         try
             applyToObject cfg settings
         with ex ->

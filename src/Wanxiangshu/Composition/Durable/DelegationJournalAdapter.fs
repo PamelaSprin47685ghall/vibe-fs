@@ -1,11 +1,14 @@
 namespace Wanxiangshu.Composition.Durable
 
+open System.Threading.Tasks
+
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Interaction.Authority
 
 [<RequireQualifiedAccess>]
 module DelegationJournalAdapter =
@@ -29,7 +32,10 @@ module DelegationJournalAdapter =
                     | Ok receipt -> return Ok(receipt.BlobRef, receipt.BlobDigest)
                     | Error err -> return Error err
                 }
-          Sha256 = HostDigest.sha256Hex }
+          Sha256 = HostDigest.sha256Hex
+          AppendAuthorityTerminalSource =
+            fun _ _ ->
+                Task.FromResult(Error "AppendAuthorityTerminalSource is not supported by DelegationJournalAdapter") }
 
 module TaskDeliveryJournal =
     /// 精确围栏读取：调用方持有完整围栏时使用，围栏其余字段不一致即拒绝。

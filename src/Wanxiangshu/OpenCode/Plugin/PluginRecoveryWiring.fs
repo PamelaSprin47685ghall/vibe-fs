@@ -317,7 +317,9 @@ module PluginRecoveryWiring =
     let attach (boot: PluginBoot.Boot) : unit =
         let scope = boot.Scope
         let snapshotPort = SessionSnapshotPort.create boot.WorkspaceDirectory boot.Input
-        let discoveryPort = SessionSnapshotPort.createSessionPort boot.WorkspaceDirectory boot.Input
+
+        let discoveryPort =
+            SessionSnapshotPort.createSessionPort boot.WorkspaceDirectory boot.Input
 
         let retirementBlockers sessionId =
             scope.RetirementBlockersFor sessionId |> List.toArray
