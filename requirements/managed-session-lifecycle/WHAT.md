@@ -86,7 +86,7 @@ HandleAbandoned 表示 child 不会再沿当前 handle 返回，只由已确认�
 
 Attempt/TurnAborted、provider failure/retry、degeneration-guard、Fission、插件卸载、进程 shutdown 或 runtime dispose 均无此权限，只结束当前观察者/attempt 或 detach 本地资源，保留 durable Active handle 供恢复与 Join/Horizon。未知停止信号不升级成 ParentCancelled。
 
-放弃原因（`HandleAbandonReason`）的合法集合是四项：`ParentCancelled`、`DeadlineExceeded`、`HostSessionGone` 与 `Voided`。`Voided`（作废）是 2026-10-21 裁决新增的一项：它表示该 child 工作**已无法交付**、因此以作废结清父方的未解除义务；作废不是完成，它不写完成正文。这四项是 `wanxiangli/handle-lifecycle` 的 `recoverChild()` 所接受的 `durableReason` 全集——**已被 2026-10-21 作废裁决取代的旧口径**是「只有 `ParentCancelled`/`DeadlineExceeded`/`HostSessionGone` 三项」，现已作废，见 `requirements/delegation/tests/README.md` 的「未交付子工作的作废结清」一节。库侧已发布 0.66.0（`handle-lifecycle` 接受 `Voided`）；**主仓的 `wanxiangli` gitlink 尚停在 0.65.0（`fde10a0`），gitlink 未 bump**——在此之前，主仓把 `durableReason = "Voided"` 交给库的那条恢复路径不会被已发布版本接受。
+放弃原因（`HandleAbandonReason`）的合法集合是四项：`ParentCancelled`、`DeadlineExceeded`、`HostSessionGone` 与 `Voided`。`Voided`（作废）是 2026-10-21 裁决新增的一项：它表示该 child 工作**已无法交付**、因此以作废结清父方的未解除工作义务（对 scoped 工作，其具体工作单元格转为 `Abandoned(Voided)`，底层 handle 绑定保留供复用；对无 scope 历史，其 handle 自身转为 `Abandoned(Voided)`）；作废不是完成，它不写完成正文。这四项是 `wanxiangli/handle-lifecycle` 的 `recoverChild()` 所接受的 `durableReason` 全集——**已被 2026-10-21 作废裁决取代的旧口径**是「只有 `ParentCancelled`/`DeadlineExceeded`/`HostSessionGone` 三项」，现已作废，见 `requirements/delegation/tests/README.md` 的「未交付子工作的作废结清」一节。库侧已发布 0.66.0（`handle-lifecycle` 接受 `Voided`）；**主仓的 `wanxiangli` gitlink 尚停在 0.65.0（`fde10a0`），gitlink 未 bump**——在此之前，主仓把 `durableReason = "Voided"` 交给库的那条恢复路径不会被已发布版本接受。
 
 ## [019] Cancel/Delete 精确排空
 

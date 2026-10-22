@@ -94,8 +94,8 @@
 
 ## Unreleased — 2026-10-21 作废裁决：未交付的子工作以作废结清，而非完成
 
-- **裁决全文**：未交付的子工作**永不写完成**，但**可以**写一个作废（void）。作废**像完成一样结清那份义务**。落在实现上是：重启加载时，上一进程遗留、本进程无法继续持有的孤儿子工作在加载期被作废——有 scope 的已准入工作追加 `ChildWorkVoided`（work 单元格转 `Abandoned Voided`），合法但无 scope 的历史用 `ChildRunVoided`；handle 变为 `Abandoned(Voided)`（**绝不**是 `Completed*`）。**作废不是完成**：不写完成正文，也不把已有交付视图当作完成凭据。
-- **可见性与结清**：作废后该工作在 horizon 名册里显示为 `voided`（`resources/provider/tool/horizon/voided/*`，`Path.Voided = "tool/horizon/voided"`），join 报告它**恰好一次**，状态为 `voided`（`resources/provider/tool/join/agent-voided/*`，`Path.AgentVoided = "tool/join/agent-voided"`），**既不**是 `completed` **也不是** `undelivered`；报告之后该 handle 退役（`Retired`）、离开名册，同一目录上再起一个进程不再报告也不重复作废。结清是幂等的：每个孤儿子工作在其一生中只产生一条作废事实，作废的工作永不产生完成事实。
+- **裁决全文**：未交付的子工作**永不写完成**，但**可以**写一个作废（void）。作废**像完成一样结清那份义务**。落在实现上是：重启加载时，上一进程遗留、本进程无法继续持有的孤儿子工作在加载期被作废——有 scope 的已准入工作追加 `ChildWorkVoided`（具体工作单元格 `Works[exact id]` 转 `Abandoned(Voided)`，其 `activeLogicalRun` 清空；底层 handle 绑定保留 `Active` 供参与者身份复用，`summary` 投影叠盖工作状态并读出终态），合法但无 scope 的历史追加 `ChildRunVoided`（无独立 work 单元格，其 unscoped handle 绑定自身转 `Abandoned(Voided)`）。作废结清的是**工作义务生命周期**，不是草率退役可复用的参与者身份；终态**绝不**是 `Completed*`。**作废不是完成**：不写完成正文，也不把已有交付视图当作完成凭据。
+- **可见性与结清**：作废后该工作在 horizon 名册里显示为 `voided`（`resources/provider/tool/horizon/voided/*`，`Path.Voided = "tool/horizon/voided"`），join 报告它**恰好一次**，状态为 `voided`（`resources/provider/tool/join/agent-voided/*`，`Path.AgentVoided = "tool/join/agent-voided"`），**既不**是 `completed` **也不是** `undelivered`；报告之后该工作退役（`Retired`）、离开名册，同一目录上再起一个进程不再报告也不重复作废。结清是幂等的：每个孤儿子工作在其一生中只产生一条作废事实，作废的工作永不产生完成事实。
 - **文档侧同步**：delegation、crash-reconciliation、participant-horizon、repository-programming 的条款与 `tests/README.md`、模型侧文案（`resources/provider/tool/js-program/**`）、抽吸看板 CUT-35 行、`requirements/GAP.md` GAP-218 与 `proposals/W2-实施-WP-025-horizon泄露重置-2026-10-10.md` 已按此合同改写。
 - **未验证（重要）**：本条只记录**文档合同**，不记任何测试结论。加载期作废接线、void 报告恰好一次、重启后不重复、交付过又被 abort 的子工作报 `voided` 且 join 关闭，这些**行为**结论由行为泳道与正式 runner 给出；本 lane **没有跑 F# 构建、没有重建 dist、没有执行任何 requirement 套件**。
 - **取代的旧口径**：此前「重启后遗留子工作保持活跃、join 跨重启保持打开、`horizon` 与 `join` 对它都为空」的口径**已被本裁决取代**；相关旧段落已在 2026-10-21 的改写中移除或改写，历史条目按 append-only 原则保留原样，只作历史记录。
