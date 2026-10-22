@@ -8,7 +8,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Tool
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode.Host
-open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 
 /// JS-native execution-gate surface. The product ToolAdmissionTable owns the
@@ -57,14 +56,7 @@ module ToolRegistrySurface =
         | _ -> [||]
 
     let jsPlanDescription (language: string) : string =
-        let parsed = ProviderLanguage.parse language
-
-        let prose = Wanxiangshu.Repository.Programming.Js.JsDescriptionAssets.load parsed
-
-        Wanxiangshu.Repository.Programming.Js.JsToolGenerator.generate
-            "plan"
-            (OfficeCapability.permissions Role.Plan)
-            prose
+        Wanxiangshu.Repository.Programming.Js.JsGeneratorSurface.typedRole "plan" language
         |> Option.map (fun s -> s.Description)
         |> Option.defaultValue ""
 

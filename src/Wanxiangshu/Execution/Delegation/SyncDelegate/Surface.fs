@@ -1275,7 +1275,7 @@ module SyncDelegateSurface =
 
             return
                 match result with
-                | Ok view -> Wanxiangshu.OpenCode.ToolResultText.tomlObjectWithInstructions [ view ] []
+                | Ok view -> ToolResultText.tomlObjectWithInstructions [ view ] []
                 | Error error -> failwith error
         }
 

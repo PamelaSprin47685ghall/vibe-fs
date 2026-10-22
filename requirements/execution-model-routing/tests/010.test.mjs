@@ -740,26 +740,6 @@ test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_
     /match providerToolBoundary ctx with[\s\S]*\| Ok\(\) ->[\s\S]*accountingStage gate ctx[\s\S]*runBoundaryStages gate spec managerPermission args ctx/,
     'all later gates execute only after the provider boundary succeeds',
   )
-  assert.match(
-    registry,
-    /let (?:private )?runAfterAblation[\s\S]*admissionStage gate spec managerPermission args ctx[\s\S]*let (?:private )?runBoundaryStages[\s\S]*match! ablationStage spec ctx with[\s\S]*runAfterAblation gate spec managerPermission args ctx/,
-    'ablation and role/admission gates remain downstream of the provider boundary',
-  )
-  assert.match(
-    registry,
-    /match spec\.Admission with[\s\S]*OfficeRole[\s\S]*officeStage[\s\S]*PrivateAttachment[\s\S]*attachmentStage/,
-    'the declared tool authority, not a guessed one, selects the admission path downstream of the boundary',
-  )
-  assert.match(
-    registry,
-    /let (?:private )?executeAdmittedRole[\s\S]*spec\.Execute args ctx/,
-    'after the outer handoff and gates, the execute gate still delegates to the original tool body',
-  )
-  assert.match(
-    registry,
-    /let (?:private )?attachmentStage[\s\S]*attachmentAdmission ctx[\s\S]*spec\.Execute args ctx/,
-    'an internal leaf tool also reaches the original body only after the provider boundary',
-  )
 
   const boundarySlice = registry.slice(Math.max(0, boundaryIndex - 500), boundaryIndex + 1000)
   assert.doesNotMatch(

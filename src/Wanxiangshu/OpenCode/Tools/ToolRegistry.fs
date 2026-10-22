@@ -33,7 +33,6 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Repository.Programming.Js.OpenCode
-open Wanxiangshu.Ablation
 open Wanxiangshu.Process
 
 /// Assembly-only registry: tool behavior lives in one vertical verb module;
