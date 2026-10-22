@@ -41,7 +41,7 @@ module PathsPort =
     let private readText (value: obj) : string option =
         if isNullish value || not (isJsString value) then
             None
-        elif System.String.IsNullOrWhiteSpace (unbox<string> value) then
+        elif System.String.IsNullOrWhiteSpace(unbox<string> value) then
             None
         else
             Some(unbox<string> value)

@@ -149,7 +149,12 @@ module LoadRecoverySurface =
                   ReadBlob = fun _ -> Task.FromResult(Error "fixture has no completion body")
                   WriteBlob = fun _ -> Task.FromResult(Error "fixture does not write blobs")
                   RefreshProjection = fun () -> Ok()
-                  Sha256 = fun _ -> invalidOp "fixture does not hash blobs" }
+                  Sha256 = fun _ -> invalidOp "fixture does not hash blobs"
+                  AppendAuthorityTerminalSource =
+                    fun _ _ ->
+                        System.Threading.Tasks.Task.FromResult(
+                            Error "AppendAuthorityTerminalSource is not supported by LoadRecoverySurface"
+                        ) }
 
             match!
                 JoinDrain.drainFromJournalWhere

@@ -64,7 +64,10 @@ module PromptRecovery =
         =
         match claim.Origin with
         | PromptAuthority.PromptOrigin.AuthorityRoot _ ->
-            runtime.AcceptAgentOwnerRoot claim.PromptKey sessionId physical
+            // The life of an agent-owner root is derived from the durable
+            // ownership evidence at acceptance, so a replay after a restart
+            // proves the same life the first acceptance did.
+            runtime.AcceptAgentOwnerRoot claim.PromptKey sessionId physical None
             |> TaskValue.map (Result.map ignore)
         | PromptAuthority.PromptOrigin.Continuation _
         | PromptAuthority.PromptOrigin.HostInternal
@@ -105,9 +108,9 @@ module PromptRecovery =
                 claim.Receipt.IsSome
                 (messages
                  |> List.map (fun message ->
-                        roleText message.Role,
-                        message.Correlation |> Option.map PromptKey.value,
-                        TranscriptMessageAddress.value message.Id))
+                     roleText message.Role,
+                     message.Correlation |> Option.map PromptKey.value,
+                     TranscriptMessageAddress.value message.Id))
 
         match verdict with
         | Ok physical -> reconcileWithPhysical runtime claim sessionId (PhysicalUserMessageId.create physical) report
@@ -131,7 +134,7 @@ module PromptRecovery =
                   Outcome = outcome }
 
             match! transcript.Messages sessionId with
-            | Error error -> return report (Unreadable (hostErrorReason error))
+            | Error error -> return report (Unreadable(hostErrorReason error))
             | Ok messages -> return! reconcileMessages runtime claim sessionId messages report
         }
 

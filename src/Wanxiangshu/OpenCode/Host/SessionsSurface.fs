@@ -18,6 +18,15 @@ open Wanxiangshu.Host.Ports
 /// Parent lineage is a durable lookup; the physical parent for every child is
 /// the resolved family root, never the immediate logical parent. Adapter probes
 /// return JSON observations and keep transport capabilities private.
+///
+/// Probe isolation of the terminal source: every probe in this file builds its
+/// own terminal source with `Events.newTerminalSource ()` and therefore keeps
+/// its own sticky cache and its own listener list. That is deliberate isolation,
+/// not a second production truth. The production truth is the single instance
+/// the composition root creates (`OpenCode/Host/PluginHost.fs`) and shares per
+/// workspace through `SharedTerminalBus`; the probes never join that bus, so a
+/// probe can neither observe nor disturb a production terminal fact, and a
+/// production terminal fact can never leak into a probe's sticky replay.
 module SessionsSurface =
 
     let private hostErrorReason (error: HostError) =
@@ -137,16 +146,6 @@ module SessionsSurface =
             member _.ListChildren _ = Task.FromResult(Ok [])
             member _.CloseChildSession _ = Task.FromResult(Ok())
 
-    type private ControlledEventPort() =
-        let subscription =
-            { new IDisposable with
-                member _.Dispose() = () }
-
-        interface IEventObservationPort with
-            member _.SubscribeTerminalListener _ = subscription
-            member _.SubscribeFutureTerminalListener _ = subscription
-            member _.NotifyTerminal _ _ = true
-
     /// Exercise the production flattening membrane, not a duplicated family-root
     /// algorithm or the logical-parent argument above the Host adapter.
     let flattenedChildAdapterProbe () : Task<obj> =
@@ -157,8 +156,7 @@ module SessionsSurface =
                 ControlledOpenCodePort(SessionId.create "flat-sphinx-engineer", false)
 
             let sessions =
-                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
-                :> ISessionHostPort
+                InjectedSessionPort(Some(transport :> IOpenCodePort), Events.newTerminalSource ()) :> ISessionHostPort
 
             let options: ChildSessionOptions =
                 { Title = Some "standard Engineer"
@@ -248,8 +246,7 @@ module SessionsSurface =
             let ownerLang = GlobalProviderLanguage.current ()
 
             let sessions =
-                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
-                :> ISessionHostPort
+                InjectedSessionPort(Some(transport :> IOpenCodePort), Events.newTerminalSource ()) :> ISessionHostPort
 
             let options: ChildSessionOptions =
                 { Title = Some "restored owner worker"
@@ -293,8 +290,7 @@ module SessionsSurface =
             transport.SetParent("broken-owner", Error "Host transport connection reset")
 
             let sessions =
-                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
-                :> ISessionHostPort
+                InjectedSessionPort(Some(transport :> IOpenCodePort), Events.newTerminalSource ()) :> ISessionHostPort
 
             let options: ChildSessionOptions =
                 { Title = Some "failing child"
@@ -333,8 +329,7 @@ module SessionsSurface =
             transport.SetParent("cycle-b", Ok(Some "cycle-a"))
 
             let sessions =
-                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
-                :> ISessionHostPort
+                InjectedSessionPort(Some(transport :> IOpenCodePort), Events.newTerminalSource ()) :> ISessionHostPort
 
             let options: ChildSessionOptions =
                 { Title = Some "cyclic child"
@@ -365,8 +360,7 @@ module SessionsSurface =
             let transport = ControlledOpenCodePort(childId, false)
 
             let sessions =
-                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
-                :> ISessionHostPort
+                InjectedSessionPort(Some(transport :> IOpenCodePort), Events.newTerminalSource ()) :> ISessionHostPort
 
             let options: ChildSessionOptions =
                 { Title = Some "adapter child"
@@ -420,8 +414,7 @@ module SessionsSurface =
             let transport = ControlledOpenCodePort(childId, true)
 
             let sessions =
-                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
-                :> ISessionHostPort
+                InjectedSessionPort(Some(transport :> IOpenCodePort), Events.newTerminalSource ()) :> ISessionHostPort
 
             let options: ChildSessionOptions =
                 { Title = Some "adapter rejected child"
@@ -486,14 +479,15 @@ module SessionsSurface =
             let cancellationFinished =
                 TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-            let subscription =
-                { new IDisposable with
-                    member _.Dispose() = () }
+            let registry = Events.newTerminalSource ()
 
             let eventPort =
                 { new IEventObservationPort with
-                    member _.SubscribeTerminalListener _ = subscription
-                    member _.SubscribeFutureTerminalListener _ = subscription
+                    member _.SubscribeTerminalListener listener =
+                        registry.SubscribeTerminalListener(listener)
+
+                    member _.SubscribeFutureTerminalListener listener =
+                        registry.SubscribeFutureTerminalListener(listener)
 
                     member _.NotifyTerminal session outcome =
                         let kind, reason, root =
@@ -512,10 +506,10 @@ module SessionsSurface =
                                     root |> Option.map AuthorityRootUserMessageId.value |> Option.defaultValue "" |}
                         )
 
-                        true }
+                        registry.NotifyTerminal session outcome }
 
             let sessions =
-                InjectedSessionPort(Some(transport :> IOpenCodePort), eventPort) :> ISessionHostPort
+                InjectedSessionPort(Some(transport :> IOpenCodePort), registry) :> ISessionHostPort
 
             let cancel session : Task =
                 cancelled.Add(SessionId.value session)
@@ -583,7 +577,7 @@ module SessionsSurface =
             let sessions =
                 InjectedSessionPort(
                     Some(transport :> IOpenCodePort),
-                    ControlledEventPort() :> IEventObservationPort,
+                    Events.newTerminalSource (),
                     ?isLifecycleTerminated = Some(fun sessionId -> sessionId = terminalId)
                 )
                 :> ISessionHostPort

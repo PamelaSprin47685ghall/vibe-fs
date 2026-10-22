@@ -14,7 +14,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
 /// horizon(): who remains at the caller's horizon, as prose or as data.
-/// Host-neutral; a host reaches it through `IDelegationCallerHost`.
+/// Host-neutral; a host reaches it through `DelegationEnvironment`.
 module HorizonRoster =
 
     [<RequireQualifiedAccess>]
@@ -87,7 +87,7 @@ module HorizonRoster =
           Terminals: string list }
 
     /// The calling session's id text; empty when the host could not name it.
-    let private callerText (host: IDelegationCallerHost) =
+    let private callerText (host: DelegationEnvironment) =
         match host.Caller.Session with
         | Some session -> SessionId.value session
         | None -> ""
@@ -281,7 +281,7 @@ module HorizonRoster =
                 do! appendHandleLines language journal snapshot now runtimeByAgentId agentLines agentId handle
         }
 
-    let private executeWithJournal language (host: IDelegationCallerHost) (journal: AgentJournal) =
+    let private executeWithJournal language (host: DelegationEnvironment) (journal: AgentJournal) =
         task {
             let parentSessionId = SessionId.create (callerText host) |> host.LogicalOwnerFor
 
@@ -325,7 +325,7 @@ module HorizonRoster =
                 return rosterInstructions language lines
         }
 
-    let instructions (host: IDelegationCallerHost) : Task<string list> =
+    let instructions (host: DelegationEnvironment) : Task<string list> =
         task {
             let language = ProviderLanguageBinding.forSessionText (callerText host)
 
@@ -405,7 +405,7 @@ module HorizonRoster =
 
     let private rosterWithJournal
         (language: ProviderLanguage)
-        (host: IDelegationCallerHost)
+        (host: DelegationEnvironment)
         (journal: AgentJournal)
         : Task<Roster option> =
         task {
@@ -420,7 +420,7 @@ module HorizonRoster =
                 return Some roster
         }
 
-    let roster (language: ProviderLanguage) (host: IDelegationCallerHost) : Task<Roster option> =
+    let roster (language: ProviderLanguage) (host: DelegationEnvironment) : Task<Roster option> =
         task {
             match host.Journal with
             | None -> return None

@@ -62,13 +62,38 @@ module DispatchSessionPort =
             late
             |> Option.map (fun listener -> fun (verdict: DetachedSendVerdict) -> listener (toDeliveryVerdict verdict)) }
 
-    let ofSessionPort (sessionPort: ISessionHostPort) : IDispatchSessionPort =
+    /// Build a dispatch port over the neutral P-02 send port and the product
+    /// Host-boundary adapter: an `ISessionHostPort` already speaks the neutral
+    /// enough surface (send + terminals) at the host boundary, so wrap it into
+    /// an `IDispatchSessionPort` without forcing every cross-lane caller to
+    /// hand-build the adapter. This is the existing host contract, not a
+    /// substitute for a missing neutral equivalent.
+    let ofSessionPort (port: ISessionHostPort) : IDispatchSessionPort =
         { new IDispatchSessionPort with
             member _.SendPrompt(sessionId, request, metadata, late) =
-                sessionPort.SendPrompt(sessionId, request.Text, toHostOptions request metadata late)
+                port.SendPrompt(sessionId, request.Text, toHostOptions request metadata late)
 
             member _.SubscribeFutureTerminal(sessionId, listener) =
-                sessionPort.SubscribeFutureTerminal(sessionId, listener)
+                port.SubscribeFutureTerminal(sessionId, listener)
 
             member _.SubscribeTerminal(sessionId, listener) =
-                sessionPort.SubscribeTerminal(sessionId, listener) }
+                port.SubscribeTerminal(sessionId, listener) }
+
+    /// Build a dispatch port over the neutral P-02 send port and the product
+    /// terminal source. `metadata` is a product side channel with no neutral
+    /// carrier today (HNI A4): it is accepted on `SendPrompt` but cannot be
+    /// forwarded across `IPromptPort` — the host-side metadata echo therefore
+    /// has no neutral equivalent yet, stated explicitly rather than smuggled.
+    let ofNeutral (promptPort: IPromptPort) (terminalSource: ISessionTerminalSource) : IDispatchSessionPort =
+        { new IDispatchSessionPort with
+            member _.SendPrompt(sessionId, request, metadata, late) =
+                // GAP (HNI A4): `metadata` has no neutral carrier on P-02;
+                // it is retained on the product side channel only.
+                let _ = metadata
+                promptPort.Send(sessionId, request, late)
+
+            member _.SubscribeFutureTerminal(sessionId, listener) =
+                terminalSource.SubscribeFutureTerminal(sessionId, listener)
+
+            member _.SubscribeTerminal(sessionId, listener) =
+                terminalSource.SubscribeTerminal(sessionId, listener) }

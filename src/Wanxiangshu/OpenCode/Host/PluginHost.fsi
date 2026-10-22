@@ -31,7 +31,7 @@ module PluginHost =
                     ISessionHostPort *
                     ISessionSnapshotPort option *
                     string option *
-                    Events.HostEventPort option,
+                    ISessionTerminalSource option,
                     string
                  >
              >

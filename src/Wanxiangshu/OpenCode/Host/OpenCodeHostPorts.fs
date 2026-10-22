@@ -156,6 +156,7 @@ module OpenCodeHostPorts =
 
             let promptPort = OpenCodePromptPort(host.SessionPort) :> IPromptPort
             let configPort = liveConfig :> IHostConfigPort
+
             let diagnosticsPort =
                 DiagnosticsPort.create boot.Input
                 |> Option.defaultWith (fun () -> DiagnosticSinkPort() :> IDiagnosticSink)
@@ -165,7 +166,11 @@ module OpenCodeHostPorts =
             // names no catalog source falls back to a declared refusal, never
             // to an empty catalog that would look like a host without models.
             let modelsOpt = ModelCatalogPort.create boot.WorkspaceDirectory boot.Input
-            let modelsPort = modelsOpt |> Option.defaultWith (fun () -> UnsupportedModelCatalog() :> IModelCatalog)
+
+            let modelsPort =
+                modelsOpt
+                |> Option.defaultWith (fun () -> UnsupportedModelCatalog() :> IModelCatalog)
+
             let signalsPort = UnsupportedSignalSource() :> ISignalSource
             let toolsPort = UnsupportedToolRegistrar() :> IToolRegistrar
             let agentsPort = UnsupportedAgentCatalog() :> IAgentCatalog
@@ -173,14 +178,18 @@ module OpenCodeHostPorts =
             let capabilities: HostCapabilities =
                 { HostName = "OpenCode"
                   Supports =
-                    set
-                        ([ HostCapability.ChildSessions
-                           HostCapability.SessionDiscovery
-                           HostCapability.Interrupt ]
-                         // The catalog capability is claimed only when the
-                         // catalog is really wired; an unclaimed capability
-                         // must answer `HostError.Unsupported`.
-                         @ (if modelsOpt.IsSome then [ HostCapability.ModelCatalog ] else [])) }
+                    set (
+                        [ HostCapability.ChildSessions
+                          HostCapability.SessionDiscovery
+                          HostCapability.Interrupt ]
+                        // The catalog capability is claimed only when the
+                        // catalog is really wired; an unclaimed capability
+                        // must answer `HostError.Unsupported`.
+                        @ (if modelsOpt.IsSome then
+                               [ HostCapability.ModelCatalog ]
+                           else
+                               [])
+                    ) }
 
             return
                 { Sessions = sessionPort

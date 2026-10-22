@@ -14,6 +14,7 @@ open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Admission
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 
@@ -203,7 +204,18 @@ module DispatchSurface =
     /// Seed the durable AgentOwnerRoot needed by a continuation owner. This is
     /// the same PromptFact writer used by production ingress; the returned value
     /// contains no AgentFact/union representation.
-    let appendAuthorityRoot (handle: JournalHandle) (session: string) (identitySeed: obj) : Task<obj> =
+    ///
+    /// interaction-authority-018: `agentOwnerLife` is the life the producer
+    /// proved about this root ("Child" | "Attached" | "InternalLeaf"). It is
+    /// not optional: a root whose life is not proven records no closure kind
+    /// and so admits no closure, which is the honest outcome rather than a
+    /// guessed one.
+    let appendAuthorityRoot
+        (handle: JournalHandle)
+        (session: string)
+        (identitySeed: obj)
+        (agentOwnerLife: string)
+        : Task<obj> =
         task {
             match identitySeedOf identitySeed with
             | Error error -> return box {| ok = false; error = error |}
@@ -216,11 +228,8 @@ module DispatchSurface =
                 let sessionId = SessionId.create session
 
                 let closure =
-                    AuthorityLifeClassification.deriveClosureKind "AgentOwnerRoot" false
-                    |> Option.defaultValue (
-                        AuthorityLifeClassification.coarseAgentOwnerLife
-                        |> fun life -> ("AgentOwnerChildWork", Some life)
-                    )
+                    AuthorityLifeClassification.deriveClosureKind "AgentOwnerRoot" false (Some agentOwnerLife)
+                    |> Option.defaultValue ("AgentOwnerChildWork", Some agentOwnerLife)
 
                 let ownerLogicalRunId =
                     match identitySeed with
@@ -536,6 +545,7 @@ module DispatchSurface =
             member _.RuntimeId = journal.RuntimeId
             member _.ProjectionFor sessionId = journal.ProjectionFor sessionId
             member _.HandleForChild sessionId = journal.HandleForChild sessionId
+            member _.OwnershipEvidenceFor sessionId = journal.OwnershipEvidenceFor sessionId
             member _.ChatAcceptancePersistence() = journal.ChatAcceptancePersistence()
 
             member _.Append sessionId providerRun fact =
@@ -828,19 +838,35 @@ module DispatchSurface =
     /// PROMPT-004/005: prove one dispatched AgentOwnerRoot at a physical message
     /// boundary. The Dispatcher writes PhysicalAccepted before registering the
     /// authority profile; only the normalized profile crosses this boundary.
+    ///
+    /// interaction-authority-018: `agentOwnerLife` is the life the producer
+    /// proved about this root ("Child" | "Attached" | "InternalLeaf"). When the
+    /// caller states none, the life is derived from the durable ownership
+    /// evidence of the session; a root whose life cannot be proven that way
+    /// records no closure kind and so admits no closure.
     let acceptAgentOwnerRoot
         (handle: JournalHandle)
         (session: string)
         (promptKey: string)
         (physicalMessageId: string)
+        (agentOwnerLife: obj)
         : Task<obj> =
         task {
+            let statedLife =
+                if isNull agentOwnerLife then
+                    None
+                else
+                    match unbox<string> agentOwnerLife with
+                    | "" -> None
+                    | text -> Some text
+
             let! result =
                 (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal))
                     .AcceptAgentOwnerRoot
                     (PromptKey.create promptKey)
                     (SessionId.create session)
                     (PhysicalUserMessageId.create physicalMessageId)
+                    statedLife
 
             return
                 match result with

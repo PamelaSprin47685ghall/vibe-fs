@@ -94,7 +94,7 @@ module PluginHost =
                   ISessionHostPort *
                   ISessionSnapshotPort option *
                   string option *
-                  Events.HostEventPort option,
+                  ISessionTerminalSource option,
                   string
                >
            >
@@ -103,19 +103,24 @@ module PluginHost =
             // Completion/output port is process-local per workspace runtime path so
             // root + worktree plugin instances share AwaitAgent / NotifyTerminal.
             // Host SSE remains only a coarse idle/retry/deleted signal source.
-            let! shared = SharedTerminalBus.tryAcquireForWorkspace workspaceDirectory
+            // The terminal facts and their subscribers are the product's; the
+            // adapter only forwards to them. The workspace-shared source is
+            // the first registry of that workspace, so the root and worktree
+            // plugin instances share one terminal truth.
+            let candidate = Events.newTerminalSource ()
+            let! shared = SharedTerminalBus.tryAcquireForWorkspace workspaceDirectory candidate
 
             let hostEventPort, terminalKey =
                 match shared with
-                | Some(key, port) -> port, Some key
-                | None -> Events.HostEventPort(), None
+                | Some(key, source) -> Events.HostEventPort(source), Some key
+                | None -> Events.HostEventPort(candidate), None
 
             let eventPort = hostEventPort :> IEventObservationPort
 
             let sessionPort =
                 InjectedSessionPort(
                     portOpt,
-                    eventPort,
+                    hostEventPort :> ISessionTerminalSource,
                     ?familyParent = familyParent,
                     ?isLifecycleTerminated = isLifecycleTerminated,
                     ?isUserQuestionWaiting = isUserQuestionWaiting
@@ -123,5 +128,12 @@ module PluginHost =
 
             let snapshotPort = SessionSnapshotPort.create workspaceDirectory input
 
-            return Ok(eventPort, sessionPort :> ISessionHostPort, snapshotPort, terminalKey, Some hostEventPort)
+            return
+                Ok(
+                    eventPort,
+                    sessionPort :> ISessionHostPort,
+                    snapshotPort,
+                    terminalKey,
+                    Some(hostEventPort :> ISessionTerminalSource)
+                )
         }

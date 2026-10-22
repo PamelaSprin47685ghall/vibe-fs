@@ -77,9 +77,6 @@ module DiagnosticsPort =
     let create (input: obj) : IDiagnosticSink option =
         let client = if isNullish input then null else field input "client"
 
-        if isNullish client then
-            None
-        elif isNullish (field (field client "app") "log") then
-            None
-        else
-            Some(SdkDiagnosticSink(client) :> IDiagnosticSink)
+        if isNullish client then None
+        elif isNullish (field (field client "app") "log") then None
+        else Some(SdkDiagnosticSink(client) :> IDiagnosticSink)

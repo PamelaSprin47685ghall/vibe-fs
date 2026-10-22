@@ -93,8 +93,11 @@ type SessionRecoveryHost
             messages
             |> List.filter (fun message ->
                 message.Role = TranscriptRole.Assistant
-                && message.Parent
-                   = Some(TranscriptMessageAddress.create(PhysicalUserMessageId.value state.key.PhysicalUserMessageId)))
+                && message.Parent = Some(
+                                        TranscriptMessageAddress.create (
+                                            PhysicalUserMessageId.value state.key.PhysicalUserMessageId
+                                        )
+                                    ))
 
         match matches, state.startedEvidence with
         | [], _ -> ProviderPhysicalObservation.ProviderAbsent state.key

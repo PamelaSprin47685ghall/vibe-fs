@@ -181,31 +181,30 @@ module PromptIngressCodec =
         | Raw value -> isTrue value
         | _ -> false
 
-    let private isHostCompaction (output: obj) =
+    /// The raw facts one host message carries, read from the wire.
+    ///
+    /// Which of them count as a compaction source is the product's rule
+    /// (`HostInternalClassification`); this only reads them.
+    let private hostMessageFacts (output: obj) : HostInternalClassification.HostMessageFacts =
         let outputParts = parts output
         let message = childObject output "message"
 
-        outputParts
-        |> Array.exists (fun part ->
-            readString part "type"
-            |> Option.exists (fun kind -> kind.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
-        || isTrueProperty message "summary"
-        || (agentOf output
-            |> Option.exists (fun agent -> agent.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
-        || (readString message "mode"
-            |> Option.exists (fun mode -> mode.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
-
-    let private isHostSynthetic (output: obj) =
         let messageParts = parts output
 
-        // Only material the Host generated outright is HostInternal. A real user
-        // message still carries host-injected synthetic echoes (for example the
-        // TUI's @-file read output) next to its own parts; treating that mixture
-        // as synthetic would let user-authored content bypass managed admission
-        // and arrive at the provider with the uncontrolled TUI model selection
-        // still attached.
-        messageParts.Length > 0
-        && Array.forall (fun part -> isTrueProperty part "synthetic") messageParts
+        { HostInternalClassification.HasCompactionPart =
+            outputParts
+            |> Array.exists (fun part ->
+                readString part "type"
+                |> Option.exists (fun kind -> kind.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
+          HasSummary = isTrueProperty message "summary"
+          AgentIsCompaction =
+            (agentOf output
+             |> Option.exists (fun agent -> agent.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
+          ModeIsCompaction =
+            (readString message "mode"
+             |> Option.exists (fun mode -> mode.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
+          HasParts = messageParts.Length > 0
+          AllPartsSynthetic = Array.forall (fun part -> isTrueProperty part "synthetic") messageParts }
 
     let private sessionIdCarrierOfPart (sess: obj) : TextCarrier =
         if isNull sess then
@@ -270,10 +269,10 @@ module PromptIngressCodec =
     /// Classify one physical message part; synthetic and non-text parts are not
     /// opening content.
     let private textOfPart (part: obj) : string option =
-        match isTrueProperty part "synthetic", readString part "type" with
-        | true, _ -> None
-        | false, Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) -> readString part "text"
-        | _ -> None
+        HostInternalClassification.openingTextOfPart
+            (isTrueProperty part "synthetic")
+            (readString part "type")
+            (readString part "text")
 
     /// COMPANION-003: the user message's text, for the opening capture. Only the
     /// physical user message's own text parts count — the opening is the first
@@ -316,11 +315,13 @@ module PromptIngressCodec =
                 | MalformedText -> Some kind
                 | _ -> None)
 
+        let facts = hostMessageFacts output
+
         { InvalidIdentityCarrier = invalidCarrier
           SessionId = sessionId
           PhysicalUserMessageId = messageIdOf input output
           ExplicitAgent = explicitAgent
           PromptKey = promptKey |> textOption |> Option.map PromptKey.create
-          IsHostCompaction = isHostCompaction output
-          IsHostSynthetic = isHostSynthetic output
+          IsHostCompaction = HostInternalClassification.isCompaction facts
+          IsHostSynthetic = HostInternalClassification.isHostSynthetic facts
           Text = textOf output }

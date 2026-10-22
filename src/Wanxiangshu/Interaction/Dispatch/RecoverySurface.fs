@@ -35,7 +35,11 @@ module RecoverySurface =
                 let projected =
                     SessionSnapshotPort.projectMessages rawMessages
                     |> List.choose (fun message ->
-                        match TranscriptPort.project { message with Role = neutralRole message.Role } with
+                        match
+                            TranscriptPort.project
+                                { message with
+                                    Role = neutralRole message.Role }
+                        with
                         | Ok record -> Some record
                         | Error _ -> None)
 

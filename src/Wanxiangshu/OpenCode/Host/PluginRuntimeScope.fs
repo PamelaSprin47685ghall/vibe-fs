@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider.Attempt
@@ -35,7 +36,7 @@ type PluginRuntimeScope
     // DSL-MUTABLE: resource — shared terminal bus key
     let mutable sharedTerminalKey: string option = None
     // DSL-MUTABLE: resource — shared terminal bus port handle
-    let mutable sharedTerminalPort: Events.HostEventPort option = None
+    let mutable sharedTerminalPort: ISessionTerminalSource option = None
     let disposeGate = obj ()
     let ownedWorkGate = obj ()
     // DSL-MUTABLE: resource — scope dispose latch
@@ -338,7 +339,7 @@ type PluginRuntimeScope
             return lock ownedWorkGate (fun () -> backgroundFailure)
         }
 
-    member _.AttachSharedTerminal(key: string option, port: Events.HostEventPort option) =
+    member _.AttachSharedTerminal(key: string option, port: ISessionTerminalSource option) =
         sharedTerminalKey <- key
         sharedTerminalPort <- port
 

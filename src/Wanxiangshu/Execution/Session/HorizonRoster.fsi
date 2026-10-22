@@ -1,12 +1,13 @@
 namespace Wanxiangshu.Execution.Session
 
 open System.Threading.Tasks
+open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host.Domain
 open Wanxiangshu.Participant.Provider
 
 /// horizon(): who remains at the caller's horizon, as prose or as data.
-/// Host-neutral; a host reaches it through `IDelegationCallerHost`.
+/// Host-neutral; a host reaches it through `DelegationEnvironment`.
 module HorizonRoster =
 
     [<RequireQualifiedAccess>]
@@ -83,11 +84,11 @@ module HorizonRoster =
 
     /// The roster as instruction lines in the caller's language; a horizon
     /// the caller cannot be shown answers with one line saying so.
-    val instructions: host: IDelegationCallerHost -> Task<string list>
+    val instructions: host: DelegationEnvironment -> Task<string list>
 
     /// The same roster as data: every horizon-visible participant with the
     /// status the prose line reports, its work state, its latest record body,
     /// and the four calibration numbers, plus the terminals still open. None
     /// when the caller cannot be shown a horizon. No provider prose beyond the
     /// participant labels is rendered.
-    val roster: language: ProviderLanguage -> host: IDelegationCallerHost -> Task<Roster option>
+    val roster: language: ProviderLanguage -> host: DelegationEnvironment -> Task<Roster option>

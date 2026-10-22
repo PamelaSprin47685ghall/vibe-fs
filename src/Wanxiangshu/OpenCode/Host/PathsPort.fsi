@@ -15,7 +15,7 @@ module PathsPort =
 
     /// The paths for a resolved state-root thunk, a project root and a project id.
     type HostPaths =
-        new: stateRoot: unit -> string * projectRoot: string * projectId: string -> HostPaths
+        new: stateRoot: (unit -> string) * projectRoot: string * projectId: string -> HostPaths
         interface IHostPaths
 
     /// The workspace directory the plugin runs in (`input.directory`) — the
@@ -34,4 +34,4 @@ module PathsPort =
 
     /// The paths for the given host wiring, or `None` when the input names no
     /// project root.
-    val create: stateRoot: unit -> string -> input: obj -> IHostPaths option
+    val create: stateRoot: (unit -> string) -> input: obj -> IHostPaths option

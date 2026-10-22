@@ -504,7 +504,7 @@ module PromptDispatcherSend =
                     | _ -> None
 
                 let acceptFn physicalId =
-                    this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId claim.IdentitySeed
+                    this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId claim.IdentitySeed None
                     |> TaskValue.map (Result.map ignore)
 
                 let awaitRootSend sendTask =

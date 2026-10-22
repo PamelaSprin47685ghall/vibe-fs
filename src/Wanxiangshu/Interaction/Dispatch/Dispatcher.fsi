@@ -69,6 +69,7 @@ module PromptDispatcher =
 
         member RegisterAuthority:
             profile: PromptAuthority.AuthorityExecutionProfile ->
+            agentOwnerLife: string option ->
                 Task<Result<PromptAuthority.AuthorityExecutionProfile, AuthorityRegistrationFailure>>
 
         member AcceptHumanRoot:
@@ -89,12 +90,14 @@ module PromptDispatcher =
             sessionId: SessionId ->
             physicalMessageId: PhysicalUserMessageId ->
             identitySeed: PromptAuthority.IdentitySeed ->
+            agentOwnerLife: string option ->
                 Task<Result<PromptAuthority.AuthorityExecutionProfile, string>>
 
         member AcceptAgentOwnerRoot:
             key: PromptKey ->
             sessionId: SessionId ->
             physicalMessageId: PhysicalUserMessageId ->
+            agentOwnerLife: string option ->
                 Task<Result<PromptAuthority.AuthorityExecutionProfile, string>>
 
         member AcceptContinuation:

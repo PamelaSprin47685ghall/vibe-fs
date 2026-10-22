@@ -47,7 +47,10 @@ module TranscriptPort =
     /// A non-empty text wins; an empty one falls back to the value carried by
     /// the host part.
     let private preferredText (recorded: string) (fallback: string) : string =
-        if System.String.IsNullOrWhiteSpace recorded then fallback else recorded
+        if System.String.IsNullOrWhiteSpace recorded then
+            fallback
+        else
+            recorded
 
     /// The failure carried by a message that reported an error name.
     ///
@@ -92,12 +95,12 @@ module TranscriptPort =
         |> Array.map (fun part ->
             let state, output = toolStateOf part.State
 
-            ( ToolCallId.value part.ToolCallId,
-              { CallId = part.ToolCallId
-                Tool = part.ToolName
-                Input = CanonicalJsonText part.InputCanonical
-                State = state
-                Output = output } ))
+            (ToolCallId.value part.ToolCallId,
+             { CallId = part.ToolCallId
+               Tool = part.ToolName
+               Input = CanonicalJsonText part.InputCanonical
+               State = state
+               Output = output }))
         |> Map.ofArray
 
     /// A tool part merged with the facts the host message carries on the
@@ -111,19 +114,35 @@ module TranscriptPort =
     /// record. The tool call id of the host snapshot is the join key: a tool
     /// part that cannot be matched is reported as an opaque part, never as a
     /// fabricated call record.
-    let private toolUseOf (tools: Map<string, ToolCallRecord>) (callId: string) (name: string) (args: string) : TranscriptPart list =
+    let private toolUseOf
+        (tools: Map<string, ToolCallRecord>)
+        (callId: string)
+        (name: string)
+        (args: string)
+        : TranscriptPart list =
         match Map.tryFind callId tools with
         | None -> [ TranscriptPart.Other "tool" ]
         | Some record -> [ TranscriptPart.ToolUse(mergeToolUse record name args) ]
 
     /// A tool call part of the host message.
-    let private toolCallPartOf (tools: Map<string, ToolCallRecord>) (seen: System.Collections.Generic.HashSet<string>) (callId: string) (name: string) (args: string) : TranscriptPart list =
+    let private toolCallPartOf
+        (tools: Map<string, ToolCallRecord>)
+        (seen: System.Collections.Generic.HashSet<string>)
+        (callId: string)
+        (name: string)
+        (args: string)
+        : TranscriptPart list =
         seen.Add callId |> ignore
         toolUseOf tools callId name args
 
     /// A tool result part of the host message. The result completes the call
     /// when the snapshot knows it; otherwise the part stays opaque.
-    let private toolResultPartOf (tools: Map<string, ToolCallRecord>) (seen: System.Collections.Generic.HashSet<string>) (callId: string) (result: string) : TranscriptPart list =
+    let private toolResultPartOf
+        (tools: Map<string, ToolCallRecord>)
+        (seen: System.Collections.Generic.HashSet<string>)
+        (callId: string)
+        (result: string)
+        : TranscriptPart list =
         seen.Add callId |> ignore
 
         match Map.tryFind callId tools with
@@ -131,8 +150,8 @@ module TranscriptPort =
         | Some record ->
             [ TranscriptPart.ToolUse
                   { record with
-                        State = ToolCallState.Completed
-                        Output = Some result } ]
+                      State = ToolCallState.Completed
+                      Output = Some result } ]
 
     /// One host part projected onto the neutral part vocabulary.
     ///
@@ -141,7 +160,11 @@ module TranscriptPort =
     /// `Other "tool"` part otherwise; every other host part kind stays an
     /// opaque `Other` part carrying its kind name, because the neutral port
     /// has no richer home for it.
-    let private partOf (tools: Map<string, ToolCallRecord>) (seen: System.Collections.Generic.HashSet<string>) (part: MessagePart) : TranscriptPart list =
+    let private partOf
+        (tools: Map<string, ToolCallRecord>)
+        (seen: System.Collections.Generic.HashSet<string>)
+        (part: MessagePart)
+        : TranscriptPart list =
         match part with
         | MessagePart.Text text -> [ TranscriptPart.Text text ]
         | MessagePart.Reasoning text -> [ TranscriptPart.Reasoning text ]
@@ -159,8 +182,8 @@ module TranscriptPort =
 
         let fromParts =
             message.Parts
-            |> Array.collect (fun part -> partOf tools seen part)
             |> Array.toList
+            |> List.collect (fun part -> partOf tools seen part)
 
         let unmatchedTools =
             tools
@@ -192,23 +215,31 @@ module TranscriptPort =
     /// refuses the whole transcript: a partially projected transcript would
     /// silently lose messages, and a caller cannot tell a short transcript
     /// from a broken one.
-    let rec private projectLoop (acc: TranscriptMessage list) (remaining: SessionMessage list) : Result<TranscriptMessage list, HostError> =
+    let rec private projectLoop
+        (acc: TranscriptMessage list)
+        (remaining: SessionMessage list)
+        : Result<TranscriptMessage list, HostError> =
         match remaining with
         | [] -> Ok(List.rev acc)
         | head :: tail -> projectStep (project head) acc tail
 
-    and private projectStep (step: Result<TranscriptMessage, HostError>) (acc: TranscriptMessage list) (remaining: SessionMessage list) : Result<TranscriptMessage list, HostError> =
+    and private projectStep
+        (step: Result<TranscriptMessage, HostError>)
+        (acc: TranscriptMessage list)
+        (remaining: SessionMessage list)
+        : Result<TranscriptMessage list, HostError> =
         match step with
         | Error error -> Error error
         | Ok value -> projectLoop (value :: acc) remaining
 
     /// A whole session projected onto the neutral transcript records.
-    let projectAll (messages: SessionMessage list) : Result<TranscriptMessage list, HostError> =
-        projectLoop [] messages
+    let projectAll (messages: SessionMessage list) : Result<TranscriptMessage list, HostError> = projectLoop [] messages
 
     /// The snapshot outcome translated onto the neutral error channel.
     /// A snapshot failure is a transport failure: the transcript is unknown.
-    let private ofSnapshotOutcome (outcome: Result<SessionMessage list, string>) : Result<TranscriptMessage list, HostError> =
+    let private ofSnapshotOutcome
+        (outcome: Result<SessionMessage list, string>)
+        : Result<TranscriptMessage list, HostError> =
         match outcome with
         | Error reason -> Error(HostError.Transport reason)
         | Ok messages -> projectAll messages

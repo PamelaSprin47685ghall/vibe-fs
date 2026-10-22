@@ -9,6 +9,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host
@@ -48,14 +49,31 @@ module PromptDispatcher =
         | HumanRootAcceptanceFailure.AuthorityRegistrationRejected failure ->
             describeAuthorityRegistrationFailure failure
 
-    let private authorityRootFact (profile: PromptAuthority.AuthorityExecutionProfile) : PromptSessionFact =
+    /// interaction-authority-018: the closure kind and the agent-owner life of
+    /// an accepted root.
+    ///
+    /// The life is not guessed: a HumanRoot's kind follows from its own
+    /// recorded role, and an agent-owner root's life is whatever the
+    /// producer proved about it. A producer that cannot prove the life
+    /// admits no agent-owner root at all, because a closure of the wrong
+    /// kind would never be admitted later.
+    let private authorityRootFact
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (agentOwnerLife: string option)
+        : PromptSessionFact =
         let authorityKind =
             match profile.AuthorityKind with
             | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
             | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
 
         let closure =
-            AuthorityLifeClassification.deriveClosureKind authorityKind (profile.CanonicalRole = Role.Manager)
+            AuthorityLifeClassification.deriveClosureKind
+                authorityKind
+                (profile.CanonicalRole = Role.Manager)
+                (if authorityKind = "AgentOwnerRoot" then
+                     agentOwnerLife
+                 else
+                     None)
             |> Option.defaultValue ("HumanRootManagedRun", None)
 
         let ownerLogicalRunId =
@@ -70,7 +88,10 @@ module PromptDispatcher =
               AuthorityKind = authorityKind
               ExpectedClosureKind = fst closure
               OwnerLogicalRunId = ownerLogicalRunId
-              AgentOwnerLife = snd closure
+              AgentOwnerLife =
+                match authorityKind with
+                | "AgentOwnerRoot" -> snd closure
+                | _ -> None
               IdentitySeed = profile.IdentitySeed }
 
     let private registrationDecision
@@ -79,11 +100,24 @@ module PromptDispatcher =
         : Result<PromptAuthority.AuthorityExecutionProfile, PromptAuthorityRun.AuthorityRegistrationRejection> =
         PromptAuthorityRun.resolveAuthorityProfile profile projection
 
+    /// interaction-authority-018: the agent-owner life a durable ownership
+    /// record states.
+    ///
+    /// A companion or a bookkeeper is an internal leaf; any other attached
+    /// session is attached work; a root session is a fork child.
+    let private lifeOfOwnership (ownership: SessionOwnership) : string =
+        match ownership with
+        | SessionOwnership.Attached(_, AttachmentKind.Companion) -> "InternalLeaf"
+        | SessionOwnership.Attached(_, AttachmentKind.Bookkeeper _) -> "InternalLeaf"
+        | SessionOwnership.Attached(_, _) -> "Attached"
+        | SessionOwnership.Root -> "Child"
+
     let private appendAuthorityRoot
         (journal: IPromptJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
+        (agentOwnerLife: string option)
         : Task<Result<unit, JournalAppendFailure>> =
-        journal.Append profile.SessionId None (authorityRootFact profile)
+        journal.Append profile.SessionId None (authorityRootFact profile agentOwnerLife)
 
     let private appendManagedPromptAccepted
         (journal: IPromptJournal)
@@ -310,7 +344,9 @@ module PromptDispatcher =
                 |> Task.FromResult
             | None ->
                 task {
-                    let! appended = appendAuthorityRoot journal profile
+                    // A managed authority is always a HumanRoot: its closure
+                    // kind follows from its own recorded role.
+                    let! appended = appendAuthorityRoot journal profile None
 
                     return
                         appended
@@ -495,13 +531,14 @@ module PromptDispatcher =
         /// without its requirement appearing with it.
         member this.RegisterAuthority
             (profile: PromptAuthority.AuthorityExecutionProfile)
+            (agentOwnerLife: string option)
             : Task<Result<PromptAuthority.AuthorityExecutionProfile, AuthorityRegistrationFailure>> =
             match registrationDecision profile (this.ProjectionFor profile.SessionId) with
             | Error rejection -> Task.FromResult(Error(AuthorityRegistrationFailure.RegistrationRejected rejection))
             | Ok canonical when canonical <> profile -> Task.FromResult(Ok canonical)
             | Ok canonical ->
                 task {
-                    let! appended = appendAuthorityRoot journal profile
+                    let! appended = appendAuthorityRoot journal profile agentOwnerLife
 
                     return completeRegistrationAppend canonical profile (this.ProjectionFor profile.SessionId) appended
                 }
@@ -537,7 +574,9 @@ module PromptDispatcher =
 
                 let! registered =
                     task {
-                        let! result = this.RegisterAuthority profile
+                        // A HumanRoot's closure kind follows from its own
+                        // recorded role; it carries no agent-owner life.
+                        let! result = this.RegisterAuthority profile None
                         return Result.mapError HumanRootAcceptanceFailure.AuthorityRegistrationRejected result
                     }
 
@@ -578,7 +617,20 @@ module PromptDispatcher =
             (sessionId: SessionId)
             (physicalMessageId: PhysicalUserMessageId)
             (identitySeed: PromptAuthority.IdentitySeed)
+            (agentOwnerLife: string option)
             : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
+            // interaction-authority-018: the life of an agent-owner root comes
+            // from the durable ownership evidence of the session. A producer
+            // may state it when it knows more than the association does (a
+            // dedicated Sync delegate, for instance), but the evidence is the
+            // floor: without it the root records no closure kind.
+            let provenLife =
+                match agentOwnerLife with
+                | Some life -> Some life
+                | None ->
+                    journal.OwnershipEvidenceFor sessionId
+                    |> Option.map (fun ownership -> lifeOfOwnership ownership)
+
             let authorityClaimDecision: Result<PromptAuthority.AuthorityExecutionProfile, string> =
                 this.ValidateAgentOwnerIdentitySeed identitySeed
                 |> Result.mapError describeIdentitySeedRejection
@@ -609,7 +661,7 @@ module PromptDispatcher =
 
                 let! registered =
                     task {
-                        let! result = this.RegisterAuthority profile
+                        let! result = this.RegisterAuthority profile provenLife
                         return Result.mapError describeAuthorityRegistrationFailure result
                     }
 
@@ -621,6 +673,7 @@ module PromptDispatcher =
             (key: PromptKey)
             (sessionId: SessionId)
             (physicalMessageId: PhysicalUserMessageId)
+            (agentOwnerLife: string option)
             : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
             let projection = this.ProjectionFor sessionId
 
@@ -629,7 +682,7 @@ module PromptDispatcher =
                 : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
                 match claim.Origin with
                 | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
-                    this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId claim.IdentitySeed
+                    this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId claim.IdentitySeed agentOwnerLife
                 | _ ->
                     Task.FromResult(Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key)))
 
@@ -640,7 +693,7 @@ module PromptDispatcher =
                     accepted.PromptKey = key
                     && accepted.SessionId = sessionId
                     && accepted.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                        PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                                             PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
             let acceptExisting
                 (accepted: PromptAuthority.AcceptedDispatch)
@@ -657,7 +710,13 @@ module PromptDispatcher =
                             sprintf "AgentOwnerRoot claim %s does not match the active child run" (PromptKey.value key)
                         )
                     )
-                | None -> this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId accepted.IdentitySeed
+                | None ->
+                    this.AcceptPhysicalAgentOwnerRoot
+                        key
+                        sessionId
+                        physicalMessageId
+                        accepted.IdentitySeed
+                        agentOwnerLife
 
             match Map.tryFind key projection.PendingClaims, acceptedClaim with
             | Some claim, _ -> acceptClaim claim

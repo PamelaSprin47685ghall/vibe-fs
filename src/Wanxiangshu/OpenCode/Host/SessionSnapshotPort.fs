@@ -431,7 +431,8 @@ module SessionSnapshotPort =
             { Id = id
               Parent = readString row?parentID |> Option.map SessionId.create
               Role = readString row?agent |> Option.map AgentRole
-              Title = readString row?title })
+              Title = readString row?title
+              Workspace = readString row?directory |> Option.map WorkspacePath })
 
     let private sessionInfosOfRows (rows: obj array) : SessionInfo list =
         rows |> Array.choose sessionInfoOfRow |> Array.toList
@@ -453,10 +454,7 @@ module SessionSnapshotPort =
         if isNull session then
             Error(HostError.Transport "Missing session response")
         else
-            session?parentID
-            |> readString
-            |> Option.map SessionId.create
-            |> Ok
+            session?parentID |> readString |> Option.map SessionId.create |> Ok
 
     /// The HTTP status a transport response carries, when the transport
     /// exposes one. The SDK envelope keeps the raw response under `response`.
@@ -501,19 +499,15 @@ module SessionSnapshotPort =
             | None -> sprintf "%s failed" verb
 
         match responseStatus response with
-        | Some status when status = 404 ->
-            HostError.NotFound(sprintf "%s: %s" verb detail)
-        | Some status when status >= 400 && status < 500 ->
-            HostError.Refused(sprintf "%s: %s" verb detail)
-        | Some status ->
-            HostError.Transport(sprintf "%s: %s (HTTP %d)" verb detail status)
+        | Some status when status = 404 -> HostError.NotFound(sprintf "%s: %s" verb detail)
+        | Some status when status >= 400 && status < 500 -> HostError.Refused(sprintf "%s: %s" verb detail)
+        | Some status -> HostError.Transport(sprintf "%s: %s (HTTP %d)" verb detail status)
         | None -> HostError.Refused(sprintf "%s: %s" verb detail)
 
     /// The failure a transport status carries, when the status is a failure.
     let private statusFailure (response: obj) (verb: string) : HostError option =
         match responseStatus response with
-        | Some status when status < 200 || status >= 300 ->
-            Some(hostErrorOfStatus status verb)
+        | Some status when status < 200 || status >= 300 -> Some(hostErrorOfStatus status verb)
         | _ -> None
 
     /// The failure an SDK response envelope carries, if it carries one. The
@@ -582,10 +576,7 @@ module SessionSnapshotPort =
 
                     let! response = sdkInvoke sessObj listFn payload
 
-                    return!
-                        match response with
-                        | Ok raw -> sdkOr raw "session.list" (fun () -> discoveredSessions title raw)
-                        | Error failure -> Error failure
+                    return! sdkOr response "session.list" (fun () -> discoveredSessions title response)
                 }
 
             member _.Create(parent, spec) =
@@ -623,15 +614,12 @@ module SessionSnapshotPort =
                     let! response = sdkInvoke sessObj createFn payload
 
                     return!
-                        match response with
-                        | Ok raw ->
-                            sdkOr raw "session.create" (fun () ->
-                                let created = objectPayload raw
+                        sdkOr response "session.create" (fun () ->
+                            let created = objectPayload response
 
-                                readString created?id
-                                |> Option.map SessionId.create
-                                |> Result.requireSome (HostError.Transport "Missing session id in response"))
-                        | Error failure -> Error failure
+                            readString created?id
+                            |> Option.map SessionId.create
+                            |> Result.requireSome (HostError.Transport "Missing session id in response"))
                 }
 
             member _.Parent(session) =
@@ -639,10 +627,7 @@ module SessionSnapshotPort =
                     let sessObj = client?session
                     let getFn = sessObj?get
 
-                    do!
-                        Result.requireFalse
-                            (HostError.Transport "session.get unavailable on SDK client")
-                            (isNull getFn)
+                    do! Result.requireFalse (HostError.Transport "session.get unavailable on SDK client") (isNull getFn)
 
                     let sId = SessionId.value session
 
@@ -654,10 +639,7 @@ module SessionSnapshotPort =
 
                     let! response = sdkInvoke sessObj getFn payload
 
-                    return!
-                        match response with
-                        | Ok raw -> sdkOr raw "session.get" (fun () -> parentOfPayload raw)
-                        | Error failure -> Error failure
+                    return! sdkOr response "session.get" (fun () -> parentOfPayload response)
                 }
 
             member _.Children(parent) =
@@ -680,9 +662,7 @@ module SessionSnapshotPort =
                     let! response = sdkInvoke sessObj childrenFn payload
 
                     return!
-                        match response with
-                        | Ok raw -> sdkOr raw "session.children" (fun () -> Ok(sessionInfosOfRows (unwrapPayload raw)))
-                        | Error failure -> Error failure
+                        sdkOr response "session.children" (fun () -> Ok(sessionInfosOfRows (unwrapPayload response)))
                 }
 
             member _.Abort(session) =
@@ -704,10 +684,7 @@ module SessionSnapshotPort =
 
                     let! response = sdkInvoke sessObj abortFn payload
 
-                    return!
-                        match response with
-                        | Ok raw -> sdkOr raw "session.abort" (fun () -> Ok())
-                        | Error failure -> Error failure
+                    return! sdkOr response "session.abort" (fun () -> Ok())
                 }
 
             // The OpenCode host (API v1) exposes exactly one stop action per
@@ -740,10 +717,7 @@ module SessionSnapshotPort =
 
                     let! response = sdkInvoke sessObj closeFn payload
 
-                    return!
-                        match response with
-                        | Ok raw -> sdkOr raw "session.delete" (fun () -> Ok())
-                        | Error failure -> Error failure
+                    return! sdkOr response "session.delete" (fun () -> Ok())
                 }
 
     type HttpSessionPort(baseUrl: string) =
@@ -757,14 +731,14 @@ module SessionSnapshotPort =
         let jsFetch (url: string) (init: obj) : Task<obj> = jsNative
 
         /// A response body, parsed when it can be parsed.
-        let private tryParse (text: string) : obj =
+        let tryParse (text: string) : obj =
             try
                 JS.JSON.parse text
             with _ ->
                 null
 
         /// The message a parsed error body carries, when it carries one.
-        let private messageOf (parsed: obj) : string option =
+        let messageOf (parsed: obj) : string option =
             if not (isNull parsed?data) && not (isNull parsed?data?message) then
                 readString parsed?data?message
             elif not (isNull parsed?message) then
@@ -773,22 +747,23 @@ module SessionSnapshotPort =
                 None
 
         /// The message a failed response body carries, when it carries one.
-        let private detailOfBody (text: string) : string option =
-            let parsed = if String.IsNullOrWhiteSpace text then null else tryParse text
+        let detailOfBody (text: string) : string option =
+            let parsed =
+                if String.IsNullOrWhiteSpace text then
+                    null
+                else
+                    tryParse text
 
-            if isNull parsed then
-                None
-            else
-                messageOf parsed
+            if isNull parsed then None else messageOf parsed
 
         /// The detail a failed call reports, when the body carries none.
-        let private failureDetail (verb: string) (text: string) : string =
+        let failureDetail (verb: string) (text: string) : string =
             match detailOfBody text with
             | Some message -> message
             | None -> sprintf "%s failed" verb
 
         /// A failed HTTP status expressed in the port's error vocabulary.
-        let private httpError (verb: string) (status: int) (detail: string) : HostError =
+        let httpError (verb: string) (status: int) (detail: string) : HostError =
             if status = 404 then
                 HostError.NotFound(sprintf "%s: %s" verb detail)
             elif status >= 400 && status < 500 then
@@ -797,8 +772,13 @@ module SessionSnapshotPort =
                 HostError.Transport(sprintf "%s: %s (HTTP %d)" verb detail status)
 
         /// The body of a successful HTTP answer.
-        let private httpBody (text: string) : Result<obj, HostError> =
-            let candidate = if String.IsNullOrWhiteSpace text then createObj [] else tryParse text
+        let httpBody (text: string) : Result<obj, HostError> =
+            let candidate =
+                if String.IsNullOrWhiteSpace text then
+                    createObj []
+                else
+                    tryParse text
+
             let usable = if isNull candidate then None else Some candidate
 
             match usable with
@@ -807,14 +787,14 @@ module SessionSnapshotPort =
 
         /// One HTTP call, with its failure expressed in the port's error
         /// vocabulary. The raw host payload never leaves the adapter.
-        let private httpOutcome (verb: string) (status: int) (text: string) : Result<obj, HostError> =
+        let httpOutcome (verb: string) (status: int) (text: string) : Result<obj, HostError> =
             if status < 200 || status >= 300 then
                 Error(httpError verb status (failureDetail verb text))
             else
                 httpBody text
 
         /// The request payload of one HTTP call.
-        let private httpInit (method: string) (body: obj option) : obj =
+        let httpInit (method: string) (body: obj option) : obj =
             match body with
             | Some payload ->
                 createObj
@@ -824,7 +804,7 @@ module SessionSnapshotPort =
             | None -> createObj [ "method", box method ]
 
         /// The raw answer of one HTTP call: its status and its body text.
-        let private fetchRaw (url: string) (init: obj) : Task<Result<int * string, HostError>> =
+        let fetchRaw (url: string) (init: obj) : Task<Result<int * string, HostError>> =
             taskResult {
                 try
                     let! response = jsFetch url init |> TaskResultCE.ofTask
@@ -837,7 +817,7 @@ module SessionSnapshotPort =
 
         /// One HTTP request, with its failure expressed in the port's error
         /// vocabulary. The raw host payload never leaves the adapter.
-        let private requestJson
+        let requestJson
             (verb: string)
             (method: string)
             (url: string)
@@ -848,25 +828,19 @@ module SessionSnapshotPort =
             taskResult {
                 let! raw = fetchRaw url init
 
-                return!
-                    match raw with
-                    | Ok(status, text) -> httpOutcome verb status text
-                    | Error failure -> Error failure
+                let (status, text) = raw
+
+                return! httpOutcome verb status text
             }
 
-        let private readJson (verb: string) (url: string) : Task<Result<obj, HostError>> =
-            requestJson verb "GET" url None
+        let readJson (verb: string) (url: string) : Task<Result<obj, HostError>> = requestJson verb "GET" url None
 
-        let private postJson (verb: string) (endpoint: string) (body: obj) : Task<Result<obj, HostError>> =
+        let postJson (verb: string) (endpoint: string) (body: obj) : Task<Result<obj, HostError>> =
             requestJson verb "POST" (cleanBase + endpoint) (Some body)
 
         /// The host's session-removal verb: `DELETE /session/{id}`.
-        let private deleteSession (session: SessionId) : Task<Result<obj, HostError>> =
-            requestJson
-                "session.delete"
-                "DELETE"
-                (sprintf "%s/session/%s" cleanBase (SessionId.value session))
-                None
+        let deleteSession (session: SessionId) : Task<Result<obj, HostError>> =
+            requestJson "session.delete" "DELETE" (sprintf "%s/session/%s" cleanBase (SessionId.value session)) None
 
         interface ISessionPort with
             member _.FindByTitle(title) =
@@ -919,10 +893,7 @@ module SessionSnapshotPort =
             member _.Abort(session) =
                 taskResult {
                     let! _ =
-                        postJson
-                            "session.abort"
-                            (sprintf "/session/%s/abort" (SessionId.value session))
-                            (createObj [])
+                        postJson "session.abort" (sprintf "/session/%s/abort" (SessionId.value session)) (createObj [])
 
                     return ()
                 }

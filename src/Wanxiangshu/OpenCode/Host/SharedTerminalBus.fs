@@ -5,6 +5,7 @@ open System.Collections.Generic
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 
 /// Process-local terminal fan-out keyed by the same workspace runtime path as
@@ -15,25 +16,28 @@ open Wanxiangshu.Persistence.Journal
 /// OrchestratorHost never observes the completion signal.
 module SharedTerminalBus =
 
-    /// DSL-state-combination: physical — shared terminal port refcount resource
+    /// DSL-state-combination: physical — shared terminal source refcount resource
     type private SharedPort =
-        { Port: Events.HostEventPort
+        { Source: ISessionTerminalSource
           mutable RefCount: int }
 
     let private gate = obj ()
     // DSL-MUTABLE: resource — shared terminal port refcount registry
     let private shared = Dictionary<string, SharedPort>()
 
-    let acquire (directory: string) : Events.HostEventPort =
+    /// The shared terminal source of a workspace. The caller supplies the
+    /// candidate for a workspace it has not seen before; the bus keeps the
+    /// first one so the root and worktree plugin instances of a workspace
+    /// share one terminal truth.
+    let acquire (directory: string) (candidate: ISessionTerminalSource) : ISessionTerminalSource =
         lock gate (fun () ->
             match shared.TryGetValue directory with
             | true, entry ->
                 entry.RefCount <- entry.RefCount + 1
-                entry.Port
+                entry.Source
             | false, _ ->
-                let port = Events.HostEventPort()
-                shared.[directory] <- { Port = port; RefCount = 1 }
-                port)
+                shared.[directory] <- { Source = candidate; RefCount = 1 }
+                candidate)
 
     let private updateRelease key (entry: SharedPort) =
         let remaining = entry.RefCount - 1
@@ -46,22 +50,23 @@ module SharedTerminalBus =
     let private releaseTarget key target =
         lock gate (fun () ->
             match shared.TryGetValue key with
-            | true, entry when obj.ReferenceEquals(entry.Port, target) -> updateRelease key entry
+            | true, entry when obj.ReferenceEquals(entry.Source, target) -> updateRelease key entry
             | _ -> ())
 
-    let release (directory: string option) (port: Events.HostEventPort option) =
-        match directory, port with
+    let release (directory: string option) (source: ISessionTerminalSource option) =
+        match directory, source with
         | Some key, Some target -> releaseTarget key target
         | _ -> ()
 
     let tryAcquireForWorkspace
         (workspace: string option)
-        : System.Threading.Tasks.Task<(string * Events.HostEventPort) option> =
+        (candidate: ISessionTerminalSource)
+        : System.Threading.Tasks.Task<(string * ISessionTerminalSource) option> =
         task {
             match workspace with
             | None -> return None
             | Some path when String.IsNullOrWhiteSpace path -> return None
             | Some path ->
                 let! key = RuntimePath.forWorkspace path
-                return Some(key, acquire key)
+                return Some(key, acquire key candidate)
         }

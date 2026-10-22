@@ -1,9 +1,10 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Foundation.TerminalSignal
 
 module EventsSurface =
-    val create: unit -> obj
+    val create: terminalSource: ISessionTerminalSource -> obj
     val notify: port: obj -> sessionId: string -> kind: string -> providerRun: string -> text: string -> bool
 
     val notifyForAuthority:

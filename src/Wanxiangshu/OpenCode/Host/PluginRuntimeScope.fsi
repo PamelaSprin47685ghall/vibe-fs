@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 
 open System
 open System.Threading.Tasks
@@ -124,7 +125,7 @@ type PluginRuntimeScope =
 
     member RunOwnedWork: start: (unit -> Task) -> Task
 
-    member AttachSharedTerminal: key: string option * port: Events.HostEventPort option -> unit
+    member AttachSharedTerminal: key: string option * port: ISessionTerminalSource option -> unit
 
     member DisposeExecutorRuntime: sessionId: string -> Task
 

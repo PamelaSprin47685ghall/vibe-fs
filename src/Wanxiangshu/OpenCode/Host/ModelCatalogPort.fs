@@ -44,7 +44,7 @@ module ModelCatalogPort =
     let private readText (value: obj) : string option =
         if isNullish value || not (isJsString value) then
             None
-        elif System.String.IsNullOrWhiteSpace (unbox<string> value) then
+        elif System.String.IsNullOrWhiteSpace(unbox<string> value) then
             None
         else
             Some(unbox<string> value)
@@ -68,7 +68,10 @@ module ModelCatalogPort =
     let private payloadOf (response: obj) : obj =
         if isNullish response then
             null
-        elif not (isNullish (field response "data")) && not (isNullish (field (field response "data") "data")) then
+        elif
+            not (isNullish (field response "data"))
+            && not (isNullish (field (field response "data") "data"))
+        then
             field (field response "data") "data"
         elif not (isNullish (field response "data")) then
             field response "data"
@@ -84,23 +87,18 @@ module ModelCatalogPort =
         else
             None
 
-    /// The catalog outcome carried by a host response.
-    let private catalogOf (response: obj) : Result<ModelRoute list, HostError> =
-        match failureOf response with
-        | Some error -> Error error
-        | None -> Ok(routesOfCatalog (payloadOf response))
-
     /// The providers of a catalog payload. An absent provider list is an
     /// empty catalog, never a failure.
     let private providersOf (payload: obj) : obj array =
-        let providers = if isNullish payload then null else field payload "providers"
+        let providers =
+            if isNullish payload then
+                null
+            else
+                field payload "providers"
 
-        if isNullish providers then
-            [||]
-        elif isJsArray providers then
-            unbox<obj array> providers
-        else
-            [||]
+        if isNullish providers then [||]
+        elif isJsArray providers then unbox<obj array> providers
+        else [||]
 
     /// The model ids one provider advertises. The catalog keys its models by
     /// the model id; a provider without a model map advertises none.
@@ -115,23 +113,39 @@ module ModelCatalogPort =
     /// The routes one provider advertises. The SDK catalog carries no variant
     /// field, so every enumerated route has `Variant = None`.
     let private routesOfProvider (provider: obj) : ModelRoute list =
-        let providerId = if isNullish provider then None else readText (field provider "id")
+        let providerId =
+            if isNullish provider then
+                None
+            else
+                readText (field provider "id")
 
         match providerId with
         | None -> []
         | Some id ->
             modelKeysOf provider
             |> Array.toList
-            |> List.map (fun key -> { Provider = id; Model = key; Variant = None })
+            |> List.map (fun key ->
+                { Provider = id
+                  Model = key
+                  Variant = None })
 
     /// The routes of a whole catalog payload.
     let private routesOfCatalog (payload: obj) : ModelRoute list =
         providersOf payload |> Array.toList |> List.collect routesOfProvider
 
+    /// The catalog outcome carried by a host response.
+    let private catalogOf (response: obj) : Result<ModelRoute list, HostError> =
+        match failureOf response with
+        | Some error -> Error error
+        | None -> Ok(routesOfCatalog (payloadOf response))
+
     /// The catalog read over the OpenCode SDK client. The host call is
     /// `client.config.providers` (`GET /config/providers`), the only host
     /// verb that lists every provider together with its models.
-    let private sdkAvailable (client: obj) (workspaceDirectory: string option) : Task<Result<ModelRoute list, HostError>> =
+    let private sdkAvailable
+        (client: obj)
+        (workspaceDirectory: string option)
+        : Task<Result<ModelRoute list, HostError>> =
         task {
             let configObj = field client "config"
             let providersFn = field configObj "providers"
@@ -149,7 +163,10 @@ module ModelCatalogPort =
         }
 
     /// The catalog read over the OpenCode HTTP server (`GET /config/providers`).
-    let private httpAvailable (baseUrl: string) (workspaceDirectory: string option) : Task<Result<ModelRoute list, HostError>> =
+    let private httpAvailable
+        (baseUrl: string)
+        (workspaceDirectory: string option)
+        : Task<Result<ModelRoute list, HostError>> =
         let cleanBaseUrl =
             if baseUrl.EndsWith("/") then
                 baseUrl.Substring(0, baseUrl.Length - 1)
@@ -196,9 +213,7 @@ module ModelCatalogPort =
             /// capability as unsupported instead of inventing a write the host
             /// would ignore.
             member this.Apply(_session: SessionId, _route: ModelRoute) : Task<Result<unit, HostError>> =
-                task {
-                    return Error(HostError.Unsupported HostCapability.ProviderParams)
-                }
+                task { return Error(HostError.Unsupported HostCapability.ProviderParams) }
 
     /// The catalog over the OpenCode HTTP server.
     type HttpModelCatalog(baseUrl: string, workspaceDirectory: string option) =
@@ -212,9 +227,7 @@ module ModelCatalogPort =
                 }
 
             member this.Apply(_session: SessionId, _route: ModelRoute) : Task<Result<unit, HostError>> =
-                task {
-                    return Error(HostError.Unsupported HostCapability.ProviderParams)
-                }
+                task { return Error(HostError.Unsupported HostCapability.ProviderParams) }
 
     /// The catalog for the given host wiring, or `None` when the input names
     /// no host the catalog can be built on.
@@ -231,6 +244,9 @@ module ModelCatalogPort =
         elif not (isNullish (field input "baseUrl")) then
             Some(HttpModelCatalog(unbox<string> (field input "baseUrl"), workspaceDirectory) :> IModelCatalog)
         elif not (isNullish (field input "port")) then
-            Some(HttpModelCatalog(sprintf "http://127.0.0.1:%d" (unbox<int> (field input "port")), workspaceDirectory) :> IModelCatalog)
+            Some(
+                HttpModelCatalog(sprintf "http://127.0.0.1:%d" (unbox<int> (field input "port")), workspaceDirectory)
+                :> IModelCatalog
+            )
         else
             None
