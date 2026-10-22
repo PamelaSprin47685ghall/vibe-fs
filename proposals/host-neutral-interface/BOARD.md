@@ -116,6 +116,29 @@ by `(ChatExecutionKey * ChatAdmissionPurpose)`). Installed-Host canary gap diagn
 mismatch (uncompleted join); canary remains unresolved. No HNI port added or changed; claims no card; next free
 port id stays **P-19**; omp mirror n/a.
 
+vs-006 fact (control-pyramid slice, 2026-10-22): the last two `fsharp-control-pyramid` findings in the OpenCode
+session adapter are gone — `src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs` `sessionInfoOfRow` and
+`parentOfPayload` now name their decision boundary instead of nesting a `match` under an `if` (landed as
+`a46af54fda09a53d420671f86d8fc74e5d3f9fdf`, range `a2d2787cb..a46af54fd`, 1 file, +10/-14). Semantics are
+unchanged (same `None` / `Error` cases, same `"Missing session response"` string, same field values, same
+laziness of the `parentID` / `agent` / `title` host reads); all four touched functions keep their names and
+arities. The pyramid baseline JSON was **not** touched (`{"version":1,"files":{}}`), no allowlist, no threshold
+change, no scanner change, no helper relocation. Gates on the pushed tree: `fsharp-control-pyramid.mjs` →
+`clean (0 nested decisions)` exit 0, `architecture.mjs` → `architecture: OK` exit 0.
+**No HNI port added or changed** (P-01 / P-03 untouched, no port id consumed, no consumer cut over), so the
+port-id bookkeeping on master is unchanged by this slice and the generated TS mirror is unaffected
+(`omp: n/a`). **No compile or runtime F# proof** (no `build.mjs` / `dotnet build` / `build-slot` was run; the
+owner permits a static-only landing and requires `build-slot` for any compile): whether `Option.map AgentRole`
+type-checks, whether `|> Ok` infers `Result<SessionId option, HostError>` against the annotation, and whether
+the edited offside region compiles are all unconfirmed — **the delivery team must build master and type-check
+this file** (shard `…host-boundary.opencode-host-sessionquiescencegate`). Fact only: this claims no HNI card and
+changes no card state. The same lane also produced the precise diagnosis of the still-RED
+`requirements/verification-system` 006 suite (root cause: the supervisor's verdict-silence window is armed
+before the work exists; 46/59 pass, 13 fail, workload dependent; **no assertion, budget or product watchdog was
+changed**; a relaxed 30000 ms window is a diagnostic instrument only and is **not** an acceptance
+configuration) — written up in `evidence/vs-006-root-cause.md`.
+
+
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 
 ## CUT-36（第二宿主真实 canary）当前口径（2026-10-21）

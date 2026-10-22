@@ -1,6 +1,25 @@
 # Changelog — 版本历史
 
 
+## Unreleased — vs-006 控制金字塔切片落地（`SessionSnapshotPort.fs` 2 条 match-pyramid 清零）+ 006 红例精确诊断
+
+- **代码落地（已推 `origin/master`）**：`a46af54fda09a53d420671f86d8fc74e5d3f9fdf`（范围 `a2d2787cb..a46af54fd`，1 个文件，+10/-14），提交标题 `refactor(opencode-host): name the session-row identity decision instead of nesting a match`。改动文件只有 `src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs`。
+  - `sessionInfoOfRow`：原来的 `if isNull row || isNull row?id then None else match readString row?id with …` 改为复用本模块既有的 `sessionIdOfRow`，再用 `Option.map` 组装 record（`Parent = readString row?parentID |> Option.map SessionId.create`、`Role = readString row?agent |> Option.map AgentRole`、`Title = readString row?title`）。
+  - `parentOfPayload`：原来的 `if isNull session then Error(…) else match readString session?parentID with …` 改为 `session?parentID |> readString |> Option.map SessionId.create |> Ok`。
+  - 语义不变：`None` / `Error` 分支、错误串 `"Missing session response"`、字段取值均不变；`parentID` / `agent` / `title` 的宿主读取仍然只在 id 存在时发生（record 在 `Option.map` 内部构造）。四个被触及的函数都保持原名与元数，无新增未用符号。
+  - **未改门禁**：`scripts/checks/fsharp-control-pyramid-baseline.json` 保持 `{"version":1,"files":{}}`；未加白名单、未改阈值、未改 scanner、未用「搬移 helper」消警。
+- **门禁证据（静态，在推送的那棵树 `a46af54fd` 上跑的分离 worktree `/home/hermes/tmp/vs-006/land-doc`）**：`node scripts/checks/fsharp-control-pyramid.mjs` → `fsharp-control-pyramid: clean (0 nested decisions)`，exit 0；`node scripts/checks/architecture.mjs` → `architecture: OK`，exit 0。落地前同一门禁的红基线是 2 条：`SessionSnapshotPort.fs:444` 与 `:473`，均 `depth=2 chain=if → match`。
+- **未验证（重要）**：本 lane **没有跑任何 F#/Fable/dotnet 编译**（`scripts/build.mjs`、`dotnet build`、`build-slot` 均未执行；仓主允许静态落地，任何编译须走 `build-slot`）。因此**没有编译或运行时 F# 证明**：`Option.map AgentRole` 是否通过类型检查（`type AgentRole = AgentRole of string`，`src/Wanxiangshu/Host/Ports/Vocabulary.fs:32`）、`|> Ok` 是否按返回标注推成 `Result<SessionId option, HostError>`、以及改动区的 offside 是否按原样编译，都**未**被编译器确认。**交付团队必须构建 master 并 type-check 该文件**（归口 shard：`…host-boundary.opencode-host-sessionquiescencegate`）。
+- **落地路径说明**：本地提交 `9fcb45b23` 落在 `origin/master` 前进之前，推送被拒（非快进）。**没有**在共享的脏 worktree 里 rebase/reset；改用分离 worktree `git worktree add --detach … && git rebase origin/master`（exit 0），在 rebase 后的树上重跑两道静态门禁（均 exit 0）后 `git push origin HEAD:master`（`a2d2787cb..a46af54fd`，**无 force push**），随后删除临时 worktree。
+- **006 红例的精确诊断（本条只记录诊断，不修红）**：`requirements/verification-system/tests/006.test.mjs` **仍然红**（本机实测 59 用例 46 通过 / 13 失败，exit 1；失败集合随子进程竞态抖动）。根因是**监督器的静默窗口在被监督的工作存在之前就被武装**：看门狗在 `…/tests/e2e/support/supervise-node-test.mjs:336-337` 以 `timeoutMs: silenceMs` 起表，内层 runner 在 `:368` 才 spawn，而第一个进度事件 `runner:file-start` 要到 `…/tests/support/run-inner.mjs:160`（`run()` 之后）才发。
+  - **精确 z1 采样**（instrumented、放宽窗口的诊断跑，`silenceMs: 30000`，**不是验收配置**；`/home/hermes/tmp/vs-006/repro/runs/z1/timing.log`）：`spawn-inner` wall `1792631019784` → `runner:file-start` IPC `1792631021234`（**spawn 后 +1450 ms**）→ `body-enter` `1792631022582`（**+2798 ms**）→ 首个 `test:complete` `1792631022993`（**+3209 ms**）。未改的预算是 fixture 级 1000 ms（`…/tests/support/supervised-tool-reclamation-tests.mjs:248`、`…/tests/006.test.mjs:868`）与 suite 级 `UNIT_VERDICT_SILENCE_MS` = 5000 ms（`…/tests/e2e/support/time-budget.js:149`）：启动开销在任何用例体开始前就已超过 1000 ms 的 fixture 窗口。
+  - **未改窗口的采样**（`silenceMs: 1000`，`/home/hermes/tmp/vs-006/repro/runs/s5/out.txt`）：`WATCHDOG: 'synchronous-verdicts' silent for 1030ms (limit 1000ms); 0 blocking progress update(s)`、`1 queued file(s) have not started`。两个采样合起来说明**启动预算被耗尽**。
+  - **失败分类**：7 条 ownership-marker / diagnostic-marker（监督者第一次 `inspectProcessTree` 约 +1105 ms，而 `tool-ownership.json` 约 +5416 ms 才写 ⇒ `…/tests/support/supervised-tool-reclamation-tests.mjs:152` ENOENT，caller catch `:254` 再一次，`caught.json`（`:257`）永不写出，`:307` 断言失败——这是叶子根本没跑到那一步的后果）；1 条 `caught.json` ENOENT（`…/tests/support/normal-exit-residual-support.mjs:164`，叶子在 5000 ms 静默被杀掉，`owned.json` 未写）；5 条纯静默窗口过期（2×300 ms worker-cost/body-start、1×1000 ms file-wait 诊断、1×1000 ms `silence-caller-cleanup`（`…/tests/006.test.mjs:868`，断言在 `:893-894`）、以及 3 条 `synchronous-verdicts`）；1 条 physical backstop（`SUITE_BACKSTOP_MS` 先触发，随后 teardown 的 `ps` 撞上 2000 ms 的 `PROCESS_TREE_TIMEOUT_MS`（`…/tests/e2e/support/time-budget.js:229`）⇒ `spawnSync ps ETIMEDOUT`，经 `…/supervise-node-test.mjs:76`/`:82`/`:134`）。
+  - **不能说「失败全是启动」**：ownership/diagnostic-marker 与 `caught.json` 两类是同一预算耗尽的**下游后果**；physical-backstop 一类还额外在 **teardown** 里失败（`ps` 自己超时），这是与启动竞态不同的症状，不能并入「只是启动」。
+  - **对照跑只作诊断，不是通过验收**：同一 fixture 在 30000 ms 放宽窗口下 exit 0、8/8 通过并给出完整 `runner:summary`（`/home/hermes/tmp/vs-006/repro/runs/z1/out.txt`）；`run-inner.mjs` 单跑 8 passed / 0 failed。这说明**没有丢失任何真实裁决**，红因是预算/次序问题；但 **30000 ms 是诊断仪器，绝不构成验收口径**，未改配置下套件仍然红。
+  - 红是**负载相关**的：本机当时 loadavg 21.6/32.4/36.4（4 CPU），裸 `node -e 0` 需 361–748 ms；空闲机器上同 fixture 通过。
+  - 完整记录见 `proposals/host-neutral-interface/evidence/vs-006-root-cause.md`（含逐条路径/行号与本地证据路径）。**本条未改任何断言、预算或产品看门狗**，红例仍然敞开。
+
 ## Unreleased — red-unit 测试线收编：027/006/prefix-stability/065/host-boundary-034
 
 - **收编范围（6 个提交，已落 `origin/master`）**：本线（分支 `land/redunit-034`）把 `origin/wip/redunit`（tip `cec1235db`）上一条面向「发布门禁 unit 26 红」的修复栈逐条裁决后，只落 6 个提交，其余 4 个判为「master 已有更强版本」或「会复活已退休的 fake surface」，一律不落。
