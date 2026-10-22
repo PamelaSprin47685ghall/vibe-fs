@@ -162,3 +162,13 @@ module RelayNarrativeTransform =
                 return! project durable interruptAttempt (SessionId.create value) acceptedRequest (Some work) outObj
             | _ -> return RelayProjectionDisposition.Unchanged
         }
+
+    let RelayNarrativeTransform_apply
+        (journal: AgentJournal option)
+        (acceptedRequest: bool)
+        (interruptAttempt: SessionId -> Task<unit>)
+        (sessionId: string option)
+        (lifecycle: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option)
+        (outObj: obj)
+        : Task<RelayProjectionDisposition> =
+        apply journal acceptedRequest interruptAttempt sessionId lifecycle outObj

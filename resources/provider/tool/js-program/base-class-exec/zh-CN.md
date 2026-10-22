@@ -1,7 +1,12 @@
-  // 可继承的工程循环基类：this.call(class extends this.Callable { ... }) 的父类。
-  Callable = Callable;
+  async call(command) {
+    // 返回 { ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }。command 是一条 shell 字符串。stdout/stderr 是上一次自动 park 所带增量之后的新输出。函数或类参数是 CALL_COMMAND_UNSUPPORTED。
+    // 例如: const outcome = await this.call("printf ok");
+  }
 
-  async call(callableClass) {
-    // 返回 { ok, status, reason, exitCode, stdout, stderr, truncated, bytes, durationMs, steps }: 把一个继承 this.Callable 的类交给宿主的工程循环执行。宿主先跑 sanity 自证，再逐轮调 next，每个时间片调 watch，最后按 maxDuration 收口。
-    // 例如: const outcome = await this.call(class extends this.Callable { ... });
+  async signal(signal) {
+    // 向让本次程序 park 的那条 call 发信号。那条命令已经结束时是 CALL_CHILD_UNKNOWN。
+  }
+
+  async send(input) {
+    // 把键盘输入写进让本次程序 park 的那条 call。缺行尾换行时补一个。那条命令已经结束时是 CALL_CHILD_UNKNOWN。
   }

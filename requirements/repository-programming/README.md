@@ -28,11 +28,11 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 独立宿主 `mv`/`rm` `ToolSpec`（及 `FileTools`/`FileMutationTools`）已退役，`rm`/`mv` 仅由 Remove/Move capability 在 js 编程面上投影，与 `write` 同属 as-is 逐笔落盘路径：rm 删文件或空目录，mv 按 POSIX 语义移动或重命名并支持覆盖。越界报 `PATH_DENIED` 且源存活；成功渲染报 `removed = [...]` 与 `moved = ["from -> to"]`。每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影。
 
-## js.call 工程执行循环（WHAT[repository-programming-050]、[051]、[052]）
+## js.call（WHAT[repository-programming-050]、[058]）
 
-Exec capability 在基类上投影 `this.call` 与 `this.Callable`。模型写 `await this.call(class extends this.Callable { ... })`；宿主拥有循环：校验规格（`maxDuration`/`next`/`watch` 缺一即 `CALLABLE_SPEC_INCOMPLETE`）、执行命令、按 `interval` 时间片调用 `watch`、派发 `onExit`、执行 `maxDuration` 上界。`watch` 可 `{ abort }` 或 `{ park }`；park 走与 `this.park` 相同的挂起通道与 source 标记，恢复值 `'abort'` 中止。`next` 支持命令字符串/`null`/`{ spawn, name }`/`{ signal, name }`/`{ waitFor: { port, timeoutMs } }`；后台进程在 `watch` 的 `backgrounds` 观察面可见，run 结束时全部 SIGKILL。成功结局是 `{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }`；每路输出保留头尾各 128 KiB 并如实报总字节。host 失败经 `__jsFailure` 哨兵成为稳定失败码。双语教学在 `tool/js-program/run-rules`，wget Ultra Example 在 `tool/js-program/ultra-devops`。
+Exec capability 投影 `this.call(command)`、`this.signal(signal)`、`this.send(input)`。`call` 收一条 shell 字符串；成功结局的 `stdout`/`stderr` 是上一次自动 park 增量之后的新输出。谁让这次程序 park，`signal` 与 `send` 就作用在谁身上；那条命令已经结束时是 `CALL_CHILD_UNKNOWN`。
 
-`run`/`pty` 宿主工具已整体退役（[058]，GAP-234）：`js.call` 是唯一执行面，`{ send: { name, input } }` 写命名子进程 stdin，`watch(ctx)` 的 `stdout`/`stderr` 是该时间片的增量（前台命令与后台子进程合并），因此 REPL/server 式的交互也走同一循环。
+park 的 handle 是这次工具调用自己带的 `name`。自动 yield park 的载荷带 `{ name, planB, delta: { stdout, stderr } }`。`where` 是字面 `IndexOf`。
 
 ## 委托原语：fork / join / fission / dag（WHAT[repository-programming-056]）
 

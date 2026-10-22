@@ -217,3 +217,79 @@ test('WHAT[delegation-033] the turn prose before the deliver call attributes its
     assert.equal(witness.FormalText, 'THE TURN PROSE')
   })
 })
+
+// AXIOM 6 (wanxiangli): the system never judges content. A form-compliant
+// delivery is established even when its projection selects nothing; the
+// witness carries an empty view and the caller still receives an empty view.
+test('WHAT[delegation-033] an empty delivered view is still an established delivery', async () => {
+  const { DeliveryAttribution } = await import('../../../dist/Repository/Programming/Js/ToolWorkflow.js')
+  const { TaskDelivery_validate } = await import('../../../dist/Host/Facts.js')
+  const { sha256Hex } = await import('../../../dist/Host/Digest.js')
+  const root = mkdtempSync(join(tmpdir(), 'wxs-033-empty-'))
+  const sessionId = 'sess-033-empty'
+  try {
+    clearDeliveredValue(sessionId)
+    const surface = typedRole('engineer', 'en')
+    const witnessed = []
+    const attribution = new DeliveryAttribution(
+      identity.LogicalRunIdModule_create('logical-033-empty'),
+      identity.AuthorityRootUserMessageIdModule_create('msg-033-empty-root'),
+      identity.PhysicalUserMessageIdModule_create('msg-033-empty-root'),
+      new DeliveryTaskReference(1, ['call-033-empty']),
+      undefined,
+      '',
+    )
+    const writer = {
+      CommitDeliveryWitness: async (witness) => {
+        witnessed.push(witness)
+        return { tag: 0, fields: [] }
+      },
+    }
+
+    const outcome = await JsToolWorkflow_executeWithReviewCheckAndDelivery(
+      undefined,
+      new DeliverySettlement(0, [attribution, writer]),
+      sessionId,
+      [identity.ProviderRunIdentityModule_create('run-033-empty'), identity.ToolCallIdModule_create('call-033-empty')],
+      surface.Capabilities,
+      root,
+      surface.BaseClassSource,
+      { program: 'class Js extends JsProgram { async run() { await this.deliver({}); return { done: true }; } }' },
+      3000,
+      Date.now() + 60_000,
+      1 << 20,
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    assert.equal(outcome.tag, 0, 'the delivery form is accepted')
+    assert.equal(witnessed.length, 1, 'the witness is committed once')
+    assert.equal(witnessed[0].View, '', 'the empty projection is returned as-is')
+    assert.equal(witnessed[0].FormalText, '', 'no prose is invented')
+    assert.equal(witnessed[0].ViewDeclaration, '{"prefixUntil":0,"thenMap":{}}', 'the declaration is captured')
+    // The durable facts codec translates DeliveryTaskReference to TaskDeliveryTask,
+    // and unwraps typed identities for the wire TaskDeliveryFence.
+    const fence = {
+      SessionId: witnessed[0].SessionId,
+      LogicalRunId: witnessed[0].LogicalRunId,
+      AuthorityRoot: witnessed[0].AuthorityRoot,
+      PhysicalUserMessageId: witnessed[0].PhysicalUserMessageId,
+      ProviderRun: witnessed[0].ProviderRun,
+      ToolCallId: witnessed[0].ToolCallId,
+      Task: { tag: 1, fields: [identity.ToolCallIdModule_value(witnessed[0].ToolCallId)] },
+    }
+    const taskWitness = {
+      Fence: fence,
+      FormalText: witnessed[0].FormalText,
+      ViewDeclaration: witnessed[0].ViewDeclaration,
+      View: witnessed[0].View,
+      MaterialDigest: sha256Hex(witnessed[0].View),
+      RetirementId: witnessed[0].RetirementId,
+    }
+    assert.equal(TaskDelivery_validate(sha256Hex, taskWitness).tag, 0, 'the witness is form-valid')
+  } finally {
+    clearDeliveredValue(sessionId)
+    rmSync(root, { recursive: true, force: true })
+  }
+})

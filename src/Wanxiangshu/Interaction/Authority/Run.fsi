@@ -81,7 +81,10 @@ module PromptAuthorityRun =
     /// interaction-authority-018: the canonical closure witness of a completed
     /// Manager life, or `None` when the root does not expect a Manager-life closure.
     val managerLifeClosureWitness:
-        profile: PromptAuthority.AuthorityExecutionProfile -> retirementId: string -> string option
+        expectedKind: string ->
+        profile: PromptAuthority.AuthorityExecutionProfile ->
+        retirementId: string ->
+            string option
 
     /// interaction-authority-018: the canonical closure witness of a completed
     /// managed HumanRoot run, a child work, an attached work or an internal

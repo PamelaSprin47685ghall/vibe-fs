@@ -91,7 +91,11 @@ module TerminalReporter =
                   TerminalText = sessionWideText
                   TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
-            if not runResult.IsValid then
+            if not deliveryWitness then
+                // A stop without a valid delivery of this run is not a completion:
+                // publish no terminal fact and keep the task active for its owner.
+                return XTraceTerminalCompletion.RejectedUndelivered
+            elif not runResult.IsValid then
                 eventPort.NotifyTerminal
                     turn.SessionId
                     (TerminalOutcome.Failed(
@@ -100,10 +104,6 @@ module TerminalReporter =
                 |> ignore
 
                 return XTraceTerminalCompletion.RejectedEmptyOutput
-            elif not deliveryWitness then
-                // A stop without a valid delivery of this run is not a completion:
-                // publish no terminal fact and keep the task active for its owner.
-                return XTraceTerminalCompletion.RejectedUndelivered
             else
                 return! notifyTerminalCompletion eventPort port turn sessionWideText runResult
         }

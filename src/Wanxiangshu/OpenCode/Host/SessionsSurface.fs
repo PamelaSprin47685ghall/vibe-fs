@@ -219,7 +219,7 @@ module SessionsSurface =
                 let p = SessionId.value parent
                 listParents.Add p
 
-                let children: ChildSessionInfo list =
+                let children: OpenCodeChildInfo list =
                     createdChildren
                     |> Seq.map (fun c ->
                         { SessionId = SessionId.create c
@@ -228,7 +228,7 @@ module SessionsSurface =
                           Title = Some "test-title" })
                     |> Seq.toList
 
-                Task.FromResult(Ok children)
+                Task.FromResult(Ok(children |> List.map ChildSession.toInfo))
 
             member _.CloseChildSession _ = Task.FromResult(Ok())
 

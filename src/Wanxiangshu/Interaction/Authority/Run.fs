@@ -708,10 +708,11 @@ module PromptAuthorityRun =
     /// Manager life (its delivered S4 retirement), or `None` when the active
     /// root does not expect a Manager-life closure.
     let managerLifeClosureWitness
+        (expectedKind: string)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (retirementId: string)
         : string option =
-        AuthorityLaw.managerLifeWitness "HumanRootManagerLife" (SessionId.value profile.SessionId) retirementId
+        AuthorityLaw.managerLifeWitness expectedKind (SessionId.value profile.SessionId) retirementId
 
     /// interaction-authority-018: the canonical closure witness of a completed
     /// managed HumanRoot run, a child work, an attached work or an internal

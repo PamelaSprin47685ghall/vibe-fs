@@ -339,7 +339,32 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     })
   }
 
-  const watchdog = new Watchdog({
+
+  let watchdog = null
+  const homeArguments = ownedHome === null ? [] : ['--owned-test-home', ownedHome]
+  try {
+    child = spawn(process.execPath, [inner, ...homeArguments, ...files], {
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      detached: true,
+      env,
+    })
+    transitions.expectedPid(child.pid)
+    // Decode diagnostic output as UTF-8 and forward through this process.
+    // Inherited descriptors or raw binary chunks can corrupt an outer
+    // node:test result stream. Only IPC carries authoritative verdicts.
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    // Diagnostic output never shares a stream with a node:test result protocol:
+    // route it to stderr so an outer worker always receives monitor diagnostics.
+    const diagnostics = process.stderr
+    child.stdout.pipe(diagnostics, { end: false })
+    child.stderr.pipe(process.stderr, { end: false })
+  } catch (error) {
+    try { watchdog?.stop() } catch {}
+    throw error
+  }
+
+  watchdog = new Watchdog({
     timeoutMs: silenceMs,
     label,
     deps: {
@@ -369,27 +394,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     },
   })
 
-  const homeArguments = ownedHome === null ? [] : ['--owned-test-home', ownedHome]
-  try {
-    child = spawn(process.execPath, [inner, ...homeArguments, ...files], {
-      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-      detached: true,
-      env,
-    })
-    transitions.expectedPid(child.pid)
-    // Decode diagnostic output as UTF-8 and forward through this process.
-    // Inherited descriptors or raw binary chunks can corrupt an outer
-    // node:test result stream. Only IPC carries authoritative verdicts.
-    child.stdout.setEncoding('utf8')
-    child.stderr.setEncoding('utf8')
-    // Diagnostic output never shares a stream with a node:test result protocol:
-    // route it to stderr so an outer worker always receives monitor diagnostics.
-    const diagnostics = process.stderr
-    child.stdout.pipe(diagnostics, { end: false })
-    child.stderr.pipe(process.stderr, { end: false })
-  } catch (error) {
-    watchdog.stop()
-    throw error
+  throw error
   }
 
   let backstopFired = false

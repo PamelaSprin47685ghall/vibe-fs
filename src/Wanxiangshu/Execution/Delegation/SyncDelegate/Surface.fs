@@ -628,7 +628,7 @@ module SyncDelegateSurface =
                 | Some "query-error" -> Task.FromResult(Error "controlled ListChildren rejection")
                 | Some "host-recording" -> Task.FromResult(Ok [])
                 | Some mode ->
-                    let descriptor id title agent =
+                    let descriptor id title agent : OpenCodeChildInfo =
                         { SessionId = SessionId.create id
                           ParentSessionId = Some parent
                           Title = Some title
@@ -651,7 +651,7 @@ module SyncDelegateSurface =
                                   "engineer" ]
                         | _ -> [ descriptor "host-child-wrong-agent" exactTitle "coder" ]
 
-                    Task.FromResult(Ok children)
+                    Task.FromResult(Ok(children |> List.map ChildSession.toInfo))
                 | None ->
                     children
                     |> Seq.filter (fun child ->
@@ -667,6 +667,7 @@ module SyncDelegateSurface =
                             Title = Some "managed delegate"
                             Agent = Some "coder" } ])
                     |> Seq.toList
+                    |> List.map ChildSession.toInfo
                     |> Ok
                     |> Task.FromResult
 

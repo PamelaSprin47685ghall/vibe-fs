@@ -610,9 +610,8 @@ type SyncDelegateRuntime
             Error reason
         | Ok _ ->
             response
-            |> Option.filter (fun terminal -> not (String.IsNullOrWhiteSpace terminal.FormalText))
             |> Option.map Ok
-            |> Option.defaultValue (Error "Completed delegation did not supply a formal response")
+            |> Option.defaultValue (Error "Completed delegation did not supply a terminal response")
 
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached

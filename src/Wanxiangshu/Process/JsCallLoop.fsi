@@ -1,13 +1,19 @@
 namespace Wanxiangshu.Process
 
+open System
 open System.Threading.Tasks
 
-/// Host-owned execution loop for `this.call` (PLAN phase 2). The model writes one
-/// Callable class; this module owns the loop and returns one structured
-/// outcome or a stable failure object.
+/// Process table for one programming call. `Start` begins one command and
+/// returns a ticket. `Wait` resolves when it exits, with only the output
+/// since the previous drain. `Signal` and `Send` address that ticket.
+/// `TakeDelta` drains unread output of every still-running command.
 module JsCallLoop =
-    /// Execute one Callable class against `root` as the shell working
-    /// directory. `stack` is the model stack of the `this.call(...)` call site,
-    /// used as the execution marker when a check verdict parks the run.
-    val execute:
-        parkState: JsSandbox.ParkState option -> root: string -> callableClass: obj -> stack: string -> Task<obj>
+    type Host =
+        interface IDisposable
+        new: root: string -> Host
+        member Start: command: obj -> obj
+        member Wait: ticket: obj -> Task<obj>
+        member SignalParked: signal: obj -> Task<obj>
+        member SendParked: input: obj -> Task<obj>
+        member TakeDelta: unit -> obj
+        member DisposeAsync: unit -> Task<unit>

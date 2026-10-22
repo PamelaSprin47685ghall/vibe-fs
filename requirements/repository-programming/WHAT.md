@@ -230,9 +230,9 @@ rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INV
 
 `write(path, content)` 覆盖或创建，一次原子写、即写即生效（[010]）。五个原语都继承路径边界、符号链接防护、写前 `FILE_CHANGED` 与 as-is 逐笔落盘；底层文件系统效果与稳定失败映射归 MutationFs 原语。
 
-## [046] where/whereAll：规范化匹配与歧义即 park
+## [046] where/whereAll：字面匹配与歧义即 park
 
-`whereAll(content, needle, from = 0)` 在内容上做规范化精确匹配：每段空白折叠为一个空格，needle 首尾空白裁掉；返回全部非重叠匹配的原文 UTF-16 下标 `[[begin, end], ...]`，零个返回 `[]`，`from` 是原文起始下标。
+`whereAll(content, needle, from = 0)` 做字面匹配：`IndexOf` 作用在原样的 needle 上。返回全部非重叠匹配的原文 UTF-16 下标 `[[begin, end], ...]`，零个返回 `[]`，`from` 是原文起始下标。空白按原文参与匹配。
 
 `where(content, needle, from = 0)` 的唯一匹配直接返回 `[begin, end]`。零个或多个匹配时，程序经与 `js.park` 相同的信号通道挂起，载荷为 `{ needle, candidates, nearest }`：`candidates` 至多 8 项，每项 `{ span, context }`；零匹配时 `nearest` 为最接近的一行 `{ span, text, distance }` 或 null。unpark 注入的值原样成为 `where` 的返回值；注入非 span 时由后续程序自然失败，宿主不预校验。`where` 永不抛定位错误，也永不静默选择匹配。
 
@@ -254,29 +254,21 @@ parked 载荷的 `source` 字段携带完整程序与执行点标记（[037]）�
 
 `unpark.value` 的 host schema 是任意 JSON 值（可选），执行端零校验；注入值的语义由 park 点定义，错误注入由下游自然失败。工具描述与 `tool/js-program/park` 资源明确这一责任边界。
 
-## [050] js.call：宿主拥有的工程执行循环
+## [050] js.call：一条命令
 
-Exec capability 在基类上投影 `this.call` 与 `this.Callable`。模型写 `await this.call(class extends this.Callable { ... })`。接口文档是整体本地化的基类伪代码，方法体内以紧凑的 `//` 注释说明返回值、行为与例子；能力片段直接写成伪代码，用 `{{...}}` 填入基类模板。控制流归宿主：校验规格、驱动 sanity thunk、执行命令、调用 `next` / `watch` / `onExit` 并执行 `maxDuration` 上界。
+Exec capability 投影 `this.call(command)`。`command` 是一条 shell 字符串。函数或类以 `CALL_COMMAND_UNSUPPORTED` 失败。
 
-必选 `maxDuration`（正数毫秒）、`next(ctx)`、`watch(ctx)` 与 `sanity()`；缺任一以 `CALLABLE_SPEC_INCOMPLETE` 失败。可选 `interval`（默认 10000ms，下限钳制）、`onExit(result)`、`onTimeout`。`watch` 与 `sanity` 是规格的一部分，因此 watchdog 不可能被绕过。
+成功结局是 `{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }`。`stdout` 与 `stderr` 是上一次自动 park 的 `delta` 之后的新输出。等待就是 `await this.call(command)`。宿主未注入时以 `CALL_HOST_UNAVAILABLE` 失败。
 
-`sanity()` 是控制流自证，先于一切执行。它返回 `{ nextDone, watchVeto }` 两个 thunk。thunk 只负责把实例拨到目标状态并返回参数数组，绝不自己调用 `next` 或 `watch`：`nextDone` 返回 `next` 的参数数组（一项，即 `{ root, step }`），`watchVeto` 返回 `watch` 的参数数组（一项，即 watch ctx）。宿主用该数组调用对应方法并机械检测：`next` 必须返回 `null`，`watch` 必须一次否决（`false` 或 `{ abort }`）。写 thunk 就是在设计终止条件，断言代码由宿主承担。返回值不是数组、或调出的方法未展示出口，整个 `js.call` 在调用点经统一 park 通道挂起，载荷携带 `{ sanity: { failure, returned } }` 诊断——在新调用里修好类，或以 unpark 注入值作为程序消费的 js.call 结局。
+每次工具调用带 `name`。这次调用造成的任何 park 都以这个 name 登记。空名字或同名已挂起以 `INVALID_ARGUMENT` 拒绝。
 
-`next(ctx)` 返回代数：命令字符串（前台跑到退出）| `null`（完工）| `{ spawn, name }`（后台进程，立即继续）| `{ signal, name }`（向该后台发送 `signal`，默认 SIGTERM；2 秒后仍存活则 SIGKILL）| `{ waitFor: { port, timeoutMs } }`（等到 TCP 端口可连接）| `{ send: { name, input } }`（写命名子进程 stdin，见 [058]）。其他形态以 `CALL_COMMAND_UNSUPPORTED` 失败；`waitFor` 超时以 `CALL_WAIT_TIMEOUT` 失败；`signal` 指向未知后台以 `CALL_CHILD_UNKNOWN` 失败。
+## [051] signal / send 作用在让本次 park 的那条 call 上
 
-`watch(ctx)` 每片返回 continue（无返回/true）、否决（`false` 或 `{ abort: reason }`）或 `{ park: payload }`；`false` 是真实否决，不是「继续」的同义词。park 走与 `js.park` 相同的挂起通道（载荷与 source 执行点同样登记）；恢复值 `'abort'` 中止，其余继续。合法的 abort/timeout SIGKILL 前台命令；运行结束时全部后台进程被杀死。park 裁决需要编排执行路径，缺 park 通道时以 `CALL_PARK_UNSUPPORTED` 失败，不静默降级。
-
-ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, stderr, exited, exitCode, backgrounds, elapsedMs, remainingMs }`，`stdout`/`stderr` 是本片增量（前台命令与全部后台子进程合并进同一观察窗），`backgrounds` 是 `{ name, exited, exitCode }` 数组；`onExit(result)` 收到 `{ root, exitCode, stdout, stderr, elapsedMs }`，其 `stdout`/`stderr` 携带该子进程的完整输出（有界头尾），不是片增量。成功结局是结构化对象 `{ ok, status: completed|aborted|timeout, exitCode, stdout, stderr, truncated, bytes, durationMs, steps }`（`steps` 计宿主执行的循环轮数——timeout 时轮数多而命令短，即 `next` 缺终止分支的签名）；host 失败经 `__jsFailure` 哨兵成为程序的稳定失败码，而不是数据。
-
-每路输出保留至多 256 KiB（前 128 KiB 加后 128 KiB），`truncated` 为真并如实报告总字节数；磁盘不回滚，剧本（如 `wget -c`）自行幂等。
-
-## [051] js.call 的多进程形态
-
-`spawn` 起的后台进程进入本次 run 的进程表，`watch` 的 `backgrounds` 观察面报告其 exited/exitCode；`signal` 收割命名后台；run 结束时兜底 SIGKILL 全部后台。`waitFor` 期间宿主仍按片调用 `watch`，后台崩溃可被观察并触发 abort。
+`this.signal(signal)` 与 `this.send(input)` 各自只收一个参数。谁让这次程序 park，它们就作用在谁身上。那条命令已经结束时是 `CALL_CHILD_UNKNOWN`。`send` 缺行尾换行时补一个。自动 park 的 `delta` 带 `stdout` 与 `stderr`。
 
 ## [052] js.call 教学与验证形态
 
-双语资源 `tool/js-program/run-rules` 与 `tool/js-program/ultra-devops`（wget 批量下载 Ultra Example）成对；示例覆盖断点续传、停滞/过慢检测、退出码分派与逐文件 park 汇报。测试以本地限速 Range 服务器真实驱动 `wget -c`：中断后恢复、部分文件保留、逐文件 park/unpark、404 退出码 8 分派给 `onExit`。教学与示例不以无观察的恒真 `watch`（裸 `return true`）为示范：`watch` 的教学形态是先读 ctx 增量与实例状态再作裁决；宿主不拦恒真，但教学不示范它。ultra-devops 示例覆盖 where 歧义 park → unpark 恢复的完整路径：故意触发一次真实歧义（清单中目标名出现两次），读 `{ needle, candidates, nearest }` 诊断、unpark 注入选中 span、程序从原 await 继续——不以 happy path 为唯一示范。
+双语资源 `tool/js-program/base-class-exec` 陈述 `this.call(command)`、`this.signal(signal)`、`this.send(input)`。等待是 `call` 返回的 promise。
 
 ## [053] 顶层上下文整理参数与报告材料形状
 
@@ -328,9 +320,9 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 
 旧 `glob` js 成员已退役。旧 `grep(needle, pattern)` 成员已退役，其能力现在只投影 `rg(argv)`。旧 `file`/`edit`/`rewrite` 成员仍从仓库生成编程面退役（包括 Plan；Plan 的文件参数受 `PLAN_PATH` 闸门限制）。
 
-## [058] js.call 的交互形态（send）与唯一执行面
+## [058] 交互成员与唯一执行面
 
-Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`read-terminal`/`signal-terminal`）整体退役；`ToolPermission.Exec` 只投影编程面的 `call` 成员，`ToolPermission.Pty` 不再投影任何宿主工具。交互执行由 `js.call` 承担：`next()` 返回 `{ spawn, name }` 起后台子进程，`watch(ctx)` 的 `stdout`/`stderr` 是**该时间片的增量**（前台命令与全部后台子进程的增量合并为一个观察窗），`{ send: { name, input } }` 写进命名子进程的 stdin（缺行尾换行时补一个），`{ signal, name }` 收割，`{ waitFor: { port, timeoutMs } }` 等端口就绪。`send` 指向未知后台名以 `CALL_CHILD_UNKNOWN` 失败；嵌套 `{ send: { name, input } }` 是 canonical 形态，平铺 `{ send: input, name }` 拼写被接受为同一语义，`send` 载荷解析不出目标名时同样以 `CALL_CHILD_UNKNOWN` 失败；子进程 stdout 没有换行协议假设，增量就是字节。
+Host 原生 `run` 与 pty 工具已退役。交互是 `this.send(input)` 与 `this.signal(signal)`。自动 park 载荷带 `delta: { stdout, stderr }`，相对上一次增量。`call` 收一条命令字符串。
 
 ## [059] this.deliver 的视图记录与增量去重
 

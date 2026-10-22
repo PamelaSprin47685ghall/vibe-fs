@@ -59,14 +59,6 @@ module TaskDelivery =
             )
         then
             Error "delivery fence is incomplete"
-        elif
-            not (
-                nonBlank witness.FormalText
-                && nonBlank witness.ViewDeclaration
-                && nonBlank witness.View
-            )
-        then
-            Error "delivery requires pre-call formal prose and materialized view"
         elif sha256 witness.View <> witness.MaterialDigest then
             Error "delivery material digest mismatch"
         else

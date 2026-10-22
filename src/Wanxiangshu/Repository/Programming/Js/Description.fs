@@ -275,14 +275,6 @@ module JsCanonicalDescription =
 class JsProgram {"""
             .TrimStart()
 
-    /// `Callable` exists exactly when the Exec capability is projected; the
-    /// base class hands it to the program as `this.Callable`.
-    let private callableOpen (capabilities: Set<JsCapability>) =
-        if present capabilities "call" then
-            "class Callable {}\n\n"
-        else
-            ""
-
     let private reviewCalls (text: string) =
         text
             .Replace("this.cat(", "this.reviewOnly.cat(")
@@ -296,7 +288,7 @@ class JsProgram {"""
             prose.BaseClass
             [ "baseClassCallable",
               if present capabilities "call" then
-                  prose.BaseClassCallable
+                  ""
               else
                   ""
               "baseClassRead",
@@ -513,8 +505,6 @@ class JsProgram {"""
                   "  constructor(api) { this._api = api; this.reviewOnly = new ReviewOnly(api.reviewOnly); }"
               else
                   "  constructor(api) { this._api = api; }"
-              if present capabilities "call" then
-                  "  Callable = Callable;"
               if not reviewOnly then
                   yield! runtimeFileMethods capabilities "this._api" (fun _ -> "")
               if present capabilities "cat" then
@@ -567,10 +557,17 @@ class JsProgram {"""
                       [ "rethrow_host", rethrowHost ]
               if present capabilities "call" then
                   fill
-                      """  async call(callableClass) {
-    return await this._api.call(callableClass);
+                      """  async call(command) {
+    return await this._api.call(command);
   }"""
                       []
+              if has capabilities JsCapability.Exec then
+                  """  async signal(signal) {
+    return await this._api.signal(signal);
+  }"""
+                  """  async send(input) {
+    return await this._api.send(input);
+  }"""
               if present capabilities "ask" then
                   fill
                       """  async ask(question) {
@@ -801,7 +798,7 @@ class JsProgram {"""
                   "" in
 
           reviewClass
-          + String.concat "\n\n" ((callableOpen capabilities + classOpen) :: methods @ [ "}" ])
+          + String.concat "\n\n" (classOpen :: methods @ [ "}" ])
 
     let runtimeBaseClass prose capabilities =
         runtimeBaseClassCore false prose capabilities
@@ -820,7 +817,7 @@ class JsProgram {"""
               if has capabilities JsCapability.Write then
                   yield! [ prose.VerbCreate; "mkdir" ]
               if has capabilities JsCapability.Exec then
-                  yield "call" ]
+                  yield! [ "call"; "signal"; "send"; "delta" ] ]
             |> String.concat ", "
 
         let parallelTemplate =

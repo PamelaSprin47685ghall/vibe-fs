@@ -5,3 +5,9 @@ type HostModel =
     { providerID: string
       modelID: string
       variant: string option }
+
+/// Reflection alias used by emitted OpenCode contract surfaces.
+type OpencodeModel =
+    { providerID: string
+      modelID: string
+      variant: string option }

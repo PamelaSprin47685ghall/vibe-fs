@@ -630,123 +630,22 @@ module JsToolsBindings =
             }
             |> renderOutcome
 
-    let private isWhitespaceChar (ch: char) =
-        ch = ' ' || ch = '\t' || ch = '\n' || ch = '\r' || ch = '\012' || ch = '\011'
-
-    let private appendPendingSpace (sb: StringBuilder) (pendingSpace: bool) =
-        if pendingSpace && sb.Length > 0 then
-            sb.Append(' ') |> ignore
-
-    let private accumulateCollapsedChar (sb: StringBuilder) (pendingSpace: bool) (ch: char) =
-        if isWhitespaceChar ch then
-            true
-        else
-            appendPendingSpace sb pendingSpace
-            sb.Append(ch) |> ignore
-            false
-
-    /// Collapse a whitespace run to one space and drop leading/trailing
-    /// whitespace. This is the canonical `where` needle normalization.
-    let private collapseWhitespace (text: string) =
-        let sb = StringBuilder()
-        // DSL-MUTABLE: algorithm-scratch — whitespace run cursor
-        let mutable pendingSpace = false
-
-        for ch in text do
-            pendingSpace <- accumulateCollapsedChar sb pendingSpace ch
-
-        sb.ToString()
-
-    /// Normalize content and keep the original offset of every normalized
-    /// character. A whitespace run maps to its first original character.
-    let private appendNormalizedSpace
-        (sb: StringBuilder)
-        (offsets: ResizeArray<int>)
-        (previousWasSpace: bool)
-        (index: int)
-        =
-        if not previousWasSpace && sb.Length > 0 then
-            sb.Append(' ') |> ignore
-            offsets.Add index
-            true
-        else
-            previousWasSpace
-
-    let private accumulateNormalizedChar
-        (sb: StringBuilder)
-        (offsets: ResizeArray<int>)
-        (previousWasSpace: bool)
-        (index: int)
-        (ch: char)
-        =
-        if isWhitespaceChar ch then
-            appendNormalizedSpace sb offsets previousWasSpace index
-        else
-            sb.Append ch |> ignore
-            offsets.Add index
-            false
-
-    let private normalizeWithMap (text: string) =
-        let sb = StringBuilder()
-        let offsets = ResizeArray<int>()
-        // DSL-MUTABLE: algorithm-scratch — whitespace run cursor
-        let mutable previousWasSpace = false
-
-        for index in 0 .. text.Length - 1 do
-            let ch = text.[index]
-            previousWasSpace <- accumulateNormalizedChar sb offsets previousWasSpace index ch
-
-        sb.ToString(), offsets
-
-    /// All non-overlapping normalized matches, mapped back to original
-    /// UTF-16 offsets. `fromIndex` is an original content offset.
-    let private recordSpanMatch
-        (offsets: ResizeArray<int>)
-        (spans: ResizeArray<int * int>)
-        (targetLength: int)
-        (fromIndex: int)
-        (found: int)
-        =
-        let beginIndex = offsets.[found]
-        let endIndex = offsets.[found + targetLength - 1] + 1
-
-        if beginIndex >= fromIndex then
-            spans.Add(beginIndex, endIndex)
-
-    let private scanNextSpan
-        (normalized: string)
-        (target: string)
-        (offsets: ResizeArray<int>)
-        (spans: ResizeArray<int * int>)
-        (fromIndex: int)
-        (cursor: int)
-        =
-        let found = normalized.IndexOf(target, cursor)
-
-        if found < 0 then
-            normalized.Length
-        else
-            recordSpanMatch offsets spans target.Length fromIndex found
-            found + max 1 target.Length
-
-    let private collectWhereSpans (content: string) (target: string) (fromIndex: int) =
-        let normalized, offsets = normalizeWithMap content
-        // DSL-MUTABLE: algorithm-scratch — match scan cursor
-        let mutable cursor = 0
-        let spans = ResizeArray<int * int>()
-
-        while cursor <= normalized.Length - target.Length do
-            cursor <- scanNextSpan normalized target offsets spans fromIndex cursor
-
-        List.ofSeq spans
-
     let private whereSpans (content: string) (needle: string) (fromIndex: int) =
-        let target = collapseWhitespace needle
-
-        if target.Length = 0 then
+        if needle.Length = 0 then
             []
         else
-            collectWhereSpans content target fromIndex
+            // 字面匹配：needle 与 content 原样 IndexOf，不折叠空白、不 trim。
+            let spans = ResizeArray<int * int>()
+            let mutable cursor = max 0 fromIndex
+            while cursor <= content.Length - needle.Length do
+                let found = content.IndexOf(needle, cursor)
+                if found < 0 then
+                    cursor <- content.Length + 1
+                else
+                    if found >= fromIndex then
+                        spans.Add(found, found + needle.Length)
+                    cursor <- found + max 1 needle.Length
+            List.ofSeq spans
 
     let private computeRowCell (aChar: char) (bChar: char) (leftDist: int) (aboveDist: int) (diagDist: int) =
         let substitution = if aChar = bChar then 0 else 1
@@ -808,9 +707,8 @@ module JsToolsBindings =
         if scanned >= 2000 || System.String.IsNullOrWhiteSpace line then
             scanned, best
         else
-            let trimmed = line.Trim()
-            let distance = editDistance trimmed target
-            scanned + 1, considerBetterCandidate best distance offset (offset + line.Length) trimmed
+            let distance = editDistance line target
+            scanned + 1, considerBetterCandidate best distance offset (offset + line.Length) line
 
     let private scanNearestLine (content: string) (target: string) =
         let lines = content.Split('\n')
@@ -845,12 +743,10 @@ module JsToolsBindings =
     /// Diagnostic for a zero-match where: the closest single line, bounded to
     /// the first 2000 non-empty lines so a huge file cannot dominate cost.
     let private nearestLine (content: string) (needle: string) =
-        let target = collapseWhitespace needle
-
-        if target.Length = 0 then
+        if needle.Length = 0 then
             null
         else
-            renderNearestMatch (scanNearestLine content target)
+            renderNearestMatch (scanNearestLine content needle)
 
     /// Shared suspension path: park(payload) and where ambiguity both fire
     /// the same signal and await the same deferred promise.
@@ -1022,20 +918,77 @@ module JsToolsBindings =
 
     /// The host loop behind `call`. The closure is injected by the workflow
     /// (Process.JsCallLoop) so this module stays free of process interop.
+    /// `Children` is the process table owned for one programming call; every
+    /// call/signal/send of that call share it. Unread output is drained by the
+    /// yield park, not by a member. Disposing the host kills leftovers.
     type JsCallHost =
-        { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
+        { Start: obj -> obj
+          Wait: obj -> Task<obj>
+          SignalParked: obj -> Task<obj>
+          SendParked: obj -> Task<obj>
+          TakeDelta: unit -> obj
+          Dispose: unit -> Task<unit> }
 
-    /// `call(class extends this.Callable { ... })`: hand the class to the host
-    /// loop and await its structured outcome. Without an injected host loop
-    /// the member refuses with CALL_HOST_UNAVAILABLE instead of pretending.
-    let private makeCallMember (host: JsCallHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
+    let private makeCallMember (host: JsCallHost option) =
         let settled =
-            fun (callableClass: obj) ->
+            fun (command: obj) ->
                 match host with
-                | Some injected -> box (injected.Loop parkState callableClass (currentStack ()))
+                | Some injected ->
+                    match injected.Start command with
+                    | started when unbox<bool> (started?ok) -> box (injected.Wait (started?ticket))
+                    | failed -> box (task { return failed })
                 | None -> box (task { return failureObj JsFailure.CallHostUnavailable })
 
-        "call" ==> fun (callableClass: obj) -> rejectCallFailure (settled callableClass)
+        "call" ==> fun (command: obj) -> rejectCallFailure (settled command)
+
+    let private makeSignalMember (host: JsCallHost option) =
+        let settled =
+            fun (signalName: obj) ->
+                match host with
+                | Some injected -> box (injected.SignalParked signalName)
+                | None -> box (task { return failureObj JsFailure.CallHostUnavailable })
+
+        "signal" ==> fun (signalName: obj) -> rejectCallFailure (settled signalName)
+
+    let private makeSendMember (host: JsCallHost option) =
+        let settled =
+            fun (input: obj) ->
+                match host with
+                | Some injected -> box (injected.SendParked input)
+                | None -> box (task { return failureObj JsFailure.CallHostUnavailable })
+
+        "send" ==> fun (input: obj) -> rejectCallFailure (settled input)
+
+    /// The workflow disposes the process table when the program finishes.
+    /// The host is stashed on the api object the sandbox already keeps.
+    [<Emit("$0.__callHost = $1")>]
+    let private stashCallHost (api: obj) (host: JsCallHost) : unit = jsNative
+
+    let attachCallHost (api: obj) (host: JsCallHost option) =
+        match host with
+        | Some injected -> stashCallHost api injected
+        | None -> ()
+
+    [<Emit("$0 && $0.__callHost")>]
+    let private readCallHost (api: obj) : JsCallHost = jsNative
+
+    /// Unread output since the previous drain. A yield park carries this
+    /// instead of exposing a delta member.
+    let readStashedDelta (api: obj) : obj =
+        let host = readCallHost api
+
+        if isNull (box host) then
+            createObj [ "ok" ==> true; "stdout" ==> ""; "stderr" ==> "" ]
+        else
+            host.TakeDelta()
+
+    let disposeCallHost (api: obj) : Task<unit> =
+        let host = readCallHost api
+
+        if isNull (box host) then
+            Task.FromResult()
+        else
+            host.Dispose()
 
     /// The report mapping is the declared parent → child context projection:
     /// it must arrive with every delegation member, and a missing or
@@ -1163,7 +1116,11 @@ module JsToolsBindings =
                   makeMvMember root staging readSnapshots ledger
 
               if present "call" then
-                  makeCallMember callHost parkState
+                  makeCallMember callHost
+
+              if Set.contains JsCapability.Exec capabilities then
+                  makeSignalMember callHost
+                  makeSendMember callHost
 
               if present "commission" then
                   makeDelegateMember delegationHost "commission"
@@ -1214,17 +1171,21 @@ module JsToolsBindings =
         (delegationHost: JsDelegationHost option)
         (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
-        createApiCore
-            capabilities
-            root
-            staging
-            readSnapshots
-            explicitReads
-            ledger
-            None
-            callHost
-            delegationHost
-            askInvoke
+        let api =
+            createApiCore
+                capabilities
+                root
+                staging
+                readSnapshots
+                explicitReads
+                ledger
+                None
+                callHost
+                delegationHost
+                askInvoke
+
+        attachCallHost api callHost
+        api
 
     /// Build the api object for one sandbox run that carries a park lifecycle
     /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
@@ -1241,17 +1202,21 @@ module JsToolsBindings =
         (delegationHost: JsDelegationHost option)
         (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
-        createApiCore
-            capabilities
-            root
-            staging
-            readSnapshots
-            explicitReads
-            ledger
-            (Some parkState)
-            callHost
-            delegationHost
-            askInvoke
+        let api =
+            createApiCore
+                capabilities
+                root
+                staging
+                readSnapshots
+                explicitReads
+                ledger
+                (Some parkState)
+                callHost
+                delegationHost
+                askInvoke
+
+        attachCallHost api callHost
+        api
 
 module JsReviewOnly =
     let scopeReviewOnly (check: unit -> Task<bool>) (api: obj) : obj =

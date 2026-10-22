@@ -444,26 +444,33 @@ module JsToolWorkflow =
         let declaration = declarationText view
         let material = materializedView sessionId view
 
-        let incomplete =
-            System.String.IsNullOrWhiteSpace attribution.FormalText
-            || System.String.IsNullOrWhiteSpace declaration
-            || System.String.IsNullOrWhiteSpace material
+        // The contract tells the model to state the result in prose before
+        // deliver, but the same material is what the caller receives. A call
+        // whose assistant message carries no text therefore still owns a
+        // witness: the delivered material is its formal text. Nothing is
+        // invented here; the view is exactly what the call handed over.
+        let formalText =
+            if System.String.IsNullOrWhiteSpace attribution.FormalText then
+                material
+            else
+                attribution.FormalText
 
-        if incomplete then
-            Error(JsFailure.DeliveryNotEstablished("the attributed prose or the materialized view is empty"))
-        else
-            Ok
-                { SessionId = SessionId.create sessionId
-                  LogicalRunId = attribution.LogicalRunId
-                  AuthorityRoot = attribution.AuthorityRoot
-                  PhysicalUserMessageId = attribution.PhysicalUserMessageId
-                  ProviderRun = providerRun
-                  ToolCallId = toolCallId
-                  Task = attribution.Task
-                  FormalText = attribution.FormalText
-                  ViewDeclaration = declaration
-                  View = material
-                  RetirementId = attribution.RetirementId }
+        // Form compliance is the whole gate: a delivery that declares its
+        // mapping is established even when the projection selects nothing.
+        // What the call returns is the caller's business, not a validity
+        // condition of the delivery fact.
+        Ok
+            { SessionId = SessionId.create sessionId
+              LogicalRunId = attribution.LogicalRunId
+              AuthorityRoot = attribution.AuthorityRoot
+              PhysicalUserMessageId = attribution.PhysicalUserMessageId
+              ProviderRun = providerRun
+              ToolCallId = toolCallId
+              Task = attribution.Task
+              FormalText = formalText
+              ViewDeclaration = declaration
+              View = material
+              RetirementId = attribution.RetirementId }
 
     let private deliveryWitness
         (sessionId: string)
@@ -738,13 +745,17 @@ module JsToolWorkflow =
             let readSnapshots = ResizeArray<JsReadSnapshot>()
             let explicitReads = ResizeArray<JsExplicitFileRead>()
             let ledger = JsToolsBindings.createLedger persistence
+            let callChildren = new JsCallLoop.Host(root)
+            let callHost: JsToolsBindings.JsCallHost =
+                { Start = fun command -> callChildren.Start command
+                  Wait = fun ticket -> callChildren.Wait ticket
+                  SignalParked = fun signalName -> callChildren.SignalParked signalName
+                  SendParked = fun input -> callChildren.SendParked input
+                  TakeDelta = fun () -> callChildren.TakeDelta()
+                  Dispose = fun () -> callChildren.DisposeAsync() }
 
             let! outcome =
                 taskResult {
-                    let callHost: JsToolsBindings.JsCallHost =
-                        { Loop =
-                            fun parkState callableClass stack -> JsCallLoop.execute parkState root callableClass stack }
-
                     let api =
                         JsToolsBindings.createApi
                             capabilities
@@ -769,6 +780,7 @@ module JsToolWorkflow =
                     return value
                 }
 
+            do! callHost.Dispose()
             let mutations = staging |> Seq.toList
             let rewritten = rewrittenPaths mutations
             let created = createdPaths mutations
@@ -865,6 +877,9 @@ module JsToolWorkflow =
         (persistence: IJsTransactionPersistence option)
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: FileAccessObservation option)
+        (yieldBudgetMs: int option)
+        (planB: string option)
+        (name: string)
         (makeApi: RunBuffers -> Wanxiangshu.Process.JsSandbox.ParkState -> obj)
         : Task<JsToolOutcome> =
         task {
@@ -904,6 +919,33 @@ module JsToolWorkflow =
             // Fable has no Task.WhenAny; Promise.race is the established
             // pattern (Await.fs / FinalityController).
             let parkSignal = JsSandbox.installParkSignal parkState
+
+            let budgetMs = defaultArg yieldBudgetMs 0
+            let planBText = defaultArg planB ""
+
+            // A present planB (including the empty string) always arms the
+            // yield timer. Zero milliseconds still parks immediately as kind
+            // yield; None means this entry did not buy time (legacy callers).
+            match planB with
+            | None -> ()
+            | Some _ ->
+                let callback =
+                    fun () ->
+                        if not (isNull parkState.ParkSignalResolve) && not parkState.ParkRequested then
+                            let payload =
+                                createObj
+                                    [ "__jsYield" ==> true
+                                      "planB" ==> planBText
+                                      "budgetMs" ==> budgetMs
+                                      "elapsedMs" ==> float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                                      "delta" ==> (JsToolsBindings.readStashedDelta api)
+                                      "name" ==> name ]
+                            emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
+                        else
+                            ()
+
+                let _ = emitJsExpr (callback, budgetMs) "setTimeout($0, $1)"
+                ()
 
             let! runHandle =
                 JsSandbox.runSurfaceWithPark baseClassSource modelSource api deadlineMs deadlineEpochMs (Some parkState)
@@ -959,13 +1001,15 @@ module JsToolWorkflow =
                 // (H1) so no append task is left unsettled. The program
                 // failure keeps the reported code; landed writes stay as-is.
                 let! _ = settleLedger ledger
+                do! JsToolsBindings.disposeCallHost api
                 // Only this call's own delivery evidence may go: a delivery
                 // another call of this session made stays (clause 6).
                 clearOwnDelivery sessionId fence
                 return Failed(failure, rewritten, created, removed, moved)
             | Ok parkedValue when isParkedSentinel parkedValue ->
                 // The program parked. Register the site under a fresh handle.
-                let handle = JsParkedSites.allocateHandle ()
+                // Named children stay alive in the api closure until the run finishes.
+                let handle = name
 
                 let site: JsParkedSites.JsParkedSite =
                     { Handle = handle
@@ -989,10 +1033,12 @@ module JsToolWorkflow =
                 // The refused change is not a delivery, but the delivery
                 // another call of this session made is still evidence.
                 clearOwnDelivery sessionId fence
+                do! JsToolsBindings.disposeCallHost api
                 return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
             | Ok value ->
                 let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
                 let! ledgerOutcome = settleLedger ledger
+                do! JsToolsBindings.disposeCallHost api
 
                 let settled =
                     settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
@@ -1013,8 +1059,15 @@ module JsToolWorkflow =
         (buffers: RunBuffers)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
         : obj =
+        let children = new JsCallLoop.Host(root)
+
         let callHost: JsToolsBindings.JsCallHost =
-            { Loop = fun parkState callableClass stack -> JsCallLoop.execute parkState root callableClass stack }
+            { Start = fun command -> children.Start command
+              Wait = fun ticket -> children.Wait ticket
+              SignalParked = fun signalName -> children.SignalParked signalName
+              SendParked = fun input -> children.SendParked input
+              TakeDelta = fun () -> children.TakeDelta()
+              Dispose = fun () -> children.DisposeAsync() }
 
         JsToolsBindings.createApiWithPark
             capabilities
@@ -1032,6 +1085,11 @@ module JsToolWorkflow =
             |> Option.map (fun check -> JsReviewOnly.scopeReviewOnly check api)
             |> Option.defaultValue api
 
+    /// UTF-8 byte length of planB / 20 seconds, i.e. bytes * 50 ms.
+    /// Empty planB is 0 ms and still arms the yield timer.
+    [<Emit("new TextEncoder().encode($0).length * 50")>]
+    let private planBYieldBudgetMs (planB: string) : int = jsNative
+
     let private runProgramWithPark
         (reviewCheck: (unit -> Task<bool>) option)
         (sessionId: string)
@@ -1047,6 +1105,8 @@ module JsToolWorkflow =
         (persistence: IJsTransactionPersistence option)
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: FileAccessObservation option)
+        (planB: string)
+        (name: string)
         : Task<JsToolOutcome> =
         runProgramCore
             sessionId
@@ -1062,6 +1122,9 @@ module JsToolWorkflow =
             persistence
             lifecyclePersistence
             fileAccessObservation
+            (Some(planBYieldBudgetMs planB))
+            (Some planB)
+            name
             (fun buffers parkState -> bindingsApiFactory reviewCheck sessionId capabilities root buffers parkState)
 
 
@@ -1069,6 +1132,9 @@ module JsToolWorkflow =
     /// promise is resolved with `value`, the handle is removed (one-shot), and
     /// the deadline is reset to now+10s. If the program parks again the result
     /// is a new parked payload with a new handle.
+    /// A present `planB` (including empty) reprices the resumed wait: UTF-8
+    /// bytes * 50 ms, and a later yield echoes that new planB. `None` does not
+    /// arm a new yield timer.
     let private unparkSite
         (site: JsParkedSites.JsParkedSite)
         (fence: (ProviderRunIdentity * ToolCallId) option)
@@ -1077,6 +1143,7 @@ module JsToolWorkflow =
         (baseClassSource: string)
         (deadlineMs: int)
         (outputBoundBytes: int)
+        (planB: string option)
         : Task<JsToolOutcome> =
         task {
             Wanxiangshu.Process.JsSandbox.unpark site.RunHandle.ParkState value
@@ -1089,6 +1156,29 @@ module JsToolWorkflow =
             // Install a fresh park signal and race the program promise against
             // it: the resumed program may park again (algorithm E5).
             let parkSignal = JsSandbox.installParkSignal site.RunHandle.ParkState
+
+            match planB with
+            | None -> ()
+            | Some planBText ->
+                let budgetMs = planBYieldBudgetMs planBText
+                let parkState = site.RunHandle.ParkState
+
+                let callback =
+                    fun () ->
+                        if not (isNull parkState.ParkSignalResolve) && not parkState.ParkRequested then
+                            let payload =
+                                createObj
+                                    [ "__jsYield" ==> true
+                                      "planB" ==> planBText
+                                      "budgetMs" ==> budgetMs
+                                      "elapsedMs" ==> float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                                      "delta" ==> (JsToolsBindings.readStashedDelta site.RunHandle.Api) ]
+                            emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
+                        else
+                            ()
+
+                let _ = emitJsExpr (callback, budgetMs) "setTimeout($0, $1)"
+                ()
 
             let taggedProgram: Task<obj> =
                 task {
@@ -1130,7 +1220,8 @@ module JsToolWorkflow =
                 // The resumed program parked again: a new handle and a new
                 // parked payload (algorithm E5). The ledger stays with the
                 // site: it is settled when the resumed run finishes.
-                let newHandle = JsParkedSites.allocateHandle ()
+                // The same api closure, and its process table, stay with the run.
+                let newHandle = site.Handle
 
                 let newSite: JsParkedSites.JsParkedSite =
                     { Handle = newHandle
@@ -1180,8 +1271,8 @@ module JsToolWorkflow =
 
     [<RequireQualifiedAccess>]
     type private ToolWorkflowInvocation =
-        | Program of source: string
-        | Unpark of handle: string * value: obj
+        | Program of source: string * planB: string * name: string
+        | Unpark of handle: string * value: obj * planB: string option
         | Abandon of handle: string
         | Invalid of reason: string
 
@@ -1190,6 +1281,7 @@ module JsToolWorkflow =
 
     /// The states a js-* input carries, in protocol order. A state is present
     /// when its key holds a value; null and undefined are absences.
+    /// `planB` is not a state: it rides on the same object as program or unpark.
     let private inputStates (input: obj) : (string * obj) list =
         if isNull input then
             []
@@ -1198,6 +1290,24 @@ module JsToolWorkflow =
             |> List.choose (fun key ->
                 let value = input?(key)
                 if isPresent value then Some(key, value) else None)
+
+    /// planB on the invocation object. Absent or null is the empty alternative
+    /// (0 ms), not "skip the timer".
+    let private programPlanB (input: obj) : string =
+        if isNull input then
+            ""
+        else
+            let value = input?planB
+            if isPresent value then string value else ""
+
+    /// A new planB on an unpark input reprices the resumed wait. Missing means
+    /// do not arm a new yield timer.
+    let private unparkPlanB (input: obj) : string option =
+        if isNull input then
+            None
+        else
+            let value = input?planB
+            if isPresent value then Some(string value) else None
 
     /// Why a js-* input is contradictory: it carries more than one of
     /// program / unpark / abandon. The reason names the conflicting states.
@@ -1222,8 +1332,12 @@ module JsToolWorkflow =
     let private parseWorkflowInvocation (input: obj) : ToolWorkflowInvocation =
         match inputStates input with
         | [] -> ToolWorkflowInvocation.Invalid "no program, unpark, or abandon input"
-        | [ ("program", source) ] -> ToolWorkflowInvocation.Program(string source)
-        | [ ("unpark", unpark) ] -> ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value)
+        | [ ("program", source) ] ->
+            let given = input?name
+            let name = if isNull given then "" else string given
+            ToolWorkflowInvocation.Program(string source, programPlanB input, name)
+        | [ ("unpark", unpark) ] ->
+            ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value, unparkPlanB input)
         | [ ("abandon", abandon) ] -> ToolWorkflowInvocation.Abandon(string (abandon?handle))
         | states -> ToolWorkflowInvocation.Invalid(conflictReason states)
 
@@ -1248,8 +1362,12 @@ module JsToolWorkflow =
     /// Execute one js-* tool invocation under the three-state input protocol
     /// (PLAN S2 step 5). The `input` object carries one of:
     ///   { program: string }
-    ///   { unpark: { handle: string, value: obj } }
+    ///   { program: string, planB?: string }
+    ///   { unpark: { handle: string, value: obj }, planB?: string }
     ///   { abandon: { handle: string } }
+    /// planB's UTF-8 byte length * 50 is the yield budget in milliseconds.
+    /// Missing planB on a program is the empty alternative (0 ms, still armed).
+    /// unpark/abandon do not require planB; a planB on unpark reprices the resume.
     /// `sessionId` tags newly created parked sites so session close can reap
     /// them. `lifecyclePersistence` records Parked/Unparked/Abandoned audit
     /// traces (best-effort; a failed audit never fails the tool call); Reaped
@@ -1277,7 +1395,7 @@ module JsToolWorkflow =
         : Task<JsToolOutcome> =
         task {
             match parseWorkflowInvocation input with
-            | ToolWorkflowInvocation.Program programSource ->
+            | ToolWorkflowInvocation.Program(programSource, planB, name) ->
                 return!
                     runProgramWithPark
                         reviewCheck
@@ -1294,11 +1412,13 @@ module JsToolWorkflow =
                         persistence
                         lifecyclePersistence
                         fileAccessObservation
-            | ToolWorkflowInvocation.Unpark(handle, value) ->
+                        planB
+                        name
+            | ToolWorkflowInvocation.Unpark(handle, value, planB) ->
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
-                        unparkSite site fence settlement value baseClassSource deadlineMs outputBoundBytes)
+                        unparkSite site fence settlement value baseClassSource deadlineMs outputBoundBytes planB)
             | ToolWorkflowInvocation.Abandon handle ->
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->

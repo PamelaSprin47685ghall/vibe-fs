@@ -216,19 +216,18 @@ module AttachmentSurface =
                     // Companion kind's exact agent+title, so a hinted reuse is a real
                     // reuse rather than a replacement.
                     member _.ListChildren parent =
-                        Task.FromResult(
-                            Ok(
-                                children
-                                |> Seq.filter (fun child ->
-                                    child = ownerId || SessionId.value parent = SessionId.value ownerId)
-                                |> Seq.map (fun child ->
-                                    { SessionId = child
-                                      ParentSessionId = Some ownerId
-                                      Agent = Some "companion"
-                                      Title = Some "Companion" })
-                                |> Seq.toList
-                            )
-                        )
+                        let listed: OpenCodeChildInfo list =
+                            children
+                            |> Seq.filter (fun child ->
+                                child = ownerId || SessionId.value parent = SessionId.value ownerId)
+                            |> Seq.map (fun child ->
+                                { SessionId = child
+                                  ParentSessionId = Some ownerId
+                                  Agent = Some "companion"
+                                  Title = Some "Companion" })
+                            |> Seq.toList
+
+                        Task.FromResult(Ok(listed |> List.map ChildSession.toInfo))
 
                     member _.FamilyRootOf _ = ownerId }
 

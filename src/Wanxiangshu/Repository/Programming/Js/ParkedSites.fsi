@@ -27,9 +27,6 @@ module JsParkedSites =
     /// Concurrency ceiling for parked sites (PLAN S2 step 3: default 8).
     val concurrencyLimit: int
 
-    /// Allocate a monotonically increasing process-unique handle (algorithm C2).
-    val allocateHandle: unit -> string
-
     val register: site: JsParkedSite -> Result<string, JsFailure>
 
     val tryFind: handle: string -> JsParkedSite option

@@ -125,11 +125,6 @@ module AgentCompletion =
         | AgentAbandoned(_, reason) when reason = "Voided" -> "voided"
         | AgentAbandoned _ -> "abandoned"
 
-    let isCompleted (outcome: AgentCompletionOutcome) =
-        match outcome with
-        | AgentCompleted payload -> not (String.IsNullOrWhiteSpace payload.View)
-        | _ -> false
-
     let completed
         (agentId: string)
         (childSessionId: SessionId)

@@ -902,8 +902,7 @@ type HostForkRuntime
 
     member private _.ViewFromCompletion(completion: RunCompletion) : Result<string, string> =
         match completion.Outcome with
-        | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.View) -> Ok payload.View
-        | AgentCompleted _ -> Error "reusable fork completed without a bounded delivered view"
+        | AgentCompleted payload -> Ok payload.View
         | AgentFailed payload -> Error payload.Message
         | AgentAbandoned(_, reason) -> Error reason
 

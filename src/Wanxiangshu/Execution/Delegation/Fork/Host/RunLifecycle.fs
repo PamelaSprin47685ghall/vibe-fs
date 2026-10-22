@@ -334,8 +334,7 @@ module HostForkRunLifecycle =
                   TerminalText = witness.View
                   TurnFormalText = witness.FormalText }
 
-            if result.IsValid then
-                port.NotifyTerminal sessionId (TerminalOutcome.Completed result) |> ignore
+            port.NotifyTerminal sessionId (TerminalOutcome.Completed result) |> ignore
         | _ -> ()
 
     /// The view of one terminal, resolved only when it is asked for.
@@ -636,7 +635,7 @@ module HostForkRunLifecycle =
         : Task =
         task {
             match resolved with
-            | Some completedView when not (System.String.IsNullOrWhiteSpace completedView) ->
+            | Some completedView ->
                 let finalView = taken |> Option.defaultValue completedView
 
                 let agentOutcome =
@@ -772,50 +771,36 @@ module HostForkRunLifecycle =
             // yield an observable settlement — otherwise the parent's
             // join waits on a journal revision that never comes.
             // Nothing is invented: it is the material that was delivered.
-            let settledView =
-                match resolved with
-                | Some completedView when not (System.String.IsNullOrWhiteSpace completedView) -> Some completedView
-                | _ when not (System.String.IsNullOrWhiteSpace witnessView) -> Some witnessView
-                | _ -> None
+            // A delivery is form compliance, not content evidence: an empty
+            // view is still the return of a delivered run. The witness is the
+            // proof, so the settlement must not be withheld for blank material.
+            let completedView = resolved |> Option.defaultValue witnessView
 
-            match settledView with
-            | Some completedView ->
-                // D2: the delivered cell is consumed exactly once, and
-                // only for an admissible outcome. A take that finds
-                // nothing (another reader already consumed the cell)
-                // falls back to the peeked view, which is idempotent.
-                //
-                // The take is fenced by the whole delivery fence the
-                // witness proved — the provider run AND the tool call
-                // id. Matching the run alone would let another call of
-                // the same run take this cell and advance the returned
-                // cursor; the owning call would then lose its
-                // delivery. A mismatch takes nothing.
-                let taken =
-                    JsDeliveredValues.tryTakeRenderedForCall
-                        (SessionId.value run.ChildId)
-                        result.ProviderRun
-                        toolCallId
-                        (terminalProse result)
+            // D2: the delivered cell is consumed exactly once, and only for
+            // an admissible outcome. A take that finds nothing (another reader
+            // already consumed the cell) falls back to the peeked view, which
+            // is idempotent. The take is fenced by the whole delivery fence the
+            // witness proved — the provider run AND the tool call id.
+            let taken =
+                JsDeliveredValues.tryTakeRenderedForCall
+                    (SessionId.value run.ChildId)
+                    result.ProviderRun
+                    toolCallId
+                    (terminalProse result)
 
-                return!
-                    settleCompletedView
-                        gate
-                        pendingRuns
-                        journal
-                        parentId
-                        run
-                        childId
-                        runId
-                        handle
-                        result
-                        taken
-                        (Some completedView)
-            | _ ->
-                // LC-004: An asynchronous child that completed its physical turn without
-                // delivering a view has not delivered its obligation. Do not settle or
-                // close the run; observation only, the child continues.
-                return ()
+            return!
+                settleCompletedView
+                    gate
+                    pendingRuns
+                    journal
+                    parentId
+                    run
+                    childId
+                    runId
+                    handle
+                    result
+                    taken
+                    (Some completedView)
         }
 
     let private completeProvenResult
@@ -891,12 +876,14 @@ module HostForkRunLifecycle =
         | Aborted _ ->
             // Observation only. Keep pending run Active for a later proven terminal.
             Task.FromResult(())
-        | Completed result when not result.IsValid ->
+        | Completed result when not result.IsValid && (deliveryWitnessOf journal run childId result).IsNone ->
             // provider-attempt-recovery-008 / P0-RECOVERY-JOIN-001: an empty / XML-only terminal is
             // not a proven failure. The subagent auto-retries and continues — its
             // reconcile loop performs the bounded missing-final-report repair.
             // Concluding MISSING_FINAL_REPORT
             // here would fail the run before the last effort. Observation only.
+            // A committed delivery witness is the exception: its return may be
+            // empty, and the delivery fact itself is the terminal.
             Task.FromResult(())
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->

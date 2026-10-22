@@ -30,6 +30,7 @@ module ModelRouting =
     val configPath: unit -> string
     val bootstrapAndLoadAt: path: string -> template: string -> Task<obj>
     val toHostModel: target: ModelRoutingTarget -> HostModel
+    val toOpenCodeModel: target: ModelRoutingTarget -> HostModel
     val sameTarget: expected: ModelRoutingTarget -> observed: HostModel -> bool
 
     type internal ModelRoutingRuntime =

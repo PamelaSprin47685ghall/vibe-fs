@@ -1,7 +1,12 @@
-  // The extendable engineering-loop base class: the parent of this.call(class extends this.Callable { ... }).
-  Callable = Callable;
+  async call(command) {
+    // Returns { ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }. command is one shell string. stdout and stderr are the increment since the previous automatic park. A function or class is CALL_COMMAND_UNSUPPORTED.
+    // Example: const outcome = await this.call("printf ok");
+  }
 
-  async call(callableClass) {
-    // Returns { ok, status, reason, exitCode, stdout, stderr, truncated, bytes, durationMs, steps }: hands a class extending this.Callable to the host-owned engineering loop. The host runs the sanity self-test first, then calls next per round and watch per time slice, and closes the job at maxDuration.
-    // Example: const outcome = await this.call(class extends this.Callable { ... });
+  async signal(signal) {
+    // Signals the call that parked this program. CALL_CHILD_UNKNOWN when that command has already ended.
+  }
+
+  async send(input) {
+    // Writes keyboard input to the call that parked this program, appending a newline when missing. CALL_CHILD_UNKNOWN when that command has already ended.
   }

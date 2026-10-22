@@ -362,8 +362,11 @@ module ToolRegistry =
         /// The parent of the assistant message is the run's physical input
         /// only when that parent is a user message: inside one run the next
         /// assistant message hangs under the tool result, not under the user.
-        /// A parent that is not a user message is not a physical input, so the
-        /// session's current physical message answers instead.
+        /// Otherwise the nearest user message before this call answers: a
+        /// delivery always belongs to the turn that asked for it, and relying
+        /// on the routing's current physical alone loses that turn as soon as
+        /// the lease moves. The routing value is the last fallback, not the
+        /// first source.
         let physicalUserMessageOf
             (messages: SessionMessage list)
             (message: SessionMessage)
@@ -379,7 +382,14 @@ module ToolRegistry =
             if parentIsUserMessage then
                 message.ParentId |> Option.map PhysicalUserMessageId.create
             else
-                currentPhysical |> Option.map PhysicalUserMessageId.create
+                let nearestUser =
+                    messages
+                    |> List.takeWhile (fun candidate -> candidate.Id <> message.Id)
+                    |> List.rev
+                    |> List.tryPick (fun candidate -> if candidate.Role = "user" then Some candidate.Id else None)
+
+                (nearestUser |> Option.orElse currentPhysical)
+                |> Option.map PhysicalUserMessageId.create
 
         /// The task a delivery serves.
         ///
@@ -498,10 +508,13 @@ module ToolRegistry =
             owningAssistantMessage messages providerRun
             |> Option.bind (fun message ->
                 physicalUserMessageOf messages message (currentPhysicalUserMessage ctx.SessionId)
-                |> Option.bind (fun physical ->
-                    formalTextOf message
-                    |> Option.orElseWith (fun () -> formalTextOfTurn messages message physical)
-                    |> Option.map (fun formalText -> formalText, physical)))
+                |> Option.map (fun physical ->
+                    let formalText =
+                        formalTextOf message
+                        |> Option.orElseWith (fun () -> formalTextOfTurn messages message physical)
+                        |> Option.defaultValue ""
+
+                    formalText, physical))
 
         let attributedSettlement
             (ctx: HostToolContext)

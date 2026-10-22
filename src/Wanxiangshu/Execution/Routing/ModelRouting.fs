@@ -209,6 +209,8 @@ module ModelRouting =
           modelID = target.Model.Substring(slash + 1)
           variant = Some target.Reasoning }
 
+    let toOpenCodeModel (target: ModelRoutingTarget) : HostModel = toHostModel target
+
     let private matchReasoning (expectedReasoning: string) (obsReasoning: string) =
         if String.IsNullOrWhiteSpace expectedReasoning then
             String.IsNullOrWhiteSpace obsReasoning

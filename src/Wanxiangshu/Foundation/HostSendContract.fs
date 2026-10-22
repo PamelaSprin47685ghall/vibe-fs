@@ -44,3 +44,18 @@ type ChildSessionInfo =
       ParentSessionId: SessionId option
       Agent: string option
       Title: string option }
+
+/// OpenCode-side record used by emitted satellite surfaces. Same fields as
+/// ChildSessionInfo; convert at the port boundary.
+type OpenCodeChildInfo =
+    { SessionId: SessionId
+      ParentSessionId: SessionId option
+      Agent: string option
+      Title: string option }
+
+module ChildSession =
+    let toInfo (child: OpenCodeChildInfo) : ChildSessionInfo =
+        { SessionId = child.SessionId
+          ParentSessionId = child.ParentSessionId
+          Agent = child.Agent
+          Title = child.Title }

@@ -44,3 +44,13 @@ type ChildSessionInfo =
       ParentSessionId: SessionId option
       Agent: string option
       Title: string option }
+
+/// OpenCode-side record used by emitted satellite surfaces.
+type OpenCodeChildInfo =
+    { SessionId: SessionId
+      ParentSessionId: SessionId option
+      Agent: string option
+      Title: string option }
+
+module ChildSession =
+    val toInfo: child: OpenCodeChildInfo -> ChildSessionInfo

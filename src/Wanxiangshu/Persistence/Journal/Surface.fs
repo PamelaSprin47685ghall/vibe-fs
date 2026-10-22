@@ -512,7 +512,10 @@ module JournalSurface =
                                     // A Manager life closes with its delivered S4
                                     // retirement, which is the durable source
                                     // terminal of that life.
-                                    PromptAuthorityRun.managerLifeClosureWitness profile retirementId
+                                    PromptAuthorityRun.managerLifeClosureWitness
+                                        accepted.ExpectedClosureKind
+                                        profile
+                                        retirementId
                                 | _ ->
                                     // interaction-authority-018: the witness of a
                                     // closure is the unique durable source

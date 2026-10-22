@@ -60,7 +60,7 @@ module OpenCodePortAdapter =
         else
             Some(unbox<string> item?title)
 
-    let private tryChildInfo (item: obj) =
+    let private tryChildInfo (item: obj) : OpenCodeChildInfo option =
         if isNull item || isNull item?id then
             None
         else
@@ -70,9 +70,9 @@ module OpenCodePortAdapter =
                   Agent = optionalAgent item
                   Title = optionalTitle item }
 
-    let private childrenFromResponse (data: obj) =
+    let private childrenFromResponse (data: obj) : ChildSessionInfo list =
         let items: obj array = if isNull data then [||] else unbox data
-        items |> Array.choose tryChildInfo |> Array.toList
+        items |> Array.choose tryChildInfo |> Array.map ChildSession.toInfo |> Array.toList
 
     let private readParentId (body: obj) : Result<SessionId option, string> =
         if isNull body then
