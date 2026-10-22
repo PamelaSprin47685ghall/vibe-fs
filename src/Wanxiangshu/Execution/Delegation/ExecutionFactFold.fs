@@ -111,8 +111,7 @@ module ExecutionFactFold =
                  |> Option.bind (fun state -> state.Handles)
                  |> Option.defaultValue HandleProjection.empty)
             |> handleOutcome "ChildRunVoided" parentSessionId handle priorState (Some childSessionId)
-        | None ->
-            Ok [ TerminatedChildHandle(parentSessionId, childSessionId) ]
+        | None -> Ok [ TerminatedChildHandle(parentSessionId, childSessionId) ]
 
     let fold
         (sessionState: SessionId -> DelegationSessionState option)

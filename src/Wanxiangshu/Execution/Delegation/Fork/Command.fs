@@ -10,6 +10,7 @@ open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Host.Domain
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.ManagedAgents
@@ -20,7 +21,7 @@ open Wanxiangshu.Repository.Investigation.WarmStart
 
 /// Manager fork & resume / Orchestrator commission: the product rules behind
 /// the three delegation commands, host-neutral. A host reaches them through
-/// `IDelegationCommandHost` and renders the `DelegationReply` itself.
+/// `DelegationEnvironment` and renders the `DelegationReply` itself.
 module ForkCommand =
 
     [<RequireQualifiedAccess>]
@@ -173,12 +174,12 @@ module ForkCommand =
           ExpectedToolCalls: int option }
 
     /// The calling session's id text; empty when the host could not name it.
-    let private callerText (host: IDelegationCallerHost) =
+    let private callerText (host: DelegationEnvironment) =
         match host.Caller.Session with
         | Some session -> SessionId.value session
         | None -> ""
 
-    let private lang (host: IDelegationCommandHost) =
+    let private lang (host: DelegationEnvironment) =
         ProviderLanguageBinding.forSessionText (callerText host)
 
     let private prose language path =
@@ -293,7 +294,7 @@ module ForkCommand =
         | _ -> false
 
     let private prepareForkPromptWithRecord
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (role: Role)
         (request: Request)
@@ -312,7 +313,7 @@ module ForkCommand =
             RepositoryWarmStart.appendToBaseDocument
                 runtime.ParentId
                 role
-                host.WorkspaceDirectory
+                (Option.map (fun (WorkspacePath path) -> path) host.WorkspaceDirectory)
                 request.Keywords
                 baseDocument
             |> TaskValue.map (Result.defaultWith invalidOp >> LlmFacing.render)
@@ -330,7 +331,7 @@ module ForkCommand =
         |> Result.requireSome Path.Fork.AttachUnknown
 
     let private resolveAttachment
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (handles: AgentLinkageProjection option)
         (request: Request)
         : Task<Result<string option, string>> =
@@ -341,13 +342,14 @@ module ForkCommand =
                 let! record = resolveAttachmentRecord handles attach
 
                 let! view =
-                    host.ViewForSession(SessionId.value record.ChildSessionId)
-                    |> TaskResultCE.ofTask
+                    match host.ViewForSession with
+                    | None -> TaskResultCE.ofTask (Task.FromResult None)
+                    | Some viewForSession -> viewForSession record.ChildSessionId |> TaskResultCE.ofTask
 
                 return view
             }
 
-    let private appendFissionAffinity durable (host: IDelegationCommandHost) (lane: FissionLaneBinding) handleId =
+    let private appendFissionAffinity durable (host: DelegationEnvironment) (lane: FissionLaneBinding) handleId =
         taskResult {
             let! _ =
                 task {
@@ -368,32 +370,32 @@ module ForkCommand =
             return ()
         }
 
-    let private bindFissionAffinity (host: IDelegationCommandHost) handleId =
+    let private bindFissionAffinity (host: DelegationEnvironment) handleId =
         match FissionRuntime.tryLane (SessionId.create (callerText host)), host.Journal with
         | Some lane, Some durable -> appendFissionAffinity durable host lane handleId
         | _ -> Task.FromResult(Ok())
 
-    let private recordFissionAffinity (host: IDelegationCommandHost) handleId =
+    let private recordFissionAffinity (host: DelegationEnvironment) handleId =
         if String.IsNullOrWhiteSpace(callerText host) then
             Task.FromResult(Ok())
         else
             bindFissionAffinity host handleId
 
-    let private agentHandles (host: IDelegationCommandHost) =
+    let private agentHandles (host: DelegationEnvironment) =
         match host.Journal with
         | Some journal when not (String.IsNullOrWhiteSpace(callerText host)) ->
             let owner = host.LogicalOwnerFor(SessionId.create (callerText host))
             Some(AgentJournal.handleProjection journal owner)
         | _ -> None
 
-    let private announceChild (runtime: HostForkRuntime) (host: IDelegationCommandHost) agentKey =
+    let private announceChild (runtime: HostForkRuntime) (host: DelegationEnvironment) agentKey =
         runtime.TryFindAgentOrAdopt agentKey
         |> Option.map (fun (childId, _, _) -> childId)
         |> Option.iter (fun childId ->
             FissionRuntime.notifyChildCreated (SessionId.create (callerText host)) agentKey childId)
 
     let private runManagerFork
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         role
         (request: Request)
@@ -423,7 +425,7 @@ module ForkCommand =
         }
 
     let private runManagerReuse
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         role
         (request: Request)
@@ -446,7 +448,7 @@ module ForkCommand =
         }
 
     let private commitNewManagerFork
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -455,20 +457,26 @@ module ForkCommand =
         attachment
         =
         task {
-            let handleId = host.NewHandleId()
-
             let! placement =
-                taskResult {
-                    do! recordFissionAffinity host handleId
-                    let! result = runManagerFork host runtime role request language attachment handleId managed
-                    announceChild runtime host handleId
+                match host.NewHandleId with
+                | None -> Task.FromResult(Ok(consequence (prose language Path.Fork.ChargeContextUnavailable)))
+                | Some newHandleId ->
+                    let handleId = newHandleId ()
 
-                    return
-                        match result with
-                        | ForkResult.DispatchUncertain _ ->
-                            consequence (namedProse language Path.Fork.ChargePlacementUncertain (request.Name.Trim()))
-                        | _ -> successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
-                }
+                    taskResult {
+                        do! recordFissionAffinity host handleId
+                        let! result = runManagerFork host runtime role request language attachment handleId managed
+                        announceChild runtime host handleId
+
+                        return
+                            match result with
+                            | ForkResult.DispatchUncertain _ ->
+                                consequence (
+                                    namedProse language Path.Fork.ChargePlacementUncertain (request.Name.Trim())
+                                )
+                            | _ ->
+                                successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
+                    }
 
             match placement with
             | Ok wire -> return wire
@@ -476,7 +484,7 @@ module ForkCommand =
         }
 
     let private finishNewManagerFork
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -491,7 +499,7 @@ module ForkCommand =
         }
 
     let private placeNewManagerFork
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -513,7 +521,7 @@ module ForkCommand =
         }
 
     let private reuseWhileActive
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -535,7 +543,7 @@ module ForkCommand =
         | Ok profile -> prepareAndSend profile
 
     let private commitIdleReuse
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -565,7 +573,7 @@ module ForkCommand =
         }
 
     let private reuseWhileIdle
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -586,7 +594,7 @@ module ForkCommand =
             Ok()
 
     let private reuseWhileAllowed
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -599,7 +607,7 @@ module ForkCommand =
         | Ok() -> reuseWhileIdle host runtime request language handles role agentId
 
     let private reuseResolvedAgent
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -622,7 +630,7 @@ module ForkCommand =
             reuseWhileAllowed host runtime request language handles handle.CanonicalRole agentId
 
     let private executeManagerReusePerson
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -639,7 +647,7 @@ module ForkCommand =
         && not (String.Equals(request.Calling.Trim(), derived, StringComparison.OrdinalIgnoreCase))
 
     let private placeDerivedManagerFork
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -651,7 +659,7 @@ module ForkCommand =
         | Some managed -> placeNewManagerFork host runtime request language handles managed
 
     let private createNewManagerFork
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -665,7 +673,7 @@ module ForkCommand =
             placeDerivedManagerFork host runtime request language handles derived
 
     let private executeManagerNewCalling
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -677,7 +685,7 @@ module ForkCommand =
         | None -> createNewManagerFork host runtime request language handles
 
     let private executeManagerExistingPerson
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -688,7 +696,7 @@ module ForkCommand =
         | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnknown))
         | Some handle -> executeManagerReusePerson host runtime request language handles handle
 
-    let private executeManagerAfterGuards (host: IDelegationCommandHost) (request: Request) language =
+    let private executeManagerAfterGuards (host: DelegationEnvironment) (request: Request) language =
         match host.ForkRuntime() with
         | Error _ -> Task.FromResult(consequence (prose language Path.Fork.ChargeContextUnavailable))
         | Ok runtime ->
@@ -699,7 +707,7 @@ module ForkCommand =
 
             executeManagerNewCalling host runtime request language handles existingByname
 
-    let private resumeOnRuntime (host: IDelegationCommandHost) (request: Request) language =
+    let private resumeOnRuntime (host: DelegationEnvironment) (request: Request) language =
         match host.ForkRuntime() with
         | Error _ -> task { return consequence (prose language Path.Fork.ChargeContextUnavailable) }
         | Ok runtime ->
@@ -724,25 +732,28 @@ module ForkCommand =
             None
 
     let private boundDevOpsDispatchRefusal
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         parentSessionId
         isDevOps
         : Task<string option> =
         task {
             if isDevOps then
-                let! facts = host.ManagerCapabilityFactsFor(SessionId.value parentSessionId)
-                return devopsDispatchRefusal facts
+                match host.ManagerCapabilityFactsFor with
+                | None -> return None
+                | Some factsFor ->
+                    let! facts = factsFor parentSessionId
+                    return devopsDispatchRefusal facts
             else
                 return None
         }
 
-    let private bindWorkDevOpsIfNeeded (host: IDelegationCommandHost) parentSessionId isDevOps =
+    let private bindWorkDevOpsIfNeeded (host: DelegationEnvironment) parentSessionId isDevOps =
         task {
             if isDevOps then
                 do! host.EnsureWorkDevOpsBound parentSessionId
         }
 
-    let private executeManagerResumeAfterGuards (host: IDelegationCommandHost) (request: Request) language =
+    let private executeManagerResumeAfterGuards (host: DelegationEnvironment) (request: Request) language =
         task {
             let parentSessionId =
                 if String.IsNullOrWhiteSpace(callerText host) then
@@ -760,7 +771,7 @@ module ForkCommand =
                 return! resumeOnRuntime host request language
         }
 
-    let private executeManagerResume (host: IDelegationCommandHost) (request: Request) =
+    let private executeManagerResume (host: DelegationEnvironment) (request: Request) =
         task {
             let language = lang host
 
@@ -776,7 +787,7 @@ module ForkCommand =
                 return! executeManagerResumeAfterGuards host request language
         }
 
-    let private executeManagerAfterGate (host: IDelegationCommandHost) (request: Request) language =
+    let private executeManagerAfterGate (host: DelegationEnvironment) (request: Request) language =
         task {
             let parentSessionId =
                 if String.IsNullOrWhiteSpace(callerText host) then
@@ -792,7 +803,7 @@ module ForkCommand =
             | None -> return! executeManagerAfterGuards host request language
         }
 
-    let private executeManager (host: IDelegationCommandHost) (request: Request) =
+    let private executeManager (host: DelegationEnvironment) (request: Request) =
         task {
             let language = lang host
 
@@ -806,44 +817,48 @@ module ForkCommand =
                 return! executeManagerAfterGate host request language
         }
 
-    let private orchestratorExistingByname (host: IDelegationCommandHost) (request: Request) =
+    let private orchestratorExistingByname (host: DelegationEnvironment) (request: Request) =
         host.Journal
         |> Option.bind (fun journal ->
             (AgentJournal.snapshot journal).AgentProjections.Orchestrator
             |> OrchestratorProjection.tryFindByByname request.Name)
 
-    let private finishCommissionNew (host: IDelegationCommandHost) (request: Request) language (managed: ManagedAgent) =
+    let private finishCommissionNew (host: DelegationEnvironment) (request: Request) language (managed: ManagedAgent) =
         task {
-            let managerId = ManagerJobId.create (host.NewHandleId())
+            match host.NewHandleId, host.OpenManagerJob with
+            | Some newHandleId, Some openManagerJob ->
+                let managerId = ManagerJobId.create (newHandleId ())
 
-            match!
-                host.OpenManagerJob(
-                    managerId,
-                    managed.Name,
-                    commissionCharge request,
-                    request.Name,
-                    request.ExpectedToolCalls
-                )
-            with
-            | Ok _ -> return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
-            | Error _ -> return consequence (prose language Path.Commission.WorkNotOpened)
+                match!
+                    openManagerJob (
+                        managerId,
+                        managed.Name,
+                        commissionCharge request,
+                        request.Name,
+                        request.ExpectedToolCalls
+                    )
+                with
+                | Ok _ ->
+                    return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
+                | Error _ -> return consequence (prose language Path.Commission.WorkNotOpened)
+            | _ -> return consequence (prose language Path.Commission.WorkNotOpened)
         }
 
     /// delegation-004: Orchestrator only commissions a Manager, so a blank
     /// commission calling derives to the single Manager persona.
     let private derivedCommissionCalling = "lead"
 
-    let private commissionNewCalling (host: IDelegationCommandHost) (request: Request) language =
+    let private commissionNewCalling (host: DelegationEnvironment) (request: Request) language =
         match tryCalling orchestratorCallingBindings derivedCommissionCalling with
         | None -> Task.FromResult(consequence (prose language Path.Commission.UnknownCalling))
         | Some managed -> finishCommissionNew host request language managed
 
-    let private continueExistingCommission (host: IDelegationCommandHost) (request: Request) language job =
+    let private continueExistingCommission (host: DelegationEnvironment) (request: Request) language job =
         task {
-            match host.Caller.ProviderRunId, host.Caller.ToolCallId with
-            | Some providerRun, Some toolCallId ->
+            match host.Caller.ProviderRunId, host.Caller.ToolCallId, host.ContinueManagerJob with
+            | Some providerRun, Some toolCallId, Some continueManagerJob ->
                 match!
-                    host.ContinueManagerJob(
+                    continueManagerJob (
                         job.ManagerJobId,
                         request.Charge,
                         providerRun,
@@ -857,7 +872,7 @@ module ForkCommand =
             | _ -> return consequence (prose language Path.Commission.WorkCannotTakeCharge)
         }
 
-    let private executeOrchestratorAfterGuards (host: IDelegationCommandHost) (request: Request) language =
+    let private executeOrchestratorAfterGuards (host: DelegationEnvironment) (request: Request) language =
         let existingByname = orchestratorExistingByname host request
         let hasCalling = not (String.IsNullOrWhiteSpace request.Calling)
 
@@ -872,7 +887,7 @@ module ForkCommand =
             | Some job -> continueExistingCommission host request language job
             | None -> commissionNewCalling host request language
 
-    let private executeOrchestrator (host: IDelegationCommandHost) (request: Request) =
+    let private executeOrchestrator (host: DelegationEnvironment) (request: Request) =
         task {
             let language = lang host
 
@@ -936,19 +951,19 @@ module ForkCommand =
                   argument "charge" ArgumentShape.Text (prose language Path.Commission.ArgCharge)
                   expectedToolCallsArgument language ] }
 
-    let private executeCommand (command: Command) (host: IDelegationCommandHost) (request: Request) =
+    let private executeCommand (command: Command) (host: DelegationEnvironment) (request: Request) =
         match command with
         | Command.Fork -> executeManager host request
         | Command.Resume -> executeManagerResume host request
         | Command.Commission -> executeOrchestrator host request
 
-    let run (command: Command) (host: IDelegationCommandHost) (args: ICommandArguments) : Task<DelegationReply> =
+    let run (command: Command) (host: DelegationEnvironment) (args: ICommandArguments) : Task<DelegationReply> =
         match decode (lang host) args with
         | Error message -> Task.FromResult(consequence message)
         | Ok request -> executeCommand command host request
 
     let private commitNewManagerForkReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -957,15 +972,18 @@ module ForkCommand =
         attachment
         : Task<Result<ForkReceipt, string>> =
         task {
-            let handleId = host.NewHandleId()
-
             let! placement =
-                taskResult {
-                    do! recordFissionAffinity host handleId
-                    let! result = runManagerFork host runtime role request language attachment handleId managed
-                    announceChild runtime host handleId
-                    return result
-                }
+                match host.NewHandleId with
+                | None -> Task.FromResult(Ok(ForkResult.NotFound ""))
+                | Some newHandleId ->
+                    let handleId = newHandleId ()
+
+                    taskResult {
+                        do! recordFissionAffinity host handleId
+                        let! result = runManagerFork host runtime role request language attachment handleId managed
+                        announceChild runtime host handleId
+                        return result
+                    }
 
             return
                 match placement with
@@ -985,7 +1003,7 @@ module ForkCommand =
         }
 
     let private finishNewManagerForkReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -1000,7 +1018,7 @@ module ForkCommand =
         }
 
     let private placeNewManagerForkReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -1026,7 +1044,7 @@ module ForkCommand =
             resolveDerivedManagedCalling managerCallingBindings derived
 
     let private createNewManagerForkReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -1044,7 +1062,7 @@ module ForkCommand =
         | None -> Ok()
 
     let private createManagerForkIfNameFree
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         language
@@ -1058,7 +1076,7 @@ module ForkCommand =
         | Ok() -> createNewManagerForkReceipt host runtime request language handles
 
     let private executeManagerReceiptAfterGuards
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (request: Request)
         language
         : Task<Result<ForkReceipt, string>> =
@@ -1068,7 +1086,7 @@ module ForkCommand =
             let handles = agentHandles host
             createManagerForkIfNameFree host runtime request language handles
 
-    let private resolveParentSessionId (host: IDelegationCommandHost) (sessionId: string) =
+    let private resolveParentSessionId (host: DelegationEnvironment) (sessionId: string) =
         if String.IsNullOrWhiteSpace sessionId then
             SessionId.create ""
         else
@@ -1085,7 +1103,7 @@ module ForkCommand =
             Ok()
 
     let private validateManagerRequestPrerequisites
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (request: Request)
         (sessionId: string)
         : Task<Result<unit, string>> =
@@ -1105,7 +1123,7 @@ module ForkCommand =
         }
 
     let private executeManagerReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (request: Request)
         : Task<Result<ForkReceipt, string>> =
         task {
@@ -1117,29 +1135,32 @@ module ForkCommand =
         }
 
     let private finishCommissionNewReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (request: Request)
         (managed: ManagedAgent)
         : Task<Result<ForkReceipt, string>> =
         task {
-            let managerId = ManagerJobId.create (host.NewHandleId())
+            match host.NewHandleId, host.OpenManagerJob with
+            | Some newHandleId, Some openManagerJob ->
+                let managerId = ManagerJobId.create (newHandleId ())
 
-            match!
-                host.OpenManagerJob(
-                    managerId,
-                    managed.Name,
-                    commissionCharge request,
-                    request.Name,
-                    request.ExpectedToolCalls
-                )
-            with
-            | Ok _ ->
-                return
-                    Ok
-                        { Name = request.Name.Trim()
-                          AgentId = ""
-                          Outcome = "commissioned" }
-            | Error _ -> return Error "placement-failed"
+                match!
+                    openManagerJob (
+                        managerId,
+                        managed.Name,
+                        commissionCharge request,
+                        request.Name,
+                        request.ExpectedToolCalls
+                    )
+                with
+                | Ok _ ->
+                    return
+                        Ok
+                            { Name = request.Name.Trim()
+                              AgentId = ""
+                              Outcome = "commissioned" }
+                | Error _ -> return Error "placement-failed"
+            | _ -> return Error "placement-failed"
         }
 
     let private validateOrchestratorCalling (request: Request) =
@@ -1153,7 +1174,7 @@ module ForkCommand =
         else
             Ok()
 
-    let private validateOrchestratorRequest (host: IDelegationCommandHost) (request: Request) =
+    let private validateOrchestratorRequest (host: DelegationEnvironment) (request: Request) =
         let existingByname = orchestratorExistingByname host request
 
         if String.IsNullOrWhiteSpace(callerText host) then
@@ -1170,7 +1191,7 @@ module ForkCommand =
             resolveDerivedManagedCalling orchestratorCallingBindings derivedCommissionCalling
 
     let private executeOrchestratorReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (request: Request)
         : Task<Result<ForkReceipt, string>> =
         match validateOrchestratorRequest host request with
@@ -1178,7 +1199,7 @@ module ForkCommand =
         | Ok managed -> finishCommissionNewReceipt host request managed
 
     let private dispatchRoleReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (role: Role)
         (decoded: Result<Request, string>)
         : Task<Result<ForkReceipt, string>> =
@@ -1188,16 +1209,19 @@ module ForkCommand =
         | Error _, _ -> Task.FromResult(Error "placement-failed")
         | _ -> Task.FromResult(Error "not-a-delegation-role")
 
-    let receipt (host: IDelegationCommandHost) (args: ICommandArguments) : Task<Result<ForkReceipt, string>> =
+    let receipt (host: DelegationEnvironment) (args: ICommandArguments) : Task<Result<ForkReceipt, string>> =
         task {
-            let! roleOpt = host.CallerRole()
-
-            match roleOpt with
+            match host.CallerRole with
             | None -> return Error "not-a-delegation-role"
-            | Some role ->
-                let language = lang host
-                let decoded = decode language args
-                return! dispatchRoleReceipt host role decoded
+            | Some callerRole ->
+                let! roleOpt = callerRole ()
+
+                match roleOpt with
+                | None -> return Error "not-a-delegation-role"
+                | Some role ->
+                    let language = lang host
+                    let decoded = decode language args
+                    return! dispatchRoleReceipt host role decoded
         }
 
     let private resumeResultReceipt (request: Request) (result: ForkResult) : Result<ForkReceipt, string> =
@@ -1228,7 +1252,7 @@ module ForkCommand =
 
 
     let private resumeBusyGuidanceReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         (handles: AgentLinkageProjection option)
@@ -1250,7 +1274,7 @@ module ForkCommand =
 
     /// Busy child: the charge becomes guidance appended to the running turn.
     let private resumeBusyReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         (handles: AgentLinkageProjection option)
@@ -1261,7 +1285,7 @@ module ForkCommand =
         | Ok profile -> resumeBusyGuidanceReceipt host runtime request handles agentId profile
 
     let private resumeIdleAttachedReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         (handles: AgentLinkageProjection option)
@@ -1288,7 +1312,7 @@ module ForkCommand =
 
     /// Idle child: the charge reopens the existing child session.
     let private resumeIdleReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         (handles: AgentLinkageProjection option)
@@ -1309,7 +1333,7 @@ module ForkCommand =
     /// A busy child takes the charge as guidance; an idle one is reopened under
     /// its live (or adopted) role, else its durable canonical role.
     let private resumeKnownAgent
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         (handles: AgentLinkageProjection option)
@@ -1330,7 +1354,7 @@ module ForkCommand =
     /// The resume of a known person: the handle's agent id decides whether the
     /// child is busy or idle.
     let private resumeKnownHandle
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         (handles: AgentLinkageProjection option)
@@ -1341,7 +1365,7 @@ module ForkCommand =
         | Ok handleId -> resumeKnownAgent host runtime request handles handle handleId
 
     let private resumeReceiptExistingPerson
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (request: Request)
         (handles: AgentLinkageProjection option)
@@ -1355,7 +1379,7 @@ module ForkCommand =
 
     /// The manager resume against an available fork runtime.
     let private resumeWithForkRuntime
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (request: Request)
         (runtime: HostForkRuntime)
         : Task<Result<ForkReceipt, string>> =
@@ -1365,7 +1389,7 @@ module ForkCommand =
     /// The manager resume against the host's fork runtime, or the
     /// charge-context-unavailable refusal.
     let private resumeWithHostRuntime
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (request: Request)
         : Task<Result<ForkReceipt, string>> =
         match host.ForkRuntime() with
@@ -1375,7 +1399,7 @@ module ForkCommand =
 
     /// The manager resume once the devops guards have passed.
     let private executeManagerResumeReceiptAfterGuards
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (request: Request)
         : Task<Result<ForkReceipt, string>> =
         task {
@@ -1395,7 +1419,7 @@ module ForkCommand =
         }
 
     let private executeManagerResumeReceipt
-        (host: IDelegationCommandHost)
+        (host: DelegationEnvironment)
         (request: Request)
         : Task<Result<ForkReceipt, string>> =
         task {
@@ -1413,7 +1437,7 @@ module ForkCommand =
 
     /// Structured resume entry point: same guard chain as the prose `resume`
     /// tool, but it answers with data instead of rendered prose.
-    let resumeReceipt (host: IDelegationCommandHost) (args: ICommandArguments) : Task<Result<ForkReceipt, string>> =
+    let resumeReceipt (host: DelegationEnvironment) (args: ICommandArguments) : Task<Result<ForkReceipt, string>> =
         task {
             let language = lang host
 

@@ -388,8 +388,7 @@ module HandleController =
         : Task<Result<HandleRecord, HandleConsumeRejection>> =
         task {
             match record.Work, record.Lifecycle with
-            | None, Abandoned HandleAbandonReason.Voided ->
-                return! consumeHistoricalVoided journal parentId record
+            | None, Abandoned HandleAbandonReason.Voided -> return! consumeHistoricalVoided journal parentId record
             | None, _ ->
                 return
                     Error(

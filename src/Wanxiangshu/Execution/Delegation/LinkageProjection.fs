@@ -682,6 +682,7 @@ module HandleProjection =
         && match record.Lifecycle with
            | Abandoned HandleAbandonReason.Voided -> true
            | _ -> false
+
     let private horizonRecord current binding =
         let record = summary current binding
 
@@ -699,7 +700,9 @@ module HandleProjection =
         |> Map.toList
         |> List.map (snd >> horizonRecord current)
         |> List.filter (fun record ->
-            (record.Work.IsSome || isIdleFixedDevOpsBinding record || isHistoricalVoidedBinding record)
+            (record.Work.IsSome
+             || isIdleFixedDevOpsBinding record
+             || isHistoricalVoidedBinding record)
             && parentVisible record
             && (match record.Lifecycle with
                 | Retired -> false

@@ -44,6 +44,13 @@ module SyncDelegateSurface =
         | Scripted
         | ProviderRecovery
 
+    /// The per-listener registration the test Host keeps for one session's
+    /// terminal subscriptions. A record keeps one stable identity, so disposal
+    /// unlinks exactly that registration and a late notification skips it.
+    type private ListenerRegistration =
+        { Listener: TerminalCompletionListener
+          mutable Live: bool }
+
     /// Test-side plug of the retry decorator: the harness records each verdict
     /// request so a landing test can prove a transient failure stayed child-local
     /// (delegation-023) before only the terminal verdict failed the call.
@@ -274,7 +281,7 @@ module SyncDelegateSurface =
         (children: ResizeArray<SessionId>, readiness: PromptReadiness, observationMode: string option) =
         // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter for the harness
         let physicalSequence = ref 0
-        let listeners = Dictionary<string, ResizeArray<Events.ListenerRegistration>>()
+        let listeners = Dictionary<string, ResizeArray<ListenerRegistration>>()
         let childCountWaiters = ResizeArray<int * TaskCompletionSource<unit>>()
 
         let pendingAcceptances =
@@ -342,11 +349,11 @@ module SyncDelegateSurface =
                 match listeners.TryGetValue key with
                 | true, current -> current
                 | false, _ ->
-                    let created = ResizeArray<Events.ListenerRegistration>()
+                    let created = ResizeArray<ListenerRegistration>()
                     listeners[key] <- created
                     created
 
-            let registration: Events.ListenerRegistration = { Listener = listener; Live = true }
+            let registration: ListenerRegistration = { Listener = listener; Live = true }
             registrations.Add registration
 
             { new IDisposable with
@@ -360,7 +367,7 @@ module SyncDelegateSurface =
             with _ ->
                 ()
 
-        let notifyRegistration sessionId outcome (registration: Events.ListenerRegistration) =
+        let notifyRegistration sessionId outcome (registration: ListenerRegistration) =
             if registration.Live then
                 registration.Listener sessionId outcome
 
@@ -868,7 +875,8 @@ module SyncDelegateSurface =
                 | Some owner -> owner.Sessions.Quiescence
                 | None -> new SessionQuiescenceGate()
 
-            let eventPort = new Events.HostEventPort() :> IEventObservationPort
+            let eventPort =
+                Events.HostEventPort(Events.newTerminalSource ()) :> IEventObservationPort
 
             plugin
             |> Option.iter (fun owner ->
@@ -1473,7 +1481,10 @@ module SyncDelegateSurface =
                 let acceptance =
                     match harness.Sessions.PromptOrigin(child, index) with
                     | Some "AgentOwnerRoot" ->
-                        harness.Dispatcher.AcceptAgentOwnerRoot key child physical
+                        // A dedicated Sync delegate is attached work, not a
+                        // fork child: the root it opens closes with an
+                        // attached-work closure (interaction-authority-018).
+                        harness.Dispatcher.AcceptAgentOwnerRoot key child physical (Some "Attached")
                         |> TaskValue.map (Result.map ignore)
                     | Some "ManagedDelegationAssignment" ->
                         harness.Dispatcher.AcceptContinuation key child physical

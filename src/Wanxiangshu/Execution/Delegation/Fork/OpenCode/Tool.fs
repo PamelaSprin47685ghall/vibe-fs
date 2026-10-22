@@ -4,12 +4,14 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Host.Domain
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 
-/// OpenCode adapter for the fork / resume / commission commands: binds
-/// `IDelegationCommandHost` to one OpenCode tool call and registers the
+/// OpenCode adapter for the fork / resume / commission commands: builds one
+/// `DelegationEnvironment` per OpenCode tool call and registers the
 /// declarations `ForkCommand` makes. The rules live in `ForkCommand`.
 module ForkTool =
 
@@ -19,66 +21,67 @@ module ForkTool =
             member _.OptionalText name = args.OptionalText name
             member _.OptionalCount name = args.OptionalNonNegativeInteger name }
 
-    let private caller (scope: ToolRuntimeScope) (context: HostToolContext) =
-        { new IDelegationCallerHost with
-            member _.Caller =
-                { Session =
-                    if String.IsNullOrWhiteSpace context.SessionId then
-                        None
-                    else
-                        Some(SessionId.create context.SessionId)
-                  ProviderRunId = context.ProviderRunId
-                  ToolCallId = context.ToolCallId }
+    let private environment (scope: ToolRuntimeScope) (context: HostToolContext) : DelegationEnvironment =
+        { Caller =
+            { Session =
+                if String.IsNullOrWhiteSpace context.SessionId then
+                    None
+                else
+                    Some(SessionId.create context.SessionId)
+              ProviderRunId = context.ProviderRunId
+              ToolCallId = context.ToolCallId }
 
-            member _.Journal = scope.Journal
-            member _.LogicalOwnerFor sessionId = scope.LogicalOwnerFor sessionId
+          Journal = scope.Journal
 
-            member _.EnsureWorkDevOpsBound parentSessionId =
-                scope.EnsureWorkDevOpsBound parentSessionId
+          ForkRuntime =
+            fun () ->
+                match scope.RuntimeFor context with
+                | Ok runtime -> Ok runtime
+                | Error reason -> Error(HostError.Refused reason)
 
-            member _.ForkRuntime() = scope.RuntimeFor context }
+          LogicalOwnerFor = scope.LogicalOwnerFor
+          EnsureWorkDevOpsBound = scope.EnsureWorkDevOpsBound
 
-    let private host (scope: ToolRuntimeScope) (context: HostToolContext) =
-        let caller = caller scope context
+          WorkspaceDirectory = scope.WorkspaceDirectory |> Option.map (fun path -> WorkspacePath path)
 
-        { new IDelegationCommandHost with
-            member _.WorkspaceDirectory = scope.WorkspaceDirectory
-            member _.ViewForSession sessionId = scope.ViewForSession sessionId
+          ViewForSession = Some(fun sessionId -> scope.ViewForSession(SessionId.value sessionId))
 
-            member _.ManagerCapabilityFactsFor sessionId =
-                scope.ManagerCapabilityFactsFor sessionId
+          ManagerCapabilityFactsFor = Some(fun sessionId -> scope.ManagerCapabilityFactsFor(SessionId.value sessionId))
 
-            member _.CallerRole() = scope.EnsureRoleFor context
-            member _.NewHandleId() = ToolHostCodec.newHandleId ()
+          CallerRole = Some(fun () -> scope.EnsureRoleFor context)
+          NewHandleId = Some(fun () -> ToolHostCodec.newHandleId ())
 
-            member _.OpenManagerJob(jobId, managerAgent, prompt, byname, expectedToolCalls) =
-                (scope.OrchestratorHostFor context.SessionId)
-                    .ForkManagerJob(
-                        jobId,
-                        managerAgent,
-                        prompt,
-                        byname = byname,
-                        ?expectedToolCalls = expectedToolCalls
-                    )
+          OpenManagerJob =
+            Some(fun (jobId, managerAgent, prompt, byname, expectedToolCalls) ->
+                task {
+                    let! result =
+                        (scope.OrchestratorHostFor context.SessionId)
+                            .ForkManagerJob(
+                                jobId,
+                                managerAgent,
+                                prompt,
+                                byname = byname,
+                                ?expectedToolCalls = expectedToolCalls
+                            )
 
-            member _.ContinueManagerJob(jobId, prompt, callerProviderRun, callerToolCallId, expectedToolCalls) =
-                (scope.OrchestratorHostFor context.SessionId)
-                    .ContinueManagerJob(
-                        jobId,
-                        prompt,
-                        callerProviderRun,
-                        callerToolCallId,
-                        ?expectedToolCalls = expectedToolCalls
-                    )
-          interface IDelegationCallerHost with
-              member _.Caller = caller.Caller
-              member _.Journal = caller.Journal
-              member _.LogicalOwnerFor sessionId = caller.LogicalOwnerFor sessionId
+                    return Result.mapError (fun reason -> HostError.Refused reason) result
+                })
 
-              member _.EnsureWorkDevOpsBound parentSessionId =
-                  caller.EnsureWorkDevOpsBound parentSessionId
+          ContinueManagerJob =
+            Some(fun (jobId, prompt, callerProviderRun, callerToolCallId, expectedToolCalls) ->
+                task {
+                    let! result =
+                        (scope.OrchestratorHostFor context.SessionId)
+                            .ContinueManagerJob(
+                                jobId,
+                                prompt,
+                                callerProviderRun,
+                                callerToolCallId,
+                                ?expectedToolCalls = expectedToolCalls
+                            )
 
-              member _.ForkRuntime() = caller.ForkRuntime() }
+                    return Result.mapError (fun reason -> HostError.Refused reason) result
+                }) }
 
     let private schema factory (argument: CommandArgument) =
         let describe =
@@ -105,7 +108,7 @@ module ForkTool =
           Execute =
             fun args context ->
                 task {
-                    let! reply = ForkCommand.run command (host scope context) (arguments args)
+                    let! reply = ForkCommand.run command (environment scope context) (arguments args)
                     return wire reply
                 } }
 
@@ -119,10 +122,10 @@ module ForkTool =
         spec ForkCommand.Command.Commission factory scope
 
     let executeReceipt (scope: ToolRuntimeScope) (context: HostToolContext) (args: HostToolArguments) =
-        ForkCommand.receipt (host scope context) (arguments args)
+        ForkCommand.receipt (environment scope context) (arguments args)
 
     let executeResumeReceipt (scope: ToolRuntimeScope) (context: HostToolContext) (args: HostToolArguments) =
-        ForkCommand.resumeReceipt (host scope context) (arguments args)
+        ForkCommand.resumeReceipt (environment scope context) (arguments args)
 
     /// The placement receipt a fork or a resume hands back. It is aliased here,
     /// in the adapter namespace, under a name of its own, so that a caller

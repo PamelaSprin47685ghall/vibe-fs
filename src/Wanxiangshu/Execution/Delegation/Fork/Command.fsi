@@ -7,7 +7,7 @@ open Wanxiangshu.Participant.Provider
 
 /// Manager fork & resume / Orchestrator commission: the product rules behind
 /// the three delegation commands, host-neutral. A host reaches them through
-/// `IDelegationCommandHost` and renders the `DelegationReply` itself.
+/// `DelegationEnvironment` and renders the `DelegationReply` itself.
 module ForkCommand =
 
     [<RequireQualifiedAccess>]
@@ -101,11 +101,11 @@ module ForkCommand =
 
     /// Decode the call's arguments, run the command for the bound caller and
     /// answer with prose in the caller's language.
-    val run: command: Command -> host: IDelegationCommandHost -> args: ICommandArguments -> Task<DelegationReply>
+    val run: command: Command -> host: DelegationEnvironment -> args: ICommandArguments -> Task<DelegationReply>
 
     /// Structured fork / commission (picked by the caller's role): the same
     /// guard chain, answered with data or a stable refusal code.
-    val receipt: host: IDelegationCommandHost -> args: ICommandArguments -> Task<Result<ForkReceipt, string>>
+    val receipt: host: DelegationEnvironment -> args: ICommandArguments -> Task<Result<ForkReceipt, string>>
 
     /// Structured resume: the same guard chain as `resume`, answered with data.
-    val resumeReceipt: host: IDelegationCommandHost -> args: ICommandArguments -> Task<Result<ForkReceipt, string>>
+    val resumeReceipt: host: DelegationEnvironment -> args: ICommandArguments -> Task<Result<ForkReceipt, string>>

@@ -307,9 +307,17 @@ module OrdinaryTurnWorkflow =
                 // physically destroy background children. SessionDeleted or an
                 // explicit successor-less termination owns that irreversible act.
 
+                // 027 (HNI interruption payload, ruling 2026-10-22): the stop
+                // carries the identity of the interrupted round itself —
+                // `turn.ProviderRun` is a fact about this turn, never inferred
+                // from anywhere else. Settlement (`RunLifecycle.complete`) may
+                // match a durable delivery witness by exact fence with it; this
+                // is NOT a terminal fact source and decides no closure.
                 eventPort.NotifyTerminal
                     turn.SessionId
-                    (TerminalOutcome.Aborted(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
+                    (TerminalOutcome.Aborted(
+                        TerminalStop.forAuthorityRun turn.AuthorityRootUserMessageId turn.ProviderRun reason
+                    ))
                 |> ignore
 
                 return ()

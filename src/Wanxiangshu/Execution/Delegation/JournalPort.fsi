@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
 
 /// delegation-029: The delegation subsystem declares this capability port while
 /// durable composition implements it over the concrete journal. Host runtime,
@@ -26,4 +27,7 @@ type AgentJournalPort =
         /// adapter that produced the stored BlobDigest — a second implementation
         /// would invalidate stored evidence rather than merely disagree.
         Sha256: string -> string
+        /// interaction-authority-018: append the durable source terminal of one
+        /// authority lifecycle.
+        AppendAuthorityTerminalSource: SessionId -> AuthorityTerminalSourcePayload -> Task<Result<unit, string>>
     }
