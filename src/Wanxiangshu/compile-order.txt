@@ -1243,6 +1243,8 @@ Repository/Programming/Js/DescriptionAssets.fsi
 Repository/Programming/Js/DescriptionAssets.fs
 Repository/Programming/Js/ToolWorkflow.fsi
 Repository/Programming/Js/ToolWorkflow.fs
+Repository/Programming/Js/JsToolPolicy.fsi
+Repository/Programming/Js/JsToolPolicy.fs
 Repository/Programming/Js/OpenCode/BookkeeperTool.fsi
 Repository/Programming/Js/OpenCode/BookkeeperTool.fs
 Repository/Programming/Js/OpenCode/ToolHost.fsi

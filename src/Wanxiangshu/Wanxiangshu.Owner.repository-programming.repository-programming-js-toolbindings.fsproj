@@ -25,6 +25,8 @@
     <Compile Include="Repository/Programming/Js/DescriptionAssets.fs"/>
     <Compile Include="Repository/Programming/Js/ToolWorkflow.fsi"/>
     <Compile Include="Repository/Programming/Js/ToolWorkflow.fs"/>
+    <Compile Include="Repository/Programming/Js/JsToolPolicy.fsi"/>
+    <Compile Include="Repository/Programming/Js/JsToolPolicy.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fs"/>
     <Compile Include="Repository/Programming/Js/GeneratorSurface.fsi"/>

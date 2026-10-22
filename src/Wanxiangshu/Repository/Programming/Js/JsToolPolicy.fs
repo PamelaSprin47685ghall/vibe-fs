@@ -1,0 +1,112 @@
+namespace Wanxiangshu.Repository.Programming.Js
+
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Repository.Programming.Js.Anchor
+
+/// HNI-09: the product decisions of one generated js-* tool.
+///
+/// Everything the host-neutral js domain owns about a generated tool lives
+/// here: which role may call it, which directory it executes in, what its
+/// arguments are described as, and how a view declaration is validated and
+/// committed. The OpenCode binding (`JsToolSpec`) keeps the host-wire
+/// plumbing — the argument codec, the sandbox call, the host `ToolSpec` — and
+/// asks this module for the decisions.
+[<RequireQualifiedAccess>]
+module JsToolPolicy =
+
+    [<Emit("$0===undefined||$0===null")>]
+    let private isUndefined (value: obj) : bool = jsNative
+
+    [<Emit("$0 !== null && $0 !== undefined")>]
+    let private isPresent (value: obj) : bool = jsNative
+
+    /// The directory one session's js-* surface executes in.
+    ///
+    /// The Host creates a Manager and her forked children rooted at the directory
+    /// their owner registered — for a Change road that is the job's own worktree
+    /// (`OrchestratorHost.directoryFor` → `HostForkRuntime.CreateChildSession`).
+    /// The surface must execute where its session lives: resolving the plugin's
+    /// project directory instead writes every road mutation into the target's own
+    /// working tree, leaves the job worktree empty, and turns the candidate into a
+    /// no-op commit whose publish rebase cannot conflict.
+    ///
+    /// A registered path is used as given, never existence-checked into the
+    /// fallback: a worktree released under a live session must fail the write
+    /// closed, not silently redirect it onto the target's checkout.
+    let rootForSession
+        (sessionDirectories: System.Collections.Generic.Dictionary<string, string>)
+        (fallback: string)
+        (sessionId: string)
+        : string =
+        match System.String.IsNullOrWhiteSpace sessionId, sessionDirectories.TryGetValue sessionId with
+        | false, (true, path) when not (System.String.IsNullOrWhiteSpace path) -> path
+        | _ -> fallback
+
+    /// Same predicate as StaticTools.jsPermission and JsToolGenerator: the
+    /// role's office permissions must project a non-empty programming surface
+    /// (JsPlan expands inside ofToolCapabilities). No second permission list.
+    let admitsRole (roleName: string) (role: Role) : bool =
+        (string role).ToLowerInvariant() = roleName.ToLowerInvariant()
+        && JsCapability.admitsProgrammingSurface (OfficeCapability.permissions role)
+
+    /// The prose of the `program` argument, already localized for the host.
+    let argProgramProse () : string =
+        JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ())
+
+    /// The prose of the refusal of a call that carries no state at all.
+    let missingProgramProse () : string =
+        JsDescriptionAssets.missingProgram (ProviderLanguageBinding.readGlobalPreference ())
+
+    /// The prose of the flat view declaration's extra field.
+    let viewDeclarationExtraProse () : string =
+        JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ())
+
+    /// The flat view declaration of a call: the prefix that is protected and
+    /// the map of kept states. A call that declares neither carries none.
+    let viewDeclarationOf (raw: obj) : obj =
+        if isUndefined (raw?prefixUntil) && isUndefined (raw?thenMap) then
+            null
+        else
+            createObj [ "prefixUntil" ==> raw?prefixUntil; "thenMap" ==> raw?thenMap ]
+
+    /// Why the declaration is not a valid view declaration, if it is not.
+    let parsedDeclarationFailure (declaration: obj) : JsFailure option =
+        match AnchorSurface.parse declaration with
+        | Ok _ -> None
+        | Error failure -> Some failure
+
+    /// Why this call's view declaration is refused, if it is refused. A call
+    /// that still carries the retired `view` wrapper is refused; a flat
+    /// declaration is validated by the anchor surface.
+    let viewFailureOf (raw: obj) (declaration: obj) : JsFailure option =
+        if not (isUndefined (raw?view)) then
+            Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
+        elif not (isPresent declaration) then
+            None
+        else
+            parsedDeclarationFailure declaration
+
+    /// Commit the declaration to the pending view of the session.
+    let commitView (sessionId: string) (declaration: obj) : JsFailure option =
+        match AnchorSurface.setView sessionId declaration with
+        | Ok() -> None
+        | Error failure -> Some failure
+
+    /// Commit the declaration only after the program settled: the pending
+    /// view is what the next request projects, and a failed program must
+    /// not be able to present anything.
+    let viewCommitFailure (sessionId: string) (declaration: obj) outcome : JsFailure option =
+        match outcome with
+        | JsToolWorkflow.JsToolOutcome.Failed _ -> None
+        | JsToolWorkflow.JsToolOutcome.Succeeded _
+        | JsToolWorkflow.JsToolOutcome.Parked _ -> commitView sessionId declaration
+
+    /// The rendered result of a settled call, with the view declaration
+    /// committed when the program settled.
+    let renderCommitted (sessionId: string) (declaration: obj) outcome : string =
+        match viewCommitFailure sessionId declaration outcome with
+        | Some failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
+        | None -> JsToolsResult.render outcome
