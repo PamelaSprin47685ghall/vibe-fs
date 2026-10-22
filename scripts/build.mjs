@@ -279,7 +279,7 @@ export function determineBuildDecision({
   // gone; missing artifacts must force a recompile.
   const artifactsPresent = hasValidManifest && checkArtifactsPresent(existingManifest, targetDist)
 
-  const recordedToolIdentity = existingManifest.compiler?.toolIdentity
+  const recordedToolIdentity = existingManifest?.compiler?.toolIdentity
   // A missing manifest, missing artifact, or toolchain change does not
   // authorize a full compile. Full compilation is forbidden. The changed
   // inputs below are the impact set; compiling anything outside it hides
@@ -771,7 +771,7 @@ Options:
   }
 
   try {
-    await runBuild({ targetRoot: root, clean })
+    await runBuild({ targetRoot: root })
   } catch (err) {
     fail(err.message)
   }
