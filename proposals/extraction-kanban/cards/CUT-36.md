@@ -108,7 +108,9 @@
    （`src/Wanxiangshu/Composition/Omp/OmpExtension.fs:26-28`）。→ 真实宿主加载这一步就会失败。
 2. **`SessionManager` 构造方式不存在** —— 适配器把 `SessionManager` 当可 `new` 的类调用：`call1 (fieldValue module_ "SessionManager") (box dir)`（`src/Wanxiangshu/Omp/Adapter.fs:246-249`）。但 omp 的 `SessionManager` 构造函数是 **private**（omp `src/session/session-manager.ts:1017`），公开入口是静态 `SessionManager.create(cwd, sessionDir?, storage?)`（`:4004`），第一个参数是 **cwd**，不是 session 目录。
 3. **动态 import 的包路径解析不到** —— 适配器用裸标识符 `import("@oh-my-pi/pi-coding-agent/…")`（`src/Wanxiangshu/Omp/Adapter.fs:248`、`:255`、`:368`、`:555`、`:556`）。omp 的 `package.json`（18.12.4）`exports` 里没有 `./sdk`、也没有裸的 `./session/session-manager`（只有 `"."` 与 `"./*"` 等），本机 `require.resolve` 这四个标识符全部 `ERR_PACKAGE_PATH_NOT_EXPORTED`；而扩展 API 把 SDK 作为 `pi.pi` 交给扩展（omp `src/extensibility/extensions/types.ts:1642`），适配器**从未读过 `pi.pi`**。
-4. **transcript id 是位置序号而非 omp 的 entry id** —— 适配器用 `TranscriptMessageAddress.create (sprintf "omp:%d" index)`（`src/Wanxiangshu/Omp/Adapter.fs:188`），而 omp 的每条记录本身带 `id`（omp `src/session/session-entries.ts:79-82`）。这正是开放项 **O-1**（见 `proposals/host-neutral-interface/evidence/omp-feasibility.md:14,46`）。
+4. **transcript id 是位置序号而非 omp 的 entry id** —— 适配器曾用 `TranscriptMessageAddress.create (sprintf "omp:%d" index)`（位置序号），而 omp 的每条记录本身带 `id`（omp `src/session/session-entries.ts:79-82`）。这曾是开放项 **O-1**，现按 `proposals/host-neutral-interface/evidence/omp-feasibility.md` 的 **"## Decided rules (was: open items)"** → **"### O-1 — TranscriptMessageAddress is the omp entry id"** 落地：地址**就是** omp 的 entry id（`src/Wanxiangshu/Omp/Adapter.fs:200-211`），不再用位置序号。
+
+> **本节状态（2026-10-22 更新）**：上面 4 条是针对旧 HEAD `5494db8f5` 的历史快照，**四条现已全部修掉**——(1) 工厂形状改为 omp 加载器接受的 `export default` 形态（`src/Wanxiangshu/Composition/Omp/OmpExtension.fs:26-33`）；(2) `SessionManager` 改走 omp 18.12.4 的私有构造入口 `create`（`src/Wanxiangshu/Omp/Adapter.fs:274-277`）；(3) SDK 改从扩展 API 交下来的 `pi.pi` 取（`src/Wanxiangshu/Omp/Adapter.fs:42`）；(4) entry id 按上条改为真实 entry id。因此本节**不再**是当前阻塞清单；当前仍然开放的是 **O-3**（Fable 产物与 `activateOnOmp` 的真实绑定）与 **O-5**（见 8.4）。
 
 ### 8.4 因此本节明确不宣称的事
 
