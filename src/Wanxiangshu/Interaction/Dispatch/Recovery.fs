@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
 
@@ -15,6 +15,26 @@ open Wanxiangshu.Composition.Durable
 /// detached library only PROVES acceptance when physical evidence exists; otherwise
 /// it leaves the old claim pending. It never resends or invents a crash terminal.
 module PromptRecovery =
+
+    /// The neutral transcript error channel rendered back into the reason text
+    /// the recovery outcome reports. The wording is the one the Host adapter
+    /// surfaces already use: a transport or refusal reason is passed through
+    /// verbatim, so the operator sees the host's own text.
+    let private hostErrorReason (error: HostError) =
+        match error with
+        | HostError.Unsupported capability -> sprintf "Host capability %A is unsupported" capability
+        | HostError.NotFound what -> what
+        | HostError.Refused reason -> reason
+        | HostError.Transport reason -> reason
+        | HostError.Unknown reason -> reason
+
+    /// The neutral role rendered as the wire role the claim law matches on.
+    /// Only a user message proves a landing, so the spelling must stay exact.
+    let private roleText (role: TranscriptRole) =
+        match role with
+        | TranscriptRole.User -> "user"
+        | TranscriptRole.Assistant -> "assistant"
+        | TranscriptRole.System -> "system"
 
     /// What one pending claim resolved to.
     ///
@@ -76,7 +96,7 @@ module PromptRecovery =
         (runtime: PromptDispatcher.Runtime)
         (claim: PromptAuthority.PromptClaim)
         sessionId
-        (messages: SessionMessage list)
+        (messages: TranscriptMessage list)
         report
         =
         let verdict =
@@ -84,7 +104,10 @@ module PromptRecovery =
                 (PromptKey.value claim.PromptKey)
                 claim.Receipt.IsSome
                 (messages
-                 |> List.map (fun message -> message.Role, message.PromptKey, message.Id))
+                 |> List.map (fun message ->
+                        roleText message.Role,
+                        message.Correlation |> Option.map PromptKey.value,
+                        TranscriptMessageAddress.value message.Id))
 
         match verdict with
         | Ok physical -> reconcileWithPhysical runtime claim sessionId (PhysicalUserMessageId.create physical) report
@@ -97,7 +120,7 @@ module PromptRecovery =
     /// provable success into a permanent unknown.
     let private reconcileClaim
         (runtime: PromptDispatcher.Runtime)
-        (snapshot: ISessionSnapshotPort)
+        (transcript: ITranscriptPort)
         (sessionId: SessionId)
         (claim: PromptAuthority.PromptClaim)
         : Task<Reconciled> =
@@ -107,18 +130,18 @@ module PromptRecovery =
                   PromptKey = claim.PromptKey
                   Outcome = outcome }
 
-            match! snapshot.GetMessages sessionId with
-            | Error reason -> return report (Unreadable reason)
+            match! transcript.Messages sessionId with
+            | Error error -> return report (Unreadable (hostErrorReason error))
             | Ok messages -> return! reconcileMessages runtime claim sessionId messages report
         }
 
-    let private reconcileUnsettledClaims runtime snapshot unsettledClaims =
+    let private reconcileUnsettledClaims runtime transcript unsettledClaims =
         task {
             // DSL-MUTABLE: algorithm-scratch — reconciled result accumulator
             let results = ResizeArray<Reconciled>()
 
             for sessionId, claim in unsettledClaims do
-                let! outcome = reconcileClaim runtime snapshot sessionId claim
+                let! outcome = reconcileClaim runtime transcript sessionId claim
                 results.Add outcome
 
             return results |> Seq.toList
@@ -127,14 +150,14 @@ module PromptRecovery =
     /// Detached reconciliation library: prove a pending claim from physical Host
     /// evidence, or leave it pending. Ordinary plugin lifecycle never calls this.
     /// A process restart is not authority to abandon an unresolved old tool.
-    let reconcile (journal: AgentJournal option) (snapshotOpt: ISessionSnapshotPort option) : Task<Reconciled list> =
-        match journal, snapshotOpt with
-        // No journal means no durable claim to reconcile. No snapshot port means
-        // no way to prove acceptance, and PROMPT-011 forbids resending, so there
-        // is nothing this pass could legitimately do.
+    let reconcile (journal: AgentJournal option) (transcriptOpt: ITranscriptPort option) : Task<Reconciled list> =
+        match journal, transcriptOpt with
+        // No journal means no durable claim to reconcile. No transcript port
+        // means no way to prove acceptance, and PROMPT-011 forbids resending, so
+        // there is nothing this pass could legitimately do.
         | None, _
         | _, None -> Task.FromResult []
-        | Some durable, Some snapshot ->
+        | Some durable, Some transcript ->
             let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
             let projections = (AgentJournal.snapshot durable).AgentProjections
 
@@ -149,4 +172,4 @@ module PromptRecovery =
                         |> List.map (fun (_, claim) -> sessionId, claim))
                     |> Option.defaultValue [])
 
-            reconcileUnsettledClaims runtime snapshot unsettled
+            reconcileUnsettledClaims runtime transcript unsettled

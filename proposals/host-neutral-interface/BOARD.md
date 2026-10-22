@@ -55,6 +55,17 @@ routed onto P-03. `Host/Ports/*` is unchanged, so the next free port id stays **
 adapter-thinness 139 files / 33000 lines, product-reference 595 (baseline 689), without-port 134 (baseline 149),
 fsharp-control-pyramid 2 findings (both pre-existing). **NOT BUILD-VERIFIED, NOT TEST-RUN** — the delivery team must
 build master and run the recovery requirement suites.
+P-03 consumer cutover 2 (eng-hni-host, 2026-10-22): the dispatch recovery path now reads the transcript through the
+neutral port. `Interaction/Dispatch/Recovery.fs(i)` (`PromptRecovery.reconcile` now takes `ITranscriptPort option`) and
+`Interaction/Dispatch/RecoverySurface.fs` (the private snapshot stub became an `ITranscriptPort` stub). The claim law
+is unchanged; a host role outside the neutral vocabulary is carried as `system` so the 50-message recovery tail window
+is preserved. The legacy `ISessionSnapshotPort` / `SessionMessage` contract stays live — the remaining consumers
+(turn reconcile, prefix wire, delegation advisor, tools, fork host restart) are still to be routed onto P-03.
+`Host/Ports/*` is unchanged, so the next free port id stays **P-19**. Gates: architecture OK, adapter-thinness 139
+files / 33004 lines, product-reference 589 (baseline 689), without-port 134 (baseline 149), fsharp-control-pyramid 2
+findings (both pre-existing). **NOT BUILD-VERIFIED, NOT TEST-RUN** — the delivery team must build master and run the
+dispatch-protocol / effect-accounting recovery requirement suites.
+
 P-08 fact (arch lane, 2026-10-22, slice P-08): P-08 now has an OpenCode implementation —
 `OpenCode/Host/ModelCatalogPort.fs(i)` implements `IModelCatalog`, and the neutral port family
 `Host/Ports/ModelRouting.fs(i)` is unchanged. `Available` reads the host catalog over

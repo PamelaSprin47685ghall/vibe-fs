@@ -12,7 +12,7 @@ fixture; **not** wired to a running host, not shipped) · LEGACY-GONE (old host-
 |---|---|---|---|---|---|
 | P-01 | `ISessionPort`, `SessionSpec`, `SessionInfo` | `Host/Ports/Sessions.fs(i)` | fork (+ Execution/Session) | `IOpenCodePort` session members, `ISessionHostPort` create/list/parent, `OpenCodeChildOptions`, `OpenCodeChildInfo` | DECLARED, WIRED-OC, SKELETON-OMP — all seven verbs (`Create`, `Parent`, `Children`, `Abort`, `Interrupt`, `Close`, `FindByTitle`) implemented in the OpenCode adapter (`SdkSessionPort` / `HttpSessionPort`, `OpenCode/Host/SessionSnapshotPort.fs`); every verb reports failures as `HostError`, and no verb is left `Unsupported` |
 | P-02 | `IPromptPort`, `PromptRequest`, `DeliveryVerdict` | `Host/Ports/Prompts.fs(i)` | fission (+ Interaction/Dispatch) | `OpenCode.IPromptPort`, `OpenCodePromptOptions`, `DetachedSendVerdict` | DECLARED, SKELETON-OMP |
-| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` (both still live; cutover pending) | DECLARED, WIRED-OC, SKELETON-OMP — first consumer cut over: `SessionRecoveryHost` now takes `ITranscriptPort` (ctor arg `transcript`), the OpenCode adapter keeps the legacy `ISessionSnapshotPort` alive behind `TranscriptPort.HostTranscriptPort`; the other snapshot consumers are still to be routed |
+| P-03 | `ITranscriptPort`, `TranscriptMessage`, `TranscriptPart` | `Host/Ports/Transcript.fs(i)` | fork (+ Execution/Session) | `ISessionSnapshotPort`, `SessionMessage` (both still live; cutover in progress) | DECLARED, WIRED-OC, SKELETON-OMP — `SessionRecoveryHost` and the dispatch recovery path (`PromptRecovery` + `RecoverySurface`) now read through `ITranscriptPort`; the OpenCode adapter keeps the legacy `ISessionSnapshotPort` alive behind `TranscriptPort.HostTranscriptPort`; the remaining snapshot consumers (turn reconcile, prefix wire, delegation advisor/seat, tools, fork host restart) are still to be routed |
 | P-04 | `IToolRegistrar`, `ToolSpec`, `ToolInvocation`, `ToolOutcome` | `Host/Ports/Tools.fs(i)` | tools | `OpenCode/Tools/ToolContext` `Tool`/`ToolContext`/`ToolOutput` | DECLARED, SKELETON-OMP |
 | P-05 | `IToolGate`, `ToolCallVerdict`, `ToolResultEdit`, `ToolDefinitionEdit` | `Host/Ports/ToolGates.fs(i)` | tools | `tool.execute.before/after`, `tool.definition` handling in `OpenCode/Plugin/PluginHooks` | DECLARED, SKELETON-OMP |
 | P-06 | `ITurnTransform`, `TurnAdmission`, `ContextEdit`, `ParamsVerdict` | `Host/Ports/TurnTransforms.fs(i)` | plugin-host | `OpenCode/Plugin/PluginTransforms`, `ChatParamsHook`, `ProviderSystemTransform` entry points | DECLARED, SKELETON-OMP |
@@ -419,6 +419,24 @@ The five decided rules in `evidence/omp-feasibility.md` ("Decided rules (was: op
   `OpenCode/Host/SessionSnapshotPort.fs`, 0 in the new file, aggregate-retired OK, subsystems OK.
   **No compile/test evidence** (owner's no-build-before-push rule; the compile slot gave up with exit 75 because the
   machine was heavily loaded) — the delivery team must build master and run the model-routing requirement suites.
+
+- 2026-10-22 eng-hni-host (P-03 consumer cutover 2 — dispatch recovery): the dispatch recovery path now reads the
+  transcript through the neutral port. `Interaction/Dispatch/Recovery.fs(i)`: `PromptRecovery.reconcile` takes
+  `transcriptOpt: ITranscriptPort option` (was `snapshotOpt: ISessionSnapshotPort option`); the single host read moved
+  from `snapshot.GetMessages` to `transcript.Messages`, and a transcript failure is rendered to the recovery reason by a
+  private `HostError -> string` helper (transport/refusal reasons passed through verbatim; `Unsupported` spells
+  `Host capability <cap> is unsupported`). `Interaction/Dispatch/RecoverySurface.fs`: the private `Snapshot`
+  (`ISessionSnapshotPort`) became `Transcript` (`ITranscriptPort`) built over the same `SessionSnapshotPort.projectMessages`
+  projection, and the unreadable fixture now fails with `HostError.Transport reason` so the reason text stays verbatim.
+  The claim law (`DispatchLaw.recover`, role=`user` + `PromptKey` among the newest `RecoveryTailWindow` messages) is
+  unchanged; a host role outside the neutral vocabulary is carried as `system` (it could never prove a landing) so the
+  tail window width is preserved exactly. **The legacy `ISessionSnapshotPort` / `SessionMessage` contract stays live** —
+  the remaining consumers (turn reconcile, prefix wire, delegation advisor/seat, tools, fork host restart) are still to be
+  routed. **No new port** — P-03 (`Host/Ports/Transcript.fs(i)`) is unchanged; the next free id stays **P-19**. Gates:
+  architecture OK, adapter-thinness 139 files / 33004 lines, product-reference 589 (baseline 689), without-port 134
+  (baseline 149), fsharp-control-pyramid 2 findings — both pre-existing in `OpenCode/Host/SessionSnapshotPort.fs`.
+  **NOT BUILD-VERIFIED, NOT TEST-RUN** (owner's no-build-before-push rule) — the delivery team must build master and run
+  the dispatch-protocol / effect-accounting recovery requirement suites.
 
 ## How to add or change a port (domain lanes)
 1. Rebase, read this file and the family `.fsi`. Prefer extending an existing family over a new file.
