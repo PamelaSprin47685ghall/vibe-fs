@@ -3,16 +3,21 @@ namespace Wanxiangshu.Sphinx.V2.Hosts.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Sphinx.V2.Core
 open Wanxiangshu.Sphinx.V2.Persistence
 
 /// WHAT[sphinx-v2-034]：借用原 SyncDelegate owner，观察实际发送、接纳与终态。
 module Surface =
     let capabilities () : string array =
-        OpenCodeHostPort(Unchecked.defaultof<SyncDelegateRuntime>).Capabilities()
-        |> List.toArray
+        HostPort.capabilities () |> List.toArray
 
-    type private DispatchProbe = { Harness: obj; Owner: SessionId }
+    type private DispatchProbe =
+        {
+            Harness: obj
+            Owner: SessionId
+            /// The neutral workspace the host resolved for this inquiry. The adapter
+            /// does not read it yet; it is carried for the port adoption.
+            Workspace: Wanxiangshu.Host.Ports.WorkspacePath option
+        }
 
     let createDispatchProbe (directory: string) (owners: obj) (owner: string) : Task<obj> =
         task {
@@ -21,25 +26,19 @@ module Surface =
             return
                 box
                     { Harness = harness
-                      Owner = SessionId.create owner }
+                      Owner = SessionId.create owner
+                      Workspace = None }
         }
 
     let startDispatch (probe: obj) (_inquiry: string) (request: obj) : obj =
         let probe = unbox<DispatchProbe> probe
 
-        let refused reason : SyncDelegateObservedExecution =
-            { Admission = Task.FromResult(SyncDelegateObservedAdmission.NotDispatched reason)
-              Completion = Task.FromResult(Error reason) }
-
         match Codec.decodeBody request with
         | Ok body ->
-            match DispatchPolicy.admit body with
-            | Ok request ->
-                SyncDelegateSurface.withHostRuntime probe.Harness (fun runtime _ ->
-                    OpenCodeHostPort(runtime).Dispatch(probe.Owner, request))
-                |> box
-            | Error reason -> refused reason |> box
-        | Error fault -> refused fault.Message |> box
+            SyncDelegateSurface.withHostRuntime probe.Harness (fun runtime _ ->
+                HostPort.startDispatch runtime probe.Owner (Ok body) probe.Workspace)
+            |> box
+        | Error fault -> HostPort.refused fault.Message |> box
 
     let dispatchAdmission (execution: obj) =
         SyncDelegateSurface.observedAdmission execution
