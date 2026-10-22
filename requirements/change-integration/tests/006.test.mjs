@@ -54,7 +54,7 @@ const job = (id, path = `/tmp/${id}`) => ({
 
 test('WHAT[change-integration-006] worktree resource preserves its configured path through controlled creation and disposal', async () => {
   const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([0, '', '']) : Promise.resolve([0, '', ''])
-  const resource = await change.worktreeCreate(change.createGit('/repo', runner), 'hostfw10', '/tmp/hostfw10')
+  const resource = await change.worktreeCreate(change.createGit('/repo', runner), 'hostfw10', '/tmp/hostfw10', 'refs/heads/main')
   assert.equal(resource.ok, true)
   assert.equal(change.worktreePath(resource.value), '/tmp/hostfw10')
   await change.worktreeDispose(resource.value)
@@ -92,13 +92,11 @@ const fact = {
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
       targetHeadSnapshot}),
-  publishClaimed: (
-    authorityRevision = 'authority-1') =>
+  publishClaimed: () =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
-      expectedHead: 'h1',
-      authorityRevision}),
+      expectedHead: 'h1'}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
   abandoned: () => change.fact('JobAbandoned', null)}
@@ -268,8 +266,7 @@ const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
     jobId,
     targetRef: 'refs/heads/main',
     rebasedCommit: 'r1',
-    expectedHead,
-    authorityRevision: 'authority-1'}})
+    expectedHead}})
 const publishedEvent = (jobId, candidateCommit = 'c1', resultingTargetHead = 'r1') => ({
   kind: 'Published',
   payload: { jobId, candidateCommit, resultingTargetHead }})
@@ -352,7 +349,7 @@ test('WHAT[change-integration-006] WORKTREE_adopt_never_releases_on_dispose', as
 })
 test('WHAT[change-integration-006] WORKTREE_mark_durable_disposes_without_release', async () => {
   const { git, calls } = fakeGit()
-  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
+  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH, 'refs/heads/main'))
   change.worktreeMarkDurable(resource)
   await change.worktreeDispose(resource)
   assert.deepEqual(

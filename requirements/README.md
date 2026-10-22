@@ -26,7 +26,7 @@ grounding 由 `requirement-system` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 50 包索引
+## 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -60,7 +60,7 @@ grounding 由 `requirement-system` package 拥有。
 | [participant-horizon](participant-horizon/WHAT.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |
 | [cognitive-environment](cognitive-environment/WHAT.md) | 长期认知层与瞬时 runtime/mission 分开；knowledge 不创造 authority。 |
 | [cognitive-workspace](cognitive-workspace/WHAT.md) | 持久认知画板已经退休；本包只保留负向合同，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
-| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume` 与编程面 ANCHOR `view.thenMap` 摘要，本包只保留负向边界。 |
+| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume`、编程面 `carry` 与当前回合文本，本包只保留负向边界。 |
 | [action-affordance](action-affordance/WHAT.md) | 决策点必须知道 act 的正负边界、成功后果与参数意义。 |
 | [provider-language](provider-language/WHAT.md) | 一个 life 一个稳定 natural-language world；protocol identifiers 不翻译。 |
 | [provider-projection](provider-projection/WHAT.md) | typed semantic intent 经唯一确定性投影成为 provider representation，表示不反向创造 authority。 |
@@ -105,7 +105,7 @@ grounding 由 `requirement-system` package 拥有。
 ### 9. Mission / work
 | Package | 一句话 WHY |
 |---|---|
-| [obligation-ledger](obligation-ledger/WHAT.md) | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的有效上下文整理声明（扁平 `prefixUntil` + `thenMap`）；插件不维护第二份待办真相。 |
+| [obligation-ledger](obligation-ledger/WHAT.md) | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的有效上下文整理声明（`prefixCount` 与 `carry`）；插件不维护第二份待办真相。 |
 | [work](work/WHAT.md) | Work 与 Plan 共用一套生命周期：S1–S3 一段 deliver，S4 两段 deliver；review 返回 pairs，后继剥除前任 assistant 与 tool。 |
 
 ### 10. Feedback
@@ -127,7 +127,8 @@ grounding 由 `requirement-system` package 拥有。
 | Package | 一句话 WHY |
 |---|---|
 
-| [epistemic-reasoning](epistemic-reasoning/WHAT.md) | 认识状态区分 proposal/evidence 与不确定性，由 controller 治理信息动作与停止。 |
+| [epistemic-reasoning](epistemic-reasoning/WHAT.md) | 已由 sphinx-v2 取代的历史包：仅保留设计沿革与旧证据，不参与当前验收。 |
+| [sphinx-v2](sphinx-v2/WHAT.md) | clean-break 后的 Sphinx 内核：LLM 负责语义判断，程序负责科学问法、作用域估值与资源内调度；旧手写语义评分表整类删除。 |
 
 ### 13. Delivery
 | Package | 一句话 WHY |
@@ -136,7 +137,7 @@ grounding 由 `requirement-system` package 拥有。
 
 ## 依赖骨架
 
-权威依赖清单见各包 WHY.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 157-edge 骨架一致。
+权威依赖清单见各包 WHY.md 的 DEPENDS ON 节；`requirements/INDEX.md` 保留既有依赖导航。
 
 ## 运行与验证
 
@@ -148,3 +149,4 @@ node scripts/check.mjs                                       # 全 static gates
 
 - 每个条款恰一个顶级 `tests/NNN.test.mjs`，与用例标题中的 `WHAT[<包目录名小写>-NNN]` 强力绑定；integration/release 档用例经文件内 tier-gate 门控（环境变量 WXS_TIER_INTEGRATION / WXS_TIER_RELEASE），分别由集成调度器与 --release 执行；测试落点由测试用例标题锚 WHAT[包-NNN] 定义。
 - 迁移状态：旧 `docs/`、`changes/` 已于 2026-08-14 cutover 归档删除（git 可回溯）；`tests/` 已全部分包并统一编号。
+

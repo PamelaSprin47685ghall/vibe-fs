@@ -49,9 +49,6 @@ type ObservationId = private ObservationId of string
 type DecisionId = private DecisionId of string
 
 [<Struct>]
-type CertificateId = private CertificateId of string
-
-[<Struct>]
 type EventId = private EventId of string
 
 [<Struct>]
@@ -179,17 +176,6 @@ module DecisionId =
         | Error message -> IdConstruction.raiseId message
 
     let value (DecisionId inner) = inner
-
-module CertificateId =
-    let tryCreate value =
-        IdConstruction.make "CertificateId" CertificateId value
-
-    let create value =
-        match tryCreate value with
-        | Ok id -> id
-        | Error message -> IdConstruction.raiseId message
-
-    let value (CertificateId inner) = inner
 
 module EventId =
     let tryCreate value =

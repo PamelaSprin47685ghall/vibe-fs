@@ -38,11 +38,21 @@ type CasebookSemanticCutIncident =
         inherit System.Exception
         member Failure: CasebookAppendFailure
         member Cuts: SemanticCut list
+        static member OfFailure: failure: CasebookAppendFailure -> CasebookSemanticCutIncident
     end
 
 [<RequireQualifiedAccess>]
 module CasebookSemanticCutIncident =
     val tryFromSettlement: failure: CasebookAppendFailure -> CasebookSemanticCutIncident option
+
+/// CASEBOOK settlement scope: one case owns its own conflict, the shared log
+/// keeps its own failures.
+[<RequireQualifiedAccess>]
+type CasebookSettlementOutcome =
+    | Unscoped
+    | CaseUnavailable
+    | CaseUnavailableKnown
+    | LogScopeFailure
 
 /// CASE-003 / delegation-031 (F35): the case finalize outcome is a closed
 /// settlement, never a bare Result&lt;unit, string&gt;. `Finalized` and

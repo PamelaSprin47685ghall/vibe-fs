@@ -30,8 +30,7 @@ module OrchestratorFactFold =
             {| ManagerJobId: ManagerJobId
                TargetRef: TargetRef
                RebasedCommit: CommitHash
-               ExpectedHead: CommitHash
-               AuthorityRevision: AuthorityRevision |})
+               ExpectedHead: CommitHash |})
         (projection: OrchestratorProjection)
         : Result<OrchestratorProjection, OrchestratorFoldRejection> =
         match
@@ -51,8 +50,7 @@ module OrchestratorFactFold =
                         payload.ManagerJobId
                         {| TargetRef = payload.TargetRef
                            RebasedCommit = payload.RebasedCommit
-                           ExpectedHead = payload.ExpectedHead
-                           AuthorityRevision = payload.AuthorityRevision |}
+                           ExpectedHead = payload.ExpectedHead |}
                         projection
                 )
 

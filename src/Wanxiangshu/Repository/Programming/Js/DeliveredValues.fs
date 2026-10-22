@@ -7,8 +7,8 @@ open Wanxiangshu.Foundation
 
 /// Process-live delivered-view cell, keyed by session. The cell, its call
 /// fence and the returned cursor are owned by `wanxiangli/delivery`; this
-/// module is the composer: it selects the material a view names through the
-/// anchor ledger and renders what the owner says was not yet returned.
+/// module is the composer: it selects the material a carry names through the
+/// anchor ledger and serializes what the owner says was not yet returned.
 ///
 /// * A **delivered cell** carries the fence of the exact tool invocation that
 ///   produced it (`ProviderRun`, `ToolCallId`). Only this tier can be read as
@@ -38,7 +38,7 @@ module JsDeliveredValues =
         abstract fence: sessionId: string -> obj
         abstract returned: sessionId: string -> string array
         abstract claim: sessionId: string * request: obj -> obj
-        abstract handOff: ticket: obj * candidates: obj array * assistant: string -> obj array
+        abstract handOff: ticket: obj * candidates: obj array -> obj array
         abstract clear: sessionId: string -> unit
         abstract clearReturned: sessionId: string -> unit
         abstract clearAll: unit -> unit
@@ -82,169 +82,199 @@ module JsDeliveredValues =
 
     let peekCached (sessionId: string) : obj = owner.peekCached sessionId
 
-    let private declarationOf raw =
-        match Anchor.AnchorDeclarationRule.parse raw with
-        | Ok parsed -> parsed
-        | Error failure -> invalidOp (JsFailure.code failure + ": " + JsFailure.reason failure)
+    let private historyPiece text =
+        { Key = "material:" + JS.JSON.stringify text
+          Text = text }
 
-    let private newPiece (already: Set<string>) (anchor, text) =
-        let key = Anchor.AnchorView.materialKey anchor text
-
-        if Set.contains key already then
-            None
-        else
-            Some { Key = key; Text = text }
-
-    /// Handoff uses the same projected view as requests and advisor consultation.
+    /// Only selected history enters a transfer. Current prose is added separately.
     let select (sessionId: string) (view: obj option) (already: Set<string>) : ReturnedPiece list =
-        match view with
+        match view |> Option.map (Anchor.AnchorSurface.carryMaterial sessionId) with
         | None -> []
-        | Some raw ->
-            let declaration = declarationOf raw
+        | Some selected when not selected?ok -> invalidOp ((selected?code: string) + ": " + (selected?reason: string))
+        | Some selected ->
+            (selected?material: obj array)
+            |> Array.toList
+            |> List.map (fun entry -> historyPiece entry?text)
+            |> List.filter (fun piece -> not (Set.contains piece.Key already))
 
-            let numberOf = Anchor.AnchorLedger.numberMessage sessionId
-
-            let messages =
-                Anchor.AnchorLedger.context sessionId
-                |> List.map (fun (id, text) ->
-                    { Anchor.AnchorView.AnchorMessage.Id = id
-                      Anchor.AnchorView.AnchorMessage.Text = text
-                      Anchor.AnchorView.AnchorMessage.Raw = null })
-
-            let entries, _ =
-                Anchor.AnchorView.generate
-                    numberOf
-                    (fun _ -> 0)
-                    (Anchor.AnchorLedger.replacements sessionId)
-                    declaration
-                    messages
-
-            Anchor.AnchorView.material numberOf entries
-            |> List.choose (fun (anchor, text) -> newPiece already (anchor, text))
-
-    /// A delivery renders only what its view selected (plus the assistant
-    /// prose it names). An empty selection is not a delivery: the view
-    /// failed to point at the pre-call prose and the material it owes the
-    /// caller.
-    let private renderPieces (pieces: ReturnedPiece list) : string option =
-        if List.isEmpty pieces then
-            None
-        else
-            let prose =
-                pieces
-                |> List.map (fun piece ->
-                    LlmFacing.Data.tableArray
-                        "returned"
-                        [ LlmFacing.Data.stringMember "id" piece.Key
-                          LlmFacing.Data.stringMember "text" piece.Text ])
-
-            (LlmFacing.empty |> LlmFacing.withData prose |> LlmFacing.render).TrimEnd('\n')
-            |> fun text -> if String.IsNullOrWhiteSpace text then None else Some text
+    let private encodePieces (pieces: ReturnedPiece list) : string =
+        pieces |> List.map (fun piece -> piece.Text) |> ReturnedMaterial.ofTexts
 
     let private pieceValue (piece: ReturnedPiece) : obj =
         createObj [ "key" ==> piece.Key; "text" ==> piece.Text ]
 
     let private pieceOf (value: obj) : ReturnedPiece = { Key = value?key; Text = value?text }
 
+    let private fenceOf (value: obj) : DeliveryFence option =
+        if isNull value then
+            None
+        else
+            Some
+                { ProviderRun = Identity.ProviderRunIdentity.create value?providerRun
+                  ToolCallId = Identity.ToolCallId.create value?toolCallId }
+
+    let private currentPiece (sessionId: string) (fence: DeliveryFence option) (assistant: string option) =
+        assistant
+        |> Option.filter (fun prose -> prose.Length > 0)
+        |> Option.map (fun prose ->
+            let key =
+                match fence with
+                | Some fence ->
+                    "turn:"
+                    + JS.JSON.stringify
+                        [| sessionId
+                           Identity.ProviderRunIdentity.value fence.ProviderRun
+                           Identity.ToolCallId.value fence.ToolCallId |]
+                | None -> "prose:" + JS.JSON.stringify [| sessionId; prose |]
+
+            { Key = key; Text = prose })
+
+    let private materialPieces sessionId view fence assistant already =
+        let history = select sessionId view already
+
+        match view, currentPiece sessionId fence assistant with
+        | Some _, Some current when not (Set.contains current.Key already) -> history @ [ current ]
+        | _ -> history
+
+    /// Live handoff and the durable witness share one storage representation.
+    let materialize sessionId carry fence assistant =
+        materialPieces sessionId (Some carry) fence assistant Set.empty |> encodePieces
+
+    let private handOffPieces (ticket: obj) (candidates: ReturnedPiece list) : string option =
+        owner.handOff (ticket, candidates |> List.map pieceValue |> List.toArray)
+        |> Array.map pieceOf
+        |> Array.toList
+        |> encodePieces
+        |> Some
+
+    [<Emit("$0.ok === true")>]
+    let private claimSucceeded (outcome: obj) : bool = jsNative
+
+    /// The owner compares the fence itself: a refused claim carries the exact
+    /// reason and leaves the cell and the cursor where they are.
+    let private claimTicket (sessionId: string) (request: obj) : obj option =
+        let outcome = owner.claim (sessionId, request)
+
+        if claimSucceeded outcome then
+            Some outcome?ticket
+        else
+            None
+
     /// The owner decides whether the cell may be handed off in this mode and
     /// which selected pieces were not yet returned; selection itself stays
     /// here because it reads the anchor ledger.
     let private handoff (sessionId: string) (request: obj) (assistant: string option) : string option =
-        match owner.claim (sessionId, request) with
-        | null -> None
-        | ticket ->
-            let view = optionalView ticket?view
-            let candidates = select sessionId view (alreadyReturned sessionId)
+        match claimTicket sessionId request with
+        | None -> None
+        | Some ticket ->
+            match optionalView ticket?view with
+            | None ->
+                handOffPieces ticket [] |> ignore
+                None
+            | Some carry ->
+                let candidates =
+                    materialPieces sessionId (Some carry) (fenceOf ticket?fence) assistant (alreadyReturned sessionId)
 
-            owner.handOff (ticket, candidates |> List.map pieceValue |> List.toArray, Option.toObj assistant)
-            |> Array.map pieceOf
-            |> Array.toList
-            |> renderPieces
+                handOffPieces ticket candidates
 
     let private cacheRequest () : obj = createObj [ "mode" ==> "cache" ]
 
     let private peekRequest () : obj = createObj [ "mode" ==> "peek" ]
 
-    let peekFence (sessionId: string) : DeliveryFence option =
-        match owner.fence sessionId with
-        | null -> None
-        | fence ->
-            Some
-                { ProviderRun = Identity.ProviderRunIdentity.create fence?providerRun
-                  ToolCallId = Identity.ToolCallId.create fence?toolCallId }
+    /// The whole call identity: provider run AND tool call id. The owner
+    /// compares both fields; the caller does not pre-check anything.
+    let private runRequest
+        (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
+        (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId)
+        : obj =
+        createObj
+            [ "mode" ==> "run"
+              "fence" ==>
+                createObj
+                    [ "providerRun" ==> Identity.ProviderRunIdentity.value providerRun
+                      "toolCallId" ==> Identity.ToolCallId.value toolCallId ] ]
+
+    /// A read-only observation of the exact call: the owner answers whether
+    /// the current cell is this call's delivery, without taking anything.
+    let private observeRequest
+        (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
+        (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId)
+        : obj =
+        createObj
+            [ "mode" ==> "observe"
+              "fence" ==>
+                createObj
+                    [ "providerRun" ==> Identity.ProviderRunIdentity.value providerRun
+                      "toolCallId" ==> Identity.ToolCallId.value toolCallId ] ]
+
+    let peekFence (sessionId: string) : DeliveryFence option = owner.fence sessionId |> fenceOf
 
     /// The exact handoff: the cell must carry the fence of this very tool
     /// call — the provider run AND the tool call id.
     ///
-    /// The owner stores the whole fence when a delivery is recorded and can
-    /// read it back, but its claim compares the provider run alone. Within
-    /// one run a second delivery overwrites the cell, so a consumer that
-    /// matches only the run takes the *other* call's material and advances
-    /// the returned cursor; the owning call then loses its delivery. That
-    /// is a wrong take, not a benign degradation.
-    ///
-    /// So the fence is compared here first, in both fields. A mismatch
-    /// claims nothing and advances nothing: the cell stays where it is and
-    /// the consumer sees nothing. The compare and the claim run in one
-    /// synchronous step — there is no await between them, and the owner's
-    /// fence, claim and hand-off touch no user code — so no other turn can
-    /// slip in between.
-    let tryTakeRenderedForCall
+    /// The owner stores the whole fence when a delivery is recorded and
+    /// compares both fields itself. A mismatch claims nothing and advances
+    /// nothing: the cell stays where it is and the consumer sees nothing.
+    /// The caller no longer peeks the fence before claiming.
+    let tryTakeMaterialForCall
         (sessionId: string)
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
         (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId)
         (assistant: string option)
         : string option =
-        match peekFence sessionId with
-        | Some fence when fence.ProviderRun = providerRun && fence.ToolCallId = toolCallId ->
-            // The run mode is the owner's only mode that claims a fenced
-            // cell; it compares the provider run alone, which the check
-            // above has already done together with the tool call id.
-            let request =
-                createObj
-                    [ "mode" ==> "run"
-                      "providerRun" ==> Identity.ProviderRunIdentity.value providerRun ]
+        handoff sessionId (runRequest providerRun toolCallId) assistant
 
-            handoff sessionId request assistant
-        | _ -> None
-
-    /// Render the staged view of a render cache cell. Presentation only:
-    /// nothing taken here proves a delivery (clauses 1 and 3).
-    let tryTakeRenderedWith (sessionId: string) (assistant: string option) : string option =
-        handoff sessionId (cacheRequest ()) assistant
-
-    /// The run-only handoff: the cell must carry the fence of this provider
-    /// run. An old terminal cannot consume a newer delivery.
-    ///
-    /// This matches the provider run only — the tool call id is NOT compared
-    /// — so within one run a different call can take this cell and advance
-    /// the returned cursor, and the owning call loses its delivery. It is
-    /// therefore a harness-only channel: production consumers must use
-    /// `tryTakeRenderedForCall` (the exact fence) or the durable witness
-    /// (`TaskDeliveryJournal.tryFindByFence*`, which also filters on the
-    /// logical run and the delivery task).
-    ///
-    /// The owner has no claim mode that compares the tool call id, so the
-    /// exact comparison lives in `tryTakeRenderedForCall` above.
-    let tryTakeRenderedFor
+    /// Consume the frozen material of a durable witness. Its anchors were
+    /// resolved when deliver settled; a later compression cannot reinterpret
+    /// them or make an already proven delivery disappear.
+    let tryTakeWitnessMaterial
         (sessionId: string)
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
-        (assistant: string option)
+        (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId)
+        (material: string)
+        (assistant: string)
         : string option =
-        let request =
-            createObj
-                [ "mode" ==> "run"
-                  "providerRun" ==> Identity.ProviderRunIdentity.value providerRun ]
+        match claimTicket sessionId (runRequest providerRun toolCallId) with
+        | None -> None
+        | Some ticket ->
+            let fence = fenceOf ticket?fence
+            let texts = ReturnedMaterial.texts material
+            let current = currentPiece sessionId fence (Some assistant)
+            let finalIndex = List.length texts - 1
 
-        handoff sessionId request assistant
+            let candidates =
+                texts
+                |> List.mapi (fun index text ->
+                    current
+                    |> Option.filter (fun piece -> index = finalIndex && piece.Text = text)
+                    |> Option.defaultWith (fun () -> historyPiece text))
 
-    let tryTakeRendered (sessionId: string) : string option = tryTakeRenderedWith sessionId None
+            handOffPieces ticket candidates
+
+    /// Select the staged view of a render cache cell. Presentation only:
+    /// nothing taken here proves a delivery (clauses 1 and 3).
+    let tryTakeMaterialWith (sessionId: string) (assistant: string option) : string option =
+        handoff sessionId (cacheRequest ()) assistant
+
+    /// Read-only observation: does the current cell belong to this very tool
+    /// call? The owner answers from the stored fence; nothing is taken and
+    /// the returned cursor does not move.
+    let ownsCell
+        (sessionId: string)
+        (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
+        (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId)
+        : bool =
+        match claimTicket sessionId (observeRequest providerRun toolCallId) with
+        | Some _ -> true
+        | None -> false
+
+    let tryTakeMaterial (sessionId: string) : string option = tryTakeMaterialWith sessionId None
 
     /// Snapshot of the handoff. Does not consume the cell and does not advance
     /// the returned cursor. Presentation only.
-    let tryPeekRendered (sessionId: string) : string option = handoff sessionId (peekRequest ()) None
+    let tryPeekMaterial (sessionId: string) : string option = handoff sessionId (peekRequest ()) None
 
-    let tryPeekRenderedWith (sessionId: string) (assistant: string option) : string option =
+    let tryPeekMaterialWith (sessionId: string) (assistant: string option) : string option =
         handoff sessionId (peekRequest ()) assistant
 
     let peekView (sessionId: string) : obj option =

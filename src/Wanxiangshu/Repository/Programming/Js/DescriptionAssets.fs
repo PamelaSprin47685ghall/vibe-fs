@@ -10,7 +10,6 @@ module JsDescriptionAssets =
         ProviderProse.render lang path Map.empty
 
     let private template (lang: ProviderLanguage) (path: string) =
-        ProviderResources.requireLanguagePair path
         ProviderResources.readText lang path
 
     let load (lang: ProviderLanguage) : JsCanonicalDescription.Prose =

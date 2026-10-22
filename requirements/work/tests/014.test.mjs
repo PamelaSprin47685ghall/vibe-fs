@@ -9,25 +9,16 @@ const opening = () => surface.encodeOpening('plan', 'work-1', '/repo', 7n)
 const incumbencyIdOf = (text) =>
   [...text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line)).flatMap((frame) => frame.events ?? [])].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 
-test('WHAT[work-014] 两段式第一次确认落地前不得返回已确认，同一对重放不得第二次结束', () => {
+test('WHAT[work-014] S4 一段式交付直接完成，同一 fence 重放返回既有记录且不重复退休', () => {
   const s4 = surface.encodeOpening('S4', 'work-e', '/repo', 4n)
-  const first = surface.deliverProbe(s4, 'run-a', 'call-a', 5n)
-  assert.equal(first.decision, 'Done')
-  assert.equal(first.detail, 'ReviewRequired')
-  assert.notEqual(first.detail, 'confirmed')
+  // 一段式交付：无需两段式确认，一次 deliver 即原子写入退休与后继
+  const deliver = surface.deliverProbe(s4, 'run-a', 'call-a', 5n)
+  assert.equal(deliver.decision, 'Write')
+  assert.equal(deliver.names.includes('IncumbencyRetired'), true)
+  assert.equal(deliver.names.includes('ConfirmationCommitted'), false)
 
-  const reviewed = surface.reviewProbe(
-    s4,
-    JSON.parse(s4.split('\n').find((line) => line.includes('IncumbencyOpened'))).events.find((event) => event.type === 'IncumbencyOpened').incumbencyId,
-    'Stayed',
-  )
-  assert.equal(reviewed.decision, 'Write')
-  const afterReview = s4 + reviewed.bytes
-  const confirm = surface.deliverProbe(afterReview, 'run-a', 'call-a', 5n)
-  assert.equal(confirm.decision, 'Write')
-  assert.equal(confirm.names, 'ConfirmationCommitted')
-  const replay = surface.replayProbe(afterReview + confirm.bytes, 'run-a', 'call-a', 5n)
+  // 同一 fence 重放：返回原记录，零追加，不重复结束
+  const replay = surface.replayProbe(s4 + deliver.bytes, 'run-a', 'call-a', 5n)
   assert.equal(replay.decision, 'Done')
   assert.equal(replay.names, '')
-  assert.equal(replay.detail.includes('delivered') || replay.detail.includes('relayed'), false)
 })

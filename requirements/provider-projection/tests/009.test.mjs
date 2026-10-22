@@ -3,21 +3,26 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
+const { parse: parseToml } = await import("smol-toml");
 const join = await import("../../../dist/Execution/Delegation/Fork/JoinResultRendererSurface.js");
 
 
-test('WHAT[provider-projection-009] MISC_join_render_batch_empty_view_no_comment', () => {
+test('WHAT[provider-projection-009] MISC_join_render_batch_preserves_an_empty_literal_entry', () => {
   const wire = join.renderAgentCompletion('english', 'x', '')
   assert.match(wire, /# x has returned\./)
-  assert.equal(wire.trim().split('\n').length, 1)
+  assert.deepEqual(parseToml(wire), { returned: [{ text: '' }] })
 })
-test('WHAT[provider-projection-009] MISC_join_render_batch_child_to_parent_view_stays_entry_local_comment', () => {
-  const wire = join.renderAgentCompletion('english', 'coder', 'Work summary\ndid the thing\n\nRecent work\nok')
+test('WHAT[provider-projection-009] MISC_join_render_batch_child_material_is_a_real_multiline_TOML_entry', () => {
+  const report = 'Work summary\ndid the thing\n\nRecent work\nok'
+  const wire = join.renderAgentCompletion('english', 'coder', report)
   assert.match(wire, /# coder has returned\./)
-  assert.match(wire, /^# Work summary$/m)
-  assert.match(wire, /^# did the thing$/m)
+  assert.match(wire, /^\[\[returned\]\]$/m)
+  assert.match(wire, /^did the thing$/m)
+  assert.deepEqual(parseToml(wire), { returned: [{ text: report }] })
+  assert.equal(wire.includes(report), true, 'the report keeps real line breaks in the rendered text')
   assert.equal(wire.includes('work_record ='), false)
-  assert.equal(wire.includes("= '''"), false)
+  assert.equal(wire.includes('view ='), false)
+  assert.equal(wire.includes('byName'), false)
 })
 }
 

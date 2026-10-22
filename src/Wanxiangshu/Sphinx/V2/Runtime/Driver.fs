@@ -94,7 +94,7 @@ module Driver =
     let private emptyEnvelope () : JsonEnvelope =
         { Schema =
             { Id = "sphinx.v2/empty@1"
-              Hash = "empty" }
+              Hash = "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a" }
           CanonicalPayload = "{}" }
 
     let private reservationEvents (state: InquiryState) (specs: WorkSpec list) : InquiryEventBody list =
@@ -116,8 +116,25 @@ module Driver =
             InquiryEventBody.DispatchRequested
                 { Work = spec
                   DispatchIntentId = Recovery.intentKey state.Id spec.Id spec.Attempt
-                  PublicEnvelope = emptyEnvelope ()
+                  PublicEnvelope = spec.Input |> Option.defaultWith emptyEnvelope
                   PrivateTicket = emptyEnvelope () })
+
+    /// A planned item leaves `Planned` only when its dependencies have actually
+    /// succeeded, so the promotion carries the real precondition.
+    let private promotionEvents (items: WorkItem list) : InquiryEventBody list =
+        items
+        |> List.filter (fun item ->
+            match item.State with
+            | WorkState.Planned -> true
+            | _ -> false)
+        |> List.map (fun item ->
+            InquiryEventBody.WorkAttemptTransitioned
+                { WorkId = item.Spec.Id
+                  Attempt = item.Spec.Attempt
+                  Fence = item.Spec.Fence
+                  FromState = "Planned"
+                  NextState = WorkState.Ready
+                  PhysicalRef = None })
 
     let private leaseEvents (items: WorkItem list) : InquiryEventBody list =
         items
@@ -130,6 +147,39 @@ module Driver =
                   NextState = WorkState.Leased item.Spec.Fence
                   PhysicalRef = None })
 
+    /// The events that make one item real: its promotion, its own reservation, the
+    /// lease and the dispatch intent. The reservation comes first because the
+    /// dispatch is refused without it, and the lease comes before the intent because
+    /// the intent names the leased attempt.
+    let private dispatchEventsOf (state: InquiryState) (item: WorkItem) : InquiryEventBody list =
+        promotionEvents [ item ]
+        @ reservationEvents state [ item.Spec ]
+        @ leaseEvents [ item ]
+        @ dispatchEvents state [ item ]
+
+    /// Work that cannot run because a dependency failed. The blockage is a fact the
+    /// caller can read; it is never reported as an idle inquiry.
+    let private blockedBy (state: InquiryState) : string option =
+        let failedDependency (dependency: WorkId) =
+            state.Work
+            |> Map.tryFind dependency
+            |> Option.bind (fun item ->
+                match item.State with
+                | WorkState.Failed _ -> Some(WorkId.value dependency)
+                | _ -> None)
+
+        state.Work
+        |> Map.toList
+        |> List.map snd
+        |> List.tryPick (fun item ->
+            match item.State with
+            | WorkState.Planned ->
+                item.Spec.Dependencies
+                |> Set.toList
+                |> List.tryPick failedDependency
+                |> Option.map (fun name -> sprintf "blocked by failed dependency %s" name)
+            | _ -> None)
+
     /// Observe supplies interpretation facts. Until then, only genuine round closings
     /// can advance; paid work must wait for the pending interpretation.
     let private advanceActive (state: InquiryState) : AdvancePlan =
@@ -139,34 +189,57 @@ module Driver =
 
         let ready = dispatchable state
 
+        let cancelling =
+            match state.Status with
+            | InquiryStatus.Cancelling -> true
+            | _ -> false
+
         let events =
             closings
-            @ (if not refinable && List.isEmpty closings then
-                   reservationEvents state (ready |> List.map (fun item -> item.Spec))
-                   @ leaseEvents ready
-                   @ dispatchEvents state ready
+            @ (if not refinable && not cancelling && List.isEmpty closings then
+                   ready |> List.map (dispatchEventsOf state) |> List.concat
                else
                    [])
 
         let outcome () =
             let pending = pendingWorkCount state
 
+            let actuallyAwaiting =
+                state.Work
+                |> Map.toList
+                |> List.map snd
+                |> List.exists (fun item ->
+                    match item.State with
+                    | WorkState.Leased _
+                    | WorkState.Running _
+                    | WorkState.InputRequired _ -> true
+                    | _ -> false)
+
             let refinableOutcome () =
                 AdvanceOutcome.RefinementPending(pendingInterpretationCount state)
 
             let awaitingOutcome () =
-                AdvanceOutcome.AwaitingResults(max pending ready.Length)
+                AdvanceOutcome.AwaitingResults(pending)
 
             let idleOutcome () =
-                match awaitingRoundNote state with
-                | Some _ -> AdvanceOutcome.AwaitingResults(openRounds state |> List.length)
-                | None -> AdvanceOutcome.NoRunnalbeWork "no dispatchable work"
+                match blockedBy state with
+                | Some reason -> AdvanceOutcome.NoRunnalbeWork reason
+                | None ->
+                    match awaitingRoundNote state with
+                    | Some _ -> AdvanceOutcome.AwaitingResults(openRounds state |> List.length)
+                    | None -> AdvanceOutcome.NoRunnalbeWork "no dispatchable work"
 
-            match refinable, pending > 0, List.isEmpty ready with
-            | true, _, _ -> refinableOutcome ()
-            | false, true, _ -> awaitingOutcome ()
-            | false, false, false -> awaitingOutcome ()
-            | false, false, true -> idleOutcome ()
+            match cancelling with
+            | true -> AdvanceOutcome.NoRunnalbeWork "cancellation requested; no new work is dispatched"
+            | false ->
+                match refinable, List.isEmpty ready with
+                | true, _ -> refinableOutcome ()
+                | false, false -> awaitingOutcome ()
+                | false, true ->
+                    match blockedBy state, actuallyAwaiting with
+                    | Some reason, false -> AdvanceOutcome.NoRunnalbeWork reason
+                    | _ when pending > 0 -> awaitingOutcome ()
+                    | _ -> idleOutcome ()
 
         let chosenOutcome = outcome ()
 

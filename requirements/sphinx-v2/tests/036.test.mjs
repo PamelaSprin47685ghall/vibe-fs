@@ -1,31 +1,28 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {createHash, randomUUID} from 'node:crypto'
+import {randomUUID} from 'node:crypto'
 import {accessSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {Client} from '@modelcontextprotocol/sdk/client/index.js'
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js'
-import {ErrorCode, McpError} from '@modelcontextprotocol/sdk/types.js'
 import {Watchdog} from '../../verification-system/tests/e2e/support/watchdog.js'
 import {isTool} from '../../../dist/Sphinx/V2/Wire/Surface.js'
 import * as Wire from '../../../dist/Sphinx/V2/Wire/Surface.js'
 import {isOk, isError, errorValue} from '../../../dist/Sphinx/V2/Core/Surface.js'
 import {
   Tool_decodeStart as decodeStart,
-  Tool_decodeWorkNext as decodeWorkNext,
   Tool_decodeWorkSubmit as decodeWorkSubmit,
   Tool_decodeStatus as decodeStatus,
   Tool_decodeCancel as decodeCancel,
   Tool_decodeExport as decodeExport,
-  Tool_decodeGoalAmend as decodeGoalAmend,
   Tool_refusalCode as refusalCode,
   Tool_refusalPath as refusalPath,
   Tool_refusalMessage as refusalMessage,
 } from '../../../dist/Sphinx/V2/Hosts/Mcp/Tool.js'
 
-const allowed = ['sphinx_inquiry_start', 'sphinx_work_next', 'sphinx_work_submit', 'sphinx_inquiry_status', 'sphinx_inquiry_cancel', 'sphinx_inquiry_export', 'sphinx_goal_amend']
+const allowed = ['sphinx_inquiry_start', 'sphinx_work_submit', 'sphinx_inquiry_status', 'sphinx_inquiry_cancel', 'sphinx_inquiry_export']
 
 const refusalOf = result => {
   assert.equal(isError(result), true, 'expected a refused decode')
@@ -33,43 +30,46 @@ const refusalOf = result => {
   return {code: refusalCode(refusal), path: refusalPath(refusal), message: refusalMessage(refusal)}
 }
 
-test('WHAT[sphinx-v2-036] actual tool contract admits the v2 names and rejects retired stage aliases', () => {
+test('WHAT[sphinx-v2-036] the actual tool contract admits five names and rejects retired stage aliases and unconnected tools', () => {
   for (const name of allowed) assert.equal(isTool(name), true, name)
-  for (const name of ['sphinx_assess', 'sphinx_propose', 'sphinx_investigate', 'sphinx_synthesize', 'sphinx', 'sphinx_inquiry_start_extra', 'SPHINX_WORK_NEXT']) {
+  for (const name of ['sphinx_work_next', 'sphinx_goal_amend', 'sphinx_assess', 'sphinx_propose', 'sphinx_investigate', 'sphinx_synthesize', 'sphinx', 'sphinx_inquiry_start_extra', 'SPHINX_WORK_NEXT']) {
     assert.equal(isTool(name), false, name)
   }
 })
 
 test('WHAT[sphinx-v2-036] every registered tool decodes its own arguments instead of ignoring them', () => {
   const argumentsOf = {
-    sphinx_inquiry_start: {commandId: 'c', goalText: 'g', constraints: [], materialRefs: [], authorizationRef: 'u', profileRef: 'p'},
-    sphinx_work_next: {commandId: 'c', inquiryId: 'i', limit: 1},
-    sphinx_work_submit: {commandId: 'c', inquiryId: 'i', workId: 'w', attempt: 1, fence: 'f', canonicalResult: 'r', resultSchema: {id: 's', hash: 'h'}, clusterId: 'k'},
+    sphinx_inquiry_start: {commandId: 'c', goalText: 'g', constraints: [], materialRefs: [], authorizationRef: 'u', profileRef: 'p', steps: []},
+    sphinx_work_submit: {commandId: 'c', inquiryId: 'i', workId: 'w', attempt: 1, fence: 'f', canonicalResult: 'r', outcome: 'succeeded'},
     sphinx_inquiry_status: {inquiryId: 'i'},
     sphinx_inquiry_cancel: {commandId: 'c', inquiryId: 'i', reason: 'r'},
     sphinx_inquiry_export: {inquiryId: 'i', mode: 'summary'},
-    sphinx_goal_amend: {commandId: 'c', inquiryId: 'i', expectedRevision: '0', authorizedBy: 'u', addedConstraints: []},
   }
 
   const decoders = {
     sphinx_inquiry_start: decodeStart,
-    sphinx_work_next: decodeWorkNext,
     sphinx_work_submit: decodeWorkSubmit,
     sphinx_inquiry_status: decodeStatus,
     sphinx_inquiry_cancel: decodeCancel,
     sphinx_inquiry_export: decodeExport,
-    sphinx_goal_amend: decodeGoalAmend,
   }
 
   assert.deepEqual(Object.keys(decoders).sort(), [...allowed].sort())
   assert.deepEqual(Object.keys(argumentsOf).sort(), [...allowed].sort())
 
   for (const name of allowed) {
-    // Each tool reads its own shape: the same valid arguments are accepted, and the
-    // same empty ones are refused by the field that is missing.
     assert.equal(isOk(decoders[name](argumentsOf[name])), true, name)
     assert.equal(isError(decoders[name]({})), true, name)
   }
+})
+
+test('WHAT[sphinx-v2-036] a work submit validates outcome options and requires a failure reason on failure', () => {
+  const base = {commandId: 'c', inquiryId: 'i', workId: 'w', attempt: 1, fence: 'w:1', canonicalResult: 'r'}
+  assert.equal(isOk(decodeWorkSubmit({...base, outcome: 'succeeded'})), true)
+  assert.equal(isOk(decodeWorkSubmit({...base})), true, 'omitted outcome defaults to succeeded')
+  assert.equal(isOk(decodeWorkSubmit({...base, outcome: 'failed', reason: 'no data'})), true)
+  assert.equal(refusalOf(decodeWorkSubmit({...base, outcome: 'failed'})).path, 'reason')
+  assert.equal(refusalOf(decodeWorkSubmit({...base, outcome: 'maybe'})).path, 'outcome')
 })
 
 test('WHAT[sphinx-v2-036] invalid inquiry identities are refused by the real JS reader instead of escaping as exceptions', () => {
@@ -97,9 +97,6 @@ test('WHAT[sphinx-v2-036] invalid inquiry identities are refused by the real JS 
 })
 
 test('WHAT[sphinx-v2-036] read ingress refuses explicit additional commands and state mutations by field', () => {
-  // 这里只证明 parser 拒绝夹带的写请求，不证明真实读取的副作用。
-  // commandId、workId、attempt 等单独的身份字段不等于一次写动作；
-  // 不用任意未知键测试发明封闭字段策略。
   const reads = [
     ['sphinx_inquiry_status', decodeStatus, {inquiryId: 'i'}],
     ['sphinx_inquiry_export', decodeExport, {inquiryId: 'i', mode: 'summary'}],
@@ -128,39 +125,58 @@ test('WHAT[sphinx-v2-036] read ingress refuses explicit additional commands and 
   }
 })
 
-test('WHAT[sphinx-v2-036] a goal amendment requires its own user authorizer and validates optional replacement text', () => {
-  const args = {commandId: 'c', inquiryId: 'i', expectedRevision: '0', authorizedBy: 'u', addedConstraints: []}
-  const {authorizedBy, ...withoutAuthorizer} = args
-  for (const invalid of [withoutAuthorizer, {...args, authorizedBy: '  '}, {...args, authorizedBy: 1}]) {
-    const refusal = refusalOf(decodeGoalAmend(invalid))
-    assert.equal(refusal.code, 'INVALID_SCHEMA')
-    assert.equal(refusal.path, 'authorizedBy')
-  }
-  assert.equal(isOk(decodeGoalAmend(args)), true)
-  assert.equal(isOk(decodeGoalAmend({...args, replacementText: 'replacement'})), true)
-  for (const replacementText of [null, '  ']) {
-    const refusal = refusalOf(decodeGoalAmend({...args, replacementText}))
-    assert.equal(refusal.code, 'INVALID_SCHEMA')
-    assert.equal(refusal.path, 'replacementText')
-  }
-})
-
-test('WHAT[sphinx-v2-036] goal amendment ingress requires its own checked revision precondition', () => {
-  const args = {commandId: 'c', inquiryId: 'i', expectedRevision: '0', authorizedBy: 'u', addedConstraints: []}
-  assert.equal(isOk(decodeGoalAmend(args)), true)
-  const {expectedRevision, ...withoutRevision} = args
-  for (const invalid of [withoutRevision, {...args, expectedRevision: null}, {...args, expectedRevision: 1}, {...args, expectedRevision: '-1'}, {...args, expectedRevision: 'not-a-revision'}]) {
-    assert.equal(refusalOf(decodeGoalAmend(invalid)).path, 'expectedRevision')
-  }
-})
-
-test('WHAT[sphinx-v2-036] an export mode outside summary and full, and a claim limit that could never admit work, are refused by field', () => {
+test('WHAT[sphinx-v2-036] an export mode outside summary and full is refused by field', () => {
   assert.equal(refusalOf(decodeExport({inquiryId: 'i', mode: 'everything'})).path, 'mode')
-  assert.equal(refusalOf(decodeWorkNext({commandId: 'c', inquiryId: 'i', limit: 0})).path, 'limit')
   assert.equal(isOk(decodeExport({inquiryId: 'i', mode: 'full'})), true)
-  assert.equal(isOk(decodeWorkNext({commandId: 'c', inquiryId: 'i', limit: 1})), true)
 })
 
+test('WHAT[sphinx-v2-036] actual JS start refuses malformed string lists without coercion or exceptions', async t => {
+  const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-start-list-types-'))
+  const handle = Wire.create(commonDir, 'start-list-owner', startConfig)
+  const command = {goalText: 'original goal with spaces', constraints: ['a lawful constraint with spaces'],
+    materialRefs: [], authorizationRef: 'user', profileRef: startConfig.profileRef}
+  const cases = [
+    ['missing', undefined], ['null', null], ['object', {}], ['string', 'reference'],
+    ['numeric entry', [1]], ['object entry', [{}]], ['null entry', [null]], ['boolean entry', [true]],
+  ]
+  try {
+    for (const field of ['constraints', 'materialRefs']) {
+      for (const [index, [label, value]] of cases.entries()) {
+        await t.test('WHAT[sphinx-v2-036] actual start rejects ' + field + ' ' + label, async () => {
+          const args = {...command, commandId: field + '-invalid-' + index, [field]: value}
+          if (value === undefined) delete args[field]
+          const before = journalBytes(commonDir)
+          const result = await Wire.start(handle, args)
+          assert.equal(result.outcome, 'refused')
+          assert.equal(result.refusal.code, 'INVALID_SCHEMA')
+          assert.equal(result.refusal.path, field)
+          assert.notEqual(result.refusal.message.trim(), '')
+          assert.deepEqual(journalBytes(commonDir), before)
+        })
+      }
+    }
+    const before = journalBytes(commonDir)
+    const created = await Wire.start(handle, {...command, commandId: 'lawful-list-positive-control'})
+    assert.equal(created.outcome, 'created', 'text fields with interior spaces remain lawful')
+    assert.notDeepEqual(journalBytes(commonDir), before, 'valid lists still cause an actual durable creation')
+  } finally {
+    Wire.dispose(handle)
+    rmSync(commonDir, {recursive: true, force: true})
+  }
+})
+
+test('WHAT[sphinx-v2-036] invalid material identities receive named refusals over real stdio', async t => {
+  await withSphinxStdio(t, async session => {
+    const before = journalBytes(session.commonDir)
+    for (const reference of ['ref a', 'ref\nx', 'ref\0x']) {
+      await expectMcpRefusal(session, 'sphinx_inquiry_start', {
+        commandId: 'invalid-material', goalText: 'goal with whitespace is lawful', constraints: [],
+        materialRefs: [reference], authorizationRef: 'user', profileRef: startConfig.profileRef,
+      }, 'INVALID_SCHEMA', 'materialRefs[0]', 'invalid material identity')
+    }
+    assert.deepEqual(journalBytes(session.commonDir), before)
+  })
+})
 
 const serveEntry = fileURLToPath(new URL('../../../dist/Sphinx/V2/ServeEntry.js', import.meta.url))
 const plainObject = value => value !== null && typeof value === 'object' &&
@@ -202,10 +218,8 @@ function mcpRefusal(result, label) {
 async function expectMcpRefusal(session, name, args, code, path, label) {
   const result = await session.callTool(name, args, label)
   const refusal = mcpRefusal(result, label)
-  const ingress = 'MCP_INGRESS_REFUSAL_MISMATCH: ' + label +
-    '；若得到 unsupported/unknown 而非字段拒绝，检查完整 passthrough schema 是否保留字段到 Tool'
-  assert.equal(refusal.code, code, ingress)
-  assert.equal(refusal.path, path, ingress)
+  assert.equal(refusal.code, code, label)
+  assert.equal(refusal.path, path, label)
 }
 
 async function closeAndObserveExit(client, transport, exited, diagnostic) {
@@ -216,7 +230,6 @@ async function closeAndObserveExit(client, transport, exited, diagnostic) {
     onTimeout: () => console.error(diagnostic('等待 SDK 子进程的真实 close 事件')),
     deps: {terminate: () => rejectSilence(new Error('MCP_SERVER_EXIT_UNOBSERVED: ' + diagnostic('未观察到真实退出')))},
   })
-  // close() 可能在发送 SIGKILL 后先返回。唯有预先订阅的 onclose 证明实际退出。
   const cleanup = (async () => {
     const errors = []
     try { await client.close() } catch (error) { errors.push(error) }
@@ -235,7 +248,6 @@ async function withSphinxStdio(t, scenario, options = {}) {
   const ownsCommonDir = options.commonDir === undefined
   const commonDir = options.commonDir ?? mkdtempSync(join(tmpdir(), 'sphinx-mcp-contract-'))
   const entryPath = realpathSync(serveEntry)
-  // SDK 默认安全环境加本次目录，不继承父测试的 fatal-disable 或 NODE_OPTIONS。
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [...(options.importModule === undefined ? [] : ['--import', options.importModule]), entryPath],
@@ -258,7 +270,6 @@ async function withSphinxStdio(t, scenario, options = {}) {
   let closed = false
   let resolveExit
   const exited = new Promise(resolve => { resolveExit = resolve })
-  // SDK 1.30.0 在 ChildProcess close 后调用它；Protocol.connect 会保存这个回调。
   transport.onclose = () => { closed = true; resolveExit() }
   transport.onerror = error => { transportError = error }
   const onStderr = chunk => { stderr = (stderr + chunk).slice(-4096) }
@@ -318,7 +329,6 @@ async function withSphinxStdio(t, scenario, options = {}) {
     }
     signal.removeEventListener('abort', interrupt)
     transport.stderr.off('data', onStderr)
-    // 未见退出时保留目录作为失败材料，不能删除它并冒充资源已收束。
     if (closed || !startAttempted) {
       if (ownsCommonDir) rmSync(commonDir, {recursive: true, force: true})
     } else t.diagnostic('MCP_SERVER_EXIT_UNOBSERVED: 保留 ' + commonDir)
@@ -326,225 +336,6 @@ async function withSphinxStdio(t, scenario, options = {}) {
   if (failure) throw failure
   assert.equal(closed, true, 'MCP_SERVER_EXIT_UNOBSERVED: fixture 未取得实际退出事件')
 }
-
-test('WHAT[sphinx-v2-036] the response oracle rejects bare empty content, false success and malformed refusal fields', () => {
-  const payload = {apiVersion: '2', outcome: 'refused', refusal: {code: 'INVALID_SCHEMA', path: 'command', message: 'explicit write is refused'}}
-  const result = {isError: true, structuredContent: payload, content: []}
-  assert.deepEqual(mcpRefusal(result, 'structured positive control'), payload.refusal)
-  assert.deepEqual(mcpRefusal({isError: true, content: [{type: 'text', text: JSON.stringify(payload)}]}, 'JSON positive control'), payload.refusal)
-  for (const invalid of [
-    {isError: true, content: []},
-    {...result, isError: false},
-    {isError: true, content: [{type: 'text', text: '   '}]},
-    {isError: true, content: [{type: 'text', text: 'not JSON'}]},
-    {...result, structuredContent: {}},
-    {...result, structuredContent: {...payload, refusal: {...payload.refusal, message: ' '}}},
-    {...result, structuredContent: {...payload, refusal: {...payload.refusal, path: null}}},
-    {...result, structuredContent: {...payload, refusal: {...payload.refusal, code: ''}}},
-  ]) assert.throws(() => mcpRefusal(invalid, 'negative control'), /MCP_RESPONSE_LAYOUT/)
-})
-
-test('WHAT[sphinx-v2-036] one real SDK stdio session registers seven tools and preserves named ingress refusals', async t => {
-  await withSphinxStdio(t, async session => {
-    assert.equal(session.serverInfo.name, 'sphinx', 'initialize must reach the production Sphinx server')
-    const {tools} = await session.listTools()
-    assert.equal(tools.length, 7, 'MCP_DISCOVERY_FAILED: exactly seven real registered tools')
-    assert.deepEqual(tools.map(tool => tool.name).sort(), [...allowed].sort())
-    await t.test('WHAT[sphinx-v2-036] public goal amendment advertises optional text and a strict revision precondition', () => {
-      const amendmentSchema = tools.find(tool => tool.name === 'sphinx_goal_amend').inputSchema
-      assert.equal(amendmentSchema.type, 'object', 'MCP_SCHEMA_CONTRACT_MISMATCH: object input schema')
-      assert.equal(Array.isArray(amendmentSchema.required), true, 'MCP_SCHEMA_CONTRACT_MISMATCH: required fields')
-      assert.equal(amendmentSchema.required.includes('replacementText'), false, 'MCP_SCHEMA_CONTRACT_MISMATCH: replacementText is optional, not nullable')
-      assert.equal(amendmentSchema.required.includes('expectedRevision'), true, 'MCP_SCHEMA_CONTRACT_MISMATCH: goal amendment has a strict revision precondition')
-    })
-
-    const inquiryId = 'protocol-only-absent-inquiry'
-    await t.test('WHAT[sphinx-v2-036] public start requires explicit startup configuration', async () => {
-      await expectMcpRefusal(session, 'sphinx_inquiry_start', {
-        commandId: 'unconfigured-start', goalText: 'an authorized goal', constraints: [],
-        materialRefs: [], authorizationRef: 'user-authorizer', profileRef: 'sphinx.default@2',
-      }, 'CONFIG_REQUIRED', 'configuration', 'unconfigured start')
-    })
-    const cancel = {tool: 'sphinx_inquiry_cancel', arguments: {commandId: 'cancel-1', inquiryId, expectedRevision: '0', reason: 'stop'}}
-    const mutations = {
-      command: cancel,
-      commands: [cancel],
-      certificatePatches: [{targetRef: 'n', expectedSlotRevision: '0'}],
-      budgetDebit: {modelCalls: 1},
-      events: [{tag: 'CancelRequested', payload: 'stop'}],
-      goalRevision: '1',
-      goalAmendment: {authorizedBy: 'user-authorizer', expectedRevision: '0', addedConstraints: ['new constraint']},
-    }
-    // 该 hash 来自下列 canonical schema 文档，不冒充已注册的业务 schema。
-    const schemaDocument = '{"additionalProperties":false,"properties":{"answer":{"type":"string"}},"required":["answer"],"type":"object"}'
-    const answer = {
-      commandId: 'submit-1', inquiryId, workId: 'protocol-only-work', attempt: 1,
-      fence: 'protocol-only-fence', canonicalResult: '{"answer":"42"}',
-      resultSchema: {id: 'sphinx.answer@1', hash: createHash('sha256').update(schemaDocument).digest('hex')},
-      clusterId: 'protocol-only-cluster',
-    }
-    await t.test('WHAT[sphinx-v2-036] a clean submit reaches the current unsupported branch, not business acceptance', async () => {
-      await expectMcpRefusal(session, 'sphinx_work_submit', answer, 'RUNTIME_OPERATION_UNSUPPORTED', 'tool', 'clean submit positive control')
-    })
-    for (const field of ['certificatePatches', 'budgetDebit', 'events', 'goalRevision', 'goalAmendment']) {
-      await t.test('WHAT[sphinx-v2-036] public work_submit preserves and refuses ' + field, async () => {
-        await expectMcpRefusal(session, 'sphinx_work_submit', {...answer, [field]: mutations[field]}, 'WORK_RESULT_EXCEEDS_ROLE', field, 'work_submit.' + field)
-      })
-    }
-    const reads = [
-      ['sphinx_inquiry_status', {inquiryId}],
-      ['sphinx_inquiry_export', {inquiryId, mode: 'summary'}],
-      ['sphinx_inquiry_export', {inquiryId, mode: 'full'}],
-    ]
-    for (const [name, args] of reads) {
-      const label = name + '.' + (args.mode ?? 'status')
-      await t.test('WHAT[sphinx-v2-036] ' + label + ' clean input is not a business read/export proof', async () => {
-        const refusal = mcpRefusal(await session.callTool(name, args, label + '.clean'), label + '.clean')
-        assert.equal(refusal.path, 'inquiryId')
-        assert.equal(refusal.code, 'UNKNOWN_INQUIRY', 'valid read/export must reach the actual absent-inquiry branch')
-      })
-      for (const [field, value] of Object.entries(mutations)) {
-        await t.test('WHAT[sphinx-v2-036] public ' + label + ' refuses explicit ' + field, async () => {
-          await expectMcpRefusal(session, name, {...args, [field]: value}, 'INVALID_SCHEMA', field, label + '.' + field)
-        })
-      }
-    }
-    const amendment = {commandId: 'amend-1', inquiryId, expectedRevision: '0', authorizedBy: 'user-authorizer', addedConstraints: ['keep the original goal']}
-    await t.test('WHAT[sphinx-v2-036] public goal amendment refuses a negative revision before the unsupported driver', async () => {
-      await expectMcpRefusal(session, 'sphinx_goal_amend', {...amendment, expectedRevision: '-1'}, 'INVALID_REVISION', 'expectedRevision', 'negative amendment revision')
-    })
-    for (const [label, args] of [
-      ['omitted replacementText', amendment],
-      ['nonblank replacementText', {...amendment, replacementText: 'user replacement'}],
-    ]) {
-      await t.test('WHAT[sphinx-v2-036] public goal amendment accepts ' + label + ' at ingress only', async () => {
-        await expectMcpRefusal(session, 'sphinx_goal_amend', args, 'RUNTIME_OPERATION_UNSUPPORTED', 'tool', label)
-      })
-    }
-    for (const replacementText of [null, '  ']) {
-      const label = replacementText === null ? 'explicit null replacementText' : 'blank replacementText'
-      await t.test('WHAT[sphinx-v2-036] public goal amendment refuses ' + label + ', not as omitted', async () => {
-        if (replacementText !== null) {
-          await expectMcpRefusal(session, 'sphinx_goal_amend', {...amendment, replacementText}, 'INVALID_SCHEMA', 'replacementText', label)
-          return
-        }
-        // optional 不等于 nullable；SDK 类型拒绝无需伪装成 Tool 业务 JSON。
-        let detail
-        try {
-          const result = await session.callTool('sphinx_goal_amend', {...amendment, replacementText}, label)
-          assert.equal(plainObject(result) && nativeJson(result), true, 'MCP_SCHEMA_REJECTION: 必须是原生 MCP result')
-          assert.equal(result.isError, true, 'MCP_SCHEMA_REJECTION: null 不得被接受或当作省略')
-          assert.equal(Array.isArray(result.content), true, 'MCP_SCHEMA_REJECTION: 缺少正式 content')
-          detail = result.content.filter(block => block.type === 'text' && typeof block.text === 'string')
-            .map(block => block.text).join('\n').trim()
-          if (!detail && Object.hasOwn(result, 'structuredContent')) {
-            const refusal = mcpRefusal(result, label)
-            assert.equal(refusal.path, 'replacementText')
-            detail = refusal.path + ': ' + refusal.message
-          }
-        } catch (error) {
-          // session 只包装一层 cause；其它协议、进程或 assertion 失败原样抛回。
-          const sdkError = error instanceof McpError ? error : error.cause
-          if (!(sdkError instanceof McpError) || sdkError.code !== ErrorCode.InvalidParams) throw error
-          detail = sdkError.message
-        }
-        assert.equal(typeof detail, 'string', 'MCP_SCHEMA_REJECTION: 缺少可读字段错误')
-        assert.notEqual(detail.trim(), '', 'MCP_SCHEMA_REJECTION: 空错误不算参数拒绝')
-        assert.match(detail, /\breplacementText\b/, 'MCP_SCHEMA_REJECTION: 必须指出 replacementText')
-        assert.match(detail, /invalid[_ -]?type|expected|must|required|cannot|received|不合法|无效|必须|不能|类型/i, 'MCP_SCHEMA_REJECTION: 必须说明拒绝原因')
-        assert.match(detail, /\b(?:string|null|nullable|type)\b|字符串|空值|类型/i, 'MCP_SCHEMA_REJECTION: 必须说明类型或 null 原因')
-      })
-    }
-  })
-})
-
-const startConfig = {
-  commandNamespace: 'test-owner', createdBy: 'authorized-controller', profileRef: 'sphinx.default@2',
-  executionMode: 'delegated', resourceSpecs: [{name: 'calls', kind: {case: 'consumed', payload: 'calls'}, authorizedLimit: 0}],
-  renderReserve: {calls: 0},
-}
-
-test('WHAT[sphinx-v2-036] invalid material identities are refused by the real JS creator without a durable write', async () => {
-  const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-invalid-material-id-'))
-  const handle = Wire.create(commonDir, 'invalid-material-owner', startConfig)
-  const command = {commandId: 'invalid-material', goalText: 'goal with whitespace is lawful', constraints: [],
-    materialRefs: [], authorizationRef: 'user', profileRef: startConfig.profileRef}
-  try {
-    const before = journalBytes(commonDir)
-    for (const reference of ['ref a', 'ref\nx', 'ref\0x']) {
-      const result = await Wire.start(handle, {...command, materialRefs: [reference]})
-      assert.equal(result.outcome, 'refused')
-      assert.equal(result.refusal.code, 'INVALID_SCHEMA')
-      assert.equal(result.refusal.path, 'materialRefs[0]')
-      assert.notEqual(result.refusal.message.trim(), '')
-    }
-    assert.deepEqual(journalBytes(commonDir), before)
-  } finally {
-    Wire.dispose(handle)
-    rmSync(commonDir, {recursive: true, force: true})
-  }
-})
-
-test('WHAT[sphinx-v2-036] actual JS start refuses malformed string lists without coercion or exceptions', async t => {
-  const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-start-list-types-'))
-  const handle = Wire.create(commonDir, 'start-list-owner', startConfig)
-  const command = {goalText: 'original goal with spaces', constraints: ['a lawful constraint with spaces'],
-    materialRefs: [], authorizationRef: 'user', profileRef: startConfig.profileRef}
-  const cases = [
-    ['missing', undefined], ['null', null], ['object', {}], ['string', 'reference'],
-    ['numeric entry', [1]], ['object entry', [{}]], ['null entry', [null]], ['boolean entry', [true]],
-  ]
-  try {
-    for (const field of ['constraints', 'materialRefs']) {
-      for (const [index, [label, value]] of cases.entries()) {
-        await t.test('WHAT[sphinx-v2-036] actual start rejects ' + field + ' ' + label, async () => {
-          const args = {...command, commandId: field + '-invalid-' + index, [field]: value}
-          if (value === undefined) delete args[field]
-          const before = journalBytes(commonDir)
-          const result = await Wire.start(handle, args)
-          assert.equal(result.outcome, 'refused')
-          assert.equal(result.refusal.code, 'INVALID_SCHEMA')
-          assert.equal(result.refusal.path, field)
-          assert.notEqual(result.refusal.message.trim(), '')
-          assert.deepEqual(journalBytes(commonDir), before)
-        })
-      }
-    }
-    const before = journalBytes(commonDir)
-    const created = await Wire.start(handle, {...command, commandId: 'lawful-list-positive-control'})
-    assert.equal(created.outcome, 'created', 'text fields with interior spaces remain lawful')
-    assert.notDeepEqual(journalBytes(commonDir), before, 'valid lists still cause an actual durable creation')
-  } finally {
-    Wire.dispose(handle)
-    rmSync(commonDir, {recursive: true, force: true})
-  }
-})
-
-test('WHAT[sphinx-v2-036] invalid inquiry identities and material identities receive named refusals over real stdio', async t => {
-  await withSphinxStdio(t, async session => {
-    const before = journalBytes(session.commonDir)
-    for (const inquiryId of ['a b', 'inq\nx', 'inq\0x']) {
-      for (const [name, args] of [
-        ['sphinx_inquiry_status', {inquiryId}],
-        ['sphinx_inquiry_export', {inquiryId, mode: 'full'}],
-        ['sphinx_inquiry_cancel', {inquiryId, commandId: 'invalid-identity', reason: 'stop'}],
-      ]) {
-        await t.test('WHAT[sphinx-v2-036] real ' + name + ' rejects invalid inquiry identity ' + JSON.stringify(inquiryId), async () => {
-          await expectMcpRefusal(session, name, args, 'INVALID_SCHEMA', 'inquiryId', 'invalid inquiry identity')
-        })
-      }
-    }
-    for (const reference of ['ref a', 'ref\nx', 'ref\0x']) {
-      await t.test('WHAT[sphinx-v2-036] real start rejects invalid material identity ' + JSON.stringify(reference), async () => {
-        await expectMcpRefusal(session, 'sphinx_inquiry_start', {
-          commandId: 'invalid-material', goalText: 'goal with whitespace is lawful', constraints: [],
-          materialRefs: [reference], authorizationRef: 'user', profileRef: startConfig.profileRef,
-        }, 'INVALID_SCHEMA', 'materialRefs[0]', 'invalid material identity')
-      })
-    }
-    assert.deepEqual(journalBytes(session.commonDir), before)
-  }, {startConfig})
-})
 
 function mcpBusiness(result, outcome, label) {
   assert.equal(plainObject(result) && nativeJson(result), true, 'MCP_BUSINESS_LAYOUT: ' + label)
@@ -555,7 +346,7 @@ function mcpBusiness(result, outcome, label) {
   assert.equal(plainObject(payload) && nativeJson(payload), true, 'MCP_BUSINESS_LAYOUT: native business JSON, ' + label)
   assert.deepEqual(textPayload, payload, 'MCP_BUSINESS_LAYOUT: structured and text payload agree, ' + label)
   assert.equal(payload.apiVersion, '2', label)
-  assert.equal(payload.outcome, outcome, 'N06_A_BUSINESS_OUTCOME: ' + label)
+  assert.equal(payload.outcome, outcome, 'BUSINESS_OUTCOME: ' + label)
   assert.equal(result.isError, false, 'MCP_BUSINESS_LAYOUT: successful business outcome, ' + label)
   return payload
 }
@@ -576,13 +367,6 @@ function journalBytes(directory, prefix = '') {
   })
 }
 
-function physicalInquiryEvents(snapshot, inquiryId) {
-  return snapshot.filter(file => file.path.endsWith('.ndjson')).flatMap(file =>
-    Buffer.from(file.bytes, 'base64').toString('utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)))
-    .filter(event => event.event_type === 'sphinx/v2-transition@2' && event.payload.inquiry === inquiryId)
-    .sort((left, right) => Number(BigInt(left.payload.revision) - BigInt(right.payload.revision)))
-}
-
 function assertHashes(payload, label) {
   for (const field of ['traceHash', 'stateHash', 'semanticHash']) {
     assert.equal(typeof payload[field], 'string', label + '.' + field)
@@ -590,158 +374,216 @@ function assertHashes(payload, label) {
   }
 }
 
-function assertCreation(payload, goalText, label) {
-  for (const field of ['inquiryId', 'eventId']) {
-    assert.equal(typeof payload[field], 'string', label + '.' + field)
-    assert.notEqual(payload[field].trim(), '', label + '.' + field)
+const startConfig = {
+  commandNamespace: 'test-owner', createdBy: 'authorized-controller', profileRef: 'sphinx.default@2',
+  executionMode: 'delegated', resourceSpecs: [{name: 'calls', kind: {case: 'consumed', payload: 'calls'}, authorizedLimit: 10}],
+  renderReserve: {calls: 1},
+}
+
+const twoStepPlan = [
+  {id: 'step-a', title: 'collect facts', dependsOn: []},
+  {id: 'step-b', title: 'write the answer', dependsOn: ['step-a']},
+]
+
+async function startInquiry(session, commandId, goalText, steps = []) {
+  const command = {
+    commandId, goalText, constraints: [], materialRefs: [], authorizationRef: 'authorized-user', profileRef: 'sphinx.default@2', steps,
   }
-  assert.equal(payload.revision, '0', label + '.original revision')
-  assert.equal(payload.status, 'active', label + '.status')
-  assert.equal(payload.advance.outcome, 'no-runnable-work', label + '.advance')
-  assert.equal(typeof payload.advance.detail, 'string', label + '.advance.detail')
-  assert.notEqual(payload.advance.detail.trim(), '', label + '.advance.detail')
-  assert.notEqual(goalText.trim(), '')
+  return mcpBusiness(await session.callTool('sphinx_inquiry_start', command, 'start.' + commandId), 'created', 'start.' + commandId)
 }
 
-async function readInquiry(session, creation, goalText, label) {
-  const before = journalBytes(session.commonDir)
-  const status = mcpBusiness(await session.callTool('sphinx_inquiry_status', {inquiryId: creation.inquiryId}, label + '.status'), 'read', label + '.status')
-  assert.equal(status.inquiryId, creation.inquiryId, label + '.inquiryId')
-  assert.equal(typeof status.revision, 'string', label + '.revision')
-  assert.equal(status.inquiry.goal.originalText, goalText, label + '.original goal bytes')
-  assert.deepEqual(Buffer.from(status.inquiry.goal.originalText), Buffer.from(goalText), label + '.UTF8 goal bytes')
-  assert.equal(plainObject(status.inquiry.goal), true, label + '.native goal DTO')
-  const summary = mcpBusiness(await session.callTool('sphinx_inquiry_export', {inquiryId: creation.inquiryId, mode: 'summary'}, label + '.summary'), 'exported', label + '.summary')
-  assert.equal(summary.mode, 'summary', label + '.summary mode')
-  assert.equal(summary.replayability, 'summary-only', label + '.summary replayability')
-  assert.deepEqual(summary.inquiry, status.inquiry, label + '.summary semantic view')
-  assertHashes(summary, label + '.summary')
-  const full = mcpBusiness(await session.callTool('sphinx_inquiry_export', {inquiryId: creation.inquiryId, mode: 'full'}, label + '.full'), 'exported', label + '.full')
-  assert.equal(full.mode, 'full', label + '.full mode')
-  assert.equal(full.replayability, 'requires-external-inputs', label + '.full replayability')
-  assert.equal(full.externalInputsComplete, false, label + '.full does not claim all external inputs are available')
-  assert.equal(typeof full.replayabilityReason, 'string', label + '.full replayability reason')
-  assert.notEqual(full.replayabilityReason.trim(), '', label + '.full names the remaining external input boundary')
-  assert.equal(Array.isArray(full.externalInputs), true, label + '.explicit external inputs')
-  assert.equal(Array.isArray(full.events), true, label + '.canonical events')
-  assertHashes(full, label + '.full')
-  for (const field of ['traceHash', 'stateHash', 'semanticHash']) assert.equal(full[field], summary[field], label + '.same accepted head ' + field)
-  const events = physicalInquiryEvents(before, creation.inquiryId)
-  assert.ok(events.length > 0, label + '.creation really persisted')
-  assert.deepEqual(full.events, events, label + '.full exports actual canonical origin-to-head envelopes')
-  assert.equal(full.events[0].event_id, creation.eventId, label + '.origin receipt')
-  assert.equal(full.events[0].payload.events[0].case, 'InquiryCreated', label + '.creation event')
-  assert.equal(full.events[0].payload.events[0].payload.goal.originalText, goalText, label + '.stored goal bytes')
-  const created = full.events[0].payload.events[0].payload
-  assert.deepEqual(full.externalInputs, [
-    {kind: 'startup-configuration', ref: created.configHash},
-    ...created.goal.materialRefs.map(ref => ({kind: 'material', ref})),
-  ], label + '.external inputs bind actual creation configuration and material references')
-  assert.deepEqual(journalBytes(session.commonDir), before, label + '.status/export do not write journal bytes')
-  return {status, summary, full}
+async function readInquiry(session, inquiryId, label) {
+  return mcpBusiness(await session.callTool('sphinx_inquiry_status', {inquiryId}, label), 'read', label)
 }
 
-test('WHAT[sphinx-v2-036] configured real stdio start persists byte-exact goals and content-bound receipts, while native reads survive a new OS server', async t => {
+test('WHAT[sphinx-v2-036] one real SDK stdio session registers five tools and the single loop works through the production entry', async t => {
+  await withSphinxStdio(t, async session => {
+    assert.equal(session.serverInfo.name, 'sphinx', 'initialize must reach the production Sphinx server')
+    const {tools} = await session.listTools()
+    assert.equal(tools.length, 5, 'MCP_DISCOVERY_FAILED: exactly five real registered tools')
+    assert.deepEqual(tools.map(tool => tool.name).sort(), [...allowed].sort())
+
+    const inquiryId = 'protocol-only-absent-inquiry'
+    await expectMcpRefusal(session, 'sphinx_inquiry_start', {
+      commandId: 'unconfigured-start', goalText: 'an authorized goal', constraints: [],
+      materialRefs: [], authorizationRef: 'user-authorizer', profileRef: 'sphinx.default@2',
+    }, 'CONFIG_REQUIRED', 'configuration', 'unconfigured start')
+
+    const cancel = {tool: 'sphinx_inquiry_cancel', arguments: {commandId: 'cancel-1', inquiryId, reason: 'stop'}}
+    const mutations = {
+      command: cancel,
+      commands: [cancel],
+      certificatePatches: [{targetRef: 'n', expectedSlotRevision: '0'}],
+      budgetDebit: {modelCalls: 1},
+      events: [{tag: 'CancelRequested', payload: 'stop'}],
+      goalRevision: '1',
+      goalAmendment: {authorizedBy: 'user-authorizer', expectedRevision: '0', addedConstraints: ['new constraint']},
+    }
+    const answer = {
+      commandId: 'submit-1', inquiryId, workId: 'protocol-only-work', attempt: 1,
+      fence: 'protocol-only-fence', canonicalResult: '{"answer":"42"}', outcome: 'succeeded',
+    }
+    await expectMcpRefusal(session, 'sphinx_work_submit', answer, 'UNKNOWN_INQUIRY', 'inquiryId', 'absent inquiry submit')
+    for (const field of ['certificatePatches', 'budgetDebit', 'events', 'goalRevision', 'goalAmendment']) {
+      await expectMcpRefusal(session, 'sphinx_work_submit', {...answer, [field]: mutations[field]}, 'WORK_RESULT_EXCEEDS_ROLE', field, 'work_submit.' + field)
+    }
+    const reads = [
+      ['sphinx_inquiry_status', {inquiryId}],
+      ['sphinx_inquiry_export', {inquiryId, mode: 'summary'}],
+      ['sphinx_inquiry_export', {inquiryId, mode: 'full'}],
+    ]
+    for (const [name, args] of reads) {
+      const refusal = mcpRefusal(await session.callTool(name, args, name + '.clean'), name + '.clean')
+      assert.equal(refusal.path, 'inquiryId')
+      assert.equal(refusal.code, 'UNKNOWN_INQUIRY', 'valid read/export must reach the actual absent-inquiry branch')
+    }
+  })
+})
+
+test('WHAT[sphinx-v2-036] start plans and dispatches only satisfied steps, submit commits the answer, duplicates are not booked twice', async t => {
+  await withSphinxStdio(t, async session => {
+    const created = await startInquiry(session, 'loop-two-step', '第一目标\r\n雪 😀 尾部  ', twoStepPlan)
+    assert.equal(created.status, 'active')
+    assert.equal(created.advance.outcome, 'awaiting-results', 'the first step was dispatched')
+
+    const first = await readInquiry(session, created.inquiryId, 'first.status')
+    assert.equal(first.status, 'active')
+    assert.equal(first.nextStep.workId, 'step-a', 'only the root step is dispatchable')
+    assert.equal(first.nextStep.attempt, '1')
+    assert.equal(first.nextStep.fence, 'step-a:1')
+    assert.equal(first.nextStep.title, 'collect facts')
+
+    // Submit the root successfully; the follow-up must dispatch the child exactly once.
+    const submittedA = mcpBusiness(await session.callTool('sphinx_work_submit', {
+      commandId: 'submit-a', inquiryId: created.inquiryId, workId: 'step-a', attempt: 1,
+      fence: 'step-a:1', canonicalResult: '{"facts":"ready"}', outcome: 'succeeded',
+    }, 'submit.a'), 'applied', 'submit.a')
+    assert.equal(submittedA.status, 'active', 'the child is dispatched, not yet answered')
+
+    const second = await readInquiry(session, created.inquiryId, 'second.status')
+    assert.equal(second.nextStep.workId, 'step-b', 'the child is now dispatchable')
+    assert.equal(second.nextStep.fence, 'step-b:1')
+
+    // Submit the answer step; the final step's result becomes the answer.
+    const submittedB = mcpBusiness(await session.callTool('sphinx_work_submit', {
+      commandId: 'submit-b', inquiryId: created.inquiryId, workId: 'step-b', attempt: 1,
+      fence: 'step-b:1', canonicalResult: '{"answer":"42"}', outcome: 'succeeded',
+    }, 'submit.b'), 'applied', 'submit.b')
+    assert.equal(submittedB.status, 'completed')
+    assert.equal(JSON.parse(submittedB.answer).answer, '42')
+
+    const final = await readInquiry(session, created.inquiryId, 'final.status')
+    assert.equal(final.status, 'completed')
+    assert.equal(final.nextStep, null, 'nothing is left to dispatch')
+    assert.equal(JSON.parse(final.answer).answer, '42')
+
+    // A repeated delivery of the same result returns the original receipt and does not
+    // book a second observation.
+    const replay = mcpBusiness(await session.callTool('sphinx_work_submit', {
+      commandId: 'submit-b-again', inquiryId: created.inquiryId, workId: 'step-b', attempt: 1,
+      fence: 'step-b:1', canonicalResult: '{"answer":"42"}', outcome: 'succeeded',
+    }, 'submit.b.repeat'), 'replayed', 'submit.b.repeat')
+    assert.equal(replay.observationId, submittedB.observationId)
+
+    // The same result identity with different bytes is a conflict, not a second answer.
+    await expectMcpRefusal(session, 'sphinx_work_submit', {
+      commandId: 'submit-b-different', inquiryId: created.inquiryId, workId: 'step-b', attempt: 1,
+      fence: 'step-b:1', canonicalResult: '{"answer":"43"}', outcome: 'succeeded',
+    }, 'RESULT_PAYLOAD_CONFLICT', 'canonicalResult', 'submit.b.conflict')
+
+    const full = mcpBusiness(await session.callTool('sphinx_inquiry_export', {inquiryId: created.inquiryId, mode: 'full'}, 'final.full'), 'exported', 'final.full')
+    const observations = full.inquiry.observations.filter(obs => obs.work === 'step-b')
+    assert.equal(observations.length, 1, 'the answer step is booked exactly once')
+  }, {startConfig})
+})
+
+test('WHAT[sphinx-v2-036] a failed step leaves its dependents honestly unexecuted', async t => {
+  await withSphinxStdio(t, async session => {
+    const created = await startInquiry(session, 'loop-failure', 'goal needing a failing step', twoStepPlan)
+    const first = await readInquiry(session, created.inquiryId, 'first.status')
+    assert.equal(first.nextStep.workId, 'step-a')
+
+    const failed = mcpBusiness(await session.callTool('sphinx_work_submit', {
+      commandId: 'submit-a-failed', inquiryId: created.inquiryId, workId: 'step-a', attempt: 1,
+      fence: 'step-a:1', canonicalResult: '', outcome: 'failed', reason: 'source is unavailable',
+    }, 'submit.a.failed'), 'applied', 'submit.a.failed')
+    assert.equal(failed.status, 'active', 'a failed step does not fabricate completion')
+
+    const after = await readInquiry(session, created.inquiryId, 'after.failure')
+    assert.equal(after.nextStep, null, 'the child is not dispatched after its dependency failed')
+    assert.equal(after.advance.outcome, 'no-runnable-work')
+    assert.match(after.advance.detail, /blocked by failed dependency step-a/)
+    assert.equal(after.answer, null)
+  }, {startConfig})
+})
+
+test('WHAT[sphinx-v2-036] user cancel stops new dispatch and closes existing work', async t => {
+  await withSphinxStdio(t, async session => {
+    const created = await startInquiry(session, 'loop-cancel', 'goal that will be cancelled', twoStepPlan)
+    const before = journalBytes(session.commonDir)
+    const cancelled = mcpBusiness(await session.callTool('sphinx_inquiry_cancel', {
+      commandId: 'cancel-1', inquiryId: created.inquiryId, reason: 'authorized stop',
+    }, 'cancel'), 'applied', 'cancel')
+    assert.equal(cancelled.status, 'cancelling', 'an unconfirmed cancel is not a drained fact')
+    assert.notDeepEqual(journalBytes(session.commonDir), before, 'cancellation is a durable change')
+
+    const after = await readInquiry(session, created.inquiryId, 'after.cancel')
+    assert.equal(after.status, 'cancelling')
+    assert.equal(after.nextStep, null, 'no new work is dispatched after cancel')
+    assert.match(after.advance.detail, /cancellation requested/)
+    const workStates = after.inquiry.work.map(item => item.state)
+    assert.ok(workStates.every(state => state === 'Cancelled'), 'outstanding work is closed: ' + workStates.join(','))
+  }, {startConfig})
+})
+
+test('WHAT[sphinx-v2-036] configured real stdio start persists byte-exact goals, answers and native reads survive a new OS server', async t => {
   const commonDir = mkdtempSync(join(tmpdir(), 'sphinx-mcp-durable-start-'))
-  const goals = ['第一目标\r\n空值:\u0000；café 😀 尾部  ', '第二目标\r\n空值:\u0000；naïve 雪 尾部  ']
-  const commands = goals.map((goalText, index) => ({
-    commandId: 'stdio-create-' + index, goalText, constraints: ['keep the supplied text'],
-    materialRefs: ['material:原始-' + index], authorizationRef: 'authorized-user', profileRef: 'sphinx.default@2',
-  }))
-  const creations = []
-  let acceptedReads
+  const goalText = '第一目标\r\n空值:\u0000；café 😀 尾部  '
+  const command = {
+    commandId: 'stdio-create-0', goalText, constraints: ['keep the supplied text'],
+    materialRefs: ['material:原始-0'], authorizationRef: 'authorized-user', profileRef: 'sphinx.default@2',
+    steps: [{id: 'answer', title: 'answer the goal', dependsOn: []}],
+  }
+  let accepted
   let sharedHandle
   let completed = false
   try {
     await withSphinxStdio(t, async session => {
       const before = journalBytes(commonDir)
-      for (const [index, command] of commands.entries()) {
-        const creation = mcpBusiness(await session.callTool('sphinx_inquiry_start', command, 'start.' + index), 'created', 'start.' + index)
-        assertCreation(creation, goals[index], 'start.' + index)
-        creations.push(creation)
-      }
-      assert.notEqual(creations[0].inquiryId, creations[1].inquiryId, 'distinct commands create distinct inquiries')
+      const creation = mcpBusiness(await session.callTool('sphinx_inquiry_start', command, 'start.0'), 'created', 'start.0')
+      assert.equal(creation.revision, '0')
+      assert.equal(creation.status, 'active')
+      assert.equal(creation.advance.outcome, 'awaiting-results', 'the default answer step is dispatched')
       assert.notDeepEqual(journalBytes(commonDir), before, 'positive control: actual creation changes journal bytes')
+
+      const read = await readInquiry(session, creation.inquiryId, 'read.0')
+      assert.equal(read.inquiry.goal.originalText, goalText, 'original goal bytes')
+      assert.deepEqual(Buffer.from(read.inquiry.goal.originalText), Buffer.from(goalText), 'UTF8 goal bytes')
+      assert.equal(read.nextStep.workId, 'answer', 'the default single step is the answer step')
+
+      // Submit the answer, then read it back through export.
+      const answer = '{"answer":"字节精确 雪 😀 尾部  "}'
+      const submitted = mcpBusiness(await session.callTool('sphinx_work_submit', {
+        commandId: 'submit-answer', inquiryId: creation.inquiryId, workId: 'answer', attempt: 1,
+        fence: 'answer:1', canonicalResult: answer, outcome: 'succeeded',
+      }, 'submit.answer'), 'applied', 'submit.answer')
+      assert.equal(submitted.status, 'completed')
+
+      const full = mcpBusiness(await session.callTool('sphinx_inquiry_export', {inquiryId: creation.inquiryId, mode: 'full'}, 'full.0'), 'exported', 'full.0')
+      assertHashes(full, 'full.0')
+      assert.equal(full.inquiry.observations.find(o => o.work === 'answer').result, answer, 'answer bytes are kept exactly')
+      accepted = {creation, full}
       sharedHandle = Wire.create(commonDir, 'stdio-js-writer', startConfig)
-      for (const [index, command] of commands.entries()) {
-        const creation = creations[index]
-        const receipt = mcpBusiness(await session.callTool('sphinx_inquiry_start', command, 'start.repeat.' + index), 'replayed', 'start.repeat.' + index)
-        for (const field of ['inquiryId', 'revision', 'eventId']) assert.equal(receipt[field], creation[field], 'exact repeat keeps original ' + field)
-        const frozen = journalBytes(commonDir)
-        for (const [field, value] of [
-          ['goalText', command.goalText + '!'], ['constraints', ['a changed constraint']],
-          ['materialRefs', ['material:changed']], ['profileRef', 'different-profile'], ['authorizationRef', 'different-user'],
-        ]) {
-          await expectMcpRefusal(session, 'sphinx_inquiry_start', {...command, [field]: value}, 'COMMAND_CONFLICT', 'commandId', 'start.conflict.' + field)
-          assert.deepEqual(journalBytes(commonDir), frozen, 'conflicting ' + field + ' does not change durable bytes')
-        }
-      }
-      const first = await readInquiry(session, creations[0], goals[0], 'first.goal')
-      const second = await readInquiry(session, creations[1], goals[1], 'second.goal')
-      const beforeJsReads = journalBytes(commonDir)
-      assert.deepEqual(wireBusiness(Wire.status(sharedHandle, {inquiryId: creations[0].inquiryId}), 'read', 'JS reads MCP creation'), first.status, 'JS and MCP resolve the same canonical status')
-      for (const mode of ['summary', 'full']) {
-        assert.deepEqual(wireBusiness(Wire.exportInquiry(sharedHandle, {inquiryId: creations[0].inquiryId, mode}), 'exported', 'JS reads MCP ' + mode), first[mode], 'JS and MCP export the same accepted ' + mode)
-      }
-      assert.deepEqual(journalBytes(commonDir), beforeJsReads, 'JS status/export over MCP creation do not write journal bytes')
-      const thirdGoal = 'JS 创建的第三目标\r\n边界:\u0000 雪 😀 尾部  '
-      const thirdCommand = {...commands[0], commandId: 'js-create-third', goalText: thirdGoal, materialRefs: ['material:JS-原始']}
-      const beforeJsCreation = journalBytes(commonDir)
-      const third = wireBusiness(await Wire.start(sharedHandle, thirdCommand), 'created', 'JS actual third creation')
-      assertCreation(third, thirdGoal, 'JS actual third creation')
-      assert.ok(creations.every(creation => creation.inquiryId !== third.inquiryId), 'JS creates a distinct third inquiry in the shared owner')
-      assert.notDeepEqual(journalBytes(commonDir), beforeJsCreation, 'positive control: JS start changes the shared journal bytes')
-      const thirdReads = await readInquiry(session, third, thirdGoal, 'MCP.refresh.JS-creation')
-      const beforeSharedReads = journalBytes(commonDir)
-      assert.deepEqual(wireBusiness(Wire.status(sharedHandle, {inquiryId: third.inquiryId}), 'read', 'JS third status'), thirdReads.status, 'MCP refreshes the canonical inquiry created through JS')
-      for (const mode of ['summary', 'full']) {
-        assert.deepEqual(wireBusiness(Wire.exportInquiry(sharedHandle, {inquiryId: third.inquiryId, mode}), 'exported', 'JS third ' + mode), thirdReads[mode], 'MCP and JS share third inquiry ' + mode)
-      }
-      assert.deepEqual(journalBytes(commonDir), beforeSharedReads, 'cross-surface reads keep the same durable bytes')
-      assert.equal(first.full.events.length, second.full.events.length, 'same-length trace comparison')
-      for (const field of ['traceHash', 'stateHash', 'semanticHash']) assert.notEqual(first.full[field], second.full[field], 'different goal content changes ' + field)
-      assert.deepEqual(await readInquiry(session, creations[0], goals[0], 'first.repeat'), first, 'same accepted facts yield the same native reads')
-      const beforeCancel = journalBytes(commonDir)
-      const cancelled = mcpBusiness(await session.callTool('sphinx_inquiry_cancel', {
-        commandId: 'stdio-cancel', inquiryId: creations[0].inquiryId, reason: 'authorized stop',
-      }, 'cancel.first'), 'applied', 'cancel.first')
-      assert.equal(cancelled.inquiryId, creations[0].inquiryId)
-      assert.equal(cancelled.revision, '1')
-      assert.notDeepEqual(journalBytes(commonDir), beforeCancel, 'positive control: actual cancellation changes journal bytes')
-      const afterCancel = await readInquiry(session, creations[0], goals[0], 'first.cancelled')
-      assert.equal(afterCancel.status.revision, '1')
-      assert.equal(afterCancel.status.status, 'cancelling', 'unconfirmed cancellation is not a drained fact')
-      assert.equal(afterCancel.full.events.length, 2)
-      assert.deepEqual(afterCancel.full.events[1].parents, [creations[0].eventId], 'accepted trace follows its actual parent')
-      for (const field of ['traceHash', 'stateHash']) assert.notEqual(afterCancel.full[field], first.full[field], 'actual cancellation changes ' + field)
-      assert.equal(afterCancel.full.semanticHash, first.full.semanticHash, 'cancellation control history does not change the semantic facts')
-      assert.deepEqual(afterCancel.status.inquiry, first.status.inquiry, 'cancellation leaves the original semantic projection unchanged')
-      const beforeJsRefresh = journalBytes(commonDir)
-      assert.deepEqual(wireBusiness(Wire.status(sharedHandle, {inquiryId: creations[0].inquiryId}), 'read', 'JS.refresh.MCP-cancellation'), afterCancel.status, 'JS refresh sees MCP cancellation status and revision')
-      for (const mode of ['summary', 'full']) {
-        assert.deepEqual(wireBusiness(Wire.exportInquiry(sharedHandle, {inquiryId: creations[0].inquiryId, mode}), 'exported', 'JS.refresh.MCP-cancellation.' + mode), afterCancel[mode], 'JS refresh sees the current accepted cancellation ' + mode)
-      }
-      assert.deepEqual(journalBytes(commonDir), beforeJsRefresh, 'JS refresh over MCP cancellation writes no journal bytes')
-      const replay = mcpBusiness(await session.callTool('sphinx_inquiry_start', commands[0], 'start.repeat.after-cancel'), 'replayed', 'start.repeat.after-cancel')
-      for (const field of ['inquiryId', 'revision', 'eventId']) assert.equal(replay[field], creations[0][field], 'later revision does not change the original start ' + field)
-      assert.equal(replay.revision, '0')
-      acceptedReads = [afterCancel, second]
+      const jsRead = wireBusiness(Wire.status(sharedHandle, {inquiryId: creation.inquiryId}), 'read', 'JS reads MCP creation')
+      assert.equal(JSON.parse(jsRead.answer).answer, JSON.parse(answer).answer, 'JS sees the committed answer')
+      assert.deepEqual(Wire.exportInquiry(sharedHandle, {inquiryId: creation.inquiryId, mode: 'full'}), full, 'JS and MCP export the same accepted full')
     }, {commonDir, startConfig})
     await withSphinxStdio(t, async session => {
-      for (const [index, command] of commands.entries()) {
-        assert.deepEqual(await readInquiry(session, creations[index], goals[index], 'cold.' + index), acceptedReads[index], 'new OS process replays the original native facts')
-        const beforeReplay = journalBytes(commonDir)
-        const replay = mcpBusiness(await session.callTool('sphinx_inquiry_start', command, 'cold.start.repeat.' + index), 'replayed', 'cold.start.repeat.' + index)
-        for (const field of ['inquiryId', 'revision', 'eventId']) assert.equal(replay[field], creations[index][field], 'cold replay retains original ' + field)
-        assert.deepEqual(journalBytes(commonDir), beforeReplay, 'cold exact replay does not append another creation')
-      }
+      const read = await readInquiry(session, accepted.creation.inquiryId, 'cold.0')
+      assert.equal(read.inquiry.goal.originalText, goalText, 'cold reopen preserves goal bytes')
+      assert.equal(read.status, 'completed')
+      assert.equal(JSON.parse(read.answer).answer, JSON.parse(accepted.full.inquiry.observations.find(o => o.work === 'answer').result).answer)
     }, {commonDir, startConfig})
-    await withSphinxStdio(t, async session => {
-      const beforeConflict = journalBytes(commonDir)
-      await expectMcpRefusal(session, 'sphinx_inquiry_start', commands[0], 'COMMAND_CONFLICT', 'commandId', 'cold.changed-startup-config')
-      assert.deepEqual(journalBytes(commonDir), beforeConflict, 'changed startup configuration cannot rewrite the original command')
-      assert.deepEqual(await readInquiry(session, creations[0], goals[0], 'changed-config.read'), acceptedReads[0], 'read resolves the durable original configuration')
-    }, {commonDir, startConfig: {...startConfig, resourceSpecs: [{...startConfig.resourceSpecs[0], authorizedLimit: 1}]}})
     completed = true
   } finally {
     if (sharedHandle) Wire.dispose(sharedHandle)
@@ -755,7 +597,7 @@ for (const operation of ['start', 'cancel']) {
     const commonDir = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-settlement-')))
     const loader = fileURLToPath(new URL('./settlement-release-loader.mjs', import.meta.url))
     const command = {commandId: 'positive-start', goalText: '初始事实\r\n雪 尾部  ', constraints: [],
-      materialRefs: [], authorizationRef: 'user', profileRef: startConfig.profileRef}
+      materialRefs: [], authorizationRef: 'user', profileRef: startConfig.profileRef, steps: []}
     let failedReply
     let evidence
     let exported
@@ -792,7 +634,6 @@ for (const operation of ['start', 'cancel']) {
         assert.equal(existsSync(join(commonDir, 'wanxiangshu', 'events', `${coldWriter}.ndjson`)), false)
         assert.equal(readFileSync(evidence.sourceFile, 'base64'), evidence.bytes)
       } finally { Wire.dispose(cold) }
-      t.diagnostic(JSON.stringify({operation, physicalAndCold: true, sourcePid: evidence.pid, coldPid: process.pid}))
       const refusal = mcpRefusal(failedReply, 'actual Release uncertainty')
       assert.equal(refusal.code, 'COMMIT_UNKNOWN')
       assert.equal(refusal.path, 'inquiryId')
@@ -806,6 +647,3 @@ for (const operation of ['start', 'cancel']) {
     }
   })
 }
-
-test.todo('WHAT[sphinx-v2-036] registered writable MCP tools drive durable creation, work claim, result admission and authorized goal amendment through the single runtime')
-test.todo('WHAT[sphinx-v2-036] status/export over real stdio read an existing inquiry without creating leases, calling models or changing business state; receipts and dispatch observers need positive controls')

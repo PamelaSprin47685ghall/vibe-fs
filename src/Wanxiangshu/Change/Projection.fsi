@@ -32,8 +32,7 @@ type ManagerJobProjection =
       PublishClaimed:
           {| TargetRef: TargetRef
              RebasedCommit: CommitHash
-             ExpectedHead: CommitHash
-             AuthorityRevision: AuthorityRevision |} option
+             ExpectedHead: CommitHash |} option
       Terminal: TerminalOutcome option }
 
 [<RequireQualifiedAccess>]
@@ -86,45 +85,94 @@ type PublishClaimReality =
     | PublishReady
     | ClaimExpired
 
-/// wanxiangli/integration binding (CUT-23 ②). The library is the only owner of
-/// commission worktree binding, the publish gate's verdicts, conflict ownership
-/// and crash-recovery resume; this module converts F# values in and hands back
-/// the library's step/code vocabulary. Callers keep only the I/O and its order.
-module ChangeIntegrationLaw =
-    /// CleanUp | ReenterClaim | RunLoop
-    val resume: record: ManagerJobProjection option -> string
+/// Whether a prepared candidate may publish as it stands.
+[<RequireQualifiedAccess>]
+type CandidateAdmission =
+    | PublishCertified
+    | Rebase of reason: string
 
-    /// TargetMismatch | MissingRecord | MissingRebased | VerifyHead | RunLoop
+/// Whether the rebased pin still certifies the candidate about to publish.
+[<RequireQualifiedAccess>]
+type PublicationCertification =
+    | Certified
+    | MissingRebased
+    | CandidatePinMismatch
+    | SnapshotPinMismatch
+
+/// Whether the publication request still matches the job and target it claims.
+[<RequireQualifiedAccess>]
+type PublicationCheck =
+    | Matched
+    | JobMismatch
+    | TargetMismatch
+    | CasMismatch
+
+/// What the fast-forward actually did.
+[<RequireQualifiedAccess>]
+type FastForwardOutcome =
+    | Landed of CommitHash
+    | LandedMismatch of CommitHash
+    | TargetMoved
+    | Failed of string
+
+/// Whether a failed rebase is a conflict this job owns.
+[<RequireQualifiedAccess>]
+type ConflictOwnership =
+    | Conflict of files: string list
+    | NotAConflict
+
+/// Where a recovered job continues.
+[<RequireQualifiedAccess>]
+type RecoveryStep =
+    | CleanUp
+    | ReenterClaim
+    | RunLoop
+
+/// Why a durable publish claim cannot be re-entered.
+[<RequireQualifiedAccess>]
+type ClaimReentryRefusal =
+    | TargetMismatch
+    | MissingRecord
+    | MissingRebased
+
+/// What a durable publish claim may do after a restart.
+[<RequireQualifiedAccess>]
+type ClaimReentry =
+    | VerifyHead
+    | RunLoop
+    | Refused of ClaimReentryRefusal
+
+/// The publication decisions Change owns.
+[<RequireQualifiedAccess>]
+module PublicationLaw =
+    val resume: record: ManagerJobProjection option -> RecoveryStep
+
     val reenterClaim:
         jobTargetRef: TargetRef ->
         claimTargetRef: TargetRef ->
         claimRebased: CommitHash ->
         claimExpected: CommitHash ->
         record: ManagerJobProjection option ->
-            string
+            ClaimReentry
 
-    /// PublishCertified | TargetAdvanced | InitialRebaseRequired
     val admitCandidate:
         candidate: CommitHash ->
         target: CommitHash ->
         rebased:
             {| RebasedCommit: CommitHash
                TargetHeadSnapshot: CommitHash |} option ->
-            string
+            CandidateAdmission
 
-    /// Ok | MissingRebased | CandidatePin | SnapshotPin
     val certify:
         candidate: CommitHash ->
         expectedHead: CommitHash ->
         rebased:
             {| RebasedCommit: CommitHash
                TargetHeadSnapshot: CommitHash |} option ->
-            string
+            PublicationCertification
 
-    /// RecordConflict | Fail
-    val rebaseFailed: conflictFiles: string list -> string
+    val rebaseFailed: conflictFiles: string list -> ConflictOwnership
 
-    /// Ok | JobMismatch | TargetMismatch | CasMismatch
     val checkPublication:
         jobId: ManagerJobId ->
         jobTargetRef: TargetRef ->
@@ -132,10 +180,10 @@ module ChangeIntegrationLaw =
         evidenceTargetRef: TargetRef ->
         evidenceExpectedHead: CommitHash ->
         current: CommitHash ->
-            string
+            PublicationCheck
 
-    /// Landed | LandedMismatch | TargetMoved | Failed
-    val ffMerge: merge: Result<CommitHash, string> -> candidate: CommitHash -> targetMovedError: string -> string
+    val fastForward:
+        merge: Result<CommitHash, string> -> candidate: CommitHash -> targetMovedError: string -> FastForwardOutcome
 
 module OrchestratorProjection =
     val empty: OrchestratorProjection
@@ -194,8 +242,7 @@ module OrchestratorProjection =
         ManagerJobId ->
         {| TargetRef: TargetRef
            RebasedCommit: CommitHash
-           ExpectedHead: CommitHash
-           AuthorityRevision: AuthorityRevision |} ->
+           ExpectedHead: CommitHash |} ->
         OrchestratorProjection ->
             OrchestratorProjection
 

@@ -18,7 +18,7 @@ export function managerReviewStage(body) {
     const message = messages[index];
     if (message.role !== 'user') continue;
     if (typeof message.content !== 'string') return null;
-    const content = message.content.replace(/^\[ANCHOR: \d+\]\u0000\ufeff/, '');
+    const content = message.content.replace(/^\[ANCHOR: \d+; prefixCount: \d+\]\u0000\ufeff/, '');
     const prompt = content.split('\u0000')[0];
     const stages = prompts.get(prompt);
     if (!stages) return null;

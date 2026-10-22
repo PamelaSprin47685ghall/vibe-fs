@@ -56,13 +56,11 @@ const fact = {
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
       targetHeadSnapshot}),
-  publishClaimed: (
-    authorityRevision = 'authority-1') =>
+  publishClaimed: () =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
-      expectedHead: 'h1',
-      authorityRevision}),
+      expectedHead: 'h1'}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
   abandoned: () => change.fact('JobAbandoned', null)}
@@ -197,9 +195,8 @@ const relayedRoad = async (store, workId, root) => {
   assert.equal(opened.ok, true, opened.error)
   const reviewed = await lifecycle.seedReview(store, workId, 'Stayed')
   assert.equal(reviewed.ok, true, reviewed.error)
-  const confirmed = await lifecycle.seedDeliver(store, workId, 'run-1', 'call-1', 1n)
-  assert.equal(confirmed.ok, true, confirmed.error)
-  const relay = await lifecycle.seedDeliver(store, workId, 'run-2', 'call-2', 2n)
+  // Single delivery: Stayed review relays to a successor tenure in one call.
+  const relay = await lifecycle.seedDeliver(store, workId, 'run-1', 'call-1', 1n)
   assert.equal(relay.ok, true, relay.error)
 }
 
@@ -229,12 +226,10 @@ test('WHAT[change-integration-009] a delivered tenure with no successor holds th
     assert.equal(opened.ok, true, opened.error)
     const reviewed = await lifecycle.seedReview(store, workId, 'Promoted')
     assert.equal(reviewed.ok, true, reviewed.error)
-    const confirmed = await lifecycle.seedDeliver(store, workId, 'run-1', 'call-1', 1n)
-    assert.equal(confirmed.ok, true, confirmed.error)
-    // The promoted tenure's closing deliver writes the Delivered retirement. Its
-    // trailing logical-run closure needs a booted shared journal runtime, which this
-    // probe deliberately does not own, so the durable work state is the evidence.
-    await lifecycle.seedDeliver(store, workId, 'run-2', 'call-2', 2n)
+    // Single delivery: Promoted tenure completes in one deliver call. Its
+    // trailing logical-run closure needs a booted shared journal runtime, which
+    // this probe deliberately does not own, so the durable work state is the evidence.
+    await lifecycle.seedDeliver(store, workId, 'run-1', 'call-1', 1n)
 
     const view = lifecycle.inspected(stateRoot, workId)
     assert.equal(view.Delivered, true, 'the promoted tenure delivered')

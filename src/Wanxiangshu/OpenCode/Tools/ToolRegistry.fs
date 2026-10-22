@@ -72,49 +72,23 @@ module ToolRegistry =
     [<Emit("(() => { const out = {}; const src = $0; if (src === null || src === undefined || typeof src !== 'object') return out; for (const key of Object.keys(src)) { const descriptor = Object.getOwnPropertyDescriptor(src, key); if (descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')) { out[key] = descriptor.value; } } return out; })()")>]
     let private plainRecordCopy (source: obj) : obj = jsNative
 
-    /// The report material a delegate receives: the caller's report mapping
-    /// rendered as `<anchor>: <text>` lines, one per entry, newline-joined.
-    /// No entries means no material at all.
-    ///
-    /// The projection answers with the plain-JS receipt of
-    /// `AnchorSurface.reportMaterial`; the refusal travels as the same
-    /// `{ code, reason }` bytes the failure receipt carries.
-    let private recordOfLines (lines: string list) : obj =
-        if List.isEmpty lines then
-            null
+    let private carryMaterial (sessionId: string) (carry: obj) : obj =
+        let receipt = AnchorSurface.carryMaterial sessionId carry
+
+        if not (receipt?ok: bool) then
+            receipt
         else
-            box (String.concat "\n" lines)
+            let material: obj array = receipt?material
 
-    let private materialRecord (receipt: obj) : obj =
-        let material: obj array = receipt?material
+            createObj
+                [ "ok" ==> true
+                  "record" ==> (material |> Array.map (fun entry -> unbox<string> entry?text)) ]
 
-        let lines =
-            material
-            |> Array.toList
-            |> List.map (fun entry ->
-                let anchor: int = entry?anchor
-                let text: string = entry?text
-                sprintf "%d: %s" anchor text)
+    let private recordOfReceipt (receipt: obj) : string list =
+        unbox<string array> receipt?record |> Array.toList
 
-        createObj [ "ok" ==> true; "record" ==> recordOfLines lines ]
-
-    let private reportMaterialText (sessionId: string) (mapping: obj) : obj =
-        let receipt = AnchorSurface.reportMaterial sessionId mapping
-        let ok: bool = receipt?ok
-
-        if not ok then receipt else materialRecord receipt
-
-    /// The rendered record of a material receipt, or no record at all.
-    let private recordOfReceipt (receipt: obj) : string option =
-        let record = receipt?record
-
-        if isNullish record then None else Some(string record)
-
-    /// The delegate payload keeps every field the program sent and gains the
-    /// report material under `commissioner_record`. The payload is normalized
-    /// into a host-realm record first, so a payload built in the sandbox
-    /// realm is not dropped by the host's plain-record check.
-    let private payloadWithRecord (payload: obj) (record: string option) : obj =
+    /// Copy sandbox data into the host realm and add the selected context.
+    let private payloadWithRecord (payload: obj) (record: string list) : obj =
         let raw =
             if isStringValue payload then
                 createObj [ "charge" ==> payload ]
@@ -123,9 +97,7 @@ module ToolRegistry =
             else
                 plainRecordCopy payload
 
-        match record with
-        | None -> raw
-        | Some text -> withField raw "commissioner_record" (box text)
+        withField raw "context" (record |> List.toArray |> box)
 
     /// The devops intent travels as the program's own text: a plain string
     /// payload is the intent itself, an object payload carries it under
@@ -137,67 +109,25 @@ module ToolRegistry =
         else
             (ToolHostCodec.argumentsOfRaw normalizedPayload).Text "intent"
 
-    /// The advisor consult accepts the report mapping only — a mapping of
-    /// anchor numbers to summaries, equivalent to a `prefixUntil = 0`
-    /// declaration. There is no lenient empty declaration.
-    ///
-    /// The advisor seat needs the typed declaration itself, so it reads the
-    /// shared typed rule (`AnchorDeclarationRule`) — the very same decision the
-    /// plain-JS receipt of `AnchorSurface.parseReportMapping` reports.
-    let private advisorDeclarationOf (reportMapping: obj) =
-        AnchorDeclarationRule.parseReportMapping reportMapping
-
-    /// The transform's own wire text over a decoded snapshot part: the advisor
-    /// reads exactly what the caller's request carried, tool calls included.
-    let private advisorPartText (part: MessagePart) : string =
-        match part with
-        | MessagePart.Text text
-        | MessagePart.Reasoning text -> text
-        | MessagePart.ToolCall(_, name, args) -> name + " " + args
-        | MessagePart.ToolResult(_, result) -> result
-        | MessagePart.Activity _ -> ""
-
-    let private advisorMessageText (parts: MessagePart array) : string =
-        if isNull parts then
-            ""
-        else
-            parts |> Array.map advisorPartText |> String.concat "\n"
-
-    /// Numbering each snapshot message is what keeps the anchors in a consult
-    /// identical to the ones the caller's own request used.
-    let private advisorViewMessage (sessionId: string) (message: SessionMessage) : AdvisorViewMessage =
-        { Anchor = AnchorLedger.numberMessage sessionId message.Id
-          Text = advisorMessageText message.Parts }
-
     let private advisorIntentText (intent: obj) : string =
         if isStringValue intent then unbox<string> intent else ""
 
-    /// advisor-[006]: the member's refusals are data — `{ ok = false, code,
-    /// reason }` — never a throw the program would have to catch.
     let private advisorRefusal (code: string) (reason: string) : obj =
         createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
 
-    /// advisor-[002]/[003]: one consult — the caller's own delta rendered as the
-    /// seat's first prompt, the intent appended after it, and the seat's answer
-    /// handed back as data. A successful consult advances that caller session's
-    /// delivered-anchor cursor; a refusal changes nothing.
+    /// Resolve carry from the caller's visible history once. Only a successful
+    /// consultation advances the advisor's delivered-material cursor.
     let private advisorSeatAnswer
         (runtime: ToolRuntimeScope)
         (ctx: HostToolContext)
-        (messages: SessionMessage list)
-        (declaration: AdvisorViewDeclaration)
+        (material: obj array)
         (intent: obj)
         : Task<obj> =
         task {
             let sessionId = ctx.SessionId
 
-            let request: AdvisorViewRequest =
-                { Messages = messages |> List.map (advisorViewMessage sessionId)
-                  Declaration = declaration
-                  History = AnchorLedger.replacements sessionId }
-
             let plan =
-                AdvisorView.plan (ProviderLanguage.label (lang ctx)) (Cursor.delivered sessionId) request
+                AdvisorView.plan (ProviderLanguage.label (lang ctx)) (Cursor.delivered sessionId) material
 
             let deps: AdvisorSeatDeps =
                 { Sessions = runtime.Sessions
@@ -215,31 +145,19 @@ module ToolRegistry =
             | Error reason -> return advisorRefusal "advisor-unavailable" reason
         }
 
-    /// advisor-[006]: the `js.advisor` host closure. The caller's context comes
-    /// from its own session snapshot; an unreadable snapshot or an invalid view
-    /// declaration is a refusal, never a silently empty view. `HasNewMaterial`
-    /// does not gate the consult: the intent alone is new material.
-    let private advisorSnapshotMessages
-        (runtime: ToolRuntimeScope)
-        (ctx: HostToolContext)
-        : Task<Result<SessionMessage list, string>> =
-        match runtime.Snapshot with
-        | None -> Task.FromResult(Error "the session snapshot is unavailable")
-        | Some snapshotPort -> snapshotPort.GetMessages(SessionId.create ctx.SessionId)
-
     let private advisorConsult
         (runtime: ToolRuntimeScope)
         (ctx: HostToolContext)
         (intent: obj)
-        (reportMapping: obj)
+        (carry: obj)
         : Task<obj> =
         task {
-            let! loaded = advisorSnapshotMessages runtime ctx
+            let selected = AnchorSurface.carryMaterial ctx.SessionId carry
 
-            match loaded, advisorDeclarationOf reportMapping with
-            | Error reason, _ -> return advisorRefusal "advisor-unavailable" reason
-            | _, Error failure -> return advisorRefusal (JsFailure.code failure) (JsFailure.reason failure)
-            | Ok messages, Ok declaration -> return! advisorSeatAnswer runtime ctx messages declaration intent
+            if unbox<bool> selected?ok then
+                return! advisorSeatAnswer runtime ctx (unbox<obj array> selected?material) intent
+            else
+                return advisorRefusal (unbox<string> selected?code) (unbox<string> selected?reason)
         }
 
     let create
@@ -566,7 +484,8 @@ module ToolRegistry =
                 let! loaded = loadMessages ()
 
                 match loaded with
-                | Error _ -> return None
+                | Error err ->
+                    return Some (DeliverySettlement.ContextUnavailable (sprintf "%A" err))
                 | Ok messages ->
                     return!
                         attributedSettlement
@@ -651,8 +570,6 @@ module ToolRegistry =
 
                         return
                             facts.HasActiveIncumbency
-                            && not facts.HasAssessment
-                            && not facts.HasConfirmation
                             && facts.CleanupBlockerDigest.IsNone
                             && not frozen
                     }
@@ -698,7 +615,7 @@ module ToolRegistry =
                             let placedDelegate
                                 (execute: _ -> Task<Result<ForkTool.PlacementReceipt, string>>)
                                 (payload: obj)
-                                (record: string option)
+                                (record: string list)
                                 : Task<obj> =
                                 task {
                                     let raw = payloadWithRecord payload record
@@ -710,19 +627,21 @@ module ToolRegistry =
                                 match outcome with
                                 | Ok answer ->
                                     envelopeOk
-                                        [ "kind" ==> answer.Kind; "status" ==> answer.Status; "view" ==> answer.View ]
+                                        [ "kind" ==> answer.Kind
+                                          "status" ==> answer.Status
+                                          "returned" ==> ReturnedMaterial.entries answer.View ]
                                 | Error reason ->
                                     refusalWithReason "devops-failed" (sprintf "devops failed: %s" reason)
 
-                            let askDevops (payload: obj) (record: string option) (gitCommonDir: string) : Task<obj> =
+                            let askDevops (payload: obj) (record: string list) (gitCommonDir: string) : Task<obj> =
                                 task {
                                     let raw = payloadWithRecord payload record
                                     let intentText = devopsIntentText payload raw
 
                                     let intent =
-                                        record
-                                        |> Option.map (fun text -> intentText + "\n\n" + text)
-                                        |> Option.defaultValue intentText
+                                        LlmFacing.instruction intentText
+                                        |> LlmFacing.withData (LlmFacing.Data.textTables "context" record)
+                                        |> LlmFacing.render
 
                                     let delegateTo = devopsDelegateOf syncDelegateRuntime ctx
 
@@ -736,7 +655,7 @@ module ToolRegistry =
                                     return devopsAnswer outcome
                                 }
 
-                            let devopsDelegate (payload: obj) (record: string option) : Task<obj> =
+                            let devopsDelegate (payload: obj) (record: string list) : Task<obj> =
                                 task {
                                     let! gitCommonDir = askGitCommonDir workspaceDirectory
 
@@ -749,9 +668,7 @@ module ToolRegistry =
                                         return! askDevops payload record gitCommonDir
                                 }
 
-                            /// A delegate runs only on report material that rendered; a refused
-                            /// mapping answers with the refusal it carries.
-                            let materialGated (material: obj) (run: string option -> Task<obj>) : Task<obj> =
+                            let materialGated (material: obj) (run: string list -> Task<obj>) : Task<obj> =
                                 let materialOk: bool = material?ok
 
                                 if not materialOk then
@@ -780,9 +697,9 @@ module ToolRegistry =
 
                             let host: JsDelegationHost =
                                 { Delegate =
-                                    fun name payload mapping ->
+                                    fun name payload carry ->
                                         task {
-                                            let material = reportMaterialText ctx.SessionId mapping
+                                            let material = carryMaterial ctx.SessionId carry
 
                                             match name with
                                             | "fork"
@@ -815,14 +732,14 @@ module ToolRegistry =
                                                               "agentId" ==> record.AgentId
                                                               "role" ==> record.Role
                                                               "status" ==> record.Status
-                                                              "view" ==> record.View ]
+                                                              "returned"
+                                                              ==> (record.Returned
+                                                                   |> List.map (fun text ->
+                                                                       createObj [ "text" ==> text ])
+                                                                   |> List.toArray) ]
 
                                                     envelopeOk
-                                                        [ "records" ==> (records |> List.map toObj |> Array.ofList)
-                                                          "byName"
-                                                          ==> createObj
-                                                                  [ for record in records ->
-                                                                        record.Name ==> box (toObj record) ] ]
+                                                        [ "records" ==> (records |> List.map toObj |> Array.ofList) ]
                                                 | Error code -> refusal code
                                         }
                                   Fission =
@@ -872,7 +789,7 @@ module ToolRegistry =
                                             ))
                                             horizonContext
                                             ctx
-                                  Advisor = fun intent reportMapping -> advisorConsult runtime ctx intent reportMapping }
+                                  Advisor = fun intent carry -> advisorConsult runtime ctx intent carry }
 
                             JsDelegationBridge.install ctx.SessionId host
 
@@ -1277,21 +1194,26 @@ module ToolRegistry =
                 Execute =
                     fun args ctx ->
                         task {
-                            // Algorithm G1: the deliver hard gate.
-                            let parkedHandles = JsParkedSites.handlesForSession ctx.SessionId
+                            // Algorithm G1: the deliver gate based on real resource ownership.
+                            // Only handles with uncleared resources (e.g. pending user questions) block.
+                            // Side-effect-free pauses are auto-settled.
+                            let blockers = JsParkedSites.deliveryBlockersWithChoicesForSession ctx.SessionId
 
-                            if not (List.isEmpty parkedHandles) then
-                                let handles = String.Join(", ", parkedHandles)
+                            if not (List.isEmpty blockers) then
+                                let handles = blockers |> List.map fst |> String.concat ", "
+                                let reasons = blockers |> List.map snd |> String.concat "; "
 
                                 return
                                     ToolResultText.tomlObjectWithInstructions
                                         [ ProviderProse.render
                                               (lang ctx)
                                               Path.DeliverBlockedByParked
-                                              (Map [ "handles", handles ]) ]
+                                              (Map [ "handles", handles; "reasons", reasons ]) ]
                                         [ "code", ToolResultText.TString Path.DeliverBlockedByParked
-                                          "parked_handles", ToolResultText.TString handles ]
+                                          "parked_handles", ToolResultText.TString handles
+                                          "reasons", ToolResultText.TString reasons ]
                             else
+                                let _ = JsParkedSites.autoSettleForSession ctx.SessionId
                                 return! executeDeliverRoute ctx args
                         } }
 

@@ -34,23 +34,33 @@ type DeliveryAttribution =
 /// the durable witness fact — adding the material digest — and commits it;
 /// this layer never touches the journal itself.
 type DeliveryWitness =
-    { SessionId: SessionId
-      LogicalRunId: LogicalRunId
-      AuthorityRoot: AuthorityRootUserMessageId
-      PhysicalUserMessageId: PhysicalUserMessageId
-      ProviderRun: ProviderRunIdentity
-      ToolCallId: ToolCallId
-      Task: DeliveryTaskReference
-      FormalText: string
-      ViewDeclaration: string
-      View: string
-      RetirementId: string option }
+    {
+        SessionId: SessionId
+        LogicalRunId: LogicalRunId
+        AuthorityRoot: AuthorityRootUserMessageId
+        PhysicalUserMessageId: PhysicalUserMessageId
+        ProviderRun: ProviderRunIdentity
+        ToolCallId: ToolCallId
+        Task: DeliveryTaskReference
+        FormalText: string
+        ViewDeclaration: string
+        /// Canonical returned material; rendering belongs to the final wire boundary.
+        View: string
+        RetirementId: string option
+    }
+
+/// Required outcome shape of a durable delivery witness commit.
+[<RequireQualifiedAccess>]
+type DeliveryCommitResult =
+    | Committed
+    | NotCommitted of reason: string
+    | Unknown of reason: string
 
 /// The narrow durable capability the settle point uses to record a delivery
 /// witness. A refused commit means the delivery is not established: the
 /// caller must learn that instead of reading a success nobody can prove.
 type IDeliveryWitnessWriter =
-    abstract CommitDeliveryWitness: witness: DeliveryWitness -> Task<Result<unit, string>>
+    abstract CommitDeliveryWitness: witness: DeliveryWitness -> Task<DeliveryCommitResult>
 
 /// What the settle point needs to attribute a delivery and to make its
 /// evidence durable. A call without a settlement has no durable store behind
@@ -62,6 +72,8 @@ type IDeliveryWitnessWriter =
 type DeliverySettlement =
     | DurableDelivery of DeliveryAttribution * IDeliveryWitnessWriter
     | UnattributedDelivery of reason: string
+    | ContextUnavailable of reason: string
+    | DeferredDelivery of resolve: (unit -> Task<DeliverySettlement option>)
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
 /// sandbox execution, as-is per-write persistence, durable accounting and the

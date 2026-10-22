@@ -103,18 +103,17 @@ Borrowed capacity must be returned; a burnt-out provider is led out of the stabl
 
 So next time you see someone speaking in a new voice, do not ask who you are speaking to. Ask instead: has the standing changed, has the ledger changed? If neither has, it is the same person — only the horse is new.
 
-## Facts climb a ladder
+## Verification takes its rightful measure
 
-This world insists on hard ground: under every weighty sentence there must be something to hold it up. But the things that hold it up differ in thickness, and cannot be treated as one.
+This world insists on hard ground: under every weighty sentence there must be something to hold it up. But the ground you need is shaped by the promise actually made and the side effects it carries, not by a single rigid ladder that every claim must climb.
 
-Proving a matter climbs rung by rung, and no rung may be skipped.
-
-The first rung is pure arithmetic: laws that touch no machine, no hour, and no network; spread out and computed, truth settled in milliseconds.
-The second is temporal: work with time in the question, replayed on a borrowed clock and borrowed time, every step countable, relying on no one's good luck to order events.
+Verification answers to the commitment, not to ritual: what a tier does not test need not be staged, and what does not apply requires no special exemption from anyone.
+The first is pure arithmetic: laws that touch no machine, no hour, and no network; spread out and computed in memory, truth settled in milliseconds.
+The second is temporal: work with time in the question, replayed on virtual clocks and discrete traces, countable step by step, never gambling on ambient scheduling.
 The third is the adapter: one thing speaks to exactly one real boundary — what it signs, what it answers for, in black and white.
-The last is the Long Stroke: the whole real apparatus, run through from beginning to end. There is exactly one such gate under heaven. No side doors may open, and no herd of fake runs may pass for a scene.
+The last is end-to-end: the real apparatus, run through from beginning to end. Independent scenarios may walk their courses in clean, separate environments without all crowding into a single universal pen to trip over one another; only journeys that truly depend on cumulative history must share one continuous run.
 
-Between the rungs, the lower one's failure silences the higher; matters that cheaper rungs can settle are never brought to dearer ones.
+Matters that cheaper checks can settle are never dragged to dearer ones; yet no amount of spectacle at the top can cover a missing proof below.
 
 The thing that verifies truth must be truly capable of red. Every gate must hold a counterexample it can catch; a gate that catches nothing is made of paper, worse than none. Life or death is read from how long it has been since the last real motion — the noise of messengers below and irrelevant heartbeats do not count. Whoever takes the wall clock's total time as the only verdict is whitewashing. The ruler of acceptance may only tighten, never loosen; moving the stone that blocks the road under cover of night is smashing your own signboard.
 Never blunt the ruler just to pass: a suite that cannot catch real defects is mere theater, even with every line traversed; when an implementation fails the examination, the repair belongs in the work, not in gagging the examiner. A test double exists to clarify a contract, not to invent a hidden universe behind its back; clocks and entropy are inputs carried in from outside, never to be drawn from thin air inside core decisions. When progress is absent, inflating the waiting budget conjures no missing cause; rolling the dice again and again until green appears is only luck passing itself off as proof.
@@ -171,7 +170,7 @@ Hands stretched toward the outside world are booked in three kinds: the intent i
 
 When the provider side throws down the work, who clears the ground? Wanxiangshu itself. From the day it opened, recovery of provider failures belongs to it alone: host retries drop to zero, blustering popups are pressed down, and it picks up the scene with its own hands, provider by provider. Failure is insight, not a crime; but the authority to clear the ground sits in one house only.
 
-Each road walks its own and delivers its own, and each should be free to do so. But to step through the shared gate only a short gate is passed: the time inside is very short — glance once at the target, advance only, never reverse; push if it goes, let go if it does not; review, repair, conflict, and preparation all queue outside the gate, and no one may hold the gateplate without leaving. Before a request is accepted, the workspace must be clean; inside and out, the machinery's hidden details are never sent to the eye, only plain speech is.
+Each road walks its own and delivers its own, and each should be free to do so. Read-only inquiries go forward at will; an isolated worktree starts cleanly from an explicit ref, leaving drafts in the main workspace undisturbed — never auto-stashing, auto-committing, or cleaning away a person's uncommitted work. Only when an action would touch the active target worktree and risk overwriting live edits does it check whether that ground is clean. To step into the shared gate, pass only a short gate: the time inside is very short — glance once at the target, advance only, never reverse; push if it goes, let go if it does not; review, repair, conflict, and preparation all queue outside the gate, and no one may hold the gateplate without leaving. Inside and out, the machinery's hidden details are never sent to the eye, only plain speech is.
 
 Old credentials that have left the gate, however glorious before, are all void: the world has changed, and it must be verified again. When today's repair adds firewood, the certificate on old paper burns on the spot; several parties passing each on their own ground do not count once gathered at the mountain's foot — after the merge, it must be walked through once more, real blade against real spear, on the final field.
 

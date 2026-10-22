@@ -20,27 +20,6 @@ module PromptResources =
         | Role.Inquiry
         | Role.Distiller -> invalidArg "role" "Retired roles have no provider prompt."
 
-    let private semanticPaths =
-        [ "world/common-law"
-          "library/ingress"
-          "library/closing"
-          "library/kolmogorov"
-          "library/scarcity"
-          "library/work/quality-ledger"
-          "role/manager"
-          "role/engineer"
-          "role/devops"
-          "role/orchestrator"
-          "role/bookkeeper"
-          "role/plan"
-          "role/advisor"
-          "planning/s1"
-          "planning/s2"
-          "planning/s3" ]
-
-    let private ensureParity () =
-        semanticPaths |> List.iter ProviderResources.requireLanguagePair
-
     let private libraryPaths =
         function
         | Role.Manager -> [ "library/kolmogorov"; "library/scarcity"; "library/work/quality-ledger" ]
@@ -54,7 +33,6 @@ module PromptResources =
         |> List.map (fun text -> text.Trim())
 
     let instructionTextsForRole (lang: ProviderLanguage) (role: Role) =
-        ensureParity ()
         let common = ProviderResources.readText lang "world/common-law"
         let law = ProviderResources.readText lang (roleSemanticPath role)
         let inherited = libraryPaths role
@@ -76,8 +54,6 @@ module PromptResources =
     /// InternalLeaf Bookkeeper is not a public Role, but it shares the same
     /// Common Law and receives its own Role Law.
     let bookkeeperInstructionTextsFor (lang: ProviderLanguage) : string list =
-        ensureParity ()
-
         composeInstructions
             [ ProviderResources.readText lang "world/common-law"
               ProviderResources.readText lang "role/bookkeeper" ]

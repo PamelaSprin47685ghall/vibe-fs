@@ -142,13 +142,11 @@ const fact = {
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
       targetHeadSnapshot}),
-  publishClaimed: (
-    authorityRevision = 'authority-1') =>
+  publishClaimed: () =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
-      expectedHead: 'h1',
-      authorityRevision}),
+      expectedHead: 'h1'}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
   abandoned: () => change.fact('JobAbandoned', null)}
@@ -232,8 +230,7 @@ const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
     jobId,
     targetRef: 'refs/heads/main',
     rebasedCommit: 'r1',
-    expectedHead,
-    authorityRevision: 'authority-1'}})
+    expectedHead}})
 const publishedEvent = (jobId, candidateCommit = 'c1', resultingTargetHead = 'r1') => ({
   kind: 'Published',
   payload: { jobId, candidateCommit, resultingTargetHead }})

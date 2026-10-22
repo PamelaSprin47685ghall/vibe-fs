@@ -321,11 +321,7 @@ module FactCodecSurface =
                            RebasedCommit =
                             CommitHash.create (propertyText payload [ "RebasedCommit"; "rebasedCommit" ] "rebased-1")
                            ExpectedHead =
-                            CommitHash.create (propertyText payload [ "ExpectedHead"; "expectedHead" ] "target-1")
-                           AuthorityRevision =
-                            AuthorityRevision.create (
-                                propertyText payload [ "AuthorityRevision"; "authorityRevision" ] "authority-1"
-                            ) |}
+                            CommitHash.create (propertyText payload [ "ExpectedHead"; "expectedHead" ] "target-1") |}
                 )
             )
         | "Orchestrator", "ManagerJobCreated" ->

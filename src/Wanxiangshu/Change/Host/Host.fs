@@ -141,38 +141,6 @@ module DeliveredTenureHandOff =
         | "Delivered", None, Some cursor -> reopenDelivered (float cursor)
         | _ -> Error(sprintf "retirement %s is neither a relay nor a delivery continuation" retirement.RetirementId)
 
-/// The durable review evidence the publish gate reads for one Manager road.
-///
-/// An open tenure carries its own review. Publishing, however, happens *after*
-/// the qualifying tenure delivered its candidate (change-integration-005/013:
-/// the next tenure re-reviews and then delivers), so the open-tenure review is
-/// absent exactly when the gate needs it. The qualifying review is then the
-/// retired round's own — and only when that round was the delivery, because a
-/// relayed round's review belongs to a tenure that never produced a publishable
-/// candidate. Everything else stays a refusal with zero writes.
-[<RequireQualifiedAccess>]
-module PublishReviewEvidence =
-    let private openTenureReview (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : string option =
-        match work.Reviewed, work.ReviewOutcome with
-        | true, Some outcome -> Some outcome
-        | _ -> None
-
-    let private deliveringReview (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : string option =
-        match work.Retirements |> List.tryLast with
-        | Some retirement when retirement.Outcome = "Delivered" -> work.LastRetiredReview
-        | _ -> None
-
-    let ofWork (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : (string * string) option =
-        // An open tenure is the road's current candidate authority: while it is
-        // unreviewed nothing may publish, even though the predecessor's delivered
-        // review is still in the history.
-        let outcome =
-            match work.ActiveId with
-            | Some _ -> openTenureReview work
-            | None -> deliveringReview work
-
-        outcome |> Option.map (fun value -> value, work.Authority)
-
 /// Host wiring for one Change manager session. One physical Manager session can host many
 /// logical Relay incumbencies; Change never creates a second audit session.
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
@@ -422,33 +390,13 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 lock runtime.Gate (fun () -> runtime.Children.Remove managerId |> ignore)
         }
 
-    /// The durable unified review fact for a manager session: the recorded
-    /// Promoted/Stayed outcome together with the work's authority count. None
-    /// means no review is durable yet, and the publish gate refuses with zero
-    /// writes.
-    let lifecycleReviewed
-        (managerSessionId: SessionId)
-        (worktreePath: Wanxiangshu.Foundation.Identity.WorktreePath)
-        : Task<(string * string) option> =
-        task {
-            let! commonDir =
-                worktreePath
-                |> Wanxiangshu.Foundation.Identity.WorktreePath.value
-                |> Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
-
-            return
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value managerSessionId)
-                |> Option.bind PublishReviewEvidence.ofWork
-        }
-
     let relayPort: RelayPort =
         { CreateManagerSession = createManagerSession
           ActivateManager = activateManager
           AwaitLoopSignal = awaitLoopSignal
           ContinueLoop = continueLoop
           PrepareCandidate = prepareCandidate
-          TerminateWorkResources = terminateWorkResources
-          LifecycleReviewed = lifecycleReviewed }
+          TerminateWorkResources = terminateWorkResources }
 
     // ── engine ──────────────────────────────────────────────────────────────
 

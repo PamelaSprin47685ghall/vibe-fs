@@ -162,13 +162,11 @@ const fact = {
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
       targetHeadSnapshot}),
-  publishClaimed: (
-    authorityRevision = 'authority-1') =>
+  publishClaimed: () =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
-      expectedHead: 'h1',
-      authorityRevision}),
+      expectedHead: 'h1'}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
   abandoned: () => change.fact('JobAbandoned', null)}
@@ -259,8 +257,7 @@ const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
     jobId,
     targetRef: 'refs/heads/main',
     rebasedCommit: 'r1',
-    expectedHead,
-    authorityRevision: 'authority-1'}})
+    expectedHead}})
 const publishedEvent = (jobId, candidateCommit = 'c1', resultingTargetHead = 'r1') => ({
   kind: 'Published',
   payload: { jobId, candidateCommit, resultingTargetHead }})
@@ -281,9 +278,11 @@ test('WHAT[change-integration-003] THEOREM_publish_claimed_without_rebased_candi
   assert.match(result.error, /no rebased candidate/)
 })
 test('WHAT[change-integration-003] THEOREM_publish_claimed_with_incomplete_evidence_is_rejected', () => {
+  // A claim must still pin all three Git binding fields; dropping expectedHead
+  // makes the durable claim incomplete.
   const incomplete = {
     kind: 'PublishClaimed',
-    payload: { jobId: JOB_A, targetRef: 'refs/heads/main', rebasedCommit: 'r1', expectedHead: 'h1' }}
+    payload: { jobId: JOB_A, targetRef: 'refs/heads/main', rebasedCommit: 'r1' }}
   const result = change.fold([
     createEvent(JOB_A, 'ses_orch_a'),
     candidateEvent(JOB_A),
@@ -415,21 +414,21 @@ const valueOf = async (promise) => {
 
 test('WHAT[change-integration-003] WORKTREE_create_propagates_port_error', async () => {
   const { git } = fakeGit([['worktree add', [1, '', 'worktree add exploded']]])
-  const result = await change.worktreeCreate(git, 'job-9', PATH)
+  const result = await change.worktreeCreate(git, 'job-9', PATH, 'refs/heads/main')
   assert.equal(result.ok, false)
   assert.equal(result.error, 'worktree add exploded')
 })
 test('WHAT[change-integration-003] WORKTREE_CMD_create_returns_identity_on_success', async () => {
   const { git, calls } = fakeGit()
-  const result = await change.gitCreateWorktree(git, 'job-3', PATH)
+  const result = await change.gitCreateWorktree(git, 'job-3', PATH, 'refs/heads/main')
   assert.equal(result.ok, true)
   assert.equal(result.value, 'manager/job-3')
-  assert.deepEqual(calls[0].args, ['worktree', 'add', PATH, '-b', 'manager/job-3'])
+  assert.deepEqual(calls[0].args, ['worktree', 'add', PATH, '-b', 'manager/job-3', 'refs/heads/main'])
   assert.equal(calls[0].cwd, '/repo')
 })
 test('WHAT[change-integration-003] WORKTREE_CMD_create_surfaces_stderr_on_failure', async () => {
   const { git } = fakeGit([['worktree add', [1, '', 'already exists']]])
-  const result = await change.gitCreateWorktree(git, 'job-3', PATH)
+  const result = await change.gitCreateWorktree(git, 'job-3', PATH, 'refs/heads/main')
   assert.equal(result.error, 'already exists')
 })
 }
@@ -446,7 +445,7 @@ test('WHAT[change-integration-003] publication claim requires every explicit bin
   projection = change.recordFact(projection, 'binding-probe', change.fact('RebasedCandidateReady', {
     rebasedCommit: 'rebased', targetHeadSnapshot: 'target'}))
   const claim = {
-    targetRef: 'refs/heads/main', rebasedCommit: 'rebased', expectedHead: 'target', authorityRevision: 'authority-1'}
+    targetRef: 'refs/heads/main', rebasedCommit: 'rebased', expectedHead: 'target'}
   assert.ok(change.find(change.recordFact(projection, 'binding-probe', change.fact('PublishClaimed', claim)), 'binding-probe').facts.includes('PublishClaimed'))
   for (const field of Object.keys(claim)) {
     const incomplete = { ...claim }
@@ -454,6 +453,38 @@ test('WHAT[change-integration-003] publication claim requires every explicit bin
     assert.throws(() => change.recordFact(projection, 'binding-probe', change.fact('PublishClaimed', incomplete)), /Incomplete PublishClaimed payload/, field)
   }
 })
+
+{
+const { default: assert } = await import('node:assert/strict')
+const { default: test } = await import('node:test')
+const factCodec = await import('../../../dist/Persistence/Journal/FactCodecSurface.js')
+
+test('WHAT[change-integration-003] legacy PublishClaimed with an extra AuthorityRevision still decodes without fabricating an authority', () => {
+  const line = factCodec.encode({
+    family: 'Orchestrator',
+    case: 'PublishClaimed',
+    payload: {
+      ManagerJobId: 'job-legacy',
+      TargetRef: 'refs/heads/main',
+      RebasedCommit: 'rebased-1',
+      ExpectedHead: 'target-1',
+    },
+  })
+  const decoded = factCodec.decode(line)
+  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
+  assert.equal(decoded.case, 'PublishClaimed')
+
+  // Re-inject the retired field the old code wrote, then decode again: the
+  // extra key is ignored, and nothing reads it back as a qualification.
+  const wire = JSON.parse(line)
+  const payload = wire[1][1][1]
+  assert.equal(typeof payload, 'object', 'the PublishClaimed payload is the 3rd nesting level')
+  payload.AuthorityRevision = 'authority-1'
+  const legacy = factCodec.decode(JSON.stringify(wire))
+  assert.equal(legacy.ok, true, legacy.ok ? '' : legacy.error)
+  assert.equal(legacy.case, 'PublishClaimed')
+})
+}
 
 test('WHAT[change-integration-003] real git finalization refuses conflict markers even when the scan output is spooled', async () => {
   const assert = (await import('node:assert/strict')).default

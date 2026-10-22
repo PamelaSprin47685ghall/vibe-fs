@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
-import { abortSource, awaitOwned, createSensor, rawDelta, repetitiveText } from './support/stream.mjs'
+import { abortSource, awaitOwned, createSensor, rawDelta, repetitiveText, requestInterrupt } from './support/stream.mjs'
 
 test('WHAT[degeneration-guard-008] separately constructed sensor instances do not share armed anomalies', async () => {
   const options = { owned: ['session'], abort: () => {}, continue: () => {} }
   const first = createSensor(options)
   const second = createSensor(options)
-  sensor.observe(first, sensor.textDelta('session', repetitiveText(), 'run'))
+  requestInterrupt(first, 'session', 'run', 'TooRepetitive')
   await awaitOwned(first, 'session', 'run')
   assert.deepEqual(await sensor.consumeAbortCause(second, abortSource('session', 'run')), { cause: 'External' })
   assert.deepEqual(await sensor.consumeAbortCause(first, abortSource('session', 'run')), { cause: 'DegenerationGuard', anomaly: 'TooRepetitive' })
@@ -17,7 +17,7 @@ test('WHAT[degeneration-guard-008] separately constructed sensor instances do no
 test('WHAT[degeneration-guard-008] wrong run and wrong session cannot consume the exact armed cause or its owned task', async () => {
   const continuations = []
   const handle = createSensor({ owned: ['session', 'other'], abort: () => {}, continue: (...args) => continuations.push(args) })
-  sensor.observe(handle, rawDelta('session', 'text', repetitiveText(), 'run'))
+  requestInterrupt(handle, 'session', 'run', 'TooRepetitive')
   await awaitOwned(handle, 'session', 'run')
   for (const [id, run] of [['session', 'old-run'], ['other', 'run']]) {
     assert.deepEqual(await sensor.consumeAbortCause(handle, abortSource(id, run)), { cause: 'External' })

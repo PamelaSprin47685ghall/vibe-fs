@@ -43,9 +43,6 @@ module ChangeSurface =
 
     val createGit: repo: string -> runner: obj -> obj
 
-    val gitIsDirty: git: obj -> path: string -> Task<obj>
-
-
     val observeManagerLoopBurst: count: int -> Task<obj>
     val gitFreezeTargetBranch: git: obj -> Task<obj>
 
@@ -72,7 +69,7 @@ module ChangeSurface =
 
     val gitGetTargetHead: git: obj -> targetRef: string -> Task<obj>
 
-    val gitCreateWorktree: git: obj -> job: string -> path: string -> Task<obj>
+    val gitCreateWorktree: git: obj -> job: string -> path: string -> sourceRef: string -> Task<obj>
 
     val gitRemoveWorktree: git: obj -> path: string -> Task<obj>
 
@@ -84,7 +81,7 @@ module ChangeSurface =
 
     val gitListManagerBranches: git: obj -> Task<obj>
 
-    val worktreeCreate: git: obj -> job: string -> path: string -> Task<obj>
+    val worktreeCreate: git: obj -> job: string -> path: string -> sourceRef: string -> Task<obj>
 
     val worktreeAdopt: git: obj -> identity: string -> path: string -> obj
 

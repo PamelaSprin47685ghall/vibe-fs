@@ -89,9 +89,6 @@ module ChangeSurface =
     let private sessionId value = SessionId.create (stringOf value)
     let private commit value = CommitHash.create (stringOf value)
 
-    let private authorityRevision value =
-        AuthorityRevision.create (stringOf value)
-
     let private worktreeIdentityValue value =
         WorktreeIdentity.create (stringOf value)
 
@@ -117,22 +114,16 @@ module ChangeSurface =
         let expectedHeadStr =
             tryField payload [ "expectedHead"; "ExpectedHead" ] |> Option.map stringOf
 
-        let authorityStr =
-            tryField payload [ "authorityRevision"; "AuthorityRevision" ]
-            |> Option.map stringOf
-
-        match targetRefStr, rebasedCommitStr, expectedHeadStr, authorityStr with
-        | Some tr, Some rc, Some eh, Some ar when
+        match targetRefStr, rebasedCommitStr, expectedHeadStr with
+        | Some tr, Some rc, Some eh when
             not (String.IsNullOrWhiteSpace tr)
             && not (String.IsNullOrWhiteSpace rc)
             && not (String.IsNullOrWhiteSpace eh)
-            && not (String.IsNullOrWhiteSpace ar)
             ->
             Ok
                 {| TargetRef = target tr
                    RebasedCommit = commit rc
-                   ExpectedHead = commit eh
-                   AuthorityRevision = authorityRevision ar |}
+                   ExpectedHead = commit eh |}
         | _ -> Error "Incomplete PublishClaimed payload: missing required publication evidence"
 
     let private factKindAndPayload (value: obj) =
@@ -1060,10 +1051,6 @@ module ChangeSurface =
             box
                 {| kind = "Cancelled"
                    detail = "cancelled" |}
-        | OrchestratorVerdict.RejectedDirty reason ->
-            box
-                {| kind = "RejectedDirty"
-                   detail = reason |}
         | OrchestratorVerdict.IntegrationFailed(_, detail) ->
             box
                 {| kind = "IntegrationFailed"
@@ -1169,8 +1156,7 @@ module ChangeSurface =
                         Ok value
 
             let git: GitPort =
-                { IsDirty = fun _ -> Task.FromResult(Ok false)
-                  CreateWorktree = fun _ _ -> Task.FromResult(Ok worktreeIdentity)
+                { CreateWorktree = fun _ _ _ -> Task.FromResult(Ok worktreeIdentity)
                   FreezeTargetBranch = fun () -> Task.FromResult(Ok targetRef)
                   Rebase =
                     fun _ _ ->
@@ -1298,13 +1284,12 @@ module ChangeSurface =
                 let withClaim current =
                     match scenario.SeededPublishClaimed with
                     | None -> current
-                    | Some(targetRef, rebased, expected, _workspaceSnap, _cert, authority) ->
+                    | Some(targetRef, rebased, expected, _workspaceSnap, _cert, _authority) ->
                         OrchestratorProjection.recordPublishClaimed
                             jobId
                             {| TargetRef = TargetRef.create targetRef
                                RebasedCommit = CommitHash.create rebased
-                               ExpectedHead = CommitHash.create expected
-                               AuthorityRevision = AuthorityRevision.create authority |}
+                               ExpectedHead = CommitHash.create expected |}
                             current
 
                 let withPublished current =
@@ -1396,8 +1381,7 @@ module ChangeSurface =
                   TerminateWorkResources =
                     fun _ ->
                         timeline.Add "relay:terminate"
-                        Task.FromResult()
-                  LifecycleReviewed = fun _ _ -> Task.FromResult(Some("Promoted", "authority-1")) }
+                        Task.FromResult() }
 
             let acquireGate () =
                 if scenario.GateCancelled then
@@ -1547,12 +1531,6 @@ module ChangeSurface =
         | Ok value -> box {| ok = true; value = valueOf value |}
         | Error error -> box {| ok = false; error = error |}
 
-    let gitIsDirty (git: obj) (path: string) : Task<obj> =
-        task {
-            let! result = (git :?> GitHandle).Port.IsDirty(WorktreePath.create path)
-            return resultObject result box
-        }
-
     let gitFreezeTargetBranch (git: obj) : Task<obj> =
         task {
             let! result = (git :?> GitHandle).Port.FreezeTargetBranch()
@@ -1638,9 +1616,14 @@ module ChangeSurface =
             return resultObject result (fun value -> box (CommitHash.value value))
         }
 
-    let gitCreateWorktree (git: obj) (job: string) (path: string) : Task<obj> =
+    let gitCreateWorktree (git: obj) (job: string) (path: string) (sourceRef: string) : Task<obj> =
         task {
-            let! result = (git :?> GitHandle).Port.CreateWorktree (ManagerJobId.create job) (WorktreePath.create path)
+            let! result =
+                (git :?> GitHandle).Port.CreateWorktree
+                    (ManagerJobId.create job)
+                    (WorktreePath.create path)
+                    (TargetRef.create sourceRef)
+
             return resultObject result (fun value -> box (WorktreeIdentity.value value))
         }
 
@@ -1683,10 +1666,15 @@ module ChangeSurface =
             return resultObject result (fun values -> values |> List.map WorktreeIdentity.value |> List.toArray |> box)
         }
 
-    let worktreeCreate (git: obj) (job: string) (path: string) : Task<obj> =
+    let worktreeCreate (git: obj) (job: string) (path: string) (sourceRef: string) : Task<obj> =
         task {
             let! result =
-                WorktreeResource.Create((git :?> GitHandle).Port, ManagerJobId.create job, WorktreePath.create path)
+                WorktreeResource.Create(
+                    (git :?> GitHandle).Port,
+                    ManagerJobId.create job,
+                    WorktreePath.create path,
+                    TargetRef.create sourceRef
+                )
 
             return resultObject result (fun resource -> WorktreeHandle resource :> obj)
         }
@@ -1753,7 +1741,6 @@ module ChangeSurface =
                 stringField value [ "cleanupError"; "error"; "detail" ]
             )
         | "Cancelled" -> OrchestratorVerdict.Cancelled job
-        | "RejectedDirty" -> OrchestratorVerdict.RejectedDirty(stringField value [ "reason"; "detail" ])
         | "IntegrationFailed" ->
             OrchestratorVerdict.IntegrationFailed(job, stringField value [ "errorDetails"; "detail"; "error" ])
         | "Empty" -> OrchestratorVerdict.Empty

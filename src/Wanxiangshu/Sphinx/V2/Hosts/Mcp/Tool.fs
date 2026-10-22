@@ -8,8 +8,8 @@ open Wanxiangshu.Sphinx.V2.Wire
 
 /// The MCP tool contract: one strict decoder per tool.
 ///
-/// WHAT[sphinx-v2-036]: the seven public tools and their argument shapes.
-/// Required arguments are not defaulted; replacementText is optional.
+/// WHAT[sphinx-v2-036]: the five public tools and their argument shapes.
+/// Required arguments are not defaulted; steps and a failure reason are optional.
 ///
 /// WHAT[sphinx-v2-018]: a work submit decodes the answer bytes and nothing else. A
 /// certificate patch, a budget debit, an event write or a goal revision in the same
@@ -23,18 +23,27 @@ type ToolRefusal =
       Path: string
       Message: string }
 
+/// One step of the plan the user selected. The Runtime checks its shape and its
+/// resources; it never re-ranks it.
+type PlanStep =
+    { Id: string
+      Title: string
+      DependsOn: string list }
+
 type StartArgs =
     { CommandId: string
       GoalText: string
       Constraints: string list
       MaterialRefs: string list
       AuthorizationRef: string
-      ProfileRef: string }
+      ProfileRef: string
+      Steps: PlanStep list }
 
-type WorkNextArgs =
-    { CommandId: string
-      InquiryId: string
-      Limit: int }
+/// What the worker reports about the step it holds.
+[<RequireQualifiedAccess>]
+type WorkOutcome =
+    | Succeeded
+    | Failed
 
 type WorkSubmitArgs =
     { CommandId: string
@@ -43,8 +52,8 @@ type WorkSubmitArgs =
       Attempt: Attempt
       Fence: Fence
       CanonicalResult: string
-      ResultSchema: SchemaRef
-      ClusterId: string }
+      Outcome: WorkOutcome
+      Reason: string option }
 
 type StatusArgs = { InquiryId: string }
 
@@ -59,14 +68,6 @@ type ExportMode =
     | Full
 
 type ExportArgs = { InquiryId: string; Mode: ExportMode }
-
-type GoalAmendArgs =
-    { CommandId: string
-      InquiryId: string
-      ExpectedRevision: Revision
-      AuthorizedBy: string
-      AddedConstraints: string list
-      ReplacementText: string option }
 
 [<RequireQualifiedAccess>]
 module Tool =
@@ -86,16 +87,6 @@ module Tool =
 
     [<Emit("$0[$1]")>]
     let private field (raw: obj) (name: string) : obj = jsNative
-
-    /// 当前尚未接通的 Runtime 操作返回具名拒绝。局部 body 分支存在并不能
-    /// 证明完整 codec、父链、revision 与 receipt 已可持久化往返。
-    let unsupported (tool: string) : ToolRefusal =
-        { Code = "RUNTIME_OPERATION_UNSUPPORTED"
-          Path = "tool"
-          Message =
-            sprintf
-                "%s is refused: this Runtime operation is not connected to a verified durable transition path. The call changed nothing."
-                tool }
 
     let refusalCode (refusal: ToolRefusal) : string = refusal.Code
 
@@ -127,6 +118,54 @@ module Tool =
         |> Result.mapError fromWire
         |> Result.bind validate
 
+    /// One plan step: an id, a description and the ids it depends on. Decoding only
+    /// checks shape; the Runtime resolves the dependency graph and refuses a cycle.
+    let private stepsField raw : Result<PlanStep list, ToolRefusal> =
+        if not (hasField raw "steps") then
+            Ok []
+        else
+            let stepsValue = field raw "steps"
+
+            let isRecord =
+                emitJsExpr stepsValue "Array.isArray($0)"
+
+            if not isRecord then
+                Error(fromText "steps" "steps must be an array of {id, title, dependsOn}")
+            else
+                let stepAt index (entry: obj) : Result<PlanStep, ToolRefusal> =
+                    let isObject =
+                        emitJsExpr entry "typeof $0 === 'object' && $0 !== null && !Array.isArray($0)"
+
+                    if not isObject then
+                        Error(fromText (sprintf "steps[%d]" index) "each step must be an object")
+                    else
+                        Decode.stringField entry "id"
+                        |> Result.mapError fromWire
+                        |> Result.bind (fun id ->
+                            WorkId.tryCreate id
+                            |> Result.mapError (fromText (sprintf "steps[%d].id" index))
+                            |> Result.bind (fun stepId ->
+                                Decode.stringField entry "title"
+                                |> Result.mapError fromWire
+                                |> Result.bind (fun title ->
+                                    Decode.uniqueStringListField entry "dependsOn"
+                                    |> Result.mapError fromWire
+                                    |> Result.map (fun dependsOn ->
+                                        { Id = WorkId.value stepId
+                                          Title = title
+                                          DependsOn = dependsOn }))))
+
+                let raw = unbox<obj array> stepsValue
+
+                let rec collect index accepted remaining =
+                    match remaining with
+                    | [] -> Ok(List.rev accepted)
+                    | entry :: rest ->
+                        stepAt index entry
+                        |> Result.bind (fun step -> collect (index + 1) (step :: accepted) rest)
+
+                collect 0 [] (Array.toList raw)
+
     let decodeStart (raw: obj) : Result<StartArgs, ToolRefusal> =
         Decode.stringField raw "commandId"
         |> Result.mapError fromWire
@@ -144,30 +183,16 @@ module Tool =
                         |> Result.bind (fun authorizationRef ->
                             Decode.stringField raw "profileRef"
                             |> Result.mapError fromWire
-                            |> Result.map (fun profileRef ->
-                                { CommandId = commandId
-                                  GoalText = goalText
-                                  Constraints = constraints
-                                  MaterialRefs = materialRefs
-                                  AuthorizationRef = authorizationRef
-                                  ProfileRef = profileRef }))))))
-
-    let decodeWorkNext (raw: obj) : Result<WorkNextArgs, ToolRefusal> =
-        Decode.stringField raw "commandId"
-        |> Result.mapError fromWire
-        |> Result.bind (fun commandId ->
-            inquiryIdField raw
-            |> Result.bind (fun inquiryId ->
-                Decode.nonNegativeIntegerField raw "limit"
-                |> Result.mapError fromWire
-                |> Result.bind (fun limit ->
-                    if limit < 1L then
-                        Error(fromText "limit" "limit must be at least 1")
-                    else
-                        Ok
-                            { CommandId = commandId
-                              InquiryId = inquiryId
-                              Limit = int limit })))
+                            |> Result.bind (fun profileRef ->
+                                stepsField raw
+                                |> Result.map (fun steps ->
+                                    { CommandId = commandId
+                                      GoalText = goalText
+                                      Constraints = constraints
+                                      MaterialRefs = materialRefs
+                                      AuthorizationRef = authorizationRef
+                                      ProfileRef = profileRef
+                                      Steps = steps })))))))
 
     /// The keys a worker must never smuggle in with its answer.
     let private forbiddenResultFields =
@@ -193,22 +218,6 @@ module Tool =
             )
         | None -> Ok()
 
-    let private decodeResultSchema (raw: obj) : Result<SchemaRef, ToolRefusal> =
-        let schema = field raw "resultSchema"
-
-        let isRecord =
-            emitJsExpr schema "typeof $0 === 'object' && $0 !== null && !Array.isArray($0)"
-
-        if not isRecord then
-            Error(fromText "resultSchema" "resultSchema must be an object with id and hash")
-        else
-            Decode.stringField schema "id"
-            |> Result.mapError fromWire
-            |> Result.bind (fun schemaId ->
-                Decode.stringField schema "hash"
-                |> Result.mapError fromWire
-                |> Result.map (fun schemaHash -> { Id = schemaId; Hash = schemaHash }))
-
     let decodeWorkSubmit (raw: obj) : Result<WorkSubmitArgs, ToolRefusal> =
         match forbiddenResultFields |> List.tryFind (fun name -> hasField raw name) with
         | Some name ->
@@ -220,42 +229,93 @@ module Tool =
                         "field %s is outside what a work result may carry: a worker submits answers, not certificates, budgets, events or goal revisions"
                         name }
         | None ->
-            Decode.stringField raw "commandId"
-            |> Result.mapError fromWire
-            |> Result.bind (fun commandId ->
-                inquiryIdField raw
-                |> Result.bind (fun inquiryId ->
-                    Decode.stringField raw "workId"
+            let outcome () =
+                let commandId =
+                    Decode.stringField raw "commandId" |> Result.mapError fromWire
+
+                let inquiryId = inquiryIdField raw
+
+                let workId =
+                    Decode.stringField raw "workId" |> Result.mapError fromWire
+
+                let attempt =
+                    Decode.nonNegativeIntegerField raw "attempt"
                     |> Result.mapError fromWire
-                    |> Result.bind (fun workId ->
-                        Decode.nonNegativeIntegerField raw "attempt"
+                    |> Result.bind (Attempt.tryCreate >> Result.mapError (fromText "attempt"))
+
+                let fence =
+                    Decode.stringField raw "fence"
+                    |> Result.mapError fromWire
+                    |> Result.bind (Fence.tryCreate >> Result.mapError (fromText "fence"))
+
+                let outcome =
+                    if hasField raw "outcome" then
+                        Decode.stringField raw "outcome" |> Result.mapError fromWire
+                    else
+                        Ok "succeeded"
+
+                /// A failed step has no result bytes; a blank canonical result is
+                /// only lawful when the worker reports failure.
+                let result commandId inquiryId workId attempt fence outcome =
+                    match outcome with
+                    | "succeeded" ->
+                        Decode.stringField raw "canonicalResult"
                         |> Result.mapError fromWire
-                        |> Result.bind (fun attempt ->
-                            Attempt.tryCreate attempt
-                            |> Result.mapError (fromText "attempt")
-                            |> Result.bind (fun typedAttempt ->
-                                Decode.stringField raw "fence"
-                                |> Result.mapError fromWire
+                        |> Result.map (fun canonicalResult ->
+                            { CommandId = commandId
+                              InquiryId = inquiryId
+                              WorkId = workId
+                              Attempt = attempt
+                              Fence = fence
+                              CanonicalResult = canonicalResult
+                              Outcome = WorkOutcome.Succeeded
+                              Reason = None })
+                    | "failed" ->
+                        Decode.stringField raw "reason"
+                        |> Result.mapError fromWire
+                        |> Result.bind (fun reason ->
+                            let value = field raw "canonicalResult"
+                            let isString = emitJsExpr value "typeof $0 === 'string'"
+
+                            if not (hasField raw "canonicalResult") then
+                                Ok
+                                    { CommandId = commandId
+                                      InquiryId = inquiryId
+                                      WorkId = workId
+                                      Attempt = attempt
+                                      Fence = fence
+                                      CanonicalResult = ""
+                                      Outcome = WorkOutcome.Failed
+                                      Reason = Some reason }
+                            elif isString then
+                                Ok
+                                    { CommandId = commandId
+                                      InquiryId = inquiryId
+                                      WorkId = workId
+                                      Attempt = attempt
+                                      Fence = fence
+                                      CanonicalResult = unbox<string> value
+                                      Outcome = WorkOutcome.Failed
+                                      Reason = Some reason }
+                            else
+                                Error(fromText "canonicalResult" "canonicalResult must be a string"))
+                    | _ -> Error(fromText "outcome" "outcome must be succeeded or failed")
+
+                commandId
+                |> Result.bind (fun commandId ->
+                    inquiryId
+                    |> Result.bind (fun inquiryId ->
+                        workId
+                        |> Result.bind (fun workId ->
+                            attempt
+                            |> Result.bind (fun attempt ->
+                                fence
                                 |> Result.bind (fun fence ->
-                                    Fence.tryCreate fence
-                                    |> Result.mapError (fromText "fence")
-                                    |> Result.bind (fun typedFence ->
-                                        Decode.stringField raw "canonicalResult"
-                                        |> Result.mapError fromWire
-                                        |> Result.bind (fun canonicalResult ->
-                                            decodeResultSchema raw
-                                            |> Result.bind (fun schema ->
-                                                Decode.stringField raw "clusterId"
-                                                |> Result.mapError fromWire
-                                                |> Result.map (fun clusterId ->
-                                                    { CommandId = commandId
-                                                      InquiryId = inquiryId
-                                                      WorkId = workId
-                                                      Attempt = typedAttempt
-                                                      Fence = typedFence
-                                                      CanonicalResult = canonicalResult
-                                                      ResultSchema = schema
-                                                      ClusterId = clusterId }))))))))))
+                                    outcome
+                                    |> Result.bind (fun outcome ->
+                                        result commandId inquiryId workId attempt fence outcome))))))
+
+            outcome ()
 
     let decodeStatus (raw: obj) : Result<StatusArgs, ToolRefusal> =
         rejectReadMutation raw
@@ -296,36 +356,3 @@ module Tool =
                           Path = "mode"
                           Message = sprintf "mode must be summary or full, not %s" mode }))
 
-    let decodeGoalAmend (raw: obj) : Result<GoalAmendArgs, ToolRefusal> =
-        Decode.stringField raw "commandId"
-        |> Result.mapError fromWire
-        |> Result.bind (fun commandId ->
-            inquiryIdField raw
-            |> Result.bind (fun inquiryId ->
-                Decode.revisionField raw "expectedRevision"
-                |> Result.mapError (fun fault ->
-                    { fromWire fault with
-                        Path = "expectedRevision" })
-                |> Result.bind (fun expectedRevision ->
-                    Decode.stringField raw "authorizedBy"
-                    |> Result.mapError fromWire
-                    |> Result.bind (fun authorizedBy ->
-                        Decode.uniqueStringListField raw "addedConstraints"
-                        |> Result.mapError fromWire
-                        |> Result.bind (fun addedConstraints ->
-                            let replacement =
-                                if hasField raw "replacementText" then
-                                    Decode.stringField raw "replacementText"
-                                    |> Result.mapError fromWire
-                                    |> Result.map Some
-                                else
-                                    Ok None
-
-                            replacement
-                            |> Result.map (fun replacementText ->
-                                { CommandId = commandId
-                                  InquiryId = inquiryId
-                                  ExpectedRevision = expectedRevision
-                                  AuthorizedBy = authorizedBy
-                                  AddedConstraints = addedConstraints
-                                  ReplacementText = replacementText }))))))

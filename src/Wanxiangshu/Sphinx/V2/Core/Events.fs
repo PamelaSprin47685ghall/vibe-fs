@@ -83,10 +83,6 @@ type GraphPatchedBody =
 
 type CertificateSlotsPatchedBody = { Patches: CertificateSlotPatch list }
 
-type CertificateInvalidatedBody =
-    { Invalidation: JsonEnvelope
-      Reason: string }
-
 type DecisionRecordedBody = { Decision: JsonEnvelope }
 
 type AnswerPreparedBody =
@@ -131,7 +127,6 @@ type InquiryEventBody =
     | InterpretationFailed of InterpretationFailedBody
     | GraphPatched of GraphPatchedBody
     | CertificateSlotsPatched of CertificateSlotsPatchedBody
-    | CertificateInvalidated of CertificateInvalidatedBody
     | DecisionRecorded of DecisionRecordedBody
     | AnswerPrepared of AnswerPreparedBody
     | AnswerCommitted of AnswerCommittedBody

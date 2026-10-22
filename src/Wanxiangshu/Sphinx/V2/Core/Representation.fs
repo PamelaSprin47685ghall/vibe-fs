@@ -176,20 +176,11 @@ module Representation =
                   "numericError", box numericError ]
         | CertificateGuarantee.ResidualOnly reason -> record [ "case", box "ResidualOnly"; "reason", box reason ]
 
-    let private certificateStatus value =
-        match value with
-        | CertificateStatus.Current -> record [ "case", box "Current" ]
-        | CertificateStatus.Stale reason -> record [ "case", box "Stale"; "reason", box reason ]
-        | CertificateStatus.Invalidated source ->
-            record [ "case", box "Invalidated"; "sourceRevision", revision source ]
-        | CertificateStatus.Conflicted -> record [ "case", box "Conflicted" ]
-
     let private patch (value: CertificateSlotPatch) =
         let slot = value.Slot
 
         record
-            [ "certificateId", box (CertificateId.value value.CertificateId)
-              "targetRef", box value.TargetRef
+            [ "targetRef", box value.TargetRef
               "valueSpaceId", box value.ValueSpaceId
               "scopeId", box value.ScopeId
               "semanticsModelRef", box value.SemanticsModelRef
@@ -201,8 +192,7 @@ module Representation =
                     "schema", schema slot.Schema
                     "canonicalPayload", box slot.CanonicalPayload
                     "revision", revision slot.Revision
-                    "guarantee", guarantee slot.Guarantee
-                    "status", certificateStatus slot.Status ] ]
+                    "guarantee", guarantee slot.Guarantee ] ]
 
     let private accepted (value: ResultAcceptedBody) =
         record
@@ -327,10 +317,6 @@ module Representation =
             tagged "GraphPatched" (record [ "patch", graphPatch value.Patch; "pluginRef", box value.PluginRef ])
         | InquiryEventBody.CertificateSlotsPatched value ->
             tagged "CertificateSlotsPatched" (record [ "patches", items patch value.Patches ])
-        | InquiryEventBody.CertificateInvalidated value ->
-            tagged
-                "CertificateInvalidated"
-                (record [ "invalidation", envelope value.Invalidation; "reason", box value.Reason ])
         | InquiryEventBody.DecisionRecorded value ->
             tagged "DecisionRecorded" (record [ "decision", envelope value.Decision ])
         | InquiryEventBody.AnswerPrepared value ->

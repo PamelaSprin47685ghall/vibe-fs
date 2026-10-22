@@ -403,6 +403,7 @@ export const startPluginIncarnation = async (directory) => {
     directory,
     events: { listen: () => () => {} },
   })
+  client.__hooks = hooks
   await configureManagedPlugin(hooks)
 
   return {

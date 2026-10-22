@@ -9,6 +9,8 @@ open Fable.Core.JsInterop
 [<RequireQualifiedAccess>]
 module JsWorkflowSurface =
 
+    let mutable private harnessNameSeq = 0
+
     type private JsWorkflowOutcomeHandle(outcome: JsToolWorkflow.JsToolOutcome) =
         member _.Value = outcome
 
@@ -126,6 +128,17 @@ module JsWorkflowSurface =
                         None
                     else
                         Some(JsTransactionSurface.lifecyclePersistenceOf store)
+
+                let input =
+                    if not (isNull input) && not (isNull input?program) && (isNull input?name || string input?name = "") then
+                        harnessNameSeq <- harnessNameSeq + 1
+                        createObj
+                            [ "program" ==> input?program
+                              "name" ==> ("test-" + sessionId + "-" + string harnessNameSeq)
+                              if not (isNull input?prefixCount) then "prefixCount" ==> input?prefixCount
+                              if not (isNull input?carry) then "carry" ==> input?carry ]
+                    else
+                        input
 
                 let! outcome =
                     JsToolWorkflow.execute

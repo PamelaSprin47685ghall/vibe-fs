@@ -5,6 +5,7 @@ open System.Threading.Tasks
 module LoopSensorSurface =
     val create: options: obj -> obj
     val observe: sensor: obj -> raw: obj -> unit
+    val requestInterrupt: sensor: obj -> session: string -> run: string -> kindNameValue: string -> bool
     val consumeAbortCause: sensor: obj -> source: obj -> Task<obj>
     val activeTask: sensor: obj -> session: string -> run: string -> obj
     val dropSession: sensor: obj -> session: string -> unit

@@ -16,11 +16,11 @@ const assertInstructionsBeforeData = (text) => {
 test('WHAT[provider-projection-014] actual mixed Join result keeps late responsibility instructions before physical data', () => {
   const text = join.renderBatch('en', [
     { kind: 'pty-exited', ptyId: 'private-pty', terminalLabel: 'test run', outcome: 'exit 7', code: '', message: '' },
-    { kind: 'completed', agentId: 'private-agent', agentName: 'Ada', role: 'Engineer', runId: 'private-run', view: 'NEXT-RESPONSIBILITY' },
+    { kind: 'completed', agentId: 'private-agent', agentName: 'Ada', role: 'Engineer', runId: 'private-run', returned: [{ text: 'NEXT-RESPONSIBILITY' }] },
   ])
   assertInstructionsBeforeData(text)
   assert.match(text, /NEXT-RESPONSIBILITY/)
-  assert.deepEqual(parseToml(text), { exit_code: 7 })
+  assert.deepEqual(parseToml(text), { exit_code: 7, returned: [{ text: 'NEXT-RESPONSIBILITY' }] })
 })
 
 test('WHAT[provider-projection-014] actual warm-start appendix composes base instructions and reference data before rendering', () => {

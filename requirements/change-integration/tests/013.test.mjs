@@ -97,13 +97,11 @@ const fact = {
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
       targetHeadSnapshot}),
-  publishClaimed: (
-    authorityRevision = 'authority-1') =>
+  publishClaimed: () =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
-      expectedHead: 'h1',
-      authorityRevision}),
+      expectedHead: 'h1'}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
   abandoned: () => change.fact('JobAbandoned', null)}
@@ -181,8 +179,7 @@ const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
     jobId,
     targetRef: 'refs/heads/main',
     rebasedCommit: 'r1',
-    expectedHead,
-    authorityRevision: 'authority-1'}})
+    expectedHead}})
 const publishedEvent = (jobId, candidateCommit = 'c1', resultingTargetHead = 'r1') => ({
   kind: 'Published',
   payload: { jobId, candidateCommit, resultingTargetHead }})
@@ -243,8 +240,7 @@ test('WHAT[change-integration-013] superseding rebased evidence appends while th
       jobId: 'job_1',
       targetRef: 'refs/heads/main',
       rebasedCommit,
-      expectedHead,
-      authorityRevision: 'authority-1'}})
+      expectedHead}})
 
   const superseded = change.fold([created, rebased('r1', 'h1', 'snapshot-rebased-1'), rebased('r2', 'h2', 'snapshot-rebased-2')])
   assert.equal(superseded.ok, true)

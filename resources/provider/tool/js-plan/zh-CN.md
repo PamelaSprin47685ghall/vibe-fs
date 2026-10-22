@@ -1,11 +1,12 @@
 规划底稿 `P` 使用同一套编程面。`PLAN_PATH` 是唯一允许读写的底稿路径常量；用 `this.cat(PLAN_PATH)` 读取、`this.where` / `this.whereAll` 定位、切片重组后用 `this.write(PLAN_PATH, content)` 写回。其它路径（含绝对路径与上级目录）以 `PATH_DENIED` 拒绝。
 
-本编程面没有 glob、grep，也不访问仓库文件。需要仓库事实时调用 DevOps 成员：`await this.devops(intent, reportMapping)`。`intent` 是要问的那句话；`reportMapping` 必填，形态是「锚点编号 → `null`（保留）或摘要字符串（替换）」的记录，不带 `prefixUntil`，缺失或非法以 `VIEW_DECLARATION_INVALID` 拒绝。该调用是同步的——DevOps 交回调查结果才返回。DevOps 席位尚未绑定或已关闭时，以 `assessment-pending-for-devops` 拒绝。
+本编程面没有 glob、grep，也不访问仓库文件。需要仓库事实时调用 `await this.devops(intent)`。`intent` 写调查问题；需要旧背景时，第二参数传 `carry` 数组，整数引用可见锚点，字符串表示字面文本。父方本回合不传，问题无需再写进数组。该调用等待 DevOps 交回调查结果；席位尚未绑定或已关闭时，以 `assessment-pending-for-devops` 拒绝。
 
-每一任期在本任调用 `review` 之前，`todowrite-for-plan` 对底稿严格只读。此前调用 `write` 会被拒绝，并要求先调用 `review`。评审之后写权限解锁。接力开启的下一任期，在它自己的 `review` 之前重新锁定为只读。
+对底稿的修改由路径边界与用户授权决定，不需要先完成评审仪式。`review` 是可按需调用的独立审查能力，不是正常写入的前置条件。
 
 程序内 `await this.ask(question)` 向用户提问并暂停：本次工具调用返回 parked 载荷并中断 attempt；用户答复后用 `{ unpark: { handle, value } }` 恢复，await 的值就是注入值。只有 S1 阶段可以提问；其他阶段以 `ASK_REFUSED` 拒绝。
 
-调用还可带可选的扁平整理参数：`prefixUntil: number` 与 `thenMap: record<number, string|null>`。一旦提供，两者都必填，遵循统一的锚点区间规则。用 `thenMap` 的摘要与 null 表态保留交接所需内容；声明会记录交接 checkpoint。`prefixUntil` 只保护本轮前缀，不恢复已压缩内容，也不是交付边界。这两个参数平铺在调用顶层，不再包在包装对象里；它们与委派成员自己携带的 `reportMapping` 不是同一种形状：那份记录只有「锚点编号 → `null` 或摘要字符串」，既没有 `prefixUntil`，也没有 `thenMap`。
+需要整理交接上下文时，同时提供顶层参数 `prefixCount` 与 `carry`：原样保留开头指定数量的历史区间，再按数组顺序追加锚点引用或字面文本。非空的开头 0 区间也算一段。本回合自动保留，正文已经说清的结论无需再用数组重复。声明会记录交接 checkpoint；不传这两个参数时保持现有上下文。
 
-计划程序以 `await this.deliver(reportMapping)` 收尾——映射形状与交给 DevOps 成员的相同：锚点编号 → `null`（保留）或摘要字符串（替换），不带 `prefixUntil`。调用之前，先在助手正文写好计划的散文：规划了什么、证据是什么、还有什么未决、继任者需要什么。报告映射必须指向这次计划欠调用方的全部材料——包括这份散文和它依赖的上下文。不要把散文复制进 deliver 参数，也不要留到调用之后再写：调用之后没有以后。
+交付时先用助手正文写清计划、依据和未决事项，紧接着调用 `await this.deliver()`。本回合天然回传。只有还需附加旧上下文时才传 `carry`，例如 `await this.deliver([6])`；不要复制刚写的报告，调用之后程序已结束。
+

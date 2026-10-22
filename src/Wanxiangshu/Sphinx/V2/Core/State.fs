@@ -69,6 +69,9 @@ type InquiryState =
         RenderReserve: Map<string, float>
         ConfigHash: string
         ProfileRef: string
+        /// The plan the inquiry runs, in the order the user gave it. The last entry is
+        /// the step whose result becomes the answer.
+        Plan: WorkId list
         Graph: Map<NodeId, GraphNode>
         Edges: Map<EdgeId, HyperEdge>
         /// Certificates are addressed by their full scope key, never by node alone.
@@ -149,5 +152,5 @@ module InquiryState =
         |> List.filter (fun item ->
             match item.State with
             | WorkState.Planned -> dependenciesSucceeded item
-            | WorkState.Ready -> true
+            | WorkState.Ready -> dependenciesSucceeded item
             | _ -> false)

@@ -120,7 +120,7 @@ test('WHAT[work-025] continuous reviewed relay advances tenures at the same stag
   }
 })
 
-test('WHAT[work-025] a second consecutive unreviewed relay is refused with no write, and a review reopens the handoff', () => {
+test('WHAT[work-025] consecutive unreviewed relays succeed because review is an optional collaboration result', () => {
   let text = life.encodeOpening('plan', 'work-noop', '/repo/root', 0n)
   const promoted = life.reviewProbe(text, openedActiveId(text), 'Promoted')
   assert.equal(promoted.decision, 'Write', promoted.detail)
@@ -129,23 +129,17 @@ test('WHAT[work-025] a second consecutive unreviewed relay is refused with no wr
   const first = life.deliverProbe(text, 'run-1', 'call-1', 10n)
   assert.equal(first.detail, 'Relayed', first.detail)
   text = `${text}${first.bytes}`
-  // Second relay: an unreviewed successor, but the prior handoff was reviewed. Allowed once.
+  // Second relay: an unreviewed successor directly relays.
   const second = life.deliverProbe(text, 'run-2', 'call-2', 20n)
   assert.equal(second.detail, 'Relayed', second.detail)
   text = `${text}${second.bytes}`
-  // Third relay: two consecutive unreviewed handoffs is the no-op chain. Refused, zero write.
-  const activeBefore = openedActiveId(text)
-  const refused = life.deliverProbe(text, 'run-3', 'call-3', 30n)
-  assert.equal(refused.decision, 'Done', refused.detail)
-  assert.equal(refused.detail, 'ReviewRequired')
-  assert.equal(refused.bytes, '', 'the refusal appends nothing')
-  const afterRefusal = life.readProbe(text)
-  assert.equal(afterRefusal.activeId, activeBefore, 'the tenure is not retired')
-  // The runner submits its review; the handoff resumes at the same stage.
-  const reviewed = life.reviewProbe(text, activeBefore, 'Stayed')
-  text = `${text}${reviewed.bytes}`
-  const resumed = life.deliverProbe(text, 'run-4', 'call-4', 40n)
-  assert.equal(resumed.detail, 'Relayed', resumed.detail)
+  // Third relay: review is not a lifecycle precondition, consecutive relays succeed.
+  const third = life.deliverProbe(text, 'run-3', 'call-3', 30n)
+  assert.equal(third.decision, 'Write', third.detail)
+  assert.equal(third.detail, 'Relayed')
+  const folded = life.readProbe(`${text}${third.bytes}`)
+  assert.equal(folded.ok, true)
+  assert.equal(folded.activeId.length > 0, true)
 })
 
 test('WHAT[work-025] relay is blocked by live resources or a wrong incumbency id', async () => {

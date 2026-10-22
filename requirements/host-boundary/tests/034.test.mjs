@@ -1,8 +1,7 @@
-// WHAT[host-boundary-034] gate ⑩/⑪/⑫/⑬ adapter-thinness: the baseline write is refused on any
-// violation, the port purity scope and the neutral-port vocabulary are discovered from the sources,
-// a per-file product-reference growth is reported even when the aggregate total stays flat, an
-// adapter file that is not in the baseline is allowed while the totals stay within the baseline
-// (moves and splits), and the two Host/ namespace tiers keep their own namespaces.
+// WHAT[host-boundary-034] Gate 11/12/13 adapter boundaries: port purity forbids
+// concrete Host SDK clients, file handles, mutable registries, and adapter/product
+// namespaces; a legitimate adapter with domain references passes; port families
+// and namespace tiers maintain integrity.
 import test from 'node:test'
 
 {
@@ -11,7 +10,6 @@ const { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } = await im
 const { tmpdir } = await import('node:os')
 const { join, dirname, relative } = await import('node:path')
 const { fileURLToPath } = await import('node:url')
-const { spawnSync } = await import('node:child_process')
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
 const REPO = join(ROOT, '../../..')
@@ -19,11 +17,8 @@ const GATE = join(REPO, 'scripts/checks/adapter-thinness.mjs')
 const { walk } = await import(join(REPO, 'scripts/lib/walk.mjs'))
 const {
   scanAdapterThinness,
-  measure,
   portTypeNames,
   isPortFile,
-  baselineWritePlan,
-  applyBaselineWrite,
   scanPortFamilies,
   scanNamespaceTiers,
 } = await import(GATE)
@@ -45,47 +40,44 @@ const fixture = () => {
   return { dir, write, read, files, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-// (a) a violation refuses the baseline write; the baseline file on disk stays byte-identical.
-test('WHAT[host-boundary-034] a violation refuses the baseline write and leaves the baseline file untouched', () => {
+// (a) Enhanced Gate 11: neutral port signatures must not carry concrete Host SDK clients,
+// file handles, or mutable registries.
+test('WHAT[host-boundary-034] neutral port signatures carrying Host SDK clients, file handles, or mutable registries are rejected', () => {
   const fx = fixture()
   try {
-    const baselinePath = join(fx.dir, 'adapter-thinness-baseline.json')
-    const baselineText = JSON.stringify({
-      _note: 'fixture baseline',
-      productReference: { 'src/Wanxiangshu/OpenCode/Adapter.fs': 1 },
-      withoutPort: ['src/Wanxiangshu/OpenCode/Adapter.fs'],
-    }, null, 2) + '\n'
-    writeFileSync(baselinePath, baselineText)
-    const before = readFileSync(baselinePath)
-
-    fx.write('src/Wanxiangshu/OpenCode/Adapter.fs', [
-      'namespace Wanxiangshu.OpenCode',
-      'open Wanxiangshu.Execution.Delegation',
-      'open Wanxiangshu.Interaction.Dispatch',
+    // 1. Concrete Host SDK client handle in port
+    fx.write('src/Wanxiangshu/Host/Ports/LeakingClient.fs', [
+      'namespace Wanxiangshu.Host.Ports',
+      'type LeakingClientPort =',
+      '    member _.DoWork(client: obj) = client.session.get()',
       '',
     ].join('\n'))
 
-    const baseline = JSON.parse(baselineText)
-    const { violations } = scanAdapterThinness([...fx.files.keys()], fx.read, { baseline, root: fx.dir })
+    // 2. Concrete file handle in port
+    fx.write('src/Wanxiangshu/Host/Ports/LeakingFile.fs', [
+      'namespace Wanxiangshu.Host.Ports',
+      'open System.IO',
+      'type LeakingFilePort =',
+      '    member _.ReadFile(path: string) = File.ReadAllText(path)',
+      '',
+    ].join('\n'))
 
-    assert.ok(violations.length > 0, 'the planted growth must be a violation')
-    assert.ok(violations.some((v) => v.gate === 'adapter-thinness'))
+    // 3. Mutable registry in port
+    fx.write('src/Wanxiangshu/Host/Ports/LeakingRegistry.fs', [
+      'namespace Wanxiangshu.Host.Ports',
+      'type LeakingRegistryPort =',
+      '    val mutable table: Dictionary<string, obj>',
+      '',
+    ].join('\n'))
 
-    const plan = baselineWritePlan(violations, measure([...fx.files.keys()], fx.read, fx.dir), baseline)
-    assert.equal(plan.allowed, false)
-    assert.match(plan.reason, /refusing to write/)
-    assert.equal(plan.content, null)
+    const files = [...fx.files.keys()]
+    const { violations } = scanAdapterThinness(files, fx.read, { root: fx.dir })
+    const purityViolations = violations.filter((v) => v.gate === 'port-purity')
 
-    let written = null
-    const result = applyBaselineWrite({
-      violations,
-      measurement: measure([...fx.files.keys()], fx.read, fx.dir),
-      prior: baseline,
-      write: (content) => { written = content },
-    })
-    assert.equal(result.written, false)
-    assert.equal(written, null, 'the write callback must not be reached on a violation')
-    assert.equal(readFileSync(baselinePath).equals(before), true, 'baseline bytes must be unchanged')
+    assert.ok(purityViolations.length >= 3, `all three planted leaks must be reported: ${JSON.stringify(purityViolations)}`)
+    assert.ok(purityViolations.some((v) => /LeakingClient\.fs.*Host SDK client/.test(v.message)))
+    assert.ok(purityViolations.some((v) => /LeakingFile\.fs.*file handle/.test(v.message)))
+    assert.ok(purityViolations.some((v) => /LeakingRegistry\.fs.*mutable registry/.test(v.message)))
   } finally {
     fx.cleanup()
   }
@@ -116,10 +108,7 @@ test('WHAT[host-boundary-034] a new port family is discovered from the sources a
     const names = portTypeNames(fx.read, files, fx.dir)
     assert.ok(names.has('FissionPort'), 'the new signature must contribute its type name')
 
-    const { violations } = scanAdapterThinness(files, fx.read, {
-      baseline: { productReference: {}, withoutPort: [] },
-      root: fx.dir,
-    })
+    const { violations } = scanAdapterThinness(files, fx.read, { root: fx.dir })
     const purity = violations.filter((v) => v.gate === 'port-purity')
     assert.equal(purity.length, 1, 'exactly the new port file violates purity')
     assert.match(purity[0].message, /NeutralFission\.fs/)
@@ -129,111 +118,50 @@ test('WHAT[host-boundary-034] a new port family is discovered from the sources a
   }
 })
 
-// (c) a per-file growth is reported even when the aggregate total does not grow.
-test('WHAT[host-boundary-034] a per-file product-reference growth is reported even when the total is flat', () => {
+// (c) A legitimate adapter with multiple domain namespace references but clear responsibility
+// passes without being blocked by an import count ratchet.
+test('WHAT[host-boundary-034] a legitimate adapter with multiple product domain references passes without count ratchet rejection', () => {
   const fx = fixture()
   try {
-    fx.write('src/Wanxiangshu/OpenCode/Grown.fs', [
+    // Valid clean neutral port
+    fx.write('src/Wanxiangshu/Host/Ports/CleanPort.fsi', [
+      'namespace Wanxiangshu.Host.Ports',
+      '/// HNI P-99: clean port.',
+      'type CleanPort =',
+      '    abstract member Execute: unit -> unit',
+      '',
+    ].join('\n'))
+    fx.write('src/Wanxiangshu/Host/Ports/CleanPort.fs', [
+      'namespace Wanxiangshu.Host.Ports',
+      'type CleanPort =',
+      '    interface CleanPort with',
+      '        member _.Execute() = ()',
+      '',
+    ].join('\n'))
+
+    // Adapter referencing multiple product domains cleanly
+    fx.write('src/Wanxiangshu/OpenCode/RichAdapter.fs', [
       'namespace Wanxiangshu.OpenCode',
       'open Wanxiangshu.Execution.Delegation',
       'open Wanxiangshu.Interaction.Dispatch',
       'open Wanxiangshu.Mission.Work',
+      'open Wanxiangshu.Context.Prefix',
       '',
-    ].join('\n'))
-    fx.write('src/Wanxiangshu/OpenCode/Shrunk.fs', [
-      'namespace Wanxiangshu.OpenCode',
-      'open Wanxiangshu.Execution.Delegation',
+      'type RichAdapter = { Name: string }',
       '',
     ].join('\n'))
 
-    const baseline = {
-      productReference: {
-        'src/Wanxiangshu/OpenCode/Grown.fs': 2,
-        'src/Wanxiangshu/OpenCode/Shrunk.fs': 2,
-      },
-      withoutPort: ['src/Wanxiangshu/OpenCode/Grown.fs', 'src/Wanxiangshu/OpenCode/Shrunk.fs'],
-    }
     const files = [...fx.files.keys()]
-    const now = measure(files, fx.read, fx.dir)
-    assert.equal(now.productReferenceTotal, 4, 'the aggregate total is unchanged')
-
-    const { violations } = scanAdapterThinness(files, fx.read, { baseline, root: fx.dir })
-    assert.equal(violations.length, 1, 'exactly one per-file violation')
-    assert.equal(violations[0].gate, 'adapter-thinness')
-    assert.match(violations[0].message, /Grown\.fs: product-domain references rose 2 -> 3/)
+    const { violations } = scanAdapterThinness(files, fx.read, { root: fx.dir })
+    assert.deepEqual(violations, [], `a rich adapter with clear responsibilities must pass: ${JSON.stringify(violations)}`)
   } finally {
     fx.cleanup()
   }
 })
 
-// (d) an adapter file that is NOT in the baseline is allowed while the totals stay within the baseline:
-// a lane that moves or splits a baselined adapter file never has to edit the baseline.
-test('WHAT[host-boundary-034] an adapter file that is not in the baseline is allowed while the totals stay within the baseline', () => {
-  const fx = fixture()
-  try {
-    // A baselined file is split into two: one part keeps the old name and shrinks, the other part is
-    // a new file. The total is unchanged, so no baseline edit is needed.
-    fx.write('src/Wanxiangshu/OpenCode/Moved.fs', [
-      'namespace Wanxiangshu.OpenCode',
-      'open Wanxiangshu.Execution.Delegation',
-      'open Wanxiangshu.Interaction.Dispatch',
-      '',
-    ].join('\n'))
-    fx.write('src/Wanxiangshu/OpenCode/Old.fs', [
-      'namespace Wanxiangshu.OpenCode',
-      'open Wanxiangshu.Execution.Delegation',
-      '',
-    ].join('\n'))
-
-    const baseline = {
-      productReference: { 'src/Wanxiangshu/OpenCode/Old.fs': 3 },
-      withoutPort: ['src/Wanxiangshu/OpenCode/Old.fs', 'src/Wanxiangshu/OpenCode/Moved.fs'],
-    }
-    const files = [...fx.files.keys()]
-    const now = measure(files, fx.read, fx.dir)
-    assert.equal(now.productReferenceTotal, 3, 'the aggregate total is unchanged')
-
-    const { violations } = scanAdapterThinness(files, fx.read, { baseline, root: fx.dir })
-    assert.equal(violations.length, 0, `a move or split must not need a baseline edit: ${JSON.stringify(violations)}`)
-  } finally {
-    fx.cleanup()
-  }
-})
-
-// (e) the CLI refuses to write the baseline on a planted regression and leaves the file byte-identical.
-test('WHAT[host-boundary-034] the CLI refuses --write-baseline on a regression and leaves the baseline byte-identical', () => {
-  const fx = fixture()
-  try {
-    mkdirSync(join(fx.dir, 'scripts/checks'), { recursive: true })
-    const baselinePath = join(fx.dir, 'scripts/checks/adapter-thinness-baseline.json')
-    const baselineText = JSON.stringify({
-      _note: 'fixture baseline',
-      productReference: { 'src/Wanxiangshu/OpenCode/Adapter.fs': 1 },
-      withoutPort: ['src/Wanxiangshu/OpenCode/Adapter.fs'],
-    }, null, 2) + '\n'
-    writeFileSync(baselinePath, baselineText)
-    const before = readFileSync(baselinePath)
-
-    fx.write('src/Wanxiangshu/OpenCode/Adapter.fs', [
-      'namespace Wanxiangshu.OpenCode',
-      'open Wanxiangshu.Execution.Delegation',
-      'open Wanxiangshu.Interaction.Dispatch',
-      '',
-    ].join('\n'))
-
-    const run = spawnSync(process.execPath, [GATE, '--write-baseline'], { cwd: fx.dir, encoding: 'utf8' })
-    assert.notEqual(run.status, 0, 'the CLI must exit non-zero')
-    assert.match(run.stderr, /refusing to write/)
-    assert.equal(readFileSync(baselinePath).equals(before), true, 'baseline bytes must be unchanged')
-  } finally {
-    fx.cleanup()
-  }
-})
-
-// (f) port-family integrity: a family that claims no reserved id, a family that claims an id another
+// (d) port-family integrity: a family that claims no reserved id, a family that claims an id another
 // family already holds, and a lane file whose base name collides with a neutral family are all
-// reported (HNI-11 drift D-06 / D-07). The mirror generator hard-errors on a family without a
-// marker and reads the family by file name, so both are checked here rather than by a failing build.
+// reported (HNI-11 drift D-06 / D-07).
 test('WHAT[host-boundary-034] a port family without a marker, a duplicated id and a colliding file name are reported', () => {
   const fx = fixture()
   try {
@@ -288,7 +216,7 @@ test('WHAT[host-boundary-034] a port family without a marker, a duplicated id an
   }
 })
 
-// (g) namespace-tier integrity: a tier-A file with the wrong namespace, a tier-B file with the
+// (e) namespace-tier integrity: a tier-A file with the wrong namespace, a tier-B file with the
 // wrong namespace and a tier namespace claimed directly under Host/ are all reported (HNI-11
 // drift D-05). The tree is read from the sources, so a family another lane lands is covered
 // without editing the gate.
@@ -312,10 +240,7 @@ test('WHAT[host-boundary-034] a wrong tier namespace and a misplaced tier namesp
     ].join('\n'))
 
     const files = [...fx.files.keys()]
-    const { violations } = scanNamespaceTiers(files, fx.read, {
-      root: fx.dir,
-      seamBaseline: { adapters: [] },
-    })
+    const { violations } = scanNamespaceTiers(files, fx.read, { root: fx.dir })
     const messages = violations.map((v) => v.message)
 
     assert.ok(
@@ -335,64 +260,13 @@ test('WHAT[host-boundary-034] a wrong tier namespace and a misplaced tier namesp
   }
 })
 
-// (h) the tier-B ratchet: an adapter that newly references the domain seam fails, a baselined
-// adapter that stops referencing it must leave the baseline, and the baselined set passes.
-test('WHAT[host-boundary-034] the domain-seam ratchet may only go down', () => {
-  const fx = fixture()
-  try {
-    fx.write('src/Wanxiangshu/OpenCode/Baselined.fs', [
-      'namespace Wanxiangshu.OpenCode',
-      'open Wanxiangshu.Host.Domain',
-      '',
-    ].join('\n'))
-    fx.write('src/Wanxiangshu/OpenCode/Newcomer.fs', [
-      'namespace Wanxiangshu.OpenCode',
-      'open Wanxiangshu.Host.Domain',
-      '',
-    ].join('\n'))
-
-    const files = [...fx.files.keys()]
-    const baselined = { adapters: ['src/Wanxiangshu/OpenCode/Baselined.fs'] }
-    const { violations } = scanNamespaceTiers(files, fx.read, { root: fx.dir, seamBaseline: baselined })
-    const messages = violations.map((v) => v.message)
-
-    assert.ok(
-      messages.some((m) => /Newcomer\.fs: adapter newly references 'Wanxiangshu\.Host\.Domain'/.test(m)),
-      `a new adapter reference must be reported: ${JSON.stringify(messages)}`,
-    )
-
-    // Drop the newcomer from the tree: the baselined file that no longer references the seam must
-    // leave the baseline, so the ratchet never loosens.
-    fx.write('src/Wanxiangshu/OpenCode/Baselined.fs', [
-      'namespace Wanxiangshu.OpenCode',
-      '',
-    ].join('\n'))
-    const after = scanNamespaceTiers([...fx.files.keys()], fx.read, { root: fx.dir, seamBaseline: baselined })
-    assert.ok(
-      after.violations.some((v) => /Baselined\.fs: no longer references/.test(v.message)),
-      `a stale baseline entry must be reported: ${JSON.stringify(after.violations.map((v) => v.message))}`,
-    )
-
-    // The baselined set itself passes.
-    const clean = scanNamespaceTiers([...fx.files.keys()], fx.read, {
-      root: fx.dir,
-      seamBaseline: { adapters: ['src/Wanxiangshu/OpenCode/Newcomer.fs'] },
-    })
-    assert.equal(clean.violations.length, 0, `the baselined set must pass: ${JSON.stringify(clean.violations)}`)
-  } finally {
-    fx.cleanup()
-  }
-})
-
-// (i) the real tree passes gate ⑬: the two tiers hold their own namespaces and the domain-seam
-// baseline matches the adapter files that reference the seam.
-test('WHAT[host-boundary-034] the repository tree passes the namespace-tier gate', () => {
+// (f) the real tree passes Gate 11/12/13: port purity, port families, and namespace tiers.
+test('WHAT[host-boundary-034] the repository tree passes the port-purity and namespace-tier gates', () => {
   const files = walk(join(REPO, 'src/Wanxiangshu'), ['.fs', '.fsi'])
     .map((p) => relative(REPO, p).replace(/\\/g, '/'))
     .sort()
   const read = (p) => readFileSync(join(REPO, p), 'utf8')
-  const { violations, measurement } = scanNamespaceTiers(files, read, { root: REPO })
-  assert.deepEqual(violations, [], `the tree must pass gate 13: ${JSON.stringify(violations)}`)
-  assert.ok(measurement.adapters.length > 0, 'the measured domain-seam set must not be empty')
+  const { violations } = scanAdapterThinness(files, read, { root: REPO })
+  assert.deepEqual(violations, [], `the tree must pass port purity, port family, and namespace tier checks: ${JSON.stringify(violations)}`)
 })
 }

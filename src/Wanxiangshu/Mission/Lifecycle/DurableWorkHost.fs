@@ -263,11 +263,6 @@ module DurableWorkHost =
             OpeningStage: string option
             Reviewed: bool
             ReviewOutcome: string option
-            /// The review outcome of the most recently retired tenure. `Reviewed`
-            /// and `ReviewOutcome` describe the OPEN tenure; a delivered work has
-            /// none, yet the review that qualified its candidate is still the
-            /// durable fact of the round that delivered it.
-            LastRetiredReview: string option
             OpeningCursor: float option
             PredecessorRange: (float * float) option
             LastRetirementCursor: float option
@@ -287,7 +282,6 @@ module DurableWorkHost =
             BlockerDigest: string option
             Root: string option
             Retirements: HostRetirement list
-            Confirmation: HostRunFence option
             ProjectionCut: HostRunFence option
             Advances: HostAdvance list
         }
@@ -423,11 +417,6 @@ module DurableWorkHost =
         let history = historyEventsOf work
         let retirements = eventsOfType "IncumbencyRetired" history
 
-        let confirmation =
-            eventsOfType "ConfirmationCommitted" history
-            |> Array.tryLast
-            |> Option.map hostRunFenceOf
-
         { Opened = true
           Sequence = sequenceOf snapshot
           Stage = textOf snapshot?stage
@@ -435,7 +424,6 @@ module DurableWorkHost =
           OpeningStage = openingStageOf active
           Reviewed = outcome.IsSome
           ReviewOutcome = outcome
-          LastRetiredReview = lastRetiredReviewOf rounds
           OpeningCursor = openingCursorOf active
           PredecessorRange = predecessorRangeOf activeId rounds
           LastRetirementCursor = lastRetirementCursorOf rounds
@@ -454,11 +442,10 @@ module DurableWorkHost =
             |> Array.tryLast
             |> Option.bind (fun event -> optionalText (textOf event?target))
           Authority = textOf snapshot?authority
-          Confirmed = confirmedOf active
+          Confirmed = false
           BlockerDigest = blockerDigestOf activeId history
           Root = optionalText (textOf snapshot?root)
           Retirements = retirements |> Array.map hostRetirementOf |> Array.toList
-          Confirmation = confirmation
           ProjectionCut = projectionCutOf retirements
           Advances =
             eventsOfType "AdvanceCommitted" history

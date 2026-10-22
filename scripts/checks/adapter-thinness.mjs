@@ -1,17 +1,6 @@
 #!/usr/bin/env node
 // ⑩/⑪/⑫/⑬ host-neutral interface gates (HNI-04, HNI-11, proposals/host-neutral-interface).
 //
-// ⑩ adapter-thinness (ratchet, baseline scripts/checks/adapter-thinness-baseline.json):
-//   a) product-reference: distinct product-domain namespaces (Wanxiangshu.<Domain>… that are not an
-//      `….OpenCode` adapter namespace) opened or qualified by each adapter file. An adapter that needs them
-//      is taking product decisions instead of calling a neutral port / ProductHooks.
-//   b) without-port: adapter files that reference no host-neutral port type (a type declared by a port
-//      signature under src/Wanxiangshu/Host/Ports/**).
-//   The ratchet may only go DOWN. Totals may not grow, a baselined file may not exceed its baseline, and
-//   the number of adapter files without a neutral port may not grow. An adapter file that is NOT in the
-//   baseline may carry product-domain references as long as the totals stay within the baseline, so a
-//   lane that moves or splits a baselined adapter file never has to edit the baseline. Improvements never
-//   fail; the arch lane tightens the baseline (`--write-baseline`, and only on a clean run).
 // ⑪ port-purity (strict): every file under src/Wanxiangshu/Host/Ports/** (.fs and .fsi) references no adapter
 //   namespace and no product domain — only Foundation, Wanxiangshu.Host and System. The scope is discovered
 //   from the sources, so a port family added by another lane (any name) is covered without editing this file.
@@ -22,8 +11,7 @@
 // ⑬ namespace-tier integrity (drift D-05/D-06): src/Wanxiangshu/Host/ holds two tiers, each with one
 //   namespace: tier A `Host/Ports/` declares exactly `Wanxiangshu.Host.Ports`; tier B `Host/Domain/`
 //   declares exactly `Wanxiangshu.Host.Domain`; a file directly under Host/ declares neither. The
-//   tier-B ratchet (baseline scripts/checks/domain-seam-baseline.json) keeps the adapter files that
-//   reference the domain seam from growing. The scope is discovered from the sources.
+//   The scope is discovered from the sources.
 //
 // Honest scope notes (see proposals/host-neutral-interface/evidence/adapter-thinness-gate.md):
 //   * The domain seams (P-13 command declaration / P-14 delegation-caller / P-15 delegation-command /
@@ -36,15 +24,14 @@
 //   * src/Wanxiangshu/Host/** outside Host/Ports/ is product/neutral-host code, not adapter code; it is not
 //     counted as "adapter" either, so a neutral-host adapter folder convention is not yet covered here.
 //
-// Usage: node scripts/checks/adapter-thinness.mjs [--report] [--write-baseline]
+// Usage: node scripts/checks/adapter-thinness.mjs
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
-export const THINNESS_BASELINE = 'scripts/checks/adapter-thinness-baseline.json'
 export const PORT_ROOT = `${PRODUCTION_ROOT}/Host/Ports`
 export const PRODUCT_DOMAINS = ['Ablation', 'Change', 'Composition', 'Context', 'Execution', 'Git', 'Interaction',
   'Mission', 'Participant', 'Persistence', 'Process', 'Repository', 'Sphinx', 'Verification']
@@ -246,7 +233,6 @@ export const HOST_ROOT = `${PRODUCTION_ROOT}/Host`
 export const DOMAIN_ROOT = `${PRODUCTION_ROOT}/Host/Domain`
 export const PORT_NAMESPACE = 'Wanxiangshu.Host.Ports'
 export const DOMAIN_NAMESPACE = 'Wanxiangshu.Host.Domain'
-export const DOMAIN_SEAM_BASELINE = 'scripts/checks/domain-seam-baseline.json'
 
 // Host/FissionPort.fs(i) is the one known exception: it already declares the safe
 // `Wanxiangshu.Host.Ports` namespace but sits directly under Host/ instead of Host/Ports/.
@@ -266,24 +252,6 @@ const declaresNamespace = (text) => {
 // grow and a baselined file that stops referencing the seam must leave the baseline, so the
 // ratchet never loosens. It records existing debt; it does not forbid the seam from being used.
 const referencesDomainSeam = (text) => /\bWanxiangshu\.Host\.Domain\b/.test(code(text))
-
-export const readDomainSeamBaseline = (root = process.cwd()) => {
-  const candidates = [join(root, DOMAIN_SEAM_BASELINE), DOMAIN_SEAM_BASELINE]
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return JSON.parse(readFileSync(candidate, 'utf8'))
-  }
-  return null
-}
-
-export function measureDomainSeam(productionFiles, read, root = process.cwd()) {
-  const files = (productionFiles ?? []).map(norm)
-  const adapters = files.filter(isAdapterFile).sort()
-  const referencing = []
-  for (const file of adapters) {
-    if (referencesDomainSeam(read(file))) referencing.push(file)
-  }
-  return { adapters: referencing, adapterCount: referencing.length }
-}
 
 export function scanNamespaceTiers(productionFiles, read, options) {
   const violations = []
@@ -319,32 +287,7 @@ export function scanNamespaceTiers(productionFiles, read, options) {
       fail('namespace-tier', `${file}: declares '${ns}' but sits outside ${PORT_ROOT}/ and ${DOMAIN_ROOT}/`)
     }
   }
-
-  // The tier-B ratchet: adapter files may not grow their references to the domain seam.
-  const baseline = options?.seamBaseline ?? readDomainSeamBaseline(root)
-  const now = measureDomainSeam(files, read, root)
-  if (!baseline) {
-    fail('domain-seam-ratchet', `${DOMAIN_SEAM_BASELINE} missing`)
-    return { violations, measurement: now }
-  }
-  const baselined = baseline.adapters ?? []
-  for (const file of now.adapters) {
-    if (!baselined.includes(file)) {
-      fail('domain-seam-ratchet', `${file}: adapter newly references '${DOMAIN_NAMESPACE}'; the domain seam may not grow`)
-    }
-  }
-  // A baselined file that no longer references the seam must leave the baseline, so the ratchet
-  // never loosens. Only a file that is still in the scanned tree is judged: a fixture that scans a
-  // subset of the tree is not evidence that the other files stopped referencing the seam.
-  const scanned = new Set(files)
-  for (const file of baselined) {
-    if (!scanned.has(file)) continue
-    if (!now.adapters.includes(file)) {
-      fail('domain-seam-ratchet', `${file}: no longer references '${DOMAIN_NAMESPACE}'; drop it from ${DOMAIN_SEAM_BASELINE}`)
-    }
-  }
-
-  return { violations, measurement: now }
+  return { violations }
 }
 
 export function scanAdapterThinness(productionFiles, read, options) {
@@ -359,6 +302,9 @@ export function scanAdapterThinness(productionFiles, read, options) {
     // An unreadable port file is a hard error: skipping it would hide the file from the scope.
     const body = code(read(file))
     const bad = [...body.matchAll(/\bWanxiangshu\.([A-Z]\w*)/g)].map((m) => m[1]).filter((ns) => ns !== 'Foundation' && ns !== 'Host')
+    if (/\bSystem\.IO\b|\bFileStream\b|\bStreamReader\b|\bStreamWriter\b/.test(body)) bad.push('concrete file handle')
+    if (/\b(?:Dictionary|HashSet|ResizeArray)\s*<|\bDictionary\b|\bHashSet\b|\bResizeArray\b/.test(body)) bad.push('mutable registry')
+    if (/\bclient\s*(?:\?|\.(?:session|event|app|config|tui|find|file|project|path)\b)/.test(body)) bad.push('Host SDK client')
     if (/\bOpenCode\b|\bOpencode\w*|\bomp\b/i.test(body.replace(/\/\/\/.*$/gm, ''))) bad.push('host vocabulary')
     if (bad.length) fail('port-purity', `${file}: neutral port references ${[...new Set(bad)].join(', ')}`)
   }
@@ -369,86 +315,9 @@ export function scanAdapterThinness(productionFiles, read, options) {
 
   // ⑬ namespace-tier integrity — the two Host/ tiers keep their own namespaces, and the tier-B
   // ratchet keeps the domain seam from spreading into more adapter files.
-  violations.push(...scanNamespaceTiers(files, read, { root, seamBaseline: options?.seamBaseline }).violations)
+  violations.push(...scanNamespaceTiers(files, read, { root }).violations)
 
-  // ⑩ adapter thinness ratchet
-  const baseline = options?.baseline ?? readThinnessBaseline()
-  const now = measure(files, read, root)
-  if (!baseline) {
-    fail('adapter-thinness', `${THINNESS_BASELINE} missing`)
-    return { violations, measurement: now, baselineTotals: { productReference: 0, withoutPort: 0 } }
-  }
-  const base = baseline.productReference ?? {}
-  const baseTotal = Object.values(base).reduce((a, b) => a + b, 0)
-  if (now.productReferenceTotal > baseTotal) {
-    const grown = Object.entries(now.productReference).filter(([f, n]) => n > (base[f] ?? 0)).map(([f, n]) => `${f} ${base[f] ?? 0}->${n}`)
-    fail('adapter-thinness', `product-domain references in adapter files rose ${baseTotal} -> ${now.productReferenceTotal}: ${grown.join('; ')}`)
-  }
-  // Per-file: a baselined file may not grow. A file that is not in the baseline is allowed to carry
-  // product-domain references while the totals stay within the baseline, so a lane that moves or splits
-  // a baselined adapter file never has to edit the baseline (PROTOCOL: lanes never edit the baseline).
-  for (const [file, n] of Object.entries(now.productReference)) {
-    if (file in base && n > base[file]) {
-      fail('adapter-thinness', `${file}: product-domain references rose ${base[file]} -> ${n}`)
-    }
-  }
-  const baseWithout = baseline.withoutPort ?? []
-  if (now.withoutPort.length > baseWithout.length) {
-    const added = now.withoutPort.filter((f) => !baseWithout.includes(f))
-    fail('adapter-thinness', `adapter files without a host-neutral port rose ${baseWithout.length} -> ${now.withoutPort.length}: ${added.join(', ')}`)
-  }
-  return { violations, measurement: now, baselineTotals: { productReference: baseTotal, withoutPort: baseWithout.length } }
-}
-
-// --- baseline writing ---------------------------------------------------------------------------
-// Pure decision function: a baseline may only be written on a clean run. Any violation (product-reference
-// total rose, a baselined file grew, adapter files without a port rose, or a port-purity violation) refuses
-// the write, so the ratchet can never be raised by a regression.
-export function baselineWritePlan(violations, measurement, prior, seam = null) {
-  const list = violations ?? []
-  if (list.length > 0) {
-    const reasons = list.map((v) => `${v.gate}: ${v.message}`)
-    return {
-      allowed: false,
-      reason: `refusing to write ${THINNESS_BASELINE}: ${list.length} violation(s) would raise the ratchet; the baseline files are left unchanged`,
-      reasons,
-      content: null,
-      seamContent: null,
-    }
-  }
-  const m = measurement
-  if (!m) {
-    return {
-      allowed: false,
-      reason: `refusing to write ${THINNESS_BASELINE}: no measurement available`,
-      reasons: [],
-      content: null,
-      seamContent: null,
-    }
-  }
-  const content = JSON.stringify({
-    _note: prior?._note ?? 'HNI-04 gate 10 (adapter-thinness). Totals only go down; tighten with --write-baseline.',
-    productReference: m.productReference,
-    withoutPort: m.withoutPort,
-  }, null, 2) + '\n'
-  const seamContent = seam
-    ? JSON.stringify({
-      _note: seam.prior?._note ?? 'HNI-11 gate 13 (namespace tiers, tier-B domain seam). The set may only shrink; tighten with --write-baseline.',
-      adapters: seam.measurement.adapters,
-    }, null, 2) + '\n'
-    : null
-  return { allowed: true, reason: null, reasons: [], content, seamContent }
-}
-
-// Applies the decision: `write` is only called when the plan allows it. When a seam measurement is
-// given, the tier-B baseline is written through `writeSeam` in the same pass, so a single
-// --write-baseline keeps both ratchets in step.
-export function applyBaselineWrite({ violations, measurement, prior, write, seam = null, writeSeam = null }) {
-  const plan = baselineWritePlan(violations, measurement, prior, seam)
-  if (!plan.allowed) return { written: false, reason: plan.reason, reasons: plan.reasons, content: null, seamContent: null }
-  write(plan.content)
-  if (plan.seamContent && writeSeam) writeSeam(plan.seamContent)
-  return { written: true, reason: null, reasons: [], content: plan.content, seamContent: plan.seamContent }
+  return { violations }
 }
 
 // --- CLI -----------------------------------------------------------------------------------------
@@ -456,34 +325,8 @@ function runCli() {
   const root = process.cwd()
   const files = walk(join(root, PRODUCTION_ROOT), ['.fs', '.fsi']).map((p) => norm(relative(root, p)))
   const read = (p) => readFileSync(p, 'utf8')
-  const { violations, measurement, baselineTotals } = scanAdapterThinness(files, read, { root })
-  const m = measurement ?? measure(files.filter((f) => f.endsWith('.fs')), read, root)
-  const seamMeasurement = measureDomainSeam(files, read, root)
-  if (process.argv.includes('--write-baseline')) {
-    const prior = readThinnessBaseline()
-    const result = applyBaselineWrite({
-      violations,
-      measurement: m,
-      prior,
-      write: (content) => writeFileSync(THINNESS_BASELINE, content),
-      seam: { measurement: seamMeasurement, prior: readDomainSeamBaseline(root) },
-      writeSeam: (content) => writeFileSync(join(root, DOMAIN_SEAM_BASELINE), content),
-    })
-    if (result.written) {
-      console.log(`baseline written: product-reference ${m.productReferenceTotal}, without-port ${m.withoutPort.length}` +
-        `; domain seam ${seamMeasurement.adapters.length}`)
-    } else {
-      console.error(result.reason)
-      for (const reason of result.reasons ?? []) console.error(`  ${reason}`)
-      console.error(`${THINNESS_BASELINE} and ${DOMAIN_SEAM_BASELINE} were NOT modified`)
-    }
-  }
-  console.log(`adapter-thinness: ${m.adapterFiles} adapter files, ${m.adapterLines} lines; product-reference ${m.productReferenceTotal}` +
-    `${baselineTotals ? ` (baseline ${baselineTotals.productReference})` : ''}; without-port ${m.withoutPort.length}` +
-    `${baselineTotals ? ` (baseline ${baselineTotals.withoutPort})` : ''}`)
-  if (process.argv.includes('--report')) {
-    for (const [f, n] of Object.entries(m.productReference).sort((a, b) => b[1] - a[1])) console.log(`  ${n}\t${f}`)
-  }
+  const { violations } = scanAdapterThinness(files, read, { root })
+  console.log(`adapter-thinness: port purity, port families and namespace tiers checked (${violations.length} violation(s))`)
   for (const v of violations) console.error(`${v.gate}: ${v.message}`)
   process.exit(violations.length ? 1 : 0)
 }

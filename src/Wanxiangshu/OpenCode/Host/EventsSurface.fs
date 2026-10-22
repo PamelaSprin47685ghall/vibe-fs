@@ -15,7 +15,12 @@ module EventsSurface =
     let mutable private noRun = 0
 
     let create (terminalSource: ISessionTerminalSource) : obj =
-        box (Events.HostEventPort(terminalSource))
+        let source =
+            if isNull (box terminalSource) then
+                Events.newTerminalSource ()
+            else
+                terminalSource
+        box (Events.HostEventPort(source))
 
     let private terminal (sessionId: string) (kind: string) (providerRun: string) (text: string) : TerminalOutcome =
         match kind with

@@ -44,8 +44,7 @@ module OrchestratorFact =
             {| ManagerJobId: ManagerJobId
                TargetRef: TargetRef
                RebasedCommit: CommitHash
-               ExpectedHead: CommitHash
-               AuthorityRevision: AuthorityRevision |} ->
+               ExpectedHead: CommitHash |} ->
             AgentFact
 
     val inline Published:

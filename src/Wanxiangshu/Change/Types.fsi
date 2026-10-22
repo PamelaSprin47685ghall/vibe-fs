@@ -11,7 +11,6 @@ type OrchestratorVerdict =
     | Published of jobId: ManagerJobId * head: CommitHash
     | PublishedPendingCleanup of jobId: ManagerJobId * head: CommitHash * cleanupError: string
     | Cancelled of jobId: ManagerJobId
-    | RejectedDirty of reason: string
     | IntegrationFailed of jobId: ManagerJobId * errorDetails: string
     | Empty
 
@@ -20,8 +19,7 @@ type OrchestratorHandle =
       WorktreePath: WorktreePath }
 
 type GitPort =
-    { IsDirty: WorktreePath -> Task<Result<bool, string>>
-      CreateWorktree: ManagerJobId -> WorktreePath -> Task<Result<WorktreeIdentity, string>>
+    { CreateWorktree: ManagerJobId -> WorktreePath -> TargetRef -> Task<Result<WorktreeIdentity, string>>
       FreezeTargetBranch: unit -> Task<Result<TargetRef, string>>
       Rebase: WorktreePath -> TargetRef -> Task<Result<unit, string>>
       FfMerge: WorktreePath -> TargetRef -> CommitHash -> CommitHash -> Task<Result<CommitHash, string>>
@@ -60,7 +58,6 @@ type RelayPort =
         ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
         PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
         TerminateWorkResources: ManagerJobId -> Task<unit>
-        LifecycleReviewed: SessionId -> Wanxiangshu.Foundation.Identity.WorktreePath -> Task<(string * string) option>
     }
 
 type OrchestratorJournalPort =

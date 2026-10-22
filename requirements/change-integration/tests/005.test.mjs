@@ -114,13 +114,11 @@ const fact = {
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
       targetHeadSnapshot}),
-  publishClaimed: (
-    authorityRevision = 'authority-1') =>
+  publishClaimed: () =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
-      expectedHead: 'h1',
-      authorityRevision}),
+      expectedHead: 'h1'}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
   abandoned: () => change.fact('JobAbandoned', null)}
@@ -205,8 +203,7 @@ const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
     jobId,
     targetRef: 'refs/heads/main',
     rebasedCommit: 'r1',
-    expectedHead,
-    authorityRevision: 'authority-1'}})
+    expectedHead}})
 const publishedEvent = (jobId, candidateCommit = 'c1', resultingTargetHead = 'r1') => ({
   kind: 'Published',
   payload: { jobId, candidateCommit, resultingTargetHead }})
@@ -302,16 +299,16 @@ const valueOf = async (promise) => {
 
 test('WHAT[change-integration-005] WORKTREE_create_returns_owned_resource_and_marks_path_identity', async () => {
   const { git, calls } = fakeGit()
-  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
+  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH, 'refs/heads/main'))
 
   assertOpaque(resource, 'owned worktree resource')
   assert.equal(change.worktreePath(resource), PATH)
   assert.equal(change.worktreeIdentity(resource), 'manager/job-9')
-  assert.deepEqual(calls, [{ args: ['worktree', 'add', PATH, '-b', 'manager/job-9'], cwd: '/repo' }])
+  assert.deepEqual(calls, [{ args: ['worktree', 'add', PATH, '-b', 'manager/job-9', 'refs/heads/main'], cwd: '/repo' }])
 })
 test('WHAT[change-integration-005] WORKTREE_release_removes_worktree_and_branch_once', async () => {
   const { git, calls } = fakeGit()
-  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
+  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH, 'refs/heads/main'))
 
   const first = await change.worktreeRelease(resource)
   const second = await change.worktreeRelease(resource)
@@ -327,14 +324,14 @@ test('WHAT[change-integration-005] WORKTREE_release_aggregates_both_failures', a
     ['worktree remove', [1, '', 'rm failed']],
     ['branch -D', [1, '', 'branch failed']],
   ])
-  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
+  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH, 'refs/heads/main'))
   const result = await change.worktreeRelease(resource)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'worktree=rm failed; branch=branch failed')
 })
 test('WHAT[change-integration-005] WORKTREE_release_reports_single_failure_side', async () => {
   const first = fakeGit([['worktree remove', [1, '', 'rm failed']]])
-  const resource = await valueOf(change.worktreeCreate(first.git, 'job-9', PATH))
+  const resource = await valueOf(change.worktreeCreate(first.git, 'job-9', PATH, 'refs/heads/main'))
   const result = await change.worktreeRelease(resource)
   assert.equal(result.error, 'worktree=rm failed')
 
@@ -345,7 +342,7 @@ test('WHAT[change-integration-005] WORKTREE_release_reports_single_failure_side'
 })
 test('WHAT[change-integration-005] WORKTREE_unreleased_resource_disposes_by_releasing', async () => {
   const { git, calls } = fakeGit()
-  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
+  const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH, 'refs/heads/main'))
   await change.worktreeDispose(resource)
   assert.equal(calls.filter(({ args }) => args[1] === 'remove').length, 1)
 })
@@ -385,7 +382,7 @@ const realRunner = (command) => {
 
 const createRealWorktree = async (repo, child, job) => {
   const git = change.createGit(repo, realRunner)
-  return change.gitCreateWorktree(git, job, child)
+  return change.gitCreateWorktree(git, job, child, 'refs/heads/main')
 }
 
 integrationTest('WHAT[change-integration-005] CHGINT_worktree_create_argv_is_accepted_by_real_git', async () => {
@@ -450,13 +447,11 @@ const withSeededRoad = async (sessionId, outcome, body) => {
     assert.equal(opened.ok, true, opened.error)
     const reviewed = await lifecycle.seedReview(store, sessionId, outcome)
     assert.equal(reviewed.ok, true, reviewed.error)
-    const confirmed = await lifecycle.seedDeliver(store, sessionId, 'run-1', 'call-1', 1n)
-    assert.equal(confirmed.ok, true, confirmed.error)
-    // The closing deliver commits the Delivered retirement first and then closes the
-    // session's authority logical run. The closure needs a booted shared journal
-    // runtime, which this probe deliberately does not own, so the returned receipt is
-    // not the evidence — the durable work state is.
-    await lifecycle.seedDeliver(store, sessionId, 'run-2', 'call-2', 2n)
+    // Single delivery retires the tenure immediately. When Promoted, the deliver
+    // commits the Delivered retirement and then attempts authority logical run closure.
+    // The closure needs a booted shared journal runtime, which this probe deliberately
+    // does not own, so the durable work state is the evidence.
+    await lifecycle.seedDeliver(store, sessionId, 'run-1', 'call-1', 1n)
     const view = lifecycle.inspected(stateRoot, sessionId)
     assert.equal(typeof view, 'object', 'the seeded road must be inspectable')
     assert.equal(view.Delivered || outcome === 'Stayed', true, 'the seeded road must own its closing retirement')
@@ -527,84 +522,25 @@ test('WHAT[change-integration-005] a relayed tenure needs no hand-off: its succe
 }
 
 {
-// change-integration-005/013: publishing happens after the qualifying tenure has
-// delivered, so the open-tenure review is absent exactly when the gate reads it.
-// The gate must read the delivering round's own review, and must keep refusing a
-// road whose only retired round was a relay or whose new tenure has not reviewed.
+// change-integration-005/013: publication no longer carries a lifecycle review
+// qualification. The real protections are the target binding and the Git/CAS
+// checks, which hold even when every prior lifecycle step has completed.
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { mkdtempSync, rmSync } = await import("node:fs");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
 
-const hostSurface = await import('../../../dist/Change/Host/Surface.js')
-const journalSurface = await import('../../../dist/Persistence/Journal/Surface.js')
-const lifecycle = await import('../../../dist/Mission/Lifecycle/Surface.js')
-const workspaceSurface = await import('../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js')
+const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[change-integration-005] the publish gate reads the review of the tenure that delivered the candidate', async () => {
-  const sessionId = 'ses-conflict-publish-review'
-  const root = mkdtempSync(join(tmpdir(), 'wxs-conflict-publish-'))
-  const stateRoot = await journalSurface.JournalSurface_initializeStateRoot(root)
-  const store = workspaceSurface.acquire(stateRoot)
-  try {
-    const opened = await lifecycle.seedOpen(store, 'S4', sessionId, root, 0n)
-    assert.equal(opened.ok, true, opened.error)
-    assert.equal((await lifecycle.seedReview(store, sessionId, 'Promoted')).ok, true)
-    assert.equal((await lifecycle.seedDeliver(store, sessionId, 'run-1', 'call-1', 1n)).ok, true)
-
-    // The qualifying tenure reviews, then delivers: after the delivery no tenure is
-    // open, and the gate must still see the Promoted review that produced it.
-    await lifecycle.seedDeliver(store, sessionId, 'run-2', 'call-2', 2n)
-    assert.equal(lifecycle.inspected(stateRoot, sessionId).Delivered, true)
-    const delivered = await hostSurface.publishReviewOf(root, sessionId)
-    assert.equal(delivered.kind, 'Reviewed', 'the delivering round review must qualify publishing')
-    assert.equal(delivered.outcome, 'Promoted')
-
-    // The hand-off opens the next tenure; until that tenure reviews, the gate refuses.
-    const receipt = await hostSurface.handOffDeliveredTenure(root, sessionId, 'hand-off:publish-review', 3)
-    assert.equal(receipt.kind, 'HandOff', receipt.error)
-    assert.equal((await hostSurface.publishReviewOf(root, sessionId)).kind, 'Refused', 'an unreviewed next tenure cannot publish')
-
-    // Re-reviewed next tenure: its own review qualifies, and after it delivers the
-    // review survives its retirement again.
-    assert.equal((await lifecycle.seedReview(store, sessionId, 'Promoted')).ok, true)
-    assert.equal((await hostSurface.publishReviewOf(root, sessionId)).outcome, 'Promoted')
-    assert.equal((await lifecycle.seedDeliver(store, sessionId, 'run-3', 'call-3', 4n)).ok, true)
-    await lifecycle.seedDeliver(store, sessionId, 'run-4', 'call-4', 5n)
-    assert.equal(lifecycle.inspected(stateRoot, sessionId).Delivered, true)
-    assert.equal(
-      (await hostSurface.publishReviewOf(root, sessionId)).kind,
-      'Reviewed',
-      'the second delivery must not erase the review evidence the gate needs',
-    )
-  } finally {
-    workspaceSurface.release(stateRoot)
-    rmSync(root, { recursive: true, force: true })
-  }
+test('WHAT[change-integration-005] publication succeeds with no review record when scope/target/candidate/head are valid', async () => {
+  const fresh = await change.observeRelayProgram('fresh')
+  assert.equal(fresh.verdict.kind, 'Published')
+  assert.equal(fresh.ffCalls, 1)
+  assert.equal(fresh.facts.includes('Published'), true)
 })
 
-test('WHAT[change-integration-005] a relayed round review never qualifies a publish', async () => {
-  const sessionId = 'ses-conflict-relay-review'
-  const root = mkdtempSync(join(tmpdir(), 'wxs-conflict-relay-review-'))
-  const stateRoot = await journalSurface.JournalSurface_initializeStateRoot(root)
-  const store = workspaceSurface.acquire(stateRoot)
-  try {
-    assert.equal((await lifecycle.seedOpen(store, 'S4', sessionId, root, 0n)).ok, true)
-    assert.equal((await lifecycle.seedReview(store, sessionId, 'Stayed')).ok, true)
-    assert.equal((await lifecycle.seedDeliver(store, sessionId, 'run-1', 'call-1', 1n)).ok, true)
-    assert.equal((await lifecycle.seedDeliver(store, sessionId, 'run-2', 'call-2', 2n)).ok, true)
-
-    const view = lifecycle.inspected(stateRoot, sessionId)
-    assert.equal(view.ActiveId.length > 0, true, 'the relay opened its successor')
-    assert.equal(
-      (await hostSurface.publishReviewOf(root, sessionId)).kind,
-      'Refused',
-      'a relay hand-off has no delivery whose review could qualify publishing',
-    )
-  } finally {
-    workspaceSurface.release(stateRoot)
-    rmSync(root, { recursive: true, force: true })
-  }
+test('WHAT[change-integration-005] a moved target still blocks publication without entering the gate', async () => {
+  const moved = await change.observeRelayProgram('target-moved')
+  assert.equal(moved.facts.includes('Published'), false)
+  assert.equal(moved.gateAcquireCount, 0)
+  assert.deepEqual(moved.continuations, ['surface-loop-1'])
 })
 }

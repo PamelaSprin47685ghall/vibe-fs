@@ -75,6 +75,159 @@ module Commands =
     let private digest value =
         CanonicalJson.canonicalJson value |> HostDigest.sha256Hex
 
+    // The two schema documents the Runtime itself binds. A caller never hand-computes
+    // these hashes: the prompt and the answer schema are internal facts, and their
+    // references are derived from the canonical document so two documents always differ.
+    let private promptSchemaDocument =
+        "{\"additionalProperties\":false,\"properties\":{\"goal\":{\"type\":\"string\"},\"constraints\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"step\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"}},\"required\":[\"id\",\"title\"]}},\"required\":[\"goal\",\"step\"],\"type\":\"object\"}"
+
+    let private answerSchemaDocument =
+        "{\"additionalProperties\":false,\"properties\":{\"answer\":{\"type\":\"string\"}},\"required\":[\"answer\"],\"type\":\"object\"}"
+
+    let private promptSchema =
+        { Id = "sphinx.prompt@1"
+          Hash = HostDigest.sha256Hex promptSchemaDocument }
+
+    let private answerSchema =
+        { Id = "sphinx.answer@1"
+          Hash = HostDigest.sha256Hex answerSchemaDocument }
+
+    /// A plan step becomes one work item. Dependencies are the steps the user named; the
+    /// Runtime resolves their ids and refuses an unknown reference or a cycle before any
+    /// durable byte is written.
+    let private planSpecs (steps: PlanStep list) (goalText: string) (constraints: string list) : WorkSpec list =
+        steps
+        |> List.map (fun step ->
+            let prompt =
+                CanonicalJson.canonicalJson (
+                    box
+                        {| goal = goalText
+                           constraints = constraints
+                           step = {| id = step.Id; title = step.Title |} |}
+                )
+
+            { Id = WorkId.create step.Id
+              Attempt = Attempt.first
+              Fence = Fence.create (step.Id + ":" + string (Attempt.value Attempt.first))
+              RoundId = None
+              PlanId = PlanId.create ("plan-" + step.Id)
+              Producer = "sphinx.runtime"
+              Capability = "answer"
+              Input = Some(JsonEnvelope.ofCanonical promptSchema prompt)
+              OutputSchema = Some answerSchema
+              Dependencies = step.DependsOn |> List.map WorkId.create |> Set.ofList
+              ConflictKeys = Set.empty
+              PhysicalRef = None
+              Reserved = Map.empty })
+
+    /// Shape and resource checks only: ids resolve, dependencies exist, the graph is
+    /// acyclic and every step is named once. No step is re-ranked and no content veto.
+    let private validatePlan (steps: PlanStep list) : Result<unit, ToolRefusal> =
+        let ids = steps |> List.map (fun step -> step.Id)
+
+        let uniqueIds =
+            ids |> Set.ofList |> Set.count = List.length ids
+
+        let declared = ids |> Set.ofList
+
+        let unknownDependency =
+            steps
+            |> List.tryPick (fun step ->
+                step.DependsOn
+                |> List.tryFind (fun dependency -> not (Set.contains dependency declared))
+                |> Option.map (fun dependency -> step.Id, dependency))
+
+        let selfDependency =
+            steps
+            |> List.tryFind (fun step -> List.contains step.Id step.DependsOn)
+            |> Option.map (fun step -> step.Id, step.Id)
+
+        let hasCycle () =
+            let rec reaches (fromId: string) (visited: Set<string>) : bool =
+                if Set.contains fromId visited then
+                    true
+                else
+                    let visited = Set.add fromId visited
+
+                    steps
+                    |> List.tryFind (fun step -> step.Id = fromId)
+                    |> Option.map (fun step ->
+                        step.DependsOn
+                        |> List.exists (fun dependency -> reaches dependency visited))
+                    |> Option.defaultValue false
+
+            steps |> List.exists (fun step -> reaches step.Id Set.empty)
+
+        match uniqueIds, unknownDependency, selfDependency with
+        | false, _, _ -> Error(refusal "PLAN_SHAPE_INVALID" "steps" "plan step ids must be unique")
+        | _, Some(stepId, dependency), _ ->
+            Error(
+                refusal
+                    "PLAN_SHAPE_INVALID"
+                    "steps"
+                    (sprintf "step %s depends on unknown step %s" stepId dependency)
+            )
+        | _, _, Some(stepId, _) ->
+            Error(refusal "PLAN_SHAPE_INVALID" "steps" (sprintf "step %s depends on itself" stepId))
+        | _, _, _ when hasCycle () ->
+            Error(refusal "PLAN_SHAPE_INVALID" "steps" "plan dependencies form a cycle")
+        | _, _, _ -> Ok()
+
+    /// The last step in the plan is the one whose result is the answer.
+    let private answerWorkId (plan: WorkId list) : WorkId option =
+        plan |> List.rev |> List.tryHead
+
+    /// The step the Runtime is about to dispatch, if any, in the plain shape a worker
+    /// reads back from `status`. The fence is the holder's proof; the prompt is the
+    /// exact payload that will be dispatched.
+    let private nextStepView (state: InquiryState) : obj =
+        /// The step the worker currently holds: the first dispatched, not-yet-terminal
+        /// step in the user's plan order. A step that is only planned or ready is the
+        /// fallback, so a freshly created inquiry still reports its first executable
+        /// step.
+        let nextWorkItem =
+            let ordered =
+                state.Plan
+                |> List.map (fun id -> state.Work |> Map.tryFind id)
+                |> List.choose id
+
+            let held =
+                ordered
+                |> List.tryFind (fun item ->
+                    match item.State with
+                    | WorkState.Leased _
+                    | WorkState.Running _
+                    | WorkState.InputRequired _ -> true
+                    | _ -> false)
+
+            held |> Option.orElseWith (fun () -> InquiryState.readyWork state |> List.tryHead)
+
+        match nextWorkItem with
+        | None -> null
+        | Some item ->
+            native
+                [ "workId", box (WorkId.value item.Spec.Id)
+                  "attempt", box (string (Attempt.value item.Spec.Attempt))
+                  "fence", box (Fence.value item.Spec.Fence)
+                  "title",
+                  box (
+                      item.Spec.Input
+                      |> Option.map (fun envelope ->
+                          let parsed = JS.JSON.parse envelope.CanonicalPayload
+                          let step = parsed?step
+                          step?title)
+                      |> Option.toObj
+                  )
+                  "prompt", box (item.Spec.Input |> Option.map (fun envelope -> envelope.CanonicalPayload) |> Option.toObj) ]
+
+    /// The committed answer text, if the inquiry has one. The text is the accepted
+    /// worker result, never a new computation performed during a read.
+    let private answerView (state: InquiryState) : obj =
+        state.Answer
+        |> Option.bind (fun answer -> state.Observations |> Map.tryFind (ObservationId.value answer.ResultObservationId))
+        |> Option.map (fun observation -> box observation.CanonicalResult)
+        |> Option.toObj
+
     let private amount =
         Decode.float
         |> Decode.andThen (fun value ->
@@ -267,6 +420,8 @@ module Commands =
                   "status", box (Encode.statusOf state)
                   "revision", box (Encode.revision state.Revision)
                   "advance", advance state
+                  "nextStep", nextStepView state
+                  "answer", answerView state
                   "inquiry", Encode.semanticView state ])
 
     let private requestView (args: StartArgs) =
@@ -276,7 +431,13 @@ module Commands =
               "constraints", strings args.Constraints
               "materialRefs", strings args.MaterialRefs
               "authorizationRef", box args.AuthorizationRef
-              "profileRef", box args.ProfileRef ]
+              "profileRef", box args.ProfileRef
+              "steps",
+              Encode.list args.Steps (fun step ->
+                  native
+                      [ "id", box step.Id
+                        "title", box step.Title
+                        "dependsOn", strings step.DependsOn ]) ]
 
     let private refusalView (fault: ToolRefusal) =
         native [ "code", box fault.Code; "path", box fault.Path; "message", box fault.Message ]
@@ -320,39 +481,68 @@ module Commands =
         | AppendError.CommitUnknown _ -> settlement "COMMIT_UNKNOWN"
         | AppendError.NoNewWriteReleaseFailed _ -> settlement "RELEASE_FAILED"
 
+    let private resolveSteps (args: StartArgs) : Result<PlanStep list, ToolRefusal> =
+        match args.Steps with
+        | [] -> Ok []
+        | steps -> Ok steps
+
+    /// One transition batch is the unit of durability (WHAT[sphinx-v2-019]): the
+    /// creation, the plan, and the dispatch of every executable step are sealed as a
+    /// single accepted envelope, or none of them are.
     let private prepareCreation configuration (args: StartArgs) inquiryId fingerprint configHash =
-        let goal =
-            { GoalId = GoalId.create (InquiryId.value inquiryId + "-goal")
-              Revision = Revision.origin
-              OriginalText = args.GoalText
-              Constraints = args.Constraints
-              MaterialRefs = args.MaterialRefs |> List.map ArtifactRef.create
-              AuthorizationRef = args.AuthorizationRef
-              CreatedBy = configuration.CreatedBy
-              Amendments = [] }
-
-        let batch =
-            { SchemaVersion = "2"
-              InquiryId = inquiryId
-              PreviousRevision = Revision.origin
-              PreviousHead = None
-              Revision = Revision.origin
-              CommandId = args.CommandId
-              CommandFingerprint = fingerprint
-              PostStateFingerprint = None
-              Events =
-                [ InquiryEventBody.InquiryCreated
-                      { Goal = goal
-                        ResourceSpecs = configuration.ResourceSpecs
-                        RenderReserve = configuration.RenderReserve
-                        ProfileRef = configuration.Profile.ProfileRef
-                        ConfigHash = configHash } ] }
-
         if args.ProfileRef <> configuration.Profile.ProfileRef then
             Error(refusal "PROFILE_NOT_AVAILABLE" "profileRef" "start must select the authorized startup profile")
         else
-            Codec.seal HostDigest.sha256Hex None batch
-            |> Result.mapError (fun fault -> refusal fault.Code "goalText" fault.Message)
+            resolveSteps args
+            |> Result.bind (fun steps ->
+                validatePlan steps
+                |> Result.bind (fun () ->
+                    let goal =
+                        { GoalId = GoalId.create (InquiryId.value inquiryId + "-goal")
+                          Revision = Revision.origin
+                          OriginalText = args.GoalText
+                          Constraints = args.Constraints
+                          MaterialRefs = args.MaterialRefs |> List.map ArtifactRef.create
+                          AuthorizationRef = args.AuthorizationRef
+                          CreatedBy = configuration.CreatedBy
+                          Amendments = [] }
+
+                    let specs = planSpecs steps args.GoalText args.Constraints
+
+                    let creationEvents =
+                        [ InquiryEventBody.InquiryCreated
+                              { Goal = goal
+                                ResourceSpecs = configuration.ResourceSpecs
+                                RenderReserve = configuration.RenderReserve
+                                ProfileRef = configuration.Profile.ProfileRef
+                                ConfigHash = configHash }
+                        ] @ (if List.isEmpty specs then [] else [ InquiryEventBody.WorkPlanned specs ])
+
+                    let provisionalEventId =
+                        EventId.create ("provisional-" + InquiryId.value inquiryId)
+
+                    let provisionalBatch =
+                        { SchemaVersion = "2"
+                          InquiryId = inquiryId
+                          PreviousRevision = Revision.origin
+                          PreviousHead = None
+                          Revision = Revision.origin
+                          CommandId = args.CommandId
+                          CommandFingerprint = fingerprint
+                          PostStateFingerprint = None
+                          Events = creationEvents }
+
+                    Reducer.applyTransition HostDigest.sha256Hex provisionalEventId None provisionalBatch
+                    |> Result.mapError (fun fault -> refusal fault.Code "steps" fault.Message)
+                    |> Result.bind (fun created ->
+                        let dispatchEvents = (Driver.advance created).Events
+
+                        let batch =
+                            { provisionalBatch with
+                                Events = creationEvents @ dispatchEvents }
+
+                        Codec.seal HostDigest.sha256Hex None batch
+                        |> Result.mapError (fun fault -> refusal fault.Code "steps" fault.Message))))
 
     let private appendCreation handle inquiryId commandId fingerprint encoded =
         task {
@@ -453,6 +643,243 @@ module Commands =
                 )
             )
         | Some configuration -> configuredStart handle configuration args
+
+    /// One submitted result is one accepted observation. Its identity is a pure
+    /// function of the work, attempt and fence, so a repeated delivery of the same
+    /// result returns the original receipt instead of booking a second observation.
+    let private observationIdentity (args: WorkSubmitArgs) : ObservationId =
+        let derived =
+            native
+                [ "workId", box args.WorkId
+                  "attempt", box (string (Attempt.value args.Attempt))
+                  "fence", box (Fence.value args.Fence) ]
+            |> digest
+
+        ObservationId.create ("obs" + derived)
+
+    let private submitResultEvents
+        (state: InquiryState)
+        (args: WorkSubmitArgs)
+        (item: WorkItem)
+        (observationId: ObservationId)
+        : InquiryEventBody list =
+        let spec = item.Spec
+
+        match args.Outcome with
+        | WorkOutcome.Failed ->
+            [ InquiryEventBody.WorkAttemptTransitioned
+                  { WorkId = spec.Id
+                    Attempt = spec.Attempt
+                    Fence = spec.Fence
+                    FromState = Work.stateName item.State
+                    NextState = WorkState.Failed spec.Attempt
+                    PhysicalRef = None } ]
+        | WorkOutcome.Succeeded ->
+            let resultSchema = spec.OutputSchema |> Option.defaultValue answerSchema
+
+            let accepted =
+                InquiryEventBody.ResultAccepted
+                    { WorkId = spec.Id
+                      Attempt = spec.Attempt
+                      Fence = spec.Fence
+                      ObservationId = observationId
+                      CanonicalResult = args.CanonicalResult
+                      ResultSchema = resultSchema
+                      ClusterId = WorkId.value spec.Id }
+
+            let isAnswerWork =
+                answerWorkId state.Plan = Some spec.Id
+
+            if isAnswerWork then
+                [ accepted
+                  InquiryEventBody.AnswerPrepared
+                      { RenderWorkId = spec.Id
+                        DraftRef = ObservationId.value observationId }
+                  InquiryEventBody.AnswerCommitted
+                      { RenderWorkId = spec.Id
+                        ResultObservationId = observationId
+                        AnswerRef = ObservationId.value observationId
+                        StopReason = "answer-committed" } ]
+            else
+                [ accepted ]
+
+    let submit (handle: RuntimeHandle) (args: WorkSubmitArgs) : Task<Result<obj, ToolRefusal>> =
+        task {
+            let store = store handle
+            let inquiryId = InquiryId.create args.InquiryId
+
+            match read store inquiryId with
+            | Error fault -> return Error fault
+            | Ok state ->
+                let workId = WorkId.create args.WorkId
+
+                match state.Work |> Map.tryFind workId with
+                | None ->
+                    return
+                        Error(
+                            refusal
+                                "UNKNOWN_WORK"
+                                "workId"
+                                (sprintf "work %s is not part of this inquiry" args.WorkId)
+                        )
+                | Some item ->
+                    if item.Spec.Attempt <> args.Attempt then
+                        return Error(refusal "ATTEMPT_MISMATCH" "attempt" "result attempt does not match the work attempt")
+                    elif item.Spec.Fence <> args.Fence then
+                        return Error(refusal "STALE_FENCE" "fence" "result fence does not match the work attempt")
+                    else
+                        let observationId = observationIdentity args
+                        let key = ObservationId.value observationId
+
+                        match state.Observations |> Map.tryFind key with
+                        | Some existing when existing.CanonicalResult = args.CanonicalResult ->
+                            return
+                                native
+                                    [ "apiVersion", box Contract.apiVersion
+                                      "outcome", box "replayed"
+                                      "inquiryId", box args.InquiryId
+                                      "workId", box args.WorkId
+                                      "observationId", box key
+                                      "revision", box (Encode.revision state.Revision) ]
+                                |> Ok
+                        | Some _ ->
+                            return
+                                Error(
+                                    refusal
+                                        "RESULT_PAYLOAD_CONFLICT"
+                                        "canonicalResult"
+                                        "this result identity is already accepted with different bytes"
+                                )
+                        | None ->
+                            let running =
+                                match item.State with
+                                | WorkState.Leased fence when fence = args.Fence -> true
+                                | WorkState.Running _ -> true
+                                | _ -> false
+
+                            if not running then
+                                return
+                                    Error(
+                                        refusal
+                                            "WORK_NOT_LEASED"
+                                            "workId"
+                                            (sprintf "work %s is not leased to the submitting attempt" args.WorkId)
+                                    )
+                            else
+                                let fingerprint =
+                                    native
+                                        [ "request",
+                                          native
+                                              [ "commandId", box args.CommandId
+                                                "inquiryId", box args.InquiryId
+                                                "workId", box args.WorkId
+                                                "attempt", box (string (Attempt.value args.Attempt))
+                                                "fence", box (Fence.value args.Fence)
+                                                "canonicalResult", box args.CanonicalResult
+                                                "outcome",
+                                                box (
+                                                    match args.Outcome with
+                                                    | WorkOutcome.Succeeded -> "succeeded"
+                                                    | WorkOutcome.Failed -> "failed"
+                                                )
+                                                "reason", args.Reason |> Option.map box |> Option.toObj ] ]
+                                    |> digest
+
+                                let submission : ResultSubmission =
+                                    { WorkId = workId
+                                      Attempt = args.Attempt
+                                      Fence = args.Fence
+                                      ObservationId = observationId
+                                      CanonicalResult = args.CanonicalResult
+                                      ResultSchema = item.Spec.OutputSchema |> Option.defaultValue answerSchema
+                                      ClusterId = WorkId.value workId
+                                      Usage = None }
+
+                                match
+                                    Admission.admitCommand
+                                        state
+                                        args.CommandId
+                                        fingerprint
+                                        (InquiryCommand.SubmitResultCommand [ submission ])
+                                with
+                                | Error fault ->
+                                    return Error(refusal fault.Code "commandId" fault.Message)
+                                | Ok(IdempotencyOutcome.Conflict message) ->
+                                    return Error(refusal "COMMAND_CONFLICT" "commandId" message)
+                                | Ok(IdempotencyOutcome.Replay revision) ->
+                                    return
+                                        native
+                                            [ "apiVersion", box Contract.apiVersion
+                                              "outcome", box "replayed"
+                                              "inquiryId", box args.InquiryId
+                                              "workId", box args.WorkId
+                                              "observationId", box key
+                                              "revision", box (Encode.revision revision) ]
+                                        |> Ok
+                                | Ok(IdempotencyOutcome.Fresh _) ->
+                                    let resultEvents = submitResultEvents state args item observationId
+
+                                    let nextRevision = Revision.next state.Revision
+
+                                    let provisionalBatch =
+                                        { SchemaVersion = "2"
+                                          InquiryId = inquiryId
+                                          PreviousRevision = state.Revision
+                                          PreviousHead = state.EventHead
+                                          Revision = nextRevision
+                                          CommandId = args.CommandId
+                                          CommandFingerprint = fingerprint
+                                          PostStateFingerprint = None
+                                          Events = resultEvents }
+
+                                    match
+                                        Reducer.applyTransition
+                                            HostDigest.sha256Hex
+                                            (EventId.create ("provisional-" + args.CommandId))
+                                            (Some state)
+                                            provisionalBatch
+                                    with
+                                    | Error fault -> return Error(refusal fault.Code "workId" fault.Message)
+                                    | Ok acceptedState ->
+                                        let followUp =
+                                            if InquiryState.isTerminal acceptedState.Status then
+                                                []
+                                            else
+                                                (Driver.advance acceptedState).Events
+
+                                        let batch =
+                                            { provisionalBatch with
+                                                Events = resultEvents @ followUp }
+
+                                        match Codec.seal HostDigest.sha256Hex (Some state) batch with
+                                        | Error fault -> return Error(refusal fault.Code "workId" fault.Message)
+                                        | Ok encoded ->
+                                            match! store.Append [ encoded ] with
+                                            | Error fault ->
+                                                return Error(terminalToolRefusal handle inquiryId args.CommandId encoded.EventId fault)
+                                            | Ok receipt when not (List.isEmpty receipt.Cuts) ->
+                                                return
+                                                    Error(
+                                                        refusal
+                                                            "PERSISTENCE_SEMANTIC_CUT"
+                                                            "inquiryId"
+                                                            (receipt.Cuts
+                                                             |> List.map (fun cut -> cut.Reason)
+                                                             |> String.concat "; ")
+                                                    )
+                                            | Ok _ ->
+                                                return
+                                                    native
+                                                        [ "apiVersion", box Contract.apiVersion
+                                                          "outcome", box "applied"
+                                                          "inquiryId", box args.InquiryId
+                                                          "workId", box args.WorkId
+                                                          "observationId", box key
+                                                          "revision", box (Encode.revision nextRevision)
+                                                          "status", box (Encode.statusOf acceptedState)
+                                                          "answer", answerView acceptedState ]
+                                                    |> Ok
+        }
 
     let exportInquiry (handle: RuntimeHandle) (args: ExportArgs) : Result<obj, ToolRefusal> =
         let store = handle.Store

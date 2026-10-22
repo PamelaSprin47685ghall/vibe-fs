@@ -211,47 +211,6 @@ const countsByFile = (hits) => {
   return counts
 }
 
-export const makeBaseline = (hits) => ({
-  version: 1,
-  files: Object.fromEntries([...countsByFile(hits)].sort(([a], [b]) => a.localeCompare(b))),
-})
-
-export const evaluateBaseline = (hits, baseline) => {
-  if (baseline?.version !== 1 || typeof baseline.files !== 'object' || baseline.files === null) {
-    throw new Error('fsharp-control-pyramid: baseline must be { version: 1, files: { ... } }')
-  }
-
-  const current = countsByFile(hits)
-  const files = new Set([...Object.keys(baseline.files), ...current.keys()])
-  const regressions = []
-  const improvements = []
-
-  for (const file of [...files].sort()) {
-    const expected = baseline.files[file] ?? 0
-    const actual = current.get(file) ?? 0
-    if (!Number.isInteger(expected) || expected < 0) {
-      throw new Error(`fsharp-control-pyramid: invalid baseline count for ${file}: ${expected}`)
-    }
-    if (actual > expected) {
-      regressions.push({
-        file,
-        baseline: expected,
-        current: actual,
-        hits: hits.filter((hit) => hit.file === file),
-      })
-    } else if (actual < expected) {
-      improvements.push({ file, baseline: expected, current: actual })
-    }
-  }
-
-  return {
-    regressions,
-    improvements,
-    currentTotal: hits.length,
-    baselineTotal: Object.values(baseline.files).reduce((sum, count) => sum + count, 0),
-  }
-}
-
 export const renderFailure = (hits, heading = `fsharp-control-pyramid: ${hits.length} violation(s)`) => {
   const lines = [heading, '']
   for (const hit of hits) {
@@ -268,33 +227,20 @@ export const renderFailure = (hits, heading = `fsharp-control-pyramid: ${hits.le
 const parseArgs = (argv) => {
   const options = {
     root: DEFAULT_SOURCE_ROOT,
-    baseline: undefined,
     explain: false,
-    showAll: false,
     snapshot: false,
   }
 
   for (const arg of argv) {
     if (arg === '--explain') options.explain = true
-    else if (arg === '--show-all') options.showAll = true
-    else if (arg === '--snapshot') options.snapshot = true
     else if (arg.startsWith('--root=')) options.root = arg.slice('--root='.length)
     else if (arg.startsWith('--baseline=')) options.baseline = arg.slice('--baseline='.length)
     else throw new Error(`fsharp-control-pyramid: unknown argument ${arg}`)
   }
   return options
 }
-
-const readBaseline = (repoRoot, path) => {
-  const absolute = resolve(repoRoot, path)
-  if (!existsSync(absolute)) throw new Error(`fsharp-control-pyramid: missing baseline ${path}`)
-  return JSON.parse(readFileSync(absolute, 'utf8'))
-}
-
 export function check(context) {
   const root = context?.root ?? ROOT
-  const baselinePath = resolve(root, 'scripts/checks/fsharp-control-pyramid-baseline.json')
-  const baseline = existsSync(baselinePath) ? readBaseline(root, baselinePath) : undefined
   let entries
   if (context?.productionFiles) {
     entries = context.productionFiles()
@@ -304,26 +250,6 @@ export function check(context) {
     entries = collectControlPyramidEntries(root, DEFAULT_SOURCE_ROOT)
   }
   const hits = scanControlPyramidEntries(entries)
-  if (baseline) {
-    const evaluated = evaluateBaseline(hits, baseline)
-    if (evaluated.regressions.length > 0) {
-      const regressedHits = evaluated.regressions.flatMap((entry) => entry.hits)
-      return {
-        issues: regressedHits.map((hit) => ({
-          code: hit.kind,
-          path: hit.file,
-          line: hit.line,
-          message: `depth=${hit.depth} chain=${hit.chain.join(' → ')}: ${hit.text}`,
-          outerLine: hit.outerLine,
-          depth: hit.depth,
-          chain: hit.chain,
-          text: hit.text,
-        })),
-        hits,
-      }
-    }
-    return { issues: [], hits }
-  }
   return {
     issues: hits.map((hit) => ({
       code: hit.kind,
@@ -355,49 +281,11 @@ export const runCli = (argv = process.argv.slice(2)) => {
 
   const entries = collectControlPyramidEntries(ROOT, options.root)
   const hits = scanControlPyramidEntries(entries)
-
-  if (options.snapshot) {
-    console.log(JSON.stringify(makeBaseline(hits), null, 2))
+  if (hits.length === 0) {
+    console.log('fsharp-control-pyramid (opt-in analysis): clean (0 nested decisions)')
     return 0
   }
-
-  if (options.showAll || !options.baseline) {
-    if (hits.length === 0) {
-      console.log('fsharp-control-pyramid: clean (0 nested decisions)')
-      return 0
-    }
-    console.error(renderFailure(hits))
-    return 1
-  }
-
-  let result
-  try {
-    result = evaluateBaseline(hits, readBaseline(ROOT, options.baseline))
-  } catch (error) {
-    console.error(error.message)
-    return 2
-  }
-
-  if (result.regressions.length > 0) {
-    const regressedHits = result.regressions.flatMap((entry) => entry.hits)
-    const summary = result.regressions
-      .map((entry) => `${entry.file}: ${entry.baseline} → ${entry.current}`)
-      .join(', ')
-    console.error(
-      renderFailure(
-        regressedHits,
-        `fsharp-control-pyramid: regression (${summary}); total debt ${result.currentTotal}/${result.baselineTotal}`,
-      ),
-    )
-    return 1
-  }
-
-  const improvement = result.improvements.length
-    ? `; ${result.improvements.length} file(s) improved — lower baseline before merge`
-    : ''
-  console.log(
-    `fsharp-control-pyramid: clean (debt=${result.currentTotal}, baseline=${result.baselineTotal}${improvement})`,
-  )
+  console.log(renderFailure(hits, `fsharp-control-pyramid (opt-in analysis): ${hits.length} hotspot(s)`))
   return 0
 }
 

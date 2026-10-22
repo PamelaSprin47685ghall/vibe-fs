@@ -42,13 +42,13 @@ sequence 为 S1、S2、S3 时，deliver 不使用 ConfirmationCommitted。无权
 - 禁止后果：不得把一段写成两段。不得写 ConfirmationCommitted。S1 的 Promoted 之后，若交付授权仍为假，deliver 不得写成 Delivered。不得要求证书选出 Relayed 或 Delivered。
 - 失败后果：无活跃任期且重放未命中时拒绝，零写。活跃 blocker 非空时写 RetirementBlocked，不写 IncumbencyRetired。持权路径在预留前缺 digest/path 时拒绝；预留后的启动结果未知时保留 pending，不写 Delivered，也不再次启动。
 
-## [006] 两段 deliver
+## [006] 一段式 deliver
 
-sequence 为 S4 时，deliver 是两次调用。第一次只落确认。另一个调用才结束。
+sequence 为 S4 时，deliver 是一次调用。一个交付意图确认当前拥有者后直接原子退休或交接，不走两段确认仪式。评审是独立协作结果，不作为交付前置门禁。
 
-- 允许后果：已有评审且尚无确认时，第一次追加 ConfirmationCommitted，载荷只含 incumbencyId、providerRunId、toolCallId，不结束。同一 providerRunId 与同一 toolCallId 重放返回原确认，不第二次结束。另一个 toolCallId 才进入第二次。第二次读折叠上的评审 outcome：Promoted 写 Delivered，Stayed 写 Relayed。两段式退休载荷是 retirementId、incumbencyId、outcome、ProjectionCut 与期望推进值，不含名为 retirementCursor 的字段。S4 的 Delivered 不填 digest、path、execSessionId，不 spawn。Stayed 时，退休与后任 IncumbencyOpened 同一笔追加；后任 openingCursor 来自本次调用已观察到的 XTrace 头序号，不从退休载荷读取名为 retirementCursor 的字段。
-- 禁止后果：不得把两段并成一段。不得把第一次收成退休。不得用缺交付授权拒绝已评 Stayed 的第一次确认。S4 因缺 digest 或 path 不得判成 Conflict。无评审不得写下 ConfirmationCommitted。
-- 失败后果：无评审且已有确认时拒绝，零写，不返回已完成未退休。同一 toolCallId、不同 providerRunId 返回 RetirementConfirmationReplayConflict。
+- 允许后果：未指定 nextOwnerId 时，单笔 deliver 写入 IncumbencyRetired（Delivered），载荷含 retirementId、incumbencyId、outcome、ProjectionCut 与期望推进值，直接完成当前工作；指定 nextOwnerId 时，单笔 deliver 同步写入 IncumbencyRetired（Relayed）与后任 IncumbencyOpened，实现原子所有权交接。无需先完成评审亦可直接交付或接力。同一 providerRunId 与同一 toolCallId 重放返回既有记录，不重复退休。
+- 禁止后果：新的写入不得产生 ConfirmationCommitted。不得强迫模型调用两次 deliver 才收口。不得因未评审而返回 ReviewRequired 拒绝合规的 deliver。
+- 失败后果：非当前任期调用时拒绝，零写，已退休任期不得关闭新任期；活跃 blocker 非空时写入 RetirementBlocked，不得虚报完成。同一 requestId 异载荷返回结构化 Conflict。
 
 ## [007] 身份与重放
 
@@ -60,9 +60,9 @@ sequence 为 S4 时，deliver 是两次调用。第一次只落确认。另一�
 
 ## [008] 后继投影
 
-S1/S2/S3/S4 的接力机制不再主动清除上下文；上下文的保留与裁剪全部依靠 `view` 机制。后继通过用户原文 `U`、保留在 `view` 边界内的交互、持久化账本与前任声明的 ANCHOR 视图（durable checkpoint + `view.thenMap` 摘要）承接交棒，不注入机器物化的合成前任记录。
+S1/S2/S3/S4 的接力机制不再主动清除上下文；上下文的保留与裁剪由显式 `prefixCount` 与 `carry` 声明决定。后继通过用户原文 `U`、保留的历史与当前回合、持久化账本及 durable checkpoint 承接交棒，不注入机器物化的合成前任记录。
 
-- 允许后果：后继接收用户原文 `U`、经 `view` 机制裁剪保留的物理交互、持久化账本与前任声明的视图（`ViewCheckpointCommitted` 与前任在 `view` 里声明的 `thenMap` 摘要）；首任与非首任一律不生成合成记录、不物化合成前任记录。接力本身不主动剥除前任消息。ProjectionCut 只判定退休尝试的请求身份，不当成新任的活跃请求，也不拿来过滤历史。不生成合成消息，不概括前任。
+- 允许后果：后继接收用户原文 `U`、按 `prefixCount` 与 `carry` 声明保留的上下文、持久化账本与 `ViewCheckpointCommitted`；首任与非首任一律不生成合成记录、不物化合成前任记录。接力本身不主动剥除前任消息。ProjectionCut 只判定退休尝试的请求身份，不当成新任的活跃请求，也不拿来过滤历史。不生成合成消息，不概括前任。
 - 禁止后果：不得在接力时主动清除或强制剥除前任上下文；上下文清理必须仅由显式 `view` 声明驱动。不得注入机器物化的合成前任记录消息。不得把旧日志字节翻译成新事件再注入。
 - 失败后果：无稳定身份或 `view` 状态非法时拒绝装配，不猜测。
 
@@ -101,19 +101,19 @@ S4 第一次调用只确认。第二次调用依持久退休结果分流：Relay
 
 ## [013] 一段式内核退休
 
-一段式单笔无评审的 deliver 不得写成 Delivered，也不得被拒绝。紧接一笔无评审接力之后、本任仍未评审的再次 deliver，依 [025] 以 ReviewRequired 拒绝、零写。S4 退休载荷出现 retirementCursor 必须被拒。缺期望推进值的已落盘 Delivered 不得返回 DeliveredIdempotent。无活跃任期时调用方不得追加 IncumbencyOpened。
+一段式单笔无评审的 Plan deliver 不得写成 Delivered（必须接力），也不得被拒绝。评审是独立协作结果，背靠背无评审接力不设强制阻塞门。S4 退休载荷出现 retirementCursor 必须被拒。缺期望推进值的已落盘 Delivered 不得返回 DeliveredIdempotent。无活跃任期时调用方不得追加 IncumbencyOpened。
 
-- 允许后果：一段式 deliver 写入，明细为 relayed，事件名含 IncumbencyRetired 与 IncumbencyOpened，字节不含 Delivered。合法两段式 Relayed 写入后，读者才看见完整事件。
+- 允许后果：一段式 deliver 写入，明细为 relayed，事件名含 IncumbencyRetired 与 IncumbencyOpened，字节不含 Delivered。一段式 Relayed 写入后，读者即看见完整事件。
 - 禁止后果：一段式无评审不得写成 Delivered。S4 载荷不得携带 retirementCursor。缺期望推进值不得被读成 DeliveredIdempotent。无活跃任期不得追加 IncumbencyOpened。
-- 失败后果：带 retirementCursor 的 S4 读回位置是 StorageInvalid。无活跃任期的追加决定是 Refuse，事件名为空。背靠背无评审接力的追加决定是 ReviewRequired 观察，事件名为空，本任不退休。
+- 失败后果：带 retirementCursor 的 S4 读回位置是 StorageInvalid。无活跃任期的追加决定是 Refuse，事件名为空。
 
-## [014] 两段式内核确认
+## [014] 一段式内核交付与幂等重放
 
-两段式第一次确认落地前不得返回已确认。同一对重放不得第二次结束。
+S4 交付在单次调用内完成退休或交接。同一 fence 重放返回既有记录，不重复退休。
 
-- 允许后果：已有评审且尚无确认时，第一次写入，事件名是 ConfirmationCommitted。同一 providerRunId 与同一 toolCallId 重放返回 Done，事件名为空，不第二次结束。
-- 禁止后果：落地前不得返回 confirmed。重放不得写 delivered 或 relayed。
-- 失败后果：无评审的第一次返回 Done，明细是 assessment required，不是 confirmed，零写。
+- 允许后果：单次 deliver 在无活跃 blocker 时原子写入 IncumbencyRetired（及接力时的 IncumbencyOpened）。同一 providerRunId 与同一 toolCallId 重放返回原记录，事件名为空，不第二次结束。
+- 禁止后果：不得要求先落 ConfirmationCommitted 才允许交付。重放不得产生新的退休记录或后继任期。
+- 失败后果：非当前任期调用拒绝，零写。活跃 blocker 非空时返回 Blocked 观察，不退休。
 
 ## [015] durable 提交与恢复位置
 
@@ -159,7 +159,7 @@ S4 第一次调用只确认。第二次调用依持久退休结果分流：Relay
 
 当 Plan 模式会话被初始化或任期推进时，系统为该任期装配输入。
 
-- 允许后果：跑者接收本规划任务范围内的全部真实用户输入原文（`U`）、经 `view` 机制裁剪保留的交互（durable `ViewCheckpointCommitted` 与 `view.thenMap` 摘要），以及通过编程面读写的 Markdown 伪文件（`P`）；接力不主动清除上下文，系统不生成合成工作记录，不做机器物化的合成前任记录注入。
+- 允许后果：跑者接收本规划任务范围内的全部真实用户输入原文（`U`）、按 `prefixCount` 与 `carry` 声明保留的交互及 durable `ViewCheckpointCommitted`，以及通过编程面读写的 Markdown 伪文件（`P`）；接力不主动清除上下文，系统不生成合成工作记录，不做机器物化的合成前任记录注入。
 - 禁止后果：模型不得直接读写或篡改 `U`。系统不得向消息集注入合成前任记录，也不得在接力时主动清除上下文。`P` 不得作为文本直接注入模型输入消息集。模型不得取得任何超出 `P` 之外的仓库或工作区写权限。
 - 失败后果：若输入集合遗漏必需事实或 `view` 状态损坏，系统必须在消息投影阶段拒绝生成请求并终止本次调用。
 
@@ -167,7 +167,7 @@ S4 第一次调用只确认。第二次调用依持久退休结果分流：Relay
 
 当调度器识别到 CanonicalRole 为 `Plan`（Wire 标识为 `plan`）时，系统投影其专属权限与工具集。
 
-- 允许后果：Plan 的工作工具权限集为 `todowrite-for-plan`、`devops`、`review`、`deliver`：宿主注册的只有 `todowrite-for-plan`、`review`、`deliver`，`devops` 以编程面成员 `this.devops(intent, reportMapping)` 存活，在 Plan 的编程面由 `todowrite-for-plan` 承载，不再注册独立宿主工具（见 [028] 与 [030]）。`todowrite-for-plan` 只向 Plan 开放；向用户提问走编程面成员 `this.ask`（[049]/[050]），仅 S1 阶段可用，不注册独立宿主工具，Manager 与其他角色禁用提问，且 `ask` 不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
+- 允许后果：Plan 的工作工具权限集为 `todowrite-for-plan`、`devops`、`review`、`deliver`：宿主注册的只有 `todowrite-for-plan`、`review`、`deliver`，`devops` 以编程面成员 `this.devops(intent, carry)` 存活，可选 `carry` 默认 `[]`，由 `todowrite-for-plan` 承载（见 [028] 与 [030]）。`todowrite-for-plan` 只向 Plan 开放；向用户提问走编程面成员 `this.ask`（[049]/[050]），仅 S1 阶段可用，不注册独立宿主工具，Manager 与其他角色禁用提问，且 `ask` 不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
 - 禁止后果：Plan 角色禁止获得代码仓库与执行工具的权限，包括但不限于 `read`、`glob`、`grep`、`edit`、`write`、`mv`、`rm`、`run`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`fork`、`fission`、`commission`。严禁向 Plan 开放任何真实 shell 或命令执行通道。`resume` 与 `handoff` 不再属于 Plan 的工具面；`ask` 不注册独立宿主工具，独立 `ask` 工具调用不是公开调用面。
 - 失败后果：任何越权工具调用必须在 `ToolRegistry` 执行门禁被直接拦截（fail-closed），返回强类型拒绝错误，零副作用。
 
@@ -205,7 +205,7 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 工具调用进入执行前，动作门必须基于当前任期、授权与工作状态进行单一判定。
 
 - 允许后果：
-  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `todowrite-for-plan`、`review`、`deliver`；DevOps 调查经编程面成员 `this.devops(intent, reportMapping)` 发起，其准入与拒绝依 [028]；向用户提问走编程面 `this.ask`（仅 S1，[049]/[050]），需当前 Plan 权威与精确调用身份，Manager 禁用提问；
+  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `todowrite-for-plan`、`review`、`deliver`；DevOps 调查经编程面成员 `this.devops(intent, carry)` 发起，其准入与拒绝依 [028]；向用户提问走编程面 `this.ask`（仅 S1，[049]/[050]），需当前 Plan 权威与精确调用身份，Manager 禁用提问；
   2. 每一任期在调用 `review` 工具之前，`todowrite-for-plan` 工具是严格只读的（仅允许读操作 `read`）；若在此之前尝试写入（`edit`、`rewrite` 等修改操作），动作门与执行层均强制拦截拒绝，并向模型报错说明必须先完成 `review`。当前任期成功调用 `review` 工具之后方解锁写权限；接力（无权 deliver）开启的新任期在其成功调用 `review` 之前重新锁定为只读；
   3. 工作处于 `delivered`（`post-S3` 态）时，`todowrite-for-plan` 仅允许 `read`，`this.devops` 与 `review` 拒绝；当用户在 `post-S3` 态下输入命令要求执行交付时，允许调用 `deliver` 启动 `S4` 执行会话（且用户可反复要求启动 `S4`）；
   4. `review` 为硬门：本任已有 `Reviewed` 事实时拒绝再次调用（每任恰好一次，见 [038]）；
@@ -247,10 +247,10 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 ## [028] devops 契约（同步委派固定 DevOps）
 
-当 Plan 跑者经编程面成员 `this.devops(intent, reportMapping)` 调用时，系统把调查意图同步委派给本 work 绑定的固定 DevOps。原工具名 `ask` 不再是本能力的别名。
+当 Plan 跑者经编程面成员 `this.devops(intent, carry)` 调用时，系统把调查意图同步委派给本 work 绑定的固定 DevOps；`carry` 可省略，默认 `[]`。原工具名 `ask` 不再是本能力的别名。
 
 - 允许后果：系统查询本规划任务绑定的唯一固定 DevOps 实例；若未绑定则由运行时 single-flight 创建并持久化 `DevOpsBound` 绑定事实。将 `intent` 作为调查目标投递给该 DevOps 做只读调查（含真实 bash 执行，只读约束由 office 提示词承担，不做运行时门）。等待本次调用的完成事实，确认收敛后把 DevOps 经 `js.deliver` 交回的增量去重 TOML 视图完整交回 Planner。
-- 禁止后果：模型在调用参数中传 `intent` 与必带的 `reportMapping`（形态 `Record<string, null|string>`，无 `prefixUntil`），不得传递 DevOps 的 id、role、model 等底层拓扑标识。系统严禁对 DevOps 的返回结果做二次模型摘要，必须完整交付。同一规划任务同时至多运行一个未决 devops 委派；已有未决委派时再次调用必须返回强类型拒绝。返回材料不得携带底层 id（SessionId/AgentId/PtyId）。
+- 禁止后果：模型只传调查问题 `intent` 与可选背景数组 `carry`，不得传递 DevOps 的 id、role、model 等底层拓扑标识。背景按 context-compression [032] 展开，不携带父方当前回合，问题不重复。系统严禁对 DevOps 的返回结果做二次模型摘要，必须完整交付。同一规划任务同时至多运行一个未决 devops 委派；已有未决委派时再次调用必须返回强类型拒绝。返回材料不得携带底层 id（SessionId/AgentId/PtyId）。
 - 失败后果：若固定 DevOps 处于忙碌状态或响应失败，返回强类型错误，不静默丢弃，不新建替代操作员。
 
 ## [029] P 路径推导与编程面工具
@@ -267,7 +267,7 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 系统启动时，必须显式注册 Plan 相关的工具与参数规范。
 
-- 允许后果：在 `ToolRegistry` 中登记 `todowrite-for-plan`（JS 编程面）、`review`、`deliver`（编排面）。静态工具名单显式登记这三个名称；向用户提问走编程面成员 `this.ask`（仅 S1，[049]/[050]），不注册独立宿主工具。`devops` 已从宿主注册工具中退役，只以编程面成员 `this.devops(intent, reportMapping)` 存活，在 Plan 的编程面由 `todowrite-for-plan` 承载，参数为 `intent` 与必带的 `reportMapping`（形态 `Record<string, null|string>`，无 `prefixUntil`），缺失或非法时以 `{ ok: false, code: "VIEW_DECLARATION_INVALID" }` 拒绝；能力映射不得混用。`review` 与 Manager 共用同一 ToolSpec（见 [038]）。
+- 允许后果：在 `ToolRegistry` 中登记 `todowrite-for-plan`（JS 编程面）、`review`、`deliver`（编排面）。静态工具名单显式登记这三个名称；向用户提问走编程面成员 `this.ask`（仅 S1，[049]/[050]），不注册独立宿主工具。`devops` 只以编程面成员 `this.devops(intent, carry)` 存活，由 `todowrite-for-plan` 承载；`carry` 默认 `[]`，非法数组或引用以 `{ ok: false, code: "VIEW_DECLARATION_INVALID" }` 拒绝。能力映射不得混用。`review` 与 Manager 共用同一 ToolSpec（见 [038]）。
 - 禁止后果：严禁使用前缀匹配、通配符或模糊规则对工具进行分类或准入。未显式登记的工具不得进入 Plan 的工具列表。`handoff` 与 `resume` 不得作为 Plan 工具登记或注册；已退役的 `devops` 同样不得回到宿主注册工具面。
 - 失败后果：若工具名称或分类缺失，系统在启动静态校验或工具构建期必须报错阻断。
 
@@ -293,7 +293,7 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
 Plan 的阶段与任期机制不得污染其他角色；[027] 明确规定的长程连续性除外。
 
 - 允许后果：Orchestrator、Engineer、DevOps 的既有角色合同不变。所有实际执行角色依 [027] 承担长程连续性义务并经 `deliver` 形成有效交接或完成；internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛。Manager 禁止静默停止且禁用 `ask`，`review` 的业务判断不变。
-- 禁止后果：非 Plan 角色严禁获取 `todowrite-for-plan` 或 `ask`；宿主注册工具面已无 `devops` 这一名称，DevOps 调查只以编程面成员 `this.devops(intent, reportMapping)` 形态承载（`reportMapping` 必填），不构成任何角色的宿主工具面。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
+- 禁止后果：非 Plan 角色严禁获取 `todowrite-for-plan` 或 `ask`；宿主注册工具面已无 `devops` 这一名称，DevOps 调查只以编程面成员 `this.devops(intent, carry)` 形态承载，不构成任何角色的宿主工具面。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 
 ## [033] wanxiangli record、SQLite 持久化与投影
@@ -310,9 +310,9 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
 
 当为处于活跃任期的会话组装 Provider 请求消息集时，接力机制不再主动清除上下文；上下文的保留与裁剪全部依靠 `view` 机制。
 
-- 允许后果：先以稳定 Host 消息及 part 身份捕获本次请求中新观察到的真实交互，再按 `view` 声明（`prefixUntil` / `thenMap`）组装消息集：
+- 允许后果：先以稳定 Host 消息及 part 身份捕获本次请求中新观察到的真实交互，再按 `prefixCount` 与 `carry` 声明组装消息集，当前回合自动保留：
   1. 当前规划任务因果范围内的真实用户输入原文（U）与交互按原因果顺序保留，受显式 `view` 声明裁剪；
-  2. 交棒与上下文清理完全由模型在编程面提交的 ANCHOR `view`（durable `ViewCheckpointCommitted` + `view.thenMap` 摘要）承担，装配阶段不主动清除前任消息、不生成合成记录、不注入机器物化的合成前任记录。
+  2. 交棒与上下文清理完全由模型在编程面提交的 `prefixCount` 与 `carry` 声明承担，成功终态记录 durable `ViewCheckpointCommitted`。装配阶段不主动清除前任消息、不生成合成记录、不注入机器物化的合成前任记录。
   `openingCursor` 记录任期开启时的观察边界，不触发自动剥除前任交互。
 - 禁止后果：严禁在 S1/S2/S3/S4 接力时主动清除上下文；严禁注入机器物化的合成前任记录。规划底稿 P 的正文严禁直接拼装入消息集。用户消息 U 严禁篡改。
 - 失败后果：若消息装配失败或 `view` 状态损坏，系统必须停止当前请求组装，拒绝发送残缺或受污染的上下文。
@@ -432,3 +432,4 @@ Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择�
 ## [050] js.ask：Plan 编程面的提问成员
 
 Plan 的编程面（`todowrite-for-plan`）携带 `js.ask(question)`：程序内调用即登记 durable 问题并通知用户，然后经统一 park 通道挂起，工具返回 parked 载荷；程序不继续执行，直到恢复。阶段门禁与 [049] 相同：只有 S1 阶段的 Plan 可以提问，其他阶段以 `ASK_REFUSED` 拒绝；拒绝以失败哨兵进入程序，程序可捕获或让其失败。恢复沿用同一工具的三态入参：`{ unpark: { handle, value } }` 让 await 取到注入值，`{ abandon: { handle } }` 展开为 ABANDONED；等待期间的新调用受等待门禁拒绝，只有真实用户输入解锁。parked 载荷携带完整程序与执行点 source 标记（与生成面同规）。
+

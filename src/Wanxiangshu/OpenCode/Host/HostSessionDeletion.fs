@@ -117,13 +117,15 @@ module HostSessionDeletion =
                   "event_id", EventId.value failure.EventId
                   "result", CasebookMutationError.describe (CasebookMutationError.AppendFailure failure) ]
         | CaseFinalizeCommitment.PhaseConflict reason ->
-            Diagnostic.fatal "case-finalization-failed" [ "session_id", SessionId.value delegateId; "result", reason ]
-
-            raise (
-                invalidOp (
-                    sprintf "CASE-003: delegate %s finalization conflict: %s" (SessionId.value delegateId) reason
-                )
-            )
+            // A duplicate/phase-conflicting finalize is a per-case archive
+            // conflict, not a process invariant break. The exactly-once durable
+            // finalize is enforced upstream (Lifecycle returns PhaseConflict
+            // without a second archive), so reporting the scope and retaining
+            // the identity here preserves that invariant without killing the
+            // host or revoking the finished engineering result.
+            Diagnostic.emit
+                "case-finalization-pending"
+                [ "session_id", SessionId.value delegateId; "result", reason ]
 
     let private finalizeStagedDelegate
         (scope: PluginRuntimeScope)

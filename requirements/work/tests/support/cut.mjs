@@ -16,9 +16,7 @@ export const withSuccessor = async body => withReview(async context => {
   retirement.info.parentID = 'user-root'
   retirement.info.time = {created: 3}
   runtime.pushHostMessage(session, retirement)
-  assert.match(await hooks.tool.deliver.execute({}, {
-    sessionID: session, callID: 'deliver-confirm', messageID: 'retirement-confirm', agent: 'manager',
-  }), /confirmation_required = true/)
+  // Single delivery: deliver directly relays to successor tenure in one call.
   assert.match(await hooks.tool.deliver.execute({}, {
     sessionID: session, callID: 'deliver-call', messageID: 'retirement-run', agent: 'manager',
   }), /Finished\. Do not continue work\./)

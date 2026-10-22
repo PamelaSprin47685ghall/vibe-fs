@@ -462,8 +462,7 @@ const cases = [
   body('InterpretationApplied', { observationId: 'observation-1', interpretationId: 'interpretation-1', pluginRef: 'proof-plugin', delta: envelope('{}') }),
   body('InterpretationFailed', { observationId: 'observation-1', interpretationId: 'interpretation-1', pluginRef: 'proof-plugin', reason: 'plugin failed' }),
   body('GraphPatched', { pluginRef: 'proof-plugin', patch: { upsertNodes: [graphNode('node-2')], removeNodes: [], upsertEdges: [{ id: 'edge-1', tails: ['node-1'], heads: ['node-2'], relation: 'links', payload: envelope('{}'), revision: '0' }], removeEdges: [] } }),
-  body('CertificateSlotsPatched', { patches: [{ certificateId: 'certificate-1', targetRef: 'node-1', valueSpaceId: 'value-1', scopeId: 'scope-1', semanticsModelRef: 'model-1', expectedSlotRevision: '0', slot: { slot: 'summary', producer: 'proof-plugin', schema: envelope('{}').schema, canonicalPayload: '{}', revision: '1', guarantee: { case: 'EmpiricalSummary', assumptions: ['declared'] }, status: { case: 'Current' } } }] }),
-  body('CertificateInvalidated', { invalidation: envelope('{}'), reason: 'goal changed' }),
+  body('CertificateSlotsPatched', { patches: [{ targetRef: 'node-1', valueSpaceId: 'value-1', scopeId: 'scope-1', semanticsModelRef: 'model-1', expectedSlotRevision: '0', slot: { slot: 'summary', producer: 'proof-plugin', schema: envelope('{}').schema, canonicalPayload: '{}', revision: '1', guarantee: { case: 'EmpiricalSummary', assumptions: ['declared'] } } }] }),
   body('DecisionRecorded', { decision: envelope('{}') }),
   body('AnswerPrepared', { renderWorkId: 'work-1', draftRef: 'draft-1' }),
   body('AnswerCommitted', { renderWorkId: 'work-1', resultObservationId: 'observation-1', answerRef: 'answer-1', stopReason: 'resource-limited' }),
@@ -497,9 +496,9 @@ const bodySeed = value => {
   return seedBodies(text)
 }
 
-test('WHAT[sphinx-v2-019] all 30 body cases cross real encoding append and new-writer canonical replay without losing public DTO fields', async () => {
-  assert.equal(cases.length, 30)
-  assert.equal(new Set(cases.map(value => value.case)).size, 30)
+test('WHAT[sphinx-v2-019] all 29 surviving body cases cross real encoding append and new-writer canonical replay without losing public DTO fields', async () => {
+  assert.equal(cases.length, 29)
+  assert.equal(new Set(cases.map(value => value.case)).size, 29)
   for (const value of cases) {
     assert.deepEqual(mustOk(persistence.canonicalizeBody(value)), value, value.case)
     await withStore(async ({ open, close }) => {

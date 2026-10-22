@@ -29,9 +29,6 @@ module DeliverPolicy =
     let Retired = "tool/deliver/finished"
 
     [<Literal>]
-    let Confirmation = "tool/deliver/confirmation"
-
-    [<Literal>]
     let NonManagerRole = "tool/deliver/non-manager-role"
 
     [<Literal>]
@@ -50,14 +47,6 @@ module DeliverPolicy =
         ToolResultText.tomlObjectWithInstructions
             [ ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Retired Map.empty ]
             [ "outcome", ToolResultText.TString outcome ]
-
-    /// The first call of the two-stage sequence records the confirmation and
-    /// does not finish the work; a second deliver ends it.
-    let confirmationResult () : string =
-        ToolResultText.tomlObjectWithInstructions
-            [ ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Confirmation Map.empty ]
-            [ "finished", ToolResultText.TBool false
-              "confirmation_required", ToolResultText.TBool true ]
 
     /// A committed blocker keeps the tenure active. The call reports what to
     /// close and may be repeated once the resources have settled.
@@ -124,26 +113,12 @@ module DeliverPolicy =
 
         work.Retirements |> List.tryFind sameFence |> Option.map recordedState
 
-    /// The confirmation this call already recorded is a durable fact. The
-    /// tenure it confirmed may since have been relayed or delivered, so the
-    /// confirmation is replayed from the recorded fence alone: a later state of
-    /// the work never turns a recorded confirmation into a refusal. The
-    /// committed confirmation fence names the run and call that confirmed; this
-    /// call replays that exact confirmation to its recorded state.
-    let recordedConfirmationReplay
-        (work: DurableWorkHost.InspectedWork)
-        (providerRunId: string)
-        (toolCallId: string)
-        : Result<string, string> option =
-        work.Confirmation
-        |> Option.filter (fun fence -> fence.ProviderRunId = providerRunId && fence.ToolCallId = toolCallId)
-        |> Option.map (fun _ -> Ok(confirmationResult ()))
-
     /// The tenure this call may retire.
     type Prepared =
         { Fence: Fence
           Incumbent: string
-          Reviewed: bool }
+          Reviewed: bool
+          ReviewOutcome: string option }
 
     /// Algorithm E1.1 and E2: the entry either replays a fence the fold already
     /// settled, or binds the active tenure. The replay decision belongs to the
@@ -161,13 +136,6 @@ module DeliverPolicy =
             recordedFenceReplay work (ProviderRunIdentity.value fence.ProviderRun) (ToolCallId.value fence.ToolCallId)
             |> Option.map (Result.map Entry.Replayed)
 
-        let confirmationReplay =
-            recordedConfirmationReplay
-                work
-                (ProviderRunIdentity.value fence.ProviderRun)
-                (ToolCallId.value fence.ToolCallId)
-            |> Option.map (Result.map Entry.Replayed)
-
         let activeEntry =
             match work.ActiveId with
             | Some active ->
@@ -175,7 +143,8 @@ module DeliverPolicy =
                     Entry.Prepared
                         { Fence = fence
                           Incumbent = active
-                          Reviewed = work.Reviewed }
+                          Reviewed = work.Reviewed
+                          ReviewOutcome = work.ReviewOutcome }
                 )
             | None ->
                 Error(
@@ -183,7 +152,6 @@ module DeliverPolicy =
                 )
 
         fenceReplay
-        |> Option.orElseWith (fun () -> confirmationReplay)
         |> Option.defaultWith (fun () -> activeEntry)
 
     /// The refusal text for a call that may not be bound at all.

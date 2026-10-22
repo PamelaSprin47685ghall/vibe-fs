@@ -161,9 +161,9 @@ test('WHAT[sphinx-v2-033] a disposed public owner rejects valid operations witho
       canonicalResult: '{}', clusterId: 'explicit-cluster',
       resultSchema: {id: 'disposal-control@1', hash: createHash('sha256').update('{"type":"object"}').digest('hex')},
     }
-    const unconnected = Wire.submitResults(handle, submission)
+    const unconnected = await Wire.submitResults(handle, submission)
     assert.equal(unconnected.outcome, 'refused')
-    assert.equal(unconnected.refusal.code, 'RUNTIME_OPERATION_UNSUPPORTED', 'positive control: the valid submission reaches its unconnected owner, not a schema refusal')
+    assert.equal(unconnected.refusal.code, 'UNKNOWN_WORK', 'positive control: the valid submission reaches its connected owner, not a schema refusal')
     const beforeDispose = durableBytes(commonDir)
     Wire.dispose(handle)
     assert.doesNotThrow(() => Wire.dispose(handle), 'disposing again is the existing idempotent latch contract')

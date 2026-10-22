@@ -173,7 +173,7 @@ Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）
 ```text
 src/           生产源码
 resources/     随包运行时资源
-requirements/  56 包 normative 语义树（另 2 个历史包）：每包必备 WHY.md、WHAT.md 与 tests/
+requirements/  normative 语义树（48 个活跃包，另 1 个历史包 epistemic-reasoning）：每包必备 WHY.md、WHAT.md 与 tests/
 人工审订语义指南的保姆级多人协作实现法/  过程规范：000 手册与 001 指南
 proposals/     现行施工计划、未来提案与 archive 历史记录（用户管理）
 万象体系/     投资人材料（DOC.html、PPT.html）
@@ -244,7 +244,7 @@ npm run verify:release      # 发布验证
 
 规范是万象术的语义根：每条行为命题有稳定 ID、测试落点和 owner 包。规范不跟踪实现进度，只定义正确性。
 
-- **规范**：`requirements/<package>/`（56 包 normative 树，另 2 个历史包；必备 WHY.md、WHAT.md 与 tests/；WHAT 命题 ID 稳定寻址，条款与测试文件一一映射，覆盖缺口见 [requirements/GAP.md](requirements/GAP.md)；含 `planning`（planning-001~005、007~011、013~018、020~023）：Plan 角色的接力式规划——review 晋级、deliver 接力、任期隔离、崩溃恢复）。
+- **规范**：`requirements/<package>/`（48 个活跃包，另 1 个历史包 epistemic-reasoning；必备 WHY.md、WHAT.md 与 tests/；WHAT 命题 ID 稳定寻址，条款与测试文件一一映射，覆盖缺口见 [requirements/GAP.md](requirements/GAP.md)；Plan 角色的接力式规划归 `work` 包 work-020 起：review 晋级、deliver 接力、任期隔离、崩溃恢复）。
 - **历史 Clause 与变更记录**：2026-08-14 cutover 已归档（含 Kolmogorov 工程纪律与 completed change 考古；git 历史可回溯）。
 - 测试全部包自有（`requirements/<package>/tests/`），直接引用 WHAT 命题 ID。规范不跟踪实现进度。
 

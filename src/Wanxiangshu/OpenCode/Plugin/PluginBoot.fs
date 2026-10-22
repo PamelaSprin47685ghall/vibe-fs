@@ -30,7 +30,10 @@ module PluginBoot =
           Paths: IHostPaths option
           FamilyParent: SessionId -> SessionId option }
 
-    let private bindCasebookSemanticCut (incident: CasebookSemanticCutIncident) =
+    /// A Casebook-scoped conflict belongs to one case: it is announced once
+    /// and the case becomes unavailable. It never terminates the host process
+    /// and never revokes finished engineering work.
+    let private reportCasebookSemanticCut (incident: CasebookSemanticCutIncident) =
         let failure = incident.Failure
 
         let cutIds =
@@ -38,9 +41,10 @@ module PluginBoot =
             |> List.map (fun cut -> EventId.value cut.CutEventId)
             |> String.concat ","
 
-        Diagnostic.fatal
+        Diagnostic.emit
             "casebook-semantic-cut"
-            [ "result",
+            [ "session_id", failure.CaseIdentity
+              "result",
               sprintf
                   "%A case=%s event=%s cuts=%s: %s"
                   failure.Operation
@@ -104,7 +108,7 @@ module PluginBoot =
             let clock = NodeTiming.nodeClockPort ()
             let timer = NodeTiming.nodeTimerPort ()
 
-            let casebookSettlements = CasebookSettlementOwner bindCasebookSemanticCut
+            let casebookSettlements = CasebookSettlementOwner reportCasebookSemanticCut
 
             let familyParent (sessionId: SessionId) =
                 match scope.Sessions.SessionParents.TryGetValue(SessionId.value sessionId) with

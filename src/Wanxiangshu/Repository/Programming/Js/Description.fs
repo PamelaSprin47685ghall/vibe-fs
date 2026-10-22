@@ -289,11 +289,7 @@ class JsProgram {"""
         "const PLAN_PATH = \"plan.md\";\n"
         + fill
             prose.BaseClass
-            [ "baseClassCallable",
-              if present capabilities "call" then
-                  ""
-              else
-                  ""
+            [ "baseClassCallable", (if present capabilities "call" then "" else "")
               "baseClassRead",
               if present capabilities "cat" then
                   prose.BaseClassRead + "\n" + prose.BaseClassAnchors
@@ -560,14 +556,15 @@ class JsProgram {"""
                       [ "rethrow_host", rethrowHost ]
               if present capabilities "call" then
                   fill
-                      """  async call(command, planB) {
-    return await this._api.call(command, planB);
+                      """  async call(command, timeoutOrOptions) {
+    return await this._api.call(command, timeoutOrOptions);
   }"""
                       []
               if has capabilities JsCapability.Exec then
                   """  async signal(signal) {
     return await this._api.signal(signal);
   }"""
+
                   """  async send(input) {
     return await this._api.send(input);
   }"""
@@ -582,31 +579,31 @@ class JsProgram {"""
                       [ "rethrow_host", rethrowHost ]
               if present capabilities "commission" then
                   fill
-                      """  async commission(payload, reportMapping) {
+                      """  async commission(payload, carry = []) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
 {{name_derivation}}
-    return await this._api.commission(spec, reportMapping);
+    return await this._api.commission(spec, carry);
   }"""
                       [ "name_derivation", deriveNameFromCharge ]
               if present capabilities "fork" then
                   fill
-                      """  async fork(payload, reportMapping) {
+                      """  async fork(payload, carry = []) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
 {{name_derivation}}
-    return await this._api.fork(spec, reportMapping);
+    return await this._api.fork(spec, carry);
   }"""
                       [ "name_derivation", deriveNameFromCharge ]
               if present capabilities "resume" then
                   fill
-                      """  async resume(payload, reportMapping) {
+                      """  async resume(payload, carry = []) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
-    return await this._api.resume(spec, reportMapping);
+    return await this._api.resume(spec, carry);
   }"""
                       []
               if present capabilities "devops" then
                   fill
-                      """  async devops(intent, reportMapping) {
-    return await this._api.devops(intent, reportMapping);
+                      """  async devops(intent, carry = []) {
+    return await this._api.devops(intent, carry);
   }"""
                       []
               if present capabilities "join" then
@@ -623,8 +620,8 @@ class JsProgram {"""
                       []
               if present capabilities "advisor" then
                   fill
-                      """  async advisor(intent, reportMapping) {
-    return await this._api.advisor(intent, reportMapping);
+                      """  async advisor(intent, carry = []) {
+    return await this._api.advisor(intent, carry);
   }"""
                       []
               if present capabilities "fission" then
@@ -637,7 +634,9 @@ class JsProgram {"""
               // this.join(), so it is emitted only when Join is projected too.
               if present capabilities "dag" then
                   fill
-                      """  async dag(spec, reportMapping) {
+                      """  async dag(spec, carry = []) {
+    const parsed = this._api.validateCarry(carry);
+    if (!parsed.ok) return parsed;
     const nodes = (spec && spec.nodes) || [];
     if (nodes.length === 0) return { ok: true, results: {}, skipped: [] };
     const byId = {};
@@ -646,13 +645,16 @@ class JsProgram {"""
     const skipped = [];
     let pending = nodes.map((node) => node.id);
     const agentToNode = {};
-    const prompt = (node) => {
-      const lines = [node.charge];
+    const material = (node) => {
+      const items = parsed.carry.slice();
       for (const dep of node.deps || []) {
         const record = results[dep];
-        if (record) lines.push("--- " + dep + " ---\\n" + (record.view || ""));
+        if (record && Array.isArray(record.returned) && record.returned.length > 0) {
+          items.push("Dependency " + dep + ":");
+          for (const entry of record.returned) items.push(entry.text);
+        }
       }
-      return lines.join("\\n");
+      return items;
     };
     const decide = async (node, code, extra) => {
       const park = Object.assign({ dag: spec, node: node, code: code, deps: node.deps || [], done: Object.keys(results), pending: pending.slice() }, extra || {});
@@ -668,7 +670,7 @@ class JsProgram {"""
       if (ready.length === 0) {
         abortWith("DAG_CYCLE", "dag has a cycle or an unknown dependency");
       }
-      const receipts = await Promise.all(ready.map((node) => this.fork({ charge: prompt(node), name: node.id }, reportMapping)));
+      const receipts = await Promise.all(ready.map((node) => this.fork({ charge: node.charge, name: node.id }, material(node))));
       let waveRetry = false;
       for (let index = 0; index < ready.length; index += 1) {
         const node = ready[index];
@@ -752,33 +754,20 @@ class JsProgram {"""
     return await this._api.park(payload);
   }"""
                   []
-              // deliver(reportMapping): ends this program by handing over
-              // the report mapping; the prose must already exist in the
-              // assistant text before this call. The host reads the mapping
-              // as a prefixUntil=0 declaration. Algorithm G1 gate is verified
-              // at settlement time.
-              // Clause 1: the member carries exactly one payload — the view
-              // declaration. A missing payload or surplus arguments are
-              // refused with a data envelope; the program is not failed and
-              // nothing is delivered.
+              // The current report returns with the optional history selection.
               fill
-                  """  async deliver(reportMapping) {
+                  """  async deliver(carry = []) {
     if (arguments.length > 1) {
       return {
         ok: false,
         code: "VIEW_DECLARATION_INVALID",
-        reason: "deliver takes exactly one view declaration payload: pass the report mapping as the only argument (received " + arguments.length + " arguments)"
+        reason: "deliver accepts one optional carry array (received " + arguments.length + " arguments)"
       };
     }
-    if (reportMapping === undefined) {
-      return {
-        ok: false,
-        code: "VIEW_DECLARATION_INVALID",
-        reason: "deliver requires a view declaration payload: the report mapping argument is missing"
-      };
-    }
+    const parsed = this._api.validateCarry(carry);
+    if (!parsed.ok) return parsed;
     const err = new Error("delivered");
-    err.__jsDelivered = { view: { prefixUntil: 0, thenMap: reportMapping } };
+    err.__jsDelivered = { carry: parsed.carry };
     throw err;
   }"""
                   []
@@ -800,8 +789,7 @@ class JsProgram {"""
               else
                   "" in
 
-          reviewClass
-          + String.concat "\n\n" (classOpen :: methods @ [ "}" ])
+          reviewClass + String.concat "\n\n" (classOpen :: methods @ [ "}" ])
 
     let runtimeBaseClass prose capabilities =
         runtimeBaseClassCore false prose capabilities

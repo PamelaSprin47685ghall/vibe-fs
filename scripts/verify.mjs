@@ -9,6 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
+import { walk } from './lib/walk.mjs'
 import { collectVerificationInputs, computeDigest, diffVerificationInputs } from './lib/build-state.mjs'
 import { ensureNativeOpencode } from './lib/ensure-native-opencode.mjs'
 
@@ -94,6 +95,41 @@ export function verificationSteps({ root = ROOT, release = false, verbose = fals
   }
 
   return steps
+}
+
+export function focusedSuiteFiles(root, suites) {
+  const suiteList = Array.isArray(suites) ? suites : String(suites).split(',').map((s) => s.trim()).filter(Boolean)
+  const allFiles = []
+  for (const suite of suiteList) {
+    const suiteDir = path.join(root, 'requirements', suite, 'tests')
+    if (!fs.existsSync(suiteDir)) continue
+    const files = walk(suiteDir, ['.test.mjs'])
+      .filter((f) => !f.includes('/tests/e2e/') && !f.includes('/tests/integration/'))
+      .map((f) => path.relative(root, f).replace(/\\/g, '/'))
+    allFiles.push(...files)
+  }
+  return { suites: suiteList, files: [...new Set(allFiles)].sort() }
+}
+
+export function focusedVerificationSteps({ root = ROOT, suites, verbose = false, env: hostEnv = process.env } = {}) {
+  const { suites: suiteList, files } = focusedSuiteFiles(root, suites)
+  if (files.length === 0) {
+    throw new Error(`focused verify: no *.test.mjs found for suite(s): ${suiteList.join(', ')}`)
+  }
+  const scopedEnv = {
+    ...hostEnv,
+    TESTS_MJS_FILES: files.join(','),
+  }
+  return [
+    {
+      label: 'unit',
+      cmd: process.execPath,
+      argv: [path.join(root, 'requirements/verification-system/tests/run.mjs')],
+      env: getTestEnv({ verbose, hostEnv: scopedEnv }),
+      focusedFiles: files,
+      focusedSuites: suiteList,
+    },
+  ]
 }
 
 function defaultRunStepFactory(root, verbose, output) {
@@ -220,6 +256,7 @@ function allocateRunLogDir(baseLogDir) {
 export async function verify({
   root = ROOT,
   release = false,
+  suites = null,
   verbose = false,
   profile = false,
   runStep: runStepOverride,
@@ -233,8 +270,27 @@ export async function verify({
   const runLogDir = allocateRunLogDir(baseLogDir)
 
   const stepRunner = runStepOverride ?? defaultRunStepFactory(resolvedRoot, verbose, output)
-  const plannedSteps = verificationSteps({ root: resolvedRoot, release, verbose, env: hostEnv })
-  const mode = release ? 'release' : 'daily'
+  let plannedSteps
+  let mode
+  let focusedInfo = null
+  if (suites) {
+    try {
+      plannedSteps = focusedVerificationSteps({ root: resolvedRoot, suites, verbose, env: hostEnv })
+      focusedInfo = focusedSuiteFiles(resolvedRoot, suites)
+      mode = `focused (${focusedInfo.suites.join(', ')})`
+    } catch (err) {
+      output.write(`FAIL: ${err.message}\n`)
+      return {
+        mode: 'focused',
+        outcome: 'fail',
+        failureReason: err.message,
+        exitCode: 1,
+      }
+    }
+  } else {
+    plannedSteps = verificationSteps({ root: resolvedRoot, release, verbose, env: hostEnv })
+    mode = release ? 'release' : 'daily'
+  }
   const runStart = Date.now()
 
   let beforeInputs
@@ -257,7 +313,11 @@ export async function verify({
 
   const fullDigest = computeDigest(beforeInputs)
   const initialDigest = fullDigest.slice(0, 16)
-  output.write(`\n=== verify: ${mode}  inputs=${initialDigest} ===\n`)
+  if (focusedInfo) {
+    output.write(`\n=== verify: ${mode}  inputs=${initialDigest}  files=${focusedInfo.files.length} ===\n`)
+  } else {
+    output.write(`\n=== verify: ${mode}  inputs=${initialDigest} ===\n`)
+  }
 
   const stepResults = []
   let pipelineFailed = false
@@ -354,7 +414,7 @@ export async function verify({
   const wallMs = Date.now() - runStart
   if (pipelineFailed) {
     if (inputChanges) {
-      output.write(`FAIL: inputs changed mid-run (${inputChanges.reason}) — re-run verify on a stable tree\n`)
+      output.write(`FAIL: inputs changed mid-run (${inputChanges.reason}) — subsequent results do not apply to initial inputs (${initialDigest})\n`)
     }
     output.write(`FAIL  verify ${mode}  ${(wallMs / 1000).toFixed(1)}s\n`)
     if (profile) {
@@ -403,16 +463,22 @@ async function main() {
   let release = false
   let verbose = false
   let profile = false
+  let suites = null
 
-  for (const arg of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]
     if (arg === '--release') {
       release = true
+    } else if (arg.startsWith('--suites=')) {
+      suites = arg.slice('--suites='.length)
+    } else if (arg === '--suites') {
+      suites = argv[++i]
     } else if (arg === '--verbose') {
       verbose = true
     } else if (arg === '--profile') {
       profile = true
     } else if (arg === '-h' || arg === '--help') {
-      process.stdout.write('Usage: node scripts/verify.mjs [--release] [--verbose] [--profile]\n')
+      process.stdout.write('Usage: node scripts/verify.mjs [--release] [--verbose] [--profile] [--suites <pkg,...>]\n')
       process.exit(0)
     } else {
       process.stderr.write(`Unknown option: ${arg}\n`)
@@ -420,7 +486,7 @@ async function main() {
     }
   }
 
-  const result = await verify({ release, verbose, profile, env: process.env })
+  const result = await verify({ release, suites, verbose, profile, env: process.env })
   process.exitCode = result.exitCode
 }
 

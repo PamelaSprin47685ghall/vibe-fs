@@ -19,6 +19,10 @@ export const awaitOwned = async (sensor, session, run) => {
   assert.notEqual(task, null, 'expected an owned task for this exact run')
   await task
 }
+export const requestInterrupt = (sensor, session, run, kind = 'TooRepetitive') => {
+  assert.equal(loopSensor.requestInterrupt(sensor, session, run, kind), true,
+    'an explicit loop-prevention request must arm its exact run')
+}
 export const chaoticText = () => {
   const pieces = []
   for (let token = 0; token < vocabularySize && pieces.length < 512; token++) {

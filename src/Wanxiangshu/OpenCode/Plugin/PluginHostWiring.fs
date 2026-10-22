@@ -46,7 +46,7 @@ module PluginHostWiring =
             let! settled = settleFinalization workspaceRoot store delegateSessionId
 
             match settled.Commitment with
-            | CaseFinalizeCommitment.PersistenceFailed failure -> settlements.Observe failure
+            | CaseFinalizeCommitment.PersistenceFailed failure -> settlements.Observe failure |> ignore
             | _ -> ()
 
             return settled

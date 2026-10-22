@@ -49,11 +49,12 @@ module JsSandbox =
 
     /// Handle to a started sandbox program: the async IIFE promise is exposed
     /// (not awaited to completion) so a caller may hold it across calls, and
-    /// the deadline reference is mutable so a caller may reset the async
-    /// deadline without re-wrapping the program.
+    /// the sandbox run handle is kept so the async deadline can be re-armed
+    /// through the sandbox object without re-wrapping the program. The
+    /// sandbox owns the deadline reference; the host never mutates it.
     type JsRunHandle =
         { ProgramPromise: Task<string>
-          DeadlineRef: obj
+          SandboxHandle: obj
           Api: obj
           ParkState: ParkState }
 
@@ -63,17 +64,14 @@ module JsSandbox =
     [<Emit("JSON.parse($0)")>]
     let private parseJson (text: string) : obj = jsNative
 
-    [<Emit("$0.current = Number($1)")>]
-    let private setDeadline (deadlineRef: obj) (epochMs: int64) : unit = jsNative
-
     [<Import("Sandbox", "wanxiangli/sandbox")>]
     let private SandboxFactory: unit -> obj = jsNative
 
     let private sandboxLaw: obj = emitJsExpr (SandboxFactory) "$0()"
 
     /// Start the model program under wanxiangli/sandbox (DONT_CONTEXTIFY +
-    /// realm membrane + afterEvaluate driver). Returns host DeadlineRef and
-    /// ProgramPromise.
+    /// realm membrane + afterEvaluate driver). Returns the sandbox run handle
+    /// (which names the run for deadline extension) and the ProgramPromise.
     let private launchMembraned
         (api: obj)
         (deadlineMs: int)
@@ -86,7 +84,7 @@ module JsSandbox =
             """
 (function(law, api, deadlineMs, deadlineEpochMs, baseClass, model) {
   var handle = law.run(api, Number(deadlineMs), Number(deadlineEpochMs), baseClass, model);
-  return { DeadlineRef: handle.deadlineRef, ProgramPromise: handle.programPromise };
+  return { SandboxHandle: handle, ProgramPromise: handle.programPromise };
 })($0, $1, $2, $3, $4, $5)
 """
 
@@ -190,24 +188,24 @@ module JsSandbox =
             let launched =
                 launchMembraned api deadlineMs deadlineEpochMs baseClassSource modelSource
 
-            let deadlineRef: obj = launched?DeadlineRef
+            let sandboxHandle: obj = launched?SandboxHandle
 
             let promise: Task<string> =
                 emitJsExpr (launched) "Promise.resolve($0.ProgramPromise)"
 
             return
                 { ProgramPromise = promise
-                  DeadlineRef = deadlineRef
+                  SandboxHandle = sandboxHandle
                   Api = api
                   ParkState = state }
         }
 
     /// Start a wrapped program in a fresh vm context without awaiting it to
     /// completion. The async IIFE's promise is exposed as `ProgramPromise` so a
-    /// caller may hold it across calls; the deadline is injected as a mutable
-    /// reference (`DeadlineRef`) so a caller may reset the async deadline
-    /// without re-wrapping. The vm context is held by the promise's closure
-    /// chain while it remains unsettled — it is not explicitly lifted.
+    /// caller may hold it across calls; the sandbox run handle
+    /// (`SandboxHandle`) names the run so a caller may re-arm the async
+    /// deadline without re-wrapping. The vm context is held by the promise's
+    /// closure chain while it remains unsettled — it is not explicitly lifted.
     ///
     /// `deadlineMs` bounds the synchronous segment via the vm timeout; the
     /// injected proxy bounds async segments (JS-054.1). Synchronous errors
@@ -242,11 +240,14 @@ module JsSandbox =
     let classifyResult (json: string) (outputBoundBytes: int) : Result<string, JsFailure> =
         decodeRunResult json outputBoundBytes
 
-    /// Reset the async deadline of an in-flight sandbox program. Subsequent api
-    /// member calls re-check `deadlineRef.current`, so the new epoch takes
-    /// effect without re-wrapping or re-running the program.
+    /// Reset the async deadline of an in-flight sandbox program. The deadline
+    /// reference belongs to the sandbox object, which re-arms it by run
+    /// handle; subsequent api member calls re-check that deadline, so the new
+    /// epoch takes effect without re-wrapping or re-running the program.
     let resetDeadline (handle: JsRunHandle) (deadlineEpochMs: int64) : unit =
-        setDeadline handle.DeadlineRef deadlineEpochMs
+        emitJsExpr
+            (sandboxLaw, handle.SandboxHandle, deadlineEpochMs)
+            "$0.extendDeadline($1, Number($2))"
 
     /// The program-script line a stack frame reports, if the frame is one.
     ///

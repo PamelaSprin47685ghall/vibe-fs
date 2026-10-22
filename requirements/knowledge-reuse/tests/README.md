@@ -9,7 +9,7 @@ WHAT 是权威；本文不增加规则。先构建当前产物，再用 verifica
 - 009 证明无 marker 时实际 fetch 拒绝、显式 lifecycle 不归档；所有插件描述/索引/事件零影响待证。
 - 010 保留显式 lifecycle 清理、重复 finalization 和同步委托组合；其中测试手工 notePrompt/noteAnswer 后归档，不能证明真实 resume 分段、Fission 汇合或生产 terminal 自动归档。
 - 012 证明公开索引字段与寻址；epoch 是局部缓存证据，不证明完整 provider 低信任包装。
-- 013 原成功写入/重开已由007承接；这些不是 crash cut。自建 fatal descriptor 与源码词形不能证明结算、报告和进程退出，改为 TODO。
+- 013 保留实际 Bookkeeper/EventStore 结算后按 EventId 去重的案例不可用结果；案例冲突不再终止宿主进程、不再撤销工程交付，重复观察不重复通知/归档。共享日志真实损坏的停止写入范围仍由 EventStore 承担。真实 Boot 冷重开仍逐字节核对保留。
 - 014 证明字符预算截断器保留末尾及声明；实际请求的整体预算、所有变更路径保留和小预算后果待证。
 
 GAP-160 汇总整链缺证。GAP-161 的 005/015/016 回归走真实 fetch、Bookkeeper 和 EventStore：维护读取不可变旧 payload，一次物理目标捕获同时提供差异与待提交基线；读取到 C 后立即把物理文件改成 D 的受控切点，要求本次只维护 B→C 并保存 C，下次才维护 C→D。无关的 tracked Git 修改不进入差异；空文本、Missing、新增、删除分别取证。多个分离变更形成独立 hunk，不携带中间未变正文；005 用225对小域输入的独立动态规划 oracle 核对最短增删数和精确重建，并单独覆盖 BOM、CRLF 和 EOF。未取得完整旧材料时不得凭旧 hash 猜正文。

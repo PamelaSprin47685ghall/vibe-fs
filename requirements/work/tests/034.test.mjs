@@ -421,7 +421,7 @@ test('WHAT[work-034] post-S3 projection strips all S3-and-earlier context and in
   }
 })
 
-test('WHAT[work-034] a relaying tenure declaring view: { extra } commits ViewCheckpointCommitted and delivers the declared view to the successor request', async () => {
+test('WHAT[work-034] a relaying tenure declaring carry commits ViewCheckpointCommitted and delivers the declared context to the successor request', async () => {
   clearAll()
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
@@ -451,7 +451,7 @@ test('WHAT[work-034] a relaying tenure declaring view: { extra } commits ViewChe
     await hooks['chat.message']({ sessionID, agent: 'plan' }, { message: userRoot.info, parts: userRoot.parts })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [structuredClone(userRoot)] })
 
-    const declaredExtra = 'HANDOVER_VIEW_034: keep anchor #1 and verify S1 trade-offs.'
+    const declaredCarry = 'HANDOVER_VIEW_034: verify the recorded S1 trade-offs.'
     const viewToolMsg = {
       info: { id: 'run-034-view', role: 'assistant', sessionID, parentID: 'user-plan-root-034', time: { created: 2 } },
       parts: [
@@ -464,8 +464,8 @@ test('WHAT[work-034] a relaying tenure declaring view: { extra } commits ViewChe
             status: 'completed',
             input: {
               program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-              prefixUntil: 1,
-              thenMap: { 1: declaredExtra },
+              prefixCount: 0,
+              carry: [declaredCarry],
             },
             output: 'ok',
           },
@@ -476,8 +476,8 @@ test('WHAT[work-034] a relaying tenure declaring view: { extra } commits ViewChe
     await hooks.tool['todowrite-for-plan'].execute(
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        prefixUntil: 1,
-        thenMap: { 1: declaredExtra },
+        prefixCount: 0,
+        carry: [declaredCarry],
       },
       { sessionID, agent: 'plan', callID: 'call-034-view', messageID: 'run-034-view', providerRunID: 'run-034-view' },
     )
@@ -541,9 +541,11 @@ test('WHAT[work-034] a relaying tenure declaring view: { extra } commits ViewChe
       !successorOut.messages.some((m) => String(m?.info?.id ?? '').startsWith('synthetic-prev-')),
       'no synthetic-prev-* message is injected for the successor tenure',
     )
-    assert.ok(
-      JSON.stringify(successorOut.messages).includes(declaredExtra),
-      'successor request carries the predecessor declared view.extra text',
+    assert.equal(
+      JSON.stringify(successorOut.messages).split(declaredCarry).length - 1,
+      1,
+      'successor request carries the declared literal once, without a duplicate in the retained call',
     )
   })
 })
+

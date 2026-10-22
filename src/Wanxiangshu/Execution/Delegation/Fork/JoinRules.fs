@@ -17,14 +17,9 @@ module JoinRules =
           AgentId: string
           Role: string
           Status: string
-          View: string }
+          Returned: string list }
 
-    /// A completed run with no delivered view is not a completed delivery.
-    let decideCompletedStatus (view: string) : string =
-        if String.IsNullOrWhiteSpace view then
-            "undelivered"
-        else
-            "completed"
+    let private plain text = if isNull text then [] else [ text ]
 
     /// Join failure → the stable wire code the caller reports.
     let mapForkError (error: ForkError) : string =
@@ -47,43 +42,41 @@ module JoinRules =
         : JoinRecord =
         match item with
         | JoinItem.AgentItem(AgentCompletedItem payload) ->
-            let view = if isNull payload.View then "" else payload.View
-
             { Name = resolveName payload.AgentId
               AgentId = payload.AgentId
               Role = Roles.roleLabel payload.Role
-              Status = decideCompletedStatus view
-              View = view }
+              Status = "completed"
+              Returned = ReturnedMaterial.texts payload.View }
         | JoinItem.AgentItem(AgentFailedItem payload) ->
             { Name = resolveName payload.AgentId
               AgentId = payload.AgentId
               Role = resolveRole payload.AgentId payload.Role
               Status = "failed"
-              View = if isNull payload.Message then "" else payload.Message }
+              Returned = plain payload.Message }
         | JoinItem.AgentItem(AgentAbandonedItem(agentId, reason)) ->
             { Name = resolveName agentId
               AgentId = agentId
               Role = resolveRole agentId None
               Status = if reason = "Voided" then "voided" else "abandoned"
-              View = "" }
+              Returned = [] }
         | JoinItem.PtyItem(PtyExited payload) ->
             { Name = resolveLabel payload.PtyId
               AgentId = payload.PtyId
               Role = Roles.roleLabel Role.DevOps
               Status = "completed"
-              View = if isNull payload.Outcome then "" else payload.Outcome }
+              Returned = plain payload.Outcome }
         | JoinItem.PtyItem(PtyFailed payload) ->
             { Name = resolveLabel payload.PtyId
               AgentId = payload.PtyId
               Role = Roles.roleLabel Role.DevOps
               Status = "failed"
-              View = if isNull payload.Message then "" else payload.Message }
+              Returned = plain payload.Message }
         | JoinItem.PtyItem(PtyAborted payload) ->
             { Name = resolveLabel payload.PtyId
               AgentId = payload.PtyId
               Role = Roles.roleLabel Role.DevOps
               Status = "abandoned"
-              View = if isNull payload.Message then "" else payload.Message }
+              Returned = plain payload.Message }
 
     /// One orchestrator verdict → the record the join wire carries.
     let mapOrchestratorVerdict (resolveJobName: ManagerJobId -> string) (verdict: OrchestratorVerdict) : JoinRecord =
@@ -94,28 +87,22 @@ module JoinRules =
               AgentId = ManagerJobId.value jobId
               Role = Roles.roleLabel Role.Manager
               Status = "completed"
-              View = CommitHash.value head }
+              Returned = [ CommitHash.value head ] }
         | OrchestratorVerdict.Cancelled jobId ->
             { Name = resolveJobName jobId
               AgentId = ManagerJobId.value jobId
               Role = Roles.roleLabel Role.Manager
               Status = "abandoned"
-              View = "" }
-        | OrchestratorVerdict.RejectedDirty reason ->
-            { Name = ""
-              AgentId = ""
-              Role = Roles.roleLabel Role.Manager
-              Status = "failed"
-              View = if isNull reason then "" else reason }
+              Returned = [] }
         | OrchestratorVerdict.IntegrationFailed(jobId, errorDetails) ->
             { Name = resolveJobName jobId
               AgentId = ManagerJobId.value jobId
               Role = Roles.roleLabel Role.Manager
               Status = "failed"
-              View = if isNull errorDetails then "" else errorDetails }
+              Returned = plain errorDetails }
         | OrchestratorVerdict.Empty ->
             { Name = ""
               AgentId = ""
               Role = Roles.roleLabel Role.Manager
               Status = "abandoned"
-              View = "" }
+              Returned = [] }

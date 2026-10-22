@@ -228,20 +228,16 @@ module OrchestratorHostSurface =
         worktreePathValue (field value "path"), identity
 
     let private gitPort (raw: obj) : GitPort =
-        { IsDirty =
-            fun path ->
-                task {
-                    let! value = invokeRawTask raw "IsDirty" [| box (WorktreePath.value path) |]
-                    return plainResult value boolOf
-                }
-          CreateWorktree =
-            fun job path ->
+        { CreateWorktree =
+            fun job path sourceRef ->
                 task {
                     let! value =
                         invokeRawTask
                             raw
                             "CreateWorktree"
-                            [| box (ManagerJobId.value job); box (WorktreePath.value path) |]
+                            [| box (ManagerJobId.value job)
+                               box (WorktreePath.value path)
+                               box (TargetRef.value sourceRef) |]
 
                     return plainResult value worktreeIdentityValue
                 }
@@ -463,32 +459,6 @@ module OrchestratorHostSurface =
                                    kind = "Refused"
                                    incumbencyId = ""
                                    error = error |}
-        }
-
-    /// change-integration-005/013: the durable review evidence the publish gate
-    /// reads for one Manager road. `Refused` means the gate refuses publishing with
-    /// zero writes.
-    let publishReviewOf (workspace: string) (managerSessionId: string) : Task<obj> =
-        task {
-            let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
-
-            let evidence =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir managerSessionId
-                |> Option.bind PublishReviewEvidence.ofWork
-
-            match evidence with
-            | Some(outcome, authority) ->
-                return
-                    box
-                        {| kind = "Reviewed"
-                           outcome = outcome
-                           authority = authority |}
-            | None ->
-                return
-                    box
-                        {| kind = "Refused"
-                           outcome = ""
-                           authority = "" |}
         }
 
     let hasChild (handle: obj) (agentId: string) : bool =

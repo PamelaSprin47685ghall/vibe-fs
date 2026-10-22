@@ -6,15 +6,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 
-module private PatchStatus =
-
-    let name (status: CertificateStatus) : string =
-        match status with
-        | CertificateStatus.Current -> "current"
-        | CertificateStatus.Stale _ -> "stale"
-        | CertificateStatus.Invalidated _ -> "invalidated"
-        | CertificateStatus.Conflicted -> "conflicted"
-
 module private GuaranteeView =
 
     let name (guarantee: CertificateGuarantee) : string =
@@ -71,7 +62,6 @@ type SlotProjection =
       SchemaId: string
       SchemaHash: string
       Revision: int64
-      Status: string
       Guarantee: string
       Payload: string
       ExpectedBase: int64 }
@@ -136,6 +126,7 @@ type AnswerProjection =
 type SemanticProjection =
     { ApiVersion: string
       Goal: GoalProjection
+      Plan: string list
       Graph: NodeProjection list
       Edges: EdgeProjection list
       Certificates: CertificateProjection list
@@ -207,7 +198,6 @@ module Projection =
           SchemaId = patch.Slot.Schema.Id
           SchemaHash = patch.Slot.Schema.Hash
           Revision = Revision.value patch.Slot.Revision
-          Status = PatchStatus.name patch.Slot.Status
           Guarantee = GuaranteeView.name patch.Slot.Guarantee
           Payload = patch.Slot.CanonicalPayload
           ExpectedBase = Revision.value patch.ExpectedSlotRevision }
@@ -265,6 +255,7 @@ module Projection =
     let semanticProjection (state: InquiryState) : SemanticProjection =
         { ApiVersion = state.ApiVersion
           Goal = goalProjection state.Goal
+          Plan = state.Plan |> List.map WorkId.value
           Graph =
             state.Graph
             |> Map.toList
@@ -369,6 +360,7 @@ module Projection =
         record
             [ "apiVersion", box projection.ApiVersion
               "goal", goalView projection.Goal
+              "plan", strings projection.Plan
               "graph",
               projection.Graph
               |> items (fun node ->
@@ -406,7 +398,6 @@ module Projection =
                                   "schemaId", box slot.SchemaId
                                   "schemaHash", box slot.SchemaHash
                                   "revision", box (string slot.Revision)
-                                  "status", box slot.Status
                                   "guarantee", box slot.Guarantee
                                   "payload", box slot.Payload
                                   "expectedBase", box (string slot.ExpectedBase) ]) ])

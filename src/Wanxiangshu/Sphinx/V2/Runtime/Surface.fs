@@ -149,8 +149,10 @@ module Surface =
         |> List.map plainOf
         |> DecisionModel.supportsNumericComparison
 
-    /// Selects the highest-ranked plan in one scope and returns why. The estimate kind
-    /// survives selection so a degraded ordering stays labelled.
+    /// Selects the highest-ranked plan in one scope and returns the receipt that
+    /// explains it: the rule that ran, whether a tie actually occurred and how it was
+    /// settled. The estimate kind survives selection so a degraded ordering stays
+    /// labelled.
     let decisionSelect (scopeId: string) (candidates: obj list) : obj =
         let estimates =
             candidates
@@ -166,17 +168,31 @@ module Surface =
                 : PlanEstimate))
 
         let chosen =
-            Decision.choose scopeId "highest-estimate" "1" (Map.empty) (Map.empty) [] [] [] estimates []
+            Decision.choose scopeId estimates []
 
         match chosen with
         | Ok outcome ->
             let selected = outcome.Selected
+            let receipt = outcome.Receipt
 
             box
                 {| SelectedPlanId = PlanId.value selected.PlanId
                    SelectedRank = selected.Rank
                    SelectedKind = kindName selected.Kind
-                   Alternatives = outcome.Alternatives |> List.map (fun plan -> PlanId.value plan.PlanId) |}
+                   Alternatives = outcome.Alternatives |> List.map (fun plan -> PlanId.value plan.PlanId)
+                   SelectionRule = receipt.SelectionRule
+                   TieBreak = receipt.TieBreak |> Option.defaultValue null
+                   EstimateRefs =
+                    receipt.EstimateRefs
+                    |> List.map (fun (planId, kind) -> box {| PlanId = PlanId.value planId; Kind = kind |})
+                    |> List.toArray
+                    |> box
+                   UnestimatedPlans =
+                    receipt.UnestimatedPlans
+                    |> List.map (fun plan ->
+                        box {| PlanId = PlanId.value plan.PlanId; Reason = plan.Reason |})
+                    |> List.toArray
+                    |> box |}
         | Error fault -> box {| error = fault.Code |}
 
     let decisionExclude (planId: string) (reason: string) : obj =

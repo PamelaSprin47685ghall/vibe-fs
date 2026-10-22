@@ -54,14 +54,16 @@ module DeliveryWitnessWriter =
     /// never as a refusal — the delivery stands on its durable witness.
     let create (journal: AgentJournal) (onCommitted: DeliveryWitness -> unit) : IDeliveryWitnessWriter =
         { new IDeliveryWitnessWriter with
-            member _.CommitDeliveryWitness(witness: DeliveryWitness) : Task<Result<unit, string>> =
+            member _.CommitDeliveryWitness(witness: DeliveryWitness) : Task<DeliveryCommitResult> =
                 task {
                     let! committed = TaskDeliveryJournal.commit journal (toWitness witness)
 
                     match committed with
-                    | Error reason -> return Error reason
-                    | Ok() ->
+                    | TaskDeliveryJournal.TaskDeliveryCommitResult.Committed ->
                         onCommitted witness
-
-                        return Ok()
+                        return DeliveryCommitResult.Committed
+                    | TaskDeliveryJournal.TaskDeliveryCommitResult.NotCommitted reason ->
+                        return DeliveryCommitResult.NotCommitted reason
+                    | TaskDeliveryJournal.TaskDeliveryCommitResult.Unknown reason ->
+                        return DeliveryCommitResult.Unknown reason
                 } }

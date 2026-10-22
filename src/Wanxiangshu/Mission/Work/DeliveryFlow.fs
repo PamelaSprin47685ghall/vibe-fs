@@ -207,15 +207,25 @@ module DeliveryFlow =
             let toolCallId = ToolCallId.value prepared.Fence.ToolCallId
             let requestId = providerRunId + ":" + toolCallId
 
+            // S4 single delivery: when review outcome is "Stayed", the manager
+            // hands the work to a successor tenure; otherwise (promoted or no
+            // review), it delivers and completes the work in one step.
+            let isRelay = prepared.ReviewOutcome = Some "Stayed"
+            let nextOwnerFields =
+                if isRelay then
+                    [ "nextOwnerId", box (SessionId.value prepared.Fence.SessionId) ]
+                else
+                    []
+
             let command =
                 DurableWorkHost.command
                     "Deliver"
-                    [ "incumbencyId", box prepared.Incumbent
-                      "providerRunId", box providerRunId
-                      "toolCallId", box toolCallId
-                      "cursor", box (float cursor)
-                      "blockers", box (List.toArray blockers)
-                      "nextOwnerId", box (SessionId.value prepared.Fence.SessionId) ]
+                    ([ "incumbencyId", box prepared.Incumbent
+                       "providerRunId", box providerRunId
+                       "toolCallId", box toolCallId
+                       "cursor", box (float cursor)
+                       "blockers", box (List.toArray blockers) ]
+                     @ nextOwnerFields)
 
             let receipt =
                 DurableWorkHost.execute journalDir (SessionId.value prepared.Fence.SessionId) requestId command
@@ -234,8 +244,6 @@ module DeliveryFlow =
                         else
                             receipt.Reason
                     )
-            elif receipt.Kind = "ReviewRequired" then
-                return Error "assessment required"
             elif durableOutcome then
                 do! enqueueRelayedSuccessor runtime prepared receipt.Kind
                 runtime.UnfreezeRetirement prepared.Fence.SessionId
@@ -247,9 +255,7 @@ module DeliveryFlow =
 
                 return
                     Ok(
-                        if receipt.Kind = "Confirmed" then
-                            DeliverPolicy.confirmationResult ()
-                        elif receipt.Kind = "Blocked" then
+                        if receipt.Kind = "Blocked" then
                             DeliverPolicy.blockedResult blockers
                         else
                             DeliverPolicy.retirementResult receipt.Kind
@@ -302,31 +308,22 @@ module DeliveryFlow =
         (journal: AgentJournal)
         : Task<Result<string, string>> =
         task {
-            let hasAssessment = prepared.Reviewed
+            // N-01: One genuine delivery intent completes in one call without
+            // an assessment precondition or a two-step confirmation ritual.
+            let! journalDir =
+                match runtime.WorkspaceDirectory with
+                | None -> Task.FromResult None
+                | Some directory ->
+                    task {
+                        let! stateRoot = RuntimePath.stateRoot directory
+                        return Some stateRoot
+                    }
 
-            let confirmFirst () =
-                task {
-                    let! journalDir =
-                        match runtime.WorkspaceDirectory with
-                        | None -> Task.FromResult None
-                        | Some directory ->
-                            task {
-                                let! stateRoot = RuntimePath.stateRoot directory
-                                return Some stateRoot
-                            }
-
-                    match journalDir with
-                    | None -> return Error "lifecycle journal directory is unavailable"
-                    | Some dir when String.IsNullOrWhiteSpace dir ->
-                        return Error "lifecycle journal directory is unavailable"
-                    | Some dir -> return! runFrozenDeliver runtime prepared journal dir
-                }
-
-            if not hasAssessment then
-                runtime.UnfreezeRetirement prepared.Fence.SessionId
-                return Ok(DeliverPolicy.assessmentRequiredResult ())
-            else
-                return! confirmFirst ()
+            match journalDir with
+            | None -> return Error "lifecycle journal directory is unavailable"
+            | Some dir when String.IsNullOrWhiteSpace dir ->
+                return Error "lifecycle journal directory is unavailable"
+            | Some dir -> return! runFrozenDeliver runtime prepared journal dir
         }
 
     /// The refreshed target: the same incumbency, still the one this call may
@@ -340,7 +337,8 @@ module DeliveryFlow =
             Ok
                 { Fence = target.Fence
                   Incumbent = target.Incumbent
-                  Reviewed = reviewed }
+                  Reviewed = reviewed
+                  ReviewOutcome = work.ReviewOutcome }
         | _ -> Error(DeliverPolicy.refusalText DeliverPolicy.BindingUnavailable)
 
     let private refreshAfterFreeze (target: DeliverPolicy.Prepared) : Task<Result<DeliverPolicy.Prepared, string>> =

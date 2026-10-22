@@ -23,7 +23,6 @@ module ProviderLanguageSurface =
     val relativePath: language: string -> semanticPath: string -> string
     val exists: language: string -> semanticPath: string -> bool
     val readText: language: string -> semanticPath: string -> string
-    val requireLanguagePair: semanticPath: string -> unit
     val substitute: template: string -> substitutions: obj -> string
     val loadBookkeeperSystem: language: string -> string
 

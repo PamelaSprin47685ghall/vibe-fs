@@ -3,12 +3,10 @@ namespace Wanxiangshu.Sphinx.V2.Hosts
 [<RequireQualifiedAccess>]
 type SphinxTool =
     | InquiryStart
-    | WorkNext
     | WorkSubmit
     | InquiryStatus
     | InquiryCancel
     | InquiryExport
-    | GoalAmend
 
 module Contract =
     val toolName: SphinxTool -> string
@@ -22,5 +20,5 @@ module Contract =
 
     val roleOf: SphinxTool -> string
 
-    /// True when a name is one of the seven public tools.
+    /// True when a name is one of the five public tools.
     val isTool: string -> bool

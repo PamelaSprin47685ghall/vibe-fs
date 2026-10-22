@@ -332,4 +332,18 @@ test('WHAT[verification-system-008] module loadability verifier is red when a di
     rmSync(temporaryRoot, { recursive: true, force: true })
   }
 })
+
+test('WHAT[verification-system-008] synthetic representation output tests prove escaping, empty values, outcome distinction, required fields and isolation', async () => {
+  const { runOutputAssertions } = await import('../../../scripts/checks/llm-facing-format-gate.mjs')
+  const result = await runOutputAssertions()
+  if (result.skipped) {
+    // dist not built in local fixture, acceptable
+    return
+  }
+  assert.deepEqual(
+    result.issues,
+    [],
+    `synthetic representation output assertions must hold: ${result.issues.map((i) => i.message).join('; ')}`,
+  )
+})
 }

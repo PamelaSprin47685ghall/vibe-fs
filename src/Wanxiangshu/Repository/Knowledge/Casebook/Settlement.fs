@@ -70,10 +70,34 @@ type CasebookSemanticCutIncident private (failure: CasebookAppendFailure) =
         else
             None
 
+    /// Evidence for a failure that is not a Casebook-scoped cut (a broken
+    /// shared log, for instance): the same carrier, without the cut reading.
+    static member OfFailure(failure: CasebookAppendFailure) =
+        CasebookSemanticCutIncident failure
+
 [<RequireQualifiedAccess>]
 module CasebookSemanticCutIncident =
     let tryFromSettlement failure =
         CasebookSemanticCutIncident.TryFromSettlement failure
+
+/// CASEBOOK settlement scope. A conflict that belongs to one case is owned by
+/// that case: the case becomes unavailable, the conflict is reported once, and
+/// the engineering work and its saved artifacts are not revoked. A failure of
+/// the shared event log itself keeps its own scope: unsafe appends stop and
+/// the failure stays a failure.
+[<RequireQualifiedAccess>]
+type CasebookSettlementOutcome =
+    /// Not a Casebook-scoped conflict: the original error path owns it and it
+    /// is never swallowed here.
+    | Unscoped
+    /// A Casebook-scoped conflict on one case. The case is unavailable; the
+    /// conflict was reported once.
+    | CaseUnavailable
+    /// The same conflict observed again: no new notification, no re-archive.
+    | CaseUnavailableKnown
+    /// The shared event log's own integrity is broken: appends to it stop and
+    /// the failure is reported with that scope.
+    | LogScopeFailure
 
 /// CASE-003 / delegation-031 (F35): the case finalize outcome is a closed
 /// settlement, never a bare Result&lt;unit, string&gt;. `Finalized` and

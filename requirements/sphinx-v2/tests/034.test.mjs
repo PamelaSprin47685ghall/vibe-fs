@@ -61,14 +61,10 @@ test('WHAT[sphinx-v2-034] the work identity is checked rather than carried over 
   // A blank fence is refused rather than accepted as an unnamed attempt.
   assert.equal(refusalOf(decodeWorkSubmit(answer({fence: '  '}))).path, 'fence')
 
-  // 这里只验证 schema 引用形状，不证明 hash 已核对真实 schema 内容。
-  assert.equal(refusalOf(decodeWorkSubmit(answer({resultSchema: {id: 'sphinx.answer@1'}}))).path, 'hash')
-  assert.equal(refusalOf(decodeWorkSubmit(answer({resultSchema: {hash: 'a1b2'}}))).path, 'id')
-  for (const resultSchema of [undefined, null, [], 'sphinx.answer@1', 1]) {
-    const refusal = refusalOf(decodeWorkSubmit(answer({resultSchema})))
-    assert.equal(refusal.code, 'INVALID_SCHEMA')
-    assert.equal(refusal.path, 'resultSchema')
-  }
+  // X-09: callers never hand-compute internal schema hashes; resultSchema is retired from worker submission
+  assert.equal(isError(decodeWorkSubmit(answer({outcome: 'invalid'}))), true)
+  assert.equal(refusalOf(decodeWorkSubmit(answer({outcome: 'invalid'}))).path, 'outcome')
+  assert.equal(refusalOf(decodeWorkSubmit(answer({outcome: 'failed'}))).path, 'reason')
 
   // The answer bytes are never emptied on the way in.
   assert.equal(refusalOf(decodeWorkSubmit(answer({canonicalResult: '  '}))).path, 'canonicalResult')
@@ -170,7 +166,7 @@ test('WHAT[sphinx-v2-034] a transport receipt remains pending until actual manag
     assert.deepEqual(await remainsPending(completion), {kind: 'pending'})
     // The child delivers before its exact terminal (repository-programming [059]):
     // the fenced delivery cell of that run, as `this.deliver` leaves it.
-    runtimeSurface.recordFencedDeliveredView(prompt.sessionId, 'actual-provider-run', 'call-actual-provider-run', { prefixUntil: 0, thenMap: {} })
+    runtimeSurface.recordFencedDeliveredView(prompt.sessionId, 'actual-provider-run', 'call-actual-provider-run', [])
     assert.equal(await Host.settleHostTerminal(probe, prompt.sessionId, physical.physicalUserMessageId, physical.authorityRootUserMessageId, 'actual-provider-run', 'actual formal answer'), true)
     assert.deepEqual(await completion, {
       ok: true, value: {
@@ -206,3 +202,4 @@ test('WHAT[sphinx-v2-034] nonaccepted Host outcomes retain their own key and nev
     })
   }
 })
+

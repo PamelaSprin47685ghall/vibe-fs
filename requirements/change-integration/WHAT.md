@@ -2,11 +2,11 @@
 
 ## [001] 发布生命周期
 
-独立 worktree 的候选进入共享目标 ref 前，须经 Change 确定性准入、短门禁内 ff-only CAS 与发布事实持久化。需要 rebase 时，先记下冲突，再 rebase；沿同一 Work 进入下一 tenure，重新 review 后才可发布。模型满分不能跳过 Git/CAS。
+独立 worktree 的候选进入共享目标 ref 前，须经 Change 确定性准入、短门禁内 ff-only CAS 与发布事实持久化。需要 rebase 时，先记下冲突，再 rebase，再按最新 head 重新验证。发布对象只含操作范围、target、candidate、expected head 与当次真实 Git 检查结果；用户明确要求的审查步骤作为该任务的输出处理，不构成所有发布的内建前置条件。模型满分不能跳过 Git/CAS。
 
-## [002] Clean Gate
+## [002] 工作树边界
 
-Orchestrator 受理用户请求前，目标工作区须无暂存、未暂存、未追踪及脏子模块变更。不得自动 stash、提交或猜测清理；插件运行时与日志放在工作树外。
+只读调查、创建隔离 worktree 与推进正在使用的目标工作树是三种不同后果。只读调查直接进行。创建隔离 worktree 从明确的 Git ref 开始，它看到的是该 ref 的已提交内容；主工作树未提交的改动留在原处，既不进入隔离 worktree，也不被丢弃。只有当动作会修改正在使用的目标工作树、且可能覆盖其现有内容时，才检查该工作树的清洁状态，拒绝时指出阻挡的具体路径。不得自动 stash、提交、add -A 或猜测清理；插件运行时与日志放在工作树外。
 
 ## [003] 可恢复的原子边界
 
@@ -14,11 +14,11 @@ Orchestrator 受理用户请求前，目标工作区须无暂存、未暂存、�
 
 ## [004] Integration Gate
 
-门禁只覆盖 target 最终重读与共享 ref 的 ff-only CAS。Incumbent 工作、assessment、证书失效、rebase、冲突处理、loop continuation 等待与 audit 都在门禁外。
+门禁只覆盖 target 最终重读与共享 ref 的 ff-only CAS。Incumbent 工作、旧绑定失效、rebase、冲突处理、loop continuation 等待与 audit 都在门禁外。
 
 ## [005] 冲突归属
 
-Unmerged entries 或 rebase conflict 须记录 ConflictDetected。在门禁外交给同一 Work 的下一 tenure 重新 review；不得复活已退休 tenure，也不得另起评审者。失效原因只记录在 durable invalidation 中。
+Unmerged entries 或 rebase conflict 须记录 ConflictDetected。在门禁外交给同一 Work 的下一 tenure 重新处理与验证；不得复活已退休 tenure，也不得另起评审者。失效原因只记录在 durable invalidation 中。
 
 ## [006] 从事实恢复
 
@@ -40,18 +40,18 @@ Unmerged entries 或 rebase conflict 须记录 ConflictDetected。在门禁外�
 
 模型只接收自然语言结果与结构化工作记录，不暴露门禁状态、分支指针、内部 job_id、CAS 机制或 worktree 路径。
 
-## [013] 目标变化使证书失效
+## [013] 目标变化使旧绑定失效
 
-Gate 前重读或 CAS 发现 target 已推进时，旧发布资格不再成立。释放门禁后，基于最新 head rebase，请求下一 tenure 重新 review。旧资格不得跨 target/base 复用。
+Gate 前重读或 CAS 发现 target 已推进时，旧发布绑定不再成立。释放门禁后，基于最新 head rebase 并重新验证。旧绑定不得跨 target/base 复用。
 
 ## [014] 机器事实不可被满分覆盖
 
-存在 unmerged entries、target/base 已变化或 ff-only CAS 条件不成立时，不得修改共享 ref，须拒绝后继续循环。`8×10` 只能产生质量候选，不能覆盖机器事实。
+存在 unmerged entries、target/base 已变化或 ff-only CAS 条件不成立时，不得修改共享 ref，须拒绝后继续循环。语义判断或满分结果都不能覆盖这些机器事实，也不构成发布必须满足的附加条件。
 
 ## [015] 工作区变化后重新验证
 
-DevOps 修复或 Engineer 变更改变工作区后，旧测试结果不再支持发布资格；须在当前工作区重新验证并重新 review，不得搬用旧结果。该失效只作用于发布资格，不阻断 Manager 的评审与收口。
+DevOps 修复或 Engineer 变更改变工作区后，旧测试结果不再支持发布；须在当前工作区重新验证并重跑受影响的检查，不得搬用旧结果，也不得用重新评分代替测试。该失效只作用于发布绑定，不阻断 Manager 的评审与收口。
 
 ## [017] 汇聚后验证
 
-Orchestrator 须区分互补道路的集成与竞争道路的取舍。各道路独立通过不代表汇聚通过；合流/rebase 后须在最终工作树验证，并保留冲突失效与重新独立 assessment 的要求，不能直接发布。
+Orchestrator 须区分互补道路的集成与竞争道路的取舍。各道路独立通过不代表汇聚通过；合流/rebase 后须在最终工作树验证，并保留冲突失效与重新验证的要求，不能直接发布。

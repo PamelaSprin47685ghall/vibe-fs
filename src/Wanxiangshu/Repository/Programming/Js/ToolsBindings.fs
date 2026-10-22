@@ -52,8 +52,17 @@ module JsToolsBindings =
     [<Emit("Promise.resolve($0).then(function(value) { if (value && value.ok === false) { const err = new Error(value.reason || value.code); err.__jsFailure = { code: value.code, reason: value.reason || value.code }; throw err; } return value; })")>]
     let private rejectCallFailure (promise: obj) : obj = jsNative
 
-    [<Emit("new TextEncoder().encode($0).length * 50")>]
-    let private planBBudgetMs (planB: string) : int = jsNative
+    let defaultCallTimeoutMs = 10000
+
+    let private resolveCallTimeoutMs (optionArg: obj) : int =
+        if isNull optionArg || emitJsExpr optionArg "typeof $0 === 'undefined'" then
+            defaultCallTimeoutMs
+        elif emitJsExpr optionArg "typeof $0 === 'number' && Number.isFinite($0) && $0 > 0" then
+            int (unbox<float> optionArg)
+        elif emitJsExpr optionArg "typeof $0 === 'object' && $0 !== null && typeof $0.timeoutMs === 'number' && Number.isFinite($0.timeoutMs) && $0.timeoutMs > 0" then
+            int (unbox<float> (optionArg?timeoutMs))
+        else
+            defaultCallTimeoutMs
 
     [<Emit("setTimeout($0, $1)")>]
     let private armYield (callback: unit -> unit) (budgetMs: int) : obj = jsNative
@@ -646,14 +655,18 @@ module JsToolsBindings =
             // 字面匹配：needle 与 content 原样 IndexOf，不折叠空白、不 trim。
             let spans = ResizeArray<int * int>()
             let mutable cursor = max 0 fromIndex
+
             while cursor <= content.Length - needle.Length do
                 let found = content.IndexOf(needle, cursor)
+
                 if found < 0 then
                     cursor <- content.Length + 1
                 else
                     if found >= fromIndex then
                         spans.Add(found, found + needle.Length)
+
                     cursor <- found + max 1 needle.Length
+
             List.ofSeq spans
 
     let private computeRowCell (aChar: char) (bChar: char) (leftDist: int) (aboveDist: int) (diagDist: int) =
@@ -938,17 +951,14 @@ module JsToolsBindings =
           TakeDelta: unit -> obj
           Dispose: unit -> Task<unit> }
 
-    let private makeCallMember (host: JsCallHost option) =
+    let private makeCallMember (host: JsCallHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
         let settled =
-            fun (command: obj) (planB: obj) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) ->
+            fun (command: obj) (timeoutOrOptions: obj) ->
                 match host with
-                | Some injected when isNull (box planB) || not (emitJsExpr planB "typeof $0 === 'string'") ->
-                    box (task { return failureObj (JsFailure.CallCommandUnsupported "this.call requires planB") })
                 | Some injected ->
                     match injected.Start command with
                     | started when unbox<bool> (started?ok) ->
-                        let planBText = string planB
-                        let budgetMs = planBBudgetMs planBText
+                        let timeoutMs = resolveCallTimeoutMs timeoutOrOptions
 
                         let timer =
                             match parkState with
@@ -960,13 +970,16 @@ module JsToolsBindings =
                                             let payload =
                                                 createObj
                                                     [ "__jsYield" ==> true
-                                                      "planB" ==> planBText
-                                                      "budgetMs" ==> budgetMs
+                                                      "timeoutMs" ==> timeoutMs
                                                       "delta" ==> (injected.TakeDelta()) ]
-                                            emitJsExpr (state.ParkSignalResolve, payload) "$0($1)" |> ignore)
-                                    budgetMs
 
-                        let waiting = injected.Wait (started?ticket)
+                                            state.ParkRequested <- true
+                                            state.ParkPayload <- payload
+                                            emitJsExpr (state.ParkSignalResolve, payload) "$0($1)" |> ignore)
+                                    timeoutMs
+
+                        let waiting = injected.Wait(started?ticket)
+
                         box (
                             task {
                                 let! value = waiting
@@ -981,8 +994,8 @@ module JsToolsBindings =
                 | None -> box (task { return failureObj JsFailure.CallHostUnavailable })
 
         "call"
-        ==> fun (command: obj) (planB: obj) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) ->
-            rejectCallFailure (settled command planB parkState)
+        ==> fun (command: obj) (timeoutOrOptions: obj) ->
+            rejectCallFailure (settled command timeoutOrOptions)
 
     let private makeSignalMember (host: JsCallHost option) =
         let settled =
@@ -1033,44 +1046,28 @@ module JsToolsBindings =
         else
             host.Dispose()
 
-    /// The report mapping is the declared parent → child context projection:
-    /// it must arrive with every delegation member, and a missing or
-    /// malformed one refuses with VIEW_DECLARATION_INVALID instead of
-    /// falling back to an implicit empty mapping.
-    let private failureOfParse (parsed: Result<'T, JsFailure>) : JsFailure option =
-        match parsed with
-        | Error failure -> Some failure
-        | Ok _ -> None
+    /// Copy the validated carry into a fresh native array. User-defined
+    /// serialization hooks must never change the declaration after validation.
+    let private carryReceipt (carry: obj) : obj =
+        match AnchorDeclarationRule.parseCarry carry with
+        | Error failure -> failureObj failure
+        | Ok parsed -> createObj [ "ok" ==> true; "carry" ==> AnchorCarry.toValue parsed ]
 
-    let private reportMappingFailure (reportMapping: obj) : JsFailure option =
-        if isUndefined reportMapping then
-            Some(
-                JsFailure.ViewDeclarationInvalid
-                    "reportMapping is required: pass the anchor mapping the delegate must report through"
-            )
+    let private withCarry (carry: obj) (run: obj -> obj) : obj =
+        let receipt = carryReceipt carry
+
+        if receipt?ok then
+            run receipt?carry
         else
-            reportMapping |> AnchorDeclarationRule.parseReportMapping |> failureOfParse
+            box (task { return receipt })
 
-    /// Run a delegation member only once its report mapping is proven; a
-    /// refused mapping answers with its failure envelope instead.
-    let private withReportMapping (reportMapping: obj) (run: unit -> obj) : obj =
-        match reportMappingFailure reportMapping with
-        | Some failure -> box (task { return failureObj failure })
-        | None -> run ()
-
-    /// `fork(payload, reportMapping)`, `resume(payload, reportMapping)`,
-    /// `commission(payload, reportMapping)` and
-    /// `devops(intent, reportMapping)` all travel the single delegation
-    /// entry of the host, which receives the member name together with the
-    /// payload and the report mapping. Without an installed delegation host
-    /// the members refuse with DELEGATION_UNAVAILABLE instead of pretending.
+    /// Validate the carry array before the host can start a delegate.
     let private makeDelegateMember (host: JsDelegationHost option) (name: string) =
         name
-        ==> fun (payload: obj) (reportMapping: obj) ->
+        ==> fun (payload: obj) (carry: obj) ->
             match host with
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
-            | Some delegation ->
-                withReportMapping reportMapping (fun () -> box (delegation.Delegate name payload reportMapping))
+            | Some delegation -> withCarry carry (fun normalized -> box (delegation.Delegate name payload normalized))
 
     let private makeJoinMember (host: JsDelegationHost option) =
         "join"
@@ -1097,20 +1094,13 @@ module JsToolsBindings =
             | Some delegation -> box (delegation.Horizon())
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
-    /// `advisor(intent, reportMapping)` consults this session's own advisor
-    /// seat and returns its data envelope verbatim: the advice travels as the
-    /// value the host closure produced, never as a rendering. The report
-    /// mapping is mandatory — a missing or malformed one refuses with
-    /// VIEW_DECLARATION_INVALID; there is no silent empty-mapping path.
-    /// Without an installed delegation host the member refuses with
-    /// DELEGATION_UNAVAILABLE instead of pretending.
+    /// Advisor context follows the same carry rule as other delegates.
     let makeAdvisorMember (host: JsDelegationHost option) : (string * obj) =
         "advisor"
-        ==> fun (intent: obj) (reportMapping: obj) ->
+        ==> fun (intent: obj) (carry: obj) ->
             match host with
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
-            | Some delegation ->
-                withReportMapping reportMapping (fun () -> box (delegation.Advisor intent reportMapping))
+            | Some delegation -> withCarry carry (fun normalized -> box (delegation.Advisor intent normalized))
 
     let private createApiCore
         (capabilities: Set<JsCapability>)
@@ -1132,7 +1122,8 @@ module JsToolsBindings =
         let present (memberName: string) = Array.contains memberName directory
 
         let members =
-            [ if present "cat" then
+            [ "validateCarry" ==> fun (carry: obj) -> carryReceipt carry
+              if present "cat" then
                   makeCatMember root readSnapshots explicitReads
               if present "stat" then
                   makeStatMember root
@@ -1159,7 +1150,7 @@ module JsToolsBindings =
                   makeMvMember root staging readSnapshots ledger
 
               if present "call" then
-                  makeCallMember callHost
+                  makeCallMember callHost parkState
 
               if Set.contains JsCapability.Exec capabilities then
                   makeSignalMember callHost

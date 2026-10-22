@@ -37,7 +37,14 @@ module DelegationJournalAdapter =
             fun _ _ ->
                 Task.FromResult(Error "AppendAuthorityTerminalSource is not supported by DelegationJournalAdapter") }
 
+
 module TaskDeliveryJournal =
+    [<RequireQualifiedAccess>]
+    type TaskDeliveryCommitResult =
+        | Committed
+        | NotCommitted of reason: string
+        | Unknown of reason: string
+
     /// 精确围栏读取：调用方持有完整围栏时使用，围栏其余字段不一致即拒绝。
     let tryFindByFence (journal: AgentJournal) (fence: TaskDeliveryFence) =
         TaskDelivery.tryFindByFence fence (AgentJournal.snapshot journal).AgentProjections.Deliveries
@@ -72,10 +79,11 @@ module TaskDeliveryJournal =
         =
         tryFindByFenceFields journal sessionId providerRun None None None None None
 
-    let commit (journal: AgentJournal) (witness: TaskDeliveryWitness) =
+    let commit (journal: AgentJournal) (witness: TaskDeliveryWitness) : Task<TaskDeliveryCommitResult> =
         task {
             match TaskDelivery.validate HostDigest.sha256Hex witness with
-            | Error reason -> return Error reason
+            | Error reason ->
+                return TaskDeliveryCommitResult.NotCommitted reason
             | Ok() ->
                 let! appended =
                     AgentJournal.appendAgent
@@ -84,5 +92,16 @@ module TaskDeliveryJournal =
                         (AgentFact.Host(HostFactCases.TaskDeliveryCommitted witness))
                         journal
 
-                return appended |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
+                match appended with
+                | Ok _ ->
+                    return TaskDeliveryCommitResult.Committed
+                | Error failure ->
+                    let reason = JournalAppendFailure.describe failure
+                    match failure with
+                    | JournalAppendFailure.WriteUnknown _ ->
+                        return TaskDeliveryCommitResult.Unknown reason
+                    | JournalAppendFailure.WriterUnavailable _
+                    | JournalAppendFailure.FactRejected _
+                    | JournalAppendFailure.NoNewWriteReleaseFailed _ ->
+                        return TaskDeliveryCommitResult.NotCommitted reason
         }

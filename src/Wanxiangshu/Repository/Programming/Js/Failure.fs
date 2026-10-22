@@ -65,7 +65,6 @@ type JsFailure =
     | TransactionRecoveryRequired
     | TransactionPersistenceFailed of JsTransactionAppendFailure
     | UnknownMember
-    | PlanReviewRequired
     | ConcurrencyLimit
     | HandleUnknown of string
     | CannotParkWhileAbandoning
@@ -141,7 +140,6 @@ module JsFailure =
         | JsFailure.TransactionPersistenceFailed failure ->
             transactionPhaseCode failure.Phase + appendFailureCode failure.Error
         | JsFailure.UnknownMember -> "UNKNOWN_MEMBER"
-        | JsFailure.PlanReviewRequired -> "PLAN_REVIEW_REQUIRED"
         | JsFailure.ConcurrencyLimit -> "CONCURRENCY_LIMIT"
         | JsFailure.HandleUnknown _ -> "HANDLE_UNKNOWN"
         | JsFailure.CannotParkWhileAbandoning -> "CANNOT_PARK_WHILE_ABANDONING"
@@ -208,8 +206,6 @@ module JsFailure =
                 (EventId.value failure.EventId)
                 (AppendError.describe failure.Error)
         | JsFailure.UnknownMember -> "member is not part of this generated surface"
-        | JsFailure.PlanReviewRequired ->
-            "Review is required before modifying the plan artifact. You must call review first."
         | JsFailure.ConcurrencyLimit -> "parked-site concurrency limit reached; no queue is formed"
         | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
         | JsFailure.CannotParkWhileAbandoning -> "park is refused while the site is in its abandon cleanup window"
@@ -285,7 +281,6 @@ module JsFailure =
         | "TRANSACTION_ROLLBACK_FAILED" -> JsFailure.TransactionRollbackFailed
         | "TRANSACTION_RECOVERY_REQUIRED" -> JsFailure.TransactionRecoveryRequired
         | "UNKNOWN_MEMBER" -> JsFailure.UnknownMember
-        | "PLAN_REVIEW_REQUIRED" -> JsFailure.PlanReviewRequired
         | "CONCURRENCY_LIMIT" -> JsFailure.ConcurrencyLimit
         | "HANDLE_UNKNOWN" -> JsFailure.HandleUnknown(after "no parked site with this handle: ")
         | "CANNOT_PARK_WHILE_ABANDONING" -> JsFailure.CannotParkWhileAbandoning

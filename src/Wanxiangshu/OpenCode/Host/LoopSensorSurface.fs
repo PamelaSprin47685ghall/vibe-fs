@@ -182,6 +182,18 @@ module LoopSensorSurface =
                            anomaly = Wanxiangshu.Execution.Session.LoopSensor.kindName kind |}
         }
 
+    /// An interruption requested explicitly by a chosen loop-prevention
+    /// policy. The text statistic never arms one by itself.
+    let requestInterrupt (sensor: obj) (session: string) (run: string) (kindNameValue: string) : bool =
+        let kind =
+            match kindNameValue with
+            | "TooRepetitive" -> DegenerationKind.TooRepetitive
+            | "TooRandom" -> DegenerationKind.TooRandom
+            | unknown -> invalidArg "kindName" (sprintf "unknown DegenerationKind: %s" unknown)
+
+        (sensor :?> SensorHandle)
+            .Sensor.RequestInterrupt(SessionId.create session, ProviderRunIdentity.create run, kind)
+
     /// Owned interrupt/continuation task for the exact requested run, exposed
     /// as an awaitable. Null when no task is owned for that run; a mismatched
     /// run never observes the stored run's task.

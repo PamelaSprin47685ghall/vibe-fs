@@ -22,15 +22,8 @@ test('WHAT[work-011] a Delivered deliver records the established delivery, and t
       parts: [{type: 'tool', tool: 'deliver', callID: 'deliver-call', state: {status: 'pending', input: {}}}],
     }
     runtime.pushHostMessage(session, retirement)
-    const confirm = {sessionID: session, callID: 'deliver-confirm', messageID: 'retirement-confirm', providerRunID: 'run-confirm', agent: 'manager'}
     const retire = {sessionID: session, callID: 'deliver-call', messageID: 'retirement-run', providerRunID: 'run-retire', agent: 'manager'}
-    // First call only confirms. It does not retire and it does not abort.
-    const confirmation = await hooks.tool.deliver.execute({}, confirm)
-    assert.match(confirmation, /confirmation_required = true/)
-    assert.match(confirmation, /finished = false/)
-    assert.deepEqual(runtime.abortedIds, [])
-    // 交付已成立是提交面事实：退休落盘即登记精确 attempt 围栏。物理中断
-    // 不再发生在工具内部——停止由 transform 钩子的交付裁决执行。
+    // Single delivery completes in one call without confirmation ritual.
     const delivery = await hooks.tool.deliver.execute({}, retire)
     assert.match(delivery, /Finished\. Do not continue work\./)
     assert.deepEqual(runtime.abortedIds, [], 'the deliver tool does not interrupt the attempt')
@@ -63,9 +56,6 @@ for (const failure of ['rejected', 'thrown']) {
       runtime.pushHostMessage(session, {
         info: {id: 'final-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}},
         parts: [{type: 'tool', tool: 'deliver', callID: 'final-call', state: {status: 'pending', input: {}}}],
-      })
-      await hooks.tool.deliver.execute({}, {
-        sessionID: session, agent: 'manager', messageID: 'confirmation-run', callID: 'confirmation-call',
       })
       const reason = `terminal-interrupt-${failure}`
       let interruptAttempts = 0
@@ -190,9 +180,6 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
       parts: [{ type: 'tool', tool: 'deliver', callID: 'call-deliver', state: { status: 'pending', input: {} } }],
     }
     runtime.pushHostMessage(sessionID, retiredRun)
-    const confirmation = await hooks.tool.deliver.execute({}, context('call-deliver-confirm', 'confirm-run', 'run-confirm'))
-    assert.match(confirmation, /confirmation_required = true/)
-    assert.match(confirmation, /finished = false/)
     const deliverResult = await hooks.tool.deliver.execute({}, context('call-deliver', retiredRun.id, 'run-retire'))
     assert.match(deliverResult, /Finished\. Do not continue work\./)
 
@@ -222,11 +209,12 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     await hooks['experimental.chat.messages.transform']({ sessionID }, humanRequest)
 
     // Step 4: After human input, the dispatch member must NOT be denied.
-    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, reportMapping)`。
+    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, carry = [])`。
     const forkSuccessor = await hooks.tool['todowrite-for-manager'].execute(
       {
         program:
-          'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "alice", charge: "implement" }, { 1: null }); } }',
+          'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "alice", charge: "implement" }, []); } }',
+        name: 'fork-successor',
       },
       context('call-fork-successor', 'msg-successor'),
     )
@@ -250,9 +238,7 @@ test('WHAT[work-011] an established delivery interrupts its own attempt exactly 
       parts: [{type: 'tool', tool: 'deliver', callID: 'deliver-call', state: {status: 'pending', input: {}}}],
     }
     runtime.pushHostMessage(session, retirement)
-    const confirm = {sessionID: session, callID: 'deliver-confirm', messageID: 'retirement-confirm', providerRunID: 'run-confirm', agent: 'manager'}
     const retire = {sessionID: session, callID: 'deliver-call', messageID: 'retirement-run', providerRunID: 'run-retire', agent: 'manager'}
-    assert.match(await hooks.tool.deliver.execute({}, confirm), /confirmation_required = true/)
     assert.match(await hooks.tool.deliver.execute({}, retire), /Finished\. Do not continue work\./)
 
     // 中断次数可数：包裹宿主的 abort，但仍让它登记到 abortedIds。
@@ -333,9 +319,6 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
       parts: [{ type: 'tool', tool: 'deliver', callID: 'call-deliver', state: { status: 'pending', input: {} } }],
     }
     runtime.pushHostMessage(sessionID, retiredRun)
-    const confirmation = await hooks.tool.deliver.execute({}, context('call-deliver-confirm', 'confirm-run', 'run-confirm'))
-    assert.match(confirmation, /confirmation_required = true/)
-    assert.match(confirmation, /finished = false/)
     const deliverResult = await hooks.tool.deliver.execute({}, context('call-deliver', retiredRun.id, 'run-retire'))
     assert.match(deliverResult, /Finished\. Do not continue work\./)
 
@@ -417,10 +400,7 @@ test('WHAT[work-011] Stayed deliver enqueues the successor manager-assess prompt
       parts: [{type: 'tool', tool: 'deliver', callID: 'deliver-call', state: {status: 'pending', input: {}}}],
     }
     runtime.pushHostMessage(session, retirement)
-    const confirm = {sessionID: session, callID: 'deliver-confirm', messageID: 'retirement-confirm', providerRunID: 'run-confirm', agent: 'manager'}
     const retire = {sessionID: session, callID: 'deliver-call', messageID: 'retirement-run', providerRunID: 'run-retire', agent: 'manager'}
-    assert.match(await hooks.tool.deliver.execute({}, confirm), /confirmation_required = true/)
-    assert.equal(runtime.prompts.length, 0, 'first confirmation does not enqueue successor')
 
     let promptsAtReturn = -1
     const deliverPromise = hooks.tool.deliver.execute({}, retire).then((res) => {
@@ -457,9 +437,7 @@ const withSeededManagerWork = async (outcome, body) => {
     if (outcome != null) {
       const reviewed = await life.seedReview(store, sessionId, outcome)
       assert.equal(reviewed.ok, true, reviewed.error)
-      const confirmed = await life.seedDeliver(store, sessionId, 'run-1', 'call-1', 1n)
-      assert.equal(confirmed.ok, true, confirmed.error)
-      await life.seedDeliver(store, sessionId, 'run-2', 'call-2', 2n)
+      await life.seedDeliver(store, sessionId, 'run-1', 'call-1', 1n)
     }
     await body({root, stateRoot, store, sessionId, view: life.inspected(stateRoot, sessionId)})
   } finally {
@@ -489,7 +467,7 @@ test('WHAT[work-011] a Relayed retirement owes the successor prompt until that s
     const context = await successorPromptOf(root, sessionId)
     assert.equal(context.present, true, 'the unreviewed successor owes the successor prompt')
     assert.equal(context.retirementId, retirement.RetirementId, 'the occasion is named by the retirement')
-    assert.equal(context.providerRunId, 'run-2', 'the cut carries the provider run that made the retirement')
+    assert.equal(context.providerRunId, 'run-1', 'the cut carries the provider run that made the retirement')
 
     const reviewed = await life.seedReview(store, sessionId, 'Stayed')
     assert.equal(reviewed.ok, true, reviewed.error)
@@ -511,6 +489,7 @@ test('WHAT[work-011] the delivered hand-off reopens the occasion on the unreview
     const context = await successorPromptOf(root, sessionId)
     assert.equal(context.present, true, 'the reopened tenure owes the successor prompt')
     assert.equal(context.retirementId, delivered.RetirementId, 'the delivered retirement is the cut')
-    assert.equal(context.providerRunId, 'run-2', 'the cut carries the delivering provider run')
+    assert.equal(context.providerRunId, 'run-1', 'the cut carries the delivering provider run')
   })
 })
+

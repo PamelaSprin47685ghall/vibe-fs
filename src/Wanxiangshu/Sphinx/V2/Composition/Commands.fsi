@@ -56,5 +56,6 @@ module Commands =
         RuntimeHandle -> InquiryId -> string -> Wanxiangshu.Foundation.Identity.EventId -> AppendError -> unit
 
     val start: RuntimeHandle -> StartArgs -> Task<Result<obj, ToolRefusal>>
+    val submit: RuntimeHandle -> WorkSubmitArgs -> Task<Result<obj, ToolRefusal>>
     val status: RuntimeHandle -> StatusArgs -> Result<obj, ToolRefusal>
     val exportInquiry: RuntimeHandle -> ExportArgs -> Result<obj, ToolRefusal>

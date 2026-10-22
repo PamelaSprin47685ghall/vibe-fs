@@ -193,7 +193,7 @@ test('WHAT[work-035] recovery effects keep Done and Review for an open incumbenc
   })
 })
 
-test('WHAT[work-035] S4 recovery reads confirmation, relay and delivery from the fold, and a reopened delivered tenure is active again', async () => {
+test('WHAT[work-035] S4 recovery reads single delivery, relay and delivery from the fold, and a reopened delivered tenure is active again', async () => {
   await withStore(async (store, root) => {
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(root)
     const workId = 'work-rec-s4-successor'
@@ -229,13 +229,8 @@ test('WHAT[work-035] S4 recovery reads confirmation, relay and delivery from the
       ownerId: workId,
       openingCursor: 0,
     })
+    // Single delivery relays with successor in one call when stayed.
     review('review-1', false)
-    const confirmed = deliver('confirm-1', 'run-1', 'call-1', 1)
-    assert.equal(confirmed.Kind, 'Confirmed')
-    const confirmedWork = surface.inspected(commonDir, workId)
-    assert.equal(confirmedWork.Delivered, false, 'a recorded confirmation is not a retirement')
-    assert.equal(Array.from(confirmedWork.Retirements).length, 0)
-    assert.notEqual(confirmedWork.ActiveId, undefined)
     const relay = deliver('relay-1', 'run-1', 'call-2', 2)
     assert.equal(relay.Kind, 'Relayed')
     const successor = surface.inspected(commonDir, workId)
@@ -243,9 +238,16 @@ test('WHAT[work-035] S4 recovery reads confirmation, relay and delivery from the
     assert.equal(Array.from(successor.Retirements).at(-1).Outcome, 'Relayed')
     assert.notEqual(successor.ActiveId, undefined, 'a relay leaves its successor active')
 
+    // Single delivery completes work directly in one call when promoted.
     review('review-2', true)
-    deliver('confirm-2', 'run-2', 'call-3', 3)
-    const closed = deliver('close-2', 'run-2', 'call-4', 4)
+    const closed = commit('close-2', {
+      type: 'Deliver',
+      incumbencyId: activeId(),
+      providerRunId: 'run-2',
+      toolCallId: 'call-4',
+      cursor: 4,
+      blockers: [],
+    })
     assert.equal(closed.Kind, 'Delivered')
     const delivered = surface.inspected(commonDir, workId)
     assert.equal(delivered.Delivered, true)

@@ -50,6 +50,7 @@ module Reducer =
                       RenderReserve = body.RenderReserve
                       ConfigHash = body.ConfigHash
                       ProfileRef = body.ProfileRef
+                      Plan = []
                       Graph = Map.empty
                       Edges = Map.empty
                       Certificates = Map.empty
@@ -226,7 +227,13 @@ module Reducer =
 
                 refused () |> Option.defaultWith (fun _ -> planned ())
 
-        loop state.Work specs |> Result.map (fun work -> { state with Work = work })
+        loop state.Work specs
+        |> Result.map (fun work ->
+            { state with
+                Work = work
+                // The first plan this inquiry sees is the user's plan, in the order
+                // they gave it; the last entry is the step whose result is the answer.
+                Plan = if List.isEmpty state.Plan then specs |> List.map (fun spec -> spec.Id) else state.Plan })
 
     let private currentWork (state: InquiryState) (workId: WorkId) : Result<WorkItem, CoreError> =
         match state.Work |> Map.tryFind workId with
@@ -708,6 +715,18 @@ module Reducer =
                 // delivery of a physical retry: bookable, not a second observation.
                 match item.State with
                 | WorkState.Succeeded _ -> Ok accepted
+                // The lease is the holder's proof that this attempt is theirs, so a
+                // result from the leased attempt is admissible before any host has
+                // reported a running session.
+                | WorkState.Leased fence when fence = body.Fence ->
+                    Ok
+                        { accepted with
+                            Work =
+                                accepted.Work
+                                |> Map.add
+                                    body.WorkId
+                                    { Spec = item.Spec
+                                      State = WorkState.Succeeded body.Attempt } }
                 | WorkState.Running _ ->
                     Ok
                         { accepted with
@@ -718,7 +737,11 @@ module Reducer =
                                     { Spec = item.Spec
                                       State = WorkState.Succeeded body.Attempt } }
                 | _ ->
-                    Error(coreError "work-not-running" (sprintf "work %s is not running" (WorkId.value body.WorkId)))))
+                    Error(
+                        coreError
+                            "work-not-leased"
+                            (sprintf "work %s is not leased to the submitting attempt" (WorkId.value body.WorkId))
+                    )))
 
     let private applyInterpretation
         (state: InquiryState)
@@ -873,7 +896,6 @@ module Reducer =
         | InquiryEventBody.WorkPlanned specs -> applyWorkPlanned state specs
         | InquiryEventBody.WorkAttemptTransitioned transition -> applyWorkTransition state transition
         | InquiryEventBody.CertificateSlotsPatched patchesBody -> applyCertificateSlots state patchesBody.Patches
-        | InquiryEventBody.CertificateInvalidated _ -> Ok state
         | InquiryEventBody.BudgetReserved reserved -> applyBudgetReserved state reserved
         | InquiryEventBody.UsageSettled usage -> applyUsageSettled state usage.Usage
         | InquiryEventBody.UsageOverrunRecorded usage -> applyUsageSettled state usage.Usage

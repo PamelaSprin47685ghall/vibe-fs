@@ -16,7 +16,7 @@ module JsRuntimeSurface =
     val api: handle: obj -> obj
 
     /// Test hook: install a process-live delegation host for one session.
-    /// The delegate callback takes `(name, payload, reportMapping)`; every
+    /// The delegate callback takes `(name, payload, carry)`; every
     /// other callback returns a data envelope object (never prose).
     val installDelegationHost:
         sessionId: string -> delegation: obj -> join: obj -> fission: obj -> horizon: obj -> advisor: obj -> unit
@@ -29,7 +29,6 @@ module JsRuntimeSurface =
     val deliveredReturned: sessionId: string -> string array
     val clearDeliveredReturned: sessionId: string -> unit
     val takeDeliveredHandoffWith: sessionId: string -> assistantProse: string option -> obj
-    val takeDeliveredHandoffFor: sessionId: string -> providerRun: string -> assistantProse: string option -> obj
 
     /// Test hook: consume the handoff only when the cell carries this exact
     /// fence — the provider run AND the tool call id.
@@ -37,6 +36,8 @@ module JsRuntimeSurface =
         sessionId: string -> providerRun: string -> toolCallId: string -> assistantProse: string option -> obj
 
     val takeDeliveredHandoff: sessionId: string -> obj
+    /// Test hook: observe whether the current cell belongs to this very call.
+    val deliveredCellIsMine: sessionId: string -> providerRun: string -> toolCallId: string -> bool
     val deliveredValue: sessionId: string -> obj
     val deliveredViewOf: sessionId: string -> obj
     val deliveredFenceOf: sessionId: string -> obj

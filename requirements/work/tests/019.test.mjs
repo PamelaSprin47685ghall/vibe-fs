@@ -22,8 +22,8 @@ const bound = (sessionID, callID) => ({ sessionID, agent: 'manager', callID, mes
 
 const storeOf = async (directory) => workspaceEvents.acquire(await journalSurface.JournalSurface_initializeStateRoot(directory))
 
-// 派工是编程面成员，不是宿主工具：`this.fork(payload, reportMapping)` /
-// `this.resume(payload, reportMapping)`。宿主不再注册 fork/resume，
+// 派工是编程面成员，不是宿主工具：`this.fork(payload, carry = [])` /
+// `this.resume(payload, carry = [])`。宿主不再注册 fork/resume，
 // 拒绝与放行都必须从成员调用的返回信封里观察。
 const runManagerProgram = async (hooks, sessionID, body) =>
   String(
@@ -105,25 +105,24 @@ test('WHAT[work-019] 有任期且评审尚未接纳时只读与观察放行，�
     const forkDevops = await runManagerProgram(
       hooks,
       sessionID,
-      'return await this.fork({ calling: "devops", name: "devops", charge: "look" }, { 1: null });',
+      'return await this.fork({ calling: "devops", name: "devops", charge: "look" }, []);',
     )
     assert.match(forkDevops, devopsDispatchDenied)
     const resumeDevops = await runManagerProgram(
       hooks,
       sessionID,
-      'return await this.resume({ name: "devops", charge: "look" }, { 1: null });',
+      'return await this.resume({ name: "devops", charge: "look" }, []);',
     )
     assert.match(resumeDevops, devopsDispatchDenied)
-    // Algorithm E3: an unreviewed tenure with no confirmation is not a denial.
-    // deliver returns the completed-but-not-retired result and writes nothing.
+    // N-01: Review is an optional collaboration result, never a lifecycle precondition.
+    // An unreviewed delivery intent completes the work directly in one call.
     const before = lifecycle.workView(await storeOf(directory), sessionID)
     const deliverResult = await hooks.tool.deliver.execute({}, bound(sessionID, 'call-unreviewed'))
-    assert.match(String(deliverResult), /finished = false/)
-    assert.match(String(deliverResult), /assessment_required = true/)
+    assert.match(String(deliverResult), /Delivered/)
     assert.doesNotMatch(String(deliverResult), denied)
     const after = lifecycle.workView(await storeOf(directory), sessionID)
     assert.equal(after.confirmed, false)
-    assert.equal(after.active, before.active)
+    assert.equal(after.delivered, true)
     assert.equal(after.reviewed, '')
     assert.equal(createdIds.length, 0)
   })
@@ -139,7 +138,7 @@ test('WHAT[work-019] 评审已接纳且尚未确认时 read 与固定 DevOps 派
     const resumeResult = await runManagerProgram(
       hooks,
       sessionID,
-      'return await this.resume({ name: "devops", charge: "look" }, { 1: null });',
+      'return await this.resume({ name: "devops", charge: "look" }, []);',
     )
     assert.match(resumeResult, /ok = true/)
     assert.match(resumeResult, /outcome = "created"/)
@@ -147,13 +146,15 @@ test('WHAT[work-019] 评审已接纳且尚未确认时 read 与固定 DevOps 派
   })
 })
 
-test('WHAT[work-019] 确认先于评审时公开 Deliver 拒绝，且不落下确认', async () => {
+test('WHAT[work-019] 单笔交付无需确认仪式且不写下确认事实', async () => {
   await withExecutablePlugin(async (_hooks, directory, createdIds, runtime) => {
     const sessionID = 'ses-confirm-first'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
     const store = await storeOf(directory)
     const before = lifecycle.workView(store, sessionID)
+    // N-01: seedConfirmation attempts to observe the retired Confirmed kind.
+    // Under single delivery, deliver directly relays (Relayed) and never produces Confirmed.
     const seeded = await lifecycle.seedConfirmation(
       store,
       sessionID,
@@ -161,7 +162,7 @@ test('WHAT[work-019] 确认先于评审时公开 Deliver 拒绝，且不落下�
       'call-seeded-confirmation',
     )
     assert.equal(seeded.ok, false, seeded.error)
-    assert.match(String(seeded.error), /ReviewRequired/)
+    assert.match(String(seeded.error), /Relayed/)
     const after = lifecycle.workView(store, sessionID)
     assert.equal(after.confirmed, false)
     assert.equal(after.reviewed, '')
@@ -217,3 +218,4 @@ test('WHAT[work-019] 评审未接纳前 Manager 的写工具在执行门投影�
   assert.equal(surface.baseClassSource.includes('async write('), false)
   assert.equal(surface.baseClassSource.includes('async edit('), false)
 })
+

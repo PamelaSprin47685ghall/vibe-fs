@@ -60,7 +60,6 @@ type JsFailure =
     | TransactionRecoveryRequired
     | TransactionPersistenceFailed of JsTransactionAppendFailure
     | UnknownMember
-    | PlanReviewRequired
     | ConcurrencyLimit
     | HandleUnknown of string
     | CannotParkWhileAbandoning

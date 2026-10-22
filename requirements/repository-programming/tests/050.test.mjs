@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -9,10 +9,11 @@ import {
   parkedHandle,
   parkedPayload,
   render,
+  clearParkedSites,
 } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-run-'))
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-run-050-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
@@ -22,12 +23,15 @@ ${body}
   }
 }`
 
-const runProgram = (dir, body, sessionId = 'sess-050') =>
-  execute(dir, 'DevOps', 'en', sessionId, { program: program(body) }, 5000, Date.now() + 60_000, 1 << 20, null)
+let runCount = 0
+const runProgram = (dir, body, sessionId = 'sess-050') => {
+  runCount += 1
+  return execute(dir, 'DevOps', 'en', sessionId, { name: `run-050-${runCount}`, program: program(body) }, 5000, Date.now() + 60_000, 1 << 20, null)
+}
 
 const runText = async (dir, body) => render(await runProgram(dir, body))
 
-test('WHAT[repository-programming-050] a Runnable missing watch is refused with CALLABLE_SPEC_INCOMPLETE', async () => {
+test('WHAT[repository-programming-050] a class command is refused with CALL_COMMAND_UNSUPPORTED', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const doc = await runText(
@@ -35,311 +39,105 @@ test('WHAT[repository-programming-050] a Runnable missing watch is refused with 
       `    return await this.call(class { maxDuration = 1000; next() { return null; } });`,
     )
     assert.match(doc, /# failed/)
-    assert.match(doc, /CALLABLE_SPEC_INCOMPLETE/)
+    assert.match(doc, /CALL_COMMAND_UNSUPPORTED/)
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-050] a Runnable missing sanity is refused with CALLABLE_SPEC_INCOMPLETE', async () => {
+test('WHAT[repository-programming-050] a function command is refused with CALL_COMMAND_UNSUPPORTED', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const doc = await runText(
       dir,
-      `    return await this.call(class extends this.Callable {
-      maxDuration = 1000;
-      next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
-      watch() { return true; }
-    });`,
+      `    return await this.call(function() { return "echo hi"; });`,
     )
     assert.match(doc, /# failed/)
-    assert.match(doc, /CALLABLE_SPEC_INCOMPLETE/)
-    assert.match(doc, /sanity/)
+    assert.match(doc, /CALL_COMMAND_UNSUPPORTED/)
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-050] the host loop runs one foreground command and reports the structured outcome', async () => {
+test('WHAT[repository-programming-050] an invalid non-string command is refused with CALL_COMMAND_UNSUPPORTED', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const doc = await runText(
       dir,
-      `    return await this.call(class extends this.Callable {
-      maxDuration = 5000;
-      interval = 100;
-      next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
-      watch(ctx) {
-        this.lastExit = ctx.exitCode;
-        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
-        return true;
-      }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 1 }],
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
-    });`,
+      `    return await this.call(12345);`,
+    )
+    assert.match(doc, /# failed/)
+    assert.match(doc, /CALL_COMMAND_UNSUPPORTED/)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-050] the host runs one foreground command and reports structured outcome', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const doc = await runText(
+      dir,
+      `    return await this.call("echo hello");`,
     )
     assert.match(doc, /# ok/)
     assert.match(doc, /status = "completed"/)
     assert.match(doc, /hello/)
-    assert.match(doc, /steps = 2/)
+    assert.match(doc, /exitCode = 0/)
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-050] onExit dispatches every exited command with its exit code', async () => {
+test('WHAT[repository-programming-050] non-zero exit code is reported as data without throwing', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const doc = await runText(
       dir,
-      `    const dispatched = [];
-    const outcome = await this.call(class extends this.Callable {
-      maxDuration = 5000;
-      interval = 100;
-      next(ctx) { return ctx.step === 0 ? "exit 4" : null; }
-      watch(ctx) {
-        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
-        return true;
-      }
-      onExit(result) { dispatched.push(result.exitCode); }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 1 }],
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
-    });
-    return { outcome, dispatched };`,
+      `    return await this.call("exit 4");`,
     )
     assert.match(doc, /# ok/)
-    assert.match(doc, /dispatched = \[4\]/)
+    assert.match(doc, /exitCode = 4/)
+    assert.match(doc, /status = "completed"/)
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-050] a watch abort kills the foreground command and reports aborted', async () => {
+test('WHAT[repository-programming-050] timeout expiry parks as yield with timeoutMs and reports delta', async () => {
   const { dir, cleanup } = sandbox()
+  let outcome = null
   try {
-    const doc = await runText(
+    outcome = await runProgram(
       dir,
-      `    const outcome = await this.call(class extends this.Callable {
-      maxDuration = 8000;
-      interval = 200;
-      next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late.marker" : null; }
-      watch() { return { abort: "stalled" }; }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 1 }],
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
-    });
-    return outcome;`,
+      `    return await this.call("sleep 5", { timeoutMs: 80 });`,
     )
-    assert.match(doc, /status = "aborted"/)
-    assert.equal(existsSync(join(dir, 'late.marker')), false, 'the killed command must not finish')
+    assert.equal(caseName(outcome), 'Parked')
+    const payload = parkedPayload(outcome)
+    assert.equal(payload.__jsYield, true)
+    assert.equal(payload.timeoutMs, 80)
   } finally {
+    const handle = outcome && parkedHandle(outcome)
+    if (handle) {
+      await execute(dir, 'DevOps', 'en', 'sess-050', { abandon: { handle } }, 2000, Date.now() + 60_000, 1 << 20, null)
+    }
+    clearParkedSites()
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-050] watch returning false is a real veto, not a synonym for continue', async () => {
+test('WHAT[repository-programming-050] long note vs empty note vs no note behaves identically without text pricing', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    const doc = await runText(
-      dir,
-      `    const outcome = await this.call(class extends this.Callable {
-      maxDuration = 8000;
-      interval = 100;
-      next(ctx) { return ctx.step === 0 ? "sleep 5 && touch veto.marker" : null; }
-      watch() { return false; }
-      sanity() {
-        return { nextDone: () => [{ root: "/", step: 1 }], watchVeto: () => [{}] };
-      }
-    });
-    return outcome;`,
-    )
-    assert.match(doc, /status = "aborted"/)
-    assert.equal(existsSync(join(dir, 'veto.marker')), false)
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] a watch park suspends the run and resumes after unpark', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const parked = await runProgram(
-      dir,
-      `    const outcome = await this.call(class extends this.Callable {
-      maxDuration = 5000;
-      interval = 50;
-      next(ctx) { return ctx.step === 0 ? "sleep 0.3" : null; }
-      watch(ctx) {
-        if (!this.parked) { this.parked = true; return { park: { reason: "review" } }; }
-        if (ctx.exited && ctx.exitCode !== 0) return { abort: "failed" };
-        return true;
-      }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 1 }],
-          watchVeto: () => {
-            this.parked = true;
-            return [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }];
-          },
-        };
-      }
-    });
-    return outcome;`,
-    )
-    assert.equal(caseName(parked), 'Parked')
-    assert.deepEqual(parkedPayload(parked), { reason: 'review' })
-
-    const resumed = await execute(
-      dir,
-      'DevOps',
-      'en',
-      'sess-050',
-      { unpark: { handle: parkedHandle(parked), value: 'continue' } },
-      5000,
-      Date.now() + 60_000,
-      1 << 20,
-      null,
-    )
-    assert.equal(caseName(resumed), 'Succeeded')
-    assert.match(render(resumed), /status = "completed"/)
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] a sanity thunk that fails to show its exit parks with the diagnosis', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const parked = await runProgram(
-      dir,
-      `    const outcome = await this.call(class extends this.Callable {
-      maxDuration = 3000;
-      next(ctx) { return "echo never-terminates"; }
-      watch() { return true; }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 1 }],
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
-    });
-    return outcome;`,
-    )
-    assert.equal(caseName(parked), 'Parked')
-    const payload = parkedPayload(parked)
-    assert.ok(payload.sanity)
-    assert.match(payload.sanity.failure, /next has no null path/)
-    // Nothing ran: the proof gates the whole run.
-    assert.equal(existsSync(join(dir, 'never-terminates')), false)
-
-    const resumed = await execute(
-      dir,
-      'DevOps',
-      'en',
-      'sess-050',
-      { unpark: { handle: parkedHandle(parked), value: 'sanity failed: next has no null path' } },
-      5000,
-      Date.now() + 60_000,
-      1 << 20,
-      null,
-    )
-    assert.equal(caseName(resumed), 'Succeeded')
-    const doc = render(resumed)
-    assert.match(doc, /sanity failed: next has no null path/)
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] a no-op sanity that returns the exits itself is refused before anything runs', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const parked = await runProgram(
-      dir,
-      `    const outcome = await this.call(class extends this.Callable {
-      maxDuration = 300000;
-      interval = 5000;
-      sanity() {
-        return {
-          nextDone: () => null,
-          watchVeto: () => false,
-        };
-      }
-      next(ctx) {
-        return ctx.step === 0 ? "node scripts/build.mjs" : null;
-      }
-      watch(ctx) {
-        return true;
-      }
-    });
-    return outcome;`,
-    )
-    assert.equal(caseName(parked), 'Parked')
-    const payload = parkedPayload(parked)
-    assert.ok(payload.sanity)
-    assert.match(payload.sanity.failure, /argument array/)
-    assert.equal(existsSync(join(dir, 'scripts')), false, 'the stub must not reach the command')
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] a sanity that returns non-thunks is refused with CALLABLE_SPEC_INCOMPLETE', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const doc = await runText(
-      dir,
-      `    return await this.call(class extends this.Callable {
-      maxDuration = 1000;
-      next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
-      watch() { return true; }
-      sanity() { return { nope: true }; }
-    });`,
-    )
-    assert.match(doc, /# failed/)
-    assert.match(doc, /CALLABLE_SPEC_INCOMPLETE/)
-    assert.match(doc, /nextDone/)
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] maxDuration expiry kills the command and reports timeout', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const started = Date.now()
-    const doc = await runText(
-      dir,
-      `    return await this.call(class extends this.Callable {
-      maxDuration = 400;
-      interval = 100;
-      next(ctx) { return ctx.step === 0 ? "sleep 5 && touch too-late.marker" : null; }
-      watch(ctx) {
-        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
-        return true;
-      }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 1 }],
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
-    });`,
-    )
-    assert.match(doc, /status = "timeout"/)
-    assert.ok(Date.now() - started < 4000, 'the run must end when maxDuration expires')
-    assert.equal(existsSync(join(dir, 'too-late.marker')), false)
+    const docNoNote = await runText(dir, `    return await this.call("printf identical");`)
+    const docEmptyNote = await runText(dir, `    return await this.call("printf identical", "");`)
+    const docLongNote = await runText(dir, `    return await this.call("printf identical", "note".repeat(1000));`)
+    assert.match(docNoNote, /identical/)
+    assert.match(docEmptyNote, /identical/)
+    assert.match(docLongNote, /identical/)
+    assert.match(docNoNote, /exitCode = 0/)
+    assert.match(docEmptyNote, /exitCode = 0/)
+    assert.match(docLongNote, /exitCode = 0/)
   } finally {
     cleanup()
   }

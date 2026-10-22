@@ -236,7 +236,7 @@ test('WHAT[capability-enforcement-006] AUTOINJ_active_empty_skill_call_is_denied
     const real = transformed.messages.find((message) => message.info?.id === 'asst-real-skill')
     assert.ok(real)
     assert.deepEqual(real.parts[0].state.input, { name: 'pdfs' })
-    assert.match(real.parts[0].state.output, /^\[ANCHOR: \d+\]\u0000\ufeffreal skill output$/)
+    assert.match(real.parts[0].state.output, /^\[ANCHOR: \d+; prefixCount: \d+\]\u0000\ufeffreal skill output$/)
   })
 })
 test('WHAT[capability-enforcement-006] AUTOINJ_tryInject_rewrites_active_call_without_synthetic_injection', async () => {
@@ -320,15 +320,13 @@ const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js
 
 // 面 B — the office permission catalog still names `fork` / `resume`, so they
 // stay office names in the catalog …
-const OFFICE_TOOLS = ['fetch', 'review', 'join', 'todowrite-for-devops', 'fork', 'resume']
-// … while 面 A — the Host's registered tool surface — no longer carries any of
-// the delegation verbs, so the registry resolves no authority for them.
-const HOST_REGISTERED_OFFICE_TOOLS = ['fetch', 'review', 'join', 'todowrite-for-devops']
-const RETIRED_HOST_DELEGATION_TOOLS = ['fork', 'resume', 'commission', 'devops']
+const OFFICE_TOOLS = ['fetch', 'review', 'join', 'todowrite-for-devops', 'fork', 'resume', 'commission']
+// devops is completely retired and resolves no authority
+const RETIRED_HOST_DELEGATION_TOOLS = ['devops']
 
 test('WHAT[capability-enforcement-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
   assert.equal(admissionAuthority('todowrite-for-bookkeeper'), 'private-attachment')
-  for (const tool of HOST_REGISTERED_OFFICE_TOOLS) {
+  for (const tool of OFFICE_TOOLS) {
     assert.equal(admissionAuthority(tool), 'office', `${tool} is an office tool`)
   }
   for (const tool of RETIRED_HOST_DELEGATION_TOOLS) {
@@ -404,7 +402,7 @@ integrationTest('WHAT[capability-enforcement-006] HOST_013_skill_stays_host_owne
     const output = terminal.parts?.[0]?.state?.output ?? ''
     // The Pair Hint rides the real terminal tool result as a NUL+BOM suffix
     // behind the tool's own bytes. The head of that content may carry the
-    // anchor marker (context-compression WHAT: `[ANCHOR: N]` + NUL + BOM at
+    // anchor marker (context-compression WHAT: `[ANCHOR: N; prefixCount: K]` + NUL + BOM at
     // the beginning of a tool result), so the contract under test is the
     // suffix that follows the tool body — not the offset the body starts at.
     const separator = '\0\uFEFF'

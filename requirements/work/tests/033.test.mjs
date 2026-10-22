@@ -355,7 +355,7 @@ test('WHAT[work-033] Engineer/DevOps/Orchestrator TurnCompleted+stop without Tas
         assert.ok(before !== null, 'logical run must be active initially')
 
         const program = delivered
-          ? 'class Js extends JsProgram { async run() { await this.deliver({ 0: "the delivered view" }); } }'
+          ? 'class Js extends JsProgram { async run() { await this.deliver(["the delivered view"]); } }'
           : 'class Js extends JsProgram { async run() { return 1; } }'
         await hooks.tool[`todowrite-for-${name}`].execute(
           { program },

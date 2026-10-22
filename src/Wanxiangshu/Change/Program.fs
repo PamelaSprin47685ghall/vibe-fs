@@ -22,45 +22,40 @@ module OrchestratorProgram =
         { ManagerJobId: ManagerJobId
           TargetRef: TargetRef
           ExpectedHead: CommitHash
-          CandidateCommit: CommitHash
-          AuthorityRevision: AuthorityRevision }
+          CandidateCommit: CommitHash }
 
     let private failed (job: ManagerJob) details =
         OrchestratorVerdict.IntegrationFailed(job.JobId, details)
 
+    /// The publication request: which job publishes, to which target, with
+    /// which candidate, against which expected head.
+    ///
+    /// No qualification travels with it. A lifecycle review is a task output
+    /// the user may have asked for, never a built-in pass every publication
+    /// must clear; the real protections are the target binding and the Git
+    /// checks around the merge.
     let private buildPublicationEvidence
-        (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (rebasedReady:
             {| RebasedCommit: CommitHash
                TargetHeadSnapshot: CommitHash |})
-        : Task<Result<PublicationEvidence, OrchestratorVerdict>> =
-        task {
-            match! deps.Relay.LifecycleReviewed job.ManagerSessionId job.Worktree.Path with
-            | None -> return Error(failed job "publish refused: no durable Reviewed Promoted or Stayed")
-            | Some(_, authority) ->
-                return
-                    Ok
-                        { ManagerJobId = job.JobId
-                          TargetRef = job.TargetRef
-                          ExpectedHead = rebasedReady.TargetHeadSnapshot
-                          CandidateCommit = rebasedReady.RebasedCommit
-                          AuthorityRevision = AuthorityRevision.create authority }
-        }
+        : PublicationEvidence =
+        { ManagerJobId = job.JobId
+          TargetRef = job.TargetRef
+          ExpectedHead = rebasedReady.TargetHeadSnapshot
+          CandidateCommit = rebasedReady.RebasedCommit }
 
     let private buildClaimPublicationEvidence
         (job: ManagerJob)
         (claim:
             {| TargetRef: TargetRef
                RebasedCommit: CommitHash
-               ExpectedHead: CommitHash
-               AuthorityRevision: AuthorityRevision |})
+               ExpectedHead: CommitHash |})
         : PublicationEvidence =
         { ManagerJobId = job.JobId
           TargetRef = claim.TargetRef
           ExpectedHead = claim.ExpectedHead
-          CandidateCommit = claim.RebasedCommit
-          AuthorityRevision = claim.AuthorityRevision }
+          CandidateCommit = claim.RebasedCommit }
 
     let private mapTask (mapper: 'a -> 'b) (operation: Task<'a>) : Task<'b> =
         task {
@@ -152,9 +147,8 @@ module OrchestratorProgram =
         (evidence: PublicationEvidence)
         (current: CommitHash)
         : Result<unit, OrchestratorVerdict> =
-        // Integration Gate verdict: wanxiangli/integration `checkPublication` (CUT-23 ②).
         match
-            ChangeIntegrationLaw.checkPublication
+            PublicationLaw.checkPublication
                 job.JobId
                 job.TargetRef
                 evidence.ManagerJobId
@@ -162,11 +156,11 @@ module OrchestratorProgram =
                 evidence.ExpectedHead
                 current
         with
-        | "Ok" -> Ok()
-        | "JobMismatch" -> Error(failed job "Publication evidence job mismatch; refusing publish")
-        | "TargetMismatch" -> Error(failed job "Publication evidence target mismatch; refusing publish")
-        | "CasMismatch" -> Error(failed job "Publish CAS head does not match publication evidence; refusing publish")
-        | other -> invalidOp ("wanxiangli/integration returned an unknown publication code: " + other)
+        | PublicationCheck.Matched -> Ok()
+        | PublicationCheck.JobMismatch -> Error(failed job "Publication evidence job mismatch; refusing publish")
+        | PublicationCheck.TargetMismatch -> Error(failed job "Publication evidence target mismatch; refusing publish")
+        | PublicationCheck.CasMismatch ->
+            Error(failed job "Publish CAS head does not match publication evidence; refusing publish")
 
     let private worktreePinVerdict
         (job: ManagerJob)
@@ -199,14 +193,14 @@ module OrchestratorProgram =
         (evidence: PublicationEvidence)
         (merge: Result<CommitHash, string>)
         : Result<CommitHash option, OrchestratorVerdict> =
-        // wanxiangli/integration `ffMerge` (CUT-23 ②): only the pinned candidate lands;
-        // the declared target-moved error is a retryable miss.
+        // Only the pinned candidate lands; the declared target-moved error is a
+        // retryable miss.
         match
-            ChangeIntegrationLaw.ffMerge merge evidence.CandidateCommit OrchestratorConstants.targetRefMovedError, merge
+            PublicationLaw.fastForward merge evidence.CandidateCommit OrchestratorConstants.targetRefMovedError
         with
-        | "TargetMoved", _ -> Ok None
-        | "Failed", Error error -> Error(failed job (sprintf "FF merge failed: %s" error))
-        | "LandedMismatch", Ok landed ->
+        | FastForwardOutcome.TargetMoved -> Ok None
+        | FastForwardOutcome.Failed error -> Error(failed job (sprintf "FF merge failed: %s" error))
+        | FastForwardOutcome.LandedMismatch landed ->
             Error(
                 failed
                     job
@@ -215,8 +209,7 @@ module OrchestratorProgram =
                         (CommitHash.value landed)
                         (CommitHash.value evidence.CandidateCommit))
             )
-        | "Landed", Ok landed -> Ok(Some landed)
-        | other, _ -> invalidOp ("wanxiangli/integration returned an unknown ff outcome: " + other)
+        | FastForwardOutcome.Landed landed -> Ok(Some landed)
 
     let private appendPublishClaimed (deps: OrchestratorProgramDeps) (job: ManagerJob) (evidence: PublicationEvidence) =
         append
@@ -226,8 +219,7 @@ module OrchestratorProgram =
                 {| ManagerJobId = evidence.ManagerJobId
                    TargetRef = evidence.TargetRef
                    RebasedCommit = evidence.CandidateCommit
-                   ExpectedHead = evidence.ExpectedHead
-                   AuthorityRevision = evidence.AuthorityRevision |})
+                   ExpectedHead = evidence.ExpectedHead |})
 
     let private appendPublishedEvidence
         (deps: OrchestratorProgramDeps)
@@ -497,15 +489,15 @@ module OrchestratorProgram =
 
         let afterConflictRecord _ = continueManagerLoop deps job
 
-        // Conflict ownership: wanxiangli/integration `rebaseFailed` (CUT-23 ②) — unmerged
-        // files are this job's conflict on its own candidate and target; none is no conflict.
+        // Conflict ownership: unmerged files are this job's conflict on its own
+        // candidate and target; none is no conflict.
         let handleConflictFiles rebaseError files =
-            match ChangeIntegrationLaw.rebaseFailed files with
-            | "RecordConflict" ->
+            match PublicationLaw.rebaseFailed files with
+            | ConflictOwnership.Conflict _ ->
                 recordConflict deps job candidate target files
                 |> continueResult afterConflictRecord
-            | "Fail" -> Task.FromResult(failed job (sprintf "Rebase failed without conflicts: %s" rebaseError))
-            | other -> invalidOp ("wanxiangli/integration returned an unknown rebase step: " + other)
+            | ConflictOwnership.NotAConflict ->
+                Task.FromResult(failed job (sprintf "Rebase failed without conflicts: %s" rebaseError))
 
         let onRebaseFailure rebaseError =
             conflictedFilesResult deps job
@@ -556,32 +548,29 @@ module OrchestratorProgram =
             (rebasedReady:
                 {| RebasedCommit: CommitHash
                    TargetHeadSnapshot: CommitHash |})
-            : Task<Result<PublicationEvidence, OrchestratorVerdict>> =
-            task {
-                match ChangeIntegrationLaw.certify candidate expectedHead (Some rebasedReady) with
-                | "CandidatePin" ->
-                    return
-                        Error(
-                            failed
-                                job
-                                (sprintf
-                                    "Candidate %s does not match rebased evidence pin %s"
-                                    (CommitHash.value candidate)
-                                    (CommitHash.value rebasedReady.RebasedCommit))
-                        )
-                | "SnapshotPin" ->
-                    return
-                        Error(
-                            failed
-                                job
-                                (sprintf
-                                    "Target head %s does not match rebased evidence snapshot %s"
-                                    (CommitHash.value expectedHead)
-                                    (CommitHash.value rebasedReady.TargetHeadSnapshot))
-                        )
-                | "Ok" -> return! buildPublicationEvidence deps job rebasedReady
-                | other -> return invalidOp ("wanxiangli/integration returned an unknown certify code: " + other)
-            }
+            : Result<PublicationEvidence, OrchestratorVerdict> =
+            match PublicationLaw.certify candidate expectedHead (Some rebasedReady) with
+            | PublicationCertification.CandidatePinMismatch ->
+                Error(
+                    failed
+                        job
+                        (sprintf
+                            "Candidate %s does not match rebased evidence pin %s"
+                            (CommitHash.value candidate)
+                            (CommitHash.value rebasedReady.RebasedCommit))
+                )
+            | PublicationCertification.SnapshotPinMismatch ->
+                Error(
+                    failed
+                        job
+                        (sprintf
+                            "Target head %s does not match rebased evidence snapshot %s"
+                            (CommitHash.value expectedHead)
+                            (CommitHash.value rebasedReady.TargetHeadSnapshot))
+                )
+            | PublicationCertification.MissingRebased ->
+                Error(failed job "Missing RebasedCandidateReady evidence for certified publish")
+            | PublicationCertification.Certified -> Ok(buildPublicationEvidence job rebasedReady)
 
         let continueCertifiedWithRebased
             (rebasedReady:
@@ -589,7 +578,7 @@ module OrchestratorProgram =
                    TargetHeadSnapshot: CommitHash |})
             =
             task {
-                match! certifiedEvidence rebasedReady with
+                match certifiedEvidence rebasedReady with
                 | Error verdict -> return verdict
                 | Ok evidence -> return! publishValidated evidence
             }
@@ -636,16 +625,16 @@ module OrchestratorProgram =
 
             recordCandidate deps job candidate |> continueUnit afterCandidateRecord
 
-        // wanxiangli/integration `admitCandidate` (CUT-23 ②): publish only when the latest
-        // rebased record pins exactly this candidate on exactly this target head.
+        // Publish only when the latest rebased record pins exactly this
+        // candidate on exactly this target head.
         let admitPreparedCandidate candidate target =
             let rebased =
                 currentRecord deps job
                 |> Option.bind (fun record -> record.RebasedCandidateReady)
 
-            match ChangeIntegrationLaw.admitCandidate candidate target rebased with
-            | "PublishCertified" -> publishCertified deps job candidate target
-            | reason -> recordInitialCandidate candidate target reason
+            match PublicationLaw.admitCandidate candidate target rebased with
+            | CandidateAdmission.PublishCertified -> publishCertified deps job candidate target
+            | CandidateAdmission.Rebase reason -> recordInitialCandidate candidate target reason
 
         let onPreparedCandidate candidate =
             targetHead deps job |> continueResult (admitPreparedCandidate candidate)
@@ -745,34 +734,35 @@ module OrchestratorProgram =
         =
         verifyReentryHead deps job evidence
 
-    /// Re-entry after restart: wanxiangli/integration `reenterClaim` (CUT-23 ②) — the
-    /// claim must target the job's own ref and still pin the latest rebased candidate.
+    /// Re-entry after restart: the claim must target the job's own ref and
+    /// still pin the latest rebased candidate.
     let private reenterPublishClaim
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (claim:
             {| TargetRef: TargetRef
                RebasedCommit: CommitHash
-               ExpectedHead: CommitHash
-               AuthorityRevision: AuthorityRevision |})
+               ExpectedHead: CommitHash |})
         =
         task {
             let record = currentRecord deps job
 
             match
-                ChangeIntegrationLaw.reenterClaim
+                PublicationLaw.reenterClaim
                     job.TargetRef
                     claim.TargetRef
                     claim.RebasedCommit
                     claim.ExpectedHead
                     record
             with
-            | "TargetMismatch" -> return failed job "Publish claim target mismatch; refusing publish recovery"
-            | "MissingRecord" -> return failed job "No record found for publish claim reentry"
-            | "MissingRebased" -> return failed job "Missing RebasedCandidateReady evidence for publish claim reentry"
-            | "VerifyHead" -> return! continueReentryWithEvidence deps job (buildClaimPublicationEvidence job claim)
-            | "RunLoop" -> return! runManagerLoop deps job
-            | other -> return invalidOp ("wanxiangli/integration returned an unknown reentry step: " + other)
+            | ClaimReentry.Refused ClaimReentryRefusal.TargetMismatch ->
+                return failed job "Publish claim target mismatch; refusing publish recovery"
+            | ClaimReentry.Refused ClaimReentryRefusal.MissingRecord ->
+                return failed job "No record found for publish claim reentry"
+            | ClaimReentry.Refused ClaimReentryRefusal.MissingRebased ->
+                return failed job "Missing RebasedCandidateReady evidence for publish claim reentry"
+            | ClaimReentry.VerifyHead -> return! continueReentryWithEvidence deps job (buildClaimPublicationEvidence job claim)
+            | ClaimReentry.RunLoop -> return! runManagerLoop deps job
         }
 
     let private cleanUp (deps: OrchestratorProgramDeps) (job: ManagerJob) =
@@ -782,16 +772,16 @@ module OrchestratorProgram =
             | Error error -> return failed job (sprintf "Terminal job cleanup failed: %s" error)
         }
 
-    /// Crash-recovery entry: wanxiangli/integration `resume` (CUT-23 ②) — resume from
-    /// the last durable fact only.
+    /// Crash-recovery entry: resume from the last durable fact only.
     let private program (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         let record = currentRecord deps job
 
-        match ChangeIntegrationLaw.resume record, record with
-        | "CleanUp", _ -> cleanUp deps job
-        | "ReenterClaim", Some { PublishClaimed = Some claim } -> reenterPublishClaim deps job claim
-        | "RunLoop", _ -> runManagerLoop deps job
-        | other, _ -> invalidOp ("wanxiangli/integration returned an unknown resume step: " + other)
+        match PublicationLaw.resume record, record with
+        | RecoveryStep.CleanUp, _ -> cleanUp deps job
+        | RecoveryStep.ReenterClaim, Some { PublishClaimed = Some claim } -> reenterPublishClaim deps job claim
+        | RecoveryStep.ReenterClaim, _ ->
+            Task.FromResult(failed job "Publish claim reentry requested without a durable claim")
+        | RecoveryStep.RunLoop, _ -> runManagerLoop deps job
 
     let run (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         task {

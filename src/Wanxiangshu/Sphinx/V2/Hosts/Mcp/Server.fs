@@ -27,7 +27,7 @@ open Wanxiangshu.Sphinx.V2.Wire
 /// WHAT[sphinx-v2-034]: an unconfirmed abort stays cancelling. The fold records the
 /// request; only the Host can report a physical terminal.
 ///
-/// WHAT[sphinx-v2-036]: the seven public tools. A read-only tool creates no lease,
+/// WHAT[sphinx-v2-036]: the five public tools. A read-only tool creates no lease,
 /// calls no model and changes no business state.
 module Mcp =
 
@@ -62,16 +62,13 @@ module Mcp =
 
     let private zList (item: obj) (description: string) : obj = zListOf zod item description
 
-    [<Emit("$0.object({ id: $1, hash: $2 })")>]
-    let private zSchemaRefOf (z: obj) (id: obj) (hash: obj) : obj = jsNative
-
-    let private zSchemaRef (id: obj) (hash: obj) : obj = zSchemaRefOf zod id hash
-
     [<Emit("$0.object($1).passthrough()")>]
     let private zObjectOf (z: obj) (shape: obj) : obj = jsNative
 
     [<Emit("$0.optional()")>]
     let private zOptional (schema: obj) : obj = jsNative
+
+    let private zListOptional (item: obj) (description: string) : obj = zListOf zod item description |> zOptional
 
     [<Emit("$0.registerTool($1, $2, $3)")>]
     let private registerTool (server: obj) (name: string) (config: obj) (handler: obj) : obj = jsNative
@@ -237,6 +234,23 @@ module Mcp =
         : Task<obj> =
         let nextRevision = Revision.next state.Revision
 
+        /// A cancel request also closes the work it no longer wants dispatched: the
+        /// fold records the request and the closing of each outstanding step together,
+        /// so no later advance can dispatch a step the user already stopped.
+        let outstandingClosures =
+            state.Work
+            |> Map.toList
+            |> List.map snd
+            |> List.filter (fun item -> not (Work.isTerminal item.State))
+            |> List.map (fun item ->
+                InquiryEventBody.WorkAttemptTransitioned
+                    { WorkId = item.Spec.Id
+                      Attempt = item.Spec.Attempt
+                      Fence = item.Spec.Fence
+                      FromState = Work.stateName item.State
+                      NextState = WorkState.Cancelled item.Spec.Attempt
+                      PhysicalRef = item.Spec.PhysicalRef })
+
         let batch =
             { SchemaVersion = "2"
               InquiryId = state.Id
@@ -246,7 +260,7 @@ module Mcp =
               CommandId = args.CommandId
               CommandFingerprint = fingerprint
               PostStateFingerprint = None
-              Events = [ InquiryEventBody.CancelRequested args.Reason ] }
+              Events = InquiryEventBody.CancelRequested args.Reason :: outstandingClosures }
 
         match Codec.seal HostDigest.sha256Hex (Some state) batch with
         | Error fault ->
@@ -317,7 +331,7 @@ module Mcp =
                   Message = reason }
         | Ok _ -> cancelFromCurrent handle args
 
-    /// Registers the seven public tools. Each one decodes its own arguments and then
+    /// Registers the five public tools. Each one decodes its own arguments and then
     /// goes to the one Runtime; none of them decides what comes next.
     let private registerTools (server: obj) (handle: RuntimeHandle) : unit =
         let register (tool: SphinxTool) (description: string) (inputSchema: obj) (handler: obj -> Task<obj>) =
@@ -330,18 +344,6 @@ module Mcp =
             registerTool server (Contract.toolName tool) config (unaryHandler handler)
             |> ignore
 
-        /// A tool whose arguments are decoded and then refused: the caller learns its
-        /// arguments were read, and learns why the Runtime cannot yet carry the effect.
-        let refusedAfterDecoding
-            (tool: SphinxTool)
-            (refusal: ToolRefusal)
-            (decode: obj -> Result<'args, ToolRefusal>)
-            (args: obj)
-            : Task<obj> =
-            match decode args with
-            | Error decoded -> refused decoded
-            | Ok _ -> refused refusal
-
         let startSchema =
             createObj
                 [ "commandId"
@@ -352,14 +354,16 @@ module Mcp =
                   "materialRefs"
                   ==> zList (zString "one material ref") "Content refs of material the user attached"
                   "authorizationRef" ==> zString "Reference proving the user supplied this goal"
-                  "profileRef" ==> zString "The declared profile this inquiry runs under" ]
-
-        let workNextSchema =
-            createObj
-                [ "commandId"
-                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString "The inquiry whose ready work is claimed"
-                  "limit" ==> zCount "Maximum number of work items to claim" ]
+                  "profileRef" ==> zString "The declared profile this inquiry runs under"
+                  "steps"
+                  ==> zListOptional
+                      (zObjectOf zod
+                          (createObj
+                              [ "id" ==> zString "A step identity"
+                                "title" ==> zString "What the step does"
+                                "dependsOn"
+                                ==> zList (zString "a step id this step waits for") "Steps that must succeed first" ]))
+                      "The plan the user selected, in execution order; the last step is the answer" ]
 
         let workSubmitSchema =
             createObj
@@ -371,9 +375,10 @@ module Mcp =
                   "fence" ==> zString "The logical fence of that attempt"
                   "canonicalResult"
                   ==> zString "The worker's canonical answer bytes, kept exactly as returned"
-                  "resultSchema"
-                  ==> zSchemaRef (zString "Schema identity") (zString "Schema content hash")
-                  "clusterId" ==> zString "Ballot cluster this answer belongs to" ]
+                  "outcome"
+                  ==> zString "succeeded or failed; a failed step keeps its dependents unexecuted"
+                  "reason"
+                  ==> zOptional (zString "Required when outcome is failed; why the step could not be done") ]
 
         let statusSchema = createObj [ "inquiryId" ==> zString "The inquiry to read" ]
 
@@ -390,21 +395,9 @@ module Mcp =
                   "mode"
                   ==> zString "summary redacts; full declares what the durable store makes replayable" ]
 
-        let goalAmendSchema =
-            createObj
-                [ "commandId"
-                  ==> zString "Idempotent command identity; a repeat returns the original receipt"
-                  "inquiryId" ==> zString "The inquiry whose goal is amended"
-                  "expectedRevision" ==> zString "The inquiry revision this amendment expects"
-                  "authorizedBy" ==> zString "The user authorization reference for this amendment"
-                  "addedConstraints"
-                  ==> zList (zString "one added constraint") "Constraints the user added"
-                  "replacementText"
-                  ==> zOptional (zString "Replacement goal text, when the user reworded it") ]
-
         register
             SphinxTool.InquiryStart
-            "Creates a durable v2 inquiry under explicitly configured authorization, preserving the original goal and returning its persisted command receipt. Planning and dispatch are not yet connected."
+            "Creates a durable v2 inquiry under explicitly configured authorization, records the user's plan verbatim, and dispatches every step whose dependencies already succeeded. The last step's result becomes the answer."
             startSchema
             (fun args ->
                 task {
@@ -416,22 +409,17 @@ module Mcp =
                 })
 
         register
-            SphinxTool.WorkNext
-            "Claims up to limit ready work for the caller. Refused for now: the claim driver is not wired to durable work leasing. The call changes nothing and creates no lease."
-            workNextSchema
-            (refusedAfterDecoding
-                SphinxTool.WorkNext
-                (Tool.unsupported (Contract.toolName SphinxTool.WorkNext))
-                Tool.decodeWorkNext)
-
-        register
             SphinxTool.WorkSubmit
-            "Submits the answer for the work the caller holds, bound to workId, attempt and fence. It carries the answer bytes and their schema and nothing else: a certificate patch, budget debit, event write or goal revision in the same call is refused by name. Refused for now: the submit driver is not wired to durable result admission and interpretation."
+            "Submits the result for the step the caller holds, bound to workId, attempt and fence. It carries the answer bytes and the outcome and nothing else: a certificate patch, budget debit, event write or goal revision in the same call is refused by name. A succeeded final step commits the answer; a failed step leaves its dependents honestly unexecuted."
             workSubmitSchema
-            (refusedAfterDecoding
-                SphinxTool.WorkSubmit
-                (Tool.unsupported (Contract.toolName SphinxTool.WorkSubmit))
-                Tool.decodeWorkSubmit)
+            (fun args ->
+                task {
+                    match Tool.decodeWorkSubmit args with
+                    | Error refusal -> return! refused refusal
+                    | Ok decoded ->
+                        let! result = Commands.submit handle decoded
+                        return! runtimeResult result
+                })
 
         register
             SphinxTool.InquiryStatus
@@ -459,15 +447,6 @@ module Mcp =
                 match Tool.decodeExport args with
                 | Error refusal -> refused refusal
                 | Ok decoded -> Commands.exportInquiry handle decoded |> runtimeResult)
-
-        register
-            SphinxTool.GoalAmend
-            "Amends the goal with an explicit user authorizer. Refused for now: the amendment driver is not wired to durable user-authorized changes. The call changes nothing."
-            goalAmendSchema
-            (refusedAfterDecoding
-                SphinxTool.GoalAmend
-                (Tool.unsupported (Contract.toolName SphinxTool.GoalAmend))
-                Tool.decodeGoalAmend)
 
     let private bindAppendCutUnknown (incident: AppendCutUnknownIncident) =
         let message =

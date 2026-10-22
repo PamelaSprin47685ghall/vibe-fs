@@ -40,7 +40,6 @@ type SlotProjection =
       SchemaId: string
       SchemaHash: string
       Revision: int64
-      Status: string
       Guarantee: string
       Payload: string
       ExpectedBase: int64 }
@@ -104,6 +103,7 @@ type AnswerProjection =
 type SemanticProjection =
     { ApiVersion: string
       Goal: GoalProjection
+      Plan: string list
       Graph: NodeProjection list
       Edges: EdgeProjection list
       Certificates: CertificateProjection list

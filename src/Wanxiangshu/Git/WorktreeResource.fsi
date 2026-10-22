@@ -22,7 +22,8 @@ type WorktreeResource =
     member Release: unit -> Task<Result<unit, string>>
 
     static member Create:
-        git: GitPort * jobId: ManagerJobId * path: WorktreePath -> Task<Result<WorktreeResource, string>>
+        git: GitPort * jobId: ManagerJobId * path: WorktreePath * sourceRef: TargetRef ->
+            Task<Result<WorktreeResource, string>>
 
     static member Adopt: git: GitPort * identity: WorktreeIdentity * path: WorktreePath -> WorktreeResource
 
@@ -34,13 +35,13 @@ type WorktreeResource =
 module WorktreeCommands =
     /// The branch a job's worktree lives on IS its stable identity (ORCH-006).
     val identityOf: jobId: ManagerJobId -> WorktreeIdentity
-    val isDirty: runner: (Command -> Task<int * string * string>) -> path: WorktreePath -> Task<Result<bool, string>>
 
     val create:
         runner: (Command -> Task<int * string * string>) ->
         repo: string ->
         jobId: ManagerJobId ->
         path: WorktreePath ->
+        sourceRef: TargetRef ->
             Task<Result<WorktreeIdentity, string>>
 
     val remove: runner: (Command -> Task<int * string * string>) -> path: WorktreePath -> Task<Result<unit, string>>

@@ -30,11 +30,6 @@ module OrchestratorHostSurface =
     val handOffDeliveredTenure:
         workspace: string -> managerSessionId: string -> requestId: string -> observedCursor: obj -> Task<obj>
 
-    /// change-integration-005/013: the durable review evidence the publish gate
-    /// reads for one Manager road. `Refused` means the gate refuses publishing with
-    /// zero writes.
-    val publishReviewOf: workspace: string -> managerSessionId: string -> Task<obj>
-
     val hasChild: handle: obj -> agentId: string -> bool
 
     val forkManagerJob: handle: obj -> jobId: string -> managerAgent: string -> prompt: string -> Task<obj>

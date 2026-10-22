@@ -51,3 +51,7 @@ verify:release 覆盖构建、真实 npm pack、解包和消费者验证。校�
 ## [010] 活跃注册一致
 
 产物的代码和资源须与现行活跃角色一致，不含废止角色的注册代码、死资源或旧工具映射。todowrite-for-engineer、todowrite-for-devops、todowrite-for-bookkeeper 等现行工具在编译代码、surface manifest 和资源清单中保持完整一致，无孤立注册。
+
+## [012] 语言完整性为发行检查，不进入每次读取
+
+运行时读取只校验所选语言的文件与占位符替换；所选语言缺失即报出指明该文件/语言的资源缺失错误，绝不换成另一语言。发行完整性——每个声明的语言文件都存在、双语占位符集合一致——由发行/构建检查承担：`scripts/checks/language-parity-gate.mjs` 对 `resources/provider` 扫描，分发验收（`tests/012.test.mjs`）对所交付资源树进行完整性核验；缺项或占位符不一致必须指名具体文件或资源对，不得以笼统“资源不健康”替代。

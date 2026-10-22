@@ -1,6 +1,6 @@
 # Package index
 
-当前索引包含 **50 个活跃规范包**与 **2 个历史包**（epistemic-reasoning、institutional-learning）。包数不是目标，也不是稳定 API；后续按独立 WHY、失败含义与独立变更边界继续核对拆并。
+当前索引覆盖 **48 个活跃规范包**与 **1 个历史包**（epistemic-reasoning；institutional-learning 已整包退役删除）。包数不是目标，也不是稳定 API；后续按独立 WHY、失败含义与独立变更边界继续核对拆并。
 
 ## 1. Requirement system
 
@@ -39,7 +39,7 @@
 | `advisor` | 顾问是按需请来的第二意见：同一 session 专用、无工具的评审参与者，读调用者交出的 view 与 intent 只回散文，不持有任何工具、不产生授权副作用。 |
 | `cognitive-environment` | 世界观、身份、自我职责与继承知识必须按稳定认知层组织，瞬时 runtime/mission 不能伪装成长期身份。 |
 | `cognitive-workspace` | 持久认知画板已退休；只保留负向边界，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
-| `attention-regulation` | `enough`、`abandon` 与 `defer` 工具及 `Attention` 持久投影已退休；注意力动作并入 `assume` 与编程面 ANCHOR `view.thenMap` 摘要，本包只保留负向边界。 |
+| `attention-regulation` | `enough`、`abandon` 与 `defer` 工具及 `Attention` 持久投影已退休；注意力动作并入 `assume`、编程面 `carry` 与当前回合文本，本包只保留负向边界。 |
 | `action-affordance` | participant 在采取一个 action 的决策点必须知道该 act 的正边界、负边界、成功后果与参数意义。 |
 | `provider-language` | 语言由全局设置唯一决定，无会话绑定与持久化记录，改设置即改下一次渲染的语言；protocol identity 保持语言不变，核心角色双语 Prompt 语义同源一致。 |
 | `provider-projection` | 已决定可见的 typed semantic intent 必须经唯一确定性投影变成 provider representation，表示不能反向创造 authority。 |
@@ -89,7 +89,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `obligation-ledger` | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的有效上下文整理声明（扁平 `prefixUntil` + `thenMap`）；插件不改写工具定义与参数，只按 Host 终态追加 checkpoint，不维护第二份 todo 真相。 |
+| `obligation-ledger` | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的有效上下文整理声明（`prefixCount` 与 `carry`）；插件不改写原始调用参数，只按 Host 终态追加 checkpoint，不维护第二份 todo 真相。 |
 | `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，交棒由前任声明的 ANCHOR 视图承担，不注入机器物化的合成记录。Plan 的编程面、devops 调查、任期隔离、阶段资源、review 与持权交付，以及 Manager/Plan 禁止静默停止、ask 显式用户等待同属本包。 |
 
 
@@ -247,3 +247,4 @@ time-capability      → causal-wait         删（deadline 是可选 escape，�
 ```
 
 旧157条边的审计属于当时基线，不证明本次上游重写后的全图。索引不得恢复已退役包的权威；完整反向覆盖与依赖审查仍须从现行WHAT逐项验证。
+

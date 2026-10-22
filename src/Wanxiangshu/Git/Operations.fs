@@ -28,6 +28,30 @@ module GitOperations =
         else
             stderr.Trim()
 
+    /// The paths that block a modification of this worktree.
+    ///
+    /// `git status --porcelain` prints `XY <path>`; a rename or copy prints
+    /// `old -> new`, and the new name is the one that blocks.
+    let private blockingPaths (porcelain: string) =
+        porcelain
+        |> fun text -> text.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
+        |> Array.choose (fun line ->
+            if line.Length <= 3 then
+                None
+            else
+                let path = line.Substring(3).Trim()
+
+                let renamed =
+                    match path.IndexOf(" -> ", StringComparison.Ordinal) with
+                    | index when index >= 0 -> path.Substring(index + 4).Trim()
+                    | _ -> path
+
+                if String.IsNullOrWhiteSpace renamed then None else Some renamed)
+        |> Array.toList
+
+    /// The target worktree is the one the publish would modify, so its
+    /// uncommitted content is what the merge could overwrite. The refusal
+    /// names the blocking path instead of demanding a clean tree in general.
     let private verifyClean runner repo =
         task {
             let! code, stdout, stderr = runner (command repo [ "status"; "--porcelain" ])
@@ -37,7 +61,11 @@ module GitOperations =
             elif String.IsNullOrWhiteSpace stdout then
                 return Ok()
             else
-                return Error "target worktree is dirty; refusing ff-only merge"
+                return
+                    Error(
+                        "target worktree has uncommitted changes; refusing ff-only merge: "
+                        + (blockingPaths stdout |> String.concat ", ")
+                    )
         }
 
     let private verifyHead runner repo (expected: CommitHash) =
@@ -239,8 +267,9 @@ module GitOperations =
         WorktreeCommands.rebaseInProgress runner dir
 
     let createWithRepo repoPath (runner: Command -> Task<int * string * string>) : GitPort =
-        { IsDirty = WorktreeCommands.isDirty runner
-          CreateWorktree = WorktreeCommands.create runner repoPath
+        { CreateWorktree =
+            fun jobId path sourceRef ->
+                WorktreeCommands.create runner repoPath jobId path sourceRef
 
           // ORCH-008: freeze by symbolic-ref. A detached HEAD has no branch to
           // publish to, so this fails closed instead of resolving HEAD to a commit

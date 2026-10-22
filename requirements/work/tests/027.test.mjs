@@ -196,7 +196,7 @@ test('WHAT[work-027] Engineer/DevOps/Orchestrator progress stop cannot count as 
         assert.ok(before !== null, `${name} logical run must start active`)
 
         const program = delivered
-          ? 'class Js extends JsProgram { async run() { await this.deliver({ 0: "the delivered view" }); } }'
+          ? 'class Js extends JsProgram { async run() { await this.deliver(["the delivered view"]); } }'
           : 'class Js extends JsProgram { async run() { return 1; } }'
         await hooks.tool[`todowrite-for-${name}`].execute(
           { program },

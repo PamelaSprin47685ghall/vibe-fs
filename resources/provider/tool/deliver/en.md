@@ -1,12 +1,29 @@
 # Tool · deliver
 
-End the current incumbency, or start an `S4` execution session on user command in the `post-S3` state.
+End the current incumbency via relay or completion, or proceed to execution when authorized.
 
 ## Contract and Usage
 
-1. **Precondition**: the incumbency must hold no live blocking resources (a pending `devops`, background work, unsettled tool calls). With blockers present the call is rejected with a blocker summary; settle them first. An unanswered user `ask` is an explicit wait, not completion.
-2. **Relay (No Authority)**: before relaying, state the handover with the two flat top-level parameters `prefixUntil` and `thenMap` so the successor keeps what it needs — the `view` wrapper object is retired, and a call that still carries `view` is refused with `VIEW_DECLARATION_INVALID`; `deliver` retires this incumbency and opens the next one at the same stage. Relay does not advance the stage and produces no review. The next runner starts again from `U`, your declared view and `P`, inspecting your `P` output and the declared view read-only first. A single unreviewed relay is allowed, but the kernel refuses a relay that would be the second in a row with no review in between (`assessment required`, no write): a chain of unreviewed relays never advances the stage. Submit this incumbency's `review` first, then relay.
-3. **Authorized Closeout (Enter `post-S3` State)**: after `S3` passes review and grants authority, calling `deliver` confirms `P` is non-empty, retires this incumbency, enters the `post-S3` state, and interrupts the conversation (like `ask`) to wait for the user without immediately starting `S4`. The retired run is neither nudged nor revived; a new genuine input that resumes planning reopens a fresh incumbency, which is nudged as usual.
-4. **Start `S4` in `post-S3` State**: in the `post-S3` state, when the user enters a command asking to execute `deliver`, calling `deliver` starts a parentless `S4` (Manager) execution session with the full text of `P` as the init prompt and presents the receipt. The user may repeatedly request starting `S4`, and each `deliver` call launches a new `S4` execution session.
+1. **Preconditions**:
+   - The incumbency must hold no live blocking resources (such as a pending `devops`, background work, or unsettled tool calls). With blockers present, the call is rejected with the blocker list; settle them before delivering.
+   - An unanswered user `ask` is an explicit wait, not completion.
+   - For delivery, the plan artifact `P` must be present and non-empty; delivery is forbidden while `P` is empty or missing.
 
-Delivery is forbidden while `P` is empty or missing; the delivery path is forbidden without authority.
+2. **Relay vs Completion**:
+   - Naming a successor relays the work; naming none completes it.
+   - One delivery intent is enough: a single call completes or relays atomically without a double-deliver or confirmation ritual.
+   - Review is a recorded collaboration fact, not a precondition: unreviewed relays are permitted and succeed without forcing an assessment.
+   - If history needs organizing before handover, supply both top-level programming parameters `prefixCount` and `carry` to keep what the successor needs; the current turn is kept automatically.
+   - `deliver` retires this incumbency atomically and opens the successor at the same stage. A retired tenure cannot close or affect the new one.
+
+3. **Delivery Governed by User Grant**:
+   - Calling `deliver` with delivery authorization (after `S3` review passes and non-empty `P` is verified) proceeds according to the user's grant:
+     - **Plan-Only Grant**: The system closes out the current incumbency and stops the attempt; the retired run is no longer nudged, and the finished plan `P` is returned.
+     - **Plan-Then-Execute Grant**: When the user explicitly granted execution authority, the system launches the `S4` (Manager) execution session directly without forcing the user to repeat the decision or ask twice.
+   - The delivery path is forbidden without authority; an unauthorized delivery relays rather than delivers.
+
+4. **Idempotency, Replay, and Conflicts**:
+   - Retries with the same request identity and fence replay the existing recorded outcome; side effects occur at most once.
+   - A different payload under the same request identity or an expected advance mismatch results in a conflict.
+   - Late or duplicate receipts do not double-apply.
+

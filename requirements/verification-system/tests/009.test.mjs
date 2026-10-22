@@ -272,10 +272,12 @@ test('WHAT[verification-system-009] every wired gate path exists and every gate 
     'owner-impact-corpus.json',
     'subsystems.json',
     // Helper / non-gate modules:
+    'fsharp-control-pyramid.mjs',
     'fsharp-control-pyramid-guide.mjs',
     'js-module-linkage.mjs',
     'js-surface-gate.mjs',
     'js-surface-manifest.mjs',
+    'llm-facing-format-gate.mjs',
   ])
 
   const wiredBasenames = new Set(checks.map((p) => basename(p)))

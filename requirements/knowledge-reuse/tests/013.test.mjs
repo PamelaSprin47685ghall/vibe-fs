@@ -136,7 +136,7 @@ for (const operation of ['Refresh', 'Access']) {
         assert.equal(physicalFacts[1].payload.failed_event_id, cut.failedEventId)
         assert.deepEqual(physicalFacts[1].parents, [cut.failedEventId])
         for (let delivery = 0; delivery < 2; delivery += 1) {
-          assert.throws(() => settlements.observeIncident(owner, incidents[0]), error => error === incidents[0])
+          assert.deepEqual(settlements.observeIncident(owner, incidents[0]), { outcome: 'CaseUnavailableKnown' })
         }
         assert.equal(incidents.length, 1, 'one incident has one callback owner')
         assert.equal(observed.length, 1, 'redelivery cannot append again')
@@ -191,10 +191,13 @@ for (const operation of ['Refresh', 'Access']) {
         assert.notEqual(cold.pid, process.pid)
         assert.deepEqual({ ...cold.current, accessOrder: BigInt(cold.current.accessOrder), lastAccessOrder: BigInt(cold.current.lastAccessOrder) }, before)
 
-        assert.equal(response, undefined,
-          `settled Casebook cut must refuse a normal fetch answer; returned=${String(response)}`)
-        assert.equal(settlements.isIncident(rejection), true)
-        assert.strictEqual(rejection, incidents[0], 'a returning capability still rejects with the original typed incident')
+        assert.equal(rejection, undefined,
+          'a per-case conflict is reported, not raised into the caller')
+        assert.equal(settlements.isIncident(incidents[0]), true)
+        assert.match(response, operation === 'Refresh'
+          ? /Maintenance could not|未能根据所给文件 diff/
+          : /No change was found|没有变化/,
+          'the unavailable case keeps its old body and reports the cache result')
       } finally {
         bookkeeper.resetRuntime()
         if (handle) eventStore.dispose(handle)
@@ -275,11 +278,14 @@ for (const operation of ['Refresh', 'Access']) {
         } else assert.equal(append.error, null)
         assert.equal(append.cuts.length, cut ? 1 : 0)
         if (cut) {
-          assert.strictEqual(rejection, sentinel, 'the injected fatal capability exception is not swallowed or replaced')
-          assert.equal(response, undefined)
+          assert.equal(rejection, undefined, 'a reporting capability that fails never changes the case settlement')
           assert.equal(incidents.length, 1)
           assert.equal(settlements.isIncident(incidents[0]), true)
           assert.deepEqual(settlements.describeIncident(incidents[0]).cuts, append.cuts)
+          assert.match(response, operation === 'Refresh'
+            ? /Maintenance could not|未能根据所给文件 diff/
+            : /No change was found|没有变化/,
+            'the unavailable case keeps its old body and reports the cache result')
         } else {
           assert.equal(rejection, undefined)
           assert.equal(incidents.length, 0)
@@ -333,7 +339,7 @@ for (const operation of ['Refresh', 'Access']) {
 }
 
 test('WHAT[knowledge-reuse-013] the native owner requires its capability and rejects an incident descriptor without an original settled carrier', () => {
-  assert.throws(() => settlements.createOwner(null), /onIncident/)
+  assert.throws(() => settlements.createOwner(null), /onConflict/)
   const callbacks = []
   const owner = settlements.createOwner(value => callbacks.push(value))
   const descriptor = { operation: 'Access', caseIdentity: 'unsettled', eventId: 'invented', cuts: [] }
@@ -612,9 +618,12 @@ for (const scenario of [
       assert.deepEqual(readFileSync(operationFile), operationBytes)
       assert.deepEqual(readFileSync(setupFile), setupBytes)
       assert.deepEqual(index.tryGet(), beforeIndex)
-      assert.equal(response, undefined, 'an actual Capture cut must not return a normal Host finalization settlement')
+      assert.equal(rejection, undefined, 'an actual Capture cut returns its settlement instead of raising')
+      assert.notEqual(response, undefined, 'the settlement is delivered to the caller')
+      assert.equal(response.identity, identity)
+      assert.equal(response.releasesIdentity, false)
+      assert.equal(response.persistenceFailure.operation, 'Capture')
       assert.equal(incidents.length, 1)
-      assert.strictEqual(rejection, callbackThrows ? callbackError : incidents[0])
       assert.equal(settlements.isIncident(incidents[0]), true)
       const incident = settlements.describeIncident(incidents[0])
       assert.equal(incident.operation, 'Capture')
@@ -703,7 +712,7 @@ for (const fate of ['success', 'CurrentCommitUnknown', 'observer-throws']) {
 }
 
 for (const scenario of ['valid', 'valid-unknown', 'malformed', 'malformed-unknown']) {
-  test(`WHAT[knowledge-reuse-013] actual Boot owner ${scenario} reports and terminates its own native process only after original Host Capture settlement`, async t => {
+  test(`WHAT[knowledge-reuse-013] actual Boot owner ${scenario} returns its own settlement and never terminates the host for a per-case conflict`, async t => {
     const directory = realpathSync(mkdtempSync(join(tmpdir(), 'wxs-boot-capture-physical-')))
     const fatal = scenario.startsWith('malformed')
     const unknown = scenario.endsWith('-unknown')
@@ -730,8 +739,8 @@ for (const scenario of ['valid', 'valid-unknown', 'malformed', 'malformed-unknow
       assert.notEqual(measured.pid, measured.coordinatorPid)
       assert.notEqual(measured.pid, process.pid)
       assert.equal(measured.cleanupRequested, false, 'parent cleanup never supplies fatal evidence')
-      assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, fatal
-        ? { exitCode: null, signal: 'SIGKILL' } : { exitCode: 0, signal: null })
+      assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, { exitCode: 0, signal: null },
+        'a per-case conflict never terminates the host process')
       const receipt = measured.measured
       assert.equal(receipt.pid, measured.pid)
       assert.equal(receipt.parentPid, measured.coordinatorPid)
@@ -776,16 +785,12 @@ for (const scenario of ['valid', 'valid-unknown', 'malformed', 'malformed-unknow
         assert.deepEqual(cutFact.parents, [original.id])
         assert.notEqual(cutFact.stream, original.stream)
         assert.equal(receipt.indexUnchanged, true)
-        assert.equal(measured.returned, null)
-        assert.equal(measured.reports.length, 1)
-        assert.equal(measured.reports[0].operation, 'casebook-semantic-cut')
-        for (const text of ['Capture', receipt.identity, original.id, cut.cutEventId]) {
-          assert.ok(measured.reports[0].result.includes(text), text)
-        }
-        if (unknown) {
-          assert.ok(measured.reports[0].result.includes('CurrentCommit'))
-          assert.ok(measured.reports[0].result.includes(receipt.causeText))
-        }
+        assert.deepEqual(measured.reports, [])
+        assert.equal(measured.returned.identity, receipt.identity)
+        assert.equal(measured.returned.commitment, 'PersistenceFailed')
+        assert.equal(measured.returned.releasesIdentity, false)
+        assert.equal(measured.returned.persistenceFailure.operation, 'Capture')
+        assert.equal(measured.returned.persistenceFailure.caseIdentity, receipt.identity)
       } else {
         assert.deepEqual(measured.reports, [])
         assert.equal(measured.returned.identity, receipt.identity)
@@ -816,4 +821,4 @@ for (const scenario of ['valid', 'valid-unknown', 'malformed', 'malformed-unknow
   })
 }
 
-test.todo('WHAT[knowledge-reuse-013] GAP-160: actual Casebook semantic conflict commits or settles its failure cut before a mandatory injected fuse reports and kills once without modifying its projection')
+test.todo('WHAT[knowledge-reuse-013] GAP-160: actual Casebook semantic conflict commits or settles its failure cut before the case object reports once without modifying its projection')

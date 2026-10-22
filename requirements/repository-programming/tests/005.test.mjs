@@ -106,11 +106,15 @@ const schemaOf = (state) => ({
   nullable: () => schemaOf({ ...state, nullable: true }),
   describe: (text) => schemaOf({ ...state, description: text }),
   optional: () => schemaOf({ ...state, optional: true }),
+  int: () => schemaOf({ ...state, int: true }),
+  nonnegative: () => schemaOf({ ...state, nonnegative: true }),
+  integer: () => schemaOf({ ...state, int: true }),
   ...state,
 })
 const toolModule = () => {
   const tool = (definition) => definition
   tool.schema = {
+    union: (items) => schemaOf({ type: 'union', items }),
     string: () => schemaOf({ type: 'string' }),
     any: () => schemaOf({ type: 'any' }),
     number: () => schemaOf({ type: 'number' }),

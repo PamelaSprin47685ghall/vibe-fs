@@ -15,7 +15,6 @@ type OrchestratorVerdict =
     | Published of jobId: ManagerJobId * head: CommitHash
     | PublishedPendingCleanup of jobId: ManagerJobId * head: CommitHash * cleanupError: string
     | Cancelled of jobId: ManagerJobId
-    | RejectedDirty of reason: string
     | IntegrationFailed of jobId: ManagerJobId * errorDetails: string
     | Empty
 
@@ -30,12 +29,14 @@ type OrchestratorHandle =
 /// built for, and ORCH-008's frozen target branch belongs to exactly one repo.
 type GitPort =
     {
-        IsDirty: WorktreePath -> Task<Result<bool, string>>
-
-        /// Creates the worktree and returns its stable identity (ORCH-006).
+        /// Creates the worktree from `sourceRef` and returns its stable identity
+        /// (ORCH-006).
+        ///
         /// Recovery locates a worktree by identity; the path is diagnostic and may
-        /// move.
-        CreateWorktree: ManagerJobId -> WorktreePath -> Task<Result<WorktreeIdentity, string>>
+        /// move. The start point is named because it is the source the isolated
+        /// worktree sees: the committed content of that ref, never another
+        /// worktree's uncommitted changes.
+        CreateWorktree: ManagerJobId -> WorktreePath -> TargetRef -> Task<Result<WorktreeIdentity, string>>
 
         /// ORCH-008: freeze the target branch by `symbolic-ref` at fork time.
         ///
@@ -100,10 +101,6 @@ type RelayPort =
         ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
         PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
         TerminateWorkResources: ManagerJobId -> Task<unit>
-        /// The durable unified review fact for a manager session, with the work's
-        /// authority count. `None` when no review is durable yet: the publish gate
-        /// then refuses with zero writes.
-        LifecycleReviewed: SessionId -> Wanxiangshu.Foundation.Identity.WorktreePath -> Task<(string * string) option>
     }
 
 type OrchestratorJournalPort =

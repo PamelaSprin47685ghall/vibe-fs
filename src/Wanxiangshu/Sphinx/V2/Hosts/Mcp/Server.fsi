@@ -7,7 +7,7 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Sphinx.V2.Core
 
 module Mcp =
-    /// Registers the seven public tools against the same Runtime surface.
+    /// Registers the five public tools against the same Runtime surface.
     val serve: IEventStore -> JS.Promise<unit>
 
     /// Binds explicit start authorization to the same durable Runtime used by reads.

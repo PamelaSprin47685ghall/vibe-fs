@@ -108,30 +108,16 @@ module JsToolsData =
         with _ ->
             Error JsFailure.InvalidReturnValue
 
-    /// `this.deliver(view)` ends the program by handing over a view
-    /// declaration; the sandbox reports it as this sentinel instead of a
-    /// return value.
+    /// Delivery has a separate payload; its tool receipt does not repeat it.
     let private deliveredPrefix = "{\"__jsDelivered\":"
 
     let isDelivered (json: string) = json.StartsWith deliveredPrefix
 
-    let private presentView (view: obj) : Result<obj, JsFailure> =
-        if isNull view then
-            Error JsFailure.InvalidReturnValue
-        else
-            Ok view
-
-    let private outcomeView (json: string) : Result<obj, JsFailure> =
-        try
-            presentView ((JS.JSON.parse json)?view)
-        with _ ->
-            Error JsFailure.InvalidReturnValue
-
-    /// One decode for both endings: a delivered program's value is the view
-    /// declaration it handed over. The declaration is validated as a view
-    /// at the deliver gate; a deliver without a view is not a delivery.
     let parseOutcome (json: string) : Result<obj, JsFailure> =
-        if isDelivered json then outcomeView json else parse json
+        if isDelivered json then
+            Ok(createObj [ "delivered" ==> true ])
+        else
+            parse json
 
 /// The task a delivery serves. The durable witness names the same three
 /// references; this layer states them in its own vocabulary because it runs
@@ -158,23 +144,33 @@ type DeliveryAttribution =
 /// the durable witness fact — adding the material digest — and commits it;
 /// this layer never touches the journal itself.
 type DeliveryWitness =
-    { SessionId: SessionId
-      LogicalRunId: LogicalRunId
-      AuthorityRoot: AuthorityRootUserMessageId
-      PhysicalUserMessageId: PhysicalUserMessageId
-      ProviderRun: ProviderRunIdentity
-      ToolCallId: ToolCallId
-      Task: DeliveryTaskReference
-      FormalText: string
-      ViewDeclaration: string
-      View: string
-      RetirementId: string option }
+    {
+        SessionId: SessionId
+        LogicalRunId: LogicalRunId
+        AuthorityRoot: AuthorityRootUserMessageId
+        PhysicalUserMessageId: PhysicalUserMessageId
+        ProviderRun: ProviderRunIdentity
+        ToolCallId: ToolCallId
+        Task: DeliveryTaskReference
+        FormalText: string
+        ViewDeclaration: string
+        /// Canonical returned material; rendering belongs to the final wire boundary.
+        View: string
+        RetirementId: string option
+    }
+
+/// Required outcome shape of a durable delivery witness commit.
+[<RequireQualifiedAccess>]
+type DeliveryCommitResult =
+    | Committed
+    | NotCommitted of reason: string
+    | Unknown of reason: string
 
 /// The narrow durable capability the settle point uses to record a delivery
 /// witness. A refused commit means the delivery is not established: the
 /// caller must learn that instead of reading a success nobody can prove.
 type IDeliveryWitnessWriter =
-    abstract CommitDeliveryWitness: witness: DeliveryWitness -> Task<Result<unit, string>>
+    abstract CommitDeliveryWitness: witness: DeliveryWitness -> Task<DeliveryCommitResult>
 
 /// What the settle point needs to attribute a delivery and to make its
 /// evidence durable. A call without a settlement has no durable store behind
@@ -187,6 +183,8 @@ type IDeliveryWitnessWriter =
 type DeliverySettlement =
     | DurableDelivery of DeliveryAttribution * IDeliveryWitnessWriter
     | UnattributedDelivery of reason: string
+    | ContextUnavailable of reason: string
+    | DeferredDelivery of resolve: (unit -> Task<DeliverySettlement option>)
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
 /// sandbox execution, staging, preflight, durable prepare, commit and the
@@ -331,45 +329,48 @@ module JsToolWorkflow =
         else
             None
 
-    let private decodeViewDeclaration (raw: obj) : Result<obj option, JsFailure> =
-        if isNull raw then
-            Ok None
-        else
-            Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse raw
-            |> Result.map Some
-
-    let private parseRawView (json: string) : Result<obj, JsFailure> =
+    let private parseRawCarry (json: string) : Result<obj, JsFailure> =
         try
-            Ok((JS.JSON.parse json)?view)
+            Ok((JS.JSON.parse json)?carry)
         with _ ->
-            Error(JsFailure.ViewDeclarationInvalid "delivered view did not parse")
+            Error(JsFailure.ViewDeclarationInvalid "delivered carry did not parse")
 
-    let private deliveredView (json: string) : Result<obj option, JsFailure> =
+    let private validateDeliveredCarry (sessionId: string) (carry: obj) : Result<obj option, JsFailure> =
+        let selected =
+            Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.carryMaterial sessionId carry
+
+        if selected?ok then
+            Ok(Some carry)
+        else
+            Error(JsFailure.ViewDeclarationInvalid(selected?reason))
+
+    let private deliveredCarry (sessionId: string) (json: string) : Result<obj option, JsFailure> =
         if not (JsToolsData.isDelivered json) then
             Ok None
         else
-            parseRawView json |> Result.bind decodeViewDeclaration
+            parseRawCarry json |> Result.bind (validateDeliveredCarry sessionId)
 
     let private parkedDeliveryFailure (sessionId: string) : JsFailure option =
-        let parkedHandles = JsParkedSites.handlesForSession sessionId
+        let blockers = JsParkedSites.deliveryBlockersWithChoicesForSession sessionId
 
-        if List.isEmpty parkedHandles then
-            None
-        else
-            let handles = System.String.Join(", ", parkedHandles)
-
+        if not (List.isEmpty blockers) then
+            let reasons = blockers |> List.map snd |> String.concat "; "
             Some(
                 JsFailure.ProgramFailed(
-                    sprintf "delivery is blocked while this session has unresolved parked handles: %s" handles
+                    sprintf "delivery is blocked by unresolved resources: %s" reasons
                 )
             )
+        else
+            let _ = JsParkedSites.autoSettleForSession sessionId
+            None
 
     let private captureDelivered
         (deliveredJson: string option ref)
+        (sessionId: string)
         (json: string)
         (parsed: Result<obj, JsFailure>)
         : Result<obj, JsFailure> =
-        match deliveredView json with
+        match deliveredCarry sessionId json with
         | Error failure -> Error failure
         | Ok _ ->
             deliveredJson.Value <- Some json
@@ -383,7 +384,7 @@ module JsToolWorkflow =
         : Result<obj, JsFailure> =
         match parkedDeliveryFailure sessionId with
         | Some failure -> Error failure
-        | None -> captureDelivered deliveredJson json parsed
+        | None -> captureDelivered deliveredJson sessionId json parsed
 
     /// Algorithm G1: the deliver hard gate. A program cannot deliver while
     /// its own session still has unresolved parked sites; an unrelated
@@ -421,14 +422,6 @@ module JsToolWorkflow =
     /// over, so the witness states the view and not a paraphrase of it.
     let private declarationText (view: obj) : string = JS.JSON.stringify view
 
-    /// The materialized view of a delivered declaration: the entries its view
-    /// selects, rendered as text. This is the material the witness digests
-    /// and the crash-recovery path hands back.
-    let private materializedView (sessionId: string) (view: obj) : string =
-        JsDeliveredValues.select sessionId (Some view) Set.empty
-        |> List.map (fun piece -> piece.Text)
-        |> String.concat "\n"
-
     /// The delivery witness of a settled call: the fence of the delivering
     /// call, the host's attribution of that call, and the view it handed
     /// over. Every field comes from one of those three sources — nothing
@@ -442,23 +435,17 @@ module JsToolWorkflow =
         (view: obj)
         : Result<DeliveryWitness, JsFailure> =
         let declaration = declarationText view
-        let material = materializedView sessionId view
 
-        // The contract tells the model to state the result in prose before
-        // deliver, but the same material is what the caller receives. A call
-        // whose assistant message carries no text therefore still owns a
-        // witness: the delivered material is its formal text. Nothing is
-        // invented here; the view is exactly what the call handed over.
-        let formalText =
-            if System.String.IsNullOrWhiteSpace attribution.FormalText then
-                material
-            else
-                attribution.FormalText
+        let material =
+            JsDeliveredValues.materialize
+                sessionId
+                view
+                (Some
+                    { JsDeliveredValues.DeliveryFence.ProviderRun = providerRun
+                      JsDeliveredValues.DeliveryFence.ToolCallId = toolCallId })
+                (Some attribution.FormalText)
 
-        // Form compliance is the whole gate: a delivery that declares its
-        // mapping is established even when the projection selects nothing.
-        // What the call returns is the caller's business, not a validity
-        // condition of the delivery fact.
+        // An empty carry and an empty report still form a valid delivery.
         Ok
             { SessionId = SessionId.create sessionId
               LogicalRunId = attribution.LogicalRunId
@@ -467,7 +454,7 @@ module JsToolWorkflow =
               ProviderRun = providerRun
               ToolCallId = toolCallId
               Task = attribution.Task
-              FormalText = formalText
+              FormalText = attribution.FormalText
               ViewDeclaration = declaration
               View = material
               RetirementId = attribution.RetirementId }
@@ -501,15 +488,23 @@ module JsToolWorkflow =
             let! committed = writer.CommitDeliveryWitness witness
 
             match committed with
-            | Ok() ->
+            | DeliveryCommitResult.Committed ->
                 record ()
-
                 return Ok()
-            | Error reason ->
+            | DeliveryCommitResult.NotCommitted reason ->
+                // The store confirms nothing was written — repeating the delivery with the same operation identity is safe.
                 return
                     Error(
                         JsFailure.DeliveryNotEstablished(
-                            "the durable delivery witness was not committed (" + reason + ")"
+                            "the durable delivery witness was not committed (" + reason + "); repeating the delivery with the same operation identity is safe"
+                        )
+                    )
+            | DeliveryCommitResult.Unknown reason ->
+                // The commit may have happened — do not re-run blindly; observe the original operation first.
+                return
+                    Error(
+                        JsFailure.DeliveryNotEstablished(
+                            "the durable delivery witness commit outcome is unknown (" + reason + "); the delivery may have succeeded — do not retry blindly, observe the original operation first"
                         )
                     )
         }
@@ -528,7 +523,7 @@ module JsToolWorkflow =
             | Ok witness -> return! commitWitness record writer witness
         }
 
-    let private settleView
+    let rec private settleView
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
         (settlement: DeliverySettlement option)
@@ -548,6 +543,16 @@ module JsToolWorkflow =
                 // itself still stands on its own process-live cell.
 
                 return Ok()
+            | Some(DeferredDelivery resolve) ->
+                let! resolved = resolve ()
+                return! settleView sessionId fence resolved view
+            | Some(ContextUnavailable reason) ->
+                // The session snapshot or context could not be read: the
+                // delivery outcome cannot be attributed. Report the real cause
+                // instead of claiming the message had no prose.
+                return
+                    Error(
+                        JsFailure.DeliveryNotEstablished("session context could not be read: " + reason))
             | Some(UnattributedDelivery reason) ->
                 // A durable host that could not attribute this call has no
                 // witness to commit. The delivery did not happen, and the
@@ -576,9 +581,9 @@ module JsToolWorkflow =
         (json: string)
         : Task<Result<unit, JsFailure>> =
         task {
-            match deliveredView json with
+            match deliveredCarry sessionId json with
             | Error failure -> return Error failure
-            | Ok None -> return Error(JsFailure.ViewDeclarationInvalid "the delivered view declaration is empty")
+            | Ok None -> return Error(JsFailure.ViewDeclarationInvalid "the delivered carry array is missing")
             | Ok(Some view) -> return! settleView sessionId fence settlement view
         }
 
@@ -746,6 +751,7 @@ module JsToolWorkflow =
             let explicitReads = ResizeArray<JsExplicitFileRead>()
             let ledger = JsToolsBindings.createLedger persistence
             let callChildren = new JsCallLoop.Host(root)
+
             let callHost: JsToolsBindings.JsCallHost =
                 { Start = fun command -> callChildren.Start command
                   Wait = fun ticket -> callChildren.Wait ticket
@@ -877,8 +883,6 @@ module JsToolWorkflow =
         (persistence: IJsTransactionPersistence option)
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: FileAccessObservation option)
-        (yieldBudgetMs: int option)
-        (planB: string option)
         (name: string)
         (makeApi: RunBuffers -> Wanxiangshu.Process.JsSandbox.ParkState -> obj)
         : Task<JsToolOutcome> =
@@ -919,33 +923,6 @@ module JsToolWorkflow =
             // Fable has no Task.WhenAny; Promise.race is the established
             // pattern (Await.fs / FinalityController).
             let parkSignal = JsSandbox.installParkSignal parkState
-
-            let budgetMs = defaultArg yieldBudgetMs 0
-            let planBText = defaultArg planB ""
-
-            // A present planB (including the empty string) always arms the
-            // yield timer. Zero milliseconds still parks immediately as kind
-            // yield; None means this entry did not buy time (legacy callers).
-            match planB with
-            | None -> ()
-            | Some _ ->
-                let callback =
-                    fun () ->
-                        if not (isNull parkState.ParkSignalResolve) && not parkState.ParkRequested then
-                            let payload =
-                                createObj
-                                    [ "__jsYield" ==> true
-                                      "planB" ==> planBText
-                                      "budgetMs" ==> budgetMs
-                                      "elapsedMs" ==> float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-                                      "delta" ==> (JsToolsBindings.readStashedDelta api)
-                                      "name" ==> name ]
-                            emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
-                        else
-                            ()
-
-                let _ = emitJsExpr (callback, budgetMs) "setTimeout($0, $1)"
-                ()
 
             let! runHandle =
                 JsSandbox.runSurfaceWithPark baseClassSource modelSource api deadlineMs deadlineEpochMs (Some parkState)
@@ -1085,11 +1062,6 @@ module JsToolWorkflow =
             |> Option.map (fun check -> JsReviewOnly.scopeReviewOnly check api)
             |> Option.defaultValue api
 
-    /// UTF-8 byte length of planB / 20 seconds, i.e. bytes * 50 ms.
-    /// Empty planB is 0 ms and still arms the yield timer.
-    [<Emit("new TextEncoder().encode($0).length * 50")>]
-    let private planBYieldBudgetMs (planB: string) : int = jsNative
-
     let private runProgramWithPark
         (reviewCheck: (unit -> Task<bool>) option)
         (sessionId: string)
@@ -1105,7 +1077,6 @@ module JsToolWorkflow =
         (persistence: IJsTransactionPersistence option)
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: FileAccessObservation option)
-        (planB: string)
         (name: string)
         : Task<JsToolOutcome> =
         runProgramCore
@@ -1122,8 +1093,6 @@ module JsToolWorkflow =
             persistence
             lifecyclePersistence
             fileAccessObservation
-            None
-            None
             name
             (fun buffers parkState -> bindingsApiFactory reviewCheck sessionId capabilities root buffers parkState)
 
@@ -1132,9 +1101,6 @@ module JsToolWorkflow =
     /// promise is resolved with `value`, the handle is removed (one-shot), and
     /// the deadline is reset to now+10s. If the program parks again the result
     /// is a new parked payload with a new handle.
-    /// A present `planB` (including empty) reprices the resumed wait: UTF-8
-    /// bytes * 50 ms, and a later yield echoes that new planB. `None` does not
-    /// arm a new yield timer.
     let private unparkSite
         (site: JsParkedSites.JsParkedSite)
         (fence: (ProviderRunIdentity * ToolCallId) option)
@@ -1143,7 +1109,6 @@ module JsToolWorkflow =
         (baseClassSource: string)
         (deadlineMs: int)
         (outputBoundBytes: int)
-        (planB: string option)
         : Task<JsToolOutcome> =
         task {
             Wanxiangshu.Process.JsSandbox.unpark site.RunHandle.ParkState value
@@ -1156,29 +1121,6 @@ module JsToolWorkflow =
             // Install a fresh park signal and race the program promise against
             // it: the resumed program may park again (algorithm E5).
             let parkSignal = JsSandbox.installParkSignal site.RunHandle.ParkState
-
-            match planB with
-            | None -> ()
-            | Some planBText ->
-                let budgetMs = planBYieldBudgetMs planBText
-                let parkState = site.RunHandle.ParkState
-
-                let callback =
-                    fun () ->
-                        if not (isNull parkState.ParkSignalResolve) && not parkState.ParkRequested then
-                            let payload =
-                                createObj
-                                    [ "__jsYield" ==> true
-                                      "planB" ==> planBText
-                                      "budgetMs" ==> budgetMs
-                                      "elapsedMs" ==> float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-                                      "delta" ==> (JsToolsBindings.readStashedDelta site.RunHandle.Api) ]
-                            emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
-                        else
-                            ()
-
-                let _ = emitJsExpr (callback, budgetMs) "setTimeout($0, $1)"
-                ()
 
             let taggedProgram: Task<obj> =
                 task {
@@ -1271,8 +1213,8 @@ module JsToolWorkflow =
 
     [<RequireQualifiedAccess>]
     type private ToolWorkflowInvocation =
-        | Program of source: string * planB: string * name: string
-        | Unpark of handle: string * value: obj * planB: string option
+        | Program of source: string * name: string
+        | Unpark of handle: string * value: obj
         | Abandon of handle: string
         | Invalid of reason: string
 
@@ -1281,7 +1223,6 @@ module JsToolWorkflow =
 
     /// The states a js-* input carries, in protocol order. A state is present
     /// when its key holds a value; null and undefined are absences.
-    /// `planB` is not a state: it rides on the same object as program or unpark.
     let private inputStates (input: obj) : (string * obj) list =
         if isNull input then
             []
@@ -1290,24 +1231,6 @@ module JsToolWorkflow =
             |> List.choose (fun key ->
                 let value = input?(key)
                 if isPresent value then Some(key, value) else None)
-
-    /// planB on the invocation object. Absent or null is the empty alternative
-    /// (0 ms), not "skip the timer".
-    let private programPlanB (input: obj) : string =
-        if isNull input then
-            ""
-        else
-            let value = input?planB
-            if isPresent value then string value else ""
-
-    /// A new planB on an unpark input reprices the resumed wait. Missing means
-    /// do not arm a new yield timer.
-    let private unparkPlanB (input: obj) : string option =
-        if isNull input then
-            None
-        else
-            let value = input?planB
-            if isPresent value then Some(string value) else None
 
     /// Why a js-* input is contradictory: it carries more than one of
     /// program / unpark / abandon. The reason names the conflicting states.
@@ -1339,9 +1262,8 @@ module JsToolWorkflow =
             if System.String.IsNullOrWhiteSpace name then
                 ToolWorkflowInvocation.Invalid "name is required"
             else
-                ToolWorkflowInvocation.Program(string source, programPlanB input, name)
-        | [ ("unpark", unpark) ] ->
-            ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value, None)
+                ToolWorkflowInvocation.Program(string source, name)
+        | [ ("unpark", unpark) ] -> ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value)
         | [ ("abandon", abandon) ] -> ToolWorkflowInvocation.Abandon(string (abandon?handle))
         | states -> ToolWorkflowInvocation.Invalid(conflictReason states)
 
@@ -1366,12 +1288,7 @@ module JsToolWorkflow =
     /// Execute one js-* tool invocation under the three-state input protocol
     /// (PLAN S2 step 5). The `input` object carries one of:
     ///   { program: string }
-    ///   { program: string, planB?: string }
-    ///   { unpark: { handle: string, value: obj }, planB?: string }
     ///   { abandon: { handle: string } }
-    /// planB's UTF-8 byte length * 50 is the yield budget in milliseconds.
-    /// Missing planB on a program is the empty alternative (0 ms, still armed).
-    /// unpark/abandon do not require planB; a planB on unpark reprices the resume.
     /// `sessionId` tags newly created parked sites so session close can reap
     /// them. `lifecyclePersistence` records Parked/Unparked/Abandoned audit
     /// traces (best-effort; a failed audit never fails the tool call); Reaped
@@ -1399,7 +1316,7 @@ module JsToolWorkflow =
         : Task<JsToolOutcome> =
         task {
             match parseWorkflowInvocation input with
-            | ToolWorkflowInvocation.Program(programSource, planB, name) ->
+            | ToolWorkflowInvocation.Program(programSource, name) ->
                 return!
                     runProgramWithPark
                         reviewCheck
@@ -1416,13 +1333,12 @@ module JsToolWorkflow =
                         persistence
                         lifecyclePersistence
                         fileAccessObservation
-                        planB
                         name
-            | ToolWorkflowInvocation.Unpark(handle, value, planB) ->
+            | ToolWorkflowInvocation.Unpark(handle, value) ->
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
-                        unparkSite site fence settlement value baseClassSource deadlineMs outputBoundBytes planB)
+                        unparkSite site fence settlement value baseClassSource deadlineMs outputBoundBytes)
             | ToolWorkflowInvocation.Abandon handle ->
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->

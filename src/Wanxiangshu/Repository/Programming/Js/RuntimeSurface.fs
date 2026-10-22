@@ -3,6 +3,7 @@ namespace Wanxiangshu.Repository.Programming.Js
 open Fable.Core
 open Fable.Core.JsInterop
 open System.Threading.Tasks
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// JS runtime owner boundary for bindings and sandbox execution. The mutable
@@ -81,7 +82,7 @@ module JsRuntimeSurface =
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api
 
     /// Test hook: install a process-live delegation host for one session. The
-    /// delegate callback takes `(name, payload, reportMapping)`.
+    /// delegate callback takes `(name, payload, carry)`.
     let installDelegationHost
         (sessionId: string)
         (delegation: obj)
@@ -93,17 +94,17 @@ module JsRuntimeSurface =
         JsDelegationBridge.install
             sessionId
             { Delegate =
-                fun name payload mapping ->
-                    unbox<Task<obj>> (emitJsExpr (delegation, name, payload, mapping) "$0($1,$2,$3)")
+                fun name payload carry ->
+                    unbox<Task<obj>> (emitJsExpr (delegation, name, payload, carry) "$0($1,$2,$3)")
               Join = fun () -> unbox<Task<obj>> (emitJsExpr join "$0()")
               Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)")
               Horizon = fun () -> unbox<Task<obj>> (emitJsExpr horizon "$0()")
-              Advisor = fun intent mapping -> unbox<Task<obj>> (emitJsExpr (advisor, intent, mapping) "$0($1,$2)") }
+              Advisor = fun intent carry -> unbox<Task<obj>> (emitJsExpr (advisor, intent, carry) "$0($1,$2)") }
 
     let clearDelegationHost (sessionId: string) : unit = JsDelegationBridge.clear sessionId
 
 
-    /// Test hook: record a value with an already-shaped deliver view.
+    /// Test hook: record a carry array for presentation.
     let recordDeliveredView (sessionId: string) (view: obj) : unit =
         JsDeliveredValues.recordView sessionId (if isNull view then None else Some view)
 
@@ -125,20 +126,8 @@ module JsRuntimeSurface =
 
     /// Test hook: consume the handoff the completion path reads.
     let takeDeliveredHandoffWith (sessionId: string) (assistantProse: string option) : obj =
-        match JsDeliveredValues.tryTakeRenderedWith sessionId assistantProse with
-        | Some text -> box text
-        | None -> null
-
-    /// Test hook: consume the handoff only when the cell carries this exact
-    /// provider run; a fenced cell from another run stays untouched.
-    ///
-    /// Run-only on purpose: within one run a different call can hold the
-    /// cell. The exact hook below is the one production reads.
-    let takeDeliveredHandoffFor (sessionId: string) (providerRun: string) (assistantProse: string option) : obj =
-        match
-            JsDeliveredValues.tryTakeRenderedFor sessionId (ProviderRunIdentity.create providerRun) assistantProse
-        with
-        | Some text -> box text
+        match JsDeliveredValues.tryTakeMaterialWith sessionId assistantProse with
+        | Some material -> box (ReturnedMaterial.render material)
         | None -> null
 
     /// Test hook: consume the handoff only when the cell carries this exact
@@ -151,25 +140,33 @@ module JsRuntimeSurface =
         (assistantProse: string option)
         : obj =
         match
-            JsDeliveredValues.tryTakeRenderedForCall
+            JsDeliveredValues.tryTakeMaterialForCall
                 sessionId
                 (ProviderRunIdentity.create providerRun)
                 (ToolCallId.create toolCallId)
                 assistantProse
         with
-        | Some text -> box text
+        | Some material -> box (ReturnedMaterial.render material)
         | None -> null
 
     let takeDeliveredHandoff (sessionId: string) : obj =
-        match JsDeliveredValues.tryTakeRendered sessionId with
-        | Some text -> box text
+        match JsDeliveredValues.tryTakeMaterial sessionId with
+        | Some material -> box (ReturnedMaterial.render material)
         | None -> null
+
+    /// Test hook: observe whether the current cell belongs to this very
+    /// call. Nothing is taken and the returned cursor does not move.
+    let deliveredCellIsMine (sessionId: string) (providerRun: string) (toolCallId: string) : bool =
+        JsDeliveredValues.ownsCell
+            sessionId
+            (ProviderRunIdentity.create providerRun)
+            (ToolCallId.create toolCallId)
 
     /// Test hook: the raw value a program handed over through `this.deliver`,
     /// as it stands right now — a delivery or a staged render cache. This is
     /// the staged view: presentation only. The delivery evidence is the
     /// fenced cell, read by `deliveredFenceOf` and consumed by
-    /// `takeDeliveredHandoffFor`.
+    /// `takeDeliveredHandoffForCall`.
     let deliveredValue (sessionId: string) : obj = JsDeliveredValues.peekCached sessionId
 
     let deliveredViewOf (sessionId: string) : obj =

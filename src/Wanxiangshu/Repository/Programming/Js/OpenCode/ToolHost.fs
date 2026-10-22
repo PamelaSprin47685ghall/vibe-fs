@@ -3,6 +3,7 @@ namespace Wanxiangshu.Repository.Programming.Js.OpenCode
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Repository.Programming.Js
@@ -87,7 +88,9 @@ module JsToolSpec =
                 | Some abandonValue -> Some("abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ])
                 | None -> None
 
-            [ programEntry; nameEntry; unparkEntry; abandonEntry ] |> List.choose id |> createObj
+            [ programEntry; nameEntry; unparkEntry; abandonEntry ]
+            |> List.choose id
+            |> createObj
 
         // The unpark/abandon arguments are nested objects; the Host schema
         // describes them as plain objects with string handle fields. The value
@@ -103,13 +106,8 @@ module JsToolSpec =
         let abandonSchema =
             ToolHostCodec.optionalObjectSchema [ "handle", ToolHostCodec.stringSchema factory ] factory
 
-        // One view contract: the prefix is protected; the map states keep or summary.
-        let mappingSchema =
-            ToolHostCodec.optionalRecordSchemaOf
-                (ToolHostCodec.stringSchema factory)
-                (ToolHostCodec.nullableStringSchema factory)
-                (JsToolPolicy.viewDeclarationExtraProse ())
-                factory
+        let carrySchema =
+            ToolHostCodec.optionalCarrySchema (JsToolPolicy.viewDeclarationExtraProse ()) factory
 
         let callFenceOf (ctx: HostToolContext) =
             match ctx.ProviderRunId, ctx.ToolCallId with
@@ -119,10 +117,11 @@ module JsToolSpec =
         // A delivery witness belongs to a fenced call: without the
         // call fence there is nothing that can own the witness.
         // A fence-less call therefore never carries a settlement.
-        let settlementFor (ctx: HostToolContext) fence : Task<DeliverySettlement option> =
+        // RT-02: attribution resolution is deferred to delivery time.
+        let settlementFor (ctx: HostToolContext) fence : DeliverySettlement option =
             match fence with
-            | None -> Task.FromResult None
-            | Some _ -> settlementOf ctx
+            | None -> None
+            | Some _ -> Some (DeliverySettlement.DeferredDelivery (fun () -> settlementOf ctx))
 
         let runProgramCall (ctx: HostToolContext) (input: obj) (declaration: obj) =
             task {
@@ -134,7 +133,13 @@ module JsToolSpec =
                 // created in, not in the target's checkout.
                 let root = rootOf ctx.SessionId
                 let fence = callFenceOf ctx
-                let! settlement = settlementFor ctx fence
+
+                let callIdentity =
+                    fence
+                    |> Option.map (fun (providerRun, toolCallId) ->
+                        ProviderRunIdentity.value providerRun, ToolCallId.value toolCallId)
+
+                let settlement = settlementFor ctx fence
 
                 // Without a settlement this is exactly executeWithReviewCheck.
                 let! outcome =
@@ -154,7 +159,7 @@ module JsToolSpec =
                         lifecyclePersistence
                         (fileAccessObservation |> Option.map (fun observe -> observe ctx))
 
-                return JsToolPolicy.renderCommitted ctx.SessionId declaration outcome
+                return JsToolPolicy.renderCommitted ctx.SessionId callIdentity declaration outcome
             }
 
         // Clause 6: a failed call must not leave a presentable
@@ -180,7 +185,13 @@ module JsToolSpec =
                 Task.FromResult(
                     ToolResultText.tomlObject [ "error", ToolResultText.TString(JsToolPolicy.missingProgramProse ()) ]
                 )
-            | None -> runProgramCall ctx input declaration
+            | None ->
+                match
+                    Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.validateView ctx.SessionId declaration
+                with
+                | Error failure ->
+                    Task.FromResult(JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])))
+                | Ok() -> runProgramCall ctx input declaration
 
         { Name = surface.ToolName
           Description = surface.Description
@@ -189,12 +200,24 @@ module JsToolSpec =
               "name", ToolHostCodec.optionalStringSchemaDescribed (JsToolPolicy.argNameProse ()) factory
               "unpark", unparkSchema
               "abandon", abandonSchema
-              "prefixUntil", ToolHostCodec.optionalNumberSchema factory
-              "thenMap", mappingSchema ]
+              "prefixCount", ToolHostCodec.optionalNumberSchema factory
+              "carry", carrySchema ]
           Execute =
             fun args ctx ->
                 task {
-                    let input = inputOf args
+                    let input =
+                        let raw = inputOf args
+                        if not (isNull raw) && not (isNull raw?program) && (isNull raw?name || string raw?name = "") then
+                            let defaultName =
+                                ctx.ToolCallId
+                                |> Option.map ToolCallId.value
+                                |> Option.orElseWith (fun () -> ctx.ProviderRunId |> Option.map ProviderRunIdentity.value)
+                                |> Option.defaultValue ("call-" + ctx.SessionId)
+                            createObj
+                                [ "program" ==> raw?program
+                                  "name" ==> defaultName ]
+                        else
+                            raw
 
                     // The three states are mutually exclusive: a call carries
                     // exactly one of program / unpark / abandon. A conflicting

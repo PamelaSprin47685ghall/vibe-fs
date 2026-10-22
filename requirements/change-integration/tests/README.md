@@ -6,26 +6,26 @@
 
 - `observeRelayProgram` 执行真实 Change Program，注入受控 Git、Relay、持久化和资源端口，记录实际调用。它能证明程序对这些端口结果的裁决与顺序，不能证明外部端口已完成持久化、真实 Agent 独立评估或整个 Orchestrator 已接线。
 - `recordFact`、`fold` 和分类用例验证事实投影与恢复裁决；重复纯 fold、重建 projection 或注入已有 claim 都不等于发生过进程崩溃和恢复。旧标题中的 `THEOREM`、`PERSIST` 也不提升证明层级。
-- Git adapter 用例调用实际适配器，以命令端口注入正常与失败结果。`002` 还通过实际 Host 的 ForkManagerJob 调用实际 Git adapter，验证 cleanliness 检查失败或命令拒绝时，新 Job 不追加 worktree 请求、不创建 worktree 或 Manager；clean 正向对照确实抵达 worktree 请求和创建边界。该夹具从空的 Orchestrator 历史开始，不能证明 Host 初始化时恢复、清理旧义务没有副作用。真实临时 Git 仓库用例另证 status 失败返回错误及 dirty target 不被推进。
+- Git adapter 用例调用实际适配器，以命令端口注入正常与失败结果。`002` 还通过实际 Host 的 ForkManagerJob 调用实际 Git adapter，验证无关 dirty 主工作树不阻挡新 Job 追加 worktree 请求并抵达创建边界；worktree 从命名 source ref 创建。该夹具从空的 Orchestrator 历史开始，不能证明 Host 初始化时恢复、清理旧义务没有副作用。真实临时 Git 仓库用例另证 dirty target 不被 ff 推进且拒绝信息指出阻挡路径。
 - IntegrationGate 用例实际创建并释放锁；ManagerLoop 的 10,000 次 Continue 用例执行真实循环，只证明这些信号下的有限推进及资源计账，不声称完成 10,000 次发布。
 
 ## 条款对应
 
 | 条款 | 当前有效观察 | 尚不能据此宣称 |
 | --- | --- | --- |
-| [001] | 真实 Program 从候选到发布的调用顺序与继续循环；候选与已承认变基 pin 不符时 fold 拒绝 | 真实模型独立 review 的全链闭合 |
-| [002] | dirty/clean/error 分别返回；实际 Host 在 cleanliness 错误后拒绝新 Job，保持其持久请求、worktree、Manager 和目标 HEAD 不变；ff 发布遇到 dirty 或 status 失败时拒绝 | 用户请求入口的所有 Clean Gate 条件均已接入；Host 初始化中既有义务的恢复、清理过程也没有副作用 |
+| [001] | 真实 Program 从候选到发布的调用顺序与继续循环；候选与已承认变基 pin 不符时 fold 拒绝 | 真实模型独立评估的全链闭合 |
+| [002] | 无关 dirty 主工作树不再阻挡新 Job 创建隔离 worktree；worktree 从命名 source ref 创建，不复制主工作树的未提交改动；ff 发布遇到 dirty 或 status 失败时拒绝并指出阻挡路径 | 用户请求入口的所有工作树边界条件均已接入；Host 初始化中既有义务的恢复、清理过程也没有副作用 |
 | [003] | 各事实独立投影；完整 claim 的恢复裁决；缺失字段拒绝；Published 追加失败不会伪装成功 | 任意真实崩溃点都有足够持久材料可恢复 |
 | [004] | rebase/冲突处置不持锁；ff 受锁保护；发布完成后释放门禁再清理一次；实际锁与循环 | 门内只存在 ref 重读和 CAS；durable claim/Published 写入等仍在门内，见 GAP-215 |
-| [005] | 冲突事实留存、门外继续循环、worktree 清理错误传播 | 下一真实 incumbency 的端到端因果链；重复 fold 不是重启 |
+| [005] | 发布不再携带生命周期 review 资格；冲突事实留存、门外继续循环、worktree 清理错误传播 | 下一真实 incumbency 的端到端因果链；重复 fold 不是重启 |
 | [006] | 事实投影保留 Road、终态和 worktree 身份；受控资源创建/采用/清理 | fresh process 从真实中断产物恢复且沿用原 worktree，见 GAP-212 |
 | [007] | claim 三分支优先级及受控已发布重入不再 ff | 在真实进程故障后自动完成这些分支 |
 | [008] | 冻结符号引用、head 读取拒绝、错误分支与 expected head、严格快进判定 | 所有并发进程共享同一入口的完整发布原子性 |
 | [009] | Job/worktree 身份在事实投影中稳定 | 追加 charge、retirement、AuthorityRevision 与真实物理 session 的完整接线 |
 | [011] | 明确 TODO | 真实 fork/resume/join 发给 provider 的内容遵守 horizon，见 GAP-212 |
 | [013] | target 前移或 CAS miss 时真实 Program 释放门禁、rebase 并继续；新事实替代旧绑定 | 这些裁决已在真实进程崩溃后重放 |
-| [014] | 真实 Program 在 target 与已承认变基证据不符时拒绝发布、拒绝 unmerged files | 满分评估的全部生产路径均已贯穿到同一检查 |
-| [015] | 真实 Program 在观察到的 target 与已承认证据不符时 rebase 并继续到下一 tenure，含 fresh 正向控制 | 真实 Engineer/DevOps 修改后，旧测试证据失效并新跑验证，见 GAP-212 |
+| [014] | 真实 Program 在 target 与已承认变基证据不符时拒绝发布、拒绝 unmerged files | 语义判定无法覆盖机器事实的全部生产路径均已贯穿到同一检查 |
+| [015] | 真实 Program 在观察到的 target 与已承认证据不符时 rebase 并继续到下一 tenure，含 fresh 正向控制 | 真实 Engineer/DevOps 修改后，旧测试证据失效并重跑受影响的验证，见 GAP-212 |
 | [017] | 明确 TODO | 两条真实 Road 合流后对最终工作树完成独立验证，见 GAP-212 |
 
 `PublishClaimed` 的 Surface 只接受明确给出的完整绑定材料，不再从 Job 或候选记录猜字段；这项测试证明接缝没有补造事实，不能替代生产事件解码兼容测试。已删除的 `applyFact`、`createJobResult`、`jobView`、`dropEphemeral` 曾在接缝中自建失效与跨 Road 规则，其结果不能证明生产实现。

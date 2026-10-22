@@ -75,9 +75,12 @@ module Surface =
     let exportInquiry (handle: RuntimeHandle) (args: obj) : obj =
         Tool.decodeExport args |> Result.bind (Commands.exportInquiry handle) |> result
 
-    let submitResults (handle: RuntimeHandle) (args: obj) : obj =
+    let submitResults (handle: RuntimeHandle) (args: obj) : Task<obj> =
         Commands.store handle |> ignore
-
-        Tool.decodeWorkSubmit args
-        |> Result.bind (fun _ -> Error(Tool.unsupported (Contract.toolName SphinxTool.WorkSubmit)))
-        |> result
+        task {
+            match Tool.decodeWorkSubmit args with
+            | Error refusal -> return refused refusal
+            | Ok decoded ->
+                let! submitted = Commands.submit handle decoded
+                return result submitted
+        }

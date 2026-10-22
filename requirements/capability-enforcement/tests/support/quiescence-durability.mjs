@@ -36,8 +36,11 @@ const journalEnvelope = {
       SchemaVersion: 2,
       SessionId: SESSION,
       LogicalRunId: 'run-durability',
+      OwnerLogicalRunId: undefined,
       AuthorityRootUserMessageId: 'root-durability',
       AuthorityKind: 'HumanRoot',
+      AgentOwnerLife: undefined,
+      ExpectedClosureKind: 'HumanRootManagedRun',
       IdentitySeed: {
         kind: 'RootSelection',
         ownerSession: null,

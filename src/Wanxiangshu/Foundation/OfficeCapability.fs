@@ -61,7 +61,6 @@ module OfficeCapability =
     /// The slice of the stateless `wanxiangli/capability` object this module reads.
     type private CapabilityLibrary =
         abstract permissions: role: string -> string array
-        abstract managerReviewReadOnlyPermissions: unit -> string array
         abstract managerFinishPermissions: unit -> string array
         abstract permissionsForManagerFacts: facts: obj -> string array
         abstract toolNames: permission: string -> string array
@@ -143,9 +142,6 @@ module OfficeCapability =
             | Some permission -> permission
             | None -> failwithf "wanxiangli/capability returned an unknown permission %s" label)
         |> Set.ofArray
-
-    let managerReviewReadOnlyPermissions: ToolPermission Set =
-        library.managerReviewReadOnlyPermissions () |> permissionSet
 
     /// capability-enforcement-025: the final incumbent's read/cleanup/close-out surface.
     let managerFinishPermissions: ToolPermission Set =

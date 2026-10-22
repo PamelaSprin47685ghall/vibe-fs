@@ -71,9 +71,9 @@ type WorktreeResource
             else
                 WorktreeDisposal.asValueTask (AsyncSupport.completedTask ())
 
-    static member Create(git: GitPort, jobId: ManagerJobId, path: WorktreePath) =
+    static member Create(git: GitPort, jobId: ManagerJobId, path: WorktreePath, sourceRef: TargetRef) =
         task {
-            match! git.CreateWorktree jobId path with
+            match! git.CreateWorktree jobId path sourceRef with
             | Error error -> return Error error
             | Ok identity -> return Ok(WorktreeResource(path, identity, git, true))
         }
@@ -116,17 +116,16 @@ module WorktreeCommands =
     let private failure stdout stderr =
         if String.IsNullOrWhiteSpace stderr then stdout else stderr
 
-    let isDirty (runner: Command -> Task<int * string * string>) (path: WorktreePath) =
-        task {
-            let! code, stdout, stderr = runner (command (Some(WorktreePath.value path)) [ "status"; "--porcelain" ])
-
-            if code <> 0 then
-                return Error(failure stdout stderr)
-            else
-                return Ok(not (String.IsNullOrWhiteSpace stdout))
-        }
-
-    let create (runner: Command -> Task<int * string * string>) repo (jobId: ManagerJobId) (path: WorktreePath) =
+    /// The isolated worktree is created from `sourceRef`, so the source it sees
+    /// is that ref's committed content. Another worktree's uncommitted changes
+    /// are not part of it — and are not touched by this command either.
+    let create
+        (runner: Command -> Task<int * string * string>)
+        repo
+        (jobId: ManagerJobId)
+        (path: WorktreePath)
+        (sourceRef: TargetRef)
+        =
         task {
             let identity = identityOf jobId
 
@@ -138,7 +137,8 @@ module WorktreeCommands =
                           "add"
                           WorktreePath.value path
                           "-b"
-                          WorktreeIdentity.value identity ]
+                          WorktreeIdentity.value identity
+                          TargetRef.value sourceRef ]
                 )
 
             // Returns the identity rather than unit: it is what recovery locates the

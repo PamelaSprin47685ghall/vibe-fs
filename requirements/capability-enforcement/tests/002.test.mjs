@@ -240,14 +240,24 @@ const { rolePredicate } = await import("../../../dist/OpenCode/Tools/ToolRegistr
 const { generateRole } = await import("../../../dist/Repository/Programming/Js/GeneratorSurface.js");
 
 
-test('WHAT[capability-enforcement-002] TOOLSPEC_delegation_verbs_are_no_longer_host_tools', () => {
+test('WHAT[capability-enforcement-002] TOOLSPEC_delegation_verbs_are_no_longer_host_tools', async () => {
+  const { toolSpecNames } = await import("../../../dist/OpenCode/Tools/ToolSurface.js");
+  const hostToolNames = toolSpecNames()
   // Clean-break: the delegation verbs live exclusively as programming-surface
-  // members, so the Host registers no `fork` / `resume` / `commission` /
-  // `devops` tool and admits none of them for any role.
+  // members, so the Host registers no `fork` / `resume` / `commission` / `devops` tool.
   for (const tool of ['fork', 'resume', 'commission', 'devops']) {
-    for (const role of ['manager', 'orchestrator', 'engineer', 'devops']) {
-      assert.equal(rolePredicate(tool, role), false, `${tool} must not be admitted for ${role}`)
-    }
+    assert.equal(hostToolNames.includes(tool), false, `${tool} must not be a registered host tool`)
+  }
+  // devops is completely retired and admits no role
+  for (const role of ['manager', 'orchestrator', 'engineer', 'devops']) {
+    assert.equal(rolePredicate('devops', role), false, `devops must not be admitted for ${role}`)
+  }
+  for (const role of ['orchestrator', 'engineer', 'devops']) {
+    assert.equal(rolePredicate('fork', role), false, `fork must not be admitted for ${role}`)
+    assert.equal(rolePredicate('resume', role), false, `resume must not be admitted for ${role}`)
+  }
+  for (const role of ['manager', 'engineer', 'devops']) {
+    assert.equal(rolePredicate('commission', role), false, `commission must not be admitted for ${role}`)
   }
 })
 test('WHAT[capability-enforcement-002] TOOLSPEC_delegation_member_names_stay_on_the_programming_surface', () => {

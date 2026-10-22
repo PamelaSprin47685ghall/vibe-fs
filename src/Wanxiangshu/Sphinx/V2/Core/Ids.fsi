@@ -37,8 +37,6 @@ type ObservationId = private ObservationId of string
 type DecisionId = private DecisionId of string
 
 [<Struct>]
-type CertificateId = private CertificateId of string
-
 [<Struct>]
 type EventId = private EventId of string
 
@@ -104,11 +102,6 @@ module DecisionId =
     val tryCreate: string -> Result<DecisionId, string>
     val create: string -> DecisionId
     val value: DecisionId -> string
-
-module CertificateId =
-    val tryCreate: string -> Result<CertificateId, string>
-    val create: string -> CertificateId
-    val value: CertificateId -> string
 
 module EventId =
     val tryCreate: string -> Result<EventId, string>

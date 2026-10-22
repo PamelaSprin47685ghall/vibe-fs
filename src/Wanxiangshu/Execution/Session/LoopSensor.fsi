@@ -22,6 +22,9 @@ type LoopSensor =
 
     member Observe: delta: LoopTextDelta -> unit
 
+    member RequestInterrupt:
+        sessionId: SessionId * providerRun: ProviderRunIdentity * kind: DegenerationKind -> bool
+
     member ConsumeAbortCause:
         source: ProviderAttemptSource * directory: string option * observer: ContinuationAcceptanceObserver option ->
             Task<AbortCause>

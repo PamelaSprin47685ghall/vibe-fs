@@ -59,9 +59,13 @@ Fission 来源包含裂变前工作、各 lane 的 keyed 记录和实质访问�
 
 索引是低信任数据，只向模型暴露 `{shelfmark, canonical question}`。Shelfmark 稳定寻址内部 Case，不泄漏内部会话状态、拓扑、新鲜度标记或机器私有字段。
 
-## [013] Fatal settlement
+## [013] 案例所有其结算
 
-Casebook semantic conflict 须先写 durable failure/cut-tail 并取得 committed 或 unknown settlement evidence，再构造 typed incident。fatal 只能通过装配时必需注入的 capability 执行，无 physical adapter 直连、optional/default/global fallback。同一 incident 只 report、kill 一次；fatal 不修改 Case 投影、epoch 或 freshness。
+Casebook semantic conflict 须先写 durable failure/cut-tail 并取得 committed 或 unknown settlement evidence，再构造 typed incident。冲突只属于一个案例：该案例变为不可用或保留旧版本，向使用方返回准确的未完成状态；已完成的工程任务与已保存产物不被撤销，宿主进程不因单个案例的冲突被终止。
+
+同一 incident 只 report 一次，重复观察不重复通知、不重复归档。案例对象完整拥有归档、刷新与失效结果；装配层注入的是非致命的 reporting capability，无 physical adapter 直连 fatal、无 optional/default/global fallback。
+
+共用存储底座的真实损坏由存储对象报告并保持明确范围：它仍停止向损坏日志的不安全追加并保持失败或未知；不能把普通案例竞争、刷新冲突或缺失案例材料自动提升为全局故障。committed、notCommitted、unknown 的区分保留：unknown 从不冒充没写过，也不盲目重追加同一案例。
 
 ## [014] 预算与截断
 

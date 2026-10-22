@@ -56,5 +56,3 @@
 4. 修改纪律
   - 工作区可能包含用户的未提交改动。动手前先看 `git status` 与对应 diff，妥善保留无关改动。
   - 自动 git commit 并推送到 `master`；严禁对 `master` 执行 force push。提交成功、验证通过、已部署运行分别报告，不相互代替。
-
-**未闭合**：release 层 e2e（Long Stroke）仍红——编排器第三轮后停住，manager / engineer 的 lane 期望未发出；回退本轮清理后停点不变，属既有欠账（pre-cutover 基线的 shard 覆盖本身不闭合），Long Stroke 场景尚未与新的接力/工作记录语义对齐。

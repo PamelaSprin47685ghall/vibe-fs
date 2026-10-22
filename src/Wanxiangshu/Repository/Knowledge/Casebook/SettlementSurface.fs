@@ -10,11 +10,20 @@ module CasebookSettlementSurface =
         | :? CasebookSemanticCutIncident as incident -> incident
         | _ -> invalidArg "incident" "A Casebook incident must come from its original settled owner"
 
-    let createOwner (onIncident: obj -> unit) : obj =
-        if isNull (box onIncident) then
-            nullArg "onIncident"
+    let private outcomeName (outcome: CasebookSettlementOutcome) =
+        match outcome with
+        | CasebookSettlementOutcome.Unscoped -> "Unscoped"
+        | CasebookSettlementOutcome.CaseUnavailable -> "CaseUnavailable"
+        | CasebookSettlementOutcome.CaseUnavailableKnown -> "CaseUnavailableKnown"
+        | CasebookSettlementOutcome.LogScopeFailure -> "LogScopeFailure"
 
-        box (CasebookSettlementOwner(fun incident -> onIncident (box incident)))
+    /// The owner takes a reporting capability: it announces a conflict once and
+    /// never terminates the host process.
+    let createOwner (onConflict: obj -> unit) : obj =
+        if isNull (box onConflict) then
+            nullArg "onConflict"
+
+        box (CasebookSettlementOwner(fun incident -> onConflict (box incident)))
 
     let describeIncident (incident: obj) : obj =
         let incident = incidentOf incident
@@ -43,6 +52,19 @@ module CasebookSettlementSurface =
 
     let isIncident (value: obj) : bool = value :? CasebookSemanticCutIncident
 
-    let observeIncident (owner: obj) (incident: obj) : unit =
+    /// Re-observe an already settled incident: the owner keeps its single
+    /// notification and its single archive.
+    let observeIncident (owner: obj) (incident: obj) : obj =
         let incident = incidentOf incident
-        (unbox<CasebookSettlementOwner> owner).Redeliver incident
+        let outcome = (unbox<CasebookSettlementOwner> owner).Redeliver incident
+        box {| outcome = outcomeName outcome |}
+
+    /// Observe one settled append failure and return the scope it had.
+    let observeFailure (owner: obj) (failure: obj) : obj =
+        let failure =
+            match failure with
+            | :? CasebookAppendFailure as failure -> failure
+            | _ -> invalidArg "failure" "A Casebook settlement failure must be a CasebookAppendFailure"
+
+        let outcome = (unbox<CasebookSettlementOwner> owner).Observe failure
+        box {| outcome = outcomeName outcome |}

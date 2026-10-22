@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.Fork
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Change
@@ -12,10 +13,12 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Process
+open Wanxiangshu.Repository.Programming.Js
 
 /// Delegation-owned join wire surface. Inputs and outputs are plain JavaScript
 /// data; completion and error unions remain inside the renderer owner.
@@ -74,7 +77,7 @@ module JoinSurface =
                           Role = role
                           AuthorityRoot = None
                           ProviderRun = None
-                          View = text (value?view)
+                          View = ReturnedMaterial.ofEntries value?returned
                           Directory = None }
                 )
             )
@@ -204,7 +207,6 @@ module JoinSurface =
                         "cleanup-failed"
                     )
                 | "Cancelled" -> OrchestratorVerdict.Cancelled(ManagerJobId.create "job")
-                | "RejectedDirty" -> OrchestratorVerdict.RejectedDirty "dirty"
                 | "IntegrationFailed" -> OrchestratorVerdict.IntegrationFailed(ManagerJobId.create "job", "failed")
                 | _ -> OrchestratorVerdict.Empty)
             |> Array.toList
@@ -357,6 +359,91 @@ module JoinSurface =
             )
 
         box (JoinProbeHandle(parentId, runtime))
+
+    /// Validate delivery material through the durable owner with a complete
+    /// attribution fence and matching digest. Generated unions stay here.
+    let validateDeliveredMaterial (material: string) : obj =
+        let witness: Wanxiangshu.Host.TaskDeliveryWitness =
+            { Fence =
+                { SessionId = SessionId.create "delivery-material-probe"
+                  LogicalRunId = LogicalRunId.create "delivery-material-probe-run"
+                  AuthorityRoot = AuthorityRootUserMessageId.create "delivery-material-probe-root"
+                  PhysicalUserMessageId = PhysicalUserMessageId.create "delivery-material-probe-root"
+                  ProviderRun = ProviderRunIdentity.create "delivery-material-probe-attempt"
+                  ToolCallId = ToolCallId.create "delivery-material-probe-call"
+                  Task = Wanxiangshu.Host.TaskDeliveryTask.Invocation "delivery-material-probe-call" }
+              FormalText = ""
+              ViewDeclaration = "[]"
+              View = material
+              MaterialDigest = Wanxiangshu.Host.HostDigest.sha256Hex material
+              RetirementId = None }
+
+        match Wanxiangshu.Host.TaskDelivery.validate Wanxiangshu.Host.HostDigest.sha256Hex witness with
+        | Ok() -> box {| accepted = true; reason = "" |}
+        | Error reason -> box {| accepted = false; reason = reason |}
+
+    /// Exercise the real journal-less completion path: the fenced delivery
+    /// is consumed before its lazy view reader runs.
+    let joinProbeDeliver (probe: obj) (carry: obj) (report: string) : Task<obj> =
+        task {
+            let handle = unbox<JoinProbeHandle> probe
+            let childId = SessionId.create (SessionId.value handle.ParentId + "-child")
+            let providerRun = ProviderRunIdentity.create "probe-delivery-run"
+            let toolCallId = ToolCallId.create "probe-delivery-call"
+            let root = AuthorityRootUserMessageId.create "probe-delivery-root"
+
+            let run: PendingHostRun =
+                { Token = obj ()
+                  AgentId = "probe-agent"
+                  ChildId = childId
+                  Role = Role.Engineer
+                  AuthorityRoot = root
+                  Work = None
+                  Source =
+                    TaskCompletionSource<AgentCompletionOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+                  Subscription = None
+                  Finished = false }
+
+            let pending = Dictionary<string, PendingHostRun>()
+            pending.Add(run.AgentId, run)
+
+            JsDeliveredValues.recordFencedView (SessionId.value childId) providerRun toolCallId (Some carry)
+
+            let result: AgentRunResult =
+                { SessionId = childId
+                  AuthorityRootUserMessageId = root
+                  ProviderRun = providerRun
+                  Role = Role.Engineer
+                  Directory = None
+                  TerminalText = report
+                  TurnFormalText = report }
+
+            let lazyView () =
+                JsDeliveredValues.tryPeekMaterialWith (SessionId.value childId) (Some report)
+                |> Task.FromResult
+
+            do!
+                HostForkRunLifecycle.complete
+                    (obj ())
+                    pending
+                    None
+                    handle.ParentId
+                    (JoinProbeSessions())
+                    run
+                    (TerminalOutcome.Completed result)
+                    (Some lazyView)
+
+            let! outcome = run.Source.Task
+
+            return
+                match outcome with
+                | AgentCompleted payload ->
+                    createObj
+                        [ "status" ==> "completed"
+                          "returned" ==> ReturnedMaterial.entries payload.View ]
+                | AgentFailed payload -> createObj [ "status" ==> "failed"; "reason" ==> payload.Message ]
+                | AgentAbandoned(_, reason) -> createObj [ "status" ==> "abandoned"; "reason" ==> reason ]
+        }
 
     let joinProbeForkPty (probe: obj) (command: string) : Task<obj> =
         task {

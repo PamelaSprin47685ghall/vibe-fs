@@ -72,8 +72,8 @@ test('WHAT[work-021] the devops verb survives as a Plan programming-surface memb
   const planMembers = plan.members.map((member) => member.memberName)
   assert.ok(planMembers.includes('devops'), 'the Plan surface carries the devops member')
   assert.ok(
-    plan.baseClassSource.includes('async devops(intent, reportMapping)'),
-    'the Plan base class declares devops with an explicit report mapping',
+    plan.baseClassSource.includes('async devops(intent, carry = [])'),
+    'the Plan base class defaults devops to an empty carry array',
   )
 
   // 其它角色没有这个成员：DevOps 调查只对 Plan 开放。
@@ -85,38 +85,38 @@ test('WHAT[work-021] the devops verb survives as a Plan programming-surface memb
   }
 })
 
-test('WHAT[work-021] the Plan devops member refuses a missing or malformed report mapping as data', async () => {
+test('WHAT[work-021] the Plan devops member refuses malformed carry as data', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const sessionID = 'ses-work-021-devops-mapping'
+    const sessionID = 'ses-work-021-devops-carry'
     await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
 
     const runPlan = async (body) =>
       String(
         await hooks.tool['todowrite-for-plan'].execute(
-          { program: `class Js extends JsProgram { async run() { ${body} } }` },
+          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-carry' },
           { sessionID, agent: 'plan' },
         ),
       )
 
-    const missing = await runPlan('return await this.devops("find the flaky test");')
-    assert.match(missing, /ok = false/)
-    assert.match(missing, /code = "VIEW_DECLARATION_INVALID"/)
-    assert.match(missing, /reportMapping is required/)
-
     const malformed = await runPlan('return await this.devops("find the flaky test", { "not-an-anchor": null });')
     assert.match(malformed, /ok = false/)
     assert.match(malformed, /code = "VIEW_DECLARATION_INVALID"/)
-    assert.match(malformed, /must be a non-negative anchor number/)
+    assert.match(malformed, /array/)
+
+    const invalidItem = await runPlan('return await this.devops("find the flaky test", [null]);')
+    assert.match(invalidItem, /ok = false/)
+    assert.match(invalidItem, /code = "VIEW_DECLARATION_INVALID"/)
 
     // 非 Plan 角色没有这个成员：调用在编程面直接失败关闭，而不是静默成功。
     const engineerSession = 'ses-work-021-devops-engineer'
     await acceptAuthorityRoot(runtime, engineerSession, 'engineer', 'user-engineer-root')
     const engineer = String(
       await hooks.tool['todowrite-for-engineer'].execute(
-        { program: 'class Js extends JsProgram { async run() { return await this.devops("find the flaky test", { 1: null }); } }' },
+        { program: 'class Js extends JsProgram { async run() { return await this.devops("find the flaky test", []); } }', name: 'engineer-devops' },
         { sessionID: engineerSession, agent: 'engineer' },
       ),
     )
     assert.match(engineer, /this\.devops is not a function/)
   })
 })
+

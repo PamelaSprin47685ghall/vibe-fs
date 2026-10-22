@@ -136,12 +136,14 @@ test('WHAT[causal-wait-005] thousands of immediate stale wakes still form one ob
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 60_000)
+  let cancels = 0
+  const deadline = { Delay: handle.Delay, Cancel: () => { cancels += 1; handle.Cancel() } }
   let reads = 0
   let wakes = 0
   const pending = causal.untilSignalOrDeadline(
     registry,
     descriptor(),
-    handle,
+    deadline,
     () => {
       reads += 1
       return reads > STALE ? 'material' : null
@@ -156,26 +158,28 @@ test('WHAT[causal-wait-005] thousands of immediate stale wakes still form one ob
   assert.deepEqual(await pending, { ok: true, value: 'material' })
   assert.equal(wakes, STALE)
   assert.equal(reads, STALE + 1)
-  assert.equal(handle.cancelCount, 1)
+  assert.equal(cancels, 1)
   assert.equal(enteredLeft(causal.snapshot(registry)), 'WaitResolved')
 
   // Quiescence: firing the (cancelled) deadline afterwards revives nothing.
   process.timerAdvance(timer, 120_000)
   assert.equal(causal.snapshot(registry).active.length, 0)
   assert.equal(causal.snapshot(registry).history.length, 2)
-  assert.equal(handle.cancelCount, 1)
+  assert.equal(cancels, 1)
   process.timerDispose(timer)
 })
 test('WHAT[causal-wait-005] stale wakes stop re-reading after deadline termination', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 250)
+  let cancels = 0
+  const deadline = { Delay: handle.Delay, Cancel: () => { cancels += 1; handle.Cancel() } }
   let reads = 0
   let wakes = 0
   const pending = causal.untilSignalOrDeadline(
     registry,
     descriptor(),
-    handle,
+    deadline,
     () => {
       reads += 1
       return null
@@ -193,7 +197,7 @@ test('WHAT[causal-wait-005] stale wakes stop re-reading after deadline terminati
   assert.deepEqual(await pending, { ok: false, reason: 'WaitTimedOut' })
   assert.equal(wakes, 3)
   assert.equal(reads, 3)
-  assert.equal(handle.cancelCount, 0)
+  assert.equal(cancels, 0)
   assert.equal(enteredLeft(causal.snapshot(registry)), 'WaitTimedOut')
 
   // Quiescence: no lease, no pending deadline arm, no re-read after the exit.

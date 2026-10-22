@@ -359,16 +359,15 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
       }
 
       lifecycle.notePrompt(delegateId, question)
-      // deliver(reportMapping) 的键必须是非负整数锚点编号字符串，值是该段材料；
-      // 旧形态 { question, answer, turn } 会被当作锚点声明而拒（VIEW_DECLARATION_INVALID）。
-      const deliveredMaterial = `question = ${JSON.stringify(question)}\nanswer = ${JSON.stringify(answer)}\nturn = ${i + 1}`
+      // carry 中的字符串是字面材料，由宿主在交付时统一渲染为 TOML。
+      const deliveredMaterial = `Question: ${question}\nAnswer: ${answer}\nTurn: ${i + 1}`
       const delivered = await jsWorkflow.execute(
         dir,
         'Engineer',
         'en',
         delegateId,
         {
-          program: `class Js extends JsProgram { async run() { await this.deliver({ "0": ${JSON.stringify(deliveredMaterial)} }); } }`,
+          program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(deliveredMaterial)}]); } }`,
         },
         3000,
         Date.now() + 60_000,
@@ -384,14 +383,13 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
         delegateId,
         `asst_q${i + 1}`,
         `call_q${i + 1}`,
-        { prefixUntil: 0, thenMap: { 0: deliveredMaterial } },
+        [deliveredMaterial],
       )
       assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', `RAW-PROSE-Q${i + 1}`, `asst_q${i + 1}`), true)
       const text = await pending
       // 消费者事实：返回的材料里有本轮的答案与本轮该交的散文。
-      // repository-programming [054]：reportMapping 指向本次工作的全部材料，
-      // 含末条 assistant 散文；旧形态（LlmFacing.Data DTO、顶层 turn 字段）
-      // 已退役，不再断言。
+      // repository-programming [054]：carry 选择的材料与自动保留的当前报告
+      // 一起回传；正文不需要在 carry 中复制。
       assert.match(
         text,
         new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
@@ -513,7 +511,7 @@ test('WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually
         delegateId,
         `asst_q${i + 1}`,
         `call_q${i + 1}`,
-        { prefixUntil: 0, thenMap: { 0: answer } },
+        [answer],
       )
       assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', answer, `asst_q${i + 1}`), true)
       const done = await pending
@@ -725,3 +723,4 @@ test('WHAT[knowledge-reuse-010] G6_G_cancel_session_cleanup_no_publication', asy
 }
 
 test.todo('WHAT[knowledge-reuse-010] GAP-160: actual Engineer resume boundaries and Fission takeover each archive exactly one distinct logical invocation, rejecting lane, late and duplicate terminal events')
+

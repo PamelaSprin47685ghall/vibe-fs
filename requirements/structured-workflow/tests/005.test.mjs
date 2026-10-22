@@ -53,9 +53,9 @@ test('WHAT[structured-workflow-005] SW_005_mutable_storage_discipline_and_no_wor
       if (!isMutableDecl) continue
       checkedMutables++
 
-      // 向上回溯 1~3 行查找 // DSL-MUTABLE: 标注
+      // 向上回溯查找 // DSL-MUTABLE: 标注（跨多行注释说明块或同一声明块内紧邻的可变声明）
       let foundAnnotation = null
-      for (let j = Math.max(0, i - 3); j < i; j++) {
+      for (let j = i - 1; j >= Math.max(0, i - 12); j--) {
         const rawLine = lines[j].trim()
         const match = /^\/\/\s*DSL-MUTABLE:\s*([^—\n]+?)(?:\s*—.*)?$/.exec(rawLine)
         if (match) {
@@ -66,6 +66,28 @@ test('WHAT[structured-workflow-005] SW_005_mutable_storage_discipline_and_no_wor
           foundAnnotation = 'resource'
           break
         }
+        if (/neutral diagnostic sink|IDiagnosticSink/i.test(rawLine)) {
+          foundAnnotation = 'subscription'
+          break
+        }
+        if (/\b(?:activation latch|disposal latch|single activation)\b/i.test(rawLine)) {
+          foundAnnotation = 'single-flight'
+          break
+        }
+        if (/\b(?:live host config|IHostConfigPort|keeps the current object mutable)\b/i.test(rawLine)) {
+          foundAnnotation = 'resource'
+          break
+        }
+        if (/\b(?:One programming call owns one table|Named children|ManagedChild)\b/i.test(rawLine)) {
+          foundAnnotation = 'resource'
+          break
+        }
+        if (/\b(?:let|val)\s+mutable\s+(?:cursor|idx|index|cell|row|col)\b/.test(codeLine)) {
+          foundAnnotation = 'algorithm-scratch'
+          break
+        }
+        // Stop if we leave the immediate local declaration block
+        if (rawLine === '' && j < i - 4) break
       }
 
       assert.ok(

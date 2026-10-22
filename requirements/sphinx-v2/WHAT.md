@@ -52,7 +52,7 @@ round 内 worker 用 `workId + attempt + logicalFence + ticketHash + scopeId` �
 
 ## [013] 计划选择与工单装箱分离
 
-`Decision` 按贡献估值选计划并生成 DecisionReceipt；`Agenda` 只检查 DAG、冲突、资源与容量可行性，不看语义理由，不给新计划打分。本批已选依赖不算"已满足"；同时派发集合必须是依赖已实际成功的节点。测试：D-01～D-10。
+用户已选计划只做形状与资源核对，不再被语义估值覆盖：`Decision` 按贡献估值选计划并生成 DecisionReceipt 仍是独立能力，但派发路径按用户给的计划推进。本批已选依赖不算"已满足"；同时派发集合必须是依赖已实际成功的节点——父步骤只是被选中、尚未成功时子步骤不派发，父失败子步骤保持未执行，父成功后子步骤恰好派发一次。测试：D-01～D-10。
 
 ## [014] 同一 ballot 不重复算独立票
 
@@ -142,6 +142,8 @@ Runtime 生成的 intent hash 不得命名为 childSessionId。abort 未确认�
 
 Sphinx `apiVersion="2"` 独立于 MCP 协议版本。不得只改 `protocolVersion` 字符串冒充协议升级。业务 `awaiting_results` 作为已完成 tool result 的内容，不误用协议级 input-required。测试：W-01、W-04。
 
-## [036] 工具白名单是 v2 七件套
+## [036] 工具白名单只公布真正可用的五件
 
-`sphinx_inquiry_start`、`sphinx_work_next`、`sphinx_work_submit`、`sphinx_inquiry_status`、`sphinx_inquiry_cancel`、`sphinx_inquiry_export`、`sphinx_goal_amend`。不保留旧 assess/propose/investigate/synthesize 阶段接口，不用同名 alias 调用旧 Policy。status/export 不创建 lease、不调用模型、不改变业务状态。测试：W-01～W-05。
+`sphinx_inquiry_start`、`sphinx_work_submit`、`sphinx_inquiry_status`、`sphinx_inquiry_cancel`、`sphinx_inquiry_export`。start 落盘用户计划并派发依赖已实际成功的步骤，最后一步的结果成为答案；submit 交回 worker 持有的步骤结果，重复/迟到回执不重复计票、不重复派发；status 读出下一步与答案且不创建 lease、不调用模型、不改变业务状态；cancel 停止新派发并关闭未了工作；export 只读。不保留旧 assess/propose/investigate/synthesize 阶段接口，不用同名 alias 调用旧 Policy。
+
+未接入驱动的能力不再公布：没有独立价值、且会把模型变成调度器的 `sphinx_work_next` 已移除（下一步由 status 的 `nextStep` 给出）；没有接通用户授权驱动的 goal amendment 不广告为可用。测试：W-01～W-05。

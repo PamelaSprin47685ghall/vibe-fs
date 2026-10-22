@@ -19,10 +19,11 @@ module JsSandbox =
 
     /// Handle to a started sandbox program: the async IIFE promise is exposed
     /// (not awaited to completion) so a caller may hold it across calls, and the
-    /// deadline reference is mutable so a caller may reset the async deadline.
+    /// sandbox run handle names the run so a caller may re-arm the async
+    /// deadline without re-wrapping.
     type JsRunHandle =
         { ProgramPromise: Task<string>
-          DeadlineRef: obj
+          SandboxHandle: obj
           Api: obj
           ParkState: ParkState }
 

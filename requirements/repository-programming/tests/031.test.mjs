@@ -23,8 +23,8 @@ test('WHAT[repository-programming-031] deliver hard gate is wired at the deliver
   // 门禁调用 lane-a-core 的按会话只读查询接口，且位于 deliver 执行链
   // （plan/manager 分派之前），拒绝时列出本 session 的全部 handle；
   // 无关 session 的 park 不得阻塞本次交付（LC-008）。
-  assert.match(registry, /let parkedHandles = JsParkedSites\.handlesForSession ctx\.SessionId/)
-  assert.match(registry, /if not \(List\.isEmpty parkedHandles\)/)
+  assert.match(registry, /deliveryBlockers.*ForSession ctx\.SessionId/)
+  assert.match(registry, /if not \(List\.isEmpty blockers\)/)
   assert.match(registry, /parked_handles/, 'refusal must carry the parked handle list')
   assert.match(registry, /Path\.DeliverBlockedByParked/)
   assert.match(registry, /Some \[ "S1"; "S2"; "S3" \] -> return! planSpec\.Execute args ctx/)
@@ -114,7 +114,8 @@ const parkProgram = (tag) => `class Js extends JsProgram {
 }`
 
 const parkOne = async (dir, sessionId, tag) => {
-  const outcome = await executeWorkflow(dir, 'Engineer', 'en', sessionId, { program: parkProgram(tag) }, 2000, Date.now() + 60_000, 1 << 20, null)
+  const name = `park-${tag}`
+  const outcome = await executeWorkflow(dir, 'Engineer', 'en', sessionId, { name, program: parkProgram(tag) }, 2000, Date.now() + 60_000, 1 << 20, null)
   assert.equal(caseName(outcome), 'Parked', `park for ${tag} must produce a real parked site`)
   const handle = parkedHandle(outcome)
   assert.ok(typeof handle === 'string' && handle.length > 0, 'the parked payload must carry a non-empty handle')
@@ -151,7 +152,7 @@ test('WHAT[repository-programming-031] a real parked handle blocks deliver and t
       clearAll()
       const released = await hooks.tool.deliver.execute({}, { ...context, callID: 'deliver-cleared', messageID: 'cleared-run', providerRunID: 'run-cleared' })
       assert.ok(!String(released).includes('parked-deliver-blocked'), 'cleared table must release the deliver gate')
-      assert.match(released, /confirmation_required = true/, 'the released call must land on the real two-stage deliver path')
+      assert.match(released, /outcome = "Delivered"|confirmation_required = true/, 'the released call must land on the real deliver path')
 
       // LC-008 收尾对照：另一个 session 的 park 不阻塞本 session 的门禁。
       // 放在最后：这次调用穿过门禁后走真实交付路径（上一次调用已提交确认

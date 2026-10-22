@@ -33,7 +33,13 @@ module TaskDeliveryJournal =
         providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
             Wanxiangshu.Host.TaskDeliveryWitness option
 
+    [<RequireQualifiedAccess>]
+    type TaskDeliveryCommitResult =
+        | Committed
+        | NotCommitted of reason: string
+        | Unknown of reason: string
+
     val commit:
         journal: AgentJournal ->
         witness: Wanxiangshu.Host.TaskDeliveryWitness ->
-            System.Threading.Tasks.Task<Result<unit, string>>
+            System.Threading.Tasks.Task<TaskDeliveryCommitResult>

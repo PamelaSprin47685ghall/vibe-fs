@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as detector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 import * as sensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
 import * as HostSignalSurface from '../../../dist/OpenCode/Host/HostSignalSurface.js'
-import { awaitOwned, createSensor, rawDelta, repetitiveText } from './support/stream.mjs'
+import { awaitOwned, createSensor, rawDelta, repetitiveText, requestInterrupt } from './support/stream.mjs'
 
 test('WHAT[degeneration-guard-002] delta codec accepts textual fields and rejects unrelated events and fields', () => {
   assert.equal(detector.tryDecodeTextDelta({ type: 'session.status' }), null)
@@ -17,13 +17,29 @@ test('WHAT[degeneration-guard-002] delta codec accepts textual fields and reject
   }
 })
 
-test('WHAT[degeneration-guard-002] non-text deltas cause no interruption before a reasoning control sample', async () => {
+test('WHAT[degeneration-guard-002] non-text deltas are ignored and textual deltas cause no automatic interruption', async () => {
   const aborts = []
-  const handle = createSensor({ owned: ['session'], abort: id => aborts.push(id), continue: () => {} })
-  for (const field of ['tool', 'tool_call', 'custom_metadata']) sensor.observe(handle, rawDelta('session', field, repetitiveText(), 'run'))
+  const diagnostics = []
+  const handle = createSensor({
+    owned: ['session'],
+    abort: id => aborts.push(id),
+    continue: () => {},
+    diagnostic: (op, fields) => diagnostics.push([op, fields]),
+  })
+  for (const field of ['tool', 'tool_call', 'custom_metadata']) {
+    sensor.observe(handle, rawDelta('session', field, repetitiveText(), 'run'))
+  }
   assert.equal(sensor.activeTask(handle, 'session', 'run'), null)
   assert.deepEqual(aborts, [])
+  assert.deepEqual(diagnostics, [])
+
   sensor.observe(handle, rawDelta('session', 'reasoning', repetitiveText(), 'run'))
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(sensor.activeTask(handle, 'session', 'run'), null)
+  assert.deepEqual(aborts, [])
+  assert.ok(diagnostics.some(([op, fields]) => op === 'degeneration-guard'))
+
+  requestInterrupt(handle, 'session', 'run', 'TooRepetitive')
   await awaitOwned(handle, 'session', 'run')
   assert.deepEqual(aborts, ['session'])
 })

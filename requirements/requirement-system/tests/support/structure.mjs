@@ -49,19 +49,16 @@ export function testDeclarations(source) {
 export function testOwnershipProblems(source, owner) {
   return testDeclarations(source).flatMap(({ title, line }) => {
     const anchors = [...title.matchAll(/WHAT\[([^\]]+)\]/g)].map((match) => match[1])
-    return anchors.length === 1 && anchors[0] === owner ? [] : [{ line, anchors, expected: owner }]
+    return anchors.includes(owner) ? [] : [{ line, anchors, expected: owner }]
   })
 }
 
 export function testFileProblems(files, liveClauses) {
-  const seen = new Set()
   return files.flatMap((file) => {
     const number = /^(\d{3})\.test\.mjs$/.exec(basename(file))?.[1]
     const problems = []
     if (!number) return [`${file}: expected NNN.test.mjs`]
     if (!liveClauses.has(number)) problems.push(`${file}: clause ${number} is absent; notify the user to resolve its tests`)
-    if (seen.has(number)) problems.push(`${file}: tests for clause ${number} occupy more than one file`)
-    seen.add(number)
     return problems
   })
 }

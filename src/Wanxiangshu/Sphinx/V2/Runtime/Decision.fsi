@@ -28,16 +28,11 @@ type DecisionReceiptBody =
     { ScopeId: string
       SelectedPlanId: PlanId
       SelectionRule: string
-      RuleVersion: string
       EstimateRefs: (PlanId * string) list
       ExcludedPlans: ExcludedPlan list
       UnestimatedPlans: UnestimatedPlan list
       TieBreak: string option
-      BudgetBefore: Map<string, float>
-      RenderReserve: Map<string, float>
-      ConsideredQuestions: string list
-      ApproximationTags: string list
-      SourceObservations: string list }
+    }
 
 type SelectionOutcome =
     { Selected: PlanEstimate
@@ -47,16 +42,15 @@ type SelectionOutcome =
 type DecisionError = { Code: string; Message: string }
 
 module Decision =
+    /// The rule this module actually executes, recorded in every receipt.
+    val selectionRule: string
+
+    /// The tie-break this module applies, named exactly as it is applied.
+    val tieBreakRule: string
+
     /// Select the best-ranked plan in one scope and produce the receipt that explains it.
     val choose:
         scopeId: string ->
-        rule: string ->
-        ruleVersion: string ->
-        budgetBefore: Map<string, float> ->
-        renderReserve: Map<string, float> ->
-        consideredQuestions: string list ->
-        approximationTags: string list ->
-        sourceObservations: string list ->
         candidates: PlanEstimate list ->
         unestimated: UnestimatedPlan list ->
             Result<SelectionOutcome, DecisionError>

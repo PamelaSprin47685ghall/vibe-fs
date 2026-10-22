@@ -394,9 +394,6 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     },
   })
 
-  throw error
-  }
-
   let backstopFired = false
   const backstop = setTimeout(() => {
     backstopFired = true

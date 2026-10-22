@@ -15,7 +15,7 @@ export const END_TOOL = 'deliver'
 
 export function confirmationCount(sequence) {
   if (sequence.join(',') === 'S1,S2,S3') return 1
-  if (sequence.join(',') === 'S4') return 2
+  if (sequence.join(',') === 'S4') return 1
   return null
 }
 
@@ -51,7 +51,7 @@ export function review(view, outcome) {
   let projection = view.projection
   let deliveryAuthorized = false
   if (outcome === 'Promoted' && hasNext) projection = sequence[index + 1]
-  if (outcome === 'Promoted' && !hasNext && confirmationCount(sequence) === 1) deliveryAuthorized = true
+  if (outcome === 'Promoted' && !hasNext && sequence.join(',') === 'S1,S2,S3') deliveryAuthorized = true
   return {
     ok: true,
     written: [{ type: 'Reviewed', incumbencyId: view.incumbencyId, stage: view.projection, outcome }],
@@ -95,20 +95,6 @@ export function deliverOnce(view) {
 }
 
 export function deliverTwice(view, call) {
-  if (confirmationCount(view.sequence) !== 2) return { ok: false, reason: 'wrong-sequence' }
-  if (!view.reviewed && view.confirmed) return { ok: false, written: [], finished: false }
-  if (!view.reviewed) return { ok: true, finished: false, assessmentRequired: true, written: [] }
-  if (!view.confirmed) {
-    return {
-      ok: true,
-      finished: false,
-      written: [{ type: 'ConfirmationCommitted', toolCallId: call.toolCallId, providerRunId: call.providerRunId }],
-    }
-  }
-  if (call.toolCallId === view.confirmedToolCallId && call.providerRunId === view.confirmedProviderRunId) {
-    return { ok: true, finished: false, replay: true, written: [] }
-  }
-  if (call.toolCallId === view.confirmedToolCallId) return { ok: false, reason: 'RetirementConfirmationReplayConflict', written: [] }
   const outcome = view.reviewOutcome === 'Promoted' ? 'Delivered' : 'Relayed'
   const retired = { type: 'IncumbencyRetired', outcome, projectionCut: { providerRunId: call.providerRunId, toolCallId: call.toolCallId } }
   if ('retirementCursor' in retired || 'digest' in retired || 'snapshotId' in retired) return { ok: false, written: [] }

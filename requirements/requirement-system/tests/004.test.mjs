@@ -13,11 +13,12 @@ test('WHAT[requirement-system-004] ownership accepts multiline titles, modifiers
   assert.deepEqual(testOwnershipProblems(source, 'sample-001'), [])
 })
 
-test('WHAT[requirement-system-004] ownership rejects missing, multiple and wrong primary clauses', () => {
-  for (const title of ['no owner', 'WHAT[sample-002] wrong', 'WHAT[sample-001] WHAT[sample-002] two']) {
+test('WHAT[requirement-system-004] ownership rejects missing and wrong primary clauses, but accepts cross-clause references', () => {
+  for (const title of ['no owner', 'WHAT[sample-002] wrong']) {
     const issues = testOwnershipProblems(`test(${JSON.stringify(title)}, () => {})`, 'sample-001')
     assert.equal(issues.length, 1, title)
     assert.equal(issues[0].expected, 'sample-001')
   }
+  assert.deepEqual(testOwnershipProblems('test("WHAT[sample-001] WHAT[sample-002] cross", () => {})', 'sample-001'), [])
   assert.deepEqual(testOwnershipProblems('// test("WHAT[wrong-001]", () => {})', 'sample-001'), [])
 })

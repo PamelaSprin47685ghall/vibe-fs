@@ -65,7 +65,7 @@ module FetchTool =
 
     let private observeMutationFailure (owner: CasebookSettlementOwner) (error: CasebookMutationError) =
         match error with
-        | CasebookMutationError.AppendFailure failure -> owner.Observe failure
+        | CasebookMutationError.AppendFailure failure -> owner.Observe failure |> ignore
         | _ -> ()
 
     let private touchAccess owner workspaceRoot store identity =

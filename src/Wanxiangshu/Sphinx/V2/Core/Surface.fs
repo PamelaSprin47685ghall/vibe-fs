@@ -212,7 +212,6 @@ module Surface =
         | InquiryEventBody.InterpretationFailed _ -> "InterpretFailed"
         | InquiryEventBody.GraphPatched _ -> "GraphPatched"
         | InquiryEventBody.CertificateSlotsPatched _ -> "CertificateSlotsPatched"
-        | InquiryEventBody.CertificateInvalidated _ -> "CertificateInvalidated"
         | InquiryEventBody.DecisionRecorded _ -> "DecisionRecorded"
         | InquiryEventBody.AnswerPrepared _ -> "AnswerPrepared"
         | InquiryEventBody.AnswerCommitted _ -> "AnswerCommitted"

@@ -12,10 +12,9 @@ open Wanxiangshu.Participant.Provider
 /// EXEC-004 / EXEC-017 / EXEC-030: LLM-facing join wire — natural language + delivered view only.
 /// No status / count / ordinal / kind / agent / code / message DTO plane.
 ///
-/// Directional delivered-view plane (delegation-013 / delegation-019 / provider-projection-009):
-/// child → parent join MUST keep the delivered view in Instruction Plane. Do NOT
-/// wrap it in `view = …` or any other TOML data field. Parent → child fork payload is the opposite contract
-/// (`commissioner_record` / `attached_view` fields) — do not conflate.
+/// Delivered entries stay structured until this final boundary. The parent
+/// receives real [[returned]] tables; no rendered document is quoted inside
+/// another field.
 module JoinResultRenderer =
 
     [<RequireQualifiedAccess>]
@@ -52,9 +51,6 @@ module JoinResultRenderer =
 
         [<Literal>]
         let OrchestratorPublished = "tool/join/orchestrator-published"
-
-        [<Literal>]
-        let OrchestratorRejectedDirty = "tool/join/orchestrator-rejected-dirty"
 
         [<Literal>]
         let OrchestratorIntegrationFailed = "tool/join/orchestrator-integration-failed"
@@ -180,13 +176,7 @@ module JoinResultRenderer =
         let name =
             byname lang resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
 
-        let instructions =
-            if String.IsNullOrWhiteSpace payload.View then
-                [ bynameLine lang Path.AgentReturned name ]
-            else
-                [ bynameLine lang Path.AgentReturned name; payload.View ]
-
-        entry instructions []
+        entry [ bynameLine lang Path.AgentReturned name ] (ReturnedMaterial.data payload.View)
 
     let private renderAgentFailed
         (lang: ProviderLanguage)
@@ -409,7 +399,6 @@ module JoinResultRenderer =
             | OrchestratorVerdict.Published _ -> Path.OrchestratorPublished
             | OrchestratorVerdict.PublishedPendingCleanup _ -> Path.OrchestratorPublished
             | OrchestratorVerdict.Cancelled _ -> Path.OrchestratorEmpty
-            | OrchestratorVerdict.RejectedDirty _ -> Path.OrchestratorRejectedDirty
             | OrchestratorVerdict.IntegrationFailed _ -> Path.OrchestratorIntegrationFailed
             | OrchestratorVerdict.Empty -> Path.OrchestratorEmpty
 

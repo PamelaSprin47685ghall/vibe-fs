@@ -43,6 +43,9 @@ type LoopSensor
     let activeInterrupts = Dictionary<string, ProviderRunIdentity * Task * Task>()
     // DSL-MUTABLE: single-flight — attempted run identities survive effect failure and reconciliation.
     let interruptAttempts = Dictionary<string, HashSet<ProviderRunIdentity>>()
+    /// DSL-MUTABLE: resource — last observed statistic class per session, so the
+    /// advisory record is announced once per change instead of once per delta.
+    let observedClasses = Dictionary<string, string>()
 
     let keyOf (sessionId: SessionId) = SessionId.value sessionId
 
@@ -73,7 +76,7 @@ type LoopSensor
     let reportPhysicalOutcome operation sessionId kind outcome =
         let baseFields =
             [ "session_id", SessionId.value sessionId
-              "kind", kindName kind
+              "failure_class", kindName kind
               "operation", operation ]
 
         match outcome with
@@ -364,24 +367,29 @@ type LoopSensor
 
         this.StartContinueExecution(source.SessionId, source.ProviderRun, kind, directory, proxy, publicTask, launch)
 
-    member private this.Interrupt
+    /// An interruption requested explicitly by a chosen loop-prevention
+    /// policy. The text statistic never arms one by itself, and nothing in the
+    /// default host wiring asks for one.
+    member this.RequestInterrupt
         (
             sessionId: SessionId,
             providerRun: ProviderRunIdentity,
-            kind: DegenerationKind,
-            evaluation: LoopDetector.Evaluation
-        ) =
-        match this.RunInterrupt(sessionId, providerRun, kind) with
-        | None -> ()
-        | Some _ ->
-            observeDiagnostic
-                "degeneration-guard"
-                [ "session_id", SessionId.value sessionId
-                  "kind", kindName kind
-                  "operation", "interrupt"
-                  "result", "armed"
-                  "detector_step", string evaluation.Step
-                  "weighted_distinct_token_count", sprintf "%.4f" evaluation.WeightedDistinctTokenCount ]
+            kind: DegenerationKind
+        ) : bool =
+        if not (isOwned sessionId) then
+            false
+        else
+            match this.RunInterrupt(sessionId, providerRun, kind) with
+            | None -> false
+            | Some _ ->
+                observeDiagnostic
+                    "degeneration-guard"
+                    [ "session_id", SessionId.value sessionId
+                      "operation", "interrupt"
+                      "result", "armed"
+                      "failure_class", kindName kind ]
+
+                true
 
     member private this.DetectorFor(sessionId: SessionId) =
         let key = keyOf sessionId
@@ -412,18 +420,36 @@ type LoopSensor
                 detectors.[key] <- updated
                 Some evaluation)
 
-    member private this.InterruptForEvaluation(delta: LoopTextDelta, evaluation: LoopDetector.Evaluation) =
-        // An anomaly requires its exact provider run: without a message id the
-        // delta is observed into detector scratch only and never interrupts.
-        match this.ClassifyDegeneration evaluation.State, delta.Message with
-        | Some kind, Some messageId ->
-            let providerRun = ProviderRunIdentity.create messageId
-            this.Interrupt(delta.Session, providerRun, kind, evaluation)
-        | _ -> ()
+    /// The statistic is advisory only: it announces that the weighted distinct
+    /// count left the repository envelope, once per class change, and never
+    /// gains control of the run. Interruption is a separate explicit request.
+    member private this.ObserveStatistic(delta: LoopTextDelta, evaluation: LoopDetector.Evaluation) =
+        match this.ClassifyDegeneration evaluation.State with
+        | None -> ()
+        | Some kind ->
+            let key = keyOf delta.Session
+            let classText = kindName kind
+            let announce =
+                lock gate (fun () ->
+                    match observedClasses.TryGetValue key with
+                    | true, previous when previous = classText -> false
+                    | _ ->
+                        observedClasses.[key] <- classText
+                        true)
+
+            if announce then
+                observeDiagnostic
+                    "degeneration-guard"
+                    [ "session_id", SessionId.value delta.Session
+                      "operation", "observe"
+                      "result", "anomaly-observed"
+                      "failure_class", classText
+                      "detector_step", string evaluation.Step
+                      "weighted_distinct_token_count", sprintf "%.4f" evaluation.WeightedDistinctTokenCount ]
 
     member private this.ObserveEligible(delta: LoopTextDelta) =
         this.TryEvaluate delta
-        |> Option.iter (fun evaluation -> this.InterruptForEvaluation(delta, evaluation))
+        |> Option.iter (fun evaluation -> this.ObserveStatistic(delta, evaluation))
 
     member private this.ObserveOwned(delta: LoopTextDelta) =
         if isOwned delta.Session then
@@ -491,6 +517,7 @@ type LoopSensor
         lock gate (fun () ->
             let key = keyOf sessionId
             detectors.Remove key |> ignore
+            observedClasses.Remove key |> ignore
             armed.Remove key |> ignore
             interruptAttempts.Remove key |> ignore
             activeInterrupts.Remove key |> ignore)

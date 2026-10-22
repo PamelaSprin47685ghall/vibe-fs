@@ -28,9 +28,6 @@ module DeliverPolicy =
     val Retired: string = "tool/deliver/finished"
 
     [<Literal>]
-    val Confirmation: string = "tool/deliver/confirmation"
-
-    [<Literal>]
     val NonManagerRole: string = "tool/deliver/non-manager-role"
 
     [<Literal>]
@@ -46,10 +43,6 @@ module DeliverPolicy =
     /// over to a successor or ended it. The instruction alone cannot tell the
     /// two apart, so the recorded outcome travels with it.
     val retirementResult: outcome: string -> string
-
-    /// The first call of the two-stage sequence records the confirmation and
-    /// does not finish the work; a second deliver ends it.
-    val confirmationResult: unit -> string
 
     /// A committed blocker keeps the tenure active. The call reports what to
     /// close and may be repeated once the resources have settled.
@@ -90,23 +83,12 @@ module DeliverPolicy =
         toolCallId: string ->
             Result<string, string> option
 
-    /// The confirmation this call already recorded is a durable fact. The
-    /// tenure it confirmed may since have been relayed or delivered, so the
-    /// confirmation is replayed from the recorded fence alone: a later state of
-    /// the work never turns a recorded confirmation into a refusal. The
-    /// committed confirmation fence names the run and call that confirmed; this
-    /// call replays that exact confirmation to its recorded state.
-    val recordedConfirmationReplay:
-        work: DurableWorkHost.InspectedWork ->
-        providerRunId: string ->
-        toolCallId: string ->
-            Result<string, string> option
-
     /// The tenure this call may retire.
     type Prepared =
         { Fence: Fence
           Incumbent: string
-          Reviewed: bool }
+          Reviewed: bool
+          ReviewOutcome: string option }
 
     /// Algorithm E1.1 and E2: the entry either replays a fence the fold already
     /// settled, or binds the active tenure. The replay decision belongs to the

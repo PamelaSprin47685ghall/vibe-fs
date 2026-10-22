@@ -6,25 +6,21 @@ const base = {
   sequence: ['S4'],
   reviewed: true,
   confirmed: false,
-  reviewOutcome: 'Stayed',
+  reviewOutcome: 'Promoted',
 }
 
-test('WHAT[work-006] S4 deliver confirms first and ends only on another call', () => {
-  const first = deliverTwice(base, { toolCallId: 'c1', providerRunId: 'r1', head: 3 })
-  assert.equal(first.finished, false)
-  assert.equal(first.written[0].type, 'ConfirmationCommitted')
-  const replay = deliverTwice(
-    { ...base, confirmed: true, confirmedToolCallId: 'c1', confirmedProviderRunId: 'r1' },
-    { toolCallId: 'c1', providerRunId: 'r1', head: 4 },
-  )
-  assert.equal(replay.finished, false)
-  assert.equal(replay.replay, true)
-  const second = deliverTwice(
-    { ...base, confirmed: true, confirmedToolCallId: 'c1', confirmedProviderRunId: 'r1', reviewOutcome: 'Promoted' },
-    { toolCallId: 'c2', providerRunId: 'r1', head: 5 },
-  )
-  assert.equal(second.finished, true)
-  assert.equal(second.outcome, 'Delivered')
-  assert.equal('retirementCursor' in second.written[0], false)
-  assert.equal(second.written.some((event) => event.type === 'ConfirmationCommitted'), false)
+test('WHAT[work-006] S4 deliver completes in a single call without confirmation ritual', () => {
+  // One genuine delivery intent completes without writing ConfirmationCommitted
+  const completed = deliverTwice(base, { toolCallId: 'c1', providerRunId: 'r1', head: 3 })
+  assert.equal(completed.finished, true)
+  assert.equal(completed.outcome, 'Delivered')
+  assert.equal('retirementCursor' in completed.written[0], false)
+  assert.equal(completed.written.some((event) => event.type === 'ConfirmationCommitted'), false)
+
+  // Stayed review relays in a single call with successor opened
+  const stayed = deliverTwice({ ...base, reviewOutcome: 'Stayed' }, { toolCallId: 'c2', providerRunId: 'r1', head: 4 })
+  assert.equal(stayed.finished, true)
+  assert.equal(stayed.outcome, 'Relayed')
+  assert.equal(stayed.written.some((event) => event.type === 'IncumbencyOpened'), true)
+  assert.equal(stayed.written.some((event) => event.type === 'ConfirmationCommitted'), false)
 })

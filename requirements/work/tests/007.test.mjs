@@ -20,7 +20,7 @@ const accepted = receipt => {
   return receipt
 }
 
-test('WHAT[work-007] the retirement identity is recomputed from the same fence and does not merge the two confirmation counts', () => {
+test('WHAT[work-007] the retirement identity is recomputed from the same fence and distinguishes sequences', () => {
   const plan = life.encodeOpening('plan', 'work-007-identity', '/repo', 7n)
   const oneshot = life.deliverProbe(plan, 'run-007', 'call-007', 9n)
   assert.equal(oneshot.decision, 'Write')
@@ -29,15 +29,14 @@ test('WHAT[work-007] the retirement identity is recomputed from the same fence a
   const recomputed = life.deliverProbe(life.encodeOpening('plan', 'work-007-identity', '/repo', 7n), 'run-007', 'call-007', 9n)
   assert.equal(retirementIdOf(recomputed.bytes), retirementIdOf(oneshot.bytes))
 
-  // The same fence under the other confirmation count carries the other marker.
+  // S4 delivery directly retires in a single call without a confirmation step.
   const s4 = life.encodeOpening('S4', 'work-007-identity', '/repo', 4n)
   const reviewed = life.reviewProbe(s4, incumbencyIdOf(s4), 'Stayed')
-  const confirmed = life.deliverProbe(s4 + reviewed.bytes, 'run-007', 'call-confirm', 9n)
-  assert.equal(confirmed.names, 'ConfirmationCommitted')
-  const twoshot = life.deliverProbe(s4 + reviewed.bytes + confirmed.bytes, 'run-007', 'call-007', 9n)
-  assert.equal(twoshot.decision, 'Write')
+  const s4Retirement = life.deliverProbe(s4 + reviewed.bytes, 'run-007', 'call-007', 9n)
+  assert.equal(s4Retirement.decision, 'Write')
+  assert.equal(s4Retirement.names.includes('ConfirmationCommitted'), false)
   assert.notEqual(
-    retirementIdOf(twoshot.bytes),
+    retirementIdOf(s4Retirement.bytes),
     retirementIdOf(oneshot.bytes),
     'oneshot-retirement-v1 and retirement-v1 must not merge into one identity',
   )
@@ -46,7 +45,6 @@ test('WHAT[work-007] the retirement identity is recomputed from the same fence a
 test('WHAT[work-007] a settled fence replays its recorded state instead of the tenure the retirement removed', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
-    assert.match(await hooks.tool.deliver.execute({}, call(session, 'deliver-confirm', 'run-confirm')), /confirmation_required = true/)
     assert.match(await hooks.tool.deliver.execute({}, call(session, 'deliver-call', 'run-retire')), /Finished\. Do not continue work\./)
 
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(runtime.directory)
@@ -79,7 +77,6 @@ test('WHAT[work-007] a settled fence replays its recorded state instead of the t
 test('WHAT[work-007] a retried delivered fence is answered by the fold, not by the missing tenure', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('PERFECT'))
-    assert.match(await hooks.tool.deliver.execute({}, call(session, 'deliver-confirm', 'run-confirm')), /confirmation_required = true/)
     assert.match(await hooks.tool.deliver.execute({}, call(session, 'deliver-call', 'run-retire')), /Finished\. Do not continue work\./)
 
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(runtime.directory)
@@ -105,7 +102,6 @@ test('WHAT[work-007] a retried delivered fence is answered by the fold, not by t
 test('WHAT[work-007] a settled fence whose expected advance moved is refused with no write', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
-    await hooks.tool.deliver.execute({}, call(session, 'deliver-confirm', 'run-confirm'))
     await hooks.tool.deliver.execute({}, call(session, 'deliver-call', 'run-retire'))
 
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(runtime.directory)

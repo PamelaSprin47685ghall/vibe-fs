@@ -5,7 +5,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const [directory, scenario] = process.argv.slice(2)
-const fatal = scenario.startsWith('malformed')
 const env = { ...process.env, WANXIANGSHU_PROVIDER_LANGUAGE: 'en' }
 delete env.NODE_TEST_CONTEXT
 delete env.NODE_OPTIONS
@@ -31,15 +30,16 @@ try {
   if (failure) throw failure
   assert.equal(stdout, '', 'the original finalization path does not emit a normal answer')
   assert.equal(cleanupRequested, false)
-  assert.deepEqual(terminal, fatal ? { exitCode: null, signal: 'SIGKILL' } : { exitCode: 0, signal: null })
+  // A per-case conflict is not a process fatality: the child always returns its
+  // settlement and exits cleanly.
+  assert.deepEqual(terminal, { exitCode: 0, signal: null })
   const reports = fs.readFileSync(fatalFile, 'utf8').split('\n').filter(line => line.length > 0).map(JSON.parse)
-  assert.equal(reports.length, fatal ? 1 : 0)
+  assert.equal(reports.length, 0, 'a per-case conflict never reaches the fatal reporter')
   const measured = JSON.parse(fs.readFileSync(path.join(directory, 'settlement.json'), 'utf8'))
   assert.equal(measured.pid, child.pid)
   assert.equal(measured.parentPid, process.pid)
-  const returned = fs.existsSync(path.join(directory, 'returned.json'))
-    ? JSON.parse(fs.readFileSync(path.join(directory, 'returned.json'), 'utf8')) : null
-  assert.equal(returned === null, fatal)
+  const returned = JSON.parse(fs.readFileSync(path.join(directory, 'returned.json'), 'utf8'))
+  assert.notEqual(returned, null)
   fs.writeSync(1, JSON.stringify({ coordinatorPid: process.pid, pid: child.pid,
     ...terminal, cleanupRequested, reports, measured, returned }) + '\n')
 } finally {

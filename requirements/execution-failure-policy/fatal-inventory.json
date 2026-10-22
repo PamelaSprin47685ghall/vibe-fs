@@ -320,18 +320,19 @@
     {
       "id": "F35",
       "ownerRequirement": "managed-session-lifecycle",
-      "sourceSymbol": "OpenCode/Host/HostSessionDeletion.fs :: HostSessionDeletion.finalizeDelegateAtRoot / Error branch",
-      "operation": "case-finalization-failed (fixed string)",
-      "triggerBranch": "finalizeDelegateAtRoot: typed CaseFinalizeSettlement decides — finalizeDelegate returns the settlement; only a true finalization cut fuses Diagnostic.fatal \"case-finalization-failed\" with the exact delegate session. Identity retention is owner-driven (CaseFinalizeSettlement), never the generic finally. Then invalidOp raise (harness return path).",
+      "sourceSymbol": "OpenCode/Host/HostSessionDeletion.fs :: HostSessionDeletion.finalizeDisposition / PhaseConflict branch",
+      "operation": "case-finalization-failed (retired; non-fatal case-finalization-pending emit)",
+      "triggerBranch": "PhaseConflict in finalizeDisposition previously called Diagnostic.fatal \"case-finalization-failed\" and raised invalidOp. Replaced by non-fatal Diagnostic.emit \"case-finalization-pending\" with [session_id; result].",
       "inputSource": "Case finalizer result for the exact staged delegate session,",
       "exactIdentity": "Exact delegate SessionId + workspace root,",
       "phase": "SessionDeleted teardown (case finalization before later cleanup drops physical identity),",
-      "assertedInvariant": "The staged case must be exactly finalized before its physical identity is dropped; failure is diagnostic AND process-fatal,",
-      "commitDisposition": "Case finalization migrated to a typed CaseFinalizeSettlement contract (HostSessionDeletion.fs + Casebook Lifecycle.fs): replayable exact finalize/drain result; identity retention is owner-driven, not finally-driven. Current: fuse fires, but the finally still drops the identity the completion-recovery may need. Per proposal W9: establish a replayable exact finalize/drain result; the finally must not discard identity needed for completion recovery — whether the identity may be retained and which durable evidence that needs is the owner's decision, not generic cleanup's guess,",
-      "scopeOfEffect": "Whole current process + dropped delegate identity,",
-      "evidenceType": "DelegationCompletion-adjacent (W9, landed in worktree): typed CaseFinalizeSettlement. Regression: requirements/managed-session-lifecycle/tests/021.test.mjs — finalized releases identity exactly once; nothing-to-finalize is not a failure; uncommitted finalize does not publish a case (MANAGED-SESSION-022); identity retention is owner-driven not finally (4 tests).",
-      "formalTestId": "requirements/managed-session-lifecycle/tests/021.test.mjs::WHAT[MANAGED-SESSION-021] CASE_SETTLE_finalized_releases_identity_exactly_once",
-      "status": "FixedWithRegression"
+      "assertedInvariant": "A per-case finalization conflict is an archive conflict, not a process invariant break: the exactly-once durable finalize is enforced upstream without killing the host process or revoking finished engineering results,",
+      "commitDisposition": "A duplicate/phase-conflicting finalize emits non-fatal case-finalization-pending and retains identity (releasesIdentity=false). No second durable finalize fact is created and the surrounding session deletion continues normally.",
+      "scopeOfEffect": "Per-case archive outcome only; host process and surrounding engineering work continue unharmed,",
+      "evidenceType": "HostSessionDeletion PhaseConflict non-fatal emit and identity retention; upstream CasebookLifecycle ensures exactly-once archive.",
+      "formalTestId": null,
+      "status": "ExcludedWithEvidence",
+      "notes": "case-finalization-failed fatal entry retired: a per-case finalize conflict emits non-fatal case-finalization-pending, retains delegate identity, and does not kill the host."
     },
     {
       "id": "F36",

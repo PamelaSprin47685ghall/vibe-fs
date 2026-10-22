@@ -129,16 +129,6 @@ type Orchestrator
             let integration failurePrefix error =
                 OrchestratorVerdict.IntegrationFailed(jobId, sprintf "%s: %s" failurePrefix error)
 
-            let! dirty =
-                git.IsDirty(WorktreePath.create repoPath)
-                |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to inspect target cleanliness")
-
-            do!
-                if dirty then
-                    Error(OrchestratorVerdict.RejectedDirty "Worktree is dirty")
-                else
-                    Ok()
-
             let path = defaultArg worktreePath (defaultWorktreePath jobId)
             // PERSIST-009: effect identity is deterministic before git runs.
             let identity = WorktreeCommands.identityOf jobId
@@ -209,7 +199,10 @@ type Orchestrator
                 match decision with
                 | WorktreeReconciliationDecision.RequestThenCreate
                 | WorktreeReconciliationDecision.CreateAfterProvenMissing ->
-                    WorktreeResource.Create(git, jobId, path)
+                    // The isolated worktree is created from the frozen target
+                    // ref: it sees that ref's committed content, and the main
+                    // worktree's unrelated drafts stay where they are.
+                    WorktreeResource.Create(git, jobId, path, targetRef)
                     |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to create worktree")
                 | WorktreeReconciliationDecision.AdoptThenRecordCreated
                 | WorktreeReconciliationDecision.AdoptCreated ->

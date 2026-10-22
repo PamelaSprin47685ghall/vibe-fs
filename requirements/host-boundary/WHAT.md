@@ -157,11 +157,11 @@ Root workspace 是process-local Host资源定位结果，不是公开可变状�
 
 ## [034] adapter 薄度与 Host 命名空间层级的门禁契约
 
-adapter 文件（`src/Wanxiangshu` 下的 `OpenCode/`、`Omp/` 适配面）不得自行承担产品决策：每个 adapter 文件对产品域命名空间的引用数量受 `scripts/checks/adapter-thinness-baseline.json` 棘轮约束，产品域引用总数不得增长，基线内单个文件的产品域引用数量不得增长，未引用任何中立端口类型的 adapter 文件数量不得增长。合计总数持平不构成豁免：基线内单个文件的引用增长即便被其他文件的下降抵消，仍必须单独报告为违规。不在基线内的 adapter 文件可以携带产品域引用，只要合计总数仍在基线之内——移动或拆分一个基线内 adapter 文件因此永远不需要编辑基线。改进方向不构成失败，只有一次干净运行才可收紧基线。基线写入是纯决策：存在任一违规时写入计划必须拒绝（不允许写入、内容为空、理由指明拒绝写入），写入动作不得被触达，磁盘上的基线文件必须逐字节保持不变；命令行 `--write-baseline` 在存在违规时必须以非零状态退出、报告拒绝理由并保持基线文件逐字节不变。
+adapter 文件（`src/Wanxiangshu` 下的 `OpenCode/`、`Omp/` 适配面）不得自行承担产品决策。引用数量与端口出现与否不作为硬性计数棘轮：一个职责明确的合法 adapter 即使引用较多领域命名空间，只要不越界替领域对象作决策、不持有第二业务账本且不控制外部生命周期，即为合规；单纯的命名空间计数或基线不作为交付否决依据。
 
-中立端口纯度是严格约束：`src/Wanxiangshu/Host/Ports/` 下的每个 `.fs` 与 `.fsi` 文件不得引用适配器命名空间、产品域或宿主词汇，只允许 Foundation、`Wanxiangshu.Host` 与 System。纯度范围从源码发现，不依赖任何硬编码族名：任意名称的新端口族自动纳入范围，其签名文件声明的 `type` 名即成为中立端口词汇表的一部分，词汇表同样从源码发现。端口族完整性由族签名自述：每个端口族签名必须以 `HNI P-xx` 头标记声明恰好一个保留端口 id，不得声明零个或多个；两个族不得声明同一保留 id；直接位于 `src/Wanxiangshu/Host/` 下的文件不得占用某个中立族的基名，否则该族一旦被移入 `Host/Ports/` 就会静默覆盖。
+中立端口纯度是严格约束：`src/Wanxiangshu/Host/Ports/` 下的每个 `.fs` 与 `.fsi` 文件不得引用适配器命名空间、产品域或宿主词汇，只允许 Foundation、`Wanxiangshu.Host` 与 System。宣称纯计算的中立端口签名严禁携带具体 Host SDK 客户端句柄、物理文件句柄（如 `System.IO`、`FileStream`、`StreamReader`、`StreamWriter`）或可变注册表（如 `Dictionary`、`HashSet`、`ResizeArray`）。纯度范围从源码发现，不依赖任何硬编码族名：任意名称的新端口族自动纳入范围，其签名文件声明的 `type` 名即成为中立端口词汇表的一部分，词汇表同样从源码发现。端口族完整性由族签名自述：每个端口族签名必须以 `HNI P-xx` 头标记声明恰好一个保留端口 id，不得声明零个或多个；两个族不得声明同一保留 id；直接位于 `src/Wanxiangshu/Host/` 下的文件不得占用某个中立族的基名，否则该族一旦被移入 `Host/Ports/` 就会静默覆盖。
 
-`src/Wanxiangshu/Host/` 承载两层且每层只有一个命名空间：A 层 `Host/Ports/` 必须声明 `Wanxiangshu.Host.Ports`，B 层 `Host/Domain/` 必须声明 `Wanxiangshu.Host.Domain`，直接位于 `Host/` 下的文件两者均不得声明——目录位置与命名空间因此不得各自漂移。B 层适配器棘轮（`scripts/checks/domain-seam-baseline.json`）只许收紧：某个 adapter 新引用 `Wanxiangshu.Host.Domain` 必须报告为违规，基线内某个 adapter 已不再引用该接缝则必须从基线中移除，基线集合本身必须通过。层范围同样从源码发现，新增的族与接缝自动被覆盖。
+`src/Wanxiangshu/Host/` 承载两层且每层只有一个命名空间：A 层 `Host/Ports/` 必须声明 `Wanxiangshu.Host.Ports`，B 层 `Host/Domain/` 必须声明 `Wanxiangshu.Host.Domain`，直接位于 `Host/` 下的文件两者均不得声明——目录位置与命名空间因此不得各自漂移。层范围从源码发现，新增的族与接缝自动被覆盖。
 
 ## [035] omp 入口模块不持有产品决策
 

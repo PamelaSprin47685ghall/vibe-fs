@@ -13,7 +13,7 @@ test('WHAT[change-integration-001] fresh quality candidate runs the full publish
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
 
   // No invalidation stream remains. The surviving order is the rebase record,
-  // the next tenure's review signal, then the claim and the gated ff.
+  // the loop continuation, then the claim and the gated ff.
   assert.deepEqual(observation.timeline, [
     'await:Candidate',
     'fact:CandidateReady',
@@ -74,13 +74,11 @@ const fact = {
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
       targetHeadSnapshot}),
-  publishClaimed: (
-    authorityRevision = 'authority-1') =>
+  publishClaimed: () =>
     change.fact('PublishClaimed', {
       targetRef: 'refs/heads/main',
       rebasedCommit: 'r1',
-      expectedHead: 'h1',
-      authorityRevision}),
+      expectedHead: 'h1'}),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
   abandoned: () => change.fact('JobAbandoned', null)}
@@ -144,9 +142,8 @@ test('WHAT[change-integration-001] fresh quality candidate runs to Published wit
   assert.equal(observation.gateReleaseCount, 1)
 })
 test('WHAT[change-integration-001] a candidate whose commit no longer matches the rebased evidence pin fails closed', async () => {
-  // Publication evidence is the durable Reviewed plus the work's authority
-  // count. The surviving fail-closed check is the pin: a live candidate that
-  // no longer equals the admitted rebased commit is refused with zero writes.
+  // The fail-closed check is the rebased pin: a live candidate that no longer
+  // equals the admitted rebased commit is refused with zero writes.
   const created = {
     kind: 'ManagerJobCreated',
     payload: {
@@ -167,8 +164,7 @@ test('WHAT[change-integration-001] a candidate whose commit no longer matches th
         jobId: 'job_1',
         targetRef: 'refs/heads/main',
         rebasedCommit: claimCommit,
-        expectedHead: 'target-1',
-        authorityRevision: 'authority-1'}},
+        expectedHead: 'target-1'}},
   ]
 
   const mismatched = change.fold(events('rebased-1'))

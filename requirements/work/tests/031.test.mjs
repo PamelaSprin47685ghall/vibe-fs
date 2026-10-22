@@ -93,7 +93,7 @@ test('WHAT[work-031] plan prompts state that S1/S2 review gaps are entry-bar gap
 
   // Role law and plan-promoted state that review immediately returns the next stage requirements
   assert.match(roleEn, /`review` tool result immediately returns the next stage's method requirements/i)
-  assert.match(roleZh, /`review` 的工具返回值会当场给出下一阶段的方法要求/)
+  assert.match(roleZh, /`review`(?:\s*的)?\s*工具返回值会当场给出下一阶段的方法要求/)
   assert.doesNotMatch(roleEn, /The one who works in the next stage is some later runner, not you/i)
   assert.doesNotMatch(roleZh, /进入下一阶段工作的是你之后的某任，不是你/)
   assert.doesNotMatch(promotedEn, /will be presented on the next request/i)
@@ -140,12 +140,25 @@ test('WHAT[work-031] plan prompts state that S1/S2 review gaps are entry-bar gap
   assertPostS3Semantics(roleZh, 'role/plan/zh-CN.md', chinesePostS3Wording)
   assertPostS3Semantics(s3En, 'planning/s3/en.md', englishPostS3Wording)
   assertPostS3Semantics(s3Zh, 'planning/s3/zh-CN.md', chinesePostS3Wording)
-  assertPostS3Semantics(deliverEn, 'tool/deliver/en.md', englishPostS3Wording)
-  assertPostS3Semantics(deliverZh, 'tool/deliver/zh-CN.md', chinesePostS3Wording)
 
   // The repeated user-requested `S4` start is also pinned verbatim in the stage and tool prompts
   assert.match(s3En, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)
   assert.match(s3Zh, /`post-S3`[\s\S]*反复要求启动 `S4`/)
-  assert.match(deliverEn, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)
-  assert.match(deliverZh, /`post-S3`[\s\S]*反复要求启动 `S4`/)
+
+  // Deliver tool prompt asserts the real surviving contract:
+  // 1. Precondition: non-empty P is required
+  assert.match(deliverEn, /`P`[\s\S]*non-empty|empty or missing/i)
+  assert.match(deliverZh, /`P`[\s\S]*非空|为空或缺失/)
+  // 2. Relay vs completion per successor; one delivery intent; review optional
+  assert.match(deliverEn, /naming a successor relays.*naming none completes/i)
+  assert.match(deliverZh, /指定后继者即接力.*不指定即完成/)
+  assert.match(deliverEn, /single call.*without.*confirmation ritual|one delivery intent/i)
+  assert.match(deliverZh, /单笔交付意图|单次调用.*无.*确认仪式/)
+  assert.doesNotMatch(deliverEn, /second consecutive unreviewed relay is refused/i)
+  assert.doesNotMatch(deliverZh, /拒绝背靠背第二笔仍未评审的接力/)
+  // 3. User grant decides continuation: plan-only stops; execution grant continues without repeating decision
+  assert.match(deliverEn, /plan-only.*stops?.*(?:returns? `P`|no longer nudged)/i)
+  assert.match(deliverZh, /仅规划.*(?:返回.*`P`|不再被催促)/)
+  assert.match(deliverEn, /(?:granted execution|covers execution).*`S4`.*without.*(?:forcing|repeat|ask twice)/i)
+  assert.match(deliverZh, /明确授予执行.*启动 `S4`.*无需.*(?:强迫|重复|再次)/)
 })

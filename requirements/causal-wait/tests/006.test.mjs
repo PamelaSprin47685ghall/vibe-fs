@@ -274,15 +274,17 @@ test('WHAT[causal-wait-006] CAUSAL_006_history_default_capacity_is_256', () => {
       const registry = causal.createRegistry()
       const timer = temporal.createVirtualTimer()
       const deadline = temporal.timerDelay(timer, 100)
+      let cancels = 0
+      const deadlineWithCounter = { Delay: deadline.Delay, Cancel: () => { cancels += 1; deadline.Cancel() } }
       const fail = () => { throw new Error(`controlled ${failureAt} failure`) }
       try {
-        await assert.rejects(causal.untilSignalOrDeadline(registry, descriptor, deadline,
+        await assert.rejects(causal.untilSignalOrDeadline(registry, descriptor, deadlineWithCounter,
           failureAt === 'read' ? fail : () => null,
           failureAt === 'signal' ? fail : () => new Promise(() => {})), /controlled/)
         const ended = causal.snapshot(registry)
         assert.equal(ended.active.length, 0)
         assert.equal(ended.history.at(-1).exit, 'WaitFailed')
-        assert.equal(deadline.cancelCount, 1)
+        assert.equal(cancels, 1)
         temporal.timerAdvance(timer, 1000)
         await new Promise(resolve => setImmediate(resolve))
         assert.deepEqual(causal.snapshot(registry), ended)

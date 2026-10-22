@@ -403,20 +403,6 @@ module internal BodyDto =
             |> Result.map (fun () -> value)
             |> Result.mapError (fun fault -> fault.Message))
 
-    let private certificateStatus: Decoder<CertificateStatus> =
-        Decode.field "case" Decode.string
-        |> Decode.andThen (function
-            | "Current" -> exact [ "case" ] (Decode.succeed CertificateStatus.Current)
-            | "Stale" ->
-                exact [ "case"; "reason" ] (Decode.field "reason" nonBlank |> Decode.map CertificateStatus.Stale)
-            | "Invalidated" ->
-                exact
-                    [ "case"; "sourceRevision" ]
-                    (Decode.field "sourceRevision" revision
-                     |> Decode.map CertificateStatus.Invalidated)
-            | "Conflicted" -> exact [ "case" ] (Decode.succeed CertificateStatus.Conflicted)
-            | _ -> Decode.fail "unknown certificate status")
-
     let private slot: Decoder<CertificateSlot> =
         exact
             [ "slot"
@@ -424,16 +410,14 @@ module internal BodyDto =
               "schema"
               "canonicalPayload"
               "revision"
-              "guarantee"
-              "status" ]
+              "guarantee" ]
             (Decode.object (fun get ->
                 { Slot = get.Required.Field "slot" nonBlank
                   Producer = get.Required.Field "producer" nonBlank
                   Schema = get.Required.Field "schema" schema
                   CanonicalPayload = get.Required.Field "canonicalPayload" canonical
                   Revision = get.Required.Field "revision" revision
-                  Guarantee = get.Required.Field "guarantee" guarantee
-                  Status = get.Required.Field "status" certificateStatus }))
+                  Guarantee = get.Required.Field "guarantee" guarantee }))
         |> validated (fun value ->
             Certificate.validateSlot value
             |> Result.map (fun () -> value)
@@ -441,16 +425,14 @@ module internal BodyDto =
 
     let private patch: Decoder<CertificateSlotPatch> =
         exact
-            [ "certificateId"
-              "targetRef"
+            [ "targetRef"
               "valueSpaceId"
               "scopeId"
               "semanticsModelRef"
               "slot"
               "expectedSlotRevision" ]
             (Decode.object (fun get ->
-                { CertificateId = get.Required.Field "certificateId" (id CertificateId.tryCreate)
-                  TargetRef = get.Required.Field "targetRef" nonBlank
+                { TargetRef = get.Required.Field "targetRef" nonBlank
                   ValueSpaceId = get.Required.Field "valueSpaceId" nonBlank
                   ScopeId = get.Required.Field "scopeId" nonBlank
                   SemanticsModelRef = get.Required.Field "semanticsModelRef" nonBlank
@@ -627,13 +609,6 @@ module internal BodyDto =
                 (Decode.object (fun get ->
                     InquiryEventBody.CertificateSlotsPatched
                         { Patches = get.Required.Field "patches" (Decode.list patch) }))
-        | "CertificateInvalidated" ->
-            exact
-                [ "invalidation"; "reason" ]
-                (Decode.object (fun get ->
-                    InquiryEventBody.CertificateInvalidated
-                        { Invalidation = get.Required.Field "invalidation" envelope
-                          Reason = get.Required.Field "reason" Decode.string }))
         | "DecisionRecorded" ->
             exact
                 [ "decision" ]

@@ -11,13 +11,6 @@ type CertificateGuarantee =
     | ExactWithinModel of modelRef: string * numericError: string
     | ResidualOnly of reason: string
 
-[<RequireQualifiedAccess>]
-type CertificateStatus =
-    | Current
-    | Stale of reason: string
-    | Invalidated of sourceRevision: Revision
-    | Conflicted
-
 type CertificateSlot =
     {
         Slot: string
@@ -27,12 +20,10 @@ type CertificateSlot =
         /// Revision of the slot's own content; a patch names the base it expects.
         Revision: Revision
         Guarantee: CertificateGuarantee
-        Status: CertificateStatus
     }
 
 type CertificateSlotPatch =
     {
-        CertificateId: CertificateId
         TargetRef: string
         ValueSpaceId: string
         ScopeId: string

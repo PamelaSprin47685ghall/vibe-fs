@@ -63,11 +63,6 @@ module ProviderResources =
         let api = resources ()
         api?readText (ProviderLanguage.externalName language, semanticPath)
 
-    /// ARCH-016 Gate C hook: both locale leaves must exist for a semantic path.
-    let requireLanguagePair (semanticPath: string) : unit =
-        let api = resources ()
-        api?requireLanguagePair semanticPath |> ignore
-
     /// Layout smoke: provider tree root present.
     let languageRootsPresent () : bool =
         let api = resources ()

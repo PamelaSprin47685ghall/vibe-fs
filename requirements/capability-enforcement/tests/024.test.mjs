@@ -45,7 +45,7 @@ test('WHAT[capability-enforcement-024] FORK_manager_fork_rejects_devops_calling'
     const { data } = await runManagerProgram(
       hooks,
       'ses-fork-devops',
-      'return await this.fork({ calling: "devops", name: "Op", charge: "run tests" }, { 1: null });',
+      'return await this.fork({ calling: "devops", name: "Op", charge: "run tests" }, []);',
     )
     // 显式 calling=devops：Manager 只能 fork Engineer，不能 fork DevOps。
     // 结构化拒绝：显式 calling 与由 name 派生出的 calling 冲突。
@@ -65,7 +65,7 @@ test('WHAT[capability-enforcement-024] FORK_devops_dispatch_denied_until_review_
     const forkDevops = await runManagerProgram(
       hooks,
       sessionID,
-      'return await this.fork({ name: "devops", charge: "run tests" }, { 1: null });',
+      'return await this.fork({ name: "devops", charge: "run tests" }, []);',
     )
     assert.equal(forkDevops.data.ok, false)
     assert.equal(forkDevops.data.code, devopsReviewGateCode)
@@ -74,7 +74,7 @@ test('WHAT[capability-enforcement-024] FORK_devops_dispatch_denied_until_review_
     const resumeDevops = await runManagerProgram(
       hooks,
       sessionID,
-      'return await this.resume({ name: "devops", charge: "run tests" }, { 1: null });',
+      'return await this.resume({ name: "devops", charge: "run tests" }, []);',
     )
     assert.equal(resumeDevops.data.ok, false)
     assert.equal(resumeDevops.data.code, devopsReviewGateCode)
@@ -85,7 +85,7 @@ test('WHAT[capability-enforcement-024] FORK_devops_dispatch_denied_until_review_
     const admitted = await runManagerProgram(
       hooks,
       sessionID,
-      'return await this.resume({ name: "devops", charge: "run tests" }, { 1: null });',
+      'return await this.resume({ name: "devops", charge: "run tests" }, []);',
     )
     assert.equal(admitted.data.ok, true)
     assert.ok(['created', 'nudged'].includes(admitted.data.outcome), admitted.rendered)
@@ -103,7 +103,7 @@ test('WHAT[capability-enforcement-024] FORK_manager_fork_engineer_admitted_after
     const { data } = await runManagerProgram(
       hooks,
       sessionID,
-      'return await this.fork({ calling: "engineer", name: "Op", charge: "run tests" }, { 1: null });',
+      'return await this.fork({ calling: "engineer", name: "Op", charge: "run tests" }, []);',
     )
     assert.equal(data.ok, true)
     assert.equal(data.name, 'Op')

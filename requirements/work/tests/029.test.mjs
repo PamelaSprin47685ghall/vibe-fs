@@ -99,7 +99,7 @@ test('WHAT[work-029] shared Plan interface permits only PLAN_PATH and rejects re
     assert.equal(opened.ok, true, opened.error)
 
     const run = body => hooks.tool['todowrite-for-plan'].execute(
-      { program: `class Js extends JsProgram { async run() { ${body} } }` },
+      { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'plan-read' },
       { sessionID, agent: 'plan', callID: 'call-work-029', messageID: 'run-work-029', providerRunID: 'run-work-029' },
     )
 

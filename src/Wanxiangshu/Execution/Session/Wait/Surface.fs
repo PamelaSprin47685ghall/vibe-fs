@@ -310,17 +310,10 @@ module CausalWaitSurface =
         let handle = registry :?> RuntimeHandle
         let inner = unbox<IDeadlineHandle> deadline
 
-        let cancellations = System.Collections.Generic.List<int>()
-        emitJsExpr (deadline, 0) "$0.cancelCount = $1" |> ignore
-
         let deadlineHandle =
             { new IDeadlineHandle with
                 member _.Delay = inner.Delay
-
-                member _.Cancel() =
-                    cancellations.Add 1
-                    emitJsExpr (deadline, cancellations.Count) "$0.cancelCount = $1" |> ignore
-                    inner.Cancel() }
+                member _.Cancel() = inner.Cancel() }
 
         let read () =
             let value = call0 tryRead

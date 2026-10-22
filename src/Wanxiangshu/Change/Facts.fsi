@@ -31,8 +31,7 @@ type OrchestratorFactCases =
         {| ManagerJobId: ManagerJobId
            TargetRef: TargetRef
            RebasedCommit: CommitHash
-           ExpectedHead: CommitHash
-           AuthorityRevision: AuthorityRevision |}
+           ExpectedHead: CommitHash |}
     | Published of
         {| ManagerJobId: ManagerJobId
            CandidateCommit: CommitHash

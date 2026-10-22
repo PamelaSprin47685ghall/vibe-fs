@@ -46,37 +46,49 @@ module JsDeliveredValues =
     /// only: this reader never judges a delivery.
     val peekCached: sessionId: string -> obj
     val select: sessionId: string -> view: obj option -> already: Set<string> -> ReturnedPiece list
-    /// Render the staged view of a render cache cell. Presentation only:
+
+    /// Select carry and append this call's report as canonical returned material.
+    val materialize:
+        sessionId: string -> carry: obj -> fence: DeliveryFence option -> assistant: string option -> string
+
+    /// Select the staged view of a render cache cell. Presentation only:
     /// nothing taken here proves a delivery (clauses 1 and 3).
-    val tryTakeRenderedWith: sessionId: string -> assistant: string option -> string option
+    val tryTakeMaterialWith: sessionId: string -> assistant: string option -> string option
 
     /// The exact handoff: the cell must carry the fence of this very tool
     /// call — the provider run AND the tool call id. A mismatch claims
-    /// nothing and advances nothing.
-    val tryTakeRenderedForCall:
+    /// nothing and advances nothing; the owner compares the fence itself.
+    val tryTakeMaterialForCall:
         sessionId: string ->
         providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
         toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId ->
         assistant: string option ->
             string option
 
-    /// The run-only handoff: the cell must carry the fence of this provider
-    /// run. It matches the provider run only, not the full fence, so within
-    /// one run a different call can take this cell and advance the returned
-    /// cursor. It is a harness-only channel; production consumers use
-    /// `tryTakeRenderedForCall` or the durable witness.
-    val tryTakeRenderedFor:
+    /// Read-only observation: does the current cell belong to this very tool
+    /// call? Nothing is taken and the returned cursor does not move.
+    val ownsCell:
         sessionId: string ->
         providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
-        assistant: string option ->
+        toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId ->
+            bool
+
+    /// Consume the exact call using already materialized durable evidence,
+    /// without resolving its historical anchors a second time.
+    val tryTakeWitnessMaterial:
+        sessionId: string ->
+        providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId ->
+        material: string ->
+        assistant: string ->
             string option
 
-    /// Render the staged view of a render cache cell. Presentation only.
-    val tryTakeRendered: sessionId: string -> string option
+    /// Select the staged view of a render cache cell. Presentation only.
+    val tryTakeMaterial: sessionId: string -> string option
     /// Snapshot of the handoff, delivery or render cache. Presentation only:
     /// it never judges a delivery.
-    val tryPeekRendered: sessionId: string -> string option
-    val tryPeekRenderedWith: sessionId: string -> assistant: string option -> string option
+    val tryPeekMaterial: sessionId: string -> string option
+    val tryPeekMaterialWith: sessionId: string -> assistant: string option -> string option
     /// The raw view declaration of the current cell — a delivery or a render
     /// cache. Presentation only.
     val peekView: sessionId: string -> obj option

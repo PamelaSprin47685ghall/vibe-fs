@@ -22,4 +22,4 @@ module Surface =
     val start: RuntimeHandle -> args: obj -> Task<obj>
     val status: RuntimeHandle -> args: obj -> obj
     val exportInquiry: RuntimeHandle -> args: obj -> obj
-    val submitResults: RuntimeHandle -> args: obj -> obj
+    val submitResults: RuntimeHandle -> args: obj -> Task<obj>

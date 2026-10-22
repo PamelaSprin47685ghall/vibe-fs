@@ -1,4 +1,4 @@
-// WHAT[repository-programming-017] 同一助理消息内的多个工具调用由宿主按确定
+// WHAT[repository-programming-065] 同一助理消息内的多个工具调用由宿主按确定
 // 顺序逐个执行，各为独立事务，后者读取前者提交后的状态。
 //
 // 为什么这条不能用「测试自己串行调用」来证明：
@@ -90,7 +90,7 @@ const overlapped = (log) => {
   )
 }
 
-test('WHAT[repository-programming-017] two tool calls of one assistant message commit in a deterministic serial order, the second reading the first commit', async () => {
+test('WHAT[repository-programming-065] two tool calls of one assistant message commit in a deterministic serial order, the second reading the first commit', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, SESSION, 'engineer')
 
@@ -106,11 +106,11 @@ test('WHAT[repository-programming-017] two tool calls of one assistant message c
     // 值，所以 call1 先被派发、call2 后被派发，而两者在产品侧同时在飞。
     const [first, second] = await Promise.all([
       hooks.tool['todowrite-for-engineer'].execute(
-        { program: appendProgram('call1') },
+        { name: 'call1', program: appendProgram('call1') },
         { sessionID: SESSION, agent: 'engineer', callID: 'call-017-1', messageID: RUN },
       ),
       hooks.tool['todowrite-for-engineer'].execute(
-        { program: appendProgram('call2') },
+        { name: 'call2', program: appendProgram('call2') },
         { sessionID: SESSION, agent: 'engineer', callID: 'call-017-2', messageID: RUN },
       ),
     ])

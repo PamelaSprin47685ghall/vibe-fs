@@ -62,21 +62,21 @@ test('WHAT[work-024] the Plan devops member refuses an unusable report mapping a
     const runPlan = async (body) =>
       String(
         await hooks.tool['todowrite-for-plan'].execute(
-          { program: `class Js extends JsProgram { async run() { ${body} } }` },
+          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-plan' },
           { sessionID, agent: 'plan' },
         ),
       )
 
-    const missing = await runPlan('return await this.devops("investigate the build artifact");')
-    assert.match(missing, /ok = false/)
-    assert.match(missing, /code = "VIEW_DECLARATION_INVALID"/)
+    const invalidItem = await runPlan('return await this.devops("investigate the build artifact", [null]);')
+    assert.match(invalidItem, /ok = false/)
+    assert.match(invalidItem, /code = "VIEW_DECLARATION_INVALID"/)
 
     const malformed = await runPlan('return await this.devops("investigate the build artifact", { "not-an-anchor": null });')
     assert.match(malformed, /ok = false/)
     assert.match(malformed, /code = "VIEW_DECLARATION_INVALID"/)
 
-    // 合法映射但没有已开立的 Plan 工作：拒绝，不派工，也不伪造成功。
-    const withoutWork = await runPlan('return await this.devops("investigate the build artifact", { 1: null });')
+    // 合法 carry（默认 []）但没有已开立的 Plan 工作：拒绝，不派工，也不伪造成功。
+    const withoutWork = await runPlan('return await this.devops("investigate the build artifact");')
     assert.match(withoutWork, /ok = false/)
     assert.match(withoutWork, /code = "devops-failed"/)
     assert.match(withoutWork, /lifecycle work is missing/)
@@ -105,7 +105,7 @@ test('WHAT[work-024] an unreviewed tenure may read the draft', async () => {
       async run() {
         return { ok: true };
       }
-    }` },
+    }`, name: 'read-draft' },
       { sessionID, agent: 'plan', callID: 'call-work-024', messageID: 'run-work-024', providerRunID: 'run-work-024' },
     )
     assert.match(String(read), /# ok/)

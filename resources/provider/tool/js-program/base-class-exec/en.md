@@ -1,6 +1,6 @@
-  async call(command, planB) {
-    // Returns { ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }. command is one shell string. planB is required: the alternative if this command is not run. Its UTF-8 byte length × 50ms is the automatic yield budget. A missing planB is CALL_COMMAND_UNSUPPORTED. stdout and stderr are the increment since the previous automatic park.
-    // Example: const outcome = await this.call("printf ok", "read the file directly");
+  async call(command, timeoutOrOptions) {
+    // Returns { ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }. command is one shell string. Optional timeoutOrOptions specifies an explicit timeout in milliseconds (a positive number or { timeoutMs } object); omitted uses the stable default timeout (10000ms). Text notes do not price waiting time. stdout and stderr are the increment since the previous automatic park.
+    // Example: const outcome = await this.call("printf ok");
   }
 
   async signal(signal) {

@@ -88,9 +88,6 @@ module ProviderLanguageSurface =
     let readText (language: string) (semanticPath: string) : string =
         ProviderResources.readText (languageOf language) semanticPath
 
-    let requireLanguagePair (semanticPath: string) : unit =
-        ProviderResources.requireLanguagePair semanticPath
-
     let substitute (template: string) (substitutions: obj) : string =
         ProviderProse.substitute template (mapOf substitutions)
 

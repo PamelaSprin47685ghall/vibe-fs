@@ -27,13 +27,6 @@ module DeliveredTenureHandOff =
         requestId: string ->
             Result<IncumbencyId, string>
 
-/// The durable review evidence the publish gate reads for one Manager road
-/// (change-integration-005/013). Module level so the read-only harness probes the
-/// exact rule the gate applies after a delivered hand-off.
-[<RequireQualifiedAccess>]
-module PublishReviewEvidence =
-    val ofWork: work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork -> (string * string) option
-
 /// Host wiring for one Change Work. One physical Manager session can host many
 /// logical Relay incumbencies; no second audit session participates in publication.
 type OrchestratorHost =

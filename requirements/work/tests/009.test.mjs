@@ -21,25 +21,23 @@ test('WHAT[work-009] a live owned resource blocks deliver without retiring', () 
   assert.equal(blocked.finished, false)
 })
 
-test('WHAT[work-009] the second deliver reports the live blocker instead of reporting an end', async () => {
+test('WHAT[work-009] deliver reports the live blocker instead of reporting an end', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
-    // 派工是编程面成员：`this.fork(payload, reportMapping)`，宿主不再注册 fork 工具。
+    // 派工是编程面成员：`this.fork(payload, carry = [])`，宿主不再注册 fork 工具。
     const forked = await hooks.tool['todowrite-for-manager'].execute(
       {
         program:
-          'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "implement" }, { 1: null }); } }',
+          'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "implement" }, []); } }',
+        name: 'fork-ada',
       },
       { sessionID: session, agent: 'manager' },
     )
     assert.match(String(forked), /ok = true/)
     assert.match(String(forked), /name = "Ada"/)
     assert.match(String(forked), /outcome = "created"/)
-    // The first call only confirms; Algorithm E4 does not read the blocker set.
-    assert.match(
-      await hooks.tool.deliver.execute({}, { sessionID: session, callID: 'deliver-confirm', messageID: 'run-confirm', agent: 'manager' }),
-      /confirmation_required = true/,
-    )
+    // Single delivery: when blockers are active, deliver immediately reports
+    // the blocker set without an intermediate confirmation step.
     const blocked = await hooks.tool.deliver.execute(
       {},
       { sessionID: session, callID: 'deliver-call', messageID: 'run-retire', agent: 'manager' },
@@ -175,3 +173,4 @@ test('WHAT[work-009] durable ownership host commits Reserve before granting star
     rmSync(root, { recursive: true, force: true })
   }
 })
+
