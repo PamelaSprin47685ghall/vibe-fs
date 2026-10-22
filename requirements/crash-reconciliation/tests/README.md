@@ -29,7 +29,7 @@ WHAT 是合同。这里说明当前证据，不为恢复增加隐含规则。用
 
 这些回归调用真实 journal 结算入口，没有驱动 PluginRecoveryWiring、插件 activation 或 OS crash。crash-reconciliation-018/020 的 Load Phase 表述与 durable-events-020、host-boundary-021 的延迟激活边界仍需协调；本轮不改变激活时点和等待语义，不声称已经阻止普通执行越过未完成结算。JoinDrain 的受控 append port 仍只把实际事实交 production Fold，没有写磁盘。主动取消产生可收取 completion，ChildRunVoided 与 ChildWorkVoided 均不产生 completion，二者不是同一场景。
 
-作废与「不写完成」的区别正在这里：作废**结清**父方的未解除工作义务（join 以 `voided` 报告一次后该工作退役），所以它不是「什么都没发生」；而「不写完成」只是没有交付，本身并不结清任何义务。
+作废与「不写完成」的区别正在这里：作废**结清**父方的未解除工作义务（join 以 `voided` 报告一次后该工作退役），所以它不是「什么都没发生」；而「不写完成」只是没有交付，本身并不结清任何义务。**结算按孤儿幂等**：每个孤儿一生只产生一条作废事实，**重启的进程不得再次作废同一份孤儿工作**（journal 里不会出现第二条作废事实，join 也不再重复报告）；在这一次 `voided` 报告之后，该 handle 经 `durableLifecycleByname` 读出 `Retired`——**这是经 `summary` 投影读出的终态**（投影叠盖工作状态），不是从原始 handle 绑定直接读出的。
 
 绑定/Fission 测试会在 finally 移除自己的 resolver/cache。canonical journal JSON 是持久协议载体，不是 Fable 内部 tag/fields 对象。018 的旧 `/continue` 材料链随新版合同退役；本轮逐项覆盖迁移表见[历史迁移记录](../../../proposals/archive/2026-10-03/20模块迁移-恢复与委托-2026-09-28.md)。
 

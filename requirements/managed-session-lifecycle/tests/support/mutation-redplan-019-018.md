@@ -328,7 +328,7 @@
 
 - 改后（新增 SendFailure guard 分支，形态与既有 `HandleWorkAbandoned` 分支（113-120 行）同构（foldWork 第 5 参同为 `true`）；`HandleAbandonReason.ParentCancelled` 为 Facts.fs 20-23 行 DU 的合法构造子；DU 的 `=` structural comparison 合法）：
 
-> **后续补记（2026-10-21 作废裁决）**：上面的 DU 行号区间已过时——`HandleAbandonReason` 现在是**四个**合法构造子（`Facts.fs` 20-24 行）：`ParentCancelled`｜`DeadlineExceeded`｜`HostSessionGone`｜**`Voided`**。`Voided` 表示该 child 工作**已无法交付**、以作废结清父方的未解除义务；作废不是完成，它不写完成正文。**已被 2026-10-21 作废裁决取代的旧口径**是「只有前三个构造子」，现已作废，见 `requirements/delegation/tests/README.md` 的「未交付子工作的作废结清（2026-10-21 裁决）」一节。本变异计划自身的落点不变——它针对的是 `SendFailure` 完成结算被改写成 abandon，理由仍取 `ParentCancelled`；`Voided` 只是同一 DU 上的第四项，与本变异无关。库侧 `wanxiangli/handle-lifecycle` 自 0.66.0（`663ba59`）起，`recoverChild()` 的 `durableReason` 接受这四项全集；**主仓的 `wanxiangli` gitlink 仍停在 0.65.0（`fde10a0`），未 bump**。
+> **后续补记（2026-10-21 作废裁决）**：上面的 DU 行号区间已过时——`HandleAbandonReason` 现在是**四个**合法构造子（`Facts.fs` 20-24 行）：`ParentCancelled`｜`DeadlineExceeded`｜`HostSessionGone`｜**`Voided`**。`Voided` 表示该 child 工作**已无法交付**、以作废结清父方的未解除义务；作废不是完成，它不写完成正文。**已被 2026-10-21 作废裁决取代的旧口径**是「只有前三个构造子」，现已作废，见 `requirements/delegation/tests/README.md` 的「未交付子工作的作废结清（2026-10-21 裁决）」一节。本变异计划自身的落点不变——它针对的是 `SendFailure` 完成结算被改写成 abandon，理由仍取 `ParentCancelled`；`Voided` 只是同一 DU 上的第四项，与本变异无关。库侧 `wanxiangli/handle-lifecycle` 自 0.66.0（`663ba59`）起，`recoverChild()` 的 `durableReason` 接受这四项全集；**主仓的 `wanxiangli` gitlink 仍停在 0.65.0（`fde10a0`），未 bump**。作废侧的结算契约另记在此备查：**重启的进程不得再次作废同一份孤儿工作**（每个孤儿一生一条作废事实，join 只报告一次），报告之后该 handle 经 `durableLifecycleByname` 读出 `Retired`——经 `summary` 投影读出的终态。
 
 ```fsharp
         | ExecutionFactCases.HandleWorkCompleted p when p.Kind = HandleCompletionKind.SendFailure ->
