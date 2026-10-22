@@ -65,6 +65,18 @@ HNI-08 (plugin-host) board's model-routing surface, but it claims no card and ch
 legacy `OpencodeModel` and the `ModelRoutingSurface` host calls stay live (retirement is HNI-10) and no
 consumer was cut over; routing them onto P-08 is the next slice.
 
+P-12 fact (arch lane, 2026-10-22, slice P-12): P-12 now has an OpenCode implementation —
+`OpenCode/Host/DiagnosticsPort.fs(i)` implements `IDiagnosticSink` over the host's own log verb
+`client.app.log` (`POST /log`, SDK body `{ service, level, message, extra }`); the neutral port family
+`Host/Ports/Diagnostics.fs(i)` is unchanged. The neutral `Emit` returns `unit` and carries no severity,
+so every diagnostic is written at level `info` with the operation as the message and the fields as
+`extra`; the write is fired and not awaited, and a failed log write is dropped rather than thrown into
+product code (a diagnostic must not break a turn). Fact only: it touches the HNI-08 (plugin-host)
+board's diagnostics surface, but it claims no card and changes no card state. The product's existing
+diagnostic path is `Foundation/Diagnostic.fs` (`Diagnostic.emit`, a product diagnostic behind the CTX-014
+whitelist and the `WANXIANGSHU_DIAG=1` gate), not the host verb; those call sites stay live and no
+consumer was cut over onto P-12.
+
 Lane worker ids: fill the Owner column when you claim (lanes started 06:05 UTC: fission, fork, tools, plugin-host).
 
 ## Gate ⑩/⑪/⑫/⑬ (HNI-04, HNI-11) — `scripts/checks/adapter-thinness.mjs`, run inside `architecture.mjs`

@@ -805,6 +805,8 @@ OpenCode/Host/TranscriptPort.fsi
 OpenCode/Host/TranscriptPort.fs
 OpenCode/Host/ModelCatalogPort.fsi
 OpenCode/Host/ModelCatalogPort.fs
+OpenCode/Host/DiagnosticsPort.fsi
+OpenCode/Host/DiagnosticsPort.fs
 Execution/Session/ChatExecution/ProviderRunBinding.fsi
 Execution/Session/ChatExecution/ProviderRunBinding.fs
 OpenCode/Host/SessionSnapshotSurface.fsi
