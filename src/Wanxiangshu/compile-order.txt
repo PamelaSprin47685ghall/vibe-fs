@@ -807,6 +807,8 @@ OpenCode/Host/ModelCatalogPort.fsi
 OpenCode/Host/ModelCatalogPort.fs
 OpenCode/Host/DiagnosticsPort.fsi
 OpenCode/Host/DiagnosticsPort.fs
+OpenCode/Host/PathsPort.fsi
+OpenCode/Host/PathsPort.fs
 Execution/Session/ChatExecution/ProviderRunBinding.fsi
 Execution/Session/ChatExecution/ProviderRunBinding.fs
 OpenCode/Host/SessionSnapshotSurface.fsi
