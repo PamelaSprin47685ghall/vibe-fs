@@ -52,7 +52,8 @@ type SyncDelegateTerminalResponse =
       PhysicalUserMessageId: PhysicalUserMessageId
       AuthorityRootUserMessageId: AuthorityRootUserMessageId
       ProviderRun: ProviderRunIdentity
-      FormalText: string }
+      View: string
+      TurnFormalText: string }
 
 type SyncDelegateObservedExecution =
     { Admission: Task<SyncDelegateObservedAdmission>
@@ -64,5 +65,4 @@ module DedicatedDelegateKey =
 module SyncDelegate =
     val tryRoleOfToolName: name: string -> SyncDelegateRole option
     val roleLabel: role: SyncDelegateRole -> string
-    val delegateRoleToAttachment: role: SyncDelegateRole -> AttachmentKind
     val agentNameFor: role: SyncDelegateRole -> string

@@ -9,6 +9,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -127,7 +128,7 @@ module JournalPortObservationSurface =
 
             let port =
                 { new IDispatchSessionPort with
-                    member _.SendPrompt(_, _, _) =
+                    member _.SendPrompt(_, _, _, _) =
                         Task.FromResult(SendOutcome.AdmittedWithReceipt(TransportReceipt.create "receipt-port-obs"))
 
                     member _.SubscribeFutureTerminal(_, _) =
@@ -157,6 +158,7 @@ module JournalPortObservationSurface =
                     key
                     child
                     (PhysicalUserMessageId.create ("msg-" + SessionId.value child))
+                    (Some "Child")
 
             acceptedChild
             |> Result.defaultWith (fun error -> failwithf "child admission rejected: %s" error)

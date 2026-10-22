@@ -20,10 +20,6 @@ type EventStoreBlobWriter =
 
     static member Create: store: IEventStore -> IBlobWriter
 
-[<RequireQualifiedAccess>]
-module JournalPayloadClosure =
-    val ofFact: fact: Fact -> PayloadRef list
-
 [<Sealed>]
 type EventStoreJournalWriter =
     private new:

@@ -7,6 +7,7 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.execution-tool-admissions.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
@@ -21,8 +22,12 @@
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-js-run-loop.fsproj"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fsi"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
-    <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fsi"/>
-    <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fs"/>
+    <Compile Include="Repository/Programming/Js/DescriptionAssets.fsi"/>
+    <Compile Include="Repository/Programming/Js/DescriptionAssets.fs"/>
+    <Compile Include="Repository/Programming/Js/ToolWorkflow.fsi"/>
+    <Compile Include="Repository/Programming/Js/ToolWorkflow.fs"/>
+    <Compile Include="Repository/Programming/Js/JsToolPolicy.fsi"/>
+    <Compile Include="Repository/Programming/Js/JsToolPolicy.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fs"/>
     <Compile Include="Repository/Programming/Js/GeneratorSurface.fsi"/>

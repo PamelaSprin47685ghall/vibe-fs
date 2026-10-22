@@ -10,6 +10,7 @@ module ProcessOutput =
           mutable Spool: Spool.StreamingSpool option
           mutable BytesObserved: int64
           mutable Discarded: bool
+          mutable Finished: CapturedOutput option
           OutputLimit: int64 }
 
     val create: estimate: ProcessEstimate -> OutputCollector

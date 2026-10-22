@@ -2,8 +2,16 @@ namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Foundation.Identity
 
 module PromptJournalAdapter =
+    val createWithOwnership:
+        liveOwnershipFor: (SessionId -> SessionOwnership option) ->
+        internalLeafOwnerFor: (SessionId -> SessionId option) ->
+        journal: AgentJournal ->
+            IPromptJournal
+
     val create: journal: AgentJournal -> IPromptJournal
     val forJournal: journal: AgentJournal -> PromptDispatcher.Runtime
 

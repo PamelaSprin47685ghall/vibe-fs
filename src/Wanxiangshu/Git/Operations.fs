@@ -18,7 +18,7 @@ module GitOperations =
         }
 
     let private command repo args =
-        { FileName = "git"
+        { FileName = GitSubject.Executable
           Arguments = args
           WorkingDirectory = Some repo
           Environment = None
@@ -32,12 +32,6 @@ module GitOperations =
             Ok()
         else
             Error(failure result.Stdout result.Stderr)
-
-    let private absoluteGitPath (directory: string) (path: string) =
-        if path.StartsWith "/" then
-            path
-        else
-            System.IO.Path.Combine(directory, path)
 
     let private stderrOr (missing: string) (stderr: string) =
         if String.IsNullOrWhiteSpace stderr then
@@ -283,47 +277,7 @@ module GitOperations =
         }
 
     let private rebaseInProgress (runner: TextProcessRunner) dir =
-        taskResult {
-            // ORCH-003: continue only when rebase-merge/rebase-apply exists.
-            // A bare REBASE_HEAD ref can be stale (no rebase in progress).
-            let! merge = execute runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
-
-            do!
-                if merge.ExitCode = 0 then
-                    Ok()
-                else
-                    Error(failure merge.Stdout merge.Stderr)
-
-            do!
-                if String.IsNullOrWhiteSpace merge.Stdout then
-                    Error "git rebase-state query returned no path"
-                else
-                    Ok()
-
-            let! apply = execute runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
-
-            do!
-                if apply.ExitCode = 0 then
-                    Ok()
-                else
-                    Error(failure apply.Stdout apply.Stderr)
-
-            do!
-                if String.IsNullOrWhiteSpace apply.Stdout then
-                    Error "git rebase-state query returned no path"
-                else
-                    Ok()
-
-            let exists (path: string) =
-                if String.IsNullOrWhiteSpace path then
-                    false
-                else
-                    let path = path.Trim()
-                    let absolute = absoluteGitPath dir path
-                    System.IO.Directory.Exists absolute
-
-            return exists merge.Stdout || exists apply.Stdout
-        }
+        WorktreeCommands.rebaseInProgress runner dir
 
     let createWithRepo repoPath (runner: TextProcessRunner) : GitPort =
         { IsDirty = WorktreeCommands.isDirty runner
@@ -400,5 +354,3 @@ module GitOperations =
                     repoPath
                     (targetSpec target)
                     (sprintf "target branch not found: %s" (TargetRef.value target)) }
-
-    let createWithRunner runner = createWithRepo "." runner

@@ -9,21 +9,6 @@ open Wanxiangshu.Persistence.EventStore
 /// authority).
 module CasebookStore =
 
-    /// Canonical Casebook event stream id.
-    val CasebookStream: string
-
-    /// Event type for a captured Case.
-    val CapturedEventType: string
-
-    /// Event type for a refreshed Case.
-    val RefreshedEventType: string
-
-    /// Event type for a touched Case.
-    val AccessedEventType: string
-
-    /// Event type for an evicted Case.
-    val EvictedEventType: string
-
     /// True if the event type is one of the Casebook event types.
     val isCasebookEventType: eventType: string -> bool
 

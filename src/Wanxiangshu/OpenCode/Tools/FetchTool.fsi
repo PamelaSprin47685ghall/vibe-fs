@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Knowledge.Casebook
 
@@ -22,15 +23,8 @@ module FetchTool =
         val Stale: string = "tool/fetch/stale"
 
         [<Literal>]
-        val NoCase: string = "tool/fetch/no-case"
-
-        [<Literal>]
         val Unavailable: string = "tool/fetch/unavailable"
 
-        [<Literal>]
-        val ShelfmarkRequired: string = "tool/fetch/shelfmark-required"
-
-    val admission: ToolAdmission
 
     val spec:
         factory: HostToolFactory ->

@@ -350,7 +350,4 @@ module AgentJournal =
 
     let runtimeId (journal: AgentJournal) : RuntimeId = journal.RuntimeId
 
-    let writeBlob (content: string) (journal: AgentJournal) : Task<Result<BlobWriteReceipt, string>> =
-        journal.WriteBlob content
-
     let isPoisoned (journal: AgentJournal) : bool = journal.IsPoisoned

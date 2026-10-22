@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
+import * as join from '../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 import { scanText } from '../../../scripts/checks/provider-leak-gate.mjs'
 
 const completed = (agentName, view = '') => ({

@@ -137,7 +137,7 @@ test('WHAT[managed-chat-execution-003] an exact admission joining after committe
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const transaction = await import("../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js");
+const transaction = await import("../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js");
 
 const evidence = {
   sessionId: 'ses-transaction',

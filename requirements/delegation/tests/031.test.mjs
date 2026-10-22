@@ -4,7 +4,6 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
-import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 const directories = new Set()
 const live = async (owner) => {
@@ -23,10 +22,7 @@ const waitForPromptCount = async (h, owner, role, count) => {
 }
 
 const settle = async (h, owner, role, answer, run = 'run-1') => {
-  runtimeSurface.recordFencedDeliveredView(sync.child(h, owner, role), run, `call-${run}`, {
-    prefixUntil: 0,
-    thenMap: {},
-  })
+  await sync.deliverCurrent(h, owner, role, run, `call-${run}`, answer, { 0: answer })
   return sync.settle(h, owner, role, answer, run)
 }
 
@@ -97,6 +93,11 @@ test('WHAT[delegation-031] DELEG_031_parent_supersede_leaves_no_orphan_completio
     const child = sync.child(h, owner, 'Engineer')
     assert.equal(typeof child, 'string')
     assert.notEqual(child, '')
+    const delivered = await sync.deliverCurrent(
+      h, owner, 'Engineer', 'run-late', 'call-run-late', 'LATE-ANSWER', { 0: 'LATE-ANSWER' },
+    )
+    assert.match(delivered, /LATE-ANSWER/)
+    assert.deepEqual(await remainsPending(pending), { kind: 'pending' })
 
     // Parent supersedes the call before its completion arrives.
     assert.equal(sync.abandonPendingCall(h, owner, 'Engineer'), true)
@@ -105,10 +106,6 @@ test('WHAT[delegation-031] DELEG_031_parent_supersede_leaves_no_orphan_completio
     // call is gone, so settle finds no live call and reports false; the
     // invocation itself already failed with the supersede reason, not with
     // a stale success.
-    runtimeSurface.recordFencedDeliveredView(child, 'run-late', 'call-run-late', {
-      prefixUntil: 0,
-      thenMap: {},
-    })
     assert.equal(await sync.settle(h, owner, 'Engineer', 'LATE-ANSWER', 'run-late'), false)
     const result = await pending
     assert.equal(result.ok, false)

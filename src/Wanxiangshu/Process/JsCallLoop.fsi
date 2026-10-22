@@ -30,3 +30,13 @@ module JsCallLoop =
         runnableClass: obj ->
         stack: string ->
             Task<obj>
+
+    type Host =
+        interface IDisposable
+        new: root: string * scope: ExecutionScope -> Host
+        member Start: command: obj -> obj
+        member Wait: ticket: obj -> Task<obj>
+        member SignalParked: signal: obj -> Task<obj>
+        member SendParked: input: obj -> Task<obj>
+        member TakeDelta: ticket: obj * publish: (obj -> bool) -> Task<obj>
+        member DisposeAsync: unit -> Task<unit>

@@ -2,13 +2,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import { withJournal, acceptOwner, hostPort } from './support/authority.mjs'
+import { withJournal, acceptOwner, hostPort, linkChildWork } from './support/authority.mjs'
 
 test('WHAT[dispatch-protocol-001] actual owner-root and continuation sends reach Host with an already registered exact claim', async () => {
   await withJournal('dispatch-entry', async (handle) => {
     const owner = await acceptOwner(handle)
     const seed = authority.issueInheritedIdentitySeed('engineer', owner)
     assert.equal(seed.ok, true)
+    await linkChildWork(handle, owner.session, 'child', 'engineer')
     const sentKeys = []
     const port = hostPort(async (session, text, options) => {
       const key = options.Metadata.wanxiangshu_prompt_key

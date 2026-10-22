@@ -46,25 +46,34 @@ module PromptAuthorityProjectionBridge =
 module ProviderFailureProjectionBridge =
 
     let private providerFailuresOf (projection: AgentProjectionSet) (sessionId: SessionId) =
-        Map.tryFind sessionId projection.Sessions
-        |> Option.bind (fun session -> session.ProviderFailures)
+        PromptAuthorityProjectionQueries.providerFailureBudget sessionId projection
+        |> Option.map snd
 
-    let private applyChange (projection: AgentProjectionSet) (change: ProviderFailureProjectionChange) =
-        match change with
-        | ProviderFailureProjectionChange.ProviderFailuresSet(sessionId, failures) ->
+    let private applyChange
+        (projection: AgentProjectionSet)
+        (ProviderFailureProjectionChange.ProviderFailuresSet(sessionId, failures))
+        =
+        match PromptAuthorityProjectionQueries.providerFailureBudget sessionId projection with
+        | None -> FoldRejection.reject "ProviderFailureBudget" "The provider failure change has no proven budget owner"
+        | Some(owner, _) ->
             ProjectionUpdate.updateSession
-                sessionId
+                owner
                 (fun session ->
                     { session with
                         ProviderFailures = Some failures })
                 projection
+            |> Ok
 
     let fold
         (projection: AgentProjectionSet)
         (fact: ProviderFailureFactCases)
         : Result<AgentProjectionSet, FoldRejection> =
         match ProviderFailureFactFold.fold (providerFailuresOf projection) fact with
-        | Ok changes -> Ok(List.fold applyChange projection changes)
+        | Ok changes ->
+            changes
+            |> List.fold
+                (fun current change -> current |> Result.bind (fun updated -> applyChange updated change))
+                (Ok projection)
         | Error rejection ->
             FoldRejection.reject
                 (ProviderFailureFoldRejection.fact rejection)
@@ -150,6 +159,10 @@ module ContextProjectionBridge =
     let private retireAuxiliaryVisibility projection sessionId =
         ProjectionUpdate.updateSession sessionId ProjectionUpdate.retireAuxiliaryInjectionVisibility projection
 
+    /// PERSIST-010 / HOST-006: an epoch-advancing line commits through the prefix
+    /// owner (`wanxiangli/prefix`). Only a committed advance retires the old horizon:
+    /// a replayed line or a repeated observation is absorbed and changes nothing, so
+    /// it can neither clear rebuilt checkpoints nor retire visibility a second time.
     let private reanchor factName projection sessionId apply =
         match ProjectionUpdate.tryUpdatePrefix sessionId apply projection with
         | Ok advanced -> Ok(clearCheckpointGeneration (retireAuxiliaryVisibility advanced sessionId) sessionId)

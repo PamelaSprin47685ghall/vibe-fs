@@ -7,6 +7,7 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-delivery-attempt-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.degeneration-guard.execution-session-loopdetector.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.session-nudge.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
@@ -26,6 +27,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-opencode-host.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-tools-toolruntimescope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-bookkeeper.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-wire.fsproj"/>
     <Compile Include="OpenCode/Host/TurnRuntimePreparation.fsi"/>

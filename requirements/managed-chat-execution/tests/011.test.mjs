@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { linkChildWork } from '../../dispatch-protocol/tests/support/authority.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -64,8 +65,8 @@ const rootIdentity = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent: 'manager',
-    canonicalRole: 'manager',
+    participant: 'manager',
+    role: 'manager',
     selectedTier: 'deep',
     persona: 'Lead',
     personaCatalogVersion: 1,
@@ -98,6 +99,7 @@ test('WHAT[managed-chat-execution-011] external and plugin roots share AcceptMan
 
     const inherited = authority.issueInheritedIdentitySeed('engineer', owner.profile)
     assert.equal(inherited.ok, true, inherited.error)
+    await linkChildWork(handle, owner.profile.session, 'ses-plugin', 'engineer')
 
     const sent = await dispatch.sendAgentOwnerRoot(
       hostPort(async () => dispatch.admittedWithReceipt('plugin-root-receipt')),

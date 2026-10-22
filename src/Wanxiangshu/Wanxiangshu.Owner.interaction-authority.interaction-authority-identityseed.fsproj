@@ -16,6 +16,8 @@
     <Compile Include="Interaction/Authority/Origin.fs"/>
     <Compile Include="Interaction/Authority/Facts.fsi"/>
     <Compile Include="Interaction/Authority/Facts.fs"/>
+    <Compile Include="Interaction/Authority/LifeClassification.fsi"/>
+    <Compile Include="Interaction/Authority/LifeClassification.fs"/>
     <Compile Include="Interaction/Authority/PromptSessionFact.fsi"/>
     <Compile Include="Interaction/Authority/PromptSessionFact.fs"/>
   </ItemGroup>

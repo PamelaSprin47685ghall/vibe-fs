@@ -1,6 +1,13 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System.Threading.Tasks
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Git
@@ -27,8 +34,9 @@ module PluginHostWiring =
           SnapshotOpt: ISessionSnapshotPort option
           Wired: HostSignalBootstrap.WiredSignals
           SharedTerminalKey: string option
-          SharedTerminalPort: Events.HostEventPort option
+          SharedTerminalPort: ISessionTerminalSource option
           RootWorkspace: IRootWorkspaceReader
+          InternalLeafOwnerFor: SessionId -> SessionId option
 
           CausalWaitObserver: IWaitObserver }
 

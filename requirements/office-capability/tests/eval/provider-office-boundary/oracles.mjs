@@ -20,8 +20,10 @@ export const evaluateManagerMixedMission = (_c, trace) => {
   if (trace.mutations === true || named(trace, 'todowrite-for-engineer', 'todowrite-for-devops', 'read', 'glob', 'grep', 'write', 'edit', 'mv', 'rm', 'run', 'exec', 'open-terminal', 'send-terminal', 'fission').length > 0) {
     return { ok: false, reason: 'Manager must delegate repository work and execution' }
   }
-  const forks = named(trace, 'fork')
-  const resumes = named(trace, 'resume')
+  // The delegation verbs are programming-surface members: the Manager's
+  // program calls them, they are no longer host-registered tools.
+  const forks = named(trace, 'this.fork')
+  const resumes = named(trace, 'this.resume')
 
   // Manager must not fork DevOps (DevOps is resumed, not forked)
   for (const fork of forks) {
@@ -40,7 +42,7 @@ export const evaluateManagerMixedMission = (_c, trace) => {
 
 export const evaluateDevopsInherentRepair = (_c, trace) => {
   if (trace.role !== 'devops') return { ok: false, reason: 'expected DevOps' }
-  if (named(trace, 'fission', 'fork', 'resume').length > 0) {
+  if (named(trace, 'fission', 'this.fork', 'this.resume', 'this.commission', 'this.devops').length > 0) {
     return { ok: false, reason: 'DevOps must repair directly without creating or dispatching agents' }
   }
   const calls = trace.toolCalls ?? []

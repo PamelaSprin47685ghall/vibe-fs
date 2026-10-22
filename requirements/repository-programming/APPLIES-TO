@@ -14,6 +14,7 @@
 /src/Wanxiangshu/Repository/Programming/Js/AnchorFs.fs
 /src/Wanxiangshu/Repository/Programming/Js/Capability.fs
 /src/Wanxiangshu/Repository/Programming/Js/Description.fs
+/src/Wanxiangshu/Repository/Programming/Js/DescriptionAssets.fs
 /src/Wanxiangshu/Repository/Programming/Js/Failure.fs
 /src/Wanxiangshu/Repository/Programming/Js/FilesystemSurface.fs
 /src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs
@@ -21,7 +22,7 @@
 /src/Wanxiangshu/Repository/Programming/Js/MutationFs.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHostSurface.fs
-/src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+/src/Wanxiangshu/Repository/Programming/Js/ToolWorkflow.fs
 /src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs
 /src/Wanxiangshu/Repository/Programming/Js/Surface.fs
 /src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs

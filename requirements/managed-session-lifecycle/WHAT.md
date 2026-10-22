@@ -22,7 +22,7 @@ Dedicated 绑定键为 `(OwnerReuseScopeId, Role)`。同一 scope 内每个 Role
 
 ## [006] Handle 四态
 
-Handle 仅有 `Active | CompletedAwaitingJoin | Retired | Abandoned` 四态。Retired 与 Abandoned 为持久终态，不可恢复为活动状态。
+Handle 仅有 `Active | CompletedAwaitingJoin | Retired | Abandoned` 四态。Retired 与 Abandoned 为持久终态，不可恢复为活动状态。作废（`ChildWorkVoided`）不是第五个 handle 态：它结清该 handle 的未解除义务，并要求 join 以 `voided` 报告一次。退役不得先于这一次报告发生，否则报告无处送达、父方的义务在名册里静默消失。
 
 ## [007] Completion 单赋值
 
@@ -30,7 +30,7 @@ Handle 仅有 `Active | CompletedAwaitingJoin | Retired | Abandoned` 四态。Re
 
 ## [008] Consume 与 Retire
 
-join 消费完成结果时原子写入 HandleRetired 墓碑；提交未确认不返回 payload。完成事实在重启后仍仅投递一次。
+join 消费完成结果时原子写入 HandleRetired 墓碑；提交未确认不返回 payload。完成事实在重启后仍仅投递一次。作废结算的成员同样只报告一次：join 以 `voided` 报告该次作废，随后退役；已退役则不再报告，重启不重复。
 
 ## [009] 父取消等待子收束
 
@@ -62,9 +62,11 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 ## [016] Attempt Interrupt 与 Logical Cancel
 
-内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。自动化机制不得任意中断用户根会话；deliver 可凭已落地的退休事实终止残余尝试。work-049 的已登记用户询问是另一项窄例外：同一 ask 的工具结果确认后，只暂停提问者的当前 attempt，不取消已入队的真实用户输入，也不影响子资源或逻辑运行。
+内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。自动化机制不得任意中断用户根会话；deliver 可凭已落地的退休事实终止残余尝试——交付完成后的停止发生在 transform 钩子：抑制下一次 provider 请求、清空本次请求的消息、并中断本次 attempt。work-049 的已登记用户询问是另一项窄例外：同一 ask 的工具结果确认后，只暂停提问者的当前 attempt，不取消已入队的真实用户输入，也不影响子资源或逻辑运行。
 
-work-011 的 S4 Delivered 是完成停止，不是任意取消：无继任者时，在退休与对应 logical run 关闭落盘后、deliver 返回前等待当前 attempt 的中断回执。有继任者的 Relayed 不发此中断；第一次确认也不中断。失败必须如实呈现，不能用成功文字代替停止保证。
+work-011 的 S4 Delivered 是完成停止，不是任意取消：交付已成立（提交面事实）后，本次请求在 transform 钩子处被交付裁决拦下——抑制下一次 provider step、清空本次请求的消息（LLM 因此看不到 deliver 回复）、中断本次 attempt。物理中断不在 deliver 工具内部发出，deliver 也不等 Host 中断回执才返回。有继任者的 Relayed 不发此中断；第一次确认也不中断。交付裁决只命中「登记时那次物理输入仍是当前物理输入」的交付：旧交付不得停住新输入或后任。
+
+「中断已发出」与「已观察到中断成功」是两个分别取证的事实。中断未确认不推翻已提交的交付，也不把已提交的交付呈现为失败：失败必须如实呈现为「中断未确认」，不得用交付回执的成功文字代替停止保证，也不得用它抹掉已提交的交付。
 
 真实外部物理用户输入只允许打断 `join` 等待，不得中断当前 LLM 输出或其他工具，也不得调用 Host `AbortSession` / `InterruptAttempt` 排空当前 attempt。新输入作为下一次 LLM 请求的材料，由 Host 在当前输出或工具自然结束后纳入；当前物理 assistant 与工具结果仍须正常保存。
 
@@ -83,6 +85,8 @@ work-049 的 `ask` 是模型主动请求的人类等待，不是“新用户输�
 HandleAbandoned 表示 child 不会再沿当前 handle 返回，只由已确认的 logical parent/session 终止或 child 永久丢失证据授权。
 
 Attempt/TurnAborted、provider failure/retry、degeneration-guard、Fission、插件卸载、进程 shutdown 或 runtime dispose 均无此权限，只结束当前观察者/attempt 或 detach 本地资源，保留 durable Active handle 供恢复与 Join/Horizon。未知停止信号不升级成 ParentCancelled。
+
+放弃原因（`HandleAbandonReason`）的合法集合是四项：`ParentCancelled`、`DeadlineExceeded`、`HostSessionGone` 与 `Voided`。`Voided`（作废）是 2026-10-21 裁决新增的一项：它表示该 child 工作**已无法交付**、因此以作废结清父方的未解除工作义务。**两类作废事实都走 abandon，没有一类是 abandon 规则的例外**，差别只在于被 abandon 的是工作单元格还是 handle 绑定：对 scoped 工作，其具体工作单元格转为 `Abandoned(Voided)`，它承载的那份**工作义务已是终态**；底层 handle 绑定仍**可复用**（它标识可再次参与的参与者身份，不是被作废的那份工作）；对无 scope 历史，被 abandon 的就是该 handle 绑定自身，它转为 `Abandoned(Voided)`。两种情形都是 join 报告恰好一次 `voided` 之后退役；**结算按孤儿幂等，重启的进程不得再次作废同一份孤儿工作**（每个孤儿一生只产生一条作废事实），报告之后该 handle 经 `durableLifecycleByname` 读出 `Retired`——**这是经 `summary` 投影读出的终态**，不是从原始 handle 绑定直接读出的。作废不是完成，它不写完成正文。这四项是 `wanxiangli/handle-lifecycle` 的 `recoverChild()` 所接受的 `durableReason` 全集——**已被 2026-10-21 作废裁决取代的旧口径**是「只有 `ParentCancelled`/`DeadlineExceeded`/`HostSessionGone` 三项」，现已作废，见 `requirements/delegation/tests/README.md` 的「未交付子工作的作废结清」一节。库侧已发布 0.66.0（`handle-lifecycle` 接受 `Voided`），**主仓的 `wanxiangli` gitlink 也已随 `cfa8d0dad` 前移到 0.66.0（`663ba59`）**（该 bump 已随行为泳道的 `6ccc761c2` 进入 `origin/master`），主仓把 `durableReason = "Voided"` 交给库的那条恢复路径现在交到的就是已发布并接受它的库版本。
 
 ## [019] Cancel/Delete 精确排空
 

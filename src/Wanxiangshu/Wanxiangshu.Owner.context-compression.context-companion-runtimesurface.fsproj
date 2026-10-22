@@ -24,8 +24,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-trace-capture.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj" />
-    <Compile Include="Context/Companion/Transform.fsi" />
-    <Compile Include="Context/Companion/Transform.fs" />
     <Compile Include="OpenCode/Host/HostCompactionGate.fsi" />
     <Compile Include="OpenCode/Host/HostCompactionGate.fs" />
     <Compile Include="OpenCode/Host/HostCompactionObserver.fsi" />

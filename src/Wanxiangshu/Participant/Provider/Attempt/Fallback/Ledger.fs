@@ -16,17 +16,11 @@ type FailureAdmissionOutcome =
 /// Single writer: policy-authorized provider failure → durable dedupe → budget advance/exhaust.
 module ProviderFailureLedger =
 
-    let private replayLatestFailure (identity: FailedProviderAttemptIdentity) (current: ProviderFailureProjection) =
-        let exactLatest =
-            (current.ObservedFailures
-             |> List.tryHead
-             |> Option.exists (fun observed -> observed.Key = FailedProviderAttemptIdentity.dedupeKey identity))
-            && not current.LastTransitionWasSuccess
-
-        match exactLatest, ProviderFailureProjection.mayRetry current with
-        | true, true -> FailureAdmissionOutcome.RetryAuthorized
-        | true, false -> FailureAdmissionOutcome.RetryExhausted
-        | false, _ -> FailureAdmissionOutcome.EpisodeSuperseded
+    let private admissionOfReplay replay =
+        match replay with
+        | ProviderFailureReplay.RetryAuthorized -> FailureAdmissionOutcome.RetryAuthorized
+        | ProviderFailureReplay.RetryExhausted -> FailureAdmissionOutcome.RetryExhausted
+        | ProviderFailureReplay.EpisodeSuperseded -> FailureAdmissionOutcome.EpisodeSuperseded
 
     let private appendExhausted
         (port: ProviderFailureJournalPort)
@@ -99,16 +93,14 @@ module ProviderFailureLedger =
             Ok current
 
     let private outcomeForAdvanceRejection
-        (identity: FailedProviderAttemptIdentity)
-        (current: ProviderFailureProjection)
         (rejection: ProviderFailureAdvanceRejection)
         : Result<FailureAdmissionOutcome, string> =
         match rejection with
-        | ProviderFailureAdvanceRejection.AlreadyObserved -> Ok(replayLatestFailure identity current)
         | ProviderFailureAdvanceRejection.AlreadyExhausted -> Ok FailureAdmissionOutcome.RetryExhausted
         | ProviderFailureAdvanceRejection.DifferentRun
         | ProviderFailureAdvanceRejection.NoActiveBudget -> Ok FailureAdmissionOutcome.NoActiveRun
         | ProviderFailureAdvanceRejection.InvalidBudget
+        | ProviderFailureAdvanceRejection.AlreadyObserved
         | ProviderFailureAdvanceRejection.ConflictingObservation
         | ProviderFailureAdvanceRejection.InvalidTransition ->
             Error "Provider failure advance violates validation (budget, count or observed identity conflicts)"
@@ -128,25 +120,11 @@ module ProviderFailureLedger =
                     current.AuthorityRootUserMessageId
                     providerRun
 
-            let key = FailedProviderAttemptIdentity.dedupeKey identity
-
-            let appendNewFailure () =
-                let spec =
-                    current.BudgetSpec
-                    |> Option.defaultWith (fun () ->
-                        { Version = 1
-                          Limit = ProviderFailureBudget.DefaultBudget })
-
-                let nextCount = current.Budget.ConsecutiveFailureCount + 1
-
-                match ProviderFailureProjection.applyFailure identity spec nextCount reason current with
-                | Error rejection -> Task.FromResult(outcomeForAdvanceRejection identity current rejection)
-                | Ok updated -> appendFailureRecorded port spec sessionId providerRun reason current nextCount updated
-
-            match current.ObservedFailures |> List.tryFind (fun observed -> observed.Key = key) with
-            | Some observed when observed.Reason = reason -> return Ok(replayLatestFailure identity current)
-            | Some _ -> return Error "Provider failure identity conflicts with its recorded reason"
-            | None -> return! appendNewFailure ()
+            match ProviderFailureProjection.observeFailure identity reason current with
+            | Error rejection -> return outcomeForAdvanceRejection rejection
+            | Ok(ProviderFailureObservation.Replay replay) -> return Ok(admissionOfReplay replay)
+            | Ok(ProviderFailureObservation.Record(spec, nextCount, updated)) ->
+                return! appendFailureRecorded port spec sessionId providerRun reason current nextCount updated
         }
 
     let private recordAfterLicenceCheck

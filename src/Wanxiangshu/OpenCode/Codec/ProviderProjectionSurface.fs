@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
@@ -142,7 +144,7 @@ module ProviderProjectionSurface =
                text = optionString decoded.Text |}
 
     let opencodeModel (providerId: string) (modelId: string) (variant: obj) : obj =
-        let value: OpencodeModel =
+        let value: HostModel =
             { providerID = providerId
               modelID = modelId
               variant = if isNull variant then None else Some(unbox<string> variant) }
@@ -201,7 +203,7 @@ module ProviderProjectionSurface =
         (model: obj)
         (parts: obj array)
         : obj =
-        let modelValue: OpencodeModel option =
+        let modelValue: HostModel option =
             if isNull model then
                 None
             else
@@ -282,7 +284,7 @@ module ProviderProjectionSurface =
                parts = List.toArray value.parts |}
 
     let opencodeHookInput (sessionId: string) (messageId: string) (agent: string) (model: obj) : obj =
-        let modelValue: OpencodeModel =
+        let modelValue: HostModel =
             { providerID = string model?providerID
               modelID = string model?modelID
               variant =

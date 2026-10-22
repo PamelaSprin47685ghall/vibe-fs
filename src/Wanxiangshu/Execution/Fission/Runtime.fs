@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Fission
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
 [<CLIMutable>]
@@ -34,6 +35,8 @@ module FissionRuntime =
     let private deliveryClaims = HashSet<string>()
     // DSL-MUTABLE: single-flight — takeover claim latch per group
     let private takeoverClaims = HashSet<string>()
+    // DSL-MUTABLE: resource — materialization queue per group and lane
+    let private materializations = Dictionary<string, TaskCompletionSource<unit>>()
 
     let private handleKey ownerSessionId handleId =
         SessionId.value ownerSessionId + "\u001f" + handleId
@@ -130,6 +133,37 @@ module FissionRuntime =
 
     let endTakeover groupId =
         lock gate (fun () -> takeoverClaims.Remove groupId |> ignore)
+
+    let acquireLaneMaterialization groupId (laneIndex: int) : Task<IDisposable> =
+        let key = groupId + "\u001f" + string laneIndex
+
+        let completion =
+            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let previous =
+            lock gate (fun () ->
+                let previous =
+                    match materializations.TryGetValue key with
+                    | true, pending -> pending.Task
+                    | false, _ -> Task.FromResult(())
+
+                materializations.[key] <- completion
+                previous)
+
+        task {
+            do! previous
+
+            return
+                { new IDisposable with
+                    member _.Dispose() =
+                        lock gate (fun () ->
+                            match materializations.TryGetValue key with
+                            | true, pending when Object.ReferenceEquals(pending, completion) ->
+                                materializations.Remove key |> ignore
+                            | _ -> ())
+
+                        completion.TrySetResult(()) |> ignore }
+        }
 
     let private observerForGroup groupId =
         lock gate (fun () ->

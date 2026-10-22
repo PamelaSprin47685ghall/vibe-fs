@@ -2,7 +2,7 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Process
 
 [<RequireQualifiedAccess>]

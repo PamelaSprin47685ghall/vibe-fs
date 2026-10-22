@@ -9,6 +9,33 @@ module DelegationJournalAdapter =
     val fromAgentJournal: journal: AgentJournal -> AgentJournalPort
 
 module TaskDeliveryJournal =
+    val tryFindForWork:
+        journal: AgentJournal ->
+        sessionId: Wanxiangshu.Foundation.Identity.SessionId ->
+        logicalRunId: Wanxiangshu.Foundation.Identity.LogicalRunId ->
+        authorityRoot: Wanxiangshu.Foundation.Identity.AuthorityRootUserMessageId ->
+        physicalUserMessageId: Wanxiangshu.Foundation.Identity.PhysicalUserMessageId ->
+        task: Wanxiangshu.Host.TaskDeliveryTask option ->
+            Wanxiangshu.Host.TaskDeliveryWitness option
+
+    /// 精确围栏读取：按完整围栏取见证，围栏其余字段不一致即拒绝。
+    val tryFindByFence:
+        journal: AgentJournal ->
+        fence: Wanxiangshu.Host.TaskDeliveryFence ->
+            Wanxiangshu.Host.TaskDeliveryWitness option
+
+    /// 围栏子集读取：只掌握部分围栏字段时使用；材料不一致时拒绝。
+    val tryFindByFenceFields:
+        journal: AgentJournal ->
+        sessionId: Wanxiangshu.Foundation.Identity.SessionId ->
+        providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId option ->
+        authorityRoot: Wanxiangshu.Foundation.Identity.AuthorityRootUserMessageId option ->
+        physicalUserMessageId: Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option ->
+        logicalRunId: Wanxiangshu.Foundation.Identity.LogicalRunId option ->
+        task: Wanxiangshu.Host.TaskDeliveryTask option ->
+            Wanxiangshu.Host.TaskDeliveryWitness option
+
     val tryFind:
         journal: AgentJournal ->
         sessionId: Wanxiangshu.Foundation.Identity.SessionId ->
@@ -20,7 +47,7 @@ module TaskDeliveryJournal =
         witness: Wanxiangshu.Host.TaskDeliveryWitness ->
             System.Threading.Tasks.Task<Result<unit, string>>
 
-    val commitChild:
+    val prepareChild:
         journal: AgentJournal ->
         sessionId: Wanxiangshu.Foundation.Identity.SessionId ->
         physicalUserMessageId: Wanxiangshu.Foundation.Identity.PhysicalUserMessageId ->
@@ -29,6 +56,4 @@ module TaskDeliveryJournal =
         formalText: string ->
         declaration: string ->
         view: string ->
-            System.Threading.Tasks.Task<
-                Result<Wanxiangshu.Host.TaskDeliveryWitness * Wanxiangshu.Foundation.Role, string>
-             >
+            Result<Wanxiangshu.Host.TaskDeliveryWitness * Wanxiangshu.Foundation.Role, string>

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { parse } from 'smol-toml'
 
 import {isError, errorValue} from '../../../dist/Sphinx/V2/Core/Surface.js'
 import {
@@ -11,7 +12,6 @@ import {
 import {capabilities} from '../../../dist/Sphinx/V2/Hosts/OpenCode/Surface.js'
 import {Host, admittedWithReceipt, withHost, hostRequest} from './host-support.mjs'
 import {retryable, fatal, acceptanceUnknown} from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import {recordDeliveredValue} from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
 const refusalOf = result => {
   assert.equal(isError(result), true, 'expected a refused decode')
@@ -168,14 +168,28 @@ test('WHAT[sphinx-v2-034] a transport receipt remains pending until actual manag
     assert.notEqual(accepted.promptKey, hostRequest().payload.dispatchIntentId)
     assert.equal(await Host.settleHostTerminal(probe, prompt.sessionId, 'foreign-physical', physical.authorityRootUserMessageId, 'foreign-run', 'foreign answer'), false)
     assert.deepEqual(await remainsPending(completion), {kind: 'pending'})
-    recordDeliveredValue(prompt.sessionId, 'actual formal answer')
-    assert.equal(await Host.settleHostTerminal(probe, prompt.sessionId, physical.physicalUserMessageId, physical.authorityRootUserMessageId, 'actual-provider-run', 'actual formal answer'), true)
-    assert.deepEqual(await completion, {
+    const sealed = await Host.deliverHostMaterial(
+      probe, prompt.sessionId, physical.physicalUserMessageId, physical.authorityRootUserMessageId,
+      'actual-provider-run', 'call-actual-provider-run', 'actual formal answer', {},
+    )
+    assert.equal(await Host.settleHostTerminal(probe, prompt.sessionId, physical.physicalUserMessageId, physical.authorityRootUserMessageId, 'actual-provider-run', 'late provider prose'), true)
+    const completed = await completion
+    assert.equal(completed.value.view, sealed)
+    assert.equal(completed.value.turnFormalText, 'late provider prose')
+    const delivered = parse(completed.value.view)
+    assert.deepEqual(Object.keys(delivered), ['returned'])
+    assert.equal(delivered.returned.length, 1)
+    assert.deepEqual(delivered.returned.map(row => row.text), ['actual formal answer'])
+    assert.equal(typeof delivered.returned[0].id, 'string')
+    assert.notEqual(delivered.returned[0].id, '')
+    assert.doesNotMatch(completed.value.view, /late provider prose|reasoning/)
+    assert.deepEqual(completed, {
       ok: true, value: {
         sessionId: prompt.sessionId,
         physicalUserMessageId: physical.physicalUserMessageId,
         authorityRootUserMessageId: physical.authorityRootUserMessageId,
-        providerRun: 'actual-provider-run', formalText: 'actual formal answer',
+        providerRun: 'actual-provider-run', view: completed.value.view,
+        turnFormalText: 'late provider prose',
       },
     })
   })

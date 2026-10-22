@@ -5,12 +5,11 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 
@@ -66,7 +65,7 @@ module PairProgrammingThoughtSurface =
                 {| guidelines = value.Guidelines.IsSome
                    xTrace = XTraceProjection.hasSemanticParts value.XTrace |}
 
-    let private anchoredFactOf (payload: obj) : AgentFact * SessionId =
+    let private anchoredFactOf (payload: obj) : Fact.AgentFact * SessionId =
         let sessionId = SessionId.create (textOf payload?session)
 
         let fact =
@@ -76,15 +75,9 @@ module PairProgrammingThoughtSurface =
                    CallId = ToolCallId.create (textOf payload?callId)
                    MarkerText = textOf payload?markerText
                    CallGap = transcriptGapOf payload?callGapAfter
-                   ResultGap = transcriptGapOf payload?resultGapAfter
-                   ConcernPlacement = None |}
+                   ResultGap = transcriptGapOf payload?resultGapAfter |}
 
         fact, sessionId
-
-    let private flagsForJournal (journal: obj) (session: string) : obj =
-        let sessionId = SessionId.create session
-        let projection = AgentJournal.snapshot (agentJournalOf journal)
-        projectionFlagsOf projection.AgentProjections sessionId
 
     /// Boot the production EventStore journal behind one opaque capability.
     let createJournal (directory: string) : Task<obj> =
@@ -165,7 +158,6 @@ module PairProgrammingThoughtSurface =
                            error = JournalAppendFailure.describe failure |}
         }
 
-    let projectionFlags (journal: obj) (session: string) : obj = flagsForJournal journal session
 
     /// Fold one anchored pair without opening a journal; used by the pure law test.
     let foldAnchoredPair (payload: obj) : obj =
@@ -189,11 +181,9 @@ module PairProgrammingThoughtSurface =
                report = Option.toObj report |}
 
     let text = PairProgrammingThoughtTransform.text
-    let source = PairProgrammingThoughtTransform.source
+    let source = PairGuidanceOccurrences.source
     let markerSource = source
     let markerToolName = PairProgrammingThoughtTransform.toolName
-    let canonicalText = text
-    let deniedText = PairProgrammingThoughtTransform.reprimandText None
 
     let private gapName gap =
         match gap with
@@ -255,7 +245,7 @@ module PairProgrammingThoughtSurface =
                    error = error.Message |}
 
     let stableCallId (sessionId: obj) (ordinal: int64) : string =
-        PairProgrammingThoughtTransform.stableCallId (if isNull sessionId then None else Some(string sessionId)) ordinal
+        PairGuidanceOccurrences.stableCallId (if isNull sessionId then None else Some(string sessionId)) ordinal
 
     let isPairProgrammingThought (raw: obj) : bool =
         PairProgrammingThoughtTransform.isPairProgrammingThought raw
@@ -270,10 +260,10 @@ module PairProgrammingThoughtSurface =
         |> Option.toObj
         |> box
 
+    /// The fuse is provider-blind: Cursor projection still records the same occurrence.
     let skipAutoInjectedRequested (providerId: obj) : bool =
-        PairProgrammingThoughtTransform.skipAutoInjectedRequested (
-            if isNull providerId then None else Some(string providerId)
-        )
+        ignore providerId
+        PairGuidanceOccurrences.skipRequested ()
 
     let tryInject (sessionId: obj) (markerText: string) (rawMessages: obj array) : Task<obj> =
         task {

@@ -4,7 +4,8 @@ import test from 'node:test'
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { default: fc } = await import("fast-check");
-const { decodeIngress } = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
+// CUT-40: the chat.message ingress decode is exercised on the OpenCode codec surface (one copy, next to PromptIngressCodec).
+const { decodeIngress } = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
 
 const malformedString = fc.anything({ withBoxedValues: true }).filter(value => typeof value !== 'string')
 const nonblankString = fc.string().filter(value => value.trim().length > 0)
@@ -43,7 +44,8 @@ test('WHAT[dispatch-protocol-015] generated non-arrays and non-booleans remain i
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { decodeIngress } = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
+// CUT-40: the chat.message ingress decode is exercised on the OpenCode codec surface (one copy, next to PromptIngressCodec).
+const { decodeIngress } = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
 
 
 test('WHAT[dispatch-protocol-015] ingress identity carrier algebra is exact conflict closed and byte preserving', () => {

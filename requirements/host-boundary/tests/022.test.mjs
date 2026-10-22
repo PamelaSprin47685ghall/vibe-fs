@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as transaction from '../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js'
+import * as transaction from '../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js'
 import * as executionStatus from '../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
 import * as hooks from '../../../dist/OpenCode/Host/PluginHooksSurface.js'
 

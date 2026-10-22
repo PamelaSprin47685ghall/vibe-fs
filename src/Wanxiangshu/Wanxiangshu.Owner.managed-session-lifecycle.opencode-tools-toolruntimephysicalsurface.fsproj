@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-tools-toolruntimephysicalsurface</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>managed-session-lifecycle</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>opencode-tools-toolruntimephysicalsurface</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-tools-toolruntimescope.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
+    <Compile Include="OpenCode/Tools/ToolRuntimePhysicalSurface.fsi"/>
+    <Compile Include="OpenCode/Tools/ToolRuntimePhysicalSurface.fs"/>
+  </ItemGroup>
+</Project>

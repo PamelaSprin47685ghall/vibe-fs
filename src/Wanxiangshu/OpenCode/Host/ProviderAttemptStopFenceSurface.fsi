@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Routing
+
 open System.Threading.Tasks
 
 /// provider-attempt-recovery-022 fence: opaque handle surface.

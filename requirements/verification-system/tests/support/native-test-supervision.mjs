@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { isFileCompletionEvent, isFileWrapper, testEntryFile } from './test-run-state.mjs'
+import { createCausalTransitionTracker } from './causal-transitions.mjs'
 
 export const MAX_PHYSICAL_WAIT_MS = 30000
 
@@ -25,12 +26,16 @@ export class NativeTestSupervision {
     this.requireAllocation = requireAllocation
     this.lastProgressAt = now()
     this.progressCount = 0
+    this.transitionCount = 0
     this.lastProgress = 'start'
     this.backgroundCount = 0
     this.lastBackground = null
     this.entries = new Map()
     this.failure = null
     this.stopped = false
+    this.runnerPid = null
+    this.runnerStarted = false
+    this.transitions = createCausalTransitionTracker({ plannedFiles: files })
     for (const name of files) {
       const file = resolve(name)
       if (this.entries.has(file)) throw new Error(`Duplicate planned entry ${file}`)
@@ -65,6 +70,51 @@ export class NativeTestSupervision {
     this.stopped = true
   }
 
+  expectRunner(pid) {
+    this.check()
+    if (!Number.isSafeInteger(pid) || pid <= 0 || this.runnerPid !== null) {
+      throw new Error('Runner process identity is missing or was already bound')
+    }
+    this.runnerPid = pid
+    this.transitions.expectedPid(pid)
+  }
+
+  observeTransition(event) {
+    const now = this.now()
+    this.check(now)
+    if (this.stopped) return
+    this.#recordTransition(event, now)
+  }
+
+  #recordTransition(event, now) {
+    if (event?.type === 'runner:started') {
+      if (this.runnerPid === null) return
+      if ([...this.entries.values()].some(entry => entry.phase !== 'queued')) {
+        throw new Error('Runner startup arrived after a file was submitted')
+      }
+    } else if (event?.type === 'runner:file-start' || event?.type === 'runner:file-drained') {
+      const entry = this.entry(event.data?.entryFile)
+      const expected = event.type === 'runner:file-start' ? 'active' : 'drained'
+      if (entry.phase !== expected) throw new Error('Causal transition has no validated file lifecycle')
+      if (this.runnerPid !== null && event.data?.pid !== this.runnerPid) {
+        throw new Error('File lifecycle event names another runner process')
+      }
+    } else return
+    const transition = this.transitions.observe(event)
+    if (transition === null) return
+    if (transition.lane === 'runner') {
+      this.runnerStarted = true
+      this.lastProgressAt = now
+    }
+    else {
+      const entry = this.entry(transition.lane)
+      entry.lastProgressAt = now
+      if (event.type === 'runner:file-drained') this.lastProgressAt = now
+    }
+    this.transitionCount += 1
+    this.lastProgress = transition.reason
+  }
+
   entry(file) {
     if (typeof file !== 'string' || file.length === 0) throw new Error('File lifecycle event requires entryFile')
     const entry = this.entries.get(resolve(file))
@@ -86,6 +136,10 @@ export class NativeTestSupervision {
     this.check(now)
     if (this.stopped) return []
     const type = event?.type
+    if (type === 'runner:started') {
+      this.observeTransition(event)
+      return []
+    }
     if (type !== 'test:complete') {
       this.backgroundCount += 1
       this.lastBackground = type ?? 'unknown event'
@@ -93,20 +147,28 @@ export class NativeTestSupervision {
     const relevant = ['runner:file-start', 'runner:file-drained', 'test:start', 'test:dequeue', 'test:complete', 'test:pass', 'test:fail']
     if (!relevant.includes(type)) return []
     const entry = this.entry(testEntryFile(event))
+    if ((type === 'runner:file-start' || type === 'runner:file-drained') &&
+        this.runnerPid !== null && event.data?.pid !== this.runnerPid) {
+      throw new Error('File lifecycle event names another runner process')
+    }
+    if (type === 'runner:file-start' && this.runnerPid !== null && !this.runnerStarted) {
+      throw new Error('File submission arrived before runner startup')
+    }
     const expected = type === 'runner:file-start' ? 'queued' : 'active'
     if (entry.phase !== expected) throw new Error(`File lifecycle event ${type} received while ${entry.file} is ${entry.phase}`)
+    if ((type === 'runner:file-start' || type === 'runner:file-drained') &&
+        (this.requireAllocation || entry.runId) && (!entry.runId || entry.runId !== event.data.runId)) {
+      throw new Error(`File ${type === 'runner:file-start' ? 'start' : 'drain'} does not match its allocated execution instance`)
+    }
     if (type === 'runner:file-start') {
-      if ((this.requireAllocation || entry.runId) && (!entry.runId || entry.runId !== event.data.runId)) {
-        throw new Error('File start does not match its allocated execution instance')
-      }
       entry.phase = 'active'
       entry.runId ??= event.data.runId
-      entry.lastProgressAt = now
     } else if (type === 'runner:file-drained') {
       if (entry.allowance) throw new Error('A file drained with an open physical wait')
       entry.phase = 'drained'
     } else if (type === 'test:start') entry.lastStart = { ...event.data }
     else if (type === 'test:dequeue' || type === 'test:complete') return this.native(entry, event, now)
+    this.#recordTransition(event, now)
     return []
   }
 
@@ -211,6 +273,7 @@ export class NativeTestSupervision {
 
   progress() {
     return { count: this.progressCount, last: this.lastProgress,
+      transitions: this.transitionCount,
       backgroundCount: this.backgroundCount, lastBackground: this.lastBackground }
   }
 

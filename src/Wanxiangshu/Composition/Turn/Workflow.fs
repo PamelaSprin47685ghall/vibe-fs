@@ -10,6 +10,9 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 
@@ -44,9 +47,10 @@ module TurnWorkflow =
             // (Inspector/Coder/Engineer/DevOps dedicated sessions). Do not break
             // this ownership.
             let! syncDelegateHandled =
-                match syncDelegate with
-                | Some runtime -> runtime.HandleTurn(turn, context.Failure, context.Quiescence)
-                | None -> Task.FromResult false
+                match abortCause, turn.Outcome, syncDelegate with
+                | AbortCause.DegenerationGuard _, ReconcileProgram.TurnAborted _, _ -> Task.FromResult false
+                | _, _, Some runtime -> runtime.HandleTurn(turn, context.Failure, context.Quiescence)
+                | _, _, None -> Task.FromResult false
 
             if syncDelegateHandled then
                 return ()

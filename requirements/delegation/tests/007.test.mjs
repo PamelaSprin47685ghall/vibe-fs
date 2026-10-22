@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
-import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 test('WHAT[delegation-007] new sync invocations reject historical Coder and Inspector without creating or prompting a child', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-retired-sync-'))
@@ -26,11 +25,7 @@ test('WHAT[delegation-007] new sync invocations reject historical Coder and Insp
     const work = sync.invoke(runtime, owner, 'Engineer', 'current research')
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
     assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 0), true)
-    const child = sync.child(runtime, owner, 'Engineer')
-    runtimeSurface.recordFencedDeliveredView(child, 'run-current', 'call-x', {
-      prefixUntil: 0,
-      thenMap: {},
-    })
+    await sync.deliverCurrent(runtime, owner, 'Engineer', 'run-current', 'call-x', 'local facts', { 0: 'local facts' })
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'local facts', 'run-current'), true)
     assert.equal((await work).ok, true)
   } finally {

@@ -10,7 +10,7 @@ const rootDir = path.resolve(__dirname, '../../..')
 const resourcesDir = path.join(rootDir, 'resources/provider')
 
 test('WHAT[work-031] plan role, stages, and tool resources exist in paired English and Simplified Chinese markdown files', () => {
-  // Both human questions and DevOps investigations have paired resources.
+  // The human-question resources have paired languages.
   const resourceBases = [
     'role/plan',
     'planning/s1',
@@ -18,7 +18,6 @@ test('WHAT[work-031] plan role, stages, and tool resources exist in paired Engli
     'planning/s3',
     'tool/js-plan',
     'tool/ask',
-    'tool/devops',
     'tool/ask-question',
     'tool/ask-title',
     'tool/ask-sent',
@@ -47,7 +46,7 @@ test('WHAT[work-031] plan role, stages, and tool resources exist in paired Engli
   }
 
   // Retired plan tools must not keep loadable tool resources
-  for (const retired of ['tool/resume', 'tool/handoff']) {
+  for (const retired of ['tool/resume', 'tool/handoff', 'tool/devops']) {
     const enFile = path.join(resourcesDir, retired, 'en.md')
     const zhFile = path.join(resourcesDir, retired, 'zh-CN.md')
     assert.ok(!fs.existsSync(enFile), `${retired}/en.md must not exist: the tool is retired from the plan surface`)
@@ -103,6 +102,51 @@ test('WHAT[work-031] plan prompts state that S1/S2 review gaps are entry-bar gap
   // Retirement ends this run's nudges; a genuine new input may open a fresh incumbency.
   assert.match(roleEn, /`post-S3`[\s\S]*interrupts the conversation[\s\S]*neither nudged nor revived[\s\S]*reopens a fresh incumbency[\s\S]*repeatedly request starting `S4`/i)
   assert.match(roleZh, /`post-S3`[\s\S]*中断[\s\S]*不再被催促也不复活[\s\S]*新任期[\s\S]*反复要求启动 `S4`/)
+  // S3 deliver enters the post-S3 state, stops nudging the retired run, interrupts like ask, and allows repeated S4 starts on user command.
+  // The sentence carrying this clause is rewritten across prompt revisions, so the assertions
+  // below check the semantics inside the post-S3 clauses instead of pinning one English or
+  // Chinese wording: the retired run is no longer nudged, the conversation is interrupted like
+  // ask, and the user may repeatedly request starting `S4`.
+  const postS3Paragraphs = (text) => text.split(/\n{2,}/).filter((p) => p.includes('`post-S3`'))
+
+  const assertPostS3Semantics = (text, label, wording) => {
+    const paragraphs = postS3Paragraphs(text)
+    assert.ok(paragraphs.length > 0, `${label}: must describe the post-S3 state`)
+    const statesInPostS3 = (re) => paragraphs.some((p) => re.test(p))
+    assert.ok(
+      statesInPostS3(wording.noNudge),
+      `${label}: the post-S3 clause must state that the retired run is no longer nudged`,
+    )
+    assert.ok(
+      statesInPostS3(wording.interruptsLikeAsk),
+      `${label}: the post-S3 clause must state that it interrupts the conversation like ask`,
+    )
+    assert.ok(
+      statesInPostS3(wording.repeatedS4Start),
+      `${label}: the post-S3 clause must state that the user may repeatedly request starting \`S4\``,
+    )
+  }
+
+  const englishPostS3Wording = {
+    noNudge: /neither nudged nor revived|no longer nudged|permanently disables? nudges?|not nudged|never nudged/i,
+    interruptsLikeAsk: /interrupts?[^.\n]{0,120}\bask\b/i,
+    repeatedS4Start: /repeatedly (?:request|ask|command)[^.\n]{0,80}`S4`/i,
+  }
+
+  const chinesePostS3Wording = {
+    noNudge: /不再被催促|不再催促|永久关闭[^。]{0,20}催促|不受催促|不再被自动催促/,
+    interruptsLikeAsk: /像\s*`?ask`?\s*一样中断|中断[^。]{0,30}(?:当前)?对话/,
+    repeatedS4Start: /反复[^。]{0,30}启动 `S4`/,
+  }
+
+  assertPostS3Semantics(roleEn, 'role/plan/en.md', englishPostS3Wording)
+  assertPostS3Semantics(roleZh, 'role/plan/zh-CN.md', chinesePostS3Wording)
+  assertPostS3Semantics(s3En, 'planning/s3/en.md', englishPostS3Wording)
+  assertPostS3Semantics(s3Zh, 'planning/s3/zh-CN.md', chinesePostS3Wording)
+  assertPostS3Semantics(deliverEn, 'tool/deliver/en.md', englishPostS3Wording)
+  assertPostS3Semantics(deliverZh, 'tool/deliver/zh-CN.md', chinesePostS3Wording)
+
+  // The repeated user-requested `S4` start is also pinned verbatim in the stage and tool prompts
   assert.match(s3En, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)
   assert.match(s3Zh, /`post-S3`[\s\S]*反复要求启动 `S4`/)
   assert.match(deliverEn, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)

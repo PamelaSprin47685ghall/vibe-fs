@@ -8,7 +8,7 @@
 /src/Wanxiangshu/Participant/Provider/SessionLanguage.fs
 /src/Wanxiangshu/Participant/Provider/ProviderResources.fs
 /src/Wanxiangshu/Participant/Provider/Prose.fs
-/src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs
+/src/Wanxiangshu/Participant/Provider/ProviderLanguageBinding.fs
 /src/Wanxiangshu/Resources/PackageResources.fs
 /src/Wanxiangshu/Resources/ProviderResourceBytes.fs
 /scripts/checks/language-parity-gate.mjs

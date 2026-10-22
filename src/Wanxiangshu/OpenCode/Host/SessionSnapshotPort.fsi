@@ -1,9 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Host.Ports
 
 module SessionSnapshotPort =
     val projectMessage: raw: obj -> SessionMessage option
@@ -17,5 +19,13 @@ module SessionSnapshotPort =
         new: baseUrl: string -> HttpSnapshotPort
         interface ISessionSnapshotPort
 
-    val create: input: obj -> ISessionSnapshotPort option
-    val createDiscovery: input: obj -> ISessionDiscoveryPort option
+    type SdkSessionPort =
+        new: client: obj * workspaceDirectory: string option -> SdkSessionPort
+        interface ISessionPort
+
+    type HttpSessionPort =
+        new: baseUrl: string -> HttpSessionPort
+        interface ISessionPort
+
+    val create: workspaceDirectory: string option -> input: obj -> ISessionSnapshotPort option
+    val createSessionPort: workspaceDirectory: string option -> input: obj -> ISessionPort option

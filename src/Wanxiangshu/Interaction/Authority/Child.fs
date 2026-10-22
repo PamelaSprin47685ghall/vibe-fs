@@ -28,11 +28,13 @@ module ChildPromptAuthority =
         handle
         (activeProfile: PromptAuthority.AuthorityExecutionProfile option)
         (accepted: PromptAuthority.AcceptedDispatch option)
+        acceptedExecution
         : System.Threading.Tasks.Task<Result<unit, string>> =
-        match handle, activeProfile, accepted with
-        | None, _, _
-        | Some _, Some _, _ -> System.Threading.Tasks.Task.FromResult(Ok())
-        | Some _, None, None ->
+        match handle, activeProfile, accepted, acceptedExecution with
+        | None, _, _, _
+        | Some _, Some _, _, _
+        | Some _, None, Some _, true -> System.Threading.Tasks.Task.FromResult(Ok())
+        | Some _, None, None, _ ->
             System.Threading.Tasks.Task.FromResult(
                 Error(
                     sprintf
@@ -41,12 +43,13 @@ module ChildPromptAuthority =
                         (PhysicalUserMessageId.value turn.PhysicalUserMessageId)
                 )
             )
-        | Some _, None, Some claim ->
+        | Some _, None, Some claim, false ->
             runtime.AcceptPhysicalAgentOwnerRoot
                 claim.PromptKey
                 turn.SessionId
                 turn.PhysicalUserMessageId
                 claim.IdentitySeed
+                None
             |> TaskValue.map (Result.map ignore)
 
     let ensureForLinkedChild
@@ -67,6 +70,21 @@ module ChildPromptAuthority =
                             PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
                 let runtime = PromptDispatcher.forPrompts prompts
-                return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted
+
+                let key: Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionKey =
+                    { SessionId = turn.SessionId
+                      PhysicalUserMessageId = turn.PhysicalUserMessageId }
+
+                let acceptedExecution =
+                    (prompts.ChatAcceptancePersistence()).ReadExact key
+                    |> Option.exists (fun execution ->
+                        let evidence = execution.acceptedEvidence
+
+                        evidence.AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                        && evidence.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                        && (accepted
+                            |> Option.exists (fun claim -> claim.IdentitySeed = evidence.IdentitySeed)))
+
+                return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted acceptedExecution
             | None -> return Ok()
         }

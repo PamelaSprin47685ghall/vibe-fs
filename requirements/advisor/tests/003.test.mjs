@@ -3,7 +3,7 @@ import test from 'node:test'
 import { parse } from 'smol-toml'
 import { clear, clearAll, delivered, plan, record } from '../../../dist/Execution/Delegation/Advisor/Surface.js'
 
-const request = (anchors, prefixUntil, thenMap = {}, history = []) => ({
+const request = (anchors, prefixUntil, thenMap, history = []) => ({
   messages: anchors.map((anchor) => ({ anchor, text: 'material-' + anchor })),
   declaration: { prefixUntil, thenMap }, history,
 })
@@ -11,19 +11,20 @@ const texts = (result) => (parse(result.viewPrompt).new_work_to_record ?? []).ma
 test.beforeEach(() => clearAll())
 
 test('WHAT[advisor-003] follow-ups use successfully delivered material rather than a declaration boundary', () => {
-  const first = plan('en', [], request([1, 2, 3], 0))
+  const first = plan('en', [], request([1, 2, 3], 0, { 1: null, 2: null, 3: null }))
+  assert.deepEqual(texts(first), ['material-1', 'material-2', 'material-3'])
   record('caller', first.deliveredMaterial)
-  const second = plan('en', delivered('caller'), request([1, 2, 3, 4, 5], 99))
+  const second = plan('en', delivered('caller'), request([1, 2, 3, 4, 5], 99, {}))
   assert.deepEqual(texts(second), ['material-4', 'material-5'])
   record('caller', second.deliveredMaterial)
-  const third = plan('en', delivered('caller'), request([1, 2, 3, 4, 5], 0))
+  const third = plan('en', delivered('caller'), request([1, 2, 3, 4, 5], 0, { 1: null, 2: null, 3: null, 4: null, 5: null }))
   assert.deepEqual(texts(third), [])
   assert.equal(third.hasNewMaterial, false)
   assert.deepEqual(third.deliveredMaterial, [])
 })
 
 test('WHAT[advisor-003] view generation folds intervals before delta and delivers a new representative summary', () => {
-  const initial = plan('en', [], request([1, 2, 3], 0))
+  const initial = plan('en', [], request([1, 2, 3], 0, { 1: null, 2: null, 3: null }))
   record('caller', initial.deliveredMaterial)
   const history = [{ anchor: 2, until: 3, summary: 'old-summary-two' }]
   const result = plan('en', delivered('caller'), request([1, 2, 3], 1, { 1: 'one-and-two', 3: null }, history))
@@ -34,16 +35,17 @@ test('WHAT[advisor-003] view generation folds intervals before delta and deliver
 })
 
 test('WHAT[advisor-003] an unrecorded or failed consultation does not consume its proposed delta', () => {
-  const pending = request([1, 2], 0)
+  const pending = request([1, 2], 0, { 1: null, 2: null })
   const first = plan('en', delivered('caller'), pending)
   const retry = plan('en', delivered('caller'), pending)
+  assert.deepEqual(texts(first), ['material-1', 'material-2'])
   assert.deepEqual(texts(retry), texts(first))
   assert.deepEqual(delivered('caller'), [])
 })
 
 test('WHAT[advisor-003] delivery cursors are isolated, monotone, and cleared per caller', () => {
-  const first = plan('en', [], request([1], 0))
-  const second = plan('en', [], request([2], 0))
+  const first = plan('en', [], request([1], 0, { 1: null }))
+  const second = plan('en', [], request([2], 0, { 2: null }))
   record('caller', first.deliveredMaterial)
   record('caller', first.deliveredMaterial)
   record('other', second.deliveredMaterial)

@@ -21,7 +21,7 @@
     <Compile Include="Execution/Session/Attachment/AttachmentSurface.fs"/>
     <Compile Include="Execution/Session/Attachment/CompanionLeaseRuntime.fsi"/>
     <Compile Include="Execution/Session/Attachment/CompanionLeaseRuntime.fs"/>
-    <Compile Include="OpenCode/Host/SatelliteSurface.fsi"/>
-    <Compile Include="OpenCode/Host/SatelliteSurface.fs"/>
+    <Compile Include="Execution/Session/Attachment/SatelliteSurface.fsi"/>
+    <Compile Include="Execution/Session/Attachment/SatelliteSurface.fs"/>
   </ItemGroup>
 </Project>

@@ -3,7 +3,14 @@
  * Oracles are eval-only. Do not wire into production Tools/*.fs.
  */
 
-/** @typedef {{ name: string, args?: Record<string, string> }} EvalToolCall */
+/**
+ * A recorded action is either a provider-visible tool call (`todowrite-for-*`)
+ * or a programming-surface delegation member call (`this.fork`, `this.resume`).
+ * The delegation verbs are no longer host-registered tools, so a trace records
+ * them as the member call the Manager's program makes.
+ *
+ * @typedef {{ name: string, args?: Record<string, string> }} EvalToolCall
+ */
 /** @typedef {{ role: string, toolCalls: EvalToolCall[], mutations?: boolean }} EvalTrace */
 
 /** @type {readonly object[]} */
@@ -37,7 +44,7 @@ export const CASES = Object.freeze([
       role: 'manager',
       toolCalls: Object.freeze([
         Object.freeze({
-          name: 'fork',
+          name: 'this.fork',
           args: Object.freeze({
             calling: 'engineer',
             name: 'Ada',
@@ -45,7 +52,7 @@ export const CASES = Object.freeze([
           }),
         }),
         Object.freeze({
-          name: 'resume',
+          name: 'this.resume',
           args: Object.freeze({
             name: 'Op',
             charge: 'Run test suite and perform necessary non-architectural repairs.',
@@ -57,7 +64,7 @@ export const CASES = Object.freeze([
       role: 'manager',
       toolCalls: Object.freeze([
         Object.freeze({
-          name: 'fork',
+          name: 'this.fork',
           args: Object.freeze({
             calling: 'devops',
             name: 'Op',

@@ -222,7 +222,7 @@ module CompressionSurface =
                 let values = unbox<obj array> pair
                 text values.[0], text values.[1])
 
-        Wanxiangshu.OpenCode.Diagnostic.emit operation pairs
+        Wanxiangshu.Foundation.Diagnostic.emit operation pairs
 
     let diagnosticFatal (operation: string) (fields: obj array) : unit =
         let pairs =
@@ -232,4 +232,4 @@ module CompressionSurface =
                 let values = unbox<obj array> pair
                 text values.[0], text values.[1])
 
-        Wanxiangshu.OpenCode.Diagnostic.fatal operation pairs
+        Wanxiangshu.Foundation.Diagnostic.fatal operation pairs

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Mission.Work.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 
 /// work-038: the Manager backend of the shared `review` shell.
@@ -22,16 +23,10 @@ module ReviewBackendManager =
         val BindingUnavailable: string = "tool/review/binding-unavailable"
 
         [<Literal>]
-        val MissingRequest: string = "tool/review/missing-request"
-
-        [<Literal>]
         val InvalidFindings: string = "tool/review/invalid-findings"
 
         [<Literal>]
         val RecordFailed: string = "tool/review/record-failed"
-
-        [<Literal>]
-        val ReplayConflict: string = "tool/review/replay-conflict"
 
         [<Literal>]
         val AlreadySubmitted: string = "tool/review/already-submitted"

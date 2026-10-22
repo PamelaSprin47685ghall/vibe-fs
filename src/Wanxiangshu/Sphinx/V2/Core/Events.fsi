@@ -158,3 +158,16 @@ module SphinxV2EventTypes =
     val strictTransition: string
     val all: string list
     val isKnown: string -> bool
+
+[<RequireQualifiedAccess>]
+module DispatchPolicy =
+    val hostCapabilities: string list
+    val notDispatchRequestedReason: string
+
+    /// The whole dispatch decision in one step: a decode failure and an
+    /// admission refusal are the same answer — nothing was dispatched.
+    val decide: Result<InquiryEventBody, string> -> Result<DispatchRequestedBody, string>
+
+    /// The text of the dispatched prompt: the public envelope's canonical
+    /// payload, never the private ticket.
+    val dispatchedPromptText: DispatchRequestedBody -> string

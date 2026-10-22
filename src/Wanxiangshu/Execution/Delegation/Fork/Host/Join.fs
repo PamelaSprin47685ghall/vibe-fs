@@ -31,7 +31,6 @@ open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -51,17 +50,34 @@ module HostForkJoin =
         | Done of Result<JoinWaitOutcome<JoinItem>, ForkError>
         | Retry
 
-    /// Admitted work remains an obligation after restart. A bare historical
-    /// binding does not establish work or restore a process-local tool resource.
+    /// host-boundary-021 / EXEC-009 / participant-horizon-011: a durable handle is
+    /// actionable only while THIS process established its agent. A child cancelled
+    /// by its own process stays established (durable Abandoned, consequence not
+    /// yet consumed) even after its runtime is replaced, so that process still
+    /// sees it and join can consume it. After a restart the journal still carries
+    /// the previous process's handles; join must not consume them and the horizon
+    /// roster must not present them. Join admission and HorizonTool share this
+    /// one predicate so the two surfaces cannot disagree.
+    ///
+    /// Voided is the one exception: a void settles the obligation (the owner
+    /// ruling — an undelivered child is never completed, it is voided), and the
+    /// settled consequence must still be reported exactly once by whoever reads
+    /// the journal next. A restarted process owns nobody, so the voided child
+    /// would otherwise be invisible to BOTH horizon and join and the report
+    /// would never happen. The widening is voided-only: a cancelled
+    /// (ParentCancelled) child of the previous process stays invisible after a
+    /// restart, as participant-horizon-011 requires.
     let ownerWorkHandle (runtime: HostForkRuntime) (record: HandleRecord) =
-        match HandleId.tryAgent record.Handle with
-        | None -> false
-        | Some handleId ->
-            let agentId = AgentHandleId.value handleId
+        let voided = record.Lifecycle = HandleLifecycle.Abandoned HandleAbandonReason.Voided
 
-            record.Work.IsSome
-            || runtime.OwnsAgent agentId
-            || runtime.EstablishedByProcess agentId
+        let owned =
+            HandleId.tryAgent record.Handle
+            |> Option.map (fun handleId ->
+                let agentId = AgentHandleId.value handleId
+                runtime.OwnsAgent agentId || runtime.EstablishedByProcess agentId)
+            |> Option.defaultValue false
+
+        voided || owned
 
     let private neverCompleting<'T> () : Task<'T> =
         (TaskCompletionSource<'T>(TaskCreationOptions.RunContinuationsAsynchronously))
@@ -669,54 +685,3 @@ module HostForkJoin =
         (timeoutMs: int option)
         : Task<Result<RunCompletion, string>> =
         runtime.AwaitChild(agentId, timeoutMs)
-
-    /// Permit-gated targeted agent await. validatePermit then AwaitAgent;
-    /// string errors map to ForkError.NotFound. No second RunCompletion truth source.
-    let awaitAgentWithPermit
-        (runtime: HostForkRuntime)
-        (permit: FamilyRecoveryPermit)
-        (agentId: string)
-        (timeoutMs: int option)
-        : Task<Result<RunCompletion, ForkError>> =
-        match validatePermit runtime permit with
-        | Error e -> Task.FromResult(Error e)
-        | Ok() ->
-            task {
-                let! outcome = awaitAgent runtime agentId timeoutMs
-                return Result.mapError ForkError.NotFound outcome
-            }
-
-    /// Targeted cancel for one forked agent (Executor map/reduce sibling abort).
-    /// Completes the pending run cell and aborts the Host child so Join unblocks;
-    /// ForkRuntime CTS cancel alone cannot settle Source.Task.
-    let cancelAgent (runtime: HostForkRuntime) (agentId: string) : unit =
-        runtime.Runtime.CancelAgent(agentId)
-
-        let pending, childId =
-            lock runtime.Gate (fun () ->
-                let run =
-                    match runtime.PendingRuns.TryGetValue agentId with
-                    | true, r -> Some r
-                    | false, _ -> None
-
-                let child =
-                    match runtime.Children.TryGetValue agentId with
-                    | true, id -> Some id
-                    | false, _ -> None
-
-                run, child)
-
-        match pending with
-        | Some run ->
-            // IDistillationRuntime.CancelAgent is synchronous; durable completion
-            // continues on the returned Task while the physical abort starts below.
-            runtime.FailRun(run, "cancelled") |> ignore
-        | None -> ()
-
-        match childId with
-        | Some id ->
-            runtime.Sessions.AbortSession id
-            |> Async.AwaitTask
-            |> Async.Ignore
-            |> Async.StartImmediate
-        | None -> ()

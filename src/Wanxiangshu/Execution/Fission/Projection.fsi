@@ -68,6 +68,8 @@ module FissionProjection =
     val tryLatestForOwner: owner: SessionId -> state: FissionProjectionState -> FissionGroupProjection option
     val tryOwnerOfLane: lane: SessionId -> state: FissionProjectionState -> SessionId option
     val tryMembershipOfLane: lane: SessionId -> state: FissionProjectionState -> (FissionGroupProjection * int) option
+    /// wanxiangli/fission-group `convergenceReady` over a folded group (CUT-28).
+    val convergenceReady: group: FissionGroupProjection -> bool
 
     val fold:
         state: FissionProjectionState ->

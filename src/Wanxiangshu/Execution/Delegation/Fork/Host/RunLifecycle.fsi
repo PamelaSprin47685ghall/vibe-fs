@@ -6,10 +6,14 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 
 module HostForkRunLifecycle =
+    /// The delivered view of one terminal, resolved on demand.
+    type ViewResolution = unit -> Task<string option>
+
     [<RequireQualifiedAccess>]
     type AgentOwnerDispatchOutcome =
         | Accepted of physicalUserMessageId: PhysicalUserMessageId * authorityRoot: AuthorityRootUserMessageId
@@ -27,6 +31,12 @@ module HostForkRunLifecycle =
         run: PendingHostRun ->
         outcome: TerminalOutcome ->
             Task<string option>
+
+    val safeViewResolution:
+        childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) ->
+        run: PendingHostRun ->
+        outcome: TerminalOutcome ->
+            ViewResolution
 
     val sendAgentOwnerRootObserved:
         sessions: ISessionHostPort ->

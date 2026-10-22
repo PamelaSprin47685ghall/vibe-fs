@@ -2,10 +2,6 @@ namespace Wanxiangshu.Host
 
 open Wanxiangshu.Foundation.Identity
 
-type ConcernPlacementBatch =
-    { AnnouncedGenerations: string list
-      DeliveredMessages: string list }
-
 [<RequireQualifiedAccess>]
 type TipPresentation =
     | Full
@@ -38,6 +34,35 @@ module TaskDelivery =
     val key: fence: TaskDeliveryFence -> SessionId * ProviderRunIdentity * ToolCallId
     val validate: sha256: (string -> string) -> witness: TaskDeliveryWitness -> Result<unit, string>
 
+    val tryFindForWork:
+        sessionId: SessionId ->
+        logicalRunId: LogicalRunId ->
+        authorityRoot: AuthorityRootUserMessageId ->
+        physicalUserMessageId: PhysicalUserMessageId ->
+        task: TaskDeliveryTask option ->
+        witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness> ->
+            TaskDeliveryWitness option
+
+    /// 精确围栏读取：按 (SessionId, ProviderRun, ToolCallId) 精确命中，
+    /// 未命中时按 (SessionId, ProviderRun) 取全部见证并按完整围栏筛选。
+    val tryFindByFence:
+        fence: TaskDeliveryFence ->
+        witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness> ->
+            TaskDeliveryWitness option
+
+    /// 围栏子集读取：调用方只掌握部分围栏字段时使用；材料不一致时拒绝。
+    val tryFindByFenceFields:
+        sessionId: SessionId ->
+        providerRun: ProviderRunIdentity ->
+        toolCallId: ToolCallId option ->
+        authorityRoot: AuthorityRootUserMessageId option ->
+        physicalUserMessageId: PhysicalUserMessageId option ->
+        logicalRunId: LogicalRunId option ->
+        task: TaskDeliveryTask option ->
+        witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness> ->
+            TaskDeliveryWitness option
+
+    /// 粗粒度读取：同一 (SessionId, ProviderRun) 下多条见证不再整体丢弃证据。
     val tryFind:
         sessionId: SessionId ->
         providerRun: ProviderRunIdentity ->
@@ -52,8 +77,7 @@ type HostFactCases =
            CallId: ToolCallId
            MarkerText: string
            CallGap: TranscriptGap
-           ResultGap: TranscriptGap
-           ConcernPlacement: ConcernPlacementBatch option |}
+           ResultGap: TranscriptGap |}
     | SessionStartedAtBound of
         {| SessionId: SessionId
            StartedAt: System.DateTimeOffset |}

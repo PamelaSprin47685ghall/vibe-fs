@@ -121,9 +121,11 @@ test('WHAT[host-boundary-021] HOST_021_plugin_load_graph_has_no_semantic_recover
   assert.doesNotMatch(recoveryWiring, /restoreLinkedChildren|recoverFamilyDirect|defaultRecoverPromptClaims/)
 })
 test('WHAT[host-boundary-021] HOST_021_broken_tool_recovery_APIs_do_not_exist', () => {
-  const fission = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
+  const fissionAdapter = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
+  const fission = read('src/Wanxiangshu/Execution/Fission/Convergence.fs')
   const jsStore = read('src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs')
 
+  assert.doesNotMatch(fissionAdapter, /let\s+recoverGroups\b/)
   assert.doesNotMatch(fission, /let\s+recoverGroups\b/)
   assert.doesNotMatch(jsStore, /let\s+recoverCurrent\b/)
 })

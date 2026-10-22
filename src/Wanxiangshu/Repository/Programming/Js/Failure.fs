@@ -81,6 +81,10 @@ type JsFailure =
     | AskRefused of string
     | DelegationUnavailable
     | ViewDeclarationInvalid of string
+    /// The delivery of this call did not happen: the durable witness was not
+    /// committed, the call has no fence to own the witness, or the delivery
+    /// material could not be materialized. The payload says which one.
+    | DeliveryNotEstablished of string
 
 module JsFailure =
 
@@ -155,6 +159,7 @@ module JsFailure =
         | JsFailure.AskRefused _ -> "ASK_REFUSED"
         | JsFailure.DelegationUnavailable -> "DELEGATION_UNAVAILABLE"
         | JsFailure.ViewDeclarationInvalid _ -> "VIEW_DECLARATION_INVALID"
+        | JsFailure.DeliveryNotEstablished _ -> "DELIVERY_NOT_ESTABLISHED"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
     let private reasonWithMessage fallback prefix message =
@@ -225,6 +230,8 @@ module JsFailure =
         | JsFailure.DelegationUnavailable -> "fork/join is not wired in this execution path"
         | JsFailure.ViewDeclarationInvalid detail ->
             reasonWithMessage "view declaration is invalid" "view declaration is invalid: " detail
+        | JsFailure.DeliveryNotEstablished detail ->
+            reasonWithMessage "delivery was not established" "delivery was not established: " detail
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =
@@ -305,4 +312,5 @@ module JsFailure =
         | "ASK_REFUSED" -> JsFailure.AskRefused text
         | "DELEGATION_UNAVAILABLE" -> JsFailure.DelegationUnavailable
         | "VIEW_DECLARATION_INVALID" -> JsFailure.ViewDeclarationInvalid text
+        | "DELIVERY_NOT_ESTABLISHED" -> JsFailure.DeliveryNotEstablished(after "delivery was not established: ")
         | _ -> JsFailure.ProgramFailed text

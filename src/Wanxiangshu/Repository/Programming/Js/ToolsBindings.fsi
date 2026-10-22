@@ -11,7 +11,13 @@ open System.Threading.Tasks
 module JsToolsBindings =
     /// The host loop behind `js.call`, injected by the workflow.
     type JsCallHost =
-        { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
+        { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj>
+          Start: obj -> obj
+          Wait: obj -> Task<obj>
+          SignalParked: obj -> Task<obj>
+          SendParked: obj -> Task<obj>
+          TakeDelta: (obj * (obj -> bool)) -> Task<obj>
+          Dispose: unit -> Task<unit> }
 
     type JsSearchHost =
         { Search: string array -> bool -> Task<obj> }
@@ -29,9 +35,11 @@ module JsToolsBindings =
     /// envelope; refuses with DELEGATION_UNAVAILABLE when no host is installed.
     val makeHorizonMember: host: JsDelegationHost option -> (string * obj)
 
-    /// `js.advisor(intent, view)`: the `(memberName, member)` pair for the
-    /// advisor consult; refuses with DELEGATION_UNAVAILABLE when no host is
-    /// installed and returns the host closure's envelope verbatim otherwise.
+    /// `advisor(intent, reportMapping)`: the `(memberName, member)` pair for
+    /// the advisor consult; the report mapping is mandatory and a missing or
+    /// malformed one refuses with VIEW_DECLARATION_INVALID. It refuses with
+    /// DELEGATION_UNAVAILABLE when no host is installed and returns the host
+    /// closure's envelope verbatim otherwise.
     val makeAdvisorMember: host: JsDelegationHost option -> (string * obj)
 
     val createApi:
@@ -63,6 +71,10 @@ module JsToolsBindings =
         delegationHost: JsDelegationHost option ->
         askInvoke: (string -> Task<Result<unit, string>>) option ->
             obj
+
+    /// Kill named children left by `call` on this api. A missing host is a no-op.
+    val disposeCallHost: api: obj -> Task<unit>
+
 
 module JsReviewOnly =
     val scopeReviewOnly: check: (unit -> Task<bool>) -> api: obj -> obj

@@ -5,6 +5,37 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 
+/// Typed projection of the `wanxiangli/dispatch` claim-ledger law (CUT-11).
+[<RequireQualifiedAccess>]
+module DispatchLaw =
+
+    val nextClaimSequence: consumed: int option -> int
+
+    [<RequireQualifiedAccess>]
+    type Edit =
+        | RecordReceipt
+        | DropPending
+        | LandOccasion
+        | LandExact
+        | RecordContinuation
+        | ClearOccasion
+
+    val settle: event: string -> pending: bool -> continuation: bool -> Edit list
+
+    val answer: sent: string -> string * bool * string
+
+    val reset:
+        sessionId: string ->
+        claims: (string * string option) list ->
+        counters: (string * string * string option) list ->
+            Set<string> * Set<string> * bool * bool
+
+    val recover:
+        promptKey: string ->
+        hasReceipt: bool ->
+        messages: (string * string option * string) list ->
+            Result<string, bool>
+
 [<RequireQualifiedAccess>]
 module PromptAuthority =
     type RootAuthorityKind = PromptRootAuthorityKind
@@ -101,6 +132,31 @@ module PromptAuthority =
             PriorPhysicalInputs: Set<PhysicalUserMessageId>
         }
 
+    /// interaction-authority-018: the closure contract an accepted authority
+    /// root commits to, kept beside the profile so a closure can be judged
+    /// after the active run is gone.
+    type AcceptedRootClosure =
+        { RootKind: string
+          ExpectedClosureKind: string
+          OwnerLogicalRunId: string option
+          AgentOwnerLife: string option
+          AuthorityRootUserMessageId: AuthorityRootUserMessageId }
+
+    /// interaction-authority-018: one recorded durable closure.
+    type AuthorityClosureRecord =
+        { RootKind: string
+          ClosureWitness: string }
+
+    /// interaction-authority-018: one durable source terminal.
+    type AuthorityTerminalSource =
+        { SourceKind: string
+          OwnerLogicalRunId: string option
+          ChildLogicalRunId: string option
+          AttachmentKind: string option
+          AssociationGeneration: string option
+          DecisionOrTransactionId: string option
+          FactId: string }
+
     type PromptAuthorityProjection =
         { LastAuthorityProfile: AuthorityExecutionProfile option
           ActiveLogicalRun: AuthorityExecutionProfile option
@@ -109,7 +165,10 @@ module PromptAuthority =
           PhysicalLandings: Map<PhysicalUserMessageId, AcceptedDispatch>
           AcceptedContinuationIds: Map<PhysicalUserMessageId, ContinuationKind>
           ClaimSequences: Map<string, ClaimSequenceCounter>
-          UserQuestions: Map<ToolCallId, UserQuestion> }
+          UserQuestions: Map<ToolCallId, UserQuestion>
+          AcceptedRootClosures: Map<LogicalRunId, AcceptedRootClosure>
+          TerminalSources: Map<LogicalRunId, Map<string, AuthorityTerminalSource>>
+          ClosedRuns: Map<LogicalRunId, AuthorityClosureRecord> }
 
     val empty: PromptAuthorityProjection
     val acceptedDispatchKey: sessionId: SessionId -> payloadDigest: string -> string
@@ -125,7 +184,6 @@ module PromptAuthority =
 
     type ParsedAgentName = { Name: string; Role: Role }
 
-    val parseAgentNameTyped: value: string -> Result<ParsedAgentName, AgentNameRejection>
     val parseAgentName: value: string -> Result<string * Role, string>
 
     val stableLogicalRunId:
@@ -146,9 +204,6 @@ module PromptAuthority =
 
     val nextClaimSequence: scope: string -> projection: PromptAuthorityProjection -> int
 
-    val rootClaimSequences:
-        sessionId: SessionId -> projection: PromptAuthorityProjection -> Map<string, ClaimSequenceCounter>
-
     val derivePromptKey:
         sha256: (string -> string) ->
         sessionId: SessionId ->
@@ -162,7 +217,6 @@ module PromptAuthority =
     val repairPayloadDigest:
         requestId: RepairRequestId -> terminalProviderRun: ProviderRunIdentity -> repairKind: string -> string
 
-    val repairPayloadBelongsToRequest: requestId: RepairRequestId -> payloadDigest: string -> bool
     val gateNudgePayloadDigest: gateKind: string -> terminalProviderRun: ProviderRunIdentity -> string
 
     val gateNudgeAlreadyAdmitted:

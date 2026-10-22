@@ -500,3 +500,66 @@ test('WHAT[change-integration-003] publication claim requires every explicit bin
     assert.throws(() => change.recordFact(projection, 'binding-probe', change.fact('PublishClaimed', incomplete)), /Incomplete PublishClaimed payload/, field)
   }
 })
+
+test('WHAT[change-integration-003] real git finalization refuses every conflict marker in a large Unicode scan', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { mkdtempSync, rmSync, writeFileSync, readdirSync } = await import('node:fs')
+  const { execFileSync } = await import('node:child_process')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const hostSurface = await import('../../../dist/Change/Host/Surface.js')
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-change-003-spool-'))
+  const spoolDirectory = mkdtempSync(join(tmpdir(), 'wxs-change-003-spool-files-'))
+  const previousTmp = process.env.TMPDIR
+  try {
+    execFileSync('git', ['init', '-q', repo])
+    execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'base'])
+    writeFileSync(join(repo, 'conflicted.txt'), Array.from({ length: 6000 }, (_, i) => `<<<<<<< ours ${i} 甲🙂é\n`).join(''))
+    process.env.TMPDIR = spoolDirectory
+    const result = await hostSurface.finalizeWorktreeWithGit('manager-spool', repo)
+    assert.equal(result.ok, false)
+    assert.match(result.error, /^conflict markers remain in worktree:\nconflicted\.txt:1:<<<<<<< ours 0/)
+    assert.match(result.error, /conflicted\.txt:6000:<<<<<<< ours 5999 甲🙂é$/)
+    assert.equal(execFileSync('git', ['-C', repo, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' }).trim(), '1')
+    assert.deepEqual(readdirSync(spoolDirectory), [], 'the Git runner removes its output stream files')
+  } finally {
+    if (previousTmp === undefined) delete process.env.TMPDIR
+    else process.env.TMPDIR = previousTmp
+    rmSync(repo, { recursive: true, force: true })
+    rmSync(spoolDirectory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[change-integration-003] real git commit preserves complete forwarded hook output in stderr', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { mkdtempSync, rmSync, writeFileSync, readdirSync } = await import('node:fs')
+  const { execFileSync } = await import('node:child_process')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const hostSurface = await import('../../../dist/Change/Host/Surface.js')
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-change-003-channels-'))
+  const spoolDirectory = mkdtempSync(join(tmpdir(), 'wxs-change-003-channels-files-'))
+  const previousTmp = process.env.TMPDIR
+  const diagnostic = '甲🙂é'.repeat(30000)
+  try {
+    execFileSync('git', ['init', '-q', repo])
+    execFileSync('git', ['-C', repo, 'config', 'user.name', 't'])
+    execFileSync('git', ['-C', repo, 'config', 'user.email', 't@t'])
+    execFileSync('git', ['-C', repo, 'commit', '-q', '--allow-empty', '-m', 'base'])
+    writeFileSync(join(repo, 'candidate.txt'), 'candidate\n')
+    writeFileSync(join(repo, '.git', 'hooks', 'pre-commit'),
+      `#!/bin/sh\nprintf 'hook stdout forwarded by git\\n'\nprintf '${diagnostic}\\n' >&2\nexit 1\n`,
+      { mode: 0o755 })
+    process.env.TMPDIR = spoolDirectory
+    const result = await hostSurface.finalizeWorktreeWithGit('manager-channels', repo)
+    assert.equal(result.ok, false)
+    assert.equal(result.error, `git commit failed: hook stdout forwarded by git\n${diagnostic}\n`)
+    assert.equal(execFileSync('git', ['-C', repo, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' }).trim(), '1')
+    assert.deepEqual(readdirSync(spoolDirectory), [])
+  } finally {
+    if (previousTmp === undefined) delete process.env.TMPDIR
+    else process.env.TMPDIR = previousTmp
+    rmSync(repo, { recursive: true, force: true })
+    rmSync(spoolDirectory, { recursive: true, force: true })
+  }
+})

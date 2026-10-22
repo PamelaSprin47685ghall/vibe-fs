@@ -24,10 +24,6 @@ module CasebookBookkeeperSurface =
 
     val take: txId: string -> obj
 
-    val runProgram: sessionId: string -> program: string -> Task<string>
-
-    val contract: toolModule: obj -> obj
-
     val sessionId: value: string -> obj
 
     val sessionValue: value: obj -> string

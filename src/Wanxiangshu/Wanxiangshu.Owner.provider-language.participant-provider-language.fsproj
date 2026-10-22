@@ -17,7 +17,7 @@
     <Compile Include="Participant/Provider/DurationLabel.fs"/>
     <Compile Include="Participant/Provider/Prose.fsi"/>
     <Compile Include="Participant/Provider/Prose.fs"/>
-    <Compile Include="OpenCode/Host/ProviderLanguageBinding.fsi"/>
-    <Compile Include="OpenCode/Host/ProviderLanguageBinding.fs"/>
+    <Compile Include="Participant/Provider/ProviderLanguageBinding.fsi"/>
+    <Compile Include="Participant/Provider/ProviderLanguageBinding.fs"/>
   </ItemGroup>
 </Project>

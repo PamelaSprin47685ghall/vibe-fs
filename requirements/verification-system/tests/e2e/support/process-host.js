@@ -52,6 +52,8 @@ export class ProcessHost {
     this._env = null;
     this._started = false;
     this._stopped = false;
+    this._stopPromise = null;
+    this._stopForced = false;
     this._exitInfo = null;
   }
 
@@ -66,6 +68,8 @@ export class ProcessHost {
 
   async start(opts = {}) {
     if (this._started) throw new Error('ProcessHost already started');
+    this._stopPromise = null;
+    this._stopForced = false;
     this._startOpts = { ...opts };
     this._started = true;
     this._stdoutBuffer.length = 0;
@@ -196,9 +200,23 @@ export class ProcessHost {
   }
 
 
-  async stop({ assert = true } = {}) {
-    if (this._stopped) return;
+  stop({ assert = true, force = false } = {}) {
+    if (this._stopPromise) {
+      if (force && !this._stopForced) {
+        const missing = new Error('The running normal stop has no forced descendant inventory');
+        return this._stopPromise.then(() => { throw missing; }, error => {
+          throw new AggregateError([error, missing], 'Normal stop failed without forced descendant inventory', { cause: error });
+        });
+      }
+      return this._stopPromise;
+    }
     this._stopped = true;
+    this._stopForced = force;
+    this._stopPromise = Promise.resolve().then(() => this._stopOwned({ assert, force }));
+    return this._stopPromise;
+  }
+
+  async _stopOwned({ assert, force }) {
     if (!this._child) {
       // Already stopped, but reset flags so a fresh host can be started.
       this._started = false;
@@ -212,7 +230,7 @@ export class ProcessHost {
     const port = this._port;
     const pid = this._pid;
     try {
-      await terminateChild(this._child, SIGTERM_GRACE_MS, SIGKILL_GRACE_MS);
+      await terminateChild(this._child, SIGTERM_GRACE_MS, SIGKILL_GRACE_MS, { force });
       try { this._child.stdout.destroy(); } catch {}
       try { this._child.stderr.destroy(); } catch {}
       try { this._child.stdin.destroy(); } catch {}
@@ -221,7 +239,7 @@ export class ProcessHost {
         // Parallel canaries under load: SIGKILL can leave the listen socket
         // accept-able (orphaned descendant / mid-fork escape). Reclaim before
         // fail-closed assert — still assert, never paper over a true leak.
-        if (port && !(await checkSocketClosed(port, SOCKET_CHECK_TIMEOUT_MS))) {
+        if (!force && port && !(await checkSocketClosed(port, SOCKET_CHECK_TIMEOUT_MS))) {
           if (pid) {
             try {
               if (process.platform !== 'win32') process.kill(-pid, 'SIGKILL');
@@ -256,12 +274,14 @@ export class ProcessHost {
       // Allow the same ProcessHost instance to be re-used in a future
       // scenario. New scenarios must always get a fresh instance via
       // `new ProcessHost()`, but resetting here keeps the API forgiving.
-      this._started = false;
-      this._stopped = false;
-      this._baseUrl = null;
-      this._port = null;
-      this._pid = null;
-      this._exitInfo = null;
+      if (!force || this._child === null) {
+        this._started = false;
+        this._stopped = false;
+        this._baseUrl = null;
+        this._port = null;
+        this._pid = null;
+        this._exitInfo = null;
+      }
     }
   }
 

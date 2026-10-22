@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System
 open System.Threading.Tasks
 open Fable.Core
@@ -9,7 +11,7 @@ open Wanxiangshu.Foundation.Identity
 /// JS boundary for the process-local degeneration guard.
 module LoopSensorSurface =
 
-    type private SensorHandle(sensor: LoopSensor) =
+    type private SensorHandle(sensor: Wanxiangshu.Execution.Session.LoopSensor) =
         member _.Sensor = sensor
 
     [<Emit("$0==null")>]
@@ -101,7 +103,10 @@ module LoopSensorSurface =
                 let! result =
                     unbox<Task<obj>> (
                         asPromise (
-                            apply2 value (box (SessionId.value source.SessionId)) (box (LoopSensor.kindName kind))
+                            apply2
+                                value
+                                (box (SessionId.value source.SessionId))
+                                (box (Wanxiangshu.Execution.Session.LoopSensor.kindName kind))
                         )
                     )
 
@@ -126,11 +131,26 @@ module LoopSensorSurface =
         let continueCallback = property options "continue"
         let diagnostic = property options "diagnostic"
 
-        SensorHandle(LoopSensor(ownedOf owned, abortOf abort, continueOf continueCallback, diagnosticOf diagnostic))
+        SensorHandle(
+            Wanxiangshu.Execution.Session.LoopSensor(
+                ownedOf owned,
+                abortOf abort,
+                continueOf continueCallback,
+                diagnosticOf diagnostic
+            )
+        )
         :> obj
 
+    /// Host wire edge: the raw delta is decoded here (the adapter owns the
+    /// wire format) and observed through the neutral port.
     let observe (sensor: obj) (raw: obj) : unit =
-        (sensor :?> SensorHandle).Sensor.Observe raw
+        match LoopEventCodec.tryDecodeTextDelta raw with
+        | None -> ()
+        | Some delta ->
+            (sensor :?> SensorHandle).Sensor.Observe
+                { Session = delta.SessionId
+                  Message = delta.MessageId
+                  Delta = delta.Delta }
 
     let private sourceField (source: obj) field =
         let value = property source field
@@ -159,7 +179,7 @@ module LoopSensorSurface =
                 | AbortCause.DegenerationGuard kind ->
                     box
                         {| cause = "DegenerationGuard"
-                           anomaly = LoopSensor.kindName kind |}
+                           anomaly = Wanxiangshu.Execution.Session.LoopSensor.kindName kind |}
         }
 
     /// Owned interrupt/continuation task for the exact requested run, exposed
@@ -181,8 +201,8 @@ module LoopSensorSurface =
 
     let continuationResourcePath (kindName: string) : string =
         match kindName with
-        | "TooRepetitive" -> LoopSensor.continuationPath DegenerationKind.TooRepetitive
-        | "TooRandom" -> LoopSensor.continuationPath DegenerationKind.TooRandom
+        | "TooRepetitive" -> Wanxiangshu.Execution.Session.LoopSensor.continuationPath DegenerationKind.TooRepetitive
+        | "TooRandom" -> Wanxiangshu.Execution.Session.LoopSensor.continuationPath DegenerationKind.TooRandom
         | unknown -> invalidArg "kindName" (sprintf "unknown DegenerationKind: %s" unknown)
 
     /// Streaming delta for the exact provider run. A nullish message id

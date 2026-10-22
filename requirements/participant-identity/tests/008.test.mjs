@@ -243,7 +243,7 @@ const register = (profile) => {
   assert.equal(projection.activeLogicalRun?.logicalRun, profile.logicalRun)
   return projection
 }
-const authorityFact = (profile, identitySeed = profile.identitySeed) => ({
+const authorityFact = (profile, identitySeed = profile.identitySeed, agentOwnerLife) => ({
   family: 'Prompt',
   case: 'AuthorityRootAccepted',
   payload: {
@@ -252,6 +252,11 @@ const authorityFact = (profile, identitySeed = profile.identitySeed) => ({
     LogicalRunId: profile.logicalRun,
     AuthorityRootUserMessageId: profile.authorityRoot,
     AuthorityKind: profile.authorityKind,
+    ExpectedClosureKind: authority.recordedClosureKind(
+      profile.authorityKind, profile.participantIdentity.role === 'manager', agentOwnerLife ?? null, null,
+    ),
+    OwnerLogicalRunId: identitySeed.ownerLogicalRun ?? undefined,
+    AgentOwnerLife: agentOwnerLife,
     IdentitySeed: identitySeed,
   },
 })
@@ -303,6 +308,9 @@ const legacyHumanRootLine = (profile) => {
   const payload = tagged[1]
   delete payload.SchemaVersion
   delete payload.IdentitySeed
+  delete payload.ExpectedClosureKind
+  delete payload.OwnerLogicalRunId
+  delete payload.AgentOwnerLife
   payload.SelectedAgent = 'engineer'
   payload.PeerAgent = 'engineer'
   payload.CanonicalRole = 'engineer'
@@ -318,13 +326,16 @@ const inheritedProfile = () => {
 
 test('WHAT[participant-identity-008] current v2 durable identity recovers exact participant and owner provenance', () => {
   const profile = inheritedProfile()
-  const payload = journalRoundTripPayload(authorityFact(profile))
+  const payload = journalRoundTripPayload(authorityFact(profile, profile.identitySeed, 'Child'))
   assert.deepEqual(payload, {
     SchemaVersion: 2,
     SessionId: profile.session,
     LogicalRunId: profile.logicalRun,
     AuthorityRootUserMessageId: profile.authorityRoot,
     AuthorityKind: profile.authorityKind,
+    ExpectedClosureKind: authority.recordedClosureKind(profile.authorityKind, false, 'Child', null),
+    OwnerLogicalRunId: profile.identitySeed.ownerLogicalRun,
+    AgentOwnerLife: 'Child',
     IdentitySeed: profile.identitySeed,
   })
 
@@ -377,6 +388,9 @@ test('WHAT[participant-identity-008] supported legacy HumanRoot deterministicall
     LogicalRunId: profile.logicalRun,
     AuthorityRootUserMessageId: profile.authorityRoot,
     AuthorityKind: profile.authorityKind,
+    ExpectedClosureKind: authority.recordedClosureKind(profile.authorityKind, false, null, null),
+    OwnerLogicalRunId: undefined,
+    AgentOwnerLife: undefined,
     IdentitySeed: rootSeed,
   })
   assert.equal(JSON.stringify(first.payload).includes('PeerAgent'), false)

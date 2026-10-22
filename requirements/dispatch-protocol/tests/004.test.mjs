@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { linkChildWork } from './support/authority.mjs'
 import assert from 'node:assert/strict'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as executionStatus from '../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
@@ -47,7 +48,9 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 
-const physicalIdentity = (input, output) => dispatch.decodePhysicalUserMessageId(input, output)
+// CUT-40: physical identity is read through the OpenCode codec surface (same PromptIngressCodec.decodeWith).
+const ingressCodec = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
+const physicalIdentity = (input, output) => ingressCodec.decodeIngress(input, output).physicalUserMessageId
 
 test('WHAT[dispatch-protocol-004] ingress_accepts_the_exact_nonblank_Host_identity', () => {
   assert.equal(physicalIdentity({ messageID: 'msg-input' }, {}), 'msg-input')
@@ -123,6 +126,7 @@ const sendAgentOwnerRoot = async (port, handle, session, text) => {
   assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
   const seed = authority.issueInheritedIdentitySeed('engineer', owner.profile)
   assert.equal(seed.ok, true, seed.ok ? '' : seed.error)
+  await linkChildWork(handle, owner.profile.session, session, 'engineer')
   return dispatch.sendAgentOwnerRoot(port, handle, session, text, seed.value)
 }
 const userMessageWithKey = (id, keyValue) => ({

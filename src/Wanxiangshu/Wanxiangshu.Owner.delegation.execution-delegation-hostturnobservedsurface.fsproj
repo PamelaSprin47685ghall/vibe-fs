@@ -7,6 +7,7 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.execution-tool-admissions.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.journal-outcome-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-runtime.fsproj"/>
@@ -25,6 +26,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-joinguard-port.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-event-envelope.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-neutral-ports.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.host-contract-toolresultbound.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
@@ -41,23 +43,35 @@
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
     <Compile Include="Execution/Delegation/Join.fsi"/>
     <Compile Include="Execution/Delegation/Join.fs"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fsi"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fs"/>
+    <Compile Include="Execution/Delegation/Fork/JoinGuard.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/JoinGuard.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
-    <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fsi"/>
-    <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fs"/>
-    <Compile Include="Execution/Delegation/OpenCode/DelegatedToolEstimate.fsi"/>
-    <Compile Include="Execution/Delegation/OpenCode/DelegatedToolEstimate.fs"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs"/>
+    <Compile Include="Execution/Delegation/Handle/JoinWake.fsi"/>
+    <Compile Include="Execution/Delegation/Handle/JoinWake.fs"/>
+    <Compile Include="Execution/Delegation/Fork/JoinResultRenderer.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/JoinResultRenderer.fs"/>
+    <Compile Include="Host/Domain/CommandDeclaration.fsi"/>
+    <Compile Include="Host/Domain/CommandDeclaration.fs"/>
+    <Compile Include="Host/Domain/DelegationCommand.fsi"/>
+    <Compile Include="Host/Domain/DelegationCommand.fs"/>
+    <Compile Include="Execution/Delegation/Fork/DelegationEnvironment.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/DelegationEnvironment.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Command.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Command.fs"/>
+    <Compile Include="Execution/Delegation/Fork/JoinResultRendererSurface.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/JoinResultRendererSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fs"/>
+    <Compile Include="Execution/Delegation/Fork/JoinRules.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/JoinRules.fs"/>
+    <Compile Include="Execution/Delegation/Fork/JoinRun.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/JoinRun.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fs"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/Batching.fsi"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/Batching.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Batching.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Batching.fs"/>
-    <Compile Include="OpenCode/JoinResultRendererSurface.fsi"/>
-    <Compile Include="OpenCode/JoinResultRendererSurface.fs"/>
   </ItemGroup>
 </Project>

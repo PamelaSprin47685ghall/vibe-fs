@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as intent from '../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js'
+import * as intent from '../../../dist/Interaction/Admission/ChatAdmissionIntentSurface.js'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
 const hash = (value) => `H(${value})`
@@ -76,7 +76,7 @@ test('WHAT[interaction-authority-009] IA_009_pure_resolution_never_infers_human_
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
+const intent = await import("../../../dist/Interaction/Admission/ChatAdmissionIntentSurface.js");
 
 const message = (overrides = {}) => ({
   sessionId: 'ses-chat',

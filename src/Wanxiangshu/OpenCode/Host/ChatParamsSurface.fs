@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open Fable.Core.JsInterop
 open Wanxiangshu.Persistence.Journal
 

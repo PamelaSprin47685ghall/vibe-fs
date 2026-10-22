@@ -1,5 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Foundation.HostSession
+
 /// JS-native boundary for host-boundary-008: the causal read that binds a
 /// provider run identity to the unsealed assistant child of one physical user
 /// message.

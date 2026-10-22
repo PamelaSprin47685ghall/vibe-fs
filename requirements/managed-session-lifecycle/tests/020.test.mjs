@@ -232,4 +232,137 @@ test('WHAT[managed-session-lifecycle-020] registering a second root without clos
 })
 }
 
-test.todo('WHAT[managed-session-lifecycle-020] each authority kind requires matching durable exact prior-run closure before fresh identity installation (GAP-123)')
+// GAP-123: a fresh identity may only be installed after the prior run's
+// durable exact closure. The closure must cite the durable source terminal of
+// the accepted root's own closure kind; a witness whose source is not durable
+// does not release the binding.
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const journal = await import("../../../dist/Persistence/Journal/Surface.js");
+const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
+const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
+const { withSharedJournal, rootSelection, appendClosureEnvelope } = await import(
+  "../../interaction-authority/tests/support/authority.mjs"
+);
+
+const authorityOf = (handle, session) =>
+  journal.JournalSurface_snapshot(handle).sessionProjections[session].promptAuthority;
+
+const hash = (value) => `H(${value})`;
+
+const managedRunTerminal = (session, logicalRun, authorityRoot) =>
+  authority.terminalSourceFact(
+    hash,
+    "HumanRootManagedRun",
+    session,
+    logicalRun,
+    authorityRoot,
+    "",
+    "",
+    "",
+    "",
+    "completed",
+  );
+
+test('WHAT[managed-session-lifecycle-020] a fresh identity is refused until the prior run has its durable exact closure', async () => {
+  await withSharedJournal("fresh-identity", async (handle, reopen, directory, commonDir) => {
+    const session = "fresh-identity";
+    const accepted = await dispatch.acceptHumanRootSelection(
+      handle,
+      session,
+      "root-first",
+      rootSelection("engineer"),
+    );
+    assert.equal(accepted.ok, true, JSON.stringify(accepted.error));
+
+    // The prior run is active: a fresh identity on the same session is refused.
+    const premature = await dispatch.acceptHumanRootSelection(
+      handle,
+      session,
+      "root-second",
+      rootSelection("manager"),
+    );
+    assert.equal(premature.ok, false, "an unclosed prior run refuses a fresh identity");
+
+    // The lifecycle owner writes the durable source terminal of the prior run.
+    const appended = await journal.JournalSurface_appendAuthorityTerminalSource(
+      handle,
+      session,
+      managedRunTerminal(session, accepted.profile.logicalRun, accepted.profile.authorityRoot),
+    );
+    assert.equal(appended.ok, true, JSON.stringify(appended.error));
+
+    const sourceFactId = authorityOf(handle, session).terminalSources[0].sources[0].factId;
+
+    // A durable source alone does not release the binding: the closure is a
+    // separate durable fact.
+    const stillActive = authorityOf(handle, session);
+    assert.notEqual(stillActive.activeLogicalRun, null, "the source terminal alone closes nothing");
+    assert.equal(stillActive.closedRuns.length, 0);
+
+    await journal.JournalSurface_appendAuthorityLogicalRunClosed(commonDir, session, "retirement-fresh");
+
+    const closed = authorityOf(handle, session);
+    assert.equal(closed.activeLogicalRun, null, "the durable exact closure releases the prior run");
+    assert.equal(closed.closedRuns.length, 1);
+    const [kind, run, fact] = JSON.parse(closed.closedRuns[0].closureWitness);
+    assert.equal(kind, "ManagedLogicalRunTerminal");
+    assert.equal(run, accepted.profile.logicalRun, "the witness names the exact prior run");
+    assert.equal(fact, sourceFactId, "the witness names the exact durable source terminal");
+
+    // Only now may a fresh identity be installed on the same session.
+    const fresh = await dispatch.acceptHumanRootSelection(
+      handle,
+      session,
+      "root-second",
+      rootSelection("manager"),
+    );
+    assert.equal(fresh.ok, true, JSON.stringify(fresh.error));
+    assert.notEqual(fresh.profile.logicalRun, accepted.profile.logicalRun);
+  });
+});
+
+test('WHAT[managed-session-lifecycle-020] a closure whose witness cites a source that is not durable does not release the prior run', async () => {
+  await withSharedJournal("fresh-identity-unproven", async (handle, reopen, directory, commonDir) => {
+    const session = "fresh-identity-unproven";
+    const accepted = await dispatch.acceptHumanRootSelection(
+      handle,
+      session,
+      "root-unproven",
+      rootSelection("engineer"),
+    );
+    assert.equal(accepted.ok, true, JSON.stringify(accepted.error));
+
+    // A closure that names a source terminal nobody wrote is not admitted,
+    // and the identity binding stays in place.
+    const refused = await appendClosureEnvelope(commonDir, session, {
+      logicalRun: accepted.profile.logicalRun,
+      authorityRoot: accepted.profile.authorityRoot,
+      rootKind: "HumanRoot",
+      closureWitness: JSON.stringify([
+        "ManagedLogicalRunTerminal",
+        accepted.profile.logicalRun,
+        "terminal-never-written",
+      ]),
+    });
+    assert.equal(refused.ok, true, "the rejected semantic fact and cut are durable");
+    assert.equal(refused.cuts.length, 1, "a closure citing an absent source is refused by the actual fold");
+    assert.equal(refused.cuts[0].failedEventId, refused.event.id);
+    assert.match(refused.cuts[0].reason, /AuthorityLogicalRunClosed does not cite the unique durable source terminal/);
+
+    const cold = await reopen();
+    const active = authorityOf(cold, session);
+    assert.notEqual(active.activeLogicalRun, null, "the refused closure released nothing");
+    assert.equal(active.activeLogicalRun.logicalRun, accepted.profile.logicalRun);
+
+    const fresh = await dispatch.acceptHumanRootSelection(
+      cold,
+      session,
+      "root-second",
+      rootSelection("manager"),
+    );
+    assert.equal(fresh.ok, false, "the session identity is still in use");
+  });
+});
+}

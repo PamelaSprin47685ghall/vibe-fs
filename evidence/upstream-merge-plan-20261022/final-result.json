@@ -1,0 +1,581 @@
+{
+  "status": "ready-for-pr",
+  "resume": {
+    "requestedByUser": true,
+    "delivery": "Open a PR from codex/upstream-merge-20261022 to origin/master; do not directly update master.",
+    "acceptancePolicy": "Fix reproducible failures first. The user permits recording and bypassing unresolved failures only when normal operation is demonstrated; bypassed failures remain failures, not passed or silently disabled tests.",
+    "validationLocation": "local-only",
+    "runtimeDeploymentAuthorized": false
+  },
+  "pause": {
+    "requestedByUser": true,
+    "recordedAt": "2026-10-23T02:30:22+08:00",
+    "candidateDirectory": "/Users/yuanxi/.codex/worktrees/upstream-merge-plan-20261022/vibe-fs",
+    "candidateBranch": "codex/upstream-merge-20261022",
+    "candidateHead": "540fe20e7f0c6e0cd53245fa08111e8fadd3dadc",
+    "pendingMergeHead": "939ada1ebac6765b50543dc42f9e795866d7cb91",
+    "upstreamTargetRemainsPinned": true,
+    "latestBuildGeneration": 38,
+    "latestInputsAreBuilt": false,
+    "currentEditsStaged": false,
+    "formalBuildOrAcceptanceRunning": false,
+    "mainCommittedOrPushed": false,
+    "libraryCommittedAndPushed": true,
+    "completedSinceRelease12": [
+      "Migrated positive child-authority fixtures to actual durable HandleLinked facts; unknown lifecycle still refuses admission.",
+      "Updated explicit view selection, current schema and source-owner fixtures while preserving exact delivery, fence, persistence and rejection assertions.",
+      "Replaced Advisor's mutable prompt phase with separate lexical per-prompt observers; actual view terminal and durable close still precede the intent prompt.",
+      "Isolated only the steady-allocation VM probe in a real ordinary Node child while preserving its original budgets, timeout code, same-child healthy program and natural-exit assertions.",
+      "Moved the real concurrent Host proof from the misfiled repository-programming-065 into 017; removed the weaker self-serialized proof and preserved the independent consecutive-transaction case.",
+      "Recorded complete release12 failures and the unrepaired Node native async_hooks/afterEvaluate boundary."
+    ],
+    "unfinishedClockWork": {
+      "status": "implementation saved, static review and behavior acceptance pending",
+      "saved": [
+        "Host/SecondHost/HostPlugin.fs and .fsi: explicit clock plus per-activation timer factory, typed Deadline, actual delay cancellation and lifecycle cleanup.",
+        "Composition/Omp/OmpExtension.fs and .fsi: real activateWithTiming composition used by the default physical entry.",
+        "The two owner fsproj files, exact physical raw-time exceptions, actual JS entry registration, and narrow host-boundary-035 contract/gate/mutation cases."
+      ],
+      "notYetVerified": [
+        "Latest clock source and gate edits have not received syntax, Fantomas or full diff review.",
+        "requirements/time-capability/tests/004.test.mjs has 112 newly saved lines and support/second-host-time.fixture.mjs is an untracked 173-line draft. Both were saved at the pause boundary and remain unreviewed and unverified; the fixture agent was told to stop and then interrupted.",
+        "No generation39 build or targeted acceptance has run."
+      ],
+      "diagnosticOnly": "The interim adapter-thinness check exited 0: 601 product references within the unchanged 689 baseline, and 127 without-port files within 147. This is not acceptance of the unfinished clock work."
+    },
+    "resumeOrder": [
+      "Inspect the saved diff and any partially saved virtual-time fixture; complete and review the narrow clock/timer work without weakening time-capability or adapter gates.",
+      "Check syntax, formatting, requirement anchors and scoped diffs; stage the reviewed candidate, freeze every input and rebuild through scripts/build.mjs.",
+      "Run all release12 failing suites and directly related Advisor, closure, recovery, worktree and Host timing proofs through the real unit supervisor.",
+      "Run the complete verify:release on the same frozen inputs, using local-only validation, ordinary 5000ms supervision and the already authorized 900000ms suite backstop.",
+      "Only after acceptance and preservation review, commit with local parent 540fe20e7f0c6e0cd53245fa08111e8fadd3dadc and upstream parent 32ec1423745602ce1ea433bade781b8f3d941bb5, push normally to origin/master, and verify the exact SHA CI. Keep the running checkout unchanged."
+    ]
+  },
+  "upstreamTarget": "32ec1423745602ce1ea433bade781b8f3d941bb5",
+  "localParent": "540fe20e7f0c6e0cd53245fa08111e8fadd3dadc",
+  "libraryCommit": "0ef8ad1608615118b178e148263b56660d04be4a",
+  "runtime": {
+    "commit": "8db33b3429a70d5cdbea30e393363666b3649573",
+    "deployed": false,
+    "userUntrackedFilePreserved": "万象术独特功能导论.md"
+  },
+  "localAcceptance": {
+    "location": "local-only",
+    "unitSuiteBackstopMs": 900000,
+    "ordinaryVerdictSilenceMs": 5000,
+    "existingFiniteOperationDeadlinesChanged": false,
+    "sourceBudgetDefaultsChanged": false,
+    "authorization": "User explicitly approved this one local 15-minute whole-suite backstop; original failures remain recorded.",
+    "unitOuterTimer": "An explicit valid suite backstop delegates termination to the real unit supervisor; its original cleanup remains authoritative. This is not a 15-minute bound on CLI startup and teardown.",
+    "release": "last consolidated run failed; final affected and normal-operation gates passed",
+    "operationalAcceptance": "passed",
+    "steps": ["format:check", "check", "build", "unit-runtime-equivalence", "affected-unit", "integration", "e2e", "package"],
+    "finalAcceptance": {
+      "testedTree": "9326c7026be20a4133c268feb8ca76115e0edcbe",
+      "generation": 44,
+      "inputDigests": {
+        "validation": "7570c47f84ba3e31481b03c88640e3c5d564ddbb36729b8e3befd141c1e0e5d4",
+        "compiler": "e6209d05833c3f066639e8293fd4a9ffbceefe57261d59c67885e2840cb98643",
+        "generated": "ee7c709795fea14888bcbb5850745eaa535b166f71dac9c84945d2bfd6794a39",
+        "artifact": "7296ae8ccf8b216315a74ec4564ee2cdf126ae29cf53cb54ded3f46a1c6fbf05"
+      },
+      "unitBaseline": {
+        "generation": 43,
+        "files": 765,
+        "passed": 4763,
+        "failed": 0,
+        "skipped": 112,
+        "todo": 267,
+        "log": "/private/tmp/m22-main-release-14.log"
+      },
+      "runtimeByteEquivalence": {
+        "beforeGeneration": 43,
+        "afterGeneration": 44,
+        "modules": 783,
+        "changedModules": 0,
+        "beforeDigest": "619d8e45eeb9ad101cd730ea57f45016870ae31c28365f98054e0069b319b32d",
+        "afterDigest": "619d8e45eeb9ad101cd730ea57f45016870ae31c28365f98054e0069b319b32d",
+        "method": "SHA256 of sorted [relative dist JavaScript path, file SHA256] entries; complete membership and each of the 783 module bytes matched."
+      },
+      "affectedUnit": {
+        "files": 6,
+        "passed": 52,
+        "failed": 0,
+        "skipped": 0,
+        "todo": 2,
+        "wallMs": 3130,
+        "processGroup": 81615,
+        "reclamationAccepted": true,
+        "reclamationMs": 21.037,
+        "log": "/private/tmp/m22-gen44-build-tool-units.log"
+      },
+      "integration": {
+        "files": 40,
+        "passed": 722,
+        "failed": 0,
+        "skipped": 7,
+        "todo": 7,
+        "wallMs": 541540,
+        "allGroupsWallMs": 557300,
+        "processGroup": 58485,
+        "reclamationAccepted": true,
+        "reclamationMs": 20.949,
+        "distributionChild": "passed",
+        "harnessChild": { "passed": 295, "failed": 0 },
+        "log": "/private/tmp/m22-gen44-integration.log"
+      },
+      "longStroke": {
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "todo": 0,
+        "wallMs": 12951,
+        "realOpenCodeHost": true,
+        "log": "/private/tmp/m22-gen44-long-stroke.log"
+      },
+      "package": {
+        "passed": true,
+        "generation": 44,
+        "members": 1507,
+        "totalBytes": 14810146,
+        "tarballSha256": "588e8c098e53be388a217122bf0be5e7fd1f00197e4968de5fa9ebee9f6efab2",
+        "log": "/private/tmp/m22-gen44-package.log"
+      },
+      "newFailuresWaivedOrDisabled": [],
+      "scope": "The final change fixes build-tool source-directory ownership and two child-count assertions. All direct owner-compile test consumers are covered by the final integration plus six affected unit files. Runtime JavaScript is byte-identical to the complete 4763-pass unit baseline. The entire verify:release CLI was not rerun after this final tool fix; its prior failure remains recorded. Current related suites, actual Long Stroke and package consumption passed."
+    },
+    "abortedReleaseRuns": [
+      {
+        "log": "/private/tmp/m22-main-release-9.log",
+        "reason": "Stopped after discovering additional obsolete real positive Host and Long Stroke fixture inputs; not an acceptance verdict.",
+        "completedFiles": 3,
+        "plannedFiles": 766,
+        "authoritativeCountsAvailable": false,
+        "innerPid": 50219,
+        "reclamationAccepted": false,
+        "residualGroupReclaimed": true,
+        "reclamationMs": 116.253,
+        "knownTestPidsExitConfirmed": true
+      }
+    ],
+    "pendingFixtureMigrations": [],
+    "targetedGeneration39": {
+      "testedTree": "e41a4a7021dcf3c6966c3395bba100e2f43bc984",
+      "generation": 39,
+      "completedFiles": 33,
+      "plannedFiles": 33,
+      "tests": 291,
+      "passed": 270,
+      "failed": 8,
+      "log": "/private/tmp/m22-gen39-failure-regressions.log",
+      "processGroup": 35258,
+      "reclamationAccepted": true,
+      "reclamationMs": 21.875,
+      "reason": "Remaining failures: the temporal verification helper manually encoded a noncanonical closure witness; the diagnostic sink lacked its required mutable-resource declaration; the real Omp tool callback was emitted as a curried function instead of a five-argument JavaScript function, preventing the new timing cases from executing. No failure was waived or disabled."
+    },
+    "targetedGeneration40": {
+      "testedTree": "518ccafd6ae90cf70f2a44ac7e342b3048492d25",
+      "generation": 40,
+      "completedFiles": 33,
+      "plannedFiles": 33,
+      "tests": 291,
+      "passed": 277,
+      "failed": 1,
+      "skipped": 2,
+      "todo": 11,
+      "wallMs": 48440,
+      "log": "/private/tmp/m22-gen40-failure-regressions.log",
+      "processGroup": 42414,
+      "reclamationAccepted": true,
+      "reclamationMs": 21.069,
+      "remainingFailure": "The physical Omp activation latch lacked its required DSL-MUTABLE declaration. The real tool callback, six virtual-time behavior proofs, exact closure, delivery, recovery and Advisor regressions passed. No failure was waived or disabled."
+    },
+    "failedBuild41": {
+      "log": "/private/tmp/m22-build-41.log",
+      "reason": "A focused 82-source build exposed the Omp adapter's missing direct RuntimePath owner dependency, which the larger generation40 compile closure had incidentally supplied. The exact owner project reference is now explicit; no build failure was bypassed.",
+      "acceptanceEvidence": false
+    },
+    "generation41MutableDeclarationReview": {
+      "log": "/private/tmp/m22-gen41-sw005.log",
+      "passed": 0,
+      "failed": 1,
+      "reclamationAccepted": true,
+      "reason": "After the Omp declaration, the complete static scan found the live Host config holder. A source review found 13 missing declarations across live config, native process lifetime, output aggregation, literal scanning and sandbox handoff resources. Their actual physical or local algorithm roles are now declared without changing behavior or weakening the scan."
+    },
+    "failedRelease13": {
+      "testedTree": "0624e7c8f5db5ee8a212eab4960be98086902308",
+      "generation": 42,
+      "completedSteps": ["format:check"],
+      "failedStep": "check",
+      "wallMs": 10100,
+      "log": "/private/tmp/m22-main-release-13.log",
+      "reason": "The control-flow gate rejected the new timer's try/finally nested in a match arm. The actual wait and cancellation are now a named resource operation; the branch keeps the ordinary call and recursion. No behavior test ran and no gate was bypassed."
+    },
+    "release14": {
+      "testedTree": "a7152f44d05e2232f587c627ef659e6ac33d4b01",
+      "generation": 43,
+      "log": "/private/tmp/m22-main-release-14.log",
+      "result": "failed at integration",
+      "wallMs": 974300,
+      "completedSteps": ["format:check", "check", "build", "unit"],
+      "unit": {
+        "files": 765,
+        "passed": 4763,
+        "failed": 0,
+        "skipped": 112,
+        "todo": 267,
+        "wallMs": 400820,
+        "processGroup": 55380,
+        "reclamationAccepted": true,
+        "reclamationMs": 24.064
+      },
+      "integration": {
+        "files": 40,
+        "tests": 736,
+        "passed": 719,
+        "failed": 3,
+        "wallMs": 545100,
+        "processGroup": 10471,
+        "reclamationAccepted": true,
+        "reclamationMs": 23.007,
+        "distributionChild": "passed",
+        "harnessChild": { "passed": 295, "failed": 0 },
+        "failures": [
+          "Two crash-reconciliation-020 assertions expected one initial dispatch although the fixture now creates two children; the unchanged no-extra-dispatch contract is being corrected to the exact initial child count.",
+          "structured-workflow-012 retained stale Alpha.js after source deletion in a real incremental Fable compile. This remains failed while its actual output path is investigated."
+        ]
+      },
+      "laterReleaseStagesRan": false
+    },
+    "retiredOutputDiagnosis": {
+      "acceptanceEvidence": false,
+      "beforeLog": "/private/tmp/m22-retired-output-diagnostic.log",
+      "afterLog": "/private/tmp/m22-retired-output-correction-diagnostic.log",
+      "reason": "The materializer ignored the caller's source directory and anchored every generated project in the main repository. Real Fable then emitted an absolute-directory prefix, while deletion cleanup correctly expected source-relative paths. Both aliased and canonical temporary roots reproduced this.",
+      "correction": "Owner and impact plans now carry the declared project directory into materialization; the source anchor is bound into restore/artifact identity. Both independent real-Fable diagnostics now emit Alpha/Alpha.js and remove only Alpha.js after deletion, preserving Core/Core.js. The existing integration deletion oracle is retained and strengthened with its exact output path. Formal acceptance is still pending."
+    },
+    "targetedExhaustedSeries": {
+      "testedTree": "9a1f4e95e8e51f6806762d07f6473b0699934551",
+      "generation": 38,
+      "suite": "durable-events-005 through the real unit supervisor",
+      "concurrency": 1,
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "wallMs": 12680,
+      "refusalAndNoWriteMs": 1923,
+      "fullColdReadAndCleanupMs": 2848,
+      "processGroup": 31309,
+      "reclamationAccepted": true,
+      "reclamationMs": 26.022,
+      "log": "/private/tmp/m22-gen38-de005.log"
+    },
+    "targetedArchivePreparation": {
+      "testedTree": "7bb17e6ab8f8ff9f38f67560e9bbb64dedd2d7c3",
+      "generation": 37,
+      "suite": "verification-system-016 through the real unit supervisor",
+      "concurrency": 1,
+      "total": 311,
+      "passed": 290,
+      "failed": 0,
+      "skipped": 20,
+      "todo": 1,
+      "testTimeMs": 220100,
+      "processGroup": 76251,
+      "reclamationAccepted": true,
+      "reclamationMs": 24.799,
+      "log": "/private/tmp/m22-gen37-prepared-vs016.log",
+      "correction": "Separate real selected-tool preparation and real installation verdicts share the same closed-over source snapshot, signal and tool owner. All original real probes, inventories, mutation, cancellation and cleanup assertions remain. Preparation keeps its immutable 5000ms probe allowance; installation has no allowance and retains ordinary 5000ms supervision. Active, spent and unused-owner guards are verified.",
+      "boundary": "The existing input-mutation TODO and 20 excluded cases are not passes."
+    },
+    "targetedWorkScope": {
+      "testedTree": "8446506a97fc4d5a6dad9de464fe7ab3b148c4d5",
+      "generation": 36,
+      "suite": "work-027 including two actual independent worktree plugin scopes",
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "reclamationAccepted": true,
+      "log": "/private/tmp/m22-gen36-work027.log",
+      "boundary": "Actual independent-scope Delivered and unfinished controls passed. Existing Some directory precedence and absent Host directory remain direct source-branch checks, not separately claimed dynamic proofs."
+    },
+    "targetedLongStroke": {
+      "testedTree": "8446506a97fc4d5a6dad9de464fe7ab3b148c4d5",
+      "generation": 36,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "wallMs": 17982,
+      "opencodeLifetimes": 1,
+      "managerProviderRequests": 32,
+      "journalEvents": 231,
+      "journalLimit": 699,
+      "sseEvents": 1420,
+      "sseLimit": 3351,
+      "log": "/private/tmp/m22-gen36-long-stroke.log"
+    },
+    "targetedScenarioGates": {
+      "testedTree": "2d0114ed164def2eb0235956c4befe70c7b665a0",
+      "generation": 31,
+      "suites": ["verification-system-003", "verification-system-014", "verification-system-017"],
+      "passed": 24,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "The real Long Stroke is a separate release-tier execution.",
+      "todo": 0,
+      "reclamationAccepted": true,
+      "log": "/private/tmp/m22-gen31-scenario-gates.log"
+    },
+    "targetedDeferredAndNativeCleanup": {
+      "testedTree": "4193f934a1134d800738c2c818b55a80b79cd3e2",
+      "generation": 32,
+      "suites": ["change-integration-001", "work-011", "work-027", "work-032", "verification-system-006"],
+      "passed": 139,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "reclamationAccepted": true,
+      "log": "/private/tmp/m22-gen32-deferred-and-cleanup.log"
+    },
+    "failedHarnessRuns": [
+      {
+        "testedTree": "4193f934a1134d800738c2c818b55a80b79cd3e2",
+        "generation": 32,
+        "passed": 294,
+        "failed": 1,
+        "log": "/private/tmp/m22-gen32-harness.log",
+        "reason": "Forced Host stop proved process-group drain before the actual ChildProcess exit callback; the unchanged leak assertion correctly refused acceptance."
+      }
+    ],
+    "targetedHarness": {
+      "testedTree": "b1970b8facf1949b5f010b5507a31db5cff307f2",
+      "generation": 33,
+      "passed": 295,
+      "failed": 0,
+      "wallMs": 12400,
+      "log": "/private/tmp/m22-gen33-harness.log"
+    },
+    "failedTargetedScopeRuns": [
+      {
+        "testedTree": "dbd4a854ba80d5b3fac469827a5a6f9d59c3ba12",
+        "generation": 34,
+        "passed": 26,
+        "failed": 2,
+        "log": "/private/tmp/m22-gen34-work-scope.log",
+        "reclamationAccepted": true,
+        "reason": "The new scope fixtures supplied a /var work root while the actual Git root is /private/var; exact lifecycle root validation refused setup before the target assertions."
+      },
+      {
+        "testedTree": "73c826d9e05daa9edb321abafbd27e01f1578480",
+        "generation": 35,
+        "passed": 6,
+        "failed": 2,
+        "log": "/private/tmp/m22-gen35-work027.log",
+        "reclamationAccepted": true,
+        "reason": "The new fixtures reached the provider boundary before publishing their actual assistant run; the unchanged HostRunUnavailable/NoBindableRun guard refused setup."
+      }
+    ],
+    "failedLongStrokeRuns": [
+      {
+        "testedTree": "2d0114ed164def2eb0235956c4befe70c7b665a0",
+        "generation": 31,
+        "log": "/private/tmp/m22-gen31-long-stroke.log",
+        "reason": "Strict no-declared-turn exposed an unfinished-work repair claimed after durable Delivered. Investigation found the missing deferred first-prompt RunStarted callback; generation 33 then exposed the additional independent worktree Host scope gap. The matcher remains strict; no acceptance verdict.",
+        "terminalOrdering": "Delivered tool completed at 16:48:15.516 UTC; the next empty stop ended at .558; InteractionRepair was claimed at .617 and physically accepted at .624, with no Reopened work record.",
+        "rootPid": 89421,
+        "hostPid": 89439,
+        "rootAndHostExitConfirmed": true,
+        "ownedOrphanSupervisorPid": 90055,
+        "orphanCleanup": "Reclaimed only after exact command, scenario directory and recorded Host ownership were rechecked; its group is absent."
+      },
+      {
+        "testedTree": "b1970b8facf1949b5f010b5507a31db5cff307f2",
+        "generation": 33,
+        "log": "/private/tmp/m22-gen33-long-stroke.log",
+        "reason": "The strict matcher still caught the post-delivery repair. The real worktree has a separate plugin scope and reconciliation binding store, so the parent first-prompt callback cannot supply that instance's recovered directory.",
+        "rootPid": 27618,
+        "hostPid": 27638,
+        "hostExitLedgerWitness": true,
+        "rootAndHostExitConfirmed": true,
+        "scopedCleanup": "The fatal path settled forced Host, events and provider cleanup before exit. The exact scenario marker and recorded root, Host and Git target 28215 were absent in fresh process observations; the target had real exit and closed records. Unpersisted guardian group identities are not claimed as an independent complete inventory."
+      }
+    ],
+    "failedReleaseLogs": [
+      "/private/tmp/m22-main-release-6.log",
+      "/private/tmp/m22-main-release-7.log",
+      "/private/tmp/m22-main-release-8.log",
+      "/private/tmp/m22-main-release-10.log",
+      "/private/tmp/m22-main-release-11.log",
+      "/private/tmp/m22-main-release-12.log"
+    ],
+    "failedRelease10": {
+      "testedTree": "f6a63ddfd07ed7ec76da5db62b2f029646c9510c",
+      "generation": 36,
+      "completedSteps": ["format:check", "check", "build"],
+      "failedStep": "unit",
+      "completedFiles": 3,
+      "plannedFiles": 766,
+      "authoritativeCountsAvailable": false,
+      "wallMs": 140200,
+      "unitWallMs": 124100,
+      "concurrency": 2,
+      "processGroup": 51448,
+      "reclamationAccepted": true,
+      "reclamationMs": 25.511,
+      "reason": "The selected Node/npm identity probe had ended, but its immutable 5000ms allowance still correctly bound the same native held-install invocation. Installation, complete revalidation and cleanup did not finish before that deadline. The 900000ms suite backstop was not reached."
+    },
+    "failedTargetedArchiveRuns": [
+      {
+        "testedTree": "f6a63ddfd07ed7ec76da5db62b2f029646c9510c",
+        "generation": 36,
+        "log": "/private/tmp/m22-gen37-vs016-single.log",
+        "concurrency": 1,
+        "completedFiles": 0,
+        "plannedFiles": 1,
+        "authoritativeCountsAvailable": false,
+        "processGroup": 66303,
+        "reclamationAccepted": true,
+        "reclamationMs": 25.213,
+        "reason": "The positive real locked-registry install also exceeded the immutable initial-probe allowance at single concurrency; reduced contention alone is insufficient."
+      }
+    ],
+    "failedRelease11": {
+      "testedTree": "a903c0106330aac02ef629b4e2795b998158c452",
+      "generation": 37,
+      "completedSteps": ["format:check", "check", "build"],
+      "failedStep": "unit",
+      "completedFiles": 11,
+      "plannedFiles": 766,
+      "authoritativeCountsAvailable": false,
+      "wallMs": 454800,
+      "unitWallMs": 437500,
+      "concurrency": 1,
+      "processGroup": 89097,
+      "reclamationAccepted": true,
+      "reclamationMs": 23.805,
+      "reason": "The real 10001-file ordinal-exhaustion case combined refusal, zero-write assertions, full cold retained-stream decoding and cleanup in one ordinary invocation and exceeded 5000ms. No total-backstop expiry or authoritative test summary occurred."
+    },
+    "failedRelease12": {
+      "testedTree": "43a6130c135d9fc0a866591226b75c3f8fa519f7",
+      "generation": 38,
+      "completedSteps": ["format:check", "check", "build"],
+      "failedStep": "unit",
+      "completedFiles": 766,
+      "plannedFiles": 766,
+      "authoritativeCountsAvailable": true,
+      "tests": 5126,
+      "passed": 4709,
+      "failed": 38,
+      "skipped": 112,
+      "todo": 267,
+      "failedContainers": 1,
+      "wallMs": 503300,
+      "unitWallMs": 488900,
+      "concurrency": 2,
+      "processGroup": 33442,
+      "reclamationAccepted": true,
+      "reclamationMs": 25.158,
+      "reason": "All discovered unit files drained within the unchanged ordinary and authorized total budgets. Failures expose stale explicit lifecycle, view-selection, schema and source-owner fixtures, a misfiled real Host concurrency proof, an Advisor prompt-phase counter, direct ambient time in the second-host product flow, and an upstream Node VM timeout interaction with node:test async hooks. Later release phases did not run."
+    },
+    "nodeVmTimeoutDiagnostics": {
+      "acceptanceEvidence": false,
+      "officialIssue": "https://github.com/nodejs/node/issues/66439",
+      "nodeVersion": "22.13.0",
+      "upstreamContainsAfterEvaluateAndSteadyProbe": true,
+      "originalLocalSyncProbePredatesAfterEvaluate": true,
+      "observations": [
+        "A raw VM with afterEvaluate and enabled async_hooks caught its 5ms timeout, then aborted at the native execution_async_id assertion on a later callback.",
+        "A standalone public-runtime steady allocation with enabled async_hooks returned PROGRAM_TIMEOUT, then completed sum 3 and a native callback; this does not disprove the separately reproduced contamination.",
+        "The exact 200ms synchronous probe under node:test completed its same-process healthy program and callback with natural exit 0.",
+        "The exact 50ms steady-allocation probe under node:test returned PROGRAM_TIMEOUT, then aborted before its healthy program and callback."
+      ],
+      "diagnosticChildrenReaped": true,
+      "correction": "Only the steady-allocation probe moves to an ordinary real Node child, as existing Sandbox SPEC[002] requires for hard asynchronous VM probes. Its 50ms absolute deadline, 2000ms sync budget, PROGRAM_TIMEOUT, same-child healthy sum 3 and actual later native callback remain required, with natural exit 0 and bounded real parent cleanup. This does not repair or prove safe a product Node Host using enabled async_hooks."
+    },
+    "exhaustedSeriesDiagnostic": {
+      "log": "/private/tmp/m22-de005-phase-diagnostic.log",
+      "acceptanceEvidence": false,
+      "fixtureReadyMs": 781.720375,
+      "reorganizationSettledMs": 1970.17225,
+      "noWriteAssertionsCompleteMs": 1977.641042,
+      "fullColdReadCompleteMs": 4073.631958,
+      "fixtureReclaimedMs": 4527.621292,
+      "correction": "The actual refusal and zero-write proof now form one verdict; the same untouched on-disk fixture is then fully cold-read through the original retainedWriterIdsAt API in a second verdict. Both retain ordinary 5000ms supervision with no physical allowance; all original file counts, reads and assertions remain. Product metadata, path checks, canonical decoding and persistence ordering are unchanged."
+    },
+    "diagnosticOnly": [
+      {
+        "log": "/private/tmp/m22-gen27-integration.log",
+        "reason": "Generated-input freshness failed after Markdown evidence changed; not acceptance evidence.",
+        "observedFailures": [
+          "delegation-027 actual Host tool-step guidance failed after 25051ms with an empty serialized abort error",
+          "delegation-027 actual Host final-output guidance physical deadline"
+        ],
+        "fixtureCorrection": "run-user-input-canary.mjs:179 now passes the direct reportMapping to this.deliver; original stop, Join and coldRetired assertions and deadlines remain."
+      }
+    ],
+    "diagnosticOrphanCleanup": {
+      "recordedHostPid": 46922,
+      "recordedOwnerPid": 46906,
+      "scenario": "wxs-user-input-y85bVq",
+      "result": "The old failed diagnostic owner was absent. Its exact ledger entry, command, process group and test working directory were rechecked before reclaiming only that group; the group is absent."
+    },
+    "targetedHostGuidance": {
+      "testedTree": "62fc43f0a04c5ec5033e4970066b2aee6fd36dcf",
+      "generation": 29,
+      "buildFreshness": "passed before execution",
+      "suite": "delegation-027 with actual integration tier",
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "wallMs": 19480,
+      "processGroup": 49091,
+      "reclamationAccepted": true,
+      "reclamationMs": 22.605,
+      "log": "/private/tmp/m22-gen29-delegation027.log"
+    },
+    "targetedPrefixStability": {
+      "testedTree": "f779e63ca5698f415f9e0bad8ef299d9ab09e0f5",
+      "generation": 30,
+      "suite": "prefix-stability-014 with actual integration tier",
+      "passed": 28,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "wallMs": 21270,
+      "processGroup": 60209,
+      "reclamationAccepted": true,
+      "reclamationMs": 23.579,
+      "log": "/private/tmp/m22-gen30-prefix014.log"
+    }
+  },
+  "workPackages": {
+    "M22-0": "DONE",
+    "M22-1": "DONE",
+    "M22-2": "DONE: exact library pin and Host/package integration verified; recorded library limits remain",
+    "M22-3": "DONE: authority, delivery and recovery regressions passed",
+    "M22-4": "DONE: build boundaries, actual Host and Long Stroke passed",
+    "M22-5": "DONE for resumed scope: final normal-operation and affected-suite acceptance passed; consolidated CLI history is not relabeled",
+    "M22-6": "DOING: publish PR; exact-head CI remains separate from local acceptance"
+  },
+  "sourceDelivery": {
+    "mode": "pull-request",
+    "headBranch": "codex/upstream-merge-20261022",
+    "baseBranch": "master",
+    "pullRequest": null,
+    "commit": null,
+    "pushed": false,
+    "ci": null
+  },
+  "remainingBoundaries": [
+    "Node VM afterEvaluate timeout with enabled async_hooks has a reproduced native execution_async_id failure; isolating the test probe does not fix that product runtime combination.",
+    "Existing Bun post-await hard-deadline failures and MF-01 remain open.",
+    "GAP-123 remains OPEN; legacy projection repair does not prove all five typed source producers.",
+    "HNI completion, real OMP smoke and guest production wiring are not claimed.",
+    "Known skip and TODO cases do not count as passed.",
+    "Detached reclamation proves the captured and rechecked cohort, not unobserved descendants."
+  ]
+}

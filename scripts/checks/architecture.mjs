@@ -6,6 +6,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
+import { scanAdapterThinness } from './adapter-thinness.mjs'
 
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 const SRC_ROOT = 'src'
@@ -14,15 +15,47 @@ const PURE_DIRS = [`${PRODUCTION_ROOT}/Foundation/`]
 const RESOURCE_DIR = `${PRODUCTION_ROOT}/Resources/`
 const UPPER_NAMESPACES = ['Wanxiangshu.OpenCode', 'Wanxiangshu.Session', 'Wanxiangshu.Process']
 const PACKAGE_RESOURCE_READ = /PackageResources\./
+const HOST_ADAPTER_DIRS = ['Codec', 'Host', 'Signals', 'Plugin']
+  .map((dir) => `${PRODUCTION_ROOT}/OpenCode/${dir}/`)
+  .concat([`${PRODUCTION_ROOT}/Host/`])
+const HOST_SDK_IMPORT = /@opencode-ai\//
+const OPENCODE_IMPORT_BASELINE = 'scripts/checks/opencode-import-baseline.json'
+const isKernelFile = (file) =>
+  !HOST_ADAPTER_DIRS.some((dir) => file.startsWith(dir)) &&
+  !file.startsWith(`${PRODUCTION_ROOT}/OpenCode/`) &&
+  !file.startsWith(`${PRODUCTION_ROOT}/Composition/`) &&
+  !file.includes('/OpenCode/') &&
+  !file.endsWith('Surface.fs') &&
+  !file.endsWith('Surface.fsi')
+const referencesOpenCode = (text) =>
+  text.split('\n').some((line) => !/^\s*\/\//.test(line) && /\bWanxiangshu\.OpenCode\b/.test(line))
+export const readOpenCodeImportBaseline = () =>
+  existsSync(OPENCODE_IMPORT_BASELINE) ? JSON.parse(readFileSync(OPENCODE_IMPORT_BASELINE, 'utf8')).files : []
+// ⑨ (CUT-40): a domain-local adapter namespace is `Wanxiangshu.<Domain…>.OpenCode` (the code under a
+// `<Domain>/…/OpenCode/` folder). Gate ⑧ only counts the top-level `Wanxiangshu.OpenCode`.
+const DOMAIN_ADAPTER_REF = /\bWanxiangshu\.(?!OpenCode\b)[A-Z]\w*(?:\.[A-Z]\w*)*\.OpenCode\b/
+const DOMAIN_ADAPTER_BASELINE = 'scripts/checks/domain-adapter-import-baseline.json'
+const isAdapterArea = (file) =>
+  HOST_ADAPTER_DIRS.some((dir) => file.startsWith(dir)) ||
+  file.startsWith(`${PRODUCTION_ROOT}/OpenCode/`) ||
+  file.includes('/OpenCode/')
+const referencesDomainAdapter = (text) =>
+  text.split('\n').some((line) => !/^\s*\/\//.test(line) && DOMAIN_ADAPTER_REF.test(line))
+export const readDomainAdapterImportBaseline = () =>
+  existsSync(DOMAIN_ADAPTER_BASELINE) ? JSON.parse(readFileSync(DOMAIN_ADAPTER_BASELINE, 'utf8')).files : []
+const HOST_SDK_CLIENT = /\?client\b|\bclient\s*(?:\?|\.(?:session|event|app|config|tui|find|file|project|path)\b)/
 
 const norm = (path) => path.replace(/\\/g, '/')
 const isFs = (path) => path.endsWith('.fs')
+const isFsi = (path) => path.endsWith('.fsi')
 
-export function scanArchitecture(productionFiles, read) {
+export function scanArchitecture(productionFiles, read, options) {
   const violations = []
   const fail = (gate, message) => violations.push({ gate, message })
 
   const productionFs = productionFiles.filter(isFs).map(norm)
+  // Gates ⑧/⑨ (CUT-40 F40-03) also read signature files: an `open` in a .fsi is a dependency too.
+  const productionSources = productionFs.concat(productionFiles.filter(isFsi).map(norm))
 
   // ① sole F# source root under src/
   {
@@ -99,6 +132,82 @@ export function scanArchitecture(productionFiles, read) {
     }
   }
 
+  // ⑦ Host SDK is consumed only inside the explicit adapter area (CUT-34, D-07):
+  // `@opencode-ai/*` imports and the SDK `client` handle stay in OpenCode/{Host,Codec,Signals,Plugin}/ or Host/.
+  for (const file of productionFs) {
+    if (HOST_ADAPTER_DIRS.some((dir) => file.startsWith(dir))) continue
+    const text = read(file)
+    if (HOST_SDK_IMPORT.test(text)) {
+      fail('host-sdk-boundary', `${file}: imports the OpenCode SDK outside the adapter area`)
+    }
+    if (HOST_SDK_CLIENT.test(text)) {
+      fail('host-sdk-boundary', `${file}: touches the OpenCode SDK client outside the adapter area`)
+    }
+  }
+
+  // ⑧ Kernel-to-adapter imports only shrink (CUT-34): outside the adapter area, the composition
+  // root (Composition/), domain-local OpenCode/ adapter folders and plain-JS *Surface.fs boundaries,
+  // a production file may reference `Wanxiangshu.OpenCode` only if it is on the recorded baseline;
+  // a baseline entry that no longer references it must be removed so the ratchet never loosens.
+  {
+    const baseline = new Set(readOpenCodeImportBaseline())
+    const seen = new Set()
+    for (const file of productionSources) {
+      if (!isKernelFile(file)) continue
+      if (!referencesOpenCode(read(file))) continue
+      seen.add(file)
+      if (!baseline.has(file)) {
+        fail('adapter-import-ratchet', `${file}: kernel code newly references Wanxiangshu.OpenCode (adapter layer)`)
+      }
+    }
+    for (const file of baseline) {
+      if (!seen.has(file)) {
+        fail('adapter-import-ratchet', `${file}: no longer references Wanxiangshu.OpenCode; drop it from ${OPENCODE_IMPORT_BASELINE}`)
+      }
+    }
+  }
+
+  // ⑨ Domain-local adapter imports only shrink (CUT-40): outside the adapter area (top-level OpenCode/,
+  // Host/, any `…/OpenCode/` folder), no production file — kernel, Composition/ or *Surface.fs alike — may
+  // open or qualify an in-domain `Wanxiangshu.<Domain>.OpenCode` namespace unless it is on the recorded
+  // baseline; an entry that no longer references one must be removed so the ratchet never loosens.
+  {
+    const baseline = new Set(readDomainAdapterImportBaseline())
+    const seen = new Set()
+    for (const file of productionSources) {
+      if (isAdapterArea(file)) continue
+      if (!referencesDomainAdapter(read(file))) continue
+      seen.add(file)
+      if (!baseline.has(file)) {
+        fail('domain-adapter-import-ratchet', `${file}: newly references an in-domain *.OpenCode adapter namespace`)
+      }
+    }
+    for (const file of baseline) {
+      if (!seen.has(file)) {
+        fail('domain-adapter-import-ratchet', `${file}: no longer references an in-domain *.OpenCode namespace; drop it from ${DOMAIN_ADAPTER_BASELINE}`)
+      }
+    }
+  }
+
+  // ⑩ adapter-thinness ratchet, ⑪ port-purity and ⑫ port-family integrity (HNI-04, HNI-11):
+  // see scripts/checks/adapter-thinness.mjs.
+  for (const v of scanAdapterThinness(productionFs, read, { root: options?.root }).violations) violations.push(v)
+
+  // ⑨b A namespace must not hide its folder (CUT-40 F40-02): ⑨ recognises adapter code by its
+  // `….OpenCode` namespace, so every source under an `OpenCode/` folder declares a namespace with an
+  // `OpenCode` segment, and no source outside one does.
+  for (const file of productionSources) {
+    const decl = /^(?:namespace|module)\s+(?:rec\s+)?([\w.]+)/m.exec(read(file))
+    if (!decl) continue
+    const inFolder = file.startsWith(`${PRODUCTION_ROOT}/OpenCode/`) || file.includes('/OpenCode/')
+    const inNamespace = decl[1].split('.').includes('OpenCode')
+    if (inFolder && !inNamespace) {
+      fail('adapter-namespace-folder', `${file}: lives under an OpenCode/ adapter folder but declares '${decl[1]}'`)
+    } else if (!inFolder && inNamespace) {
+      fail('adapter-namespace-folder', `${file}: declares adapter namespace '${decl[1]}' outside an OpenCode/ folder`)
+    }
+  }
+
   return { violations, productionFsCount: productionFs.length }
 }
 
@@ -124,8 +233,8 @@ export function check(context) {
 
   const productionFiles = context?.sourceFiles
     ? context.sourceFiles()
-    : walk(join(root, PRODUCTION_ROOT), ['.fs', '.fsproj']).map((p) => relative(root, p))
-  const { violations } = scanArchitecture(productionFiles, read)
+    : walk(join(root, PRODUCTION_ROOT), ['.fs', '.fsi', '.fsproj']).map((p) => relative(root, p))
+  const { violations } = scanArchitecture(productionFiles, read, { root })
 
   const issues = violations.map(({ gate, message }) => ({
     code: gate,

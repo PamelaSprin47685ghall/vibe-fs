@@ -69,6 +69,21 @@ export const acceptOwner = async (handle, session = 'authority-owner') => {
   return result.profile
 }
 
+export const linkChildWork = async (handle, parent, child, participant) => {
+  const linked = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session: parent }, null, {
+    family: 'Execution', case: 'HandleLinked', payload: {
+      ParentSessionId: parent,
+      ChildSessionId: child,
+      Handle: `agent:${child}`,
+      TargetAgent: participant,
+      Byname: child,
+      CanonicalRole: participant,
+      Ownership: 'DurableParentHandle',
+    },
+  })
+  assert.equal(linked.ok, true, JSON.stringify(linked.error))
+}
+
 export const hostPort = (send) => ({ SubscribeTerminal: () => ({ Dispose() {} }), SendPrompt: send })
 
 export const journalBytes = directory => {
@@ -87,6 +102,7 @@ export const prepareAcceptanceObserver = async (handle, path, label) => {
   const owner = await acceptOwner(handle, `owner-${session}`)
   const issued = authority.issueInheritedIdentitySeed('engineer', owner)
   assert.equal(issued.ok, true, issued.error)
+  await linkChildWork(handle, owner.session, session, 'engineer')
   if (path === 'root') return { session, seed: issued.value, profile: null }
   const root = await dispatch.sendAgentOwnerRoot(
     hostPort(async () => dispatch.admittedWithReceipt(`bootstrap-${session}`)),

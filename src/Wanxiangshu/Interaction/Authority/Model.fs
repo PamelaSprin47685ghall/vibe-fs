@@ -1,10 +1,165 @@
 namespace Wanxiangshu.Interaction.Authority
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+
+/// Typed projection of the stateless `wanxiangli/dispatch` claim-ledger law
+/// (CUT-11): claim scope and PromptKey material, ClaimSequence consumption, the
+/// four-state settlement edits, exact-occasion admission and the bounded
+/// recovery proof. The projection record, sha256 and the journal stay here.
+[<RequireQualifiedAccess>]
+module DispatchLaw =
+
+    type private Law =
+        abstract recoveryTailWindow: int
+        abstract claimScope: input: obj -> string
+        abstract promptKeyMaterial: input: obj -> string
+        abstract nextClaimSequence: consumed: obj -> int
+        abstract alreadyClaimed: consumed: obj -> bool
+        abstract settle: input: obj -> string array
+        abstract occasionAdmitted: input: obj -> bool
+        abstract recover: input: obj -> obj
+        abstract answer: sent: string -> obj
+        abstract reset: input: obj -> obj
+
+    [<Import("Dispatch", "wanxiangli/dispatch")>]
+    let private dispatchClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : Law = jsNative
+
+    let private law: Law = construct dispatchClass
+
+    let private orNull (value: string option) : obj =
+        match value with
+        | Some text -> box text
+        | None -> null
+
+    let private count (consumed: int option) : obj =
+        match consumed with
+        | Some value -> box value
+        | None -> null
+
+    let recoveryTailWindow = law.recoveryTailWindow
+
+    let claimScope (sessionId: string) (logicalRunId: string option) (origin: string) (payloadDigest: string) =
+        law.claimScope (
+            createObj
+                [ "sessionId" ==> sessionId
+                  "logicalRunId" ==> orNull logicalRunId
+                  "origin" ==> origin
+                  "payloadDigest" ==> payloadDigest ]
+        )
+
+    let promptKeyMaterial
+        (sessionId: string)
+        (logicalRunId: string option)
+        (authorityRoot: string option)
+        (origin: string)
+        (payloadDigest: string)
+        (claimSequence: int)
+        =
+        law.promptKeyMaterial (
+            createObj
+                [ "sessionId" ==> sessionId
+                  "logicalRunId" ==> orNull logicalRunId
+                  "authorityRoot" ==> orNull authorityRoot
+                  "origin" ==> origin
+                  "payloadDigest" ==> payloadDigest
+                  "claimSequence" ==> claimSequence ]
+        )
+
+    let nextClaimSequence (consumed: int option) = law.nextClaimSequence (count consumed)
+    let alreadyClaimed (consumed: int option) = law.alreadyClaimed (count consumed)
+
+    [<RequireQualifiedAccess>]
+    type Edit =
+        | RecordReceipt
+        | DropPending
+        | LandOccasion
+        | LandExact
+        | RecordContinuation
+        | ClearOccasion
+
+    let private edit (label: string) =
+        match label with
+        | "RecordReceipt" -> Edit.RecordReceipt
+        | "DropPending" -> Edit.DropPending
+        | "LandOccasion" -> Edit.LandOccasion
+        | "LandExact" -> Edit.LandExact
+        | "RecordContinuation" -> Edit.RecordContinuation
+        | "ClearOccasion" -> Edit.ClearOccasion
+        | other -> failwithf "wanxiangli/dispatch returned an unknown ledger edit %s" other
+
+    /// event: "Submit" | "Accept" | "Abandon".
+    let settle (event: string) (pending: bool) (continuation: bool) : Edit list =
+        law.settle (createObj [ "event" ==> event; "pending" ==> pending; "continuation" ==> continuation ])
+        |> Array.map edit
+        |> Array.toList
+
+    let occasionAdmitted (pendingSameOccasion: bool) (landedOrigin: string option) (origin: string) =
+        law.occasionAdmitted (
+            createObj
+                [ "pendingSameOccasion" ==> pendingSameOccasion
+                  "landedOrigin" ==> orNull landedOrigin
+                  "origin" ==> origin ]
+        )
+
+    /// Host send answer label → (ledger action, definitely-not-sent, detached verdict).
+    /// Labels: "AdmittedWithReceipt" | "AdmittedWithPhysicalMessage" | "Retryable" |
+    /// "Fatal" | "AcceptanceUnknown".
+    let answer (sent: string) : string * bool * string =
+        let verdict = law.answer sent
+        unbox<string> verdict?ledger, unbox<bool> verdict?definitelyNotSent, unbox<string> verdict?detached
+
+    /// Run-boundary reset: (claim keys kept, counter scopes kept, clear
+    /// continuations, clear questions). claims: (key, logical run);
+    /// counters: (scope, session, logical run).
+    let reset
+        (sessionId: string)
+        (claims: (string * string option) list)
+        (counters: (string * string * string option) list)
+        : Set<string> * Set<string> * bool * bool =
+        let verdict =
+            law.reset (
+                createObj
+                    [ "sessionId" ==> sessionId
+                      "claims"
+                      ==> (claims
+                           |> List.map (fun (key, run) -> createObj [ "key" ==> key; "logicalRunId" ==> orNull run ])
+                           |> List.toArray)
+                      "counters"
+                      ==> (counters
+                           |> List.map (fun (scope, session, run) ->
+                               createObj [ "scope" ==> scope; "sessionId" ==> session; "logicalRunId" ==> orNull run ])
+                           |> List.toArray) ]
+            )
+
+        Set.ofArray (unbox<string array> verdict?keepClaims),
+        Set.ofArray (unbox<string array> verdict?keepCounters),
+        unbox<bool> verdict?clearContinuations,
+        unbox<bool> verdict?clearQuestions
+
+    /// messages: (role, PromptKey carrier, physical id), oldest first.
+    /// Ok physical = proven; Error hasReceipt = still pending.
+    let recover (promptKey: string) (hasReceipt: bool) (messages: (string * string option * string) list) =
+        let wire =
+            messages
+            |> List.map (fun (role, key, id) -> createObj [ "role" ==> role; "promptKey" ==> orNull key; "id" ==> id ])
+            |> List.toArray
+
+        let verdict =
+            law.recover (createObj [ "promptKey" ==> promptKey; "hasReceipt" ==> hasReceipt; "messages" ==> wire ])
+
+        match unbox<string> verdict?kind with
+        | "Proven" -> Ok(unbox<string> verdict?physicalUserMessageId)
+        | "StillPending" -> Error(unbox<bool> verdict?hasReceipt)
+        | other -> failwithf "wanxiangli/dispatch returned an unknown recovery verdict %s" other
 
 [<RequireQualifiedAccess>]
 module PromptAuthority =
@@ -216,6 +371,45 @@ module PromptAuthority =
             PriorPhysicalInputs: Set<PhysicalUserMessageId>
         }
 
+    /// interaction-authority-018: the closure contract an accepted authority
+    /// root commits to, kept beside the profile so a closure can be judged
+    /// after the active run is gone.
+    ///
+    /// The profile itself cannot carry it: it is the execution identity, and
+    /// the closure contract is the durable answer to "how does this root
+    /// end?". A restart must still be able to tell a repeated closure from a
+    /// conflicting one, so the contract survives the close.
+    type AcceptedRootClosure =
+        { RootKind: string
+          ExpectedClosureKind: string
+          OwnerLogicalRunId: string option
+          AgentOwnerLife: string option
+          AuthorityRootUserMessageId: AuthorityRootUserMessageId }
+
+    /// interaction-authority-018: one recorded durable closure.
+    type AuthorityClosureRecord =
+        { RootKind: string
+          ClosureWitness: string }
+
+    /// interaction-authority-018: one durable source terminal.
+    ///
+    /// The fields are the witness fields of the closure kind this terminal
+    /// belongs to, so a closure can be checked against the exact source and
+    /// not merely against a fact id.
+    type AuthorityTerminalSource =
+        {
+            /// The library's closure kind this terminal is the source of:
+            /// "HumanRootManagedRun" | "AgentOwnerChildWork" |
+            /// "AgentOwnerAttachedWork" | "AgentOwnerInternalLeaf".
+            SourceKind: string
+            OwnerLogicalRunId: string option
+            ChildLogicalRunId: string option
+            AttachmentKind: string option
+            AssociationGeneration: string option
+            DecisionOrTransactionId: string option
+            FactId: string
+        }
+
     type PromptAuthorityProjection =
         {
             LastAuthorityProfile: AuthorityExecutionProfile option
@@ -252,6 +446,27 @@ module PromptAuthority =
             /// Root scopes belong to the session and keep their consumed count.
             ClaimSequences: Map<string, ClaimSequenceCounter>
             UserQuestions: Map<ToolCallId, UserQuestion>
+            /// interaction-authority-018: the closure contract of every
+            /// accepted root, keyed by its logical run.
+            ///
+            /// The accepted root is the only thing that knows which closure
+            /// kind a run may close under, so this map is what a closure is
+            /// judged against once the active run has been cleared.
+            AcceptedRootClosures: Map<LogicalRunId, AcceptedRootClosure>
+            /// interaction-authority-018: the durable source terminals of a
+            /// logical run, keyed by the run and then by the source fact id.
+            ///
+            /// A closure may only cite a source terminal that is already
+            /// durable; a closure that cites nothing durable is refused rather
+            /// than inferred.
+            TerminalSources: Map<LogicalRunId, Map<string, AuthorityTerminalSource>>
+            /// interaction-authority-018: the closure already recorded for a
+            /// logical run.
+            ///
+            /// Kept so a replay after the active run is gone can still tell an
+            /// identical closure (idempotent) from a conflicting one
+            /// (fail-closed).
+            ClosedRuns: Map<LogicalRunId, AuthorityClosureRecord>
         }
 
     let empty: PromptAuthorityProjection =
@@ -262,7 +477,10 @@ module PromptAuthority =
           PhysicalLandings = Map.empty
           AcceptedContinuationIds = Map.empty
           ClaimSequences = Map.empty
-          UserQuestions = Map.empty }
+          UserQuestions = Map.empty
+          AcceptedRootClosures = Map.empty
+          TerminalSources = Map.empty
+          ClosedRuns = Map.empty }
 
     /// Key of one logical dispatch's landing evidence: the session plus the
     /// payload digest both send paths derive identically (`sha256 text`).
@@ -282,7 +500,6 @@ module PromptAuthority =
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
         | Continuation DegenerationGuard -> "DegenerationGuard"
         | Continuation FissionHandoff -> "FissionHandoff"
-        | Continuation DeferredWorkPresentation -> "DeferredWorkPresentation"
         | HostInternal -> "HostInternal"
         | UnknownOrigin -> "UnknownOrigin"
 
@@ -297,7 +514,6 @@ module PromptAuthority =
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
         | "DegenerationGuard" -> Some DegenerationGuard
         | "FissionHandoff" -> Some FissionHandoff
-        | "DeferredWorkPresentation" -> Some DeferredWorkPresentation
         | _ -> None
 
     let originFromLabel (label: string) =
@@ -384,59 +600,38 @@ module PromptAuthority =
     // a different key for the same logical dispatch and conclude nothing was
     // sent.
 
-    /// Absent identities participate in the digest as an explicit marker rather
-    /// than an empty string, so "no Logical Run yet" cannot collide with "a run
-    /// whose id happens to be blank".
-    let private digestField (value: string option) =
-        match value with
-        | Some text -> text
-        | None -> "\u0000absent"
+    /// PROMPT-011 recovery bounds, owned by `wanxiangli/dispatch`: a Host
+    /// session's history is unbounded while a pending claim is minutes old at
+    /// most, and PROMPT-011 forbids resending either way.
+    ///
+    /// Plain `let`, not `[<Literal>]`: the value stays assertable from a layer 1 test.
+    let RecoveryTailWindow = DispatchLaw.recoveryTailWindow
 
-    /// PROMPT-011 recovery bounds.
-    ///
-    /// The tail window exists because a Host session's history is unbounded while
-    /// a pending claim is minutes old at most. Scanning further would not find a
-    /// message that is genuinely absent, and PROMPT-011 forbids resending either
-    /// way — so a wider window buys nothing and costs an unbounded read.
-    ///
-    /// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,
-    /// leaving the clause value unassertable from a layer 1 test.
-    let RecoveryTailWindow = 50
-
-    /// The scope a ClaimSequence counts within.
-    ///
-    /// PROMPT-011 names (SessionId, LogicalRunId, Origin, PayloadDigest). Two
-    /// dispatches agreeing on all four are the same logical act repeated, which
-    /// is exactly when a distinct sequence number is needed.
+    /// The scope a ClaimSequence counts within: (SessionId, LogicalRunId,
+    /// Origin, PayloadDigest), as `wanxiangli/dispatch` spells it.
     let claimScopeDigest
         (sessionId: SessionId)
         (logicalRunId: LogicalRunId option)
         (origin: PromptOrigin)
         (payloadDigest: string)
         =
-        String.Join(
-            "\u001f",
-            [| SessionId.value sessionId
-               digestField (logicalRunId |> Option.map LogicalRunId.value)
-               originLabel origin
-               payloadDigest |]
-        )
+        DispatchLaw.claimScope
+            (SessionId.value sessionId)
+            (logicalRunId |> Option.map LogicalRunId.value)
+            (originLabel origin)
+            payloadDigest
 
-    /// Root claims have no LogicalRunId until physical acceptance. Their
-    /// sequence scope belongs to the session, so closing a run cannot reset it.
-    let rootClaimSequences (sessionId: SessionId) (projection: PromptAuthorityProjection) =
-        projection.ClaimSequences
-        |> Map.filter (fun _ counter -> counter.SessionId = sessionId && counter.LogicalRunId.IsNone)
+    let private consumedClaims (scope: string) (projection: PromptAuthorityProjection) =
+        Map.tryFind scope projection.ClaimSequences
+        |> Option.map (fun counter -> counter.Count)
 
     /// The ClaimSequence this scope's next claim would carry.
     let nextClaimSequence (scope: string) (projection: PromptAuthorityProjection) =
-        (Map.tryFind scope projection.ClaimSequences
-         |> Option.map (fun counter -> counter.Count)
-         |> Option.defaultValue 0)
-        + 1
+        DispatchLaw.nextClaimSequence (consumedClaims scope projection)
 
-    /// PROMPT-011's key. Deterministic in every input, so the same logical
-    /// dispatch derives the same key on any process that folds the same journal.
+    /// PROMPT-011's key: sha256 of the library's deterministic material, so the
+    /// same logical dispatch derives the same key on any process that folds the
+    /// same journal.
     let derivePromptKey
         (sha256: string -> string)
         (sessionId: SessionId)
@@ -446,20 +641,15 @@ module PromptAuthority =
         (payloadDigest: string)
         (claimSequence: int)
         : PromptKey =
-        PromptKey.create (
-            sha256 (
-                String.Join(
-                    "\u001f",
-                    [| SessionId.value sessionId
-                       digestField (logicalRunId |> Option.map LogicalRunId.value)
-                       digestField (authorityRoot |> Option.map AuthorityRootUserMessageId.value)
-                       originLabel origin
-                       payloadDigest
-                       string claimSequence |]
-                )
-            )
-        )
-
+        DispatchLaw.promptKeyMaterial
+            (SessionId.value sessionId)
+            (logicalRunId |> Option.map LogicalRunId.value)
+            (authorityRoot |> Option.map AuthorityRootUserMessageId.value)
+            (originLabel origin)
+            payloadDigest
+            claimSequence
+        |> sha256
+        |> PromptKey.create
 
     /// Request + terminal-scoped repair identity. Both axes matter: terminal identity
     /// makes same-terminal re-entry idempotent.
@@ -476,9 +666,6 @@ module PromptAuthority =
                ProviderRunIdentity.value terminalProviderRun
                repairKind |]
         )
-
-    let repairPayloadBelongsToRequest (requestId: RepairRequestId) (payloadDigest: string) =
-        payloadDigest.StartsWith(RepairRequestId.value requestId + "\u001f", System.StringComparison.Ordinal)
 
     /// Gate nudges are not a finite repair budget. They are repeatable while the
     /// guarded condition remains unsatisfied, but one exact terminal occasion is
@@ -501,12 +688,12 @@ module PromptAuthority =
                 && claim.Origin = origin
                 && claim.PayloadDigest = payloadDigest)
 
-        let accepted =
+        let landedOrigin =
             projection.AcceptedDispatches
             |> Map.tryFind (acceptedDispatchKey sessionId payloadDigest)
-            |> Option.exists (fun dispatch -> dispatch.Origin = origin)
+            |> Option.map (fun dispatch -> originLabel dispatch.Origin)
 
-        pending || accepted
+        DispatchLaw.occasionAdmitted pending landedOrigin (originLabel origin)
 
     let gateNudgeAlreadyAdmitted
         (sessionId: SessionId)
@@ -562,7 +749,7 @@ module PromptAuthority =
                 (PromptOrigin.Continuation ContinuationKind.InteractionRepair)
                 (repairPayloadDigest requestId terminalProviderRun repairKind)
 
-        nextClaimSequence scope projection > 1
+        DispatchLaw.alreadyClaimed (consumedClaims scope projection)
 
     /// AGENT-001: Canonical role shares one system prompt, so the prompt
     /// identity is a function of CanonicalRole alone.

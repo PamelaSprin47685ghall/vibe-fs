@@ -28,8 +28,7 @@ module ReliabilityDiagnosticsSurface =
     [<Emit("(() => { const freeze = value => { if (value && typeof value === 'object' && !Object.isFrozen(value)) { Object.freeze(value); Object.values(value).forEach(freeze); } return value; }; return freeze($0); })()")>]
     let private deepFreeze (value: obj) : obj = jsNative
 
-    let diagnosticsVisible () : bool =
-        Environment.GetEnvironmentVariable "WANXIANGSHU_DIAG" = "1"
+    let diagnosticsVisible () : bool = Diagnostic.diagnosticsVisible ()
 
     [<Emit("console.error(JSON.stringify($0))")>]
     let private writeRecord (value: obj) : unit = jsNative
@@ -287,19 +286,8 @@ module ReliabilityDiagnosticsSurface =
                 Some(recoveryOf value?recoveryDecision)
           PersistenceCommitment = persistenceCommitment }
 
-    let redactText (value: string) =
-        let oneLine = Regex.Replace(value, "[\\r\\n].*$", "")
+    let redactText (value: string) = Diagnostic.redactText value
 
-        oneLine
-        |> fun text -> Regex.Replace(text, "\\bBearer\\s+[^\\s]+", "Bearer [REDACTED]", RegexOptions.IgnoreCase)
-        |> fun text ->
-            Regex.Replace(
-                text,
-                "\\b(api[_-]?key|token|password|cookie|credential)\\s*[:=]\\s*[^\\s,;]+",
-                "$1=[REDACTED]",
-                RegexOptions.IgnoreCase
-            )
-        |> fun text -> Regex.Replace(text, "(?:[A-Za-z]:\\\\|/)(?:[^\\s/\\\\]+[/\\\\])+[^\\s,;]+", "[REDACTED]")
 
     let private optionObject map value =
         value |> Option.map (map >> box) |> Option.defaultValue null

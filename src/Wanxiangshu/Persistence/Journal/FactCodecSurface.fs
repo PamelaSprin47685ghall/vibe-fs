@@ -55,6 +55,7 @@ module FactCodecSurface =
         | "ParentCancelled" -> HandleAbandonReason.ParentCancelled
         | "DeadlineExceeded" -> HandleAbandonReason.DeadlineExceeded
         | "HostSessionGone" -> HandleAbandonReason.HostSessionGone
+        | "Voided" -> HandleAbandonReason.Voided
         | other -> failwith $"FactCodecSurface: unknown abandon reason '{other}'"
 
     let private roleOf (value: obj) =
@@ -153,6 +154,33 @@ module FactCodecSurface =
 
         match family, case with
         | "Prompt", "AuthorityRootAccepted" ->
+            let identitySeed = identitySeedOfJs (payload?IdentitySeed)
+
+            let authorityKind = text (payload?AuthorityKind)
+
+            let isManager =
+                match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity identitySeed) with
+                | Some role -> role = Role.Manager
+                | None -> false
+
+            let agentOwnerLife =
+                optionalString (payload?AgentOwnerLife)
+                |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
+
+            let owner =
+                PromptAuthority.identitySeedOwner identitySeed
+                |> Option.map (fun (_, run, _) -> LogicalRunId.value run)
+
+            let suppliedOwner =
+                optionalString (payload?OwnerLogicalRunId)
+                |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
+
+            if (authorityKind = "AgentOwnerRoot") <> owner.IsSome then
+                invalidArg "IdentitySeed" "the authority kind does not match its owner identity"
+
+            if suppliedOwner.IsSome && suppliedOwner <> owner then
+                invalidArg "OwnerLogicalRunId" "the recorded owner does not match the identity seed"
+
             Fact.Agent(
                 AgentFact.Prompt(
                     PromptFactCases.AuthorityRootAccepted
@@ -161,10 +189,70 @@ module FactCodecSurface =
                           LogicalRunId = LogicalRunId.create (text (payload?LogicalRunId))
                           AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
-                          AuthorityKind = text (payload?AuthorityKind)
-                          IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
+                          AuthorityKind = authorityKind
+                          ExpectedClosureKind =
+                            AuthorityLifeClassification.recordedClosureKind
+                                authorityKind
+                                isManager
+                                agentOwnerLife
+                                (optionalString (payload?ExpectedClosureKind)
+                                 |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value)))
+                          OwnerLogicalRunId = owner
+                          AgentOwnerLife = agentOwnerLife
+                          IdentitySeed = identitySeed }
                 )
             )
+        | "Prompt", "AuthorityManagedRunTerminal" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityManagedRunTerminal
+                        { SessionId = SessionId.create (text (payload?SessionId))
+                          LogicalRunId = LogicalRunId.create (text (payload?LogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          FactId = text (payload?FactId) }
+                )
+            )
+        | "Prompt", "AuthorityChildWorkTerminal" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityChildWorkTerminal
+                        { SessionId = SessionId.create (text (payload?SessionId))
+                          OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                          ChildLogicalRunId = LogicalRunId.create (text (payload?ChildLogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          FactId = text (payload?FactId) }
+                )
+            )
+        | "Prompt", "AuthorityAttachedWorkTerminal" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityAttachedWorkTerminal
+                        { SessionId = SessionId.create (text (payload?SessionId))
+                          OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                          ChildLogicalRunId = LogicalRunId.create (text (payload?ChildLogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          AttachmentKind = text (payload?AttachmentKind)
+                          AssociationGeneration = text (payload?AssociationGeneration)
+                          FactId = text (payload?FactId) }
+                )
+            )
+        | "Prompt", "AuthorityInternalLeafTerminal" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityInternalLeafTerminal
+                        { SessionId = SessionId.create (text (payload?SessionId))
+                          OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                          LeafLogicalRunId = LogicalRunId.create (text (payload?LeafLogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          DecisionOrTransactionId = text (payload?DecisionOrTransactionId)
+                          FactId = text (payload?FactId) }
+                )
+            )
+
         | "Runtime", "RuntimeStarted" ->
             Fact.Runtime(
                 RuntimeStarted
@@ -305,7 +393,53 @@ module FactCodecSurface =
                        LogicalRunId = LogicalRunId.value payload.LogicalRunId
                        AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                        AuthorityKind = payload.AuthorityKind
+                       ExpectedClosureKind = payload.ExpectedClosureKind
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       AgentOwnerLife = payload.AgentOwnerLife
                        IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityManagedRunTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityManagedRunTerminal"
+                   payload =
+                    {| SessionId = SessionId.value payload.SessionId
+                       LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityChildWorkTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityChildWorkTerminal"
+                   payload =
+                    {| SessionId = SessionId.value payload.SessionId
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityAttachedWorkTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityAttachedWorkTerminal"
+                   payload =
+                    {| SessionId = SessionId.value payload.SessionId
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       AttachmentKind = payload.AttachmentKind
+                       AssociationGeneration = payload.AssociationGeneration
+                       FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityInternalLeafTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityInternalLeafTerminal"
+                   payload =
+                    {| SessionId = SessionId.value payload.SessionId
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       LeafLogicalRunId = LogicalRunId.value payload.LeafLogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       DecisionOrTransactionId = payload.DecisionOrTransactionId
+                       FactId = payload.FactId |} |}
+
         | _ ->
             box
                 {| family = "Unknown"
@@ -315,6 +449,12 @@ module FactCodecSurface =
     let private caseOfFact (fact: Fact) : string =
         match fact with
         | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted _)) -> "AuthorityRootAccepted"
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityManagedRunTerminal _)) -> "AuthorityManagedRunTerminal"
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityChildWorkTerminal _)) -> "AuthorityChildWorkTerminal"
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityAttachedWorkTerminal _)) ->
+            "AuthorityAttachedWorkTerminal"
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityInternalLeafTerminal _)) ->
+            "AuthorityInternalLeafTerminal"
         | Fact.Runtime(RuntimeStarted _) -> "RuntimeStarted"
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleAbandoned _)) -> "HandleAbandoned"
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted _)) -> "HandleCompleted"

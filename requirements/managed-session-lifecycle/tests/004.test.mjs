@@ -20,9 +20,19 @@ const admit = async (runtime, count) => {
 const invokeAndSettle = async (runtime, charge, answer, promptCount, runId) => {
   const pending = SyncDelegateSurface.invoke(runtime, owner, 'Engineer', charge)
   await admit(runtime, promptCount)
+  const delivered = await SyncDelegateSurface.deliverCurrent(
+    runtime,
+    owner,
+    'Engineer',
+    runId,
+    `call-${runId}`,
+    answer,
+    { 0: answer },
+  )
   assert.equal(await SyncDelegateSurface.settle(runtime, owner, 'Engineer', answer, runId), true)
   const result = await pending
   assert.equal(result.ok, true)
+  assert.equal(result.value, delivered)
   return result
 }
 

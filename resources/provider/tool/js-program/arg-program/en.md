@@ -1,1 +1,1 @@
-Exactly one class named Js that extends the generated JsProgram in this tool description and implements async run().
+Exactly one class named Js that extends the generated JsProgram in this tool description and implements async run(). An optional name labels any park from this call; always use its returned unique handle to resume.

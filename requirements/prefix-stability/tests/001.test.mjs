@@ -112,6 +112,15 @@ test('WHAT[prefix-stability-001] reused delegation completes three questions; se
       assert.equal(wire.providerId, ENGINEER_PROVIDER)
       assert.equal(wire.messages.at(-1).parts[0].text, question)
 
+      await delegation.deliverCurrent(
+        harness,
+        OWNER,
+        'Engineer',
+        `asst_q${ordinal + 1}`,
+        `call_q${ordinal + 1}`,
+        answer,
+        { 0: answer },
+      )
       const settled = await delegation.settle(harness, OWNER, 'Engineer', answer, `asst_q${ordinal + 1}`)
       assert.equal(settled, true, `Q${ordinal + 1} completion must be observed`)
       const completed = await resultValue(pending, `Q${ordinal + 1}`)

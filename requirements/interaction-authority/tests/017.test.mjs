@@ -113,7 +113,7 @@ test('WHAT[interaction-authority-017] dispatcher delivers a continuation to a ta
     assert.equal(root.ok, true, root.error)
     const rootClaim = dispatch.projectionObservation(handle, 'active-target').pendingClaims.find(claim => claim.promptKey === root.key)
     assert.ok(rootClaim)
-    const accepted = await dispatch.acceptAgentOwnerRoot(handle, 'active-target', root.key, 'physical-root-active')
+    const accepted = await dispatch.acceptAgentOwnerRoot(handle, 'active-target', root.key, 'physical-root-active', 'Child')
     assert.equal(accepted.ok, true, accepted.error)
     const continuation = await dispatch.sendContinuation(port, handle, 'active-target', 'continue same work', 'ManagerGuard', accepted.profile, 'Await')
     // The same gate must admit the legitimate continuation: a sender that

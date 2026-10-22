@@ -17,6 +17,7 @@ e1合并的gen77官方510文件与完整36文件integration均0 fail。003实际
 | 001、004、017、020、030 | 明确待证 | 全体委托四要素、全局工具合同唯一、返回不扩权、换工具仍守约、真正 fatal settlement/report/kill |
 | 002 | 生产权限投影及兼容 calling | 实际直接/包装/转发请求的全链权限；权限表不证明模型自行返回 |
 | 032 | 生产权限投影；另有真实 fork 入口断言：Manager 派发 `devops` 被拒，返回文案不宣告承接，且 `childCount`/`promptCount` 不再增长、无 durable handle（先以合法 engineer 派发证明计数器是活的） | 包装与转发请求形态上的同一拒绝；权限表不证明模型自行返回 |
+| 033 | 待正式跑：真实 fork→deliver→transform 保持不 abort、不 Completed、work Active；tool-calls 后仍等待，同 physical 的实际 Host stop 才完成并由一次 join 收取原 sealed View。同 physical 的前序 prose 可归属实际 tool call；无 prose、跨旧 physical prose、未匹配 call 均拒绝交付且普通读取仍可执行 | 新冻结候选下的整文件正式验收；当前只有静态检查，尚未证明运行通过 |
 | 003、006、027 | fork/resume 工具接收、拒绝 calling、复用 Byname；忙碌 Engineer/固定 DevOps 追加指导，warm/cold work 与原完成回调不变；完成后无需 join 即新工作；027 的无 prepared handoff 旧 Root Failed/Aborted 拒绝断言保留 | 跨进程物理恢复绑定；同进程 canonical reopen 不是 OS crash |
 | 005、013、014 | 真实 renderer、独立 TOML 解析、handle fold；实际 Join 队列上限与完整剩余项消费；commission mailbox 的 FIFO、余项与空队列 | 全部参数/错误不泄漏拓扑、真实 agent completion 的 owner/CAS/恢复；commission 完整入口接线 |
 | 007 | 真实同步普通/批次入口拒绝已废止 Coder/Inspector，拒绝前不创建 child、不发 prompt；Engineer 正例 | Sphinx 受管入口、无环与 family-root 放置的整链约束；032 的标准权限投影不替代入口授权 |
@@ -25,7 +26,7 @@ e1合并的gen77官方510文件与完整36文件integration均0 fail。003实际
 | 019、021 | 生产 typed renderer 的两种语言、敌意 TOML 样本、指令与数据平面分离、空背景省略 | 真正首提示读取最新 durable parent、指定 peer 的材料来源、权限不克隆 |
 | 022 | 完整语言资源选择、estimate fold 的去重与零饱和 | 归零后仍能真实执行、同一 durable estimate 的替换/重开 |
 | 023 | 同步 workflow 消费注入 retry verdict，恢复成功或耗尽后返回 | 真实恢复 engine 各路径与最终失败组合 |
-| 024—026 | 同名/同角色复用、own child delta、因果完成/失败、实际 fork 接收与不确定发送后果；Host event port 保留身份（父到子 `DelegationHandoff` delta tracking 已随显式 charge 传递与共享 ANCHOR 地址空间退役） | 所有 terminal 分支、进程 crash cuts、未知接收的后续收敛 |
+| 024—026 | 同名/同角色复用、own child delta、因果完成/失败、实际 fork 接收与不确定发送后果；Host event port 保留身份（父到子 `DelegationHandoff` delta tracking 已随显式 charge 传递与共享 ANCHOR 地址空间退役）。026 的重启未交付子工作用例现名 `RESTART_PENDING_CHILD_WORK_is_voided_at_load_and_join_reports_it_once_without_hang`：加载期把上一进程遗留、已无法交付的子工作**作废**（不是完成），horizon 名册把它显示为 `voided`，join 以 `voided` 报告一次后该工作退役并离开名册（scoped 情形被 abandon 的是工作单元格，底层 handle 绑定仍可复用，`summary` 读出终态），同一目录上再起一个进程不再重复报告 | 所有 terminal 分支、进程 crash cuts、未知接收的后续收敛 |
 | 028、029 | 当前编译清单的直接/传递闭包、额度及反向注入检测；部分源码词形审计 | 各 locality 独立真实编译、类型隔离和实际 capability 行为；路径/词形只是当前结构审计 |
 | 031 | 连续完成复用同一 child 并交付 bounded view、旧 root 拒绝、parent supersede 取消、完成与删除在两种顺序下各结算一次（`HandoffCheckpointSettlement` 已随父到子 `DelegationHandoff` 退役） | 真正重复 terminal；SyncDelegate 不替 fork 证明 |
 
@@ -49,6 +50,14 @@ Join 的条数上限、显示窗口和交付视图本身的有界物化不是同
 
 本次合并已接入 scope vocabulary、Surface 登记、编译引用与正式测试，统一 Fable 构建通过。gen72 的 Node22 定向生命周期与 Scope 诊断为 15 passed、0 failed、5 TODO；该范围只包括 managed-session-lifecycle/013、018、025 及 relay-retirement/009，不替 delegation 全包背书。固定 DevOps 道路的空闲可见性、普通取消保留固定 work、回调排空与 detach 订阅释放仍以本批新 owner 的最终正式 runner 为准，证据与未通过的旧产物反例见[本批同步记录](../../../proposals/archive/2026-10-03/Upstream同步-e1e7dd3f1-2026-10-03.md)。GAP-132 的完整迁移、历史隔离及物理恢复范围仍须分别验收。没有新增 durable ActiveWorkUnit、generation 或时钟胜者，也没有改模型路由/Role 政策。
 
-本次合并将 `OpenCode/Host/ChildWorkRecovery.fs` 的启动结算接到 exact `ChildWorkVoided`：只选择 canonical Active work 与 child 当前 Root、LogicalRun、physical child 一致的已有 `AdmittedWork`，不创建 completion 或 join payload；无 scoped work 的历史恢复独立保留 `ChildRunVoided`，不能为新 work 补造 scope。`crash-reconciliation/018` 新回归通过真实 dispatcher physical acceptance、journal 重开和生产恢复入口，验证旧 work 作废、稳定道路保留及显式新 work；`020` 保留持久化 Unknown/poisoned writer 反例。gen70 构建通过，Node22 定向启用 integration 的 018/020 为 10 passed、0 failed、3 TODO；正式 runner 汇总仍待本批验收，真实 plugin activation 与 OS crash 不在这份局部证据内。旧 `Retired` 或不同 child 不授予 DevOps physical replacement；永久丢失、关联关闭及固定 executor 证明仍须由 lifecycle owner 提供，未扩出猜测性的 replacement writer。
+本次合并将 `OpenCode/Host/ChildWorkRecovery.fs` 的启动结算接到 exact `ChildWorkVoided`：只选择 canonical Active work 与 child 当前 Root、LogicalRun、physical child 一致的已有 `AdmittedWork`，不创建 completion 或 join payload；无 scoped work 的历史恢复独立保留 `ChildRunVoided`，不能为新 work 补造 scope。`crash-reconciliation/018` 新回归通过真实 dispatcher physical acceptance、journal 重开和生产恢复入口，验证旧 work 作废、稳定道路保留及显式新 work；`020` 保留持久化写入受阻与保持健康的 writer 用例。gen70 构建通过，Node22 定向启用 integration 的 018/020 为 10 passed、0 failed、3 TODO；正式 runner 汇总仍待本批验收，真实 plugin activation 与 OS crash 不在这份局部证据内。旧 `Retired` 或不同 child 不授予 DevOps physical replacement；永久丢失、关联关闭及固定 executor 证明仍须由 lifecycle owner 提供，未扩出猜测性的 replacement writer。
+
+## 未交付子工作的作废结清（2026-10-21 裁决）
+
+未交付的子工作**永不写完成**。但「未交付」本身不是一种终态：只要交付仍可能，它保持活跃，join 不关闭，父方可以继续等待或重派。交付已不可能时（被 abort、取消，或重启加载期结算上一进程遗留的孤儿工作），系统追加 `ChildWorkVoided`（合法但无 scope 的历史用 `ChildRunVoided`）——**两类作废事实都走 abandon，没有一类是 abandon 规则的例外**，差别只在于被 abandon 的是工作单元格还是 handle 绑定：对 scoped 工作，具体工作单元格（`Works[exact id]`）转为 `Abandoned(Voided)` 并在报告后退役，它承载的那份**工作义务已是终态**；底层 handle 绑定仍**可复用**（它标识可再次参与的参与者身份，不是被作废的那份工作），`summary` 投影叠盖工作并读出终态；对无 scope 的历史，其 unscoped handle 绑定自身转为 `Abandoned(Voided)` 并在报告后退役。**作废不是完成**：不写完成正文，也不把已有交付视图当作完成凭据；可它**结清父方的未解除义务**：join 以 `voided` 状态报告一次，报告之后该工作退役（durable）并离开名册。join 的状态词表因此是 `completed | failed | abandoned | voided`。
+
+本包 026 的重启用例正是这条合同的唯一端到端见证：加载期作废 → horizon 显示 `voided` → join 报告一次 `voided`（既非 `completed` 也非 `undelivered`）→ `durableLifecycleByname` 读出 `Retired`（**经 `summary` 投影读出的终态**，不是从原始 handle 绑定直接读出的）、名册不再列出 → 同一目录上再起一个进程不再报告。**结算按孤儿幂等**：每个孤儿一生只产生一条作废事实，**重启的进程不得再次作废同一份孤儿工作**（journal 里不会出现第二条作废事实，join 也不再重复报告）。crash-reconciliation-018/020 从 journal 侧见证同一结算（每个孤儿一条作废事实、零 completion 事实、重复结算不再追加事实）。**本页只描述合同与见证范围，不记任何测试结论**；这两组用例的通过与否由行为泳道与正式 runner 给出。
+
+作废的持久原因也是 `HandleAbandonReason` 的第四个合法构造子 `Voided`：`wanxiangli/handle-lifecycle` 的 `recoverChild()` 接受的 `durableReason` 全集是 `ParentCancelled`｜`DeadlineExceeded`｜`HostSessionGone`｜`Voided`。**已被 2026-10-21 作废裁决取代的旧口径**是「只有前三项」，现已作废。库侧 0.66.0 起接受 `Voided`；**主仓的 `wanxiangli` gitlink 也已随 `cfa8d0dad` 前移到 0.66.0（`663ba59`）**，该 gitlink bump 已随行为泳道的 `6ccc761c2` 进入 `origin/master`，主仓恢复路径交出去的 `durableReason = "Voided"` 现在交到的就是已发布并接受它的库版本——落地链上这一环**已闭合**。
 
 本次结果见[迁移记录](../../../proposals/archive/2026-10-03/20模块迁移-恢复与委托-2026-09-28.md)。直接 `node --test` 只用于局部调试；正式结论使用 verification-system runner，TODO 会使它返回未完成。

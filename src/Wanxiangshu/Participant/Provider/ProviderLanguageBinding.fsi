@@ -1,0 +1,12 @@
+namespace Wanxiangshu.Participant.Provider
+
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider
+
+[<RequireQualifiedAccess>]
+module ProviderLanguageBinding =
+    val setHostConfigPreference: raw: string -> unit
+    val clearHostConfigPreferenceForTests: unit -> unit
+    val readGlobalPreference: unit -> ProviderLanguage
+    val refreshGlobalLanguage: unit -> unit
+    val forSessionText: sessionText: string -> ProviderLanguage

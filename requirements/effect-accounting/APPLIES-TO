@@ -7,12 +7,10 @@
 /src/Wanxiangshu/Change/Runtime.fs
 /src/Wanxiangshu/Execution/Delegation/Facts.fs
 /src/Wanxiangshu/Execution/Delegation/Fact.fs
-/src/Wanxiangshu/Mission/Work/ProjectionSurface.fs
 /src/Wanxiangshu/Repository/Programming/Js/Transaction.fs
 /src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs
 /src/Wanxiangshu/Persistence/Journal/FactCodec.fs
 /src/Wanxiangshu/Interaction/Dispatch/**
 /src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs*
-/src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs*
 /src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
 /src/Wanxiangshu/Context/Companion/Facts.*

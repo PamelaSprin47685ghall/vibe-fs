@@ -91,7 +91,6 @@ module Identity =
     module PhysicalUserMessageId =
         val create: value: string -> PhysicalUserMessageId
         val value: id: PhysicalUserMessageId -> string
-        val isNonBlank: id: PhysicalUserMessageId -> bool
         val promoteToAuthorityRoot: id: PhysicalUserMessageId -> AuthorityRootUserMessageId
 
     module PromptKey =

@@ -18,7 +18,7 @@
 
 ## [005] 委托面不暴露机器拓扑
 
-参数和返回结果不得包含 SessionId、AgentId、ManagerJobId、worktree、reused 等物理拓扑标识。跨 horizon 只传语义后果与 `js.deliver` 交回的 view。
+参数和返回结果不得包含 SessionId、AgentId、ManagerJobId、worktree、reused 等物理拓扑标识。跨 horizon 只传语义后果与 `this.deliver` 交回的 view。
 
 ## [006] 承接后果与绑定连续性
 
@@ -44,7 +44,7 @@ fork 成功只表示该 Byname 已承接 charge。续做按 Byname 找到既有 
 
 ## [011] 普通完成结束同步批次
 
-不设独立 return 工具或双重 await。被委托方的普通 Assistant completion 结束批次，由宿主交回该次 `js.deliver` 的 view。
+不设独立 return 工具或双重 await。被委托方的普通 Assistant completion 结束批次，由宿主交回该次 `this.deliver` 的 view。
 
 ## [012] Canonical 正文与 sibling 引用
 
@@ -72,15 +72,17 @@ Join 只在新输入已由 Host 保存、且属于该 owner 的已接纳物理�
 
 ## [019] Typed 首提示词
 
-fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与 CommissionerRecord/Attachment 只读背景。父到子背景用 TOML 数据字段，子到父完成项用 `js.deliver` 交回的 view，不得混淆方向。
+fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与 CommissionerRecord 只读背景。父到子背景由该次委派必传的 reportMapping 投影进 CommissionerRecord 槽位，用 TOML 数据字段承载；子到父完成项用 `this.deliver` 交回的 view，不得混淆方向。
 
 ## [020] 语义不依赖物理工具名
 
-工具改名或替换不改变委托的权能、所有权与生命周期合同。
+工具改名或替换不改变委托的权能、所有权与生命周期合同。委派成员一律走编程面（`this.fork`/`this.resume`/`this.commission`/`this.devops`/`this.dag`），不再有独立的 Host 工具注册；工具名不变，但调用面、物理注册与工具名都不改变委托语义。
 
-## [021] Attachment 只作背景
+## [021] 只读背景由 reportMapping 承载
 
-attachment 只将指定同伴已经交回的 view 作为只读数据放入首 prompt，不将其中未竟工作转成新任务义务，不克隆 authority。
+父 → 子上下文（包括父已从同伴交回的 view）不再由调用方在 charge 文本里手工拼接。委派必传 reportMapping：形状是 `Record<string, null|string>`（锚点编号字符串 → 摘要或 null），**不带 prefixUntil**，语义等价 prefixUntil=0 的 view 声明。宿主把 reportMapping 投影为子方载荷里的 `commissioner_record` 槽位，作为只读背景数据按父 → 子方向交给子方。
+
+charge 只承载任务本身。背景只作背景：不把其中未竟工作转成新任务义务，不克隆 authority。
 
 ## [022] 建议性工具次数
 
@@ -94,9 +96,17 @@ attachment 只将指定同伴已经交回的 view 作为只读数据放入首 pr
 
 复用 participant 的每个新工作是独立 direct-CE invocation，不建立 durable Stage/Phase/ActiveWorkUnit 或第二状态机。resume route 由 Byname 标识，SyncDelegate route 由 caller scope + dedicated role 标识；物理 SessionId 不拥有 handoff 连续性。
 
-输入为新 charge（调用方在 charge 中显式提供上下文，SyncDelegate/dag 可直接拼接上游已交付的 view，且 ANCHOR 编号共享同一进程地址空间；父到子 `DelegationHandoff` delta tracking 已退役）。
+输入为新 charge 与该次委派必传的 reportMapping。charge 只承载任务本身；父 → 子上下文由 reportMapping 单独承载（形态 `Record<string, null|string>`，无 prefixUntil，等价 prefixUntil=0 的声明），宿主把它投影为子方载荷的 `commissioner_record` 槽位。SyncDelegate 与 dag 同样传 reportMapping，且 dag 的全部节点收到**同一份** reportMapping，节点不得覆盖或另设自己的映射。ANCHOR 编号共享同一进程地址空间；父到子 `DelegationHandoff` delta tracking 已退役。
 
-同步调用等待自己完成，只返回本次 `js.deliver` 交回的 view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自 `js.deliver` 交付格的 view；未交付的子工作不写完成、join 不关闭，保持可见的未解除义务——父方可以继续等待或重派，原子工作保持活跃，不把 undelivered 结算成终态。S1/S2/S3/S4 接力不再主动清除上下文。
+委派成员全部走编程面：`this.fork(payload, reportMapping)`、`this.resume(payload, reportMapping)`、`this.commission(payload, reportMapping)`、`this.devops(intent, reportMapping)`；不再有独立的 Host 工具注册，工具名不变但语义不因工具名变化而改变（[020]）。reportMapping 缺失或非法时，数据信封拒绝 `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`，不执行程序、不留下部分效果。
+
+`this.fission(payload)` 不带 reportMapping：它是同身份换执行道，无条件继承本对话衣钵。`this.join()` 与 `this.horizon()` 是拉取动作，不强加 reportMapping。
+
+同步调用等待自己完成，只返回本次 `this.deliver` 交回的 view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自 `this.deliver` 交付格的 view。写完成需要两件事同时成立：该 work unit 有因果上证明的终态（proven terminal，见 [025]），并且有经 `this.deliver` 有效交付的材料——只有交付不证明完成。**仍能交付时**，未交付的子工作不写完成、join 不关闭，保持可见的未解除义务——父方可以继续等待或重派，原子工作保持活跃，不把未交付结算成终态（未交付本身不是一种状态）。
+
+当 abort、cancel 或重启加载结算已经使交付不再可能（无存活执行可以继续交付），系统**必须**追加 `ChildWorkVoided` 作废该工作，不得让父方继续等待一个不会到来的交付。作废**不是完成**：它不产生完成交付（既不写完成正文，也不把已有交付视图当作完成凭据），`status` 不是 `completed`。但作废**结清父方的未解除义务**：join 以 `voided` 状态把它报告一次（join 状态只有 `completed | failed | abandoned | voided`，未交付本身不是一种状态），报告之后该工作从名册退役（durable），重启不重复报告。作废在报告之前仍是可见的在场后果，父方据此得知该子工作已被结清，而不是任其消失。交付过一次又被 abort、因而不再可能完成交付的子工作同样走作废分支：交付本身不证明完成，abort 绝不因"曾经交付过"被写成 `completed`。S1/S2/S3/S4 接力不再主动清除上下文。
+
+同一条规则跨两个委派通道一致：异步 fork/resume 通道与同步 SyncDelegate 通道里，被委托方「完成但未交付」（本次工作没有 `this.deliver` 交付格）**在仍能交付时**都不是终态——不写完成、不结算失败；work unit 保持活跃并留下可见的未解除义务，父方这次等待不被该次完成关闭，可以继续等待或重派。两个通道同样适用作废分支：交付已不可能时 `ChildWorkVoided` 必须结清该义务，join 报告一次 `voided` 后退役。
 
 ## [025] Completion 以因果身份认领
 
@@ -112,11 +122,13 @@ run-scoped Completed/Failed/Aborted 均须保留因果身份；只有 session-wi
 
 acceptance unknown 或确认超时时，保留 durable Pending 与原 PromptKey，不伪造失败、不自动重发；返回明确的 `DispatchUncertain`，说明可能已接受、不要重复委托，且不得发布为 join 等待任务。已经发生的 effect 不得被后置失败否认为“未放置”。
 
-Join 等待当前进程真正在跑、当前 owner 已 durable 接纳但尚未交付，或已产生可 join 结果的工作：真实 Host agent 运行经 `PendingRuns`/`PendingCompletionCount`/`PtyRuns` 可见，已接纳的 work 与可 join 后果经 journal 投影可见。重启不解除未交付的工作义务，也不自动恢复旧工具资源。重启后按 durable handle 重新收养的**空闲伴随句柄**（如 Manager 的 `devops`）只注册其身份、不代表有在跑任务，不得让 Join 误判为有工作而无限等待；无 journal 的纯 PTY 模式才以进程内 active run 计数作为 agent 工作信号。
+Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真实 Host agent 运行经 `PendingRuns`/`PendingCompletionCount`/`PtyRuns` 可见，可 join 的 durable handle 经 journal 投影可见。重启后按 durable handle 重新收养的**空闲伴随句柄**（如 Manager 的 `devops`）只注册其身份、不代表有在跑任务，不得让 Join 误判为有工作而无限等待；无 journal 的纯 PTY 模式才以进程内 active run 计数作为 agent 工作信号。已作废的工作不是"在跑"，join 无须为它等待：它以 `voided` 报告一次后即从名册退役；仍可能交付的未交付工作才是 join 可以等待的那种在跑。
 
 ## [027] Busy nudge 不承载新 assignment
 
 同一 logical route 同时至多一个 active work unit。对忙碌 participant 调用 `resume` 时，charge 作为 `BusyAgentNudge` 追加到既有 LogicalRun，在 Host 保存后进入下一次尚未开始准备的 LLM 请求，不中断当前输出或工具。Engineer 与固定 DevOps 均允许此行为；保留原 work 的 Root、身份与完成订阅，不创建新 assignment，不因提示文本与旧 charge 相同而假装发送成功。
+
+忙碌提示仍按委派契约携带本次 `resume` 的 reportMapping，作为只读背景随提示送达；它不因未新建 assignment 而免于携带，也不改写既有 work 的背景。
 
 前一 work unit 完成后，`resume` 才承接下一项，不依赖 join 消费或重建 participant。忙碌提示的发送路径不得因异步准备期间任务结束而自动改走新 assignment。
 
@@ -138,8 +150,16 @@ sync invariant 违例由委托 owner 构造 typed incident；先保留已发生 
 
 ## [031] Checkpoint 保留已完成事实
 
-（父到子 `DelegationHandoff` 及其 `HandoffCheckpointSettlement` 已随显式 charge 上下文传递与共享 ANCHOR 地址空间退役。）child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交付终值 view，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
+（父到子 `DelegationHandoff` 及其 `HandoffCheckpointSettlement` 已随 charge 与 reportMapping 分离传递、共享 ANCHOR 地址空间退役。）child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交付终值 view，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
 
 ## [032] Engineer 与 DevOps 不相互差遣
 
 Engineer 完成工作或到达需 Manager 决定的边界即返回，不自行组织验证链，不直接、包装或转发任务给 DevOps。DevOps 不创建或差遣其他工程子代理。运行验证和进一步组织工作由 Manager 调度。
+
+## [033] 投递后中断不得吞掉返回
+
+子代理经 `this.deliver` 提交持久交付见证后，该见证保留本次交付材料。交付本身不证明子工作已完成：仍在执行或处于 `tool-calls` 的子工作不得被中断或结算为完成。宿主实际观察到同一子工作、逻辑运行、权威根和物理输入的合法终态后，以已提交见证的 view 结算父方 `join`；终态可以来自同一物理输入的后续 provider step。
+
+- 允许后果：真实终态成立后，join 记录里的 `view` 是本次交付的材料；中断事实（已发出 / 已观察到）独立登记，不推翻交付。
+- 禁止后果：不得仅凭交付或 abort / cancel 事实伪造完成；不得因终态出自后续 provider step 而丢失原交付材料；不得用后续散文替换已提交的 view；不得把未交付的后续步骤写成完成。
+- 边界：Manager / Plan 的生命周期 deliver 没有自己的父 join，本条只约束有 handle 链接的子会话。交付见证缺失时不是“已完成”：投递不成立，工具必须报告 `DELIVERY_NOT_ESTABLISHED`，不得只留进程内交付格。

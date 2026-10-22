@@ -2,6 +2,8 @@ namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation.Identity
+open Fable.Core
+open Fable.Core.JsInterop
 
 type ObservedProviderFailure =
     { Key: string
@@ -28,21 +30,90 @@ type ProviderFailureAdvanceRejection =
     | InvalidBudget
     | ConflictingObservation
 
+[<RequireQualifiedAccess>]
+type ProviderFailureReplay =
+    | RetryAuthorized
+    | RetryExhausted
+    | EpisodeSuperseded
+
+[<RequireQualifiedAccess>]
+type ProviderFailureObservation =
+    | Record of ProviderFailureBudgetSpec * int * ProviderFailureProjection
+    | Replay of ProviderFailureReplay
+
 module ProviderFailureProjection =
 
-    let forAuthority (logicalRunId: LogicalRunId) (authorityRoot: AuthorityRootUserMessageId) =
-        { LogicalRunId = logicalRunId
-          AuthorityRootUserMessageId = authorityRoot
-          Budget = ProviderFailureBudget.forNewAuthorityRoot
-          BudgetSpec = None
-          ObservedFailures = []
-          SuccessKeys = []
-          Exhausted = false
-          LastTransitionWasSuccess = false }
+    [<Import("ProviderFailureBudget", "wanxiangli/failure-budget")>]
+    let private budgetLibraryClass: obj = jsNative
 
-    let private isDifferentRun (identity: FailedProviderAttemptIdentity) (current: ProviderFailureProjection) =
-        identity.LogicalRunId <> current.LogicalRunId
-        || identity.AuthorityRootUserMessageId <> current.AuthorityRootUserMessageId
+    let private library: obj = emitJsExpr budgetLibraryClass "new $0()"
+
+    let private specView (spec: ProviderFailureBudgetSpec) =
+        createObj [ "version" ==> spec.Version; "limit" ==> spec.Limit ]
+
+    let private specOf (value: obj) : ProviderFailureBudgetSpec =
+        { Version = unbox<int> value?version
+          Limit = unbox<int> value?limit }
+
+    let private stateView (current: ProviderFailureProjection) =
+        createObj
+            [ "logicalRun" ==> LogicalRunId.value current.LogicalRunId
+              "authorityRoot"
+              ==> AuthorityRootUserMessageId.value current.AuthorityRootUserMessageId
+              "consecutiveFailureCount" ==> current.Budget.ConsecutiveFailureCount
+              "budgetSpec" ==> (current.BudgetSpec |> Option.map specView |> Option.toObj)
+              "observedFailures"
+              ==> (current.ObservedFailures
+                   |> List.map (fun failure ->
+                       createObj
+                           [ "key" ==> failure.Key
+                             "count" ==> failure.Count
+                             "reason" ==> failure.Reason ])
+                   |> List.toArray)
+              "successKeys" ==> List.toArray current.SuccessKeys
+              "exhausted" ==> current.Exhausted
+              "lastTransitionWasSuccess" ==> current.LastTransitionWasSuccess ]
+
+    let private stateOf (value: obj) : ProviderFailureProjection =
+        { LogicalRunId = LogicalRunId.create (unbox<string> value?logicalRun)
+          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (unbox<string> value?authorityRoot)
+          Budget = { ConsecutiveFailureCount = unbox<int> value?consecutiveFailureCount }
+          BudgetSpec =
+            if isNull value?budgetSpec then
+                None
+            else
+                Some(specOf value?budgetSpec)
+          ObservedFailures =
+            (unbox<obj array> value?observedFailures)
+            |> Array.map (fun failure ->
+                { Key = unbox<string> failure?key
+                  Count = unbox<int> failure?count
+                  Reason = unbox<string> failure?reason })
+            |> Array.toList
+          SuccessKeys = (unbox<string array> value?successKeys) |> Array.toList
+          Exhausted = unbox<bool> value?exhausted
+          LastTransitionWasSuccess = unbox<bool> value?lastTransitionWasSuccess }
+
+    let private rejectionOf name =
+        match name with
+        | "AlreadyObserved" -> AlreadyObserved
+        | "AlreadyExhausted" -> AlreadyExhausted
+        | "DifferentRun" -> DifferentRun
+        | "NoActiveBudget" -> NoActiveBudget
+        | "InvalidTransition" -> InvalidTransition
+        | "InvalidBudget" -> InvalidBudget
+        | "ConflictingObservation" -> ConflictingObservation
+        | _ -> invalidOp ("Unknown provider failure rejection: " + name)
+
+    let private decisionOf (result: obj) =
+        if unbox<bool> result?ok then
+            Ok(stateOf result?state)
+        else
+            Error(rejectionOf (unbox<string> result?rejection))
+
+    let forAuthority (logicalRunId: LogicalRunId) (authorityRoot: AuthorityRootUserMessageId) =
+        library?recordedForAuthority (LogicalRunId.value logicalRunId, AuthorityRootUserMessageId.value authorityRoot)
+        |> stateOf
 
     /// Apply one failure record.
     let applyFailure
@@ -52,78 +123,49 @@ module ProviderFailureProjection =
         (reason: string)
         (current: ProviderFailureProjection)
         : Result<ProviderFailureProjection, ProviderFailureAdvanceRejection> =
-        let key = FailedProviderAttemptIdentity.dedupeKey identity
-
-        match current.ObservedFailures |> List.tryFind (fun observed -> observed.Key = key) with
-        | _ when isDifferentRun identity current -> Error DifferentRun
-        | _ when
-            not (ProviderFailureBudgetSpec.isValid spec)
-            || (current.BudgetSpec |> Option.exists ((<>) spec))
-            ->
-            Error InvalidBudget
-        | _ when List.contains key current.SuccessKeys -> Error ConflictingObservation
-        | Some observed when observed.Count = consecutiveFailureCount && observed.Reason = reason ->
-            Error AlreadyObserved
-        | Some _ -> Error ConflictingObservation
-        | None when current.Exhausted -> Error AlreadyExhausted
-        | None when
-            consecutiveFailureCount > spec.Limit
-            || not (ProviderFailureBudget.isValidRecord current.Budget.ConsecutiveFailureCount consecutiveFailureCount)
-            ->
-            Error InvalidTransition
-        | None ->
-            Ok
-                { current with
-                    Budget = { ConsecutiveFailureCount = consecutiveFailureCount }
-                    BudgetSpec = Some spec
-                    ObservedFailures =
-                        { Key = key
-                          Count = consecutiveFailureCount
-                          Reason = reason }
-                        :: current.ObservedFailures
-                    Exhausted = consecutiveFailureCount = spec.Limit
-                    LastTransitionWasSuccess = false }
+        library?recordedApplyFailure (
+            FailedProviderAttemptIdentity.view identity,
+            specView spec,
+            consecutiveFailureCount,
+            reason,
+            stateView current
+        )
+        |> decisionOf
 
     /// Terminal exhausted state.
     let applyExhausted (finalCount: int) (current: ProviderFailureProjection) =
-        match current.BudgetSpec with
-        | Some spec when
-            current.Exhausted
-            && finalCount = spec.Limit
-            && finalCount = current.Budget.ConsecutiveFailureCount
-            ->
-            Ok current
-        | _ -> Error InvalidTransition
+        library?recordedApplyExhausted (finalCount, stateView current) |> decisionOf
 
     /// Success clears the budget streak.
     let recordSuccess (identity: FailedProviderAttemptIdentity) (current: ProviderFailureProjection) =
-        let key = FailedProviderAttemptIdentity.dedupeKey identity
+        library?recordedSuccess (FailedProviderAttemptIdentity.view identity, stateView current)
+        |> decisionOf
 
-        let budget =
-            if current.Exhausted then
-                current.Budget
-            else
-                ProviderFailureBudget.recordSuccess current.Budget
+    let mayRetry (current: ProviderFailureProjection) : bool =
+        library?recordedMayRetry (stateView current)
 
-        if isDifferentRun identity current then
-            Error DifferentRun
-        elif List.contains key current.SuccessKeys then
-            Error AlreadyObserved
-        elif current.ObservedFailures |> List.exists (fun observed -> observed.Key = key) then
-            Error ConflictingObservation
-        else
-            Ok
-                { current with
-                    Budget = budget
-                    SuccessKeys = key :: current.SuccessKeys
-                    LastTransitionWasSuccess = true }
+    let observeFailure
+        (identity: FailedProviderAttemptIdentity)
+        (reason: string)
+        (current: ProviderFailureProjection)
+        : Result<ProviderFailureObservation, ProviderFailureAdvanceRejection> =
+        let result: obj =
+            library?recordedObserveFailure (FailedProviderAttemptIdentity.view identity, reason, stateView current)
 
-    let mayRetry (current: ProviderFailureProjection) =
-        match current.BudgetSpec with
-        | _ when current.Exhausted -> false
-        | None ->
-            current.Budget.ConsecutiveFailureCount = 0
-            && List.isEmpty current.ObservedFailures
-        | Some spec ->
-            ProviderFailureBudgetSpec.isValid spec
-            && spec.Limit > current.Budget.ConsecutiveFailureCount
+        match unbox<bool> result?ok, unbox<string> result?kind, unbox<string> result?outcome with
+        | false, _, _ -> Error(rejectionOf (unbox<string> result?rejection))
+        | true, "Record", _ ->
+            Ok(
+                ProviderFailureObservation.Record(
+                    specOf result?budgetSpec,
+                    unbox<int> result?consecutiveFailureCount,
+                    stateOf result?state
+                )
+            )
+        | true, "Replay", "RetryAuthorized" ->
+            Ok(ProviderFailureObservation.Replay ProviderFailureReplay.RetryAuthorized)
+        | true, "Replay", "RetryExhausted" -> Ok(ProviderFailureObservation.Replay ProviderFailureReplay.RetryExhausted)
+        | true, "Replay", "EpisodeSuperseded" ->
+            Ok(ProviderFailureObservation.Replay ProviderFailureReplay.EpisodeSuperseded)
+        | true, "Replay", name -> invalidOp ("Unknown provider failure replay: " + name)
+        | true, name, _ -> invalidOp ("Unknown provider failure observation: " + name)

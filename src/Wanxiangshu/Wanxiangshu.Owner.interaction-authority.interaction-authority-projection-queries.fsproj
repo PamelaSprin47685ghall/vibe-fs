@@ -15,6 +15,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
     <Compile Include="Interaction/Authority/ProjectionQueries.fsi"/>
     <Compile Include="Interaction/Authority/ProjectionQueries.fs"/>
   </ItemGroup>

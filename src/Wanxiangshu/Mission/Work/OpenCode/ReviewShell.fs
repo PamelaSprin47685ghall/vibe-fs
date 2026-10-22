@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Work.OpenCode
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Mission.Work.Review
@@ -10,7 +11,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 
 /// work-038: the shared `review` shell. Owns the one ToolSpec
-/// (name, description, findings schema, admission) and dispatches by caller
+/// (name, description, findings schema) and dispatches by caller
 /// role: Plan goes to the plan backend (ReviewPlanBackend), every other
 /// admitted caller goes to the Manager backend (ReviewBackendManager). The
 /// shell renders the plan backend's result; the Manager backend keeps its own
@@ -46,15 +47,11 @@ module ReviewShell =
         | "S3" -> [ providerText Path.PlanS3 Map.empty ]
         | _ -> []
 
-    let admission =
-        ToolAdmission.OfficeRole(fun _ role ->
-            OfficeCapability.isAllowed role ToolPermission.ReviewAssessment
-            || OfficeCapability.isAllowed role ToolPermission.Review)
 
     let private planRejected path =
-        ToolHostCodec.tomlObjectWithInstructions
+        ToolResultText.tomlObjectWithInstructions
             [ providerText path Map.empty ]
-            [ "recorded", ToolHostCodec.TBool false ]
+            [ "recorded", ToolResultText.TBool false ]
 
     let private rejectionPath (error: PlanReviewError) =
         match error with
@@ -79,7 +76,7 @@ module ReviewShell =
             else
                 [ providerText Path.PlanStayed Map.empty ] @ (review.Gaps |> List.map gapLine)
 
-        ToolHostCodec.tomlObjectWithInstructions instructions [ "recorded", ToolHostCodec.TBool true ]
+        ToolResultText.tomlObjectWithInstructions instructions [ "recorded", ToolResultText.TBool true ]
 
     let private renderPlanReview (result: Result<PlanReviewResult, PlanReviewError>) : string =
         match result with
@@ -162,5 +159,4 @@ module ReviewShell =
         { Name = "review"
           Description = providerText Path.Description Map.empty
           Arguments = [ "findings", findingsSchema; noteArgument ]
-          Admission = admission
           Execute = dispatch }

@@ -33,6 +33,9 @@ module JsRuntimeSurface =
                   JsCapability.Remove
                   JsCapability.Exec
                   JsCapability.Fork
+                  JsCapability.Resume
+                  JsCapability.Commission
+                  JsCapability.DevOps
                   JsCapability.Join
                   JsCapability.Fission
                   JsCapability.Horizon
@@ -54,29 +57,13 @@ module JsRuntimeSurface =
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 
-    let private capabilityOfLabel (label: string) : JsCapability option =
-        match label with
-        | "Read" -> Some JsCapability.Read
-        | "Write" -> Some JsCapability.Write
-        | "Glob" -> Some JsCapability.Glob
-        | "Grep" -> Some JsCapability.Grep
-        | "Move" -> Some JsCapability.Move
-        | "Remove" -> Some JsCapability.Remove
-        | "Exec" -> Some JsCapability.Exec
-        | "Fork" -> Some JsCapability.Fork
-        | "Join" -> Some JsCapability.Join
-        | "Fission" -> Some JsCapability.Fission
-        | "Horizon" -> Some JsCapability.Horizon
-        | "Advisor" -> Some JsCapability.Advisor
-        | "Ask" -> Some JsCapability.Ask
-        | "Park" -> Some JsCapability.Park
-        | _ -> None
-
     let createApiFor (root: string) (permissionLabels: string array) : obj =
         // DSL-MUTABLE: resource — JS mutation staging buffer handed off in handle
         let staging = ResizeArray<JsStagedMutation>()
         let readSnapshots = ResizeArray<JsReadSnapshot>()
-        let capabilities = permissionLabels |> Array.choose capabilityOfLabel |> Set.ofArray
+
+        let capabilities =
+            permissionLabels |> Array.choose JsCapability.ofLabel |> Set.ofArray
 
         let api =
             JsToolsBindings.createApi
@@ -95,10 +82,11 @@ module JsRuntimeSurface =
 
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api
 
-    /// Test hook: install a process-live delegation host for one session.
+    /// Test hook: install a process-live delegation host for one session. The
+    /// delegate callback takes `(name, payload, reportMapping)`.
     let installDelegationHost
         (sessionId: string)
-        (fork: obj)
+        (delegation: obj)
         (join: obj)
         (fission: obj)
         (horizon: obj)
@@ -106,17 +94,18 @@ module JsRuntimeSurface =
         : unit =
         JsDelegationBridge.install
             sessionId
-            { Fork = fun payload -> unbox<Task<obj>> (emitJsExpr (fork, payload) "$0($1)")
+            { Delegate =
+                fun name payload mapping ->
+                    unbox<Task<obj>> (emitJsExpr (delegation, name, payload, mapping) "$0($1,$2,$3)")
               Join = fun () -> unbox<Task<obj>> (emitJsExpr join "$0()")
               Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)")
               Horizon = fun () -> unbox<Task<obj>> (emitJsExpr horizon "$0()")
-              Advisor = fun intent view -> unbox<Task<obj>> (emitJsExpr (advisor, intent, view) "$0($1,$2)") }
+              Advisor = fun intent mapping -> unbox<Task<obj>> (emitJsExpr (advisor, intent, mapping) "$0($1,$2)") }
 
     let clearDelegationHost (sessionId: string) : unit = JsDelegationBridge.clear sessionId
 
     let clearDelegationHosts () : unit = JsDelegationBridge.clearAll ()
 
-    /// Test hook: the raw value a program handed over through `this.deliver`.
     /// Test hook: record a value with an already-shaped deliver view.
     let recordDeliveredView (sessionId: string) (view: obj) : unit =
         JsDeliveredValues.recordView sessionId (if isNull view then None else Some view)
@@ -153,9 +142,31 @@ module JsRuntimeSurface =
 
     /// Test hook: consume the handoff only when the cell carries this exact
     /// provider run; a fenced cell from another run stays untouched.
+    ///
+    /// Run-only on purpose: within one run a different call can hold the
+    /// cell. The exact hook below is the one production reads.
     let takeDeliveredHandoffFor (sessionId: string) (providerRun: string) (assistantProse: string option) : obj =
         match
             JsDeliveredValues.tryTakeRenderedFor sessionId (ProviderRunIdentity.create providerRun) assistantProse
+        with
+        | Some text -> box text
+        | None -> null
+
+    /// Test hook: consume the handoff only when the cell carries this exact
+    /// fence — the provider run AND the tool call id. A cell of another call
+    /// stays untouched and the returned cursor does not move.
+    let takeDeliveredHandoffForCall
+        (sessionId: string)
+        (providerRun: string)
+        (toolCallId: string)
+        (assistantProse: string option)
+        : obj =
+        match
+            JsDeliveredValues.tryTakeRenderedForCall
+                sessionId
+                (ProviderRunIdentity.create providerRun)
+                (ToolCallId.create toolCallId)
+                assistantProse
         with
         | Some text -> box text
         | None -> null
@@ -165,7 +176,12 @@ module JsRuntimeSurface =
         | Some text -> box text
         | None -> null
 
-    let deliveredValue (sessionId: string) : obj = JsDeliveredValues.peek sessionId
+    /// Test hook: the raw value a program handed over through `this.deliver`,
+    /// as it stands right now — a delivery or a staged render cache. This is
+    /// the staged view: presentation only. The delivery evidence is the
+    /// fenced cell, read by `deliveredFenceOf` and consumed by
+    /// `takeDeliveredHandoffFor`.
+    let deliveredValue (sessionId: string) : obj = JsDeliveredValues.peekCached sessionId
 
     let deliveredViewOf (sessionId: string) : obj =
         match JsDeliveredValues.peekView sessionId with

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Mission.Work.OpenCode
 
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 
 /// work-038: the shared `review` shell. Owns the one ToolSpec
@@ -9,5 +10,4 @@ open Wanxiangshu.OpenCode
 /// shell renders the plan backend's result; the Manager backend keeps its own
 /// result rendering so its byte behavior is unchanged.
 module ReviewShell =
-    val admission: ToolAdmission
     val spec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec

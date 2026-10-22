@@ -27,6 +27,25 @@ const runProgram = (dir, body, sessionId = 'sess-050') =>
 
 const runText = async (dir, body) => render(await runProgram(dir, body))
 
+for (const [label, invocation] of [
+  ['missing planB', 'this.call("printf started > started")'],
+  ['non-string planB', 'this.call("printf started > started", { alternative: "inspect" })'],
+  ['empty command', 'this.call(" ", "inspect the existing file")'],
+]) {
+  test(`WHAT[repository-programming-050] direct call refuses ${label} before physical execution`, async () => {
+    const { dir, cleanup } = sandbox()
+    try {
+      const outcome = await runProgram(dir, `return await ${invocation};`)
+      assert.equal(caseName(outcome), 'Failed', render(outcome))
+      assert.match(render(outcome), /CALL_COMMAND_UNSUPPORTED/)
+      assert.equal(existsSync(join(dir, 'started')), false)
+      assert.equal(parkedHandle(outcome), null)
+    } finally {
+      cleanup()
+    }
+  })
+}
+
 test('WHAT[repository-programming-050] call proofs use argument arrays, preserve this and ignore a forged method apply', async () => {
   const { dir, cleanup } = sandbox()
   try {

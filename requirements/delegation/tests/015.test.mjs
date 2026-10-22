@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
+import * as join from '../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 
 const forkOne = async (probe) => {
   const placed = await join.joinProbeForkPty(probe, 'exit 0')

@@ -1,0 +1,8 @@
+{
+  "_note": "HNI-11 gate 13 (namespace tiers, tier-B domain seam). The adapter files that reference Wanxiangshu.Host.Domain; the set may only shrink. Tighten with --write-baseline.",
+  "adapters": [
+    "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs",
+    "src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs",
+    "src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs"
+  ]
+}

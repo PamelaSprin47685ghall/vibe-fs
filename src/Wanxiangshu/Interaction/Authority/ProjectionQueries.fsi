@@ -3,23 +3,51 @@ namespace Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Query layer translating an AgentProjectionSet to PromptAuthority facts with
 /// durable-level readonly views. This must be durable-composition because it
 /// has complete knowledge of AgentProjectionSet.
 module PromptAuthorityProjectionQueries =
 
-    /// Returns the authority projection associated with the given session.
+
+    /// The durable PromptAuthority projection of one session.
     val projectionFor:
         sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.PromptAuthorityProjection option
+
+    /// The durable Fission owner of a lane session, when this session is a lane.
+    val laneOwnerSessionId: sessionId: SessionId -> agentProjections: AgentProjectionSet -> SessionId option
+
+    /// The physical ids this session accepted as continuations of its own claims.
+    val ownContinuationPhysicals:
+        sessionId: SessionId -> agentProjections: AgentProjectionSet -> PhysicalUserMessageId list
+
+    /// The owner's active logical run for a lane session (never for an ordinary session).
+    val inheritedOwnerProfile:
+        sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.AuthorityExecutionProfile option
 
     /// Returns the authority projection for the fission-owner of this session.
     val activeProfile:
         sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.AuthorityExecutionProfile option
 
+    val providerFailureBudget:
+        sessionId: SessionId -> agentProjections: AgentProjectionSet -> (SessionId * ProviderFailureProjection) option
+
     /// Returns the last known authority projection for the fission-owner of this session.
     val lastAuthorityProfile:
         sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.AuthorityExecutionProfile option
+
+    val acceptedRootClosure:
+        sessionId: SessionId ->
+        logicalRunId: LogicalRunId ->
+        agentProjections: AgentProjectionSet ->
+            PromptAuthority.AcceptedRootClosure option
+
+    val terminalSources:
+        sessionId: SessionId ->
+        logicalRunId: LogicalRunId ->
+        agentProjections: AgentProjectionSet ->
+            PromptAuthority.AuthorityTerminalSource list
 
     /// Returns the pending claim for the given session and prompt key.
     val pendingClaim:

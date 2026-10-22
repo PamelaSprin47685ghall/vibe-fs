@@ -7,7 +7,7 @@ import { execute, caseName } from '../../../dist/Repository/Programming/Js/Workf
 import {
   deliveredValue, clearDeliveredValue, recordDeliveredView, recordFencedDeliveredView, takeDeliveredHandoff,
   takeDeliveredHandoffWith, takeDeliveredHandoffFor, clearDeliveredReturned, deliveredReturned,
-  deliveredViewOf, deliveredFenceOf, sealFencedDeliveredView,
+  deliveredViewOf, deliveredFenceOf, sealFencedDeliveredView, takeDeliveredHandoffForCall,
 } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { applyView, clearAll, numberMessage, setView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 import { verifyPrepareFailure, verifyCommitFailure } from './support/delivery-settlement.mjs'
@@ -27,12 +27,12 @@ const seed = (id, texts) => {
 }
 test.beforeEach(() => clearAll())
 
-test('WHAT[repository-programming-059] this.deliver records its view declaration and does not run later statements', async () => {
+test('WHAT[repository-programming-059] this.deliver records its report mapping as a prefixUntil=0 declaration and does not run later statements', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-view-deliver-'))
   const id = 'native-deliver'
   try {
     clearDeliveredValue(id)
-    const result = await run(dir, 'await this.deliver({ prefixUntil: 0, thenMap: { 0: "indexed" } }); throw new Error("unreachable");', id)
+    const result = await run(dir, 'await this.deliver({ 0: "indexed" }); throw new Error("unreachable");', id)
     assert.equal(caseName(result), 'Succeeded')
     assert.deepEqual(deliveredViewOf(id), { prefixUntil: 0, thenMap: { 0: 'indexed' } })
   } finally { clearDeliveredValue(id); rmSync(dir, { recursive: true, force: true }) }
@@ -42,7 +42,7 @@ test('WHAT[repository-programming-059] a fenced cell answers only its own provid
   const id = 'fence-owner'
   clearDeliveredReturned(id)
   const rows = seed(id, ['protected-one', 'raw-two', 'kept-three'])
-  setView(id, declaration(2, { 2: 'summary-two' }))
+  setView(id, declaration(2, { 2: 'summary-two', 3: null }))
   applyView(id, rows)
   recordFencedDeliveredView(id, 'run-059', 'call-1', declaration(2, { 1: 'ignored', 2: 'summary-two', 3: null }))
   assert.deepEqual(deliveredFenceOf(id), { providerRun: 'run-059', toolCallId: 'call-1' })
@@ -69,7 +69,7 @@ test('WHAT[repository-programming-059] permanent compression survives a later pr
   const id = 'handoff-history'
   clearDeliveredReturned(id)
   const rows = seed(id, ['one', 'two', 'three'])
-  setView(id, declaration(1, { 2: 'old-two-summary' }))
+  setView(id, declaration(1, { 1: null, 2: 'old-two-summary', 3: null }))
   applyView(id, rows)
   recordFencedDeliveredView(id, 'run-059', 'call-1', declaration(1, { 1: 'one-and-two-summary', 3: null }))
   const result = String(takeDeliveredHandoffFor(id, 'run-059', null))
@@ -84,7 +84,7 @@ test('WHAT[repository-programming-059] implicit zero can return the opening inte
   const id = 'handoff-opening'
   clearDeliveredReturned(id)
   const rows = seed(id, ['one', 'two'])
-  setView(id, declaration(1, { 1: 'summary-one' }))
+  setView(id, declaration(1, { 1: 'summary-one', 2: null }))
   applyView(id, rows)
   recordDeliveredView(id, declaration(0, { 0: 'opening-summary', 2: null }))
   const result = String(takeDeliveredHandoff(id))
@@ -113,7 +113,7 @@ test('WHAT[repository-programming-059] a sealed view advances only its captured 
   const id = 'sealed-handoff'
   clearDeliveredReturned(id)
   seed(id, ['original material'])
-  recordFencedDeliveredView(id, 'run-sealed', 'call-sealed', declaration(0, {}))
+  recordFencedDeliveredView(id, 'run-sealed', 'call-sealed', declaration(0, { 1: null }))
   assert.equal(sealFencedDeliveredView(id, 'other-run', 'call-sealed', 'wrong prose'), null)
   const sealed = sealFencedDeliveredView(id, 'run-sealed', 'call-sealed', 'pre-call prose')
   assert.match(sealed, /original material/)
@@ -127,7 +127,7 @@ test('WHAT[repository-programming-059] a sealed view advances only its captured 
   assert.ok(returned.some(key => key.includes('pre-call prose')))
   assert.ok(returned.every(key => !key.includes('late')))
   seed(id, ['original material'])
-  recordFencedDeliveredView(id, 'run-next', 'call-next', declaration(0, {}))
+  recordFencedDeliveredView(id, 'run-next', 'call-next', declaration(0, { 1: null }))
   assert.equal(takeDeliveredHandoffFor(id, 'run-next', 'pre-call prose'), null)
   clearDeliveredReturned(id)
 })
@@ -136,7 +136,7 @@ test('WHAT[repository-programming-059] staging presentation cannot downgrade an 
   const id = 'fenced-stage'
   clearDeliveredReturned(id)
   seed(id, ['owned material'])
-  const owned = declaration(0, {})
+  const owned = declaration(0, { 1: null })
   recordFencedDeliveredView(id, 'owned-run', 'owned-call', owned)
   recordDeliveredView(id, declaration(0, { 0: 'unowned presentation' }))
   assert.deepEqual(deliveredFenceOf(id), { providerRun: 'owned-run', toolCallId: 'owned-call' })
@@ -149,7 +149,7 @@ test('WHAT[repository-programming-059] staging presentation cannot downgrade an 
 test('WHAT[repository-programming-059] a sealed empty delivery cannot acquire late material or prose', () => {
   const id = 'sealed-empty'
   clearDeliveredReturned(id)
-  seed(id, [])
+  seed(id, ['unselected material'])
   recordFencedDeliveredView(id, 'empty-run', 'empty-call', declaration(0, {}))
   assert.equal(sealFencedDeliveredView(id, 'empty-run', 'empty-call', ''), null)
   seed(id, ['late material'])
@@ -167,10 +167,12 @@ test('WHAT[repository-programming-059] sealing requires the exact call and canno
   const id = 'sealed-once'
   clearDeliveredReturned(id)
   seed(id, ['captured bytes'])
-  recordFencedDeliveredView(id, 'exact-run', 'exact-call', declaration(0, {}))
+  recordFencedDeliveredView(id, 'exact-run', 'exact-call', declaration(0, { 1: null }))
   assert.equal(sealFencedDeliveredView(id, 'exact-run', 'other-call', 'wrong call'), null)
   assert.deepEqual(deliveredReturned(id), [])
   const sealed = sealFencedDeliveredView(id, 'exact-run', 'exact-call', 'captured prose')
+  assert.match(sealed, /captured bytes/)
+  assert.match(sealed, /captured prose/)
   seed(id, ['changed bytes'])
   assert.equal(sealFencedDeliveredView(id, 'exact-run', 'exact-call', 'changed prose'), null)
   assert.equal(deliveredValue(id), sealed)
@@ -217,3 +219,78 @@ test('WHAT[repository-programming-059] changed opening material is returned once
   assert.doesNotMatch(String(takeDeliveredHandoffFor(id, 'run-059', null)), /second/)
   clearDeliveredReturned(id)
 })
+
+test('WHAT[repository-programming-059] a call of the same run cannot take the cell of another call of that run', () => {
+  const id = 'handoff-same-run-two-calls'
+  clearDeliveredReturned(id)
+  seed(id, ['material-one', 'material-two'])
+  // Two deliveries in ONE provider run: the second overwrites the cell.
+  setView(id, declaration(2, { 1: 'first-call', 2: null }))
+  recordFencedDeliveredView(id, 'run-059', 'call-1', declaration(2, { 1: 'first-call', 2: null }))
+  setView(id, declaration(2, { 2: 'second-call' }))
+  recordFencedDeliveredView(id, 'run-059', 'call-2', declaration(2, { 2: 'second-call' }))
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'run-059', toolCallId: 'call-2' })
+
+  // The terminal of call-1 holds the whole fence of its own delivery. It
+  // must not take the cell that call-2 left behind.
+  const wrongTake = takeDeliveredHandoffForCall(id, 'run-059', 'call-1', null)
+  assert.equal(wrongTake, null, 'a different call of the same run must not take this cell')
+  assert.deepEqual(deliveredFenceOf(id), { providerRun: 'run-059', toolCallId: 'call-2' })
+  assert.deepEqual(deliveredReturned(id), [], 'a refused take must not advance the returned cursor')
+
+  // The owning call takes its own cell.
+  const rightTake = takeDeliveredHandoffForCall(id, 'run-059', 'call-2', null)
+  assert.match(String(rightTake), /second-call/)
+  assert.equal(deliveredFenceOf(id), null)
+  clearDeliveredReturned(id)
+})
+
+// Moved from tests/061.test.mjs (LC-006): the fenced delivered-view cell is [059]'s take/peek, and the requirement tree keeps one test file per clause.
+{
+// LC-006: 交付格按 provider run 实施精确围栏，防止旧终态错领新任务交付
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const {
+  clearDeliveredValue,
+  clearDeliveredReturned,
+  recordFencedDeliveredView,
+  takeDeliveredHandoffFor,
+  deliveredFenceOf,
+} = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
+const { clearAll, numberMessage, applyView } = await import("../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js");
+
+
+test('WHAT[repository-programming-059] LC-006: fenced delivered view answers only the owning run', () => {
+  const session = 'session-lc006'
+  const runA = 'run-A'
+  const callA = 'call-A'
+  const runB = 'run-B'
+  const view = { prefixUntil: 1, thenMap: { 1: null } }
+
+  clearDeliveredValue(session)
+  clearDeliveredReturned(session)
+  try {
+    const rows = [{ id: 'msg-0', text: 'summary-text' }]
+    rows.forEach((row) => numberMessage(session, row.id))
+    applyView(session, rows)
+
+    recordFencedDeliveredView(session, runA, callA, view)
+
+    // runB 取交付必须返回 null，且 deliveredFenceOf 保持为 runA
+    assert.equal(takeDeliveredHandoffFor(session, runB, null), null)
+    assert.deepEqual(deliveredFenceOf(session), { providerRun: runA, toolCallId: callA })
+
+    // runA 才能取走
+    const handoffA = takeDeliveredHandoffFor(session, runA, null)
+    assert.notEqual(handoffA, null)
+    assert.match(String(handoffA), /summary-text/)
+
+    // 取走后交付格已被消费
+    assert.equal(deliveredFenceOf(session), null)
+    assert.equal(takeDeliveredHandoffFor(session, runA, null), null)
+  } finally {
+    clearDeliveredValue(session)
+    clearDeliveredReturned(session)
+  }
+})
+}

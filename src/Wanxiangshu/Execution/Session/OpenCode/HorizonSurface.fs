@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Session.OpenCode
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 
@@ -22,6 +23,7 @@ module HorizonSurface =
         let statusPath =
             match status with
             | "returned" -> HorizonTool.Path.Returned
+            | "voided" -> HorizonTool.Path.Voided
             | "abandoned" -> HorizonTool.Path.DidNotReturn
             | _ -> HorizonTool.Path.StillAway
 
@@ -56,14 +58,14 @@ module HorizonSurface =
         let lines = List.append agentLines ptyLines
 
         if List.isEmpty lines then
-            ToolHostCodec.tomlObjectWithInstructions
+            ToolResultText.tomlObjectWithInstructions
                 (ProviderProse.instructionLines language HorizonTool.Path.EmptyRoster Map.empty)
                 []
         else
-            ToolHostCodec.tomlObjectWithInstructions lines []
+            ToolResultText.tomlObjectWithInstructions lines []
 
     let unavailable () : string =
-        ToolHostCodec.tomlObjectWithInstructions
+        ToolResultText.tomlObjectWithInstructions
             [ ProviderProse.render
                   (ProviderLanguageBinding.readGlobalPreference ())
                   HorizonTool.Path.UnavailableFromContext
@@ -71,7 +73,7 @@ module HorizonSurface =
             []
 
     let cannotBeSeen () : string =
-        ToolHostCodec.tomlObjectWithInstructions
+        ToolResultText.tomlObjectWithInstructions
             [ ProviderProse.render
                   (ProviderLanguageBinding.readGlobalPreference ())
                   HorizonTool.Path.CannotBeSeen

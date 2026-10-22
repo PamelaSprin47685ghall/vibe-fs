@@ -2,7 +2,6 @@ namespace Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 
@@ -22,7 +21,7 @@ module CasebookTools =
         : Task<ToolSpec list> =
         task {
             try
-                let! commonDir = RuntimePath.stateRoot workspaceRoot
+                let! commonDir = CasebookToolPlan.commonDir workspaceRoot
                 let store = WorkspaceEventStore.acquire commonDir
 
                 return
@@ -41,7 +40,7 @@ module CasebookTools =
             if isNull (box owner) then
                 nullArg "owner"
 
-            if not (CasebookFeature.isEnabled workspaceRoot) then
+            if not (CasebookToolPlan.isEnabled workspaceRoot) then
                 return []
             else
                 return! tryBuildSpecs factory workspaceRoot owner

@@ -12,7 +12,10 @@ class JsProgram {
 {{baseClassMove}}
 {{baseClassExec}}
 {{baseClassFork}}
+{{baseClassDag}}
+{{baseClassResume}}
 {{baseClassCommission}}
+{{baseClassDevOps}}
 {{baseClassJoin}}
 {{baseClassFission}}
 {{baseClassHorizon}}

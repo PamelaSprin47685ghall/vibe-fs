@@ -11,8 +11,8 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Wait
@@ -22,13 +22,20 @@ open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Repair
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Interaction.Admission
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Programming.Js
 
 /// Delegation-owned opaque runtime harness. Host sessions, journal writers,
 /// attached-session state and completion turns never cross into JS; callers
@@ -39,6 +46,13 @@ module SyncDelegateSurface =
     type private RetryHarnessMode =
         | Scripted
         | ProviderRecovery
+
+    /// The per-listener registration the test Host keeps for one session's
+    /// terminal subscriptions. A record keeps one stable identity, so disposal
+    /// unlinks exactly that registration and a late notification skips it.
+    type private ListenerRegistration =
+        { Listener: TerminalCompletionListener
+          mutable Live: bool }
 
     /// Test-side plug of the retry decorator: the harness records each verdict
     /// request so a landing test can prove a transient failure stayed child-local
@@ -182,14 +196,26 @@ module SyncDelegateSurface =
         { SessionId: SessionId
           Index: int
           Text: string
-          Options: OpenCodePromptOptions
+          Options: SessionPromptOptions
           ListenerCount: int }
 
     type private RecordedCreation =
         { Parent: SessionId
           PhysicalParent: SessionId option
           SessionId: SessionId
-          Options: OpenCodeChildOptions }
+          Options: ChildSessionOptions }
+
+    /// One session-control call this harness's Host boundary received: the
+    /// abort or the interrupt, the session it aimed at, the provider run it
+    /// fenced, and the outcome it returned. The record is observability
+    /// only — it never decides anything.
+    type private SessionControlCall =
+        { SessionId: string
+          ProviderRun: string
+          Kind: string
+          Refused: bool
+          Reason: string option
+          Outcome: Task<Result<unit, string>> }
 
     type private Harness
         (
@@ -258,7 +284,7 @@ module SyncDelegateSurface =
         (children: ResizeArray<SessionId>, readiness: PromptReadiness, observationMode: string option) =
         // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter for the harness
         let physicalSequence = ref 0
-        let listeners = Dictionary<string, ResizeArray<Events.ListenerRegistration>>()
+        let listeners = Dictionary<string, ResizeArray<ListenerRegistration>>()
         let childCountWaiters = ResizeArray<int * TaskCompletionSource<unit>>()
 
         let pendingAcceptances =
@@ -274,6 +300,13 @@ module SyncDelegateSurface =
         let recordedSiblings = ResizeArray<RecordedCreation>()
         let recordedChildren = ResizeArray<RecordedCreation>()
         let isHostRecording = observationMode = Some "host-recording"
+
+        // DSL-MUTABLE: resource — every abort/interrupt this Host boundary received
+        let sessionControlCalls = ResizeArray<SessionControlCall>()
+        // DSL-MUTABLE: resource — the provider run this harness last observed per session
+        let currentProviderRuns = Dictionary<string, string>()
+        // DSL-MUTABLE: resource — the injected refusal for session-control calls
+        let mutable sessionControlRefusal: string option = None
 
         let prompted =
             TaskCompletionSource<SessionId>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -319,11 +352,11 @@ module SyncDelegateSurface =
                 match listeners.TryGetValue key with
                 | true, current -> current
                 | false, _ ->
-                    let created = ResizeArray<Events.ListenerRegistration>()
+                    let created = ResizeArray<ListenerRegistration>()
                     listeners[key] <- created
                     created
 
-            let registration: Events.ListenerRegistration = { Listener = listener; Live = true }
+            let registration: ListenerRegistration = { Listener = listener; Live = true }
             registrations.Add registration
 
             { new IDisposable with
@@ -337,7 +370,7 @@ module SyncDelegateSurface =
             with _ ->
                 ()
 
-        let notifyRegistration sessionId outcome (registration: Events.ListenerRegistration) =
+        let notifyRegistration sessionId outcome (registration: ListenerRegistration) =
             if registration.Live then
                 registration.Listener sessionId outcome
 
@@ -374,7 +407,7 @@ module SyncDelegateSurface =
                       Options = options
                       ListenerCount = listenerCount sessionId }
 
-        let recordMetadata sessionId (options: OpenCodePromptOptions) =
+        let recordMetadata sessionId (options: SessionPromptOptions) =
             match options.Metadata with
             | None when isHostRecording -> ()
             | _ ->
@@ -385,6 +418,32 @@ module SyncDelegateSurface =
                 keysOf (SessionId.value sessionId)
                 |> fun values -> values.Add(PromptKey.create promptKey)
 
+        /// One session-control call: the abort or the interrupt, the session it
+        /// aimed at and the provider run it fenced. The refusal is injected by
+        /// the test; without one the Host boundary accepts the call.
+        let recordSessionControl kind (sessionId: SessionId) : Task<Result<unit, string>> =
+            let key = SessionId.value sessionId
+
+            let providerRun =
+                match currentProviderRuns.TryGetValue key with
+                | true, run -> run
+                | false, _ -> ""
+
+            let outcome: Task<Result<unit, string>> =
+                match sessionControlRefusal with
+                | Some reason -> Task.FromResult(Error reason)
+                | None -> Task.FromResult(Ok())
+
+            sessionControlCalls.Add
+                { SessionId = key
+                  ProviderRun = providerRun
+                  Kind = kind
+                  Refused = sessionControlRefusal.IsSome
+                  Reason = sessionControlRefusal
+                  Outcome = outcome }
+
+            outcome
+
         member _.ListedFamilies = listedFamilies.ToArray()
         member _.CreateRequests = createRequests.ToArray()
         member _.IsHostRecording = isHostRecording
@@ -392,6 +451,22 @@ module SyncDelegateSurface =
         member _.RecordedSiblings = recordedSiblings.ToArray()
         member _.RecordedChildren = recordedChildren.ToArray()
         member _.RecordedPromptCount = recordedPrompts.Count
+        member _.SessionControlCalls = sessionControlCalls |> Seq.toList
+
+        /// The provider run this harness last observed for a session: the
+        /// fence a session-control call for that session carries.
+        member _.NoteProviderRun(sessionId: SessionId, providerRun: string) =
+            if not (String.IsNullOrWhiteSpace providerRun) then
+                currentProviderRuns[SessionId.value sessionId] <- providerRun
+
+        /// Inject a refusal for the session-control calls this Host boundary
+        /// receives. An empty reason clears it.
+        member _.RefuseSessionControl(reason: string) =
+            sessionControlRefusal <-
+                if String.IsNullOrWhiteSpace reason then
+                    None
+                else
+                    Some reason
 
         member _.ParentFor(child: SessionId) =
             match parents.TryGetValue child with
@@ -496,8 +571,17 @@ module SyncDelegateSurface =
                 acceptancesOf (SessionId.value sessionId) |> fun values -> values.Add acceptance
                 acceptance.Task
 
-            member _.AbortSession _ = Task.FromResult(Ok())
-            member _.InterruptAttempt _ = Task.FromResult(Ok())
+            // D5: the abort and the interrupt are recorded with the session
+            // they aimed at and the provider run they fenced, so a landing
+            // test can assert that the interrupt was issued (and observed)
+            // before the stale attempt's lease was released. A refusal can be
+            // injected to exercise the degraded path.
+            member _.AbortSession sessionId =
+                recordSessionControl "AbortSession" sessionId
+
+            member _.InterruptAttempt sessionId =
+                recordSessionControl "InterruptAttempt" sessionId
+
             member _.IsManagedChild _ = true
             member _.AbortChildren _ = Task.FromResult()
 
@@ -547,7 +631,7 @@ module SyncDelegateSurface =
                 | Some "query-error" -> Task.FromResult(Error "controlled ListChildren rejection")
                 | Some "host-recording" -> Task.FromResult(Ok [])
                 | Some mode ->
-                    let descriptor id title agent =
+                    let descriptor id title agent : OpenCodeChildInfo =
                         { SessionId = SessionId.create id
                           ParentSessionId = Some parent
                           Title = Some title
@@ -570,7 +654,7 @@ module SyncDelegateSurface =
                                   "engineer" ]
                         | _ -> [ descriptor "host-child-wrong-agent" exactTitle "coder" ]
 
-                    Task.FromResult(Ok children)
+                    Task.FromResult(Ok(children |> List.map ChildSession.toInfo))
                 | None ->
                     children
                     |> Seq.filter (fun child ->
@@ -586,6 +670,7 @@ module SyncDelegateSurface =
                             Title = Some "managed delegate"
                             Agent = Some "coder" } ])
                     |> Seq.toList
+                    |> List.map ChildSession.toInfo
                     |> Ok
                     |> Task.FromResult
 
@@ -771,7 +856,12 @@ module SyncDelegateSurface =
         : Task<obj> =
         task {
             let! journal = createJournal directory
-            let dispatcher = PromptDispatcher.Runtime(PromptJournalAdapter.create journal)
+            let attached = new AttachedSessionRuntime()
+
+            let dispatcher =
+                PromptDispatcher.Runtime(
+                    PromptJournalAdapter.createWithOwnership attached.TryFindOwnership (fun _ -> None) journal
+                )
 
             let! acceptedOwners = acceptOwnerRoots dispatcher admissions
             requireAcceptedOwners journal acceptedOwners
@@ -781,7 +871,6 @@ module SyncDelegateSurface =
             let readiness = PromptReadiness()
             let sessionPort = SessionPort(children, readiness, observationMode)
             let sessions = sessionPort :> ISessionHostPort
-            let attached = new AttachedSessionRuntime()
 
             let plugin =
                 match retryMode with
@@ -794,7 +883,8 @@ module SyncDelegateSurface =
                 | Some owner -> owner.Sessions.Quiescence
                 | None -> new SessionQuiescenceGate()
 
-            let eventPort = new Events.HostEventPort() :> IEventObservationPort
+            let eventPort =
+                Events.HostEventPort(Events.newTerminalSource ()) :> IEventObservationPort
 
             plugin
             |> Option.iter (fun owner ->
@@ -926,7 +1016,7 @@ module SyncDelegateSurface =
         let harness = hostRecordingHarness value
         useRuntime harness.Runtime (harness.Sessions :> ISessionHostPort)
 
-    let private recordedModel (model: OpencodeModel) =
+    let private recordedModel (model: HostModel) =
         box
             {| providerID = model.providerID
                modelID = model.modelID
@@ -1013,7 +1103,13 @@ module SyncDelegateSurface =
     let closeGuardRecovery (value: obj) : Task = closeRecovery value
 
     let observeGuardDelta (value: obj) (raw: obj) : unit =
-        (unbox<Harness> value).Plugin.Value.LoopSensor.Observe raw
+        match LoopEventCodec.tryDecodeTextDelta raw with
+        | None -> ()
+        | Some delta ->
+            (unbox<Harness> value).Plugin.Value.LoopSensor.Observe
+                { Session = delta.SessionId
+                  Message = delta.MessageId
+                  Delta = delta.Delta }
 
     let awaitGuardInterrupt (value: obj) session providerRun : Task =
         match
@@ -1025,6 +1121,48 @@ module SyncDelegateSurface =
         with
         | Some running -> running
         | None -> raise (InvalidOperationException "no guard interrupt exists for the exact provider run")
+
+    /// D5: the session-control calls this harness's Host boundary received —
+    /// every abort and every interrupt, with the session it aimed at, the
+    /// provider run it fenced and the outcome it returned. Observability
+    /// only: the record never decides anything.
+    let sessionControlSnapshot (value: obj) : obj =
+        let harness = unbox<Harness> value
+
+        box
+            {| calls =
+                harness.Sessions.SessionControlCalls
+                |> List.map (fun call ->
+                    box
+                        {| sessionId = call.SessionId
+                           providerRun = call.ProviderRun
+                           kind = call.Kind
+                           refused = call.Refused
+                           reason = call.Reason |> Option.defaultValue null |}) |}
+
+    /// D5: inject a refusal for the session-control calls this harness's Host
+    /// boundary receives, so the degraded path (a refused interrupt that does
+    /// not fail the delegation) can be exercised. An empty reason clears the
+    /// injection.
+    let refuseSessionControl (value: obj) (reason: string) : unit =
+        let harness = unbox<Harness> value
+        harness.Sessions.RefuseSessionControl reason
+
+    /// D5: await the session-control call this harness issued for the exact
+    /// session and provider run — the interrupt the delegate child received
+    /// after its delivery. It awaits the very task the Host boundary
+    /// answered, so the caller observes the interrupt's own settlement.
+    let awaitDeliveryInterrupt (value: obj) (session: string) (providerRun: string) : Task =
+        let harness = unbox<Harness> value
+
+        match
+            harness.Sessions.SessionControlCalls
+            |> List.filter (fun call -> call.SessionId = session && call.ProviderRun = providerRun)
+            |> List.tryLast
+        with
+        | Some call -> call.Outcome :> Task
+        | None ->
+            raise (InvalidOperationException("no session control call exists for the exact session and provider run"))
 
     let private createForObservation (directory: string) (observationMode: string option) : Task<obj> =
         match ownerAdmissionFor "managed-child-reconciliation" "manager" with
@@ -1156,7 +1294,7 @@ module SyncDelegateSurface =
 
             return
                 match result with
-                | Ok view -> Wanxiangshu.OpenCode.ToolHostCodec.tomlObjectWithInstructions [ view ] []
+                | Ok view -> ToolResultText.tomlObjectWithInstructions [ view ] []
                 | Error error -> failwith error
         }
 
@@ -1286,7 +1424,8 @@ module SyncDelegateSurface =
                                authorityRootUserMessageId =
                                 AuthorityRootUserMessageId.value response.AuthorityRootUserMessageId
                                providerRun = ProviderRunIdentity.value response.ProviderRun
-                               formalText = response.FormalText |} |}
+                               view = response.View
+                               turnFormalText = response.TurnFormalText |} |}
         }
 
     let private requestedPrompt (harness: Harness) owner role index =
@@ -1354,7 +1493,10 @@ module SyncDelegateSurface =
                 let acceptance =
                     match harness.Sessions.PromptOrigin(child, index) with
                     | Some "AgentOwnerRoot" ->
-                        harness.Dispatcher.AcceptAgentOwnerRoot key child physical
+                        // A dedicated Sync delegate is attached work, not a
+                        // fork child: the root it opens closes with an
+                        // attached-work closure (interaction-authority-018).
+                        harness.Dispatcher.AcceptAgentOwnerRoot key child physical (Some "Attached")
                         |> TaskValue.map (Result.map ignore)
                     | Some "ManagedDelegationAssignment" ->
                         harness.Dispatcher.AcceptContinuation key child physical
@@ -1450,30 +1592,6 @@ module SyncDelegateSurface =
     let terminalListenerCount (value: obj) : int =
         (unbox<Harness> value).Sessions.TerminalListenerCount
 
-    let private fenceHarnessMaterial (harness: Harness) (turn: ReconciledTurn) =
-        let session = SessionId.value turn.SessionId
-        let material = Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek session
-
-        let accepted =
-            harness.Runtime.TryAcceptedAuthorityRoot turn.SessionId = Some(
-                AuthorityRootUserMessageId.value turn.AuthorityRootUserMessageId
-            )
-            && harness.Sessions.LatestAcceptedPhysical turn.SessionId = Some turn.PhysicalUserMessageId
-
-        if
-            accepted
-            && turn.Outcome = ReconcileProgram.TurnCompleted
-            && not (String.IsNullOrWhiteSpace(CompletedTurnClassifier.partsText turn.Parts))
-            && (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peekFence session
-                |> Option.isNone)
-            && (emitJsExpr material "typeof $0 === 'string'": bool)
-        then
-            Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.restoreFencedMaterial
-                session
-                turn.ProviderRun
-                (ToolCallId.create "harness-delivery")
-                (unbox<string> material)
-
     let private handleTurn
         (harness: Harness)
         (child: SessionId)
@@ -1481,7 +1599,6 @@ module SyncDelegateSurface =
         (turn: ReconciledTurn)
         =
         task {
-            fenceHarnessMaterial harness turn
             // delegation-031: the terminal capture inside HandleTurn writes through
             // the production journal. A released writer surfaces as
             // XTraceCaptureError.StorageAppendFailed carrying the typed
@@ -1550,6 +1667,8 @@ module SyncDelegateSurface =
         : Task<bool> =
         let harness = unbox<Harness> value
 
+        harness.Sessions.NoteProviderRun(SessionId.create session, providerRun)
+
         let turn =
             exactTerminalTurn
                 session
@@ -1568,7 +1687,6 @@ module SyncDelegateSurface =
         let turn =
             exactTerminalTurn session physical authorityRoot providerRun [| MessagePart.Text formalText |]
 
-        fenceHarnessMaterial harness turn
         harness.Runtime.SettleCompletedFromTurn turn
 
     let observeExactProviderFailure (value: obj) session physical authorityRoot providerRun reason : Task<bool> =
@@ -1579,6 +1697,30 @@ module SyncDelegateSurface =
                 Outcome = ReconcileProgram.TurnFailed reason }
 
         handleTurn harness turn.SessionId (Some ExecutionFailure.ProviderTransient) turn
+
+    let observeExactAttemptSettlementFailure
+        (value: obj)
+        session
+        physical
+        authorityRoot
+        providerRun
+        (finish: string)
+        reason
+        : Task<bool> =
+        let harness = unbox<Harness> value
+
+        let outcome =
+            match finish with
+            | "stop" -> ReconcileProgram.TurnCompleted
+            | "tool-calls" -> ReconcileProgram.TurnInProgress
+            | _ -> invalidArg "finish" "Expected a settled provider attempt"
+
+        let turn =
+            { exactTerminalTurn session physical authorityRoot providerRun [||] with
+                Finish = Some finish
+                Outcome = outcome }
+
+        harness.Runtime.ObserveAttemptSettlementFailure(turn, reason)
 
     let private observeRecoveryTurn (harness: Harness) abortCause context : Task =
         let owner = harness.Plugin |> Option.get
@@ -1682,6 +1824,171 @@ module SyncDelegateSurface =
 
         Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.restoreMaterial sessionId material
 
+    let deliver
+        (value: obj)
+        session
+        physical
+        authorityRoot
+        providerRun
+        toolCallId
+        formalText
+        (reportMapping: obj)
+        : Task<string> =
+        task {
+            let harness = unbox<Harness> value
+            let sessionId = SessionId.create session
+            let physicalId = PhysicalUserMessageId.create physical
+            let root = AuthorityRootUserMessageId.create authorityRoot
+
+            if
+                harness.Runtime.TryAcceptedAuthorityRoot sessionId <> Some authorityRoot
+                || not (harness.Runtime.OwnsAcceptedPhysical(sessionId, physicalId))
+            then
+                invalidOp "delivery requires the live invocation's accepted physical input"
+
+            let profile =
+                PromptAuthorityProjectionQueries.activeProfile
+                    sessionId
+                    (AgentJournal.snapshot harness.Journal).AgentProjections
+                |> Option.filter (fun active -> active.AuthorityRootUserMessageId = root)
+                |> Option.defaultWith (fun () -> invalidOp "delivery requires the invocation's active authority")
+
+            let key: ChatExecutionKey =
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physicalId }
+
+            let execution =
+                ChatExecutionProjection.byKey
+                    key
+                    (AgentJournal.snapshot harness.Journal).AgentProjections.ChatExecutions
+
+            if execution |> Option.exists (fun current -> current.terminalDisposition.IsSome) then
+                invalidOp "delivery requires an open physical execution"
+
+            let evidence =
+                execution
+                |> Option.map _.acceptedEvidence
+                |> Option.defaultWith (fun () ->
+                    ManagedChatAcceptance.evidenceFromIntent
+                        profile
+                        physicalId
+                        (PromptOrigin.AuthorityRoot profile.AuthorityKind))
+
+            if
+                evidence.AuthorityRootUserMessageId <> root
+                || evidence.LogicalRunId <> profile.LogicalRunId
+            then
+                invalidOp "delivery acceptance does not match the invocation authority"
+
+            let! accepted = Wanxiangshu.Composition.Durable.ManagedChatAcceptance.accept harness.Journal key evidence
+            accepted |> Result.defaultWith (fun error -> failwithf "%A" error) |> ignore
+            let provider = ProviderRunIdentity.create providerRun
+            let call = ToolCallId.create toolCallId
+
+            match execution |> Option.bind _.startedEvidence with
+            | Some _ -> ()
+            | None ->
+                let! started =
+                    ManagedChatProviderLifecycle.providerStarted
+                        harness.Journal
+                        key
+                        evidence
+                        provider
+                        ProviderRequestKind.WorkMain
+
+                started |> Result.defaultWith (fun error -> failwithf "%A" error) |> ignore
+
+            let settlement =
+                DeliverySettlement.Attributed(
+                    { LogicalRunId = profile.LogicalRunId
+                      AuthorityRoot = root
+                      PhysicalUserMessageId = physicalId
+                      Task = DeliveryTaskReference.Invocation toolCallId
+                      RetirementId = None
+                      FormalText = formalText },
+                    DeliveryWitnessWriter.create harness.Journal ignore
+                )
+
+            let surface =
+                JsGeneratorSurface.typedRole (Roles.roleLabel profile.CanonicalRole) "en"
+                |> Option.defaultWith (fun () -> invalidOp "delivery requires a generated delegate surface")
+
+            let mapping: string = emitJsExpr reportMapping "JSON.stringify($0)"
+
+            let source =
+                "class Js extends JsProgram { async run() { await this.deliver("
+                + mapping
+                + "); } }"
+
+            let! delivered =
+                JsToolWorkflow.executeWithReviewCheckAndDelivery
+                    None
+                    (Some settlement)
+                    session
+                    (Some(provider, call))
+                    surface.Capabilities
+                    (harness.RootWorkspace.TryRead() |> Option.get)
+                    surface.BaseClassSource
+                    (createObj [ "program" ==> source ])
+                    5000
+                    (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 5000L)
+                    (1024 * 1024)
+                    None
+                    None
+                    None
+                    None
+
+            match delivered with
+            | JsToolWorkflow.JsToolOutcome.Succeeded _ ->
+                return
+                    TaskDeliveryJournal.tryFindByFenceFields
+                        harness.Journal
+                        sessionId
+                        provider
+                        (Some call)
+                        (Some root)
+                        (Some physicalId)
+                        (Some profile.LogicalRunId)
+                        (Some(TaskDeliveryTask.Invocation toolCallId))
+                    |> Option.map _.View
+                    |> Option.defaultWith (fun () -> invalidOp "delivery did not commit its exact witness")
+            | _ -> return invalidOp (JsToolsResult.render delivered)
+        }
+
+    let deliverCurrent (value: obj) owner role providerRun toolCallId formalText (reportMapping: obj) : Task<string> =
+        task {
+            let harness = unbox<Harness> value
+            let role = roleOf role |> Result.defaultWith invalidOp
+
+            let child =
+                harness.Runtime.TryFind(harness.OwnerSession owner, role)
+                |> Option.defaultWith (fun () -> invalidOp "delivery requires an accepted invocation")
+
+            let! ready = harness.Runtime.AwaitAssignmentReady child
+
+            if not ready || not (harness.Runtime.HasOpeningCursor child) then
+                invalidOp "delivery requires an accepted invocation"
+
+            let physical =
+                harness.Sessions.LatestAcceptedPhysical child
+                |> Option.defaultWith (fun () -> invalidOp "delivery requires an accepted physical input")
+
+            let root =
+                harness.Runtime.TryAcceptedAuthorityRoot child
+                |> Option.defaultWith (fun () -> invalidOp "delivery requires an accepted authority root")
+
+            return!
+                deliver
+                    value
+                    (SessionId.value child)
+                    (PhysicalUserMessageId.value physical)
+                    root
+                    providerRun
+                    toolCallId
+                    formalText
+                    reportMapping
+        }
+
     let private settleReadyChild
         (harness: Harness)
         (role: SyncDelegateRole)
@@ -1691,18 +1998,13 @@ module SyncDelegateSurface =
         (physical: PhysicalUserMessageId)
         (authorityRoot: string)
         =
-        if
-            harness.Runtime.TryAcceptedAuthorityRoot child = Some authorityRoot
-            && not (String.IsNullOrWhiteSpace answer)
-            && isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value child))
-        then
-            recordDeliveredValue (SessionId.value child) (box answer)
-
         let parts =
             if String.IsNullOrWhiteSpace answer then
                 [||]
             else
                 [| MessagePart.Text answer |]
+
+        harness.Sessions.NoteProviderRun(child, runId)
 
         handleTurn
             harness
@@ -1833,10 +2135,19 @@ module SyncDelegateSurface =
                     with
                     | Some physical, Some root ->
                         let parts =
-                            if outcomeName = "TurnCompleted" && not (String.IsNullOrWhiteSpace answer) then
+                            // A completed turn and an interrupted turn both
+                            // carry the text the child produced: the delivery
+                            // that was already made is settled from the same
+                            // material in either case.
+                            if
+                                (outcomeName = "TurnCompleted" || outcomeName = "TurnAborted")
+                                && not (String.IsNullOrWhiteSpace answer)
+                            then
                                 [| MessagePart.Text answer |]
                             else
                                 [||]
+
+                        harness.Sessions.NoteProviderRun(child, runId)
 
                         // A reconciled failure carries the confirmed typed witness;
                         // the injected retry decorator owns what happens next.
@@ -2146,15 +2457,3 @@ module SyncDelegateSurface =
             | Some _ ->
                 harness.Runtime.CancelSession(harness.OwnerSession owner)
                 true
-
-    let stageDeferredInspection
-        (sessionId: string)
-        (callId: string)
-        (charge: string)
-        (keywords: string)
-        (estimate: int option)
-        : string =
-        SyncDelegateBatching.stageDeferredInspection sessionId (ToolCallId.create callId) charge keywords estimate
-
-    let applyReplacedResults (messages: obj list) : obj list =
-        SyncDelegateBatching.applyReplacedResults messages

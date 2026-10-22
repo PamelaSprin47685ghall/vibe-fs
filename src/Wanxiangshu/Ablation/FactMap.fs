@@ -22,5 +22,3 @@ module AblationFactMap =
     let resetCache () = cached <- None
 
     let tryNode (factTag: string) = map () |> Map.tryFind factTag
-
-    let allFacts () = map () |> Map.toList

@@ -1,9 +1,15 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Host.Ports
+
 
 /// Optional Host capability bound to exact already-accepted physical material.
 /// Absence is not permission to create a replacement PromptClaim or resend text.
@@ -13,7 +19,7 @@ type ExactAcceptedMessageRecoveryPort =
 type SessionRecoveryHost =
     new:
         journal: AgentJournal *
-        snapshot: ISessionSnapshotPort *
+        transcript: ITranscriptPort *
         scope: PluginRecoveryScope *
         acceptedMessageRecovery: ExactAcceptedMessageRecoveryPort option *
         notifyTerminal: (SessionId -> TerminalOutcome -> unit) option ->

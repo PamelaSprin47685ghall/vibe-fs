@@ -29,8 +29,12 @@ type AccessTracker =
 module CasebookCapture =
 
     type MaintenanceCapture =
-        { DiffSummary: string
-          TargetState: string }
+        {
+            DiffSummary: string
+            /// True exactly when DiffSummary is non-empty: a real B→T change asks for CaseRefresh.
+            Refresh: bool
+            TargetState: string
+        }
 
     /// Stable content fingerprint.
     val contentHash: text: string -> string

@@ -15,6 +15,7 @@ module JournalSurface =
         | "ParentCancelled" -> Ok HandleAbandonReason.ParentCancelled
         | "DeadlineExceeded" -> Ok HandleAbandonReason.DeadlineExceeded
         | "HostSessionGone" -> Ok HandleAbandonReason.HostSessionGone
+        | "Voided" -> Ok HandleAbandonReason.Voided
         | other -> Error $"unknown abandon reason '{other}'"
 
     let private workId agent child root : HandleWorkId =
@@ -61,16 +62,47 @@ module JournalSurface =
         | Retired -> "Retired"
         | Abandoned _ -> "Abandoned"
 
+    /// The durable view of one work unit.
+    ///
+    /// `lifecycle` is the work's own lifecycle; `lifecycleKind` is the kind of
+    /// the **last completion** the work ever accepted (Terminal, SendFailure,
+    /// Cancelled) and is `null` while the work has accepted no completion at
+    /// all. `completionRef` / `completionDigest` are the durable identity of
+    /// that completion — `null` while the work has accepted none.
+    ///
+    /// These two are the non-waiting observation of a pending work: a work
+    /// that has settled nothing carries no digest. They never require waiting
+    /// for a completion that may never arrive.
     let private recordView (record: HandleWork) : obj =
         let reason =
             match record.Lifecycle with
             | Abandoned reason -> Some(string reason)
             | _ -> None
 
+        let completionKind =
+            record.LastCompletion
+            |> Option.map (fun completion -> string completion.Kind)
+            |> Option.defaultValue null
+
+        let completionRef =
+            record.LastCompletion
+            |> Option.bind (fun completion -> completion.CompletionRef)
+            |> Option.map BlobRef.value
+            |> Option.defaultValue null
+
+        let completionDigest =
+            record.LastCompletion
+            |> Option.bind (fun completion -> completion.CompletionDigest)
+            |> Option.map BlobDigest.value
+            |> Option.defaultValue null
+
         box
             {| lifecycle = lifecycle record.Lifecycle
                abandonReason = reason
-               child = SessionId.value record.Work.ChildSessionId |}
+               child = SessionId.value record.Work.ChildSessionId
+               lifecycleKind = completionKind
+               completionRef = completionRef
+               completionDigest = completionDigest |}
 
     let snapshot (handle: JournalHandle) (parent: string) (agent: string) (child: string) (root: string) : obj =
         let parentId = SessionId.create parent

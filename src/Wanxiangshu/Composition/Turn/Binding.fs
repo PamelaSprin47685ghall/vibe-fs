@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// Root / physical / continuation bindings for a logical run.
 ///
@@ -50,7 +51,8 @@ module TurnBinding =
                   PhysicalUserMessageId = tryBoundPhysical userBindings sessionId
                   ContinuationMessageIds = continuationIds
                   Role = Some run.CanonicalRole
-                  Directory = None }
+                  Directory = None
+                  InheritedAuthorityOwner = None }
 
     /// Mutable store for in-memory bindings. Durable recovery uses the journal.
     type Store() =
@@ -92,7 +94,8 @@ module TurnBinding =
                           PhysicalUserMessageId = Some physical
                           ContinuationMessageIds = Set.empty
                           Role = agentRole
-                          Directory = None })
+                          Directory = None
+                          InheritedAuthorityOwner = None })
 
         /// Bind a continuation physical message to the active logical run.
         member _.BindContinuationUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId) =
@@ -122,7 +125,8 @@ module TurnBinding =
                           PhysicalUserMessageId = Some physical
                           ContinuationMessageIds = continuations
                           Role = None
-                          Directory = None })
+                          Directory = None
+                          InheritedAuthorityOwner = None })
 
         /// crash-reconciliation-018: the explicit-resume material and the first ordinary
         /// material that replaces it must move reconciliation's physical cursor
@@ -145,7 +149,8 @@ module TurnBinding =
                           PhysicalUserMessageId = Some physical
                           ContinuationMessageIds = Set.empty
                           Role = None
-                          Directory = None })
+                          Directory = None
+                          InheritedAuthorityOwner = None })
 
         /// Register a host-provided active run (e.g. child session start).
         member _.BindActiveRun(binding: ActiveRunBinding) =
@@ -178,21 +183,59 @@ module TurnBinding =
                     | true, set -> set
                     | false, _ -> Set.empty
 
+                // A Fission lane owns no authority root of its own: it continues
+                // the owner's logical run. The owner's active run comes from the
+                // durable lane membership, and the lane's own accepted
+                // continuation is the physical cursor.
+                let inheritedBinding (proj: AgentProjectionSet) =
+                    match PromptAuthorityProjectionQueries.inheritedOwnerProfile sessionId proj with
+                    | None -> None
+                    | Some ownerProfile ->
+                        let owner = PromptAuthorityProjectionQueries.laneOwnerSessionId sessionId proj
+
+                        let lanePhysicals =
+                            PromptAuthorityProjectionQueries.ownContinuationPhysicals sessionId proj
+
+                        Some
+                            { SessionId = sessionId
+                              RunId = None
+                              AuthorityRootUserMessageId = Some ownerProfile.AuthorityRootUserMessageId
+                              PhysicalUserMessageId = lanePhysicals |> List.tryLast
+                              ContinuationMessageIds = continuations
+                              Role = Some ownerProfile.CanonicalRole
+                              Directory = None
+                              InheritedAuthorityOwner = owner }
+
                 let projectedBinding (proj: AgentProjectionSet) =
                     Map.tryFind sessionId proj.Sessions
                     |> Option.bind (fun session -> session.PromptAuthority)
                     |> Option.bind (fun authority ->
                         fromProjection sessionId authority userMessageBindings continuations)
+                    // A lane has no authority root of its own, so its own
+                    // projection yields nothing: the inherited owner binding
+                    // is the only durable binding a lane can have.
+                    |> Option.orElseWith (fun () -> inheritedBinding proj)
 
                 let mergeProjectedBinding (binding: ActiveRunBinding) (projected: ActiveRunBinding) =
-                    { binding with
-                        AuthorityRootUserMessageId =
+                    // An inherited (lane) root belongs to another session, so it
+                    // is authoritative for the lane: the lane's own promoted
+                    // physical is a continuation, never an authority root.
+                    let root =
+                        match projected.InheritedAuthorityOwner with
+                        | Some _ -> projected.AuthorityRootUserMessageId
+                        | None ->
                             binding.AuthorityRootUserMessageId
                             |> Option.orElse projected.AuthorityRootUserMessageId
+
+                    { binding with
+                        AuthorityRootUserMessageId = root
                         PhysicalUserMessageId =
                             binding.PhysicalUserMessageId |> Option.orElse projected.PhysicalUserMessageId
                         ContinuationMessageIds = binding.ContinuationMessageIds + continuations
-                        Role = binding.Role |> Option.orElse projected.Role }
+                        Role = binding.Role |> Option.orElse projected.Role
+                        InheritedAuthorityOwner =
+                            projected.InheritedAuthorityOwner
+                            |> Option.orElse binding.InheritedAuthorityOwner }
 
                 let mergeBindings (explicitBinding: ActiveRunBinding option) (projected: ActiveRunBinding option) =
                     match explicitBinding, projected with

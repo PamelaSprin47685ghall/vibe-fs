@@ -52,7 +52,7 @@ const jsViewCall = (id, view, delivered = false) => {
     'todowrite-for-engineer',
     JSON.stringify({
       program: delivered
-        ? 'class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: { 0: "OL002_DONE" } }); } }'
+        ? 'class Js extends JsProgram { async run() { await this.deliver({ 0: "OL002_DONE" }); } }'
         : 'class Js extends JsProgram { async run() { return { ok: true }; } }',
       ...(view === undefined ? {} : view),
     }),

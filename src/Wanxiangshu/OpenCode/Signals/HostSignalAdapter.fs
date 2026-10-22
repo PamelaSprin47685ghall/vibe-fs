@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Session.ChatExecution
 
 /// Applies ownership and source routing to HostEventCodec output. Raw host
 /// payload decoding has exactly one owner: HostEventCodec.

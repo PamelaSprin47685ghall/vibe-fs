@@ -13,9 +13,23 @@ import * as fetchSurface from '../../../dist/Repository/Knowledge/Casebook/Fetch
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
 import * as settlements from '../../../dist/Repository/Knowledge/Casebook/SettlementSurface.js'
 import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
-import * as hostFinalize from '../../../dist/OpenCode/Plugin/PluginHostWiringSurface.js'
 import { createCase } from './support/casebook.mjs'
 import { CANONICAL_Q, CANONICAL_A, installBookkeeperRuntime, scriptedBookkeeperPort } from './support/bookkeeper-session-support.mjs'
+
+// The Boot wiring surface pulls the widest production graph in this file:
+// measured 3340 ms of module evaluation for the static import graph
+// (EventStore + Bookkeeper dominate), 391 dist modules / 4.05 MB on its own.
+// Importing it statically delayed this file's FIRST verdict past the suite's
+// verdict-silence window, so it is resolved lazily, inside the tests that
+// actually need it. A failed import leaves `hostFinalizeModule` unset: the
+// `??=` assignment only happens after the await resolves, so a rejection is
+// never cached.
+let hostFinalizeModule
+const loadHostFinalize = async () => {
+  hostFinalizeModule ??= await import('../../../dist/OpenCode/Plugin/PluginHostWiringSurface.js')
+  return hostFinalizeModule
+}
+
 
 for (const operation of ['Refresh', 'Access']) {
   for (const settlement of ['committed', 'CurrentCommitUnknown']) {
@@ -506,6 +520,7 @@ for (const scenario of [
     const observed = []
     const incidents = []
     const callbackError = new Error('original Capture owner callback error')
+    const hostFinalize = await loadHostFinalize()
     const owner = settlements.createOwner(incident => {
       assert.equal(observed.length, 1, 'actual Capture settles before its original owner receives the incident')
       incidents.push(incident)
@@ -631,6 +646,7 @@ for (const fate of ['success', 'CurrentCommitUnknown', 'observer-throws']) {
     const incidents = []
     const owner = settlements.createOwner(value => incidents.push(value))
     let handle
+    const hostFinalize = await loadHostFinalize()
     try {
       handle = fate === 'CurrentCommitUnknown'
         ? eventStore.createWithCurrentCommitFault(directory, 'operation', cause, false)
@@ -706,6 +722,7 @@ for (const scenario of ['valid', 'valid-unknown', 'malformed', 'malformed-unknow
     }
     let completed = false
     try {
+      const hostFinalize = await loadHostFinalize()
       assert.equal(typeof hostFinalize.finalizeDraftWithBoot, 'function')
       const measured = await probe(fileURLToPath(new URL('./support/boot-capture-physical-coordinator.mjs', import.meta.url)),
         [directory, scenario])

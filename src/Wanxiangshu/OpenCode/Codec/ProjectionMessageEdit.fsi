@@ -11,10 +11,6 @@ module ProjectionMessageEdit =
         sessionId: string -> sha256: (string -> string) -> rendered: RenderedMessages -> Result<obj list, string>
 
     module HostWireEncoding =
-        val tryEncodeNonToolParts: parts: WirePart list -> Result<obj list, string>
-
-        val completedToolPart:
-            callId: ToolCallId -> name: string -> argsCanonical: string -> resultCanonical: string -> obj
 
         val rawMessage:
             sessionId: string ->

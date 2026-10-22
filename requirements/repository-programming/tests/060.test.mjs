@@ -15,7 +15,9 @@ test('WHAT[repository-programming-060] the executed SDK uses this members and ex
       }
     }`, 2000, Date.now() + 60000, 1 << 20, null)
     assert.equal(caseName(outcome), 'Succeeded')
-    assert.deepEqual(parse(render(outcome)).data, { global: 'undefined', nested: 'undefined', call: 'function', callable: 'function', write: 'function' })
+    assert.deepEqual(parse(render(outcome)).data, {
+      global: 'undefined', nested: 'undefined', call: 'function', callable: 'function', write: 'function',
+    })
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }

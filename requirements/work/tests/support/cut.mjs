@@ -16,6 +16,10 @@ export const withSuccessor = async body => withReview(async context => {
   retirement.info.parentID = 'user-root'
   retirement.info.time = {created: 3}
   runtime.pushHostMessage(session, retirement)
+  runtime.pushHostMessage(session, {
+    info: {id: 'retirement-confirm', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 2, completed: 2}},
+    parts: [{id: 'part-deliver-confirm', type: 'tool', tool: 'deliver', callID: 'deliver-confirm', state: {status: 'pending', input: {}}}],
+  })
   assert.match(await hooks.tool.deliver.execute({}, {
     sessionID: session, callID: 'deliver-confirm', messageID: 'retirement-confirm', agent: 'manager',
   }), /confirmation_required = true/)

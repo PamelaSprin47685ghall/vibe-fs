@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as ToolSurface from '../../../dist/OpenCode/Tools/ToolSurface.js'
 
-test('WHAT[work-030] StaticTools explicitly registers all five plan tools and excludes handoff/resume', () => {
-  const planTools = ['todowrite-for-plan', 'devops', 'review', 'deliver']
+test('WHAT[work-030] StaticTools explicitly registers all three plan tools and excludes handoff/delegation verbs', () => {
+  const planTools = ['todowrite-for-plan', 'review', 'deliver']
 
   // ToolSurface exports toolSpecNames as an array of all recognized tool names
   const names = ToolSurface.toolSpecNames()
@@ -13,10 +13,16 @@ test('WHAT[work-030] StaticTools explicitly registers all five plan tools and ex
     assert.ok(names.includes(tool), `StaticTools.knownToolNames must explicitly include "${tool}"`)
   }
 
-  // This existing surface excludes resume from the spec list. Its separate
-  // Manager permission remains intact; Plan still cannot use it.
+  // This existing surface excludes the delegation verbs from the spec list.
+  // Their separate Manager/Orchestrator permissions remain intact; Plan still
+  // cannot use them.
   assert.ok(!names.includes('resume'))
+  assert.ok(!names.includes('fork'))
+  assert.ok(!names.includes('commission'))
   assert.ok(!names.includes('handoff'))
+
+  // The host devops tool is retired: it is no longer a registered tool.
+  assert.ok(!names.includes('devops'))
 
   // Admission is by exact registered name: the plan tools are the only
   // plan-admitted entries beyond the shared base permissions.
@@ -28,7 +34,7 @@ test('WHAT[work-030] StaticTools explicitly registers all five plan tools and ex
 
 test('WHAT[work-030] tool registration does not allow prefix or wildcard matching for plan tools', () => {
   const planRules = ToolSurface.rolePermissionRules('plan')
-  const invalidAttempts = ['js-plan-fake', 'plan*', 'ask_question', 'devops_extra', 'review_next', 'deliver_final']
+  const invalidAttempts = ['js-plan-fake', 'plan*', 'ask_question', 'devops', 'devops_extra', 'review_next', 'deliver_final']
   for (const attempt of invalidAttempts) {
     assert.equal(Object.hasOwn(planRules, attempt), false, `"${attempt}" must not be a plan-admitted name`)
   }

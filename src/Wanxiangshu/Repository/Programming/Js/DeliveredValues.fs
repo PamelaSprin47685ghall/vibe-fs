@@ -9,15 +9,16 @@ open Wanxiangshu.Foundation
 /// selects Anchor material and renders the bytes captured at settlement.
 module JsDeliveredValues =
 
-    /// The exact tool invocation that produced this cell. A terminal from an
-    /// older provider run cannot consume a newer run's delivery, and vice
-    /// versa. `None` exists only for the test/dev harness and restored
-    /// material whose call fence is no longer live.
     type DeliveryFence =
         { ProviderRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity
           ToolCallId: Wanxiangshu.Foundation.Identity.ToolCallId }
 
     type ReturnedPiece = { Key: string; Text: string }
+
+    [<Sealed>]
+    type CapturedDelivery internal (receipt: obj, text: string) =
+        member _.Text = text
+        member internal _.Receipt = receipt
 
     [<AllowNullLiteral>]
     type private DeliveryMessages =
@@ -25,6 +26,10 @@ module JsDeliveredValues =
         abstract deliver: sessionId: string * fence: obj * view: obj -> unit
         abstract seal: sessionId: string * fence: obj * material: string * keys: string array -> bool
         abstract restore: sessionId: string * fence: obj * material: string -> unit
+        abstract capture: sessionId: string * view: obj * candidates: obj array * assistant: string -> obj
+        abstract publish: sessionId: string * fence: obj * captured: obj * material: string -> bool
+        abstract take: sessionId: string -> obj
+        abstract peek: sessionId: string -> obj
         abstract peekCached: sessionId: string -> obj
         abstract fence: sessionId: string -> obj
         abstract returned: sessionId: string -> string array
@@ -52,11 +57,13 @@ module JsDeliveredValues =
 
     let alreadyReturned (sessionId: string) : Set<string> = owner.returned sessionId |> Set.ofArray
 
+
+    /// Stage a view for presentation only. The owner keeps a fenced delivery
+    /// in place: a render cache never downgrades it (clauses 1 and 3).
     let recordView (sessionId: string) (view: obj option) : unit =
         owner.stage (sessionId, Option.toObj view)
 
-    /// Record a delivery with the exact call fence that produced it. The
-    /// settled tool call owns this cell; another run cannot take it.
+    /// Record a delivery with the exact call fence that produced it (clause 3).
     let recordFencedView
         (sessionId: string)
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
@@ -76,13 +83,17 @@ module JsDeliveredValues =
         if not (String.IsNullOrWhiteSpace text) then
             owner.restore (sessionId, fenceValue providerRun toolCallId, text)
 
-    let peek (sessionId: string) : obj = owner.peekCached sessionId
+    let take (sessionId: string) : obj = owner.take sessionId
+
+    let peek (sessionId: string) : obj = owner.peek sessionId
+
+    let peekCached (sessionId: string) : obj = owner.peekCached sessionId
 
     let private renderNonBlank (text: string) : string option =
         if String.IsNullOrWhiteSpace text then None else Some text
 
     let private declarationOf raw =
-        match Anchor.AnchorSurface.parseDeclaration raw with
+        match Anchor.AnchorDeclarationRule.parse raw with
         | Ok parsed -> parsed
         | Error failure -> invalidOp (JsFailure.code failure + ": " + JsFailure.reason failure)
 
@@ -140,6 +151,26 @@ module JsDeliveredValues =
             (LlmFacing.empty |> LlmFacing.withData prose |> LlmFacing.render).TrimEnd('\n')
             |> renderNonBlank
 
+    let captureMaterial (sessionId: string) (view: obj) (assistant: string option) : CapturedDelivery option =
+        let candidates =
+            select sessionId (Some view) Set.empty
+            |> List.map (fun piece -> createObj [ "key" ==> piece.Key; "text" ==> piece.Text ])
+            |> List.toArray
+
+        let receipt: obj =
+            owner.capture (sessionId, view, candidates, Option.toObj assistant)
+
+        let pieces: obj array = receipt?pieces
+
+        pieces
+        |> Array.map (fun piece -> { Key = piece?key; Text = piece?text })
+        |> Array.toList
+        |> renderPieces
+        |> Option.map (fun text -> CapturedDelivery(receipt, text))
+
+    let publishCaptured sessionId providerRun toolCallId (captured: CapturedDelivery) =
+        owner.publish (sessionId, fenceValue providerRun toolCallId, captured.Receipt, captured.Text)
+
     let private selectTicket sessionId (ticket: obj) assistant =
         let candidates =
             select sessionId (optionalView ticket?view) Set.empty
@@ -184,11 +215,46 @@ module JsDeliveredValues =
             Option.ofObj (unbox<string> ticket?material)
         | ticket -> selectTicket sessionId ticket assistant |> renderPieces
 
+    let peekFence (sessionId: string) : DeliveryFence option =
+        match owner.fence sessionId with
+        | null -> None
+        | fence ->
+            Some
+                { ProviderRun = Identity.ProviderRunIdentity.create fence?providerRun
+                  ToolCallId = Identity.ToolCallId.create fence?toolCallId }
+
+    let tryTakeRenderedForCall
+        (sessionId: string)
+        (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
+        (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId)
+        (assistant: string option)
+        : string option =
+        match peekFence sessionId with
+        | Some fence when fence.ProviderRun = providerRun && fence.ToolCallId = toolCallId ->
+            let request =
+                createObj
+                    [ "mode" ==> "run"
+                      "providerRun" ==> Identity.ProviderRunIdentity.value providerRun ]
+
+            handoff sessionId request assistant
+        | _ -> None
+
+    /// Render the staged view of a render cache cell. Presentation only:
+    /// nothing taken here proves a delivery (clauses 1 and 3).
     let tryTakeRenderedWith (sessionId: string) (assistant: string option) : string option =
         handoff sessionId (createObj [ "mode" ==> "cache" ]) assistant
 
-    /// Take the cell only when it belongs to this exact provider run. An old
-    /// terminal that arrives after a newer delivery cannot consume it.
+    /// The run-only handoff: the cell must carry the fence of this provider
+    /// run. An old terminal cannot consume a newer delivery.
+    ///
+    /// This matches the provider run only — the tool call id is NOT compared
+    /// — so within one run a different call can take this cell and advance
+    /// the returned cursor, and the owning call loses its delivery. It is
+    /// therefore a harness-only channel: production consumers must use
+    /// `tryTakeRenderedForCall` (the exact fence) or the durable witness
+    /// (`TaskDeliveryJournal.tryFindByFence*`, which also filters on the
+    /// logical run and the delivery task).
+    ///
     let tryTakeRenderedFor
         (sessionId: string)
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
@@ -208,23 +274,13 @@ module JsDeliveredValues =
     let tryPeekRendered (sessionId: string) : string option =
         handoff sessionId (createObj [ "mode" ==> "peek" ]) None
 
-    /// Peek with the pre-call assistant prose included, without consuming.
     let tryPeekRenderedWith (sessionId: string) (assistant: string option) : string option =
         handoff sessionId (createObj [ "mode" ==> "peek" ]) assistant
 
-    /// The raw view declaration of the current cell, without consuming it.
     let peekView (sessionId: string) : obj option =
         match owner.claim (sessionId, createObj [ "mode" ==> "peek" ]) with
         | null -> None
         | ticket -> optionalView ticket?view
-
-    let peekFence (sessionId: string) : DeliveryFence option =
-        match owner.fence sessionId with
-        | null -> None
-        | fence ->
-            Some
-                { ProviderRun = Identity.ProviderRunIdentity.create fence?providerRun
-                  ToolCallId = Identity.ToolCallId.create fence?toolCallId }
 
     let clear (sessionId: string) : unit = owner.clear sessionId
 

@@ -7,6 +7,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode.ProviderWireDecode
 open Wanxiangshu.OpenCode.ProviderWireCapture
 open Wanxiangshu.Persistence.Journal

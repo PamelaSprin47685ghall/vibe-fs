@@ -638,14 +638,14 @@ test('WHAT[process-execution-001] PTY_TYPES_read_plans_cover_unknown_in_progress
 
 {
   // The four PTY host tools (`open-terminal`, `send-terminal`, `read-terminal`,
-  // `signal-terminal`) are retired; interactive execution is superseded by `js.call`
+  // `signal-terminal`) are retired; interactive execution is superseded by `this.call`
   // (`{ spawn, name }`, `check(ctx)`, `{ send: { name, input } }`, `{ signal, name }`,
   // repository-programming [050]-[052]).
   const { default: assert } = await import('node:assert/strict')
   const { default: test } = await import('node:test')
   const { sandbox, runProgram, caseName, render } = await import('./support/executor.mjs')
 
-  test('WHAT[process-execution-001] js.call interactive actions spawn, send, observe incremental output in check, and signal background child', async () => {
+  test('WHAT[process-execution-001] this.call interactive actions spawn, send, observe incremental output in check, and signal background child', async () => {
     const { dir, cleanup } = sandbox('wxs-proc-001-')
     try {
       const outcome = await runProgram(
@@ -666,10 +666,19 @@ test('WHAT[process-execution-001] PTY_TYPES_read_plans_cover_unknown_in_progress
         if (ctx.step === 3) return { signal: "SIGTERM", name: "repl" };
         return null;
       }
-      sanity() { return { nextDone: () => [{ step: 4 }], watchVeto: () => [{ remainingMs: 0 }] }; }
-      watch(ctx) {
+      check(ctx) {
         if (ctx.stdout) chunks.push(ctx.stdout);
-        return ctx.remainingMs > 0;
+        return true;
+      }
+      watch(ctx) {
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
+        return this.check(ctx);
+      }
+      sanity() {
+        return {
+          nextDone: () => [{ root: "/", step: 4 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [{ name: "repl", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
+        };
       }
     });
     return { status: result.status, observed: chunks.join("") };`,

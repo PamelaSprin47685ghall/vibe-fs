@@ -45,8 +45,7 @@ module JsCallLoop =
     let private delay (milliseconds: int) : JS.Promise<unit> = jsNative
 
     /// Race one promise against a timeout and clear the timer when the
-    /// promise wins: a pending slice timer would otherwise keep the host
-    /// event loop alive after the run is already over.
+    /// promise wins, so a pending timer cannot keep the host event loop alive.
     [<Emit("(function(work, ms) { return new Promise(function(resolve) { let done = false; const timer = setTimeout(function() { if (!done) { done = true; resolve({ timeout: true }); } }, ms); Promise.resolve(work).then(function(value) { if (!done) { done = true; clearTimeout(timer); resolve({ value: value }); } }, function(error) { if (!done) { done = true; clearTimeout(timer); resolve({ error: String(error) }); } }); }); })($0, $1)")>]
     let private raceWorkTimeout (work: obj) (timeoutMs: int) : JS.Promise<obj> = jsNative
 
@@ -187,6 +186,8 @@ module JsCallLoop =
             pending <- OutputBuffer()
             taken
 
+        member _.Peek() = pending.Text
+
         member _.Clear() = pending.Clear()
 
     type private ManagedChild(name: string) =
@@ -239,9 +240,7 @@ module JsCallLoop =
     let private callbackBudget scope deadline =
         int (min (int64 scope.SynchronousBudgetMs) (max 0L (deadline - nowMs ())))
 
-    /// Fable's TaskCompletionSource does not expose TrySet*; a guarded
-    /// SetResult is idempotent after the first completion.
-    let private trySetResult (completion: TaskCompletionSource<int>) (value: int) =
+    let private trySetResult (completion: TaskCompletionSource<'value>) (value: 'value) =
         try
             completion.SetResult value
             true
@@ -553,7 +552,6 @@ module JsCallLoop =
                 return resolveSliceWaitOutcome managed winner
             }
 
-    /// Await exit after a kill, up to the grace window.
     let private awaitExit (managed: ManagedChild) (graceMs: int) : Task<unit> =
         task {
             let deadline = nowMs () + int64 graceMs
@@ -1922,3 +1920,452 @@ module JsCallLoop =
             refused?minimumOutputBudgetBytes <- float (minimumOutputBudget root (scope.OutputNotice()))
             Task.FromResult refused
         | Ok spec -> executeWithProof scope parkState root stack spec
+
+    type private DirectCall() =
+        member val Ready = TaskCompletionSource<Result<ManagedChild, string>>()
+        member val Result = TaskCompletionSource<obj>()
+        member val Closed = TaskCompletionSource<unit>()
+        member val Published: obj option = None with get, set
+        member val Drained = false with get, set
+        member val Child: ManagedChild option = None with get, set
+        member val DrainedBytes = 0L with get, set
+
+    let private directChildFault (managed: ManagedChild) =
+        managed.StartFailure
+        |> Option.map ProcessResult.describe
+        |> Option.orElse (managed.Child |> Option.bind (fun child -> child.Failure.Value))
+        |> Option.orElse (
+            managed.Child
+            |> Option.bind (fun child -> child.Rejection.Value)
+            |> Option.map (ProcessResult.NotStarted >> ProcessResult.describe)
+        )
+        |> Option.orElse managed.SignalFailure
+
+    let private directStatus stop fault (managed: ManagedChild) =
+        match stop, fault, managed.Signal with
+        | Some NodeProcessWait.StopCause.Cancellation, _, _ -> "aborted"
+        | Some NodeProcessWait.StopCause.Deadline, _, _ -> "timeout"
+        | _, Some _, _ -> "failed"
+        | _, _, Some _ -> "signalled"
+        | _ -> "completed"
+
+    let private directStopName =
+        function
+        | NodeProcessWait.StopCause.Cancellation -> "cancellation"
+        | NodeProcessWait.StopCause.Deadline -> "deadline"
+
+    let private directResult (scope: ExecutionScope) (entry: DirectCall) started stop =
+        task {
+            let! authority = scope.ReadOutput()
+            let managed = entry.Child.Value
+
+            let observedFault =
+                match authority with
+                | Ok() -> directChildFault managed
+                | Error reason -> Some reason
+
+            let fault =
+                observedFault
+                |> Option.orElse (
+                    if managed.Exited then
+                        None
+                    else
+                        Some "Process scope closure was not confirmed"
+                )
+
+            let stdout, stderr =
+                match authority with
+                | Ok() ->
+                    let stdout = managed.SliceStdout.Take()
+                    let stderr = managed.SliceStderr.Take()
+                    stdout, stderr
+                | Error _ -> "", ""
+
+            let bytes = managed.ObservedBytes - entry.DrainedBytes
+
+            if Result.isOk authority then
+                entry.DrainedBytes <- managed.ObservedBytes
+
+            let value =
+                outcome
+                    (directStatus stop fault managed)
+                    managed.ExitCode
+                    managed.Signal
+                    managed.Exited
+                    fault
+                    (stop |> Option.map directStopName)
+                    stdout
+                    stderr
+                    (managed.Stdout.Truncated || managed.Stderr.Truncated)
+                    bytes
+                    (nowMs () - started)
+                    1
+                    (fault |> Option.defaultValue null)
+
+            value?notStarted <- childWasNotStarted managed
+            value?outputComplete <- (managed.Exited && fault.IsNone && stop.IsNone)
+            return boundResult (int64 (ToolResultBound.HostMaxBytes())) (scope.OutputNotice()) value
+        }
+
+    /// String calls and Callable share the supervised physical process and capture owner.
+    type Host(root: string, scope: ExecutionScope) =
+        let children = Dictionary<string, DirectCall>()
+        let cancellation = new CancellationTokenSource()
+        // DSL-MUTABLE: resource — native command tickets and Host admission lifetime.
+        let mutable nextTicket = 0
+        let mutable parkedTicket: string option = None
+        let mutable stopping = false
+        // DSL-MUTABLE: single-flight — one native disposal task owns process cleanup.
+        let mutable disposal: Task<unit> option = None
+
+        let publishResult (entry: DirectCall) value =
+            if entry.Published.IsNone && trySetResult entry.Result value then
+                entry.Published <- Some value
+
+        let rejectedCommand (entry: DirectCall) code reason =
+            trySetResult entry.Ready (Error reason) |> ignore
+            failure code reason
+
+        let publishBeforeClosure (entry: DirectCall) value =
+            if entry.Child |> Option.exists (fun managed -> not managed.Exited) then
+                publishResult entry value
+
+        let observeCommand (entry: DirectCall) started deadline (ownedScope: ExecutionScope) (managed: ManagedChild) =
+            task {
+                entry.Child <- Some managed
+                trySetResult entry.Ready (Ok managed) |> ignore
+
+                let! observed =
+                    match managed.Child with
+                    | Some child -> NodeProcessWait.waitForExit child deadline ownedScope.Cancellation
+                    | None -> Task.FromResult { NodeProcessWait.WaitOutcome.StopRequested = None }
+
+                if observed.StopRequested.IsSome && not managed.Exited then
+                    do! awaitExit managed signalGraceMs
+
+                let! value = directResult scope entry started observed.StopRequested
+                publishBeforeClosure entry value
+                return value
+            }
+
+        let startBeforePhysicalDeadline entry command (token: CancellationToken) started limit deadline =
+            task {
+                if Deadline.isExpired (fun () -> DateTimeOffset.UtcNow) deadline then
+                    return
+                        rejectedCommand
+                            entry
+                            "CALL_DEADLINE_BEFORE_START"
+                            "The physical deadline expired before execution"
+                else
+                    let ownedScope =
+                        { scope with
+                            Cancellation = token
+                            HardLimit = limit }
+
+                    let! managed = startChild ownedScope root "call" command true ignore ignore
+                    return! observeCommand entry started deadline ownedScope managed
+            }
+
+        let startWithinRemaining (entry: DirectCall) command (token: CancellationToken) borrowed =
+            task {
+                let! remaining = scope.RemainingMs()
+                let budget = scope.HardLimit.TotalMilliseconds
+
+                if token.IsCancellationRequested then
+                    return
+                        rejectedCommand
+                            entry
+                            "CALL_CANCELLED_BEFORE_START"
+                            "Host cancellation was requested before execution"
+                elif
+                    remaining <= 0L
+                    || Double.IsNaN budget
+                    || Double.IsInfinity budget
+                    || budget <= 0.0
+                then
+                    return
+                        rejectedCommand
+                            entry
+                            "CALL_DEADLINE_BEFORE_START"
+                            "The run deadline expired before physical execution"
+                else
+                    let started = nowMs ()
+                    let limit = TimeSpan.FromMilliseconds budget
+                    let deadline = Deadline.ofBudget DateTimeOffset.UtcNow limit
+                    let! release = scope.BorrowDeadline(int64 budget + 2L * int64 signalGraceMs)
+                    borrowed release
+                    return! startBeforePhysicalDeadline entry command token started limit deadline
+            }
+
+        let prepareCommand entry command token borrowed =
+            task {
+                try
+                    let! value = startWithinRemaining entry command token borrowed
+                    return value, None
+                with error ->
+                    let value = rejectedCommand entry "CALL_PROCESS_FAILED" error.Message
+                    publishBeforeClosure entry value
+                    return value, Some error
+            }
+
+        let closeCommand (entry: DirectCall) releaseDeadline =
+            task {
+                match entry.Child with
+                | Some managed ->
+                    retireCapture managed
+                    do! closeRetainedChild managed
+                | None -> ()
+
+                releaseDeadline ()
+                entry.Drained <- true
+                trySetResult entry.Closed () |> ignore
+            }
+
+        let cleanupFailure cause (cleanup: exn) : exn =
+            match cause with
+            | None -> cleanup
+            | Some original ->
+                emitJsExpr
+                    (original, cleanup)
+                    "new AggregateError([$0, $1], 'Command failed: ' + String($0.message) + '; cleanup failed: ' + String($1.message), { cause: $0 })"
+
+        let retainCleanupFailure (entry: DirectCall) (error: exn) =
+            task {
+                do! awaitPhysicalClosure (entry.Child |> Option.toList)
+                entry.Closed.SetException error
+            }
+
+        let startCommand (entry: DirectCall) command =
+            task {
+                use ownedCancellation = new CancellationTokenSource()
+                use parent = scope.Cancellation.Register(fun () -> ownedCancellation.Cancel())
+                use closing = cancellation.Token.Register(fun () -> ownedCancellation.Cancel())
+                // DSL-MUTABLE: cancellation — release the actual command deadline after physical closure.
+                let releaseDeadline = ref ignore
+
+                let! value, cause =
+                    prepareCommand entry command ownedCancellation.Token (fun release ->
+                        releaseDeadline.Value <- release)
+
+                try
+                    do! closeCommand entry releaseDeadline.Value
+                    publishResult entry value
+                with cleanup ->
+                    let error = cleanupFailure cause cleanup
+                    publishResult entry (failure "CALL_PROCESS_FAILED" error.Message)
+                    do! retainCleanupFailure entry error
+            }
+
+        let findParked () =
+            parkedTicket
+            |> Option.bind (fun key ->
+                match children.TryGetValue key with
+                | true, entry -> Some entry
+                | _ -> None)
+
+        let useReady action (entry: DirectCall) =
+            task {
+                match! entry.Ready.Task with
+                | Error reason -> return failure "CALL_START_FAILED" reason
+                | Ok managed -> return! action managed
+            }
+
+        let useParked action =
+            task {
+                match findParked () with
+                | None -> return failure "CALL_CHILD_UNKNOWN" "the parked call is no longer available"
+                | Some entry -> return! useReady action entry
+            }
+
+        let admitCommand command =
+            nextTicket <- nextTicket + 1
+            let ticket = "c" + string nextTicket
+            let entry = DirectCall()
+            children.Add(ticket, entry)
+
+            if scope.Own(fun () -> startCommand entry command :> Task) then
+                createObj [ "ok" ==> true; "ticket" ==> ticket ]
+            else
+                children.Remove ticket |> ignore
+                failure "CALL_HOST_UNAVAILABLE" "The process owner is closing"
+
+        let awaitEntry key (entry: DirectCall) =
+            task {
+                let! value = entry.Result.Task
+
+                if entry.Drained then
+                    children.Remove key |> ignore
+
+                return value
+            }
+
+        let useNative (managed: ManagedChild) action =
+            match managed.Child with
+            | None -> Task.FromResult(failure "CALL_START_FAILED" "Target start was not confirmed")
+            | Some child -> action child
+
+        let signalNative managed name child =
+            match NodeProcessHost.signal child name with
+            | Error reason -> failure "CALL_SIGNAL_FAILED" reason
+            | Ok() ->
+                let receipt = childView managed
+                receipt?ok <- true
+                receipt?status <- "signal-requested"
+                receipt?requestedSignal <- name
+                receipt
+
+        let inputReceipt =
+            function
+            | Error reason -> failure "CALL_INPUT_UNCONFIRMED" reason
+            | Ok bytes -> createObj [ "ok" ==> true; "status" ==> "sent"; "bytes" ==> bytes ]
+
+        let requireOutput () =
+            task {
+                match! scope.ReadOutput() with
+                | Error reason -> return raise (InvalidOperationException reason)
+                | Ok() -> return ()
+            }
+
+        let snapshotDelta () =
+            let snapshots =
+                children.Values
+                |> Seq.choose (fun entry ->
+                    entry.Child |> Option.map (fun managed -> entry, managed, managed.ObservedBytes))
+                |> Seq.toArray
+
+            let stdout = ResizeArray<string>()
+            let stderr = ResizeArray<string>()
+            // DSL-MUTABLE: algorithm-scratch — aggregate this output snapshot only.
+            let mutable bytes = 0L
+            let mutable truncated = false
+
+            for entry, managed, observed in snapshots do
+                stdout.Add(managed.SliceStdout.Peek())
+                stderr.Add(managed.SliceStderr.Peek())
+                bytes <- bytes + observed - entry.DrainedBytes
+                truncated <- truncated || managed.Stdout.Truncated || managed.Stderr.Truncated
+
+            let value =
+                createObj
+                    [ "ok" ==> true
+                      "stdout" ==> String.concat "" stdout
+                      "stderr" ==> String.concat "" stderr
+                      "bytes" ==> float bytes
+                      "truncated" ==> truncated ]
+
+            boundResult (int64 (ToolResultBound.HostMaxBytes())) (scope.OutputNotice()) value, snapshots
+
+        let canYield key =
+            match children.TryGetValue key with
+            | true, entry ->
+                entry.Published.IsNone
+                && (entry.Child |> Option.forall (fun managed -> not managed.Exited))
+            | false, _ -> false
+
+        let consumeDelta key snapshots =
+            parkedTicket <- Some key
+
+            for (entry: DirectCall), (managed: ManagedChild), observed in snapshots do
+                managed.SliceStdout.Take() |> ignore
+                managed.SliceStderr.Take() |> ignore
+                entry.DrainedBytes <- observed
+
+        let publishDelta key publish =
+            let delta, snapshots = snapshotDelta ()
+            let accepted = canYield key && publish delta
+
+            if accepted then
+                consumeDelta key snapshots
+
+            createObj [ "ok" ==> true; "yielded" ==> accepted ]
+
+        let drainCalls () =
+            let entries = children.Values |> Seq.toArray
+
+            task {
+                for entry in entries do
+                    do! entry.Closed.Task
+
+                children.Clear()
+                cancellation.Dispose()
+            }
+
+        member _.Start(command: obj) : obj =
+            if not (isString command) || String.IsNullOrWhiteSpace(string command) then
+                failure "CALL_COMMAND_UNSUPPORTED" "this.call expects a non-empty command string"
+            elif stopping || scope.Cancellation.IsCancellationRequested then
+                failure "CALL_CANCELLED_BEFORE_START" "The process owner is closing"
+            elif not (ToolResultBound.fitsInWindow (minimumResult root (scope.OutputNotice()))) then
+                failure "CALL_OUTPUT_BUDGET_TOO_SMALL" "The Host window cannot encode the process result"
+            else
+                admitCommand (string command)
+
+        member _.Wait(ticket: obj) : Task<obj> =
+            task {
+                let key = if isNullish ticket then "" else string ticket
+
+                match children.TryGetValue key with
+                | false, _ -> return failure "CALL_CHILD_UNKNOWN" "call is no longer running"
+                | true, entry -> return! awaitEntry key entry
+            }
+
+        member _.SignalParked(signal: obj) : Task<obj> =
+            useParked (fun managed ->
+                task {
+                    let name =
+                        if isString signal && string signal <> "" then
+                            string signal
+                        else
+                            "SIGTERM"
+
+                    return! useNative managed (fun child -> Task.FromResult(signalNative managed name child))
+                })
+
+        member _.SendParked(input: obj) : Task<obj> =
+            useParked (fun managed ->
+                task {
+                    let text = if isNullish input then "" else string input
+
+                    let payload =
+                        if text = "" || text.EndsWith "\n" then
+                            text
+                        else
+                            text + "\n"
+
+                    return!
+                        useNative managed (fun child ->
+                            task {
+                                let! sent =
+                                    NodeProcessHost.writeInput
+                                        child
+                                        (System.Text.Encoding.UTF8.GetBytes payload)
+                                        scope.Cancellation
+
+                                return inputReceipt sent
+                            })
+                })
+
+        member _.TakeDelta(ticket: obj, publish: obj -> bool) : Task<obj> =
+            task {
+                let key = if isNullish ticket then "" else string ticket
+
+                if not (children.ContainsKey key) then
+                    raise (InvalidOperationException "the yielding call is no longer available")
+
+                do! requireOutput ()
+                return publishDelta key publish
+            }
+
+        member _.DisposeAsync() : Task<unit> =
+            match disposal with
+            | Some pending -> pending
+            | None ->
+                stopping <- true
+                cancellation.Cancel()
+                let pending = drainCalls ()
+
+                disposal <- Some pending
+                pending
+
+        interface IDisposable with
+            member this.Dispose() = this.DisposeAsync() |> ignore

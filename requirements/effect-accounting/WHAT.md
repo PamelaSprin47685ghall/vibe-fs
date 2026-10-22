@@ -30,7 +30,7 @@
 
 ## [008] 效果家族
 
-工作区创建与分支发布分别使用 WorktreeCreateRequested/WorktreeCreated、PublishClaimed/Published 表达意图与确认。编程面调用（`todowrite-for-<role>`）的待办与视图写入由 Host executor 完成；插件不改写其 provider 参数，不在 before/after 产生 checkpoint。只有 Host 随后的 `message.part.updated` 明确给出该 exact call 的 `completed` ToolPart（且 `state.input.view` 为非空对象），才追加 `ViewCheckpointCommitted`；`error` 只关闭候选而不推进压缩。各领域负责具体证据。
+工作区创建与分支发布分别使用 WorktreeCreateRequested/WorktreeCreated、PublishClaimed/Published 表达意图与确认。编程面调用（`todowrite-for-<role>`）的待办与视图写入由 Host executor 完成；插件不改写其 provider 参数，不在 before/after 产生 checkpoint。只有 Host 随后的 `message.part.updated` 明确给出该 exact call 的 `completed` ToolPart（且 `state.input` 携带有效上下文整理声明，即扁平顶层参数 `prefixUntil` + `thenMap`），才追加 `ViewCheckpointCommitted`；`error` 只关闭候选而不推进压缩。各领域负责具体证据。
 
 ## [010] 拒绝旧通用事实
 
@@ -39,3 +39,7 @@
 ## [012] 后续阶段以确认证据为前提
 
 只有上一阶段的确认事实完成，才可准备下一阶段调用。发布 Claim 须基于已完成变基与双重评审的不可变见证，不得凭空发起。
+
+## [013] 交付成功不是效果
+
+交付只表示工作已提交，本身不构成任何效果的确认；效果仍须按 [001] 另行分型记账，并另有确认证据。交付未成立不得留下成功效果，也不得以任何摘要把它记成已确认。提交、呈现与中断分开取证：「交付已提交而呈现或中断未确认」与「交付未成立」是两种不同结果，不得混成同一个终态。前者保留已提交事实，不因后续物理中断失败而被抹掉；后者是零交付，不得凭散文或 provider stop 补造完成。恢复只依据真实交付与接力事实判断。

@@ -4,6 +4,7 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 type ReconciledTurn =
     { SessionId: SessionId
@@ -15,7 +16,7 @@ type ReconciledTurn =
       Parts: MessagePart array
       Finish: string option
       ErrorName: string option
-      Model: OpencodeModel option
+      Model: HostModel option
       Outcome: ReconcileProgram.TurnOutcome
       Observation: ReconcileProgram.SnapshotObservation option }
 
@@ -37,4 +38,5 @@ type ActiveRunBinding =
       PhysicalUserMessageId: PhysicalUserMessageId option
       ContinuationMessageIds: Set<string>
       Role: Role option
-      Directory: string option }
+      Directory: string option
+      InheritedAuthorityOwner: SessionId option }

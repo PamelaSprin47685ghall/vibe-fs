@@ -174,7 +174,7 @@ test('WHAT[degeneration-guard-009] LOOP_018_diagnostics_name_kind_not_side', asy
 })
 
 test('WHAT[degeneration-guard-009] LOOP_008_guard_has_no_fallback_or_nudge_recovery_path', () => {
-  const sensorSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Host/LoopSensor.fs'), 'utf8')
+  const sensorSource = readFileSync(join(root, 'src/Wanxiangshu/Execution/Session/LoopSensor.fs'), 'utf8')
   const ordinarySource = readFileSync(
     join(root, 'src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs'),
     'utf8',

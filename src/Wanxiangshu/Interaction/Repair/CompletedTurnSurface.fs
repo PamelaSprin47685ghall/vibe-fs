@@ -5,6 +5,7 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// JS-native semantic surface for completed-turn classification.
 /// Host message parts and turn outcomes remain typed behind this boundary.
@@ -22,7 +23,7 @@ module CompletedTurnSurface =
     let private partsOf (value: obj) : MessagePart array =
         arrayOf value |> Array.choose HostMessageCodec.decodePart
 
-    let private optionalModel (value: obj) : OpencodeModel option =
+    let private optionalModel (value: obj) : HostModel option =
         if isNull value then
             None
         else

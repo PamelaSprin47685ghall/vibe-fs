@@ -27,15 +27,19 @@ ${body}
 const runProgram = (dir, body, sessionId = 'sess-046') =>
   execute(dir, 'Coder', 'en', sessionId, { program: program(body) }, 2000, Date.now() + 60_000, 1 << 20, null)
 
-test('WHAT[repository-programming-046] whereAll collapses whitespace runs and returns original offsets', () => {
+test('WHAT[repository-programming-046] whereAll matches literal whitespace and returns original UTF-16 offsets', () => {
   const { dir, cleanup } = sandbox()
   try {
     const content = 'alpha   beta\n gamma'
-    const result = apiOf(createApi(dir)).whereAll(content, 'alpha beta gamma')
+    const binding = apiOf(createApi(dir))
+    assert.deepEqual(binding.whereAll(content, 'alpha beta gamma').spans, [], 'spaces and newlines do not collapse')
+    const result = binding.whereAll(content, content)
     assert.equal(result.ok, true)
     assert.equal(result.spans.length, 1)
     const [begin, end] = result.spans[0]
-    assert.equal(content.slice(begin, end), content, 'the span covers the original normalized run')
+    assert.deepEqual([begin, end], [0, content.length])
+    assert.equal(content.slice(begin, end), content)
+    assert.deepEqual(binding.whereAll('😀  alpha\tbeta ', ' alpha\tbeta ').spans, [[3, 15]], 'needle whitespace and UTF-16 offsets stay exact')
   } finally {
     cleanup()
   }

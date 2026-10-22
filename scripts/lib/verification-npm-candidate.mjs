@@ -183,41 +183,72 @@ export async function installVerificationDependencies({ sourceRoot, parentDirect
   return installSelectedDependencies({ ...source, parentDirectory, execution: { kind: 'bootstrap', nodeBytes, npmCli: path.resolve(npmCli), nodeSha256, npmCliSha256, expectedNpmVersion }, signal, output })
 }
 
-export async function installVerificationDependenciesFromToolArchive({ sourceRoot, parentDirectory, toolArchive, expectedNpmVersion, expectedNodeVersion, registry = 'https://registry.npmjs.org/', signal, output }) {
+export async function prepareVerificationNpmInstallationFromToolArchive({ sourceRoot, parentDirectory, toolArchive, expectedNpmVersion, expectedNodeVersion, registry = 'https://registry.npmjs.org/', signal, output, probeScope }) {
   const source = readNpmSource({ sourceRoot, expectedNpmVersion, registry, signal })
   let tools
-  let candidate
   try {
-    tools = await prepareVerificationNodeTools({ archivePath: toolArchive.archivePath, archiveSha256: toolArchive.archiveSha256, nodePath: toolArchive.nodePath, npmCliPath: toolArchive.npmCliPath, parentDirectory, signal })
+    tools = await prepareVerificationNodeTools({ archivePath: toolArchive.archivePath, archiveSha256: toolArchive.archiveSha256, nodePath: toolArchive.nodePath, npmCliPath: toolArchive.npmCliPath, parentDirectory, signal, probeScope })
     if (tools.npm.version !== expectedNpmVersion || (expectedNodeVersion !== undefined && tools.node.version !== expectedNodeVersion)) {
       throw Object.assign(new Error('Actual selected tool versions differ from the installation contract'), { code: 'verification-npm-tool-invalid' })
     }
-    candidate = await installSelectedDependencies({
-      ...source,
-      parentDirectory,
-      execution: { kind: 'selected-bundle', nodeExecutable: path.join(tools.toolRoot, tools.node.path), npmCli: path.join(tools.toolRoot, tools.npm.cliPath), nodeSha256: tools.node.sha256, npmCliSha256: tools.npm.cliSha256, expectedNpmVersion, nodeVersion: tools.node.version, toolDigest: tools.toolDigest, revalidate: tools.revalidate },
-      signal,
-      output,
-    })
-    signal?.throwIfAborted()
-    tools.revalidate()
-    tools.dispose()
-    return candidate
   } catch (error) {
-    const errors = [error]
-    try {
-      candidate?.dispose()
-    } catch (cleanupError) {
-      errors.push(cleanupError)
-    }
     try {
       tools?.dispose()
     } catch (cleanupError) {
-      errors.push(cleanupError)
+      throw new AggregateError([error, cleanupError], 'Tool archive preparation and cleanup failed', { cause: error })
     }
-    if (errors.length > 1) throw new AggregateError(errors, 'Tool archive installation and cleanup failed', { cause: error })
     throw error
   }
+  let state = 'ready'
+  const invalidState = () => Object.assign(new Error(`Prepared npm installation is ${state}`), { code: 'verification-npm-install-state-invalid' })
+  const installation = Object.freeze({ identityScope: 'selected-node-npm-bundle', toolDigest: tools.toolDigest, nodeVersion: tools.node.version, npmVersion: tools.npm.version })
+  return Object.freeze({
+    installation,
+    async install() {
+      if (state !== 'ready') throw invalidState()
+      state = 'active'
+      let candidate
+      try {
+        candidate = await installSelectedDependencies({
+          ...source,
+          parentDirectory,
+          execution: { kind: 'selected-bundle', nodeExecutable: path.join(tools.toolRoot, tools.node.path), npmCli: path.join(tools.toolRoot, tools.npm.cliPath), nodeSha256: tools.node.sha256, npmCliSha256: tools.npm.cliSha256, expectedNpmVersion, nodeVersion: tools.node.version, toolDigest: tools.toolDigest, revalidate: tools.revalidate },
+          signal,
+          output,
+        })
+        signal?.throwIfAborted()
+        tools.revalidate()
+        tools.dispose()
+        return candidate
+      } catch (error) {
+        const errors = [error]
+        try {
+          candidate?.dispose()
+        } catch (cleanupError) {
+          errors.push(cleanupError)
+        }
+        try {
+          tools.dispose()
+        } catch (cleanupError) {
+          errors.push(cleanupError)
+        }
+        if (errors.length > 1) throw new AggregateError(errors, 'Tool archive installation and cleanup failed', { cause: error })
+        throw error
+      } finally {
+        state = 'spent'
+      }
+    },
+    dispose() {
+      if (state === 'active') throw invalidState()
+      tools.dispose()
+      state = 'spent'
+    },
+  })
+}
+
+export async function installVerificationDependenciesFromToolArchive(options) {
+  const prepared = await prepareVerificationNpmInstallationFromToolArchive(options)
+  return prepared.install()
 }
 
 async function installSelectedDependencies({ sourceBytes, selectedRegistry, parentDirectory, execution, signal, output }) {

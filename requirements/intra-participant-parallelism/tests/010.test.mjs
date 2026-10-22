@@ -8,7 +8,7 @@ import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 import * as events from '../../../dist/OpenCode/Host/EventsSurface.js'
 import * as jsRuntime from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
-test('WHAT[intra-participant-parallelism-010] restart closes the interrupted Fission group and explicit resume continues the original work through delivery and join', async () => {
+test('WHAT[intra-participant-parallelism-010] restart voids the interrupted work and explicit resume admits new work for the same participant through delivery and join', async () => {
   const hostObservers = new Set()
   const emit = async (hooks, event) => {
     for (const observe of hostObservers) observe(event)
@@ -22,11 +22,12 @@ test('WHAT[intra-participant-parallelism-010] restart closes the interrupted Fis
       await openIncumbency(runtime, managerSession)
     })
 
-    const forked = await hooks1.tool.fork.execute(
-      { name: 'ruling-materials', charge: 'collect seven materials' },
+    const forked = await hooks1.tool['todowrite-for-manager'].execute(
+      { program: 'class Js extends JsProgram { async run() { return await this.fork({ name: "ruling-materials", charge: "collect seven materials" }, {}); } }' },
       { sessionID: managerSession, agent: 'manager' },
     )
-    assert.match(forked, /现已接下这项托付|carries this charge now/i)
+    assert.match(forked, /ok = true/)
+    assert.match(forked, /outcome = "created"/)
     const engineerSession = createdIds[0]
 
     const fissioned = await hooks1.tool.fission.execute(
@@ -34,6 +35,9 @@ test('WHAT[intra-participant-parallelism-010] restart closes the interrupted Fis
       { sessionID: engineerSession, agent: 'engineer', callID: 'call-fission-orphan', messageID: 'run-pre-crash' },
     )
     assert.match(fissioned, /status\s*=\s*"fissioned"/i)
+
+    const [admitted] = factPayloads(directory, 'FissionAdmitted')
+    assert.equal(admitted.LaneCount, 2)
 
     const originalAuthority = await withRuntime(async runtime =>
       journalSurface.JournalSurface_snapshot(runtime.journal).sessionProjections[engineerSession].promptAuthority.activeLogicalRun,
@@ -51,10 +55,18 @@ test('WHAT[intra-participant-parallelism-010] restart closes the interrupted Fis
       await new Promise(resolve => setImmediate(resolve))
     }
     assert.equal(prompts.length, sentBeforeRestart, 'restart must not replay a prompt')
+    const [failed] = factPayloads(directory, 'FissionFailed')
+    assert.equal(failed.GroupId, admitted.GroupId)
+    assert.equal(failed.Reason, 'process_interrupted')
+    assert.ok(readJournal(directory, 'ChildWorkVoided').named > 0, 'lost child runs are voided without completion material')
     const retainedAuthority = await withRuntime(async runtime =>
       journalSurface.JournalSurface_snapshot(runtime.journal).sessionProjections[engineerSession].promptAuthority.activeLogicalRun,
     )
-    assert.deepEqual(retainedAuthority, originalAuthority)
+    assert.equal(retainedAuthority, null, 'voiding the lost run clears its active authority without completing it')
+    assert.equal(readJournal(directory, 'TaskDeliveryCommitted').named, 0)
+    const interrupted = await hooks2.tool.join.execute({}, { sessionID: managerSession, agent: 'manager' })
+    assert.match(interrupted, /ruling-materials was voided/)
+    assert.doesNotMatch(interrupted, /status = "completed"|Complete 9-item ruling materials report/)
 
     const continuationAccepted = Promise.withResolvers()
     const sendPrompt = client.session.promptAsync
@@ -66,17 +78,19 @@ test('WHAT[intra-participant-parallelism-010] restart closes the interrupted Fis
       }
     }
 
-    const resumed = await hooks2.tool.resume.execute(
-      { name: 'ruling-materials', charge: 'continue the existing materials collection after restart' },
+    const resumed = await hooks2.tool['todowrite-for-manager'].execute(
+      { program: 'class Js extends JsProgram { async run() { return await this.resume({ name: "ruling-materials", charge: "continue the existing materials collection after restart" }, {}); } }' },
       { sessionID: managerSession, agent: 'manager' },
     )
-    assert.match(resumed, /appended to the existing work|追加.*现有|追加.*原有/i)
+    assert.match(resumed, /ok = true/)
     await continuationAccepted.promise
     client.session.promptAsync = sendPrompt
     const resumedAuthority = await withRuntime(async runtime =>
       journalSurface.JournalSurface_snapshot(runtime.journal).sessionProjections[engineerSession].promptAuthority.activeLogicalRun,
     )
-    assert.deepEqual(resumedAuthority, originalAuthority)
+    assert.equal(resumedAuthority.session, engineerSession)
+    assert.notEqual(resumedAuthority.logicalRun, originalAuthority.logicalRun, 'explicit resume admits a new run instead of reviving voided work')
+    assert.equal(createdIds.filter(id => id === engineerSession).length, 1, 'the original participant binding is reused')
     const terminals = []
     const terminalSubscription = await withRuntime(async runtime =>
       events.subscribeFuture(runtime.terminalPort, (sessionId, outcome) => terminals.push({ sessionId, ...outcome })),
@@ -147,7 +161,7 @@ test('WHAT[intra-participant-parallelism-010] restart closes the interrupted Fis
         state: { status: 'running', input: {} } },
     ]
     const delivered = await hooks2.tool['todowrite-for-engineer'].execute(
-      { program: 'class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: { 0: "Complete 9-item ruling materials report" } }) } }' },
+      { program: 'class Js extends JsProgram { async run() { await this.deliver({ 0: "Complete 9-item ruling materials report" }) } }' },
       { ...toolContext, callID: 'delivery-after-restart' },
     )
     assert.match(delivered, /^# ok\b/m)
@@ -196,12 +210,15 @@ test('WHAT[intra-participant-parallelism-010] restart closes the interrupted Fis
       events.dispose(terminalSubscription)
     })
     assert.match(joined, /Complete 9-item ruling materials report/)
-    assert.doesNotMatch(joined, /LATE_FINAL_TEXT_NOT_THE_DELIVERED_VIEW/)
+    assert.doesNotMatch(joined, /LATE_FINAL_TEXT_NOT_THE_DELIVERED_VIEW|was voided/)
     assert.ok(jsRuntime.deliveredReturned(engineerSession).some(key => key.startsWith('prose:')))
     assert.ok(jsRuntime.deliveredReturned(engineerSession).every(key => !key.includes('LATE_FINAL_TEXT')))
     assert.equal(terminals.filter(outcome =>
       outcome.sessionId === engineerSession && outcome.kind === 'Completed',
     ).length, 1)
+    assert.deepEqual(terminals.filter(outcome =>
+      outcome.sessionId === engineerSession && outcome.kind === 'Completed',
+    ).map(outcome => outcome.providerRun), [finalMessage.info.id])
     await stop(hooks2)
     assert.equal(prompts.length, promptsBeforeStop, 'a later provider step must not revive the delivered exchange')
   }, { events: { listen(observe) {

@@ -12,6 +12,7 @@ test('WHAT[host-boundary-019] the ordinary transform runs the full static stage 
     'relay',
     'tenure-isolation',
     'capture',
+    'adjudicate-delivery',
     'refresh-companion',
     'companion',
     'prefix',
@@ -95,8 +96,9 @@ integrationTest(
     assert.ok(stdoutSummary, 'Canary runner must produce JSON summary output')
     assert.equal(stdoutSummary.versions?.plugin, '1.18.29', 'plugin version must match fixture')
     assert.ok(stdoutSummary.wireInspection, 'wireInspection evidence required')
-    assert.equal(stdoutSummary.wireInspection?.contractRequired, false, 'wire must not require a model attestation')
-    assert.equal(stdoutSummary.wireInspection?.contractType, null, 'the tool schema must omit contract')
+    assert.equal(stdoutSummary.wireInspection?.contractRequired, false, 'wire must not require an attestation')
+    assert.equal(stdoutSummary.wireInspection?.contractType, null, 'wire must not expose an attestation')
+    assert.equal(stdoutSummary.wireInspection?.contractEnum, null, 'wire must not expose a contract enum')
     assert.ok(stdoutSummary.calls?.normal, 'normal call evidence required')
     assert.equal(stdoutSummary.calls.normal.status, 'completed')
     assert.ok(stdoutSummary.calls?.executorThrow, 'executorThrow boundary canary evidence required')

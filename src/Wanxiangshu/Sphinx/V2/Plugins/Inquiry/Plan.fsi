@@ -32,7 +32,3 @@ type PlanFault =
     | NoPlans
     | DuplicatePlanId of planId: string
     | AnswerNowWithoutRenderReserve
-
-module Plan =
-    val validateCard: PlanCard -> Result<unit, PlanFault>
-    val validateProposal: Set<string> -> PlanProposal -> Result<PlanProposal, PlanFault>

@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System
 open System.Threading.Tasks
 open Fable.Core
@@ -7,8 +9,8 @@ open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Host.Ports
 
 module SessionSnapshotPort =
 
@@ -153,7 +155,7 @@ module SessionSnapshotPort =
         else
             decodeToolPartsOrEmpty (unbox<obj array> raw?parts)
 
-    let private modelOf (info: obj) : OpencodeModel option =
+    let private modelOf (info: obj) : HostModel option =
         if isNull info then
             None
         elif not (isNull info?providerID) && not (isNull info?modelID) then
@@ -289,9 +291,9 @@ module SessionSnapshotPort =
                       CreatedAt = createdAtOf info raw
                       Completed = completedOf info raw
                       IsCompaction = isCompactionOf info raw
-                      PromptKey = metadataTextOf PromptMetadataCodec.PromptKeyField info raw
+                      PromptKey = metadataTextOf PromptMetadataField.PromptKeyField info raw
                       Origin =
-                        metadataTextOf PromptMetadataCodec.OriginField info raw
+                        metadataTextOf PromptMetadataField.OriginField info raw
                         |> Option.map PromptAuthority.originFromLabel
                       Parts = parts
                       PartIds = partIds
@@ -332,17 +334,6 @@ module SessionSnapshotPort =
         else
             projectMessages (unwrapPayload (JS.JSON.parse text))
 
-    let private nonBlankDirectory (directory: string) =
-        if String.IsNullOrWhiteSpace directory then
-            None
-        else
-            Some directory
-
-    let private directoryOption (input: obj) =
-        if isNull input || isNull input?directory then
-            None
-        else
-            nonBlankDirectory (unbox<string> input?directory)
 
     type SdkSnapshotPort(client: obj, workspaceDirectory: string option) =
         let headersObj () =
@@ -384,61 +375,545 @@ module SessionSnapshotPort =
         && not (isNull row?title)
         && unbox<string> row?title = title
 
-    let private discoveredSessions (title: string) (response: obj) =
+    /// The manager session a candidate row carries, or the refusal it raises.
+    let private managerSessionOfRow (row: obj) : Result<SessionId option, HostError> =
+        if readString row?agent <> Some "manager" then
+            Error(HostError.Refused "Delivery session does not identify the Manager agent")
+        else
+            sessionIdOfRow row
+            |> Option.map (fun session -> Ok(Some session))
+            |> Option.defaultWith (fun () -> Error(HostError.Refused "Delivery session has no valid identity"))
+
+    /// One step of the row scan: the first refusal stops the scan.
+    let private scanStep (acc: Result<SessionId list, HostError>) (row: obj) : Result<SessionId list, HostError> =
+        acc
+        |> Result.bind (fun sessions ->
+            managerSessionOfRow row
+            |> Result.map (fun found -> found |> Option.toList |> List.append sessions))
+
+    /// The manager sessions among the candidate rows, or the first refusal a
+    /// row carries.
+    let private scanManagerSessions (rows: obj array) : Result<SessionId list, HostError> =
+        rows |> Array.fold scanStep (Ok []) |> Result.map List.rev
+
+    /// The manager sessions on a discovery page, or the ambiguity refusal.
+    /// A full page cannot prove there is only one candidate, even when local
+    /// filtering would leave one usable row.
+    let private managerSessionsOnPage (title: string) (rows: obj array) : Result<SessionId list, HostError> =
+        if rows.Length >= 2 then
+            Error(HostError.Refused "Session discovery is ambiguous or its result page is full")
+        else
+            let matches = rows |> Array.filter (exactRootTitle title)
+
+            scanManagerSessions matches
+
+    let private discoveredSessions (title: string) (response: obj) : Result<SessionId list, HostError> =
         let rows =
             if not (isNull response) && not (isNull response?error) then
-                invalidOp "Session discovery returned an error response"
+                Error(HostError.Refused "Session discovery returned an error response")
             elif isJsArray response then
-                unbox<obj array> response
+                Ok(unbox<obj array> response)
             elif not (isNull response) && isJsArray response?data then
-                unbox<obj array> response?data
+                Ok(unbox<obj array> response?data)
             else
-                invalidOp "Session discovery did not return a session list"
+                Error(HostError.Refused "Session discovery did not return a session list")
 
-        // Request two matches. A full page cannot prove there is only one
-        // candidate, even when local filtering would leave one usable row.
-        if rows.Length >= 2 then
-            invalidOp "Session discovery is ambiguous or its result page is full"
+        match rows with
+        | Error error -> Error error
+        | Ok rows -> managerSessionsOnPage title rows
 
-        rows
-        |> Array.filter (exactRootTitle title)
-        |> Array.map (fun row ->
-            if readString row?agent <> Some "manager" then
-                invalidOp "Delivery session does not identify the Manager agent"
+    [<Emit("encodeURIComponent($0)")>]
+    let private encodeURIComponent (_value: string) : string = jsNative
 
-            match sessionIdOfRow row with
-            | Some session -> session
-            | None -> invalidOp "Delivery session has no valid identity")
-        |> Array.toList
+    /// Host-neutral session verbs mapped onto the OpenCode host. The adapter
+    /// owns the host payload shape; the product only ever sees port records.
+    let private sessionInfoOfRow (row: obj) : SessionInfo option =
+        sessionIdOfRow row
+        |> Option.map (fun id ->
+            { Id = id
+              Parent = readString row?parentID |> Option.map SessionId.create
+              Role = readString row?agent |> Option.map AgentRole
+              Title = readString row?title
+              Workspace = readString row?directory |> Option.map WorkspacePath })
 
-    type SdkDiscoveryPort(client: obj, workspaceDirectory: string option) =
-        let headersObj () =
-            match workspaceDirectory with
+    let private sessionInfosOfRows (rows: obj array) : SessionInfo list =
+        rows |> Array.choose sessionInfoOfRow |> Array.toList
+
+    /// A single host object, unwrapped from the SDK's `data` envelopes.
+    let private objectPayload (response: obj) : obj =
+        if isNull response then
+            null
+        elif not (isNull response?data) && not (isNull response?data?data) then
+            response?data?data
+        elif not (isNull response?data) then
+            response?data
+        else
+            response
+
+    let private parentOfPayload (payload: obj) : Result<SessionId option, HostError> =
+        let session = objectPayload payload
+
+        if isNull session then
+            Error(HostError.Transport "Missing session response")
+        else
+            session?parentID |> readString |> Option.map SessionId.create |> Ok
+
+    /// The HTTP status a transport response carries, when the transport
+    /// exposes one. The SDK envelope keeps the raw response under `response`.
+    let private responseStatus (response: obj) : int option =
+        if isNull response then
+            None
+        elif not (isNull response?response) && not (isNull response?response?status) then
+            Some(unbox<int> response?response?status)
+        elif not (isNull response?status) then
+            Some(unbox<int> response?status)
+        elif not (isNull response?error) && not (isNull response?error?status) then
+            Some(unbox<int> response?error?status)
+        else
+            None
+
+    /// A transport status expressed in the port's error vocabulary.
+    let private hostErrorOfStatus (status: int) (verb: string) : HostError =
+        if status = 404 then
+            HostError.NotFound(sprintf "%s: session not found (HTTP %d)" verb status)
+        elif status >= 400 && status < 500 then
+            HostError.Refused(sprintf "%s: host refused the request (HTTP %d)" verb status)
+        else
+            HostError.Transport(sprintf "%s: transport failure (HTTP %d)" verb status)
+
+    /// The message a failed host response carries, when it carries one.
+    let private failureMessage (response: obj) : string option =
+        let error = if isNull response then null else response?error
+
+        if isNull error then
+            None
+        elif not (isNull error?data) && not (isNull error?data?message) then
+            readString error?data?message
+        else
+            readString error?message
+
+    /// The failure a host response carries, expressed in the port's error
+    /// vocabulary. The host payload itself never leaves the adapter.
+    let private hostErrorOfResponse (response: obj) (verb: string) : HostError =
+        let detail =
+            match failureMessage response with
+            | Some message -> message
+            | None -> sprintf "%s failed" verb
+
+        match responseStatus response with
+        | Some status when status = 404 -> HostError.NotFound(sprintf "%s: %s" verb detail)
+        | Some status when status >= 400 && status < 500 -> HostError.Refused(sprintf "%s: %s" verb detail)
+        | Some status -> HostError.Transport(sprintf "%s: %s (HTTP %d)" verb detail status)
+        | None -> HostError.Refused(sprintf "%s: %s" verb detail)
+
+    /// The failure a transport status carries, when the status is a failure.
+    let private statusFailure (response: obj) (verb: string) : HostError option =
+        match responseStatus response with
+        | Some status when status < 200 || status >= 300 -> Some(hostErrorOfStatus status verb)
+        | _ -> None
+
+    /// The failure an SDK response envelope carries, if it carries one. The
+    /// SDK client reports a non-2xx answer as an error envelope rather than
+    /// as a thrown exception.
+    let private sdkFailure (response: obj) (verb: string) : HostError option =
+        if isNull response then
+            None
+        elif not (isNull response?error) then
+            Some(hostErrorOfResponse response verb)
+        else
+            statusFailure response verb
+
+    /// The outcome of an SDK call: the host's failure, or the mapped answer.
+    let private sdkOr (response: obj) (verb: string) (ok: unit -> Result<'T, HostError>) : Result<'T, HostError> =
+        match sdkFailure response verb with
+        | Some failure -> Error failure
+        | None -> ok ()
+
+    /// One SDK call, with any transport failure expressed in the port's
+    /// error vocabulary.
+    let private sdkInvoke (sessObj: obj) (fn: obj) (payload: obj) : Task<Result<obj, HostError>> =
+        taskResult {
+            try
+                let! response = unbox<Task<obj>> (fn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                return! Ok response
+            with ex ->
+                return! Error(HostError.Transport ex.Message)
+        }
+
+    /// The SDK client's session-removal method: `session.delete` when the
+    /// client exposes it, `session.close` otherwise.
+    let private closeMethod (sessObj: obj) : obj =
+        if isNull sessObj?delete then
+            sessObj?close
+        else
+            sessObj?delete
+
+    type SdkSessionPort(client: obj, workspaceDirectory: string option) =
+        let headersObj (directory: string option) =
+            match directory with
             | Some dir -> createObj [ "x-opencode-directory", box (emitJsExpr dir "encodeURIComponent($0)") ]
             | None -> createObj []
 
-        interface ISessionDiscoveryPort with
-            member _.FindRootSessionsByTitle(title) =
+        interface ISessionPort with
+            member _.FindByTitle(title) =
                 taskResult {
-                    try
-                        let sessObj = client?session
-                        let listFn = sessObj?list
-                        do! Result.requireFalse "session.list unavailable on SDK client" (isNull listFn)
+                    let sessObj = client?session
+                    let listFn = sessObj?list
 
-                        let queryFields =
-                            [ "roots", box true; "search", box title; "limit", box 2 ]
-                            @ (workspaceDirectory
-                               |> Option.map (fun dir -> [ "directory", box dir ])
-                               |> Option.defaultValue [])
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "session.list unavailable on SDK client")
+                            (isNull listFn)
 
-                        let payload =
-                            createObj [ "query", box (createObj queryFields); "headers", box (headersObj ()) ]
+                    let queryFields =
+                        [ "roots", box true; "search", box title; "limit", box 2 ]
+                        @ (workspaceDirectory
+                           |> Option.map (fun dir -> [ "directory", box dir ])
+                           |> Option.defaultValue [])
 
-                        let! response = unbox<Task<obj>> (listFn?call (sessObj, payload)) |> TaskResultCE.ofTask
+                    let payload =
+                        createObj
+                            [ "query", box (createObj queryFields)
+                              "headers", box (headersObj workspaceDirectory) ]
 
-                        return discoveredSessions title response
-                    with ex ->
-                        return! Error ex.Message
+                    let! response = sdkInvoke sessObj listFn payload
+
+                    return! sdkOr response "session.list" (fun () -> discoveredSessions title response)
+                }
+
+            member _.Create(parent, spec) =
+                taskResult {
+                    let sessObj = client?session
+                    let createFn = sessObj?create
+
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "session.create unavailable on SDK client")
+                            (isNull createFn)
+
+                    let bodyFields =
+                        (parent
+                         |> Option.map (fun p -> [ "parentID", box (SessionId.value p) ])
+                         |> Option.defaultValue [])
+                        @ (spec.Title
+                           |> Option.map (fun title -> [ "title", box title ])
+                           |> Option.defaultValue [])
+                        @ (spec.Role
+                           |> Option.map (fun (AgentRole role) -> [ "agent", box role ])
+                           |> Option.defaultValue [])
+
+                    let directory =
+                        spec.Workspace
+                        |> Option.map (fun (WorkspacePath dir) -> dir)
+                        |> Option.orElse workspaceDirectory
+
+                    let payload =
+                        createObj (
+                            [ "body", box (createObj bodyFields); "headers", box (headersObj directory) ]
+                            @ bodyFields
+                        )
+
+                    let! response = sdkInvoke sessObj createFn payload
+
+                    return!
+                        sdkOr response "session.create" (fun () ->
+                            let created = objectPayload response
+
+                            readString created?id
+                            |> Option.map SessionId.create
+                            |> Result.requireSome (HostError.Transport "Missing session id in response"))
+                }
+
+            member _.Parent(session) =
+                taskResult {
+                    let sessObj = client?session
+                    let getFn = sessObj?get
+
+                    do! Result.requireFalse (HostError.Transport "session.get unavailable on SDK client") (isNull getFn)
+
+                    let sId = SessionId.value session
+
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box sId ])
+                              "sessionID", box sId
+                              "headers", box (headersObj workspaceDirectory) ]
+
+                    let! response = sdkInvoke sessObj getFn payload
+
+                    return! sdkOr response "session.get" (fun () -> parentOfPayload response)
+                }
+
+            member _.Children(parent) =
+                taskResult {
+                    let sessObj = client?session
+                    let childrenFn = sessObj?children
+
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "session.children unavailable on SDK client")
+                            (isNull childrenFn)
+
+                    let pId = SessionId.value parent
+
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box pId ])
+                              "headers", box (headersObj workspaceDirectory) ]
+
+                    let! response = sdkInvoke sessObj childrenFn payload
+
+                    return!
+                        sdkOr response "session.children" (fun () -> Ok(sessionInfosOfRows (unwrapPayload response)))
+                }
+
+            member _.Abort(session) =
+                taskResult {
+                    let sessObj = client?session
+                    let abortFn = sessObj?abort
+
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "session.abort unavailable on SDK client")
+                            (isNull abortFn)
+
+                    let sId = SessionId.value session
+
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box sId ])
+                              "headers", box (headersObj workspaceDirectory) ]
+
+                    let! response = sdkInvoke sessObj abortFn payload
+
+                    return! sdkOr response "session.abort" (fun () -> Ok())
+                }
+
+            // The OpenCode host (API v1) exposes exactly one stop action per
+            // session: `session.abort` (POST /session/{id}/abort). It has no
+            // attempt-scoped interrupt route — the only `session.interrupt`
+            // in the host belongs to the v2 API generation, which this
+            // adapter's client does not speak. The product's own
+            // attempt-interrupt path already calls `session.abort` for the
+            // session that owns the attempt (see OpenCodePort.fs), so the
+            // attempt-scoped stop maps onto that same wire verb.
+            member this.Interrupt(session) = (this :> ISessionPort).Abort session
+
+            member _.Close(session) =
+                taskResult {
+                    let sessObj = client?session
+                    let closeFn = closeMethod sessObj
+
+                    do!
+                        Result.requireFalse
+                            (HostError.Transport "No close/delete session method on SDK client")
+                            (isNull closeFn)
+
+                    let sId = SessionId.value session
+
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box sId ])
+                              "sessionID", box sId
+                              "headers", box (headersObj workspaceDirectory) ]
+
+                    let! response = sdkInvoke sessObj closeFn payload
+
+                    return! sdkOr response "session.delete" (fun () -> Ok())
+                }
+
+    type HttpSessionPort(baseUrl: string) =
+        let cleanBase =
+            if baseUrl.EndsWith("/") then
+                baseUrl.Substring(0, baseUrl.Length - 1)
+            else
+                baseUrl
+
+        [<Emit("fetch($0, $1)")>]
+        let jsFetch (url: string) (init: obj) : Task<obj> = jsNative
+
+        /// A response body, parsed when it can be parsed.
+        let tryParse (text: string) : obj =
+            try
+                JS.JSON.parse text
+            with _ ->
+                null
+
+        /// The message a parsed error body carries, when it carries one.
+        let messageOf (parsed: obj) : string option =
+            if not (isNull parsed?data) && not (isNull parsed?data?message) then
+                readString parsed?data?message
+            elif not (isNull parsed?message) then
+                readString parsed?message
+            else
+                None
+
+        /// The message a failed response body carries, when it carries one.
+        let detailOfBody (text: string) : string option =
+            let parsed =
+                if String.IsNullOrWhiteSpace text then
+                    null
+                else
+                    tryParse text
+
+            if isNull parsed then None else messageOf parsed
+
+        /// The detail a failed call reports, when the body carries none.
+        let failureDetail (verb: string) (text: string) : string =
+            match detailOfBody text with
+            | Some message -> message
+            | None -> sprintf "%s failed" verb
+
+        /// A failed HTTP status expressed in the port's error vocabulary.
+        let httpError (verb: string) (status: int) (detail: string) : HostError =
+            if status = 404 then
+                HostError.NotFound(sprintf "%s: %s" verb detail)
+            elif status >= 400 && status < 500 then
+                HostError.Refused(sprintf "%s: %s" verb detail)
+            else
+                HostError.Transport(sprintf "%s: %s (HTTP %d)" verb detail status)
+
+        /// The body of a successful HTTP answer.
+        let httpBody (text: string) : Result<obj, HostError> =
+            let candidate =
+                if String.IsNullOrWhiteSpace text then
+                    createObj []
+                else
+                    tryParse text
+
+            let usable = if isNull candidate then None else Some candidate
+
+            match usable with
+            | Some body -> Ok body
+            | None -> Error(HostError.Transport "Host returned a body that is not valid JSON")
+
+        /// One HTTP call, with its failure expressed in the port's error
+        /// vocabulary. The raw host payload never leaves the adapter.
+        let httpOutcome (verb: string) (status: int) (text: string) : Result<obj, HostError> =
+            if status < 200 || status >= 300 then
+                Error(httpError verb status (failureDetail verb text))
+            else
+                httpBody text
+
+        /// The request payload of one HTTP call.
+        let httpInit (method: string) (body: obj option) : obj =
+            match body with
+            | Some payload ->
+                createObj
+                    [ "method", box method
+                      "headers", box (createObj [ "Content-Type", box "application/json" ])
+                      "body", box (JS.JSON.stringify payload) ]
+            | None -> createObj [ "method", box method ]
+
+        /// The raw answer of one HTTP call: its status and its body text.
+        let fetchRaw (url: string) (init: obj) : Task<Result<int * string, HostError>> =
+            taskResult {
+                try
+                    let! response = jsFetch url init |> TaskResultCE.ofTask
+                    let status = unbox<int> response?status
+                    let! text = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
+                    return! Ok((status, text))
+                with ex ->
+                    return! Error(HostError.Transport ex.Message)
+            }
+
+        /// One HTTP request, with its failure expressed in the port's error
+        /// vocabulary. The raw host payload never leaves the adapter.
+        let requestJson
+            (verb: string)
+            (method: string)
+            (url: string)
+            (body: obj option)
+            : Task<Result<obj, HostError>> =
+            let init = httpInit method body
+
+            taskResult {
+                let! raw = fetchRaw url init
+
+                let (status, text) = raw
+
+                return! httpOutcome verb status text
+            }
+
+        let readJson (verb: string) (url: string) : Task<Result<obj, HostError>> = requestJson verb "GET" url None
+
+        let postJson (verb: string) (endpoint: string) (body: obj) : Task<Result<obj, HostError>> =
+            requestJson verb "POST" (cleanBase + endpoint) (Some body)
+
+        /// The host's session-removal verb: `DELETE /session/{id}`.
+        let deleteSession (session: SessionId) : Task<Result<obj, HostError>> =
+            requestJson "session.delete" "DELETE" (sprintf "%s/session/%s" cleanBase (SessionId.value session)) None
+
+        interface ISessionPort with
+            member _.FindByTitle(title) =
+                taskResult {
+                    let url =
+                        sprintf "%s/session?roots=true&limit=2&search=%s" cleanBase (encodeURIComponent title)
+
+                    let! data = requestJson "session.list" "GET" url None
+
+                    return! discoveredSessions title data
+                }
+
+            member _.Create(parent, spec) =
+                taskResult {
+                    let bodyFields =
+                        (parent
+                         |> Option.map (fun p -> [ "parentID", box (SessionId.value p) ])
+                         |> Option.defaultValue [])
+                        @ (spec.Title
+                           |> Option.map (fun title -> [ "title", box title ])
+                           |> Option.defaultValue [])
+                        @ (spec.Role
+                           |> Option.map (fun (AgentRole role) -> [ "agent", box role ])
+                           |> Option.defaultValue [])
+
+                    let! data = postJson "session.create" "/session" (createObj bodyFields)
+
+                    return!
+                        readString (objectPayload data)?id
+                        |> Option.map SessionId.create
+                        |> Result.requireSome (HostError.Transport "Missing session id in response")
+                }
+
+            member _.Parent(session) =
+                taskResult {
+                    let! data = readJson "session.get" (sprintf "%s/session/%s" cleanBase (SessionId.value session))
+                    return! parentOfPayload data
+                }
+
+            member _.Children(parent) =
+                taskResult {
+                    let! data =
+                        readJson
+                            "session.children"
+                            (sprintf "%s/session/%s/children" cleanBase (SessionId.value parent))
+
+                    return sessionInfosOfRows (unwrapPayload (objectPayload data))
+                }
+
+            member _.Abort(session) =
+                taskResult {
+                    let! _ =
+                        postJson "session.abort" (sprintf "/session/%s/abort" (SessionId.value session)) (createObj [])
+
+                    return ()
+                }
+
+            // The OpenCode host (API v1) exposes exactly one stop action per
+            // session: `POST /session/{id}/abort`. It has no attempt-scoped
+            // interrupt route — the only `session.interrupt` in the host
+            // belongs to the v2 API generation, which this adapter does not
+            // speak. The product's own attempt-interrupt path already calls
+            // `session.abort` for the session that owns the attempt (see
+            // OpenCodePort.fs), so the attempt-scoped stop maps onto that
+            // same wire verb.
+            member this.Interrupt(session) = (this :> ISessionPort).Abort session
+
+            member _.Close(session) =
+                taskResult {
+                    let! _ = deleteSession session
+                    return ()
                 }
 
     type HttpSnapshotPort(baseUrl: string) =
@@ -468,43 +943,13 @@ module SessionSnapshotPort =
                         return! Error ex.Message
                 }
 
-    [<Emit("encodeURIComponent($0)")>]
-    let private encodeURIComponent (_value: string) : string = jsNative
 
-    type HttpDiscoveryPort(baseUrl: string) =
-        let cleanBase =
-            if baseUrl.EndsWith("/") then
-                baseUrl.Substring(0, baseUrl.Length - 1)
-            else
-                baseUrl
-
-        [<Emit("fetch($0, $1)")>]
-        let jsFetch (url: string) (init: obj) : Task<obj> = jsNative
-
-        interface ISessionDiscoveryPort with
-            member _.FindRootSessionsByTitle(title) =
-                taskResult {
-                    try
-                        let url =
-                            sprintf "%s/session?roots=true&limit=2&search=%s" cleanBase (encodeURIComponent title)
-
-                        let! response = jsFetch url (createObj [ "method", box "GET" ]) |> TaskResultCE.ofTask
-                        let status = unbox<int> response?status
-                        do! Result.requireTrue (sprintf "HTTP %d" status) (status >= 200 && status < 300)
-                        let! body = unbox<Task<string>> (response?text ()) |> TaskResultCE.ofTask
-
-                        return discoveredSessions title (JS.JSON.parse body)
-                    with ex ->
-                        return! Error ex.Message
-                }
-
-    let create (input: obj) : ISessionSnapshotPort option =
-        let workDir = directoryOption input
+    let create (workspaceDirectory: string option) (input: obj) : ISessionSnapshotPort option =
 
         if isNull input then
             None
         elif not (isNull input?client) && not (isNull input?client?session) then
-            Some(SdkSnapshotPort(input?client, workDir) :> ISessionSnapshotPort)
+            Some(SdkSnapshotPort(input?client, workspaceDirectory) :> ISessionSnapshotPort)
         elif not (isNull input?serverUrl) then
             Some(HttpSnapshotPort(unbox<string> input?serverUrl) :> ISessionSnapshotPort)
         elif not (isNull input?baseUrl) then
@@ -514,18 +959,20 @@ module SessionSnapshotPort =
         else
             None
 
-    let createDiscovery (input: obj) : ISessionDiscoveryPort option =
-        let workDir = directoryOption input
+    /// HNI P-01: the OpenCode adapter's session port. Every session verb is
+    /// mapped onto the OpenCode host; the adapter owns the host payload
+    /// shape and the product only ever sees port records.
+    let createSessionPort (workspaceDirectory: string option) (input: obj) : ISessionPort option =
 
         if isNull input then
             None
         elif not (isNull input?client) && not (isNull input?client?session) then
-            Some(SdkDiscoveryPort(input?client, workDir) :> ISessionDiscoveryPort)
+            Some(SdkSessionPort(input?client, workspaceDirectory) :> ISessionPort)
         elif not (isNull input?serverUrl) then
-            Some(HttpDiscoveryPort(unbox<string> input?serverUrl) :> ISessionDiscoveryPort)
+            Some(HttpSessionPort(unbox<string> input?serverUrl) :> ISessionPort)
         elif not (isNull input?baseUrl) then
-            Some(HttpDiscoveryPort(unbox<string> input?baseUrl) :> ISessionDiscoveryPort)
+            Some(HttpSessionPort(unbox<string> input?baseUrl) :> ISessionPort)
         elif not (isNull input?port) then
-            Some(HttpDiscoveryPort(sprintf "http://127.0.0.1:%d" (unbox<int> input?port)) :> ISessionDiscoveryPort)
+            Some(HttpSessionPort(sprintf "http://127.0.0.1:%d" (unbox<int> input?port)) :> ISessionPort)
         else
             None

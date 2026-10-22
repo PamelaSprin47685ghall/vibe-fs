@@ -11,7 +11,7 @@
 /src/Wanxiangshu/Enforcer/Continuation.fs
 /src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs
 /src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs
-/src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
+/src/Wanxiangshu/Execution/Routing/ModelRouting.fs
 /src/Wanxiangshu/Persistence/Journal/CodecSurface.fs
 /src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fs
 /src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fsi

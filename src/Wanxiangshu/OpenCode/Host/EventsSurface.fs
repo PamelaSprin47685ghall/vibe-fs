@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
@@ -11,7 +13,9 @@ open Wanxiangshu.Persistence.Journal
 module EventsSurface =
     // DSL-MUTABLE: resource — synthetic provider-run identity counter for malformed host input
     let mutable private noRun = 0
-    let create () : obj = box (Events.HostEventPort())
+
+    let create () : obj =
+        box (Events.HostEventPort(Events.newTerminalSource ()))
 
     let private terminal (sessionId: string) (kind: string) (providerRun: string) (text: string) : TerminalOutcome =
         match kind with
@@ -135,13 +139,15 @@ module EventsSurface =
 
     let acquireSharedForWorkspace (workspace: string) : Task<obj> =
         task {
-            match! SharedTerminalBus.tryAcquireForWorkspace (Some workspace) with
-            | Some(_, port) -> return box port
+            let candidate = Events.newTerminalSource ()
+
+            match! SharedTerminalBus.tryAcquireForWorkspace (Some workspace) candidate with
+            | Some(_, source) -> return box source
             | None -> return null
         }
 
     let releaseSharedForWorkspace (workspace: string) (port: obj) : Task<unit> =
         task {
             let! key = RuntimePath.forWorkspace workspace
-            SharedTerminalBus.release (Some key) (Some(port :?> Events.HostEventPort))
+            SharedTerminalBus.release (Some key) (Some(port :?> ISessionTerminalSource))
         }

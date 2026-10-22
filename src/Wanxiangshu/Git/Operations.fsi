@@ -10,5 +10,3 @@ module GitOperations =
     val stageAll: runner: TextProcessRunner -> dir: string -> Task<Result<unit, string>>
 
     val candidateCommit: runner: TextProcessRunner -> dir: string -> msg: string -> Task<Result<unit, string>>
-
-    val createWithRunner: runner: TextProcessRunner -> GitPort

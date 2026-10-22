@@ -20,7 +20,7 @@
 
 ## [005] 终点与退休流程不再执行 DeferredWork 消费注入
 
-`OrdinaryTurnWorkflow` 在 Engineer、DevOps 或 Orchestrator 自然终止时不再读取或发送 `presentPendingDeferredWork` continuation；Manager `DeliverTool` 不再从 `AgentProjection` 读取 `pendingAttentionWorkPairs` 待办列表。
+`OrdinaryTurnWorkflow` 在 Engineer、DevOps 或 Orchestrator 自然终止时不再读取或发送 `presentPendingDeferredWork` continuation；Manager `DeliverTool` 不再从 `AgentProjection` 读取 `pendingAttentionWorkPairs` 待办列表。`PromptContinuationKind` 不再包含 `DeferredWorkPresentation`：它已无生产者，保留只会是一个无人发出的准入标签。
 
 ## [006] durable fact 与 projection 不含 Attention
 

@@ -257,7 +257,7 @@ test('WHAT[verification-system-009] every ladder step target exists as a real fi
     assert.ok(existsSync(join(ROOT, rel)), `ladder step target missing: ${rel}`)
   }
 })
-test('WHAT[verification-system-009] every wired gate path exists and checks set matches scripts/checks directory', () => {
+test('WHAT[verification-system-009] every wired gate path exists and every gate script is registered or explicitly aggregated', () => {
   for (const gatePath of checks) {
     assert.ok(
       existsSync(gatePath),
@@ -281,10 +281,25 @@ test('WHAT[verification-system-009] every wired gate path exists and checks set 
   const wiredBasenames = new Set(checks.map((p) => basename(p)))
   const gateScriptsInDir = dirEntries.filter((f) => f.endsWith('.mjs') && !nonGateFiles.has(f))
 
+  // A gate script reaches the release gate set in one of two ways: it is registered in
+  // check.mjs, or a registered gate imports it and calls it — that is how
+  // adapter-thinness.mjs runs (architecture.mjs imports scanAdapterThinness). Counting
+  // registrations alone would call that a missing gate, so the invariant is that every
+  // gate script is reachable from the registered set.
+  const aggregated = new Set()
+  for (const gatePath of checks) {
+    const text = readFileSync(gatePath, 'utf8')
+    for (const name of dirEntries) {
+      if (!name.endsWith('.mjs') || wiredBasenames.has(name)) continue
+      if (text.includes(`./${name}`) || text.includes(`'${name}'`)) aggregated.add(name)
+    }
+  }
+
+  const unreachable = gateScriptsInDir.filter((f) => !wiredBasenames.has(f) && !aggregated.has(f))
   assert.deepEqual(
-    [...wiredBasenames].sort(),
-    gateScriptsInDir.sort(),
-    'checks registered in check.mjs must equal gate scripts in scripts/checks',
+    unreachable,
+    [],
+    'every gate script in scripts/checks must be registered in check.mjs or aggregated by a registered gate',
   )
 })
 }

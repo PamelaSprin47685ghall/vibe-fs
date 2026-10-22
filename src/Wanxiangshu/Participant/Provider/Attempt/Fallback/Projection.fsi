@@ -27,6 +27,17 @@ type ProviderFailureAdvanceRejection =
     | InvalidBudget
     | ConflictingObservation
 
+[<RequireQualifiedAccess>]
+type ProviderFailureReplay =
+    | RetryAuthorized
+    | RetryExhausted
+    | EpisodeSuperseded
+
+[<RequireQualifiedAccess>]
+type ProviderFailureObservation =
+    | Record of ProviderFailureBudgetSpec * int * ProviderFailureProjection
+    | Replay of ProviderFailureReplay
+
 module ProviderFailureProjection =
     val forAuthority:
         logicalRunId: LogicalRunId -> authorityRoot: AuthorityRootUserMessageId -> ProviderFailureProjection
@@ -50,3 +61,9 @@ module ProviderFailureProjection =
             Result<ProviderFailureProjection, ProviderFailureAdvanceRejection>
 
     val mayRetry: current: ProviderFailureProjection -> bool
+
+    val observeFailure:
+        identity: FailedProviderAttemptIdentity ->
+        reason: string ->
+        current: ProviderFailureProjection ->
+            Result<ProviderFailureObservation, ProviderFailureAdvanceRejection>

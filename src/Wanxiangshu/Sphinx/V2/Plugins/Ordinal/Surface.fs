@@ -1,11 +1,26 @@
 namespace Wanxiangshu.Sphinx.V2.Plugins
 
 open System
+open Fable.Core
 open Fable.Core.JsInterop
 
 /// The JS-native conformance surface for the question vocabulary and the pairwise
-/// likelihood. Pure functions only; no store, no clock, no model call.
+/// likelihood (the likelihood itself is owned by wanxiangli/ordinal). Pure functions only; no store, no clock, no model call.
 module Surface =
+
+    /// The `wanxiangli/ordinal` owner (CUT-31 ①) of the pairwise and ranking likelihoods.
+    type private OrdinalLawLibrary =
+        abstract logSigmoid: x: float -> float
+        abstract logSumExp: a: float * b: float -> float
+        abstract compositePairs: order: string array -> string array array
+
+    [<Import("OrdinalLaw", "wanxiangli/ordinal")>]
+    let private ordinalLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : OrdinalLawLibrary = jsNative
+
+    let private law = construct ordinalLawClass
 
     let stringSetOf (items: string list) : Set<string> = items |> List.ofSeq |> Set.ofSeq
 
@@ -54,11 +69,14 @@ module Surface =
 
         QuestionnaireModel.labelsWithin presented candidate
 
-    let logSigmoid (x: float) : float = Pairwise.logSigmoid x
+    let logSigmoid (x: float) : float = law.logSigmoid x
 
-    let logSumExp (a: float) (b: float) : float = Pairwise.logSumExp a b
+    let logSumExp (a: float) (b: float) : float = law.logSumExp (a, b)
 
-    let compositePairs (order: string list) : (string * string) list = Ranking.compositePairs order
+    let compositePairs (order: string list) : (string * string) list =
+        law.compositePairs (order |> List.ofSeq |> Array.ofList)
+        |> Array.map (fun pair -> pair[0], pair[1])
+        |> List.ofArray
 
     let decodeMaxDiff (raw: obj) : Result<MaxDiffObservation, DecodeError> =
         // A JS object reaches the decoder directly; the decoder reads only plain fields.

@@ -1,12 +1,14 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider.Attempt
@@ -25,10 +27,6 @@ type PluginRuntimeScope
         PluginSessionScope(journal, isModelLeaseExternallyOwned, jsLifecyclePersistence)
 
     let recovery = PluginRecoveryScope(journal)
-    // DSL-MUTABLE: resource — session cleanup hook list registered by composition
-    let mutable sessionCleanups: (string -> unit) list = []
-    // DSL-MUTABLE: resource — scope dispose hook list registered by composition
-    let mutable scopeDisposers: (unit -> unit) list = []
 
     let toolRuntimeGate = obj ()
     // DSL-MUTABLE: resource — session tool runtime owner handle
@@ -38,7 +36,7 @@ type PluginRuntimeScope
     // DSL-MUTABLE: resource — shared terminal bus key
     let mutable sharedTerminalKey: string option = None
     // DSL-MUTABLE: resource — shared terminal bus port handle
-    let mutable sharedTerminalPort: Events.HostEventPort option = None
+    let mutable sharedTerminalPort: ISessionTerminalSource option = None
     let disposeGate = obj ()
     let ownedWorkGate = obj ()
     // DSL-MUTABLE: resource — scope dispose latch
@@ -90,10 +88,6 @@ type PluginRuntimeScope
     let mutable loopSensor: ILoopSensor option = None
     // DSL-MUTABLE: resource — message-visibility hub attachment slot
     let mutable messageVisibility: MessageVisibilityHub option = None
-    // DSL-MUTABLE: resource — the ONE attachment lease registry shared by every kind
-    let mutable attachmentRegistry: AttachmentLeaseRegistry option = None
-    // DSL-MUTABLE: resource — Companion kind adapter over that registry
-    let mutable companionLeases: CompanionLeaseRuntime option = None
     // DSL-MUTABLE: resource — sync-delegate runtime attachment slot
     let mutable syncDelegateRuntime: SyncDelegateRuntime option = None
     // DSL-MUTABLE: resource — event-driven managed chat recovery owner
@@ -158,34 +152,12 @@ type PluginRuntimeScope
 
     member _.MarkRestartGuidanceDelivered() = restartGuidancePending <- false
 
-    member _.AttachSessionCleanup(cleanup: string -> unit) =
-        sessionCleanups <- cleanup :: sessionCleanups
-
-    member _.AttachScopeDispose(dispose: unit -> unit) =
-        scopeDisposers <- dispose :: scopeDisposers
-
 
     /// Composition-of-owners: per-instance session registries live in their own scope.
     member _.Sessions = sessions
 
     /// Composition-of-owners: family recovery + attempt planning live in their own scope.
     member _.Recovery = recovery
-
-    /// The single lifecycle owner's registry: one instance per plugin, attached by
-    /// Host composition and shared by every AttachmentKind adapter.
-    member _.AttachAttachmentRegistry(registry: AttachmentLeaseRegistry) = attachmentRegistry <- Some registry
-
-    member _.AttachmentRegistry =
-        match attachmentRegistry with
-        | Some registry -> registry
-        | None -> invalidOp "AttachmentLeaseRegistry has not been attached"
-
-    member _.AttachCompanionLeases(runtime: CompanionLeaseRuntime) = companionLeases <- Some runtime
-
-    member _.CompanionLeases =
-        match companionLeases with
-        | Some runtime -> runtime
-        | None -> invalidOp "CompanionLeaseRuntime has not been attached"
 
     member _.AttachSyncDelegateRuntime(runtime: SyncDelegateRuntime) = syncDelegateRuntime <- Some runtime
 
@@ -235,22 +207,12 @@ type PluginRuntimeScope
 
     member _.RevokeManualIntervention(key: ChatExecutionKey) : unit = recovery.RevokeManualIntervention key
 
-    member this.RecordPendingAttemptPlan
-        (sessionId: SessionId)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        (plan: PendingAttemptPlan)
-        =
-        recovery.RecordPendingAttemptPlan sessionId physicalUserMessageId plan
-
     member this.TryBindAttemptPlan
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
         (providerRun: ProviderRunIdentity)
         =
         recovery.TryBindAttemptPlan sessionId physicalUserMessageId providerRun
-
-    member this.RecordAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
-        recovery.RecordAttemptPlan sessionId providerRun plan
 
     member this.TryAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
         recovery.TryAttemptPlan sessionId providerRun
@@ -377,7 +339,7 @@ type PluginRuntimeScope
             return lock ownedWorkGate (fun () -> backgroundFailure)
         }
 
-    member _.AttachSharedTerminal(key: string option, port: Events.HostEventPort option) =
+    member _.AttachSharedTerminal(key: string option, port: ISessionTerminalSource option) =
         sharedTerminalKey <- key
         sharedTerminalPort <- port
 
@@ -448,9 +410,6 @@ type PluginRuntimeScope
 
             attemptSync (fun () -> recovery.ClearSession sessionId)
 
-            for cleanup in List.rev sessionCleanups do
-                attemptSync (fun () -> cleanup sessionId)
-
             attemptSync (fun () -> this.LoopSensor.DropSession(SessionId.create sessionId))
 
             attemptSync (fun () -> recovery.ClearAttemptPlansFor sessionId)
@@ -512,9 +471,6 @@ type PluginRuntimeScope
             remember (captureSyncFailure (fun () -> sessions.Dispose()))
             remember (captureSyncFailure (fun () -> syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())))
             syncDelegateRuntime <- None
-
-            for dispose in List.rev scopeDisposers do
-                remember (captureSyncFailure dispose)
 
 
             // managed-session-lifecycle-018: the shared durable substrate is the last owner

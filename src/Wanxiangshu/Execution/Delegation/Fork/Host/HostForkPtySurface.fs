@@ -11,6 +11,9 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Participant.ManagedAgents
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Process
 

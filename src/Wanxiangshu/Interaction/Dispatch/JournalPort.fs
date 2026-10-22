@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
 open Wanxiangshu.Persistence.Journal.JournalOutcome
+open Wanxiangshu.Execution.Session
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
@@ -10,6 +11,14 @@ open Wanxiangshu.Interaction.Authority
 type IPromptJournal =
     abstract RuntimeId: RuntimeId
     abstract ProjectionFor: sessionId: SessionId -> PromptAuthority.PromptAuthorityProjection
+
+    /// Actual ownership from a live attachment lease or a durable association.
+    /// Missing evidence does not prove a lifecycle; restart must re-establish
+    /// any live lease before using its ownership.
+    abstract OwnershipEvidenceFor: sessionId: SessionId -> SessionOwnership option
+
+    /// A live producer's exact ownership proof for an InternalLeaf child.
+    abstract InternalLeafOwnerFor: sessionId: SessionId -> SessionId option
 
     abstract Append:
         sessionId: SessionId ->

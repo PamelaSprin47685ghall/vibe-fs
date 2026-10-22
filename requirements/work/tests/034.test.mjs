@@ -467,7 +467,8 @@ test('WHAT[work-034] Plan relays an explicit view, keeps physical originals, and
             status: 'completed',
             input: {
               program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-              prefixUntil: 1, thenMap: { 1: declaredExtra },
+              prefixUntil: 1,
+              thenMap: { 1: declaredExtra },
             },
             output: 'ok',
           },
@@ -478,7 +479,8 @@ test('WHAT[work-034] Plan relays an explicit view, keeps physical originals, and
     await hooks.tool['todowrite-for-plan'].execute(
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        prefixUntil: 1, thenMap: { 1: declaredExtra },
+        prefixUntil: 1,
+        thenMap: { 1: declaredExtra },
       },
       { sessionID, agent: 'plan', callID: 'call-034-view', messageID: 'run-034-view', providerRunID: 'run-034-view' },
     )

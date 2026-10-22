@@ -198,12 +198,17 @@ const withCompletedEngineer = async (action, { beforeCreate } = {}) => {
         accepted: true, providerStarted: false, terminal: false, disposition: null,
       })
 
+      const program = `class Js extends JsProgram { async run() { await this.deliver({ 0: ${JSON.stringify(answer)} }); } }`
       const assistant = { info: {
         id: 'd0p-assistant-run', sessionID: sent.child, parentID: physicalInfo.id,
         role: 'assistant', agent: 'engineer',
         providerID: physicalInfo.model.providerID, modelID: physicalInfo.model.modelID,
         time: { created: 2 },
-      }, parts: [] }
+      }, parts: [
+        { id: 'd0p-answer-part', type: 'text', text: answer },
+        { id: 'd0p-delivery-part', type: 'tool', tool: 'todowrite-for-engineer',
+          callID: 'd0p-delivery', state: { status: 'pending', input: { program } } },
+      ] }
       runtime.pushHostMessage(sent.child, assistant)
       const user = { info: { ...physicalInfo, sessionID: sent.child, agent: 'engineer' },
         parts: physicalParts }
@@ -213,17 +218,24 @@ const withCompletedEngineer = async (action, { beforeCreate } = {}) => {
         accepted: true, providerStarted: true, terminal: false, disposition: null,
       })
 
-      assistant.parts.push({ id: 'd0p-answer-part', type: 'text', text: answer })
-      assistant.parts.push({ id: 'd0p-delivery-part', type: 'tool', tool: 'todowrite-for-engineer',
-        callID: 'd0p-delivery', state: { status: 'running', input: {} } })
-      const delivered = await hooks.tool['todowrite-for-engineer'].execute({
-        program: `class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: { 0: ${JSON.stringify(answer)} } }) } }`,
-      }, { sessionID: sent.child, agent: 'engineer', messageID: assistant.info.id,
+      await hooks.event({ event: { type: 'message.updated', properties: { info: assistant.info } } })
+      const delivered = await hooks.tool['todowrite-for-engineer'].execute({ program }, {
+        sessionID: sent.child, agent: 'engineer', messageID: assistant.info.id,
         providerRunID: assistant.info.id, callID: 'd0p-delivery' })
       assert.match(delivered, /^# ok\b/m)
+      assistant.parts[1].state = { status: 'completed', input: { program }, output: delivered }
       assistant.info.time.completed = 3
-      assistant.info.finish = 'stop'
+      assistant.info.finish = 'tool-calls'
       await hooks.event({ event: { type: 'message.updated', properties: { info: assistant.info } } })
+
+      const terminalAssistant = { info: {
+        id: 'd0p-assistant-terminal', sessionID: sent.child, parentID: physicalInfo.id,
+        role: 'assistant', agent: 'engineer',
+        providerID: physicalInfo.model.providerID, modelID: physicalInfo.model.modelID,
+        time: { created: 4, completed: 5 }, finish: 'stop',
+      }, parts: [{ id: 'd0p-terminal-answer-part', type: 'text', text: answer }] }
+      runtime.pushHostMessage(sent.child, terminalAssistant)
+      await hooks.event({ event: { type: 'message.updated', properties: { info: terminalAssistant.info } } })
       await hooks.event({ event: { type: 'session.idle', properties: { sessionID: sent.child } } })
       const result = await invocation
       assert.equal(result.ok, true, result.reason)
@@ -236,9 +248,9 @@ const withCompletedEngineer = async (action, { beforeCreate } = {}) => {
 
       const trace = semanticTrace.snapshot(runtime.journal, sent.child)
       assert.equal(semanticTrace.hasOpening(trace), true)
-      const terminal = semanticTrace.terminalEvidenceForProviderRun(assistant.info.id, trace)
+      const terminal = semanticTrace.terminalEvidenceForProviderRun(terminalAssistant.info.id, trace)
       assert.ok(terminal)
-      assert.equal(terminal.providerRun, assistant.info.id)
+      assert.equal(terminal.providerRun, terminalAssistant.info.id)
       assert.deepEqual(terminal.frontier, semanticTrace.headCursor(trace))
       assert.ok(terminal.frontier.sequence > 0)
       assert.match(terminal.textRef, /^blobs\/[0-9a-f]{64}$/)

@@ -292,15 +292,15 @@ const CONTROLLED_PUBLIC_TYPES = Object.freeze([
   'BorrowingCapacity',
 ])
 const OWNER_FILES = Object.freeze([
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs',
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs',
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs',
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs',
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelCapacity/Model.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelCapacity/Ledger.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelCapacity/Queue.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelCapacity/Borrowing.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelCapacity/Surface.fs',
 ])
 const PERMITTED_CONSUMER_FILES = Object.freeze([
   ...OWNER_FILES,
-  'src/Wanxiangshu/OpenCode/Host/ModelRouting.fs',
+  'src/Wanxiangshu/Execution/Routing/ModelRouting.fs',
 ])
 
 test('WHAT[execution-model-routing-010] EMR_010_model_capacity_owner_defines_all_private_borrowing_knowledge', async () => {
@@ -631,26 +631,45 @@ const source = async (relative) => readFile(new URL(`../../../${relative}`, impo
 test('WHAT[execution-model-routing-010] EMR_010_borrowing_complexity_is_owned_only_by_the_capacity_decorator', async () => {
   const capacity = (
     await Promise.all([
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs'),
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs'),
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs'),
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs'),
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs'),
+      source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Model.fs'),
+      source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Ledger.fs'),
+      source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Queue.fs'),
+      source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Borrowing.fs'),
+      source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Surface.fs'),
     ])
   ).join('\n')
-  const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
+  const adapter = await source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Borrowing.fs')
+  const model = await source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Model.fs')
+  const queue = await source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Queue.fs')
+  const permits = await source('src/Wanxiangshu/Execution/Routing/ModelCapacity/Surface.fs')
+  const routing = await source('src/Wanxiangshu/Execution/Routing/ModelRouting.fs')
   const sessions = await source('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const binding = await source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
   const transform = await source('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const scheduler = await source('resources/wanxiangshu.mjs')
 
-  assert.match(capacity, /type internal CapacityLedger<'target>/)
   assert.match(capacity, /type internal BorrowingCapacity<'target>/)
-  assert.match(capacity, /routeDecision/)
-  assert.match(capacity, /CapacityCreditState/)
+  // The verified Int64 owner remains until the extracted capacity ABI can carry
+  // its credits, fences and queue sequences without float narrowing.
+  assert.match(adapter, /ledger: CapacityLedger<'target>/)
+  assert.match(adapter, /type private CapacityCreditState/)
+  assert.doesNotMatch(adapter, /Import\("CapacityBorrowing", "wanxiangli\/borrowing"\)/)
+  for (const identity of ['CapacityCreditId', 'CapacityLeaseId', 'CapacityFence', 'QueueNodeId', 'QueueFence']) {
+    assert.match(model, new RegExp(`type internal ${identity} = private ${identity} of int64`))
+  }
+  assert.match(queue, /Sequence: int64/)
+  assert.match(permits, /Import\("ExecutionPermits", "wanxiangli\/permit"\)/)
+  assert.match(permits, /credit: int64/)
+  assert.match(permits, /fence: int64/)
+  assert.match(permits, /new WeakMap\(\)/)
+  assert.match(permits, /obj\.ReferenceEquals\(projected, box lease\)/)
   assert.match(routing, /BorrowingCapacity<ModelRoutingTarget>/)
   assert.doesNotMatch(routing, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution/)
+  // CUT-10 ⑥a: the provider-run witness, run step identity and recovery retry binding are owned by
+  // wanxiangli/run-witness; the host runtime must not keep its own maps for them.
+  assert.match(routing, /Import\("ProviderRunWitness", "wanxiangli\/run-witness"\)/)
+  assert.doesNotMatch(routing, /targetByProviderRun|latestProviderRunBySession|providerStepIdentityByRun|recoveryRetryTargetBySession/)
 
   for (const main of [sessions, binding, transform, host]) {
     assert.doesNotMatch(main, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution|CapacityCreditState|CapacityStepDemand/)
@@ -668,10 +687,24 @@ const root = new URL('../../../', import.meta.url)
 const source = (path) => readFile(new URL(path, root), 'utf8')
 
 test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_current_provider_step_before_tool_body', async () => {
-  const [binding, registry] = await Promise.all([
+  const [binding, hostRegistry, registry] = await Promise.all([
     source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs'),
     source('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs'),
+    // The execute gate is product code behind the host-neutral tool port; the
+    // OpenCode registry wraps every registered tool body in it.
+    source('src/Wanxiangshu/Execution/Tool/ExecuteGate.fs'),
   ])
+
+  assert.match(
+    hostRegistry,
+    /baseSpecs \|> List\.map \(fun spec -> \{ spec with Execute = gateExecute spec \}\)/,
+    'every registered tool body is wrapped by the gate',
+  )
+  assert.match(
+    hostRegistry,
+    /let gateExecute[\s\S]*Execute = spec\.Execute[\s\S]*ToolExecuteGate\.execute gateFacts gated managerPermission args ctx/,
+    'the host registry delegates the original tool body to the product execute gate',
+  )
 
   // The tool context carries this call's own exact ProviderRunIdentity. The
   // physical message it answers comes from the ModelRouting relation the
@@ -686,7 +719,7 @@ test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_
   const boundaryCall = 'ModelRouting.tryProviderStepIdentity'
   const boundaryIndex = registry.indexOf(boundaryCall)
 
-  assert.ok(boundaryIndex >= 0, 'ToolRegistry must cross the provider→tool capacity boundary')
+  assert.ok(boundaryIndex >= 0, 'the execute gate must cross the provider→tool capacity boundary')
   assert.match(
     registry,
     /let (?:private )?endObservedStep[\s\S]*ModelRouting\.tryProviderStepIdentity[\s\S]*ModelRouting\.endProviderStep/,
@@ -705,22 +738,27 @@ test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_
   assert.match(
     registry,
     /let (?:private )?runAfterAblation[\s\S]*admissionStage gate spec managerPermission args ctx[\s\S]*let (?:private )?runBoundaryStages[\s\S]*match! ablationStage spec ctx with[\s\S]*runAfterAblation gate spec managerPermission args ctx/,
-    'ablation and role/admission gates remain downstream of the provider boundary',
+    'ablation and admission remain downstream of the provider boundary',
   )
   assert.match(
     registry,
-    /match spec\.Admission with[\s\S]*OfficeRole[\s\S]*officeStage[\s\S]*PrivateAttachment[\s\S]*attachmentStage/,
-    'the declared tool authority, not a guessed one, selects the admission path downstream of the boundary',
+    /match ToolAdmissionTable\.tryAdmission spec\.Name with[\s\S]*OfficeRole[\s\S]*officeStage[\s\S]*PrivateAttachment[\s\S]*attachmentStage/,
+    'the declared tool authority selects the downstream admission path',
   )
   assert.match(
     registry,
-    /let (?:private )?executeAdmittedRole[\s\S]*spec\.Execute args ctx/,
-    'after the outer handoff and gates, ToolRegistry still delegates to the original tool body',
+    /let (?:private )?executeAdmittedRole[\s\S]*executeToolBody spec args ctx/,
+    'the admitted public role reaches the original tool body',
   )
   assert.match(
     registry,
-    /let (?:private )?attachmentStage[\s\S]*attachmentAdmission ctx[\s\S]*spec\.Execute args ctx/,
-    'an internal leaf tool also reaches the original body only after the provider boundary',
+    /let (?:private )?attachmentStage[\s\S]*ToolAdmissionTable\.privateAttachmentAdmitsForSession spec\.Name ctx\.SessionId[\s\S]*executeToolBody spec args ctx/,
+    'the internal leaf reaches the original body after attachment admission',
+  )
+  assert.match(
+    registry,
+    /let (?:private )?executeToolBody[\s\S]*spec\.Execute args ctx/,
+    'the common tool body stage executes the original specification',
   )
 
   const boundarySlice = registry.slice(Math.max(0, boundaryIndex - 500), boundaryIndex + 1000)
@@ -975,4 +1013,49 @@ test('WHAT[execution-model-routing-010] EMR_010_provider_step_reentry_with_same_
   releasePhysicalExecution(runtime, 'waiter-1', 'msg-w1')
   releasePhysicalExecution(runtime, 'waiter-2', 'msg-w2')
 })
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+
+// 行为断言（走 dist 公共面）：工具执行门在工具体之前结束本次 provider step，
+// 结束它用的是「本次 run 自己的」物理消息关系，而不是 session 当前绑定的物理消息。
+// 这条断言不读源码：它只走 ModelRoutingSurface 的公共读写面。
+test('WHAT[execution-model-routing-010] EMR_010_provider_step_ends_on_the_runs_own_physical_message_not_the_session_current_one', async () => {
+  const runtime = routing.createRuntime(() => ({ model: 'provider/shared', reasoning: 'none' }));
+
+  // 权威的 Host start 观察写下：run-1 回答的是 msg-run-1。
+  routing.rememberProviderStepIdentity(runtime, 'session-a', 'msg-run-1', 'run-1');
+
+  const observed = routing.tryProviderStepIdentity(runtime, 'run-1');
+  assert.notEqual(observed, null, 'an observed run resolves its own physical message');
+  assert.equal(observed.sessionId, 'session-a');
+  assert.equal(
+    observed.physicalUserMessageId,
+    'msg-run-1',
+    'the run resolves the physical message the Host stated for that run',
+  );
+
+  // 另一个 run 回答另一条物理消息：读取必须精确到 run，绝不退回 session 当前绑定。
+  routing.rememberProviderStepIdentity(runtime, 'session-a', 'msg-run-2', 'run-2');
+  const second = routing.tryProviderStepIdentity(runtime, 'run-2');
+  assert.equal(second.physicalUserMessageId, 'msg-run-2');
+
+  // 本进程从未观察过的 run 读不到任何关系（不是「回退到 session 当前物理消息」）。
+  assert.equal(
+    routing.tryProviderStepIdentity(runtime, 'run-unobserved'),
+    null,
+    'an unobserved run has no step to end and never falls back to a session-current binding',
+  );
+
+  // 结束 provider step：结束的正是该 run 自己的那条关系。
+  routing.endProviderStep(runtime, 'session-a', 'msg-run-1', 'run-1');
+  assert.equal(
+    routing.tryProviderStepIdentity(runtime, 'run-2')?.physicalUserMessageId,
+    'msg-run-2',
+    'ending one run’s step never touches another run’s relation',
+  );
+});
 }

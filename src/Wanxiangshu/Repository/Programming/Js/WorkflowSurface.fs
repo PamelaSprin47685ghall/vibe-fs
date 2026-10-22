@@ -3,7 +3,6 @@ namespace Wanxiangshu.Repository.Programming.Js
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// Opaque workflow outcome. The semantic observation functions expose the
 /// commit report and failure algebra without leaking JsToolOutcome's union.
@@ -126,6 +125,12 @@ module JsWorkflowSurface =
                 let! outcome =
                     JsToolWorkflow.execute
                         sessionId
+                        // The harness runs a program outside any host call: it
+                        // holds no provider run and no tool call of its own,
+                        // so there is no fence to bind here. Its deliveries
+                        // land as render caches — presentable, never delivery
+                        // evidence. A harness that does know the calling
+                        // identity passes it in place of this `None`.
                         None
                         surface.Capabilities
                         workspaceRoot

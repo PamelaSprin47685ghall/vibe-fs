@@ -11,14 +11,12 @@ module ManagedAgentCatalog =
     val allPublicRoles: Role list
     val allInternalRoles: Role list
     val managerForkableRoles: Role list
-    val bookkeeperNames: string list
     val bookkeeperName: string
     val isBookkeeperName: string -> bool
     val isRoleName: string -> bool
     val requiredNames: string list
     val managerForkableNames: string list
     val orchestratorForkableNames: string list
-    val engineerToolNames: string list
     val legacyAgentNames: Set<string>
     val isLegacyAgentName: string -> bool
     val formatLegacyNameNotSupported: string -> string

@@ -1,12 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 import * as events from '../../../dist/OpenCode/Host/EventsSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as delivery from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { withSyncRuntime } from './support/sync-runtime.mjs'
 import { runRecoveryProcess } from './support/recovery-process.mjs'
 import { runGuardRecoveryProcess } from './support/guard-recovery-process.mjs'
 import { runRepairRecoveryProcess } from './support/repair-recovery-process.mjs'
+
+const deliverTo = (runtime, owner, providerRun, material) =>
+  sync.deliverCurrent(runtime, owner, 'Engineer', providerRun, `call-${providerRun}`, material, { 0: material })
 
 test('WHAT[delegation-025] an invocation completes from its own genuinely accepted production retry successor', async t => {
   const receipt = await runRecoveryProcess('own-retry', t.signal, message => t.diagnostic(message))
@@ -14,7 +22,9 @@ test('WHAT[delegation-025] an invocation completes from its own genuinely accept
   assert.notEqual(receipt.successor.physicalUserMessageId, receipt.initial.physicalUserMessageId)
   assert.equal(receipt.successor.authorityRootUserMessageId, receipt.initial.authorityRootUserMessageId)
   assert.equal(receipt.result.value.physicalUserMessageId, receipt.successor.physicalUserMessageId)
-  assert.equal(receipt.result.value.formalText, 'RECOVERY-FORMAL-ANSWER')
+  assert.equal(receipt.result.value.view, receipt.deliveredView)
+  assert.equal(receipt.result.value.turnFormalText, 'RECOVERY-FORMAL-ANSWER')
+  assert.match(receipt.deliveredView, /RECOVERY-FORMAL-ANSWER/)
   assert.equal(receipt.promptCount, 2)
   assert.equal(receipt.childCount, 1)
 })
@@ -43,6 +53,7 @@ test('WHAT[delegation-025] late failure from a previous root cannot settle a reu
     const first = sync.invoke(runtime, owner, 'Engineer', 'FIRST')
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
     assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 0), true)
+    await deliverTo(runtime, owner, 'run-first', 'FIRST-ANSWER')
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'FIRST-ANSWER', 'run-first'), true)
     assert.equal((await first).ok, true)
     const second = sync.invoke(runtime, owner, 'Engineer', 'SECOND')
@@ -93,6 +104,104 @@ const stillPendingObserved = async promise => Promise.race([
   new Promise(resolve => setImmediate(() => resolve('pending'))),
 ])
 
+for (const reused of [false, true]) {
+  test(`WHAT[delegation-025] exact Host settlement failure closes only its ${reused ? 'reused tool-call continuation' : 'fresh completed attempt'} without completing durable work`, async () => {
+    const owner = `observed-settlement-failure-${reused ? 'reused' : 'fresh'}`
+    const directory = mkdtempSync(join(tmpdir(), 'wxs-delegation-settlement-'))
+    const runtime = await sync.create(directory, [{ sessionId: owner, agent: 'manager' }])
+    try {
+      const first = sync.startObserved(runtime, owner, 'FIRST-SETTLEMENT')
+      await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
+      assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 0, dispatch.admittedWithPhysicalMessage(`${owner}-physical-1`)), true)
+      const firstAdmission = await sync.observedAdmission(first)
+      assert.equal(firstAdmission.kind, 'Accepted')
+
+      let execution = first
+      let accepted = firstAdmission
+      let count = 1
+      if (reused) {
+        await deliverTo(runtime, owner, `${owner}-provider-1`, 'FIRST-DONE')
+        assert.equal(await sync.settleExactTerminal(runtime, firstAdmission.sessionId, firstAdmission.physicalUserMessageId, firstAdmission.authorityRootUserMessageId, `${owner}-provider-1`, 'FIRST-DONE', ''), true)
+        assert.equal((await sync.observedCompletion(first)).ok, true)
+        execution = sync.startObserved(runtime, owner, 'SECOND-SETTLEMENT')
+        count = 2
+        await sync.awaitPromptCount(runtime, owner, 'Engineer', count)
+        assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 1, dispatch.admittedWithPhysicalMessage(`${owner}-physical-2`)), true)
+        accepted = await sync.observedAdmission(execution)
+        assert.equal(accepted.kind, 'Accepted')
+        assert.equal(accepted.sessionId, firstAdmission.sessionId)
+        assert.equal(accepted.authorityRootUserMessageId, firstAdmission.authorityRootUserMessageId)
+        assert.notEqual(accepted.physicalUserMessageId, firstAdmission.physicalUserMessageId)
+        assert.equal(sync.promptOrigin(runtime, owner, 'Engineer', 1), 'ManagedDelegationAssignment')
+      }
+
+      const completion = sync.observedCompletion(execution)
+      const provider = `${owner}-provider-${count}`
+      const view = await deliverTo(runtime, owner, provider, 'DELIVERED-BEFORE-SETTLEMENT-FAULT')
+      const fence = delivery.deliveredFenceOf(accepted.sessionId)
+      assert.equal(delivery.deliveredValue(accepted.sessionId), view)
+      assert.equal(fence.providerRun, provider)
+      assert.ok(fence.toolCallId)
+      const returned = delivery.deliveredReturned(accepted.sessionId)
+      const snapshot = () => sync.withJournal(runtime, async handle => journal.JournalSurface_snapshot(handle))
+      const before = await snapshot()
+      const eventsDirectory = join(directory, 'wanxiangshu', 'events')
+      const durableBytes = () => readdirSync(eventsDirectory).filter(name => name.endsWith('.ndjson')).sort()
+        .map(name => [name, readFileSync(join(eventsDirectory, name), 'utf8')])
+      const bytesBefore = durableBytes()
+      const finish = reused ? 'tool-calls' : 'stop'
+      const reason = 'provider success commit failed: actual append outcome unknown'
+      const fail = (physical, root, failure = reason) => sync.observeExactAttemptSettlementFailure(
+        runtime, accepted.sessionId, physical, root, provider, finish, failure,
+      )
+
+      assert.equal(await fail(accepted.physicalUserMessageId, `${accepted.authorityRootUserMessageId}-wrong`), false)
+      assert.equal(await fail(reused ? firstAdmission.physicalUserMessageId : `${owner}-unaccepted`, accepted.authorityRootUserMessageId), false)
+      assert.equal(await stillPendingObserved(completion), 'pending')
+      if (reused) {
+        assert.equal(await sync.failWithAuthorityRoot(runtime, owner, 'Engineer', 'coarse same-root failure', accepted.authorityRootUserMessageId), 'Ignored')
+        assert.equal(await stillPendingObserved(completion), 'pending')
+      }
+
+      assert.equal(await fail(accepted.physicalUserMessageId, accepted.authorityRootUserMessageId), true)
+      assert.deepEqual(await completion, { ok: false, error: `SyncDelegate run failed: ${reason}` })
+      assert.equal(await fail(accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'duplicate settlement failure'), false)
+      assert.equal(sync.retryCalls(runtime), 0)
+      assert.equal(sync.promptCount(runtime, owner, 'Engineer'), count)
+      assert.equal(sync.terminalListenerCount(runtime), 0)
+      assert.equal(delivery.deliveredValue(accepted.sessionId), view)
+      assert.deepEqual(delivery.deliveredFenceOf(accepted.sessionId), fence)
+      assert.deepEqual(delivery.deliveredReturned(accepted.sessionId), returned)
+      assert.deepEqual(await snapshot(), before, 'settlement failure must keep the durable projection unchanged')
+      assert.deepEqual(durableBytes(), bytesBefore, 'settlement failure must not append a completion or any other durable fact')
+
+      const successor = sync.startObserved(runtime, owner, 'AFTER-SETTLEMENT-FAULT')
+      const successorCompletion = sync.observedCompletion(successor)
+      await sync.awaitPromptCount(runtime, owner, 'Engineer', count + 1)
+      assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', count, dispatch.admittedWithPhysicalMessage(`${owner}-physical-next`)), true)
+      const successorAdmission = await sync.observedAdmission(successor)
+      assert.equal(successorAdmission.kind, 'Accepted')
+      assert.equal(successorAdmission.authorityRootUserMessageId, accepted.authorityRootUserMessageId)
+      assert.notEqual(successorAdmission.physicalUserMessageId, accepted.physicalUserMessageId)
+      assert.equal(await fail(accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'late previous settlement failure'), false)
+      assert.equal(await stillPendingObserved(successorCompletion), 'pending')
+      const successorView = await deliverTo(runtime, owner, `${owner}-provider-next`, 'AFTER-FAULT-DONE')
+      assert.equal(await sync.settleExactTerminal(runtime, successorAdmission.sessionId, successorAdmission.physicalUserMessageId, successorAdmission.authorityRootUserMessageId, `${owner}-provider-next`, 'AFTER-FAULT-DONE', ''), true)
+      const result = await successorCompletion
+      assert.equal(result.ok, true)
+      assert.equal(result.value.view, successorView)
+      assert.equal(result.value.turnFormalText, 'AFTER-FAULT-DONE')
+      assert.deepEqual(await completion, { ok: false, error: `SyncDelegate run failed: ${reason}` })
+      assert.equal(sync.retryCalls(runtime), 0)
+      assert.equal(sync.childCount(runtime), 1)
+      assert.equal(sync.terminalListenerCount(runtime), 0)
+    } finally {
+      sync.dispose(runtime)
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
 test('WHAT[delegation-025] observed Engineer execution publishes the exact admitted prompt and causal formal terminal after the existing workflow', async () => {
   observedApiRequired()
   const owner = 'observed-engineer-exact'
@@ -121,7 +230,7 @@ test('WHAT[delegation-025] observed Engineer execution publishes the exact admit
       authorityRootUserMessageId: 'actual-observed-physical-1',
     })
     assert.equal(await stillPendingObserved(completion), 'pending')
-    sync.recordDeliveredValue(sent.sessionId, 'FORMAL-ONLY')
+    const deliveredView = await deliverTo(runtime, owner, 'actual-observed-provider-run-1', 'FORMAL-ONLY')
     assert.equal(await sync.settleExactTerminal(runtime, sent.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'actual-observed-provider-run-1', 'FORMAL-ONLY', 'REASONING-ONLY'), true)
     assert.deepEqual(await completion, {
       ok: true,
@@ -130,7 +239,8 @@ test('WHAT[delegation-025] observed Engineer execution publishes the exact admit
         physicalUserMessageId: 'actual-observed-physical-1',
         authorityRootUserMessageId: 'actual-observed-physical-1',
         providerRun: 'actual-observed-provider-run-1',
-        formalText: 'FORMAL-ONLY',
+        view: deliveredView,
+        turnFormalText: 'FORMAL-ONLY',
       },
     })
     assert.equal(sync.terminalListenerCount(runtime), 0)
@@ -146,7 +256,7 @@ test('WHAT[delegation-025] observed invocations reuse a child while preserving d
     assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 0, dispatch.admittedWithPhysicalMessage('observed-reuse-physical-1')), true)
     const firstAdmission = await sync.observedAdmission(first)
     assert.equal(firstAdmission.kind, 'Accepted')
-    sync.recordDeliveredValue(firstAdmission.sessionId, 'FIRST-FORMAL')
+    await deliverTo(runtime, owner, 'observed-reuse-run-1', 'FIRST-FORMAL')
     assert.equal(await sync.settleExactTerminal(runtime, firstAdmission.sessionId, firstAdmission.physicalUserMessageId, firstAdmission.authorityRootUserMessageId, 'observed-reuse-run-1', 'FIRST-FORMAL', ''), true)
     const firstResult = await sync.observedCompletion(first)
     assert.equal(firstResult.ok, true)
@@ -163,11 +273,12 @@ test('WHAT[delegation-025] observed invocations reuse a child while preserving d
     assert.equal(await stillPendingObserved(secondCompletion), 'pending')
     assert.equal(await sync.failWithAuthorityRoot(runtime, owner, 'Engineer', 'stale coarse failure', firstAdmission.authorityRootUserMessageId), 'Ignored')
     assert.equal(await stillPendingObserved(secondCompletion), 'pending')
-    sync.recordDeliveredValue(secondAdmission.sessionId, 'SECOND-FORMAL')
+    const deliveredView = await deliverTo(runtime, owner, 'observed-reuse-run-2', 'SECOND-FORMAL')
     assert.equal(await sync.settleExactTerminal(runtime, secondAdmission.sessionId, secondAdmission.physicalUserMessageId, secondAdmission.authorityRootUserMessageId, 'observed-reuse-run-2', 'SECOND-FORMAL', ''), true)
     const secondResult = await secondCompletion
     assert.equal(secondResult.ok, true)
-    assert.equal(secondResult.value.formalText, 'SECOND-FORMAL')
+    assert.equal(secondResult.value.view, deliveredView)
+    assert.equal(secondResult.value.turnFormalText, 'SECOND-FORMAL')
     assert.equal(secondResult.value.physicalUserMessageId, 'observed-reuse-physical-2')
     assert.equal(secondResult.value.providerRun, 'observed-reuse-run-2')
     assert.notEqual(secondResult.value.providerRun, firstResult.value.providerRun)
@@ -190,7 +301,7 @@ test('WHAT[delegation-025] rejection before dispatch settles both observed tasks
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 1)
     assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 0, dispatch.admittedWithPhysicalMessage('observed-active-first-physical')), true)
     const accepted = await sync.observedAdmission(first)
-    sync.recordDeliveredValue(accepted.sessionId, 'FIRST-DONE')
+    await deliverTo(runtime, owner, 'observed-active-first-run', 'FIRST-DONE')
     assert.equal(await sync.settleExactTerminal(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'observed-active-first-run', 'FIRST-DONE', ''), true)
     assert.equal((await sync.observedCompletion(first)).ok, true)
     assert.equal(sync.terminalListenerCount(runtime), 0)
@@ -223,7 +334,7 @@ for (const defect of ['wrong-root', 'previous-physical']) {
       await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
       assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 0, dispatch.admittedWithPhysicalMessage(`fallback-first-${defect}`)), true)
       const firstAdmission = await sync.observedAdmission(first)
-      sync.recordDeliveredValue(firstAdmission.sessionId, 'FIRST-DONE')
+      await deliverTo(runtime, owner, `fallback-first-run-${defect}`, 'FIRST-DONE')
       assert.equal(await sync.settleExactTerminal(runtime, firstAdmission.sessionId, firstAdmission.physicalUserMessageId, firstAdmission.authorityRootUserMessageId, `fallback-first-run-${defect}`, 'FIRST-DONE', ''), true)
       assert.equal((await sync.observedCompletion(first)).ok, true)
       const second = sync.startObserved(runtime, owner, 'FALLBACK-SECOND')
@@ -237,10 +348,12 @@ for (const defect of ['wrong-root', 'previous-physical']) {
       sync.recordDeliveredValue(accepted.sessionId, 'CURRENT-FALLBACK')
       assert.equal(sync.settleExactFallback(runtime, accepted.sessionId, physical, root, `fallback-stale-run-${defect}`, 'STALE-FALLBACK'), false)
       assert.equal(await stillPendingObserved(completion), 'pending')
+      const deliveredView = await deliverTo(runtime, owner, `fallback-current-run-${defect}`, 'CURRENT-FALLBACK')
       assert.equal(sync.settleExactFallback(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, `fallback-current-run-${defect}`, 'CURRENT-FALLBACK'), true)
       const result = await completion
       assert.equal(result.ok, true)
-      assert.equal(result.value.formalText, 'CURRENT-FALLBACK')
+      assert.equal(result.value.view, deliveredView)
+      assert.equal(result.value.turnFormalText, 'CURRENT-FALLBACK')
       assert.equal(result.value.physicalUserMessageId, accepted.physicalUserMessageId)
       assert.equal(result.value.providerRun, `fallback-current-run-${defect}`)
       assert.equal(sync.terminalListenerCount(runtime), 0)
@@ -257,12 +370,13 @@ test('WHAT[delegation-025] production completed-turn fallback settles its invoca
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
     assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 0, dispatch.admittedWithPhysicalMessage('fallback-single-physical')), true)
     const accepted = await sync.observedAdmission(execution)
-    sync.recordDeliveredValue(accepted.sessionId, 'FIRST-FALLBACK')
+    const deliveredView = await deliverTo(runtime, owner, 'fallback-first-provider-run', 'FIRST-FALLBACK')
     assert.equal(sync.settleExactFallback(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'fallback-first-provider-run', 'FIRST-FALLBACK'), true)
     assert.equal(sync.settleExactFallback(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'fallback-late-provider-run', 'LATE-FALLBACK'), false)
     const result = await completion
     assert.equal(result.ok, true)
-    assert.equal(result.value.formalText, 'FIRST-FALLBACK')
+    assert.equal(result.value.view, deliveredView)
+    assert.equal(result.value.turnFormalText, 'FIRST-FALLBACK')
     assert.equal(result.value.physicalUserMessageId, accepted.physicalUserMessageId)
     assert.equal(result.value.providerRun, 'fallback-first-provider-run')
     assert.equal(sync.terminalListenerCount(runtime), 0)

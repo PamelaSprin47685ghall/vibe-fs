@@ -14,7 +14,7 @@
 /src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs
 /src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
 /src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs
-/src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs
+/src/Wanxiangshu/Execution/Fission/Convergence.fs
 /src/Wanxiangshu/Interaction/Authority/Model.fs
 /resources/provider/runtime/degeneration-too-repetitive/**
 /resources/provider/runtime/degeneration-too-random/**

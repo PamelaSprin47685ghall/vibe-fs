@@ -115,8 +115,6 @@ module DurableWorkHost =
     val ownershipMessage: kind: string -> fields: (string * obj) list -> obj
     val leaseObject: lease: OwnershipLease -> obj
     val bindingObject: externalId: string -> incarnationId: string -> obj
-    val parseLease: value: obj -> OwnershipLease option
-    val parseBlockers: raw: obj -> OwnershipBlocker list
     val createOwnership: registryId: string -> records: string array -> obj
     val executeOwnershipInMemory: ownership: obj -> requestId: string -> message: obj -> HostReceipt
     val ownershipBlockersInMemory: ownership: obj -> scopeId: string -> OwnershipBlocker list

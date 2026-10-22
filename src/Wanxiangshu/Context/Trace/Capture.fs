@@ -25,7 +25,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
@@ -72,7 +72,7 @@ type XTraceStableCaptureEligibility =
     | DuplicateHostMessageIdentity
 
 type XTraceMessageObservation =
-    { Message: ProviderWireCapture.CapturedWireMessage
+    { Message: CapturedWire.CapturedWireMessage
       HostMessageId: string option
       PromptKey: PromptKey option
       Origin: PromptAuthority.PromptOrigin option }
@@ -959,7 +959,7 @@ module XTraceCapture =
     let captureMessageView
         (journal: AgentJournal option)
         (sessionId: SessionId)
-        (messages: ProviderWireCapture.CapturedWireMessage list)
+        (messages: CapturedWire.CapturedWireMessage list)
         : Task<XTraceProjectionState option> =
         messages
         |> List.map (fun message ->
@@ -984,7 +984,7 @@ module XTraceCapture =
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (messageIds: string list)
-        (messages: ProviderWireCapture.CapturedWireMessage list)
+        (messages: CapturedWire.CapturedWireMessage list)
         : Task<Result<XTraceProjectionState option, string>> =
         messages
         |> List.map (fun message ->
@@ -1005,7 +1005,7 @@ module XTraceCapture =
                       HostToolPartId = captured.HostToolPartId }) })
         |> captureSourcesStable journal sessionId messageIds
 
-    let private toCapturedWire (message: SessionMessage) : ProviderWireCapture.CapturedWireMessage =
+    let private toCapturedWire (message: SessionMessage) : CapturedWire.CapturedWireMessage =
         { Role = message.Role
           ProviderRun =
             if message.Role = "assistant" && not (String.IsNullOrWhiteSpace message.Id) then
@@ -1189,18 +1189,6 @@ module XTraceCapture =
         captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
             captureTerminalText journal sessionId text providerRun)
 
-    let captureTerminalBlobWithReceipt
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (textRef: BlobRef)
-        (textDigest: BlobDigest)
-        (providerRun: ProviderRunIdentity)
-        =
-        captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
-            match journal with
-            | None -> Task.FromResult(())
-            | Some durable -> captureTerminalBlobWhenFresh durable sessionId textRef textDigest providerRun)
-
     let captureTerminalWithReceipt (journal: AgentJournal option) (turn: ReconciledTurn) =
         captureUnitWithReceipt journal turn.SessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
             captureTerminal journal turn)
@@ -1326,7 +1314,7 @@ module XTraceCapture =
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (messageIds: string list option)
-        (messages: ProviderWireCapture.CapturedWireMessage list)
+        (messages: CapturedWire.CapturedWireMessage list)
         : Task<Result<XTraceCaptureReceipt, XTraceCaptureError>> =
         task {
             let observations =

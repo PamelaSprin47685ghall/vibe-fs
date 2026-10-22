@@ -20,6 +20,7 @@ type HandleAbandonReason =
     | ParentCancelled
     | DeadlineExceeded
     | HostSessionGone
+    | Voided
 
 [<RequireQualifiedAccess>]
 type FalseCompletionReason = | LegacyAbortWasObservation
@@ -67,7 +68,8 @@ type ExecutionFactCases =
     | HandleRetired of
         {| ParentSessionId: SessionId
            Handle: HandleId |}
-    /// crash-reconciliation-020: a child work run interrupted by a restart is void.
+    /// crash-reconciliation-020: a child work run interrupted by a restart is
+    /// void; the child run is closed and its handle is marked Abandoned(Voided).
     | ChildRunVoided of
         {| ParentSessionId: SessionId
            ChildSessionId: SessionId |}

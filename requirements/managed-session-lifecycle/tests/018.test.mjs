@@ -34,6 +34,12 @@ const journalBytes = directory => {
   return names.map(name => ({ name, bytes: readFileSync(join(events, name)) }))
 }
 
+const executionFacts = directory => journalBytes(directory)
+  .flatMap(({ bytes }) => bytes.toString('utf8').split('\n').filter(Boolean)
+    .map(line => JSON.parse(line).payload.Fact))
+  .filter(fact => fact[0] === 'Agent' && fact[1]?.[0] === 'Execution')
+  .map(fact => fact[1][1])
+
 for (const afterCommit of [false, true]) {
   test(`WHAT[managed-session-lifecycle-018] Drain receipt loss ${afterCommit ? 'after' : 'before'} COMMIT cannot skip local child observer release`, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-drain-observers-'))
@@ -273,9 +279,35 @@ test('WHAT[managed-session-lifecycle-018] real TurnAborted, retry, Fission and u
     try {
       assert.deepEqual(await forkTool.coldWorkSnapshot(directory, owner), durableAtExit,
         `${scenario.label}: a cold replay of the journal folds the exact same durable handle facts`)
+      const beforeLoadFacts = executionFacts(directory)
+      assert.equal(beforeLoadFacts.filter(fact => fact[0] === 'ChildWorkVoided').length, 0,
+        `${scenario.label}: neither the stop nor dispose voids the child work`)
 
       const b = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
       try {
+        const loadedLifecycle = scenario.expected === 'Active' ? 'Abandoned' : scenario.expected
+        const loadedWork = forkTool.workSnapshot(b, owner).find(work => work.root === first.root)
+        assert.deepEqual(loadedWork, {
+          ...durableAtExit.find(work => work.root === first.root),
+          lifecycle: loadedLifecycle,
+        }, `${scenario.label}: load settles the orphaned work without changing its identity or completion evidence`)
+        const loadedFacts = executionFacts(directory)
+        const voids = loadedFacts.filter(fact => fact[0] === 'ChildWorkVoided')
+        assert.equal(voids.length, scenario.expected === 'Active' ? 1 : 0,
+          `${scenario.label}: load voids exactly the active orphan and leaves a settled work unchanged`)
+        if (voids.length === 1) {
+          const payload = voids[0][1]
+          const linked = beforeLoadFacts.find(fact => fact[0] === 'HandleLinked'
+            && fact[1].ChildSessionId.at(-1) === first.child)
+          assert.ok(linked, `${scenario.label}: the orphan has a real durable child binding`)
+          assert.equal(payload.ParentSessionId.at(-1), owner)
+          assert.deepEqual(payload.Work.Handle, linked[1].Handle)
+          assert.equal(payload.Work.ChildSessionId.at(-1), first.child)
+          assert.equal(payload.Work.AuthorityRoot.at(-1), first.root)
+        }
+        assert.deepEqual(loadedFacts.filter(fact => fact[0] !== 'ChildWorkVoided'), beforeLoadFacts,
+          `${scenario.label}: load adds no completion or other execution fact`)
+
         const reEnlist = forkTool.executeManagerResume(b, toolModule, owner, '', 'Ada', `RE-ENLIST-${scenario.label}`)
         await forkTool.awaitPromptCount(b, 1)
         assert.equal(forkTool.acceptPrompt(b, 0), true)
@@ -288,16 +320,12 @@ test('WHAT[managed-session-lifecycle-018] real TurnAborted, retry, Fission and u
         const next = works.find(work => work.lifecycle === 'Active')
         assert.equal(next.handle, first.handle)
         assert.equal(next.child, first.child)
-        // A settled stop (fission) frees the byname for a new work root; an
-        // unsettled stop (Active) means the same work unit is resumed, so the
-        // root is reused — both preserve the durable handle binding.
-        if (scenario.expected === 'CompletedAwaitingJoin') {
-          assert.notEqual(next.root, first.root)
-        } else {
-          assert.equal(next.root, first.root)
-        }
-        assert.equal(works.find(work => work.root === first.root).lifecycle, scenario.expected,
-          `${scenario.label}: re-enlisting new work must not rewrite the stopped root's settled fact`)
+        assert.notEqual(next.root, first.root,
+          `${scenario.label}: resume admits a new charge instead of reviving the settled work`)
+        assert.deepEqual(works.find(work => work.root === first.root), loadedWork,
+          `${scenario.label}: re-enlisting new work must not rewrite the loaded work's settled fact`)
+        assert.deepEqual(executionFacts(directory).filter(fact => fact[0] === 'ChildWorkVoided'), voids,
+          `${scenario.label}: resume does not void the old work again`)
       } finally {
         await forkTool.disposeRuntime(b)
       }

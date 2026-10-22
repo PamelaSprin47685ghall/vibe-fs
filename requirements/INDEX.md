@@ -89,7 +89,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `obligation-ledger` | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的非空 `view` 声明；插件不改写工具定义与参数，只按 Host 终态追加 checkpoint，不维护第二份 todo 真相。 |
+| `obligation-ledger` | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的有效上下文整理声明（扁平 `prefixUntil` + `thenMap`）；插件不改写工具定义与参数，只按 Host 终态追加 checkpoint，不维护第二份 todo 真相。 |
 | `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，交棒由前任声明的 ANCHOR 视图承担，不注入机器物化的合成记录。Plan 的编程面、devops 调查、任期隔离、阶段资源、review 与持权交付，以及 Manager/Plan 禁止静默停止、ask 显式用户等待同属本包。 |
 
 
@@ -132,7 +132,7 @@
 | 7 | `causal-wait` | 9 | causal-wait-001 ~ 009 |
 | 8 | `session-ontology` | 14 | session-ontology-001 ~ 012、014 ~ 015 |
 | 9 | `managed-session-lifecycle` | 28 | managed-session-lifecycle-001 ~ 022、managed-session-lifecycle-023（身份替换后旧活跃会话显式收束）、managed-session-lifecycle-024（固定 DevOps 崩溃恢复单一权威与进程排空）、managed-session-lifecycle-025（固定 DevOps 每次工作返回时 PTY 进程彻底收束与记账清理）、managed-session-lifecycle-026（Main 收束级联 Attached InternalLeaf 的 execution 结算）、managed-session-lifecycle-027（Session 收束的作用域保留取消与延后归还）、managed-session-lifecycle-028（子完成投递必达与 join guard 有出口） |
-| 10 | `host-boundary` | 33 | host-boundary-001 ~ 031、host-boundary-032（Contract 提示字段解耦与参数清理安全）、host-boundary-033（旧租约保持到可见输入进入下一步与流式/非 join 工具保留） |
+| 10 | `host-boundary` | 34 | host-boundary-001 ~ 031、host-boundary-032（Contract 提示字段解耦与参数清理安全）、host-boundary-033（旧租约保持到可见输入进入下一步与流式/非 join 工具保留）、host-boundary-034（adapter 薄度棘轮与 Host 命名空间层级门禁） |
 | 11 | `participant-identity` | 10 | participant-identity-001 ~ 009、participant-identity-010（活跃身份解析与历史身份隔离解码） |
 | 12 | `execution-model-routing` | 20 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型）、execution-model-routing-020（多席位路由与外部占位模型被租约覆盖） |
 | 13 | `office-capability` | 13 | office-capability-001、003 ~ 007、011 ~ 012、015 ~ 016、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部标准 Engineer）、office-capability-019（Plan 规划角色与四工具权限集） |
@@ -149,14 +149,14 @@
 | 23 | `managed-chat-execution` | 15 | managed-chat-execution-001 ~ 014、managed-chat-execution-015（Provider 启动边界拒绝的精确定夺） |
 | 24 | `dispatch-protocol` | 15 | dispatch-protocol-001 ~ 015 |
 | 25 | `durable-events` | 28 | durable-events-001 ~ 028 |
-| 26 | `effect-accounting` | 10 | effect-accounting-001 ~ 008、010、012 |
+| 26 | `effect-accounting` | 11 | effect-accounting-001 ~ 008、010、012、013（交付成功不是效果） |
 | 27 | `durable-convergence` | 11 | durable-convergence-001 ~ 011 |
-| 28 | `delegation` | 30 | delegation-001 ~ 015、017、019 ~ 032 |
+| 28 | `delegation` | 31 | delegation-001 ~ 015、017、019 ~ 033（033：投递后中断前先以交付见证结算子运行，父方 join 仍收到返回） |
 | 58 | `advisor` | 6 | advisor-001 ~ 006（专席归属与家族根父级、law/view/intent 三材料独立 prompt、view 增量与已交付游标、无工具散文、无授权副作用、`js.advisor` 编程面成员） |
-| 29 | `intra-participant-parallelism` | 16 | intra-participant-parallelism-001 ~ 015、017 |
+| 29 | `intra-participant-parallelism` | 17 | intra-participant-parallelism-001 ~ 015、017 ~ 018 |
 | 30 | `process-execution` | 17 | process-execution-001 ~ 017；通用工具结果边界归 host-boundary |
 | 31 | `change-integration` | 14 | change-integration-001 ~ 009、011、013 ~ 015、017 |
-| 32 | `semantic-trace` | 12 | semantic-trace-001 ~ 010、semantic-trace-011（Fission keyed convergence 与多 Present 轨迹归并）、semantic-trace-012（独立 Invocation 范围与 Resume 边界） |
+| 32 | `semantic-trace` | 13 | semantic-trace-001 ~ 010、semantic-trace-011（Fission keyed convergence 与多 Present 轨迹归并）、semantic-trace-012（独立 Invocation 范围与 Resume 边界）、semantic-trace-013（交付见证是可重放的语义事实） |
 
 | 34 | `context-compression` | 31 | context-compression-001 ~ 027、context-compression-028（逐次 view checkpoint K 窗口）、context-compression-029（落后不丢 raw）、context-compression-030（assume call/result 原文保留）、context-compression-031（ANCHOR 编址、视图声明与 token 经济） |
 | 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015；view checkpoint 窗口见 context-compression-028 |

@@ -297,9 +297,64 @@ test('WHAT[provider-attempt-recovery-003] concurrent identical ledger commands a
   }
 })
 
+for (const [label, kind, wrongRoot, owner, reason] of [
+  ['another authority root', 'HumanRootManagedRun', true, '', /different authority root/],
+  ['another closure kind and owner', 'AgentOwnerChildWork', false, 'different-owner-run', /closure kind/],
+]) {
+  test(`WHAT[provider-attempt-recovery-003] a terminal source naming ${label} is rejected and retains its exact durable fault`, async () => {
+    const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
+    const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+    const { createHash } = await import('node:crypto')
+    const { withJournal } = await import('../../interaction-authority/tests/support/authority.mjs')
+    await withJournal('budget-refused-source', async (handle, reopen, directory) => {
+      await acceptHumanRoot(handle, 'negative-budget-root')
+      const state = () => journal.JournalSurface_snapshot(handle).sessionProjections[SESSION].promptAuthority
+      const before = state()
+      const active = before.activeLogicalRun
+      assert.ok(active)
+      const eventsDirectory = join(directory, 'wanxiangshu', 'events')
+      const bytes = () => readdirSync(eventsDirectory).filter(name => name.endsWith('.ndjson')).sort()
+        .map(name => [name, readFileSync(join(eventsDirectory, name), 'utf8')])
+      const records = () => bytes().flatMap(([, text]) => text.trimEnd().split('\n').map(JSON.parse))
+      const original = records()
+      const source = authority.terminalSourceFact(
+        value => createHash('sha256').update(value).digest('hex'),
+        kind, SESSION, active.logicalRun, wrongRoot ? 'different-authority-root' : active.authorityRoot,
+        owner, '', '', '', 'completed',
+      )
+      const refused = await journal.JournalSurface_appendAuthorityTerminalSource(handle, SESSION, source)
+      assert.equal(refused.ok, false, 'a source outside the accepted root contract is refused')
+      assert.match(refused.error, reason)
+      assert.deepEqual(state(), before, 'the rejected source must not close or change the active authority')
+
+      const durable = records()
+      assert.deepEqual(durable.slice(0, original.length), original)
+      const added = durable.slice(original.length)
+      assert.equal(added.length, 2, 'the rejected fact and its cut are both retained')
+      const [bad, cut] = added
+      assert.equal(bad.event_type, 'JournalEnvelope')
+      assert.equal(bad.payload.Fact[1][1][0], source.case)
+      assert.equal(bad.payload.Fact[1][1][1].FactId, source.payload.FactId)
+      assert.equal(cut.event_type, 'ProjectionCutTail')
+      assert.deepEqual(cut.parents, [bad.event_id])
+      assert.equal(cut.payload.failed_event_id, bad.event_id)
+      assert.equal(cut.payload.rule, 'Journal')
+      assert.match(cut.payload.reason, reason)
+
+      const retained = bytes()
+      const cold = await reopen()
+      assert.deepEqual(journal.JournalSurface_snapshot(cold).sessionProjections[SESSION].promptAuthority, before)
+      assert.deepEqual(bytes(), retained, 'cold replay retains the exact rejected fact and cut')
+    })
+  })
+}
+
 test('WHAT[provider-attempt-recovery-003] a success from a legally closed old root cannot clear a new run budget', async () => {
+  const { Authority } = await import('wanxiangli/authority')
+  const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
+  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
   const store = await import('../../../dist/Persistence/EventStore/Surface.js')
-  const { randomUUID } = await import('node:crypto')
+  const { createHash, randomUUID } = await import('node:crypto')
   const directory = mkdtempSync(join(tmpdir(), 'wxs-budget-old-root-success-'))
   let opened = await bootWithWriterId(directory, 'old-root-writer', 'old-root-runtime', 1, '2026-01-01T00:00:00Z')
   const eventsDirectory = join(directory, 'wanxiangshu', 'events')
@@ -312,19 +367,35 @@ test('WHAT[provider-attempt-recovery-003] a success from a legally closed old ro
       .find(event => event.payload?.Fact?.[1]?.[1]?.[0] === 'AuthorityRootAccepted')
     assert.ok(original)
     const root = original.payload.Fact[1][1][1]
+    const terminalSource = (kind, authorityRoot, owner = '') => authority.terminalSourceFact(
+      value => createHash('sha256').update(value).digest('hex'),
+      kind, SESSION, root.LogicalRunId[1], authorityRoot, owner, '', '', '', 'completed',
+    )
+    const source = terminalSource('HumanRootManagedRun', root.AuthorityRootUserMessageId[1])
+    const terminal = await journal.JournalSurface_appendAuthorityTerminalSource(opened.journal, SESSION, source)
+    assert.equal(terminal.ok, true, terminal.error)
+    const sourceEnvelope = bytes().flatMap(([, text]) => text.trimEnd().split('\n').map(JSON.parse))
+      .find(event => event.payload?.Fact?.[1]?.[1]?.[0] === 'AuthorityManagedRunTerminal')
+    assert.ok(sourceEnvelope)
+    assert.equal(sourceEnvelope.payload.Fact[1][1][1].FactId, source.payload.FactId)
     dispose(opened.journal)
     opened = null
     const closer = store.create(directory, 'root-closure-writer')
     try {
       const id = randomUUID().replaceAll('-', '')
       const closed = await store.append(closer, [{
-        id, stream: original.stream_id, type: 'JournalEnvelope', parents: [original.event_id], payloadRefs: [],
+        id, stream: original.stream_id, type: 'JournalEnvelope', parents: [sourceEnvelope.event_id], payloadRefs: [],
         payload: {
           ...original.payload, EventId: ['EventId', id], RuntimeId: ['RuntimeId', 'root-closure-runtime'], LocalSeq: ['LocalSeq', '1'],
           Fact: ['Agent', ['Prompt', ['AuthorityLogicalRunClosed', {
             SessionId: root.SessionId, LogicalRunId: root.LogicalRunId,
             AuthorityRootUserMessageId: root.AuthorityRootUserMessageId,
-            RootKind: 'HumanRoot', ClosureWitness: 'old-root-proved-closed',
+            RootKind: 'HumanRoot',
+            ClosureWitness: new Authority().encodeClosureWitness({
+              kind: 'ManagedLogicalRunTerminal',
+              logicalRunId: root.LogicalRunId[1],
+              factId: source.payload.FactId,
+            }),
           }]]],
         },
       }])

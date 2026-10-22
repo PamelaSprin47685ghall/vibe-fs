@@ -1,11 +1,11 @@
 # obligation-ledger — README
 
-本包规定编程面（`todowrite-for-<role>`）的 ANCHOR `view` 声明压缩 checkpoint 边界与宿主原生 `todowrite` 的退役约束。规则正文见 `WHAT.md`；本 README 记录各条款的实际证明边界，不新增规则。
+本包规定编程面（`todowrite-for-<role>`）的 ANCHOR 上下文整理声明（扁平顶层参数 `prefixUntil` + `thenMap`）压缩 checkpoint 边界与宿主原生 `todowrite` 的退役约束。规则正文见 `WHAT.md`；本 README 记录各条款的实际证明边界，不新增规则。
 
-## 001 / 002 — 原生 todowrite 退役、view 声明门禁与 checkpoint 记录
+## 001 / 002 — 原生 todowrite 退役、上下文整理声明门禁与 checkpoint 记录
 
-- `tests/001.test.mjs`：验证 `todowrite` 已从 `StaticTools.knownToolNames`、角色权限矩阵、`InvestigationEstimateContract.classifyTool`（返回 `Unreviewed`）和 `resources/ablation/tool-map.json` 中移除；验证只有携带非空 `state.input.view` 的 `todowrite-for-*` 终态才产生 `ViewCheckpointCommitted`，缺省 `view`、空对象 `{}`、数组或原生 `todowrite` 均不产生 checkpoint。
-- `tests/002.test.mjs`：验证 `PhaseWindow` checkpoint 窗口与跨 `todowrite-for-*` 编程面调用的 `ViewCheckpointCommitted` 累积，以及真实 `opencode serve` canary（`tests/support/run-native-todo-replacement-canary.mjs`）驱动带 `view` 的 `todowrite-for-engineer` 调用落盘 `ViewCheckpointCommitted`。
+- `tests/001.test.mjs`：验证 `todowrite` 已从 `StaticTools.knownToolNames`、角色权限矩阵、`InvestigationEstimateContract.classifyTool`（返回 `Unreviewed`）和 `resources/ablation/tool-map.json` 中移除；验证只有 `state.input` 携带**有效**扁平声明（`prefixUntil` + `thenMap`）的 `todowrite-for-*` 终态才产生 `ViewCheckpointCommitted`，无声明、声明不完整、声明非法或原生 `todowrite` 均不产生 checkpoint。
+- `tests/002.test.mjs`：验证 `PhaseWindow` checkpoint 窗口与跨 `todowrite-for-*` 编程面调用的 `ViewCheckpointCommitted` 累积，以及真实 `opencode serve` canary（`tests/support/run-native-todo-replacement-canary.mjs`）驱动带扁平声明的 `todowrite-for-engineer` 调用落盘 `ViewCheckpointCommitted`。
 
 ## 004 — ViewCheckpointCommitted 不影响非 checkpoint projection
 

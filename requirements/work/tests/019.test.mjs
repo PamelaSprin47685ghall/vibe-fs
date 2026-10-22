@@ -17,10 +17,21 @@ import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 // 不按列表顺序，也不按后缀猜测。
 
 const denied = /当前不可用|不可用|not available right now|not available to|denied-task-state/i
-const devopsDispatchDenied = /尚未被系统接纳|不得向 DevOps 派发|assessment.*not.*accepted|not allowed until/i
+const devopsDispatchDenied = /尚未被系统接纳|不得向 DevOps 派发|assessment.*not.*accepted|not allowed until|assessment-pending-for-devops/i
 const bound = (sessionID, callID) => ({ sessionID, agent: 'manager', callID, messageID: `msg-${callID}`, providerRunID: `run-${callID}` })
 
 const storeOf = async (directory) => workspaceEvents.acquire(await journalSurface.JournalSurface_initializeStateRoot(directory))
+
+// 派工是编程面成员，不是宿主工具：`this.fork(payload, reportMapping)` /
+// `this.resume(payload, reportMapping)`。宿主不再注册 fork/resume，
+// 拒绝与放行都必须从成员调用的返回信封里观察。
+const runManagerProgram = async (hooks, sessionID, body) =>
+  String(
+    await hooks.tool['todowrite-for-manager'].execute(
+      { program: `class Js extends JsProgram { async run() { ${body} } }` },
+      { sessionID, agent: 'manager' },
+    ),
+  )
 
 
 
@@ -33,15 +44,18 @@ const assertReadDenied = async (hooks, sessionID, callID) => {
   assert.match(String(result), /REVIEW_ONLY/)
 }
 
-test('WHAT[work-019] 没有任期时 read、review、fork、resume 在工具执行入口被拒绝', async () => {
+const assertBeforeDenied = async (hooks, sessionID, tool, callID) => {
+  await assert.rejects(
+    () => hooks['tool.execute.before']({ tool, sessionID, callID }, { args: {} }),
+    /not permitted under current manager capability facts|refused on the review gate/i,
+  )
+}
+
+test('WHAT[work-019] 没有任期时 review 与 deliver 在执行入口被拒绝', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     const sessionID = 'ses-no-tenure'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     // 无活跃任期：office 工具在 ToolRegistry 执行入口 fail closed。
-    const forkResult = await hooks.tool.fork.execute({ name: 'Ada', charge: 'look' }, { sessionID, agent: 'manager' })
-    assert.match(String(forkResult), denied)
-    const resumeResult = await hooks.tool.resume.execute({ name: 'Ada', charge: 'look' }, { sessionID, agent: 'manager' })
-    assert.match(String(resumeResult), denied)
     const reviewResult = await hooks.tool.review.execute({ findings: [] }, { sessionID, agent: 'manager', callID: 'r', messageID: 'm', providerRunID: 'p' })
     assert.match(String(reviewResult), denied)
     const deliverResult = await hooks.tool.deliver.execute({}, { sessionID, agent: 'manager' })
@@ -51,28 +65,72 @@ test('WHAT[work-019] 没有任期时 read、review、fork、resume 在工具执�
   })
 })
 
+test('WHAT[work-019] 调用方权威确立之前，派工成员在执行入口 fail closed 且不创建子会话', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    const sessionID = 'ses-no-authority'
+    // 未确立权威：成员调用被真实执行入口拒绝。
+    // 这条拒绝路径是 `tool/registry/denied-unestablished`，它只渲染散文、不带稳定
+    // code 字段，所以可断言到的事实只有三层：调用以返回值结束（不是抛错）、
+    // 没有成功信封（`ok = true` / `name` / `outcome = "created"` 都不出现）、
+    // 零子会话。断言散文措辞会把测试绑死在语言上，故此处不断言措辞。
+    let threw = null
+    let forkResult = ''
+    try {
+      forkResult = await runManagerProgram(
+        hooks,
+        sessionID,
+        'return await this.fork({ calling: "engineer", name: "Ada", charge: "look" }, { 1: null });',
+      )
+    } catch (error) {
+      threw = error
+    }
+    assert.equal(threw, null, 'the refused member call must answer with a value, not throw')
+    assert.doesNotMatch(forkResult, /ok = true/)
+    assert.doesNotMatch(forkResult, /name = "Ada"/)
+    assert.doesNotMatch(forkResult, /outcome = "created"/)
+    assert.equal(createdIds.length, 0)
+  })
+})
+
 test('WHAT[work-019] 有任期且评审尚未接纳时只读与观察放行，派工和 deliver 在执行入口被拒绝', async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     const sessionID = 'ses-unreviewed'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
-    // deliver binds the invocation to the current physical user message.
-    // Without one the call fails before Algorithm E3 can answer.
+    const user = { id: 'user-root', role: 'user', agent: 'manager' }
+    const parts = [{ type: 'text', text: 'Deliver the requested behavior and verification.' }]
+    runtime.pushHostMessage(sessionID, { info: user, parts })
     await hooks['chat.message']({ sessionID, agent: 'manager' }, {
-      message: { id: 'user-root', role: 'user', agent: 'manager' },
-      parts: [{ type: 'text', text: 'Deliver the requested behavior and verification.' }],
+      message: user,
+      parts,
     })
     // 评审未接纳：todowrite-for-manager 评审专用只读工具放行（before 门禁通过）。
     await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-js' }, { args: { path: 'x' } })
-    // 派工（fork/resume devops）与 deliver 在执行入口拒绝。
-    const forkDevops = await hooks.tool.fork.execute({ name: 'devops', charge: 'look' }, { sessionID, agent: 'manager' })
-    assert.match(String(forkDevops), devopsDispatchDenied)
-    const resumeDevops = await hooks.tool.resume.execute({ name: 'devops', charge: 'look' }, { sessionID, agent: 'manager' })
-    assert.match(String(resumeDevops), devopsDispatchDenied)
+    // 跨角色绕路工具在评审门前被拒绝。
+    await assertBeforeDenied(hooks, sessionID, 'todowrite-for-engineer', 'call-js-engineer')
+    await assertBeforeDenied(hooks, sessionID, 'todowrite-for-devops', 'call-js-devops')
+    // 向固定 DevOps 派工在评审未接纳时被拒（数据信封，非异常）。
+    const forkDevops = await runManagerProgram(
+      hooks,
+      sessionID,
+      'return await this.fork({ calling: "devops", name: "devops", charge: "look" }, { 1: null });',
+    )
+    assert.match(forkDevops, devopsDispatchDenied)
+    const resumeDevops = await runManagerProgram(
+      hooks,
+      sessionID,
+      'return await this.resume({ name: "devops", charge: "look" }, { 1: null });',
+    )
+    assert.match(resumeDevops, devopsDispatchDenied)
     // Algorithm E3: an unreviewed tenure with no confirmation is not a denial.
     // deliver returns the completed-but-not-retired result and writes nothing.
     const before = lifecycle.workView(await storeOf(directory), sessionID)
-    const deliverResult = await hooks.tool.deliver.execute({}, bound(sessionID, 'call-unreviewed'))
+    const deliverContext = bound(sessionID, 'call-unreviewed')
+    runtime.pushHostMessage(sessionID, {
+      info: { id: deliverContext.messageID, role: 'assistant', sessionID, parentID: user.id, time: { created: 2 } },
+      parts: [{ type: 'tool', tool: 'deliver', callID: deliverContext.callID, state: { status: 'pending', input: {} } }],
+    })
+    const deliverResult = await hooks.tool.deliver.execute({}, deliverContext)
     assert.match(String(deliverResult), /finished = false/)
     assert.match(String(deliverResult), /assessment_required = true/)
     assert.doesNotMatch(String(deliverResult), denied)
@@ -91,9 +149,14 @@ test('WHAT[work-019] 评审已接纳且尚未确认时 read 与固定 DevOps 派
     await openIncumbency(runtime, sessionID)
     await injectAcceptedAssessment(runtime, sessionID)
     await assertReadDenied(hooks, sessionID, 'call-js')
-    // 固定 DevOps 派工恢复（resume devops 放行）。
-    const resumeResult = await hooks.tool.resume.execute({ name: 'devops', charge: 'look' }, { sessionID, agent: 'manager' })
-    assert.match(String(resumeResult), /现已接下这项托付|carries this charge now/i)
+    // 评审接纳后：向固定 DevOps 派工恢复。
+    const resumeResult = await runManagerProgram(
+      hooks,
+      sessionID,
+      'return await this.resume({ name: "devops", charge: "look" }, { 1: null });',
+    )
+    assert.match(resumeResult, /ok = true/)
+    assert.match(resumeResult, /outcome = "created"/)
     assert.equal(createdIds.length, 1)
   })
 })

@@ -4,7 +4,7 @@
 
 ## 1. 当前状态与前置核对
 
-- **当前列状态**：`READY`（由 `CUT-00` 完成准备核对后转入，待认领）
+- **当前列状态**：`DONE`（2026-10-20 eng-cut07-goose：库 identity 0.11.0 发布，主仓切换合入 master，旧 owner 退出；见 §11）
 - **所属泳道 / 波次**：权威 / W1 独立卡
 - **切换前置**：`CUT-00`（已完成，见 [CUT-00](CUT-00.md)）
 - **强制护栏（D-01）**：**严格保留现行未知来源拒绝 / 明确 `UnknownPromptOrigin` 语义，绝对禁止按 `wanxiangli/src/authority` 草稿将缺失或未知来源静默回退为 `human`。**
@@ -137,3 +137,71 @@
   - `tests/001-005.test.mjs`：WHAT[participant-identity-00N] 锚点，覆盖卡内反例 1–3 及 owner 派生（反例 4 的库仓侧：`OwnerRequired`/persona 错配；同 SessionId 关闭核验归 CUT-09 主仓侧）。
 - **主仓切换状态**：被 vendor tarball `0.5.2`（无 `./identity` 导出）物理阻塞，归 CUT-33 发 `0.6.0` 后的集成队列；主仓 `Roles.tryParseRole` 宽解析被 Journal 历史解码调用方依赖（编辑面外），活跃隔离已由 `ParticipantIdentity` 层承担且 `requirements/participant-identity/tests/010.test.mjs` 绿，故本卡不动主仓源码。
 - **验收边界**：源码与测试已写、未运行；DevOps 需在库仓执行 `npm test`（含 `src/identity/tests`）与独立构建验证后方可认领通过。
+
+## 11. 主仓切换与旧 owner 退出（2026-10-20，eng-cut07-goose）
+
+### 11.1 库侧（wanxiangli）
+
+- `b196749` 实现、`54dcc34` 发布 **0.11.0**。master 现在的 gitlink `c9a943d`（0.16.0）包含它。
+- `Roles.fs`：补 `Advisor`（活跃、内部），增加 `isInternal`（Advisor、Distiller）。活跃顺序为 Orchestrator, Manager, Engineer, DevOps, Plan, Advisor；历史角色为 Coder, Inspector, Browser, Inquiry, Distiller。
+- `PersonaCatalog.fs`：Advisor → Auditor，增加 `Persona.tryParse`（含 `DirectorV1` 别名）。
+- `ParticipantIdentity.fs`：按宿主算法逐分支重写。
+  - 名称分类顺序：Blank → Legacy → Malformed → bookkeeper/活跃角色 → Unknown。
+  - `validateShape` 依次检查目录版本、RoleMismatch、BlankPersona。
+  - 根来源 rehydrate 检查 PersonaMismatch；继承来源检查 OwnerPersonaMismatch / OwnerCatalogVersionMismatch；有 owner 但来源为根时报 OriginMismatch。
+  - 继承的 legacy 名解码为历史角色。
+  - `restoreRecorded` 保持宿主 `fromInput` 语义。
+  - JS 边界 `decodeInput` 报 InvalidRoleLabel / InvalidOriginLabel。
+  - `errorView` 带 `expected` / `actual`。
+- `Identity.fs` 门面与 `index.d.ts` 同步更新；`ExecutionBinding` 改走 `decodeInput >> restoreRecorded`。
+- 测试：identity 32/32；库全套 504/504（`--test-force-exit`，原因见 evidence §1）。
+
+### 11.2 主仓接线（F）
+
+两个提交：`refactor(CUT-07): consume wanxiangli/identity as the participant identity owner` 和 `fix(CUT-07): call the typed RoleCatalog interface instead of dynamic access`。
+
+- `Foundation/Roles.fs`：只保留 `Role` DU 与 `roleLabel` 编解码。
+  - 私有类型接口 `RoleCatalog` 从 `wanxiangli/identity` 导入。Foundation 是纯核心目录，禁止 JsInterop，所以只用 Import/Emit。
+  - `all` 来自库 `activeRoleLabels`；`tryParseRole` 来自库 `tryParseHistoricalRole`，保留宿主一贯的宽解析，Journal 历史解码依赖它，活跃准入由 ParticipantIdentity 把关；`isInternal` 来自库 `isInternalRole`。
+- `Participant/Persona/Catalog.fs(.fsi)`：新增 internal `IdentityLibrary`。`Persona.ofCanonical` / `tryParse`、`PersonaCatalog.personaV1` / `persona` / `bookkeeperPersona` 全部由库回答。
+- `Participant/Persona/Identity.fs`：`ParticipantIdentity` 成为库的类型化投影。
+  - `inputView` / `evidenceView` 交给库，`evidenceOfView` / `kindOfLabel` / `errorOfView` 映射回 F#；`fromInput` 等于库 `restoreRecorded`。
+  - 宿主只保留 legacy V1 适配：HumanRoot 走 resolveAtRoot，AgentOwnerRoot 判为 Unprovable。
+  - `.fsi` 未改，所有调用方零改动。
+- `Participant/Persona/ManagedCatalog.fs`：`legacyAgentNames` / `isLegacyAgentName` 来自库。
+
+### 11.3 旧符号去向（G）
+
+| 旧实现 | 去向 |
+|---|---|
+| `Roles.all` 活跃列表、`isInternal` 判定表 | 删除，改由库 `activeRoleLabels` / `isInternalRole` 回答 |
+| `Roles.tryParseRole` 的大小写/历史解析 | 删除，改由库 `tryParseHistoricalRole` 回答，宿主只做 label→DU |
+| `Persona` 名称解析、`PersonaCatalog` V1 Role→Persona 表、bookkeeper 人格 | 删除，改由库 `tryParsePersona` / `personaOfRole` / `bookkeeperPersona` 回答 |
+| `ParticipantIdentity` resolve/inherit/rehydrate/fromInput 校验算法及名称分类 | 删除，改由库 `resolveAtRoot` / `inheritFromOwner` / `rehydrate` / `restoreRecorded` 回答；宿主只保留 F# 类型投影与错误映射 |
+| `ManagedCatalog` legacy 名单 | 删除，改由库 `legacyNames` / `isLegacyName` 回答 |
+| 保留在宿主 | `Role`/`Persona`/错误 DU 编解码；Host 呼名表 `tryParsePersonaCallingName`（宿主 UI 词汇）；legacy V1 记录适配（历史数据读取，未重写历史） |
+
+只有一个可写 owner，没有同步器。旧测试无需删除：participant-identity 等 WHAT 套件原样运行，现在测试的是库回答。
+
+### 11.4 验收（§9）
+
+证据见 [evidence/CUT-07](../evidence/CUT-07/README.md)。
+
+- 14 个相关套件 base `959f05643` 与 candidate 计数相同，既有失败用例名 diff 为空。
+- check.mjs 无新增发现，report-only 审计 255 → 253。
+- 差分 509,617 次双算只有 1 处不同：`null` 角色名从抛错变为空权限，fail-closed。
+- 净改进：身份规则只剩一个 owner；宿主少约 200 行判定逻辑；行为保持；权限未扩大；历史读取未变。
+
+### 11.5 移交相邻卡（未做，范围明确）
+
+- 宿主 `Interaction/Authority/Origin.fs` 对接库 `classifyOrigin` 归 **CUT-09**：库的 continuation 词汇与宿主现行词汇不一致，需在 CUT-09 统一。D-01 护栏两侧都没有 human 回退。
+- `IdentitySeed` 组合归 **CUT-09**。
+- 宿主 `SessionExecutionBinding` 对接库 `bindExecution` / `rebindTarget` 归 **CUT-10 / CUT-12**。
+
+### 11.6 复核（2026-10-21，eng-cut07b-goose 接手）
+
+- 接手时两提交已位于 `origin/master` `1c90ecf69` 之上（merge-base 即 origin/master），工作树无源码改动。
+- 在含 `fix(CUT-07)` 的 HEAD 上重新完整构建（`node scripts/build.mjs` exit 0），重跑 participant-identity、capability-enforcement、session-ontology、interaction-authority、office-capability、managed-chat-execution：计数与 §2 表一致，fail/cancelled 为 0。
+- 差分重跑：compared 509617; differing 1（仍为 §11.4 的 `null` fail-closed 差异）。
+- `node scripts/check.mjs` 重跑：exit 1（既有），对 base 去路径去行号后无新增发现；shard-edge-audit 253。
+- delegation / managed-session-lifecycle / work / dispatch-protocol 未在含 fix 的 HEAD 上重跑（fix 只把 `Roles.all` 的动态属性访问换成类型化接口调用，产物等价）；它们最近一次 candidate 运行的结果见 evidence §2。

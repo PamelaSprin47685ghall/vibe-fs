@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Session.ChatExecution
@@ -8,28 +10,42 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Mission.Planning
+open Wanxiangshu.Mission.Lifecycle
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode.Host
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
+open Wanxiangshu.Host.Ports
 
 module PluginRecoveryWiring =
+
+    let private hostErrorReason (error: HostError) =
+        match error with
+        | HostError.Unsupported capability -> sprintf "Host capability %A is unsupported" capability
+        | HostError.NotFound what -> what
+        | HostError.Refused reason -> reason
+        | HostError.Transport reason -> reason
+        | HostError.Unknown reason -> reason
 
     let private inspectRecoveryWork gitCommonDir workId =
         try
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
         with error ->
-            Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", error.Message ]
+            Wanxiangshu.Foundation.Diagnostic.emit
+                "lifecycle-work-recovery-refused"
+                [ "work_id", workId; "reason", error.Message ]
+
             None
 
-    let private chooseRecoveredWork
-        (workId: string, result: Result<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option, string>)
-        =
+    let private chooseRecoveredWork (workId: string, result: Result<DurableWorkHost.InspectedWork option, string>) =
         match result with
         | Ok(Some work) -> Some(SessionId.create workId, work)
         | Ok None -> None
         | Error reason ->
-            Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", reason ]
+            Wanxiangshu.Foundation.Diagnostic.emit
+                "lifecycle-work-recovery-refused"
+                [ "work_id", workId; "reason", reason ]
+
             None
 
     let private queryInspectedWorks stateRoot workIds =
@@ -37,7 +53,10 @@ module PluginRecoveryWiring =
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspectedMany stateRoot workIds
             |> Array.choose chooseRecoveredWork
         with error ->
-            Diagnostic.emit "lifecycle-work-recovery-refused" [ "workspace", stateRoot; "reason", error.Message ]
+            Wanxiangshu.Foundation.Diagnostic.emit
+                "lifecycle-work-recovery-refused"
+                [ "workspace", stateRoot; "reason", error.Message ]
+
             [||]
 
     let private inspectRecoveryWorks (journal: AgentJournal) (workspace: string option) =
@@ -81,7 +100,7 @@ module PluginRecoveryWiring =
     /// replaced by the current scheduler preference.
     let private seedBoundDevOpsModelTargets
         (journal: AgentJournal)
-        (works: (SessionId * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) array)
+        (works: (SessionId * DurableWorkHost.InspectedWork) array)
         =
         let snapshot = AgentJournal.snapshot journal
 
@@ -123,7 +142,7 @@ module PluginRecoveryWiring =
                     |> Option.map Ok
                     |> Option.defaultValue (Error("pending", "bound session has no observed user prompt")))
                 |> Result.bind (fun prompt ->
-                    Wanxiangshu.Mission.Planning.PlanTools.reconcileBoundExecution
+                    PlanTools.reconcileBoundExecution
                         gitCommonDir
                         workId
                         execSessionId
@@ -133,9 +152,11 @@ module PluginRecoveryWiring =
 
             match settled with
             | Ok _ ->
-                Diagnostic.emit "plan-delivery-recovery-settled" [ "work_id", workId; "exec_session_id", execSessionId ]
+                Wanxiangshu.Foundation.Diagnostic.emit
+                    "plan-delivery-recovery-settled"
+                    [ "work_id", workId; "exec_session_id", execSessionId ]
             | Error(kind, reason) ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     ("plan-delivery-recovery-" + kind)
                     [ "work_id", workId; "exec_session_id", execSessionId; "reason", reason ]
         }
@@ -144,7 +165,10 @@ module PluginRecoveryWiring =
         match snapshots with
         | Some snapshot -> observeBoundDelivery gitCommonDir workId execSessionId snapshot retirementBlockers
         | None ->
-            Diagnostic.emit "plan-delivery-recovery-no-snapshot" [ "work_id", workId; "exec_session_id", execSessionId ]
+            Wanxiangshu.Foundation.Diagnostic.emit
+                "plan-delivery-recovery-no-snapshot"
+                [ "work_id", workId; "exec_session_id", execSessionId ]
+
             Task.FromResult(()) :> Task
 
     let private bindDiscoveredDelivery
@@ -156,15 +180,9 @@ module PluginRecoveryWiring =
         retirementBlockers
         : Task =
         task {
-            match
-                Wanxiangshu.Mission.Planning.PlanTools.bindObservedExecutionSession
-                    gitCommonDir
-                    workId
-                    operationId
-                    execSessionId
-            with
+            match PlanTools.bindObservedExecutionSession gitCommonDir workId operationId execSessionId with
             | Error reason ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-bind-refused"
                     [ "work_id", workId
                       "operation_id", operationId
@@ -178,19 +196,21 @@ module PluginRecoveryWiring =
         (workId: string)
         (operationId: string)
         (snapshots: ISessionSnapshotPort option)
-        (discovery: ISessionDiscoveryPort)
+        (discovery: ISessionPort)
         (retirementBlockers: string -> string array)
         : Task =
         task {
             let title = "wanxiangshu-delivery:" + operationId
 
-            match! discovery.FindRootSessionsByTitle title with
-            | Error reason ->
-                Diagnostic.emit
+            match! discovery.FindByTitle title with
+            | Error error ->
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-discovery-failed"
-                    [ "work_id", workId; "operation_id", operationId; "reason", reason ]
+                    [ "work_id", workId
+                      "operation_id", operationId
+                      "reason", hostErrorReason error ]
             | Ok [] ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-unbound"
                     [ "work_id", workId
                       "operation_id", operationId
@@ -199,7 +219,7 @@ module PluginRecoveryWiring =
                 let execSessionId = SessionId.value sessionId
                 do! bindDiscoveredDelivery gitCommonDir workId operationId execSessionId snapshots retirementBlockers
             | Ok sessions ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-ambiguous"
                     [ "work_id", workId
                       "operation_id", operationId
@@ -209,7 +229,7 @@ module PluginRecoveryWiring =
     let private reconcilePendingWork
         gitCommonDir
         workId
-        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        (work: DurableWorkHost.InspectedWork)
         snapshotPort
         discoveryPort
         retirementBlockers
@@ -221,9 +241,11 @@ module PluginRecoveryWiring =
             | None, Some operationId, Some discovery ->
                 do! discoverUnboundDelivery gitCommonDir workId operationId snapshotPort discovery retirementBlockers
             | None, Some operationId, None ->
-                Diagnostic.emit "plan-delivery-recovery-no-discovery" [ "work_id", workId; "operation_id", operationId ]
+                Wanxiangshu.Foundation.Diagnostic.emit
+                    "plan-delivery-recovery-no-discovery"
+                    [ "work_id", workId; "operation_id", operationId ]
             | None, None, _ ->
-                Diagnostic.emit
+                Wanxiangshu.Foundation.Diagnostic.emit
                     "plan-delivery-recovery-unbound"
                     [ "work_id", workId; "reason", "pending delivery has no operation identity" ]
         }
@@ -239,7 +261,9 @@ module PluginRecoveryWiring =
             try
                 do! reconcileDeliveryWork gitCommonDir workId snapshotPort discoveryPort retirementBlockers
             with error ->
-                Diagnostic.emit "plan-delivery-recovery-failed" [ "work_id", workId; "reason", error.Message ]
+                Wanxiangshu.Foundation.Diagnostic.emit
+                    "plan-delivery-recovery-failed"
+                    [ "work_id", workId; "reason", error.Message ]
         }
 
     /// A delivery session is bound durably before its first prompt is sent.
@@ -248,10 +272,10 @@ module PluginRecoveryWiring =
     /// we read the exact bound session and settle only when the real first user
     /// message proves the reserved plan bytes reached that container.
     let private reconcilePendingDeliveries
-        (works: (SessionId * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) array)
+        (works: (SessionId * DurableWorkHost.InspectedWork) array)
         (workspace: string option)
         (snapshotPort: ISessionSnapshotPort option)
-        (discoveryPort: ISessionDiscoveryPort option)
+        (discoveryPort: ISessionPort option)
         (retirementBlockers: string -> string array)
         : Task =
         task {
@@ -286,8 +310,10 @@ module PluginRecoveryWiring =
 
     let attach (boot: PluginBoot.Boot) : unit =
         let scope = boot.Scope
-        let snapshotPort = SessionSnapshotPort.create boot.Input
-        let discoveryPort = SessionSnapshotPort.createDiscovery boot.Input
+        let snapshotPort = SessionSnapshotPort.create boot.WorkspaceDirectory boot.Input
+
+        let discoveryPort =
+            SessionSnapshotPort.createSessionPort boot.WorkspaceDirectory boot.Input
 
         let drainPtys work =
             task {
@@ -313,10 +339,10 @@ module PluginRecoveryWiring =
         scope.AttachDurabilityActivation(fun () ->
             scope.RunBackground(fun () ->
                 task {
-                    // crash-reconciliation-020: orphaned child runs maintain visible
-                    // obligations on restart rather than being voided or closed.
-                    // The active child work stays observable to the road, preserving
-                    // unfulfilled obligations across process restart without hiding them.
+                    // crash-reconciliation-020: the child work the previous process
+                    // left behind can no longer be delivered, so it is voided
+                    // (Abandoned(Voided)) — the obligation stays visible until
+                    // join reports the void once and retires it.
                     match boot.Journal with
                     | Some journal -> do! ChildWorkRecovery.settleOrphanedChildRuns drainPtys journal
                     | None -> ()

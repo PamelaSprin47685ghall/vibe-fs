@@ -321,13 +321,33 @@ module ProviderFailureSurface =
         | "AgentOwnerRoot", _ -> invalidArg "identitySeed" "AgentOwnerRoot requires an inherited owner identity seed"
         | kind, _ -> invalidArg "authorityKind" $"unknown authority kind '{kind}'"
 
+        let isManager =
+            match
+                PromptAuthority.identitySeedParticipantIdentity identitySeed
+                |> ParticipantIdentity.role
+            with
+            | Some role -> role = Role.Manager
+            | None -> false
+
+        let agentOwnerLife = optionalText (field value "agentOwnerLife")
+
+        let closureKind =
+            AuthorityLifeClassification.recordedClosureKind authorityKind isManager agentOwnerLife None
+
+        let ownerLogicalRunId =
+            PromptAuthority.identitySeedOwner identitySeed
+            |> Option.map (fun (_, ownerRun, _) -> LogicalRunId.value ownerRun)
+
         box
             {| kind = "AuthorityRootAccepted"
-               schemaVersion = 2
+               schemaVersion = 3
                session = text (field value "session")
                logicalRun = text (field value "logicalRun")
                authorityRoot = text (field value "authorityRoot")
                authorityKind = authorityKind
+               expectedClosureKind = closureKind
+               ownerLogicalRunId = optionObj ownerLogicalRunId
+               agentOwnerLife = optionObj agentOwnerLife
                identitySeed = identitySeedView identitySeed |}
 
     let providerFailureRecorded (value: obj) : obj =
@@ -370,13 +390,47 @@ module ProviderFailureSurface =
     let private factOf (value: obj) : AgentFact =
         match text (field value "kind") with
         | "AuthorityRootAccepted" ->
+            let authorityKind = text (field value "authorityKind")
+
+            let identitySeed = identitySeedOf (field value "identitySeed")
+
+            let isManager =
+                match
+                    PromptAuthority.identitySeedParticipantIdentity identitySeed
+                    |> ParticipantIdentity.role
+                with
+                | Some role -> role = Role.Manager
+                | None -> false
+
+            let agentOwnerLife = optionalText (field value "agentOwnerLife")
+
+            let owner =
+                PromptAuthority.identitySeedOwner identitySeed
+                |> Option.map (fun (_, run, _) -> LogicalRunId.value run)
+
+            let suppliedOwner = optionalText (field value "ownerLogicalRunId")
+
+            if (authorityKind = "AgentOwnerRoot") <> owner.IsSome then
+                invalidArg "identitySeed" "the authority kind does not match its owner identity"
+
+            if suppliedOwner.IsSome && suppliedOwner <> owner then
+                invalidArg "ownerLogicalRunId" "the recorded owner does not match the identity seed"
+
             PromptFact.AuthorityRootAccepted
-                { SchemaVersion = 2
+                { SchemaVersion = 3
                   SessionId = SessionId.create (text (field value "session"))
                   LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
-                  AuthorityKind = text (field value "authorityKind")
-                  IdentitySeed = identitySeedOf (field value "identitySeed") }
+                  AuthorityKind = authorityKind
+                  ExpectedClosureKind =
+                    AuthorityLifeClassification.recordedClosureKind
+                        authorityKind
+                        isManager
+                        agentOwnerLife
+                        (optionalText (field value "expectedClosureKind"))
+                  OwnerLogicalRunId = owner
+                  AgentOwnerLife = agentOwnerLife
+                  IdentitySeed = identitySeed }
         | "FailureRecorded" ->
             Wanxiangshu.Composition.Durable.ProviderFailureFact.FailureRecorded
                 {| SessionId = SessionId.create (text (field value "session"))

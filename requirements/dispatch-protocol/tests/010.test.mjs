@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { linkChildWork } from './support/authority.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -164,6 +165,7 @@ test('WHAT[dispatch-protocol-010] PROMPT_006_send_payload_carries_participant_an
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_006_owner')
+      await linkChildWork(opened.journal, owner.session, 'ses_006', 'engineer')
       const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
       const ownerRoot = await dispatch.sendAgentOwnerRoot(
         capturingPort(),
@@ -289,7 +291,9 @@ for (const [participant, tools] of [
 ]) {
   test(`WHAT[dispatch-protocol-010] managed ${participant} assignments retain the accepted run and tool boundary across journal reopen`, async () => {
     await withJournal(`assignment-${participant}`, async (handle, reopen) => {
-      const seed = authority.issueInheritedIdentitySeed(participant, await acceptOwner(handle))
+      const owner = await acceptOwner(handle)
+      await linkChildWork(handle, owner.session, 'child', participant)
+      const seed = authority.issueInheritedIdentitySeed(participant, owner)
       assert.equal(seed.ok, true, seed.error)
       const port = hostPort(async () => dispatch.admittedWithReceipt('accepted-assignment'))
       const first = await dispatch.sendManagedAssignment(port, handle, 'child', 'Investigate the current work.', seed.value, tools)
@@ -321,6 +325,7 @@ test('WHAT[dispatch-protocol-010] synthetic send producers leave model selection
     const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
     const profiles = new Map()
     for (const session of ['ses_p_4', 'ses_p_5', 'ses_p_6']) {
+      await linkChildWork(handle, owner.session, session, 'engineer')
       const root = await dispatch.sendAgentOwnerRoot(hostPort(async () => dispatch.admittedWithReceipt('receipt-root')), handle, session, 'root send', seed)
       assert.equal(root.ok, true, root.error)
       const accepted = await dispatch.acceptAgentOwnerRoot(handle, session, root.key, `msg-producers-root-${session}`)

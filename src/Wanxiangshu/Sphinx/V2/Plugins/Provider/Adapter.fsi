@@ -32,6 +32,3 @@ module ProviderAdapter =
 
     /// Whether the outcome must keep its reservation booked because usage is unknown.
     val keepsReservation: ProviderOutcome -> bool
-
-    /// A settled usage record for one work item, derived from the outcome.
-    val settledUsageOf: WorkId -> Attempt -> ProviderOutcome -> SettledUsage

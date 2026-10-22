@@ -86,6 +86,57 @@ type PublishClaimReality =
     | PublishReady
     | ClaimExpired
 
+/// wanxiangli/integration binding (CUT-23 ②). The library is the only owner of
+/// commission worktree binding, the publish gate's verdicts, conflict ownership
+/// and crash-recovery resume; this module converts F# values in and hands back
+/// the library's step/code vocabulary. Callers keep only the I/O and its order.
+module ChangeIntegrationLaw =
+    /// CleanUp | ReenterClaim | RunLoop
+    val resume: record: ManagerJobProjection option -> string
+
+    /// TargetMismatch | MissingRecord | MissingRebased | VerifyHead | RunLoop
+    val reenterClaim:
+        jobTargetRef: TargetRef ->
+        claimTargetRef: TargetRef ->
+        claimRebased: CommitHash ->
+        claimExpected: CommitHash ->
+        record: ManagerJobProjection option ->
+            string
+
+    /// PublishCertified | TargetAdvanced | InitialRebaseRequired
+    val admitCandidate:
+        candidate: CommitHash ->
+        target: CommitHash ->
+        rebased:
+            {| RebasedCommit: CommitHash
+               TargetHeadSnapshot: CommitHash |} option ->
+            string
+
+    /// Ok | MissingRebased | CandidatePin | SnapshotPin
+    val certify:
+        candidate: CommitHash ->
+        expectedHead: CommitHash ->
+        rebased:
+            {| RebasedCommit: CommitHash
+               TargetHeadSnapshot: CommitHash |} option ->
+            string
+
+    /// RecordConflict | Fail
+    val rebaseFailed: conflictFiles: string list -> string
+
+    /// Ok | JobMismatch | TargetMismatch | CasMismatch
+    val checkPublication:
+        jobId: ManagerJobId ->
+        jobTargetRef: TargetRef ->
+        evidenceJobId: ManagerJobId ->
+        evidenceTargetRef: TargetRef ->
+        evidenceExpectedHead: CommitHash ->
+        current: CommitHash ->
+            string
+
+    /// Landed | LandedMismatch | TargetMoved | Failed
+    val ffMerge: merge: Result<CommitHash, string> -> candidate: CommitHash -> targetMovedError: string -> string
+
 module OrchestratorProjection =
     val empty: OrchestratorProjection
     val tryFind: ManagerJobId -> OrchestratorProjection -> ManagerJobProjection option

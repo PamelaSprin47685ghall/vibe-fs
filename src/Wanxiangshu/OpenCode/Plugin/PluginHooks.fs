@@ -9,7 +9,6 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation.Fork
@@ -35,14 +34,10 @@ open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Host
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
-open Wanxiangshu.Execution.Delegation.Handle.OpenCode
-open Wanxiangshu.Execution.Delegation.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -77,14 +72,55 @@ module PluginHooks =
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
-    let private hasViewDeclaration (value: obj) : bool =
-        if isNull value then
+    [<Emit("$0 === undefined")>]
+    let private isUndefined (value: obj) : bool = jsNative
+
+    /// The top-level context-compression declaration of one js-* call, read
+    /// from the flat arguments `prefixUntil` and `thenMap`. The retired
+    /// `view` wrapper is refused by the call surface, so it is never read
+    /// here. A call carries a declaration iff it gives either key; the
+    /// declaration object is assembled exactly as the call surface
+    /// assembles it, so the same validator decides.
+    let private declarationOf (input: obj) : obj option =
+        let fields =
+            if isNull input then
+                None
+            else
+                let prefixUntil = input?prefixUntil
+                let thenMap = input?thenMap
+
+                Some(prefixUntil, thenMap)
+
+        fields
+        |> Option.filter (fun (prefixUntil, thenMap) -> not (isUndefined prefixUntil && isUndefined thenMap))
+        |> Option.map (fun (prefixUntil, thenMap) -> createObj [ "prefixUntil" ==> prefixUntil; "thenMap" ==> thenMap ])
+
+    /// A declaration counts only when it is valid: an invalid one never
+    /// committed a view, so it must never commit a checkpoint.
+    ///
+    /// The call surface refuses a call that carries more than one of
+    /// program / unpark / abandon; such a call never ran, so it commits no
+    /// checkpoint either. That judgement is the call surface's own law, so
+    /// it is asked, not recounted here.
+    let private declaredViewOf (input: obj) : bool =
+        let conflictingState =
+            Wanxiangshu.Repository.Programming.Js.JsToolWorkflow.conflictingInputReason input
+            |> Option.isSome
+
+        if conflictingState then
             false
         else
-            createObj [ "prefixUntil" ==> value?prefixUntil; "thenMap" ==> value?thenMap ]
-            |> Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parseDeclaration
-            |> Result.isOk
+            declarationOf input
+            |> Option.map (fun declaration ->
+                Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse declaration
+                |> Result.isOk)
+            |> Option.defaultValue false
 
+    /// obligation-ledger-005 / context-compression-028: the view checkpoint
+    /// admission law (one append per exact completed call, in-flight duplicates
+    /// join, final failures never rewritten, WriterUnavailable released) is owned
+    /// by wanxiangli/compression; this host keeps the journal write and the
+    /// waiter rendezvous on the one in-flight Task.
     [<AllowNullLiteral>]
     type private CheckpointAdmission =
         abstract observe: terminal: obj -> string
@@ -97,11 +133,11 @@ module PluginHooks =
     [<Import("Compression", "wanxiangli/compression")>]
     let private createCompression: unit -> CompressionCheckpoints = jsNative
 
-    let private checkpointCall sessionText (callId: ToolCallId) =
+    let private checkpointCall (sessionText: string) (callId: ToolCallId) =
         createObj [ "session" ==> sessionText; "callId" ==> ToolCallId.value callId ]
 
-    let private appendOutcome =
-        function
+    let private appendOutcome (failure: JournalAppendFailure) =
+        match failure with
         | JournalAppendFailure.WriterUnavailable _ -> "WriterUnavailable"
         | JournalAppendFailure.WriteUnknown _ -> "WriteUnknown"
         | JournalAppendFailure.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
@@ -109,7 +145,26 @@ module PluginHooks =
 
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
-    let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
+    let private reportOnError (report: 'e -> unit) (result: Result<unit, 'e>) : unit =
+        match result with
+        | Ok() -> ()
+        | Error reason -> report reason
+
+    /// LC-017: the exact (provider run, tool call) fence a replayed ask/deliver carries.
+    let private replayFenceOf toolInput =
+        let ctx = ToolHostCodec.decodeContext toolInput
+
+        match ctx.ProviderRunId, ctx.ToolCallId with
+        | Some run, Some call -> Some(run, call)
+        | _ -> None
+
+    let create
+        (boot: PluginBoot.Boot)
+        (host: PluginHostWiring.Host)
+        (transform: obj -> obj -> Task<unit>)
+        (product: Wanxiangshu.Host.Ports.ProductHooks)
+        (liveConfig: LiveHostConfig)
+        : Task<obj> =
         task {
             let scope = boot.Scope
             let journal = boot.Journal
@@ -169,9 +224,7 @@ module PluginHooks =
                 | Some ws -> CasebookFeature.isEnabled ws
                 | None -> false
 
-            // Programming-surface calls carrying a non-empty `view` argument establish
-            // the compression checkpoint. The plugin records one durable compression
-            // checkpoint per successfully completed call, keyed by exact call id.
+            // Valid prefixUntil/thenMap declarations establish one checkpoint per completed call.
             let viewCheckpointAdmission = createCompression().checkpoints ()
             // obligation-ledger-005: the in-flight append for each identity, so a
             // concurrent duplicate terminal waits for the same append's final
@@ -405,7 +458,7 @@ module PluginHooks =
                 let part = if isNull properties then null else properties?part
                 let state = if isNull part then null else part?state
                 let input = if isNull state then null else state?input
-                let hasView = hasViewDeclaration input
+                let declaredView = declaredViewOf input
 
                 let sessionId =
                     HostEventEnvelope.trySessionId raw
@@ -423,15 +476,26 @@ module PluginHooks =
                 | "message.part.updated", Some sessionId, Some tool, Some callId, Some status when
                     tool.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
                     && (status = "completed" || status = "error")
-                    && hasView
+                    && declaredView
                     ->
                     Some(SessionId.value sessionId, ToolCallId.create callId, status)
                 | _ -> None
 
-            let requireUserQuestionInterrupted (result: Result<unit, string>) =
-                match result with
-                | Ok() -> ()
-                | Error reason -> invalidOp ("ask was sent, but its attempt interrupt failed: " + reason)
+            /// 条款 6：中断未确认是呈现面的失败，不是事实面的失败。提问已经
+            /// 提交（durable pending 仍在等待事实），宿主也已接受工具结果；
+            /// 中断失败只记诊断——不崩、不抹掉已提交的事实，也不把已成立的
+            /// 交付呈现为失败。
+            let reportUserQuestionInterruptUnconfirmed (sessionId: string) (reason: string) =
+                Diagnostic.emit
+                    "ask-interrupt-not-confirmed"
+                    [ "session_id", sessionId
+                      "provider_error", reason
+                      "result", "interrupt-not-confirmed" ]
+
+            /// 条款 6：缺精确 provider run 身份时没有 attempt 围栏，就不该
+            /// 中断（不得误停新输入或后任），只记诊断，不崩。
+            let reportUserQuestionMissingProviderRun (sessionId: string) =
+                Diagnostic.emit "ask-observation-missing-provider-run" [ "session_id", sessionId; "result", "unbound" ]
 
             let settleUserQuestion rawInput =
                 task {
@@ -456,38 +520,30 @@ module PluginHooks =
                                 callId
                             )
 
-                        requireUserQuestionInterrupted result
+                        result |> reportOnError (reportUserQuestionInterruptUnconfirmed sessionId)
                     | Some(sessionId, _, "completed", None), Some registration when
                         registration.Runtime.IsWaitingForUser sessionId
                         ->
-                        invalidOp
-                            "ask result is missing the exact provider message identity; no attempt was interrupted"
+                        reportUserQuestionMissingProviderRun sessionId
                     | _ -> ()
                 }
 
-            let requirePostS3Interrupted (result: Result<unit, string>) =
-                match result with
-                | Ok() -> ()
-                | Error reason ->
-                    invalidOp ("post-S3 deliver was recorded, but its attempt interrupt failed: " + reason)
-
+            /// 条款 4/6：事件钩子只做观测登记——宿主已接受本次调用 + 精确
+            /// attempt 的交付工具结果（呈现面）。提交面事实由交付发生的那一次
+            /// 登记写入（它携带交付当时的物理输入），事件钩子不再新造物理围栏，
+            /// 新输入因此不会被旧交付停止。物理中断由 transform 钩子的交付
+            /// 裁决执行；交付已提交不因中断未确认而呈现为失败。
             let settlePostS3Deliver rawInput =
                 task {
                     match toolTerminalObservation "deliver" rawInput, toolRegistration with
                     | Some(sessionId, callId, "completed", Some providerRun), Some registration ->
-                        let! result =
-                            registration.Runtime.InterruptForPostS3Deliver(
-                                SessionId.create sessionId,
-                                providerRun,
-                                callId
-                            )
-
-                        requirePostS3Interrupted result
+                        registration.Runtime.RecordDeliveryPresented(SessionId.create sessionId, providerRun, callId)
                     | Some(sessionId, _, "completed", None), Some registration when
-                        registration.Runtime.HasPendingPostS3Interrupt sessionId
+                        registration.Runtime.HasEstablishedDelivery sessionId
                         ->
-                        invalidOp
-                            "post-S3 deliver result is missing the exact provider message identity; no attempt was interrupted"
+                        Diagnostic.emit
+                            "post-s3-deliver-observation-missing-provider-run"
+                            [ "session_id", sessionId; "result", "unbound" ]
                     | _ -> ()
                 }
 
@@ -520,13 +576,10 @@ module PluginHooks =
             /// One durable checkpoint per exact terminal call. A repeated Host
             /// part update for the same call id is a replay, not a second fact.
             /// obligation-ledger-005: concurrent duplicates of the same terminal
-            /// share the one in-flight append and observe its final outcome.
-            /// A failed append propagates its error to every waiter. The settled
-            /// mark is only kept when the outcome is final: WriteUnknown and
-            /// FactRejected stay settled (the event may already be durable or is
-            /// semantically refused — repeating it is unsafe), while
-            /// WriterUnavailable (NotAttempted) releases the mark so the Host's
-            /// retry gets a real second attempt.
+            /// share the one in-flight append and observe its final outcome; a
+            /// failed append propagates its error to every waiter. Which terminal
+            /// appends, joins or is skipped, and which outcomes release the call
+            /// for a real retry, is answered by the compression admission ledger.
             let settleViewCheckpointTerminal (sessionText, callId, status) =
                 let key = SessionId.create sessionText, callId
 
@@ -661,10 +714,7 @@ module PluginHooks =
                                 toolName = "deliver"
                                 || toolName.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
 
-                            let context = ToolHostCodec.decodeContext toolInput
-
-                            let replayFence =
-                                Option.map2 (fun run call -> run, call) context.ProviderRunId context.ToolCallId
+                            let replayFence = replayFenceOf toolInput
 
                             isReplayExemptTool
                             && replayFence = registration.Runtime.WaitingQuestionFenceFor sessionId
@@ -739,18 +789,79 @@ module PluginHooks =
                     config?snapshot <- box false
                     syncHostLanguagePreference config
                     ManagerConfig.configureManager config |> ignore
-                    scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
+                    // The host just delivered its config: the shared holder (and
+                    // with it the product's `IHostConfigPort`) now reads the
+                    // live object instead of a stale snapshot.
+                    liveConfig.Accept config
+
+                    let settingGap =
+                        Wanxiangshu.Composition.Plugin.ConfigPolicy.establish (
+                            liveConfig :> Wanxiangshu.Host.Ports.IHostConfigPort
+                        )
+                        |> Option.bind Wanxiangshu.Composition.Plugin.ConfigPolicy.settingOfGap
+
+                    scope.RecordCompactionSettingGap settingGap
                     syncHostToolLimits config
 
             let config = registeredHook HookKey.Config (unaryHook (box configurePluginHost))
 
+            let sessionIdOfHook (input: obj) : SessionId =
+                let idStr =
+                    if isNull input || isNull input?sessionID then
+                        "<unknown>"
+                    else
+                        unbox<string> input?sessionID
+
+                SessionId.create idStr
+
+            let existingContextOf (output: obj) : string array =
+                if isNull output || isNull output?context then
+                    [||]
+                else
+                    unbox<string array> output?context
+
+            let writeOutputField (output: obj) (field: string) (value: obj) : unit =
+                if not (isNull output) then
+                    output?(field) <- value
+
+            let appendCompactionContext (output: obj) (lines: string list) : unit =
+                let combined = Array.append (existingContextOf output) (Array.ofList lines)
+                writeOutputField output "context" (box combined)
+
+            let onSessionCompacting (input: obj) (output: obj) : Task<unit> =
+                task {
+                    let sid = sessionIdOfHook input
+
+                    Diagnostic.emit
+                        "compaction_started"
+                        [ "session_id", SessionId.value sid; "result", "cannot-refuse" ]
+
+                    let! contribution = product.Compaction.OnCompacting sid
+
+                    match contribution with
+                    | Wanxiangshu.Host.Ports.CompactionContribution.Nothing -> ()
+                    | Wanxiangshu.Host.Ports.CompactionContribution.Context lines ->
+                        appendCompactionContext output lines
+                    | Wanxiangshu.Host.Ports.CompactionContribution.ReplacePrompt prompt ->
+                        writeOutputField output "prompt" (box prompt)
+                }
+
+            let onCompactionAutoContinue (input: obj) (output: obj) : Task<unit> =
+                task {
+                    let sid = sessionIdOfHook input
+                    let! verdict = product.Compaction.AutoContinue sid
+
+                    match verdict with
+                    | Wanxiangshu.Host.Ports.ContinueVerdict.Allow -> writeOutputField output "enabled" (box true)
+                    | Wanxiangshu.Host.Ports.ContinueVerdict.Deny _reason ->
+                        writeOutputField output "enabled" (box false)
+                }
+
             let sessionCompacting =
-                registeredHook HookKey.SessionCompacting (pairedHook (box HostCompactionGate.onSessionCompacting))
+                registeredHook HookKey.SessionCompacting (pairedHook (box onSessionCompacting))
 
             let compactionAutoContinue =
-                registeredHook
-                    HookKey.CompactionAutoContinue
-                    (pairedHook (box HostCompactionGate.onCompactionAutoContinue))
+                registeredHook HookKey.CompactionAutoContinue (pairedHook (box onCompactionAutoContinue))
 
             let toolDefinitionRegistration =
                 registeredHook HookKey.ToolDefinition (pairedHook (box toolDefinition))
@@ -808,7 +919,11 @@ module PluginHooks =
             let event = registeredHook HookKey.Event (unaryHook (box observeEvent))
 
             let dispose =
-                let disposeAll () = scope.DisposeAsync()
+                let disposeAll () =
+                    task {
+                        do! product.Dispose()
+                        do! scope.DisposeAsync()
+                    }
 
                 registeredHook HookKey.Dispose (nullaryHook (box disposeAll))
 

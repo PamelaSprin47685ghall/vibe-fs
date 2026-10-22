@@ -9,24 +9,13 @@ import { permissions as rolePermissions } from '../../../dist/Participant/Person
 
 const caps = (...permissions) => permissions
 
-const surface = (role, permissionNames) => generate(role, caps(...permsOf(permissionNames)), 'en')
+const surface = (role, permissionNames) => generate(role, caps(...permissionNames), 'en')
 
 const memberNames = (s) => s.members.map((fragment) => fragment.memberName)
 
 const isNone = (value) => value === null
 
 const isSome = (value) => value !== null
-
-const PERMISSION_NAMES = [
-  'Fork', 'Join', 'Horizon', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment',
-]
-
-const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, n]))
-
-const ToolPermission = toolPermissionByName
-
-const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
 const fsPermissionsOf = (role) =>
   rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Glob', 'Move', 'Remove'].includes(n))
@@ -117,7 +106,7 @@ test('WHAT[repository-programming-022] JS_description_is_action_first_then_teach
 
   const zh = generate(
     'Coder',
-    caps(...permsOf(['Read', 'Write', 'Edit', 'Glob', 'Grep'])),
+    caps('Read', 'Write', 'Edit', 'Glob', 'Grep'),
     'zh-CN',
   ).description.replace(/\s+/g, ' ')
 

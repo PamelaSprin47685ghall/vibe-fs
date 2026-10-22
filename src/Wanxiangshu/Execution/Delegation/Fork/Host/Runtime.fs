@@ -22,7 +22,11 @@ open Fable.Core.JsInterop
 open Microsoft.FSharp.Control
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Participant.ManagedAgents
+open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Host
 open Wanxiangshu.Process
 open Wanxiangshu.Foundation
@@ -278,6 +282,11 @@ module private PtyHostHelpers =
         lock gate (fun () ->
             terminalByName
             |> Seq.tryPick (fun (KeyValue(name, id)) -> if id = ptyId then Some name else None))
+
+[<RequireQualifiedAccess>]
+module private ForkRuntimeLog =
+    [<Emit("console.error($0, $1)")>]
+    let logError (prefix: string) (message: string) : unit = jsNative
 
 type private PromptAcceptanceState =
     | Open of ResizeArray<IDisposable>
@@ -600,7 +609,7 @@ type HostForkRuntime
             | Role.DevOps, None -> invalidOp "DevOps PTY round drain is unavailable"
             | _ -> ()
 
-            return! HostForkRunLifecycle.viewForOutcome childViewForRun run outcome
+            return! HostForkRunLifecycle.safeViewResolution childViewForRun run outcome ()
         }
 
     let requireCompletionClaim (run: PendingHostRun) (error: exn) =
@@ -890,6 +899,15 @@ type HostForkRuntime
                     match sent with
                     | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted _ ->
                         lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
+
+                        let role =
+                            pending.IdentitySeed
+                            |> PromptAuthority.identitySeedParticipantIdentity
+                            |> ParticipantIdentity.role
+                            |> Option.defaultWith (fun () ->
+                                invalidOp "Deferred child assignment has no executable role")
+
+                        runStarted pending.ChildId role (this.DirectoryOf agentId)
                         Ok()
                     | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
                         // Never resend an outcome-unknown first prompt. Durable
@@ -910,11 +928,6 @@ type HostForkRuntime
             | None -> return Ok()
             | Some pending -> return! deliverDeferredPrompt pending
         }
-
-    /// Drop a deferSend preamble so process-review assignment can go out as
-    /// AgentOwnerRoot instead of a busy nudge against a session with no profile.
-    member _.DiscardDeferredFirstPrompt(agentId: string) : unit =
-        lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
 
     member internal _.Gate = gate
     member internal _.TerminalByName = terminalByName
@@ -1003,14 +1016,6 @@ type HostForkRuntime
             HandleProjection.isRetired handle projection
             || HandleProjection.isAbandoned handle projection)
 
-    member private this.DrainPtysIfDevOps(run: PendingHostRun) =
-        match run.Role, drainChildPtys with
-        | Role.DevOps, Some drain ->
-            run.Work
-            |> Option.defaultWith (fun () -> invalidOp "DevOps PTY drain requires admitted work")
-            |> drain
-        | _ -> Task.FromResult(())
-
     member this.Complete(run: PendingHostRun, outcome: TerminalOutcome) =
         // Terminal delivery is a synchronous Host callback. The runtime owns the
         // async tail so shutdown can drain it before releasing the Journal.
@@ -1071,8 +1076,7 @@ type HostForkRuntime
 
     member private _.ViewFromCompletion(completion: RunCompletion) : Result<string, string> =
         match completion.Outcome with
-        | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.View) -> Ok payload.View
-        | AgentCompleted _ -> Error "reusable fork completed without a bounded delivered view"
+        | AgentCompleted payload -> Ok payload.View
         | AgentFailed payload -> Error payload.Message
         | AgentAbandoned(_, reason) -> Error reason
 
@@ -1199,9 +1203,6 @@ type HostForkRuntime
     member this.Cancel() : unit = this.CancelAndDrain() |> ignore
 
     member _.List() = runtime.List()
-
-    member _.TryFindAgent(agentId: string) =
-        runtime.List() |> fst |> List.tryFind (fun a -> a.AgentId = agentId)
 
     member internal _.OwnsAgent(agentId: string) =
         lock gate (fun () -> processOwnedAgents.Contains agentId)
@@ -1367,6 +1368,8 @@ type HostForkRuntime
 
     member this.OwnsPty(id: PtyId) =
         lock gate (fun () -> ptyLeases.ContainsKey id.Value)
+
+    member this.IsPtyCompletion(runId: string) = this.OwnsPty(PtyId.Create runId)
 
     member this.AwaitObservedWork() : Task<unit> =
         let waiting =
@@ -1554,8 +1557,6 @@ type HostForkRuntime
             | None, Some failure -> return raise failure
             | None, None -> return ()
         }
-
-    member this.IsPtyCompletion(runId: string) = this.OwnsPty(PtyId.Create runId)
 
     member this.TryBindTerminalName(name: string, id: PtyId) : Result<unit, string> =
         if String.IsNullOrWhiteSpace name then

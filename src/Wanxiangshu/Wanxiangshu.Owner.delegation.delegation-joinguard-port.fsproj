@@ -9,7 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/HostJoinGuardJournalPort.fsi"/>
-    <Compile Include="Execution/Delegation/Fork/OpenCode/HostJoinGuardJournalPort.fs"/>
+    <Compile Include="Execution/Delegation/Fork/HostJoinGuardJournalPort.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/HostJoinGuardJournalPort.fs"/>
   </ItemGroup>
 </Project>

@@ -7,6 +7,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-dispatch-nudge.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-repair-interactionrepair.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj"/>

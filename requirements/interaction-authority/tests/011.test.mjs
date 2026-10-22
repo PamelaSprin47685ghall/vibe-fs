@@ -351,7 +351,7 @@ test('WHAT[interaction-authority-011] accepted root identity and its projection 
       handle, 'child-ia011', 'a bounded assignment', seed.value,
     )
     assert.equal(sent.ok, true, sent.error)
-    const accepted = await dispatch.acceptAgentOwnerRoot(handle, 'child-ia011', sent.key, 'actual-ia011-physical')
+    const accepted = await dispatch.acceptAgentOwnerRoot(handle, 'child-ia011', sent.key, 'actual-ia011-physical', 'Child')
     assert.equal(accepted.ok, true, accepted.error)
 
     // The attempt profile is one atomic record: every identity field the

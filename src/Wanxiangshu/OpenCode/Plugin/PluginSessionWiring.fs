@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Participant.ManagedAgents
+
 open Wanxiangshu.Execution.Delegation
 open System.Threading.Tasks
 
@@ -84,7 +86,9 @@ module PluginSessionWiring =
                     isUsable = (fun _ -> true)
                 )
 
-            let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+            let dispatcher =
+                PromptJournalAdapter.createWithOwnership attached.TryFindOwnership host.InternalLeafOwnerFor durable
+                |> PromptDispatcher.forPrompts
 
             let registerDelegate (delegateId: SessionId) (agent: string) =
                 wired.RegisterOwned(SessionId.value delegateId)
@@ -111,7 +115,8 @@ module PluginSessionWiring =
                     ?workspaceDirectory = workspaceDirectory,
                     ?onDelegatePrompt = Some CasebookLifecycle.notePrompt,
                     ?onDelegateAnswer = Some CasebookLifecycle.noteAnswer,
-                    ?onDelegateCleanup = Some CasebookLifecycle.cleanupDraft
+                    ?onDelegateCleanup = Some CasebookLifecycle.cleanupDraft,
+                    providerStepIdentity = wired.ProviderStepIdentity
                 )
 
             scope.AttachSyncDelegateRuntime syncDelegate

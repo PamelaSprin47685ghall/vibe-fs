@@ -6,9 +6,11 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Repository.Programming.Js
 
 /// JS-011/JS-053 sandbox: arbitrary model JavaScript runs in a Node vm
-/// context that carries only the injected `api` object — no fs / process /
-/// network / env globals reach the program. `new Function` is just the
-/// invocation mechanism; the vm context is the authority boundary.
+/// context created with DONT_CONTEXTIFY. Host values (api returns, errors,
+/// promises, Callable instances) cross a membrane into sandbox-realm copies
+/// so `constructor.constructor` cannot reach the real Node process. Transfer
+/// globals are deleted before user code runs; the deadline is checked with
+/// the host clock inside the membrane, not a forgeable sandbox Date.now.
 module JsSandbox =
 
     /// Park lifecycle state carried by the api closure. The park member reads
@@ -60,18 +62,11 @@ module JsSandbox =
     [<Import("Buffer", "node:buffer")>]
     let private nodeBuffer: obj = jsNative
 
-    [<Import("createContext", "node:vm")>]
-    let private createContext (sandbox: obj) : obj = jsNative
-
-    [<Import("runInContext", "node:vm")>]
-    let private runInContext (code: string) (context: obj) (options: obj) : obj = jsNative
-
     [<Emit("JSON.parse($0)")>]
     let private parseJson (text: string) : obj = jsNative
 
     [<Emit("""
-      (function(epoch) {
-        const reference = { current: Number(epoch) };
+      (function(reference) {
         const leases = new Map();
         let next = 0;
         let remaining = null;
@@ -106,7 +101,43 @@ module JsSandbox =
         };
       })($0)
     """)>]
-    let private createDeadlineOwner (epoch: int64) : obj = jsNative
+    let private createDeadlineOwner (reference: obj) : obj = jsNative
+
+    [<Import("Sandbox", "wanxiangli/sandbox")>]
+    let private SandboxFactory: unit -> obj = jsNative
+
+    let private sandboxLaw: obj = emitJsExpr (SandboxFactory) "$0()"
+
+    /// Start the model program under wanxiangli/sandbox (DONT_CONTEXTIFY +
+    /// realm membrane + afterEvaluate driver). Returns host DeadlineRef and
+    /// ProgramPromise.
+    let private launchMembraned
+        (api: obj)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (baseClassSource: string)
+        (modelSource: string)
+        : obj =
+        emitJsExpr
+            (sandboxLaw, api, deadlineMs, deadlineEpochMs, baseClassSource, modelSource)
+            """
+(function(law, api, deadlineMs, deadlineEpochMs, baseClass, model) {
+  var handle = law.run(api, Number(deadlineMs), Number(deadlineEpochMs), baseClass, model);
+  return { DeadlineRef: handle.deadlineRef, ProgramPromise: handle.programPromise, Pause: handle.pause, Resume: handle.resume };
+})($0, $1, $2, $3, $4, $5)
+"""
+
+    let private parkedPrograms: obj = emitJsExpr () "new WeakMap()"
+
+    let private pauseProgram (state: ParkState) : unit =
+        emitJsExpr
+            (parkedPrograms, state)
+            "(function(bindings, state) { const handle = bindings.get(state); if (handle) handle.Pause(); })($0, $1)"
+
+    let private resumeProgram (state: ParkState) : unit =
+        emitJsExpr
+            (parkedPrograms, state)
+            "(function(bindings, state) { const handle = bindings.get(state); if (handle) handle.Resume(); })($0, $1)"
 
     /// Sentinel payloads the wrapper returns instead of the program result;
     /// recognized by prefix, never by exception-message sniffing (JS-019).
@@ -123,73 +154,10 @@ module JsSandbox =
     /// prefix, not a message-text sniff.
     let abandonedSentinel = "__jsAbandoned"
 
-    /// Wrap base class + model source into an async IIFE that evaluates to a
-    /// JSON string. The api is proxied so every member call re-checks the
-    /// mutable injected deadline reference: synchronous segments are bounded by
-    /// the vm timeout, async segments by the proxy (JS-054.1). The deadline is
-    /// read from the vm-global `__deadlineRef.current` at each call, so a
-    /// caller may reset it between calls without re-wrapping the program.
-    ///
-    /// Park lifecycle: the api's `park(payload)` member (built by
-    /// ToolsBindings) sets `__parkState.ParkRequested`, fires the park signal
-    /// the workflow races against, and returns a deferred Promise the program
-    /// awaits. The wrapper itself is a plain async IIFE: it stays pending while
-    /// the program is suspended at `await this.park`, and resolves with the final
-    /// result when the program finishes (or with a failure/timeout sentinel).
-    /// `unpark` resolves the deferred with the injected value, letting the
-    /// program continue as if the await returned that value.
-    ///
-    /// The abandon path rejects the program promise with an `__jsAbandoned`
-    /// marker so native try/finally blocks run as a finalizer (PLAN S2 step 6).
-    let wrapProgram (baseClassSource: string) (modelSource: string) : string =
-        "(async () => {\n"
-        + baseClassSource
-        + "\n"
-        + modelSource
-        + "\n"
-        + "const __wrap = (target) => new Proxy(target, {\n"
-        + "  get(target, prop) {\n"
-        + "    const value = target[prop];\n"
-        + "    if (typeof value === 'function') {\n"
-        + "      return (...args) => {\n"
-        + "        if (Date.now() > __deadlineRef.current) {\n"
-        + "          const err = new Error('program exceeded its deadline');\n"
-        + "          err.__jsFailure = { code: 'PROGRAM_TIMEOUT', reason: 'program exceeded its deadline' };\n"
-        + "          throw err;\n"
-        + "        }\n"
-        + "        return value(...args);\n"
-        + "      };\n"
-        + "    }\n"
-        + "    if (value && typeof value === 'object') return __wrap(value);\n"
-        + "    return value;\n"
-        + "  }\n"
-        + "});\n"
-        + "const __api = __wrap(api);\n"
-        + "let __result;\n"
-        + "try { __result = await new Js(__api).run(); }\n"
-        + "catch (__e) {\n"
-        + "  if (__e && __e.__jsFailure && typeof __e.__jsFailure.code === 'string') {\n"
-        + "    return JSON.stringify({\n"
-        + "      __jsHostFailed: true,\n"
-        + "      code: __e.__jsFailure.code,\n"
-        + "      reason: String(__e.__jsFailure.reason || __e.__jsFailure.code),\n"
-        + "      minimumOutputBudgetBytes: __e.__jsFailure.minimumOutputBudgetBytes\n"
-        + "    });\n"
-        + "  }\n"
-        + "  if (__e && __e.__jsAbandoned) {\n"
-        + "    return JSON.stringify({ __jsAbandoned: true });\n"
-        + "  }\n"
-        + "  if (__e && __e.__jsDelivered) {\n"
-        + "    return JSON.stringify({ __jsDelivered: true, view: __e.__jsDelivered.view });\n"
-        + "  }\n"
-        + "  return JSON.stringify({ __jsProgramFailed: true, message: String((__e && __e.message) || __e) });\n"
-        + "}\n"
-        + "try {\n"
-        + "  const __json = JSON.stringify(__result);\n"
-        + "  return typeof __json === 'string' ? __json : JSON.stringify({ __jsInvalidReturn: true });\n"
-        + "}\n"
-        + "catch (__e2) { return JSON.stringify({ __jsInvalidReturn: true }); }\n"
-        + "})()"
+    // The async IIFE that wraps base class + model source (sentinel encoding
+    // of failures / park / delivered / invalid return) is owned by
+    // wanxiangli/sandbox. The host no longer builds or exposes that string;
+    // launchMembraned hands the two source strings to Sandbox().run.
 
     /// Classify a synchronous vm error: SyntaxError → INVALID_PROGRAM;
     /// vm timeout → PROGRAM_TIMEOUT; anything else → PROGRAM_FAILED.
@@ -261,14 +229,6 @@ module JsSandbox =
         (parkState: ParkState option)
         : Task<JsRunHandle> =
         task {
-            let deadlineOwner = createDeadlineOwner deadlineEpochMs
-            let deadlineRef: obj = deadlineOwner?reference
-
-            let borrowDeadline (milliseconds: int64) : unit -> unit =
-                deadlineOwner?borrow (milliseconds) |> unbox
-
-            let resetDeadline (epoch: int64) : unit = deadlineOwner?reset (epoch)
-
             let state =
                 match parkState with
                 | Some state -> state
@@ -281,33 +241,34 @@ module JsSandbox =
                       ParkStack = null
                       AbandonRequested = false }
 
-            try
-                let context =
-                    createContext (
-                        createObj [ "api" ==> api; "__deadlineRef" ==> deadlineRef; "__parkState" ==> state ]
-                    )
+            // Membrane launch: no host objects on the context global object;
+            // ProgramPromise is a host-driven promise that drains afterEvaluate
+            // microtasks so post-await sync loops still hit the vm timeout.
+            let launched =
+                launchMembraned api deadlineMs deadlineEpochMs baseClassSource modelSource
 
-                let promise =
-                    runInContext
-                        (wrapProgram baseClassSource modelSource)
-                        context
-                        (createObj [ "timeout" ==> deadlineMs ])
+            let deadlineRef: obj = launched?DeadlineRef
+            let deadlineOwner = createDeadlineOwner deadlineRef
+            emitJsExpr (parkedPrograms, state, launched) "$0.set($1, $2)" |> ignore
 
-                return
-                    { ProgramPromise = promise :?> Task<string>
-                      DeadlineRef = deadlineRef
-                      Api = api
-                      BorrowDeadline = borrowDeadline
-                      ResetDeadline = resetDeadline
-                      ParkState = state }
-            with ex ->
-                return
-                    { ProgramPromise = task { return raise ex }
-                      DeadlineRef = deadlineRef
-                      Api = api
-                      BorrowDeadline = borrowDeadline
-                      ResetDeadline = resetDeadline
-                      ParkState = state }
+            if state.ParkRequested then
+                pauseProgram state
+
+            let borrowDeadline (milliseconds: int64) : unit -> unit =
+                deadlineOwner?borrow (milliseconds) |> unbox
+
+            let resetDeadline (epoch: int64) : unit = deadlineOwner?reset (epoch)
+
+            let promise: Task<string> =
+                emitJsExpr (launched) "Promise.resolve($0.ProgramPromise)"
+
+            return
+                { ProgramPromise = promise
+                  DeadlineRef = deadlineRef
+                  Api = api
+                  BorrowDeadline = borrowDeadline
+                  ResetDeadline = resetDeadline
+                  ParkState = state }
         }
 
     /// Start a wrapped program in a fresh vm context without awaiting it to
@@ -343,60 +304,81 @@ module JsSandbox =
                 return Error(classifySyncError ex)
         }
 
-    /// Classify one already-awaited wrapper JSON string (sentinel prefixes and
-    /// output bound) without re-awaiting the program promise. The park race
-    /// uses this so a program failure on the raced path decodes exactly like
-    /// the plain path.
-    let classifyResult (json: string) (outputBoundBytes: int) : Result<string, JsFailure> =
-        decodeRunResult json outputBoundBytes
-
     /// Reset the async deadline of an in-flight sandbox program. Subsequent api
     /// member calls re-check `deadlineRef.current`, so the new epoch takes
     /// effect without re-wrapping or re-running the program.
     let resetDeadline (handle: JsRunHandle) (deadlineEpochMs: int64) : unit = handle.ResetDeadline deadlineEpochMs
 
-    let private extractFrameDigits (frame: string) : string option =
-        let marker = "evalmachine.<anonymous>:"
-        let at = frame.IndexOf marker
+    /// The program-script line a stack frame reports, if the frame is one.
+    ///
+    /// The sandbox evaluates the program with `new Function`, so V8 prints a
+    /// program frame as `at Js.run (eval at globalThis.__makeRunner
+    /// (evalmachine.<anonymous>:226:19), <anonymous>:150:33)`: the trailing
+    /// position is the line inside the evaluated program, while the
+    /// `evalmachine.<anonymous>` position is the runner's own source. A
+    /// frame that ran an evaluated *string* carries a nested `eval at` in its
+    /// prefix, and its trailing position is that string's own line — a
+    /// number that can coincide with a model line, so such a frame reports
+    /// no line.
+    let private programLineOfFrame (rawFrame: string) : int option =
+        let frame = rawFrame.Trim()
+        let marker = ", <anonymous>:"
+        let at = frame.LastIndexOf(marker)
+        let rest = if at < 0 then "" else frame.Substring(at + marker.Length)
+        let colon = rest.IndexOf ':'
+        let digits = if colon >= 0 then rest.Substring(0, colon) else rest
+        let firstEvalAt = frame.IndexOf "eval at"
+        let lastEvalAt = frame.LastIndexOf "eval at"
 
-        if at < 0 then
-            None
-        else
-            let rest = frame.Substring(at + marker.Length)
-            let colon = rest.IndexOf ':'
-            Some(if colon >= 0 then rest.Substring(0, colon) else rest)
+        let isProgramFrame =
+            frame.StartsWith "at "
+            && at >= 0
+            && firstEvalAt >= 0
+            && firstEvalAt = lastEvalAt
 
-    let private parseModelLine (modelStartLine: int) (modelEndLine: int) (digits: string) : int option =
         match System.Int32.TryParse digits with
-        | true, line when line >= modelStartLine && line <= modelEndLine -> Some(line - modelStartLine)
+        | true, line when isProgramFrame -> Some line
         | _ -> None
 
-    let private tryResolveFrameLine (modelStartLine: int) (modelEndLine: int) (frame: string) : int option =
-        extractFrameDigits frame
-        |> Option.bind (parseModelLine modelStartLine modelEndLine)
+    /// The model line a frame reports, when it is a program frame inside the
+    /// model source.
+    let private modelLineOfFrame (modelStart: int) (modelEnd: int) (frame: string) : int option =
+        match programLineOfFrame frame with
+        | Some line when line >= modelStart && line <= modelEnd -> Some(line - modelStart)
+        | _ -> None
 
-    let private locateSuspendedLine (modelStartLine: int) (modelEndLine: int) (stack: string) : int =
+    /// The model line the program is suspended on, or -1 when no frame
+    /// identifies one (no stack, no frame, or no frame inside the model
+    /// source). A missing marker degrades to ` | ` on every line; it never
+    /// marks a line that is not the suspended one.
+    let private locateSuspendedLine (baseLines: int) (modelLines: int) (stack: string) : int =
         if isNull stack then
             -1
         else
+            // Script line of the model's first line. The `new Function`
+            // runner numbers the program from the reconstructed function
+            // source, whose two header lines (`function anonymous(api,JSON`
+            // and `) {`) precede the evaluated body, whose first line
+            // `(async () => {` shares the third line with the `return ((`
+            // prefix: the base class therefore starts at script line 4 and
+            // the model source at `baseLines + 4`.
+            let modelStart = baseLines + 4
+            let modelEnd = modelStart + modelLines - 1
+
             stack.Split('\n')
-            |> Array.tryPick (tryResolveFrameLine modelStartLine modelEndLine)
+            |> Array.tryPick (fun rawFrame -> modelLineOfFrame modelStart modelEnd rawFrame)
             |> Option.defaultValue -1
 
     /// Render the full model program with the suspended line marked. The
-    /// wrapper places line 1 at `(async () => {`, the generated base class
-    /// next, then the model source; `modelStartLine` is the base class line
-    /// count plus two. The closest vm frame at or after that line is the
-    /// model frame that called park (directly or through where). The marker
-    /// is `>| ` on the suspended line and ` | ` everywhere else; a missing
+    /// closest program frame inside the model source is the model frame that
+    /// called park (directly or through where). The marker is `>| ` on the
+    /// suspended line and ` | ` everywhere else; a missing or unreadable
     /// stack degrades to ` | ` on every line, never to a failed park.
     let sourceWithExecutionMarker (baseClassSource: string) (modelSource: string) (stack: string) : string =
         let lines = modelSource.Split('\n')
-        // Wrapper lines: 1 = "(async () => {", then the base class, then the
-        // model source.
-        let modelStartLine = baseClassSource.Split('\n').Length + 2
-        let modelEndLine = modelStartLine + lines.Length - 1
-        let currentLine = locateSuspendedLine modelStartLine modelEndLine stack
+
+        let currentLine =
+            locateSuspendedLine (baseClassSource.Split('\n').Length) lines.Length stack
 
         lines
         |> Array.mapi (fun index line -> (if index = currentLine then ">| " else " | ") + line)
@@ -427,6 +409,7 @@ module JsSandbox =
     let suspendProgram (parkState: ParkState) (payload: obj) : obj =
         parkState.ParkRequested <- true
         parkState.ParkPayload <- payload
+        pauseProgram parkState
 
         if not (isNull parkState.ParkSignalResolve) then
             emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
@@ -439,6 +422,8 @@ module JsSandbox =
     /// Called by `unpark` with the injected value; the program continues as if
     /// the await returned that value.
     let unpark (parkState: ParkState) (value: obj) : unit =
+        resumeProgram parkState
+
         if not (isNull parkState.ParkDeferredResolve) then
             emitJsExpr (parkState.ParkDeferredResolve, value) "$0($1)" |> ignore
 
@@ -447,6 +432,7 @@ module JsSandbox =
     /// point so native try/finally blocks run as a finalizer.
     let abandon (parkState: ParkState) : unit =
         parkState.AbandonRequested <- true
+        resumeProgram parkState
 
         if not (isNull parkState.ParkDeferredReject) then
             emitJsExpr

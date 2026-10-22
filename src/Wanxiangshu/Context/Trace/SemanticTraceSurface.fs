@@ -8,6 +8,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
@@ -30,7 +32,8 @@ module SemanticTraceSurface =
 
     let completeWithoutDelivery role session authorityRoot providerRun text : Task<obj> =
         task {
-            let events = Events.HostEventPort() :> IEventObservationPort
+            let events =
+                Events.HostEventPort(Events.newTerminalSource ()) :> IEventObservationPort
             // DSL-MUTABLE: resource — count notifications from this proof's subscription.
             let notifications = ref 0
 
@@ -142,19 +145,22 @@ module SemanticTraceSurface =
 
     let private messagePartOf value =
         match text (field value "kind") with
-        | "text" -> Wanxiangshu.OpenCode.MessagePart.Text(text (field value "text"))
-        | "reasoning" -> Wanxiangshu.OpenCode.MessagePart.Reasoning(text (field value "text"))
+        | "text" -> Wanxiangshu.Foundation.HostSession.MessagePart.Text(text (field value "text"))
+        | "reasoning" -> Wanxiangshu.Foundation.HostSession.MessagePart.Reasoning(text (field value "text"))
         | "tool-call"
         | "tool_call" ->
-            Wanxiangshu.OpenCode.MessagePart.ToolCall(
+            Wanxiangshu.Foundation.HostSession.MessagePart.ToolCall(
                 text (field value "callId"),
                 text (field value "name"),
                 text (field value "args")
             )
         | "tool-result"
         | "tool_result" ->
-            Wanxiangshu.OpenCode.MessagePart.ToolResult(text (field value "callId"), text (field value "result"))
-        | "activity" -> Wanxiangshu.OpenCode.MessagePart.Activity(text (field value "activity"))
+            Wanxiangshu.Foundation.HostSession.MessagePart.ToolResult(
+                text (field value "callId"),
+                text (field value "result")
+            )
+        | "activity" -> Wanxiangshu.Foundation.HostSession.MessagePart.Activity(text (field value "activity"))
         | other -> failwith $"SemanticTraceSurface: unknown capture part '{other}'"
 
     let private projectionOf value : ProviderSemanticProjection =

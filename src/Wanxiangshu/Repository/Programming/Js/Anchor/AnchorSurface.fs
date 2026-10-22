@@ -15,76 +15,68 @@ module AnchorSurface =
     [<Emit("$0 === undefined || $0 === null")>]
     let private isNullish (value: obj) : bool = jsNative
 
-    [<Emit("$0 === null")>]
-    let private isNullValue (value: obj) : bool = jsNative
-
     [<Emit("typeof $0 === 'string'")>]
     let private isString (value: obj) : bool = jsNative
-
-    [<Emit("typeof $0 === 'number' && Number.isInteger($0) && $0 >= 0 && $0 < 2147483647")>]
-    let private isAnchor (value: obj) : bool = jsNative
-
-    [<Emit("typeof $0 === 'object' && $0 !== null && !Array.isArray($0)")>]
-    let private isRecord (value: obj) : bool = jsNative
 
     [<Emit("$0[$1]")>]
     let private getProperty (value: obj) (name: string) : obj = jsNative
 
-    [<Emit("Object.keys($0)")>]
-    let private keys (value: obj) : string[] = jsNative
-
     let countTokens text = tokenCount (encodeTokens text)
 
-    let private invalid detail =
-        Error(JsFailure.ViewDeclarationInvalid detail)
+    /// The plain-JS failure receipt: the same shape `captureView` already
+    /// returns, so every JS caller reads one vocabulary.
+    let private failureReceipt (failure: JsFailure) : obj =
+        createObj
+            [ "ok" ==> false
+              "code" ==> JsFailure.code failure
+              "reason" ==> JsFailure.reason failure ]
 
-    let private pairOf (source: obj) (key: string) =
-        match System.Int32.TryParse key with
-        | true, anchor when anchor >= 0 && anchor < System.Int32.MaxValue && string anchor = key ->
-            let value = getProperty source key
+    /// The declaration as plain data: the typed declaration stays inside this
+    /// module, so no JS caller can read a union to learn whether the shape was
+    /// legal.
+    let private declarationValue (declaration: AnchorViewDeclaration) : obj =
+        createObj
+            [ "prefixUntil" ==> declaration.PrefixUntil
+              "thenMap"
+              ==> (declaration.ThenMap
+                   |> List.map (fun (anchor, summary) ->
+                       string anchor, (summary |> Option.map box |> Option.defaultValue null))
+                   |> createObj) ]
 
-            if isNullValue value then
-                Ok(anchor, None)
-            elif isString value && not (System.String.IsNullOrWhiteSpace(unbox<string> value)) then
-                Ok(anchor, Some(unbox<string> value))
-            else
-                invalid (sprintf "thenMap[%s] must be null or a non-blank summary string" key)
-        | _ -> invalid (sprintf "thenMap key '%s' must be a non-negative anchor number" key)
+    let private declarationReceipt (declaration: AnchorViewDeclaration) : obj =
+        let value = declarationValue declaration
+        let prefixUntil: int = value?prefixUntil
 
-    let parseDeclaration (value: obj) : Result<AnchorViewDeclaration, JsFailure> =
-        if not (isRecord value) then
-            invalid "view must contain prefixUntil and thenMap"
-        elif keys value |> Array.exists (fun key -> key <> "prefixUntil" && key <> "thenMap") then
-            invalid "view accepts only prefixUntil and thenMap"
-        else
-            let prefix = getProperty value "prefixUntil"
-            let mapping = getProperty value "thenMap"
+        createObj [ "ok" ==> true; "prefixUntil" ==> prefixUntil; "thenMap" ==> value?thenMap ]
 
-            if not (isAnchor prefix) then
-                invalid "prefixUntil is required and must be a non-negative integer anchor number"
-            elif not (isRecord mapping) then
-                invalid "thenMap is required and must map anchor numbers to summaries or null"
-            else
-                keys mapping
-                |> Array.toList
-                |> List.map (pairOf mapping)
-                |> List.fold
-                    (fun result pair ->
-                        match result, pair with
-                        | Ok pairs, Ok entry -> Ok(entry :: pairs)
-                        | Error failure, _
-                        | _, Error failure -> Error failure)
-                    (Ok [])
-                |> Result.map (fun pairs ->
-                    { PrefixUntil = int (unbox<float> prefix)
-                      ThenMap = pairs |> List.sortBy fst })
+    /// The plain-JS receipt of one typed decision.
+    let private receiptOf (decision: Result<AnchorViewDeclaration, JsFailure>) : obj =
+        match decision with
+        | Ok declaration -> declarationReceipt declaration
+        | Error failure -> failureReceipt failure
 
-    let parseReportMapping (mapping: obj) : Result<AnchorViewDeclaration, JsFailure> =
-        parseDeclaration (createObj [ "prefixUntil" ==> 0; "thenMap" ==> mapping ])
+    /// The declaration shape rule, answered as plain JS. Shape rules belong to
+    /// wanxiangli/compression; the host maps the first violation onto its
+    /// failure code — the very same rule `AnchorDeclarationRule` gives F#
+    /// callers.
+    ///
+    /// The public receipt is plain JS: `{ ok: true, prefixUntil, thenMap }` or
+    /// `{ ok: false, code, reason }`.
+    let parseDeclaration (value: obj) : obj =
+        AnchorDeclarationRule.parse value |> receiptOf
 
-    let reportMaterial (sessionId: string) (mapping: obj) : Result<(int * string) list, JsFailure> =
-        parseReportMapping mapping
-        |> Result.map (fun declaration ->
+    /// A report mapping is exactly a declaration with `prefixUntil = 0`, so it
+    /// is judged by the same rule and answers with the same receipt shape.
+    let parseReportMapping (mapping: obj) : obj =
+        AnchorDeclarationRule.parseReportMapping mapping |> receiptOf
+
+    /// The read-only projection of the caller's visible interval under a report
+    /// mapping. The receipt is plain JS: `{ ok: true, material }` (an array of
+    /// `{ anchor, text }`) or `{ ok: false, code, reason }`.
+    let reportMaterial (sessionId: string) (mapping: obj) : obj =
+        match AnchorDeclarationRule.parseReportMapping mapping with
+        | Error failure -> failureReceipt failure
+        | Ok declaration ->
             let numberOf = AnchorLedger.numberMessage sessionId
 
             let messages =
@@ -97,16 +89,12 @@ module AnchorSurface =
             let entries, _ =
                 AnchorView.generate numberOf (fun _ -> 0) (AnchorLedger.replacements sessionId) declaration messages
 
-            AnchorView.material numberOf entries)
-
-    let private declarationValue (declaration: AnchorViewDeclaration) =
-        createObj
-            [ "prefixUntil" ==> declaration.PrefixUntil
-              "thenMap"
-              ==> (declaration.ThenMap
-                   |> List.map (fun (anchor, summary) ->
-                       string anchor, (summary |> Option.map box |> Option.defaultValue null))
-                   |> createObj) ]
+            createObj
+                [ "ok" ==> true
+                  "material"
+                  ==> (AnchorView.material numberOf entries
+                       |> List.map (fun (anchor, text) -> createObj [ "anchor" ==> anchor; "text" ==> text ])
+                       |> List.toArray) ]
 
     let numberMessage sessionId messageId =
         AnchorLedger.numberMessage sessionId messageId
@@ -120,23 +108,20 @@ module AnchorSurface =
         |> List.toArray
 
     let parse (declaration: obj) : Result<obj, JsFailure> =
-        parseDeclaration declaration |> Result.map (fun _ -> declaration)
+        AnchorDeclarationRule.parse declaration |> Result.map (fun _ -> declaration)
 
     let setView (sessionId: string) (declaration: obj) : Result<unit, JsFailure> =
         if isNullish declaration then
             Ok()
         else
-            parseDeclaration declaration |> Result.map (AnchorLedger.setView sessionId)
+            AnchorDeclarationRule.parse declaration
+            |> Result.map (AnchorLedger.setView sessionId)
 
     /// Plain JS receipt for declaration capture; typed Host callers use setView.
     let captureView (sessionId: string) (declaration: obj) : obj =
         match setView sessionId declaration with
         | Ok() -> createObj [ "ok" ==> true ]
-        | Error failure ->
-            createObj
-                [ "ok" ==> false
-                  "code" ==> JsFailure.code failure
-                  "reason" ==> JsFailure.reason failure ]
+        | Error failure -> failureReceipt failure
 
     let takeView sessionId =
         AnchorLedger.takeView sessionId

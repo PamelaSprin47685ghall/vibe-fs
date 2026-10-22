@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 
@@ -21,11 +22,7 @@ module AssumeTool =
         [<Literal>]
         let Committed = "tool/assume/committed"
 
-    let roleAllowed (role: Role) : bool =
-        StaticTools.cognitiveUtilityRoleAllowed role
 
-    let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ role -> roleAllowed role)
 
     let private execute (args: HostToolArguments) (ctx: HostToolContext) =
         task {
@@ -42,5 +39,4 @@ module AssumeTool =
           Arguments =
             [ "assumption",
               ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgAssumption Map.empty) factory ]
-          Admission = admission
           Execute = execute }

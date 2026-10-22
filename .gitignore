@@ -72,3 +72,4 @@ ehthumbs.db
 /local/
 /local:/
 /requirements/structured-workflow/tests/fixtures/locality-dependencies/.local/
+/.test-logs/

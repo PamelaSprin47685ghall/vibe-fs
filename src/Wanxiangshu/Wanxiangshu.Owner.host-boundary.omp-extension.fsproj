@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>omp-extension</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>omp-extension</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-neutral-ports.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.omp-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.second-host-plugin.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
+    <Compile Include="Composition/Omp/OmpExtension.fsi"/>
+    <Compile Include="Composition/Omp/OmpExtension.fs"/>
+  </ItemGroup>
+</Project>

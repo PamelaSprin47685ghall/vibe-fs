@@ -8,6 +8,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// Direct-CE reconcile scheduler (FLOW-001 / PR4).
 /// Owns queue / generation / single-flight / clear-session runtime state.
@@ -48,7 +49,5 @@ module Reconciler =
         member BindActiveRun: value: ActiveRunBinding -> unit
 
         member TryPhysicalUserMessage: sessionId: SessionId -> PhysicalUserMessageId option
-
-        member RootBindings: Dictionary<string, PhysicalUserMessageId>
 
         member ClearSession: sessionId: SessionId -> unit

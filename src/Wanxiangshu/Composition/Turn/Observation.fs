@@ -4,6 +4,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Execution.Failure
 
 /// DSL-state-combination: domain — this is a single reconciled provider-turn
@@ -28,7 +29,7 @@ type ReconciledTurn =
         Parts: MessagePart array
         Finish: string option
         ErrorName: string option
-        Model: OpencodeModel option
+        Model: HostModel option
         /// Publishable provider-turn classification (HOST-004). Never TurnUnknown.
         Outcome: ReconcileProgram.TurnOutcome
         /// Reconciliation-private finish=None observation. When Some, evidence and
@@ -67,4 +68,11 @@ type ActiveRunBinding =
         ContinuationMessageIds: Set<string>
         Role: Role option
         Directory: string option
+        /// The Fission owner whose authority this session inherits.
+        ///
+        /// A Fission lane never owns an authority root: it continues the
+        /// owner's logical run. This marker says the bound root belongs to
+        /// another session, so reconcile may accept a root that is not in this
+        /// session's transcript. `None` for every ordinary session.
+        InheritedAuthorityOwner: SessionId option
     }

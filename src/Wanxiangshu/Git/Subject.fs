@@ -28,50 +28,78 @@ module GitSubject =
     let execIn (directory: string) (arguments: string array) : Task<string> =
         execFileAsync execFileJs Executable (Array.append [| "-C"; directory |] arguments) utf8
 
-    // --- common-dir ---
+    // --- worktree root ---
 
-    let revParseGitCommonDir (workspace: string) : Task<string> =
+    /// The worktree root of `directory`, not the entry directory and not the common Git dir.
+    let revParseShowToplevel (directory: string) : Task<string> =
         task {
-            let! result = execIn workspace [| "rev-parse"; "--git-common-dir" |]
-            return result.Trim()
+            let! raw = execIn directory [| "rev-parse"; "--show-toplevel" |]
+            return raw.TrimEnd('\r', '\n')
         }
 
-    // --- tree-hash ---
+module GitPorcelain =
+    type private Messages =
+        abstract worktrees: output: string -> obj array
+        abstract primaryWorktree: outputZ: string -> obj
+        abstract branches: output: string -> string array
+        abstract shortBranch: reference: string -> string
+        abstract isManagerBranch: reference: string -> bool
+        abstract managerBranchOf: jobId: string -> string
+        abstract rebaseStatePaths: merge: obj * apply: obj -> string array
+        abstract staleWorktrees: entries: obj array * owned: string array -> string array
+        abstract staleBranches: branches: string array * owned: string array -> string array
 
-    let diffHeadBinary (directory: string) : Task<string> =
-        execIn directory [| "diff"; "HEAD"; "--binary"; "--no-ext-diff"; "--" |]
+    [<Import("GitPorcelain", "wanxiangli/git-porcelain")>]
+    let private factory: unit -> Messages = jsNative
 
-    let lsFilesUntracked (directory: string) : Task<string> =
-        execIn directory [| "ls-files"; "--others"; "--exclude-standard" |]
+    let private law: Messages = factory ()
 
-    let lsFilesUntrackedZ (directory: string) : Task<string> =
-        execIn directory [| "ls-files"; "--others"; "--exclude-standard"; "-z" |]
+    let worktrees (output: string) : (string * string option) list =
+        law.worktrees output
+        |> Array.map (fun entry ->
+            let branch: obj = entry?branch
+            (unbox<string> entry?path), (if isNull branch then None else Some(unbox<string> branch)))
+        |> Array.toList
 
-    let statusPorcelainV2Z (directory: string) : Task<string> =
-        execIn directory [| "status"; "--porcelain=v2"; "-z"; "--untracked-files=all" |]
+    let primaryWorktree (outputZ: string) : Result<string, string> =
+        let result = law.primaryWorktree outputZ
 
-    let lsFilesStageZ (directory: string) : Task<string> =
-        execIn directory [| "ls-files"; "--stage"; "-z" |]
+        if unbox<bool> result?ok then
+            Ok(unbox<string> result?path)
+        else
+            Error(unbox<string> result?code)
 
-    let hashObjectNoFilters (directory: string) (path: string) : Task<string> =
-        task {
-            let! result = execIn directory [| "hash-object"; "--no-filters"; "--"; path |]
-            return result.Trim()
-        }
+    let branches (output: string) : string list = law.branches output |> Array.toList
 
-    let revParseHeadTree (directory: string) : Task<string> =
-        task {
-            let! result = execIn directory [| "rev-parse"; "HEAD^{tree}" |]
-            return result.Trim()
-        }
+    let shortBranch (reference: string) : string = law.shortBranch reference
 
-    let tryRevParseHeadTree (directory: string) : Task<string option> =
-        task {
-            try
-                let! output =
-                    execFileAsync execFileJs Executable [| "-C"; directory; "rev-parse"; "HEAD^{tree}" |] quietUtf8
+    let isManagerBranch (reference: string) : bool = law.isManagerBranch reference
 
-                return Some(output.Trim())
-            with _ ->
-                return None
-        }
+    let managerBranchOf (jobId: string) : string = law.managerBranchOf jobId
+
+    let rebaseStatePaths (merge: int * string) (apply: int * string) : string list =
+        let mergeCode, mergePath = merge
+        let applyCode, applyPath = apply
+
+        law.rebaseStatePaths (
+            createObj [ "code" ==> mergeCode; "path" ==> mergePath ],
+            createObj [ "code" ==> applyCode; "path" ==> applyPath ]
+        )
+        |> Array.toList
+
+    let staleWorktrees (entries: (string * string option) list) (owned: string list) : string list =
+        let wire =
+            entries
+            |> List.map (fun (path, branch) ->
+                createObj
+                    [ "path" ==> path
+                      "branch"
+                      ==> (match branch with
+                           | Some value -> box value
+                           | None -> null) ])
+            |> List.toArray
+
+        law.staleWorktrees (wire, List.toArray owned) |> Array.toList
+
+    let staleBranches (branches: string list) (owned: string list) : string list =
+        law.staleBranches (List.toArray branches, List.toArray owned) |> Array.toList

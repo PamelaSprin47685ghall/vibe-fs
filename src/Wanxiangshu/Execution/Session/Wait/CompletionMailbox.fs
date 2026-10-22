@@ -74,8 +74,6 @@ type CompletionMailbox(gate: obj) =
 
     member _.PendingPtyCount: int = unbox<int> (view?pendingPtyCount ())
 
-    member _.PendingAgentWakeCount: int = unbox<int> (view?pendingAgentWakeCount ())
-
     member _.IsCancelled: bool = unbox<bool> (view?isCancelled ())
 
     interface ICompletionMailbox<AgentHandleId, PtyJoinItem, JoinInterruptReason, MailboxWakeReason> with

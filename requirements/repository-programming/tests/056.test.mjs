@@ -28,17 +28,28 @@ ${body}
 const runProgram = (dir, body, sessionId) =>
   execute(dir, 'Manager', 'en', sessionId, { program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
 
-// A stateful fake host: forks are remembered until the next join consumes them.
+// A stateful fake host: every delegation member travels the single
+// `(name, payload, reportMapping)` entry; delegated charges are remembered
+// until the next join consumes them.
 const fakeHost = () => {
   const pending = []
+  const calls = []
   let counter = 0
   return {
     pending,
-    fork: async (payload) => {
+    calls,
+    delegate: async (name, payload, reportMapping) => {
+      calls.push({ member: name, payload, reportMapping })
+      if (name === 'devops') {
+        return { ok: true, record: 'stub-devops' }
+      }
+      if (name !== 'fork' && name !== 'commission' && name !== 'resume') {
+        return { ok: false, code: 'unknown-delegate' }
+      }
       if (!payload || !payload.charge) return { ok: false, code: 'charge-required' }
       counter += 1
       const agentId = `agent-${counter}`
-      pending.push({ name: payload.name, agentId })
+      pending.push({ name: payload.name, agentId, member: name })
       return { ok: true, name: payload.name, agentId, outcome: 'created' }
     },
     join: async () => {
@@ -66,7 +77,7 @@ const fakeHost = () => {
 }
 
 const install = (sessionId, host) =>
-  installDelegationHost(sessionId, host.fork, host.join, host.fission, host.horizon, host.advisor)
+  installDelegationHost(sessionId, host.delegate, host.join, host.fission, host.horizon, host.advisor)
 
 test('WHAT[repository-programming-056] delegation members return data envelopes, never prose', async () => {
   const { dir, cleanup } = sandbox()
@@ -76,7 +87,7 @@ test('WHAT[repository-programming-056] delegation members return data envelopes,
     install(sessionId, host)
     const outcome = await runProgram(
       dir,
-      `    const placed = await this.fork("index the parser module");
+      `    const placed = await this.fork("index the parser module", { 1: null });
     const joined = await this.join();
     return { placed, joined };`,
       sessionId,
@@ -197,7 +208,7 @@ test('WHAT[repository-programming-056] a refusal envelope reaches the program as
     install(sessionId, host)
     const outcome = await runProgram(
       dir,
-      `    const refused = await this.fork({});
+      `    const refused = await this.fork({}, { 1: null });
     return { refused, continued: true };`,
       sessionId,
     )
@@ -216,13 +227,61 @@ test('WHAT[repository-programming-056] a missing host yields the DELEGATION_UNAV
   try {
     const outcome = await runProgram(
       dir,
-      `    return await this.fork("nowhere");`,
+      `    return await this.fork("nowhere", { 1: null });`,
       'sess-056-nohost',
     )
     assert.equal(caseName(outcome), 'Succeeded')
     const doc = render(outcome)
     assert.match(doc, /code = "DELEGATION_UNAVAILABLE"/)
   } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-056] a missing reportMapping is refused as VIEW_DECLARATION_INVALID and the program keeps running', async () => {
+  const { dir, cleanup } = sandbox()
+  const sessionId = `sess-nomapping-${Math.random().toString(36).slice(2, 8)}`
+  try {
+    const host = fakeHost()
+    install(sessionId, host)
+    const outcome = await runProgram(
+      dir,
+      `    const refused = await this.fork("index the parser module");
+    const continued = "kept-running";
+    return { refused, continued };`,
+      sessionId,
+    )
+    assert.equal(caseName(outcome), 'Succeeded', 'a refused mapping is data, not a failed program')
+    const doc = render(outcome)
+    assert.match(doc, /code = "VIEW_DECLARATION_INVALID"/)
+    assert.match(doc, /continued = "kept-running"/, 'the program keeps running after the refusal')
+    assert.equal(host.calls.length, 0, 'a refused mapping never reaches the delegation host')
+  } finally {
+    clearDelegationHost(sessionId)
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-056] an illegal reportMapping is refused as VIEW_DECLARATION_INVALID and the program keeps running', async () => {
+  const { dir, cleanup } = sandbox()
+  const sessionId = `sess-badmapping-${Math.random().toString(36).slice(2, 8)}`
+  try {
+    const host = fakeHost()
+    install(sessionId, host)
+    const outcome = await runProgram(
+      dir,
+      `    const refused = await this.fork("index the parser module", { "not-an-anchor": null });
+    const continued = "kept-running";
+    return { refused, continued };`,
+      sessionId,
+    )
+    assert.equal(caseName(outcome), 'Succeeded', 'a refused mapping is data, not a failed program')
+    const doc = render(outcome)
+    assert.match(doc, /code = "VIEW_DECLARATION_INVALID"/)
+    assert.match(doc, /continued = "kept-running"/, 'the program keeps running after the refusal')
+    assert.equal(host.calls.length, 0, 'a refused mapping never reaches the delegation host')
+  } finally {
+    clearDelegationHost(sessionId)
     cleanup()
   }
 })
@@ -238,7 +297,7 @@ test('WHAT[repository-programming-056] dag runs dependencies in waves and carrie
       `    return await this.dag({ nodes: [
       { id: "spec", charge: "write the interface spec" },
       { id: "impl", charge: "implement it", deps: ["spec"] },
-    ] });`,
+    ] }, { 1: null });`,
       sessionId,
     )
     assert.equal(caseName(outcome), 'Succeeded')
@@ -272,14 +331,14 @@ test('WHAT[repository-programming-056] a failed dag node parks and the injected 
         byName: {},
       }
     }
-    installDelegationHost(sessionId, host.fork, failingJoin, host.fission, host.horizon, host.advisor)
+    installDelegationHost(sessionId, host.delegate, failingJoin, host.fission, host.horizon, host.advisor)
 
     const parked = await runProgram(
       dir,
       `    return await this.dag({ nodes: [
       { id: "spec", charge: "write the interface spec" },
       { id: "impl", charge: "implement it", deps: ["spec"] },
-    ] });`,
+    ] }, { 1: null });`,
       sessionId,
     )
     assert.equal(caseName(parked), 'Parked')
@@ -307,19 +366,19 @@ test('WHAT[repository-programming-056] a failed dag node parks and the injected 
   }
 })
 
-test('WHAT[repository-programming-056] an undelivered child reports status undelivered in join and parks dag on node-undelivered', async () => {
+test('WHAT[repository-programming-056] a voided child reports status voided in join and parks dag on node-voided', async () => {
   const { dir, cleanup } = sandbox()
-  const sessionId = `sess-dagundelivered-${Math.random().toString(36).slice(2, 8)}`
+  const sessionId = `sess-dagvoided-${Math.random().toString(36).slice(2, 8)}`
   let implAgentId = null
   try {
     const host = fakeHost()
-    const undeliveredJoin = async () => {
+    const voidedJoin = async () => {
       const records = host.pending.splice(0)
       const mapped = records.map((entry) => ({
         name: entry.name,
         agentId: entry.agentId,
         role: 'engineer',
-        status: entry.name === 'impl' ? 'undelivered' : 'completed',
+        status: entry.name === 'impl' ? 'voided' : 'completed',
         view: entry.name === 'impl' ? '' : `record:${entry.name}`,
       }))
       return {
@@ -328,27 +387,27 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
         byName: Object.fromEntries(mapped.map((r) => [r.name, r])),
       }
     }
-    // 未交付不关闭执行者义务：被委托方保持活跃且未解除义务，父方不得视原子执行者已结束。
-    const trackingFork = async (payload) => {
-      const res = await host.fork(payload)
+    // 已作废（voided）的子工作已结算：父方被告知一次，自行决定重试、跳过或替换。
+    const trackingDelegate = async (name, payload, reportMapping) => {
+      const res = await host.delegate(name, payload, reportMapping)
       if (res.ok && res.name === 'impl') {
         implAgentId = res.agentId
       }
       return res
     }
-    installDelegationHost(sessionId, trackingFork, undeliveredJoin, host.fission, host.horizon, host.advisor)
+    installDelegationHost(sessionId, trackingDelegate, voidedJoin, host.fission, host.horizon, host.advisor)
 
     const joinOutcome = await runProgram(
       dir,
-      `    await this.fork({ charge: "implement it", name: "impl" });
+      `    await this.fork({ charge: "implement it", name: "impl" }, { 1: null });
     return await this.join();`,
       sessionId,
     )
     assert.equal(caseName(joinOutcome), 'Succeeded')
     const joinDoc = render(joinOutcome)
-    assert.match(joinDoc, /status = "undelivered"/)
+    assert.match(joinDoc, /status = "voided"/)
     assert.match(joinDoc, /view = ""/)
-    // join 返回 undelivered 后，原子执行者的义务未解除，不得断言已结束或结算成终态。
+    // voided 表示子工作已作废而非完成：义务已结清，父方被告知一次后决定重试/跳过/替换。
     assert.ok(implAgentId !== null, 'forked agent id must be tracked')
 
     const parked = await runProgram(
@@ -356,12 +415,12 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
       `    return await this.dag({ nodes: [
       { id: "spec", charge: "write the interface spec" },
       { id: "impl", charge: "implement it", deps: ["spec"] },
-    ] });`,
+    ] }, { 1: null });`,
       sessionId,
     )
     assert.equal(caseName(parked), 'Parked')
     const doc = render(parked)
-    assert.match(doc, /code = "node-undelivered"/)
+    assert.match(doc, /code = "node-voided"/)
     assert.match(doc, /# parked/)
 
     const resumed = await execute(

@@ -2,11 +2,11 @@ namespace Wanxiangshu.Composition.Durable
 
 open System.Threading.Tasks
 open Fable.Core
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
 
 module PromptJournalAdapter =
@@ -24,7 +24,11 @@ module PromptJournalAdapter =
     // DSL-MUTABLE: resource — one dispatch runtime per live Journal, not a durable authority cache.
     let private runtimes = newRuntimeCache ()
 
-    let create (journal: AgentJournal) : IPromptJournal =
+    let createWithOwnership
+        (liveOwnershipFor: SessionId -> SessionOwnership option)
+        (internalLeafOwnerFor: SessionId -> SessionId option)
+        (journal: AgentJournal)
+        : IPromptJournal =
         { new IPromptJournal with
             member _.RuntimeId = AgentJournal.runtimeId journal
 
@@ -32,25 +36,16 @@ module PromptJournalAdapter =
                 let snapshot = AgentJournal.snapshot journal
 
                 let authority =
-                    Map.tryFind sessionId snapshot.AgentProjections.Sessions
-                    |> Option.bind (fun s -> s.PromptAuthority)
+                    PromptAuthorityProjectionQueries.projectionFor sessionId snapshot.AgentProjections
                     |> Option.defaultValue PromptAuthorityLedger.empty
 
-                let targetSessionId =
-                    FissionProjection.tryOwnerOfLane sessionId snapshot.AgentProjections.Fission
-                    |> Option.defaultValue sessionId
-
-                let ownerAuthority =
-                    if targetSessionId = sessionId then
-                        None
-                    else
-                        Map.tryFind targetSessionId snapshot.AgentProjections.Sessions
-                        |> Option.bind (fun s -> s.PromptAuthority)
-
-                let inheritedRun =
-                    ownerAuthority |> Option.bind (fun ownerAuth -> ownerAuth.ActiveLogicalRun)
-
-                match authority.ActiveLogicalRun, inheritedRun with
+                // A Fission lane continues the owner's logical run: the owner is
+                // resolved from the durable lane membership, by the same query
+                // the turn binding uses, so both surfaces agree.
+                match
+                    authority.ActiveLogicalRun,
+                    PromptAuthorityProjectionQueries.inheritedOwnerProfile sessionId snapshot.AgentProjections
+                with
                 | None, Some run ->
                     { authority with
                         ActiveLogicalRun = Some run }
@@ -75,6 +70,28 @@ module PromptJournalAdapter =
             member _.HandleForChild(sessionId: SessionId) : Wanxiangshu.Execution.Delegation.HandleRecord option =
                 Map.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections.HandleByChildSession
 
+            member _.InternalLeafOwnerFor sessionId = internalLeafOwnerFor sessionId
+
+            member _.OwnershipEvidenceFor(sessionId: SessionId) : SessionOwnership option =
+                liveOwnershipFor sessionId
+                |> Option.orElseWith (fun () ->
+                    let snapshot = AgentJournal.snapshot journal
+
+                    let classified =
+                        SessionOwnershipClassification.tryClassify sessionId snapshot.AgentProjections.Associations
+                        |> Option.bind (fun (_, ownership) -> ownership)
+
+                    match classified with
+                    | Some ownership -> Some ownership
+                    | None ->
+                        // A fork child is recorded by the handle projection rather
+                        // than by a session association: the handle names the
+                        // child session. Root ownership is that evidence.
+                        Map.containsKey sessionId snapshot.AgentProjections.HandleByChildSession
+                        |> function
+                            | true -> Some SessionOwnership.Root
+                            | false -> None)
+
             member _.ChatAcceptancePersistence
                 ()
                 : Wanxiangshu.Execution.Session.ChatExecution.ManagedChatAcceptancePersistence =
@@ -97,6 +114,9 @@ module PromptJournalAdapter =
 
                             return appended |> Result.map ignore
                         } } }
+
+    let create (journal: AgentJournal) : IPromptJournal =
+        createWithOwnership (fun _ -> None) (fun _ -> None) journal
 
     let forJournal (journal: AgentJournal) =
         match tryRuntime runtimes journal with

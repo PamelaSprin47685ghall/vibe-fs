@@ -23,6 +23,17 @@ module JournalCodecSurface =
     let private text (value: obj) : string =
         if isNull value then "" else string value
 
+    let private optionalText (value: obj) : string option =
+        if isNull value then
+            None
+        else
+            let parsed = string value
+
+            if System.String.IsNullOrWhiteSpace parsed then
+                None
+            else
+                Some parsed
+
     let private streamOfJs (value: obj) : StreamId =
         match text (value?kind) with
         | "Workspace" -> Workspace
@@ -137,6 +148,29 @@ module JournalCodecSurface =
 
         match family, case with
         | "Prompt", "AuthorityRootAccepted" ->
+            let identitySeed = identitySeedOfJs (payload?IdentitySeed)
+
+            let authorityKind = text (payload?AuthorityKind)
+
+            let isManager =
+                match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity identitySeed) with
+                | Some role -> role = Role.Manager
+                | None -> false
+
+            let agentOwnerLife = optionalText (payload?AgentOwnerLife)
+
+            let owner =
+                PromptAuthority.identitySeedOwner identitySeed
+                |> Option.map (fun (_, run, _) -> LogicalRunId.value run)
+
+            let suppliedOwner = optionalText (payload?OwnerLogicalRunId)
+
+            if (authorityKind = "AgentOwnerRoot") <> owner.IsSome then
+                invalidArg "IdentitySeed" "the authority kind does not match its owner identity"
+
+            if suppliedOwner.IsSome && suppliedOwner <> owner then
+                invalidArg "OwnerLogicalRunId" "the recorded owner does not match the identity seed"
+
             Fact.Agent(
                 AgentFact.Prompt(
                     PromptFactCases.AuthorityRootAccepted
@@ -145,10 +179,69 @@ module JournalCodecSurface =
                           LogicalRunId = LogicalRunId.create (text (payload?LogicalRunId))
                           AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
-                          AuthorityKind = text (payload?AuthorityKind)
-                          IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
+                          AuthorityKind = authorityKind
+                          ExpectedClosureKind =
+                            AuthorityLifeClassification.recordedClosureKind
+                                authorityKind
+                                isManager
+                                agentOwnerLife
+                                (optionalText (payload?ExpectedClosureKind))
+                          OwnerLogicalRunId = owner
+                          AgentOwnerLife = agentOwnerLife
+                          IdentitySeed = identitySeed }
                 )
             )
+        | "Prompt", "AuthorityManagedRunTerminal" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityManagedRunTerminal
+                        { SessionId = SessionId.create (text (payload?SessionId))
+                          LogicalRunId = LogicalRunId.create (text (payload?LogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          FactId = text (payload?FactId) }
+                )
+            )
+        | "Prompt", "AuthorityChildWorkTerminal" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityChildWorkTerminal
+                        { SessionId = SessionId.create (text (payload?SessionId))
+                          OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                          ChildLogicalRunId = LogicalRunId.create (text (payload?ChildLogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          FactId = text (payload?FactId) }
+                )
+            )
+        | "Prompt", "AuthorityAttachedWorkTerminal" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityAttachedWorkTerminal
+                        { SessionId = SessionId.create (text (payload?SessionId))
+                          OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                          ChildLogicalRunId = LogicalRunId.create (text (payload?ChildLogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          AttachmentKind = text (payload?AttachmentKind)
+                          AssociationGeneration = text (payload?AssociationGeneration)
+                          FactId = text (payload?FactId) }
+                )
+            )
+        | "Prompt", "AuthorityInternalLeafTerminal" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityInternalLeafTerminal
+                        { SessionId = SessionId.create (text (payload?SessionId))
+                          OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                          LeafLogicalRunId = LogicalRunId.create (text (payload?LeafLogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          DecisionOrTransactionId = text (payload?DecisionOrTransactionId)
+                          FactId = text (payload?FactId) }
+                )
+            )
+
         | familyName, caseName -> failwith $"JournalCodecSurface: unknown fact '{familyName}.{caseName}'"
 
     let private factToJs (fact: Fact) : obj =
@@ -163,7 +256,52 @@ module JournalCodecSurface =
                        LogicalRunId = LogicalRunId.value payload.LogicalRunId
                        AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                        AuthorityKind = payload.AuthorityKind
+                       ExpectedClosureKind = payload.ExpectedClosureKind
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       AgentOwnerLife = payload.AgentOwnerLife
                        IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityManagedRunTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityManagedRunTerminal"
+                   payload =
+                    {| SessionId = SessionId.value payload.SessionId
+                       LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityChildWorkTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityChildWorkTerminal"
+                   payload =
+                    {| SessionId = SessionId.value payload.SessionId
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityAttachedWorkTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityAttachedWorkTerminal"
+                   payload =
+                    {| SessionId = SessionId.value payload.SessionId
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       AttachmentKind = payload.AttachmentKind
+                       AssociationGeneration = payload.AssociationGeneration
+                       FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityInternalLeafTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityInternalLeafTerminal"
+                   payload =
+                    {| SessionId = SessionId.value payload.SessionId
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       LeafLogicalRunId = LogicalRunId.value payload.LeafLogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       DecisionOrTransactionId = payload.DecisionOrTransactionId
+                       FactId = payload.FactId |} |}
         | _ ->
             box
                 {| family = "Unknown"
@@ -247,11 +385,6 @@ module JournalCodecSurface =
                payload = body?payload
                payloadRefs = event.PayloadRefs |> List.map PayloadRef.value |> List.toArray |}
 
-    let private envelopeForEvent (event: EventEnvelope) : obj =
-        match EventStoreJournalCodec.tryDecode event with
-        | Ok envelope -> envelopeToJs envelope
-        | Error error -> box {| ok = false; error = error |}
-
     /// Encode one JS-native journal envelope into a JS-native event object.
     let encode (parents: string array) (payloadRefs: string array) (envelope: obj) : obj =
         let parentIds = parents |> Array.toList |> List.map EventId.create
@@ -301,5 +434,3 @@ module JournalCodecSurface =
         |> List.sortWith Envelope.compareSortKey
         |> List.map envelopeToJs
         |> List.toArray
-
-    let decodeEventEnvelope (event: obj) : obj = envelopeForEvent (eventOfJs event)

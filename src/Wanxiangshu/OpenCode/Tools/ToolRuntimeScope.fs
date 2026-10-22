@@ -1,5 +1,12 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Host
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Participant.ManagedAgents
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -8,7 +15,7 @@ open Wanxiangshu.Change.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Fission
@@ -19,8 +26,9 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Work
+open Wanxiangshu.Mission.Lifecycle
+open Wanxiangshu.Mission.Planning
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
@@ -31,7 +39,7 @@ open Wanxiangshu.OpenCode.Host
 /// Every branch reports what the Host actually proved; an unproven creation or
 /// admission stays Unknown and never unlocks a fresh delivery operation.
 module private ExecutionSpawn =
-    type private Spawn = Wanxiangshu.Mission.Planning.DeliverySpawnOutcome
+    type private Spawn = DeliverySpawnOutcome
 
     let unknown (prefix: string) (reason: string) : Spawn =
         Spawn.Unknown(sprintf "%s: %s" prefix reason)
@@ -66,7 +74,7 @@ module private ExecutionSpawn =
         task {
             let title = sprintf "wanxiangshu-delivery:%s" operationId
 
-            let options: OpenCodeChildOptions =
+            let options: ChildSessionOptions =
                 { Title = Some title
                   Agent = Some agent
                   Directory = None }
@@ -180,12 +188,6 @@ type ToolRuntimeScope
     let questionRequests = HashSet<SessionId>()
     let questionInterrupts = HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
 
-    let postS3PendingInterrupts =
-        HashSet<SessionId * ProviderRunIdentity * ToolCallId * PhysicalUserMessageId option>()
-
-    let postS3SettledInterrupts =
-        HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
-
     /// EXEC-017 attempt-scoped join interrupt registry (PluginRuntimeScope or local default).
     // DSL-MUTABLE: resource — join attempt registry attachment
     let mutable joinAttempts: IJoinAttemptRegistry =
@@ -264,11 +266,7 @@ type ToolRuntimeScope
                     )
         }
 
-    let startReservedOwnedWork
-        (seq: int)
-        (resId: string)
-        (lease: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.OwnershipLease)
-        =
+    let startReservedOwnedWork (seq: int) (resId: string) (lease: DurableWorkHost.OwnershipLease) =
         let inc = sprintf "inc-%d" seq
 
         let startedMsg =
@@ -308,12 +306,7 @@ type ToolRuntimeScope
             with _ ->
                 None)
 
-    let finishOwnedWork
-        (lease: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.OwnershipLease)
-        (resId: string)
-        (inc: string)
-        (outcome: string)
-        =
+    let finishOwnedWork (lease: DurableWorkHost.OwnershipLease) (resId: string) (inc: string) (outcome: string) =
         lock ownedWorkGate (fun () ->
             try
                 let endedMsg =
@@ -413,7 +406,7 @@ type ToolRuntimeScope
         }
 
     let observeOwnedWork
-        (lease: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.OwnershipLease)
+        (lease: DurableWorkHost.OwnershipLease)
         (resId: string)
         (inc: string)
         (start: unit -> Task)
@@ -749,7 +742,7 @@ type ToolRuntimeScope
     // attribute here is a duplicate and the compiler rejects it.
     let inspectWorkspaceWork workspace sessionId =
         task {
-            let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+            let! commonDir = RuntimePath.stateRoot workspace
 
             if String.IsNullOrWhiteSpace commonDir then
                 return None
@@ -760,7 +753,7 @@ type ToolRuntimeScope
     let lifecycleWorkOfDirectory
         (directory: string option)
         (sessionId: string)
-        : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+        : Task<DurableWorkHost.InspectedWork option> =
         match directory with
         | None -> Task.FromResult None
         | Some workspace -> inspectWorkspaceWork workspace sessionId
@@ -1204,83 +1197,48 @@ type ToolRuntimeScope
             | _ -> return Ok()
         }
 
-    member private _.SettlePostS3Interrupt(sessionId, key, stopped) =
-        lock gate (fun () ->
-            if Result.isError stopped then
-                postS3SettledInterrupts.Remove key |> ignore
+    /// 交付已成立（提交面事实）：本次 attempt 的交付已提交，登记精确 attempt
+    /// 围栏与当时的物理输入。物理中断不在工具内部发生——停止由 transform 钩子
+    /// 的交付裁决执行（条款 4），交付已提交不因中断未确认而呈现为失败（条款 6）。
+    member _.RegisterEstablishedDelivery
+        (
+            sessionId: SessionId,
+            providerRun: ProviderRunIdentity,
+            callId: ToolCallId,
+            physicalUserMessageId: PhysicalUserMessageId
+        ) =
+        DeliveryAttemptLedger.recordEstablished
+            { SessionId = sessionId
+              ProviderRun = providerRun
+              CallId = callId }
+            (Some physicalUserMessageId)
 
-            for stale in
-                postS3PendingInterrupts
-                |> Seq.filter (fun (owner, run, call, _) ->
-                    let (_, keyRun, keyCall) = key
+    /// 呈现面登记：宿主已接受该交付的工具结果。呈现不改变提交面事实。
+    member _.RecordDeliveryPresented(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) =
+        DeliveryAttemptLedger.recordPresented
+            { SessionId = sessionId
+              ProviderRun = providerRun
+              CallId = callId }
 
-                    owner = sessionId && run = keyRun && call = keyCall)
-                |> Seq.toList do
-                postS3PendingInterrupts.Remove stale |> ignore)
-
-    member private this.RunPostS3InterruptAttempt
-        (sessionId: SessionId, key: SessionId * ProviderRunIdentity * ToolCallId)
-        : Task<Result<unit, string>> =
-        task {
-            try
-                let! stopped = sessions.InterruptAttempt sessionId
-
-                this.SettlePostS3Interrupt(sessionId, key, stopped)
-
-                return stopped
-            with ex ->
-                lock gate (fun () -> postS3SettledInterrupts.Remove key |> ignore)
-                return Error ex.Message
-        }
-
-    member _.RegisterPostS3Interrupt
-        (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId, physical: PhysicalUserMessageId)
-        =
-        lock gate (fun () ->
-            postS3PendingInterrupts.Add(sessionId, providerRun, callId, Some physical)
-            |> ignore)
-
-    member _.HasPendingPostS3Interrupt(sessionId: string) =
+    /// 本 session 是否存在一次已成立的交付（不绑定物理输入）。进程内台账是
+    /// 快速路径，durable 交付见证是判据本身——进程重启后台账为空，见证仍在。
+    member _.HasEstablishedDelivery(sessionId: string) =
         let sid = SessionId.create sessionId
-        lock gate (fun () -> postS3PendingInterrupts |> Seq.exists (fun (owner, _, _, _) -> owner = sid))
 
-    member this.InterruptForPostS3Deliver
-        (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId)
-        : Task<Result<unit, string>> =
-        task {
-            let key = sessionId, providerRun, callId
+        DeliveryAttemptLedger.hasEstablished sid
+        || DeliveryAttemptLedger.hasDurableEstablished journal sid
 
-            // LC-018: 用户问题中断至少核对 current physical；post-S3 此前只查
-            // 进程集合。若登记之后已有新输入准入，清除 pending 并跳过中断，
-            // 旧 deliver 完成事件不得停止新执行。
-            let current =
-                currentPhysicalUserMessage (SessionId.value sessionId)
-                |> Option.map PhysicalUserMessageId.create
+    static member EstablishedDeliveryCallId(sessionId: string, physicalUserMessageId: string) : string option =
+        let sid = SessionId.create sessionId
 
-            let shouldInterrupt =
-                lock gate (fun () ->
-                    match
-                        postS3PendingInterrupts
-                        |> Seq.tryFind (fun (owner, run, call, _) ->
-                            owner = sessionId && run = providerRun && call = callId)
-                    with
-                    | None -> false
-                    | Some(_, _, _, savedPhysical) when savedPhysical <> current ->
-                        postS3PendingInterrupts.Remove(sessionId, providerRun, callId, savedPhysical)
-                        |> ignore
-
-                        false
-                    | Some(_, _, _, savedPhysical) ->
-                        postS3PendingInterrupts.Remove(sessionId, providerRun, callId, savedPhysical)
-                        |> ignore
-
-                        postS3SettledInterrupts.Add key)
-
-            if shouldInterrupt then
-                return! this.RunPostS3InterruptAttempt(sessionId, key)
+        let physical =
+            if String.IsNullOrWhiteSpace physicalUserMessageId then
+                None
             else
-                return Ok()
-        }
+                Some(PhysicalUserMessageId.create physicalUserMessageId)
+
+        DeliveryAttemptLedger.tryFindEstablished sid physical
+        |> Option.map (fun (fence, _) -> ToolCallId.value fence.CallId)
 
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member _.RunStarted = onStarted
@@ -1288,13 +1246,6 @@ type ToolRuntimeScope
     member _.ContinueManagerLoop(sessionId: SessionId, workspace: string) : Task<Result<unit, string>> =
         continueManagerLoop sessionId workspace
 
-    /// EXEC-011: the administrator's ceiling on any single process.
-    ///
-    /// Resolved once per scope so every executor call in a session shares one
-    /// ceiling. A non-positive or unparseable setting falls back to the default
-    /// rather than being treated as "no limit": the clause requires the hard limit
-    /// to be finite, so an unreadable configuration must not widen it.
-    // DSL-MUTABLE: resource — resolved process hard limit ceiling
     member val ProcessHardLimit =
         match Environment.GetEnvironmentVariable "WANXIANGSHU_PROCESS_HARD_LIMIT_SECS" with
         | null
@@ -1318,9 +1269,6 @@ type ToolRuntimeScope
     member _.RoleFor(ctx: HostToolContext) = roleFor ctx
     member _.EnsureRoleFor(ctx: HostToolContext) = ensureRoleFor ctx
 
-    member _.EnsureCommandRoleFor(sessionId: SessionId, resolveAgent: SessionId -> Task<string option>) =
-        ensureCommandRoleFor sessionId resolveAgent
-
     member _.EnsureWorkDevOpsBound(parentSessionId: SessionId) = ensureWorkDevOpsBound parentSessionId
 
     /// work-039: create the parentless execution container. The returned
@@ -1337,9 +1285,7 @@ type ToolRuntimeScope
 
     /// Send the first prompt only after the exact SessionId is durably bound.
     /// AcceptanceUnknown remains pending; it is never converted to NotStarted.
-    member _.PromptExecutionSession
-        (execSessionId: string, agent: string, prompt: string)
-        : Task<Wanxiangshu.Mission.Planning.DeliverySpawnOutcome> =
+    member _.PromptExecutionSession(execSessionId: string, agent: string, prompt: string) : Task<DeliverySpawnOutcome> =
         task {
             try
                 return! ExecutionSpawn.prompt sessions (SessionId.create execSessionId) agent prompt
@@ -1352,24 +1298,10 @@ type ToolRuntimeScope
     member _.DiscardExecutionSession(execSessionId: string) : Task<Result<unit, string>> =
         sessions.AbortSession(SessionId.create execSessionId)
 
-    /// Manager authorization facts for the capability gate, derived purely
-    /// from the lifecycle work. The final incumbent is the one whose review
-    /// is Promoted: it keeps the read/cleanup/close-out surface and loses
-    /// every new-work capability. The cleanup blocker digest is the stored
-    /// objective evidence, passed through verbatim.
-    static member emptyManagerFacts: ManagerCapabilityFacts =
-        { HasActiveIncumbency = false
-          HasAssessment = false
-          HasConfirmation = false
-          IsFinalIncumbent = false
-          CleanupBlockerDigest = None }
-
     member self.ManagerCapabilityFactsFor(sessionId: string) : Task<ManagerCapabilityFacts> =
         managerFactsOfSession self.WorkspaceDirectory sessionId
 
-    member self.LifecycleWorkFor
-        (sessionId: string)
-        : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+    member self.LifecycleWorkFor(sessionId: string) : Task<DurableWorkHost.InspectedWork option> =
         lifecycleWorkOfDirectory self.WorkspaceDirectory sessionId
 
     member private _.OpenAndDrainTenureScope (sessionId: string) (incumbentId: string) (gen: int) =
@@ -1603,9 +1535,6 @@ type ToolRuntimeScope
             (forkBlockers @ executorBlockers @ toolOwned @ durableBlockers)
             |> List.distinct
             |> List.sort)
-
-    /// AGENT-013 + PROMPT-008: the managed agent a PTY is opened for.
-    member _.ManagedAgentFor(ctx: HostToolContext) = managedAgentFor ctx
 
     member this.IsRole(ctx: HostToolContext, expected: Role) = this.RoleFor ctx = Some expected
 
@@ -1857,18 +1786,7 @@ type ToolRuntimeScope
             |> Seq.toArray do
             questionInterrupts.Remove key |> ignore
 
-        lock gate (fun () ->
-            for key in
-                postS3PendingInterrupts
-                |> Seq.filter (fun (owner, _, _, _) -> owner = questionOwner)
-                |> Seq.toArray do
-                postS3PendingInterrupts.Remove key |> ignore
-
-            for key in
-                postS3SettledInterrupts
-                |> Seq.filter (fun (owner, _, _) -> owner = questionOwner)
-                |> Seq.toArray do
-                postS3SettledInterrupts.Remove key |> ignore)
+        DeliveryAttemptLedger.dropSession questionOwner
 
         let forkRuntimes, orchestrator =
             lock gate (fun () ->
@@ -2044,13 +1962,6 @@ type ToolRuntimeScope
                 return!
                     this.ContinueAfterRetire durable parentSessionId devopsAgentId oldChildSessionId devopsName role key
         }
-
-    member this.ReplacePhysicalSession
-        (parentSessionId: SessionId, devopsAgentId: string, oldChildSessionId: SessionId)
-        : Task<Result<SessionId, string>> =
-        match journal with
-        | None -> Task.FromResult(Error "journal unavailable")
-        | Some durable -> this.ProceedReplacePhysicalSession durable parentSessionId devopsAgentId oldChildSessionId
 
     member _.DisposeAsync() : Task =
         let forkRuntimes, orchestrators =

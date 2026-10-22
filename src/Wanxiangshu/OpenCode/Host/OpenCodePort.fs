@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open System
 open System.Threading.Tasks
 open Fable.Core
@@ -12,10 +14,10 @@ open Wanxiangshu.Foundation.Outcome
 
 module OpenCodePortAdapter =
 
-    let private wireModel (model: OpencodeModel) =
+    let private wireModel (model: HostModel) =
         createObj [ "providerID", box model.providerID; "modelID", box model.modelID ]
 
-    let private modelRequestFields (model: OpencodeModel option) =
+    let private modelRequestFields (model: HostModel option) =
         match model with
         | None -> []
         | Some bound ->
@@ -58,7 +60,7 @@ module OpenCodePortAdapter =
         else
             Some(unbox<string> item?title)
 
-    let private tryChildInfo (item: obj) =
+    let private tryChildInfo (item: obj) : OpenCodeChildInfo option =
         if isNull item || isNull item?id then
             None
         else
@@ -68,9 +70,13 @@ module OpenCodePortAdapter =
                   Agent = optionalAgent item
                   Title = optionalTitle item }
 
-    let private childrenFromResponse (data: obj) =
+    let private childrenFromResponse (data: obj) : ChildSessionInfo list =
         let items: obj array = if isNull data then [||] else unbox data
-        items |> Array.choose tryChildInfo |> Array.toList
+
+        items
+        |> Array.choose tryChildInfo
+        |> Array.map ChildSession.toInfo
+        |> Array.toList
 
     let private readParentId (body: obj) : Result<SessionId option, string> =
         if isNull body then
@@ -103,19 +109,6 @@ module OpenCodePortAdapter =
         else
             Fable.Core.JS.JSON.parse body
 
-    let private tryNonBlankDirectory (input: obj) =
-        let directory = unbox<string> input?directory
-
-        if String.IsNullOrWhiteSpace directory then
-            None
-        else
-            Some directory
-
-    let private tryWorkDirectory (input: obj) =
-        if isNull input || isNull input?directory then
-            None
-        else
-            tryNonBlankDirectory input
 
     let private readResponseTextSafe (response: obj) : Task<string> =
         task {
@@ -489,13 +482,11 @@ module OpenCodePortAdapter =
                     return ()
                 }
 
-    let create (input: obj) : IOpenCodePort option =
-        let workDir = tryWorkDirectory input
-
+    let create (workspaceDirectory: string option) (input: obj) : IOpenCodePort option =
         if isNull input then
             None
         elif not (isNull input?client) && not (isNull input?client?session) then
-            Some(SdkClientPort(input?client, workDir) :> IOpenCodePort)
+            Some(SdkClientPort(input?client, workspaceDirectory) :> IOpenCodePort)
         elif not (isNull input?serverUrl) then
             Some(HttpPort(unbox<string> input?serverUrl) :> IOpenCodePort)
         elif not (isNull input?baseUrl) then

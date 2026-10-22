@@ -179,3 +179,35 @@ module SphinxV2EventTypes =
     let all = [ transition; strictTransition ]
 
     let isKnown eventType = List.contains eventType all
+
+/// The dispatch decision the product owns, independent of any host adapter.
+///
+/// WHAT[sphinx-v2-015]: the event vocabulary is the product's own. Which bodies a
+/// host may present as a dispatch request, and the capability a host advertises to
+/// ask for one, are product decisions — so they live here and an adapter only asks.
+[<RequireQualifiedAccess>]
+module DispatchPolicy =
+
+    /// The capabilities a host may advertise to this product.
+    let hostCapabilities: string list = [ "dispatch" ]
+
+    /// The refusal reason for a body that is not a dispatch request.
+    let notDispatchRequestedReason = "expected DispatchRequested"
+
+    /// Admits a dispatch request, or refuses it with the product's own reason.
+    let private admit (body: InquiryEventBody) : Result<DispatchRequestedBody, string> =
+        match body with
+        | InquiryEventBody.DispatchRequested request -> Ok request
+        | _ -> Error notDispatchRequestedReason
+
+    /// The whole dispatch decision in one step: a decode failure and an
+    /// admission refusal are the same answer — nothing was dispatched.
+    let decide (body: Result<InquiryEventBody, string>) : Result<DispatchRequestedBody, string> =
+        match body with
+        | Error reason -> Error reason
+        | Ok body -> admit body
+
+    /// The text of the dispatched prompt. A dispatch request carries two
+    /// envelopes: the public one the recipient may read and the private ticket
+    /// the host keeps. The private ticket never reaches a recipient.
+    let dispatchedPromptText (request: DispatchRequestedBody) : string = request.PublicEnvelope.CanonicalPayload

@@ -55,3 +55,6 @@ module WorktreeCommands =
 
     val deleteBranch:
         runner: TextProcessRunner -> repo: string -> identity: WorktreeIdentity -> Task<Result<unit, string>>
+
+    /// rebase-merge / rebase-apply exists under `dir` (never a stale REBASE_HEAD).
+    val rebaseInProgress: runner: TextProcessRunner -> dir: string -> Task<Result<bool, string>>

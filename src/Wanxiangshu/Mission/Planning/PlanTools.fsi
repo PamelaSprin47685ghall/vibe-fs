@@ -27,6 +27,8 @@ type DeliverySpawnOutcome =
 
 module PlanTools =
 
+    val writePermission: gitCommonDir: string -> sessionId: string -> (unit -> bool)
+
     /// The one plan artifact read used by deliver and by the plan surface: the
     /// content, its digest, and the resolved path. Empty or missing is an error.
     val readAndValidatePlan: root: string -> workId: string -> Result<string * string * string, string>

@@ -1,5 +1,13 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Interaction.Admission
+
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
@@ -35,6 +43,7 @@ module HostSignalBootstrap =
           CancelSignals: SessionId seq -> unit
           BindActiveRun: SessionId -> Role -> string option -> unit
           CurrentPhysicalUserMessage: string -> string option
+          ProviderStepIdentity: ProviderRunIdentity -> (SessionId * PhysicalUserMessageId) option
           ConfirmProviderStarted: ExactProviderStartObservation -> Task
           ChatMessageHook: obj
           ObserveEvent: obj -> Task<unit>
@@ -48,6 +57,7 @@ module HostSignalBootstrap =
         eventPort: IEventObservationPort ->
         snapshotOpt: ISessionSnapshotPort option ->
         journal: AgentJournal option ->
+        internalLeafOwnerFor: (SessionId -> SessionId option) ->
         scope: PluginRuntimeScope ->
 
         rootWorkspace: IRootWorkspaceReader ->

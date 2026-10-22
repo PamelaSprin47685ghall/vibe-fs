@@ -345,8 +345,8 @@ test('WHAT[process-execution-006] runtime disposal cancels a real registered pip
 })
 
 test('WHAT[process-execution-006] an unknown physical close returns a bounded drain failure and retains the exact ownership blocker until close arrives', { timeout: 10000 }, async () => {
-  const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
-  const result = await ToolRuntimeScopeSurface.verifyUnknownProcessDrain()
+  const { ToolRuntimePhysicalSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js')
+  const result = await ToolRuntimePhysicalSurface.verifyUnknownProcessDrain()
   assert.equal(result.admitted, true)
   assert.equal(result.cancelled, true)
   assert.match(result.failure, /Process scope closure was not confirmed/)

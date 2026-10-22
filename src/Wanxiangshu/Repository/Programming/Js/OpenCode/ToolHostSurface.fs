@@ -3,6 +3,7 @@ namespace Wanxiangshu.Repository.Programming.Js.OpenCode
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Host
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.OpenCode
 
@@ -66,16 +67,21 @@ module JsToolHostSurface =
                         fun _ -> workspaceRoot
                     else
                         let map = sessionDirectoryMap sessionDirectories
-                        JsToolSpec.rootForSession map workspaceRoot
+                        JsToolPolicy.rootForSession map workspaceRoot
 
                 let processHost (ctx: HostToolContext) : JsToolWorkflow.ProcessHost =
-                    { HardLimit = Wanxiangshu.Process.JsCallLoop.standalone.HardLimit
-                      Own = Wanxiangshu.Process.JsCallLoop.standalone.Own
-                      ReadOutput = Wanxiangshu.Process.JsCallLoop.standalone.ReadOutput
-                      AttachLifetimeAbort = fun _ _ -> ignore
-                      AttachAbort = ctx.AttachAbort }
+                    JsToolWorkflow.standaloneProcessHost ctx.AttachAbort
 
-                JsToolSpec.create factory surface workspaceRoot persistence lifecyclePersistence None processHost rootOf
+                JsToolSpec.create
+                    factory
+                    surface
+                    workspaceRoot
+                    persistence
+                    lifecyclePersistence
+                    None
+                    processHost
+                    rootOf
+                    (fun _ -> Task.FromResult None)
 
             let registered = ToolHostCodec.register factory spec
             box (JsRegisteredToolHandle(spec, registered))

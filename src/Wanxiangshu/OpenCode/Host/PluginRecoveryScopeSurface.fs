@@ -66,12 +66,6 @@ module PluginRecoveryScopeSurface =
                    expected = null
                    handle = null |}
 
-    /// Invoke the real `RecordPendingAttemptPlan`; conflicts throw host-boundary-008.
-    let recordAttemptPlan (scope: obj) (sessionId: string) (physical: string) (pending: obj) : unit =
-        let scope = unbox<PluginRecoveryScope> scope
-        let plan = XWireSurface.unwrapPendingPlan pending
-        scope.RecordPendingAttemptPlan (SessionId.create sessionId) (PhysicalUserMessageId.create physical) plan
-
     /// Invoke the real `TryBindAttemptPlan`. Wrong physical parent/run yields
     /// `{ bound = false, view = null, handle = null }`.
     let bindAttempt (scope: obj) (sessionId: string) (physical: string) (providerRun: string) : obj =
@@ -93,24 +87,6 @@ module PluginRecoveryScopeSurface =
                 {| bound = false
                    view = null
                    handle = null |}
-
-    /// Invoke the real `RecordAttemptPlan`; re-binding a run to another physical
-    /// parent throws host-boundary-008.
-    let recordBound (scope: obj) (sessionId: string) (providerRun: string) (bound: obj) : unit =
-        let scope = unbox<PluginRecoveryScope> scope
-        let plan = XWireSurface.unwrapBoundPlan bound
-        scope.RecordAttemptPlan (SessionId.create sessionId) (ProviderRunIdentity.create providerRun) plan
-
-    /// Read-only peek via the real `TryPeekAttemptPlan`; keeps the plan alive.
-    let peekAttempt (scope: obj) (sessionId: string) (providerRun: string) : obj =
-        let scope = unbox<PluginRecoveryScope> scope
-
-        match scope.TryPeekAttemptPlan (SessionId.create sessionId) (ProviderRunIdentity.create providerRun) with
-        | Some bound ->
-            box
-                {| found = true
-                   view = XWireSurface.boundPlanView bound |}
-        | None -> box {| found = false; view = null |}
 
     /// Single terminal consumption via the real `ConsumeAttemptPlan`.
     let consumeAttempt (scope: obj) (sessionId: string) (providerRun: string) : obj =

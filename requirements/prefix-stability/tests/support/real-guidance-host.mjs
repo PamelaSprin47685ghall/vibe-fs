@@ -42,7 +42,7 @@ const provider = await startHttpServer(async (request, response) => {
     const id = 'guidance_deliver_' + number
     const [prose] = buildTextChunks(id, 'GUIDANCE_DONE', 1)
     sendSSE(response, [prose, ...buildToolCallChunks(id, 'todowrite-for-engineer', JSON.stringify({
-      program: 'class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: { 0: null } }); } }',
+      program: 'class Js extends JsProgram { async run() { await this.deliver({ 0: null }); } }',
     }), 1)])
   } else {
     sendSSE(response, buildTextChunks('guidance_text_' + requests.length, 'GUIDANCE_DONE', 1))

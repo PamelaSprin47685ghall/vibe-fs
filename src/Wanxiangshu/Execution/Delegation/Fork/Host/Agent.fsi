@@ -14,7 +14,6 @@ module HostForkBinding =
 [<AutoOpen>]
 module HostForkAgent =
     type HostForkRuntime with
-        member BoundManagedAgent: childId: SessionId -> string option
 
         member ActiveGuidanceProfile: agentId: string -> Result<PromptAuthority.AuthorityExecutionProfile, string>
 

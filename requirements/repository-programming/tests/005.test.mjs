@@ -7,17 +7,10 @@ const { generate, isGeneratedToolName, memberBinding } = await import("../../../
 const { permissions: rolePermissions } = await import("../../../dist/Participant/Persona/OfficeCapabilitySurface.js");
 
 const caps = (...permissions) => permissions
-const surface = (role, permissionNames) => generate(role, caps(...permsOf(permissionNames)), 'en')
+const surface = (role, permissionNames) => generate(role, caps(...permissionNames), 'en')
 const memberNames = (s) => s.members.map((fragment) => fragment.memberName)
 const isNone = (value) => value === null
 const isSome = (value) => value !== null
-const PERMISSION_NAMES = [
-  'Fork', 'Join', 'Horizon', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment',
-]
-const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, n]))
-const ToolPermission = toolPermissionByName
-const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 const fsPermissionsOf = (role) =>
   rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Glob', 'Move', 'Remove'].includes(n))
 const MEMBERS_BY_PERMISSION = {
@@ -86,7 +79,7 @@ test('WHAT[repository-programming-005] JS010_description_never_dilutes_the_ultra
   }
 })
 test('WHAT[repository-programming-005] JS_description_retains_no_unsubstituted_placeholders', () => {
-  const result = generate('Coder', caps(ToolPermission.Read, ToolPermission.Edit, ToolPermission.Write), 'en')
+  const result = generate('Coder', caps('Read', 'Edit', 'Write'), 'en')
   assert.equal(result.description.includes('{{'), false)
 })
 }
@@ -106,32 +99,24 @@ const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-host-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
+// The fake host schema builders mirror the real ones: every builder can be
+// marked optional, so a registered argument can say "this may be absent" the
+// way the zod-based host schema does.
+const schemaOf = (state) => ({
+  nullable: () => schemaOf({ ...state, nullable: true }),
+  describe: (text) => schemaOf({ ...state, description: text }),
+  optional: () => schemaOf({ ...state, optional: true }),
+  ...state,
+})
 const toolModule = () => {
   const tool = (definition) => definition
   tool.schema = {
-    string: () => ({
-      type: 'string',
-      nullable: () => ({ type: 'string', nullable: true }),
-      describe: (description) => ({ type: 'string', description }),
-    }),
-    any: () => ({
-      type: 'any',
-      optional: () => ({ type: 'any', optional: true }),
-    }),
-    number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
-    array: (item) => ({
-      type: 'array',
-      item,
-      describe: (description) => ({ type: 'array', item, description }),
-    }),
-    record: (key, value) => ({
-      type: 'record',
-      key,
-      value,
-      describe: (description) => ({ type: 'record', key, value, description,
-        optional: () => ({ type: 'record', key, value, description, optional: true }) }),
-    }),
-    object: (shape) => ({ type: 'object', shape }),
+    string: () => schemaOf({ type: 'string' }),
+    any: () => schemaOf({ type: 'any' }),
+    number: () => schemaOf({ type: 'number' }),
+    array: (item) => schemaOf({ type: 'array', item }),
+    record: (key, value) => schemaOf({ type: 'record', key, value }),
+    object: (shape) => schemaOf({ type: 'object', shape }),
   }
   return { tool }
 }

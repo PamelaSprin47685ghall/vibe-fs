@@ -25,8 +25,8 @@
     <Compile Include="Interaction/Authority/RuntimeSurface.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fsi"/>
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fs"/>
-    <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fsi"/>
-    <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fs"/>
+    <Compile Include="Interaction/Admission/ChatAdmissionIntentSurface.fsi"/>
+    <Compile Include="Interaction/Admission/ChatAdmissionIntentSurface.fs"/>
     <Compile Include="OpenCode/Host/TerminalPolicySurface.fsi"/>
     <Compile Include="OpenCode/Host/TerminalPolicySurface.fs"/>
   </ItemGroup>

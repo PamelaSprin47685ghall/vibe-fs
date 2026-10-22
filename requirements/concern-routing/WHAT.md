@@ -29,3 +29,5 @@
 ## [007] Concern 不产生新事实或投影状态
 
 `AgentProjectionSet`、`ProjectionUpdate`、`AgentJournalPortAdapter` 与 `resources/ablation/fact-map.json` 不包含 Concern 状态、端口或活跃事实登记。为使旧身份原件和 cut 可以继续读取，外层 `AgentFact.Concern` 只允许解码历史 `MailboxSubscribed` 墓碑，fold 保持原投影，新写入明确拒绝；不恢复邮箱 owner、发布或退休路径。未知 case 和缺字段仍拒绝，不将这项兼容性扩成旧邮箱迁移。
+
+Host 事实族（`HostFactCases.PairProgrammingGuidelineAnchored`）不得携带 `ConcernPlacement` 字段。

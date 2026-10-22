@@ -1,39 +1,92 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { admit, assertCold, forkTool, withForkRuntime } from '../../delegation/tests/support/scoped-work.mjs'
+import { join } from 'node:path'
+import {
+  childTurn,
+  coldWorkSnapshot,
+  forkCall,
+  joinCall,
+  observeTerminals,
+  resumeCall,
+  withRealFork,
+} from '../../delegation/tests/support/real-fork.mjs'
+import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+
+/**
+ * The cold recovery surface: a fresh writer re-opens the durable event log of
+ * the same workspace and settles against the durable facts alone. It is the
+ * only place where a **failing append** can be injected (the production join
+ * never exposes one), and it never writes a fabricated fact — the commit
+ * failure is a real append failure.
+ */
+const coldConsume = (directory, owner, root, commitment) =>
+  forkTool.coldConsumeWorkWithOutcome(join(directory, '.Herdchestra'), owner, root, commitment)
+
+/** The work unit of one root in a cold (re-folded) snapshot. */
+const workOf = (works, root) => works.find((work) => work.root === root)
 
 for (const commitment of ['before', 'after']) {
   test('WHAT[managed-session-lifecycle-008] exact consume with ' + commitment + ' commit failure never releases an unconfirmed payload', async () => {
     const owner = 'scope-consume-' + commitment
-    await withForkRuntime(owner, async (runtime, directory) => {
-      const a = await admit(runtime, owner, 1, 'FIRST')
-      assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'provider-a'), true)
-      const withheld = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, commitment)
-      assert.equal(withheld.ok, false)
-      assert.equal(Object.hasOwn(withheld, 'view'), false)
-      const state = forkTool.workSnapshot(runtime, owner)[0]
-      assert.equal(state.lifecycle, commitment === 'before' ? 'CompletedAwaitingJoin' : 'Retired')
-      await assertCold(runtime, directory, owner)
-      const next = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')
-      assert.equal(next.ok, commitment === 'before')
-      if (next.ok) assert.match(next.view, /FIRST-ANSWER/)
-      assert.equal((await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')).ok, false)
-      await assertCold(runtime, directory, owner)
+    await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+      const terminals = await observeTerminals(runtime)
+      try {
+        const first = await forkCall(hooks, owner, 'Ada', 'FIRST')
+        assert.match(first, /Ada/)
+        const child = createdIds[0]
+        const root = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+
+        // The work delivers for real: the durable completion exists before any
+        // consume is attempted.
+        await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'FIRST-ANSWER', terminals.awaitRun)
+        assert.equal(workOf(await coldWorkSnapshot(directory, owner), root).lifecycle, 'CompletedAwaitingJoin')
+
+        // The consume whose commit fails releases nothing: it reports no
+        // outcome and hands out no payload.
+        const withheld = await coldConsume(directory, owner, root, commitment)
+        assert.equal(withheld.ok, false)
+        assert.equal(Object.hasOwn(withheld, 'view'), false)
+
+        const state = workOf(await coldWorkSnapshot(directory, owner), root)
+        assert.equal(state.lifecycle, commitment === 'before' ? 'CompletedAwaitingJoin' : 'Retired')
+
+        // A later confirmed consume succeeds only when the failed commit left
+        // the work unconsumed.
+        const next = await coldConsume(directory, owner, root, 'confirmed')
+        assert.equal(next.ok, commitment === 'before')
+        if (next.ok) assert.match(next.view, /FIRST-ANSWER/)
+
+        // The work is single-assignment: consuming it again fails.
+        assert.equal((await coldConsume(directory, owner, root, 'confirmed')).ok, false)
+      } finally {
+        terminals.dispose()
+      }
     })
   })
 }
 
 test('WHAT[managed-session-lifecycle-008] concurrent exact consumers deliver a work at most once', async () => {
   const owner = 'scope-concurrent-consume'
-  await withForkRuntime(owner, async runtime => {
-    const a = await admit(runtime, owner, 1, 'FIRST')
-    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'provider-a'), true)
-    const outcomes = await Promise.all([
-      forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed'),
-      forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed'),
-    ])
-    assert.equal(outcomes.filter(outcome => outcome.ok).length, 1)
-    assert.match(outcomes.find(outcome => outcome.ok).view, /FIRST-ANSWER/)
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      const first = await forkCall(hooks, owner, 'Ada', 'FIRST')
+      assert.match(first, /Ada/)
+      const child = createdIds[0]
+      const root = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'FIRST-ANSWER', terminals.awaitRun)
+
+      const outcomes = await Promise.all([
+        joinCall(hooks, owner, 'call-join-one'),
+        joinCall(hooks, owner, 'call-join-two'),
+      ])
+      const delivered = outcomes.filter((outcome) => /ok = true/.test(outcome))
+      assert.equal(delivered.length, 1, 'exactly one consumer may deliver the work')
+      assert.match(delivered[0], /FIRST-ANSWER/)
+      assert.equal(workOf(await coldWorkSnapshot(directory, owner), root).lifecycle, 'Retired')
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
@@ -235,45 +288,56 @@ test('WHAT[managed-session-lifecycle-008] EXEC_009_consume_abandoned_writes_Hand
 
 test('WHAT[managed-session-lifecycle-008] actual join withholds payload until retirement append confirms and survives each crash cut with one delivery (GAP-133)', async () => {
   const owner = 'scope-consume-crash-cut'
-  await withForkRuntime(owner, async (runtime, directory) => {
-    const a = await admit(runtime, owner, 1, 'CRASH-CUT-A')
-    assert.equal(await forkTool.settle(runtime, owner, 'CRASH-ANSWER-A', 'provider-a'), true)
-    const b = await admit(runtime, owner, 2, 'CRASH-CUT-B')
-    assert.equal(await forkTool.settle(runtime, owner, 'CRASH-ANSWER-B', 'provider-b'), true)
-    let deliveries = 0
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      const first = await forkCall(hooks, owner, 'Ada', 'CRASH-CUT-A')
+      assert.match(first, /Ada/)
+      const child = createdIds[0]
+      const rootA = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE A', 'CRASH-ANSWER-A', terminals.awaitRun)
 
-    // Crash cut before the retirement append: the dying caller attempted a
-    // consume whose append never committed, so it received nothing and no
-    // tombstone reached the disk. A cold-reopened journal (fresh writer, full
-    // replay — the shape a restarted process takes) still finds the work
-    // unconsumed and must deliver exactly once, only after its own append
-    // confirms.
-    const dyingBefore = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'before')
-    assert.equal(dyingBefore.ok, false)
-    assert.equal(Object.hasOwn(dyingBefore, 'view'), false)
-    assert.equal((await forkTool.coldWorkSnapshot(directory, owner)).find(work => work.root === a.root).lifecycle, 'CompletedAwaitingJoin')
-    const recovered = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
-    assert.equal(recovered.ok, true)
-    assert.match(recovered.view, /CRASH-ANSWER-A/)
-    deliveries += 1
-    assert.equal((await forkTool.coldWorkSnapshot(directory, owner)).find(work => work.root === a.root).lifecycle, 'Retired')
-    const repeat = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
-    assert.equal(repeat.ok, false)
-    assert.match(repeat.error, /AlreadyRetired/)
+      await resumeCall(hooks, owner, 'Ada', 'CRASH-CUT-B')
+      const rootB = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      await childTurn(hooks, runtime, child, `run-${child}-2`, 'PROSE B', 'CRASH-ANSWER-B', terminals.awaitRun)
 
-    // Crash cut after the retirement append: this time the tombstone did
-    // commit before the caller died, but the receipt never came back and the
-    // payload was never delivered. The unknown commit stays conservative — no
-    // fabricated re-claim — and every later cold consumer meets the durable
-    // tombstone instead of a second delivery.
-    const dyingAfter = await forkTool.coldConsumeWorkWithOutcome(directory, owner, b.root, 'after')
-    assert.equal(dyingAfter.ok, false)
-    assert.equal(Object.hasOwn(dyingAfter, 'view'), false)
-    assert.equal((await forkTool.coldWorkSnapshot(directory, owner)).find(work => work.root === b.root).lifecycle, 'Retired')
-    const reclaimer = await forkTool.coldConsumeWorkWithOutcome(directory, owner, b.root, 'confirmed')
-    assert.equal(reclaimer.ok, false)
-    assert.match(reclaimer.error, /AlreadyRetired/)
+      let deliveries = 0
 
-    assert.equal(deliveries, 1, 'exactly one payload delivery reaches an independent caller across both crash cuts')
+      // Crash cut before the retirement append: the dying caller attempted a
+      // consume whose append never committed, so it received nothing and no
+      // tombstone reached the disk. A cold-reopened journal (fresh writer, full
+      // replay — the shape a restarted process takes) still finds the work
+      // unconsumed and must deliver exactly once, only after its own append
+      // confirms.
+      const dyingBefore = await coldConsume(directory, owner, rootA, 'before')
+      assert.equal(dyingBefore.ok, false)
+      assert.equal(Object.hasOwn(dyingBefore, 'view'), false)
+      assert.equal(workOf(await coldWorkSnapshot(directory, owner), rootA).lifecycle, 'CompletedAwaitingJoin')
+      const recovered = await coldConsume(directory, owner, rootA, 'confirmed')
+      assert.equal(recovered.ok, true)
+      assert.match(recovered.view, /CRASH-ANSWER-A/)
+      deliveries += 1
+      assert.equal(workOf(await coldWorkSnapshot(directory, owner), rootA).lifecycle, 'Retired')
+      const repeat = await coldConsume(directory, owner, rootA, 'confirmed')
+      assert.equal(repeat.ok, false)
+      assert.match(repeat.error, /AlreadyRetired/)
+
+      // Crash cut after the retirement append: this time the tombstone did
+      // commit before the caller died, but the receipt never came back and the
+      // payload was never delivered. The unknown commit stays conservative — no
+      // fabricated re-claim — and every later cold consumer meets the durable
+      // tombstone instead of a second delivery.
+      const dyingAfter = await coldConsume(directory, owner, rootB, 'after')
+      assert.equal(dyingAfter.ok, false)
+      assert.equal(Object.hasOwn(dyingAfter, 'view'), false)
+      assert.equal(workOf(await coldWorkSnapshot(directory, owner), rootB).lifecycle, 'Retired')
+      const reclaimer = await coldConsume(directory, owner, rootB, 'confirmed')
+      assert.equal(reclaimer.ok, false)
+      assert.match(reclaimer.error, /AlreadyRetired/)
+
+      assert.equal(deliveries, 1, 'exactly one payload delivery reaches an independent caller across both crash cuts')
+    } finally {
+      terminals.dispose()
+    }
   })
 })

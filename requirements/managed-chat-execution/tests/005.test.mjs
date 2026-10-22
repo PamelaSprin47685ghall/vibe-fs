@@ -187,7 +187,7 @@ const hostSignals = await import("../../../dist/OpenCode/Host/HostSignalSurface.
 
 const codecSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs', import.meta.url), 'utf8')
 const adapterSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs', import.meta.url), 'utf8')
-const providerLifecycleSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/ChatAdmission/ProviderLifecycle.fs', import.meta.url), 'utf8')
+const providerLifecycleSource = await readFile(new URL('../../../src/Wanxiangshu/Execution/Session/ChatExecution/ProviderLifecycle.fs', import.meta.url), 'utf8')
 const bootstrapSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs', import.meta.url), 'utf8')
 const recoveryHostSource = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs', import.meta.url), 'utf8')
 const recoveryRuntimeSource = await readFile(new URL('../../../src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntime.fs', import.meta.url), 'utf8')

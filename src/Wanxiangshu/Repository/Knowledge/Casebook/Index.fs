@@ -14,16 +14,23 @@ module CasebookIndex =
 
     type Snapshot = { Epoch: int64; Cases: Entry list }
 
-    [<Import("CasebookIndexLaw", "wanxiangli/casebook")>]
-    let private indexLawConstructor: obj = jsNative
-
-    let private indexLaw: obj = createNew indexLawConstructor ()
-
     let private gate = obj ()
     // DSL-MUTABLE: resource
     let mutable private frozen: Snapshot option = None
     // DSL-MUTABLE: resource
     let mutable private dirty = true
+
+    /// knowledge-reuse-008/012: titles, shelfmarks, entry order, shelfmark
+    /// location and the epoch-advance verdict are wanxiangli/casebook
+    /// `CasebookIndexLaw` (CUT-27). This module keeps only the process-wide
+    /// frozen snapshot, the dirty mark and the EventStore read.
+    [<Import("CasebookIndexLaw", "wanxiangli/casebook")>]
+    let private lawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
+
+    let private law: obj = construct lawClass
 
     let tryGet () : Snapshot option = lock gate (fun () -> frozen)
 
@@ -33,7 +40,7 @@ module CasebookIndex =
     /// Stable public locator. The suffix is a one-way catalog discriminator,
     /// never the durable session identity itself.
     let shelfmarkFor (sessionId: string) (canonicalQuestion: string) : string =
-        indexLaw?shelfmarkFor (sessionId, canonicalQuestion) |> unbox<string>
+        law?shelfmarkFor (sessionId, canonicalQuestion) |> unbox<string>
 
     let private caseViews (cases: (string * Case) array) : obj array =
         cases
@@ -45,7 +52,7 @@ module CasebookIndex =
     let private publicEntries (cases: Map<string, Case>) =
         let views = cases |> Map.toArray |> caseViews
 
-        indexLaw?entries (views)
+        law?entries (views)
         |> unbox<obj array>
         |> Array.map (fun entry ->
             { Shelfmark = unbox<string> entry?shelfmark
@@ -57,7 +64,7 @@ module CasebookIndex =
         | Some snapshot -> snapshot
         | None -> { Epoch = 0L; Cases = [] }
 
-    let private freezeEntries entries =
+    let private freezeEntries (entries: Entry list) =
         let previousEpoch =
             frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
 
@@ -69,7 +76,7 @@ module CasebookIndex =
         let next = entries |> List.map entryView |> List.toArray
 
         let epoch =
-            if indexLaw?advancesEpoch (previous, dirty, next) |> unbox<bool> then
+            if law?advancesEpoch (previous, dirty, next) |> unbox<bool> then
                 previousEpoch + 1L
             else
                 previousEpoch
@@ -96,7 +103,7 @@ module CasebookIndex =
             | Error error -> return Error error
             | Ok cases ->
                 let ordered = Map.toArray cases
-                let position = indexLaw?locate (caseViews ordered, shelfmark) |> unbox<int>
+                let position = law?locate (caseViews ordered, shelfmark) |> unbox<int>
 
                 return Ok(ordered |> Array.tryItem position |> Option.map snd)
         }

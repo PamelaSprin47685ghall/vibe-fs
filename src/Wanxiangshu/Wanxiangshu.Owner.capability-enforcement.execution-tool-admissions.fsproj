@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>authority</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-tool-admissions</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>capability-enforcement</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-tool-admissions</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-port.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
+    <Compile Include="Execution/Tool/Admissions.fsi"/>
+    <Compile Include="Execution/Tool/Admissions.fs"/>
+  </ItemGroup>
+</Project>

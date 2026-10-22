@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
+import * as join from '../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
 const completed = (name, record) => ({ kind: 'completed', agentId: `physical-${name}`, agentName: name, role: 'Engineer', runId: `run-${name}`, view: record })

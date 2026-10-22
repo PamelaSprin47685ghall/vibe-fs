@@ -94,6 +94,12 @@ test('WHAT[execution-model-routing-019] durable DevOps target seeding is fail-cl
   assert.throws(() => routing.seedDevOpsModelTarget(runtime, 'ses_seed_malformed', ''), /durable DevOps model target/)
   assert.throws(() => routing.seedDevOpsModelTarget(runtime, 'ses_seed_malformed', 'provider/fixed-devops'), /durable DevOps model target/)
   assert.throws(() => routing.seedDevOpsModelTarget(runtime, 'ses_seed_malformed', 'noslashmodel:high'), /provider\/model/)
+
+  // 5. CUT-10: model names may contain ':' (ollama-cloud/gemma4:31b); the
+  // reasoning is after the last ':'. Splitting at the first ':' bound the
+  // DevOps road to model 'ollama-cloud/gemma4' with reasoning '31b:none'.
+  routing.seedDevOpsModelTarget(runtime, 'ses_seed_colon', 'ollama-cloud/gemma4:31b:none')
+  assert.deepEqual(routing.boundDevopsTarget(runtime, 'ses_seed_colon'), { model: 'ollama-cloud/gemma4:31b', reasoning: 'none' })
   assert.throws(() => routing.seedDevOpsModelTarget(runtime, 'ses_seed_malformed', 'provider/fixed-devops:'), /reasoning/)
   assert.equal(
     routing.boundDevopsTarget(runtime, 'ses_seed_malformed'),

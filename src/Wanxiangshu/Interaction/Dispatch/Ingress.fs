@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Interaction.Admission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
@@ -17,7 +16,7 @@ module PromptIngress =
             Some activeRun.SelectedAgent
         | _ -> None
 
-    let private enrichHostMessage authority (message: PromptIngressCodec.DecodedMessage) =
+    let private enrichHostMessage authority (message: ChatAdmissionIntent.DecodedMessage) =
         let agentOpt =
             match message.ExplicitAgent, message.PromptKey with
             | None, None -> authority |> Option.bind tryActiveHumanRootAgent
@@ -29,7 +28,7 @@ module PromptIngress =
                 ExplicitAgent = Some agent }
         | None -> message
 
-    let private acceptedExecutionEvidence (journal: AgentJournal option) (message: PromptIngressCodec.DecodedMessage) =
+    let private acceptedExecutionEvidence (journal: AgentJournal option) (message: ChatAdmissionIntent.DecodedMessage) =
         match journal, message.SessionId, message.PhysicalUserMessageId with
         | Some durable, Some sessionId, Some physicalId ->
             (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
@@ -39,7 +38,7 @@ module PromptIngress =
             |> Option.map _.acceptedEvidence
         | _ -> None
 
-    let resolveDecision (journal: AgentJournal option) (message: PromptIngressCodec.DecodedMessage) =
+    let resolveDecision (journal: AgentJournal option) (message: ChatAdmissionIntent.DecodedMessage) =
         let authority =
             match journal, message.SessionId with
             | Some durable, Some sessionId ->

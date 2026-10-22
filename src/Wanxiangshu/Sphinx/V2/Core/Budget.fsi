@@ -60,5 +60,4 @@ module Budget =
         SettledUsage ->
             Result<Map<string, float> * Map<string, float>, BudgetError>
 
-    val mergeReservations: Reservation list -> Map<string, float>
     val mergeReserved: Map<string, float> list -> Map<string, float>

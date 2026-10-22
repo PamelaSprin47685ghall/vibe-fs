@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
 
 /// Semantic owner surface for the OpenCode tool-host codec. It keeps Host
@@ -113,7 +114,6 @@ module ToolHostSurface =
                 { Name = name
                   Description = name
                   Arguments = []
-                  Admission = ToolAdmission.OfficeRole(fun _ _ -> true)
                   Execute = fun _ _ -> Task.FromResult name })
 
         let value = ToolHostCodec.registry (factory toolModule) specs
@@ -156,17 +156,17 @@ module ToolHostSurface =
     let sessionAgent (raw: obj) : obj =
         HostIngressCodec.sessionAgent raw |> Option.map box |> Option.toObj
 
-    let rec private tomlValue (value: obj) : ToolHostCodec.TomlValue =
+    let rec private tomlValue (value: obj) : ToolResultText.TomlValue =
         if isNull value then
-            ToolHostCodec.TomlValue.TString ""
+            ToolResultText.TomlValue.TString ""
         elif emitJsExpr value "typeof $0 === 'string'" then
-            ToolHostCodec.TomlValue.TString(string value)
+            ToolResultText.TomlValue.TString(string value)
         elif emitJsExpr value "typeof $0 === 'boolean'" then
-            ToolHostCodec.TomlValue.TBool(unbox<bool> value)
+            ToolResultText.TomlValue.TBool(unbox<bool> value)
         elif emitJsExpr value "typeof $0 === 'bigint'" then
-            ToolHostCodec.TomlValue.TInt64(unbox<int64> value)
+            ToolResultText.TomlValue.TInt64(unbox<int64> value)
         elif emitJsExpr value "typeof $0 === 'number'" then
-            ToolHostCodec.TomlValue.TInt(int (unbox<float> value))
+            ToolResultText.TomlValue.TInt(int (unbox<float> value))
         elif emitJsExpr value "Array.isArray($0)" then
             let entries =
                 unbox<obj array> value
@@ -177,7 +177,7 @@ module ToolHostSurface =
                         Some(string entry?name, tomlValue entry?value))
                 |> Array.toList
 
-            ToolHostCodec.TomlValue.TTable entries
+            ToolResultText.TomlValue.TTable entries
         else
             let names: string array = emitJsExpr value "Object.getOwnPropertyNames($0)"
 
@@ -188,13 +188,13 @@ module ToolHostSurface =
                     name, tomlValue field)
                 |> Array.toList
 
-            ToolHostCodec.TomlValue.TTable fields
+            ToolResultText.TomlValue.TTable fields
 
     let tomlObject (fields: obj array) : string =
         fields
         |> Array.toList
         |> List.map (fun field -> string field?name, tomlValue field?value)
-        |> ToolHostCodec.tomlObject
+        |> ToolResultText.tomlObject
 
     let tomlObjectWithInstructions (instructions: string array) (fields: obj array) : string =
         let values =
@@ -202,7 +202,7 @@ module ToolHostSurface =
             |> Array.toList
             |> List.map (fun field -> string field?name, tomlValue field?value)
 
-        ToolHostCodec.tomlObjectWithInstructions (List.ofArray instructions) values
+        ToolResultText.tomlObjectWithInstructions (List.ofArray instructions) values
 
     let tomlTable (name: string) (entries: obj array array) : string =
         entries
@@ -211,7 +211,7 @@ module ToolHostSurface =
             |> Array.toList
             |> List.map (fun field -> string field?name, tomlValue field?value))
         |> Array.toList
-        |> ToolHostCodec.tomlTable name
+        |> ToolResultText.tomlTable name
 
     let looksLikeHandleId = ToolHostCodec.looksLikeHandleId
     let digest = ToolHostCodec.digest
@@ -224,7 +224,6 @@ module ToolHostSurface =
             { Name = name
               Description = description
               Arguments = []
-              Admission = ToolAdmission.OfficeRole(fun _ _ -> true)
               Execute = fun _ _ -> execute () }
 
         ToolHostCodec.register (factory toolModule) spec

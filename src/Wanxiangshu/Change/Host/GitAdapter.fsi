@@ -6,6 +6,8 @@ open Wanxiangshu.Process
 module OrchestratorGit =
     val createRunner: run: RunProcess -> TextProcessRunner
 
+    val run: TextProcessRunner
+
     val command: dir: string -> args: string list -> Command
 
     val hasRebaseHead: runner: TextProcessRunner -> worktree: string -> Task<Result<bool, string>>

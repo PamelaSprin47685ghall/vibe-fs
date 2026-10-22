@@ -16,10 +16,13 @@ const norm = (p) => p.replace(/\\/g, '/')
 
 /** Provider renderer surfaces (Join / horizon / tool catalog prose). */
 export const PROVIDER_SCAN_ROOTS = Object.freeze([
-  'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs',
+  'src/Wanxiangshu/Execution/Delegation/Fork/JoinResultRenderer.fs',
   'src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs',
+  'src/Wanxiangshu/Execution/Session/HorizonRoster.fs',
   'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs',
   'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs',
+  'src/Wanxiangshu/Execution/Delegation/Fork/Command.fs',
+  'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Batching.fs',
 
   'src/Wanxiangshu/Mission/Work/OpenCode/ReviewShell.fs',
   'src/Wanxiangshu/Mission/Work/OpenCode/ReviewBackendManager.fs',
@@ -30,6 +33,7 @@ export const PROVIDER_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/OpenCode/Tools/BashHoneypotTool.fs',
 
   'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
+  'src/Wanxiangshu/Execution/Fission/Launch.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/Tools.fs',
 ])
 

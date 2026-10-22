@@ -14,7 +14,6 @@ type PromptContinuationKind =
     | ProviderRetryAttempt
     | DegenerationGuard
     | FissionHandoff
-    | DeferredWorkPresentation
 
 type PromptOrigin =
     | AuthorityRoot of PromptRootAuthorityKind

@@ -4,10 +4,25 @@
     <WanxiangshuCompileShard>repository-programming-js-delivered-values</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>repository-programming-js-delivered-values</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <Compile Include="Repository/Programming/Js/Failure.fsi"/>
+    <Compile Include="Repository/Programming/Js/Failure.fs"/>
+    <Compile Include="Repository/Programming/Js/Anchor.fsi"/>
+    <Compile Include="Repository/Programming/Js/Anchor.fs"/>
+    <Compile Include="Repository/Programming/Js/Anchor/AnchorModel.fsi"/>
+    <Compile Include="Repository/Programming/Js/Anchor/AnchorModel.fs"/>
+    <Compile Include="Repository/Programming/Js/Anchor/AnchorLedger.fsi"/>
+    <Compile Include="Repository/Programming/Js/Anchor/AnchorLedger.fs"/>
+    <Compile Include="Repository/Programming/Js/Anchor/AnchorView.fsi"/>
+    <Compile Include="Repository/Programming/Js/Anchor/AnchorView.fs"/>
+    <Compile Include="Repository/Programming/Js/Anchor/AnchorSurface.fsi"/>
+    <Compile Include="Repository/Programming/Js/Anchor/AnchorSurface.fs"/>
     <Compile Include="Repository/Programming/Js/DeliveredValues.fsi"/>
     <Compile Include="Repository/Programming/Js/DeliveredValues.fs"/>
   </ItemGroup>

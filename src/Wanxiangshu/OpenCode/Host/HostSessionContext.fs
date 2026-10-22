@@ -1,5 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Participant.ManagedAgents
+
 open System
 open Fable.Core
 open Fable.Core.JsInterop
@@ -7,17 +11,8 @@ open Wanxiangshu.Foundation
 
 module HostSessionContext =
 
-    let private parseRole (agent: string) : Role option =
-        match ManagedAgent.tryParse agent with
-        | Some managed -> Some managed.Role
-        | None -> Roles.tryParseRole (agent.Trim())
-
-    /// Resolve Role from Host Agent identity (fast-ROLE / deep-ROLE) or Canonical Role.
-    /// build/plan aliases remain rejected.
-    let roleOf (agent: string) : Role option =
-        Option.ofObj agent
-        |> Option.filter (String.IsNullOrWhiteSpace >> not)
-        |> Option.bind parseRole
+    /// Pure roster law now owned by Participant.ManagedAgents.AgentRole (CUT-34).
+    let roleOf (agent: string) : Role option = AgentRole.roleOf agent
 
     let read (raw: obj) =
         let event = if isNull raw || isNull raw?event then raw else raw?event

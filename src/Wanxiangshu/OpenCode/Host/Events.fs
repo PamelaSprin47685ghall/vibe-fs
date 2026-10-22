@@ -1,157 +1,47 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
-open System.Collections.Generic
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation
-
-open Wanxiangshu.Foundation
-open Fable.Core
+open Wanxiangshu.Execution.Session
 
 module Events =
 
-    [<Emit("console.error($0, $1)")>]
-    let private logError (prefix: string) (message: string) : unit = jsNative
+    /// A fresh terminal source. The product owns the terminal facts; this is
+    /// the only adapter-side place that names the product's implementation, and
+    /// it names it only to obtain an instance — never to hold one.
+    let newTerminalSource () : ISessionTerminalSource = TerminalRegistry()
 
     /// The one event port.
     ///
-    /// `DeterministicEventPort` used to sit beside this with an identical
-    /// implementation — same listener list, same accumulator, and a `NotifyTerminal`
-    /// that computed the same answer by a different spelling. It had no production
-    /// consumer at all; only tests constructed it, so it was a second definition of
-    /// this class kept alive by its test callers.
-    /// One registration slot. A bare function element would be curry-wrapped by
-    /// Fable at every call site (the wrapper identity is re-created per call),
-    /// so a reference-based Remove could never match and disposal leaked the
-    /// listener. A record keeps one stable identity; disposal marks it dead
-    /// before unlinking it, so an in-flight notification snapshot also skips it.
-    /// DSL-state-combination: physical — listener identity + live flag for disposal without identity leak
-    type ListenerRegistration =
-        { Listener: TerminalCompletionListener
-          mutable Live: bool }
+    /// The terminal facts, the sticky cache and the listener list live in the
+    /// product's terminal registry (`Execution/Session/TerminalRegistry`): the
+    /// host does not own a terminal outcome, it only observes one. This port is
+    /// the host-facing face of that registry — it holds no second copy of the
+    /// sticky cache, of the idempotence cache or of the listener registry, so
+    /// there is exactly one truth about a terminal fact.
+    ///
+    /// The port implements the shared `ISessionTerminalSource` contract; the
+    /// product's registry is handed in, never constructed here.
+    type HostEventPort(terminalSource: ISessionTerminalSource) =
 
-    type HostEventPort() as this =
-        // DSL-MUTABLE: resource — listener registry
-        let listeners = ResizeArray<ListenerRegistration>()
-        let lockObj = obj ()
-        // DSL-MUTABLE: resource — last completed run cache per session
-        let lastCompletedRun = System.Collections.Generic.Dictionary<string, string>()
-
-        /// Last non-duplicate terminal per session. ARCH-002: sticky stores an
-        /// already-derived TerminalOutcome for wake/delivery reliability only —
-        /// not a second derivation of business facts. Late SubscribeTerminalListener
-        /// replays so InstallRun after Notify never loses completion.
-        ///
-        /// Cap 256 sessions by insert order: duplicate writes update the value
-        /// without re-enqueue so the queue cannot grow unbounded on churn.
-        // DSL-MUTABLE: resource — sticky terminal registry for late subscriber replay
-        let stickyTerminal = Dictionary<string, TerminalOutcome>()
-        let stickyOrder = Queue<string>()
-        let stickyCap = 256
-
-        let dispatchRegistration sessionId outcome registration =
-            try
-                registration.Listener sessionId outcome
-            with error ->
-                logError
-                    "EVENT-DISPATCH"
-                    (sprintf "terminal listener faulted for session %s: %s" (SessionId.value sessionId) error.Message)
-
-        let notifyRegistration sessionId outcome registration =
-            if registration.Live then
-                dispatchRegistration sessionId outcome registration
-
-        let trimSticky () =
-            while stickyOrder.Count > stickyCap do
-                let evicted = stickyOrder.Dequeue()
-                stickyTerminal.Remove(evicted) |> ignore
-
-        let rememberSticky key outcome =
-            lock lockObj (fun () ->
-                let isNew = not (stickyTerminal.ContainsKey key)
-                stickyTerminal.[key] <- outcome
-
-                if isNew then
-                    stickyOrder.Enqueue key
-
-                if isNew then
-                    trimSticky ()
-
-                listeners.Count > 0
-                && listeners |> Seq.exists (fun registration -> registration.Live))
-
-        let notify sessionId outcome =
-            let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
-
-            for registration in handlers do
-                notifyRegistration sessionId outcome registration
-
-        let replayStickyTerminals listener =
-            let stickyReplay =
-                lock lockObj (fun () -> stickyTerminal |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
-
-            for sessionKey, outcome in stickyReplay do
-                listener (SessionId.create sessionKey) outcome
-
-        let subscribe replaySticky listener =
-            let registration: ListenerRegistration =
-                lock lockObj (fun () ->
-                    let registration: ListenerRegistration = { Listener = listener; Live = true }
-
-                    listeners.Add registration
-                    registration)
-
-            if replaySticky then
-                replayStickyTerminals listener
-
-            { new IDisposable with
-                member _.Dispose() =
-                    lock lockObj (fun () ->
-                        registration.Live <- false
-                        listeners.Remove registration |> ignore) }
-
-        /// One Completed terminal per (session, provider run), across every plugin
-        /// instance sharing this port.
-        ///
-        /// HOST-012 loads the plugin once per directory; the root and the worktree
-        /// instances both reconcile a child session's terminal and both call
-        /// NotifyTerminal on the shared port. The run's token guard absorbs the
-        /// duplicate when no new run subscribed in between — but the review nudge
-        /// installs a fresh run inside that window, and the stale duplicate then
-        /// completes it with the PREVIOUS run's outcome (measured: the nudge's
-        /// run completed before the response arrived, so the Orchestrator's
-        /// second await returned early and an outcome read as UNPROVEN).
-        let isCompletedRunDuplicate sessionId (providerRun: ProviderRunIdentity) =
-            let key = SessionId.value sessionId
-            let runValue = ProviderRunIdentity.value providerRun
-
-            lock lockObj (fun () ->
-                match lastCompletedRun.TryGetValue key with
-                | true, last when last = runValue -> true
-                | _ ->
-                    lastCompletedRun.[key] <- runValue
-                    false)
-
-        member private _.IsCompletedDuplicate(sessionId: SessionId, outcome: TerminalOutcome) =
-            match outcome with
-            | TerminalOutcome.Completed result when not (isNull (box result.ProviderRun)) ->
-                isCompletedRunDuplicate sessionId result.ProviderRun
-            | _ -> false
-
-        /// Terminal completions arrive through NotifyTerminal from the reconcile
-        /// path. Raw host event observation is handled upstream by the signal stack
-        /// (HostSignalAdapter / HostSignalSubscribe).
         interface IEventObservationPort with
-            member _.SubscribeTerminalListener(listener) = subscribe true listener
+            member _.SubscribeTerminalListener(listener) =
+                terminalSource.SubscribeTerminalListener(listener)
 
-            member _.SubscribeFutureTerminalListener(listener) = subscribe false listener
+            member _.SubscribeFutureTerminalListener(listener) =
+                terminalSource.SubscribeFutureTerminalListener(listener)
 
             member _.NotifyTerminal sessionId outcome =
-                if not (this.IsCompletedDuplicate(sessionId, outcome)) then
-                    let key = SessionId.value sessionId
-                    let hasListeners = rememberSticky key outcome
-                    notify sessionId outcome
-                    hasListeners
-                else
-                    false
+                terminalSource.NotifyTerminal sessionId outcome
+
+        interface ISessionTerminalSource with
+            member _.SubscribeTerminal(sessionId, listener) =
+                terminalSource.SubscribeTerminal(sessionId, listener)
+
+            member _.SubscribeFutureTerminal(sessionId, listener) =
+                terminalSource.SubscribeFutureTerminal(sessionId, listener)
+
+            member _.HasSubscriber(sessionId) = terminalSource.HasSubscriber(sessionId)

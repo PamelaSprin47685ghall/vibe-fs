@@ -282,14 +282,16 @@ test('WHAT[execution-model-routing-002] EMR_002_invoke_scheduler_passes_role_run
 
 {
 const assert = (await import('node:assert/strict')).default
-const { mkdtemp, readFile, rm } = await import('node:fs/promises')
+const { mkdir, mkdtemp, readFile, rm, writeFile } = await import('node:fs/promises')
 const { tmpdir } = await import('node:os')
 const { join } = await import('node:path')
 const routing = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
 const withConfig = async (body, run) => {
   const root = await mkdtemp(join(tmpdir(), 'routing-strict-abi-'))
-  const path = join(root, 'wanxiangshu.mjs')
+  const path = join(root, 'nested', 'wanxiangshu.mjs')
   try {
+    await mkdir(join(root, 'nested'))
+    await writeFile(path, body, 'utf8')
     await run(path, body)
   } finally {
     await rm(root, { recursive: true, force: true })
@@ -384,5 +386,19 @@ test('WHAT[execution-model-routing-002] configured protocol calls route with thr
     assert.deepEqual(routing.releasePhysicalExecution(runtime, 'available', 'available-physical'), { kind: 'Applied' })
     assert.deepEqual(routing.snapshotOccupied(runtime), [])
   })
+})
+
+test('WHAT[execution-model-routing-002] an asynchronous theoretical-capacity query fails closed before any admission waits', async () => {
+  const scheduler = () => null
+  scheduler.hasTheoreticalCapacity = async () => false
+  const runtime = routing.createRuntime(scheduler)
+  for (const [session, message] of [['session', 'msg-1'], ['later', 'msg-2']]) {
+    await assert.rejects(
+      () => routing.beginExecutionAdmission(runtime, session, message, 'engineer', 'owner', null),
+      /hasTheoreticalCapacity must be synchronous/,
+    )
+    assert.equal(routing.pendingCount(runtime), 0)
+    assert.deepEqual(routing.snapshotOccupied(runtime), [])
+  }
 })
 }

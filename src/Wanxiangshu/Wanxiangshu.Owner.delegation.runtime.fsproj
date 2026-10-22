@@ -41,6 +41,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-deliverywitnesswriter.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.loop-event-codec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj" />
@@ -61,6 +64,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-trace-capture.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj" />
+    <Compile Include="Execution/Delegation/ChildWorkSettlement.fsi" />
+    <Compile Include="Execution/Delegation/ChildWorkSettlement.fs" />
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fsi" />
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fs" />
     <Compile Include="Execution/Delegation/Handle/Surface.fsi" />
@@ -81,17 +86,17 @@
     <Compile Include="Execution/Delegation/Fork/Host/JoinSurface.fs" />
     <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fsi" />
     <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fs" />
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinSurface.fsi" />
-    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinSurface.fs" />
+    <Compile Include="Execution/Delegation/Fork/JoinSurface.fsi" />
+    <Compile Include="Execution/Delegation/Fork/JoinSurface.fs" />
     <Compile Include="Execution/Delegation/Fork/CleanBreakSurface.fsi" />
     <Compile Include="Execution/Delegation/Fork/CleanBreakSurface.fs" />
+    <Compile Include="Execution/Delegation/Fork/OpenCode/TerminalDeliveryProof.fsi" />
+    <Compile Include="Execution/Delegation/Fork/OpenCode/TerminalDeliveryProof.fs" />
     <Compile Include="Execution/Delegation/Fork/OpenCode/ToolSurface.fsi" />
     <Compile Include="Execution/Delegation/Fork/OpenCode/ToolSurface.fs" />
     <Compile Include="Execution/Delegation/SyncDelegate/Surface.fsi" />
     <Compile Include="Execution/Delegation/SyncDelegate/Surface.fs" />
     <Compile Include="Execution/Delegation/Handle/JournalSurface.fsi" />
     <Compile Include="Execution/Delegation/Handle/JournalSurface.fs" />
-    <Compile Include="Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fsi" />
-    <Compile Include="Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs" />
   </ItemGroup>
 </Project>

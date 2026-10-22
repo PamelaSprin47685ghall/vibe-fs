@@ -11,7 +11,8 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 
@@ -52,7 +53,8 @@ type SyncDelegateRuntime =
         ?workspaceDirectory: string *
         ?onDelegatePrompt: (string -> string -> unit) *
         ?onDelegateAnswer: (string -> string -> unit) *
-        ?onDelegateCleanup: (string -> unit) ->
+        ?onDelegateCleanup: (string -> unit) *
+        ?providerStepIdentity: (ProviderRunIdentity -> (SessionId * PhysicalUserMessageId) option) ->
             SyncDelegateRuntime
 
     member Attached: IAttachedSessionPort
@@ -67,21 +69,12 @@ type SyncDelegateRuntime =
             SyncDelegateBatch option
 
     member TryFind: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
-    member TryFindDelegateOwner: delegateSessionId: SessionId -> SessionId option
     member TryFindForScopeClose: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
     member StageDeletedDelegate: ownerSessionId: SessionId * delegateSessionId: SessionId -> bool
     member StageDeletedDelegateBySession: delegateSessionId: SessionId -> SessionId option
 
     member Invoke:
         ownerSessionKey: string * role: SyncDelegateRole * charge: string * ?expectedToolCalls: int ->
-            Task<Result<string, string>>
-
-    member InvokePrepared:
-        ownerSessionKey: string *
-        role: SyncDelegateRole *
-        charge: string *
-        prepareProviderPrompt: (unit -> Task<LlmFacing.Document>) *
-        ?expectedToolCalls: int ->
             Task<Result<string, string>>
 
     member InvokeBatchPrepared:
@@ -116,9 +109,14 @@ type SyncDelegateRuntime =
         permit: QuiescencePermit option ->
             Task<bool>
 
+    /// Fail the accepted invocation without retry, view consumption or a completion write.
+    member ObserveAttemptSettlementFailure: turn: ReconciledTurn * reason: string -> Task<bool>
+
     member HasOpeningCursor: sessionId: SessionId -> bool
     member AwaitAssignmentReady: sessionId: SessionId -> Task<bool>
     member TryAcceptedAuthorityRoot: sessionId: SessionId -> string option
+
+    member OwnsAcceptedPhysical: sessionId: SessionId * physical: PhysicalUserMessageId -> bool
     /// delegation-031: settle a completed turn from its own parts when the terminal
     /// trace capture reports NotCommitted/Unknown. True iff a live call
     /// consumed the turn.

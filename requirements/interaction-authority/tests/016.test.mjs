@@ -76,7 +76,7 @@ test('WHAT[interaction-authority-016] IA_016_agent_owner_root_has_no_run_before_
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
+const intent = await import("../../../dist/Interaction/Admission/ChatAdmissionIntentSurface.js");
 const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 
 const hash = (value) => `H(${value})`

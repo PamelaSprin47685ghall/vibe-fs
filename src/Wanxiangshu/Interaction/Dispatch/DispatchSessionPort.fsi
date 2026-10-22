@@ -4,14 +4,26 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
+open Wanxiangshu.Host.Ports
 
 type IDispatchSessionPort =
-    abstract SendPrompt: sessionId: SessionId * text: string * opts: OpenCodePromptOptions -> Task<SendOutcome>
+    abstract SendPrompt:
+        sessionId: SessionId * request: PromptRequest * metadata: obj option * late: LateDeliveryListener option ->
+            Task<SendOutcome>
+
     abstract SubscribeFutureTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable
     abstract SubscribeTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable
 
 
 [<RequireQualifiedAccess>]
 module DispatchSessionPort =
-    val ofSessionPort: sessionPort: ISessionHostPort -> IDispatchSessionPort
+    val toDeliveryVerdict: verdict: DetachedSendVerdict -> DeliveryVerdict
+    val toDetachedVerdict: verdict: DeliveryVerdict -> DetachedSendVerdict
+
+    val toHostOptions:
+        request: PromptRequest -> metadata: obj option -> late: LateDeliveryListener option -> SessionPromptOptions
+
+    val ofSessionPort: port: ISessionHostPort -> IDispatchSessionPort
+    val ofNeutral: promptPort: IPromptPort -> terminalSource: ISessionTerminalSource -> IDispatchSessionPort

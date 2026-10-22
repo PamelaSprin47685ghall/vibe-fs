@@ -1,5 +1,5 @@
 import * as journal from '../../../../dist/Persistence/Journal/Surface.js'
-import { ToolRuntimeScopeSurface } from '../../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
+import { ToolRuntimePhysicalSurface } from '../../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js'
 import * as routing from '../../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import os from 'node:os'
 import { mock } from 'node:test'
@@ -15,8 +15,8 @@ syncBuiltinESMExports()
 await routing.initialize()
 const opened = await journal.JournalSurface_acquireSharedForWorkspace(workspace, process.pid, '2026-10-16T00:00:00Z')
 if (!opened.ok) throw new Error(JSON.stringify(opened.error))
-await ToolRuntimeScopeSurface.startPtyExecution(opened.journal, child, physical, 'pty-admission-provider')
-const probe = ToolRuntimeScopeSurface.ptyAdmissionProbe(opened.journal, workspace, child, false, await journal.JournalSurface_initializeStateRoot(workspace))
+await ToolRuntimePhysicalSurface.startPtyExecution(opened.journal, child, physical, 'pty-admission-provider')
+const probe = ToolRuntimePhysicalSurface.ptyAdmissionProbe(opened.journal, workspace, child, false, await journal.JournalSurface_initializeStateRoot(workspace))
 const prepare = DatabaseSync.prototype.prepare
 const execute = DatabaseSync.prototype.exec
 const ownershipConnections = new WeakSet()

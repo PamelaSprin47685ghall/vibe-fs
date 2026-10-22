@@ -6,11 +6,35 @@ import { publishVerificationToolPhase } from './verification-tool-diagnostics.mj
 const cleanupGraceMs = 1000
 const diagnostics = process.env.WXS_VERIFICATION_TOOL_DIAGNOSTICS === '1'
 const failures = []
+const deadlineVariable = 'WXS_VERIFICATION_TOOL_DEADLINE_MS'
+let executionDeadline
+let deadlineTimer
+let deadlineExpired = false
 let tool = null
 let cleanup = null
 let terminal = null
 let resolveExit
 const exited = new Promise(resolve => { resolveExit = resolve })
+
+function recordExpiredDeadline() {
+  if (executionDeadline === undefined || Date.now() < executionDeadline) return false
+  if (!deadlineExpired) {
+    deadlineExpired = true
+    failures.push(Object.assign(new Error(`The selected tool deadline expired (${executionDeadline})`), {
+      code: 'verification-tool-deadline-exceeded', deadline: executionDeadline,
+    }))
+  }
+  return true
+}
+
+function armDeadline() {
+  if (executionDeadline === undefined) return
+  if (recordExpiredDeadline()) {
+    stop()
+    return
+  }
+  deadlineTimer = setTimeout(armDeadline, Math.min(2147483647, executionDeadline - Date.now()))
+}
 
 function cleanupFailure(message, cause) {
   return Object.assign(new Error(message, { cause }), { code: 'verification-tool-group-reclamation-failed' })
@@ -37,11 +61,14 @@ function serializeFailure(error, seen = new Set(), depth = 0) {
   for (const key of ['code', 'errno', 'syscall', 'path']) {
     if (typeof error[key] === 'string' || typeof error[key] === 'number') value[key] = error[key]
   }
+  if (Number.isSafeInteger(error.deadline)) value.deadline = error.deadline
   if (error.cause instanceof Error) value.cause = serializeFailure(error.cause, seen, depth + 1)
   return value
 }
 
 function publishTerminal() {
+  recordExpiredDeadline()
+  clearTimeout(deadlineTimer)
   const message = {
     type: 'verification-tool-terminal', version: 1,
     exitCode: terminal?.exitCode ?? null, signal: terminal?.signal ?? null,
@@ -98,26 +125,41 @@ process.stdin.on('error', error => {
 process.stdin.resume()
 
 try {
+  if (process.env[deadlineVariable] !== undefined) {
+    const suppliedDeadline = Number(process.env[deadlineVariable])
+    if (!Number.isSafeInteger(suppliedDeadline) || String(suppliedDeadline) !== process.env[deadlineVariable]) {
+      throw new TypeError('The selected tool deadline must be an absolute safe-integer millisecond time')
+    }
+    executionDeadline = suppliedDeadline
+  }
   const env = { ...process.env }
   delete env.NODE_CHANNEL_FD
   delete env.NODE_CHANNEL_SERIALIZATION_MODE
   delete env.WXS_VERIFICATION_TOOL_DIAGNOSTICS
-  tool = spawn(process.argv[2], process.argv.slice(3), {
-    cwd: process.cwd(), env,
-    detached: process.platform !== 'win32', stdio: ['ignore', 'inherit', 'inherit'],
-  })
-  tool.once('spawn', () => publishVerificationToolPhase(diagnostics, 'tool-spawned', { toolPid: tool.pid, executable: process.argv[2] }))
-  tool.once('exit', (exitCode, signal) => {
-    publishVerificationToolPhase(diagnostics, 'tool-exited', { toolPid: tool.pid, exitCode, signal })
-    terminal = { exitCode, signal }
+  delete env[deadlineVariable]
+  if (recordExpiredDeadline()) {
     resolveExit()
     stop()
-  })
-  tool.once('error', error => {
-    failures.push(error)
-    resolveExit()
-    stop()
-  })
+  } else {
+    tool = spawn(process.argv[2], process.argv.slice(3), {
+      cwd: process.cwd(), env,
+      detached: process.platform !== 'win32', stdio: ['ignore', 'inherit', 'inherit'],
+    })
+    tool.once('spawn', () => publishVerificationToolPhase(diagnostics, 'tool-spawned', { toolPid: tool.pid, executable: process.argv[2] }))
+    tool.once('exit', (exitCode, signal) => {
+      recordExpiredDeadline()
+      publishVerificationToolPhase(diagnostics, 'tool-exited', { toolPid: tool.pid, exitCode, signal })
+      terminal = { exitCode, signal }
+      resolveExit()
+      stop()
+    })
+    tool.once('error', error => {
+      failures.push(error)
+      resolveExit()
+      stop()
+    })
+    armDeadline()
+  }
 } catch (error) {
   failures.push(error)
   resolveExit()

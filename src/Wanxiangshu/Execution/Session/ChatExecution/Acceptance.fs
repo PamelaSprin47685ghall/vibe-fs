@@ -305,74 +305,70 @@ module ManagedChatProviderLifecycle =
         | AppendTerminal
         | ExistingTerminal of ManagedChatTerminalWitness
 
-    let private exactStartedEvidence
-        (current: ChatExecutionState)
-        (attempted: ProviderStartedEvidence)
-        : Result<ProviderStartedEvidence, ManagedChatProviderLifecycleError> =
+    let private sameStarted (current: ChatExecutionState) (attempted: ProviderStartedEvidence) =
+        current.startedEvidence
+        |> Option.exists (fun established -> established = attempted)
+
+    let private providerRunConflict (current: ChatExecutionState) (attempted: ProviderStartedEvidence) =
         match current.startedEvidence with
-        | Some established when established = attempted -> Ok established
         | Some established ->
-            Error(ManagedChatProviderLifecycleError.ProviderRunConflict(established.ProviderRun, attempted.ProviderRun))
-        | None -> Error(ManagedChatProviderLifecycleError.ProjectionConflictAfterCommit current)
+            ManagedChatProviderLifecycleError.ProviderRunConflict(established.ProviderRun, attempted.ProviderRun)
+        | None -> ManagedChatProviderLifecycleError.ProjectionConflictAfterCommit current
 
-    let private existingStart
-        (key: ChatExecutionKey)
-        (current: ChatExecutionState)
-        (startedEvidence: ProviderStartedEvidence)
-        : Result<StartDecision, ManagedChatProviderLifecycleError> =
-        exactStartedEvidence current startedEvidence
-        |> Result.map (fun established -> ExistingStart(ManagedChatProviderStartedWitness(key, established)))
+    let private established' (decision: ChatExecutionLawDecision) =
+        match decision.Established with
+        | Some disposition -> disposition
+        | None ->
+            invalidOp (
+                "wanxiangli/chat-execution verdict without its established disposition: "
+                + decision.Verdict
+            )
 
+    /// CUT-12: the start decision is wanxiangli/chat-execution `decideStart`.
     let private decideStart
         (key: ChatExecutionKey)
         (current: ChatExecutionState)
         (startedEvidence: ProviderStartedEvidence)
         : Result<StartDecision, ManagedChatProviderLifecycleError> =
-        match current with
-        | ChatExecutionState.Accepted _ -> Ok AppendStart
-        | ChatExecutionState.Started _ -> existingStart key current startedEvidence
-        | ChatExecutionState.EndedBeforeStart(_, outcome) ->
-            Error(ManagedChatProviderLifecycleError.ProviderStartedAfterTerminal(PreStartOutcome.disposition outcome))
-        | ChatExecutionState.EndedAfterStart(_, disposition) ->
-            Error(ManagedChatProviderLifecycleError.ProviderStartedAfterTerminal disposition)
+        let decision =
+            ChatExecutionPhaseLaw.decideStart current (sameStarted current startedEvidence)
 
-    let private existingTerminal
-        (key: ChatExecutionKey)
-        (current: ChatExecutionState)
-        (startedEvidence: ProviderStartedEvidence)
-        (establishedDisposition: ChatExecutionTerminalDisposition)
-        (attemptedDisposition: ChatExecutionTerminalDisposition)
-        : Result<TerminalDecision, ManagedChatProviderLifecycleError> =
-        exactStartedEvidence current startedEvidence
-        |> Result.bind (fun established ->
-            if establishedDisposition = attemptedDisposition then
-                Ok(
-                    ExistingTerminal(
-                        ManagedChatTerminalWitness(
-                            key,
-                            ChatExecutionTerminalEvidence.AfterProviderStart established,
-                            establishedDisposition
-                        )
-                    )
-                )
-            else
-                Error(ManagedChatProviderLifecycleError.TerminalConflict(establishedDisposition, attemptedDisposition)))
+        match decision.Verdict with
+        | "append" -> Ok AppendStart
+        | "existing" -> Ok(ExistingStart(ManagedChatProviderStartedWitness(key, Option.get current.startedEvidence)))
+        | "providerRunConflict" -> Error(providerRunConflict current startedEvidence)
+        | "startedAfterTerminal" ->
+            Error(ManagedChatProviderLifecycleError.ProviderStartedAfterTerminal(established' decision))
+        | other -> invalidOp ("wanxiangli/chat-execution returned an unknown start verdict: " + other)
 
+    /// CUT-12: the after-provider terminal decision is wanxiangli/chat-execution `decideTerminal`.
     let private decideTerminal
         (key: ChatExecutionKey)
         (current: ChatExecutionState)
         (startedEvidence: ProviderStartedEvidence)
         (disposition: ChatExecutionTerminalDisposition)
         : Result<TerminalDecision, ManagedChatProviderLifecycleError> =
-        match current with
-        | ChatExecutionState.Accepted _ -> Error(ManagedChatProviderLifecycleError.ProviderNotStarted key)
-        | ChatExecutionState.Started _ ->
-            exactStartedEvidence current startedEvidence
-            |> Result.map (fun _ -> AppendTerminal)
-        | ChatExecutionState.EndedBeforeStart(_, outcome) ->
-            existingTerminal key current startedEvidence (PreStartOutcome.disposition outcome) disposition
-        | ChatExecutionState.EndedAfterStart(_, establishedDisposition) ->
-            existingTerminal key current startedEvidence establishedDisposition disposition
+        let decision =
+            ChatExecutionPhaseLaw.decideTerminal current (sameStarted current startedEvidence) disposition
+
+        match decision.Verdict with
+        | "append" -> Ok AppendTerminal
+        | "existing" ->
+            Ok(
+                ExistingTerminal(
+                    ManagedChatTerminalWitness(
+                        key,
+                        ChatExecutionTerminalEvidence.AfterProviderStart(Option.get current.startedEvidence),
+                        Option.get current.terminalDisposition
+                    )
+                )
+            )
+        | "providerNotStarted" -> Error(ManagedChatProviderLifecycleError.ProviderNotStarted key)
+        | "providerRunConflict" -> Error(providerRunConflict current startedEvidence)
+        | "projectionConflict" -> Error(ManagedChatProviderLifecycleError.ProjectionConflictAfterCommit current)
+        | "terminalConflict" ->
+            Error(ManagedChatProviderLifecycleError.TerminalConflict(established' decision, disposition))
+        | other -> invalidOp ("wanxiangli/chat-execution returned an unknown terminal verdict: " + other)
 
     let startWith
         (persistence: ManagedChatProviderLifecyclePersistence)

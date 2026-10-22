@@ -205,6 +205,7 @@ module HandleSurface =
         | "ParentCancelled" -> Ok HandleAbandonReason.ParentCancelled
         | "DeadlineExceeded" -> Ok HandleAbandonReason.DeadlineExceeded
         | "HostSessionGone" -> Ok HandleAbandonReason.HostSessionGone
+        | "Voided" -> Ok HandleAbandonReason.Voided
         | other ->
             Error
                 {| kind = "UnknownAbandonReason"

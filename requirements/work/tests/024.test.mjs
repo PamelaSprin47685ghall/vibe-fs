@@ -6,10 +6,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
-import { runJsPlan } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
-import { rolePermissionRules } from '../../../dist/OpenCode/Tools/ToolSurface.js'
+import { rolePermissionRules, toolSpecNames } from '../../../dist/OpenCode/Tools/ToolSurface.js'
+import { generateRole } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -29,9 +30,19 @@ const withStore = async (body) => {
 
 test('WHAT[work-024] Plan admits its role tools on every stage; handoff and resume stay denied', () => {
   const rules = rolePermissionRules('plan')
-  for (const tool of ['todowrite-for-plan', 'devops', 'review', 'deliver']) {
+  for (const tool of ['todowrite-for-plan', 'review', 'deliver']) {
     assert.equal(rules[tool], 'allow', `plan must admit ${tool}`)
     assert.notEqual(rolePermissionRules('engineer')[tool], 'allow', `engineer must not admit ${tool}`)
+  }
+  // DevOps 调查不再注册宿主工具：它是 Plan 编程面的成员。
+  assert.ok(!toolSpecNames().includes('devops'), 'the host devops tool must be retired')
+  assert.equal(Object.hasOwn(rules, 'devops'), false, 'the retired devops name must carry no admission rule')
+  const planMembers = generateRole('plan', 'en').members.map((member) => member.memberName)
+  assert.ok(planMembers.includes('devops'), 'the Plan surface carries the devops member')
+  for (const role of ['manager', 'orchestrator', 'engineer', 'devops']) {
+    const surface = generateRole(role, 'en')
+    const members = surface ? surface.members.map((member) => member.memberName) : []
+    assert.ok(!members.includes('devops'), `the "${role}" surface must carry no devops member`)
   }
   for (const tool of ['handoff', 'resume', 'read', 'edit', 'write']) {
     assert.notEqual(rules[tool], 'allow', `plan must deny ${tool}`)
@@ -43,19 +54,61 @@ test('WHAT[work-024] Plan admits its role tools on every stage; handoff and resu
   }
 })
 
+test('WHAT[work-024] the Plan devops member refuses an unusable report mapping and never fabricates a delegation', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    const sessionID = 'ses-work-024-devops'
+    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
+
+    const runPlan = async (body) =>
+      String(
+        await hooks.tool['todowrite-for-plan'].execute(
+          { program: `class Js extends JsProgram { async run() { ${body} } }` },
+          { sessionID, agent: 'plan' },
+        ),
+      )
+
+    const missing = await runPlan('return await this.devops("investigate the build artifact");')
+    assert.match(missing, /ok = false/)
+    assert.match(missing, /code = "VIEW_DECLARATION_INVALID"/)
+
+    const malformed = await runPlan('return await this.devops("investigate the build artifact", { "not-an-anchor": null });')
+    assert.match(malformed, /ok = false/)
+    assert.match(malformed, /code = "VIEW_DECLARATION_INVALID"/)
+
+    // 合法映射但没有已开立的 Plan 工作：拒绝，不派工，也不伪造成功。
+    const withoutWork = await runPlan('return await this.devops("investigate the build artifact", { 1: null });')
+    assert.match(withoutWork, /ok = false/)
+    assert.match(withoutWork, /code = "devops-failed"/)
+    assert.match(withoutWork, /lifecycle work is missing/)
+
+    assert.deepEqual(createdIds, [], 'no refused devops member call may place a child session')
+  })
+})
+
 test('WHAT[work-024] an unreviewed tenure may read the draft', async () => {
-  await withStore(async (store, root) => {
-    const opened = await surface.seedOpen(store, 'plan', 'work-24', root, 0n)
+  // The real Plan programming surface is the only Plan entry the host
+  // registers; an unreviewed tenure may still READ the draft through it.
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const sessionID = 'ses-work-024-unreviewed'
+    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
+    await openIncumbency(runtime, sessionID, 'inc-work-024', 'S1')
+
+    const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
+    const opened = await planning.PlanningSurface.ensurePlanWorkOpened(commonDir, directory, sessionID, 0n)
     assert.equal(opened.ok, true, opened.error)
-    const before = surface.workView(store, 'work-24')
+
+    const before = surface.workView(workspace.acquire(commonDir), sessionID)
     assert.equal(before.reviewed, '')
 
-    const read = await runJsPlan(store.gitCommonDir, root, 'work-24', `class Js extends JsProgram {
+    const read = await hooks.tool['todowrite-for-plan'].execute(
+      { program: `class Js extends JsProgram {
       async run() {
         return { ok: true };
       }
-    }`)
-    assert.match(read, /# ok/)
+    }` },
+      { sessionID, agent: 'plan', callID: 'call-work-024', messageID: 'run-work-024', providerRunID: 'run-work-024' },
+    )
+    assert.match(String(read), /# ok/)
   })
 })
 

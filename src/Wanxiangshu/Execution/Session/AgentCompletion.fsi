@@ -64,7 +64,6 @@ module AgentCompletion =
     val text: outcome: AgentCompletionOutcome -> string
     val agentId: outcome: AgentCompletionOutcome -> string
     val status: outcome: AgentCompletionOutcome -> string
-    val isCompleted: outcome: AgentCompletionOutcome -> bool
 
     val completed:
         agentId: string ->

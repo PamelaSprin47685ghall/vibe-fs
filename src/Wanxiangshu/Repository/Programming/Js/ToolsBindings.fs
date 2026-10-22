@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Repository.Programming.Js.Anchor
 
 /// JS-010/JS-016: the api object injected into the sandbox — the only
 /// authority a model program sees. Every member returns a JSON-compatible
@@ -47,6 +48,25 @@ module JsToolsBindings =
     /// sentinel the wrapper classifies instead of returning ok:false as data.
     [<Emit("Promise.resolve($0).then(function(value) { if (value && value.ok === false) { const err = new Error(value.reason || value.code); err.__jsFailure = { code: value.code, reason: value.reason || value.code, minimumOutputBudgetBytes: value.minimumOutputBudgetBytes }; throw err; } return value; })")>]
     let private rejectRunFailure (promise: obj) : obj = jsNative
+
+    [<Emit("new TextEncoder().encode($0).length * 50")>]
+    let private planBBudgetMs (planB: string) : int = jsNative
+
+    [<Emit("setTimeout($0, $1)")>]
+    let private armYield (callback: unit -> unit) (budgetMs: int) : obj = jsNative
+
+    [<Emit("clearTimeout($0)")>]
+    let private disarmYield (timer: obj) : unit = jsNative
+
+    // DSL-MUTABLE: single-flight — one pending yield owns one sandbox park state.
+    let private commandYields: obj = emitJsExpr () "new WeakMap()"
+
+    [<Emit("$0.get($1)")>]
+    let private pendingCommandYield
+        (flights: obj)
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        : Task<Result<unit, obj>> option =
+        jsNative
 
     /// A span must cross the vm boundary as a plain JS array, not a typed
     /// array: the parked payload is JSON round-tripped, and a typed array
@@ -356,123 +376,30 @@ module JsToolsBindings =
             }
             |> renderOutcome
 
-    let private isWhitespaceChar (ch: char) =
-        ch = ' ' || ch = '\t' || ch = '\n' || ch = '\r' || ch = '\012' || ch = '\011'
-
-    let private appendPendingSpace (sb: StringBuilder) (pendingSpace: bool) =
-        if pendingSpace && sb.Length > 0 then
-            sb.Append(' ') |> ignore
-
-    let private accumulateCollapsedChar (sb: StringBuilder) (pendingSpace: bool) (ch: char) =
-        if isWhitespaceChar ch then
-            true
-        else
-            appendPendingSpace sb pendingSpace
-            sb.Append(ch) |> ignore
-            false
-
-    /// Collapse a whitespace run to one space and drop leading/trailing
-    /// whitespace. This is the canonical `where` needle normalization.
-    let private collapseWhitespace (text: string) =
-        let sb = StringBuilder()
-        // DSL-MUTABLE: algorithm-scratch — whitespace run cursor
-        let mutable pendingSpace = false
-
-        for ch in text do
-            pendingSpace <- accumulateCollapsedChar sb pendingSpace ch
-
-        sb.ToString()
-
-    /// Normalize content and keep the original offset of every normalized
-    /// character. A whitespace run maps to its first original character.
-    let private appendNormalizedSpace
-        (sb: StringBuilder)
-        (offsets: ResizeArray<int>)
-        (previousWasSpace: bool)
-        (index: int)
-        =
-        if not previousWasSpace && sb.Length > 0 then
-            sb.Append(' ') |> ignore
-            offsets.Add index
-            true
-        else
-            previousWasSpace
-
-    let private accumulateNormalizedChar
-        (sb: StringBuilder)
-        (offsets: ResizeArray<int>)
-        (previousWasSpace: bool)
-        (index: int)
-        (ch: char)
-        =
-        if isWhitespaceChar ch then
-            appendNormalizedSpace sb offsets previousWasSpace index
-        else
-            sb.Append ch |> ignore
-            offsets.Add index
-            false
-
-    let private normalizeWithMap (text: string) =
-        let sb = StringBuilder()
-        let offsets = ResizeArray<int>()
-        // DSL-MUTABLE: algorithm-scratch — whitespace run cursor
-        let mutable previousWasSpace = false
-
-        for index in 0 .. text.Length - 1 do
-            let ch = text.[index]
-            previousWasSpace <- accumulateNormalizedChar sb offsets previousWasSpace index ch
-
-        sb.ToString(), offsets
-
-    /// All non-overlapping normalized matches, mapped back to original
-    /// UTF-16 offsets. `fromIndex` is an original content offset.
-    let private recordSpanMatch
-        (offsets: ResizeArray<int>)
-        (spans: ResizeArray<int * int>)
-        (targetLength: int)
-        (fromIndex: int)
-        (found: int)
-        =
-        let beginIndex = offsets.[found]
-        let endIndex = offsets.[found + targetLength - 1] + 1
-
-        if beginIndex >= fromIndex then
-            spans.Add(beginIndex, endIndex)
-
-    let private scanNextSpan
-        (normalized: string)
-        (target: string)
-        (offsets: ResizeArray<int>)
-        (spans: ResizeArray<int * int>)
-        (fromIndex: int)
-        (cursor: int)
-        =
-        let found = normalized.IndexOf(target, cursor)
-
+    let private appendLiteralSpan (spans: ResizeArray<int * int>) contentLength needleLength found =
         if found < 0 then
-            normalized.Length
+            contentLength + 1
         else
-            recordSpanMatch offsets spans target.Length fromIndex found
-            found + max 1 target.Length
+            spans.Add(found, found + needleLength)
+            found + needleLength
 
-    let private collectWhereSpans (content: string) (target: string) (fromIndex: int) =
-        let normalized, offsets = normalizeWithMap content
-        // DSL-MUTABLE: algorithm-scratch — match scan cursor
-        let mutable cursor = 0
+    let private scanLiteralSpans (content: string) (needle: string) (fromIndex: int) =
         let spans = ResizeArray<int * int>()
+        // DSL-MUTABLE: algorithm-scratch — scan this literal input once.
+        let mutable cursor = max 0 fromIndex
 
-        while cursor <= normalized.Length - target.Length do
-            cursor <- scanNextSpan normalized target offsets spans fromIndex cursor
+        while cursor <= content.Length - needle.Length do
+            let found = content.IndexOf(needle, cursor)
+
+            cursor <- appendLiteralSpan spans content.Length needle.Length found
 
         List.ofSeq spans
 
-    let private whereSpans (content: string) (needle: string) (fromIndex: int) =
-        let target = collapseWhitespace needle
-
-        if target.Length = 0 then
+    let private whereSpans content (needle: string) fromIndex =
+        if needle.Length = 0 then
             []
         else
-            collectWhereSpans content target fromIndex
+            scanLiteralSpans content needle fromIndex
 
     let private computeRowCell (aChar: char) (bChar: char) (leftDist: int) (aboveDist: int) (diagDist: int) =
         let substitution = if aChar = bChar then 0 else 1
@@ -534,9 +461,8 @@ module JsToolsBindings =
         if scanned >= 2000 || System.String.IsNullOrWhiteSpace line then
             scanned, best
         else
-            let trimmed = line.Trim()
-            let distance = editDistance trimmed target
-            scanned + 1, considerBetterCandidate best distance offset (offset + line.Length) trimmed
+            let distance = editDistance line target
+            scanned + 1, considerBetterCandidate best distance offset (offset + line.Length) line
 
     let private scanNearestLine (content: string) (target: string) =
         let lines = content.Split('\n')
@@ -571,12 +497,10 @@ module JsToolsBindings =
     /// Diagnostic for a zero-match where: the closest single line, bounded to
     /// the first 2000 non-empty lines so a huge file cannot dominate cost.
     let private nearestLine (content: string) (needle: string) =
-        let target = collapseWhitespace needle
-
-        if target.Length = 0 then
+        if needle.Length = 0 then
             null
         else
-            renderNearestMatch (scanNearestLine content target)
+            renderNearestMatch (scanNearestLine content needle)
 
     /// Shared suspension path: park(payload) and where ambiguity both fire
     /// the same signal and await the same deferred promise.
@@ -769,6 +693,7 @@ module JsToolsBindings =
               "whereAll" ==> source?whereAll
               "park" ==> source?park
               "ask" ==> source?ask
+              "devops" ==> source?devops
               "write"
               ==> fun (path: string) (text: string) ->
                   match checkPath path with
@@ -778,9 +703,171 @@ module JsToolsBindings =
                       failureObj (JsFailure.InvalidArgument "Plan content cannot be empty")
                   | Ok() -> emitJsExpr (source, path, text) "$0.write($1,$2)" ]
 
-    /// The host loop behind `js.call`, injected by the workflow.
+    /// Execution operations owned by one programming call.
     type JsCallHost =
-        { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
+        { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj>
+          Start: obj -> obj
+          Wait: obj -> Task<obj>
+          SignalParked: obj -> Task<obj>
+          SendParked: obj -> Task<obj>
+          TakeDelta: (obj * (obj -> bool)) -> Task<obj>
+          Dispose: unit -> Task<unit> }
+
+    let private awaitCommandResume (pending: Task<obj>) =
+        task {
+            try
+                let! _ = pending
+                return Ok()
+            with error ->
+                return Error(box error)
+        }
+
+    let private publishCommandYield
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        planB
+        budgetMs
+        (resumed: Task<Result<unit, obj>> option ref)
+        delta
+        =
+        if state.ParkRequested || state.AbandonRequested then
+            false
+        else
+            let payload =
+                createObj
+                    [ "__jsYield" ==> true
+                      "planB" ==> planB
+                      "budgetMs" ==> budgetMs
+                      "delta" ==> delta ]
+
+            let pending = unbox<Task<obj>> (suspend state payload)
+            resumed.Value <- Some(awaitCommandResume pending)
+            true
+
+    let private finishCommandYield (outcome: obj) resumed =
+        match unbox<bool> (outcome?ok), resumed with
+        | false, _ -> Task.FromResult(Error outcome)
+        | true, Some pending -> pending
+        | true, None -> Task.FromResult(Ok())
+
+    let private disposeFailedCommandYield (host: JsCallHost) failure =
+        task {
+            try
+                do! host.Dispose()
+                return Error failure
+            with cleanup ->
+                return
+                    Error(
+                        emitJsExpr
+                            (failure, cleanup)
+                            "new AggregateError([$0, $1], 'Command yield failed: ' + String(($0 && ($0.message || $0.reason)) || $0) + '; cleanup failed: ' + String(($1 && $1.message) || $1), { cause: $0 })"
+                    )
+        }
+
+    let private settleCommandYield host outcome =
+        match outcome with
+        | Ok() -> Task.FromResult(Ok())
+        | Error failure -> disposeFailedCommandYield host failure
+
+    let private observeCommandYield (host: JsCallHost) ticket state planB budgetMs =
+        task {
+            try
+                // DSL-MUTABLE: resource — the sandbox handoff created by the actual native yield.
+                let resumed = ref None
+                let! outcome = host.TakeDelta(ticket, publishCommandYield state planB budgetMs resumed)
+
+                let! settled = finishCommandYield outcome resumed.Value
+                return! settleCommandYield host settled
+            with error ->
+                return! settleCommandYield host (Error(box error))
+        }
+
+    let private catchCommandYield host ticket state planB budgetMs =
+        task {
+            try
+                return! observeCommandYield host ticket state planB budgetMs
+            with error ->
+                return Error(box error)
+        }
+
+    let private completeCommandYield
+        host
+        ticket
+        state
+        planB
+        budgetMs
+        (completed: TaskCompletionSource<Result<unit, obj>>)
+        =
+        task {
+            // DSL-MUTABLE: algorithm-scratch — publish this invocation's observed outcome in finally.
+            let observed = ref (Error(box "Command yield did not settle"))
+
+            try
+                let! outcome = catchCommandYield host ticket state planB budgetMs
+                observed.Value <- outcome
+            finally
+                emitJsExpr (commandYields, state) "$0.delete($1)" |> ignore
+                completed.SetResult observed.Value
+        }
+
+    let private yieldCommand host ticket state planB budgetMs =
+        match pendingCommandYield commandYields state with
+        | Some pending -> pending
+        | None ->
+            let completed = TaskCompletionSource<Result<unit, obj>>()
+            emitJsExpr (commandYields, state, completed.Task) "$0.set($1, $2)" |> ignore
+
+            completeCommandYield host ticket state planB budgetMs completed |> ignore
+
+            completed.Task
+
+    let private commandAfterResume value resume =
+        match resume with
+        | Ok() -> value
+        | Error failure -> emitJsExpr failure "(() => { throw $0; })()"
+
+    let private waitCommand
+        (host: JsCallHost)
+        ticket
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        planB
+        =
+        task {
+            // DSL-MUTABLE: resource — the native wait and its sandbox handoff task.
+            let finished = ref false
+            let resumed = ref (Task.FromResult(Ok()))
+            let budgetMs = planBBudgetMs planB
+
+            let timer =
+                parkState
+                |> Option.map (fun state ->
+                    armYield
+                        (fun () ->
+                            if not finished.Value && not state.ParkRequested && not state.AbandonRequested then
+                                resumed.Value <- yieldCommand host ticket state planB budgetMs)
+                        budgetMs)
+
+            try
+                let! value = host.Wait ticket
+                finished.Value <- true
+                let! resume = resumed.Value
+
+                return commandAfterResume value resume
+            finally
+                finished.Value <- true
+                timer |> Option.iter disarmYield
+        }
+
+    let private startCommand (host: JsCallHost) command parkState planB =
+        match host.Start command with
+        | started when unbox<bool> (started?ok) -> waitCommand host (started?ticket) parkState planB
+        | failed -> Task.FromResult failed
+
+    let private callCommand host command parkState (planB: obj) =
+        match host with
+        | None -> Task.FromResult(failureObj JsFailure.RunHostUnavailable)
+        | Some _ when not (emitJsExpr planB "typeof $0 === 'string'") ->
+            Task.FromResult(failureObj (JsFailure.RunCommandUnsupported "this.call requires planB"))
+        | Some injected -> startCommand injected command parkState (string planB)
 
     type JsSearchHost =
         { Search: string array -> bool -> Task<obj> }
@@ -964,32 +1051,99 @@ module JsToolsBindings =
 
             rejectRunFailure (box search)
 
-    /// `js.call(class extends js.Callable { ... })`: hand the class to the host
-    /// loop and await its structured outcome. Without an injected host loop
-    /// the member refuses with CALL_HOST_UNAVAILABLE instead of pretending.
+    let private callEngineeringLoop host parkState input =
+        match host with
+        | Some injected -> injected.Loop parkState input (currentStack ())
+        | None -> Task.FromResult(failureObj JsFailure.RunHostUnavailable)
+
     let private makeCallMember (host: JsCallHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
         let settled =
-            fun (runnableClass: obj) ->
+            fun (input: obj) (planB: obj) ->
+                if emitJsExpr input "typeof $0 === 'string'" then
+                    box (callCommand host input parkState planB)
+                else
+                    box (callEngineeringLoop host parkState input)
+
+        "call"
+        ==> fun (input: obj) (planB: obj) -> rejectRunFailure (settled input planB)
+
+    let private makeSignalMember (host: JsCallHost option) =
+        let settled =
+            fun (signalName: obj) ->
                 match host with
-                | Some injected -> box (injected.Loop parkState runnableClass (currentStack ()))
+                | Some injected -> box (injected.SignalParked signalName)
                 | None -> box (task { return failureObj JsFailure.RunHostUnavailable })
 
-        "call" ==> fun (callableClass: obj) -> rejectRunFailure (settled callableClass)
+        "signal" ==> fun (signalName: obj) -> rejectRunFailure (settled signalName)
 
-    /// `js.fork(payload)` hands the payload to the wiring-owned fork spec and
-    /// returns its receipt text; `js.join()` waits for this session's children.
-    /// Without an installed delegation host the members refuse with
-    /// DELEGATION_UNAVAILABLE instead of pretending.
-    let private makeForkMember (host: JsDelegationHost option) =
-        "fork"
-        ==> fun (payload: obj) ->
+    let private makeSendMember (host: JsCallHost option) =
+        let settled =
+            fun (input: obj) ->
+                match host with
+                | Some injected -> box (injected.SendParked input)
+                | None -> box (task { return failureObj JsFailure.RunHostUnavailable })
+
+        "send" ==> fun (input: obj) -> rejectRunFailure (settled input)
+
+    /// The workflow disposes the process table when the program finishes.
+    /// The host is stashed on the api object the sandbox already keeps.
+    [<Emit("$0.__callHost = $1")>]
+    let private stashCallHost (api: obj) (host: JsCallHost) : unit = jsNative
+
+    let attachCallHost (api: obj) (host: JsCallHost option) =
+        match host with
+        | Some injected -> stashCallHost api injected
+        | None -> ()
+
+    [<Emit("$0 && $0.__callHost")>]
+    let private readCallHost (api: obj) : JsCallHost = jsNative
+
+    let disposeCallHost (api: obj) : Task<unit> =
+        let host = readCallHost api
+
+        if isNull (box host) then
+            Task.FromResult()
+        else
+            host.Dispose()
+
+    /// The report mapping is the declared parent → child context projection:
+    /// it must arrive with every delegation member, and a missing or
+    /// malformed one refuses with VIEW_DECLARATION_INVALID instead of
+    /// falling back to an implicit empty mapping.
+    let private failureOfParse (parsed: Result<'T, JsFailure>) : JsFailure option =
+        match parsed with
+        | Error failure -> Some failure
+        | Ok _ -> None
+
+    let private reportMappingFailure (reportMapping: obj) : JsFailure option =
+        if isUndefined reportMapping then
+            Some(
+                JsFailure.ViewDeclarationInvalid
+                    "reportMapping is required: pass the anchor mapping the delegate must report through"
+            )
+        else
+            reportMapping |> AnchorDeclarationRule.parseReportMapping |> failureOfParse
+
+    /// Run a delegation member only once its report mapping is proven; a
+    /// refused mapping answers with its failure envelope instead.
+    let private withReportMapping (reportMapping: obj) (run: unit -> obj) : obj =
+        match reportMappingFailure reportMapping with
+        | Some failure -> box (task { return failureObj failure })
+        | None -> run ()
+
+    /// `fork(payload, reportMapping)`, `resume(payload, reportMapping)`,
+    /// `commission(payload, reportMapping)` and
+    /// `devops(intent, reportMapping)` all travel the single delegation
+    /// entry of the host, which receives the member name together with the
+    /// payload and the report mapping. Without an installed delegation host
+    /// the members refuse with DELEGATION_UNAVAILABLE instead of pretending.
+    let private makeDelegateMember (host: JsDelegationHost option) (name: string) =
+        name
+        ==> fun (payload: obj) (reportMapping: obj) ->
             match host with
-            | Some delegation -> box (delegation.Fork payload)
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
-
-    let private makeCommissionMember (host: JsDelegationHost option) =
-        let _, fork = makeForkMember host
-        "commission", fork
+            | Some delegation ->
+                withReportMapping reportMapping (fun () -> box (delegation.Delegate name payload reportMapping))
 
     let private makeJoinMember (host: JsDelegationHost option) =
         "join"
@@ -1016,17 +1170,20 @@ module JsToolsBindings =
             | Some delegation -> box (delegation.Horizon())
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
-    /// `js.advisor(intent, view)` consults this session's own advisor seat and
-    /// returns its data envelope verbatim: the advice travels as the value the
-    /// host closure produced, never as a rendering. Without an installed
-    /// delegation host the member refuses with DELEGATION_UNAVAILABLE instead
-    /// of pretending.
+    /// `advisor(intent, reportMapping)` consults this session's own advisor
+    /// seat and returns its data envelope verbatim: the advice travels as the
+    /// value the host closure produced, never as a rendering. The report
+    /// mapping is mandatory — a missing or malformed one refuses with
+    /// VIEW_DECLARATION_INVALID; there is no silent empty-mapping path.
+    /// Without an installed delegation host the member refuses with
+    /// DELEGATION_UNAVAILABLE instead of pretending.
     let makeAdvisorMember (host: JsDelegationHost option) : (string * obj) =
         "advisor"
-        ==> fun (intent: obj) (view: obj) ->
+        ==> fun (intent: obj) (reportMapping: obj) ->
             match host with
-            | Some delegation -> box (delegation.Advisor intent view)
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+            | Some delegation ->
+                withReportMapping reportMapping (fun () -> box (delegation.Advisor intent reportMapping))
 
     let private makeAvailableAskMember parkState askInvoke =
         match parkState, askInvoke with
@@ -1049,51 +1206,72 @@ module JsToolsBindings =
         (delegationHost: JsDelegationHost option)
         (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
+        // Which members are installed is the library member directory
+        // (wanxiangli/programming `membersFor`), the same one the public and
+        // runtime base classes and the schema member list read; `dag` is pure
+        // base-class sugar over fork + join and has no host member.
+        let directory = JsCapability.memberNamesFor capabilities ""
+        let present (memberName: string) = Array.contains memberName directory
+
         let members =
-            [ if Set.contains JsCapability.Read capabilities then
+            [ if present "cat" then
                   makeCatMember root readSnapshots explicitReads
+              if present "stat" then
                   makeStatMember root
+              if present "whereAll" then
                   makeWhereAllMember ()
+              if present "where" then
                   makeWhereMember parkState
 
-              if Set.contains JsCapability.Glob capabilities then
+              if present "ls" then
                   makeLsMember root
 
-              if Set.contains JsCapability.Grep capabilities then
+              if present "rg" then
                   makeRgMember root searchHost
 
-              if Set.contains JsCapability.Write capabilities then
+              if present "write" then
                   makeWriteMember root staging readSnapshots ledger
+              if present "mkdir" then
                   makeMkdirMember root
 
-              if Set.contains JsCapability.Remove capabilities then
+              if present "rm" then
                   makeRmMember root staging readSnapshots ledger
 
-              if Set.contains JsCapability.Move capabilities then
+              if present "mv" then
                   makeMvMember root staging readSnapshots ledger
 
-              if Set.contains JsCapability.Exec capabilities then
+              if present "call" then
                   makeCallMember runHost parkState
 
-              if Set.contains JsCapability.Commission capabilities then
-                  makeCommissionMember delegationHost
+              if Set.contains JsCapability.Exec capabilities then
+                  makeSignalMember runHost
+                  makeSendMember runHost
 
-              if Set.contains JsCapability.Fork capabilities then
-                  makeForkMember delegationHost
+              if present "commission" then
+                  makeDelegateMember delegationHost "commission"
 
-              if Set.contains JsCapability.Join capabilities then
+              if present "fork" then
+                  makeDelegateMember delegationHost "fork"
+
+              if present "resume" then
+                  makeDelegateMember delegationHost "resume"
+
+              if present "devops" then
+                  makeDelegateMember delegationHost "devops"
+
+              if present "join" then
                   makeJoinMember delegationHost
 
-              if Set.contains JsCapability.Fission capabilities then
+              if present "fission" then
                   makeFissionMember delegationHost
 
-              if Set.contains JsCapability.Horizon capabilities then
+              if present "horizon" then
                   makeHorizonMember delegationHost
 
-              if Set.contains JsCapability.Advisor capabilities then
+              if present "advisor" then
                   makeAdvisorMember delegationHost
 
-              if Set.contains JsCapability.Ask capabilities then
+              if present "ask" then
                   makeAvailableAskMember parkState askInvoke
 
               match parkState with
@@ -1119,18 +1297,22 @@ module JsToolsBindings =
         (delegationHost: JsDelegationHost option)
         (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
-        createApiCore
-            capabilities
-            root
-            staging
-            readSnapshots
-            explicitReads
-            ledger
-            None
-            runHost
-            searchHost
-            delegationHost
-            askInvoke
+        let api =
+            createApiCore
+                capabilities
+                root
+                staging
+                readSnapshots
+                explicitReads
+                ledger
+                None
+                runHost
+                searchHost
+                delegationHost
+                askInvoke
+
+        attachCallHost api runHost
+        api
 
     /// Build the api object for one sandbox run that carries a park lifecycle
     /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
@@ -1148,18 +1330,22 @@ module JsToolsBindings =
         (delegationHost: JsDelegationHost option)
         (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
-        createApiCore
-            capabilities
-            root
-            staging
-            readSnapshots
-            explicitReads
-            ledger
-            (Some parkState)
-            runHost
-            searchHost
-            delegationHost
-            askInvoke
+        let api =
+            createApiCore
+                capabilities
+                root
+                staging
+                readSnapshots
+                explicitReads
+                ledger
+                (Some parkState)
+                runHost
+                searchHost
+                delegationHost
+                askInvoke
+
+        attachCallHost api runHost
+        api
 
 module JsReviewOnly =
     let scopeReviewOnly (check: unit -> Task<bool>) (api: obj) : obj =

@@ -9,6 +9,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
@@ -135,7 +137,7 @@ module OrchestratorHostSurface =
         | "Unknown" -> Outcome.SendOutcome.AcceptanceUnknown(stringOf (field value "reason"))
         | _ -> Outcome.SendOutcome.Fatal(stringOf (field value "reason"))
 
-    let private childInfo (value: obj) : OpenCodeChildInfo =
+    let private childInfo (value: obj) : ChildSessionInfo =
         { SessionId = sessionValue (field value "sessionId")
           ParentSessionId = optionalString (field value "parentSessionId") |> Option.map SessionId.create
           Agent = optionalString (field value "agent")
@@ -352,7 +354,16 @@ module OrchestratorHostSurface =
               SessionSnapshot = None
               OnChildCreated = fun _ _ _ -> ()
               RegisterChildDirectory = fun _ _ -> ()
-              OnRunStarted = fun _ _ _ -> ()
+              OnRunStarted =
+                fun sessionId role directory ->
+                    if not (isNullish (field options "onRunStarted")) then
+                        invokeRawValue
+                            options
+                            "onRunStarted"
+                            [| box (SessionId.value sessionId)
+                               box (Roles.roleLabel role)
+                               box (directory |> Option.toObj) |]
+                        |> ignore
               SendGateContinuation =
                 fun _ _ _ _ _ _ _ -> Task.FromResult(Error "SendGateContinuation unavailable on harness surface")
               ContinueManagerLoop = fun _ _ -> Task.FromResult(Ok())
@@ -501,6 +512,18 @@ module OrchestratorHostSurface =
             return
                 match result with
                 | Ok path -> box {| ok = true; value = path |}
+                | Error error -> box {| ok = false; error = error |}
+        }
+
+    /// The same finalization sequence through the production Git runner (real
+    /// `git` via ProcessRunner and separate output streams), not a JavaScript port.
+    let finalizeWorktreeWithGit (managerId: string) (worktree: string) : Task<obj> =
+        task {
+            let! result = OrchestratorGit.finalizeWorktree OrchestratorGit.run managerId worktree
+
+            return
+                match result with
+                | Ok _ -> box {| ok = true; error = null |}
                 | Error error -> box {| ok = false; error = error |}
         }
 

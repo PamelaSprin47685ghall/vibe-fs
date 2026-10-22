@@ -12,7 +12,7 @@ open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 
@@ -38,9 +38,16 @@ module HostForkRestart =
           ReadDeliveryView =
             durableJournal
             |> Option.map (fun durable ->
-                fun child provider authority ->
-                    TaskDeliveryJournal.tryFind durable child provider
-                    |> Option.filter (fun witness -> witness.Fence.AuthorityRoot = authority)
+                fun childSession providerRun authorityRoot ->
+                    TaskDeliveryJournal.tryFindByFenceFields
+                        durable
+                        childSession
+                        providerRun
+                        None
+                        (Some authorityRoot)
+                        None
+                        None
+                        None
                     |> Option.map _.View)
           ParentId = parentId
           Snapshot = snapshot

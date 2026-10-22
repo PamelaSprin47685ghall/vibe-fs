@@ -1,14 +1,17 @@
 namespace Wanxiangshu.Execution.Session.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Persistence.Journal
 
-/// horizon() — natural-language roster of who remains at the caller's horizon.
+/// OpenCode adapter for horizon() (`HorizonRoster`): the host port binding,
+/// the wire encoding and registration.
 module HorizonTool =
 
+    /// Provider prose paths for the horizon surfaces, owned by the adapter.
     [<RequireQualifiedAccess>]
     module Path =
         [<Literal>]
@@ -22,6 +25,9 @@ module HorizonTool =
 
         [<Literal>]
         val DidNotReturn: string = "tool/horizon/did-not-return"
+
+        [<Literal>]
+        val Voided: string = "tool/horizon/voided"
 
         [<Literal>]
         val RemainsOpen: string = "tool/horizon/remains-open"
@@ -59,7 +65,6 @@ module HorizonTool =
           Journal: AgentJournal option
           EnsureWorkDevOpsBound: SessionId -> Task<unit> }
 
-    val admission: ToolAdmission
     val spec: runtimeCtx: HorizonRuntimeContext -> ToolSpec
 
     /// The same roster as data for `this.horizon()`: every horizon-visible

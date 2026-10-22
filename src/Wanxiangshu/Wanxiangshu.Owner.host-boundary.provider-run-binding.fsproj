@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>provider-run-binding</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>provider-run-binding</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
+    <Compile Include="Execution/Session/ChatExecution/ProviderRunBinding.fsi"/>
+    <Compile Include="Execution/Session/ChatExecution/ProviderRunBinding.fs"/>
+    <Compile Include="OpenCode/Host/ProviderRunBindingSurface.fsi"/>
+    <Compile Include="OpenCode/Host/ProviderRunBindingSurface.fs"/>
+  </ItemGroup>
+</Project>

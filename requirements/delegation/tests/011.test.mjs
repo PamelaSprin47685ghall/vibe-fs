@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
-import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { withSyncRuntime } from './support/sync-runtime.mjs'
 
 test('WHAT[delegation-011] ordinary completion returns delivered view without a separate return call or parent opening', async () => {
@@ -11,11 +10,7 @@ test('WHAT[delegation-011] ordinary completion returns delivered view without a 
     const work = sync.invoke(runtime, owner, 'Engineer', 'CHILD-OPENING-ONLY')
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
     assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 0), true)
-    const child = sync.child(runtime, owner, 'Engineer')
-    runtimeSurface.recordFencedDeliveredView(child, 'ordinary-run', 'call-x', {
-      prefixUntil: 0,
-      thenMap: {},
-    })
+    await sync.deliverCurrent(runtime, owner, 'Engineer', 'ordinary-run', 'call-x', 'ordinary delivered view', { 0: 'ordinary delivered view' })
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'ordinary delivered view', 'ordinary-run'), true)
     const result = await work
     assert.equal(result.ok, true)

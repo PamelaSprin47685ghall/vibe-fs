@@ -91,6 +91,7 @@ export class Scenario {
     this.turn = createScenarioTurn(this);
     this.watchdog = null;
     this._tornDown = false;
+    this.fatalCleanup = null;
   }
 
   async restart() {
@@ -270,7 +271,8 @@ export async function setupScenarioParallel(opts, tmpDir) {
     });
     scenario.watchdog = watchdog;
     // First mock script mismatch: stop the entire canary process (not just 500).
-    provider.onFatal = (fatal) => {
+    provider.onFatal = (fatal, error) => {
+      if (scenario.fatalCleanup) return;
       try {
         console.error(`── fatal script mismatch: ${fatal.reason} ──`);
         console.error(`session=${fatal.sessionId} lastUser=${JSON.stringify(fatal.lastUser)}`);
@@ -283,7 +285,19 @@ export async function setupScenarioParallel(opts, tmpDir) {
         }
       } catch {}
       try { watchdog.stop(); } catch {}
-      process.exit(1);
+      const failures = [error];
+      const stopped = host.stop({ assert: true, force: true });
+      scenario.fatalCleanup = (async () => {
+        try { await stopped; } catch (failure) { failures.push(failure); }
+        try { await events.close(); } catch (failure) { failures.push(failure); }
+        try { await provider.stop(); } catch (failure) { failures.push(failure); }
+        if (failures.length > 1) throw new AggregateError(failures, 'Fatal scenario failure and owned cleanup failed', { cause: error });
+        throw error;
+      })();
+      scenario.fatalCleanup.catch(failure => {
+        console.error(failure);
+        setImmediate(() => process.exit(1));
+      });
     };
     provider.onExpectationConsumed = ({ id, lane, blocking }) => {
       watchdog.advance({

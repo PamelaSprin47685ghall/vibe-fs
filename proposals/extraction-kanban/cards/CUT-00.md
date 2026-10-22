@@ -69,7 +69,7 @@ Reviewer（非作者）：manager
 | **D-04** | 18、19 | **`wanxiangli/eventstore` (`SqliteJournal`) 单流 SQLite CAS 与主仓多 writer JSONL 合法分叉 `DomainConflict` 分属不同承诺。** 在 CUT-18/19 中分别建模与演进，禁止用单流 CAS 抹杀多 writer 分叉。 |
 | **D-05** | 27、29、30、31 | **Casebook、Strength/投机调查、Rulebook/退化观察、Sphinx 默认暂留并维护。** 未经逐卡裁决不得借口删库。 |
 | **D-06** | 32、33、38 | **主干合并采用相对基线净改进准入，验证结果如实报告，不虚报 Long Stroke。** |
-| **D-07** | 00、34、36 | **按当前授权推进 `wanxiangshu` 与 `wanxiangli` 重构。** OpenCode 宿主适配归 CUT-34，第二宿主 `CUT-36` 保持 `OPTIONAL`。 |
+| **D-07** | 00、34、36 | **按当前授权推进 `wanxiangshu` 与 `wanxiangli` 重构。** OpenCode 宿主适配归 CUT-34，第二宿主 `CUT-36` 保持 `OPTIONAL`。**2026-10-21 更新**：仓主已指认 **omp 18.12.4**（锁定版本）为第二宿主并授权 canary 所需的真实模型调用，`CUT-36` 转入 `DOING`；其余护栏（不得编造宿主 API、不得用模拟回调冒充 canary、不得宣称已支持第二宿主）不因此放宽。 |
 
 ## 4. 首批并行卡认领与公共编辑面预约安排
 

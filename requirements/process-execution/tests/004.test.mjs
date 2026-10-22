@@ -87,48 +87,15 @@ test('WHAT[process-execution-004] the real registered loop applies the administr
 for (const exhaustAfterRun of [false, true]) {
   test(`WHAT[process-execution-004] concurrent explicit runs borrow the script deadline and ${exhaustAfterRun ? 'return its original remaining budget' : 'keep later watch and result reads alive'}`, async () => {
     const assert = (await import('node:assert/strict')).default
-    const { sandbox, program, nodeCommand, caseName, parseData, render } = await import('./support/executor.mjs')
-    const { execute } = await import('../../../dist/Repository/Programming/Js/WorkflowSurface.js')
-    const { writeFileSync, readFileSync } = await import('node:fs')
+    const { spawnSync } = await import('node:child_process')
     const { join } = await import('node:path')
-    const { dir, cleanup } = sandbox('wxs-run-deadline-lease-')
-    try {
-      writeFileSync(join(dir, 'probe'), 'data')
-      const command = nodeCommand('setTimeout(() => {}, 350)')
-      const outcome = await execute(dir, 'DevOps', 'en', 'deadline-lease', { program: program(`
-        const host = this;
-        let observedLate = false;
-        const runnable = (command) => {
-          return class extends this.Callable {
-            maxDuration = 1500;
-            interval = 25;
-            next(ctx) { return ctx.step === 0 ? command : null; }
-            async watch(ctx) {
-              if (ctx.remainingMs === 0) return false;
-              const observed = await host.stat('probe');
-              if (ctx.elapsedMs > 200 && observed.exists) observedLate = true;
-              return true;
-            }
-            sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
-          };
-        }
-        const results = await Promise.all([this.call(runnable('sleep 0.1')), this.call(runnable(${JSON.stringify(command)}))]);
-        await host.write('runs-finished', JSON.stringify({ observedLate, statuses: results.map(result => result.status) }));
-        ${exhaustAfterRun ? 'const until = Date.now() + 250; while (Date.now() < until) {}' : ''}
-        const after = await host.stat('probe');
-        return { observedLate, afterExists: after.exists, statuses: results.map(result => result.status) };
-      `) }, 1000, Date.now() + 150, 4096, null)
-      assert.deepEqual(JSON.parse(readFileSync(join(dir, 'runs-finished'), 'utf8')), { observedLate: true, statuses: ['completed', 'completed'] })
-      if (exhaustAfterRun) {
-        assert.equal(caseName(outcome), 'Failed')
-        assert.match(render(outcome), /PROGRAM_TIMEOUT/)
-      } else {
-        assert.equal(caseName(outcome), 'Succeeded', render(outcome))
-        assert.deepEqual(parseData(outcome), { observedLate: true, afterExists: true, statuses: ['completed', 'completed'] })
-      }
-    } finally {
-      cleanup()
-    }
+    // A post-await vm timeout must not unwind node:test's async_hooks stack.
+    const result = spawnSync(process.execPath, [join(import.meta.dirname, 'support/deadline-lease.fixture.mjs'), String(exhaustAfterRun)], {
+      timeout: 3000, encoding: 'utf8',
+    })
+    assert.equal(result.error, undefined, result.stderr)
+    assert.equal(result.signal, null, result.stderr)
+    assert.equal(result.status, 0, result.stderr || result.stdout)
   })
 }
 

@@ -51,11 +51,11 @@ export const collectManagerProviderToolEvidence = (scenario, opts = {}) => {
       if (!sessionID || !managerSessions.has(sessionID)) continue;
     }
     // Without a bound Manager session, only consider requests that already carry tools
-    // and a manager-shaped tool surface (fork+join+horizon+deliver) — never invent matches.
+    // and the Manager programming entry with join, horizon and deliver.
     const tools = extractToolNamesFromRequest(request);
     if (managerSessions.size === 0) {
       const hasManagerSpine =
-        tools.includes('fork')
+        tools.includes('todowrite-for-manager')
         && tools.includes('join')
         && tools.includes('horizon')
         && tools.includes('deliver');
@@ -100,9 +100,14 @@ export const assertManagerToolSurface = (opts = {}) => {
       `MANAGER_TOOL_SURFACE: Manager provider wire must advertise todowrite-for-manager: ${JSON.stringify(wire)}`,
     );
   }
-  for (const required of ['fork', 'horizon', 'join', 'resume', 'assume', 'deliver', 'todowrite-for-manager']) {
+  for (const required of ['horizon', 'join', 'review', 'assume', 'deliver', 'todowrite-for-manager']) {
     if (!wire.unionTools.includes(required)) {
       throw new Error(`MANAGER_TOOL_SURFACE: missing Manager tool ${required}`);
+    }
+  }
+  for (const retired of ['fork', 'resume', 'commission', 'devops']) {
+    if (wire.unionTools.includes(retired)) {
+      throw new Error(`MANAGER_TOOL_SURFACE: retired Host tool ${retired} remains advertised`);
     }
   }
   return { ok: true, unionTools: wire.unionTools, requestCount: wire.requestCount };

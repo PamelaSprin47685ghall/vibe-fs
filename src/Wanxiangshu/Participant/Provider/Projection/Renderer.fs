@@ -9,79 +9,31 @@ type RenderedMessages =
 [<RequireQualifiedAccess>]
 module ProjectionRenderer =
 
-    let private renderedRows (rows: ProjectionMessageRow list) : RenderedMessages =
-        { Messages = rows |> List.map (fun row -> row.Message)
-          HostMessageIds = rows |> List.map (fun row -> row.HostMessageId)
-          HostIsPhysical = rows |> List.map (fun row -> row.HostIsPhysical) }
+    let private intentRows (intent: ProjectionIntent) : ProjectionMessageRow array =
+        match intent with
+        | ProjectionIntent.ReplaceMessageBase value -> List.toArray value.Rows
+        | ProjectionIntent.InsertMessageRows value -> List.toArray value.Rows
 
-    let private emptyRendered (baseMessages: ProviderProjection.WireMessage list) : RenderedMessages =
-        { Messages = baseMessages
-          HostMessageIds = baseMessages |> List.map (fun _ -> None)
-          HostIsPhysical = baseMessages |> List.map (fun _ -> false) }
-
-    let private spliceBefore (index: int) (extra: RenderedMessages) (acc: RenderedMessages) : RenderedMessages =
-        let beforeMessages, afterMessages = List.splitAt index acc.Messages
-        let beforeIds, afterIds = List.splitAt index acc.HostMessageIds
-        let beforePhysical, afterPhysical = List.splitAt index acc.HostIsPhysical
-
-        { Messages = beforeMessages @ extra.Messages @ afterMessages
-          HostMessageIds = beforeIds @ extra.HostMessageIds @ afterIds
-          HostIsPhysical = beforePhysical @ extra.HostIsPhysical @ afterPhysical }
-
-    let private applyInsertions
-        (insertions: ProjectionMessageInsertion list)
-        (acc: RenderedMessages)
-        : RenderedMessages =
-        let before, append =
-            insertions
-            |> List.partition (fun insertion ->
-                match insertion.Anchor with
-                | ProjectionMessageAnchor.BeforeMessageIndex _ -> true
-                | ProjectionMessageAnchor.Append -> false)
-
-        let beforeInApplicationOrder =
-            before
-            |> List.sortByDescending (fun insertion ->
-                match insertion.Anchor with
-                | ProjectionMessageAnchor.BeforeMessageIndex index -> index, insertion.Key
-                | ProjectionMessageAnchor.Append -> -1, "")
-
-        let appendInApplicationOrder =
-            append |> List.sortBy (fun insertion -> insertion.Key)
-
-        (acc, beforeInApplicationOrder @ appendInApplicationOrder)
-        ||> List.fold (fun state insertion ->
-            let extra = renderedRows insertion.Rows
-
-            match insertion.Anchor with
-            | ProjectionMessageAnchor.Append ->
-                { Messages = state.Messages @ extra.Messages
-                  HostMessageIds = state.HostMessageIds @ extra.HostMessageIds
-                  HostIsPhysical = state.HostIsPhysical @ extra.HostIsPhysical }
-            | ProjectionMessageAnchor.BeforeMessageIndex index -> spliceBefore index extra state)
-
+    /// 规范顺序与锚点拼接由 wanxiangli/projection `layout` 决定；宿主只按来源取回行与元数据。
     let private renderOrdered
         (baseMessages: ProviderProjection.WireMessage list)
-        (ordered: ProjectionIntent list)
+        (intents: ProjectionIntent list)
         : RenderedMessages =
-        let replacement =
-            ordered
-            |> List.tryPick (function
-                | ProjectionIntent.ReplaceMessageBase value -> Some value
-                | _ -> None)
+        let baseRows = List.toArray baseMessages
+        let sources = intents |> List.toArray |> Array.map intentRows
 
-        let initial =
-            match replacement with
-            | Some value -> renderedRows value.Rows
-            | None -> emptyRendered baseMessages
+        let rows =
+            ProjectionPlanner.layout intents baseRows.Length
+            |> List.map (fun (intent, row) ->
+                match intent with
+                | None -> baseRows[row], None, false
+                | Some index ->
+                    let value = sources[index][row]
+                    value.Message, value.HostMessageId, value.HostIsPhysical)
 
-        let insertions =
-            ordered
-            |> List.choose (function
-                | ProjectionIntent.InsertMessageRows value -> Some value
-                | _ -> None)
-
-        applyInsertions insertions initial
+        { Messages = rows |> List.map (fun (message, _, _) -> message)
+          HostMessageIds = rows |> List.map (fun (_, id, _) -> id)
+          HostIsPhysical = rows |> List.map (fun (_, _, physical) -> physical) }
 
     /// Plan and materialize generic rows into canonical wire and Host side-channel lists.
     let renderMessagesWithHostIds
@@ -91,7 +43,7 @@ module ProjectionRenderer =
         : RenderedMessages =
         match ProjectionPlanner.plan intents with
         | Error _ -> invalidOp "ProjectionRenderer.renderMessagesWithHostIds requires a conflict-free intent set"
-        | Ok ordered -> renderOrdered baseMessages ordered
+        | Ok _ -> renderOrdered baseMessages intents
 
     /// Render only the canonical wire message list.
     let renderMessagesWithIntents

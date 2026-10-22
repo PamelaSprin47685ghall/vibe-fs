@@ -2,7 +2,7 @@ namespace Wanxiangshu.Interaction.Dispatch
 
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 

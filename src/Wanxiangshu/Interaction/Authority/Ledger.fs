@@ -20,11 +20,60 @@ module PromptAuthorityLedger =
         | "AgentOwnerRoot" -> Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot
         | unknown -> Error(sprintf "unknown authority root kind: %s" unknown)
 
+
+    /// The root kind a recorded closure kind belongs to, when the kind is known.
+    let private recordedRootKindOf (closureKind: string) : string option =
+        if AuthorityLifeClassification.closureKindLabels |> List.contains closureKind then
+            Some(AuthorityLifeClassification.rootKindOfKind closureKind)
+        else
+            None
+
+    /// The closure kind the accepted root derives, when it derives one.
+    let private derivedClosureKindOf
+        (payload: AuthorityRootAcceptedPayload)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : string option =
+        AuthorityLifeClassification.expectedClosureKind
+            payload.AuthorityKind
+            (profile.CanonicalRole = Role.Manager)
+            payload.AgentOwnerLife
+
+    /// The closure kind the acceptance recorded must be the kind the root
+    /// derives, and must be the only kind it may close under.
+    let private validateExpectedClosureKind
+        (payload: AuthorityRootAcceptedPayload)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Result<unit, string> =
+        match (recordedRootKindOf payload.ExpectedClosureKind, derivedClosureKindOf payload profile) with
+        | (None, _) ->
+            Error(sprintf "AuthorityRootAccepted expected closure kind is unknown: %s" payload.ExpectedClosureKind)
+        | (Some rootKind, _) when rootKind <> payload.AuthorityKind ->
+            Error(
+                sprintf
+                    "AuthorityRootAccepted expected closure kind %s does not match authority kind %s"
+                    payload.ExpectedClosureKind
+                    payload.AuthorityKind
+            )
+        | (Some _, None) ->
+            Error(
+                sprintf
+                    "AuthorityRootAccepted expected closure kind %s cannot be derived from the accepted root"
+                    payload.ExpectedClosureKind
+            )
+        | (Some _, Some derived) when derived = payload.ExpectedClosureKind -> Ok()
+        | (Some _, Some derived) ->
+            Error(
+                sprintf
+                    "AuthorityRootAccepted expected closure kind %s does not match the derived kind %s"
+                    payload.ExpectedClosureKind
+                    derived
+            )
+
     let foldAuthorityRootAccepted
         (projection: PromptAuthority.PromptAuthorityProjection)
         (payload: AuthorityRootAcceptedPayload)
         : Result<PromptAuthority.PromptAuthorityProjection, string> =
-        if payload.SchemaVersion <> 2 then
+        if payload.SchemaVersion <> 2 && payload.SchemaVersion <> 3 then
             Error(sprintf "unsupported AuthorityRootAccepted schema version: %d" payload.SchemaVersion)
         else
             parseAuthorityKind payload.AuthorityKind
@@ -36,68 +85,25 @@ module PromptAuthorityLedger =
                     authorityKind
                     payload.IdentitySeed)
             |> Result.bind (fun profile ->
-                PromptAuthorityRun.registerAuthority profile projection
-                |> Result.mapError PromptAuthorityRun.describeRegistrationRejection)
-
-    let private closeActiveRun (profile: PromptAuthority.AuthorityExecutionProfile) projection =
-        match PromptAuthorityRun.closeAuthority profile.LogicalRunId profile.AuthorityRootUserMessageId projection with
-        | Ok closed -> closed
-        | Error error -> invalidOp error
-
-    /// Work completion closes HumanRoot authority; AgentOwnerRoot closure belongs to its owner.
-    let closeCompletedHumanRootManager
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        : PromptAuthority.PromptAuthorityProjection =
-        match projection.ActiveLogicalRun with
-        | Some profile when
-            profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-            && profile.CanonicalRole = Role.Manager
-            ->
-            closeActiveRun profile projection
-        | _ -> projection
-
-    /// PROMPT-005 `Claimed`.
-    let foldPromptClaimed
-        (runtimeStartCount: int)
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        (fact:
-            {| PromptKey: PromptKey
-               SessionId: SessionId
-               ContinuationKind: string
-               LogicalRunId: LogicalRunId option
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId option
-               IdentitySeed: PromptIdentitySeed
-               PayloadDigest: string |})
-        =
-        let origin =
-            if fact.ContinuationKind = "AgentOwnerRoot" then
-                Some(PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
-            else
-                PromptAuthority.tryParseContinuationKind fact.ContinuationKind
-                |> Option.map PromptAuthority.PromptOrigin.Continuation
-
-        match origin with
-        // PROMPT-004: UnknownOrigin fails closed. A registered claim with an
-        // unrecognised origin would later resolve into whatever the resolution
-        // order defaults to.
-        | None -> projection
-        | Some resolvedOrigin ->
-            let claim: PromptAuthority.PromptClaim =
-                { PromptKey = fact.PromptKey
-                  SessionId = fact.SessionId
-                  Origin = resolvedOrigin
-                  LogicalRunId = fact.LogicalRunId
-                  AuthorityRootUserMessageId = fact.AuthorityRootUserMessageId
-                  IdentitySeed = fact.IdentitySeed
-                  PayloadDigest = fact.PayloadDigest
-                  // PROMPT-005: `Claimed` precedes the Host call, so no transport
-                  // receipt can exist yet. `foldPromptSubmitted` attaches it.
-                  Receipt = None
-                  // PROMPT-011: watermark of the workspace RuntimeStartCount.
-                  // Subsequent RuntimeStarted envelopes only advance that counter.
-                  ClaimedAtRuntimeStartCount = runtimeStartCount }
-
-            PromptAuthorityRun.registerClaim claim projection
+                validateExpectedClosureKind payload profile
+                |> Result.bind (fun () ->
+                    PromptAuthorityRun.registerAuthority profile projection
+                    |> Result.mapError PromptAuthorityRun.describeRegistrationRejection))
+            // The closure contract of an accepted root outlives the run it
+            // governs: a closure that arrives after the run was closed must
+            // still be judged against the kind the acceptance committed to.
+            |> Result.map (fun registered ->
+                { registered with
+                    AcceptedRootClosures =
+                        Map.add
+                            payload.LogicalRunId
+                            ({ RootKind = payload.AuthorityKind
+                               ExpectedClosureKind = payload.ExpectedClosureKind
+                               OwnerLogicalRunId = payload.OwnerLogicalRunId
+                               AgentOwnerLife = payload.AgentOwnerLife
+                               AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId }
+                            : PromptAuthority.AcceptedRootClosure)
+                            registered.AcceptedRootClosures })
 
     /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
     ///

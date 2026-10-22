@@ -19,6 +19,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// Narrow JS-native owner for deterministic temporal proofs.
 ///
@@ -199,15 +200,93 @@ module TemporalSurface =
 
         match family, caseName with
         | "Prompt", "AuthorityRootAccepted" ->
+            let identitySeed = identitySeedOfJs (payload?IdentitySeed)
+
+            let authorityKind = text (payload?AuthorityKind)
+
+            let isManager =
+                match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity identitySeed) with
+                | Some role -> role = Role.Manager
+                | None -> false
+
+            let agentOwnerLife =
+                match text (payload?AgentOwnerLife) with
+                | "" -> None
+                | value -> Some value
+
+            let owner =
+                PromptAuthority.identitySeedOwner identitySeed
+                |> Option.map (fun (_, run, _) -> LogicalRunId.value run)
+
+            let suppliedOwner =
+                match text (payload?OwnerLogicalRunId) with
+                | "" -> None
+                | value -> Some value
+
+            if (authorityKind = "AgentOwnerRoot") <> owner.IsSome then
+                invalidArg "IdentitySeed" "the authority kind does not match its owner identity"
+
+            if suppliedOwner.IsSome && suppliedOwner <> owner then
+                invalidArg "OwnerLogicalRunId" "the recorded owner does not match the identity seed"
+
             AgentFact.Prompt(
                 PromptFactCases.AuthorityRootAccepted
-                    { SchemaVersion = 2
+                    { SchemaVersion = 3
                       SessionId = sessionIdOf (payload?SessionId)
                       LogicalRunId = logicalRunOf (payload?LogicalRunId)
                       AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
-                      AuthorityKind = text (payload?AuthorityKind)
-                      IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
+                      AuthorityKind = authorityKind
+                      ExpectedClosureKind =
+                        AuthorityLifeClassification.recordedClosureKind
+                            authorityKind
+                            isManager
+                            agentOwnerLife
+                            (match text (payload?ExpectedClosureKind) with
+                             | "" -> None
+                             | value -> Some value)
+                      OwnerLogicalRunId = owner
+                      AgentOwnerLife = agentOwnerLife
+                      IdentitySeed = identitySeed }
             )
+        | "Prompt", "AuthorityManagedRunTerminal" ->
+            AgentFact.Prompt(
+                PromptFactCases.AuthorityManagedRunTerminal
+                    { SessionId = sessionIdOf (payload?SessionId)
+                      LogicalRunId = logicalRunOf (payload?LogicalRunId)
+                      AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                      FactId = text (payload?FactId) }
+            )
+        | "Prompt", "AuthorityChildWorkTerminal" ->
+            AgentFact.Prompt(
+                PromptFactCases.AuthorityChildWorkTerminal
+                    { SessionId = sessionIdOf (payload?SessionId)
+                      OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                      ChildLogicalRunId = logicalRunOf (payload?ChildLogicalRunId)
+                      AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                      FactId = text (payload?FactId) }
+            )
+        | "Prompt", "AuthorityAttachedWorkTerminal" ->
+            AgentFact.Prompt(
+                PromptFactCases.AuthorityAttachedWorkTerminal
+                    { SessionId = sessionIdOf (payload?SessionId)
+                      OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                      ChildLogicalRunId = logicalRunOf (payload?ChildLogicalRunId)
+                      AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                      AttachmentKind = text (payload?AttachmentKind)
+                      AssociationGeneration = text (payload?AssociationGeneration)
+                      FactId = text (payload?FactId) }
+            )
+        | "Prompt", "AuthorityInternalLeafTerminal" ->
+            AgentFact.Prompt(
+                PromptFactCases.AuthorityInternalLeafTerminal
+                    { SessionId = sessionIdOf (payload?SessionId)
+                      OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                      LeafLogicalRunId = logicalRunOf (payload?LeafLogicalRunId)
+                      AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                      DecisionOrTransactionId = text (payload?DecisionOrTransactionId)
+                      FactId = text (payload?FactId) }
+            )
+
         | "ProviderFailure", "FailureRecorded" ->
             AgentFact.ProviderFailure(
                 ProviderFailureFactCases.FailureRecorded
@@ -353,13 +432,66 @@ module TemporalSurface =
                    case = "AuthorityRootAccepted"
                    payload =
                     box
-                        {| SchemaVersion = 2
+                        {| SchemaVersion = payload.SchemaVersion
                            SessionId = SessionId.value payload.SessionId
                            LogicalRunId = LogicalRunId.value payload.LogicalRunId
                            AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                            AuthorityKind = payload.AuthorityKind
+                           ExpectedClosureKind = payload.ExpectedClosureKind
+                           OwnerLogicalRunId = payload.OwnerLogicalRunId
+                           AgentOwnerLife = payload.AgentOwnerLife
                            IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityManagedRunTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityManagedRunTerminal"
+                   payload =
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityChildWorkTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityChildWorkTerminal"
+                   payload =
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           OwnerLogicalRunId = payload.OwnerLogicalRunId
+                           ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityAttachedWorkTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityAttachedWorkTerminal"
+                   payload =
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           OwnerLogicalRunId = payload.OwnerLogicalRunId
+                           ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           AttachmentKind = payload.AttachmentKind
+                           AssociationGeneration = payload.AssociationGeneration
+                           FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityInternalLeafTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityInternalLeafTerminal"
+                   payload =
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           OwnerLogicalRunId = payload.OwnerLogicalRunId
+                           LeafLogicalRunId = LogicalRunId.value payload.LeafLogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           DecisionOrTransactionId = payload.DecisionOrTransactionId
+                           FactId = payload.FactId |} |}
         | Fact.Agent(AgentFact.ProviderFailure(ProviderFailureFactCases.FailureRecorded payload)) ->
             box
                 {| family = "ProviderFailure"
@@ -891,24 +1023,45 @@ module TemporalSurface =
     let sessionReuseIdentityScenario (firstAccepted: obj) (secondAccepted: obj) : obj =
         let accept (current: ProjectionSet) (fact: obj) = Fold.foldFact current (factOfJs fact)
 
+        /// interaction-authority-018: the prior run closes the way it closes in
+        /// production — a durable source terminal of the accepted root's own
+        /// closure kind, followed by the durable closure that cites it.
+        ///
+        /// The old witness-less close is retired: it released the identity
+        /// binding without any source, which is exactly what WHAT-018 forbids.
         let closeFirst (current: ProjectionSet) (fact: obj) =
             let sessionId = sessionIdOf (fact?payload?SessionId)
+            let logicalRunId = logicalRunOf (fact?payload?LogicalRunId)
+            let authorityRoot = authorityRootOf (fact?payload?AuthorityRootUserMessageId)
 
-            { current with
-                AgentProjections =
-                    match
-                        AgentProjection.tryUpdate
-                            sessionId
-                            (fun session ->
-                                Ok
-                                    { session with
-                                        PromptAuthority =
-                                            session.PromptAuthority
-                                            |> Option.map PromptAuthorityLedger.closeCompletedHumanRootManager })
-                            current.AgentProjections
-                    with
-                    | Ok updated -> updated
-                    | Error _ -> current.AgentProjections }
+            let source: PromptFactCases =
+                PromptFactCases.AuthorityManagedRunTerminal
+                    { SessionId = sessionId
+                      LogicalRunId = logicalRunId
+                      AuthorityRootUserMessageId = authorityRoot
+                      FactId = sprintf "terminal-%s" (LogicalRunId.value logicalRunId) }
+
+            let closure: PromptFactCases =
+                PromptFactCases.AuthorityLogicalRunClosed
+                    { SessionId = sessionId
+                      LogicalRunId = logicalRunId
+                      AuthorityRootUserMessageId = authorityRoot
+                      RootKind = "HumanRoot"
+                      ClosureWitness =
+                        PromptAuthorityRun.managedRunClosureWitness
+                            (text (fact?payload?ExpectedClosureKind))
+                            (LogicalRunId.value logicalRunId)
+                            (sprintf "terminal-%s" (LogicalRunId.value logicalRunId))
+                        |> Option.defaultWith (fun () -> invalidArg "firstAccepted" "expected a managed HumanRoot") }
+
+            let afterSource = Fold.foldFact current (Fact.Agent(AgentFact.Prompt source))
+
+            match afterSource with
+            | Error _ -> current
+            | Ok withSource ->
+                match Fold.foldFact withSource (Fact.Agent(AgentFact.Prompt closure)) with
+                | Ok closed -> closed
+                | Error _ -> withSource
 
         let refused reason =
             box

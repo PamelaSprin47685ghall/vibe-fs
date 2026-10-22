@@ -49,26 +49,62 @@ test('WHAT[participant-horizon-011] real cancellation keeps an accepted child an
   })
 })
 
-test('WHAT[participant-horizon-011] a restarted owner retains the abandoned child until its consequence is consumed', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-horizon-restart-abandoned-'))
-  const owner = 'manager-horizon-restart-abandoned'
+test('WHAT[participant-horizon-011] a restarted process voids the previous process pending child work and reports it once', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-horizon-restart-voided-'))
+  const owner = 'manager-horizon-restart-voided'
   const first = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
 
   try {
+    // The child work stays pending: it is accepted and visible, never cancelled.
     await placeEngineer(first, owner, 'Ada')
-    await forkTool.cancelOwnerChildren(first, owner)
-    assert.match(await forkTool.executeHorizon(first, owner), /Ada.*did not return/)
+    assert.equal(forkTool.durableLifecycleByname(first, owner, 'Ada'), 'Active')
   } finally {
     await forkTool.disposeRuntime(first)
   }
 
+  // Restart: the pending child work can no longer be delivered, so load
+  // settlement voids it. A void is not a completion, but it settles the
+  // outstanding obligation: it stays visible until it is reported once.
   const restarted = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
 
   try {
-    const horizon = await forkTool.executeHorizon(restarted, owner)
-    assert.match(horizon, /Ada.*did not return/)
+    const horizonReceipt = await forkTool.executeHorizonReceipt(restarted, owner)
+    assert.equal(horizonReceipt.ok, true)
+    const voidedRow = horizonReceipt.agents.find((row) => row.label === 'Ada')
+    assert.ok(voidedRow, 'the voided work keeps a row in the horizon roster')
+    assert.equal(voidedRow.status, 'voided', 'the voided work is reported as voided, not as still away')
+
+    const joinPromise = forkTool.executeJoinReceipt(restarted, owner)
+    let timer
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500) })
+    const joinResult = await Promise.race([joinPromise, timeout]).finally(() => clearTimeout(timer))
+    assert.equal(joinResult.ok, true)
+    const adaRecord = joinResult.records.find((record) => record.name === 'Ada')
+    assert.ok(adaRecord, 'join reports the voided work by its Byname')
+    assert.equal(adaRecord.status, 'voided')
+    assert.notEqual(adaRecord.status, 'completed')
+    assert.notEqual(adaRecord.status, 'undelivered')
+    assert.equal(joinResult.byName.Ada.status, 'voided')
+
+    // Reported once: the work leaves the roster and the handle retires.
+    assert.doesNotMatch(await forkTool.executeHorizon(restarted, owner), /Ada/)
+    assert.equal(forkTool.durableLifecycleByname(restarted, owner, 'Ada'), 'Retired')
   } finally {
     await forkTool.disposeRuntime(restarted)
+  }
+
+  // A further process on the same directory does not report the void again.
+  const third = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
+
+  try {
+    const thirdJoinPromise = forkTool.executeJoin(third, owner)
+    let timer
+    const thirdTimeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500) })
+    const thirdJoin = await Promise.race([thirdJoinPromise, thirdTimeout]).finally(() => clearTimeout(timer))
+    assert.match(thirdJoin, /NothingToJoin|无可等待|没有|nothing away to receive/i)
+    assert.doesNotMatch(await forkTool.executeHorizon(third, owner), /Ada/)
+  } finally {
+    await forkTool.disposeRuntime(third)
     rmSync(directory, { recursive: true, force: true })
   }
 })

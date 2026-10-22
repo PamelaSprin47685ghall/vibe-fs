@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Execution.Session
 
 open System
-open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 
@@ -61,66 +60,90 @@ module LoopDetector =
           WeightedDistinctTokenCount: float
           Step: int }
 
-    /// DSL-state-combination: physical — immutable fold state plus bounded
-    /// token-decay scratch. A Detector stored by LoopSensor is one physical
+    type DegenerationEnvelope =
+        {| vocabularySize: int
+           lambda: float
+           normalWeightedDistinctCount: float
+           minimumWeightedDistinctCount: float
+           maximumWeightedDistinctCount: float |}
+
+    [<AllowNullLiteral>]
+    type DegenerationEvaluation =
+        abstract state: string
+        abstract isAnomalous: bool
+        abstract weightedDistinctTokens: float
+        abstract step: int
+
+    [<AllowNullLiteral>]
+    type DegenerationDetector =
+        abstract push: tokens: int[] -> DegenerationEvaluation
+        abstract evaluate: unit -> DegenerationEvaluation
+        abstract trackedTokenCount: unit -> int
+
+    [<AllowNullLiteral>]
+    type DegenerationMessages =
+        abstract detector: unit -> DegenerationDetector
+        abstract classify: weightedDistinctTokens: float -> string
+
+    [<Import("Degeneration", "wanxiangli/degeneration")>]
+    let private createDegeneration: DegenerationEnvelope -> DegenerationMessages =
+        jsNative
+
+    let private degeneration =
+        createDegeneration
+            {| vocabularySize = TokenVocabularySize
+               lambda = Lambda
+               normalWeightedDistinctCount = NormalWeightedDistinctCount
+               minimumWeightedDistinctCount = MinimumWeightedDistinctCount
+               maximumWeightedDistinctCount = MaximumWeightedDistinctCount |}
+
+    let private toState (state: string) : State =
+        match state with
+        | "TooRepetitive" -> State.TooRepetitive
+        | "TooRandom" -> State.TooRandom
+        | _ -> State.Normal
+
+    let private toEvaluation (evaluation: DegenerationEvaluation) : Evaluation =
+        { State = toState evaluation.state
+          IsAnomalous = evaluation.isAnomalous
+          WeightedDistinctTokenCount = evaluation.weightedDistinctTokens
+          Step = evaluation.step }
+
+    /// DSL-state-combination: physical — one wanxiangli/degeneration detector
+    /// (bounded token-decay scratch) plus the evaluation observed when this
+    /// record was produced. A Detector stored by LoopSensor is one physical
     /// per-attempt cache entry and is never durable business state.
     type Detector =
-        { Step: int
-          WeightedDistinctTokenCount: float
-          LastSeenTokenStep: Dictionary<int, int> }
+        { Engine: DegenerationDetector
+          Observed: Evaluation }
 
+    /// The library rejects non-finite counts; the host surface keeps its
+    /// historical answers for them (NaN compares false both ways, infinities
+    /// fall outside the matching bound) so JS callers see no new exception.
     let classify (weightedDistinctTokenCount: float) : State =
-        if weightedDistinctTokenCount < MinimumWeightedDistinctCount then
-            State.TooRepetitive
-        elif weightedDistinctTokenCount > MaximumWeightedDistinctCount then
-            State.TooRandom
-        else
+        if Double.IsNaN weightedDistinctTokenCount then
             State.Normal
+        elif Double.IsPositiveInfinity weightedDistinctTokenCount then
+            State.TooRandom
+        elif Double.IsNegativeInfinity weightedDistinctTokenCount then
+            State.TooRepetitive
+        else
+            toState (degeneration.classify weightedDistinctTokenCount)
 
     let create () : Detector =
-        { Step = 0
-          WeightedDistinctTokenCount = NormalWeightedDistinctCount
-          LastSeenTokenStep = Dictionary<int, int>() }
+        let engine = degeneration.detector ()
 
-    let evaluate (detector: Detector) : Evaluation =
-        let state = classify detector.WeightedDistinctTokenCount
+        { Engine = engine
+          Observed = toEvaluation (engine.evaluate ()) }
 
-        { State = state
-          IsAnomalous = state <> State.Normal
-          WeightedDistinctTokenCount = detector.WeightedDistinctTokenCount
-          Step = detector.Step }
+    let evaluate (detector: Detector) : Evaluation = detector.Observed
 
-    let trackedTokenCount (detector: Detector) = detector.LastSeenTokenStep.Count
-
-    /// Pure fold over one token. Only LastSeenTokenStep is algorithm scratch.
-    let private pushToken (detector: Detector) (token: int) : Detector =
-        let step = detector.Step + 1
-
-        let replacement =
-            match detector.LastSeenTokenStep.TryGetValue token with
-            | true, previousStep -> 1.0 - Math.Pow(Lambda, float (step - previousStep))
-            | false, _ -> 1.0
-
-        detector.LastSeenTokenStep.[token] <- step
-
-        { Step = step
-          WeightedDistinctTokenCount = Lambda * detector.WeightedDistinctTokenCount + replacement
-          LastSeenTokenStep = detector.LastSeenTokenStep }
-
-    let private pushTokens (detector: Detector) (text: string) : Detector =
-        // DSL-MUTABLE: algorithm-scratch — fold accumulator over token stream
-        let mutable acc = detector
-
-        for token in RepositoryEnvelope.encode text do
-            acc <- pushToken acc token
-
-        acc
+    let trackedTokenCount (detector: Detector) = detector.Engine.trackedTokenCount ()
 
     let pushText (detector: Detector) (text: string) : Detector * Evaluation =
-        let updated =
-            if String.IsNullOrEmpty text then
-                detector
-            else
-                pushTokens detector text
-
-        updated, evaluate updated
+        if String.IsNullOrEmpty text then
+            detector, detector.Observed
+        else
+            let observed = toEvaluation (detector.Engine.push (RepositoryEnvelope.encode text))
+            let updated = { detector with Observed = observed }
+            updated, observed

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { deliverOnce, relayHandover } from './support/contract.mjs'
-import * as scopeMod from '../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
+import { ToolRuntimePhysicalSurface } from '../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js'
 import { withAdmittedChildren, withSharedAdmittedChildren } from '../../managed-session-lifecycle/tests/support/admitted-child-work.mjs'
 import { join } from 'node:path'
 import * as ownershipHost from '../../../dist/Mission/Lifecycle/Surface.js'
@@ -10,11 +10,9 @@ import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js
 import * as journalPort from '../../../dist/Persistence/Journal/Surface.js'
 import { acceptOwner, hostPort } from '../../interaction-authority/tests/support/authority.mjs'
 
-const evaluateBlockers =
-  scopeMod.evaluateRetirementBlockers ||
-  (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.evaluateRetirementBlockers)
+const evaluateBlockers = ToolRuntimePhysicalSurface.evaluateRetirementBlockers
 
-const coldBlockers = scopeMod.coldRetirementBlockers ?? scopeMod.ToolRuntimeScopeSurface?.coldRetirementBlockers
+const coldBlockers = ToolRuntimePhysicalSurface.coldRetirementBlockers
 
 test('WHAT[work-044] Relayed keeps the fixed DevOps and its received work for the successor', () => {
   const relayed = deliverOnce({ sequence: ['S1', 'S2', 'S3'], blockers: [], deliveryAuthorized: false, head: 7, projection: 'S1', incumbencyId: 'i' })

@@ -72,7 +72,9 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   const result = compileScenario(source, { name: 'long-stroke.toml' })
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'))
   const byId = new Map(result.scenario.entries.map((entry) => [entry.id, entry]))
-  assert.deepEqual(byId.get('orch.0')?.tools, ['commission', 'join', 'todowrite-for-orchestrator'])
+  assert.deepEqual(byId.get('orch.0')?.tools, ['join', 'todowrite-for-orchestrator'])
+  assert.equal(byId.get('orch.0')?.respond?.tool, 'todowrite-for-orchestrator')
+  assert.match(byId.get('orch.0')?.respond?.args?.program ?? '', /this\.commission\(/)
   assert.equal(byId.get('orch.2')?.respond?.tool, 'todowrite-for-orchestrator')
   assert.match(byId.get('orch.2')?.respond?.args?.program ?? '', /this\.deliver\(/)
   const ordinary = byId.get('manager-loop.2')
@@ -81,8 +83,8 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   assert.deepEqual(result.scenario.faults.filter((fault) => fault.kind === 'provider-error' && fault.status === 400)
     .map((fault) => fault.entryId), ['manager-loop.2', 'continue.0'])
 
-  const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'deliver']
-  const managerTools = ['fork', 'resume', 'join', 'horizon', 'assume', 'deliver']
+  const loopTools = ['todowrite-for-manager', 'join', 'horizon', 'review', 'deliver']
+  const managerTools = ['todowrite-for-manager', 'join', 'horizon', 'assume', 'deliver']
   const request = (turn, step, tools) => ({
     messages: [{ role: 'user', content: turn },
       ...Array.from({ length: step }, (_, index) => ({ role: 'assistant', content: `reply-${index}` }))],
@@ -92,6 +94,17 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   const context = { sessionId: 'ses_manager' }
   assert.equal(resolveEntry(request('# Delegated work you sent out has not come back yet. Continue the work.', 1, managerTools), result.scenario.entries, bindings, context).matched?.id,
     'manager-join-guard.0')
+  for (const tools of [
+    managerTools.filter((name) => name !== 'todowrite-for-manager'),
+    ...['fork', 'resume', 'commission', 'devops'].map((name) => [...managerTools, name]),
+  ]) {
+    assert.equal(resolveEntry(request('# Delegated work you sent out has not come back yet. Continue the work.', 1, tools), result.scenario.entries, bindings, context).matched,
+      undefined, `The real Manager wire cannot match with tools ${tools.join(',')}`)
+  }
+  const finisherResume = result.scenario.entries.find((entry) => entry.turnId === 'manager-join-guard' && entry.step === 6)
+  assert.equal(finisherResume?.respond?.tool, 'todowrite-for-manager')
+  assert.match(finisherResume?.respond?.args?.program ?? '', /this\.resume\(/)
+  assert.doesNotMatch(finisherResume?.respond?.args?.program ?? '', /calling\s*:/)
   const assessUser =
     '# You are the 2 Manager taking over this mission. A predecessor may already have done\n' +
     '# part of the work, or may already have finished it; investigate the actual workspace before you\n' +

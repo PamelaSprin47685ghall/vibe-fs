@@ -7,6 +7,7 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.execution-tool-admissions.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-linkage-projection.fsproj"/>
@@ -17,9 +18,13 @@
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-neutral-ports.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
-    <Compile Include="Execution/Session/OpenCode/HorizonCalibration.fsi"/>
-    <Compile Include="Execution/Session/OpenCode/HorizonCalibration.fs"/>
+    <Compile Include="Execution/Session/HorizonCalibration.fsi"/>
+    <Compile Include="Execution/Session/HorizonCalibration.fs"/>
+    <Compile Include="Execution/Session/HorizonRoster.fsi"/>
+    <Compile Include="Execution/Session/HorizonRoster.fs"/>
     <Compile Include="Execution/Session/OpenCode/HorizonTool.fsi"/>
     <Compile Include="Execution/Session/OpenCode/HorizonTool.fs"/>
     <Compile Include="Execution/Session/OpenCode/HorizonSurface.fsi"/>

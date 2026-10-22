@@ -106,6 +106,13 @@ test('WHAT[interaction-authority-003] physical receipt installs exact AgentOwner
     const owner = await acceptOwner(handle)
     const seed = inheritedSeed(owner, 'engineer')
     const order = []
+    const linked = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session: owner.session }, null, {
+      family: 'Execution', case: 'HandleLinked', payload: {
+        ParentSessionId: owner.session, ChildSessionId: 'ses-physical-child', Handle: 'physical-child',
+        TargetAgent: 'engineer', CanonicalRole: 'engineer', Ownership: 'DurableParentHandle',
+      },
+    })
+    assert.equal(linked.ok, true, JSON.stringify(linked.error))
 
     const result = await dispatch.sendAgentOwnerRootAwait(
       hostPort(async () => {
@@ -302,6 +309,9 @@ const currentPayload = {
   LogicalRunId: 'run-authority-v2',
   AuthorityRootUserMessageId: 'root-authority-v2',
   AuthorityKind: 'HumanRoot',
+  ExpectedClosureKind: 'HumanRootManagedRun',
+  OwnerLogicalRunId: undefined,
+  AgentOwnerLife: undefined,
   IdentitySeed: {
     kind: 'RootSelection',
     ownerSession: null,
@@ -322,6 +332,9 @@ const inheritedPayload = {
   LogicalRunId: 'run-authority-child',
   AuthorityRootUserMessageId: 'root-authority-child',
   AuthorityKind: 'AgentOwnerRoot',
+  ExpectedClosureKind: 'AgentOwnerChildWork',
+  OwnerLogicalRunId: 'run-authority-owner',
+  AgentOwnerLife: 'Child',
   IdentitySeed: {
     kind: 'InheritedFromOwner',
     ownerSession: 'ses-authority-owner',
@@ -456,7 +469,7 @@ test('WHAT[interaction-authority-003] repeated legacy HumanRoot replay upgrades 
 test('WHAT[interaction-authority-003] unknown authority schema fails closed precisely', () => {
   assert.throws(
     () => factCodec.encode(currentFact({ ...currentPayload, SchemaVersion: 1 })),
-    /AuthorityRootAccepted encoder requires SchemaVersion 2, got 1/,
+    /AuthorityRootAccepted encoder requires SchemaVersion 2 or 3, got 1/,
   )
 
   const unknown = replacePayload(factCodec.encode(currentFact()), (payload) => {

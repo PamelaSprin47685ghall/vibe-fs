@@ -815,13 +815,13 @@ module internal PtyRecovery =
                 N.optional status?signal
             )
 
-    let private awaitExit (client: obj) (completion: Task<obj>) graceMs =
+    let private awaitExit (terminalClient: obj) (completion: Task<obj>) graceMs =
         task {
-            client?signal "SIGTERM" |> ignore
+            terminalClient?signal "SIGTERM" |> ignore
             let! first = NodeTiming.raceExit (completion :> Task) (max 0 graceMs)
 
             if not first then
-                client?signal "SIGKILL" |> ignore
+                terminalClient?signal "SIGKILL" |> ignore
 
             let! last = NodeTiming.raceExit (completion :> Task) 5000
             N.require last "PTY recovered scope exit is unknown"
@@ -830,18 +830,18 @@ module internal PtyRecovery =
 
     let private drainClient directory request graceMs =
         task {
-            let client = createClient directory request "recover"
+            let terminalClient = createClient directory request "recover"
             let completion = TaskCompletionSource<obj>()
-            client?onExit (fun result -> completion.SetResult result) |> ignore
+            terminalClient?onExit (fun result -> completion.SetResult result) |> ignore
 
-            client?onFault (fun reason -> completion.SetException(InvalidOperationException reason))
+            terminalClient?onFault (fun reason -> completion.SetException(InvalidOperationException reason))
             |> ignore
 
             try
-                let! result = awaitExit client completion.Task graceMs
+                let! result = awaitExit terminalClient completion.Task graceMs
                 return resultOf request result
             finally
-                client?dispose () |> ignore
+                terminalClient?dispose () |> ignore
         }
 
     let drain (directory: string) (key: string) (incarnationId: string option) (graceMs: int) =

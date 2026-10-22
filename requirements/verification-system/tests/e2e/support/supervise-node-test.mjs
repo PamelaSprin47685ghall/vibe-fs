@@ -1,8 +1,8 @@
 /**
  * Out-of-process supervisor for a node:test child (verification-system-006 silence criterion).
  *
- * Shared by unit / integration / package runners. The silence window is fed only by
- * test verdicts; stdout/stderr/diagnostics are background and never renew.
+ * Shared by unit / integration / package runners. Test verdicts and validated runner
+ * transitions advance the silence window; stdout/stderr/diagnostics never renew.
  */
 
 import { execFileSync, spawn } from 'node:child_process'
@@ -17,6 +17,7 @@ import { PROCESS_TREE_TIMEOUT_MS, SIGKILL_GRACE_MS, SUITE_BACKSTOP_MS } from './
 import { validateWorkerCostSnapshot } from '../../support/worker-cost-observation.mjs'
 import { NativeTestSupervision } from '../../support/native-test-supervision.mjs'
 import { createFiniteWaitChannel } from '../../support/finite-wait-channel.mjs'
+import { reclaimOwnedProcessGroup } from './owned-process-group.mjs'
 
 export const NODE_TEST_INNER = fileURLToPath(new URL('../../support/run-inner.mjs', import.meta.url))
 
@@ -31,94 +32,6 @@ function liveGroupMembers(pgid, timeout = PROCESS_TREE_TIMEOUT_MS) {
     if (!fields) throw new Error(`unparseable process record: ${line}`)
     return Number(fields[2]) === pgid && !/^[ZX]/.test(fields[3]) ? [Number(fields[1])] : []
   })
-}
-
-function inspectProcesses({ timeout }) {
-  return execFileSync('ps', ['-eo', 'pid=,ppid=,pgid=,stat='], { encoding: 'utf8', timeout })
-}
-
-function processRecords(deadline, phase, inspect = inspectProcesses) {
-  const remaining = deadline - Date.now()
-  if (remaining <= 0) throw new Error('Owned termination observation deadline expired')
-  const output = inspect({ phase, timeout: Math.min(PROCESS_TREE_TIMEOUT_MS, remaining) })
-  if (!output.trim()) throw new Error('process inspection returned no records')
-  return output.trim().split('\n').map(line => {
-    const fields = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line)
-    if (!fields) throw new Error(`unparseable process record: ${line}`)
-    return { pid: Number(fields[1]), parent: Number(fields[2]), group: Number(fields[3]), state: fields[4] }
-  }).filter(record => !/^[ZX]/.test(record.state))
-}
-
-function rememberDescendantGroups(pgid, records, groups) {
-  const descendants = new Set(records.filter(record => record.group === pgid).map(record => record.pid))
-  let added
-  do {
-    added = false
-    for (const record of records) {
-      if (descendants.has(record.parent) && !descendants.has(record.pid)) {
-        descendants.add(record.pid)
-        added = true
-      }
-    }
-  } while (added)
-  for (const record of records) {
-    if (descendants.has(record.pid) && record.group !== pgid) groups.add(record.group)
-  }
-}
-
-async function freezeAndCaptureDescendantGroups(pgid, deadline, inspect, groups) {
-  try {
-    process.kill(-pgid, 'SIGSTOP')
-  } catch (error) {
-    if (error.code === 'ESRCH') throw new Error('The owned inner group disappeared before frozen descendant capture', { cause: error })
-    throw error
-  }
-  while (true) {
-    const records = processRecords(deadline, 'freeze-confirmation', inspect)
-    rememberDescendantGroups(pgid, records, groups)
-    const owned = records.filter(record => record.group === pgid)
-    if (owned.length === 0) throw new Error('The owned inner group was absent from the frozen descendant snapshot')
-    if (owned.every(record => /^[Tt]/.test(record.state))) return
-    if (Date.now() >= deadline) throw new Error(`Could not observe the frozen inner process group ${pgid}`)
-    await delay(5)
-  }
-}
-
-async function captureFrozenDescendantGroups(pgid, deadline, inspect, groups) {
-  let initialFailure
-  try {
-    rememberDescendantGroups(pgid, processRecords(deadline, 'initial-capture', inspect), groups)
-  } catch (error) {
-    initialFailure = { error }
-  }
-  try {
-    await freezeAndCaptureDescendantGroups(pgid, deadline, inspect, groups)
-  } catch (error) {
-    if (initialFailure) throw new AggregateError([initialFailure.error, error], 'Initial and frozen descendant capture failed', { cause: initialFailure.error })
-    throw error
-  }
-  if (initialFailure) throw initialFailure.error
-}
-
-async function awaitObservedGroups(groups, deadline, inspect, phase = 'descendant-drain') {
-  if (groups.size === 0) return
-  while (true) {
-    const survivors = processRecords(deadline, phase, inspect).filter(record => groups.has(record.group))
-    if (survivors.length === 0) return
-    if (Date.now() >= deadline) {
-      throw new Error(`Observed descendant groups did not drain: ${survivors.map(record => `${record.pid}/${record.group}`).join(', ')}`)
-    }
-    await delay(10)
-  }
-}
-
-async function failAfterObservedCleanup(error, groups, deadline, inspect) {
-  try {
-    await awaitObservedGroups(groups, deadline, inspect, 'failure-drain')
-  } catch (cleanupError) {
-    throw new AggregateError([error, cleanupError], 'Owned termination and remaining group observation failed', { cause: error })
-  }
-  throw error
 }
 
 async function verifyExitedGroup(pgid, logPrefix) {
@@ -270,31 +183,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
         finishExit({ code: null, signal: null, observed: false })
       }, SIGKILL_GRACE_MS)
     }
-    termination = (async () => {
-      const groups = new Set()
-      let captureFailure
-      try {
-        if (child?.pid) await captureFrozenDescendantGroups(child.pid, deadline, inspectProcessTree, groups)
-      } catch (error) {
-        captureFailure = { error }
-      } finally {
-        try {
-          if (child?.pid) process.kill(-child.pid, 'SIGKILL')
-        } catch (error) {
-          if (error.code !== 'ESRCH') {
-            captureFailure = { error: captureFailure
-              ? new AggregateError([captureFailure.error, error], 'Owned capture and inner termination failed', { cause: captureFailure.error })
-              : error }
-          }
-        }
-      }
-      if (captureFailure) await failAfterObservedCleanup(captureFailure.error, groups, deadline, inspectProcessTree)
-      try {
-        await awaitObservedGroups(groups, deadline, inspectProcessTree)
-      } catch (error) {
-        await failAfterObservedCleanup(error, groups, deadline, inspectProcessTree)
-      }
-    })().catch(error => {
+    termination = (child?.pid ? reclaimOwnedProcessGroup(child, { deadline, inspectProcessTree }) : Promise.resolve()).catch(error => {
       terminationFailure = error
       runnerError = { message: `Could not complete owned runner termination: ${error.message}` }
       console.error(`${logPrefix}: ${runnerError.message}`)
@@ -308,7 +197,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
       silenceFired = true
       const progress = fileWaits.progress()
       console.error(`WATCHDOG: '${label}' silent for ${silenceMs}ms; ${JSON.stringify(error.deadline)}; ` +
-        `${progress.count} blocking progress update(s), last progress: ${progress.last}`)
+        `${progress.count} blocking progress update(s), ${progress.transitions} causal transition(s), last progress: ${progress.last}`)
       if (progress.lastBackground) console.error(`WATCHDOG: background progress ${progress.lastBackground} ` +
         `(${progress.backgroundCount} background update(s), none of them renewals)`)
       const outstanding = fileWaits.incomplete()
@@ -349,8 +238,6 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   const reply = responses => {
     for (const response of responses) channels.get(resolve(response.entryFile))?.channel?.reply(response)
   }
-  armSilence()
-
   const homeArguments = ownedHome === null ? [] : ['--owned-test-home', ownedHome]
   try {
     const controlArguments = inner === NODE_TEST_INNER ? ['--physical-wait-control'] : []
@@ -359,13 +246,15 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
       detached: true,
       env,
     })
+    if (inner === NODE_TEST_INNER) fileWaits.expectRunner(child.pid)
     // Decode diagnostic output as UTF-8 and forward through this process.
     // Inherited descriptors or raw binary chunks can corrupt an outer
     // node:test result stream. Only IPC carries authoritative verdicts.
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
-    // In a test worker, stdout belongs to its native result protocol.
-    const diagnostics = process.env.NODE_TEST_CONTEXT ? process.stderr : process.stdout
+    // Diagnostic output never shares a stream with a node:test result protocol:
+    // route it to stderr so an outer worker always receives monitor diagnostics.
+    const diagnostics = process.stderr
     child.stdout.pipe(diagnostics, { end: false })
     child.stderr.pipe(process.stderr, { end: false })
   } catch (error) {
@@ -373,6 +262,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     fileWaits.stop()
     throw error
   }
+  armSilence()
 
   let backstopFired = false
   const backstop = setTimeout(() => {
@@ -494,7 +384,8 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   clearTimeout(backstop)
   if (termination !== null) await termination
   const groupVerificationStarted = performance.now()
-  const processGroupClean = child.pid ? await verifyExitedGroup(child.pid, logPrefix) : false
+  const rootGroupClean = child.pid ? await verifyExitedGroup(child.pid, logPrefix) : false
+  const processGroupClean = rootGroupClean && terminationFailure === null
   console.error(
     `${logPrefix}: post-exit group verification/reclamation: pid=${child.pid ?? 'none'}; ` +
       `elapsedMs=${(performance.now() - groupVerificationStarted).toFixed(3)}; accepted=${processGroupClean}`,

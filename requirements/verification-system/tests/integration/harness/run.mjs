@@ -19,6 +19,7 @@ import { deliveryCases } from './delivery-cases.mjs';
 import { pluginDependencyCase } from './plugin-dependency-case.mjs';
 import { forestLibCases } from './forest-lib-cases.mjs';
 import { forestCases } from './forest-cases.mjs';
+import { hostCleanupCases } from './host-cleanup-cases.mjs';
 import { mutationCases } from './mutation-cases.mjs';
 import { readinessCases } from './readiness-cases.mjs';
 import { unitRunnerCases } from './unit-runner-cases.mjs';
@@ -61,6 +62,7 @@ const allCases = [
   ...unitRunnerCases,
   ...arch010Cases,
   ...forestCases,
+  ...hostCleanupCases,
   ...mutationCases,
   ...degradationCases,
 ];

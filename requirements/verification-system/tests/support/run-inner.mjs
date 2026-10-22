@@ -116,6 +116,10 @@ export async function runTestFiles({
     fileLimit === true ? Math.max(availableParallelism() - 1, 1) : fileLimit)
   const startedAt = performance.now()
   const runState = createRunState()
+  // The inner runner's first causal event: it has accepted the plan and is about to
+  // execute it. The supervisor validates it against its own plan and child identity, so
+  // it is evidence that the monitored work exists and started — not a byte heartbeat.
+  send({ type: 'runner:started', data: { pid: process.pid, files: files.map(file => resolve(file)) } })
   const output = new PassThrough({ objectMode: true })
   const active = new Set()
   const errors = new Set()
@@ -231,7 +235,8 @@ export async function runTestFiles({
       const completion = await drained
       reportCosts(costs.finish())
       if (!completion.drained) reportError(completion.error)
-      else send({ type: 'runner:file-drained', data: { entryFile: resolve(file) } })
+      else send({ type: 'runner:file-drained', data: { entryFile: resolve(file), runId: descriptor?.runId,
+        pid: process.pid, parentPid: process.ppid } })
     } finally { active.delete(controller) }
   }
   const pending = files[Symbol.iterator]()

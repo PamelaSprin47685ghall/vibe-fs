@@ -4,8 +4,7 @@ namespace Wanxiangshu.Execution.Delegation
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation.Fork
@@ -19,6 +18,8 @@ open Wanxiangshu.Participant.Persona
 /// GREEN-5: after durable commit, Pulse agent handle only (wake); Journal is fact source.
 module ChildRecoveryWorkflow =
 
+    type DeliveryViewReader = SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> string option
+
     /// DSL-state-combination: physical — optional Journal/Snapshot capabilities
     /// are injected infrastructure ports; the remaining fields are one recovery
     /// invocation's identities and observations, not a stored program counter.
@@ -26,7 +27,7 @@ module ChildRecoveryWorkflow =
     type Ports =
         {
             Journal: AgentJournalPort option
-            ReadDeliveryView: (SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> string option) option
+            ReadDeliveryView: DeliveryViewReader option
             ParentId: SessionId
             Snapshot: ISessionSnapshotPort option
             AgentId: string

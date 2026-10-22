@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as fission from '../../../dist/Execution/Fission/Surface.js'
+import * as fissionCanaries from '../../../dist/Execution/Fission/Canaries.js'
 import * as fissionHost from '../../../dist/OpenCode/Host/FissionHostSurface.js'
 import { assertJsData } from '../../verification-system/tests/support/js-contract.mjs'
 
@@ -61,7 +62,7 @@ test('WHAT[intra-participant-parallelism-009] actual turn observers absorb a mar
 })
 
 test('WHAT[intra-participant-parallelism-009] an explicitly kicked reconciler observes the supplied completed execution without an idle event', async () => {
-  const observed = await fissionHost.missingIdleTerminalBridgeScenario()
+  const observed = await fissionCanaries.missingIdleTerminalBridgeScenario()
   assertJsData(observed, 'reconciler observation')
   assert.equal(observed.outcome, 'TurnCompleted')
   assert.equal(observed.physicalUserMessageId, 'fission-missing-idle-user')

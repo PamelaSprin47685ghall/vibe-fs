@@ -2,12 +2,12 @@ import assert from 'node:assert/strict'
 import { fork } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { withSharedAdmittedChildren } from './admitted-child-work.mjs'
-import { ToolRuntimeScopeSurface } from '../../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
+import { ToolRuntimePhysicalSurface } from '../../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js'
 
 export const withAdmissionWorkers = (label, action, { realBackend = false, runtime = realBackend ? 'bun' : undefined } = {}) => withSharedAdmittedChildren(
   label, 'manager-pty', [{ agentId: 'devops', sessionId: 'devops-pty', role: 'devops' }],
   async (journal, _profiles, workspace) => {
-    await ToolRuntimeScopeSurface.startPtyExecution(journal, 'devops-pty', `physical-${label}-devops`, 'pty-admission-provider')
+    await ToolRuntimePhysicalSurface.startPtyExecution(journal, 'devops-pty', `physical-${label}-devops`, 'pty-admission-provider')
     const workers = []
     const start = () => new Promise((resolve, reject) => {
       const process = fork(fileURLToPath(new URL(realBackend ? './pty-admission-real-worker.mjs' : './pty-admission-worker.mjs', import.meta.url)), [workspace, 'devops-pty', `physical-${label}-devops`], {

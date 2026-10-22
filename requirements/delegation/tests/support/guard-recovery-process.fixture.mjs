@@ -12,6 +12,11 @@ const pendingAfterTurn = promise => Promise.race([
   new Promise(resolve => setImmediate(() => resolve('pending'))),
 ])
 
+const deliverTo = (accepted, providerRun, material) => sync.deliver(
+  runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId,
+  providerRun, `call-${providerRun}`, material, { 0: material },
+)
+
 for (const name of ['createForGuardRecovery', 'observeGuardDelta', 'awaitGuardInterrupt',
   'observeExactGuardAbort', 'closeGuardRecovery', 'confirmManagedPromptPhysical']) {
   assert.equal(typeof sync[name], 'function', `missing guard fixture capability: ${name}`)
@@ -53,17 +58,18 @@ try {
   assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2, 'one armed source cannot send a second continuation')
 
   let successor = null
+  let deliveredView
   if (!isLateAcceptance) {
     successor = await sync.confirmManagedPromptPhysical(runtime, owner, 'Engineer', 1, 'guard-successor-physical')
     assert.equal(successor.ok, true, JSON.stringify(successor))
     assert.equal(successor.origin, 'DegenerationGuard')
     assert.notEqual(successor.physicalUserMessageId, initial.physicalUserMessageId)
     assert.equal(successor.authorityRootUserMessageId, initial.authorityRootUserMessageId)
-    sync.recordDeliveredValue(successor.sessionId, 'GUARD-FORMAL-ANSWER')
+    deliveredView = await deliverTo(successor, 'guard-successor-provider-run', 'GUARD-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, successor.sessionId, successor.physicalUserMessageId,
       successor.authorityRootUserMessageId, 'guard-successor-provider-run', 'GUARD-FORMAL-ANSWER', ''), true)
   } else {
-    sync.recordDeliveredValue(initial.sessionId, 'FIRST-FORMAL-ANSWER')
+    deliveredView = await deliverTo(initial, 'guard-initial-completed-run', 'FIRST-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, initial.sessionId, initial.physicalUserMessageId,
       initial.authorityRootUserMessageId, 'guard-initial-completed-run', 'FIRST-FORMAL-ANSWER', ''), true)
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 1).kind, 'Pending', 'call completion cannot abandon a pending actual guard send')
@@ -119,21 +125,23 @@ try {
     assert.equal(secondSuccessor.origin, 'DegenerationGuard')
     assert.notEqual(secondSuccessor.physicalUserMessageId, secondAccepted.physicalUserMessageId)
     assert.equal(secondSuccessor.authorityRootUserMessageId, secondAccepted.authorityRootUserMessageId)
-    sync.recordDeliveredValue(secondSuccessor.sessionId, 'SECOND-GUARD-ANSWER')
+    const secondDeliveredView = await deliverTo(secondSuccessor, 'guard-second-provider-run', 'SECOND-GUARD-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, secondSuccessor.sessionId, secondSuccessor.physicalUserMessageId,
       secondSuccessor.authorityRootUserMessageId, 'guard-second-provider-run', 'SECOND-GUARD-ANSWER', ''), true)
     const result = await secondCompletion
     assert.equal(result.ok, true)
     assert.equal(result.value.physicalUserMessageId, secondSuccessor.physicalUserMessageId)
     assert.equal(result.value.providerRun, 'guard-second-provider-run')
-    assert.equal(result.value.formalText, 'SECOND-GUARD-ANSWER')
+    assert.equal(result.value.view, secondDeliveredView)
+    assert.equal(result.value.turnFormalText, 'SECOND-GUARD-ANSWER')
   } else {
     assert.deepEqual(firstResult, { ok: true, value: {
       sessionId: successor.sessionId,
       physicalUserMessageId: successor.physicalUserMessageId,
       authorityRootUserMessageId: successor.authorityRootUserMessageId,
       providerRun: 'guard-successor-provider-run',
-      formalText: 'GUARD-FORMAL-ANSWER',
+      view: deliveredView,
+      turnFormalText: 'GUARD-FORMAL-ANSWER',
     } })
   }
   assert.equal(sync.childCount(runtime), 1)

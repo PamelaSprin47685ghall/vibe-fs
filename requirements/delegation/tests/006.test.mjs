@@ -1,26 +1,52 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
-import { toolModule, withForkRuntime } from './support/fork-runtime.mjs'
+import {
+  agentIdOf,
+  childTurn,
+  forkCall,
+  joinCall,
+  observeTerminals,
+  physicalUserMessageOf,
+  resumeCall,
+  workLifecycleOf,
+  withRealFork,
+} from './support/real-fork.mjs'
 
 test('WHAT[delegation-006] actual accepted fork returns placement and resume reuses the same child without waiting for completion', async () => {
   const owner = 'owner-placement-binding'
-  await withForkRuntime(owner, async runtime => {
-    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'FIRST-CHARGE')
-    await forkTool.awaitPromptCount(runtime, 1)
-    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
-    const child = forkTool.child(runtime)
-    assert.match(await first, /Ada/)
-    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
-    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-RESULT', 'run-first'), true)
-    const next = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'NEXT-CHARGE')
-    await forkTool.awaitPromptCount(runtime, 2)
-    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
-    assert.equal(forkTool.child(runtime), child)
-    assert.equal(forkTool.childCount(runtime), 1)
-    assert.match(await next, /Ada/)
-    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
-    assert.equal(await forkTool.settle(runtime, owner, 'NEXT-RESULT', 'run-next'), true)
+  await withRealFork(owner, async ({ hooks, createdIds, runtime }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      // The fork returns its placement while the child's work is still running.
+      const first = await forkCall(hooks, owner, 'Ada', 'FIRST-CHARGE')
+      assert.match(first, /Ada/)
+      assert.equal(createdIds.length, 1)
+      const child = createdIds[0]
+      const agentId = agentIdOf(first)
+      const firstRoot = physicalUserMessageOf(runtime, child).id
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, firstRoot), 'Active')
+
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'FIRST PROSE', 'FIRST-RESULT', terminals.awaitRun)
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, firstRoot), 'CompletedAwaitingJoin')
+
+      // The resume reuses the same physical child and also returns while its work runs.
+      const next = await resumeCall(hooks, owner, 'Ada', 'NEXT-CHARGE')
+      assert.match(next, /Ada/)
+      assert.equal(createdIds.length, 1, 'the resume must reuse the same physical child')
+      assert.equal(agentIdOf(next), agentId)
+      const nextRoot = physicalUserMessageOf(runtime, child).id
+      assert.notEqual(nextRoot, firstRoot, 'the resumed work roots a new physical input')
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, nextRoot), 'Active')
+
+      await childTurn(hooks, runtime, child, `run-${child}-2`, 'NEXT PROSE', 'NEXT-RESULT', terminals.awaitRun)
+      assert.equal(workLifecycleOf(runtime, owner, agentId, child, nextRoot), 'CompletedAwaitingJoin')
+
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /FIRST-RESULT/)
+      assert.match(joined, /NEXT-RESULT/)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 

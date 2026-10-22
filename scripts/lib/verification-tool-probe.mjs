@@ -1,9 +1,9 @@
 import { spawnOwnedVerificationTool } from './verification-owned-tool.mjs'
 
-export function runVerificationToolProbe(executable, argv, { cwd, env, signal }) {
+export function runVerificationToolProbe(executable, argv, { cwd, env, signal, deadline }) {
   signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
-    const owned = spawnOwnedVerificationTool(executable, argv, { cwd, env })
+    const owned = spawnOwnedVerificationTool(executable, argv, { cwd, env, deadline })
     const child = owned.child
     let failure
     let setupFailure

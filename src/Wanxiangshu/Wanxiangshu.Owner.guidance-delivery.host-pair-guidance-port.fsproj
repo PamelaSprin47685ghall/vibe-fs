@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>host-pair-guidance-port</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>guidance-delivery</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>host-pair-guidance-port</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj" />
+    <Compile Include="Host/Domain/PairGuidance.fsi" />
+    <Compile Include="Host/Domain/PairGuidance.fs" />
+  </ItemGroup>
+</Project>

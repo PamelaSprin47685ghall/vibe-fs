@@ -27,9 +27,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionexecutionbinding.fsproj"/>
-    <Compile Include="OpenCode/Host/ChatAdmission/ProviderLifecycle.fsi"/>
-    <Compile Include="OpenCode/Host/ChatAdmission/ProviderLifecycle.fs"/>
-    <Compile Include="OpenCode/Host/ChatAdmission/TransactionSurface.fsi"/>
-    <Compile Include="OpenCode/Host/ChatAdmission/TransactionSurface.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/ProviderLifecycle.fsi"/>
+    <Compile Include="Execution/Session/ChatExecution/ProviderLifecycle.fs"/>
+    <Compile Include="Interaction/Admission/ChatAdmissionTransactionSurface.fsi"/>
+    <Compile Include="Interaction/Admission/ChatAdmissionTransactionSurface.fs"/>
   </ItemGroup>
 </Project>

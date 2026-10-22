@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { parse } from 'smol-toml'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import { withJournal, acceptOwner, hostPort } from './support/authority.mjs'
@@ -47,11 +48,22 @@ test('WHAT[dispatch-protocol-003] observed receipt-only send stays unaccepted un
     assert.equal(accepted.physicalUserMessageId, 'actual-ingress-physical')
     assert.notEqual(accepted.physicalUserMessageId, accepted.hostOutcome.value)
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 0).kind, 'Accepted')
-    sync.recordDeliveredValue(accepted.sessionId, 'RECEIPT-DELIVERED')
+    const sealed = await sync.deliver(
+      runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId,
+      'receipt-provider-run', 'call-receipt-provider-run', 'RECEIPT-DELIVERED', {},
+    )
     assert.equal(await sync.settleExactTerminal(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'receipt-provider-run', 'RECEIPT-FORMAL', ''), true)
     const completed = await completion
+    assert.equal(completed.value.view, sealed)
+    assert.equal(completed.value.turnFormalText, 'RECEIPT-FORMAL')
     assert.equal(completed.value.providerRun, 'receipt-provider-run')
-    assert.equal(completed.value.formalText, 'RECEIPT-DELIVERED')
+    const delivered = parse(completed.value.view)
+    assert.deepEqual(Object.keys(delivered), ['returned'])
+    assert.equal(delivered.returned.length, 1)
+    assert.deepEqual(delivered.returned.map(row => row.text), ['RECEIPT-DELIVERED'])
+    assert.equal(typeof delivered.returned[0].id, 'string')
+    assert.notEqual(delivered.returned[0].id, '')
+    assert.doesNotMatch(completed.value.view, /RECEIPT-FORMAL/)
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 1)
     assert.equal(sync.terminalListenerCount(runtime), 0)
   })

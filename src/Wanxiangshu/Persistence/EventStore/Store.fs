@@ -172,29 +172,17 @@ module EventStore =
         |> Result.map ignore
 
     let private validatePayloadClosure (events: EventEnvelope list) : Result<unit, StorageInvalid> =
-        // durable-events-012: payloads are inline in the event line; closure is
-        // satisfied exactly when every PayloadRef has inline content with a
-        // matching content address.
-        let unresolvedPayload (envelope: EventEnvelope) =
-            envelope.PayloadRefs
-            |> List.tryFind (fun payloadRef ->
-                envelope.Payloads
-                |> Map.tryFind payloadRef
-                |> Option.exists (fun content -> ProcessEventLog.payloadDigest content = PayloadRef.value payloadRef)
-                |> not)
-
-        let orphanPayload (envelope: EventEnvelope) =
-            envelope.Payloads
-            |> Map.toList
-            |> List.map fst
-            |> List.tryFind (fun payloadRef -> not (List.contains payloadRef envelope.PayloadRefs))
-
-        events
-        |> List.tryPick (fun envelope ->
-            unresolvedPayload envelope
-            |> Option.orElseWith (fun () -> orphanPayload envelope))
-        |> Option.map (fun payloadRef -> Error(StorageInvalid.MissingPayload payloadRef))
-        |> Option.defaultValue (Ok())
+        // durable-events-012: payloads are inline in the event line; every
+        // PayloadRef has inline content with a matching content address and every
+        // inline payload is referenced. Vocabulary was already checked first by
+        // validateVocabulary, so the closure rule here sees every type as known.
+        // Every closure fault keeps its append-side shape, MissingPayload.
+        CanonicalEventCodec.checkStoredClosure (fun _ -> true) events
+        |> Result.mapError (function
+            | StoredLineFault.MissingPayload payloadRef
+            | StoredLineFault.PayloadDigestMismatch payloadRef
+            | StoredLineFault.UnreferencedPayload payloadRef -> StorageInvalid.MissingPayload payloadRef
+            | StoredLineFault.UnknownEventType eventType -> StorageInvalid.UnknownEventType eventType)
 
     let private validateFreshBatch
         (integrator: ICanonicalIntegrator)

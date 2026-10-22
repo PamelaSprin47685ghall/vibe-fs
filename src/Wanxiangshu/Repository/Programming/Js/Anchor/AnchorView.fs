@@ -1,8 +1,8 @@
 namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
-/// ANCHOR view application. Pure: identity numbering, token counting and the
-/// accumulated replacement map are parameters so the same selection can be
-/// driven from the transform pipeline and from semantic tests.
+open Fable.Core
+
+/// Shared view projection. Each operation replaces its captured, latest interval.
 [<RequireQualifiedAccess>]
 module AnchorView =
 
@@ -29,41 +29,11 @@ module AnchorView =
           Folded: int
           Replaced: int list }
 
-    type private Row =
-        { Position: int
-          Entry: AnchorViewEntry }
-
     let private textOf =
         function
         | Kept message -> message.Text
         | Summarized(_, summary)
         | OpeningSummary summary -> summary
-
-    let private messageOf =
-        function
-        | Kept message
-        | Summarized(message, _) -> message
-        | OpeningSummary _ -> invalidOp "a real anchor cannot replace the opening row"
-
-    let private replace (rows: Row list) (change: AnchorReplacement) =
-        let before = rows |> List.takeWhile (fun row -> row.Position < change.Anchor)
-        let remaining = rows |> List.skip before.Length
-
-        let covered, after =
-            remaining |> List.partition (fun row -> row.Position < change.Until)
-
-        match change.Anchor, covered with
-        | 0, _ ->
-            before
-            @ [ { Position = 0
-                  Entry = OpeningSummary change.Summary } ]
-            @ after
-        | _, [] -> rows
-        | _, first :: _ ->
-            before
-            @ [ { Position = change.Anchor
-                  Entry = Summarized(messageOf first.Entry, change.Summary) } ]
-            @ after
 
     let apply
         (numberOf: string -> int)
@@ -72,46 +42,36 @@ module AnchorView =
         (declaration: AnchorViewDeclaration)
         (messages: AnchorMessage list)
         : AnchorViewEntry list * AnchorViewReport =
-        let rows, _ =
+        let positions, _ =
             messages
             |> List.mapFold
                 (fun position message ->
                     let anchor = message.Id |> Option.map numberOf |> Option.defaultValue position
-
-                    { Position = anchor
-                      Entry = Kept message },
-                    anchor)
+                    anchor, anchor)
                 0
 
-        let projected = history |> List.fold replace rows
-        let entries = projected |> List.map _.Entry
+        let inputs = List.toArray messages
+        let projection = AnchorCoverage.project positions history declaration.PrefixUntil
 
-        let kept =
-            entries
-            |> List.sumBy (function
-                | Kept _ -> 1
-                | _ -> 0)
+        let rows =
+            projection.Rows
+            |> List.map (function
+                | AnchorProjectedRow.Kept(index, cached) -> Kept inputs.[index], cached
+                | AnchorProjectedRow.Summarized(index, summary, cached) -> Summarized(inputs.[index], summary), cached
+                | AnchorProjectedRow.Opening(summary, cached) -> OpeningSummary summary, cached)
 
-        let opening =
-            entries
-            |> List.sumBy (function
-                | OpeningSummary _ -> 1
-                | _ -> 0)
+        let entries = rows |> List.map fst
 
         entries,
         { Total = messages |> List.sumBy (fun message -> countTokens message.Text)
           Used = entries |> List.sumBy (textOf >> countTokens)
           Cached =
-            projected
-            |> List.sumBy (fun row ->
-                if row.Position < declaration.PrefixUntil then
-                    countTokens (textOf row.Entry)
-                else
-                    0)
-          Kept = kept
-          Summarized = entries.Length - kept
-          Folded = max 0 (messages.Length - entries.Length + opening)
-          Replaced = history |> List.map _.Anchor |> List.distinct |> List.sort }
+            rows
+            |> List.sumBy (fun (entry, cached) -> if cached then countTokens (textOf entry) else 0)
+          Kept = projection.Kept
+          Summarized = projection.Summarized
+          Folded = projection.Folded
+          Replaced = projection.Replaced }
 
     let generate numberOf countTokens history declaration messages =
         let anchors =
@@ -127,5 +87,18 @@ module AnchorView =
             | Summarized(message, summary) -> message.Id |> Option.map numberOf |> Option.defaultValue 0, summary
             | OpeningSummary summary -> 0, summary)
 
-    let materialKey (anchor: int) (text: string) =
-        string anchor + ":" + string text.Length + ":" + text
+    [<AllowNullLiteral>]
+    type private MaterialIdentityLaw =
+        abstract materialKey: anchor: int * text: string -> string
+
+    [<Import("AdvisorLaw", "wanxiangli/advisor")>]
+    let private advisorLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : MaterialIdentityLaw = jsNative
+
+    let private identityLaw = construct advisorLawClass
+
+    /// A material identity includes its representative and exact rendered bytes. The identity
+    /// law is owned by `wanxiangli/advisor` (CUT-39); handoff selection and advisor deltas share it.
+    let materialKey (anchor: int) (text: string) = identityLaw.materialKey (anchor, text)

@@ -10,8 +10,11 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Interaction.Admission
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 
@@ -22,14 +25,14 @@ open Wanxiangshu.Persistence.Journal
 module DispatchSurface =
 
     type private PlainSessionPort(raw: obj) =
-        let typed = unbox<Wanxiangshu.OpenCode.ISessionHostPort> raw
+        let typed = unbox<Wanxiangshu.Foundation.HostSession.ISessionHostPort> raw
         let sendPrompt = raw?``SendPrompt``
         // DSL-MUTABLE: resource — latest physical send observation for the JS result
         let mutable lastObservation: obj = null
 
         member _.LastObservation = lastObservation
 
-        interface Wanxiangshu.OpenCode.ISessionHostPort with
+        interface Wanxiangshu.Foundation.HostSession.ISessionHostPort with
             member _.SubscribeTerminal(sessionId, listener) =
                 typed.SubscribeTerminal(sessionId, listener)
 
@@ -76,33 +79,39 @@ module DispatchSurface =
         /// through a dedicated member so AttachMembers never collides.
         member this.DispatchPort: Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort =
             { new Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort with
-                member _.SendPrompt(sessionId, text, options) =
-                    (this :> Wanxiangshu.OpenCode.ISessionHostPort)
-                        .SendPrompt(sessionId, text, options)
+                member _.SendPrompt(sessionId, request, metadata, late) =
+                    let options =
+                        DispatchSessionPort.toHostOptions
+                            (request: Wanxiangshu.Host.Ports.PromptRequest)
+                            metadata
+                            (late: Wanxiangshu.Host.Ports.LateDeliveryListener option)
+
+                    (this :> Wanxiangshu.Foundation.HostSession.ISessionHostPort)
+                        .SendPrompt(sessionId, request.Text, options)
 
                 member _.SubscribeTerminal(sessionId, listener) =
-                    (this :> Wanxiangshu.OpenCode.ISessionHostPort)
+                    (this :> Wanxiangshu.Foundation.HostSession.ISessionHostPort)
                         .SubscribeTerminal(sessionId, listener)
 
                 member _.SubscribeFutureTerminal(sessionId, listener) =
-                    (this :> Wanxiangshu.OpenCode.ISessionHostPort)
+                    (this :> Wanxiangshu.Foundation.HostSession.ISessionHostPort)
                         .SubscribeFutureTerminal(sessionId, listener) }
 
-    let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort =
-        PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort
+    let internal sessionPort (port: obj) : Wanxiangshu.Foundation.HostSession.ISessionHostPort =
+        PlainSessionPort(port) :> Wanxiangshu.Foundation.HostSession.ISessionHostPort
 
-    let internal rootWorkspaceReader (directory: obj) : Wanxiangshu.OpenCode.IRootWorkspaceReader =
-        { new Wanxiangshu.OpenCode.IRootWorkspaceReader with
+    let internal rootWorkspaceReader (directory: obj) : Wanxiangshu.Foundation.HostSession.IRootWorkspaceReader =
+        { new Wanxiangshu.Foundation.HostSession.IRootWorkspaceReader with
             member _.TryRead() =
                 if isNull directory then None else Some(string directory) }
 
     /// JS-safe controlled Host child listing for adapter proofs. The F# Result
-    /// and OpenCodeChildInfo representations stay on this registered surface.
+    /// and ChildSessionInfo representations stay on this registered surface.
     let acceptedChild
         (session: string)
         (title: string)
         (agent: string)
-        : Result<Wanxiangshu.OpenCode.OpenCodeChildInfo list, string> =
+        : Result<Wanxiangshu.Foundation.HostSession.ChildSessionInfo list, string> =
         Ok
             [ { SessionId = SessionId.create session
                 ParentSessionId = None
@@ -121,28 +130,6 @@ module DispatchSurface =
         Outcome.SendOutcome.AcceptanceUnknown reason
 
     let fatal (reason: string) : Outcome.SendOutcome = Outcome.SendOutcome.Fatal reason
-
-    let decodePhysicalUserMessageId (input: obj) (output: obj) : obj =
-        PromptIngressCodec.decodeWith input output
-        |> fun decoded -> decoded.PhysicalUserMessageId
-        |> Option.map PhysicalUserMessageId.value
-        |> Option.map box
-        |> Option.toObj
-
-    let decodeIngress (input: obj) (output: obj) : obj =
-        let decoded = PromptIngressCodec.decodeWith input output
-
-        box
-            {| sessionId = decoded.SessionId |> Option.map SessionId.value |> Option.toObj
-               physicalUserMessageId =
-                decoded.PhysicalUserMessageId
-                |> Option.map PhysicalUserMessageId.value
-                |> Option.toObj
-               explicitAgent = decoded.ExplicitAgent |> Option.toObj
-               promptKey = decoded.PromptKey |> Option.map PromptKey.value |> Option.toObj
-               isHostCompaction = decoded.IsHostCompaction
-               isHostSynthetic = decoded.IsHostSynthetic
-               text = decoded.Text |> Option.toObj |}
 
     let private appendResult result =
         match result with
@@ -217,24 +204,52 @@ module DispatchSurface =
     /// Seed the durable AgentOwnerRoot needed by a continuation owner. This is
     /// the same PromptFact writer used by production ingress; the returned value
     /// contains no AgentFact/union representation.
-    let appendAuthorityRoot (handle: JournalHandle) (session: string) (identitySeed: obj) : Task<obj> =
+    ///
+    /// interaction-authority-018: `agentOwnerLife` is the life the producer
+    /// proved about this root ("Child" | "Attached" | "InternalLeaf"). It is
+    /// not optional: a root whose life is not proven records no closure kind
+    /// and so admits no closure, which is the honest outcome rather than a
+    /// guessed one.
+    let appendAuthorityRoot
+        (handle: JournalHandle)
+        (session: string)
+        (identitySeed: obj)
+        (agentOwnerLife: string)
+        : Task<obj> =
         task {
-            match identitySeedOf identitySeed with
-            | Error error -> return box {| ok = false; error = error |}
-            | Ok(PromptAuthority.IdentitySeed.RootSelection _) ->
+            match
+                identitySeedOf identitySeed,
+                AuthorityLifeClassification.deriveClosureKind "AgentOwnerRoot" false (Some agentOwnerLife)
+            with
+            | Error error, _ -> return box {| ok = false; error = error |}
+            | Ok(PromptAuthority.IdentitySeed.RootSelection _), _ ->
                 return
                     box
                         {| ok = false
                            error = "AgentOwnerRoot requires an inherited owner identity seed" |}
-            | Ok identitySeed ->
+            | Ok _, None ->
+                return
+                    box
+                        {| ok = false
+                           error = "AgentOwnerRoot requires a proven closure lifecycle" |}
+            | Ok identitySeed, Some closure ->
                 let sessionId = SessionId.create session
 
+                let ownerLogicalRunId =
+                    match identitySeed with
+                    | PromptAuthority.IdentitySeed.InheritedFromOwner witness ->
+                        Some(LogicalRunId.value witness.OwnerLogicalRunId)
+                    | PromptAuthority.IdentitySeed.RootSelection _ -> None
+
                 let payload: AuthorityRootAcceptedPayload =
-                    { SchemaVersion = 2
+                    { SchemaVersion = 3
                       SessionId = sessionId
                       LogicalRunId = LogicalRunId.create (sprintf "run-%s" session)
                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (sprintf "root-%s" session)
                       AuthorityKind = "AgentOwnerRoot"
+                      ExpectedClosureKind = fst closure
+                      OwnerLogicalRunId = ownerLogicalRunId
+                      AgentOwnerLife = snd closure
                       IdentitySeed = identitySeed }
 
                 let fact = PromptFact.AuthorityRootAccepted payload
@@ -534,6 +549,8 @@ module DispatchSurface =
             member _.RuntimeId = journal.RuntimeId
             member _.ProjectionFor sessionId = journal.ProjectionFor sessionId
             member _.HandleForChild sessionId = journal.HandleForChild sessionId
+            member _.OwnershipEvidenceFor sessionId = journal.OwnershipEvidenceFor sessionId
+            member _.InternalLeafOwnerFor sessionId = journal.InternalLeafOwnerFor sessionId
             member _.ChatAcceptancePersistence() = journal.ChatAcceptancePersistence()
 
             member _.Append sessionId providerRun fact =
@@ -860,6 +877,10 @@ module DispatchSurface =
             box
                 {| kind = "IdentityRejected"
                    reason = reason |}
+        | PromptDispatcher.HumanRootAcceptanceFailure.AuthorityRegistrationRejected(PromptDispatcher.AuthorityRegistrationFailure.ClosureRejected reason) ->
+            box
+                {| kind = "AuthorityClosureRejected"
+                   reason = reason |}
         | PromptDispatcher.HumanRootAcceptanceFailure.AuthorityRegistrationRejected(PromptDispatcher.AuthorityRegistrationFailure.PersistenceRejected reason) ->
             box
                 {| kind = "AuthorityPersistenceRejected"
@@ -874,19 +895,35 @@ module DispatchSurface =
     /// PROMPT-004/005: prove one dispatched AgentOwnerRoot at a physical message
     /// boundary. The Dispatcher writes PhysicalAccepted before registering the
     /// authority profile; only the normalized profile crosses this boundary.
+    ///
+    /// interaction-authority-018: `agentOwnerLife` is the life the producer
+    /// proved about this root ("Child" | "Attached" | "InternalLeaf"). When the
+    /// caller states none, the life is derived from the durable ownership
+    /// evidence of the session; a root whose life cannot be proven that way
+    /// records no closure kind and so admits no closure.
     let acceptAgentOwnerRoot
         (handle: JournalHandle)
         (session: string)
         (promptKey: string)
         (physicalMessageId: string)
+        (agentOwnerLife: obj)
         : Task<obj> =
         task {
+            let statedLife =
+                if isNull agentOwnerLife then
+                    None
+                else
+                    match unbox<string> agentOwnerLife with
+                    | "" -> None
+                    | text -> Some text
+
             let! result =
                 (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal))
                     .AcceptAgentOwnerRoot
                     (PromptKey.create promptKey)
                     (SessionId.create session)
                     (PhysicalUserMessageId.create physicalMessageId)
+                    statedLife
 
             return
                 match result with

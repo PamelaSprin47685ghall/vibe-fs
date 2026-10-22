@@ -38,6 +38,7 @@ module JoinDrain =
         | HandleAbandonReason.ParentCancelled -> "ParentCancelled"
         | HandleAbandonReason.DeadlineExceeded -> "DeadlineExceeded"
         | HandleAbandonReason.HostSessionGone -> "HostSessionGone"
+        | HandleAbandonReason.Voided -> "Voided"
 
     let private afterConsumeCas
         (runIdPrefix: string)
@@ -270,13 +271,9 @@ module JoinDrain =
         | HandleLifecycle.CompletedAwaitingJoin _ -> tryConsumeOneDurable durable parentId record completedAt
         | _ -> Task.FromResult None
 
-    let private refreshCandidates
-        (acc: RunCompletion list)
-        (refresh: unit -> AgentLinkageProjection)
-        (records: HandleRecord list)
-        =
+    let private refreshCandidates (refresh: unit -> HandleRecord list) (records: HandleRecord list) =
         // Exact consumed work tombstones, not agent ids, remove delivered entries.
-        orderedCandidates (refresh ())
+        refresh ()
         |> fun refreshed ->
             if List.isEmpty refreshed then Choice1Of3()
             elif refreshed = records then Choice2Of3()
@@ -286,9 +283,9 @@ module JoinDrain =
     /// Returns Ok list (may be empty) or Error when the first item fails hard.
     let drainJoinableBatch
         (maxCount: int)
-        (projection: AgentLinkageProjection)
+        (candidates: HandleRecord list)
         (consumeOne: HandleRecord -> Task<Result<RunCompletion, ForkError> option>)
-        (refresh: unit -> AgentLinkageProjection)
+        (refresh: unit -> HandleRecord list)
         : Task<Result<RunCompletion list, ForkError>> =
         let rec consumeSafe
             (acc: RunCompletion list)
@@ -319,7 +316,7 @@ module JoinDrain =
             (record: HandleRecord)
             (rest: HandleRecord list)
             : Task<Result<RunCompletion list, ForkError>> =
-            match refreshCandidates acc refresh (record :: rest) with
+            match refreshCandidates refresh (record :: rest) with
             | Choice1Of3() -> Task.FromResult(Ok(List.rev acc))
             | Choice2Of3() -> consumeSafe acc n rest
             | Choice3Of3 refreshed -> consumeSafe acc n refreshed
@@ -342,7 +339,7 @@ module JoinDrain =
         if cap <= 0 then
             Task.FromResult(Ok [])
         else
-            consumeSafe [] cap (orderedCandidates projection)
+            consumeSafe [] cap candidates
 
     let private completionBlobPair (cell: HandleCompletion) =
         match cell.CompletionRef, cell.CompletionDigest with
@@ -445,11 +442,8 @@ module JoinDrain =
         (completedAt: DateTimeOffset)
         (accept: HandleRecord -> bool)
         : Task<Result<RunCompletion list, ForkError>> =
-        let filtered () =
-            let projection = durable.HandleProjection parentId
-
-            { projection with
-                Handles = projection.Handles |> Map.filter (fun _ record -> accept record) }
+        let candidates () =
+            durable.HandleProjection parentId |> orderedCandidates |> List.filter accept
 
         task {
             let! reconcileResult = reconcileFalseAborts durable parentId
@@ -457,7 +451,6 @@ module JoinDrain =
             match reconcileResult with
             | Error e -> return Error e
             | Ok() ->
-                let projection = filtered ()
-
-                return! drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) filtered
+                return!
+                    drainJoinableBatch maxCount (candidates ()) (tryConsumeOne durable parentId completedAt) candidates
         }

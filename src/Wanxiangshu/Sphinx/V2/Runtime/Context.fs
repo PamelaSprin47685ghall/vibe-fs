@@ -59,29 +59,3 @@ module Context =
             error "invalid-snapshot" "every excluded item needs a handling rule"
         else
             Ok snapshot
-
-    /// The public envelope a worker sees: goal, visible material, the question, the
-    /// response schema, and the declared work limits. It never carries the label map
-    /// that links an opaque id back to a real candidate.
-    let publicEnvelopeView (snapshot: ContextSnapshot) (question: string) (schemaId: string) : (string * string) list =
-        [ ("goalRevision", string (Revision.value snapshot.GoalRevision))
-          ("snapshotId", SnapshotId.value snapshot.SnapshotId)
-          ("visibleBytesHash", snapshot.ModelVisibleBytesHash)
-          ("question", question)
-          ("responseSchemaId", schemaId) ]
-
-    /// The private ticket the host keeps: the real mapping, the producer, the schema
-    /// reference and the dispatch identity. A worker never receives this.
-    let privateTicketView
-        (scopeId: string)
-        (clusterId: string)
-        (dispatchIntentId: string)
-        (candidateMapping: (string * string) list)
-        : (string * string) list =
-        [ ("scopeId", scopeId)
-          ("clusterId", clusterId)
-          ("dispatchIntentId", dispatchIntentId)
-          ("candidateMapping",
-           candidateMapping
-           |> List.map (fun (opaque, real) -> real + " <- " + opaque)
-           |> String.concat ";") ]

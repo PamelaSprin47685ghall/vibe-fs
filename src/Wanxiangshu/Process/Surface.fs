@@ -11,7 +11,7 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.ManagedAgents
 
 /// JS-native time/process boundary. Clocks, timers and deadlines are opaque
 /// capabilities; estimates, elapsed text and validation results are plain data.
@@ -419,7 +419,6 @@ module ProcessSurface =
 
         RegistrationHandle registration :> obj
 
-    let disposeCancellationRegistration (_registration: obj) : unit = ()
 
     let private evidenceView evidence : obj =
         match evidence with
@@ -634,7 +633,8 @@ module ProcessSurface =
                outputLimit = float value.OutputLimit
                spooled = value.Spool.IsSome
                stdoutChunks = value.Stdout.Count
-               stderrChunks = value.Stderr.Count |}
+               stderrChunks = value.Stderr.Count
+               bytesHeld = value.Combined |> Seq.sumBy (fun bytes -> bytes.Length) |}
 
     let spoolChunkCount (bytes: float) : int = Spool.chunkCount (int64 bytes)
 
@@ -654,7 +654,6 @@ module ProcessSurface =
     let spoolBytesWritten (spool: obj) : float = float (spoolOf spool).BytesWritten
 
     let spoolRead (spool: obj) : Task<obj array> =
-        // DSL-MUTABLE: algorithm-scratch — spool chunk accumulator
         let chunks = ResizeArray<obj>()
 
         task {
@@ -787,7 +786,6 @@ module ProcessSurface =
                   Message = message }
         )
 
-    let ptySignalParse (name: string) : obj = signalParse name
 
     let ptySignalView (name: string) : obj =
         match PtySignal.tryParse name with
@@ -1170,14 +1168,6 @@ module ProcessSurface =
             return chunks.ToArray()
         }
 
-    let spoolBytesToTempFile (bytes: obj) : obj =
-        let path, count, chunks = Spool.spoolBytesToTempFile (bytesOf bytes)
-
-        box
-            {| path = path
-               bytesWritten = float count
-               chunkCount = chunks |}
-
     let abortParent (parentId: string) : unit = Pty.abortParent parentId
 
     let readPlanView (plan: ReadPlan) : obj =
@@ -1187,11 +1177,6 @@ module ProcessSurface =
         | ClosedImmediate -> box {| kind = "ClosedImmediate" |}
         | Park _ -> box {| kind = "Park" |}
 
-    let ptySessionCreate (id: string) (backend: obj) : obj = sessionCreate id backend
-    let ptySessionView (session: obj) : obj = sessionView session
-    let ptySessionSetClosed (session: obj) (closed: bool) : unit = sessionSetClosed session closed
-    let ptySessionSetBackend (session: obj) (backend: obj) : unit = sessionSetBackend session backend
-    let ptySessionPushPending (session: obj) (command: obj) : unit = sessionPushPending session command
 
     let sessionExitPending (session: obj) : bool = not ((sessionOf session).ExitCompleted)
 
@@ -1200,8 +1185,6 @@ module ProcessSurface =
         value.ExitCompleted <- true
         value.ExitCompletion.SetResult()
 
-    let ptySessionExitPending (session: obj) : bool = sessionExitPending session
-    let ptySessionResolveExit (session: obj) : unit = sessionResolveExit session
 
     let sessionPendingView (session: obj) : obj array =
         (sessionOf session).Pending
@@ -1219,7 +1202,6 @@ module ProcessSurface =
         |> List.map (fun (command, completion) -> PendingEntryHandle(command, completion) :> obj)
         |> List.toArray
 
-    let pendingCommands (pending: obj) : obj array = supervisorPendingEntries pending
 
     let pendingEntryView (entry: obj) : obj =
         let value = entry :?> PendingEntryHandle

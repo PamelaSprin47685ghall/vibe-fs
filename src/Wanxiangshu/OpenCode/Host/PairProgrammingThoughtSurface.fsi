@@ -20,7 +20,6 @@ module PairProgrammingThoughtSurface =
         journal: obj -> session: string -> previousEpoch: int64 -> nextEpoch: int64 -> observedRun: string -> Task<obj>
 
 
-    val projectionFlags: journal: obj -> session: string -> obj
 
     /// Fold one anchored pair without opening a journal; used by the pure law test.
     val foldAnchoredPair: payload: obj -> obj
@@ -31,8 +30,6 @@ module PairProgrammingThoughtSurface =
     val source: string
     val markerSource: string
     val markerToolName: string
-    val canonicalText: string
-    val deniedText: string
 
     /// Executes the production pair constructor with an observable pure callback.
     val gapConstructorTrace: messageId: string -> obj

@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { join } from 'node:path'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -39,38 +40,68 @@ test.todo('WHAT[managed-session-lifecycle-013] actual restart re-enlists durable
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { admit, forkTool, withForkRuntime } = await import("../../delegation/tests/support/scoped-work.mjs");
+const {
+  childTurn,
+  coldWorkSnapshot,
+  forkCall,
+  joinCall,
+  observeTerminals,
+  withRealFork,
+} = await import('../../delegation/tests/support/real-fork.mjs');
+const forkTool = await import("../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js");
+
+/**
+ * The cold recovery surface: a fresh writer re-opens the durable event log of
+ * the same workspace and settles against the durable facts alone. It never
+ * writes a fabricated fact.
+ */
+const coldConsume = (directory, owner, root, commitment) =>
+  forkTool.coldConsumeWorkWithOutcome(join(directory, '.Herdchestra'), owner, root, commitment)
 
 test('WHAT[managed-session-lifecycle-013] a stale-projection consumer is arbitrated by the durable consumption tombstone, not its own fold', async () => {
   const owner = 'scope-cross-instance-consume'
-  await withForkRuntime(owner, async (runtime, directory) => {
-    const a = await admit(runtime, owner, 1, 'RACE-FIRST')
-    assert.equal(await forkTool.settle(runtime, owner, 'RACE-ANSWER', 'provider-a'), true)
-    let deliveries = 0
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      const first = await forkCall(hooks, owner, 'Ada', 'RACE-FIRST')
+      assert.match(first, /Ada/)
+      const child = createdIds[0]
+      const root = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'RACE-ANSWER', terminals.awaitRun)
 
-    // A fresh writer with replay consumes before the old runtime reads again.
-    const first = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
-    assert.equal(first.ok, true)
-    assert.match(first.view, /RACE-ANSWER/)
-    deliveries += 1
+      let deliveries = 0
 
-    // The old runtime still holds the in-memory projection it folded before
-    // the cold instance's append. WHAT-013 durable re-enlist: its consume
-    // must be arbitrated by the durable tombstone, not by its own stale
-    // fold — no second delivery, and no second consumption append written
-    // from a projection that never saw the first tombstone.
-    const stale = await forkTool.consumeWorkWithOutcome(runtime, owner, a.root, 'confirmed')
-    assert.equal(stale.ok, false)
-    assert.match(stale.error, /AlreadyRetired/)
-    assert.equal(Object.hasOwn(stale, 'view'), false)
+      // A fresh writer with replay consumes before the old runtime reads again.
+      const cold = await coldConsume(directory, owner, root, 'confirmed')
+      assert.equal(cold.ok, true)
+      assert.match(cold.view, /RACE-ANSWER/)
+      deliveries += 1
 
-    // Durable replay keeps a single terminal: a fresh cold reader sees the
-    // work Retired and every later consumer meets the same tombstone.
-    assert.equal((await forkTool.coldWorkSnapshot(directory, owner)).find(work => work.root === a.root).lifecycle, 'Retired')
-    const late = await forkTool.coldConsumeWorkWithOutcome(directory, owner, a.root, 'confirmed')
-    assert.equal(late.ok, false)
-    assert.match(late.error, /AlreadyRetired/)
-    assert.equal(deliveries, 1, 'sequential cold and stale consumers deliver only once')
+      // The old runtime still holds the in-memory projection it folded before
+      // the cold instance's append. WHAT-013 durable re-enlist: its consume
+      // must be arbitrated by the durable tombstone, not by its own stale
+      // fold — no second delivery, and no second consumption append written
+      // from a projection that never saw the first tombstone.
+      //
+      // The arbitration is asserted on the durable surface, not on the error
+      // text: the production join reports `nothing-to-join` where the old
+      // harness reported `AlreadyRetired` — the same meaning (there is no
+      // payload left to hand out), and the tombstone itself is read back from
+      // the durable facts below.
+      const stale = await joinCall(hooks, owner)
+      assert.match(stale, /ok = false/)
+      assert.doesNotMatch(stale, /RACE-ANSWER/)
+
+      // Durable replay keeps a single terminal: a fresh cold reader sees the
+      // work Retired and every later consumer meets the same tombstone.
+      assert.equal((await coldWorkSnapshot(directory, owner)).find(work => work.root === root).lifecycle, 'Retired')
+      const late = await coldConsume(directory, owner, root, 'confirmed')
+      assert.equal(late.ok, false)
+      assert.match(late.error, /AlreadyRetired/)
+      assert.equal(deliveries, 1, 'sequential cold and stale consumers deliver only once')
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 }

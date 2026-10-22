@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { recordedClosureKind } from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -17,6 +18,9 @@ const ROOT_ACCEPTED = {
     LogicalRunId: 'run_a',
     AuthorityRootUserMessageId: 'msg_root_a',
     AuthorityKind: 'HumanRoot',
+    ExpectedClosureKind: recordedClosureKind('HumanRoot', false, null, null),
+    OwnerLogicalRunId: undefined,
+    AgentOwnerLife: undefined,
     IdentitySeed: {
       kind: 'RootSelection',
       ownerSession: null,
@@ -81,6 +85,9 @@ const ROOT_ACCEPTED = {
     LogicalRunId: 'run_a',
     AuthorityRootUserMessageId: 'msg_root_a',
     AuthorityKind: 'HumanRoot',
+    ExpectedClosureKind: recordedClosureKind('HumanRoot', false, null, null),
+    OwnerLogicalRunId: undefined,
+    AgentOwnerLife: undefined,
     IdentitySeed: {
       kind: 'RootSelection',
       ownerSession: null,
@@ -362,6 +369,9 @@ const ROOT_ACCEPTED = {
     LogicalRunId: 'run_meta',
     AuthorityRootUserMessageId: 'msg_root_meta',
     AuthorityKind: 'HumanRoot',
+    ExpectedClosureKind: recordedClosureKind('HumanRoot', false, null, null),
+    OwnerLogicalRunId: undefined,
+    AgentOwnerLife: undefined,
     IdentitySeed: {
       kind: 'RootSelection',
       ownerSession: null,

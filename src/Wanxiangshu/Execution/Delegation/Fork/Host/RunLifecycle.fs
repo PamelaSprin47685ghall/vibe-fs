@@ -6,6 +6,8 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Routing
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
@@ -20,7 +22,9 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation
@@ -39,6 +43,15 @@ module HostForkRunLifecycle =
 
     [<Emit("console.error($0, $1)")>]
     let private logError (prefix: string) (message: string) : unit = jsNative
+
+    /// The delivered view of one terminal, resolved on demand.
+    ///
+    /// The resolution is deferred on purpose. A terminal that does not
+    /// address this run must never spend the live run's material, so the
+    /// view is read only after the ownership guards have passed — not when
+    /// the terminal arrives. The resolution never throws: a faulting read is
+    /// an empty view (EXEC-006).
+    type ViewResolution = unit -> Task<string option>
 
     [<RequireQualifiedAccess>]
     type AgentOwnerDispatchOutcome =
@@ -233,6 +246,18 @@ module HostForkRunLifecycle =
         | Some record -> Some record
         | None -> observed
 
+    /// Peek the delivered cell of this run without consuming it.
+    ///
+    /// The cell is fenced: only a delivery of this exact provider run is
+    /// evidence for this terminal, and a render cache (no call fence) is
+    /// presentation only. The peek advances no cursor and removes nothing,
+    /// so repeated reads of one terminal yield the same view.
+    let private peekDeliveredView (run: PendingHostRun) (result: AgentRunResult) (prose: string option) =
+        match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
+        | Some fence when fence.ProviderRun = result.ProviderRun ->
+            JsDeliveredValues.tryPeekRenderedWith (SessionId.value run.ChildId) prose
+        | _ -> None
+
     let private completedOutcomeView
         (childViewForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (run: PendingHostRun)
@@ -247,8 +272,11 @@ module HostForkRunLifecycle =
                 else
                     Some result.TurnFormalText
 
-            let delivered =
-                JsDeliveredValues.tryTakeRenderedFor (SessionId.value run.ChildId) result.ProviderRun prose
+            // D2: the cell is peeked, never taken. Two entries (the terminal
+            // subscription and the runtime's Complete) read the same child
+            // terminal; a consuming read would leave the second reader
+            // without the material and strand the run.
+            let delivered = peekDeliveredView run result prose
 
             return chooseView delivered observed
         }
@@ -261,6 +289,27 @@ module HostForkRunLifecycle =
         match outcome with
         | TerminalOutcome.Completed result -> completedOutcomeView childViewForRun run result
         | _ -> Task.FromResult None
+
+    /// The view of one terminal, resolved only when it is asked for.
+    ///
+    /// The read is deferred so that a terminal which does not address this
+    /// run never touches the run's material. A faulting read is an empty
+    /// view: it is bounded auxiliary evidence and never a reason to lose a
+    /// terminal the child already proved.
+    let safeViewResolution
+        (childViewForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
+        (run: PendingHostRun)
+        (outcome: TerminalOutcome)
+        : ViewResolution =
+        fun () ->
+            task {
+                try
+                    return! viewForOutcome childViewForRun run outcome
+                with error ->
+                    logError "FORK-VIEW" (sprintf "run %s view read faulted: %s" run.AgentId error.Message)
+
+                    return None
+            }
 
     /// Idle existing child / first prompt for an AgentOwnerRoot work unit.
     ///
@@ -434,10 +483,16 @@ module HostForkRunLifecycle =
         (run: PendingHostRun)
         (proof: JoinableCompletion)
         (agentOutcome: AgentCompletionOutcome)
+        (consume: unit -> unit)
         : Task =
         task {
             try
                 let! finalOutcome = resolveFinalCommittedOutcome journal parentId proof run agentOutcome
+
+                journal
+                |> Option.filter (fun _ -> isCompletionCommitted journal parentId run)
+                |> Option.iter (fun _ -> consume ())
+
                 releaseClaimedRunIfCommitted gate pendingRuns journal parentId run
                 run.Source.SetResult finalOutcome
             with error ->
@@ -459,6 +514,7 @@ module HostForkRunLifecycle =
         (run: PendingHostRun)
         (proof: JoinableCompletion)
         (agentOutcome: AgentCompletionOutcome)
+        (consume: unit -> unit)
         : Task =
         let claimed, subscriptionToDispose = claimPendingRun gate pendingRuns run
 
@@ -470,7 +526,7 @@ module HostForkRunLifecycle =
                 // itself faults. The `do!` stays after the fault boundary, not in
                 // a `finally` (a `finally` in `task { }` cannot await).
                 disposeSubscriptionSafely subscriptionToDispose
-                do! startClaimDelivery gate pendingRuns journal parentId run proof agentOutcome
+                do! startClaimDelivery gate pendingRuns journal parentId run proof agentOutcome consume
             }
             :> Task
         else
@@ -484,12 +540,13 @@ module HostForkRunLifecycle =
         (run: PendingHostRun)
         (evidence: TerminalEvidence)
         (agentOutcome: AgentCompletionOutcome)
+        (consume: unit -> unit)
         : Task =
         match JoinableCompletion.tryFromProvenTerminal evidence with
         | Error _ ->
             // Fail closed: leave run Active / pending for a later proven terminal.
             Task.FromResult(())
-        | Ok proof -> deliverClaimedCompletion pendingRuns gate journal parentId run proof agentOutcome
+        | Ok proof -> deliverClaimedCompletion pendingRuns gate journal parentId run proof agentOutcome consume
 
     let private deliverFailedCompletion
         (gate: obj)
@@ -517,6 +574,7 @@ module HostForkRunLifecycle =
             run
             (TerminalEvidence.failed run.AgentId handle childId body)
             agentOutcome
+            ignore
 
     let private prepareCurrentCompletion
         gate
@@ -559,31 +617,45 @@ module HostForkRunLifecycle =
         else
             Task.FromResult(()) :> Task
 
-    let private deliverPreparedCompletion
-        gate
-        pendingRuns
-        journal
-        parentId
+    let private completedMaterial journal taken completedView =
+        match journal with
+        | Some _ -> completedView
+        | None -> taken |> Option.defaultValue completedView
+
+    /// Settle a proven completion with the material this run delivered.
+    ///
+    /// `taken` is the consumed delivery cell (already fenced by its whole
+    /// delivery fence), and `resolved` is the peeked view that a take that
+    /// found nothing falls back to — the peek is idempotent, so a second
+    /// reader of the same terminal still sees the material.
+    let private settleCompletedView
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
         (run: PendingHostRun)
+        (childId: SessionId)
+        (runId: string)
+        (handle: HandleId)
         (result: AgentRunResult)
-        view
-        =
+        (taken: string option)
+        (resolved: string option)
+        (consume: unit -> unit)
+        : Task =
         task {
-            match view with
-            | None -> ()
-            | Some text when System.String.IsNullOrWhiteSpace text -> ()
-            | Some text ->
-                let runId = "run-" + run.AgentId
+            match resolved with
+            | Some completedView when journal.IsSome || not (System.String.IsNullOrWhiteSpace completedView) ->
+                let finalView = completedMaterial journal taken completedView
 
                 let agentOutcome =
                     AgentCompletion.completed
                         run.AgentId
-                        run.ChildId
+                        childId
                         runId
                         run.Role
                         result.AuthorityRootUserMessageId
                         result.ProviderRun
-                        text
+                        finalView
                         result.Directory
 
                 let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
@@ -595,14 +667,242 @@ module HostForkRunLifecycle =
                         journal
                         parentId
                         run
-                        (TerminalEvidence.completed
-                            run.AgentId
-                            (HandleController.agentHandle run.AgentId)
-                            run.ChildId
-                            body)
+                        (TerminalEvidence.completed run.AgentId handle childId body)
                         agentOutcome
+                        consume
+            | _ ->
+                // LC-004: An asynchronous child that completed its physical turn without
+                // delivering a view has not delivered its obligation. Do not settle or
+                // close the run; observation only, the child continues.
+                return ()
         }
-        :> Task
+
+    let private workDeliveryWitness
+        (durable: AgentJournal)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (result: AgentRunResult)
+        =
+        match run.Work, ModelRouting.tryProviderStepIdentity result.ProviderRun with
+        | Some work, Some(sessionId, physical) when sessionId = childId ->
+            let projections = (AgentJournal.snapshot durable).AgentProjections
+
+            let key: ChatExecutionKey =
+                { SessionId = childId
+                  PhysicalUserMessageId = physical }
+
+            ChatExecutionProjection.byKey key projections.ChatExecutions
+            |> Option.map _.acceptedEvidence
+            |> Option.filter (fun accepted ->
+                accepted.LogicalRunId = AdmittedWork.logicalRunId work
+                && accepted.AuthorityRootUserMessageId = result.AuthorityRootUserMessageId
+                && accepted.AuthorityRootUserMessageId = (AdmittedWork.id work).AuthorityRoot)
+            |> Option.bind (fun accepted ->
+                TaskDeliveryJournal.tryFindForWork
+                    durable
+                    childId
+                    accepted.LogicalRunId
+                    accepted.AuthorityRootUserMessageId
+                    physical
+                    None)
+        | _ -> None
+
+    let private deliveryWitnessOf
+        (journal: AgentJournal option)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (result: AgentRunResult)
+        =
+        match journal with
+        | None -> None
+        | Some durable ->
+            // LogicalRunId 是实值：写入端与本处同源。
+            // 写入端取被调会话的 activeProfile.LogicalRunId
+            // （ToolRegistry.fs:821），而该 profile 就是子会话自己的
+            // ActiveLogicalRun（ProjectionQueries.fs:16-21，profileOwner
+            // 对非 fission lane 就是会话自己）；本处取子会话准入时记下的
+            // 逻辑运行（LinkageProjection.fs:310，准入用的也是该子会话
+            // 自己的 ActiveLogicalRun —— DelegationProjectionBridge.fs:100
+            // 取 childId 的 PromptAuthority）。同一条逻辑运行，
+            // 别的逻辑运行的见证不得满足本子运行的交付门禁。
+            let logicalRunId = run.Work |> Option.map AdmittedWork.logicalRunId
+
+            TaskDeliveryJournal.tryFindByFenceFields
+                durable
+                childId
+                result.ProviderRun
+                None
+                (Some result.AuthorityRootUserMessageId)
+                None
+                logicalRunId
+                // Task 不启用：写入端按「本会话的 lifecycle 退休 → 本会话
+                // 的子句柄 → 本次 toolCall」三级判定
+                // （ToolRegistry.fs:768-800），Manager 子运行的交付会落到
+                // Lifecycle 分支，其余才可能是 ChildWork 或 Invocation。
+                // 本处只能确定「这是哪个子运行」，断定不了写入端落到了哪一支；
+                // 断言 ChildWork 会让本该命中的见证永不匹配，D6 门禁下子运行
+                // 永远 witnessed=false 而卡死。缺失的这一位由交付见证的写入方
+                // 另行核对。
+                None
+            |> Option.bind (fun witness ->
+                TaskDeliveryJournal.tryFindForWork
+                    durable
+                    childId
+                    witness.Fence.LogicalRunId
+                    witness.Fence.AuthorityRoot
+                    witness.Fence.PhysicalUserMessageId
+                    None
+                |> Option.map (fun _ -> witness))
+            |> Option.orElseWith (fun () -> workDeliveryWitness durable run childId result)
+
+    let private terminalProse (result: AgentRunResult) : string option =
+        if System.String.IsNullOrWhiteSpace result.TurnFormalText then
+            None
+        else
+            Some result.TurnFormalText
+
+    let private resolveView (view: ViewResolution option) : Task<string option> =
+        match view with
+        | Some resolution -> resolution ()
+        | None -> Task.FromResult None
+
+    /// Journal-less harness: only this child's own provider run's cell may be taken.
+    let private takeOwnRunCell (run: PendingHostRun) (result: AgentRunResult) (prose: string option) =
+        match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
+        | Some fence when fence.ProviderRun = result.ProviderRun ->
+            JsDeliveredValues.tryTakeRenderedForCall
+                (SessionId.value run.ChildId)
+                result.ProviderRun
+                fence.ToolCallId
+                prose
+        | _ -> None
+
+    let private completeHarnessRun
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (runId: string)
+        (handle: HandleId)
+        (result: AgentRunResult)
+        (view: ViewResolution option)
+        =
+        task {
+            let taken = takeOwnRunCell run result (terminalProse result)
+            let! resolved = resolveView view
+
+            return!
+                settleCompletedView
+                    gate
+                    pendingRuns
+                    journal
+                    parentId
+                    run
+                    childId
+                    runId
+                    handle
+                    result
+                    taken
+                    resolved
+                    ignore
+        }
+
+    let private consumeWitnessCache (witness: TaskDeliveryWitness) =
+        let sessionId = SessionId.value witness.Fence.SessionId
+
+        if JsDeliveredValues.peek sessionId = box witness.View then
+            JsDeliveredValues.tryTakeRenderedForCall
+                sessionId
+                witness.Fence.ProviderRun
+                witness.Fence.ToolCallId
+                (Some witness.FormalText)
+            |> ignore
+
+    let private completeWitnessedRun
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (runId: string)
+        (handle: HandleId)
+        (result: AgentRunResult)
+        (witness: TaskDeliveryWitness)
+        (_view: ViewResolution option)
+        =
+        task {
+            // The durable witness is the delivery proof and it
+            // carries the material of that very delivery. The
+            // process-live cell is only a cache of it: when the
+            // cell was lost (another reader took it) or the view
+            // read faulted, the proven material is still on the
+            // durable side. A proven terminal must therefore always
+            // yield an observable settlement — otherwise the parent's
+            // join waits on a journal revision that never comes.
+            // Nothing is invented: it is the material that was delivered.
+            // The real terminal has proven this work. Its sealed view may
+            // select no text; the return remains the committed material.
+            return!
+                settleCompletedView
+                    gate
+                    pendingRuns
+                    journal
+                    parentId
+                    run
+                    childId
+                    runId
+                    handle
+                    result
+                    None
+                    (Some witness.View)
+                    (fun () -> consumeWitnessCache witness)
+        }
+
+    let private completeProvenResult
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (childId: SessionId)
+        (runId: string)
+        (handle: HandleId)
+        (result: AgentRunResult)
+        (view: ViewResolution option)
+        =
+        task {
+            // D6: a durable completion must be backed by a durable
+            // delivery witness. Without a fence-matched witness nothing
+            // proves that this run delivered anything, so the run stays
+            // open (LC-004) instead of writing a HandleCompleted that
+            // nobody witnessed. The journal-less harness path has no
+            // witness to ask for and keeps working.
+            // The witness is kept, not reduced to a flag: it carries the
+            // fence of the delivery that was proven, and that fence's
+            // tool call id is what the cell must be matched against
+            // before it may be consumed.
+            let witness = deliveryWitnessOf journal run childId result
+
+            match witness with
+            | None when journal.IsNone ->
+                // The journal-less harness path has no witness to ask
+                // for and keeps working. There is no proven fence there,
+                // so the cell may only be taken under its own complete
+                // identity: the cell of this child session whose
+                // provider run is this run's. Another run's cell is never
+                // taken.
+                return! completeHarnessRun gate pendingRuns journal parentId run childId runId handle result view
+            | None -> return ()
+            | Some witness ->
+                // D1: the view is resolved only now. The terminal has
+                // been proven to address this run, so its material may
+                // be read and — once the outcome is admissible — spent.
+                return!
+                    completeWitnessedRun gate pendingRuns journal parentId run childId runId handle result witness view
+        }
 
     let complete
         (gate: obj)
@@ -621,21 +921,33 @@ module HostForkRunLifecycle =
         | Aborted _ ->
             // Observation only. Keep pending run Active for a later proven terminal.
             Task.FromResult(())
-        | Completed result when not result.IsValid ->
+        | Completed result when
+            System.String.IsNullOrWhiteSpace result.TurnFormalText
+            || (not result.IsValid && (deliveryWitnessOf journal run childId result).IsNone)
+            ->
             // provider-attempt-recovery-008 / P0-RECOVERY-JOIN-001: an empty / XML-only terminal is
             // not a proven failure. The subagent auto-retries and continues — its
             // reconcile loop performs the bounded missing-final-report repair.
             // Concluding MISSING_FINAL_REPORT
             // here would fail the run before the last effort. Observation only.
+            // An attributed real terminal may return an empty sealed view.
+            // The delivery witness alone never proves that terminal.
             Task.FromResult(())
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->
-            prepareCurrentCompletion
-                gate
-                pendingRuns
-                run
-                (fun () -> prepareCompletion run outcome)
-                (deliverPreparedCompletion gate pendingRuns journal parentId run result)
+            prepareCurrentCompletion gate pendingRuns run (fun () -> prepareCompletion run outcome) (fun prepared ->
+                completeProvenResult
+                    gate
+                    pendingRuns
+                    journal
+                    parentId
+                    run
+                    childId
+                    runId
+                    handle
+                    result
+                    (Some(fun () -> Task.FromResult prepared))
+                :> Task)
         | Failed stop when not (stopBelongsToRun run stop) -> Task.FromResult(())
         | Failed stop when
             stop.Reason = "MISSING_FINAL_REPORT"

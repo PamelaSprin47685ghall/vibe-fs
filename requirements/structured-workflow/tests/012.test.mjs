@@ -1,6 +1,26 @@
 import test from 'node:test'
 import { withMacMountedOutput } from './support/mac-mounted-output.mjs'
 
+test('WHAT[structured-workflow-012] actual build CLI reaches runBuild before the first artifact write', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { spawnSync } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  const entry = fileURLToPath(new URL('../../../scripts/build.mjs', import.meta.url))
+  const buildState = fileURLToPath(new URL('../../../.fable-build', import.meta.url))
+  const preload = `import fs from 'node:fs';
+    const mkdir = fs.mkdirSync;
+    fs.mkdirSync = function (directory, ...options) {
+      if (String(directory) === ${JSON.stringify(buildState)}) throw new Error('BUILD_CLI_WRITE_BOUNDARY_REACHED');
+      return mkdir.call(this, directory, ...options);
+    };`
+  const result = spawnSync(process.execPath, ['--import', `data:text/javascript,${encodeURIComponent(preload)}`, entry], {
+    encoding: 'utf8', timeout: 10000,
+  })
+  assert.equal(result.status, 1, result.stderr)
+  assert.match(result.stderr, /BUILD_CLI_WRITE_BOUNDARY_REACHED/)
+  assert.doesNotMatch(result.stderr, /clean is not defined/)
+})
+
 {
 const { default: assert } = await import('node:assert/strict')
 const { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, lstatSync } = await import('node:fs')
@@ -46,7 +66,8 @@ async function compileIntoMountedOutput(outputRoot) {
     assert.deepEqual(readFileSync(join(outputRoot, 'new.js')), before)
     const completed = await compile(0, 'Compiled.js')
     assert.equal(completed.ok, true)
-    assert.deepEqual(readdirSync(outputRoot), ['Compiled.js'])
+    assert.deepEqual(readdirSync(outputRoot).sort(), ['Compiled.js', 'new.js'])
+    assert.deepEqual(readFileSync(join(outputRoot, 'new.js')), before)
     assert.equal(readFileSync(join(outputRoot, 'Compiled.js'), 'utf8'), 'export const value = 1;\n')
   } finally { rmSync(root, { recursive: true, force: true }) }
 }
@@ -378,15 +399,18 @@ const verifyGraph = (graph) => {
   const disconnectedProject = fixture.projects.at(-1)
   assert.ok(!mixedPlan.projectPaths.includes(disconnectedProject))
 
-  for (const changedPath of [fixture.projects[graph.changeNodes[0]], join(fixture.root, 'Directory.Build.props')]) {
-    const fullPlan = planImpactFromInventory({
-      inventory: fixture.inventory,
-      changedPaths: [changedPath],
-    })
-    assert.equal(fullPlan.mode, 'full')
-    assert.deepEqual(fullPlan.projectPaths, [...fixture.projects].sort())
-    assert.deepEqual(fullPlan.compileItems, compileItemsForProjects(fixture, graph, new Set(fixture.projects)))
-  }
+  const projectChange = planImpactFromInventory({
+    inventory: fixture.inventory,
+    changedPaths: [fixture.projects[graph.changeNodes[0]]],
+  })
+  assert.equal(projectChange.mode, 'focused')
+  assert.ok(projectChange.projectPaths.includes(fixture.projects[graph.changeNodes[0]]))
+  const toolchainChange = planImpactFromInventory({
+    inventory: fixture.inventory,
+    changedPaths: [join(fixture.root, 'Directory.Build.props')],
+  })
+  assert.equal(toolchainChange.mode, 'focused')
+  assert.deepEqual(new Set(toolchainChange.projectPaths), new Set(fixture.projects), 'shared compiler inputs affect every shard')
 }
 const writeDiskFixture = () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiangshu-impact-parity-'))
@@ -807,7 +831,7 @@ test('WHAT[structured-workflow-012] signature changes include every reverse cons
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[structured-workflow-012] toolchain changes and oversized impact select one full flat build', () => {
+test('WHAT[structured-workflow-012] shared compiler inputs select all affected shards while large local impact stays focused', () => {
   const fixture = createFixture()
   try {
     const oversized = planImpactCompile({
@@ -815,16 +839,18 @@ test('WHAT[structured-workflow-012] toolchain changes and oversized impact selec
       projectDirectory: fixture.root,
       aggregatePath: fixture.aggregate,
     })
-    assert.equal(oversized.mode, 'full')
-    assert.equal(oversized.compileItems.length, 12)
+    assert.equal(oversized.mode, 'focused')
+    assert.ok(oversized.compileItems.length < 12, 'a signature change compiles its closure, not the fixture tree')
+    assert.ok(!sourceNames(oversized).includes('Unrelated.fs'))
 
     const toolchain = planImpactCompile({
       changedPaths: [join(fixture.root, 'Directory.Build.props')],
       projectDirectory: fixture.root,
       aggregatePath: fixture.aggregate,
     })
-    assert.equal(toolchain.mode, 'full')
+    assert.equal(toolchain.mode, 'focused')
     assert.equal(toolchain.compileItems.length, 12)
+    assert.equal(toolchain.forceCompileCache, false)
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
@@ -876,7 +902,7 @@ test('WHAT[structured-workflow-012] multi-change union compiles each closure onc
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[structured-workflow-012] project file changes select one full flat build', () => {
+test('WHAT[structured-workflow-012] project file changes select its reverse consumers and forward closure', () => {
   const fixture = createFixture()
   try {
     const plan = planImpactCompile({
@@ -884,9 +910,11 @@ test('WHAT[structured-workflow-012] project file changes select one full flat bu
       projectDirectory: fixture.root,
       aggregatePath: fixture.aggregate,
     })
-    assert.equal(plan.mode, 'full')
-    assert.equal(plan.reason, 'toolchain-or-project-change')
-    assert.equal(plan.compileItems.length, 12)
+    assert.equal(plan.mode, 'focused')
+    assert.equal(plan.reason, 'focused-impact')
+    assert.ok(plan.projectPaths.includes(fixture.projects.runtime))
+    assert.ok(plan.projectPaths.includes(fixture.projects.composition), 'a project edge change reaches its reverse consumer')
+    assert.ok(!plan.projectPaths.includes(fixture.projects.unrelated))
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
@@ -921,21 +949,23 @@ test('WHAT[structured-workflow-012] production impact-set ladder classifies fs f
   )
   assert.ok(new Set(signature.projectPaths).size >= new Set(impl.projectPaths).size)
   
-  const project = planImpactCompile({
+  const projectFile = planImpactCompile({
     changedPaths: [join(SOURCE_ROOT, 'Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj')],
     projectDirectory: SOURCE_ROOT,
     aggregatePath: AGGREGATE,
   })
-  assert.equal(project.mode, 'full')
-  assert.equal(project.reason, 'toolchain-or-project-change')
+  assert.equal(projectFile.mode, 'focused')
+  assert.equal(projectFile.reason, 'focused-impact')
+  assert.ok(projectFile.compileItems.includes(join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')))
 
   const toolchain = planImpactCompile({
     changedPaths: [join(ROOT, 'package.json')],
     projectDirectory: SOURCE_ROOT,
     aggregatePath: AGGREGATE,
   })
-  assert.equal(toolchain.mode, 'full')
-  assert.equal(toolchain.reason, 'toolchain-or-project-change')
+  assert.equal(toolchain.mode, 'focused')
+  assert.ok(toolchain.compileItems.length > signature.compileItems.length)
+  assert.equal(toolchain.forceCompileCache, false)
 })
 test('WHAT[structured-workflow-012] compile-impact CLI plan-only smoke matches the planner', () => {
   const changed = join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')
@@ -948,12 +978,9 @@ test('WHAT[structured-workflow-012] compile-impact CLI plan-only smoke matches t
   )
   assert.equal(result.status, 0, result.stderr || result.stdout)
   const cli = JSON.parse(result.stdout)
-  // The plan reflects the live worktree: a clean tree reports no-op, a
-  // toolchain change reports full, and non-compiler inputs (e.g. shard-graph
-  // fsproj edits) legitimately report focused. All three are valid modes.
   assert.ok(
-    cli.mode === 'no-op' || cli.mode === 'full' || cli.mode === 'focused',
-    'manifest mode is valid',
+    cli.mode === 'no-op' || cli.mode === 'focused',
+    `full compilation is forbidden, got ${cli.mode}`,
   )
   const plan = planImpactCompile({
     changedPaths: [changed],
@@ -998,7 +1025,6 @@ const corpus = ({ baseline = null } = {}) => ({
   schema_version: 1,
   purpose: 'm6-owner-impact-report-only',
   baseline_commit: commit('a'),
-  aggregate_path: 'src/Wanxiangshu/Wanxiangshu.fsproj',
   project_directory: 'src/Wanxiangshu',
   full_threshold: 0.6,
   lockfile_path: 'package-lock.json',
@@ -1071,6 +1097,7 @@ test('WHAT[structured-workflow-012] fixed owner impact corpus drives the product
 
     const baselineMeasurement = {
       commit: commit('a'),
+      timing_commit: commit('a'),
       environment: environment(),
       structural: structural(10),
       timing: timing(100),
@@ -1099,6 +1126,7 @@ test('WHAT[structured-workflow-012] owner impact corpus rejects stable-case dele
   const driftedBaseline = corpus({
     baseline: {
       commit: commit('b'),
+      timing_commit: commit('b'),
       environment: environment(),
       structural: structural(10),
       timing: timing(100),
@@ -1113,6 +1141,26 @@ test('WHAT[structured-workflow-012] owner impact corpus rejects stable-case dele
   const changedCommand = corpus()
   changedCommand.timing_commands[0].command = ['npm', 'run', 'format-build-test', '--extra-flag']
   assert.throws(() => validateOwnerImpactCorpusV1(changedCommand), /closed report-only schema/)
+})
+test('WHAT[structured-workflow-012] a baseline whose timing was measured at another commit is labelled, never silently re-dated', () => {
+  const staleTiming = corpus({
+    baseline: {
+      commit: commit('a'),
+      timing_commit: commit('c'),
+      environment: environment(),
+      structural: structural(10),
+      timing: timing(100),
+    },
+  })
+  const report = buildOwnerImpactReportV1({
+    corpus: staleTiming,
+    candidate_commit: commit('b'),
+    structural: structural(10),
+  })
+  assert.equal(report.baseline_timing_commit, commit('c'))
+  assert.deepEqual(report.findings.map(({ code }) => code), [
+    'baseline-timing-measured-at-other-commit',
+  ])
 })
 test('WHAT[structured-workflow-012] baseline writer binds one clean exact commit and refuses overwrite', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'owner-impact-baseline-'))
@@ -1224,11 +1272,11 @@ test('WHAT[structured-workflow-012] focused Controller compilation includes Snap
   assert.ok(plan.compileItems.includes(controllerFs))
   assert.ok(plan.compileItems.includes(recoveryFs))
   for (const extension of ['fsi', 'fs']) {
-    const snapshot = join(SOURCE_ROOT, `OpenCode/Host/SessionSnapshot.${extension}`)
-    assert.ok(plan.compileItems.includes(snapshot), `focused Controller compilation must include SessionSnapshot.${extension}`)
+    const snapshot = join(SOURCE_ROOT, `Foundation/HostSessionSnapshot.${extension}`)
+    assert.ok(plan.compileItems.includes(snapshot), `focused Controller compilation must include HostSessionSnapshot.${extension}`)
     assert.ok(plan.compileItems.indexOf(snapshot) < plan.compileItems.indexOf(recoveryFs), 'Snapshot must precede its recovery consumer in canonical order')
   }
-  for (const path of ['OpenCode/Host/SessionHostPort', 'Execution/Session/ChatExecution/Acceptance', 'Execution/Session/ChatExecution/Settlement']) {
+  for (const path of ['Foundation/HostSessionPort', 'Execution/Session/ChatExecution/Acceptance', 'Execution/Session/ChatExecution/Settlement']) {
     for (const extension of ['fsi', 'fs']) {
       assert.equal(plan.compileItems.includes(join(SOURCE_ROOT, `${path}.${extension}`)), false, `Snapshot recovery must not import ${path}.${extension}`)
     }
@@ -1365,12 +1413,12 @@ test('WHAT[structured-workflow-012] inventory rejects bad topology inputs and pl
         () => planImpactFromInventory({ inventory, changedPaths: [] }),
         /changedPaths must contain at least one path/,
       )
-      for (const fullThreshold of [0, -0.5, 1.5]) {
-        assert.throws(
-          () => planImpactFromInventory({ inventory, changedPaths: [join(fresh.sourceDirectory, 'Node0.fs')], fullThreshold }),
-          /fullThreshold must be within/,
-        )
-      }
+      const ignoredThreshold = planImpactFromInventory({
+        inventory,
+        changedPaths: [join(fresh.sourceDirectory, 'Node0.fs')],
+        fullThreshold: 0,
+      })
+      assert.equal(ignoredThreshold.mode, 'focused', 'a threshold argument must not change or reject the closure')
     } finally {
       rmSync(fresh.root, { recursive: true, force: true })
     }
@@ -1829,8 +1877,6 @@ test('WHAT[structured-workflow-012] failure lifecycle prevents false-green warm 
     const rootPropsPath = join(ROOT, 'Directory.Build.props')
 
     let spawnInvocations = 0
-    let run4SawPreservedOutput = false
-    let run5SawPreservedOutput = false
 
     const fakeSpawn = (command, args, options) => {
       spawnInvocations++
@@ -1980,7 +2026,7 @@ test('WHAT[structured-workflow-012] failure lifecycle prevents false-green warm 
     const markerFile = join(result3.scratchDir, '.success')
     assert.equal(existsSync(markerFile), true, 'success marker must be created on successful zero-exit compilation')
 
-    // Call 4: Next warm call must invoke injected spawn again, preserve output before invocation, and require a new successful compiler result
+    // Call 4: identical inputs and a valid marker must skip the compiler.
     const result4 = await compileOwnerProject({
       projectPath,
       aggregatePath,
@@ -1990,51 +2036,69 @@ test('WHAT[structured-workflow-012] failure lifecycle prevents false-green warm 
       stdio: 'pipe',
     })
 
-    assert.equal(result4.ok, true, 'fourth compilation must succeed with new compiler result')
-    assert.equal(result4.code, 0, 'fourth compilation must return exit code 0')
-    assert.equal(spawnInvocations, 4, 'fourth compilation must invoke injected spawn again (no marker-only cache bypass)')
-    assert.equal(run4SawPreservedOutput, true, 'fourth compilation must preserve existing output before spawn invocation')
+    assert.equal(result4.ok, true, 'fourth compilation must reuse the marked output')
+    assert.equal(result4.cached, true, 'fourth compilation must report a cache hit')
+    assert.equal(spawnInvocations, 3, 'fourth compilation must not spawn once the marker and emitted JS agree')
     assert.equal(
       existsSync(join(result4.outputPath, 'Runtime.fs.js')),
       true,
-      'emitted Runtime.fs.js must exist on successful warm compilation',
+      'cached compilation must keep the previously emitted Runtime.fs.js',
     )
     assert.equal(
       existsSync(join(result4.outputPath, 'LeakyConsumer.fs.js')),
       true,
-      'emitted LeakyConsumer.fs.js must exist on successful warm compilation',
+      'cached compilation must keep the previously emitted LeakyConsumer.fs.js',
     )
-    assert.equal(existsSync(markerFile), true, 'success marker must remain intact after successful warm compilation')
+    assert.equal(existsSync(markerFile), true, 'success marker must remain intact after a cache hit')
+  } finally {
+    rmSync(scratchRoot, { recursive: true, force: true })
+  }
+})
 
-    // Call 5: Warm compilation failure must remove marker and output
-    const result5 = await compileOwnerProject({
-      projectPath,
-      aggregatePath,
+test('WHAT[structured-workflow-012] warm cache rejects missing or changed emitted files and supports an explicit compiler refresh', async () => {
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-emission-cache-'))
+  try {
+    const options = {
+      projectPath: join(FIXTURE, 'LeakyConsumer.fsproj'),
+      aggregatePath: join(FIXTURE, 'Emitter.fsproj'),
       scratchRoot,
-      rootPropsPath,
-      spawn: fakeSpawn,
+      rootPropsPath: join(ROOT, 'Directory.Build.props'),
       stdio: 'pipe',
-    })
+    }
+    let invocations = 0
+    const spawn = (_command, args) => {
+      invocations++
+      const output = args[args.indexOf('-o') + 1]
+      writeFileSync(join(output, 'Runtime.js'), 'export const runtime = true;\n')
+      writeFileSync(join(output, 'Consumer.js'), 'export const consumer = true;\n')
+      const child = new EventEmitter()
+      child.stdout = new EventEmitter()
+      child.stderr = new EventEmitter()
+      setImmediate(() => child.emit('close', 0, null))
+      return child
+    }
+    const first = await compileOwnerProject({ ...options, spawn })
+    assert.equal(first.ok, true)
+    const warm = await compileOwnerProject({ ...options, spawn })
+    assert.equal(warm.cached, true)
+    assert.equal(invocations, 1)
 
-    assert.equal(result5.ok, false, 'fifth compilation must fail when injected spawn returns nonzero')
-    assert.equal(result5.code, 5, 'fifth compilation must propagate exit code 5')
-    assert.equal(spawnInvocations, 5, 'fifth compilation must invoke injected spawn')
-    assert.equal(run5SawPreservedOutput, true, 'fifth compilation must preserve existing output before spawn invocation')
-    assert.equal(
-      existsSync(join(result5.outputPath, 'Runtime.fs.js')),
-      false,
-      'injected warm failure must remove output directory / JS outputs',
-    )
-    assert.equal(
-      existsSync(join(result5.outputPath, 'LeakyConsumer.fs.js')),
-      false,
-      'injected warm failure must remove output directory / JS outputs',
-    )
-    assert.equal(
-      existsSync(markerFile),
-      false,
-      'injected warm failure must remove success marker',
-    )
+    rmSync(join(first.outputPath, 'Consumer.js'))
+    const missing = await compileOwnerProject({ ...options, spawn })
+    assert.equal(missing.ok, true)
+    assert.equal(invocations, 2, 'one surviving JavaScript file cannot validate the missing consumer')
+    assert.equal(readFileSync(join(first.outputPath, 'Consumer.js'), 'utf8'), 'export const consumer = true;\n')
+
+    writeFileSync(join(first.outputPath, 'Runtime.js'), 'corrupted bytes')
+    const corrupt = await compileOwnerProject({ ...options, spawn })
+    assert.equal(corrupt.ok, true)
+    assert.equal(invocations, 3)
+    assert.equal(readFileSync(join(first.outputPath, 'Runtime.js'), 'utf8'), 'export const runtime = true;\n')
+
+    const plan = planOwnerCompile(options)
+    const refreshed = await compileOwnerProject({ ...options, spawn, compilePlan: { ...plan, forceCompileCache: false } })
+    assert.equal(refreshed.ok, true)
+    assert.equal(invocations, 4, 'a changed compiler configuration cannot reuse a source-only success marker')
   } finally {
     rmSync(scratchRoot, { recursive: true, force: true })
   }
@@ -2055,7 +2119,7 @@ const CLI = join(ROOT, 'requirements/structured-workflow/tests/fixtures/impact-c
 const FIXTURE_BOUNDARY = join(ROOT, 'requirements/structured-workflow/tests/fixtures/owner-project-boundary')
 
 const findImpactProject = (root) => {
-  const pending = [join(ROOT, 'src/Wanxiangshu/.fable-build/output-compile')]
+  const pending = [join(root, '.fable-build/output-compile')]
   let newest = null
   let newestMtime = 0
   while (pending.length > 0) {
@@ -2190,10 +2254,10 @@ integrationTest('WHAT[structured-workflow-012] compile-impact CLI compiles a foc
     writeFileSync(propsPath, `${readFileSync(propsPath, 'utf8')}<!-- impact-cli full-fallback probe -->\n`, 'utf8')
     const fallback = runCli([propsPath, ...flags])
     assert.equal(fallback.status, 0, fallback.stderr || fallback.stdout)
-    assert.match(fallback.stdout, /compiled full impact \(8 items\)/)
+    assert.match(fallback.stdout, /compiled focused impact \(8 items\)/)
     assert.ok(
       findEmittedJs(outputDir, 'BetaTwo.js'),
-      'full fallback must emit the whole fixture closure',
+      'shared props must re-emit every affected fixture shard',
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -2329,13 +2393,14 @@ integrationTest('WHAT[structured-workflow-012] deleting a source purges its stal
     const alphaFs = join(dir, 'Alpha', 'Alpha.fs')
     const baseline = runCli([alphaFs, ...flags])
     assert.equal(baseline.status, 0, baseline.stderr || baseline.stdout)
-    assert.ok(findEmittedJs(outputDir, 'Alpha.js'), 'baseline must emit Alpha.js')
+    assert.equal(findEmittedJs(outputDir, 'Alpha.js'), join(outputDir, 'Alpha', 'Alpha.js'),
+      'the compiler must keep outputs relative to the declared source project directory')
 
     rmSync(alphaFs)
     rmSync(join(dir, 'Wanxiangshu.Owner.fixture.alpha.fsproj'))
     const afterDelete = runCli([alphaFs, ...flags])
     assert.equal(afterDelete.status, 0, afterDelete.stderr || afterDelete.stdout)
-    assert.match(afterDelete.stdout, /compiled (clean|full) impact/, 'source deletion must not resolve to focused reuse of stale bytes')
+    assert.match(afterDelete.stdout, /compiled none impact \(0 items\)/, 'a retired shard has no live consumer closure to recompile')
     assert.ok(
       !findEmittedJs(outputDir, 'Alpha.js'),
       'deleted source must not leave old JS in the emitted set',
@@ -2443,7 +2508,7 @@ const {
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 
-test('WHAT[structured-workflow-012] collectTrackedInputs includes compile-order global.json and build state scripts, and compile-order change triggers full plan', () => {
+test('WHAT[structured-workflow-012] tracked shared compiler inputs select their affected shard closure', () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'tracked-inputs-fixture-'));
   try {
     const srcDir = join(fixtureRoot, 'src/Wanxiangshu');
@@ -2489,13 +2554,13 @@ test('WHAT[structured-workflow-012] collectTrackedInputs includes compile-order 
     const hasBuildState = tracked.some((p) => p.endsWith('scripts/lib/build-state.mjs'));
     assert.equal(hasBuildState, true, 'collectTrackedInputs must include scripts/lib/build-state.mjs');
 
-    // 5. compile-order.txt change in planner side triggers mode: full
     const plan = planImpactCompile({
       changedPaths: [compileOrderPath],
       projectDirectory: srcDir,
     });
-    assert.equal(plan.mode, 'full', 'compile-order.txt modification must trigger full compilation mode');
-    assert.equal(plan.reason, 'toolchain-or-project-change', 'compile-order.txt reason must be toolchain-or-project-change');
+    assert.equal(plan.mode, 'focused');
+    assert.equal(plan.projectPaths.length, 1);
+    assert.equal(plan.forceCompileCache, false);
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -2783,7 +2848,7 @@ test('WHAT[structured-workflow-012] compileIncremental staging rebaseEmittedImpo
   }
 });
 
-test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan focused, non-fs inputs plan full, and plan matches run mode', async () => {
+test('WHAT[structured-workflow-012] build decisions preserve local closures and invalidate all shared compiler consumers', async () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-mode-fixture-'));
   try {
     execFileSync('git', ['init', '--quiet', fixtureRoot]);
@@ -2937,11 +3002,12 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
       'planBuild selectedShards must agree with planImpactCompile projectPaths',
     );
 
-    // 3. Threshold behavior: hitting >= 60% threshold triggers mode = full
-    // Modify ModA (pulls A & B = 2 shards) AND ModC (1 shard) => 3/4 = 75% >= 60%
+    // Three shards of four is still three closures. Size never promotes the
+    // plan to compiling the untouched fourth shard.
     writeFileSync(join(srcDir, 'Source/ModC.fs'), 'namespace Core\nlet c = 99\n', 'utf8');
     const planThreshold = await planBuild({ targetRoot: fixtureRoot, currentToolchain: controlledToolIdentity });
-    assert.equal(planThreshold.mode, 'full', 'hitting 75% >= 60% threshold must plan full mode');
+    assert.equal(planThreshold.mode, 'focused', 'impact size must not promote a focused closure to the whole tree');
+    assert.equal(planThreshold.selectedShards.some((p) => p.endsWith('Wanxiangshu.Shard.D.fsproj')), false);
 
     // 4. Non-.fs/.fsi input change (Directory.Build.props):
     writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 1\nlet inline helper x = x + 1\n', 'utf8');
@@ -2949,12 +3015,73 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
     writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project><!-- updated --></Project>\n', 'utf8');
 
     const planFull = await planBuild({ targetRoot: fixtureRoot, currentToolchain: controlledToolIdentity });
-    assert.equal(planFull.mode, 'full', 'modifying non-.fs/.fsi input must plan full mode, not clean');
-    assert.notEqual(planFull.mode, 'clean', 'planBuild must never report clean for non-clean non-fs changes');
+    assert.equal(planFull.mode, 'focused');
+    assert.equal(planFull.selectedShards.length, 4, 'shared props affect all four fixture shards');
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
 });
+
+test('WHAT[structured-workflow-012] missing snapshots and damaged outputs invalidate every source even with a simultaneous local edit', () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-combined-invalidation-'))
+  try {
+    const dist = join(fixtureRoot, 'dist')
+    mkdirSync(dist)
+    writeFileSync(join(dist, 'Alpha.js'), 'old alpha')
+    writeFileSync(join(dist, 'Beta.js'), 'old beta')
+    const oldInputs = [
+      { path: 'src/Wanxiangshu/Alpha.fs', sha256: 'old-alpha' },
+      { path: 'src/Wanxiangshu/Beta.fs', sha256: 'beta' },
+      { path: 'global.json', sha256: 'sdk' },
+    ]
+    const inputs = [{ ...oldInputs[0], sha256: 'new-alpha' }, ...oldInputs.slice(1)]
+    const manifest = {
+      schema: MANIFEST_SCHEMA,
+      compiler: { inputs: oldInputs, toolIdentity: 'compiler-v1' },
+      generated: { inputDigest: 'generated' },
+      artifacts: { inputDigest: 'artifacts' },
+      outputs: collectOutputs(dist),
+    }
+    const decide = (existingManifest, currentToolchain = 'compiler-v1') => determineBuildDecision({
+      existingManifest, currentToolchain, targetDist: dist, resolvedRoot: fixtureRoot,
+      compilerInputs: inputs, generatedInputDigest: 'generated', artifactInputDigest: 'artifacts',
+    })
+    const expected = inputs.map((input) => resolve(fixtureRoot, input.path)).sort()
+    assert.deepEqual(decide(null).changedPaths.sort(), expected, 'a fresh checkout has no prior compiler authority')
+    assert.deepEqual(decide(manifest, 'compiler-v2').changedPaths.sort(), expected, 'a local edit must not hide a compiler change')
+    writeFileSync(join(dist, 'Beta.js'), 'corrupted beta')
+    assert.deepEqual(decide(manifest).changedPaths.sort(), expected, 'the untouched source must repair its corrupted output')
+    rmSync(join(dist, 'Beta.js'))
+    assert.deepEqual(decide(manifest).changedPaths.sort(), expected, 'the untouched source must repair its missing output')
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[structured-workflow-012] retiring a shard removes only its old emitted module without invoking the compiler', async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'compile-retired-module-'))
+  try {
+    mkdirSync(join(fixtureRoot, 'Source'))
+    writeFileSync(join(fixtureRoot, 'Source/Keep.fs'), 'namespace Retired\nlet keep = 1\n')
+    writeFileSync(join(fixtureRoot, 'Wanxiangshu.Shard.Keep.fsproj'), '<Project><ItemGroup><Compile Include="Source/Keep.fs"/></ItemGroup></Project>')
+    const outputDir = join(fixtureRoot, 'dist')
+    mkdirSync(join(outputDir, 'Source'), { recursive: true })
+    writeFileSync(join(outputDir, 'Source/Gone.js'), 'retired bytes')
+    writeFileSync(join(outputDir, 'Source/Gone.js.map'), 'retired map')
+    writeFileSync(join(outputDir, 'Source/Keep.js'), 'retained bytes')
+    const result = await compileIncremental({
+      root: fixtureRoot, projectDirectory: fixtureRoot, outputDir,
+      changedPaths: [join(fixtureRoot, 'Source/Gone.fs')],
+      spawn: () => assert.fail('retired shard has no remaining compiler input'),
+    })
+    assert.equal(result.ok, true)
+    assert.equal(result.mode, 'none')
+    assert.deepEqual(readdirSync(join(outputDir, 'Source')), ['Keep.js'])
+    assert.equal(readFileSync(join(outputDir, 'Source/Keep.js'), 'utf8'), 'retained bytes')
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true })
+  }
+})
 
 test('WHAT[structured-workflow-012] build failure preserves prior valid manifest and does not delete it (unit: pre-compile failure)', async () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-manifest-retention-unit-'));

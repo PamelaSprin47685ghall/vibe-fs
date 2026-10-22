@@ -3,10 +3,16 @@ namespace Wanxiangshu.Composition.Turn
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 
 /// Ordinary turn observation policy (INTERACTION-REPAIR / PROVIDER-RECOVERY / TERMINAL-REPORT).
 module OrdinaryTurnWorkflow =
+
+    val tryDeliveryEvidence:
+        journal: AgentJournal option -> turn: ReconciledTurn -> Wanxiangshu.Host.TaskDeliveryWitness option
 
     /// Revisit a previously delivered turn only for work whose authority comes
     /// from a fresh idle observation. Terminal plumbing remains first-delivery only.

@@ -64,7 +64,7 @@ test('WHAT[verification-system-017] release adds one Long Stroke and package pro
     })
     assert.equal(result.exitCode, 0)
     assert.deepEqual(calls.map(({ label }) => label), ['format:check', 'check', 'build', 'unit', 'integration', 'e2e', 'package'])
-    assert.ok(calls.find(({ label }) => label === 'build').argv.includes('--clean'))
+    assert.deepEqual(calls.find(({ label }) => label === 'build').argv, [join(root, 'scripts/build.mjs')])
     for (const label of ['e2e', 'package']) assertRealEntry(root, calls.find((call) => call.label === label).argv[0])
   } finally {
     rmSync(directory, { recursive: true, force: true })
@@ -147,6 +147,34 @@ test('WHAT[verification-system-017] daily verification executes each stage in or
     assert.equal(afterLink, beforeLink, 'default verify-logs/latest must not be modified')
   } finally {
     rmSync(tmpLogDir, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-017] an explicit valid suite backstop delegates only the unit outer timer to its real supervisor', () => {
+  for (const release of [false, true]) {
+    for (const [raw, delegated] of [
+      [undefined, false], ['', false], [' ', false], ['0', false], ['-1', false],
+      ['NaN', false], ['Infinity', false], ['invalid', false],
+      ['900000', true], ['1', true], ['1.5', true], ['1e3', true],
+    ]) {
+      const env = { UNIT_VERDICT_SILENCE_MS: '5000', NODE_TEST_CONCURRENCY: '2' }
+      if (raw !== undefined) env.SUITE_BACKSTOP_MS = raw
+      const steps = verificationSteps({ root: ROOT, release, env })
+      const unit = steps.find(step => step.label === 'unit')
+      assert.equal(unit.cmd, process.execPath)
+      assert.deepEqual(unit.argv, [join(ROOT, 'requirements/verification-system/tests/run.mjs')])
+      assert.equal(Object.hasOwn(unit, 'timeoutMs'), delegated, `Only a valid explicit backstop delegates: ${JSON.stringify(raw)}`)
+      assert.equal(unit.timeoutMs, delegated ? null : undefined)
+      assert.equal(Object.hasOwn(unit.env, 'SUITE_BACKSTOP_MS'), raw !== undefined)
+      assert.equal(unit.env.SUITE_BACKSTOP_MS, raw, 'The real runner receives the original value, including invalid values that it must reject')
+      assert.equal(unit.env.UNIT_VERDICT_SILENCE_MS, '5000')
+      assert.equal(unit.env.NODE_TEST_CONCURRENCY, '2')
+      assert.deepEqual(steps.filter(step => step.label !== 'unit').map(({ label, timeoutMs }) => [label, timeoutMs]), [
+        ['format:check', undefined], ['check', undefined], ['build', undefined],
+        ['integration', release ? 1_200_000 : 600_000],
+        ...(release ? [['e2e', 1_500_000], ['package', 600_000]] : []),
+      ])
+    }
   }
 })
 

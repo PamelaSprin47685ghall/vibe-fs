@@ -943,6 +943,7 @@ export async function runCanary(scriptName, { customs, preFlow } = {}) {
     }
 
     await runFlow(scenario, doc, ctx);
+    if (scenario.fatalCleanup) await scenario.fatalCleanup;
 
     const ceilingSnap = scenario.eventCeilings?.snapshot?.();
     if (ceilingSnap && (ceilingSnap.maxJournalEvents != null || ceilingSnap.maxSseEvents != null)) {
@@ -957,7 +958,12 @@ export async function runCanary(scriptName, { customs, preFlow } = {}) {
     await teardownScenario(scenario);
     return 0;
   } catch (error) {
-    console.error(`${doc.name} scenario failed: ${error.stack || error}`);
+    if (scenario?.fatalCleanup) {
+      try { await scenario.fatalCleanup; } catch (failure) {
+        if (error !== failure) error = new AggregateError([error, failure], 'Scenario execution and fatal cleanup failed', { cause: error });
+      }
+    }
+    console.error(`${doc.name} scenario failed:`, error);
     if (scenario?.provider?.unexpectedRequests?.length) {
       console.error(JSON.stringify(scenario.provider.unexpectedRequests.slice(0, 3)));
     }

@@ -152,12 +152,11 @@ test('WHAT[structured-workflow-011] RETIRED-GATE: unconditional resetOutputDirec
   try {
     writeShimShard(dir)
     writeManifest(dir, ['Shim'])
-    // An argv-parsing build.mjs whose reset is NOT behind --clean.
-    // Accepting argv cleanly removes the second gate's noise; the only
-    // signal here is the unguarded resetOutputDirectory call.
+    // Wiping dist is a full rebuild. The gate rejects the call itself;
+    // there is no flag that makes it legal.
     writeFileSync(
       join(dir, 'scripts/build.mjs'),
-      `const unknown = process.argv.slice(2).filter((a) => !['--clean', '--plan', '--help', '-h'].includes(a))
+      `const unknown = process.argv.slice(2).filter((a) => !['--plan', '--help', '-h'].includes(a))
 if (unknown.length > 0) { console.error('unknown option(s)'); process.exit(1) }
 import { resetOutputDirectory } from './x.mjs'
 resetOutputDirectory('dist')
@@ -166,8 +165,8 @@ console.log('build done')
     )
 
     const result = check({ root: dir })
-    const red = result.issues.find((issue) => issue.code === 'unconditional-clean')
-    assert.ok(red, 'resetOutputDirectory without --clean gating must fail the gate')
+    const red = result.issues.find((issue) => issue.code === 'full-compile-forbidden')
+    assert.ok(red, 'resetOutputDirectory must fail the gate')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -482,6 +481,7 @@ test('WHAT[structured-workflow-011] shared gravity wells are split by knowledge 
   // vocabulary because role-free quiescence is still platform-tier knowledge, not a domain.
   assert.deepEqual(sources(identity), [
     'src/Wanxiangshu/Foundation/Identity.fs',
+    'src/Wanxiangshu/Foundation/PromptMetadataField.fs',
     'src/Wanxiangshu/Foundation/Quiescence.fs',
   ])
   assert.deepEqual(sources(outcome), ['src/Wanxiangshu/Foundation/Outcome.fs', 'src/Wanxiangshu/Foundation/OutcomeSurface.fs'])

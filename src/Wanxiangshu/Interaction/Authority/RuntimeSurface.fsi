@@ -4,6 +4,10 @@ module RuntimeSurface =
     val internal projectionOf: value: obj -> PromptAuthority.PromptAuthorityProjection
     val internal projectionToJs: projection: PromptAuthority.PromptAuthorityProjection -> obj
     val empty: obj
+
+    val recordedClosureKind: rootKind: string -> isManager: bool -> agentOwnerLife: obj -> recorded: obj -> string
+    val closureRootKind: closureKind: string -> string
+
     val issueInheritedIdentitySeed: childName: string -> ownerProfile: obj -> obj
     val validateInheritedIdentitySeedAgainstActiveOwner: ownerProfile: obj -> seedValue: obj -> obj
     val validateInheritedIdentitySeed: ownerProfile: obj -> seedValue: obj -> obj
@@ -49,6 +53,20 @@ module RuntimeSurface =
 
     val closeAuthority: logicalRun: string -> authorityRoot: string -> projection: obj -> obj
     val closeCompletedAgentOwnerChildWork: logicalRun: string -> authorityRoot: string -> projection: obj -> obj
+
+    val terminalSourceFact:
+        sha256: (string -> string) ->
+        kind: string ->
+        session: string ->
+        logicalRun: string ->
+        authorityRoot: string ->
+        ownerLogicalRunId: string ->
+        attachmentKind: string ->
+        associationGeneration: string ->
+        decisionOrTransactionId: string ->
+        outcome: string ->
+            obj
+
     val resolveKnownOrigin: physical: string -> promptKey: string -> hostCompaction: bool -> projection: obj -> string
     val stableLogicalRunId: hash: (string -> string) -> runtime: string -> session: string -> physical: string -> string
     val originForContinuation: kind: string -> obj

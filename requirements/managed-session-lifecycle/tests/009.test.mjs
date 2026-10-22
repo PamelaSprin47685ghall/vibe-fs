@@ -149,7 +149,10 @@ test('WHAT[managed-session-lifecycle-009] public scoped work snapshot is lossles
     assert.doesNotThrow(() => JSON.stringify(observed), 'public snapshot must serialize without compiler values or BigInt')
     assert.match(observed.revision, /^(0|[1-9]\d*)$/, 'revision retains the exact canonical decimal value')
     assert.deepEqual(JSON.parse(JSON.stringify(observed)), {
-      ...observed, record: { lifecycle: 'Active', child: CHILD },
+      ...observed, record: {
+        lifecycle: 'Active', child: CHILD,
+        lifecycleKind: null, completionRef: null, completionDigest: null,
+      },
     })
   })
 })

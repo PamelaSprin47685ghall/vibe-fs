@@ -51,7 +51,7 @@ export const verifyPrepareFailure = async () => {
       {
         program: program(`
     this.write('effect.txt', 'mutated-data');
-    await this.deliver({ prefixUntil: 0, thenMap: { 0: "should-not-persist-view" } });
+    await this.deliver({ 0: "should-not-persist-view" });
     return { done: true };
 `),
       },
@@ -101,7 +101,7 @@ export const verifyCommitFailure = async () => {
       {
         program: program(`
     this.write('target.txt', 'after');
-    await this.deliver({ prefixUntil: 0, thenMap: { 0: "fenced-report" } });
+    await this.deliver({ 0: "fenced-report" });
     return { done: true };
 `),
       },

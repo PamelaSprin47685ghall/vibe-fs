@@ -8,9 +8,12 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.execution-tool-admissions.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.execution-tool-admission-table.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-filesystem.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.feature-ablation.ablation-kernel.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.execution-tool-gate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-executortoolsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj"/>
@@ -29,6 +32,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
     
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-deliverywitnesswriter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-workspaceeventstore.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>

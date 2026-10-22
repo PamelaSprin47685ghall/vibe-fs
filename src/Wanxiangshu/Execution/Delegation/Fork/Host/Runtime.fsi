@@ -9,7 +9,10 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Participant.ManagedAgents
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 
@@ -65,7 +68,6 @@ type HostForkRuntime =
             Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>
 
     member SendDeferredFirstPrompt: agentId: string -> Task<Result<unit, string>>
-    member DiscardDeferredFirstPrompt: agentId: string -> unit
     member internal Gate: obj
     member internal TerminalByName: Dictionary<string, string>
     member internal Sessions: ISessionHostPort
@@ -112,7 +114,6 @@ type HostForkRuntime =
     member DetachAndDrain: unit -> Task
     member Cancel: unit -> unit
     member List: unit -> AgentRecord list * PtyRecord list
-    member TryFindAgent: agentId: string -> AgentRecord option
     member internal OwnsAgent: agentId: string -> bool
     member internal EstablishedByProcess: agentId: string -> bool
     member internal EstablishedAgentIds: string list

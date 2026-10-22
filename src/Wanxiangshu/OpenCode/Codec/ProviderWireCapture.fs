@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
+open Wanxiangshu.Participant.Provider.Projection.CapturedWire
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -15,19 +16,6 @@ open Wanxiangshu.Foundation.Identity
 /// parallel parser.
 module ProviderWireCapture =
 
-    /// One decoded wire part plus the stable Host ToolPart address when present.
-    type CapturedWirePart =
-        { WirePart: WirePart
-          HostPartId: HostMessagePartId option
-          HostToolPartId: HostToolPartId option }
-
-    /// A decoded wire message retaining the assistant provider-run identity.
-    /// The normal wire projection deliberately omits source addresses; capture
-    /// needs them to bind a tool call to its durable XTrace range.
-    type CapturedWireMessage =
-        { Role: string
-          ProviderRun: ProviderRunIdentity option
-          Parts: CapturedWirePart list }
 
     let private capturePart (rawPart: obj) : CapturedWirePart option =
         ProviderWireDecode.decodePart rawPart
@@ -185,18 +173,6 @@ module ProviderWireCapture =
                 ProviderWireDecode.hostMessageId raw |> Option.map PhysicalUserMessageId.create
             | _ -> None)
         |> List.tryLast
-
-    let tryPhysicalParentOfProviderRun
-        (providerRun: ProviderRunIdentity)
-        (rawMessages: obj list)
-        : PhysicalUserMessageId option =
-        rawMessages
-        |> List.tryPick (fun raw ->
-            match decodeCapturedMessage raw with
-            | Some message when message.ProviderRun = Some providerRun ->
-                ProviderWireDecode.firstString (ProviderWireDecode.infoObject raw) [ "parentID" ]
-                |> Option.map PhysicalUserMessageId.create
-            | _ -> None)
 
     /// Host semantic-turn coordinate of one physical message in the same decoded
     /// message universe used by XTrace capture. Unlike a raw array index, rows the

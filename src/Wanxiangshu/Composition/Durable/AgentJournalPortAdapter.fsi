@@ -8,7 +8,7 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Delegation.Fork
 
 module AgentJournalPortAdapter =
     val forDelegatedToolEstimate: journal: AgentJournal -> DelegatedToolEstimatePort

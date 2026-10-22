@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>authority</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-tool-gate</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>capability-enforcement</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-tool-gate</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.execution-tool-admission-table.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.feature-ablation.ablation-kernel.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-port.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <Compile Include="Execution/Tool/ExecuteGate.fsi"/>
+    <Compile Include="Execution/Tool/ExecuteGate.fs"/>
+  </ItemGroup>
+</Project>

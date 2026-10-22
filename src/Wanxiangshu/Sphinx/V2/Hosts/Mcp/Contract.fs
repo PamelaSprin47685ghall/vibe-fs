@@ -58,13 +58,6 @@ module Contract =
         | SphinxTool.InquiryExport -> "export-owner"
         | SphinxTool.GoalAmend -> "user-authorized-controller"
 
-    /// Read-only tools never create a lease, call a model, or change business state.
-    let isReadOnly (tool: SphinxTool) : bool =
-        match tool with
-        | SphinxTool.InquiryStatus
-        | SphinxTool.InquiryExport -> true
-        | _ -> false
-
     /// True when a name is one of the seven public tools. Everything else — including
     /// the old assess/propose/investigate/synthesize stages — is not a Sphinx tool.
     let isTool (name: string) : bool =

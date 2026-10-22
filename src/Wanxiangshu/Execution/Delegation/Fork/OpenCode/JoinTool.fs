@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Host
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
@@ -25,10 +26,10 @@ open Wanxiangshu.Process
 /// Process-local join admission: FamilyReady permit → HostForkJoin.joinAvailableWithPermit (no bare Join, no AST).
 /// EXEC-017: tool abort → JoinInterrupt.Signal only (≠ runtime.Cancel).
 /// DevOps join: 10s timeout budget (NodeTiming.timerTask 10000). Orch/Manager join remains untimed.
+///
+/// The decisions this tool makes live in `JoinRun`; this file binds them to the
+/// OpenCode host (runtime, journal, mailbox, clock) and renders the wire.
 module JoinTool =
-
-    [<Literal>]
-    let DevOpsJoinTimeoutMs = 10_000
 
     [<RequireQualifiedAccess>]
     module Path =
@@ -50,18 +51,14 @@ module JoinTool =
         [<Literal>]
         let UnavailableFromContext = "tool/join/unavailable-from-context"
 
-    type JoinRecord =
-        { Name: string
-          AgentId: string
-          Role: string
-          Status: string
-          View: string }
+    /// The join wire record; the rules that produce it live in `JoinRules`.
+    type JoinRecord = JoinRules.JoinRecord
 
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private consequence lines =
-        ToolHostCodec.tomlObjectWithInstructions lines []
+        ToolResultText.tomlObjectWithInstructions lines []
 
     let private recoveryBlocked language (_blocks: NonEmpty<RecoveryBlock>) =
         consequence (ProviderProse.instructionLines language Path.RecoveryBlocked Map.empty)
@@ -69,7 +66,8 @@ module JoinTool =
     let private renderOrchestratorOutcome language outcome =
         match outcome with
         | Error _ -> consequence (ProviderProse.instructionLines language Path.OrchestratorNotReady Map.empty)
-        | Ok(Interrupted reason) -> JoinResultRenderer.renderInterrupted language reason
+        | Ok(Interrupted reason) ->
+            JoinResultRenderer.renderInterrupted language (JoinRun.normalizeInterruptReason reason)
         | Ok(ResultsAvailable batch) -> JoinResultRenderer.renderOrchestratorBatch language batch
 
     let private executeOrchestratorJoin
@@ -101,9 +99,9 @@ module JoinTool =
             return renderOrchestratorOutcome language outcome
         }
 
-    let private devopsOrPlainWait (isDevOps: bool) (attemptWait: Task<JoinInterruptReason>) =
-        if isDevOps then
-            let timerTask = NodeTiming.timerTask DevOpsJoinTimeoutMs
+    let private devopsOrPlainWait (appliesBudget: bool) (attemptWait: Task<JoinInterruptReason>) =
+        if appliesBudget then
+            let timerTask = NodeTiming.timerTask JoinRun.DevOpsJoinTimeoutMs
 
             emitJsExpr
                 (attemptWait, emitJsExpr timerTask "$0.then(function(){return'DeadlineExpired';})")
@@ -115,54 +113,43 @@ module JoinTool =
         (runtime: HostForkRuntime)
         (permit: FamilyRecoveryPermit)
         (waitTask: Task<JoinInterruptReason>)
-        (fissionMembership: (string * int) option)
+        (lane: JoinRun.JoinLane)
         =
-        match fissionMembership with
-        | Some(groupId, laneIndex) ->
+        match lane with
+        | JoinRun.FissionLane(groupId, laneIndex) ->
             HostForkJoin.joinAvailableForFissionLane runtime groupId laneIndex JoinBatch.Max waitTask
-        | None -> HostForkJoin.joinAvailableWithPermit runtime permit JoinBatch.Max waitTask
+        | JoinRun.OwnerLane -> HostForkJoin.joinAvailableWithPermit runtime permit JoinBatch.Max waitTask
 
+    /// The durable and live identity evidence the join rules read.
     /// A restarted process may only know the child from its durable handle; the
     /// handle's target agent is the same evidence the process tables carry.
-    let private liveAgentName (runtime: HostForkRuntime) (agentId: string) =
-        match runtime.TryFindAgentOrAdopt agentId with
-        | Some(_, _, agent) -> agent
-        | None -> ""
-
-    let private resolveAgentName
+    let private identityFor
         (scope: ToolRuntimeScope)
         (root: SessionId)
         (runtime: HostForkRuntime)
-        (agentId: string)
-        =
-        let durableByname =
+        : JoinRun.AgentIdentity =
+        let durableHandle agentId =
             scope.Journal
             |> Option.bind (fun journal ->
                 AgentJournal.handleProjection journal root
                 |> HandleProjection.tryFind (HandleController.agentHandle agentId))
-            |> Option.map (fun handle -> handle.Byname)
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
-        match durableByname with
-        | Some byname -> byname.Trim()
-        | None -> liveAgentName runtime agentId
+        let liveAgent agentId = runtime.TryFindAgentOrAdopt agentId
 
-    let private terminalNameFromMap (runtime: HostForkRuntime) (ptyId: string) =
-        runtime.TryTerminalNameByPtyId ptyId |> Option.defaultValue ""
+        { DurableByname = (fun agentId -> durableHandle agentId |> Option.map (fun handle -> handle.Byname))
+          LiveAgentName = (fun agentId -> liveAgent agentId |> Option.map (fun (_, _, agent) -> agent))
+          DurableRole = (fun agentId -> durableHandle agentId |> Option.map (fun handle -> handle.CanonicalRole))
+          RuntimeRole = (fun agentId -> liveAgent agentId |> Option.map (fun (_, role, _) -> role)) }
 
     let private resolveTerminalLabel (runtime: HostForkRuntime) (ptyId: string) =
         let _, ptys = runtime.List()
 
-        match ptys |> List.tryFind (fun record -> record.PtyId = ptyId) with
-        | Some record when not (String.IsNullOrWhiteSpace record.Command) -> record.Command.Trim()
-        | _ -> terminalNameFromMap runtime ptyId
+        let command =
+            ptys
+            |> List.tryFind (fun record -> record.PtyId = ptyId)
+            |> Option.map (fun record -> record.Command)
 
-    let private renderInterruptedReason language (reason: JoinInterruptReason) =
-        match reason with
-        | JoinInterruptReason.OperatorAbort
-        | JoinInterruptReason.UserMessageArrived -> JoinResultRenderer.renderInterrupted language reason
-        | JoinInterruptReason.DeadlineExpired ->
-            JoinResultRenderer.renderInterrupted language JoinInterruptReason.DeadlineExpired
+        JoinRun.resolveTerminalLabel command (runtime.TryTerminalNameByPtyId ptyId)
 
     let private bufferRemainingItems (runtime: HostForkRuntime) (remaining: JoinItem list) =
         match List.isEmpty remaining with
@@ -179,7 +166,9 @@ module JoinTool =
         let rendered, remaining =
             JoinResultRenderer.renderJoinItemBatchWithWindow language resolveName batch resolveLabel
 
-        bufferRemainingItems runtime remaining
+        let window = JoinRun.windowOf batch remaining
+
+        bufferRemainingItems runtime window.Remaining
         rendered
 
     let private renderJoined
@@ -190,7 +179,8 @@ module JoinTool =
         (joined: Result<JoinWaitOutcome<JoinItem>, ForkError>)
         =
         match joined with
-        | Ok(Interrupted reason) -> renderInterruptedReason language reason
+        | Ok(Interrupted reason) ->
+            JoinResultRenderer.renderInterrupted language (JoinRun.normalizeInterruptReason reason)
         | Ok(ResultsAvailable batch) -> renderResultsAvailable language runtime resolveName resolveLabel batch
         | Error joinError -> JoinResultRenderer.renderForkError language joinError resolveName
 
@@ -204,8 +194,8 @@ module JoinTool =
         (runtime: HostForkRuntime)
         =
         task {
-            let isDevOps = scope.IsRole(context, Role.DevOps)
-            let waitTask = devopsOrPlainWait isDevOps attempt.Wait
+            let waitTask =
+                devopsOrPlainWait (JoinRun.appliesWaitBudget (scope.RoleFor context)) attempt.Wait
 
             let joinDescriptor =
                 DiagnosticWait.create
@@ -220,21 +210,18 @@ module JoinTool =
             // Only process-local Fission bindings are active. A durable Open
             // group from a previous process is a broken tool record, not an
             // implicit lane to resume.
-            let fissionMembership =
+            let lane =
                 FissionRuntime.tryLane sessionId
                 |> Option.map (fun binding -> binding.GroupId, binding.LaneIndex)
+                |> JoinRun.decideLane
 
-            let joinTask = joinTaskForMembership runtime permit waitTask fissionMembership
+            let joinTask = joinTaskForMembership runtime permit waitTask lane
             let! joined = CausalAwait.awaitTask scope.WaitObserver joinDescriptor joinTask
             let root = scope.LogicalOwnerFor sessionId
+            let identity = identityFor scope root runtime
 
             return
-                renderJoined
-                    language
-                    runtime
-                    (resolveAgentName scope root runtime)
-                    (resolveTerminalLabel runtime)
-                    joined
+                renderJoined language runtime (JoinRun.resolveAgentName identity) (resolveTerminalLabel runtime) joined
         }
 
     let private executeAgentJoin
@@ -262,10 +249,9 @@ module JoinTool =
         =
         // NEVER Cancel mailbox/runtime on user wake (EXEC-017); the attempt's
         // Wait is the only interrupt channel. Completion still beats interrupt.
-        if scope.IsRole(context, Role.Orchestrator) then
-            executeOrchestratorJoin scope context language sessionId attempt
-        else
-            executeAgentJoin scope context language sessionId attempt permit
+        match JoinRun.decideRoute (scope.RoleFor context) with
+        | JoinRun.OrchestratorRoute -> executeOrchestratorJoin scope context language sessionId attempt
+        | JoinRun.AgentRoute -> executeAgentJoin scope context language sessionId attempt permit
 
     let private executeAfterSession
         (scope: ToolRuntimeScope)
@@ -312,94 +298,13 @@ module JoinTool =
                 return! executeAfterSession scope context language (SessionId.create context.SessionId)
         }
 
-    let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Join)
 
     let spec scope =
         { Name = "join"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
-          Admission = admission
           Execute = execute scope }
-
-    let private findDurableAgentRole (scope: ToolRuntimeScope) (root: SessionId) (agentId: string) : string option =
-        scope.Journal
-        |> Option.bind (fun journal ->
-            AgentJournal.handleProjection journal root
-            |> HandleProjection.tryFind (HandleController.agentHandle agentId))
-        |> Option.map (fun handle -> Roles.roleLabel handle.CanonicalRole)
-
-    let private findRuntimeAgentRole (runtime: HostForkRuntime) (agentId: string) : string option =
-        match runtime.TryFindAgentOrAdopt agentId with
-        | Some(_, role, _) -> Some(Roles.roleLabel role)
-        | None -> None
-
-    let private resolveAgentRole
-        (scope: ToolRuntimeScope)
-        (root: SessionId)
-        (runtime: HostForkRuntime)
-        (agentId: string)
-        (fallback: Role option)
-        : string =
-        match fallback with
-        | Some role -> Roles.roleLabel role
-        | None ->
-            findDurableAgentRole scope root agentId
-            |> Option.orElseWith (fun () -> findRuntimeAgentRole runtime agentId)
-            |> Option.defaultValue ""
-
-    let private decideCompletedStatus (view: string) =
-        if String.IsNullOrWhiteSpace view then
-            "undelivered"
-        else
-            "completed"
-
-    let private mapJoinItem
-        (resolveName: string -> string)
-        (resolveRole: string -> Role option -> string)
-        (resolveLabel: string -> string)
-        (item: JoinItem)
-        : JoinRecord =
-        match item with
-        | JoinItem.AgentItem(AgentCompletedItem payload) ->
-            let view = if isNull payload.View then "" else payload.View
-
-            { Name = resolveName payload.AgentId
-              AgentId = payload.AgentId
-              Role = Roles.roleLabel payload.Role
-              Status = decideCompletedStatus view
-              View = view }
-        | JoinItem.AgentItem(AgentFailedItem payload) ->
-            { Name = resolveName payload.AgentId
-              AgentId = payload.AgentId
-              Role = resolveRole payload.AgentId payload.Role
-              Status = "failed"
-              View = if isNull payload.Message then "" else payload.Message }
-        | JoinItem.AgentItem(AgentAbandonedItem(agentId, _)) ->
-            { Name = resolveName agentId
-              AgentId = agentId
-              Role = resolveRole agentId None
-              Status = "abandoned"
-              View = "" }
-        | JoinItem.PtyItem(PtyExited payload) ->
-            { Name = resolveLabel payload.PtyId
-              AgentId = payload.PtyId
-              Role = Roles.roleLabel Role.DevOps
-              Status = "completed"
-              View = if isNull payload.Outcome then "" else payload.Outcome }
-        | JoinItem.PtyItem(PtyFailed payload) ->
-            { Name = resolveLabel payload.PtyId
-              AgentId = payload.PtyId
-              Role = Roles.roleLabel Role.DevOps
-              Status = "failed"
-              View = if isNull payload.Message then "" else payload.Message }
-        | JoinItem.PtyItem(PtyAborted payload) ->
-            { Name = resolveLabel payload.PtyId
-              AgentId = payload.PtyId
-              Role = Roles.roleLabel Role.DevOps
-              Status = "abandoned"
-              View = if isNull payload.Message then "" else payload.Message }
 
     let private mapResultsAvailable
         language
@@ -412,23 +317,12 @@ module JoinTool =
         let _, remaining =
             JoinResultRenderer.renderJoinItemBatchWithWindow language resolveName batch resolveLabel
 
-        let deliveredCount = NonEmptyBatch.length batch - List.length remaining
+        let window = JoinRun.windowOf batch remaining
 
-        let deliveredList = NonEmptyBatch.toList batch |> List.take deliveredCount
+        bufferRemainingItems runtime window.Remaining
 
-        bufferRemainingItems runtime remaining
-        deliveredList |> List.map (mapJoinItem resolveName resolveRole resolveLabel)
-
-    let private mapForkError (error: ForkError) : string =
-        match error with
-        | ForkError.NothingToJoin
-        | ForkError.Empty -> "nothing-to-join"
-        | ForkError.JoinInProgress -> "join-in-progress"
-        | ForkError.Cancelled
-        | ForkError.TimedOut -> "interrupted"
-        | ForkError.Abandoned _ -> "abandoned"
-        | ForkError.NotFound _
-        | ForkError.TerminalMaterializationFailed _ -> "not-ready"
+        window.Delivered
+        |> List.map (JoinRules.mapJoinItem resolveName resolveRole resolveLabel)
 
     let private resolveManagerJobName (scope: ToolRuntimeScope) (jobId: ManagerJobId) : string =
         scope.Journal
@@ -439,40 +333,6 @@ module JoinTool =
         |> Option.filter (String.IsNullOrWhiteSpace >> not)
         |> Option.map (fun name -> name.Trim())
         |> Option.defaultValue ""
-
-    let private mapOrchestratorVerdict (scope: ToolRuntimeScope) (verdict: OrchestratorVerdict) : JoinRecord =
-        match verdict with
-        | OrchestratorVerdict.Published(jobId, head)
-        | OrchestratorVerdict.PublishedPendingCleanup(jobId, head, _) ->
-            { Name = resolveManagerJobName scope jobId
-              AgentId = ManagerJobId.value jobId
-              Role = Roles.roleLabel Role.Manager
-              Status = "completed"
-              View = CommitHash.value head }
-        | OrchestratorVerdict.Cancelled jobId ->
-            { Name = resolveManagerJobName scope jobId
-              AgentId = ManagerJobId.value jobId
-              Role = Roles.roleLabel Role.Manager
-              Status = "abandoned"
-              View = "" }
-        | OrchestratorVerdict.RejectedDirty reason ->
-            { Name = ""
-              AgentId = ""
-              Role = Roles.roleLabel Role.Manager
-              Status = "failed"
-              View = if isNull reason then "" else reason }
-        | OrchestratorVerdict.IntegrationFailed(jobId, errorDetails) ->
-            { Name = resolveManagerJobName scope jobId
-              AgentId = ManagerJobId.value jobId
-              Role = Roles.roleLabel Role.Manager
-              Status = "failed"
-              View = if isNull errorDetails then "" else errorDetails }
-        | OrchestratorVerdict.Empty ->
-            { Name = ""
-              AgentId = ""
-              Role = Roles.roleLabel Role.Manager
-              Status = "abandoned"
-              View = "" }
 
     let private executeOrchestratorJoinReceipt
         (scope: ToolRuntimeScope)
@@ -501,12 +361,13 @@ module JoinTool =
 
             return
                 match outcome with
-                | Error err when err.StartsWith("JOIN_IN_PROGRESS", StringComparison.Ordinal) ->
-                    Error "join-in-progress"
-                | Error _ -> Error "not-ready"
+                | Error err -> Error(JoinRun.mapOrchestratorMailboxError err)
                 | Ok(Interrupted _) -> Error "interrupted"
                 | Ok(ResultsAvailable batch) ->
-                    Ok(NonEmptyBatch.toList batch |> List.map (mapOrchestratorVerdict scope))
+                    Ok(
+                        NonEmptyBatch.toList batch
+                        |> List.map (JoinRules.mapOrchestratorVerdict (resolveManagerJobName scope))
+                    )
         }
 
     let private executeAgentWithRuntimeReceipt
@@ -519,8 +380,8 @@ module JoinTool =
         (runtime: HostForkRuntime)
         : Task<Result<JoinRecord list, string>> =
         task {
-            let isDevOps = scope.IsRole(context, Role.DevOps)
-            let waitTask = devopsOrPlainWait isDevOps attempt.Wait
+            let waitTask =
+                devopsOrPlainWait (JoinRun.appliesWaitBudget (scope.RoleFor context)) attempt.Wait
 
             let joinDescriptor =
                 DiagnosticWait.create
@@ -532,15 +393,17 @@ module JoinTool =
                       WaitEscape.SessionLifetime ]
                     "JoinTool.joinAvailable"
 
-            let fissionMembership =
+            let lane =
                 FissionRuntime.tryLane sessionId
                 |> Option.map (fun binding -> binding.GroupId, binding.LaneIndex)
+                |> JoinRun.decideLane
 
-            let joinTask = joinTaskForMembership runtime permit waitTask fissionMembership
+            let joinTask = joinTaskForMembership runtime permit waitTask lane
             let! joined = CausalAwait.awaitTask scope.WaitObserver joinDescriptor joinTask
             let root = scope.LogicalOwnerFor sessionId
-            let resolveName = resolveAgentName scope root runtime
-            let resolveRole = resolveAgentRole scope root runtime
+            let identity = identityFor scope root runtime
+            let resolveName = JoinRun.resolveAgentName identity
+            let resolveRole = JoinRun.resolveAgentRole identity
             let resolveLabel = resolveTerminalLabel runtime
 
             return
@@ -548,7 +411,7 @@ module JoinTool =
                 | Ok(Interrupted _) -> Error "interrupted"
                 | Ok(ResultsAvailable batch) ->
                     Ok(mapResultsAvailable language runtime resolveName resolveRole resolveLabel batch)
-                | Error joinError -> Error(mapForkError joinError)
+                | Error joinError -> Error(JoinRules.mapForkError joinError)
         }
 
     let private executeWhenReadyReceipt
@@ -559,13 +422,13 @@ module JoinTool =
         (attempt: JoinAttemptLease)
         (permit: FamilyRecoveryPermit)
         : Task<Result<JoinRecord list, string>> =
-        let isOrchestrator = scope.IsRole(context, Role.Orchestrator)
         let runtimeResult = scope.RuntimeFor context
 
-        match isOrchestrator, runtimeResult with
-        | true, _ -> executeOrchestratorJoinReceipt scope context sessionId attempt
-        | false, Error _ -> Task.FromResult(Error "context-unavailable")
-        | false, Ok runtime -> executeAgentWithRuntimeReceipt scope context language sessionId attempt permit runtime
+        match JoinRun.decideRoute (scope.RoleFor context), runtimeResult with
+        | JoinRun.OrchestratorRoute, _ -> executeOrchestratorJoinReceipt scope context sessionId attempt
+        | JoinRun.AgentRoute, Error _ -> Task.FromResult(Error "context-unavailable")
+        | JoinRun.AgentRoute, Ok runtime ->
+            executeAgentWithRuntimeReceipt scope context language sessionId attempt permit runtime
 
     let private executeAfterSessionReceipt
         (scope: ToolRuntimeScope)

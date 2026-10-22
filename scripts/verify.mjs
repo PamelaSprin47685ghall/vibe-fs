@@ -30,6 +30,7 @@ export function getTestEnv({ verbose = false, hostEnv = process.env, extra = {} 
 }
 
 export function verificationSteps({ root = ROOT, release = false, verbose = false, env: hostEnv = process.env } = {}) {
+  const suiteBackstop = Number(hostEnv.SUITE_BACKSTOP_MS)
   const steps = [
     {
       label: 'format:check',
@@ -46,13 +47,15 @@ export function verificationSteps({ root = ROOT, release = false, verbose = fals
     {
       label: 'build',
       cmd: process.execPath,
-      argv: [path.join(root, 'scripts/build.mjs'), ...(release ? ['--clean'] : [])],
+      argv: [path.join(root, 'scripts/build.mjs')],
       env: hostEnv,
     },
     {
       label: 'unit',
       cmd: process.execPath,
       argv: [path.join(root, 'requirements/verification-system/tests/run.mjs')],
+      // An explicit valid backstop leaves termination and owned cleanup to the unit supervisor.
+      ...(Number.isFinite(suiteBackstop) && suiteBackstop > 0 ? { timeoutMs: null } : {}),
       env: getTestEnv({
         verbose,
         hostEnv,
@@ -111,11 +114,11 @@ function defaultRunStepFactory(root, verbose, output) {
     const logStream = fs.createWriteStream(stepLog, { flags: 'w' })
 
     let killed = false
-    const timer = setTimeout(() => {
+    const timer = timeoutMs === null ? null : setTimeout(() => {
       killed = true
       child.kill('SIGKILL')
     }, timeoutMs)
-    timer.unref()
+    timer?.unref()
 
     let child
     try {

@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 open ToolHostCodec
@@ -25,16 +26,16 @@ module BashHoneypotTool =
 
     let private execute (_args: HostToolArguments) (ctx: HostToolContext) =
         task {
-            return tomlObjectWithInstructions (ProviderProse.instructionLines (languageOf ctx) Path.Denial Map.empty) []
+            return
+                ToolResultText.tomlObjectWithInstructions
+                    (ProviderProse.instructionLines (languageOf ctx) Path.Denial Map.empty)
+                    []
         }
 
-    let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.BashHoneypot)
 
     let spec: ToolSpec =
         { Name = "bash-honeypot"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
-          Admission = admission
           Execute = execute }

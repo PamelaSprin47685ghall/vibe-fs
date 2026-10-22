@@ -10,12 +10,6 @@ open Wanxiangshu.Foundation
 /// Git command plumbing for the production Orchestrator host.
 module OrchestratorGit =
 
-    let private absoluteGitPath (directory: string) (path: string) =
-        if path.StartsWith "/" then
-            path
-        else
-            System.IO.Path.Combine(directory, path)
-
     let private estimate =
         { EstimatedRuntime = RuntimeSeconds 30.0
           EstimatedOutput = OutputBytes 65536L
@@ -36,6 +30,69 @@ module OrchestratorGit =
             return ProcessResult.requireText res
         }
 
+    let private readText (spool: Spool.StreamingSpool option) =
+        match spool with
+        | None -> ""
+        | Some value ->
+            let chunks = ResizeArray<byte[]>()
+            Spool.readChunksSync value.Path chunks.Add
+            chunks |> Seq.toArray |> Array.concat |> ProcessOutput.decodeText
+
+    let private streamOf (slot: Spool.StreamingSpool option ref) =
+        match slot.Value with
+        | Some value -> value
+        | None ->
+            let value = Spool.startStreamingSpool ()
+            slot.Value <- Some value
+            value
+
+    let private readExitText stdout stderr (exit: TextProcessExit) =
+        try
+            Ok
+                { exit with
+                    Stdout = readText stdout
+                    Stderr = readText stderr }
+        with error ->
+            Error(
+                ProcessResult.Observed
+                    { End = EndEvidence.Confirmed(ProgramEnd.Exited exit.ExitCode)
+                      StopRequested = None
+                      Output = None
+                      Fault = Some error.Message }
+            )
+
+    let private readOutput stdout stderr result =
+        ProcessResult.requireText result |> Result.bind (readExitText stdout stderr)
+
+    let run (cmd: Command) : Task<Result<TextProcessExit, ProcessResult>> =
+        task {
+            // DSL-MUTABLE: resource — separate output streams owned by this invocation.
+            let stdout = ref None
+            let stderr = ref None
+            let closed = ref false
+
+            let append (slot: Spool.StreamingSpool option ref) (bytes: byte[]) =
+                if not closed.Value && not (isNull bytes) && bytes.Length > 0 then
+                    Spool.appendStreamingSpool (streamOf slot) bytes
+
+            let host command context _ _ cancellation =
+                NodeProcessHost.spawn command context (append stdout) (append stderr) cancellation
+
+            let context =
+                { WorkingDirectory = cmd.WorkingDirectory
+                  HardLimit = ProcessEstimate.DefaultHardLimit }
+
+            try
+                let! result = ProcessRunner.runWithHost host cmd estimate context CancellationToken.None
+                closed.Value <- true
+
+                return readOutput stdout.Value stderr.Value result
+            finally
+                closed.Value <- true
+                stdout.Value |> Option.iter (fun spool -> Spool.delete spool.Path)
+                stderr.Value |> Option.iter (fun spool -> Spool.delete spool.Path)
+        }
+
     let command (dir: string) (args: string list) : Command =
         { FileName = GitSubject.Executable
           Arguments = args
@@ -43,35 +100,16 @@ module OrchestratorGit =
           Environment = None
           Stdin = None }
 
-    /// True when an in-progress rebase is present. Prefer rebase-merge / rebase-apply
-    /// over a bare REBASE_HEAD ref: a stale REBASE_HEAD can survive after a failed
-    /// continue and would make `rebase --continue` report "no rebase in progress"
-    /// while HasRebaseHead still returns true (ORCH-003 conflict resume).
     let private execute (runner: TextProcessRunner) cmd =
         task {
             let! result = runner cmd
             return Result.mapError ProcessResult.describe result
         }
 
+    /// True when an in-progress rebase is present (rebase-merge / rebase-apply,
+    /// never a stale REBASE_HEAD; ORCH-003). One reader: WorktreeCommands.
     let hasRebaseHead (runner: TextProcessRunner) (worktree: string) =
-        let pathFor name =
-            taskResult {
-                let! result = execute runner (command worktree [ "rev-parse"; "--git-path"; name ])
-
-                if result.ExitCode <> 0 || String.IsNullOrWhiteSpace result.Stdout then
-                    return! Error(sprintf "git rebase-state query failed: %s" result.Stderr)
-                else
-                    let path = result.Stdout.Trim()
-                    let absolute = absoluteGitPath worktree path
-
-                    return System.IO.Directory.Exists absolute
-            }
-
-        taskResult {
-            let! merge = pathFor "rebase-merge"
-            let! apply = pathFor "rebase-apply"
-            return merge || apply
-        }
+        WorktreeCommands.rebaseInProgress runner worktree
 
     /// After a manager terminal: stage everything, then either continue an
     /// in-flight rebase or create the candidate commit.

@@ -104,9 +104,9 @@ Host 只通过 `ReliabilityDiagnostics.CausalDiagnosticRecord` 发布结构化�
 
 Host subsystem 的公开 Contract、Runtime 与物理 Adapter 必须保持编译隔离。以下名称标识合同和编译边界，不赋予 compile shard 独立的架构治理身份或 consumer 授权：
 - `Host.Session.Contract`（`host-session-contract`）：仅包含会话静止 capability 与纯 `SessionSnapshot` 词汇、端口、定位 decision，不依赖 SDK/HTTP 投影、具体 Host 运行时、进程控制、诊断或 Sphinx MCP。
-- `Host.Signal.Contract`（`host-signal-contract`）：仅发布共享终端词汇 `EventContract`，无状态且零副作用；不得因终端词汇而传递摘要实现、消息词汇、SDK 类型、工具注册或物理启动配置，不作为兼容 umbrella。
+- `Host.Signal.Contract`（`host-signal-contract`）：仅发布共享终端词汇 `Foundation.TerminalSignal`（原 `OpenCode/Signals/EventContract`，CUT-34 移出适配层），无状态且零副作用；不得因终端词汇而传递摘要实现、消息词汇、SDK 类型、工具注册或物理启动配置，不作为兼容 umbrella。
 - `Host.Message.Contract`（`host-message-contract`）：独立发布 `Message`/`MessagePart` 消息词汇，不携带 SDK 类型、终端事件或摘要实现。
-- `Host.SDK.Types`（`host-opencode-types`）：独立发布 `OpencodeTypes`/`OpencodeModel` SDK 数据类型，不携带消息词汇、终端事件或物理 Host 能力。
+- `Host.SDK.Types`（`host-opencode-types`）：独立发布 `OpencodeTypes` SDK 数据类型与 `HostModel` 宿主中立模型词汇（原 `OpencodeModel`，HNI-10 于 2026-10-22 就地改名），不携带消息词汇、终端事件或物理 Host 能力。
 - `Host.Event.Envelope`（`host-event-envelope`）：只发布 raw Host envelope unwrap、event type、session identity 与 message-session identity 的唯一无状态公式；不得修改输入对象。
 - `Host.Message.Codec`（`host-message-codec`）：只发布 raw Host message part → `MessagePart` 的无状态 decode；其 bounded audience 只包含实际 message consumer。
 - `Host.Loop.Event.Codec`（`loop-event-codec`）：只发布 loop text-delta decode/query，并单向依赖 `Host.Event.Envelope`；不得获得完整 provider failure/terminal codec。
@@ -154,3 +154,19 @@ Root workspace 是process-local Host资源定位结果，不是公开可变状�
 `chat.params`、provider step 门禁与 provider attempt 生命周期一律以 exact `(SessionId, PhysicalUserMessageId)` 读取容量所有者已提交的租约完成校验：查询不得调用 scheduler、不得发放 fence、不得建立或回填第二份绑定状态。同一物理消息的重复观察幂等，拒绝原因保持一致；A/B 交错消息各自校验自身物理 id，互不串读。受管输入缺少已提交租约时 fail-closed 拒绝且 Host 输出不被改写，不得回退到 session-current 绑定副本，也不得把观察升级为受管租约；未绑定 Host 辅助会话保持豁免。attempt plan 冻结与 `ProviderStarted` 持久化按 exact key 查验 durable Accepted 执行，缺失即明确拒绝，不得兜底重建准入；terminal 后的迟到事件不得复活准入。
 
 活跃 run 的 `HumanMessage` / `BusyAgentNudge` 在 Host 保存前不得撤销旧 committed lease。provider transform 选择可见新输入时，先经 managed-chat-execution-003 的独立准入操作验证 exact Accepted、同 run 与旧 opaque lease，交接原容量并提交新 exact lease，然后执行只读门禁。不得把任意缺失租约视为追加材料或从 session-current 猜造身份。Join 的输入唤醒只消费已保存消息的 exact 可见回执，不在 `chat.message` 保存前唤醒。
+
+## [034] adapter 薄度与 Host 命名空间层级的门禁契约
+
+adapter 文件（`src/Wanxiangshu` 下的 `OpenCode/`、`Omp/` 适配面）不得自行承担产品决策：每个 adapter 文件对产品域命名空间的引用数量受 `scripts/checks/adapter-thinness-baseline.json` 棘轮约束，产品域引用总数不得增长，基线内单个文件的产品域引用数量不得增长，未引用任何中立端口类型的 adapter 文件数量不得增长。合计总数持平不构成豁免：基线内单个文件的引用增长即便被其他文件的下降抵消，仍必须单独报告为违规。不在基线内的 adapter 文件可以携带产品域引用，只要合计总数仍在基线之内——移动或拆分一个基线内 adapter 文件因此永远不需要编辑基线。改进方向不构成失败，只有一次干净运行才可收紧基线。基线写入是纯决策：存在任一违规时写入计划必须拒绝（不允许写入、内容为空、理由指明拒绝写入），写入动作不得被触达，磁盘上的基线文件必须逐字节保持不变；命令行 `--write-baseline` 在存在违规时必须以非零状态退出、报告拒绝理由并保持基线文件逐字节不变。
+
+中立端口纯度是严格约束：`src/Wanxiangshu/Host/Ports/` 下的每个 `.fs` 与 `.fsi` 文件不得引用适配器命名空间、产品域或宿主词汇，只允许 Foundation、`Wanxiangshu.Host` 与 System。纯度范围从源码发现，不依赖任何硬编码族名：任意名称的新端口族自动纳入范围，其签名文件声明的 `type` 名即成为中立端口词汇表的一部分，词汇表同样从源码发现。端口族完整性由族签名自述：每个端口族签名必须以 `HNI P-xx` 头标记声明恰好一个保留端口 id，不得声明零个或多个；两个族不得声明同一保留 id；直接位于 `src/Wanxiangshu/Host/` 下的文件不得占用某个中立族的基名，否则该族一旦被移入 `Host/Ports/` 就会静默覆盖。
+
+`src/Wanxiangshu/Host/` 承载两层且每层只有一个命名空间：A 层 `Host/Ports/` 必须声明 `Wanxiangshu.Host.Ports`，B 层 `Host/Domain/` 必须声明 `Wanxiangshu.Host.Domain`，直接位于 `Host/` 下的文件两者均不得声明——目录位置与命名空间因此不得各自漂移。B 层适配器棘轮（`scripts/checks/domain-seam-baseline.json`）只许收紧：某个 adapter 新引用 `Wanxiangshu.Host.Domain` 必须报告为违规，基线内某个 adapter 已不再引用该接缝则必须从基线中移除，基线集合本身必须通过。层范围同样从源码发现，新增的族与接缝自动被覆盖。
+
+## [035] omp 入口模块不持有产品决策
+
+omp 入口模块（`src/Wanxiangshu/Composition/Omp/` 下携带 `[<ExportDefault>]` 的那个文件及其 `.fsi`）是手写、无产品决策的接线层：它只建立子会话接缝、调用 `activateOnOmp`，并以普通 `IHostPlugin` 值接收 Fable 编译出的产品。它不得反射产品、不得动态 import 产品内部、不得在运行时查产品符号。
+
+入口模块不得出现任何产品决策：不写准入/拒绝规则、不写重试、不算预算、不渲染产品散文、不保留产品状态；并且不 import 任何产品模块。允许的命名面只有中立端口、omp 适配器与 second-host plugin 取值面（`System`、`Fable.Core`、`Wanxiangshu.Host.Ports`、`Wanxiangshu.Host.SecondHost`、`Wanxiangshu.Omp`），以及中立时间契约的精确类型 `Wanxiangshu.Foundation.IClockPort`、`Wanxiangshu.Foundation.ITimerPort` 和物理工厂模块 `Wanxiangshu.Process.NodeTiming`。时间能力只在入口组装后注入产品；入口本身不得读取 ambient 时间、安排全局 timer 或计算预算，不开放整个 Foundation、Process 或其其它模块。产品散文只存在于产品资源树。
+
+该约束由门禁 `scripts/checks/omp-entry-decision-gate.mjs` 强制：门禁只读取入口模块与其接口，不扫描其他 lane 的文件；入口模块缺失、导出点缺失或歧义时必须 fail closed。门禁自带 planted-violation 自证——每一类禁止项都必须在植入违规后被拒绝，且真实入口模块必须被接受；自证失败本身就是门禁 issue。

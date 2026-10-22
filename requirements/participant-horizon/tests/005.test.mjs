@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
+import * as join from '../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 
 const terminal = (kind, values = {}) => ({
   kind, ptyId: 'private-terminal', terminalLabel: 'npm test', outcome: 'exit 0', code: '', message: '', ...values,

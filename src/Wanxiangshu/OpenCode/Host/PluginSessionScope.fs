@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Routing
+
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -35,7 +37,6 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// Per-instance session registry state for one plugin instance (HOST-012):
 /// owned sessions, companions, verdicts, nudges,
@@ -69,8 +70,6 @@ type PluginSessionScope
     member val SessionParents = SharedState.SessionParents
     // DSL-MUTABLE: resource — per-instance companion registry.
     member val Companions = Dictionary<string, CompanionHost>()
-    // DSL-MUTABLE: resource — lock gate object for companion operations.
-    member val CompanionGate = obj ()
     // DSL-MUTABLE: single-flight — per-instance nudge sent set.
     member val NudgeSent = HashSet<string>()
     // DSL-MUTABLE: single-flight — per-instance join guard nudge set.
@@ -86,6 +85,12 @@ type PluginSessionScope
     /// cancelling mailbox/runtime and without a future latch (not journaled).
     // DSL-MUTABLE: resource — per-instance join interrupt registry.
     member val JoinInterrupts: IJoinAttemptRegistry = JoinAttemptRegistry() :> IJoinAttemptRegistry
+
+    /// EXEC-017: a visible user message wakes the CURRENT active join attempt.
+    /// The adapter-facing scope owns the call so the host boundary never opens
+    /// the delegation handle namespace itself.
+    member this.ObserveAcceptedMessage(evidence: AcceptedChatExecutionEvidence) =
+        JoinWake.observeAcceptedMessage this.JoinInterrupts evidence
 
     member private _.SettleExecution(durable: AgentJournal, execution: ChatExecutionState) : Task =
         task {

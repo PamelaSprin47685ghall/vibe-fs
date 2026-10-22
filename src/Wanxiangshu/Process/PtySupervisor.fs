@@ -191,17 +191,6 @@ module PtySupervisor =
                 session.OutputBuffer.Clear() |> ignore
                 port.ReadResult(id, buffered, session.Closed)
             else
-                // PTY-READ-FIRST-BYTE: an open terminal with nothing buffered has not
-                // answered yet, and answering "" instantly makes the obvious agent
-                // sequence — write a command, read its output — return nothing whenever
-                // the shell has not echoed within the same tick. Measured: `pty-stress`
-                // reads eleven times and every read came back empty under suite load,
-                // while the echo turned up later in the join outcome.
-                //
-                // So the read waits for the next byte instead of guessing. Event-driven:
-                // `onData` resolves the parked reader as soon as the terminal speaks. The
-                // timer is only the answer for a genuinely silent terminal, which must
-                // still get "" rather than hang.
                 armFirstByteWait supervisor port id session
 
             return Ok()
@@ -293,9 +282,6 @@ module PtySupervisor =
 
     let private appendLiveData (port: PtyPort) (id: PtyId) (data: string) (s: PtySession) =
         s.OutputBuffer.Append data |> ignore
-        // PTY-READ-FIRST-BYTE: a read parked on an empty buffer is answered by the
-        // terminal speaking, not by a timer expiring. Draining here is what makes
-        // write-then-read deterministic instead of a race against the shell's echo.
         drainAwaitingFirstByte port id s
 
     let private onSessionData (supervisor: PtySupervisor) (port: PtyPort) (id: PtyId) (data: string) =

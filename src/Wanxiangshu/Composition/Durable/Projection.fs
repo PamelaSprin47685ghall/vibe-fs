@@ -10,7 +10,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Bounded projections one session owns (PERSIST-008).
@@ -79,9 +79,11 @@ type AgentProjectionSet =
         /// checkpoints it has actually crossed.
         ViewCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
 
+        /// Task-delivery witnesses keyed by (session, provider run, tool call),
+        /// folded from Host facts by `HostFactFold`.
+        Deliveries: Map<SessionId * ProviderRunIdentity * ToolCallId, Wanxiangshu.Host.TaskDeliveryWitness>
         /// Historical count of folded `RuntimeStarted` envelopes. Retained for
         /// audit/backward-compatible projections; it no longer drives recovery.
-        Deliveries: Map<SessionId * ProviderRunIdentity * ToolCallId, Wanxiangshu.Host.TaskDeliveryWitness>
         RuntimeStartCount: int
     }
 

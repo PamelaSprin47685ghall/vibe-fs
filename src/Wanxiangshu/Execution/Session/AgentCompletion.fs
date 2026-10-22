@@ -114,17 +114,16 @@ module AgentCompletion =
         | AgentFailed payload -> payload.AgentId
         | AgentAbandoned(agentId, _) -> agentId
 
+    /// The join status vocabulary: completed | failed | abandoned | voided.
+    /// A completed item always carries a body, so there is no separate
+    /// "undelivered" terminal — an undelivered child is a live obligation
+    /// (still deliverable) or a void (settled, reported as voided).
     let status (outcome: AgentCompletionOutcome) =
         match outcome with
-        | AgentCompleted payload when String.IsNullOrWhiteSpace payload.View -> "undelivered"
         | AgentCompleted _ -> "completed"
         | AgentFailed _ -> "failed"
+        | AgentAbandoned(_, reason) when reason = "Voided" -> "voided"
         | AgentAbandoned _ -> "abandoned"
-
-    let isCompleted (outcome: AgentCompletionOutcome) =
-        match outcome with
-        | AgentCompleted payload -> not (String.IsNullOrWhiteSpace payload.View)
-        | _ -> false
 
     let completed
         (agentId: string)

@@ -1,7 +1,8 @@
 namespace Wanxiangshu.Execution.Delegation.Advisor
 
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 /// advisor-[001]: the caller-supplied physical handles one consult runs on.
@@ -21,6 +22,9 @@ type AdvisorSeatDeps =
 /// consult that did not reach prose refuses, and advice is never fabricated from an error path.
 [<RequireQualifiedAccess>]
 module AdvisorSeat =
+
+    /// Only a successful child creation in this journal's live seat proves an owner.
+    val tryFindOwner: journal: AgentJournal -> childId: SessionId -> SessionId option
 
     /// advisor-[002]/[003]: append this request's view and intent to the caller session's advisor
     /// as two separate prompts, then return the advisor's prose.

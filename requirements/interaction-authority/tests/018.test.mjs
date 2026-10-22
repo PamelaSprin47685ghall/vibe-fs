@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -8,7 +8,7 @@ import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
-import { withJournal, acceptOwner, rootSelection as durableRootSelection } from './support/authority.mjs'
+import { withJournal, withSharedJournal, acceptOwner, appendClosureEnvelope, rootSelection as durableRootSelection } from './support/authority.mjs'
 
 const hash = (value) => `H(${value})`
 
@@ -245,5 +245,329 @@ test('WHAT[interaction-authority-018] a refused closure append keeps the active 
   })
 })
 
-test.todo('WHAT[interaction-authority-018] GAP-123 all five accepted lifecycle kinds carry ExpectedClosureKind and exact source witness into a durable AuthorityLogicalRunClosed')
-test.todo('WHAT[interaction-authority-018] GAP-123 committed source plus unknown closure append retains identity and blocks SessionId reuse across restart')
+
+// CUT-09-b: the closure of a HumanRoot Manager life carries the canonical
+// LifeCompleted(life, retirement) witness, and durable replay admits a closure
+// only with the exact source witness of the active root's expected kind.
+const closedManagerLife = async (handle, directory, session) => {
+  const store = journal.JournalSurface_eventStore(handle)
+  const owner = await acceptOwner(handle, session)
+  mustOk(await lifecycle.seedOpen(store, 'S4', session, directory, 1n))
+  mustOk(await lifecycle.seedReview(store, session, 'Promoted'))
+  mustOk(await lifecycle.seedDeliver(store, session, 'run-witness', 'call-first', 2n))
+  mustOk(await lifecycle.seedDeliver(store, session, 'run-witness', 'call-second', 3n))
+  return owner
+}
+
+const rewriteClosureWitness = (directory, rewrite) => {
+  const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
+  let rewritten = 0
+  for (const name of readdirSync(events).filter((file) => file.endsWith('.ndjson'))) {
+    const path = join(events, name)
+    const lines = readFileSync(path, 'utf8').split('\n').map((line) => {
+      if (!line.includes('"AuthorityLogicalRunClosed"')) return line
+      const event = JSON.parse(line)
+      const payload = event.payload.Fact[1][1][1]
+      payload.ClosureWitness = rewrite(payload)
+      rewritten += 1
+      return JSON.stringify(event)
+    })
+    writeFileSync(path, lines.join('\n'))
+  }
+  assert.equal(rewritten, 1, 'exactly one durable closure was written')
+}
+
+test('WHAT[interaction-authority-018] a delivered S4 retirement closes the Manager life with the canonical LifeCompleted witness', async () => {
+  await withSharedJournal('witness-canonical', async (handle, reopen, directory) => {
+    const session = 'witness-canonical'
+    const owner = await closedManagerLife(handle, directory, session)
+    let witness
+    rewriteClosureWitness(directory, (payload) => {
+      assert.equal(payload.RootKind, 'HumanRoot')
+      assert.equal(payload.LogicalRunId[1], owner.logicalRun)
+      witness = payload.ClosureWitness
+      return witness
+    })
+    const [kind, life, fact] = JSON.parse(witness)
+    assert.deepEqual([kind, life], ['LifeCompleted', session], 'the Manager life is the session whose S4 retirement delivered')
+    assert.match(fact, /\S/, 'the witness names the exact delivered retirement')
+    const cold = await reopen()
+    assert.equal(journal.JournalSurface_snapshot(cold).sessionProjections[session].promptAuthority.activeLogicalRun, null)
+  })
+})
+
+for (const [label, rewrite] of [
+  ['another closure kind', (payload) => JSON.stringify(['ManagedLogicalRunTerminal', payload.LogicalRunId[1], JSON.parse(payload.ClosureWitness)[2]])],
+  ['another Manager life', (payload) => JSON.stringify(['LifeCompleted', 'another-session', JSON.parse(payload.ClosureWitness)[2]])],
+  ['a malformed witness', () => '["LifeCompleted"'],
+]) {
+  test(`WHAT[interaction-authority-018] a durable closure carrying ${label} does not release the active run on replay`, async () => {
+    await withSharedJournal('witness-foreign', async (handle, reopen, directory) => {
+      const session = 'witness-foreign'
+      const owner = await closedManagerLife(handle, directory, session)
+      rewriteClosureWitness(directory, rewrite)
+      const cold = await reopen()
+      const active = journal.JournalSurface_snapshot(cold).sessionProjections[session].promptAuthority.activeLogicalRun
+      assert.notEqual(active, null, 'only the exact source witness may close the run')
+      assert.equal(active.logicalRun, owner.logicalRun)
+    })
+  })
+}
+
+test('WHAT[interaction-authority-018] a pre-CUT-09-b closure with a bare retirement id still closes the Manager life it was written for', async () => {
+  await withSharedJournal('witness-legacy', async (handle, reopen, directory) => {
+    const session = 'witness-legacy'
+    await closedManagerLife(handle, directory, session)
+    rewriteClosureWitness(directory, (payload) => JSON.parse(payload.ClosureWitness)[2])
+    const cold = await reopen()
+    assert.equal(journal.JournalSurface_snapshot(cold).sessionProjections[session].promptAuthority.activeLogicalRun, null)
+  })
+})
+
+// GAP-123: the five accepted lifecycle kinds each carry their ExpectedClosureKind
+// and their exact source witness into one durable AuthorityLogicalRunClosed.
+// The lifecycle owner writes the durable source terminal; the closure writer
+// only cites a source that is already durable, and only the unique one.
+
+// The lifecycle owner builds the durable source terminal; the fact id is
+// derived from the identity of the lifecycle and the outcome, so the same
+// outcome recorded twice names the same source.
+const terminalSource = (kind, session, logicalRun, authorityRoot, outcome, extra = {}) =>
+  authority.terminalSourceFact(
+    hash,
+    kind,
+    session,
+    logicalRun,
+    authorityRoot,
+    extra.ownerLogicalRunId ?? '',
+    extra.attachmentKind ?? '',
+    extra.associationGeneration ?? '',
+    extra.decisionOrTransactionId ?? '',
+    outcome,
+  )
+
+const authorityOf = (handle, session) =>
+  journal.JournalSurface_snapshot(handle).sessionProjections[session].promptAuthority
+
+test('WHAT[interaction-authority-018] GAP-123 an accepted root records its expected closure kind and a durable source terminal becomes the exact closure witness', async () => {
+  await withSharedJournal('managed-closure', async (handle, reopen, directory, commonDir) => {
+    const session = 'managed-closure'
+    const store = journal.JournalSurface_eventStore(handle)
+    assert.ok(store)
+
+    // A non-Manager HumanRoot is a managed run: its expected closure kind is
+    // HumanRootManagedRun, recorded atomically with the acceptance.
+    const accepted = await dispatch.acceptHumanRootSelection(
+      handle,
+      session,
+      'root-managed',
+      durableRootSelection('engineer'),
+    )
+    assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
+
+    const contract = authorityOf(handle, session).acceptedRootClosures
+    assert.equal(contract.length, 1, 'the accepted root records exactly one closure contract')
+    assert.equal(contract[0].expectedClosureKind, 'HumanRootManagedRun')
+    assert.equal(contract[0].rootKind, 'HumanRoot')
+
+    // The lifecycle owner writes the durable source terminal.
+    const source = terminalSource(
+      'HumanRootManagedRun',
+      session,
+      accepted.profile.logicalRun,
+      accepted.profile.authorityRoot,
+      'completed',
+    )
+    const appended = await journal.JournalSurface_appendAuthorityTerminalSource(handle, session, source)
+    assert.equal(appended.ok, true, JSON.stringify(appended.error))
+
+    const withSource = authorityOf(handle, session)
+    assert.equal(withSource.terminalSources.length, 1)
+    assert.equal(withSource.terminalSources[0].sources.length, 1)
+    assert.equal(withSource.terminalSources[0].sources[0].sourceKind, 'HumanRootManagedRun')
+    const sourceFactId = withSource.terminalSources[0].sources[0].factId
+    assert.match(sourceFactId, /\S/, 'the source terminal names its durable fact')
+
+    // The closure writer cites the durable source and writes exactly one
+    // closure for this run.
+    await journal.JournalSurface_appendAuthorityLogicalRunClosed(commonDir, session, 'retirement-managed')
+
+    const closed = authorityOf(handle, session)
+    assert.equal(closed.activeLogicalRun, null, 'the durable closure releases the active run')
+    assert.equal(closed.closedRuns.length, 1)
+    assert.equal(closed.closedRuns[0].rootKind, 'HumanRoot')
+    const [kind, run, fact] = JSON.parse(closed.closedRuns[0].closureWitness)
+    assert.equal(kind, 'ManagedLogicalRunTerminal')
+    assert.equal(run, accepted.profile.logicalRun)
+    assert.equal(fact, sourceFactId, 'the witness names the exact durable source terminal')
+  })
+})
+
+test('WHAT[interaction-authority-018] GAP-123 a closure without a durable source terminal is refused and the active run keeps its identity', async () => {
+  await withSharedJournal('managed-no-source', async (handle, reopen, directory, commonDir) => {
+    const session = 'managed-no-source'
+    const accepted = await dispatch.acceptHumanRootSelection(
+      handle,
+      session,
+      'root-no-source',
+      durableRootSelection('engineer'),
+    )
+    assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
+
+    // No durable source terminal exists, so no closure may be written.
+    await journal.JournalSurface_appendAuthorityLogicalRunClosed(commonDir, session, 'retirement-no-source')
+
+    const active = authorityOf(handle, session)
+    assert.notEqual(active.activeLogicalRun, null, 'a closure without a durable source releases nothing')
+    assert.equal(active.activeLogicalRun.logicalRun, accepted.profile.logicalRun)
+    assert.equal(active.closedRuns.length, 0)
+  })
+})
+
+test('WHAT[interaction-authority-018] GAP-123 a repeated closure append is idempotent and a conflicting closure is refused across restart', async () => {
+  await withSharedJournal('managed-conflict', async (handle, reopen, directory, commonDir) => {
+    const session = 'managed-conflict'
+    const accepted = await dispatch.acceptHumanRootSelection(
+      handle,
+      session,
+      'root-conflict',
+      durableRootSelection('engineer'),
+    )
+    assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
+
+    const appended = await journal.JournalSurface_appendAuthorityTerminalSource(
+      handle,
+      session,
+      terminalSource(
+        'HumanRootManagedRun',
+        session,
+        accepted.profile.logicalRun,
+        accepted.profile.authorityRoot,
+        'completed',
+      ),
+    )
+    assert.equal(appended.ok, true, JSON.stringify(appended.error))
+
+    await journal.JournalSurface_appendAuthorityLogicalRunClosed(commonDir, session, 'retirement-conflict')
+    const closed = authorityOf(handle, session)
+    assert.equal(closed.activeLogicalRun, null)
+    assert.equal(closed.closedRuns.length, 1)
+
+    // The same closure again is a no-op, even across a restart.
+    const cold = await reopen()
+    await journal.JournalSurface_appendAuthorityLogicalRunClosed(commonDir, session, 'retirement-conflict')
+    const afterRepeat = authorityOf(cold, session)
+    assert.equal(afterRepeat.closedRuns.length, 1, 'a repeated closure appends no second closure')
+    assert.equal(afterRepeat.activeLogicalRun, null)
+
+    // A different witness must not count as the recorded duplicate.
+    const rejected = await appendClosureEnvelope(commonDir, session, {
+      logicalRun: accepted.profile.logicalRun,
+      authorityRoot: accepted.profile.authorityRoot,
+      rootKind: 'HumanRoot',
+      closureWitness: JSON.stringify(['ManagedLogicalRunTerminal', accepted.profile.logicalRun, 'terminal-conflict-other']),
+    })
+    assert.equal(rejected.ok, true, 'the rejected semantic fact and cut are durable')
+    assert.equal(rejected.cuts.length, 1, 'a conflicting closure is refused by the actual fold')
+    assert.equal(rejected.cuts[0].failedEventId, rejected.event.id)
+    assert.match(rejected.cuts[0].reason, /AuthorityLogicalRunClosed conflicts with the recorded closure/)
+    const afterConflict = authorityOf(await reopen(), session)
+    assert.equal(afterConflict.activeLogicalRun, null, 'the refused closure changed nothing')
+    assert.equal(afterConflict.closedRuns.length, 1, 'the recorded closure is still the only one')
+    assert.equal(afterConflict.closedRuns[0].closureWitness, closed.closedRuns[0].closureWitness)
+  })
+})
+
+test('WHAT[interaction-authority-018] the durable root writer refuses missing or unknown lifecycle before appending', async () => {
+  await withJournal('invalid-root-life', async (handle, reopen, directory) => {
+    const owner = await acceptOwner(handle)
+    const issued = authority.issueInheritedIdentitySeed('engineer', owner)
+    assert.equal(issued.ok, true, issued.error)
+    const eventDirectory = join(directory, 'wanxiangshu', 'events')
+    const bytes = () => readdirSync(eventDirectory).filter(name => name.endsWith('.ndjson')).sort()
+      .map(name => ({ name, content: readFileSync(join(eventDirectory, name)) }))
+    const before = bytes()
+    for (const life of [undefined, null, '', 'bogus']) {
+      const result = await dispatch.appendAuthorityRoot(handle, 'child-invalid-root-life', issued.value, life)
+      assert.equal(result.ok, false)
+      assert.match(result.error, /proven closure lifecycle/)
+      assert.deepEqual(bytes(), before, 'a missing classification must not write a fabricated root or CutTail')
+      assert.equal(dispatch.projectionObservation(handle, 'child-invalid-root-life').activeLogicalRun, null)
+    }
+    const recovered = await reopen()
+    assert.equal(dispatch.projectionObservation(recovered, 'child-invalid-root-life').activeLogicalRun, null)
+    assert.deepEqual(dispatch.projectionObservation(recovered, owner.session).activeLogicalRun, owner)
+  })
+})
+
+test('WHAT[interaction-authority-018] acceptance closure kinds require the exact proven lifecycle and never normalize missing or conflicting evidence', async () => {
+  const fc = (await import('fast-check')).default
+
+  const rootKinds = ['HumanRoot', 'AgentOwnerRoot']
+  const lives = ['Child', 'Attached', 'InternalLeaf', 'bogus', '']
+  const closureKinds = [
+    'HumanRootManagerLife',
+    'HumanRootManagedRun',
+    'AgentOwnerChildWork',
+    'AgentOwnerAttachedWork',
+    'AgentOwnerInternalLeaf',
+  ]
+
+  fc.assert(
+    fc.property(
+      fc.constantFrom(...rootKinds),
+      fc.boolean(),
+      fc.option(fc.constantFrom(...lives), { nil: null }),
+      fc.option(fc.constantFrom(...closureKinds, 'bogus'), { nil: null }),
+      (rootKind, isManager, life, recorded) => {
+        let expected = null
+        if (rootKind === 'HumanRoot' && life === null) {
+          expected = isManager ? 'HumanRootManagerLife' : 'HumanRootManagedRun'
+        } else if (rootKind === 'AgentOwnerRoot') {
+          expected = { Child: 'AgentOwnerChildWork', Attached: 'AgentOwnerAttachedWork',
+            InternalLeaf: 'AgentOwnerInternalLeaf' }[life] ?? null
+        }
+        if (expected === null || (recorded !== null && recorded !== expected)) {
+          assert.throws(
+            () => authority.recordedClosureKind(rootKind, isManager, life, recorded),
+            /proven closure lifecycle|recorded closure kind/,
+          )
+          return
+        }
+        const chosen = authority.recordedClosureKind(rootKind, isManager, life, recorded)
+
+        assert.equal(chosen, expected, 'the exact lifecycle owns the only permitted closure kind')
+        assert.ok(closureKinds.includes(chosen), `unknown closure kind ${chosen}`)
+        assert.equal(authority.closureRootKind(chosen), rootKind, `${rootKind}/${life}/${recorded} produced ${chosen}`)
+
+        if (rootKind === 'AgentOwnerRoot') {
+          assert.notEqual(
+            authority.closureRootKind(chosen),
+            'HumanRoot',
+            'an agent-owner root must never close under a HumanRoot kind',
+          )
+        }
+      },
+    ),
+    { seed: 18018, numRuns: 400 },
+  )
+
+  for (const [rootKind, manager, life, expected] of [
+    ['HumanRoot', true, null, 'HumanRootManagerLife'],
+    ['HumanRoot', false, null, 'HumanRootManagedRun'],
+    ['AgentOwnerRoot', false, 'Child', 'AgentOwnerChildWork'],
+    ['AgentOwnerRoot', false, 'Attached', 'AgentOwnerAttachedWork'],
+    ['AgentOwnerRoot', false, 'InternalLeaf', 'AgentOwnerInternalLeaf'],
+  ]) {
+    assert.equal(authority.recordedClosureKind(rootKind, manager, life, null), expected)
+    assert.equal(authority.recordedClosureKind(rootKind, manager, life, expected), expected)
+  }
+  assert.throws(
+    () => authority.recordedClosureKind('AgentOwnerRoot', false, null, 'HumanRootManagedRun'),
+    /no proven closure lifecycle/,
+  )
+  assert.throws(
+    () => authority.recordedClosureKind('AgentOwnerRoot', false, 'Attached', 'AgentOwnerChildWork'),
+    /recorded closure kind/,
+  )
+})

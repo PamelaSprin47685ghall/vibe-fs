@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 
 type HostSessionObservation =
     { SessionId: SessionId
@@ -17,35 +18,19 @@ type HostToolArguments =
     internal new: raw: obj -> HostToolArguments
     member Text: name: string -> string
     member OptionalText: name: string -> string option
-    member OptionalTextIn: objectName: string * propertyName: string -> string option
     member OptionalTexts: name: string -> string list option
     member Texts: name: string -> string list
     member OptionalNumber: name: string -> float option
     member OptionalNonNegativeInteger: name: string -> Result<int option, unit>
     member Raw: obj
-    member OptionalBool: name: string -> bool option
-
-type HostToolContext =
-    { SessionId: string
-      Agent: string option
-      ToolCallId: ToolCallId option
-      ProviderRunId: ProviderRunIdentity option
-      PromptText: string option
-      AttachAbort: (unit -> unit) -> (unit -> unit) }
 
 type HostToolFactory = private HostToolFactory of obj
 type HostSchema = private HostSchema of obj
-
-[<RequireQualifiedAccess>]
-type ToolAdmission =
-    | OfficeRole of (HostToolContext -> Role -> bool)
-    | PrivateAttachment of (HostToolContext -> bool)
 
 type ToolSpec =
     { Name: string
       Description: string
       Arguments: (string * HostSchema) list
-      Admission: ToolAdmission
       Execute: HostToolArguments -> HostToolContext -> Task<string> }
 
 module ToolHostCodec =
@@ -64,12 +49,6 @@ module ToolHostCodec =
     val numberSchema: factory: HostToolFactory -> HostSchema
     val numberSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
 
-    val boundedIntegerSchema:
-        minimum: int -> maximum: int -> description: string -> factory: HostToolFactory -> HostSchema
-
-    val optionalBoundedIntegerSchema:
-        minimum: int -> maximum: int -> description: string -> factory: HostToolFactory -> HostSchema
-
     val boolSchema: factory: HostToolFactory -> HostSchema
     val boolSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val enumSchema: values: string list -> factory: HostToolFactory -> HostSchema
@@ -87,24 +66,19 @@ module ToolHostCodec =
     val optionalStringArraySchema: factory: HostToolFactory -> HostSchema
     val stringArraySchema: factory: HostToolFactory -> HostSchema
     val objectSchemaOf: fields: (string * HostSchema) list -> factory: HostToolFactory -> HostSchema
+
+    /// Optional object schema: the caller may omit the whole object.
+    val optionalObjectSchema: fields: (string * HostSchema) list -> factory: HostToolFactory -> HostSchema
+
     val arraySchemaOf: item: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
 
-    val recordSchemaOf:
+    /// Optional open key→value map (zod `record`); the description carries the key shape.
+    val optionalRecordSchemaOf:
         key: HostSchema -> value: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
 
     val register: factory: HostToolFactory -> spec: ToolSpec -> obj
     val registry: factory: HostToolFactory -> specs: ToolSpec list -> obj
     val hide: registry: obj -> name: string -> callback: 'callback -> unit
 
-    type TomlValue =
-        | TString of string
-        | TInt of int
-        | TInt64 of int64
-        | TBool of bool
-        | TTable of (string * TomlValue) list
-
-    val tomlObject: fields: (string * TomlValue) list -> string
-    val tomlObjectWithInstructions: instructions: string list -> fields: (string * TomlValue) list -> string
-    val tomlTable: name: string -> entries: (string * TomlValue) list list -> string
     val looksLikeHandleId: value: string -> bool
     val digest: text: string -> string

@@ -6,13 +6,11 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Process
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 module LoadRecoverySurface =
     type private State =
@@ -37,17 +35,13 @@ module LoadRecoverySurface =
 
     let childSettlements (state: obj) : string array =
         ChildWorkRecovery.orphanedChildRuns (stateOf state).Projection.AgentProjections
-        |> List.choose (
+        |> List.map (
             ChildWorkRecovery.settlementFact
-            >> Option.map (AgentFact.Execution >> Fact.Agent >> FactCodec.serializeFact)
+            >> AgentFact.Execution
+            >> Fact.Agent
+            >> FactCodec.serializeFact
         )
         |> List.toArray
-
-    let settleChildRuns (handle: JournalHandle) (commonDir: string) : Task<unit> =
-        let drainPtys work =
-            HostForkRuntime.CloseUnboundPtyRun(PtyBackend.recover, commonDir, work)
-
-        ChildWorkRecovery.settleOrphanedChildRuns drainPtys handle.Journal
 
     let private handlesOf state parent =
         (stateOf state).Projection.AgentProjections.Sessions
@@ -68,13 +62,7 @@ module LoadRecoverySurface =
             |> Option.defaultValue ""
 
         let lifecycle =
-            handles.Handles
-            |> Map.toList
-            |> List.tryPick (fun (_, record) ->
-                if record.ChildSessionId = SessionId.create child then
-                    Some record
-                else
-                    None)
+            HandleProjection.tryFindByChildSession (SessionId.create child) handles
             |> Option.map (fun record ->
                 match record.Lifecycle with
                 | HandleLifecycle.Active -> "Active"
@@ -151,7 +139,12 @@ module LoadRecoverySurface =
                   ReadBlob = fun _ -> Task.FromResult(Error "fixture has no completion body")
                   WriteBlob = fun _ -> Task.FromResult(Error "fixture does not write blobs")
                   RefreshProjection = fun () -> Ok()
-                  Sha256 = fun _ -> invalidOp "fixture does not hash blobs" }
+                  Sha256 = fun _ -> invalidOp "fixture does not hash blobs"
+                  AppendAuthorityTerminalSource =
+                    fun _ _ ->
+                        System.Threading.Tasks.Task.FromResult(
+                            Error "AppendAuthorityTerminalSource is not supported by LoadRecoverySurface"
+                        ) }
 
             match!
                 JoinDrain.drainFromJournalWhere

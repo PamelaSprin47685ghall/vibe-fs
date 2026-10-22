@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Host
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
@@ -16,8 +17,10 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
@@ -25,7 +28,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Mission.Work
-open Wanxiangshu.Foundation.Identity
 
 /// Opaque JS-native harness for the real Manager fork tool path.
 /// Production semantics stay in ForkTool/HostForkRuntime; this surface only
@@ -41,7 +43,7 @@ module ForkToolSurface =
           Options: SessionPromptOptions }
 
     type private ForkSessionPort(abortSession: SessionId -> Task<Result<unit, string>>, existingChildIds: Set<string>) =
-        let children = ResizeArray<OpenCodeChildInfo>()
+        let children = ResizeArray<ChildSessionInfo>()
         // DSL-MUTABLE: algorithm-scratch — latest prompted session in the harness
         let mutable latestPromptedSession: SessionId option = None
         // DSL-MUTABLE: algorithm-scratch — pre-accepted prompt count in the harness
@@ -366,11 +368,13 @@ module ForkToolSurface =
             journal: AgentJournal,
             scope: ToolRuntimeScope,
             sessions: ForkSessionPort,
-            ownerAgents: Dictionary<string, string>
+            ownerAgents: Dictionary<string, string>,
+            directory: string
         ) =
         member _.Journal = journal
         member _.Scope = scope
         member _.Sessions = sessions
+        member _.Directory = directory
         member _.OwnerSession(owner: string) = SessionId.create owner
         member _.OwnerAgent(owner: string) = ownerAgents[owner]
 
@@ -566,8 +570,9 @@ module ForkToolSurface =
                 )
 
             scope.AttachCurrentProcessJoinMode "ready"
+            do! ChildWorkSettlement.settleOrphanedChildRuns journal
 
-            return box (ForkHarness(journal, scope, sessionPort, ownerAgents))
+            return box (ForkHarness(journal, scope, sessionPort, ownerAgents, directory))
         }
 
     let createRuntime (directory: string) (owners: obj) : Task<obj> =
@@ -820,16 +825,24 @@ module ForkToolSurface =
         }
         :> Task
 
-    let private captureCompletedTrace journal sessionId providerRun text : Task =
+    let private captureCompletedTrace (harness: ForkHarness) sessionId providerRun text : Task =
         task {
+            let journal = harness.Journal
             do! captureTraceText journal sessionId providerRun text
 
-            if isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value sessionId)) then
-                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordFencedView
-                    (SessionId.value sessionId)
+            let physical =
+                harness.Sessions.LatestAuthorityRoot sessionId
+                |> Option.map PhysicalUserMessageId.create
+                |> Option.defaultWith (fun () -> invalidOp "terminal delivery requires an accepted physical input")
+
+            do!
+                TerminalDeliveryProof.materialize
+                    journal
+                    harness.Directory
+                    sessionId
+                    physical
                     (ProviderRunIdentity.create providerRun)
-                    (ToolCallId.create (providerRun + "-delivery"))
-                    (Some(createObj [ "prefixUntil" ==> 0; "thenMap" ==> createObj [ "0" ==> text ] ]))
+                    text
 
             match!
                 XTraceCapture.captureTerminalTextWithReceipt
@@ -900,7 +913,7 @@ module ForkToolSurface =
             recorded.Options.Metadata
             |> Option.defaultWith (fun () -> invalidOp "Actual managed Host prompt has no correlation metadata")
 
-        let value: obj = metadata?(PromptMetadataCodec.PromptKeyField)
+        let value: obj = metadata?(PromptMetadataField.PromptKeyField)
         let isString: bool = emitJsExpr value "typeof $0 === 'string'"
 
         if not isString || String.IsNullOrWhiteSpace(unbox<string> value) then
@@ -1099,7 +1112,7 @@ module ForkToolSurface =
                 match harness.Sessions.LatestAuthorityRoot childId with
                 | None -> return false
                 | Some root ->
-                    do! captureCompletedTrace harness.Journal childId providerRun answer
+                    do! captureCompletedTrace harness childId providerRun answer
 
                     match harness.Scope.RuntimeFor(managerContext harness owner) with
                     | Error _ -> return false
@@ -1202,7 +1215,7 @@ module ForkToolSurface =
                     harness.Sessions.LatestAuthorityRoot childId
                 with
                 | Some binding, Some root ->
-                    do! captureCompletedTrace harness.Journal childId providerRun answer
+                    do! captureCompletedTrace harness childId providerRun answer
 
                     return
                         fun () ->

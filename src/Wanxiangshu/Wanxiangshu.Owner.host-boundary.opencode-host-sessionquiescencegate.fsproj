@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-neutral-ports.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-dispatch-metadata-codec.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
@@ -18,18 +19,28 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fsi"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fs"/>
+    <Compile Include="OpenCode/Host/TranscriptPort.fsi"/>
+    <Compile Include="OpenCode/Host/TranscriptPort.fs"/>
+    <Compile Include="OpenCode/Host/ModelCatalogPort.fsi"/>
+    <Compile Include="OpenCode/Host/ModelCatalogPort.fs"/>
+    <Compile Include="OpenCode/Host/DiagnosticsPort.fsi"/>
+    <Compile Include="OpenCode/Host/DiagnosticsPort.fs"/>
+    <Compile Include="OpenCode/Host/PathsPort.fsi"/>
+    <Compile Include="OpenCode/Host/PathsPort.fs"/>
     <Compile Include="OpenCode/Host/SessionSnapshotSurface.fsi"/>
     <Compile Include="OpenCode/Host/SessionSnapshotSurface.fs"/>
     <Compile Include="OpenCode/Host/SessionQuiescenceGate.fsi"/>
     <Compile Include="OpenCode/Host/SessionQuiescenceGate.fs"/>
-    <Compile Include="OpenCode/Host/ProviderAttemptStopFence.fsi"/>
-    <Compile Include="OpenCode/Host/ProviderAttemptStopFence.fs"/>
+    <Compile Include="Execution/Routing/ProviderAttemptStopFence.fsi"/>
+    <Compile Include="Execution/Routing/ProviderAttemptStopFence.fs"/>
     <Compile Include="OpenCode/Host/ProviderAttemptStopFenceSurface.fsi"/>
     <Compile Include="OpenCode/Host/ProviderAttemptStopFenceSurface.fs"/>
     <Compile Include="OpenCode/Host/QuiescenceSurface.fsi"/>
     <Compile Include="OpenCode/Host/QuiescenceSurface.fs"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fsi"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fs"/>
+    <Compile Include="Participant/Persona/AgentRole.fsi"/>
+    <Compile Include="Participant/Persona/AgentRole.fs"/>
     <Compile Include="OpenCode/Host/HostSessionContext.fsi"/>
     <Compile Include="OpenCode/Host/HostSessionContext.fs"/>
     <Compile Include="OpenCode/Host/HostBoundarySurface.fsi"/>

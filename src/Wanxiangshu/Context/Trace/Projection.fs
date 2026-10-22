@@ -851,6 +851,3 @@ module XTraceProjection =
 
     let semanticCursorAfter (cursor: XTraceCursor) (state: XTraceProjectionState) : XTraceCursor =
         semanticCursorFor (XTraceCursor.sequence cursor) state
-
-    let semanticCursorAfterCoverage (coverage: RecordCoverage) (state: XTraceProjectionState) : XTraceCursor =
-        semanticCursorAfter (RecordCoverage.ingestedThrough coverage) state

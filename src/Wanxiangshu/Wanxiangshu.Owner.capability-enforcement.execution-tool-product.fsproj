@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>authority</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-tool-product</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>capability-enforcement</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-tool-product</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-neutral-ports.fsproj"/>
+    <Compile Include="Execution/Tool/ToolResultText.fsi"/>
+    <Compile Include="Execution/Tool/ToolResultText.fs"/>
+    <Compile Include="Execution/Tool/ToolArgs.fsi"/>
+    <Compile Include="Execution/Tool/ToolArgs.fs"/>
+  </ItemGroup>
+</Project>

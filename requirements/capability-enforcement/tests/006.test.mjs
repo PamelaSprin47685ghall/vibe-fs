@@ -91,6 +91,12 @@ const HOST_UTILITY_ALLOW = ['skill']
 const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (_role) => HOST_UTILITY_ALLOW
 const cognitiveUtilityAllowFor = (_role) => COGNITIVE_UTILITY_ALLOW
+// Two distinct faces, kept apart:
+//   面 A — 宿主注册的工具面（宿主注册表 / `hooks.tool`）：`fork` / `resume` /
+//   `commission` / `devops` 四个名字都不再注册。
+//   面 B — 宿主权限目录面（`StaticTools.knownToolNames` 及其派生的权限矩阵）：
+//   `fork` / `resume` / `commission` 仍留在目录里（ToolSpec 构造器保留，委派线
+//   协议仍在），只有 `devops` 离开了权限目录。
 const ROLE_ALLOW = {
   Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
   Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
@@ -312,12 +318,21 @@ const { default: test } = await import("node:test");
 const { admissionAuthority, privateAttachmentAdmits, rolePredicate } = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
 const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js");
 
+// 面 B — the office permission catalog still names `fork` / `resume`, so they
+// stay office names in the catalog …
 const OFFICE_TOOLS = ['fetch', 'review', 'join', 'todowrite-for-devops', 'fork', 'resume']
+// … while 面 A — the Host's registered tool surface — no longer carries any of
+// the delegation verbs, so the registry resolves no authority for them.
+const HOST_REGISTERED_OFFICE_TOOLS = ['fetch', 'review', 'join', 'todowrite-for-devops']
+const RETIRED_HOST_DELEGATION_TOOLS = ['fork', 'resume', 'commission', 'devops']
 
 test('WHAT[capability-enforcement-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
   assert.equal(admissionAuthority('todowrite-for-bookkeeper'), 'private-attachment')
-  for (const tool of OFFICE_TOOLS) {
+  for (const tool of HOST_REGISTERED_OFFICE_TOOLS) {
     assert.equal(admissionAuthority(tool), 'office', `${tool} is an office tool`)
+  }
+  for (const tool of RETIRED_HOST_DELEGATION_TOOLS) {
+    assert.equal(admissionAuthority(tool), 'unknown', `${tool} is no longer a host tool`)
   }
   assert.equal(admissionAuthority('no-such-tool'), 'unknown')
 })
@@ -388,7 +403,17 @@ integrationTest('WHAT[capability-enforcement-006] HOST_013_skill_stays_host_owne
     assert.ok(terminal, 'terminal real tool result survives the transform')
     const output = terminal.parts?.[0]?.state?.output ?? ''
     assert.match(output, /^\[ANCHOR: \d+\]\0\uFEFFok1\0\uFEFF/, 'the anchored real result retains its NUL+BOM guidance suffix')
-    assert.match(output, /#/, 'suffix carries guidance bytes')
+    // The Pair Hint rides the real terminal tool result as a NUL+BOM suffix
+    // behind the tool's own bytes. The head of that content may carry the
+    // anchor marker (context-compression WHAT: `[ANCHOR: N]` + NUL + BOM at
+    // the beginning of a tool result), so the contract under test is the
+    // suffix that follows the tool body — not the offset the body starts at.
+    const separator = '\0\uFEFF'
+    const body = 'ok1'
+    const suffixAt = output.indexOf(`${body}${separator}`)
+    assert.ok(suffixAt >= 0, 'guidance travels as NUL+BOM suffix on the terminal real tool result')
+    const guidance = output.slice(suffixAt + body.length + separator.length)
+    assert.ok(guidance.trim().length > 0, 'suffix carries guidance bytes')
   })
 })
 }
@@ -443,7 +468,15 @@ integrationTest('WHAT[capability-enforcement-006] MANAGER_pair_guidance_rides_cu
     assert.ok(terminal, 'terminal real tool result survives the transform')
     const output = terminal.parts?.[0]?.state?.output ?? ''
     assert.match(output, /^\[ANCHOR: \d+\]\0\uFEFFok1\0\uFEFF/, 'the anchored real result retains its NUL+BOM guidance suffix')
-    assert.match(output, /#/, 'suffix carries guidance bytes')
+    // Same contract as the HOST-013 case: the Pair Hint rides the real
+    // terminal tool result as a NUL+BOM suffix behind the tool's own bytes,
+    // whatever marker the anchor owner may put at the head of that content.
+    const separator = '\0\uFEFF'
+    const body = 'ok1'
+    const suffixAt = output.indexOf(`${body}${separator}`)
+    assert.ok(suffixAt >= 0, 'guidance travels as NUL+BOM suffix on the terminal real tool result')
+    const guidance = output.slice(suffixAt + body.length + separator.length)
+    assert.ok(guidance.trim().length > 0, 'suffix carries guidance bytes')
     assert.equal(hooks.tool[markerToolName], undefined, 'cursor suffix borrows no plugin-registered skill name')
   })
 })

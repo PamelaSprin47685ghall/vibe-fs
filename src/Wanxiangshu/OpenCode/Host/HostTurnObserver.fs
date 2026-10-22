@@ -1,20 +1,22 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Context.Prefix.OpenCode
 open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Mission.Work
 
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
@@ -30,7 +32,10 @@ module HostTurnObserver =
         : Task<Result<unit, string>> =
         task {
             let prompt =
-                ProviderProse.documentFor source.SessionId (LoopSensor.continuationPath kind) Map.empty
+                ProviderProse.documentFor
+                    source.SessionId
+                    (Wanxiangshu.Execution.Session.LoopSensor.continuationPath kind)
+                    Map.empty
 
             let! outcome =
                 HostSessionNudge.sendContinuationResult
@@ -61,7 +66,7 @@ module HostTurnObserver =
             | _ -> sendGuardContinuation sessionPort rootWorkspace journal source kind directory observer
 
         let sensor =
-            LoopSensor.create
+            Wanxiangshu.Execution.Session.LoopSensor.create
                 scope.Sessions.OwnedSessions
                 scope.Sessions.SessionParents
                 sessionPort.InterruptAttempt
@@ -113,9 +118,25 @@ module HostTurnObserver =
         (providerRun: ProviderRunIdentity)
         : Task =
         task {
-            match scope.LoopSensor.ActiveInterruptTask(sessionId, providerRun) with
-            | None -> return ()
-            | Some owned -> do! owned
+            // DEG-OWN: the guard's own interrupt task, addressed by exact run
+            // (unchanged).
+            let guardTask = scope.LoopSensor.ActiveInterruptTask(sessionId, providerRun)
+
+            // 条款 4：「已发出」不等于「已观察到」。交付自己发起的那次中断
+            // 也是本观察者自有任务，同样按精确 run 取；两者都未发出时不等待
+            // （没有中断不得变成阻塞）。
+            let deliveryTask = DeliveryAttemptLedger.activeInterruptTask sessionId providerRun
+
+            match guardTask, deliveryTask with
+            | None, None -> return ()
+            | Some owned, None -> do! owned
+            | None, Some owned -> do! owned
+            | Some guard, Some delivery ->
+                // 同一处等待：任一自有中断任务结算即返回；结算的那个仍被
+                // await（异常不被吞掉），未结算的那个由其发起方各自结算。
+                // Fable has no Task.WhenAny; Promise.race is the established
+                // pattern (Await.fs / ToolWorkflow.fs).
+                do! (Fable.Core.JsInterop.emitJsExpr (guard, delivery) "Promise.race([$0, $1])": Task)
         }
 
     let private observeApplicationTurn
@@ -156,7 +177,23 @@ module HostTurnObserver =
                   TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
 
             let wirePort = journal |> Option.map AgentJournalPortAdapter.forWire
-            do! XWire.reconcileAttempt wirePort attempts turn
+            let! settled = XWire.reconcileAttempt wirePort attempts turn
+
+            match settled with
+            | Error reason ->
+                let! _ =
+                    scope.SyncDelegateRuntime
+                    |> Option.map (fun runtime -> runtime.ObserveAttemptSettlementFailure(turn, reason))
+                    |> Option.defaultWith (fun () -> Task.FromResult false)
+
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
+                |> ignore
+
+                raise (InvalidOperationException reason)
+            | Ok() -> ()
+
             do! TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
             let! fissionHandled =

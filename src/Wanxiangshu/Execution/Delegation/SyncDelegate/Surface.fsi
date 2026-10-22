@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// Delegation-owned opaque runtime harness. Host sessions, journal writers,
 /// attached-session state and completion turns never cross into JS; callers
@@ -32,6 +33,20 @@ module SyncDelegateSurface =
     val closeGuardRecovery: value: obj -> Task
     val observeGuardDelta: value: obj -> raw: obj -> unit
     val awaitGuardInterrupt: value: obj -> session: string -> providerRun: string -> Task
+
+    /// The session-control calls this harness's Host boundary received: every
+    /// abort and interrupt, with the session it aimed at, the provider run it
+    /// fenced and the outcome it returned. Observability only.
+    val sessionControlSnapshot: value: obj -> obj
+
+    /// Inject a refusal for the session-control calls this harness's Host
+    /// boundary receives. An empty reason clears the injection.
+    val refuseSessionControl: value: obj -> reason: string -> unit
+
+    /// Await the session-control call this harness issued for the exact
+    /// session and provider run — the interrupt the delegate child received
+    /// after its delivery.
+    val awaitDeliveryInterrupt: value: obj -> session: string -> providerRun: string -> Task
 
     val observeExactGuardAbort:
         value: obj -> session: string -> physical: string -> authorityRoot: string -> providerRun: string -> Task
@@ -120,6 +135,17 @@ module SyncDelegateSurface =
         reason: string ->
             Task<bool>
 
+    /// Drive the real Host settlement-failure entry with exact attempt identity.
+    val observeExactAttemptSettlementFailure:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        finish: string ->
+        reason: string ->
+            Task<bool>
+
     /// Settle the current managed child through the real HandleTurn path.
     val settleWithAuthorityRoot:
         value: obj ->
@@ -133,6 +159,28 @@ module SyncDelegateSurface =
     val settle: value: obj -> owner: string -> role: string -> answer: string -> runId: string -> Task<bool>
 
     val recordDeliveredValue: sessionId: string -> deliveredValue: obj -> unit
+
+    /// Execute an explicit delivery through the real workflow and durable writer.
+    val deliver:
+        value: obj ->
+        session: string ->
+        physical: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        toolCallId: string ->
+        formalText: string ->
+        reportMapping: obj ->
+            Task<string>
+
+    val deliverCurrent:
+        value: obj ->
+        owner: string ->
+        role: string ->
+        providerRun: string ->
+        toolCallId: string ->
+        formalText: string ->
+        reportMapping: obj ->
+            Task<string>
 
     val failWithAuthorityRoot:
         value: obj -> owner: string -> role: string -> reason: string -> authorityRoot: string -> Task<string>
@@ -194,8 +242,3 @@ module SyncDelegateSurface =
     /// delegation-031 probe: abandon the pending call for this delegate (parent
     /// supersede guard) so a stale completion afterwards cannot claim it.
     val abandonPendingCall: value: obj -> owner: string -> role: string -> bool
-
-    val stageDeferredInspection:
-        sessionId: string -> callId: string -> charge: string -> keywords: string -> estimate: int option -> string
-
-    val applyReplacedResults: messages: obj list -> obj list

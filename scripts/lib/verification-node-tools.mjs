@@ -7,6 +7,7 @@ import { runVerificationToolProbe } from './verification-tool-probe.mjs'
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 const invalidEntry = message => Object.assign(new Error(message), { code: 'verification-tool-entry-invalid' })
+const deadlineFailure = deadline => Object.assign(new Error('The selected tool probe deadline expired'), { code: 'verification-tool-deadline-exceeded', deadline })
 
 function requireRolePath(relativePath, prefix) {
   if (typeof relativePath !== 'string' || !relativePath.startsWith(`${prefix}/`) || relativePath.split('/').some(segment => !segment || segment === '.' || segment === '..' || segment.includes('\\'))) {
@@ -167,8 +168,9 @@ function privateEnvironment(root) {
   }
 }
 
-export async function prepareVerificationNodeTools({ archivePath, archiveSha256, parentDirectory, nodePath = 'toolchain/node/bin/node', npmCliPath = 'toolchain/npm/bin/npm-cli.js', signal }) {
+export async function prepareVerificationNodeTools({ archivePath, archiveSha256, parentDirectory, nodePath = 'toolchain/node/bin/node', npmCliPath = 'toolchain/npm/bin/npm-cli.js', signal, probeScope }) {
   signal?.throwIfAborted()
+  if (probeScope !== undefined && typeof probeScope !== 'function') throw new TypeError('The selected tool probe scope must be a function')
   requireRolePath(nodePath, 'toolchain')
   requireRolePath(npmCliPath, 'toolchain/npm')
   const archiveBytes = fs.readFileSync(archivePath)
@@ -192,21 +194,80 @@ export async function prepareVerificationNodeTools({ archivePath, archiveSha256,
     validateDeclaredNpmLibraries(candidate)
     probeOwner = allocateVerificationDirectory(parentDirectory, 'verification-tool-probe-', invalidEntry)
     probeRoot = probeOwner.root
-    const options = { cwd: candidate.root, env: privateEnvironment(probeRoot), signal }
+    const environment = privateEnvironment(probeRoot)
     const nodeExecutable = path.join(candidate.root, nodePath)
-    const runtimeOutput = await runVerificationToolProbe(nodeExecutable, ['--input-type=module', '-e', 'console.log(JSON.stringify({ version: process.version, platform: process.platform, arch: process.arch }))'], options)
-    probeOwner.assertOwned()
-    candidate.revalidate()
     let runtime
-    try {
-      runtime = JSON.parse(runtimeOutput)
-    } catch (cause) {
-      throw Object.assign(invalidEntry('Selected Node must report its actual runtime identity'), { cause })
+    let npmVersion
+    const runProbes = async (deadline, probeSignal) => {
+      const options = { cwd: candidate.root, env: environment, signal: probeSignal, deadline }
+      const runtimeOutput = await runVerificationToolProbe(nodeExecutable, ['--input-type=module', '-e', 'console.log(JSON.stringify({ version: process.version, platform: process.platform, arch: process.arch }))'], options)
+      probeOwner.assertOwned()
+      candidate.revalidate()
+      if (deadline !== undefined && Date.now() >= deadline) throw deadlineFailure(deadline)
+      try {
+        runtime = JSON.parse(runtimeOutput)
+      } catch (cause) {
+        throw Object.assign(invalidEntry('Selected Node must report its actual runtime identity'), { cause })
+      }
+      if (typeof runtime?.version !== 'string' || !/^v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(runtime.version) || typeof runtime.platform !== 'string' || !runtime.platform || typeof runtime.arch !== 'string' || !runtime.arch) throw invalidEntry('Selected Node must report a valid runtime identity')
+      npmVersion = await runVerificationToolProbe(nodeExecutable, [path.join(candidate.root, npmCliPath), '--version'], options)
+      probeOwner.assertOwned()
+      candidate.revalidate()
+      if (deadline !== undefined && Date.now() >= deadline) throw deadlineFailure(deadline)
     }
-    if (typeof runtime?.version !== 'string' || !/^v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(runtime.version) || typeof runtime.platform !== 'string' || !runtime.platform || typeof runtime.arch !== 'string' || !runtime.arch) throw invalidEntry('Selected Node must report a valid runtime identity')
-    const npmVersion = await runVerificationToolProbe(nodeExecutable, [path.join(candidate.root, npmCliPath), '--version'], options)
-    probeOwner.assertOwned()
-    candidate.revalidate()
+    if (probeScope === undefined) {
+      await runProbes(undefined, signal)
+    } else {
+      const controller = new AbortController()
+      const probeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+      let invocation
+      let attempted = false
+      let settled = false
+      let open = true
+      let scopeFailure
+      const run = options => {
+        if (!open || attempted) {
+          const error = invalidEntry('The selected tool probe scope must start its operation exactly once')
+          scopeFailure ??= { error }
+          controller.abort(scopeFailure.error)
+          throw error
+        }
+        attempted = true
+        try {
+          const deadline = options?.deadline
+          if (!Number.isSafeInteger(deadline)) throw new TypeError('The selected tool probe scope requires an absolute safe-integer deadline')
+          if (Date.now() >= deadline) throw deadlineFailure(deadline)
+          probeSignal.throwIfAborted()
+          probeOwner.assertOwned()
+          candidate.revalidate()
+          if (Date.now() >= deadline) throw deadlineFailure(deadline)
+          invocation = runProbes(deadline, probeSignal)
+          invocation.then(() => { settled = true }, () => { settled = true })
+          return invocation
+        } catch (error) {
+          scopeFailure ??= { error }
+          throw error
+        }
+      }
+      try {
+        const scoped = probeScope('selected Node runtime and npm identity probes', run)
+        if (scoped !== null && (typeof scoped === 'object' || typeof scoped === 'function') && typeof scoped.then === 'function') await scoped
+      } catch (error) {
+        scopeFailure ??= { error }
+      } finally {
+        open = false
+      }
+      if (!scopeFailure && (invocation === undefined || !settled)) scopeFailure = { error: invalidEntry('The selected tool probe scope must await its actual operation') }
+      if (scopeFailure) controller.abort(scopeFailure.error)
+      if (invocation !== undefined) {
+        const [outcome] = await Promise.allSettled([invocation])
+        if (outcome.status === 'rejected') {
+          if (scopeFailure && scopeFailure.error !== outcome.reason) throw new AggregateError([scopeFailure.error, outcome.reason], 'Tool probe scope and owned operation failed', { cause: scopeFailure.error })
+          throw outcome.reason
+        }
+      }
+      if (scopeFailure) throw scopeFailure.error
+    }
     if (npmVersion !== manifest.version) throw invalidEntry('Actual npm version differs from the selected package manifest')
     signal?.throwIfAborted()
     probeOwner.dispose()

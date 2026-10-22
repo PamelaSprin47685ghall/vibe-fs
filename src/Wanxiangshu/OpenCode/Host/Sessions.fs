@@ -1,5 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Routing
+
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -68,21 +74,11 @@ module ManagedSessionTermination =
 type InjectedSessionPort
     (
         underlyingPort: IOpenCodePort option,
-        eventPort: IEventObservationPort,
+        terminalSource: ISessionTerminalSource,
         ?familyParent: SessionId -> SessionId option,
         ?isLifecycleTerminated: SessionId -> bool,
         ?isUserQuestionWaiting: SessionId -> bool
     ) =
-    // DSL-MUTABLE: resource — active terminal listener registry per session
-    let activeListeners = Dictionary<SessionId, HashSet<Guid>>()
-
-    let removeActiveListenerToken sessionId token =
-        match activeListeners.TryGetValue sessionId with
-        | true, listeners ->
-            listeners.Remove token |> ignore
-            listeners.Count = 0
-        | false, _ -> false
-
     // DSL-MUTABLE: resource — parent-to-child session set map
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()
     // DSL-MUTABLE: resource — child-to-parent session map
@@ -300,7 +296,7 @@ type InjectedSessionPort
         (port: IOpenCodePort)
         (sessionId: SessionId)
         (text: string)
-        (sendOptions: OpenCodePromptOptions)
+        (sendOptions: SessionPromptOptions)
         =
         // Pass the outcome through unchanged. This layer knows less about
         // acceptance than the port does; execution identity is handed off by
@@ -342,7 +338,7 @@ type InjectedSessionPort
     let createSiblingSession
         (ownerSessionId: SessionId)
         (physicalParentId: SessionId option)
-        (options: OpenCodeChildOptions)
+        (options: ChildSessionOptions)
         =
         taskResult {
             let! port =
@@ -353,7 +349,7 @@ type InjectedSessionPort
             return! bindSiblingLane port ownerSessionId laneId options.Agent
         }
 
-    let createChildSession (parentId: SessionId) (options: OpenCodeChildOptions) =
+    let createChildSession (parentId: SessionId) (options: ChildSessionOptions) =
         taskResult {
             let! port =
                 underlyingPort
@@ -416,68 +412,13 @@ type InjectedSessionPort
         member _.AbortChildren(parentId) = abortChildren parentId
 
         member me.SubscribeTerminal(sessionId, listener) =
-            let token = Guid.NewGuid()
-
-            lock lockObj (fun () ->
-                let listeners =
-                    match activeListeners.TryGetValue sessionId with
-                    | true, current -> current
-                    | false, _ ->
-                        // DSL-MUTABLE: algorithm-scratch — local created set for batch replay
-                        let created = HashSet<Guid>()
-                        activeListeners.[sessionId] <- created
-                        created
-
-                listeners.Add token |> ignore)
-
-            let sub =
-                eventPort.SubscribeTerminalListener(fun sId outcome ->
-                    if sId = sessionId then
-                        listener sId outcome)
-
-            { new IDisposable with
-                member _.Dispose() =
-                    sub.Dispose()
-
-                    lock lockObj (fun () ->
-                        if removeActiveListenerToken sessionId token then
-                            activeListeners.Remove(sessionId) |> ignore) }
+            terminalSource.SubscribeTerminal(sessionId, listener)
 
         member me.SubscribeFutureTerminal(sessionId, listener) =
-            let token = Guid.NewGuid()
-
-            lock lockObj (fun () ->
-                let listeners =
-                    match activeListeners.TryGetValue sessionId with
-                    | true, current -> current
-                    | false, _ ->
-                        let created = HashSet<Guid>()
-                        activeListeners.[sessionId] <- created
-                        created
-
-                listeners.Add token |> ignore)
-
-            let sub =
-                eventPort.SubscribeFutureTerminalListener(fun sId outcome ->
-                    if sId = sessionId then
-                        listener sId outcome)
-
-            { new IDisposable with
-                member _.Dispose() =
-                    sub.Dispose()
-
-                    lock lockObj (fun () ->
-                        if removeActiveListenerToken sessionId token then
-                            activeListeners.Remove(sessionId) |> ignore) }
+            terminalSource.SubscribeFutureTerminal(sessionId, listener)
 
         member me.SendPrompt(sessionId, text, opts) =
-            let hasListener =
-                lock lockObj (fun () ->
-                    match activeListeners.TryGetValue sessionId with
-                    | true, listeners -> listeners.Count > 0
-                    | false, _ -> false)
-
-            if not hasListener then
+            if not (terminalSource.HasSubscriber sessionId) then
                 // Fatal, not Retryable: the listener is registered by the caller
                 // before it sends, so this is a call-order defect. Retrying the
                 // same wrong order cannot fix it.

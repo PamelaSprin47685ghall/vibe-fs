@@ -1,5 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Threading.Tasks
 open System.Collections.Generic
@@ -34,17 +38,6 @@ module PluginHost =
     [<Import("pid", "node:process")>]
     let processId: int = jsNative
 
-    let private nonBlankDirectory (directory: string) : string option =
-        if String.IsNullOrWhiteSpace directory then
-            None
-        else
-            Some directory
-
-    let workspaceDirectory (input: obj) : string option =
-        if isNull input || isNull input?directory then
-            None
-        else
-            input?directory |> unbox<string> |> nonBlankDirectory
 
     let private semanticUnavailable reason : Result<AgentJournal option, string> =
         Diagnostic.emit "journal-semantic-unavailable" [ "result", reason ]
@@ -82,12 +75,14 @@ module PluginHost =
     /// Load may read durable bytes, but it never repairs semantic state. Physical
     /// corruption is a load error; a domain fold rejection only disables the journal
     /// capability for this plugin instance.
-    let createJournal (input: obj) : Task<Result<AgentJournal option, string>> =
-        match workspaceDirectory input with
+    let createJournal (workspaceDirectory: string option) : Task<Result<AgentJournal option, string>> =
+        match workspaceDirectory with
         | None -> Task.FromResult(Ok None)
         | Some workspace -> createWorkspaceJournal workspace
 
+
     let createHost
+        (workspaceDirectory: string option)
         (input: obj)
         (portOpt: IOpenCodePort option)
         (familyParent: (SessionId -> SessionId option) option)
@@ -99,7 +94,7 @@ module PluginHost =
                   ISessionHostPort *
                   ISessionSnapshotPort option *
                   string option *
-                  Events.HostEventPort option,
+                  ISessionTerminalSource option,
                   string
                >
            >
@@ -108,25 +103,31 @@ module PluginHost =
             // Completion/output port is process-local per workspace runtime path so
             // root + worktree plugin instances share AwaitAgent / NotifyTerminal.
             // Host SSE remains only a coarse idle/retry/deleted signal source.
-            let! shared = SharedTerminalBus.tryAcquireForWorkspace (workspaceDirectory input)
+            // The terminal facts and their subscribers are the product's; the
+            // adapter only forwards to them. The workspace-shared source is
+            // the first registry of that workspace, so the root and worktree
+            // plugin instances share one terminal truth.
+            let candidate = Events.newTerminalSource ()
+            let! shared = SharedTerminalBus.tryAcquireForWorkspace workspaceDirectory candidate
 
-            let hostEventPort, terminalKey =
+            let terminalSource, terminalKey =
                 match shared with
-                | Some(key, port) -> port, Some key
-                | None -> Events.HostEventPort(), None
+                | Some(key, source) -> source, Some key
+                | None -> candidate, None
 
+            let hostEventPort = Events.HostEventPort(terminalSource)
             let eventPort = hostEventPort :> IEventObservationPort
 
             let sessionPort =
                 InjectedSessionPort(
                     portOpt,
-                    eventPort,
+                    hostEventPort :> ISessionTerminalSource,
                     ?familyParent = familyParent,
                     ?isLifecycleTerminated = isLifecycleTerminated,
                     ?isUserQuestionWaiting = isUserQuestionWaiting
                 )
 
-            let snapshotPort = SessionSnapshotPort.create input
+            let snapshotPort = SessionSnapshotPort.create workspaceDirectory input
 
-            return Ok(eventPort, sessionPort :> ISessionHostPort, snapshotPort, terminalKey, Some hostEventPort)
+            return Ok(eventPort, sessionPort :> ISessionHostPort, snapshotPort, terminalKey, Some terminalSource)
         }

@@ -7,6 +7,7 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-delivery-attempt-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj"/>
@@ -42,7 +43,5 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
     <Compile Include="OpenCode/Tools/ToolRuntimeScope.fsi"/>
     <Compile Include="OpenCode/Tools/ToolRuntimeScope.fs"/>
-    <Compile Include="OpenCode/Tools/ToolRuntimeScopeSurface.fsi"/>
-    <Compile Include="OpenCode/Tools/ToolRuntimeScopeSurface.fs"/>
   </ItemGroup>
 </Project>

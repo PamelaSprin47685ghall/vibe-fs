@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import * as intent from '../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as intent from '../../../dist/Interaction/Admission/ChatAdmissionIntentSurface.js'
 import { withJournal, acceptOwner, hostPort } from './support/authority.mjs'
 
 test('WHAT[interaction-authority-002] identical identifier text grants different authority only through typed receipt or physical evidence', async () => {
@@ -11,6 +12,13 @@ test('WHAT[interaction-authority-002] identical identifier text grants different
     const seed = authority.issueInheritedIdentitySeed('engineer', owner)
     assert.equal(seed.ok, true)
     for (const [session, makeOutcome] of [['receipt', dispatch.admittedWithReceipt], ['physical', dispatch.admittedWithPhysicalMessage]]) {
+      const linked = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session: owner.session }, null, {
+        family: 'Execution', case: 'HandleLinked', payload: {
+          ParentSessionId: owner.session, ChildSessionId: session, Handle: session,
+          TargetAgent: 'engineer', CanonicalRole: 'engineer', Ownership: 'DurableParentHandle',
+        },
+      })
+      assert.equal(linked.ok, true, JSON.stringify(linked.error))
       const sent = await dispatch.sendAgentOwnerRootAwait(hostPort(async () => makeOutcome('accepted-same-text')), handle, session, 'same body', seed.value)
       assert.equal(sent.ok, true, sent.error)
     }

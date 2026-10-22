@@ -384,36 +384,38 @@ module ProcessEventLog =
                 segmentCapState.Override <- previous
         }
 
-    let private segmentFileOf (writerId: string) (ordinal: int) =
-        writerId + "-" + (sprintf "%04d" ordinal) + ".ndjson"
+    /// durable-events-005/014: writer segment naming and grouping has one
+    /// owner, wanxiangli/segments (CUT-19): `<WriterId>-dddd.ndjson` with
+    /// exactly four ASCII digits, ordinals 0..9999, contiguous-series
+    /// grouping and the legacy/segment layout verdict. This log only lists
+    /// the directory and moves bytes.
+    [<Import("WriterSegments", "wanxiangli/segments")>]
+    let private segmentsClass: obj = jsNative
 
-    let private legacyFileOf (writerId: string) = writerId + ".ndjson"
+    let private segmentLaw: obj = constructRetention segmentsClass
 
-    let private endsWithSegmentSuffix (writerId: string) =
-        writerId.Length >= 5
-        && writerId.[writerId.Length - 5] = '-'
-        && writerId.Substring(writerId.Length - 4) |> Seq.forall Char.IsDigit
+    /// Throws instead of spelling a five-digit name that would read back as
+    /// another writer.
+    let private segmentFileOf (writerId: string) (ordinal: int) : string =
+        unbox<string> (segmentLaw?segmentFileName (writerId, ordinal))
 
-    /// durable-events-005: a writer file name is a segment name when it ends
-    /// with a hyphen, exactly four digits, and the .ndjson suffix.
-    let private isSegmentFileName (name: string) =
-        name.Length >= 12
-        && name.EndsWith(".ndjson", StringComparison.Ordinal)
-        && name.[name.Length - 12] = '-'
-        && name.Substring(name.Length - 11, 4) |> Seq.forall Char.IsDigit
+    let private legacyFileOf (writerId: string) : string =
+        unbox<string> (segmentLaw?legacyFileName writerId)
 
-    let private ordinalOfSegmentFileName (name: string) =
-        Int32.Parse(name.Substring(name.Length - 11, 4))
+    let private ordinalOfSegmentFileName (name: string) : int =
+        let parsed: obj = segmentLaw?parseSegmentFileName name
+
+        if isNull parsed then
+            invalidArg "name" (sprintf "not a segment file name: %s" name)
+        else
+            unbox<int> parsed?ordinal
 
     let private safeWriterId (writerId: string) =
-        if String.IsNullOrWhiteSpace writerId then
-            invalidArg "writerId" "WriterId is required"
-        elif writerId.IndexOfAny([| '/'; '\\' |]) >= 0 || writerId = "." || writerId = ".." then
-            invalidArg "writerId" "WriterId must be one path segment"
-        elif endsWithSegmentSuffix writerId then
-            invalidArg "writerId" "WriterId must not end with a hyphen and four digits"
-        else
-            writerId
+        match unbox<string> (segmentLaw?writerIdFault writerId) with
+        | null -> writerId
+        | "required" -> invalidArg "writerId" "WriterId is required"
+        | "pathSegment" -> invalidArg "writerId" "WriterId must be one path segment"
+        | _ -> invalidArg "writerId" "WriterId must not end with a hyphen and four digits"
 
     let createWithSegmentCap (commonDir: string) (writerId: string) (segmentCap: int) : ProcessEventLog =
         if String.IsNullOrWhiteSpace commonDir then
@@ -486,12 +488,7 @@ module ProcessEventLog =
         if not (existsSync directory) then
             []
         else
-            readdirSync directory
-            |> Array.filter (fun name ->
-                isSegmentFileName name
-                && name.StartsWith(writerId + "-", StringComparison.Ordinal)
-                && name.Length = writerId.Length + 12)
-            |> Array.sort
+            unbox<string array> (segmentLaw?seriesOf (writerId, readdirSync directory))
             |> Array.toList
 
     let private fallbackTargetOf (commonDir: string) (writerId: string) : string =
@@ -585,40 +582,20 @@ module ProcessEventLog =
         | Ok "" -> Ok PhysicalAppendCompletion.NoAppend
         | Ok text -> appendEncoded log text
 
-    let private decodeWriterLine (label: string) (line: string) : Result<EventEnvelope, StorageInvalid> =
-        if String.IsNullOrEmpty line then
-            Error(StorageInvalid.NonCanonical(sprintf "writer file contains empty interior line: %s" label))
-        else
-            CanonicalEventCodec.tryDecode (line + "\n")
-
-    let private decodeWriterLines (label: string) (lines: string[]) : Result<EventEnvelope list, StorageInvalid> =
-        // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with writer history length.
-        let mutable acc: EventEnvelope list = []
-        let mutable failure: StorageInvalid option = None
-        // DSL-MUTABLE: algorithm-scratch — writer-line cursor
-        let mutable index = 0
-
-        let advance () =
-            match decodeWriterLine label lines.[index] with
-            | Ok envelope ->
-                acc <- envelope :: acc
-                index <- index + 1
-            | Error invalid -> failure <- Some invalid
-
-        while index < lines.Length - 1 && failure.IsNone do
-            advance ()
-
-        match failure with
-        | Some invalid -> Error invalid
-        | None -> Ok(List.rev acc)
-
+    /// durable-events-005/014: writer stream framing (non-empty text ends in LF, no
+    /// empty interior line) and per-line canonical decode are wanxiangli/segments
+    /// `decodeStream` (CUT-19-a); this keeps only the StorageInvalid projection.
     let decodeWriterText (label: string) (text: string) : Result<EventEnvelope list, StorageInvalid> =
-        if String.IsNullOrEmpty text then
-            Ok []
-        elif not (text.EndsWith("\n", StringComparison.Ordinal)) then
-            Error(StorageInvalid.NonCanonical(sprintf "writer file has incomplete trailing line: %s" label))
+        let outcome: obj = segmentLaw?decodeStream (label, text)
+
+        if unbox<bool> outcome?ok then
+            Ok(
+                unbox<obj array> outcome?events
+                |> Array.map CanonicalEventCodec.ofLibraryEvent
+                |> Array.toList
+            )
         else
-            decodeWriterLines label (text.Split('\n'))
+            Error(CanonicalEventCodec.invalidOfLibraryError outcome?error)
 
     let decodeWriterBytes (label: string) (bytes: byte[]) : Result<EventEnvelope list, StorageInvalid> =
         CanonicalEventCodec.tryDecodeUtf8Text bytes
@@ -824,186 +801,121 @@ module ProcessEventLog =
         |> Option.map (fun size -> withReadFd path (fun ex -> Error ex.Message) (readLastLineFromFd path size))
         |> Option.defaultValue (Ok None)
 
-    type private TailActivity =
-        | JournalActivity of float
-        | ProjectionCutTail
-        | NoDurableActivity
+    [<Emit("({ [Symbol.iterator]() { return { next: $0 } } })")>]
+    let private iterableOfNext (next: unit -> obj) : obj = jsNative
 
-    let private classifyTailActivity (line: string) =
-        let verdict: obj = retention?classifyTail (line)
+    /// Where the reverse line reader stands: the open file and the LF that ends
+    /// the next line to supply, or not yet inside a file.
+    type private TailCursor =
+        | BetweenFiles
+        | InsideFile of fd: int * path: string * lineEnd: int
 
-        match string verdict?kind with
-        | "observed" -> TailActivity.JournalActivity(unbox<float> verdict?observedAtMs)
-        | "cutTail" -> TailActivity.ProjectionCutTail
-        | _ -> TailActivity.NoDurableActivity
-
-    type private TailSearch =
-        | SearchBefore of int
-        | TailCutTailExhausted
-        | TailResolved of float option
-
-    let private decideTailSearch (line: TailLine) =
-        match classifyTailActivity line.Text with
-        | TailActivity.JournalActivity observedAt -> TailResolved(Some observedAt)
-        | TailActivity.ProjectionCutTail when line.Start > 0 -> SearchBefore(line.Start - 1)
-        | TailActivity.ProjectionCutTail -> TailCutTailExhausted
-        | TailActivity.NoDurableActivity -> TailResolved None
-
-    let private advanceTailSearch fd path lineEnd =
-        readCompleteLineBefore fd path lineEnd
-        |> Result.map decideTailSearch
-        |> Result.defaultValue (TailResolved None)
-
-    type private FileTailOutcome =
-        | FileTailActivity of float
-        | FileTailCutTailChain
-        | FileTailNoDurable
-
-    let private findDurableActivity fd path lineEnd =
-        // DSL-MUTABLE: algorithm-scratch — finite reverse scan verdict.
-        let mutable search = SearchBefore lineEnd
-
-        let isSearching () =
-            match search with
-            | SearchBefore _ -> true
-            | _ -> false
-
-        let advance () =
-            let cursor =
-                match search with
-                | SearchBefore value -> value
-                | _ -> 0
-
-            search <- advanceTailSearch fd path cursor
-
-        while isSearching () do
-            advance ()
-
-        match search with
-        | TailResolved(Some observedAt) -> FileTailActivity observedAt
-        | TailResolved None -> FileTailNoDurable
-        | TailCutTailExhausted -> FileTailCutTailChain
-        | SearchBefore _ -> FileTailNoDurable
-
-    let private durableActivityFromFd path size fd =
-        let trailing = readExactAt fd (size - 1) 1
-
-        if trailing.[0] = 10uy then
-            findDurableActivity fd path (size - 1)
-        else
-            FileTailNoDurable
-
-    /// Journal envelopes carry their producer observation time in durable
-    /// bytes. A trailing ProjectionCutTail is integrator metadata for the
-    /// immediately preceding fact, so it does not advance process activity by
-    /// itself; the scan may walk backwards across the whole file and, for a
-    /// segment series, into the previous segment (durable-events-005).
-    let private scanFileTail (path: string) : FileTailOutcome =
-        nonEmptyFileSize path
-        |> Option.map (fun size -> withReadFd path (fun _ -> FileTailNoDurable) (durableActivityFromFd path size))
-        |> Option.defaultValue FileTailNoDurable
-
-    /// durable-convergence-011: the writer's activity is the durable Journal
-    /// observation at the logical-stream tail (highest segment first); a
-    /// trailing ProjectionCutTail chain may walk back across segment
-    /// boundaries. Only when no durable activity exists does the
-    /// producer-side file mtime speak, and the newest file wins.
+    /// durable-convergence-011: which tail line speaks for a writer's activity
+    /// (a Journal `ObservedAt`, walking back past `ProjectionCutTail` lines,
+    /// across segment seams; anything else means no durable activity) is
+    /// wanxiangli/retention `lastActivity` (CUT-19). This log only supplies
+    /// complete lines newest first, lazily, reading O(line bytes) per pull, and
+    /// stops supplying where the physical read can no longer speak: an empty
+    /// file, an incomplete trailing line, an empty or non-UTF-8 line, or a read
+    /// failure. Only when no durable activity exists does the producer-side
+    /// file mtime speak, and the newest file wins.
     let private writerActivityOf (paths: string list) : float =
-        let rec scanDescending remaining =
-            match remaining with
-            | [] -> None
-            | path :: tail -> scanPastTail path tail
+        // DSL-MUTABLE: resource — read fds opened lazily for this one lookup; all closed below.
+        let opened = ResizeArray<int>()
+        // DSL-MUTABLE: algorithm-scratch — remaining files, newest first.
+        let mutable files = List.rev paths
+        // DSL-MUTABLE: algorithm-scratch — reverse line cursor.
+        let mutable cursor = TailCursor.BetweenFiles
+        // DSL-MUTABLE: algorithm-scratch — once the physical read stops speaking it never resumes.
+        let mutable stopped = false
 
-        and scanPastTail (path: string) (tail: string list) =
-            match scanFileTail path with
-            | FileTailActivity observedAt -> Some observedAt
-            | FileTailCutTailChain -> scanDescending tail
-            | FileTailNoDurable -> None
+        let stop () =
+            stopped <- true
+            None
 
-        match scanDescending (List.rev paths) with
-        | Some observedAt -> observedAt
-        | None -> paths |> List.map (fun path -> statSync path |> fileActivityMs) |> List.max
+        let enterSizedFile path size =
+            let fd = openSync path "r"
+            opened.Add fd
 
-    let private writerFileNames commonDir =
+            let endsWithLf =
+                tryPhysical (fun () -> (readExactAt fd (size - 1) 1).[0] = 10uy) (fun _ -> false)
+
+            if endsWithLf then
+                cursor <- TailCursor.InsideFile(fd, path, size - 1)
+                Some()
+            else
+                stop ()
+
+        let enterFile path =
+            match nonEmptyFileSize path with
+            | None -> stop ()
+            | Some size -> enterSizedFile path size
+
+        let enterNextFile () =
+            match files with
+            | [] -> stop ()
+            | path :: rest ->
+                files <- rest
+                enterFile path
+
+        let cursorBefore fd path (lineStart: int) =
+            if lineStart > 0 then
+                TailCursor.InsideFile(fd, path, lineStart - 1)
+            else
+                closeSync fd
+                opened.Remove fd |> ignore
+                TailCursor.BetweenFiles
+
+        let readLineBefore fd path lineEnd : string option =
+            match tryPhysical (fun () -> readCompleteLineBefore fd path lineEnd) (fun ex -> Error ex.Message) with
+            | Error _ -> stop ()
+            | Ok line ->
+                cursor <- cursorBefore fd path line.Start
+                Some line.Text
+
+        let rec pull () : string option =
+            match stopped, cursor with
+            | true, _ -> None
+            | false, TailCursor.BetweenFiles -> enterNextFile () |> Option.bind pull
+            | false, TailCursor.InsideFile(fd, path, lineEnd) -> readLineBefore fd path lineEnd
+
+        let next () : obj =
+            match pull () with
+            | Some line -> createObj [ "done" ==> false; "value" ==> line ]
+            | None -> createObj [ "done" ==> true ]
+
+        let verdict: obj =
+            try
+                retention?lastActivity (iterableOfNext next)
+            finally
+                opened |> Seq.iter (fun fd -> closeSync fd)
+
+        if isNull verdict then
+            paths |> List.map (fun path -> statSync path |> fileActivityMs) |> List.max
+        else
+            unbox<float> verdict
+
+    /// durable-events-005/014: one writer's physical files grouped by
+    /// WriterId (wanxiangli/segments `groupWriterFiles`). A tail `-dddd` name
+    /// joins its prefix's segment series only when the ordinals are
+    /// contiguous from 0000; otherwise the file is a legacy suffixless single
+    /// file under its full stem. A legacy file and its segment series may
+    /// coexist only as an interrupted reorganization or import intermediate.
+    type private WriterFileGroup =
+        { WriterId: string
+          FileNames: string list }
+
+    let private writerFileGroups (commonDir: string) : WriterFileGroup list =
         let directory = eventsDirectory commonDir
 
         if not (existsSync directory) then
             []
         else
-            readdirSync directory
-            |> Array.filter (fun name -> name.EndsWith(".ndjson", StringComparison.Ordinal))
-            |> Array.sort
+            unbox<obj array> (segmentLaw?groupWriterFiles (readdirSync directory))
             |> Array.toList
-
-    /// durable-events-005/014: one writer's physical files grouped by
-    /// WriterId. A tail `-dddd` name joins its prefix's segment series only
-    /// when the ordinals are contiguous from 0000; otherwise the file is a
-    /// legacy suffixless single file under its full stem. A legacy file and
-    /// its segment series may coexist only as an interrupted reorganization
-    /// or import intermediate.
-    type private WriterFileGroup =
-        { WriterId: string
-          FileNames: string list }
-
-    let private stemOfFileName (name: string) =
-        name.Substring(0, name.Length - ".ndjson".Length)
-
-    let private parseSegmentTail (stem: string) : (string * int) option =
-        let splitAt = stem.Length - 5
-        let tail = stem.Substring(splitAt)
-
-        if tail.[0] = '-' && tail.Substring(1) |> Seq.forall Char.IsDigit then
-            Some(stem.Substring(0, splitAt), Int32.Parse(tail.Substring(1)))
-        else
-            None
-
-    let private parseSegmentStem (stem: string) : (string * int) option =
-        if stem.Length >= 6 then parseSegmentTail stem else None
-
-    let private contiguousSegmentGroups (names: string list) =
-        names
-        |> List.choose (fun name ->
-            parseSegmentStem (stemOfFileName name)
-            |> Option.map (fun (writerId, ordinal) -> writerId, ordinal, name))
-        |> List.groupBy (fun (writerId, _, _) -> writerId)
-        |> List.map (fun (writerId, entries) ->
-            let ordinals = entries |> List.map (fun (_, ordinal, _) -> ordinal) |> Set.ofList
-            let highest = Set.maxElement ordinals
-
-            let contiguous =
-                [ 0..highest ] |> List.forall (fun ordinal -> Set.contains ordinal ordinals)
-
-            writerId, entries, contiguous)
-        |> List.filter (fun (_, _, contiguous) -> contiguous)
-        |> List.map (fun (writerId, entries, _) ->
-            { WriterId = writerId
-              FileNames = entries |> List.map (fun (_, _, name) -> name) })
-
-    let private legacyGroupsOf (names: string list) (segmentWriters: Set<string>) =
-        names
-        |> List.filter (fun name ->
-            match parseSegmentStem (stemOfFileName name) with
-            | None -> true
-            | Some(writerId, _) -> not (Set.contains writerId segmentWriters))
-        |> List.map (fun name ->
-            { WriterId = stemOfFileName name
-              FileNames = [ name ] })
-
-    let private writerFileGroups (commonDir: string) : WriterFileGroup list =
-        let names = writerFileNames commonDir
-        let segments = contiguousSegmentGroups names
-
-        let segmentWriters =
-            segments |> List.map (fun group -> group.WriterId) |> Set.ofList
-
-        let legacy = legacyGroupsOf names segmentWriters
-
-        (segments @ legacy)
-        |> List.groupBy (fun group -> group.WriterId)
-        |> List.map (fun (writerId, parts) ->
-            { WriterId = writerId
-              FileNames = parts |> List.collect (fun part -> part.FileNames) |> List.sort })
-        |> List.sortBy (fun group -> group.WriterId)
+            |> List.map (fun group ->
+                { WriterId = unbox<string> group?writerId
+                  FileNames = unbox<string array> group?fileNames |> Array.toList })
 
     let writerPhysicalMetadata (commonDir: string) : WriterPhysicalMetadata list =
         writerFileGroups commonDir
@@ -1116,17 +1028,19 @@ module ProcessEventLog =
             |> Result.map (fun copied -> (segments |> List.map (fun name -> name, 0)) @ [ legacyFile, copied ])
 
     let private logicalStreamFiles (commonDir: string) (group: WriterFileGroup) : Result<(string * int) list, string> =
-        let directory = eventsDirectory commonDir
+        let layout: obj =
+            segmentLaw?streamLayout (
+                createObj [ "writerId" ==> group.WriterId; "fileNames" ==> List.toArray group.FileNames ]
+            )
 
-        let legacy =
-            group.FileNames |> List.filter (fun name -> not (isSegmentFileName name))
+        let segmentNames () =
+            unbox<string array> layout?segments |> Array.toList
 
-        let segments = group.FileNames |> List.filter isSegmentFileName |> List.sort
-
-        match legacy, segments with
-        | [], files -> Ok(files |> List.map (fun name -> name, 0))
-        | [ legacyFile ], [] -> Ok [ legacyFile, 0 ]
-        | [ legacyFile ], _ -> coexistingFormsOf directory group.WriterId legacyFile segments
+        match unbox<string> layout?kind with
+        | "segments" -> Ok(segmentNames () |> List.map (fun name -> name, 0))
+        | "legacy" -> Ok [ unbox<string> layout?legacy, 0 ]
+        | "coexisting" ->
+            coexistingFormsOf (eventsDirectory commonDir) group.WriterId (unbox<string> layout?legacy) (segmentNames ())
         | _ -> Error(sprintf "multiple legacy files for one writer: %s" group.WriterId)
 
     /// durable-events-005: split canonical text into segment-sized chunks at
@@ -1297,15 +1211,8 @@ module ProcessEventLog =
         | 0 -> tailName
         | _ -> segmentFileOf writerId (ordinalOfSegmentFileName tailName + index)
 
-    let private appendLegacyPiece
-        (directory: string)
-        (writerId: string)
-        (tailName: string)
-        (index: int)
-        (piece: string)
-        : unit =
+    let private appendLegacyPiece (directory: string) (fileName: string) (piece: string) : unit =
         if piece.Length > 0 then
-            let fileName = fileNameForPiece tailName writerId index
             let path = join2 directory fileName
             AppendAllText path piece "utf8"
             durabilityBarrier path
@@ -1332,8 +1239,13 @@ module ProcessEventLog =
             let pieces =
                 splitTextIntoSegmentsWithHeadroom remaining (segmentCapBytes ()) headroom
 
-            pieces
-            |> List.iteri (fun index piece -> appendLegacyPiece directory writerId tailName index piece)
+            // Every target name is spelled before any byte lands: an ordinal
+            // past 9999 refuses here, not after part of the legacy lines moved.
+            let names =
+                pieces |> List.mapi (fun index _ -> fileNameForPiece tailName writerId index)
+
+            List.zip names pieces
+            |> List.iter (fun (fileName, piece) -> appendLegacyPiece directory fileName piece)
 
             syncCopiedSeries directory copied segments
             unlinkSync legacyFile

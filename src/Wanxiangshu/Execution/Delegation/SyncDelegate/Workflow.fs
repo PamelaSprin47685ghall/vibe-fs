@@ -7,7 +7,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 
 /// Composition-internal CE module: referenced only by SyncDelegateRuntime.
 module internal SyncDelegateWorkflow =

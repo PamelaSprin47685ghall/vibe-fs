@@ -46,14 +46,24 @@ type ManagerCapabilityFacts =
 
 [<RequireQualifiedAccess>]
 module OfficeCapability =
-    val managerReviewReadOnlyPermissions: ToolPermission Set
-    /// capability-enforcement-025: read/cleanup/close-out surface for the final incumbent.
-    val managerFinishPermissions: ToolPermission Set
     val permissions: role: Role -> ToolPermission Set
     val isAllowed: role: Role -> permission: ToolPermission -> bool
-    val permissionsForManagerFacts: facts: ManagerCapabilityFacts -> ToolPermission Set
     val isAllowedForManagerFacts: facts: ManagerCapabilityFacts -> permission: ToolPermission -> bool
     /// Stable JS-native label for one permission. Single definition point for every
     /// surface that carries permissions across the JS edge.
     val permissionLabel: permission: ToolPermission -> string
     val permissionOfLabel: label: string -> ToolPermission option
+    /// capability-enforcement-012: permission → host provider tool names (may be empty:
+    /// the duty lives on the programming surface only). Answered by wanxiangli/capability.
+    val toolNames: permission: ToolPermission -> string list
+    /// The sole reverse lookup tool name → permission for one role; a verb shared by two
+    /// permissions resolves to the one this role owns.
+    val permissionOfToolName: role: Role -> name: string -> ToolPermission option
+    /// Visible equals callable: the role owns the permission this exact name maps to.
+    val admitsToolForRole: role: Role -> name: string -> bool
+    /// Host utility tool names (`skill`, `assume`): not office permissions. Answered by
+    /// wanxiangli/capability.
+    val utilityToolNames: string list
+    /// Utility admission for one role: schema projection, request tool map and execute
+    /// admission all read this. Roles outside the office matrix fail closed.
+    val admitsUtility: role: Role -> name: string -> bool

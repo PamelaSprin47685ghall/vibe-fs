@@ -139,6 +139,11 @@ const acceptedFact = (profile) => ({
     LogicalRunId: profile.logicalRun,
     AuthorityRootUserMessageId: profile.authorityRoot,
     AuthorityKind: profile.authorityKind,
+    ExpectedClosureKind: authority.recordedClosureKind(
+      profile.authorityKind, profile.participantIdentity.role === 'manager', null, null,
+    ),
+    OwnerLogicalRunId: profile.identitySeed.ownerLogicalRun ?? undefined,
+    AgentOwnerLife: profile.agentOwnerLife ?? undefined,
     IdentitySeed: {
       Kind: profile.identitySeed.kind,
       OwnerSessionId: profile.identitySeed.ownerSession,
@@ -156,10 +161,10 @@ const acceptedFact = (profile) => ({
 })
 const current = (projection) => projection.sessions[session].activeLogicalRun
 
-test('WHAT[participant-identity-009] reuses SessionId with a fresh closed-run identity', () => {
-  const first = createRoot('msg-run-a', managerSeed)
+test('WHAT[participant-identity-009] a managed HumanRoot closes before the same SessionId admits a fresh Manager identity', () => {
+  const first = createRoot('msg-run-a', coderSeed)
   const firstSnapshot = structuredClone(first)
-  const second = createRoot('msg-run-b', coderSeed)
+  const second = createRoot('msg-run-b', managerSeed)
 
   assert.notEqual(second.logicalRun, first.logicalRun)
   assert.notEqual(second.authorityRoot, first.authorityRoot)
@@ -211,6 +216,7 @@ test('WHAT[participant-identity-009] reuses SessionId with a fresh closed-run id
     acceptedFact(first),
     acceptedFact(second),
   )
+  assert.equal(scenario.error, undefined, JSON.stringify(scenario.error))
   assert.equal(scenario.preCloseSecond.ok, false)
   assert.match(
     scenario.preCloseSecond.error.Reason,

@@ -1,5 +1,12 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Host
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Participant.ManagedAgents
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
@@ -13,6 +20,8 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Execution.Routing
+open Wanxiangshu.Execution.Tool
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
@@ -22,11 +31,9 @@ open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Repository.Programming.Js.OpenCode
-open Wanxiangshu.Ablation
 open Wanxiangshu.Process
 
 /// Assembly-only registry: tool behavior lives in one vertical verb module;
@@ -39,25 +46,6 @@ module ToolRegistry =
 
     [<RequireQualifiedAccess>]
     module Path =
-        [<Literal>]
-        let DeniedRole = "tool/registry/denied-role"
-
-        /// Fission is Engineer-only; its denial names the sole entitled role.
-        [<Literal>]
-        let DeniedFission = "tool/registry/denied-fission"
-
-        [<Literal>]
-        let DeniedAblation = "tool/registry/denied-ablation"
-
-        [<Literal>]
-        let DeniedStrength = "tool/registry/denied-strength"
-
-        [<Literal>]
-        let DeniedUnestablished = "tool/registry/denied-unestablished"
-
-        [<Literal>]
-        let DeniedTaskState = "tool/registry/denied-task-state"
-
         /// Algorithm G1: deliver is blocked while any parked site is unresolved.
         [<Literal>]
         let DeliverBlockedByParked = "tool/js-program/parked-deliver-blocked"
@@ -67,426 +55,98 @@ module ToolRegistry =
 
         ProviderLanguageBinding.forSessionText sessionText
 
-    /// The refusal prose follows the provider language, so it cannot serve as a
-    /// machine-readable reason. `code` carries the resource key when a caller
-    /// needs one; omitting it leaves the rendered bytes exactly as before, which
-    /// is why tools without a code contract keep prose only.
-    let private denied
-        (ctx: HostToolContext)
-        (specName: string)
-        (path: string)
-        (subs: Map<string, string>)
-        (code: string option)
-        =
-        let fields =
-            match code with
-            | Some key -> [ "code", ToolHostCodec.TString key ]
-            | None -> []
-
-        ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] fields
-
-    let private denyRole (ctx: HostToolContext) (specName: string) (role: Role) =
-        let path =
-            if specName = "fission" then
-                Path.DeniedFission
-            else
-                Path.DeniedRole
-
-        denied ctx specName path (Map [ "tool", specName; "role", sprintf "%A" role ]) None
-
-    /// The current capability decides; the denial stays action-focused and never
-    /// echoes internal loop state.
-    let private denyTaskState (ctx: HostToolContext) (specName: string) =
-        denied ctx specName Path.DeniedTaskState (Map [ "tool", specName ]) None
-
-    /// execution-model-routing-010: the tool context carries this call's own
-    /// exact ProviderRunIdentity. The physical message it answers is the one the
-    /// Host stated for that run; a run this process never observed has no step to
-    /// end, and must never be resolved from the session's current binding.
-    let private endObservedStep (providerRun: ProviderRunIdentity) =
-        ModelRouting.tryProviderStepIdentity providerRun
-        |> Option.iter (fun (sessionId, physicalUserMessageId) ->
-            ModelRouting.endProviderStep sessionId physicalUserMessageId providerRun)
-
-    let private providerToolBoundary (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            Ok()
-        else
-            ctx.ProviderRunId |> Option.iter endObservedStep
-            Ok()
-
-    /// capability-enforcement-005/010/025: the exact session facts the execute
-    /// gate reads. `create` fills every field from the ToolRuntimeScope or its
-    /// own callbacks; a stage never receives the whole scope.
-    type private ToolGateFacts =
-        {
-            RoleFor: HostToolContext -> Role option
-            EnsureRoleFor: HostToolContext -> Task<Role option>
-            ManagerFactsFor: string -> Task<ManagerCapabilityFacts>
-
-            IsRetirementFrozen: string -> Task<bool>
-            IsWaitingForUser: string -> bool
-            /// LC-017: the pending question's exact fence (provider run, tool call)
-            /// for a session, when a question is waiting for the user. Ask replays
-            /// carrying the same fence pass the waiting gate; everything else
-            /// stays refused.
-            WaitingQuestionFenceFor: string -> (ProviderRunIdentity * ToolCallId) option
-            BeginToolExecution: string -> unit
-            EndToolExecution: string -> unit
-            /// Algorithm E1.1: the work already recorded a retirement for this
-            /// call's exact fence, so a retried deliver replays its state instead
-            /// of being refused for the tenure that retirement removed.
-            RecordedDeliverReplay: HostToolContext -> Task<bool>
-        }
-
-    let private accountingStageWithSession
-        (gate: ToolGateFacts)
-        (ctx: HostToolContext)
-        (run: unit -> Task<string>)
-        : Task<string> =
-        task {
-            gate.BeginToolExecution ctx.SessionId
-
-            try
-                return! run ()
-            finally
-                gate.EndToolExecution ctx.SessionId
-        }
-
-    /// Tool-execution accounting around one physical gate pass.
-    let private accountingStage
-        (gate: ToolGateFacts)
-        (ctx: HostToolContext)
-        (run: unit -> Task<string>)
-        : Task<string> =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            run ()
-        else
-            accountingStageWithSession gate ctx run
-
-    /// feature-ablation-002: an ablated node never reaches the tool body.
-    let private ablationStage (spec: ToolSpec) (ctx: HostToolContext) : Task<string option> =
-        Task.FromResult(
-            if AblationGate.toolDenied (AblationGate.registry ()) spec.Name then
-                Some(denied ctx spec.Name Path.DeniedAblation (Map [ "tool", spec.Name ]) None)
-            else
-                None
-        )
-
-
-
-    /// capability-enforcement-025: current Manager facts close the office gate.
-    /// A frozen retirement keeps Join, Finality and the explicit human Ask; the final incumbent
-    /// keeps the read/cleanup/close-out surface and loses every new-work
-    /// capability.
-    /// Algorithm E1.1: a retried deliver whose fence the work already settled is
-    /// not a new capability — it replays the state that call recorded, so the
-    /// missing tenure is not a reason to refuse it. Every other denied call
-    /// keeps the action-focused refusal.
-    let private executeDeliverReplay
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        : Task<string> =
-        task {
-            let! replayed = gate.RecordedDeliverReplay ctx
-
-            if replayed then
-                return! spec.Execute args ctx
-            else
-                return denyTaskState ctx spec.Name
-        }
-
-    let private refusedOrReplayed
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        : Task<string> =
-        if spec.Name = "deliver" then
-            executeDeliverReplay gate spec args ctx
-        else
-            Task.FromResult(denyTaskState ctx spec.Name)
-
-    let private managerFactsStage
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (managerPermission: ToolPermission option)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        : Task<string> =
-        task {
-            let! managerFacts = gate.ManagerFactsFor ctx.SessionId
-            let! frozen = gate.IsRetirementFrozen ctx.SessionId
-
-            match managerPermission with
-            | Some permission when
-                frozen
-                && permission <> ToolPermission.Join
-                && permission <> ToolPermission.Finality
-                ->
-                return denyTaskState ctx spec.Name
-            | Some permission when not (OfficeCapability.isAllowedForManagerFacts managerFacts permission) ->
-                return! refusedOrReplayed gate spec args ctx
-            | _ -> return! spec.Execute args ctx
-        }
-
-    let private executeAdmittedRole
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (managerPermission: ToolPermission option)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        (role: Role)
-        : Task<string> =
-        let isExactQuestionReplay =
-            match ctx.ProviderRunId, ctx.ToolCallId with
-            | Some run, Some call -> gate.WaitingQuestionFenceFor ctx.SessionId = Some(run, call)
-            | _ -> false
-
-        let isWaitingReplayExempt =
-            (spec.Name = "deliver" || spec.Name.StartsWith "todowrite-for-")
-            && isExactQuestionReplay
-
-        if gate.IsWaitingForUser ctx.SessionId && not isWaitingReplayExempt then
-            Task.FromResult(
-                ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId) "tool/ask-waiting" Map.empty
-            )
-        elif role = Role.Manager && spec.Name <> "todowrite-for-manager" then
-            managerFactsStage gate spec managerPermission args ctx
-        else
-            spec.Execute args ctx
-
-    /// capability-enforcement-002: office Role then admission then Manager facts.
-    let private officeStage
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (managerPermission: ToolPermission option)
-        (officeAdmission: HostToolContext -> Role -> bool)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        : Task<string> =
-        task {
-            let! resolvedRole =
-                match gate.RoleFor ctx with
-                | Some role -> Task.FromResult(Some role)
-                | None -> gate.EnsureRoleFor ctx
-
-            match resolvedRole with
-            | Some role when officeAdmission ctx role ->
-                return! executeAdmittedRole gate spec managerPermission args ctx role
-            | Some role -> return denyRole ctx spec.Name role
-            | None -> return denied ctx spec.Name Path.DeniedUnestablished Map.empty None
-        }
-
-    /// capability-enforcement-006: the attachment IS the authority. Resolving a
-    /// public office Role here would deny the Bookkeeper its own exact tool,
-    /// because a HostInternal prompt deliberately installs no public authority
-    /// profile.
-    let private attachmentStage
-        (spec: ToolSpec)
-        (attachmentAdmission: HostToolContext -> bool)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        : Task<string> =
-        task {
-            if attachmentAdmission ctx then
-                return! spec.Execute args ctx
-            else
-                return denied ctx spec.Name Path.DeniedUnestablished Map.empty None
-        }
-
-    let private admissionStage
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (managerPermission: ToolPermission option)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        : Task<string> =
-        match spec.Admission with
-        | ToolAdmission.OfficeRole officeAdmission -> officeStage gate spec managerPermission officeAdmission args ctx
-        | ToolAdmission.PrivateAttachment attachmentAdmission -> attachmentStage spec attachmentAdmission args ctx
-
-    let private runAfterAblation
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (managerPermission: ToolPermission option)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        : Task<string> =
-        admissionStage gate spec managerPermission args ctx
-
-
-    let private runBoundaryStages
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (managerPermission: ToolPermission option)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        : Task<string> =
-        task {
-            match! ablationStage spec ctx with
-            | Some refusal -> return refusal
-            | None -> return! runAfterAblation gate spec managerPermission args ctx
-        }
-
-    /// The one composition point. Six named stages, fixed ordinary calls in the
-    /// order written here. No middleware list, no fold, no registry.
-    let private executeGate
-        (gate: ToolGateFacts)
-        (spec: ToolSpec)
-        (managerPermission: ToolPermission option)
-        (args: HostToolArguments)
-        (ctx: HostToolContext)
-        : Task<string> =
-        task {
-            match providerToolBoundary ctx with
-            | Error error -> return raise (InvalidOperationException error)
-            | Ok() ->
-                return! accountingStage gate ctx (fun () -> runBoundaryStages gate spec managerPermission args ctx)
-        }
-
-    let private staticAdmissions () : (string * ToolAdmission) list =
-        [ "fork", ForkTool.managerAdmission
-          "resume", ForkTool.managerAdmission
-          "commission", ForkTool.orchestratorAdmission
-
-          "join", JoinTool.admission
-
-          "devops",
-          ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
-          "horizon", HorizonTool.admission
-          "fission", FissionTool.admission
-          "review", ReviewShell.admission
-          "deliver",
-          ToolAdmission.OfficeRole(fun _ role ->
-              OfficeCapability.isAllowed role ToolPermission.Finality
-              || OfficeCapability.isAllowed role ToolPermission.Deliver)
-          "bash-honeypot", BashHoneypotTool.admission
-          "assume", AssumeTool.admission
-          "fetch", ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
-          "todowrite-for-bookkeeper", JsBookkeeperTool.admission ]
-
-    let private tryAdmissionFor (specName: string) : ToolAdmission option =
-        match staticAdmissions () |> List.tryFind (fun (name, _) -> name = specName) with
-        | Some(_, admission) -> Some admission
-
-        | None when specName.StartsWith "todowrite-for-" && specName <> "todowrite-for-bookkeeper" ->
-            Some(JsToolSpec.admissionFor (specName.Substring 14))
-        | None -> None
-
-    let private probeContext (sessionId: string) : HostToolContext =
-        { SessionId = sessionId
-          Agent = None
-          ToolCallId = None
-          ProviderRunId = None
-          PromptText = None
-          AttachAbort = fun _ -> id }
-
-    /// capability-enforcement-006: the authority the execute gate resolves for a tool, so a
-    /// consumer can tell an office tool from an internal leaf without guessing
-    /// from the tool name.
-    let tryAdmission (specName: string) : ToolAdmission option = tryAdmissionFor specName
-
-    /// capability-enforcement-006: the internal-leaf decision for a session that holds no public
-    /// office profile at all. An office tool is never admitted this way.
-    let privateAttachmentAdmits (specName: string) (sessionId: string) : bool =
-        match tryAdmissionFor specName with
-        | Some(ToolAdmission.PrivateAttachment predicate) -> predicate (probeContext sessionId)
-        | Some(ToolAdmission.OfficeRole _)
-        | None -> false
-
-    /// AGENT-007 role gate, delegates to owner-defined tool admissions.
-    /// sessionId is the tool call's Host session.
-    let rolePredicate (specName: string) (sessionId: string) : Role -> bool =
-        // capability-enforcement-006: an internal leaf tool is admitted by attachment, never by a
-        // public office, so no public Role may ever see it on this surface.
-        match tryAdmissionFor specName with
-        | Some(ToolAdmission.OfficeRole predicate) -> predicate (probeContext sessionId)
-        | Some(ToolAdmission.PrivateAttachment _)
-        | None -> fun _ -> false
-
-
-
     [<Emit("typeof $0 === 'string'")>]
     let private isStringValue (value: obj) : bool = jsNative
 
-    let private planWritePermission gitCommonDir sessionId =
-        let read () =
-            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId
+    [<Emit("$0 === null || $0 === undefined")>]
+    let private isNullish (value: obj) : bool = jsNative
 
-        let incumbent = read () |> Option.bind _.ActiveId
+    [<Emit("(() => { const out = {}; for (const k of Object.keys($0)) out[k] = $0[k]; out[$1] = $2; return out; })()")>]
+    let private withField (source: obj) (key: string) (value: obj) : obj = jsNative
 
-        fun () ->
-            match incumbent, read () with
-            | Some expected, Some work -> work.ActiveId = Some expected && work.Reviewed
-            | _ -> false
+    /// A delegate payload is built inside the JS sandbox realm, so its
+    /// prototype is that realm's `Object.prototype` — never the host's. The
+    /// host's plain-record check compares realms, so the payload is copied
+    /// here into a host-realm plain record: own enumerable data properties
+    /// only (accessors and non-enumerable properties are skipped). The copy
+    /// is a snapshot; the program may still mutate its own object afterwards.
+    [<Emit("(() => { const out = {}; const src = $0; if (src === null || src === undefined || typeof src !== 'object') return out; for (const key of Object.keys(src)) { const descriptor = Object.getOwnPropertyDescriptor(src, key); if (descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')) { out[key] = descriptor.value; } } return out; })()")>]
+    let private plainRecordCopy (source: obj) : obj = jsNative
 
-    [<Import("dirname", "node:path")>]
-    let private directoryOf (path: string) : string = jsNative
-
-    [<Import("mkdirSync", "node:fs")>]
-    let private createDirectory (path: string) (options: obj) : unit = jsNative
-
-    [<Import("realpathSync", "node:fs")>]
-    let private realPath (path: string) : string = jsNative
-
-    let private planDirectory root sessionId =
-        createDirectory root (createObj [ "recursive" ==> true ])
-
-        match PlanPath.resolvePlanPath (realPath root) sessionId with
-        | Error reason -> invalidOp reason
-        | Ok path ->
-            let directory = directoryOf path
-            createDirectory directory (createObj [ "recursive" ==> true ])
-            directory
-
-    let runPlanProgram
-        (prose: JsCanonicalDescription.Prose)
-        (gitCommonDir: string)
-        (root: string)
-        (sessionId: string)
-        (program: string)
-        : Task<string> =
-        task {
-            let planRoot = planDirectory root sessionId
-            let canWrite = planWritePermission gitCommonDir sessionId
-
-            let capabilities =
-                JsCapability.ofToolCapabilities (OfficeCapability.permissions Role.Plan)
-
-            let baseClass =
-                JsCanonicalDescription.runtimeBaseClassForRole "plan" prose capabilities
-
-            let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
-            let input = createObj [ "program" ==> program ]
-
-            let! outcome =
-                JsToolWorkflow.executeWithApiScope
-                    (fun _ api -> JsToolsBindings.scopePlanFile planRoot canWrite api)
-                    sessionId
-                    None
-                    capabilities
-                    planRoot
-                    baseClass
-                    input
-                    10000
-                    deadlineEpochMs
-                    (1 <<< 20)
-                    None
-                    None
-                    None
-                    None
-
-            return JsToolsResult.render outcome
-        }
-
-    let private advisorDeclarationOf (view: obj) =
-        if isNull view then
-            Ok AnchorViewDeclaration.empty
+    /// The report material a delegate receives: the caller's report mapping
+    /// rendered as `<anchor>: <text>` lines, one per entry, newline-joined.
+    /// No entries means no material at all.
+    ///
+    /// The projection answers with the plain-JS receipt of
+    /// `AnchorSurface.reportMaterial`; the refusal travels as the same
+    /// `{ code, reason }` bytes the failure receipt carries.
+    let private recordOfLines (lines: string list) : obj =
+        if List.isEmpty lines then
+            null
         else
-            AnchorSurface.parseDeclaration view
+            box (String.concat "\n" lines)
+
+    let private materialRecord (receipt: obj) : obj =
+        let material: obj array = receipt?material
+
+        let lines =
+            material
+            |> Array.toList
+            |> List.map (fun entry ->
+                let anchor: int = entry?anchor
+                let text: string = entry?text
+                sprintf "%d: %s" anchor text)
+
+        createObj [ "ok" ==> true; "record" ==> recordOfLines lines ]
+
+    let private reportMaterialText (sessionId: string) (mapping: obj) : obj =
+        let receipt = AnchorSurface.reportMaterial sessionId mapping
+        let ok: bool = receipt?ok
+
+        if not ok then receipt else materialRecord receipt
+
+    /// The rendered record of a material receipt, or no record at all.
+    let private recordOfReceipt (receipt: obj) : string option =
+        let record = receipt?record
+
+        if isNullish record then None else Some(string record)
+
+    /// The delegate payload keeps every field the program sent and gains the
+    /// report material under `commissioner_record`. The payload is normalized
+    /// into a host-realm record first, so a payload built in the sandbox
+    /// realm is not dropped by the host's plain-record check.
+    let private payloadWithRecord (payload: obj) (record: string option) : obj =
+        let raw =
+            if isStringValue payload then
+                createObj [ "charge" ==> payload ]
+            elif isNullish payload then
+                createObj []
+            else
+                plainRecordCopy payload
+
+        match record with
+        | None -> raw
+        | Some text -> withField raw "commissioner_record" (box text)
+
+    /// The devops intent travels as the program's own text: a plain string
+    /// payload is the intent itself, an object payload carries it under
+    /// `intent`. The object form is read from the normalized host-realm
+    /// record, so the intent of a sandbox-built payload is not lost.
+    let private devopsIntentText (payload: obj) (normalizedPayload: obj) : string =
+        if isStringValue payload then
+            unbox<string> payload
+        else
+            (ToolHostCodec.argumentsOfRaw normalizedPayload).Text "intent"
+
+    /// The advisor consult accepts the report mapping only — a mapping of
+    /// anchor numbers to summaries, equivalent to a `prefixUntil = 0`
+    /// declaration. There is no lenient empty declaration.
+    ///
+    /// The advisor seat needs the typed declaration itself, so it reads the
+    /// shared typed rule (`AnchorDeclarationRule`) — the very same decision the
+    /// plain-JS receipt of `AnchorSurface.parseReportMapping` reports.
+    let private advisorDeclarationOf (reportMapping: obj) =
+        AnchorDeclarationRule.parseReportMapping reportMapping
 
     /// The transform's own wire text over a decoded snapshot part: the advisor
     /// reads exactly what the caller's request carried, tool calls included.
@@ -575,114 +235,35 @@ module ToolRegistry =
         (runtime: ToolRuntimeScope)
         (ctx: HostToolContext)
         (intent: obj)
-        (view: obj)
+        (reportMapping: obj)
         : Task<obj> =
         task {
             let! loaded = advisorSnapshotMessages runtime ctx
 
-            match loaded, advisorDeclarationOf view with
+            match loaded, advisorDeclarationOf reportMapping with
             | Error reason, _ -> return advisorRefusal "advisor-unavailable" reason
             | _, Error failure -> return advisorRefusal (JsFailure.code failure) (JsFailure.reason failure)
             | Ok messages, Ok declaration -> return! advisorSeatAnswer runtime ctx messages declaration intent
         }
 
-    let private programDeliverySource (runtime: ToolRuntimeScope) (ctx: HostToolContext) =
-        taskResult {
-            let! snapshot = runtime.Snapshot |> Result.requireSome "delivery snapshot is unavailable"
-            let! provider = ctx.ProviderRunId |> Result.requireSome "delivery provider identity is missing"
-            let! call = ctx.ToolCallId |> Result.requireSome "delivery tool identity is missing"
-            let! messages = snapshot.GetMessages(SessionId.create ctx.SessionId)
+    [<Import("dirname", "node:path")>]
+    let private directoryOf (path: string) : string = jsNative
 
-            let! owner =
-                messages
-                |> List.tryFind (fun message ->
-                    message.Id = ProviderRunIdentity.value provider && message.Role = "assistant")
-                |> Result.requireSome "delivery provider message is absent"
+    [<Import("mkdirSync", "node:fs")>]
+    let private createDirectory (path: string) (options: obj) : unit = jsNative
 
-            do!
-                Result.requireTrue
-                    "delivery tool call does not belong to the provider message"
-                    (owner.ToolParts |> Array.exists (fun part -> part.ToolCallId = call))
+    [<Import("realpathSync", "node:fs")>]
+    let private realPath (path: string) : string = jsNative
 
-            let! physical =
-                owner.ParentId
-                |> Result.requireSome "delivery provider message has no physical input"
+    let private planDirectory root sessionId =
+        createDirectory root (createObj [ "recursive" ==> true ])
 
-            let text =
-                owner.Parts
-                |> Array.choose (function
-                    | MessagePart.Text text -> Some text
-                    | _ -> None)
-                |> String.concat "\n"
-
-            return PhysicalUserMessageId.create physical, text
-        }
-
-    let private isChildProgramDelivery (runtime: ToolRuntimeScope) (ctx: HostToolContext) =
-        match runtime.Journal, JsDeliveredValues.peekFence ctx.SessionId, ctx.ProviderRunId, ctx.ToolCallId with
-        | Some journal, Some fence, Some provider, Some call when
-            fence.ProviderRun = provider && fence.ToolCallId = call
-            ->
-            (AgentJournal.snapshot journal).AgentProjections.HandleByChildSession
-            |> Map.containsKey (SessionId.create ctx.SessionId)
-        | _ -> false
-
-    let private commitProgramDelivery
-        (runtime: ToolRuntimeScope)
-        (ctx: HostToolContext)
-        (source: Result<PhysicalUserMessageId * string, string>)
-        (eventPort: IEventObservationPort option)
-        (directory: string)
-        =
-        taskResult {
-            let! events = eventPort |> Result.requireSome "delivery completion port is unavailable"
-            let! journal = runtime.Journal |> Result.requireSome "delivery journal is unavailable"
-            let! provider = ctx.ProviderRunId |> Result.requireSome "delivery provider identity is missing"
-            let! call = ctx.ToolCallId |> Result.requireSome "delivery tool identity is missing"
-            let! physical, text = source
-
-            let! declaration =
-                JsDeliveredValues.peekView ctx.SessionId
-                |> Result.requireSome "delivery view declaration is missing"
-
-            let! view =
-                JsDeliveredValues.sealFencedView ctx.SessionId provider call (Some text)
-                |> Result.requireSome "delivery view is empty"
-
-            let! witness, role =
-                TaskDeliveryJournal.commitChild
-                    journal
-                    (SessionId.create ctx.SessionId)
-                    physical
-                    provider
-                    call
-                    text
-                    (JS.JSON.stringify declaration)
-                    view
-
-            events.NotifyTerminal
-                witness.Fence.SessionId
-                (TerminalOutcome.Completed
-                    { SessionId = witness.Fence.SessionId
-                      AuthorityRootUserMessageId = witness.Fence.AuthorityRoot
-                      ProviderRun = witness.Fence.ProviderRun
-                      Role = role
-                      Directory = Some directory |> Option.filter (String.IsNullOrWhiteSpace >> not)
-                      TerminalText = witness.View
-                      TurnFormalText = witness.FormalText })
-            |> ignore
-        }
-
-    let private settleProgramDelivery runtime ctx source eventPort directory =
-        task {
-            if isChildProgramDelivery runtime ctx then
-                let! committed = commitProgramDelivery runtime ctx source eventPort directory
-
-                committed
-                |> Result.defaultWith (fun reason ->
-                    JsDeliveredValues.clear ctx.SessionId
-                    invalidOp ("delivery failed: " + reason))
-        }
+        match PlanPath.resolvePlanPath (realPath root) sessionId with
+        | Error reason -> invalidOp reason
+        | Ok path ->
+            let directory = directoryOf path
+            createDirectory directory (createObj [ "recursive" ==> true ])
+            directory
 
     let create
         (toolModule: obj)
@@ -722,7 +303,7 @@ module ToolRegistry =
         /// registered (a Change road's worktree), so the surface follows the
         /// session instead of the plugin's project directory.
         let jsRootOf (sessionId: string) =
-            JsToolSpec.rootForSession sessionDirectories (defaultArg workspaceDirectory "") sessionId
+            JsToolPolicy.rootForSession sessionDirectories (defaultArg workspaceDirectory "") sessionId
 
         let runtime =
             new ToolRuntimeScope(
@@ -766,6 +347,298 @@ module ToolRegistry =
               AttachLifetimeAbort = fun cancel drained -> runtime.AttachProcessAbort(ctx.SessionId, cancel, drained)
               AttachAbort = ctx.AttachAbort }
 
+        // work-028: the real delegation capability — the SyncDelegate
+        // runtime runs the bound fixed DevOps for this work synchronously and
+        // hands back its complete delivered view. A missing runtime fails closed.
+        let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
+            let invokeRuntime (runtime: SyncDelegateRuntime) (intent: string) : Task<string> =
+                task {
+                    let! outcome = runtime.Invoke(ctx.SessionId, SyncDelegateRole.DevOps, intent)
+
+                    return
+                        match outcome with
+                        | Ok record -> record
+                        | Error reason ->
+                            raise (InvalidOperationException(sprintf "DevOps delegation failed: %s" reason))
+                }
+
+            fun (intent: string) ->
+                task {
+                    match syncRuntime with
+                    | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
+                    | Some runtime -> return! invokeRuntime runtime intent
+                }
+
+        let askGitCommonDir (directory: string option) : Task<string> =
+            task {
+                match directory with
+                | Some workspace ->
+                    let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+                    return commonDir
+                | None -> return ""
+            }
+
+        /// The assistant message that owns this call: the provider run IS that
+        /// message id, and its parent names the physical input.
+        let owningAssistantMessage
+            (messages: SessionMessage list)
+            (providerRun: ProviderRunIdentity)
+            : SessionMessage option =
+            let providerRunId = ProviderRunIdentity.value providerRun
+
+            messages
+            |> List.tryFind (fun message -> message.Id = providerRunId && message.Role = "assistant")
+
+        /// The text parts of one assistant message, joined by newlines.
+        let formalTextOf (message: SessionMessage) : string option =
+            let text =
+                message.Parts
+                |> Array.choose (function
+                    | MessagePart.Text text -> Some text
+                    | _ -> None)
+                |> String.concat "\n"
+
+            if String.IsNullOrWhiteSpace text then None else Some text
+
+        /// Bind only the physical parent of this assistant message.
+        let physicalUserMessageOf
+            (messages: SessionMessage list)
+            (message: SessionMessage)
+            : PhysicalUserMessageId option =
+            let parentIsUserMessage =
+                match message.ParentId with
+                | Some parent when not (String.IsNullOrWhiteSpace parent) ->
+                    messages
+                    |> List.exists (fun candidate -> candidate.Id = parent && candidate.Role = "user")
+                | _ -> false
+
+            if parentIsUserMessage then
+                message.ParentId |> Option.map PhysicalUserMessageId.create
+            else
+                None
+
+        /// The task a delivery serves.
+        ///
+        /// A lifecycle work names the tenure the delivery closes: the
+        /// retirement that carries this very call's fence is the durable fact
+        /// of that tenure, so the tenure and the retirement id come from one
+        /// fact. A delegated child names its own handle — the agent handle the
+        /// delegation bound to that child session. Everything else is this very
+        /// invocation, named by the tool call that carries it.
+        let deliveryTaskOf
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (providerRun: ProviderRunIdentity)
+            (toolCallId: ToolCallId)
+            (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option)
+            : DeliveryTaskReference * string option =
+            let providerRunId = ProviderRunIdentity.value providerRun
+            let toolCallIdText = ToolCallId.value toolCallId
+
+            let lifecycleTask =
+                work
+                |> Option.bind (fun work ->
+                    work.Retirements
+                    |> List.tryFind (fun retirement ->
+                        retirement.Fence.ProviderRunId = providerRunId
+                        && retirement.Fence.ToolCallId = toolCallIdText)
+                    |> Option.map (fun retirement ->
+                        DeliveryTaskReference.Lifecycle(SessionId.value sessionId, retirement.IncumbencyId),
+                        Some retirement.RetirementId))
+
+            let childHandle =
+                (AgentJournal.snapshot durable).AgentProjections.HandleByChildSession
+                |> Map.tryFind sessionId
+                |> Option.bind (fun record ->
+                    HandleId.tryAgent record.Handle
+                    |> Option.map (fun _ -> HandleId.describe record.Handle))
+
+            match lifecycleTask, childHandle with
+            | Some task, _ -> task
+            | None, Some handle -> DeliveryTaskReference.ChildWork handle, None
+            | None, None -> DeliveryTaskReference.Invocation toolCallIdText, None
+
+        let witnessSettlement
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (providerRun: ProviderRunIdentity)
+            (toolCallId: ToolCallId)
+            logicalRunId
+            authorityRoot
+            physical
+            (formalText: string)
+            work
+            : DeliverySettlement =
+            let deliveryTask, retirementId =
+                deliveryTaskOf durable sessionId providerRun toolCallId work
+
+            DeliverySettlement.Attributed(
+                { LogicalRunId = logicalRunId
+                  AuthorityRoot = authorityRoot
+                  PhysicalUserMessageId = physical
+                  Task = deliveryTask
+                  RetirementId = retirementId
+                  FormalText = formalText },
+                DeliveryWitnessWriter.create durable (fun witness ->
+                    DeliveryAttemptLedger.recordEstablished
+                        { SessionId = witness.SessionId
+                          ProviderRun = witness.ProviderRun
+                          CallId = witness.ToolCallId }
+                        (Some witness.PhysicalUserMessageId))
+            )
+
+        let refusedSettlement reason : Task<DeliverySettlement option> =
+            Task.FromResult(Some(DeliverySettlement.Refused reason))
+
+        /// The formal prose and the physical input of the assistant message
+        /// that made the call; either missing leaves the call unattributed.
+        ///
+        /// The prose may be the immediately preceding assistant text of the
+        /// same turn: the delivery contract tells the model to state the
+        /// result in prose and then call `deliver`, and providers commonly
+        /// split those into two assistant messages. Only text after this
+        /// call's physical input is accepted, so an older turn's prose can
+        /// never attribute a new delivery.
+        let formalTextOfTurn (messages: SessionMessage list) (owner: SessionMessage) (physical: PhysicalUserMessageId) =
+            let physicalId = PhysicalUserMessageId.value physical
+
+            let preceding =
+                messages |> List.takeWhile (fun message -> message.Id <> owner.Id) |> List.rev
+
+            preceding
+            |> List.tryFind (fun message -> message.Role = "user")
+            |> Option.filter (fun message -> message.Id = physicalId)
+            |> Option.bind (fun _ ->
+                preceding
+                |> List.takeWhile (fun message -> message.Role <> "user")
+                |> List.tryPick (fun candidate ->
+                    if candidate.Role = "assistant" && candidate.ParentId = Some physicalId then
+                        formalTextOf candidate
+                    else
+                        None))
+
+        let messageAttribution
+            (ctx: HostToolContext)
+            (providerRun: ProviderRunIdentity)
+            (messages: SessionMessage list)
+            : (string * PhysicalUserMessageId) option =
+            owningAssistantMessage messages providerRun
+            |> Option.filter (fun message ->
+                ctx.ToolCallId
+                |> Option.exists (fun call -> message.ToolParts |> Array.exists (fun part -> part.ToolCallId = call)))
+            |> Option.bind (fun message ->
+                physicalUserMessageOf messages message
+                |> Option.filter (fun physical ->
+                    ModelRouting.tryProviderStepIdentity providerRun
+                    |> Option.exists (fun (session, observedPhysical) ->
+                        session = SessionId.create ctx.SessionId && observedPhysical = physical))
+                |> Option.bind (fun physical ->
+                    formalTextOf message
+                    |> Option.orElseWith (fun () -> formalTextOfTurn messages message physical)
+                    |> Option.map (fun formalText -> formalText, physical)))
+
+        let attributedSettlement
+            (ctx: HostToolContext)
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (providerRun: ProviderRunIdentity)
+            (toolCallId: ToolCallId)
+            logicalRunId
+            authorityRoot
+            (messages: SessionMessage list)
+            : Task<DeliverySettlement option> =
+            match messageAttribution ctx providerRun messages with
+            | None ->
+                refusedSettlement
+                    "the delivering call has no exact observed provider, physical input or formal material"
+            | Some(formalText, physical) ->
+                task {
+                    // The lifecycle work is read only for a
+                    // call that already has its attribution:
+                    // the work journal is a durable read and
+                    // must not be paid for calls that never
+                    // get a witness.
+                    let! work = runtime.LifecycleWorkFor ctx.SessionId
+
+                    return
+                        Some(
+                            witnessSettlement
+                                durable
+                                sessionId
+                                providerRun
+                                toolCallId
+                                logicalRunId
+                                authorityRoot
+                                physical
+                                formalText
+                                work
+                        )
+                }
+
+        let loadedSettlement
+            (ctx: HostToolContext)
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (providerRun: ProviderRunIdentity)
+            (toolCallId: ToolCallId)
+            (loadMessages: unit -> Task<Result<SessionMessage list, 'error>>)
+            logicalRunId
+            authorityRoot
+            : Task<DeliverySettlement option> =
+            task {
+                let! loaded = loadMessages ()
+
+                match loaded with
+                | Error reason ->
+                    return Some(DeliverySettlement.Refused(sprintf "delivery snapshot is unavailable: %A" reason))
+                | Ok messages ->
+                    return!
+                        attributedSettlement
+                            ctx
+                            durable
+                            sessionId
+                            providerRun
+                            toolCallId
+                            logicalRunId
+                            authorityRoot
+                            messages
+            }
+
+        /// The delivery settlement of one js-* call: the host's attribution of
+        /// the call and the durable place its witness goes.
+        ///
+        /// Every field is read from the source the read side reads. A durable
+        /// host whose call cannot be attributed refuses the delivery: no
+        /// witness is invented, and a process-live cell alone must never
+        /// present a return the caller's join cannot receive.
+        let settlementOf (ctx: HostToolContext) : Task<DeliverySettlement option> =
+            match journal, runtime.Snapshot, ctx.ProviderRunId, ctx.ToolCallId with
+            | Some durable, Some snapshotPort, Some providerRun, Some toolCallId ->
+                let sessionId = SessionId.create ctx.SessionId
+
+                Wanxiangshu.Interaction.Authority.PromptAuthorityProjectionQueries.activeProfile
+                    sessionId
+                    (AgentJournal.snapshot durable).AgentProjections
+                |> Option.map (fun profile -> profile.LogicalRunId, profile.AuthorityRootUserMessageId)
+                |> Option.filter (fun (logicalRunId, authorityRoot) ->
+                    not (
+                        String.IsNullOrWhiteSpace(LogicalRunId.value logicalRunId)
+                        || String.IsNullOrWhiteSpace(AuthorityRootUserMessageId.value authorityRoot)
+                    ))
+                |> Option.map (fun (logicalRunId, authorityRoot) ->
+                    loadedSettlement
+                        ctx
+                        durable
+                        sessionId
+                        providerRun
+                        toolCallId
+                        (fun () -> snapshotPort.GetMessages sessionId)
+                        logicalRunId
+                        authorityRoot)
+                |> Option.defaultWith (fun () -> refusedSettlement "the delivering call has no active task authority")
+            | None, _, _, _ -> refusedSettlement "the delivering call has no durable journal"
+            | _ -> refusedSettlement "the delivering call has no durable snapshot or complete invocation fence"
+
         let generatedJsSpecFor (role: Role) =
             JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse
             |> Option.map (fun surface ->
@@ -798,6 +671,7 @@ module ToolRegistry =
                         None
                         jsProcessHost
                         jsRootOf
+                        settlementOf
 
                 let specFor (ctx: HostToolContext) =
                     task {
@@ -810,7 +684,7 @@ module ToolRegistry =
 
                             let! common = RuntimePath.stateRoot workspace
                             let directory = planDirectory (common + "/wanxiangshu") ctx.SessionId
-                            let canWrite = planWritePermission common ctx.SessionId
+                            let canWrite = PlanTools.writePermission common ctx.SessionId
 
                             return
                                 JsToolSpec.createWithApiScope
@@ -823,6 +697,7 @@ module ToolRegistry =
                                     None
                                     jsProcessHost
                                     (fun _ -> directory)
+                                    settlementOf
                     }
 
                 { spec with
@@ -833,27 +708,105 @@ module ToolRegistry =
                             let refusal (code: string) : obj =
                                 createObj [ "ok" ==> false; "code" ==> code ]
 
+                            let refusalWithReason (code: string) (reason: string) : obj =
+                                createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
+
+                            let envelopeOrRefusal (fields: Result<(string * obj) list, string>) : obj =
+                                match fields with
+                                | Ok fields -> envelopeOk fields
+                                | Error code -> refusal code
+
+                            let placedFields (placed: ForkTool.PlacementReceipt) : (string * obj) list =
+                                [ "name" ==> placed.Name
+                                  "agentId" ==> placed.AgentId
+                                  "outcome" ==> placed.Outcome ]
+
+                            let placedDelegate
+                                (execute: _ -> Task<Result<ForkTool.PlacementReceipt, string>>)
+                                (payload: obj)
+                                (record: string option)
+                                : Task<obj> =
+                                task {
+                                    let raw = payloadWithRecord payload record
+                                    let! receipt = execute (ToolHostCodec.argumentsOfRaw raw)
+                                    return receipt |> Result.map placedFields |> envelopeOrRefusal
+                                }
+
+                            let devopsAnswer (outcome: Result<AskResult, string>) : obj =
+                                match outcome with
+                                | Ok answer ->
+                                    envelopeOk
+                                        [ "kind" ==> answer.Kind; "status" ==> answer.Status; "view" ==> answer.View ]
+                                | Error reason ->
+                                    refusalWithReason "devops-failed" (sprintf "devops failed: %s" reason)
+
+                            let askDevops (payload: obj) (record: string option) (gitCommonDir: string) : Task<obj> =
+                                task {
+                                    let raw = payloadWithRecord payload record
+                                    let intentText = devopsIntentText payload raw
+
+                                    let intent =
+                                        record
+                                        |> Option.map (fun text -> intentText + "\n\n" + text)
+                                        |> Option.defaultValue intentText
+
+                                    let delegateTo = devopsDelegateOf syncDelegateRuntime ctx
+
+                                    let! outcome =
+                                        Wanxiangshu.Mission.Planning.PlanTools.executeAsk
+                                            gitCommonDir
+                                            ctx.SessionId
+                                            intent
+                                            delegateTo
+
+                                    return devopsAnswer outcome
+                                }
+
+                            let devopsDelegate (payload: obj) (record: string option) : Task<obj> =
+                                task {
+                                    let! gitCommonDir = askGitCommonDir workspaceDirectory
+
+                                    if String.IsNullOrWhiteSpace gitCommonDir then
+                                        return
+                                            refusalWithReason
+                                                "devops-failed"
+                                                "devops failed: git common directory is missing"
+                                    else
+                                        return! askDevops payload record gitCommonDir
+                                }
+
+                            /// A delegate runs only on report material that rendered; a refused
+                            /// mapping answers with the refusal it carries.
+                            let materialGated (material: obj) (run: string option -> Task<obj>) : Task<obj> =
+                                let materialOk: bool = material?ok
+
+                                if not materialOk then
+                                    Task.FromResult(refusalWithReason (string material?code) (string material?reason))
+                                else
+                                    run (recordOfReceipt material)
+
                             let host: JsDelegationHost =
-                                { Fork =
-                                    fun payload ->
+                                { Delegate =
+                                    fun name payload mapping ->
                                         task {
-                                            let raw =
-                                                if isStringValue payload then
-                                                    createObj [ "charge" ==> payload ]
-                                                else
-                                                    payload
+                                            let material = reportMaterialText ctx.SessionId mapping
 
-                                            let! receipt =
-                                                ForkTool.executeReceipt runtime ctx (ToolHostCodec.argumentsOfRaw raw)
-
-                                            return
-                                                match receipt with
-                                                | Ok placed ->
-                                                    envelopeOk
-                                                        [ "name" ==> placed.Name
-                                                          "agentId" ==> placed.AgentId
-                                                          "outcome" ==> placed.Outcome ]
-                                                | Error code -> refusal code
+                                            match name with
+                                            | "fork"
+                                            | "commission" ->
+                                                return!
+                                                    materialGated
+                                                        material
+                                                        (placedDelegate (ForkTool.executeReceipt runtime ctx) payload)
+                                            | "resume" ->
+                                                return!
+                                                    materialGated
+                                                        material
+                                                        (placedDelegate
+                                                            (ForkTool.executeResumeReceipt runtime ctx)
+                                                            payload)
+                                            | "devops" -> return! materialGated material (devopsDelegate payload)
+                                            | _ -> return refusal "unknown-delegate"
                                         }
                                   Join =
                                     fun () ->
@@ -882,11 +835,21 @@ module ToolRegistry =
                                   Fission =
                                     fun payload ->
                                         task {
+                                            // The fission payload is built inside the JS sandbox
+                                            // realm, so its prototype is that realm's
+                                            // `Object.prototype` — the host's plain-record check
+                                            // compares realms and would drop every field. The
+                                            // payload is copied into a host-realm plain record
+                                            // first, so `charge`, `lanes` and `prompts` survive.
+                                            // Fission is not a delegation: it carries no report
+                                            // material, so nothing is appended to the copy.
+                                            let raw = plainRecordCopy payload
+
                                             let! receipt =
                                                 FissionTool.executeReceipt
                                                     runtime
                                                     ctx
-                                                    (ToolHostCodec.argumentsOfRaw payload)
+                                                    (ToolHostCodec.argumentsOfRaw raw)
 
                                             return
                                                 match receipt with
@@ -916,7 +879,7 @@ module ToolRegistry =
                                             ))
                                             horizonContext
                                             ctx
-                                  Advisor = fun intent view -> advisorConsult runtime ctx intent view }
+                                  Advisor = fun intent reportMapping -> advisorConsult runtime ctx intent reportMapping }
 
                             JsDelegationBridge.install ctx.SessionId host
 
@@ -926,10 +889,7 @@ module ToolRegistry =
                             task {
                                 try
                                     let! currentSpec = specFor ctx
-                                    let! source = programDeliverySource runtime ctx
-                                    let! output = currentSpec.Execute args ctx
-                                    do! settleProgramDelivery runtime ctx source eventPort (jsRootOf ctx.SessionId)
-                                    return output
+                                    return! currentSpec.Execute args ctx
                                 finally
                                     JsDelegationBridge.clear ctx.SessionId
                             } })
@@ -939,11 +899,9 @@ module ToolRegistry =
                   yield! generatedJsSpecFor role |> Option.toList ]
 
         // Clean-break: all host delegation and lifecycle verbs (fork, resume,
-        // commission, join, horizon, fission, review, deliver, fetch) are
-        // retired from host registration and live exclusively as
-        // programming-surface members. devops stays host-registered: it is the
-        // Plan role's synchronous investigation channel into the bound fixed
-        // DevOps.
+        // commission, devops, join, horizon, fission, review, deliver, fetch)
+        // are retired from host registration and live exclusively as
+        // programming-surface members.
         let resolvePlanGitCommonDir () : Task<string option> =
             task {
                 match workspaceDirectory with
@@ -960,65 +918,6 @@ module ToolRegistry =
                     let! root = RuntimePath.stateRoot ws
                     return Some(root + "/wanxiangshu")
                 | None -> return None
-            }
-
-        // work-028: the real delegation capability — the SyncDelegate
-        // runtime runs the bound fixed DevOps for this work synchronously and
-        // hands back its complete delivered view. A missing runtime fails closed.
-        let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
-            let invokeRuntime (runtime: SyncDelegateRuntime) (intent: string) : Task<string> =
-                task {
-                    let! outcome = runtime.Invoke(ctx.SessionId, SyncDelegateRole.DevOps, intent)
-
-                    return
-                        match outcome with
-                        | Ok record -> record
-                        | Error reason ->
-                            raise (InvalidOperationException(sprintf "DevOps delegation failed: %s" reason))
-                }
-
-            fun (intent: string) ->
-                task {
-                    match syncRuntime with
-                    | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
-                    | Some runtime -> return! invokeRuntime runtime intent
-                }
-
-        let renderAskOutcome (outcome: Result<AskResult, string>) : string =
-            match outcome with
-            | Ok res -> res.View
-            | Error err -> sprintf "devops failed: %s" err
-
-        let askGitCommonDir (directory: string option) : Task<string> =
-            task {
-                match directory with
-                | Some workspace ->
-                    let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
-                    return commonDir
-                | None -> return ""
-            }
-
-        let askWithLifecycle
-            (syncRuntime: SyncDelegateRuntime option)
-            (args: HostToolArguments)
-            (ctx: HostToolContext)
-            : Task<string> =
-            task {
-                let! gitCommonDir = askGitCommonDir workspaceDirectory
-
-                if String.IsNullOrWhiteSpace gitCommonDir then
-                    return "devops failed: git common directory is missing"
-                else
-                    let delegateTo = devopsDelegateOf syncRuntime ctx
-
-                    let! outcome =
-                        Wanxiangshu.Mission.Planning.PlanTools.executeAsk
-                            gitCommonDir
-                            ctx.SessionId
-                            (args.Text "intent")
-                            delegateTo
-
-                    return renderAskOutcome outcome
             }
 
         let lifecycleWorkOf
@@ -1127,11 +1026,6 @@ module ToolRegistry =
                     return Error(sprintf "deliver failed: XTrace capture failed: %s" reason)
             }
 
-        let captureOrPropagate journal sessionId =
-            function
-            | Error err -> Task.FromResult(Error err)
-            | Ok fenced -> captureFencedFrontier journal sessionId fenced
-
         let boundDeliveryPhysical messages owningMessageId =
             messages
             |> List.tryFind (fun (message: SessionMessage) ->
@@ -1145,22 +1039,20 @@ module ToolRegistry =
         let resolveDeliverRetirementCursor
             (runtime: ToolRuntimeScope)
             (ctx: HostToolContext)
-            : Task<Result<int64 * PhysicalUserMessageId option, string>> =
-            task {
-                match deliverPorts runtime, deliverOwnership ctx with
-                | Ok(snapshotPort, journal), Ok(owningMessageId, owningCallId) ->
-                    let! exchange =
-                        readOwningExchange snapshotPort (SessionId.create ctx.SessionId) owningMessageId owningCallId
+            : Task<Result<int64 * PhysicalUserMessageId, string>> =
+            taskResult {
+                let! snapshotPort, journal = deliverPorts runtime
+                let! owningMessageId, owningCallId = deliverOwnership ctx
 
-                    let boundPhysical =
-                        exchange
-                        |> Result.map (fun messages -> boundDeliveryPhysical messages owningMessageId)
-                        |> Result.defaultValue None
+                let! messages =
+                    readOwningExchange snapshotPort (SessionId.create ctx.SessionId) owningMessageId owningCallId
 
-                    let! cursor = captureOrPropagate journal (SessionId.create ctx.SessionId) exchange
-                    return cursor |> Result.map (fun value -> value, boundPhysical)
-                | Error err, _ -> return Error err
-                | _, Error err -> return Error err
+                let! physical =
+                    boundDeliveryPhysical messages owningMessageId
+                    |> Result.requireSome "Unable to bind the current work safely: physical parent evidence is missing"
+
+                let! cursor = captureFencedFrontier journal (SessionId.create ctx.SessionId) messages
+                return cursor, physical
             }
 
         let deliverCreate (runtime: ToolRuntimeScope) (operationId: string) (agent: string) =
@@ -1177,17 +1069,29 @@ module ToolRegistry =
             | Ok res -> renderDeliverReceipt res
             | Error err -> sprintf "deliver failed: %s" err
 
-        let registerPostS3Delivery
+        /// 条款 3/4/6: 交付已成立是提交面事实, 登记精确 attempt 围栏与交付当时
+        /// 绑定的物理输入。登记时刻绝不重读会话的当前物理输入——那正是把本次
+        /// 交付的停止瞄准后来新输入的窗口。绑定不出来的交付不登记: 无法证明
+        /// 成立就不是已成立。
+        let registerEstablishedDelivery
             (runtime: ToolRuntimeScope)
             (ctx: HostToolContext)
-            (boundPhysical: PhysicalUserMessageId option)
+            (boundPhysical: PhysicalUserMessageId)
             (outcome: Result<DeliverResult, string>)
             =
-            match outcome, boundPhysical, ctx.ProviderRunId, ctx.ToolCallId with
-            | Ok res, Some physical, Some runId, Some callId when
-                res.RetirementOutcome = "PostS3" || res.RetirementOutcome = "Delivered"
-                ->
-                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId, physical)
+            let established =
+                match outcome with
+                | Ok res -> res.RetirementOutcome = "PostS3" || res.RetirementOutcome = "Delivered"
+                | Error _ -> false
+
+            match established, ctx.ProviderRunId, ctx.ToolCallId with
+            | true, Some runId, Some callId ->
+                runtime.RegisterEstablishedDelivery(
+                    SessionId.create ctx.SessionId,
+                    runId,
+                    callId,
+                    physicalUserMessageId = boundPhysical
+                )
             | _ -> ()
 
         let deliverCursor
@@ -1223,7 +1127,7 @@ module ToolRegistry =
                             retirementBlockers
                             retirementCursor
 
-                    registerPostS3Delivery runtime ctx boundPhysical outcome
+                    registerEstablishedDelivery runtime ctx boundPhysical outcome
 
                     return renderDeliverOutcome outcome
             }
@@ -1262,7 +1166,7 @@ module ToolRegistry =
                             (deliverDiscard runtime)
                             retirementCursor
 
-                    registerPostS3Delivery runtime ctx boundPhysical outcome
+                    registerEstablishedDelivery runtime ctx boundPhysical outcome
 
                     return renderDeliverOutcome outcome
             }
@@ -1331,7 +1235,6 @@ module ToolRegistry =
                 { Name = "deliver"
                   Description = ProviderProse.render providerLanguage "tool/deliver" Map.empty
                   Arguments = [ "note", ToolHostCodec.optionalStringSchema factory ]
-                  Admission = ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
                   Execute =
                     fun _ ctx ->
                         task {
@@ -1353,10 +1256,6 @@ module ToolRegistry =
                 }
 
             { managerSpec with
-                Admission =
-                    ToolAdmission.OfficeRole(fun _ role ->
-                        OfficeCapability.isAllowed role ToolPermission.Finality
-                        || OfficeCapability.isAllowed role ToolPermission.Deliver)
                 Execute =
                     fun args ctx ->
                         task {
@@ -1367,30 +1266,18 @@ module ToolRegistry =
                                 let handles = String.Join(", ", parkedHandles)
 
                                 return
-                                    ToolHostCodec.tomlObjectWithInstructions
+                                    ToolResultText.tomlObjectWithInstructions
                                         [ ProviderProse.render
                                               (lang ctx)
                                               Path.DeliverBlockedByParked
                                               (Map [ "handles", handles ]) ]
-                                        [ "code", ToolHostCodec.TString Path.DeliverBlockedByParked
-                                          "parked_handles", ToolHostCodec.TString handles ]
+                                        [ "code", ToolResultText.TString Path.DeliverBlockedByParked
+                                          "parked_handles", ToolResultText.TString handles ]
                             else
                                 return! executeDeliverRoute ctx args
                         } }
 
         let deliverTool = deliverSpec ()
-
-        // LC-021/LC-022: a real host-registered devops spec. staticAdmissions
-        // already admits DevOpsConsultation; without this spec the Plan role
-        // sees an admission with no tool behind it.
-        let devopsTool =
-            { Name = "devops"
-              Description = ProviderProse.render providerLanguage "tool/devops" Map.empty
-              Arguments = [ "intent", ToolHostCodec.stringSchema factory ]
-              Admission =
-                ToolAdmission.OfficeRole(fun _ role ->
-                    OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
-              Execute = fun args ctx -> askWithLifecycle syncDelegateRuntime args ctx }
 
         let recordedDeliverReplay (ctx: HostToolContext) : Task<bool> =
             task {
@@ -1406,11 +1293,7 @@ module ToolRegistry =
             }
 
         let baseSpecs =
-            [ yield ForkTool.managerSpec factory runtime
-              yield ForkTool.resumeSpec factory runtime
-
-              yield ForkTool.orchestratorSpec factory runtime
-              yield JoinTool.spec runtime
+            [ yield JoinTool.spec runtime
 
               let horizonContext: HorizonTool.HorizonRuntimeContext =
                   { RuntimeFor = runtime.RuntimeFor
@@ -1422,7 +1305,6 @@ module ToolRegistry =
               yield FissionTool.spec factory runtime
               yield ReviewShell.spec factory runtime
               yield deliverTool
-              yield devopsTool
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
 
@@ -1430,8 +1312,8 @@ module ToolRegistry =
               yield! generatedJsSpecs () ]
 
         let gateFacts: ToolGateFacts =
-            { RoleFor = (fun ctx -> runtime.RoleFor ctx)
-              EnsureRoleFor = (fun ctx -> runtime.EnsureRoleFor ctx)
+            { RoleFor = (fun (ctx: HostToolContext) -> runtime.RoleFor ctx)
+              EnsureRoleFor = (fun (ctx: HostToolContext) -> runtime.EnsureRoleFor ctx)
               ManagerFactsFor = (fun sessionId -> runtime.ManagerCapabilityFactsFor sessionId)
               IsRetirementFrozen = (fun sessionId -> runtime.IsRetirementFrozen sessionId)
               IsWaitingForUser = runtime.IsWaitingForUser
@@ -1440,13 +1322,17 @@ module ToolRegistry =
               EndToolExecution = endToolExecution
               RecordedDeliverReplay = recordedDeliverReplay }
 
-        let gateExecute (spec: ToolSpec) =
+        let gateExecute (spec: Wanxiangshu.OpenCode.ToolSpec) =
             let managerPermission =
                 match ManagerReviewTools.requiredPermissions spec.Name with
                 | Some perms -> perms |> Seq.tryHead
                 | None -> StaticTools.permissionOfToolName Role.Manager spec.Name
 
-            fun args (ctx: HostToolContext) -> executeGate gateFacts spec managerPermission args ctx
+            let gated: GatedTool<HostToolArguments> =
+                { Name = spec.Name
+                  Execute = spec.Execute }
+
+            fun args (ctx: HostToolContext) -> ToolExecuteGate.execute gateFacts gated managerPermission args ctx
 
         let specs =
             baseSpecs |> List.map (fun spec -> { spec with Execute = gateExecute spec })

@@ -10,16 +10,7 @@ type CasebookObservationCollector =
     /// Record one explicit file read observation for a session.
     member RecordFileRead: sessionId: string * path: string * output: string -> unit
 
-    /// Record substantive access directly.
-    member RecordSubstantive: sessionId: string * toolName: string * args: obj * committed: bool -> unit
-
     /// Observations collected so far for a session (normalized).
     member Drain: sessionId: string -> Observation list
-
-    /// Substantive access paths collected so far for a session.
-    member DrainPaths: sessionId: string -> string list
-
-    /// AccessTracker collected so far for a session.
-    member DrainTracker: sessionId: string -> AccessTracker
 
     member Count: sessionId: string -> int

@@ -223,6 +223,7 @@ test('WHAT[work-048] malformed discovery rows cannot disappear to turn an ambigu
 for (const [label, response] of [
   ['missing list', {}],
   ['SDK error', { error: { message: 'unavailable' } }],
+  ['SDK nested error', { error: { data: { message: 'unavailable' } } }],
   ['missing identity', { data: [{ title: 'wanxiangshu-delivery:operation', agent: 'manager' }] }],
   ['wrong agent', { data: [{ id: 'session', title: 'wanxiangshu-delivery:operation', agent: 'coder' }] }],
   ['full page before exact filtering', { data: [

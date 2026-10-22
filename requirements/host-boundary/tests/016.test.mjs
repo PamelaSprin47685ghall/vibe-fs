@@ -130,3 +130,58 @@ test('WHAT[host-boundary-016] mutation_canary_duplicate_completed_is_absorbed', 
   assert.equal(received.length, 1)
 })
 }
+
+{
+const { default: assert } = await import('node:assert/strict')
+const { rmSync } = await import('node:fs')
+const EventsSurface = await import('../../../dist/OpenCode/Host/EventsSurface.js')
+const PluginHostWiringSurface = await import('../../../dist/OpenCode/Plugin/PluginHostWiringSurface.js')
+const { gitDir } = await import('../../verification-system/tests/support/orchestrator-host-harness.mjs')
+
+test('WHAT[host-boundary-016] actual PluginHost returns its shared source for exact release and drops sticky facts after the last release', async () => {
+  const workspace = gitDir('terminal-source')
+  const leases = new Set()
+  const open = async () => {
+    const host = await PluginHostWiringSurface.createTerminalHost(workspace)
+    leases.add(host)
+    assert.equal(typeof host.release, 'function')
+    assert.ok(host.source)
+    return host
+  }
+  const release = host => {
+    host.release()
+    leases.delete(host)
+  }
+  const sticky = host => {
+    const seen = []
+    const subscription = EventsSurface.subscribe(host.port, (sessionId, outcome) => seen.push([sessionId, outcome.kind, outcome.providerRun, outcome.text]))
+    try {
+      return seen
+    } finally {
+      EventsSurface.dispose(subscription)
+    }
+  }
+  try {
+    const first = await open()
+    const second = await open()
+    assert.strictEqual(first.source, second.source)
+    EventsSurface.notify(first.port, 'shared-child', 'Completed', 'shared-run', 'shared-result')
+    const expected = [['shared-child', 'Completed', 'shared-run', 'shared-result']]
+    assert.deepEqual(sticky(second), expected)
+
+    release(first)
+    const retained = await open()
+    assert.strictEqual(retained.source, second.source)
+    assert.deepEqual(sticky(retained), expected)
+
+    release(second)
+    release(retained)
+    const fresh = await open()
+    assert.notStrictEqual(fresh.source, second.source)
+    assert.deepEqual(sticky(fresh), [])
+  } finally {
+    for (const host of leases) release(host)
+    rmSync(workspace, { recursive: true, force: true })
+  }
+})
+}

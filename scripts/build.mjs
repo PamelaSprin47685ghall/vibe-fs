@@ -236,8 +236,27 @@ export function checkOutputsValid(existingManifest, targetDist) {
   )
 }
 
+/**
+ * The compilation snapshot proves the sources did not change; it does not
+ * prove the emitted artifacts are still on disk. A missing manifest output
+ * must force a full recompile, or the build reports "up-to-date" while
+ * shipping a tree whose products are gone.
+ */
+export function checkArtifactsPresent(existingManifest, targetDist) {
+  if (!fs.existsSync(targetDist)) return false
+
+  const recordedOutputs = existingManifest?.outputs ?? {}
+  const recordedKeys = Object.keys(recordedOutputs)
+  if (recordedKeys.length === 0) return false
+
+  for (const rel of recordedKeys) {
+    if (!fs.existsSync(path.join(targetDist, rel))) return false
+  }
+
+  return true
+}
+
 export function determineBuildDecision({
-  clean = false,
   existingManifest,
   resolvedRoot,
   targetDist,
@@ -249,52 +268,20 @@ export function determineBuildDecision({
 }) {
   const missingDist = !fs.existsSync(targetDist)
 
-  if (clean) {
-    return {
-      mode: 'clean',
-      reason: 'clean-requested',
-      changedPaths: compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
-      isClean: true,
-      outputsValid: false,
-      missingDist,
-    }
-  }
-
   const hasValidManifest = Boolean(
     existingManifest && existingManifest.schema === MANIFEST_SCHEMA,
   )
 
   const outputsValid = hasValidManifest && checkOutputsValid(existingManifest, targetDist)
 
-  if (!hasValidManifest || !outputsValid) {
-    const reason = missingDist
-      ? 'dist-missing'
-      : !hasValidManifest
-        ? 'manifest-missing-or-invalid'
-        : 'output-hash-mismatch'
-    return {
-      mode: 'full',
-      reason,
-      changedPaths: compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
-      isClean: false,
-      outputsValid,
-      missingDist,
-    }
-  }
+  // The snapshot can be perfectly consistent while the artifacts it names are
+  // gone; missing artifacts must force a recompile.
+  const artifactsPresent = hasValidManifest && checkArtifactsPresent(existingManifest, targetDist)
 
-  const recordedToolIdentity = existingManifest.compiler?.toolIdentity
-  if (recordedToolIdentity !== currentToolchain) {
-    return {
-      mode: 'full',
-      reason: 'toolchain-mismatch',
-      changedPaths: compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
-      isClean: false,
-      outputsValid: true,
-      missingDist: false,
-    }
-  }
+  const recordedToolIdentity = existingManifest?.compiler?.toolIdentity
+  const toolchainChanged = hasValidManifest && recordedToolIdentity !== currentToolchain
 
-  const oldCompilerInputs = existingManifest.compiler?.inputs ?? []
+  const oldCompilerInputs = existingManifest?.compiler?.inputs ?? []
   const oldMap = new Map(oldCompilerInputs.map((e) => [e.path, e]))
   const currentMap = new Map(compilerInputs.map((e) => [e.path, e]))
 
@@ -329,27 +316,29 @@ export function determineBuildDecision({
 
   const uniqueChangedPaths = [...new Set(changedPaths)]
 
-  if (topologyChanged || hasNonFsChange) {
-    return {
-      mode: 'full',
-      reason: topologyChanged ? 'compiler-inputs-topology-changed' : 'toolchain-or-project-change',
-      changedPaths: uniqueChangedPaths.length > 0
-        ? uniqueChangedPaths
-        : compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
-      isClean: false,
-      outputsValid: true,
-      missingDist: false,
-    }
-  }
-
-  if (uniqueChangedPaths.length > 0) {
+  if (!hasValidManifest || !outputsValid || !artifactsPresent || toolchainChanged || topologyChanged || hasNonFsChange || uniqueChangedPaths.length > 0) {
+    const reason = !hasValidManifest
+      ? 'manifest-missing-or-invalid'
+      : !artifactsPresent
+        ? (missingDist ? 'dist-missing' : 'artifacts-missing')
+        : !outputsValid
+          ? 'output-hash-mismatch'
+          : toolchainChanged
+            ? 'toolchain-mismatch'
+            : topologyChanged
+              ? 'compiler-inputs-topology-changed'
+              : hasNonFsChange
+                ? 'toolchain-or-project-change'
+                : 'focused-impact'
     return {
       mode: 'focused',
-      reason: 'focused-impact',
-      changedPaths: uniqueChangedPaths,
+      reason,
+      changedPaths: !hasValidManifest || !outputsValid || toolchainChanged
+        ? [...new Set([...compilerInputs.map((entry) => path.resolve(resolvedRoot, entry.path)), ...uniqueChangedPaths])]
+        : uniqueChangedPaths,
       isClean: false,
-      outputsValid: true,
-      missingDist: false,
+      outputsValid,
+      missingDist,
     }
   }
 
@@ -439,7 +428,6 @@ export function recoverStaleStagedDist(targetDist) {
 
 export async function runBuild({
   targetRoot = root,
-  clean = false,
   stdio = 'inherit',
   skipSourceDependency = path.resolve(targetRoot) !== root,
 } = {}) {
@@ -473,7 +461,6 @@ export async function runBuild({
     const artifactInputDigest = computeDigest(artifactInputs)
 
     const decision = determineBuildDecision({
-      clean,
       existingManifest,
       resolvedRoot,
       targetDist,
@@ -497,51 +484,12 @@ export async function runBuild({
       }
     }
 
+    // Full compilation is forbidden. A missing manifest or a wide change is
+    // still the impact set of the files that differ, never the whole tree.
+    // Wiping dist and recompiling everything hides an impact-set bug.
     let compileResult = null
-
-    if (buildMode === 'clean') {
-      logInfo('Compiling F# (clean)...')
-      // Clean mode also stages the prior dist aside so manually derived
-      // artifacts (e.g. the loop detector envelope) survive the full
-      // rebuild and can be restored by verifyArtifacts.
-      stagedBackupDir = stageDistForFullRebuild(targetDist)
-      compileResult = await compileIncremental({
-        changedPaths: compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
-        isClean: true,
-        root: resolvedRoot,
-        outputDir: targetDist,
-        stdio,
-      })
-      if (!compileResult.ok) {
-        throw new Error(
-          `Fable compilation failed${compileResult.signal ? ` by signal ${compileResult.signal}` : ` with exit code ${compileResult.code}`}`,
-        )
-      }
-      logInfo(`compiled clean impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
-    } else if (buildMode === 'full') {
-      logInfo('Compiling F# (full)...')
-      // Full mode rebuilds from a blank slate via a staged swap: the prior
-      // dist is renamed aside so outputs whose sources were removed (orphaned
-      // JS) cannot survive into the next manifest snapshot, while a failed
-      // rebuild restores the prior dist (structured-workflow-012 fail-safe).
-      stagedBackupDir = stageDistForFullRebuild(targetDist)
-      compileResult = await compileIncremental({
-        changedPaths: changedCompilerPaths.length > 0
-          ? changedCompilerPaths
-          : compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
-        isClean: false,
-        root: resolvedRoot,
-        outputDir: targetDist,
-        stdio,
-      })
-      if (!compileResult.ok) {
-        throw new Error(
-          `Fable compilation failed${compileResult.signal ? ` by signal ${compileResult.signal}` : ` with exit code ${compileResult.code}`}`,
-        )
-      }
-      logInfo(`compiled full impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
-    } else if (buildMode === 'focused' && changedCompilerPaths.length > 0) {
-      logInfo('Compiling F# (focused)...')
+    if (changedCompilerPaths.length > 0) {
+      logInfo(`Compiling F# (${decision.reason})...`)
       compileResult = await compileIncremental({
         changedPaths: changedCompilerPaths,
         isClean: false,
@@ -554,7 +502,7 @@ export async function runBuild({
           `Fable compilation failed${compileResult.signal ? ` by signal ${compileResult.signal}` : ` with exit code ${compileResult.code}`}`,
         )
       }
-      logInfo(`compiled focused impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
+      logInfo(`compiled ${compileResult.mode} impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
     }
 
     // 编译后先清理这些异常产物，避免后续 verifyArtifacts / collectOutputs 遍历失败。
@@ -735,9 +683,7 @@ export async function planBuild({
     changedPaths: decision.changedPaths.length > 0
       ? decision.changedPaths
       : compilerInputs.map((entry) => path.resolve(resolvedRoot, entry.path)),
-    isClean: decision.isClean,
     projectDirectory: path.join(resolvedRoot, 'src/Wanxiangshu'),
-    fullThreshold: 0.6,
   })
 
   return {
@@ -784,10 +730,13 @@ function registerSignalHandlers() {
 async function main() {
   registerSignalHandlers()
 
-  const knownOptions = new Set(['--clean', '--plan', '--help', '-h'])
+  // Full compilation is forbidden. A flag that wipes dist and compiles every
+  // source is rejected with the other unknown flags; fix the impact set.
+  const knownOptions = new Set(['--plan', '--help', '-h'])
   const unknown = process.argv.slice(2).filter((arg) => arg.startsWith('-') && !knownOptions.has(arg))
   if (unknown.length > 0) {
     console.error(`unknown option(s): ${unknown.join(', ')}`)
+    console.error('full compilation is forbidden. Fix the impact set; do not rebuild the tree.')
     process.exit(1)
   }
 
@@ -796,7 +745,6 @@ async function main() {
 Usage: node scripts/build.mjs [options]
 
 Options:
-  --clean      Force clean full rebuild and invalidate manifest
   --plan       Compute and print the next build plan as JSON; no compile,
                resource emit, manifest, or dist write is performed
   --help, -h   Show this help message
@@ -804,13 +752,7 @@ Options:
     process.exit(0)
   }
 
-  const clean = process.argv.includes('--clean')
   const plan = process.argv.includes('--plan')
-
-  if (plan && clean) {
-    console.error('--plan is a read-only preview and cannot be combined with --clean')
-    process.exit(1)
-  }
 
   if (plan) {
     try {
@@ -824,7 +766,7 @@ Options:
   }
 
   try {
-    await runBuild({ targetRoot: root, clean })
+    await runBuild({ targetRoot: root })
   } catch (err) {
     fail(err.message)
   }

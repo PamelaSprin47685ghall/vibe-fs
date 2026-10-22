@@ -2,7 +2,7 @@ namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 
@@ -22,7 +22,10 @@ module HostFactFold =
             { Fact = "PairProgrammingGuidelineAnchored"
               Reason = sprintf "placement (%A, %A) already exists in this transcript (HOST-013 §8)" callGap resultGap }
 
-    let private recordDelivery (projection: AgentProjectionSet) (witness: TaskDeliveryWitness) =
+    let private recordDelivery
+        (projection: AgentProjectionSet)
+        (witness: TaskDeliveryWitness)
+        : Result<AgentProjectionSet, FoldRejection> =
         let key = TaskDelivery.key witness.Fence
 
         match Map.tryFind key projection.Deliveries with

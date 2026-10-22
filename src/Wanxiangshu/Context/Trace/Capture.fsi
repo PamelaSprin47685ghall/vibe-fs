@@ -7,7 +7,7 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
@@ -42,7 +42,7 @@ type XTraceStableCaptureEligibility =
     | DuplicateHostMessageIdentity
 
 type XTraceMessageObservation =
-    { Message: ProviderWireCapture.CapturedWireMessage
+    { Message: CapturedWire.CapturedWireMessage
       HostMessageId: string option
       PromptKey: PromptKey option
       Origin: PromptAuthority.PromptOrigin option }
@@ -76,14 +76,6 @@ module XTraceCapture =
         providerRun: ProviderRunIdentity ->
             Task<Result<XTraceCaptureReceipt, XTraceCaptureError>>
 
-    val captureTerminalBlobWithReceipt:
-        journal: AgentJournal option ->
-        sessionId: SessionId ->
-        textRef: BlobRef ->
-        textDigest: BlobDigest ->
-        providerRun: ProviderRunIdentity ->
-            Task<Result<XTraceCaptureReceipt, XTraceCaptureError>>
-
     val captureTerminalWithReceipt:
         journal: AgentJournal option -> turn: ReconciledTurn -> Task<Result<XTraceCaptureReceipt, XTraceCaptureError>>
 
@@ -111,7 +103,7 @@ module XTraceCapture =
         journal: AgentJournal option ->
         sessionId: SessionId ->
         messageIds: string list option ->
-        messages: ProviderWireCapture.CapturedWireMessage list ->
+        messages: CapturedWire.CapturedWireMessage list ->
             Task<Result<XTraceCaptureReceipt, XTraceCaptureError>>
 
     val captureSessionMessagesWithReceipt:

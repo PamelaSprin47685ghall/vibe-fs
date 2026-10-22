@@ -6,7 +6,7 @@ WHAT 决定来源、身份与生命周期边界。本目录区分纯转换、真
 - 003/005/006/015：真实 root、owner witness、拒绝/未知发送、活跃用户续行；003 新增 root 与完整 identity 经持久化重开后一同恢复。既有 codec 用例验证 current/legacy 格式，不能替代原子 append 的所有 crash cut。
 - 004/008/009/010/012/013/016/017：纯来源、claim、continuation 与 exact identity。013 比较完整 evidence，017 先建立真实可查的续行再 close；旧的“从未登记 key 在空状态里查不到”不再充当关闭证明。
 - 011 的 chat-params 用例确实执行 Host 适配器，但不是原子 AttemptExecutionProfile 全链证据。014 的资源文本检查仅证明当前提示包含相应说明，不证明 Agent 必会等待后台任务。
-- 018 保留纯 exact-close 的正反例。它没有写入 WHAT 的五类 source witness 或 AuthorityLogicalRunClosed；这些不是已完成能力（GAP-123）。
+- 018 保留 exact-close 正反例，新增固定 seed、400 runs 的 fast-check 不变量：实际 authority kind、Manager 身份及已证明的 lifecycle 只能生成唯一 exact closure kind；缺 life、未知值、跨 root kind 或同根错误 lifecycle 均拒绝，不补 Child、不改写错误记录。另逐一覆盖五类合法输入。该性质测试不替代五类真实 source producer、持久关闭与冷恢复的完整证据，GAP-123 仍未闭合。
 - 原 004 的 CompletedTurn 分类测试移至 019：保留正式文本、reasoning、工具活动、终态/在途、当前及历史 role 观测反例，不把旧 role 观察转换当成允许新准入。并发 nudge 测试使用实际所属 session。XML-only 与正文工具标签的现行区分沿用 25-D1 待议，未用测试改合同。
 - 020 删除只验证自造 descriptor 的伪证明，保留实际 settlement → report → kill 与注入边界 TODO。
 - 021 实际 EventStore 关闭重开后保留历史 payload，实际新 ingress 拒绝旧身份。另以正式历史 Inspector fixture 保存事实解码失败反例（GAP-124）；存得下不是完整读得回。

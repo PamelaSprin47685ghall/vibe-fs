@@ -244,11 +244,6 @@ module Budget =
 
         Ok(remaining, booked)
 
-    /// Merge several reservations of the same pool. Used when a round opens.
-    let mergeReservations (reservations: Reservation list) : Map<string, float> =
-        reservations
-        |> List.fold (fun acc reservation -> merge acc reservation.Resources) Map.empty
-
     /// Total outstanding reservation across every work. Derived, never stored, so it
     /// cannot drift from the individual reservations it is supposed to summarize.
     let mergeReserved (pools: Map<string, float> list) : Map<string, float> =

@@ -5,6 +5,7 @@
 /src/Wanxiangshu/Execution/Failure/**
 /src/Wanxiangshu/Participant/Provider/Attempt/**
 /src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/ProviderObservation.fs
 /src/Wanxiangshu/OpenCode/Signals/HostSignal.fs
 /src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs
 /src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs
@@ -26,9 +27,9 @@
 /src/Wanxiangshu/Interaction/Dispatch/Ingress.fs
 /src/Wanxiangshu/Interaction/Dispatch/Recovery.fs
 /src/Wanxiangshu/Interaction/Dispatch/Send.fs
-/src/Wanxiangshu/OpenCode/Host/ModelCapacity/**
-/src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
-/src/Wanxiangshu/OpenCode/Host/ChatAdmission/TransactionSurface.fs
+/src/Wanxiangshu/Execution/Routing/ModelCapacity/**
+/src/Wanxiangshu/Execution/Routing/ModelRouting.fs
+/src/Wanxiangshu/Interaction/Admission/ChatAdmissionTransactionSurface.fs
 /src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs
 /src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs
 /src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs

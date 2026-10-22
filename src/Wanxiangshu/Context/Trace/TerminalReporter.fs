@@ -6,7 +6,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.TerminalSignal
 
 [<RequireQualifiedAccess>]
 type XTraceTerminalCompletion =
@@ -21,15 +21,18 @@ type XTraceTerminalCompletion =
 /// lifecycle / JoinGuard / IdleRepair / LoopSensor.
 module TerminalReporter =
 
-    /// Runs the durable-terminal capture through the port, or yields the deterministic
-    /// empty receipt when no port is provided (test/dev harness without journal).
+    /// Captures the actual terminal turn. A sealed delivery view is published separately.
+    /// Without a port, returns the empty receipt for a harness without a journal.
     let private runCapture
         (port: TerminalTracePort option)
         (turn: ReconciledTurn)
-        (sessionWideText: string)
         : Task<Result<XTraceCaptureReceipt, XTraceCaptureError>> =
         match port with
-        | Some tracePort -> tracePort.CaptureTerminalText turn.SessionId sessionWideText turn.ProviderRun
+        | Some tracePort ->
+            tracePort.CaptureTerminalText
+                turn.SessionId
+                (CompletedTurnClassifier.partsSessionText turn.Parts)
+                turn.ProviderRun
         | None ->
             Task.FromResult(
                 Ok
@@ -45,11 +48,10 @@ module TerminalReporter =
         (eventPort: IEventObservationPort)
         (port: TerminalTracePort option)
         (turn: ReconciledTurn)
-        (sessionWideText: string)
         (runResult: AgentRunResult)
         : Task<XTraceTerminalCompletion> =
         task {
-            let! captureResult = runCapture port turn sessionWideText
+            let! captureResult = runCapture port turn
 
             match captureResult with
             | Ok _ ->
@@ -91,7 +93,14 @@ module TerminalReporter =
                   TerminalText = sessionWideText
                   TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
-            if not runResult.IsValid then
+            if not deliveryWitness && role <> Role.Advisor then
+                // A stop without a valid delivery of this run is not a completion:
+                // publish no terminal fact and keep the task active for its owner.
+                return XTraceTerminalCompletion.RejectedUndelivered
+            elif
+                System.String.IsNullOrWhiteSpace runResult.TurnFormalText
+                || (role = Role.Advisor && not runResult.IsValid)
+            then
                 eventPort.NotifyTerminal
                     turn.SessionId
                     (TerminalOutcome.Failed(
@@ -100,12 +109,8 @@ module TerminalReporter =
                 |> ignore
 
                 return XTraceTerminalCompletion.RejectedEmptyOutput
-            elif not deliveryWitness && role <> Role.Advisor then
-                // A stop without a valid delivery of this run is not a completion:
-                // publish no terminal fact and keep the task active for its owner.
-                return XTraceTerminalCompletion.RejectedUndelivered
             else
-                return! notifyTerminalCompletion eventPort port turn sessionWideText runResult
+                return! notifyTerminalCompletion eventPort port turn runResult
         }
 
     /// Build the `AgentRunResult`, admit it through the delivery witness,

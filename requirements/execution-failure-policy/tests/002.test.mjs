@@ -7,7 +7,7 @@ const policy = await import("../../../dist/Execution/Failure/Surface.js");
 const recovery = await import("../../../dist/Execution/Session/ChatExecution/RecoveryRuntimeSurface.js");
 const hostSignals = await import("../../../dist/OpenCode/Host/HostSignalSurface.js");
 const hooks = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
-const transaction = await import("../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js");
+const transaction = await import("../../../dist/Interaction/Admission/ChatAdmissionTransactionSurface.js");
 
 const executionKey = {
   sessionId: 'ses-cancel-retry-stream',
@@ -441,5 +441,32 @@ test('WHAT[execution-failure-policy-002] every phase and failure yields exactly 
   assert.equal(typeof policy.recoveryStep, 'function')
   assert.equal(policy.recoveryStep(false), 'RetrySameProvider')
   assert.equal(policy.recoveryStep(true), 'BlacklistProviderThenRetry')
+})
+
+test('WHAT[execution-failure-policy-002] one failure decision owner: the host policy only adapts wanxiangli/failure', async () => {
+  // CUT-14 ①: the resolution, breaker, fence settlement and fatality of one failure are decided only by
+  // wanxiangli/failure; the host module maps typed facts in and the plain decision out.
+  const { readFileSync } = await import('node:fs')
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Failure/Policy.fs', import.meta.url), 'utf8')
+  assert.match(source, /Import\("ExecutionFailurePolicy", "wanxiangli\/failure"\)/)
+  assert.doesNotMatch(source, /deriveBreaker|deriveCapacitySettlement|deriveFatality|terminalResolution|retryProviderResolution|releaseCapacity|retainCapacity/)
+  const library = await import('wanxiangli/failure')
+  assert.equal(new library.ExecutionFailurePolicy().contractVersion, 1)
+})
+
+test('WHAT[execution-failure-policy-002] one failure budget owner: the host projection only adapts wanxiangli/failure-budget', async () => {
+  // CUT-14 ②: exact attempt dedupe, single-step advance, exhaustion, success reset and the replay answer
+  // are decided only by wanxiangli/failure-budget; the host maps its typed projection in and out.
+  const { readFileSync } = await import('node:fs')
+  const read = file => readFileSync(new URL(`../../../src/Wanxiangshu/Participant/Provider/Attempt/${file}`, import.meta.url), 'utf8')
+  const projection = read('Fallback/Projection.fs')
+  assert.match(projection, /Import\("ProviderFailureBudget", "wanxiangli\/failure-budget"\)/)
+  assert.doesNotMatch(projection, /DedupeWindow|List\.truncate|List\.contains|isValidRecord/)
+  assert.doesNotMatch(read('Fallback/Ledger.fs'), /List\.tryHead|RecentFailureKeys/)
+  assert.doesNotMatch(read('FailureBudget.fs'), /String\.Join|>= budgetLimit/)
+  const library = await import('wanxiangli/failure-budget')
+  const budget = new library.ProviderFailureBudget()
+  assert.equal(budget.contractVersion, 1)
+  assert.equal(budget.defaultBudget, 12, 'the host DefaultBudget literal must equal the library default')
 })
 }

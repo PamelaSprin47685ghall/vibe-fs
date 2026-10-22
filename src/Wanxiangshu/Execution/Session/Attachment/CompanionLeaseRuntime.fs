@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 /// The observed allocation origin of a Companion child. The core's `Origin` is the
 /// single source; this is its Companion-facing name.
@@ -146,16 +146,6 @@ type CompanionLeaseRuntime(sessions: ISessionHostPort, registry: AttachmentLease
                         { SessionId = SessionId.create lease.SessionId
                           Origin = originOf lease.Origin }
         }
-
-    /// Only the binding is dropped, so the next material re-observes Host and durable
-    /// state instead of trusting a stale cache entry. The child lease itself ends with
-    /// the owner's lifetime or with an explicit `Retire`.
-    member _.Invalidate(owner: SessionId, kind: SatelliteKind) =
-        // The parameter names the caller's SatelliteKind (always Companion today);
-        // this adapter owns exactly the Companion AttachmentKind.
-        ignore kind
-        registry.Remove(owner, selfKind) |> ignore
-        registry.FinishEnsure(owner, selfKind)
 
     /// The owner ended, or the child has to go: end the resident child and close the
     /// durable association. Nothing resident means only the association is closed,

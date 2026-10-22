@@ -13,6 +13,7 @@ import { getDescendantPids } from "./process-host-checks.js";
 import { terminateTree } from "./process-lifecycle.js";
 import { recordSpawn, recordExit } from "./spawn-ledger.js";
 import { SIGTERM_GRACE_MS, SIGKILL_GRACE_MS } from "./time-budget.js";
+import { reclaimOwnedProcessGroup } from "./owned-process-group.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
 
@@ -82,9 +83,44 @@ export function ringPush(buffer, s) {
   if (buffer.length > STDOUT_RING_MAX) buffer.shift();
 }
 
-export async function terminateChild(child, termMs = SIGTERM_GRACE_MS, killMs = SIGKILL_GRACE_MS) {
+function observeChildExit(child, deadline) {
+  return new Promise((accept, reject) => {
+    let timer;
+    let settled = false;
+    const expired = () => new Error('Actual child exit was not observed before the owned cleanup deadline');
+    const finish = error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.removeListener('exit', onExit);
+      child.removeListener('error', onError);
+      if (error) reject(error);
+      else accept();
+    };
+    const onExit = () => finish(Date.now() >= deadline ? expired() : undefined);
+    const onError = error => finish(error);
+    child.once('exit', onExit);
+    child.once('error', onError);
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) finish(expired());
+    else if (child.exitCode != null || child.signalCode != null) finish();
+    else timer = setTimeout(() => finish(expired()), remaining);
+  });
+}
+
+export async function terminateChild(child, termMs = SIGTERM_GRACE_MS, killMs = SIGKILL_GRACE_MS, { force = false } = {}) {
   const pid = child?.pid;
   if (!pid) return;
+  if (force) {
+    const deadline = Date.now() + killMs;
+    const exited = observeChildExit(child, deadline);
+    const outcomes = await Promise.allSettled([reclaimOwnedProcessGroup(child, { deadline }), exited]);
+    const failures = outcomes.filter(outcome => outcome.status === 'rejected').map(outcome => outcome.reason);
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1) throw new AggregateError(failures, 'Owned group reclamation and actual child exit failed', { cause: failures[0] });
+    activeChildPids.delete(pid);
+    return;
+  }
   activeChildPids.delete(pid);
 
   try {

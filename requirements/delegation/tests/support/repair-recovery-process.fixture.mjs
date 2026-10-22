@@ -14,6 +14,11 @@ const pendingAfterTurn = promise => Promise.race([
   new Promise(resolve => setImmediate(() => resolve('pending'))),
 ])
 
+const deliverTo = (accepted, providerRun, material) => sync.deliver(
+  runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId,
+  providerRun, `call-${providerRun}`, material, { 0: material },
+)
+
 for (const name of ['createForProviderRecovery', 'observeRepairTurn', 'confirmManagedPromptPhysical', 'closeRecovery']) {
   assert.equal(typeof sync[name], 'function', `missing repair fixture capability: ${name}`)
 }
@@ -52,8 +57,9 @@ try {
   assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2)
   let successor
   let result
+  let deliveredView
   if (lateAcceptance) {
-    sync.recordDeliveredValue(initial.sessionId, 'INITIAL-FORMAL-ANSWER')
+    deliveredView = await deliverTo(initial, 'initial-formal-provider-run', 'INITIAL-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, initial.sessionId, initial.physicalUserMessageId,
       initial.authorityRootUserMessageId, 'initial-formal-provider-run', 'INITIAL-FORMAL-ANSWER', ''), true)
     result = await completion
@@ -66,14 +72,15 @@ try {
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 1).kind, 'Accepted')
     await observe(true)
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2)
-    sync.recordDeliveredValue(successor.sessionId, 'REPAIR-FORMAL-ANSWER')
+    deliveredView = await deliverTo(successor, 'actual-repair-provider-run', 'REPAIR-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, successor.sessionId, successor.physicalUserMessageId,
       successor.authorityRootUserMessageId, 'actual-repair-provider-run', 'REPAIR-FORMAL-ANSWER', ''), true)
     result = await completion
     assert.deepEqual(result, { ok: true, value: {
       sessionId: successor.sessionId, physicalUserMessageId: successor.physicalUserMessageId,
       authorityRootUserMessageId: successor.authorityRootUserMessageId,
-      providerRun: 'actual-repair-provider-run', formalText: 'REPAIR-FORMAL-ANSWER',
+      providerRun: 'actual-repair-provider-run', view: deliveredView,
+      turnFormalText: 'REPAIR-FORMAL-ANSWER',
     } })
   }
   assert.equal(sync.childCount(runtime), 1)
@@ -111,12 +118,13 @@ try {
     const secondSuccessor = await sync.confirmManagedPromptPhysical(runtime, owner, 'Engineer', 3, 'second-repair-physical')
     assert.equal(secondSuccessor.ok, true, JSON.stringify(secondSuccessor))
     assert.equal(secondSuccessor.origin, 'InteractionRepair')
-    sync.recordDeliveredValue(secondSuccessor.sessionId, 'SECOND-REPAIR-FORMAL-ANSWER')
+    const secondDeliveredView = await deliverTo(secondSuccessor, 'second-formal-provider-run', 'SECOND-REPAIR-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, secondSuccessor.sessionId, secondSuccessor.physicalUserMessageId,
       secondSuccessor.authorityRootUserMessageId, 'second-formal-provider-run', 'SECOND-REPAIR-FORMAL-ANSWER', ''), true)
     const secondResult = await secondCompletion
     assert.equal(secondResult.value.physicalUserMessageId, secondSuccessor.physicalUserMessageId)
-    assert.equal(secondResult.value.formalText, 'SECOND-REPAIR-FORMAL-ANSWER')
+    assert.equal(secondResult.value.view, secondDeliveredView)
+    assert.equal(secondResult.value.turnFormalText, 'SECOND-REPAIR-FORMAL-ANSWER')
     assert.equal(sync.childCount(runtime), 1)
     assert.equal(sync.terminalListenerCount(runtime), 0)
   }

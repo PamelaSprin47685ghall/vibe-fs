@@ -45,10 +45,6 @@ module Catalog =
     let sharedResponseFields: string list =
         [ "scopeRef"; "inputArtifactRefs"; "applicability"; "findings"; "unresolved" ]
 
-    /// `applicability` is one of three honest answers, and "not-applicable" is a
-    /// successful result rather than a retry signal.
-    let applicabilityValues: string list = [ "applicable"; "not-applicable"; "unclear" ]
-
     let sharedToolNeeds: string list = [ "context.read" ]
 
     let sharedDeltaShape: string list =

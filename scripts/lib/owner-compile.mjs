@@ -360,35 +360,13 @@ export function planOwnerCompile({ projectPath, aggregatePath = null } = {}) {
     candidatePath: resolvedProjectPath,
     projectPath: resolvedProjectPath,
     candidateBasename: path.basename(resolvedProjectPath),
+    projectDirectory: path.dirname(resolvedProjectPath),
     aggregatePath: resolvedAggregatePath,
     projectPaths: sortedProjectPaths,
     compileItems: orderedCompileItems,
     projectContents,
     aggregateContent: aggregate.rawText,
   }
-}
-
-const FULL_IMPACT_BASENAMES = new Set([
-  'Directory.Build.props',
-  'Directory.Build.targets',
-  'package.json',
-  'package-lock.json',
-  'pnpm-lock.yaml',
-  'yarn.lock',
-  'global.json',
-  'compile-order.txt',
-])
-
-function requiresFullImpact(changedPath, aggregatePath) {
-  const basename = path.basename(changedPath)
-  return changedPath === aggregatePath
-    || path.extname(changedPath).toLowerCase() === '.fsproj'
-    || FULL_IMPACT_BASENAMES.has(basename)
-    || /(?:^|\/)\.config\/dotnet-tools\.json$/.test(changedPath)
-    || /(?:^|\/)scripts\/build\.mjs$/.test(changedPath)
-    || /(?:^|\/)scripts\/lib\/owner-compile\.mjs$/.test(changedPath)
-    || /(?:^|\/)scripts\/lib\/compile-shards\.mjs$/.test(changedPath)
-    || /(?:^|\/)scripts\/lib\/build-state\.mjs$/.test(changedPath)
 }
 
 function discoverOwnerProjects(projectDirectory, aggregatePath) {
@@ -420,6 +398,25 @@ function discoverOwnerProjects(projectDirectory, aggregatePath) {
     .sort()
 }
 
+const SHARED_COMPILER_INPUTS = new Set([
+  'Directory.Build.props',
+  'Directory.Build.targets',
+  'package.json',
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  'global.json',
+  'compile-order.txt',
+])
+
+function isSharedCompilerInput(changedPath, aggregatePath) {
+  return changedPath === aggregatePath
+    || SHARED_COMPILER_INPUTS.has(path.basename(changedPath))
+    || /(?:^|\/)\.config\/dotnet-tools\.json$/.test(changedPath)
+    || /(?:^|\/)scripts\/build\.mjs$/.test(changedPath)
+    || /(?:^|\/)scripts\/lib\/(?:owner-compile|compile-shards|build-state)\.mjs$/.test(changedPath)
+}
+
 function impactPlan({
   mode,
   aggregate,
@@ -428,13 +425,15 @@ function impactPlan({
   selectedProjects,
   changedPaths,
   reason,
+  projectDirectory,
 }) {
   const selectedSources = new Set(
     [...selectedProjects].flatMap((projectPath) => projects.get(projectPath).compileItems),
   )
-  const compileItems = mode === 'full'
-    ? aggregate.compileItems
-    : aggregate.compileItems.filter((sourcePath) => selectedSources.has(sourcePath))
+  // Full compilation is forbidden. Every plan compiles the selected closure
+  // and nothing else; a change whose owner cannot be named is an error, not
+  // a reason to compile the tree.
+  const compileItems = aggregate.compileItems.filter((sourcePath) => selectedSources.has(sourcePath))
   const projectPaths = [...selectedProjects].sort()
 
   return {
@@ -449,6 +448,7 @@ function impactPlan({
     candidatePath: aggregate.path ?? 'impact-generated/Wanxiangshu.Impact.fsproj',
     projectPath: aggregate.path ?? 'impact-generated/Wanxiangshu.Impact.fsproj',
     candidateBasename: 'Wanxiangshu.Impact.fsproj',
+    projectDirectory,
     aggregatePath: aggregate.path,
     projectPaths,
     compileItems,
@@ -462,43 +462,38 @@ function impactPlan({
  *
  * Implementation-only .fs changes select the owning locality and its forward
  * closure. Signature changes select every reverse consumer, then union each
- * selected root's forward closure. Toolchain/topology changes and impact sets
- * above fullThreshold select the aggregate input.
+ * selected root's forward closure. An .fsproj change selects that project's
+ * reverse consumers the same way a signature change does: the project file
+ * is the closure's edge list. There is no full compilation. A missing owner,
+ * a deleted source, or an impact that happens to be large is a reason to fix
+ * the impact set, never a reason to compile everything.
  */
 export function planImpactCompile({
   changedPaths,
   projectDirectory,
   aggregatePath = null,
-  fullThreshold = 0.6,
-  isClean = false,
 } = {}) {
   if (!Array.isArray(changedPaths) || changedPaths.length === 0) {
     throw new Error('changedPaths must contain at least one path for planImpactCompile')
-  }
-  if (!(fullThreshold > 0 && fullThreshold <= 1)) {
-    throw new Error(`fullThreshold must be within (0, 1], got ${fullThreshold}`)
   }
 
   const inventory = readImpactInventory({ projectDirectory, aggregatePath })
   // Filesystem-facing pre-pass (the pure planner never touches disk):
   //  - production .fs/.fsi that exists but owns no shard → hard error;
-  //    an unowned source must not be silently covered by a full compile.
-  //  - changed sources that no longer exist at all (delete/rename) → full
-  //    plan so retired JS outputs are cleared, not reused.
+  //    an unowned source must not be silently covered by compiling everything.
+  //  - a changed source that no longer exists is the same error: its owner
+  //    must be recovered from the shard that declared it, then that closure
+  //    recompiled. Deletion is not a licence to compile the tree.
   //  - paired .fs bodies whose source contains `inline` / `[<Literal>]` or
   //    that lack a sibling .fsi are signature-risky — treat the change like
   //    an .fsi change and pull every reverse consumer.
   const signatureRiskPaths = new Set()
-  const removedSources = []
   const unmappedExisting = []
   for (const changedPath of changedPaths) {
     const normalized = norm(changedPath)
     const extension = path.extname(normalized).toLowerCase()
     if (extension !== '.fs' && extension !== '.fsi') continue
-    if (!fs.existsSync(normalized)) {
-      removedSources.push(normalized)
-      continue
-  }
+    if (!fs.existsSync(normalized)) continue
     if (!inventory.sourceOwner.has(normalized)) {
       unmappedExisting.push(normalized)
       continue
@@ -516,26 +511,44 @@ export function planImpactCompile({
   if (unmappedExisting.length > 0) {
     throw new Error(
       `Unmapped production source change (declared in no owner shard): ${unmappedExisting.join(', ')}. ` +
-      'Register the file in an owner fsproj — a silent full compile must not cover missing ownership.',
+      'Register the file in an owner fsproj. Full compilation is forbidden and must not cover missing ownership.',
     )
   }
-  if (removedSources.length > 0) {
-    return planImpactFromInventory({
-      inventory,
-  changedPaths,
-      fullThreshold,
-      isClean,
-      forceFullReason: 'source-graph-change',
-    })
+  const removedSources = changedPaths.map((changedPath) => norm(changedPath)).filter((changedPath) => {
+    const extension = path.extname(changedPath).toLowerCase()
+    return (extension === '.fs' || extension === '.fsi') && !fs.existsSync(changedPath)
+  })
+  const missingDeclaredSources = removedSources.filter((sourcePath) => inventory.sourceOwner.has(sourcePath))
+  if (missingDeclaredSources.length > 0) {
+    throw new Error(`Declared production source is missing: ${missingDeclaredSources.join(', ')}`)
   }
-  return planImpactFromInventory({
+  const liveChanges = changedPaths.filter((changedPath) => !removedSources.includes(norm(changedPath)))
+  if (liveChanges.length === 0) {
+    return {
+      mode: 'none',
+      reason: 'source-removed',
+      projectDirectory: inventory.projectDirectory,
+      changedPaths: removedSources,
+      removedSources,
+      rootProjectPaths: [],
+      candidatePath: 'impact-generated/Wanxiangshu.Impact.fsproj',
+      projectPath: 'impact-generated/Wanxiangshu.Impact.fsproj',
+      candidateBasename: 'Wanxiangshu.Impact.fsproj',
+      aggregatePath: null,
+      projectPaths: [],
+      compileItems: [],
+      projectContents: new Map(),
+      aggregateContent: '',
+  }
+  }
+  const plan = planImpactFromInventory({
     inventory,
-  changedPaths,
-    fullThreshold,
-    isClean,
+    changedPaths: liveChanges,
     signatureRiskPaths,
   })
-   }
+  if (removedSources.length > 0) plan.removedSources = removedSources
+  return plan
+ }
 
 // Lexical stripping of F# comments and strings to eliminate false positives in prose/comments.
 // Covers line comments (//), nested block comments (* ... *), triple-quoted strings, verbatim strings,
@@ -696,9 +709,14 @@ export function readImpactInventory({ projectDirectory, aggregatePath = null } =
   const projectPaths = discoverOwnerProjects(resolvedProjectDirectory, aggregate.path)
   const projects = new Map(projectPaths.map((projectPath) => [projectPath, parseProjectFile(projectPath)]))
   const sourceOwner = new Map()
+  // A source listed by the previous manifest may already be gone. Its owner
+  // is still the shard that declares it, so the impact set stays that
+  // shard's closure. Compiling the tree would hide the deletion.
+  const declaredOwner = new Map()
 
   for (const [projectPath, project] of projects) {
     for (const sourcePath of project.compileItems) {
+      declaredOwner.set(sourcePath, projectPath)
       const existingOwner = sourceOwner.get(sourcePath)
       if (existingOwner) {
         throw new Error(
@@ -736,6 +754,7 @@ export function readImpactInventory({ projectDirectory, aggregatePath = null } =
     projectPaths: Object.freeze([...projectPaths]),
       projects,
     sourceOwner,
+    declaredOwner,
     reverseReferences,
   }
   }
@@ -797,28 +816,23 @@ function canonicalImpactOrder(projectPaths, projects) {
 /**
  * Pure impact planning over an inventory from readImpactInventory.
  *
- * Performs no filesystem access: requiresFullImpact/toolchain check, signature
- * risk fan-out (reverse consumers), forward closure, aggregate-drift check,
- * and the fullThreshold/clean-build promotion. `signatureRiskPaths` is an
- * optional set of changed .fs paths that must behave like a signature change
- * (inline / [<Literal>] bodies, or a .fs with no paired .fsi). `forceFullReason`
- * promotes the plan to `full` with that reason without walking the graph — used
- * for deleted/renamed production sources whose ownership went stale.
- * Throws the same errors as planImpactCompile for bad
- * changedPaths/fullThreshold, cycles, and aggregate drift.
+ * Performs no filesystem access: signature
+ * risk fan-out (reverse consumers), forward closure, and aggregate-drift
+ * check. `signatureRiskPaths` is an optional set of changed .fs paths that
+ * must behave like a signature change (inline / [<Literal>] bodies, or a
+ * .fs with no paired .fsi). An .fsproj change fans out the same way.
+ * Full compilation is forbidden: this function never returns mode 'full'.
  */
-export function planImpactFromInventory({ inventory, changedPaths, fullThreshold = 0.6, isClean = false, signatureRiskPaths, forceFullReason } = {}) {
+export function planImpactFromInventory({ inventory, changedPaths, signatureRiskPaths } = {}) {
   if (!Array.isArray(changedPaths) || changedPaths.length === 0) {
     throw new Error('changedPaths must contain at least one path for planImpactCompile')
-  }
-  if (!(fullThreshold > 0 && fullThreshold <= 1)) {
-    throw new Error(`fullThreshold must be within (0, 1], got ${fullThreshold}`)
   }
   if (!inventory || !inventory.aggregate || !inventory.projects || !inventory.sourceOwner) {
     throw new Error('inventory from readImpactInventory is required for planImpactFromInventory')
   }
 
   const { aggregate, projects, sourceOwner } = inventory
+  const declaredOwner = inventory.declaredOwner ?? sourceOwner
   const projectPaths = inventory.projectPaths ?? [...projects.keys()]
   const reverseReferences = inventory.reverseReferences ?? (() => {
     const index = new Map(projectPaths.map((projectPath) => [projectPath, new Set()]))
@@ -831,32 +845,11 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
   })()
 
   const normalizedChanges = [...new Set(changedPaths.map((changedPath) => norm(changedPath)))].sort()
-  const allProjects = new Set(projectPaths)
-  if (normalizedChanges.some((changedPath) => requiresFullImpact(changedPath, aggregate.path))) {
-    return impactPlan({
-      mode: 'full',
-      aggregate,
-      projects,
-      roots: allProjects,
-      selectedProjects: allProjects,
-      changedPaths: normalizedChanges,
-      reason: 'toolchain-or-project-change',
-    })
-  }
-
-  if (forceFullReason) {
-    return impactPlan({
-      mode: 'full',
-      aggregate,
-      projects,
-      roots: allProjects,
-      selectedProjects: allProjects,
-      changedPaths: normalizedChanges,
-      reason: forceFullReason,
-    })
-  }
-
   const roots = new Set()
+  const sharedInputChanged = normalizedChanges.some((changedPath) => isSharedCompilerInput(changedPath, aggregate.path))
+  if (sharedInputChanged) {
+    for (const projectPath of projectPaths) roots.add(projectPath)
+  }
 
   const addRoot = (projectPath) => {
     if (!roots.has(projectPath)) roots.add(projectPath)
@@ -880,11 +873,14 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
 
   const unmappedExisting = []
   for (const changedPath of normalizedChanges) {
-    const ownerProject = sourceOwner.get(changedPath)
+    const ownerProject = sourceOwner.get(changedPath) ?? declaredOwner.get(changedPath)
     if (!ownerProject) {
       const extension = path.extname(changedPath).toLowerCase()
       if (extension === '.fs' || extension === '.fsi') {
         unmappedExisting.push(changedPath)
+      }
+      if (extension === '.fsproj' && projects.has(changedPath)) {
+        addReverseConsumers(changedPath)
       }
       continue
     }
@@ -899,7 +895,7 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
   if (unmappedExisting.length > 0) {
     throw new Error(
       `Unmapped production source change (declared in no owner shard): ${unmappedExisting.join(', ')}. ` +
-      'Register the file in an owner fsproj — a silent full compile must not cover missing ownership.',
+      'Register the file in an owner fsproj. Full compilation is forbidden and must not cover missing ownership.',
     )
   }
 
@@ -912,6 +908,7 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
       selectedProjects: new Set(),
       changedPaths: normalizedChanges,
       reason: 'no-production-impact',
+      projectDirectory: inventory.projectDirectory,
     })
   }
 
@@ -956,24 +953,7 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
     }
   }
 
-  const selectedProductionCount = [...selectedProjects]
-    .flatMap((projectPath) => projects.get(projectPath).compileItems)
-    .filter((sourcePath) => sourcePath.endsWith('.fs')).length
-  const aggregateProductionCount = aggregate.compileItems.filter((sourcePath) => sourcePath.endsWith('.fs')).length
-
-  if (isClean || selectedProductionCount / aggregateProductionCount > fullThreshold) {
-    return impactPlan({
-      mode: 'full',
-      aggregate,
-      projects,
-      roots,
-      selectedProjects: allProjects,
-      changedPaths: normalizedChanges,
-      reason: isClean ? 'clean-build' : 'impact-exceeds-full-threshold',
-    })
-  }
-
-  return impactPlan({
+  const plan = impactPlan({
     mode: 'focused',
     aggregate,
     projects,
@@ -981,7 +961,10 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
     selectedProjects,
     changedPaths: normalizedChanges,
     reason: 'focused-impact',
+    projectDirectory: inventory.projectDirectory,
   })
+  if (sharedInputChanged) plan.forceCompileCache = false
+  return plan
 }
 
 /**
@@ -1094,10 +1077,15 @@ export function materializeOwnerCompile(plan, {
   // `artifactFingerprint` is the emitted-JS identity: restore fingerprint
   // plus each compile item's bytes — exactly the inputs Fable needs to
   // decide whether to emit again.
+  const flatAnchor = plan.aggregatePath ? path.dirname(plan.aggregatePath) : plan.projectDirectory
+  if (typeof flatAnchor !== 'string' || flatAnchor.length === 0) {
+    throw new Error('Compile plan must declare its source project directory')
+  }
   const restoreHasher = crypto.createHash('sha256')
   restoreHasher.update(`schema:${SCHEMA_VERSION}\n`)
   restoreHasher.update(`candidate:${plan.candidatePath}\n`)
   restoreHasher.update(`aggregatePath:${plan.aggregatePath}\n`)
+  restoreHasher.update(`sourceAnchor:${flatAnchor}\n`)
   restoreHasher.update(`aggregateContent:${plan.aggregateContent}\n`)
   restoreHasher.update(`rootPropsPath:${resolvedRootPropsPath}\n`)
   restoreHasher.update(`rootPropsContent:${rootPropsContent}\n`)
@@ -1130,7 +1118,6 @@ export function materializeOwnerCompile(plan, {
   const outputCompileInstance = crypto.createHash('sha256').update(artifactDir).digest('hex').slice(0, 16)
   // Anchor flat-project output under the source directory; with the wrapper
   // aggregate retired, we no longer have its path to anchor against.
-  const flatAnchor = plan.aggregatePath ? path.dirname(plan.aggregatePath) : path.resolve(REPO_ROOT, 'src/Wanxiangshu')
   // Project working directory is anchored by structural identity (restoreFingerprint)
   // rather than source content bytes, preserving Fable's internal cache across body-only edits.
   const generatedProjectDir = outputDir
@@ -1252,23 +1239,42 @@ export function isSuccessMarkerValid(markerPath, expectedFingerprint, outputDir)
     if (parsed.fingerprint !== expectedFingerprint) {
       return false
     }
-    if (parsed.schema && parsed.schema !== SCHEMA_VERSION) {
+    if (parsed.schema !== SCHEMA_VERSION || !parsed.outputs) {
       return false
     }
+    const outputs = collectEmittedOutputs(outputDir)
+    const paths = Object.keys(outputs)
+    return paths.length > 0
+      && paths.length === Object.keys(parsed.outputs).length
+      && paths.every((relativePath) => outputs[relativePath] === parsed.outputs[relativePath])
   } catch {
     return false
   }
-  return hasEmittedJsFiles(outputDir)
+}
+
+function collectEmittedOutputs(outputDir) {
+  const outputs = {}
+  const visit = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const filename = path.join(directory, entry.name)
+      if (entry.isDirectory()) visit(filename)
+      else if (entry.isFile()) outputs[path.relative(outputDir, filename)] = computeFileHash(filename)
+      else throw new Error(`Emitted output is not a regular file or directory: ${filename}`)
+    }
+  }
+  visit(outputDir)
+  return outputs
 }
 
 /**
  * Atomically writes the success marker for the given fingerprint.
  */
-export function writeSuccessMarker(markerPath, fingerprint) {
+export function writeSuccessMarker(markerPath, fingerprint, outputDir) {
   const content = JSON.stringify(
     {
       schema: SCHEMA_VERSION,
       fingerprint,
+      outputs: collectEmittedOutputs(outputDir),
     },
     null,
     2,
@@ -1342,7 +1348,7 @@ export async function compileOwnerProject({
   const materialized = materializeOwnerCompile(plan, { scratchRoot, rootPropsPath, outputDir })
 
   // Check if success marker is valid for the computed fingerprint and output contains JS
-  const isWarm = isSuccessMarkerValid(
+  const isWarm = plan.forceCompileCache !== false && isSuccessMarkerValid(
     materialized.markerPath,
     materialized.fingerprint,
     materialized.outputPath,
@@ -1362,8 +1368,31 @@ export async function compileOwnerProject({
 
   const hasAssets = fs.existsSync(materialized.assetsPath)
 
-  // A shared output can hold another closure's cracked project. Only output
-  // isolated with its project may reuse that compiler cache.
+  if (isWarm) {
+    const shortFp = materialized.fingerprint.slice(0, 12)
+    if (stdio !== 'pipe') {
+      console.log(`[owner-compile] cached: ${materialized.candidateBasename} (fp:${shortFp})`)
+    }
+    return {
+      ok: true,
+      code: 0,
+      signal: null,
+      stdout: '',
+      stderr: '',
+      projectPath: materialized.projectPath,
+      outputPath: materialized.outputPath,
+      assetsPath: materialized.assetsPath,
+      scratchDir: materialized.scratchDir,
+      markerPath: materialized.markerPath,
+      successMarkerPath: materialized.successMarkerPath,
+      fingerprint: materialized.fingerprint,
+      elapsedMs: 0,
+      cached: true,
+    }
+  }
+
+  // A cache miss must emit the selected closure into this output directory.
+  // A cracked project alone does not prove those products still exist.
   const args = [
     'tool',
     'run',
@@ -1375,11 +1404,8 @@ export async function compileOwnerProject({
     '-o',
     materialized.outputPath,
     '--noGitignore',
+    '--noCache',
   ]
-
-  if (plan.forceCompileCache === false || !isScratchOutput) {
-    args.push('--noCache')
-  }
 
   if (hasAssets) {
     args.push('--noRestore')
@@ -1462,7 +1488,7 @@ export async function compileOwnerProject({
       }
     } else {
       // Atomically write marker
-      writeSuccessMarker(materialized.markerPath, materialized.fingerprint)
+      writeSuccessMarker(materialized.markerPath, materialized.fingerprint, materialized.outputPath)
     }
   } else {
     // Nonzero or signal: remove marker and partial scratch output
@@ -1694,20 +1720,38 @@ export function rebaseEmittedImports(stagingDir, targetDir) {
   }
 }
 
+function removeRetiredOutputs(outputDir, sourceDirectory, removedSources = []) {
+  for (const sourcePath of removedSources) {
+    if (!sourcePath.endsWith('.fs')) continue
+    const relativeSource = path.relative(sourceDirectory, sourcePath)
+    if (path.isAbsolute(relativeSource) || relativeSource === '..' || relativeSource.startsWith(`..${path.sep}`)) {
+      throw new Error(`Removed source is outside the compile source directory: ${sourcePath}`)
+    }
+    const outputPath = path.join(outputDir, relativeSource.replace(/\.fs$/, '.js'))
+    let directory = path.dirname(outputPath)
+    while (directory !== path.dirname(outputDir)) {
+      const entry = fs.lstatSync(directory, { throwIfNoEntry: false })
+      if (entry && !entry.isDirectory()) throw new Error(`Output root must be a real directory: ${directory}`)
+      if (directory === outputDir) break
+      directory = path.dirname(directory)
+    }
+    fs.rmSync(outputPath, { force: true })
+    fs.rmSync(`${outputPath}.map`, { force: true })
+  }
+}
+
 /**
  * Executes incremental compilation for specified changed paths.
  * Caller explicitly supplies changedPaths and clean intent; build manifests are not tracked.
  */
 export async function compileIncremental({
   changedPaths,
-  isClean = false,
   root = REPO_ROOT,
   projectDirectory,
   aggregatePath = null,
   outputDir,
   scratchRoot,
   rootPropsPath = DEFAULT_ROOT_PROPS_PATH,
-  fullThreshold = 0.6,
   stdio = 'inherit',
   env = process.env,
   spawn = nodeSpawn,
@@ -1740,16 +1784,11 @@ export async function compileIncremental({
   const plan = planImpactCompile({
     changedPaths: effectiveChangedPaths,
     aggregatePath: resolvedAggregate,
-    fullThreshold,
     projectDirectory: resolvedProjectDirectory,
-    isClean,
   })
 
-  if (isClean || plan.mode === 'full') {
-    plan.forceCompileCache = false
-  }
-
   if (plan.mode === 'none') {
+    removeRetiredOutputs(targetOutputDir, resolvedProjectDirectory, plan.removedSources)
     return {
       ok: true,
       code: 0,
@@ -1766,13 +1805,14 @@ export async function compileIncremental({
     }
   }
 
-  // Contract 8: reset output directory strictly for clean build or source graph mutations (delete/rename)
-  const needsFullReset = isClean || plan.reason === 'source-graph-change'
-
-  // Contract 6: Failures do not pollute output directory.
-  // Compile to an isolated scratch staging directory first; only sync to resolvedOutputDir upon verified success.
+  // Failures must not touch the caller output. The staging directory is named
+  // after the compile fingerprint, which compileOwnerProject also writes into
+  // the success marker. An unchanged second compile therefore lands on the
+  // same directory, sees a valid marker, and does not spawn Fable. Naming it
+  // with a timestamp made that marker unreachable.
+  const preview = materializeOwnerCompile(plan, { scratchRoot: resolvedScratchRoot, rootPropsPath })
   const stagingOutputDir = resolvedOutputDir
-    ? norm(path.join(resolvedScratchRoot, `staging-${Date.now()}-${Math.random().toString(36).slice(2)}`))
+    ? norm(path.join(resolvedScratchRoot, 'staging', preview.fingerprint))
     : undefined
 
   let result
@@ -1799,10 +1839,12 @@ export async function compileIncremental({
       } catch {}
 
       rebaseEmittedImports(stagingOutputDir, resolvedOutputDir)
+      writeSuccessMarker(result.markerPath, result.fingerprint, stagingOutputDir)
 
-      if (needsFullReset) {
-        resetOutputDirectory(resolvedOutputDir)
-      } else if (!fs.existsSync(resolvedOutputDir)) {
+      // Do not wipe the output tree. A deleted source's JavaScript is removed
+      // by the caller that knows which file left the shard; wiping every
+      // sibling is a full rebuild under another name.
+      if (!fs.existsSync(resolvedOutputDir)) {
         fs.mkdirSync(resolvedOutputDir, { recursive: true })
       }
 
@@ -1821,9 +1863,14 @@ export async function compileIncremental({
         const { execFileSync } = await import('node:child_process')
         execFileSync('find', [resolvedOutputDir, '-type', 'f', '-size', '0', '-exec', 'rm', '-f', '{}', '+'], { stdio: 'pipe' })
       } catch {}
+
+      removeRetiredOutputs(resolvedOutputDir, resolvedProjectDirectory, plan.removedSources)
     }
   } finally {
-    if (stagingOutputDir && fs.existsSync(stagingOutputDir)) {
+    // A failed compile leaves no reusable marker. Drop its staging so the
+    // next attempt cannot treat partial JavaScript as a warm hit. Successful
+    // staging stays: it is the warm input of the next identical compile.
+    if (!result?.ok && stagingOutputDir && fs.existsSync(stagingOutputDir)) {
       removeOutputDirectory(stagingOutputDir)
     }
   }

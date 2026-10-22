@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Git
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
@@ -21,6 +22,7 @@ module PluginBoot =
           Timer: ITimerPort
           CasebookSettlements: CasebookSettlementOwner
           WorkspaceDirectory: string option
+          Paths: IHostPaths option
           FamilyParent: SessionId -> SessionId option }
 
     val create: input: obj -> Task<Boot>

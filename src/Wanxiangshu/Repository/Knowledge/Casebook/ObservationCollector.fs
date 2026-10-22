@@ -39,10 +39,6 @@ type CasebookObservationCollector() =
         then
             appendObservation sessionId (Observation.FileRead(path, hash))
 
-    member _.RecordSubstantive(sessionId: string, toolName: string, args: obj, committed: bool) : unit =
-        let tracker = getTracker sessionId
-        CasebookCapture.recordSubstantiveAccess tracker toolName args committed
-
     member _.Drain(sessionId: string) : Observation list =
         match buffers.TryGetValue sessionId with
         | true, buffer ->
@@ -50,21 +46,6 @@ type CasebookObservationCollector() =
             buffers.Remove sessionId |> ignore
             snapshot
         | false, _ -> []
-
-    member _.DrainPaths(sessionId: string) : string list =
-        match trackers.TryGetValue sessionId with
-        | true, tracker ->
-            let paths = tracker.GetRelatedPaths()
-            trackers.Remove sessionId |> ignore
-            paths
-        | false, _ -> []
-
-    member _.DrainTracker(sessionId: string) : AccessTracker =
-        match trackers.TryGetValue sessionId with
-        | true, tracker ->
-            trackers.Remove sessionId |> ignore
-            tracker
-        | false, _ -> CasebookCapture.createAccessTracker ()
 
     member _.Count(sessionId: string) : int =
         match buffers.TryGetValue sessionId with

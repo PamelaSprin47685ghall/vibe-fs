@@ -81,7 +81,22 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
   // 同一个空数组，子会话的认领永远 StillPending → join RECOVERY_BLOCKED
   // （`pending claim unknown ...`）。
   const messagesBySession = new Map() // sessionId -> message[]
+  // Sends the Host takes on the transport only: promptAsync returns, but no
+  // physical user message lands and no chat.message hook runs — the receipt
+  // without ingress (`nextPromptReceiptOnly`).
+  let receiptOnly = 0
+  // Host ingress still running: the chat.message hook of a prompt the stub is
+  // admitting. The Host starts a session's provider loop for a user message only
+  // after that message's chat.message hook returned, so a fixture that drives
+  // the child's provider step first awaits these (`awaitIngress`).
+  const ingress = new Set()
   const self = {
+    __nextPromptReceiptOnly: () => {
+      receiptOnly += 1
+    },
+    __awaitIngress: async () => {
+      while (ingress.size > 0) await Promise.allSettled([...ingress])
+    },
     __pushHostMessage: (sessionId, message) => {
       const perSession = messagesBySession.get(sessionId) ?? []
       perSession.push(message)
@@ -135,6 +150,10 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
       },
       promptAsync: async (args) => {
         prompts.push(args)
+        if (receiptOnly > 0) {
+          receiptOnly -= 1
+          return {}
+        }
         // 生产在 terminal 订阅安装之后才发 prompt（OneShotAgentTool.fs:115 → send），
         // 故此调用即「可以安全 NotifyTerminal」的就绪信号。
         // OpenCodePort payload: { path: { id }, body: { parts, agent?, model?, metadata? }, headers }。
@@ -170,10 +189,18 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
         }
         const hk = self.__hooks;
         if (hk && hk['chat.message']) {
+          const admitted = (async () => {
+            try {
+              await hk['chat.message']({ sessionID: sessionId, messageID: message.id, agent: args?.body?.agent }, { message, parts: message.parts })
+            } catch (err) {
+              console.log('HOOK CHAT MESSAGE FAILED:', err)
+            }
+          })()
+          ingress.add(admitted)
           try {
-            await hk['chat.message']({ sessionID: sessionId, messageID: message.id, agent: args?.body?.agent }, { message, parts: message.parts })
-          } catch (err) {
-            console.log('HOOK CHAT MESSAGE FAILED:', err)
+            await admitted
+          } finally {
+            ingress.delete(admitted)
           }
         }
         return {}
@@ -251,6 +278,8 @@ export const withExecutablePlugin = async (body, options = {}, createHooks = ini
         messages,
         abortedIds,
         pushHostMessage: client.__pushHostMessage,
+        nextPromptReceiptOnly: client.__nextPromptReceiptOnly,
+        awaitIngress: client.__awaitIngress,
       }
       await body(hooks, directory, createdIds, runtime)
     } catch (error) {
@@ -335,6 +364,7 @@ export const withRestartablePlugin = async (body, { events = { listen: () => () 
       prompts,
       messages,
       pushHostMessage: client.__pushHostMessage,
+      awaitIngress: client.__awaitIngress,
     })
   } finally {
     for (const hooks of [...liveHooks].reverse()) await hooks.dispose()
@@ -364,6 +394,7 @@ export const startPluginIncarnation = async (directory) => {
     directory,
     events: { listen: () => () => {} },
   })
+  client.__hooks = hooks
   await configureManagedPlugin(hooks)
 
   return {

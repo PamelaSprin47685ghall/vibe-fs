@@ -1,9 +1,10 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Foundation
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Prefix
@@ -23,99 +24,6 @@ module HostCompactionGate =
     /// whitelist); there is deliberately no raw `console.warn` here.
     let private logWarn = Diagnostic.emit
 
-    /// Write one setting into the Host config object, creating intermediate nodes.
-    ///
-    /// The Host hands the plugin the live instance-state config (`config/config.ts:607`
-    /// returns `s.config` with no clone), and `plugin.init` runs before other services
-    /// (`bootstrap.ts:36`), so a write here is in force before anything reads it.
-    let private writeSetting (config: obj) (setting: CompactionSetting) : unit =
-        let ensureChild (node: obj) head =
-            if isNull node?(head) then
-                node?(head) <- createObj []
-
-            node?(head)
-
-        let rec descend (node: obj) (path: string list) =
-            match path with
-            | [] -> ()
-            | [ leaf ] -> node?(leaf) <- box setting.Required
-            | head :: rest -> descend (ensureChild node head) rest
-
-        descend config setting.Path
-
-    /// Read a setting back, or `None` when the key is absent after writing.
-    ///
-    /// Absence after a write means the Host does not have this key at all — the config
-    /// moved between versions — which is exactly the `SettingUnavailable` case. Writing
-    /// blind and assuming success is what would let a renamed key silently re-enable
-    /// automatic compaction.
-    let private readSetting (config: obj) (setting: CompactionSetting) : bool option =
-        let readLeaf (node: obj) leaf =
-            if isNull node?(leaf) then
-                None
-            else
-                Some(unbox<bool> node?(leaf))
-
-        let rec descendNonNull (node: obj) (path: string list) =
-            match path with
-            | [] -> None
-            | [ leaf ] -> readLeaf node leaf
-            | head :: rest -> descendChild node?(head) rest
-
-        and descendChild (child: obj) rest =
-            if isNull child then None else descendNonNull child rest
-
-        let descend (node: obj) (path: string list) =
-            if isNull node then None else descendNonNull node path
-
-        descend config setting.Path
-
-    /// HOST-006 prevention layer: force every required setting off.
-    ///
-    /// Returns the first setting that could not be established, which
-    /// `HostCompactionPolicy.judgeFirstTurn` turns into the startup verdict. The first
-    /// rather than all of them: they share one root cause when the config shape moved,
-    /// and an operator needs one actionable name.
-    let enforceSettings (config: obj) : CompactionSetting option =
-        if isNull config then
-            // No config object means no way to disable anything. Reported as the first
-            // required setting rather than silently passing.
-            List.tryHead HostCompactionPolicy.requiredSettings
-        else
-            HostCompactionPolicy.requiredSettings
-            |> List.tryFind (fun setting ->
-                writeSetting config setting
-                readSetting config setting <> Some setting.Required)
-
-    /// The `experimental.session.compacting` hook.
-    ///
-    /// The hook cannot veto — its output is `{ context; prompt? }` with no cancel field
-    /// (`plugin/index.ts:305`), and `plugin.trigger` discards the return value. So this
-    /// does the only thing available: leaves the prompt untouched and records that a
-    /// compaction is starting, which is a diagnostic (HOST-007), not a control action.
-    ///
-    /// Registering it anyway matters. Without a registration the plugin would learn of
-    /// a compaction only when its pseudo-run appears in a later snapshot; with one, the
-    /// containment layer has a same-turn signal it can log against, and the absence of
-    /// a cancel field is documented at the boundary rather than inferred.
-    let onSessionCompacting (input: obj) (output: obj) : unit =
-        let sessionId =
-            if isNull input || isNull input?sessionID then
-                "<unknown>"
-            else
-                unbox<string> input?sessionID
-
-        logWarn "compaction_started" [ "session_id", sessionId; "result", "cannot-refuse" ]
-
-    /// The `experimental.compaction.autocontinue` hook.
-    ///
-    /// Always `enabled = false` (HOST-006). `compaction.auto = false` already makes the
-    /// replay branch unreachable, so this is belt and braces — but it is the only
-    /// vetoable synthetic-turn injection point, and an unanswered hook relies on an
-    /// upstream default staying harmless.
-    let onCompactionAutoContinue (input: obj) (output: obj) : unit =
-        output?enabled <- box HostCompactionPolicy.autoContinueEnabled
-
     /// HOST-007 diagnostic for a reanchor that could not be appended.
     ///
     /// A failure here is deliberately not fatal to the turn that just completed.
@@ -128,6 +36,7 @@ module HostCompactionGate =
     let logReanchorFailure (sessionId: SessionId) (reason: string) : unit =
         logWarn "reanchor_failed" [ "session_id", SessionId.value sessionId; "result", reason ]
 
+    /// Append the one `ContextReanchored` line a proposed candidate describes.
     let private appendReanchor
         (journal: AgentJournal)
         (sessionId: SessionId)
@@ -154,9 +63,9 @@ module HostCompactionGate =
     /// HOST-006 containment: write one `ContextReanchored` for an observed pseudo-run.
     ///
     /// `observed` is every compaction run in the session's snapshot, oldest first.
-    /// Which one to act on — and whether any is left — is
-    /// the prefix owner's proposal; this function supplies the committed journal
-    /// projection and appends the proposed line.
+    /// Which one to act on — and whether any is left — is the prefix owner's
+    /// candidate (`PrefixEpochProjection.proposeCompaction`, wanxiangli/prefix); this
+    /// function supplies the journal's committed state and does the append.
     ///
     /// Idempotency has two independent guards, deliberately. Here, the predicate skips
     /// a run the journal already reanchored. At the fold, `PrefixEpochProjection`
@@ -178,6 +87,7 @@ module HostCompactionGate =
             // "Already reanchored" is answered from the durable projection, not a runtime
             // set: the observation repeats on every reconcile, and a memory-only set would
             // let a restart reanchor the same compaction a second time.
+            // The candidate is a proposal only; the fold of the written line commits it.
             match PrefixEpochProjection.proposeCompaction observed epoch with
             | None -> return Ok None
             | Some candidate -> return! appendReanchor journal sessionId candidate

@@ -26,6 +26,7 @@
  */
 
 import { parse as parseToml } from 'smol-toml';
+import { parse as parseJavaScript } from 'acorn';
 import { retiredFieldProblems } from './legacy-fields.js';
 import { turnFragments } from './runtime-key.js';
 import { validateFault } from './delivery-plan.js';
@@ -430,13 +431,67 @@ const resolveReference = (entries, reference) => {
   return byStep.length === 0 ? { missingStep: reference.step } : { entry: byStep[0] };
 };
 
+const literalDelegationCharge = (expression, methods) => {
+  if (expression?.type !== 'AwaitExpression') return null;
+  const call = expression.argument;
+  const member = call?.callee;
+  if (call?.type !== 'CallExpression' || call.optional || member?.type !== 'MemberExpression' ||
+      member.computed || member.optional || member.object.type !== 'ThisExpression' ||
+      member.property.type !== 'Identifier' || !methods.includes(member.property.name)) return null;
+  const [payload, mapping] = call.arguments;
+  if (call.arguments.length !== 2 || payload?.type !== 'ObjectExpression' ||
+      mapping?.type !== 'ObjectExpression' || mapping.properties.length !== 0) return null;
+  const fields = new Map();
+  for (const property of payload.properties) {
+    if (property.type !== 'Property' || property.computed || property.method || property.kind !== 'init' ||
+        property.value.type !== 'Literal' || typeof property.value.value !== 'string') return null;
+    const key = property.key.type === 'Identifier' ? property.key.name : property.key.value;
+    if (typeof key !== 'string' || fields.has(key)) return null;
+    fields.set(key, property.value.value);
+  }
+  const charge = fields.get('charge');
+  return typeof charge === 'string' && charge.trim() !== '' ? charge : null;
+};
+
+// Only the direct, literal, empty-report form proves an edge here. Unknown
+// JavaScript is not evidence that a child prompt can be dispatched.
+const programDelegationCharges = (respond) => {
+  const methods = respond?.tool === 'todowrite-for-manager' ? ['fork', 'resume']
+    : respond?.tool === 'todowrite-for-orchestrator' ? ['commission'] : [];
+  if (respond?.type !== 'tool-call' || methods.length === 0 || typeof respond.args?.program !== 'string') return [];
+  let program;
+  try {
+    program = parseJavaScript(respond.args.program, { ecmaVersion: 'latest', sourceType: 'script' });
+  } catch {
+    return [];
+  }
+  const declaration = program.body[0];
+  if (program.body.length !== 1 || declaration?.type !== 'ClassDeclaration' || declaration.id?.name !== 'Js' ||
+      declaration.superClass?.type !== 'Identifier' || declaration.superClass.name !== 'JsProgram') return [];
+  const method = declaration.body.body[0];
+  if (declaration.body.body.length !== 1 || method?.type !== 'MethodDefinition' || method.computed || method.static ||
+      method.kind !== 'method' || method.key.type !== 'Identifier' || method.key.name !== 'run' ||
+      !method.value.async || method.value.generator || method.value.params.length !== 0) return [];
+  const charges = [];
+  for (const statement of method.value.body.body) {
+    const expression = statement.type === 'ExpressionStatement' ? statement.expression
+      : statement.type === 'ReturnStatement' ? statement.argument : null;
+    const charge = literalDelegationCharge(expression, methods);
+    if (charge === null) break;
+    charges.push(charge);
+    if (statement.type === 'ReturnStatement') break;
+  }
+  return charges;
+};
+
 /**
  * Which declared turns a flow can actually reach.
  *
  * Two ways in, and they are the only two the wire supports:
  *
  *   a `flow.prompt` sends the turn's user text
- *   an earlier step's tool call carries it as `args.charge` (or legacy `args.prompt`)
+ *   an earlier tool call carries it as `args.charge` (or legacy `args.prompt`),
+ *   including direct literal delegation on the programming surface
  *
  * The second is how child turns exist at all — `fork(agent, prompt)` is what creates
  * the session that will receive them. Both are prefix comparisons because a scenario
@@ -492,7 +547,13 @@ export function reachableTurnIds(turns, entries, { flow, prompt, setup } = {}) {
 
     const toolPrompts = entries
       .filter((entry) => [...reachableTurns].some((turn) => turn.id === entry.turnId))
-      .flatMap((entry) => [entry.respond?.args?.charge, entry.respond?.args?.prompt])
+      .flatMap((entry) => {
+        const respond = entry.respond;
+        if (typeof respond?.tool === 'string' && respond.tool.startsWith('todowrite-for-')) {
+          return programDelegationCharges(respond);
+        }
+        return [respond?.args?.charge, respond?.args?.prompt];
+      })
       .filter((text) => typeof text === 'string');
 
     for (const turn of turns) {

@@ -92,6 +92,9 @@ module JsCanonicalDescription =
         val ArgProgram: string = "tool/js-program/arg-program"
 
         [<Literal>]
+        val ArgName: string = "tool/js-program/arg-name"
+
+        [<Literal>]
         val MissingProgram: string = "tool/js-program/missing-program"
 
         [<Literal>]
@@ -140,7 +143,16 @@ module JsCanonicalDescription =
         val BaseClassFork: string = "tool/js-program/base-class-fork"
 
         [<Literal>]
+        val BaseClassDag: string = "tool/js-program/base-class-dag"
+
+        [<Literal>]
+        val BaseClassResume: string = "tool/js-program/base-class-resume"
+
+        [<Literal>]
         val BaseClassCommission: string = "tool/js-program/base-class-commission"
+
+        [<Literal>]
+        val BaseClassDevOps: string = "tool/js-program/base-class-devops"
 
         [<Literal>]
         val BaseClassJoin: string = "tool/js-program/base-class-join"
@@ -159,6 +171,9 @@ module JsCanonicalDescription =
 
         [<Literal>]
         val BaseClassLifecycle: string = "tool/js-program/base-class-lifecycle"
+
+        [<Literal>]
+        val JsPlan: string = "tool/js-plan"
 
     type Prose =
         { Header: string
@@ -207,13 +222,18 @@ module JsCanonicalDescription =
           BaseClassMove: string
           BaseClassExec: string
           BaseClassFork: string
+          BaseClassDag: string
+          BaseClassResume: string
           BaseClassCommission: string
+          BaseClassDevOps: string
           BaseClassJoin: string
           BaseClassFission: string
           BaseClassHorizon: string
           BaseClassAdvisor: string
           BaseClassAsk: string
-          BaseClassLifecycle: string }
+          BaseClassLifecycle: string
+
+          JsPlan: string }
 
     val has: capabilities: Set<JsCapability> -> capability: JsCapability -> bool
     val publicBaseClass: prose: Prose -> capabilities: Set<JsCapability> -> string

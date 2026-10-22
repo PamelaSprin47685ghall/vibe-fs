@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -10,6 +10,7 @@ import { registerSupervisedToolReclamationTests } from './support/supervised-too
 import { registerNormalExitResidualTest } from './support/normal-exit-residual-tests.mjs'
 import { registerOwnedToolTests } from './support/owned-tool-tests.mjs'
 import { classifyVerdict } from './support/verdict-feed.mjs'
+import { createCausalTransitionTracker } from './support/causal-transitions.mjs'
 import { createWorkerCostObserver, encodeWorkerCostRecord, MAX_WORKER_COST_BYTES, validateWorkerCostSnapshot, WORKER_COST_PREFIX } from './support/worker-cost-observation.mjs'
 import * as testSupervisor from './e2e/support/supervise-node-test.mjs'
 import { NativeTestSupervision } from './support/native-test-supervision.mjs'
@@ -20,13 +21,104 @@ import { formatDiagnostics } from './e2e/support/diagnostics-format.js'
 import { StrictMockProvider } from './e2e/support/strict-mock-provider.js'
 import { StrictMockSignals } from './e2e/support/strict-mock-signals.js'
 import { createScenarioTurn } from './e2e/support/scenario-turn.js'
-import { DIAGNOSTIC_RACE_MS, WATCHDOG_TIMEOUT_MS } from './e2e/support/time-budget.js'
+import { DIAGNOSTIC_RACE_MS, PROCESS_TREE_TIMEOUT_MS, SIGKILL_GRACE_MS, WATCHDOG_TIMEOUT_MS } from './e2e/support/time-budget.js'
 import { attachEventCeilings, eventCeilingSetupProblems, isCountedSseEvent, normalizeEventCeilings } from './e2e/support/event-ceiling.js'
 
 registerSupervisedToolReclamationTests()
 registerNormalExitResidualTest()
 registerOwnedToolTests()
 registerFiniteWaitTests()
+
+test('WHAT[verification-system-006] silence termination reclaims a detached runner without a monitor lifeline before its caller catches failure', {
+  skip: !['linux', 'darwin'].includes(process.platform),
+}, async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'detached-runner-reclamation-'))
+  const ownershipPath = path.join(directory, 'ownership.json')
+  const fixture = fileURLToPath(new URL('./support/fixtures/detached-runner.fixture.mjs', import.meta.url))
+  const env = { ...process.env, NODE_TEST_CONCURRENCY: '1', WXS_DETACHED_RUNNER_DIRECTORY: directory,
+    WXS_DETACHED_RUNNER_OWNERSHIP: ownershipPath }
+  delete env.NODE_TEST_CONTEXT
+  const foreign = spawn(process.execPath, ['-e', `require('node:fs').watch(${JSON.stringify(directory)}, () => {})`], {
+    detached: true, stdio: 'ignore',
+  })
+  const foreignClosed = new Promise((accept, reject) => {
+    foreign.once('error', reject)
+    foreign.once('close', accept)
+  })
+  foreignClosed.catch(() => {})
+  let foreignStarted = false
+  let failure
+  const cleanupErrors = []
+  const rows = (deadline = null) => {
+    const remaining = deadline === null ? PROCESS_TREE_TIMEOUT_MS : deadline - Date.now()
+    assert.ok(remaining > 0, 'The exact test-owned group observation deadline expired')
+    return execFileSync('/bin/ps', ['-eo', 'pid=,pgid=,stat='], {
+      encoding: 'utf8', timeout: Math.min(PROCESS_TREE_TIMEOUT_MS, remaining),
+    }).trim().split('\n').map(line => {
+      const fields = /^\s*(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line)
+      assert.ok(fields, line)
+      return { pid: Number(fields[1]), group: Number(fields[2]), state: fields[3] }
+    }).filter(record => !/^[ZX]/.test(record.state))
+  }
+  try {
+    await new Promise((accept, reject) => {
+      foreign.once('spawn', () => {
+        foreignStarted = true
+        accept()
+      })
+      foreign.once('error', reject)
+    })
+    await assert.rejects(testSupervisor.superviseNodeTest({ files: [fixture], label: 'detached-runner-reclamation',
+      silenceMs: 1000, env, throwOnFailure: true }), /supervised suite failed/)
+    const owned = JSON.parse(fs.readFileSync(ownershipPath, 'utf8'))
+    assert.equal(owned.pid, owned.group, 'The actual runner created its own detached process group')
+    assert.equal(owned.childGroup, owned.group, 'Its actual descendant shares the captured group')
+    assert.notEqual(owned.group, foreign.pid)
+    const atCatch = rows()
+    assert.deepEqual(atCatch.filter(record => record.group === owned.group), [],
+      'The real detached runner and descendant have already exited when the caller catches failure')
+    assert.ok(atCatch.some(record => record.pid === foreign.pid && record.group === foreign.pid),
+      'The caller-owned foreign group remains alive')
+  } catch (error) {
+    failure = { error }
+  } finally {
+    const groups = foreignStarted && Number.isSafeInteger(foreign.pid) ? [foreign.pid] : []
+    try {
+      const owned = fs.existsSync(ownershipPath) ? JSON.parse(fs.readFileSync(ownershipPath, 'utf8')) : null
+      if (owned && rows().some(record => record.group === owned.group && [owned.pid, owned.childPid].includes(record.pid))) {
+        groups.push(owned.group)
+      }
+    } catch (error) {
+      cleanupErrors.push(error)
+    }
+    for (const group of groups) {
+      try {
+        process.kill(-group, 'SIGKILL')
+      } catch (error) {
+        if (error.code !== 'ESRCH') cleanupErrors.push(error)
+      }
+    }
+    const deadline = Date.now() + SIGKILL_GRACE_MS
+    let timer
+    try {
+      if (foreignStarted) await Promise.race([foreignClosed, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('The actual foreign process close was not observed')), SIGKILL_GRACE_MS)
+      })])
+      while (rows(deadline).some(record => groups.includes(record.group))) {
+        assert.ok(Date.now() < deadline, 'The exact test-owned groups did not drain during cleanup')
+        await new Promise(accept => setTimeout(accept, 10))
+      }
+    } catch (error) {
+      cleanupErrors.push(error)
+    } finally {
+      clearTimeout(timer)
+    }
+    try { fs.rmSync(directory, { recursive: true, force: true }) } catch (error) { cleanupErrors.push(error) }
+  }
+  if (cleanupErrors.length > 0) throw new AggregateError([...(failure ? [failure.error] : []), ...cleanupErrors],
+    'Detached runner assertion or cleanup failed', { cause: failure?.error ?? cleanupErrors[0] })
+  if (failure) throw failure.error
+})
 
 test('WHAT[verification-system-006] event safety ceilings validate input and count actual non-heartbeat events', () => {
   assert.deepEqual(normalizeEventCeilings({}), {})
@@ -272,11 +364,22 @@ await superviseNodeTest({ files: process.argv.slice(2), label: 'worker-cost-iden
       .map(line => line.slice(line.indexOf(WORKER_COST_PREFIX)))
     for (const row of rows) assert.ok(Buffer.byteLength(row + '\n') <= MAX_WORKER_COST_BYTES)
     const facts = rows.map(line => JSON.parse(line.slice(WORKER_COST_PREFIX.length)))
+    const lifecycle = output.split('\n').filter(line => line.startsWith('runner: file lifecycle '))
+      .map(line => JSON.parse(line.slice('runner: file lifecycle '.length)))
     const actualPids = new Set()
     for (const [index, file] of files.entries()) {
       const body = JSON.parse(fs.readFileSync(markers[index], 'utf8'))
       actualPids.add(body.pid)
       assert.throws(() => process.kill(body.pid, 0), { code: 'ESRCH' })
+      const fileLifecycle = lifecycle.filter(fact => fact.entryFile === file)
+      assert.deepEqual(fileLifecycle.map(fact => fact.type), ['runner:file-start', 'runner:file-drained'])
+      const [submitted, drained] = fileLifecycle
+      assert.match(submitted.runId, /^[a-f0-9]{32}$/)
+      assert.equal(submitted.pid, body.parentPid)
+      assert.equal(submitted.parentPid, child.pid)
+      assert.equal(drained.runId, submitted.runId)
+      assert.equal(drained.pid, submitted.pid)
+      assert.equal(drained.parentPid, submitted.parentPid)
       const observations = facts.filter(fact => fact.entryFile === file)
       const starts = observations.filter(fact => fact.phase === 'pre-import')
       assert.equal(starts.length, 1, output)
@@ -1104,8 +1207,14 @@ test('queued work', () => {})
     delete env.NODE_TEST_CONTEXT
     const child = spawn(process.execPath, [launcher, drained, active, queued], { env, stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
+    let diagnostics = ''
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
     child.stdout.on('data', chunk => { output += chunk })
-    child.stderr.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => {
+      diagnostics += chunk
+      output += chunk
+    })
     const code = await new Promise((resolveExit, reject) => {
       child.on('error', reject)
       child.on('close', resolveExit)
@@ -1114,7 +1223,11 @@ test('queued work', () => {})
     assert.match(output, /suite exceeded the 1500ms physical backstop/)
     assert.doesNotMatch(output, /WATCHDOG/)
     assert.equal(fs.existsSync(queuedMarker), false, 'The queued entry never acquires the occupied lane')
-    const verdicts = [...output.matchAll(/✔ bounded work (\d+) /g)]
+    const backstopMarker = 'runner: suite exceeded the 1500ms physical backstop'
+    const backstopCut = diagnostics.indexOf(backstopMarker)
+    assert.notEqual(backstopCut, -1, output)
+    // Forwarded reporter output and the supervisor's cut marker share stderr.
+    const verdicts = [...diagnostics.slice(0, backstopCut).matchAll(/✔ bounded work (\d+) /g)]
     assert.ok(verdicts.length >= 2, output)
     assert.match(output, /file streams: 1 drained, 1 active, 1 queued/)
     const activeWaits = output.split('\n').filter(line => line.includes('active file '))
@@ -1126,7 +1239,7 @@ test('queued work', () => {})
     const lastReportedIndex = Number(verdicts.at(-1)[1])
     assert.ok(
       activeVerdictIndex === lastReportedIndex || activeVerdictIndex === lastReportedIndex - 1,
-      `active verdict index (${activeVerdictIndex}) must align with last reported verdict index (${lastReportedIndex}) on physical backstop cut`,
+      `active verdict index (${activeVerdictIndex}) must align with last reported verdict index (${lastReportedIndex}) before the physical backstop cut`,
     )
     assert.match(output, /1 queued file\(s\) have not started/)
     const reclamation = /post-exit group verification\/reclamation: pid=(\d+);.*accepted=true/.exec(output)
@@ -1190,7 +1303,8 @@ test('WHAT[verification-system-006] repeat observations of one causal state do n
   const h = createWatchdogHarness()
   const scenario = { watchdog: h.watchdog }
   const observe = (token) => observeCausalProgress(scenario, {
-    id: 'accepted-work', token, reason: 'work accepted', lane: 'worker',
+    id: 'accepted-work', token, stages: ['pending', 'accepted', 'settled'],
+    reason: 'work accepted', lane: 'worker',
   })
   assert.equal(observe('pending'), false)
   await h.advance(200)
@@ -1201,6 +1315,39 @@ test('WHAT[verification-system-006] repeat observations of one causal state do n
   assert.equal(h.terminated, false)
   await h.advance(1)
   assert.equal(h.terminated, true)
+})
+
+test('WHAT[verification-system-006] a causal observation advances only to a strictly later stage', async () => {
+  const h = createWatchdogHarness()
+  const scenario = { watchdog: h.watchdog }
+  const observe = (token) => observeCausalProgress(scenario, {
+    id: 'staged-work', token, stages: ['pending', 'running', 'settled'],
+    reason: 'work advanced', lane: 'worker',
+  })
+  assert.equal(observe('running'), false, 'the first observation establishes the stage')
+  assert.equal(observe('settled'), true)
+  assert.equal(observe('running'), false, 'a stage that goes backwards is not progress')
+  assert.equal(observe('settled'), false, 'the same stage again is not progress')
+  assert.throws(() => observe('unknown-stage'), /unknown stage/)
+  await h.advance(500)
+  assert.equal(h.terminated, true)
+  assert.match(h.diagnostics.join('\n'), /0 blocking progress update\(s\), 1 causal transition\(s\)/)
+})
+
+test('WHAT[verification-system-006] a causal observation cannot turn the same token into progress by changing its stages or lane', async () => {
+  const h = createWatchdogHarness()
+  const scenario = { watchdog: h.watchdog }
+  const stages = ['pending', 'running', 'settled']
+  const observation = { id: 'fixed-work', token: 'running', stages, reason: 'work advanced', lane: 'worker' }
+  assert.equal(observeCausalProgress(scenario, observation), false)
+  await h.advance(200)
+  assert.throws(() => observeCausalProgress(scenario, { ...observation, stages: ['new', ...stages] }), /stage sequence or lane/)
+  assert.throws(() => observeCausalProgress(scenario, { ...observation, lane: 'another-worker' }), /stage sequence or lane/)
+  stages.unshift('new')
+  assert.throws(() => observeCausalProgress(scenario, observation), /stage sequence or lane/)
+  await h.advance(300)
+  assert.equal(h.terminated, true, 'schema changes must not move the original silence deadline')
+  assert.match(h.diagnostics.join('\n'), /0 blocking progress update\(s\), 0 causal transition\(s\)/)
 })
 
 test('WHAT[verification-system-006] stop cancels monitoring and late signals cannot resurrect it', async () => {
@@ -1338,5 +1485,213 @@ test('WHAT[verification-system-006] alternative progress waits resolve the obser
     signals.consume({ id: winner, permanent: true })
     assert.equal(await waiting, winner)
     assert.equal(signals._expectationWaiters.size, 0)
+  }
+})
+
+test('WHAT[verification-system-006] a planned file transition advances the window once while a repeated or unplanned one cannot', async () => {
+  const planned = path.resolve('planned.test.mjs')
+  const unplanned = path.resolve('unplanned.test.mjs')
+  const tracker = createCausalTransitionTracker({ plannedFiles: [planned] })
+
+  assert.equal(tracker.observe({ type: 'runner:file-start', data: { entryFile: unplanned } }), null,
+    'an unplanned entry file is not a transition of the monitored target')
+  assert.equal(tracker.observe({ type: 'runner:file-drained', data: { entryFile: planned } }), null,
+    'a drain without a submission is out of order and not a transition')
+
+  const submitted = tracker.observe({ type: 'runner:file-start', data: { entryFile: planned } })
+  assert.ok(submitted)
+  assert.equal(submitted.reason, 'runner:file-start')
+  assert.equal(tracker.observe({ type: 'runner:file-start', data: { entryFile: planned } }), null,
+    'the same transition observed again is not progress')
+
+  const drained = tracker.observe({ type: 'runner:file-drained', data: { entryFile: planned } })
+  assert.ok(drained)
+  assert.equal(tracker.observe({ type: 'runner:file-drained', data: { entryFile: planned } }), null,
+    'a repeated drain is not progress')
+  assert.equal(tracker.observe({ type: 'runner:file-start', data: { entryFile: planned } }), null,
+    'a submission after its drain is out of order and not a transition')
+  assert.equal(tracker.observe({ type: 'test:stdout', data: { entryFile: planned, message: 'bytes' } }), null,
+    'byte traffic is not progress')
+  assert.equal(tracker.observe({ type: 'runner:worker-cost', data: { entryFile: planned } }), null,
+    'a worker measurement is not progress')
+})
+
+test('WHAT[verification-system-006] the inner runner startup event is admitted only for its own plan and child identity', async () => {
+  const planned = path.resolve('planned.test.mjs')
+  const tracker = createCausalTransitionTracker({ plannedFiles: [planned], expectedPid: 4242 })
+  assert.equal(tracker.observe({ type: 'runner:started', data: { pid: 99, files: [planned] } }), null,
+    'another process cannot report this runner\'s startup')
+  assert.equal(tracker.observe({ type: 'runner:started', data: { pid: 4242, files: [path.resolve('other.test.mjs')] } }), null,
+    'another plan cannot report this runner\'s startup')
+  assert.equal(tracker.observe({ type: 'runner:started', data: { pid: 4242, files: [planned, path.resolve('extra.test.mjs')] } }), null,
+    'a plan with an unplanned file is not this runner\'s startup')
+  const started = tracker.observe({ type: 'runner:started', data: { pid: 4242, files: [planned] } })
+  assert.ok(started)
+  assert.equal(started.reason, 'runner:started')
+  assert.equal(tracker.observe({ type: 'runner:started', data: { pid: 4242, files: [planned] } }), null,
+    'a repeated startup event is not progress')
+})
+
+test('WHAT[verification-system-006] native causal transitions reject repeated out-of-order and foreign observations without renewing', () => {
+  const file = path.resolve('native-causal.test.mjs')
+  let time = 0
+  const waits = new NativeTestSupervision({ files: [file], silenceMs: 300, now: () => time })
+  waits.expectRunner(4242)
+  waits.allocate(file, 'run-a')
+  const startup = { type: 'runner:started', data: { pid: 4242, files: [file] } }
+  const event = (type, entryFile = file, pid = 4242) => ({ type, data: { entryFile, pid, runId: 'run-a' } })
+  waits.observe({ ...startup, data: { ...startup.data, pid: 99 } })
+  assert.throws(() => waits.observe(event('runner:file-start')), /before runner startup/)
+  assert.equal(waits.nextDeadline().at, 300)
+  time = 100
+  waits.observe(startup)
+  assert.equal(waits.nextDeadline().at, 400)
+  time = 200
+  waits.observe(startup)
+  assert.throws(() => waits.observe(event('runner:file-drained')), /queued/)
+  assert.throws(() => waits.observe(event('runner:file-start', path.resolve('foreign.test.mjs'))), /unplanned/)
+  assert.throws(() => waits.observe(event('runner:file-start', file, 99)), /another runner/)
+  assert.equal(waits.nextDeadline().at, 400)
+  time = 300
+  waits.observe(event('runner:file-start'))
+  assert.equal(waits.nextDeadline().at, 600)
+  time = 400
+  waits.observeTransition(event('runner:file-start'))
+  assert.throws(() => waits.observe(event('runner:file-start')), /active/)
+  assert.throws(() => waits.observe(startup), /after a file/)
+  assert.throws(() => waits.observe({ type: 'runner:file-drained',
+    data: { entryFile: file, pid: 4242, runId: 'old-run' } }), /allocated execution instance/)
+  assert.equal(waits.snapshot().active.length, 1)
+  assert.deepEqual(waits.snapshot().drained, [])
+  waits.observe(event('test:stdout'))
+  assert.equal(waits.nextDeadline().at, 600)
+  assert.equal(waits.progress().transitions, 2)
+  time = 600
+  assert.throws(() => waits.check(), error => error.code === 'verification-silence')
+})
+
+test('WHAT[verification-system-006] validated transitions cannot move an active physical operation deadline', () => {
+  const files = ['physical-causal.test.mjs', 'other-causal.test.mjs'].map(file => path.resolve(file))
+  let time = 0
+  const waits = new NativeTestSupervision({ files, silenceMs: 100, now: () => time, requireAllocation: true })
+  waits.expectRunner(4242)
+  waits.allocate(files[0], 'run-a')
+  waits.allocate(files[1], 'run-b')
+  waits.observe({ type: 'runner:started', data: { pid: 4242, files } })
+  const start = index => ({ type: 'runner:file-start', data: { entryFile: files[index], pid: 4242, runId: index === 0 ? 'run-a' : 'run-b' } })
+  waits.observe(start(0))
+  waits.observe({ type: 'test:dequeue', data: { entryFile: files[0], name: 'probe', nesting: 0, nativeSequence: 1 } })
+  const [reply] = waits.control({ entryFile: files[0], runId: 'run-a', requestId: 1,
+    phase: 'begin', contextToken: 'a'.repeat(32), operation: 'actual bounded process', limitMs: 1000,
+    name: 'probe', fullName: 'probe' })
+  assert.equal(reply.ok, true)
+  const deadline = waits.currentWait(files[0]).physical.deadline
+  time = 50
+  waits.observe(start(1))
+  time = 100
+  waits.observe({ type: 'runner:file-drained', data: { entryFile: files[1], pid: 4242, runId: 'run-b' } })
+  time = 900
+  waits.observeTransition(start(0))
+  assert.equal(waits.currentWait(files[0]).physical.deadline, deadline)
+  assert.equal(waits.nextDeadline().at, 1000)
+  time = 1000
+  assert.throws(() => waits.check(), error => error.code === 'verification-silence' && error.deadline.kind === 'physical')
+})
+
+test('WHAT[verification-system-006] a supervised run reports the inner startup as its first causal transition', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-started-'))
+  try {
+    const fixture = path.join(directory, 'quiet.test.mjs')
+    const launcher = path.join(directory, 'supervise.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(fixture, `import test from 'node:test'
+import { watch } from 'node:fs'
+test('never finishes', async t => {
+  const watcher = watch(new URL(import.meta.url), () => {})
+  t.after(() => watcher.close())
+  await new Promise(() => {})
+})
+`)
+    fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+await superviseNodeTest({ files: [${JSON.stringify(fixture)}], label: 'runner-started', silenceMs: 1000 })
+`)
+    const env = { ...process.env, NODE_TEST_CONCURRENCY: '1' }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.once('error', reject)
+      child.once('close', resolveExit)
+    })
+    assert.equal(code, 1, output)
+    assert.match(output, /WATCHDOG: 'runner-started' silent for/)
+    assert.match(output, /0 blocking progress update\(s\), 2 causal transition\(s\)/,
+      'the inner startup and the file submission are both real transitions')
+    assert.match(output, /last progress: runner:file-start/)
+    assert.match(output, /post-exit group verification\/reclamation:.*accepted=true/)
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-006] a lifecycle transition renews the silence window without becoming a verdict', async () => {
+  const h = createWatchdogHarness({ timeoutMs: 300 })
+  await h.advance(299)
+  assert.equal(h.terminated, false)
+  h.watchdog.advance({ reason: 'runner:file-start', lane: 'planned.test.mjs', transition: true, blocking: false })
+  await h.advance(299)
+  assert.equal(h.terminated, false, 'a real transition renews the window')
+  await h.advance(1)
+  assert.equal(h.terminateCount, 1)
+  assert.match(h.diagnostics.join('\n'), /0 blocking progress update\(s\)/)
+  assert.match(h.diagnostics.join('\n'), /1 causal transition\(s\)/)
+  assert.match(h.diagnostics.join('\n'), /last progress: runner:file-start/)
+})
+
+test('WHAT[verification-system-006] a repeated lifecycle transition cannot keep a pending file alive', async () => {
+  const h = createWatchdogHarness({ timeoutMs: 300 })
+  for (let index = 0; index < 4; index += 1) {
+    await h.advance(100)
+    h.watchdog.advance({ reason: 'runner:file-start', lane: 'planned.test.mjs', transition: true, blocking: false })
+  }
+  await h.advance(300)
+  assert.equal(h.terminated, true, 'a repeated transition must not renew the window')
+})
+
+test('WHAT[verification-system-006] a supervised run without any lifecycle transition still terminates on the original silence window', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'no-transition-silence-'))
+  try {
+    const fixture = path.join(directory, 'quiet.test.mjs')
+    const launcher = path.join(directory, 'supervise.mjs')
+    const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
+    fs.writeFileSync(fixture, `import test from 'node:test'
+import { watch } from 'node:fs'
+test('never finishes', async t => {
+  const watcher = watch(new URL(import.meta.url), () => {})
+  t.after(() => watcher.close())
+  await new Promise(() => {})
+})
+`)
+    fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
+await superviseNodeTest({ files: [${JSON.stringify(fixture)}], label: 'no-transition', silenceMs: 1000 })
+`)
+    const env = { ...process.env, NODE_TEST_CONCURRENCY: '1' }
+    delete env.NODE_TEST_CONTEXT
+    const child = spawn(process.execPath, [launcher], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    const code = await new Promise((resolveExit, reject) => {
+      child.once('error', reject)
+      child.once('close', resolveExit)
+    })
+    assert.equal(code, 1, output)
+    assert.match(output, /WATCHDOG: 'no-transition' silent for/)
+    assert.match(output, /0 blocking progress update\(s\)/)
+    assert.match(output, /post-exit group verification\/reclamation:.*accepted=true/)
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
   }
 })

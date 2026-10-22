@@ -15,7 +15,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -69,9 +69,6 @@ module HostForkAgentOwner =
         match journal with
         | None -> Task.FromResult(Error "No journal: an AgentOwnerRoot prompt cannot be claimed")
         | Some durable -> sendClaimed durable
-
-    let sendFirstPrompt sessions journal childId identitySeed directory prompt =
-        sendFirstPromptCore sessions journal childId identitySeed directory prompt None
 
     let sendFirstPromptObserved sessions journal childId identitySeed directory prompt onAccepted =
         HostForkRunLifecycle.sendAgentOwnerRootObserved

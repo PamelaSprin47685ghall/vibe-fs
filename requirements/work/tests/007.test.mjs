@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { withReview, scores } from './support/plugin.mjs'
 import { lifecycleWorkView } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { executeHostTool } from '../../delegation/tests/support/real-fork.mjs'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
@@ -46,8 +47,8 @@ test('WHAT[work-007] the retirement identity is recomputed from the same fence a
 test('WHAT[work-007] a settled fence replays its recorded state instead of the tenure the retirement removed', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
-    assert.match(await hooks.tool.deliver.execute({}, call(session, 'deliver-confirm', 'run-confirm')), /confirmation_required = true/)
-    assert.match(await hooks.tool.deliver.execute({}, call(session, 'deliver-call', 'run-retire')), /Finished\. Do not continue work\./)
+    assert.match(await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-confirm', 'deliver', {}, 'deliver-confirm'), /confirmation_required = true/)
+    assert.match(await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-retire', 'deliver', {}, 'deliver-call'), /Finished\. Do not continue work\./)
 
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(runtime.directory)
     const settled = life.inspected(commonDir, session)
@@ -79,8 +80,8 @@ test('WHAT[work-007] a settled fence replays its recorded state instead of the t
 test('WHAT[work-007] a retried delivered fence is answered by the fold, not by the missing tenure', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('PERFECT'))
-    assert.match(await hooks.tool.deliver.execute({}, call(session, 'deliver-confirm', 'run-confirm')), /confirmation_required = true/)
-    assert.match(await hooks.tool.deliver.execute({}, call(session, 'deliver-call', 'run-retire')), /Finished\. Do not continue work\./)
+    assert.match(await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-confirm', 'deliver', {}, 'deliver-confirm'), /confirmation_required = true/)
+    assert.match(await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-retire', 'deliver', {}, 'deliver-call'), /Finished\. Do not continue work\./)
 
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(runtime.directory)
     const settled = life.inspected(commonDir, session)
@@ -97,7 +98,7 @@ test('WHAT[work-007] a retried delivered fence is answered by the fold, not by t
     assert.equal(after.Delivered, true)
 
     // A fence the fold never settled keeps Algorithm E2's refusal.
-    const unsettled = await hooks.tool.deliver.execute({}, call(session, 'deliver-other', 'run-other'))
+    const unsettled = await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-other', 'deliver', {}, 'deliver-other')
     assert.doesNotMatch(unsettled, /Finished\. Do not continue work\./)
   }, { session: 'replay-delivered' })
 })
@@ -105,8 +106,8 @@ test('WHAT[work-007] a retried delivered fence is answered by the fold, not by t
 test('WHAT[work-007] a settled fence whose expected advance moved is refused with no write', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
-    await hooks.tool.deliver.execute({}, call(session, 'deliver-confirm', 'run-confirm'))
-    await hooks.tool.deliver.execute({}, call(session, 'deliver-call', 'run-retire'))
+    await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-confirm', 'deliver', {}, 'deliver-confirm')
+    await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-retire', 'deliver', {}, 'deliver-call')
 
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(runtime.directory)
     const successor = life.inspected(commonDir, session).ActiveId

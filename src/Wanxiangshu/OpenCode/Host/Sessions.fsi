@@ -1,5 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
@@ -19,7 +23,7 @@ module ManagedSessionTermination =
 type InjectedSessionPort =
     new:
         underlyingPort: IOpenCodePort option *
-        eventPort: IEventObservationPort *
+        terminalSource: ISessionTerminalSource *
         ?familyParent: (SessionId -> SessionId option) *
         ?isLifecycleTerminated: (SessionId -> bool) *
         ?isUserQuestionWaiting: (SessionId -> bool) ->

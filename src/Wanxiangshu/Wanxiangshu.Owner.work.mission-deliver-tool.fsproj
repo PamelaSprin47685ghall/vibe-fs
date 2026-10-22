@@ -19,6 +19,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
 
     <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-deliver-policy.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>

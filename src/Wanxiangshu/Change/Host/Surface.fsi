@@ -42,3 +42,4 @@ module OrchestratorHostSurface =
     /// Exercise the production candidate-finalization sequence through a plain
     /// JavaScript command port without exposing Command or Result internals.
     val finalizeWorktree: runner: obj -> managerId: string -> worktree: string -> Task<obj>
+    val finalizeWorktreeWithGit: managerId: string -> worktree: string -> Task<obj>

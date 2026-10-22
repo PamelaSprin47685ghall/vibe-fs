@@ -13,6 +13,10 @@ import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 import { verifyFailedConstruction } from './support/journal-construction.mjs'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { existsSync, readdirSync } from 'node:fs'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -31,6 +35,34 @@ const framesOf = (text) => text.split('\n').filter((line) => line.length > 0).ma
 const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])
 const incumbencyIdOf = (text) => [...eventsOf(text)].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 const sorted = (keys) => [...keys].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
+
+// 交付见证的观察口：已注册的 EventStore Surface 把 durable 事实读成普通 JSON
+// （payload.Fact = ["Agent", [family, [case, payload]]]），不构造任何 F# union。
+// 交付见证就是 Host 家族里那条 TaskDeliveryCommitted 事实。
+const deliveryWitnesses = (commonDir) => {
+  const eventsDir = join(commonDir, 'wanxiangshu', 'events')
+  if (!existsSync(eventsDir)) return []
+  const all = new Map()
+  for (const file of readdirSync(eventsDir)) {
+    const store = eventStore.create(commonDir, file.split('-')[0])
+    for (const stream of eventStore.streams(store)) {
+      let id = eventStore.head(store, stream)
+      while (id) {
+        const event = eventStore.read(store, id)
+        if (!event) break
+        all.set(id, event)
+        id = event.parents?.[0]
+      }
+    }
+    eventStore.dispose(store)
+  }
+  const witnesses = []
+  for (const event of all.values()) {
+    const fact = event?.payload?.Fact
+    if (fact?.[1]?.[0] === 'Host' && fact[1][1][0] === 'TaskDeliveryCommitted') witnesses.push(fact)
+  }
+  return witnesses
+}
 
 const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-033-'))
@@ -298,6 +330,90 @@ test('WHAT[work-033] Engineer/DevOps/Orchestrator TurnCompleted+stop without Tas
     const after = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
     assert.deepEqual(after, before, 'logical run must not be closed when delivery witness is missing')
   }, { session: 'engineer-undelivered-logical-run' })
+
+  const rolesToTest = ['engineer', 'devops', 'orchestrator']
+
+  for (const name of rolesToTest) {
+    for (const delivered of [false, true]) {
+      await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+        const session = `session-undelivered-${name}-${delivered ? 'with' : 'without'}-witness`
+        const physical = `phys-${session}`
+        await acceptAuthorityRoot(runtime, session, name, physical)
+
+        const user = {
+          info: {
+            id: physical,
+            role: 'user',
+            sessionID: session,
+            agent: name,
+            model: { providerID: 'provider', modelID: `${name}-model` },
+            time: { created: 1 },
+          },
+          parts: [{ type: 'text', text: 'Do the work.' }],
+        }
+        runtime.pushHostMessage(session, user)
+        await hooks['chat.message'](
+          { sessionID: session, messageID: physical, agent: name },
+          { message: user, parts: user.parts },
+        )
+
+        const run = `run-${session}`
+        const program = delivered
+          ? 'class Js extends JsProgram { async run() { await this.deliver({ 0: "the delivered view" }); } }'
+          : 'class Js extends JsProgram { async run() { return 1; } }'
+        const assistant = {
+          info: {
+            id: run,
+            role: 'assistant',
+            sessionID: session,
+            parentID: physical,
+            agent: name,
+            providerID: 'provider',
+            modelID: `${name}-model`,
+            time: { created: 2 },
+          },
+          parts: [
+            { type: 'text', text: 'I finished the task but did not call deliver.' },
+            { type: 'tool', tool: `todowrite-for-${name}`, callID: `call-${session}`, state: { status: 'pending', input: { program } } },
+          ],
+        }
+        runtime.pushHostMessage(session, assistant)
+        await hooks['experimental.chat.messages.transform']({ sessionID: session }, { messages: [user] })
+
+        const before = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+        assert.ok(before !== null, 'logical run must be active initially')
+
+        const result = await hooks.tool[`todowrite-for-${name}`].execute(
+          { program },
+          { sessionID: session, agent: name, callID: `call-${session}`, messageID: run },
+        )
+        assert.match(String(result), /# ok/)
+        assistant.parts.at(-1).state = { status: 'completed', input: { program }, output: String(result) }
+        assistant.info.time.completed = 3
+        assistant.info.finish = 'stop'
+        await hooks.event({ event: { type: 'message.updated', properties: { info: assistant.info } } })
+        await hooks.event({ event: { type: 'session.idle', properties: { sessionID: session } } })
+
+        const witnesses = deliveryWitnesses(join(directory, '.Herdchestra'))
+        if (delivered) {
+          assert.equal(witnesses.length, 1, `${name} a real delivery writes exactly one witness`)
+        } else {
+          assert.deepEqual(
+            witnesses,
+            [],
+            `${name} an undelivered stop writes no delivery witness, so no completion is recorded`,
+          )
+        }
+
+        const after = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+        assert.deepEqual(
+          after,
+          before,
+          'logical run must not be closed when delivery witness is missing',
+        )
+      })
+    }
+  }
 })
 
 test('WHAT[work-033] a same-request replay is idempotent and a different payload is a structured conflict', async () => {

@@ -1,8 +1,9 @@
 namespace Wanxiangshu.Persistence.EventStore
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
-open Thoth.Json
 open Wanxiangshu.Foundation.Identity
 
 /// Structural frontier oracle. It sees every durable event but owns no business
@@ -31,11 +32,47 @@ module IntegratorEngine =
         if program |> List.exists (fun rule -> rule.Name = structuralRule.Name) |> not then
             invalidArg "rules" (sprintf "IntegratorEngine program is missing required rule '%s'" structuralRule.Name)
 
+    /// CUT-19-b: the (rule, FaultScope) quarantine ledger, the skip-while-
+    /// quarantined decision, the ProjectionCutTail payload codec and when a cut
+    /// takes effect have one owner, wanxiangli/quarantine. This engine keeps the
+    /// rules themselves, Current, the one full-replay budget and PrepareLive.
+    [<Import("RuleQuarantine", "wanxiangli/quarantine")>]
+    let private quarantineClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private constructQuarantine (cls: obj) : obj = jsNative
+
+    let private quarantine: obj = constructQuarantine quarantineClass
+
     type private RuleFaultKey = { Rule: string; Scope: string }
 
     type private RuleFault =
         { FailedEventId: EventId
           Reason: string }
+
+    /// Opaque persistent ledger owned by wanxiangli/quarantine.
+    type private FaultLedger = obj
+
+    let private emptyLedger () : FaultLedger = quarantine?empty ()
+
+    let private isQuarantined (ledger: FaultLedger) (key: RuleFaultKey) : bool =
+        unbox<bool> (quarantine?isQuarantined (ledger, key.Rule, key.Scope))
+
+    let private tryFault (ledger: FaultLedger) (key: RuleFaultKey) : RuleFault option =
+        let fault: obj = quarantine?fault (ledger, key.Rule, key.Scope)
+
+        if isNull fault then
+            None
+        else
+            Some
+                { FailedEventId = EventId.create (unbox<string> fault?failedEventId)
+                  Reason = unbox<string> fault?reason }
+
+    let private recordFault (ledger: FaultLedger) (key: RuleFaultKey) (fault: RuleFault) : FaultLedger =
+        quarantine?quarantine (ledger, key.Rule, key.Scope, EventId.value fault.FailedEventId, fault.Reason)
+
+    let private releaseFault (ledger: FaultLedger) (key: RuleFaultKey) : FaultLedger =
+        quarantine?release (ledger, key.Rule, key.Scope)
 
     /// PayloadIndex (durable-events-012) maps inline payload content addresses to
     /// their bytes, folded from every accepted envelope. It is part of the same
@@ -45,7 +82,7 @@ module IntegratorEngine =
           Events: Map<string, EventEnvelope>
           PayloadIndex: Map<PayloadRef, byte[]>
           CausalParents: Map<EventId, EventId list>
-          Faults: Map<RuleFaultKey, RuleFault> }
+          Faults: FaultLedger }
 
     type private IntegrationStep =
         { State: IntegratorState
@@ -67,7 +104,7 @@ module IntegratorEngine =
           Events = Map.empty
           PayloadIndex = Map.empty
           CausalParents = Map.empty
-          Faults = Map.empty }
+          Faults = emptyLedger () }
 
     let private eventKey (eventId: EventId) = EventId.value eventId
 
@@ -84,26 +121,26 @@ module IntegratorEngine =
         { Rule = rule.Name
           Scope = rule.FaultScope envelope }
 
-    let private encodeCutPayload (payload: CutPayload) =
-        Encode.object
-            [ "rule", Encode.string payload.Rule
-              "failed_event_id", Encode.string (EventId.value payload.FailedEventId)
-              "reason", Encode.string payload.Reason
-              "reset_json", Encode.string payload.ResetJson ]
+    let private encodeCutPayload (payload: CutPayload) : obj =
+        quarantine?encodeCut (
+            createObj
+                [ "rule" ==> payload.Rule
+                  "failedEventId" ==> EventId.value payload.FailedEventId
+                  "reason" ==> payload.Reason
+                  "resetJson" ==> payload.ResetJson ]
+        )
 
     let private tryDecodeCutPayload (envelope: EventEnvelope) =
-        if envelope.EventType <> ProjectionCutTailEvent.EventType then
+        let cut: obj = quarantine?decodeCut (envelope.EventType, envelope.Payload)
+
+        if isNull cut then
             None
         else
-            Decode.fromValue
-                "$"
-                (Decode.object (fun get ->
-                    { Rule = get.Required.Field "rule" Decode.string
-                      FailedEventId = EventId.create (get.Required.Field "failed_event_id" Decode.string)
-                      Reason = get.Required.Field "reason" Decode.string
-                      ResetJson = get.Required.Field "reset_json" Decode.string }))
-                envelope.Payload
-            |> Result.toOption
+            Some
+                { Rule = unbox<string> cut?rule
+                  FailedEventId = EventId.create (unbox<string> cut?failedEventId)
+                  Reason = unbox<string> cut?reason
+                  ResetJson = unbox<string> cut?resetJson }
 
     let private causalStep (state: IntegratorState) (envelope: EventEnvelope) =
         EventCausalContext.create envelope.Parents state.CausalParents,
@@ -136,18 +173,27 @@ module IntegratorEngine =
         | Ok reset ->
             { state with
                 Currents = Map.add rule.Name reset state.Currents
-                Faults = Map.remove key state.Faults }
+                Faults = releaseFault state.Faults key }
 
     let private applyCutForFailedEvent state payload rule failed =
         let key = faultKey rule failed
 
-        match Map.tryFind key state.Faults with
+        match tryFault state.Faults key with
         | Some fault when fault.FailedEventId <> payload.FailedEventId -> state
         | _ -> applyCutForRule state payload rule key
 
     let private applyCut (program: IntegrationRule list) (state: IntegratorState) (payload: CutPayload) =
-        match tryRule program payload.Rule, Map.tryFind (eventKey payload.FailedEventId) state.Events with
-        | Some rule, Some failed -> applyCutForFailedEvent state payload rule failed
+        let named = tryRule program payload.Rule
+        let failedEvent = Map.tryFind (eventKey payload.FailedEventId) state.Events
+
+        let failedScope =
+            match named, failedEvent with
+            | Some rule, Some failed -> box (rule.FaultScope failed)
+            | _ -> null
+
+        match named, failedEvent with
+        | Some rule, Some failed when unbox<bool> (quarantine?cutVerdict (named.IsSome, failedScope)) ->
+            applyCutForFailedEvent state payload rule failed
         | _ -> state
 
     let private evaluateBusinessRule
@@ -169,7 +215,7 @@ module IntegratorEngine =
         (normalized: EventEnvelope)
         (rule: IntegrationRule)
         =
-        if Map.containsKey (faultKey rule normalized) state.Faults then
+        if isQuarantined state.Faults (faultKey rule normalized) then
             RuleSkipped
         else
             evaluateBusinessRule context state normalized rule
@@ -194,7 +240,7 @@ module IntegratorEngine =
                   Reason = reason }
 
             { state with
-                Faults = Map.add key fault state.Faults },
+                Faults = recordFault state.Faults key fault },
             (key, reason) :: failures
 
     let private applyBusinessRule
@@ -324,43 +370,22 @@ module IntegratorEngine =
                 fullReplayUsed <- true
                 true)
 
-    let private validateLocalHistory (isEventTypeKnown: string -> bool) commonDir streams =
-        result {
-            let events = streams |> List.collect snd
-
-            do!
-                events
-                |> List.tryFind (fun envelope -> not (isEventTypeKnown envelope.EventType))
-                |> Option.map (fun envelope ->
-                    Error(sprintf "unknown durable event type during replay: %s" envelope.EventType))
-                |> Option.defaultValue (Ok())
-
-            do!
-                events
-                |> List.tryPick (fun envelope ->
-                    // durable-events-012: inline payloads are self-contained; a
-                    // PayloadRef is satisfied exactly when the event line embeds it
-                    // with a matching content address. Absence and digest mismatch are
-                    // distinct physical faults and stay distinguishable in the message.
-                    envelope.PayloadRefs
-                    |> List.tryPick (fun payloadRef ->
-                        match envelope.Payloads |> Map.tryFind payloadRef with
-                        | None ->
-                            Some(
-                                sprintf
-                                    "missing durable inline payload during replay: %s"
-                                    (PayloadRef.value payloadRef)
-                            )
-                        | Some content when ProcessEventLog.payloadDigest content <> PayloadRef.value payloadRef ->
-                            Some(
-                                sprintf
-                                    "durable inline payload digest mismatch during replay: %s"
-                                    (PayloadRef.value payloadRef)
-                            )
-                        | Some _ -> None))
-                |> Option.map Error
-                |> Option.defaultValue (Ok())
-        }
+    /// durable-events-012/027: a retained replay set must name only known
+    /// event types and every stored line must be self-contained. The rule is
+    /// wanxiangli/events `checkClosure` (CUT-19); this keeps only the replay
+    /// messages whose shape 027 pins. Parent closure is not checked here: the
+    /// retained window may name aged-out parents (EventKWayMerge.mergeRetained).
+    let private validateLocalHistory (isEventTypeKnown: string -> bool) (_commonDir: string) streams =
+        CanonicalEventCodec.checkStoredClosure isEventTypeKnown (streams |> List.collect snd)
+        |> Result.mapError (function
+            | StoredLineFault.UnknownEventType eventType ->
+                sprintf "unknown durable event type during replay: %s" eventType
+            | StoredLineFault.MissingPayload payloadRef ->
+                sprintf "missing durable inline payload during replay: %s" (PayloadRef.value payloadRef)
+            | StoredLineFault.PayloadDigestMismatch payloadRef ->
+                sprintf "durable inline payload digest mismatch during replay: %s" (PayloadRef.value payloadRef)
+            | StoredLineFault.UnreferencedPayload payloadRef ->
+                sprintf "unreferenced durable inline payload during replay: %s" (PayloadRef.value payloadRef))
 
     let create (rules: IntegrationRule list) (isEventTypeKnown: string -> bool) : ICanonicalIntegrator =
         requireStructuralRule rules
@@ -461,7 +486,7 @@ module IntegratorEngine =
 
         let ensureRuleReset (currentState: IntegratorState) (rule: IntegrationRule) (key: RuleFaultKey) =
             result {
-                match Map.tryFind key currentState.Faults with
+                match tryFault currentState.Faults key with
                 | None -> return currentState, [], []
                 | Some fault ->
                     let! plan = planCut currentState rule fault

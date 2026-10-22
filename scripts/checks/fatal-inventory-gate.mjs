@@ -15,7 +15,7 @@
  *   - Direct calls: `FatalProcess.trip`, `FatalProcess.kill`, `Diagnostic.fatal`
  *     on masked F# code (comments/strings blanked via maskFSharpTrivia, so
  *     comment mentions and string literals never match). Definition files
- *     (Foundation/FatalProcess.fs, OpenCode/Host/Diagnostic.fs) are matched
+ *     (Foundation/FatalProcess.fs, Foundation/Diagnostic.fs) are matched
  *     too — their rows are F32.
  *   - One-hop aliases: a point-free binding `Name = FatalProcess.trip` (F11
  *     shape) registers Name as a fatal alias; later uses of that alias as a

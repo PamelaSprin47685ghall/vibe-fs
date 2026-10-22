@@ -6,11 +6,11 @@ import { join } from 'node:path'
 import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import * as contract from '../../../dist/OpenCode/Host/OpenCodeContract.js'
+import * as contract from '../../../dist/Foundation/HostSendContract.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import {
   withJournal, hostPort, prepareAcceptanceObserver, sendWithAcceptanceObserver,
-  acceptObservedPhysical, acceptanceObservation,
+  acceptObservedPhysical, acceptanceObservation, linkChildWork,
 } from './support/authority.mjs'
 
 const capturingPort = (captured, outcome = () => dispatch.admittedWithReceipt('accepted-007')) => ({
@@ -213,6 +213,7 @@ test('WHAT[dispatch-protocol-009] PROMPT_007_detached_continuation_same_claim_pa
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_007c_owner')
+      await linkChildWork(opened.journal, owner.session, 'ses_007c', 'engineer')
       const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
       const captured = []
       const port = capturingPort(captured)

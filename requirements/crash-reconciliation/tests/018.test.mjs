@@ -5,12 +5,13 @@ import assert from 'node:assert/strict'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
-import * as recovery from '../../../dist/OpenCode/Host/LoadRecoverySurface.js'
+import * as recovery from '../../../dist/OpenCode/Host/PhysicalRecoverySurface.js'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
 import { withJournal, acceptOwner, hostPort } from '../../interaction-authority/tests/support/authority.mjs'
 
-test('WHAT[crash-reconciliation-018] orphaned child run preserves authority and does not automatically resend', async () => {
+test('WHAT[crash-reconciliation-018] an orphaned child work is voided at load, settles the obligation and is never resent', async () => {
   await withJournal('scoped-child-load', async (initial, reopen, directory) => {
+    const commonDir = directory
     const parent = 'load-parent'
     const child = 'load-child'
     const owner = await acceptOwner(initial, parent)
@@ -35,17 +36,27 @@ test('WHAT[crash-reconciliation-018] orphaned child run preserves authority and 
     const [workA] = await forkTool.coldWorkSnapshot(directory, parent)
     assert.equal(workA.lifecycle, 'Active')
     const current = await reopen()
-    await recovery.settleChildRuns(current)
-    // Old run still holds authority (not voided)
+    await recovery.settleChildRuns(current, commonDir)
+    // The orphaned child work can no longer be executed, so load voids it: a
+    // void is not a completion, but it settles the obligation and releases the
+    // child's active logical run.
     const obs = dispatch.projectionObservation(current, child)
-    assert.ok(obs.activeLogicalRun !== null, 'old run still occupies authority')
-    assert.equal(obs.activeLogicalRun.authorityRoot, 'physical-work-A')
+    assert.ok(!obs.activeLogicalRun, 'the voided child run no longer occupies authority')
     const after = await forkTool.coldWorkSnapshot(directory, parent)
     assert.equal(after.length, 1)
-    assert.equal(after[0].lifecycle, 'Active', 'child work remains Active')
+    assert.equal(after[0].lifecycle, 'Abandoned', 'the voided child work is abandoned')
     assert.equal(sends, 1, 'load settlement does not automatically resend or replay')
-    await recovery.settleChildRuns(current)
+    const eventCount = async () => {
+      const { readdirSync, readFileSync } = await import('node:fs')
+      const { join } = await import('node:path')
+      const events = join(commonDir, 'wanxiangshu', 'events')
+      return readdirSync(events).filter(name => name.endsWith('.ndjson'))
+        .reduce((total, name) => total + readFileSync(join(events, name), 'utf8').split('\n').filter(Boolean).length, 0)
+    }
+    const settledEvents = await eventCount()
+    await recovery.settleChildRuns(current, commonDir)
     assert.equal(sends, 1, 'no automatic resend on subsequent settlements')
+    assert.equal(await eventCount(), settledEvents, 'a repeated settlement appends no durable fact')
   })
 })
 

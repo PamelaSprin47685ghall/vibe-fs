@@ -8,7 +8,7 @@ import { withSyncRuntime as withObservedRuntime } from '../../delegation/tests/s
 import {
   withJournal, hostPort, journalBytes, prepareAcceptanceObserver, sendWithAcceptanceObserver,
   acceptObservedPhysical, acceptanceObservation,
-  ownAcceptanceRegistration,
+  ownAcceptanceRegistration, linkChildWork,
 } from './support/authority.mjs'
 
 const registerLease = (key, observer) => {
@@ -574,7 +574,7 @@ const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
-const contract = await import("../../../dist/OpenCode/Host/OpenCodeContract.js");
+const contract = await import("../../../dist/Foundation/HostSendContract.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
 const hash = (value) => `H(${value})`
@@ -773,7 +773,15 @@ const appendAuthorityRoot = async (handle, session) => {
   assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
   const inherited = authority.issueInheritedIdentitySeed('engineer', owner.profile)
   assert.equal(inherited.ok, true, inherited.ok ? '' : inherited.error)
-  return dispatch.appendAuthorityRoot(handle, session, inherited.value)
+  await linkChildWork(handle, owner.profile.session, session, 'engineer')
+  const sent = await dispatch.sendAgentOwnerRoot(
+    hostPort(async () => dispatch.admittedWithReceipt(`bootstrap-${session}`)),
+    handle, session, 'bootstrap this exact JoinGuard child', inherited.value,
+  )
+  assert.equal(sent.ok, true, sent.error)
+  return dispatch.acceptManagedPromptClaim(
+    handle, session, `bootstrap-physical-${session}`, sent.key, 'engineer',
+  )
 }
 const capturingPort = (captured, behaviour = {}) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),

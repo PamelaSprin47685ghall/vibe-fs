@@ -7,6 +7,7 @@ import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as recovery from '../../../dist/Interaction/Dispatch/RecoverySurface.js'
+import { linkChildWork } from './support/authority.mjs'
 
 const BOOT_AFTER_CLAIM = '2099-01-01T00:00:00Z'
 
@@ -44,6 +45,7 @@ const sendAgentOwnerRoot = async (port, handle, session, text) => {
   assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
   const seed = authority.issueInheritedIdentitySeed('engineer', owner.profile)
   assert.equal(seed.ok, true, seed.ok ? '' : seed.error)
+  await linkChildWork(handle, owner.profile.session, session, 'engineer')
   return dispatch.sendAgentOwnerRoot(port, handle, session, text, seed.value)
 }
 

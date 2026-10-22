@@ -3,6 +3,8 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/OpenCode/Host/**
+/src/Wanxiangshu/Execution/Session/ChatExecution/ProviderRunBinding.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/ProviderLifecycle.fs
 /src/Wanxiangshu/OpenCode/Codec/**
 /src/Wanxiangshu/OpenCode/Signals/**
 /src/Wanxiangshu/OpenCode/Plugin/**
@@ -13,20 +15,25 @@
 /src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
 /scripts/checks/architecture.mjs
 /scripts/checks/hook-policy.mjs
+/src/Wanxiangshu/Composition/Omp/**
+/scripts/checks/omp-entry-decision-gate.mjs
 
 
 /src/Wanxiangshu/Host/Digest.fs
 /src/Wanxiangshu/Host/CanonicalJson.fs
+/src/Wanxiangshu/Host/ToolContext.fs
 /src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs
 /src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/ProviderObservation.fs
 /src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs
 /src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs
 /src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs
+/src/Wanxiangshu/Foundation/HostModel.fs
 /src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs
 /src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
 /src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs
 /src/Wanxiangshu/OpenCode/Host/ChatParamsSurface.fs
-/src/Wanxiangshu/OpenCode/Host/Diagnostic.fs
+/src/Wanxiangshu/Foundation/Diagnostic.fs
 /src/Wanxiangshu/OpenCode/Host/Events.fs
 /src/Wanxiangshu/OpenCode/Host/EventsSurface.fs
 /src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs
@@ -48,15 +55,15 @@
 /src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs
-/src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs
+/src/Wanxiangshu/Foundation/RootWorkspace.fs
 /src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs
 /src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs
-/src/Wanxiangshu/OpenCode/Host/SessionSnapshot.fs
+/src/Wanxiangshu/Foundation/HostSessionSnapshot.fs
 /src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs
 /src/Wanxiangshu/OpenCode/Host/SessionSnapshotSurface.fs
 /src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs
 /src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs
-/src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs
+/src/Wanxiangshu/Execution/Delegation/Fork/JoinResultRendererSurface.fs
 /src/Wanxiangshu/OpenCode/Plugin/Plugin.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs

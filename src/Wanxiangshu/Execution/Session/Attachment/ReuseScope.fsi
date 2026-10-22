@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Session.Attachment
 
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
@@ -24,6 +25,7 @@ type IAttachedSessionPort =
     abstract TryFind: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
     abstract TryFindByScope: scope: ReuseScopeId * role: SyncDelegateRole -> SessionId option
     abstract TryFindOwner: delegateSessionId: SessionId * role: SyncDelegateRole -> SessionId option
+    abstract TryFindOwnership: delegateSessionId: SessionId -> SessionOwnership option
     abstract Remove: ownerSessionId: SessionId * role: SyncDelegateRole -> bool
     abstract RemoveByDelegateSession: delegateSessionId: SessionId -> bool
 

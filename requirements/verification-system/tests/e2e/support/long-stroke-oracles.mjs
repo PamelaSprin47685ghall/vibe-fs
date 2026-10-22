@@ -452,11 +452,17 @@ export async function bindManagerLoopSequence(scenario) {
         : latestManagerAuditAttempt === 3
           ? {
               type: 'tool-call',
-              tool: 'fork',
+              tool: 'todowrite-for-manager',
               args: {
-                calling: 'engineer',
-                name: 'Conflict Resolver',
-                charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
+                program: `class Js extends JsProgram {
+  async run() {
+    return await this.fork({
+      calling: 'engineer',
+      name: 'Conflict Resolver',
+      charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
+    }, {});
+  }
+}`,
               },
             }
           : retire();
@@ -469,11 +475,17 @@ export async function bindManagerLoopSequence(scenario) {
       entry.respond = latestManagerAuditAttempt === 3
         ? {
             type: 'tool-call',
-            tool: 'fork',
+            tool: 'todowrite-for-manager',
             args: {
-              calling: 'engineer',
-              name: 'Conflict Resolver',
-              charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
+              program: `class Js extends JsProgram {
+  async run() {
+    return await this.fork({
+      calling: 'engineer',
+      name: 'Conflict Resolver',
+      charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
+    }, {});
+  }
+}`,
             },
           }
         : retire();

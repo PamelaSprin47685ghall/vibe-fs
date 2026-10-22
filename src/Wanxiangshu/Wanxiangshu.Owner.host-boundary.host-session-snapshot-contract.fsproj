@@ -11,7 +11,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-message-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-opencode-types.fsproj"/>
-    <Compile Include="OpenCode/Host/SessionSnapshot.fsi"/>
-    <Compile Include="OpenCode/Host/SessionSnapshot.fs"/>
+    <Compile Include="Foundation/HostSessionSnapshot.fsi"/>
+    <Compile Include="Foundation/HostSessionSnapshot.fs"/>
   </ItemGroup>
 </Project>

@@ -6,6 +6,7 @@ import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import { linkChildWork } from './support/authority.mjs'
 
 const hash = (value) => `H(${value})`
 
@@ -68,6 +69,7 @@ test('WHAT[dispatch-protocol-011] PROMPT_006_send_payload_carries_prompt_key_met
     try {
       const owner = await acceptOwner(opened.journal, 'ses_006m_owner')
       const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
+      await linkChildWork(opened.journal, owner.session, 'ses_006m', 'engineer')
       const ownerRoot = await dispatch.sendAgentOwnerRoot(
         capturingPort(),
         opened.journal,

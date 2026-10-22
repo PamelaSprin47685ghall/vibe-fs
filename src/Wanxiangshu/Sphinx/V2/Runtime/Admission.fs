@@ -121,22 +121,3 @@ module Admission =
         match item with
         | Some current -> matchingOutcome submission current
         | None -> unknownWork ()
-
-    let admitResult (state: InquiryState) (submission: ResultSubmission) : Result<WorkItem, CommandError> =
-        resultReason submission (state.Work |> Map.tryFind submission.WorkId)
-
-    /// Goal amendment is the one command that may move the goal, and it must name its
-    /// authorizer — a plugin cannot authorize itself (WHAT[sphinx-v2-001]).
-    let admitGoalAmendment (state: InquiryState) (authorizedBy: string) : Result<GoalSpec, CommandError> =
-        if System.String.IsNullOrWhiteSpace authorizedBy then
-            error "invalid-goal" "goal amendment requires a non-blank authorizer"
-        else
-            Ok state.Goal
-
-    /// The evidence a claim command may carry: only work the caller was allowed to run.
-    let admissibleWorkForClaim (state: InquiryState) (limit: int) : WorkSpec list =
-        state
-        |> InquiryState.readyWork
-        |> List.sortBy (fun item -> WorkId.value item.Spec.Id)
-        |> List.truncate limit
-        |> List.map (fun item -> item.Spec)

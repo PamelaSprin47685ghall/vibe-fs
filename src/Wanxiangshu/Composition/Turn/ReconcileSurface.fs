@@ -8,6 +8,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Foundation.HostSession
 
 /// JS boundary for reconciliation's classifiers, evidence, wakes and publish
 /// seals. Maps and idle permits remain opaque handles; decisions and
@@ -194,18 +196,6 @@ module ReconcileSurface =
         box
             {| kind = "AbortWake"
                hasQuiescence = false |}
-
-    let isAbortControlPlaneWake (wake: obj) : bool =
-        if isNull wake then
-            false
-        else
-            let kind =
-                try
-                    wake?kind
-                with _ ->
-                    ""
-
-            kind = "AbortWake"
 
     let mergeWakeKind (currentPhysical: string) (previous: obj) (incoming: obj) =
         ReconcileProgram.mergeWake

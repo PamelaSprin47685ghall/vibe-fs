@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 
 module PluginHostWiringSurface =
+    val createTerminalHost: workspace: string -> Task<obj>
     val createBoot: input: obj -> Task<obj>
     val bootHasJournal: boot: obj -> bool
     val disposeBoot: boot: obj -> Task

@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Context.Prefix
 
+
 open System
 open System.Threading.Tasks
 open Fable.Core
@@ -122,15 +123,6 @@ module XWireSurface =
         ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot cutoff
 
 
-    let suppressHostMessagesByIds (rawMessages: obj array) (hostMessageIds: string array) : obj array =
-        XWire.suppressHostMessagesByIds
-            (if isNull rawMessages then [] else Array.toList rawMessages)
-            (if isNull hostMessageIds then
-                 Set.empty
-             else
-                 Set.ofArray hostMessageIds)
-        |> List.toArray
-
     /// host-boundary-020/021: the X-wire transform decision.
     ///
     /// Input fields (JS object):
@@ -183,7 +175,7 @@ module XWireSurface =
                    output = input?currentProjection |}
 
     /// host-boundary-021: reconcile decision — does a completed attempt clear
-    /// the plan? Delegates to the pure decision used by `XWire.reconcileAttempt`.
+    /// the plan? Delegates to the host-neutral decision `XWire.reconcileAttempt` also uses.
     ///
     /// Input fields (JS object):
     ///   hasPlan:    true when an attempt plan exists for this (session, run).
@@ -196,7 +188,7 @@ module XWireSurface =
         let hasPlan = not (isNullish input?hasPlan) && (input?hasPlan |> unbox<bool>)
 
         let decision =
-            XWire.reconciliationDecision hasPlan (attemptOutcomeOfJs input?outcome)
+            XWireReconciliation.reconciliationDecision hasPlan (attemptOutcomeOfJs input?outcome)
 
         box
             {| cleared = decision.Cleared

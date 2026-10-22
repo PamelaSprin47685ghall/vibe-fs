@@ -1,10 +1,26 @@
 namespace Wanxiangshu.OpenCode
 
+open System
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Knowledge.Casebook
 
 module PluginHostWiringSurface =
+
+    let createTerminalHost (workspace: string) : Task<obj> =
+        task {
+            let! created = PluginHost.createHost (Some workspace) (createObj []) None None None None
+
+            match created with
+            | Error reason -> return raise (InvalidOperationException reason)
+            | Ok(eventPort, _, _, key, source) ->
+                return
+                    box
+                        {| port = box eventPort
+                           source = Option.toObj source
+                           release = (fun () -> SharedTerminalBus.release key source) |}
+        }
 
     let createBoot (input: obj) : Task<obj> =
         task {

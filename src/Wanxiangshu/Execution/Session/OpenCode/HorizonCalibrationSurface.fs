@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Session.OpenCode
 
+open Wanxiangshu.Execution.Session
+
 /// participant-horizon-[011]: JS-native owner boundary for the roster tool's calibration
 /// prose. The four numbers cross as opaque JS values; `HorizonCalibration` keeps the
 /// arithmetic and the authored-resource localization.

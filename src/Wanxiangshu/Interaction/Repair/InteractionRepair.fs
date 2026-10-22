@@ -1,8 +1,9 @@
 namespace Wanxiangshu.Interaction.Repair
 
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Execution.Fission

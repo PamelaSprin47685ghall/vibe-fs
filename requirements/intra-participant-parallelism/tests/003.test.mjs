@@ -51,11 +51,17 @@ test('WHAT[intra-participant-parallelism-003] actual Host-created Fission lanes 
     await acceptAuthorityRoot(runtime, managerSession, 'manager')
     await openIncumbency(runtime, managerSession)
 
-    const forked = await hooks.tool.fork.execute(
-      { name: 'Ada', charge: 'investigate seven items' },
+    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, reportMapping)`。
+    const forked = await hooks.tool['todowrite-for-manager'].execute(
+      {
+        program:
+          'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "investigate seven items" }, { 1: null }); } }',
+      },
       { sessionID: managerSession, agent: 'manager' },
     )
-    assert.match(forked, /现已接下这项托付|carries this charge now/i)
+    assert.match(forked, /ok = true/)
+    assert.match(forked, /name = "Ada"/)
+    assert.match(forked, /outcome = "created"/)
     assert.equal(createdIds.length, 1)
     const engineerSession = createdIds[0]
 

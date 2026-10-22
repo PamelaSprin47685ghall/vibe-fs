@@ -23,6 +23,11 @@ const rootFact = profile => ({
   family: 'Prompt', case: 'AuthorityRootAccepted', payload: {
     SchemaVersion: 2, SessionId: profile.session, LogicalRunId: profile.logicalRun,
     AuthorityRootUserMessageId: profile.authorityRoot, AuthorityKind: profile.authorityKind,
+    ExpectedClosureKind: authority.recordedClosureKind(
+      profile.authorityKind, profile.participantIdentity.role === 'manager', profile.agentOwnerLife ?? null, null,
+    ),
+    OwnerLogicalRunId: profile.identitySeed.ownerLogicalRun ?? undefined,
+    AgentOwnerLife: profile.agentOwnerLife,
     IdentitySeed: profile.identitySeed,
   },
 })
@@ -55,7 +60,7 @@ export const acceptRun = (state, { child = 'child', agent = 'engineer', parent =
     fold(state, rootFact(owner))
     const issued = authority.issueInheritedIdentitySeed(agent, owner)
     assert.equal(issued.ok, true, issued.error)
-    profile = createRoot(child, 'AgentOwnerRoot', issued.value)
+    profile = { ...createRoot(child, 'AgentOwnerRoot', issued.value), agentOwnerLife: 'Child' }
     const accepted = JSON.parse(codec.encode(rootFact(profile)))[1][1][1]
     const promptKey = id('PromptKey', `load-${child}`)
     fold(state, canonical('Prompt', 'PluginPromptClaimed', {

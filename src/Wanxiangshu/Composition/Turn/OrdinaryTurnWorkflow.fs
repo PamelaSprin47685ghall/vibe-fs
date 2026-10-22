@@ -5,16 +5,19 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Routing
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -65,6 +68,51 @@ module OrdinaryTurnWorkflow =
                         || List.contains (ProviderRunIdentity.value turn.ProviderRun) work.RetiredRuns)
         }
 
+    /// The terminal and the delivery must belong to the same accepted work.
+    /// A later provider step needs its own Host observation. Conflicting
+    /// materials cannot be resolved by choosing one provider's witness.
+    let tryDeliveryEvidence (journal: AgentJournal option) (turn: ReconciledTurn) =
+        match journal with
+        | Some durable ->
+            let projection = (AgentJournal.snapshot durable).AgentProjections
+
+            PromptAuthorityProjectionQueries.activeProfile turn.SessionId projection
+            |> Option.filter (fun profile -> profile.AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId)
+            |> Option.bind (fun profile ->
+                TaskDelivery.tryFindForWork
+                    turn.SessionId
+                    profile.LogicalRunId
+                    turn.AuthorityRootUserMessageId
+                    turn.PhysicalUserMessageId
+                    None
+                    projection.Deliveries)
+            |> Option.filter (fun witness ->
+                (TaskDelivery.tryFindByFenceFields
+                    turn.SessionId
+                    turn.ProviderRun
+                    None
+                    (Some turn.AuthorityRootUserMessageId)
+                    (Some turn.PhysicalUserMessageId)
+                    (Some witness.Fence.LogicalRunId)
+                    None
+                    projection.Deliveries
+                 |> Option.isSome)
+                || (ModelRouting.tryProviderStepIdentity turn.ProviderRun
+                    |> Option.exists (fun (sessionId, physical) ->
+                        sessionId = turn.SessionId && physical = turn.PhysicalUserMessageId)))
+        | None -> None
+
+    let private hasDeliveryEvidence journal turn =
+        tryDeliveryEvidence journal turn |> Option.isSome
+
+    /// advisor-[004]: the advisor office holds no tools and answers in prose, so the
+    /// completed turn's prose is its whole delivery. There is no `this.deliver` witness to
+    /// wait for and no unfinished work to nudge: its completed turn is an ordinary terminal
+    /// (an empty answer still fails through `AgentRunResult.IsValid`). Without this the
+    /// advisor child was sent a plan-continue nudge and never published the Completed its
+    /// seat awaits (F39-01).
+    let private deliversByProse (turn: ReconciledTurn) : bool = turn.Role = Some Role.Advisor
+
     let private classifyManagerOrPlanTurn (context: ReconciledTurnContext) : LongWorkGate =
         let turn = context.Turn
 
@@ -82,25 +130,29 @@ module OrdinaryTurnWorkflow =
             Continue
         | _ -> Ordinary
 
-    let private classifyManagedTurnGate settled hasDelivered (context: ReconciledTurnContext) =
-        match settled, hasDelivered, context.Turn.Role with
-        | true, _, _ -> Wait
-        | _, true, Some Role.Manager
-        | _, true, Some Role.Plan -> Wait
-        | _, true, _ -> Ordinary
-        | _ -> classifyManagerOrPlanTurn context
+    /// A turn whose delivery is proven by a durable witness is this turn's own
+    /// terminal: the owner of that delivery waits for a terminal fact, so the
+    /// terminal must be published. A turn without such a witness keeps the
+    /// Continue/nudge path (the obligation is still open), and Manager / Plan
+    /// turns keep their own lifecycle ownership.
+    let private classifyDeliveredTurn (turn: ReconciledTurn) =
+        match turn.Role, turn.Outcome with
+        | (Some Role.Manager | Some Role.Plan), _ -> Wait
+        | _, (ReconcileProgram.TurnCompleted | ReconcileProgram.TurnAborted _ | ReconcileProgram.TurnFailed _) ->
+            Ordinary
+        | _, _ -> Wait
 
-    let private isCompletedChildExchange (journal: AgentJournal option) (turn: ReconciledTurn) =
-        journal
-        |> Option.exists (fun durable ->
-            (AgentJournal.snapshot durable).AgentProjections.Deliveries
-            |> Map.exists (fun _ witness ->
-                witness.Fence.SessionId = turn.SessionId
-                && witness.Fence.AuthorityRoot = turn.AuthorityRootUserMessageId
-                && witness.Fence.PhysicalUserMessageId = turn.PhysicalUserMessageId
-                && (match witness.Fence.Task with
-                    | TaskDeliveryTask.ChildWork _ -> true
-                    | _ -> false)))
+    let private settledTurnGate
+        (journal: AgentJournal option)
+        (context: ReconciledTurnContext)
+        (settled: bool)
+        : LongWorkGate =
+        if settled then
+            Wait
+        elif hasDeliveryEvidence journal context.Turn then
+            classifyDeliveredTurn context.Turn
+        else
+            classifyManagerOrPlanTurn context
 
     let private longWorkGate (journal: AgentJournal option) (context: ReconciledTurnContext) : Task<LongWorkGate> =
         task {
@@ -117,35 +169,14 @@ module OrdinaryTurnWorkflow =
 
             if not hasRole then
                 return Ordinary
-            elif
-                isExplicitWaitOrOldTurn (authority ()) turn
-                || isCompletedChildExchange journal turn
-            then
+            elif isExplicitWaitOrOldTurn (authority ()) turn then
                 return Wait
+            elif deliversByProse turn then
+                return Ordinary
             else
                 let! settled = isTurnWorkSettled turn
-
-                let hasDelivered =
-                    Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value turn.SessionId)
-                    <> null
-                    || (journal
-                        |> Option.bind (fun durable ->
-                            TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun)
-                        |> Option.isSome)
-
-                return classifyManagedTurnGate settled hasDelivered context
+                return settledTurnGate journal context settled
         }
-
-    let private hasDeliveryWitness (journal: AgentJournal option) (turn: ReconciledTurn) =
-        match journal with
-        | Some durable ->
-            TaskDeliveryJournal.tryFind durable turn.SessionId turn.ProviderRun
-            |> Option.exists (fun witness ->
-                witness.Fence.AuthorityRoot = turn.AuthorityRootUserMessageId
-                && witness.Fence.PhysicalUserMessageId = turn.PhysicalUserMessageId)
-        | None ->
-            Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value turn.SessionId)
-            <> null
 
     let private requestKindOfCompleted (port: TurnObservationJournalPort) (turn: ReconciledTurn) =
         let continuationKind =
@@ -287,9 +318,17 @@ module OrdinaryTurnWorkflow =
                 // physically destroy background children. SessionDeleted or an
                 // explicit successor-less termination owns that irreversible act.
 
+                // 027 (HNI interruption payload, ruling 2026-10-22): the stop
+                // carries the identity of the interrupted round itself —
+                // `turn.ProviderRun` is a fact about this turn, never inferred
+                // from anywhere else. Settlement (`RunLifecycle.complete`) may
+                // match a durable delivery witness by exact fence with it; this
+                // is NOT a terminal fact source and decides no closure.
                 eventPort.NotifyTerminal
                     turn.SessionId
-                    (TerminalOutcome.Aborted(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
+                    (TerminalOutcome.Aborted(
+                        TerminalStop.forAuthorityRun turn.AuthorityRootUserMessageId turn.ProviderRun reason
+                    ))
                 |> ignore
 
                 return ()
@@ -549,8 +588,16 @@ module OrdinaryTurnWorkflow =
             | _, None ->
                 let completeAgent () =
                     let tracePort = journal |> Option.map TerminalTracePort.forJournal
+                    let witness = tryDeliveryEvidence journal turn
 
-                    TerminalReporter.completeWithEvidence eventPort tracePort turn (hasDeliveryWitness journal turn)
+                    TerminalReporter.completeUsingTextEvidence
+                        eventPort
+                        tracePort
+                        turn
+                        (witness
+                         |> Option.map (fun delivery -> delivery.View)
+                         |> Option.defaultWith (fun () -> CompletedTurnClassifier.partsSessionText turn.Parts))
+                        (deliversByProse turn || witness.IsSome)
 
                 return!
                     handleOutcome

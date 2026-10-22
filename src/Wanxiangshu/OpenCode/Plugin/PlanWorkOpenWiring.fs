@@ -20,15 +20,12 @@ module PlanWorkOpenWiring =
             with
             | Ok() -> ()
             | Error err ->
-                Diagnostic.emit "plan-work-open-failed" [ "work_id", sid; "error", err ]
+                Wanxiangshu.Foundation.Diagnostic.emit "plan-work-open-failed" [ "work_id", sid; "error", err ]
                 invalidOp ("Plan lifecycle opening failed: " + err)
         }
 
     let private queryWorktreeRoot (workspace: string) : Task<string> =
-        task {
-            let! raw = Wanxiangshu.Git.GitSubject.execIn workspace [| "rev-parse"; "--show-toplevel" |]
-            return raw.TrimEnd('\r', '\n')
-        }
+        Wanxiangshu.Git.GitSubject.revParseShowToplevel workspace
 
     let private resolveWorktreeRoot (workspaceDirectory: string option) : Task<Result<string, string>> =
         task {
@@ -63,6 +60,6 @@ module PlanWorkOpenWiring =
                 let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.initializeStateRoot root
                 do! runPlanWorkOpen commonDir root sid observedHead
             | Error reason ->
-                Diagnostic.emit "plan-work-open-directory-unavailable" [ "work_id", sid ]
+                Wanxiangshu.Foundation.Diagnostic.emit "plan-work-open-directory-unavailable" [ "work_id", sid ]
                 invalidOp ("Plan lifecycle opening failed: " + reason)
         }

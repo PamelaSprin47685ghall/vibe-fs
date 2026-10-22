@@ -3,6 +3,7 @@ namespace Wanxiangshu.Interaction.Dispatch
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Persistence.Journal
 
 /// Dispatch-owned JavaScript boundary. Host ports stay opaque and durable
@@ -14,8 +15,8 @@ module DispatchSurface =
     val internal rootWorkspaceReader: directory: obj -> IRootWorkspaceReader
 
     /// JS-safe controlled Host child listing for adapter proofs. The F# Result
-    /// and OpenCodeChildInfo representations stay on this registered surface.
-    val acceptedChild: session: string -> title: string -> agent: string -> Result<OpenCodeChildInfo list, string>
+    /// and ChildSessionInfo representations stay on this registered surface.
+    val acceptedChild: session: string -> title: string -> agent: string -> Result<ChildSessionInfo list, string>
 
     val admittedWithReceipt: value: string -> Outcome.SendOutcome
 
@@ -27,13 +28,12 @@ module DispatchSurface =
 
     val fatal: reason: string -> Outcome.SendOutcome
 
-    val decodePhysicalUserMessageId: input: obj -> output: obj -> obj
-    val decodeIngress: input: obj -> output: obj -> obj
 
     /// Seed the durable AgentOwnerRoot needed by a continuation owner. This is
     /// the same PromptFact writer used by production ingress; the returned value
     /// contains no AgentFact/union representation.
-    val appendAuthorityRoot: handle: JournalHandle -> session: string -> identitySeed: obj -> Task<obj>
+    val appendAuthorityRoot:
+        handle: JournalHandle -> session: string -> identitySeed: obj -> agentOwnerLife: string -> Task<obj>
 
     val sendAgentOwnerRoot:
         port: obj -> handle: JournalHandle -> session: string -> text: string -> identitySeed: obj -> Task<obj>
@@ -175,7 +175,12 @@ module DispatchSurface =
     /// boundary. The Dispatcher writes PhysicalAccepted before registering the
     /// authority profile; only the normalized profile crosses this boundary.
     val acceptAgentOwnerRoot:
-        handle: JournalHandle -> session: string -> promptKey: string -> physicalMessageId: string -> Task<obj>
+        handle: JournalHandle ->
+        session: string ->
+        promptKey: string ->
+        physicalMessageId: string ->
+        agentOwnerLife: obj ->
+            Task<obj>
 
     /// Registered proof boundary for external ingress: the caller supplies the
     /// exact RootSelection seed, including the deliberate absence of a seed.

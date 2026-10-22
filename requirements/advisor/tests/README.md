@@ -2,7 +2,7 @@
 
 本目录不定义额外规则；条款正文在 `../WHAT.md`，用例标题以 `WHAT[advisor-NNN]` 锚定条款。当前只有 002、003、006 三个条款有可执行用例，其余条款的证明缺口见文末。
 
-- `002.test.mjs`（WHAT[advisor-002]）：首次完整 view、前缀保护、null 和漏项、历史压缩不恢复、最新区间覆盖、隐含 0、统一形状校验及 TOML 记录。
+- `002.test.mjs`（WHAT[advisor-002]）：摘要替换、`null` 原样保留、没写的锚点不传、历史压缩不恢复、最新区间覆盖、隐含 0、统一形状校验及 TOML 记录。
 - `003.test.mjs`（WHAT[advisor-003]）：先完整 view 后 delta、成功材料记录、失败不推进、同锚点新摘要与永久 0、重复材料不重发、游标隔离与单调性。
 - `006.test.mjs`（WHAT[advisor-006]）：生成成员的能力投影、真实编程执行中的数据返回及宿主缺席拒绝。
 
@@ -13,3 +13,5 @@
 - `005`（无授权副作用）：运行时 capability 与 journal/authority 的观察口不在本包用例内。
 
 `plan`/游标的用例只证明纯规划与进程内游标：它们不证明 view 与 intent 真的以两条独立 prompt 到达顾问，也不证明散文真的从真实 terminal 读回——这两件事归 001/004 的缺口。002 覆盖 en 与 zh-CN 的实际记录渲染；资源成对性仍由 language parity 门禁与 provider-language 承担。
+
+纯规则本身（材料身份、增量、账本、读回）另由 wanxiangli `src/advisor/tests/001.test.mjs` 证明。本包 002/003 经主仓 dist 走的是同一个库实现（CUT-39 接线变异证据见 `proposals/extraction-kanban/evidence/CUT-39/`）。

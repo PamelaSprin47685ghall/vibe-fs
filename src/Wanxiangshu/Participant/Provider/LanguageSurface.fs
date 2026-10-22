@@ -60,18 +60,18 @@ module ProviderLanguageSurface =
         ProviderLanguage.inheritFrom (languageOf raw) |> languageName
 
     let clearAllForTests () : unit =
-        Wanxiangshu.OpenCode.ProviderLanguageBinding.clearHostConfigPreferenceForTests ()
-        Wanxiangshu.OpenCode.ProviderLanguageBinding.refreshGlobalLanguage ()
+        Wanxiangshu.Participant.Provider.ProviderLanguageBinding.clearHostConfigPreferenceForTests ()
+        Wanxiangshu.Participant.Provider.ProviderLanguageBinding.refreshGlobalLanguage ()
 
     let setHostConfigPreference (raw: string) : unit =
-        Wanxiangshu.OpenCode.ProviderLanguageBinding.setHostConfigPreference raw
+        Wanxiangshu.Participant.Provider.ProviderLanguageBinding.setHostConfigPreference raw
 
     let readGlobalPreference () : string =
-        Wanxiangshu.OpenCode.ProviderLanguageBinding.readGlobalPreference ()
+        Wanxiangshu.Participant.Provider.ProviderLanguageBinding.readGlobalPreference ()
         |> languageName
 
     let refreshGlobalLanguage () : unit =
-        Wanxiangshu.OpenCode.ProviderLanguageBinding.refreshGlobalLanguage ()
+        Wanxiangshu.Participant.Provider.ProviderLanguageBinding.refreshGlobalLanguage ()
 
     let languageOfSession (sessionId: string) : string =
         ProviderProse.languageOf (SessionId.create sessionId) |> languageName

@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Session.Attachment
 
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
 
 /// The SyncDelegate kind's observation of its owner's children. The kind decides
@@ -29,6 +30,7 @@ type AttachedSessionRuntime =
     member TryFind: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
     member TryFindByScope: scope: ReuseScopeId * role: SyncDelegateRole -> SessionId option
     member TryFindOwner: delegateSessionId: SessionId * role: SyncDelegateRole -> SessionId option
+    member TryFindOwnership: delegateSessionId: SessionId -> SessionOwnership option
     member Remove: ownerSessionId: SessionId * role: SyncDelegateRole -> bool
     member RemoveByDelegateSession: delegateSessionId: SessionId -> bool
 

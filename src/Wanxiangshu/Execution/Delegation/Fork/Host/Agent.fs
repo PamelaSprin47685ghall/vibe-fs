@@ -37,7 +37,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.OpenCode
 
 /// Existing-child send must use the session's bound managed agent.
 /// Never invent a managed name from CanonicalRole; never let the caller overwrite the bound agent.
@@ -540,10 +539,6 @@ module HostForkAgent =
             | false, _ -> None)
 
     type HostForkRuntime with
-
-        /// Current durable Authority Root binding for an already-linked child.
-        member this.BoundManagedAgent(childId: SessionId) : string option =
-            HostForkBinding.managedAgent this.Journal childId
 
         /// PROMPT-008: `agent` is the managed agent name the caller selected, and
         /// it is required. It is never defaulted, and the selected name travels to the

@@ -10,6 +10,11 @@ const pendingAfterTurn = promise => Promise.race([
   new Promise(resolve => setImmediate(() => resolve('pending'))),
 ])
 
+const deliverTo = (accepted, providerRun, material) => sync.deliver(
+  runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId,
+  providerRun, `call-${providerRun}`, material, { 0: material },
+)
+
 for (const name of ['createForProviderRecovery', 'confirmManagedPromptPhysical', 'observeProviderFailureStop', 'observeExactProviderFailure', 'recoveryStopSnapshot']) {
   assert.equal(typeof sync[name], 'function', `missing recovery fixture capability: ${name}`)
 }
@@ -53,8 +58,9 @@ try {
   const lateAcceptance = scenario === 'late-retry' || scenario === 'fallback-late-retry'
   let successor
   let result
+  let deliveredView
   if (lateAcceptance) {
-    sync.recordDeliveredValue(initial.sessionId, 'INITIAL-COMPLETES')
+    deliveredView = await deliverTo(initial, 'initial-completion-provider-run', 'INITIAL-COMPLETES')
     assert.equal(await sync.settleExactTerminal(runtime, initial.sessionId, initial.physicalUserMessageId,
       initial.authorityRootUserMessageId, 'initial-completion-provider-run', 'INITIAL-COMPLETES', ''), true)
     result = await completion
@@ -73,7 +79,7 @@ try {
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2, 'Accepted recovery reentry preserves the original PromptKey')
     assert.deepEqual(sync.promptIdentity(runtime, owner, 'Engineer', 1), retryPrompt)
 
-    sync.recordDeliveredValue(successor.sessionId, 'RECOVERY-FORMAL-ANSWER')
+    deliveredView = await deliverTo(successor, 'actual-retry-provider-run', 'RECOVERY-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, successor.sessionId, successor.physicalUserMessageId,
       successor.authorityRootUserMessageId, 'actual-retry-provider-run', 'RECOVERY-FORMAL-ANSWER', ''), true)
     result = await completion
@@ -84,7 +90,8 @@ try {
         physicalUserMessageId: successor.physicalUserMessageId,
         authorityRootUserMessageId: successor.authorityRootUserMessageId,
         providerRun: 'actual-retry-provider-run',
-        formalText: 'RECOVERY-FORMAL-ANSWER',
+        view: deliveredView,
+        turnFormalText: 'RECOVERY-FORMAL-ANSWER',
       },
     })
   }
@@ -129,19 +136,20 @@ try {
     assert.equal(secondSuccessor.ok, true, JSON.stringify(secondSuccessor))
     assert.notEqual(secondSuccessor.physicalUserMessageId, secondAccepted.physicalUserMessageId)
     assert.equal(secondSuccessor.origin, 'ProviderRetryAttempt')
-    sync.recordDeliveredValue(secondSuccessor.sessionId, 'SECOND-FORMAL-ANSWER')
+    const secondDeliveredView = await deliverTo(secondSuccessor, 'second-provider-run', 'SECOND-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, secondSuccessor.sessionId, secondSuccessor.physicalUserMessageId,
       secondSuccessor.authorityRootUserMessageId, 'second-provider-run', 'SECOND-FORMAL-ANSWER', ''), true)
     const secondResult = await secondCompletion
     assert.equal(secondResult.ok, true)
     assert.equal(secondResult.value.physicalUserMessageId, secondSuccessor.physicalUserMessageId)
     assert.equal(secondResult.value.providerRun, 'second-provider-run')
-    assert.equal(secondResult.value.formalText, 'SECOND-FORMAL-ANSWER')
+    assert.equal(secondResult.value.view, secondDeliveredView)
+    assert.equal(secondResult.value.turnFormalText, 'SECOND-FORMAL-ANSWER')
     assert.equal(sync.childCount(runtime), 1)
     assert.equal(sync.terminalListenerCount(runtime), 0)
   }
   writeFileSync(receiptPath, JSON.stringify({ pid: process.pid, scenario, initialPrompt, initial, admitted,
-    retryPrompt, successor, result, promptCount: sync.promptCount(runtime, owner, 'Engineer'), childCount: sync.childCount(runtime) }))
+    retryPrompt, successor, result, deliveredView, promptCount: sync.promptCount(runtime, owner, 'Engineer'), childCount: sync.childCount(runtime) }))
 } finally {
   await sync.closeRecovery(runtime)
 }

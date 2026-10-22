@@ -6,7 +6,7 @@ namespace Wanxiangshu.OpenCode
 /// passes it back, and never inspects it. Pending/bound plans cross as the
 /// opaque handles built by `XWireSurface.pendingPlan` /
 /// `XWireSurface.bindProviderRun`; observations return as plain JSON views.
-/// Every decision — freeze admission, binding, record/peek/consume, ownership —
+/// Every decision — freeze admission, binding, consume, ownership —
 /// delegates to the real `PluginRecoveryScope` and the `XWireSurface` typed
 /// bridges. No plan equality or binding algorithm is copied here.
 module PluginRecoveryScopeSurface =
@@ -15,13 +15,7 @@ module PluginRecoveryScopeSurface =
 
     val freezeAttemptPlan: scope: obj -> sessionId: string -> physical: string -> pending: obj -> obj
 
-    val recordAttemptPlan: scope: obj -> sessionId: string -> physical: string -> pending: obj -> unit
-
     val bindAttempt: scope: obj -> sessionId: string -> physical: string -> providerRun: string -> obj
-
-    val recordBound: scope: obj -> sessionId: string -> providerRun: string -> bound: obj -> unit
-
-    val peekAttempt: scope: obj -> sessionId: string -> providerRun: string -> obj
 
     val consumeAttempt: scope: obj -> sessionId: string -> providerRun: string -> obj
 

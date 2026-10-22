@@ -1,17 +1,22 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 #nowarn "3511"
 
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Knowledge.Casebook
@@ -72,8 +77,9 @@ module PluginHostWiring =
           SnapshotOpt: ISessionSnapshotPort option
           Wired: HostSignalBootstrap.WiredSignals
           SharedTerminalKey: string option
-          SharedTerminalPort: Events.HostEventPort option
+          SharedTerminalPort: ISessionTerminalSource option
           RootWorkspace: IRootWorkspaceReader
+          InternalLeafOwnerFor: SessionId -> SessionId option
 
           CausalWaitObserver: IWaitObserver }
 
@@ -89,11 +95,16 @@ module PluginHostWiring =
             let scope = boot.Scope
             let workspaceDirectory = boot.WorkspaceDirectory
 
-            let terminalToResult (outcome: Wanxiangshu.OpenCode.TerminalOutcome) =
+            let internalLeafOwnerFor =
+                match boot.Journal with
+                | Some journal -> Wanxiangshu.Execution.Delegation.Advisor.AdvisorSeat.tryFindOwner journal
+                | None -> fun _ -> None
+
+            let terminalToResult (outcome: Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome) =
                 match outcome with
-                | Wanxiangshu.OpenCode.TerminalOutcome.Completed _ -> Ok()
-                | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop -> Error stop.Reason
-                | Wanxiangshu.OpenCode.TerminalOutcome.Aborted stop -> Error stop.Reason
+                | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Completed _ -> Ok()
+                | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Failed stop -> Error stop.Reason
+                | Wanxiangshu.Foundation.TerminalSignal.TerminalOutcome.Aborted stop -> Error stop.Reason
 
             let sendResultToUnit (outcome: Wanxiangshu.Foundation.Outcome.SendOutcome) =
                 match outcome with
@@ -127,7 +138,7 @@ module PluginHostWiring =
                                     task {
                                         let exactTools = Map.ofList [ "*", false; "todowrite-for-bookkeeper", true ]
 
-                                        let opts: Wanxiangshu.OpenCode.SessionPromptOptions =
+                                        let opts: Wanxiangshu.Foundation.HostSession.SessionPromptOptions =
                                             { Model = None
                                               Agent = Some agent
                                               Directory = None
@@ -155,16 +166,6 @@ module PluginHostWiring =
 
                     scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
 
-                    // managed-session-lifecycle-001: ONE attachment lease registry per
-                    // plugin instance, attached before any kind adapter so every
-                    // AttachmentKind registers through the same lifecycle owner. The
-                    // Companion kind's adapter lives with it, so a plugin whose
-                    // companion step runs before the session wiring (or without a
-                    // durable journal) still has one lifecycle owner rather than an
-                    // unattached scope slot.
-                    scope.AttachAttachmentRegistry(AttachmentLeaseRegistry())
-                    scope.AttachCompanionLeases(CompanionLeaseRuntime(sessionPort, scope.AttachmentRegistry))
-
                     for KeyValue(childId, parentId) in scope.Sessions.SessionParents do
                         scope.Sessions.OwnedSessions.Add childId |> ignore
                         scope.Sessions.OwnedSessions.Add parentId |> ignore
@@ -189,6 +190,7 @@ module PluginHostWiring =
                             eventPort
                             snapshotOpt
                             boot.Journal
+                            internalLeafOwnerFor
                             scope
 
                             rootWorkspace.Reader
@@ -213,6 +215,7 @@ module PluginHostWiring =
                           SharedTerminalKey = terminalKey
                           SharedTerminalPort = sharedTerminalPort
                           RootWorkspace = rootWorkspace.Reader
+                          InternalLeafOwnerFor = internalLeafOwnerFor
 
                           CausalWaitObserver = causalWait.Observer }
                 }
@@ -260,12 +263,12 @@ module PluginHostWiring =
 
             let isUserQuestionWaiting sessionId =
                 boot.Journal
-                |> Option.bind (fun durable ->
-                    Wanxiangshu.Composition.Durable.UserQuestionJournal.pending durable sessionId)
+                |> Option.bind (fun durable -> UserQuestionJournal.pending durable sessionId)
                 |> Option.isSome
 
             match!
                 PluginHost.createHost
+                    boot.WorkspaceDirectory
                     input
                     boot.PortOpt
                     (Some boot.FamilyParent)

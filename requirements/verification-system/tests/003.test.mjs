@@ -10,6 +10,75 @@ const { readFileSync } = await import("node:fs");
 const { fileURLToPath } = await import("node:url");
 const { default: path } = await import("node:path");
 
+const compileDelegationProgram = (program, tool = 'todowrite-for-manager', extraCharge = false) => compileScenario(`
+scenario = "literal-delegation"
+prompt = { text = "Root task" }
+[[turn]]
+id = "root"
+user = "Root task"
+[[turn.step]]
+respond = { type = "tool-call", tool = ${JSON.stringify(tool)}, args = { program = ${JSON.stringify(program)}${extraCharge ? ', charge = "Child task"' : ''} } }
+[[turn]]
+id = "child"
+user = "# Child task"
+[[turn.step]]
+respond = { type = "text", text = "Child done" }
+`, { name: 'literal-delegation.toml' });
+
+test('WHAT[verification-system-003] literal awaited delegation on the public programming surface proves a child edge', () => {
+  for (const [tool, member] of [
+    ['todowrite-for-manager', 'fork'],
+    ['todowrite-for-manager', 'resume'],
+    ['todowrite-for-orchestrator', 'commission'],
+  ]) {
+    const result = compileDelegationProgram(`class Js extends JsProgram {
+  async run() {
+    return await this.${member}({ name: 'Child', charge: 'Child task' }, {});
+  }
+}`, tool);
+    assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
+  }
+  const straightLine = compileDelegationProgram(`class Js extends JsProgram {
+  async run() {
+    await this.fork({ name: 'Child', charge: 'Child task' }, {});
+    return true;
+  }
+}`);
+  assert.equal(straightLine.ok, true, straightLine.ok ? '' : straightLine.problems.join('\n'));
+});
+
+test('WHAT[verification-system-003] dead JavaScript text and unknown execution cannot manufacture a reachable child', () => {
+  const call = "await this.fork({ name: 'Child', charge: 'Child task' }, {})";
+  for (const [label, body] of [
+    ['comment', `// ${call}\nreturn true;`],
+    ['string', `return ${JSON.stringify(call)};`],
+    ['another object', "return await other.fork({ name: 'Child', charge: 'Child task' }, {});"],
+    ['unused function', `async function unused() { ${call}; } return true;`],
+    ['conditional branch', `if (false) { ${call}; }`],
+    ['after return', `return true; ${call};`],
+    ['unknown preceding effect', `await this.cat('input'); ${call};`],
+    ['dynamic payload', 'return await this.fork(payload, {});'],
+    ['spread payload', "return await this.fork({ ...payload, charge: 'Child task' }, {});"],
+    ['missing report mapping', "return await this.fork({ charge: 'Child task' });"],
+  ]) {
+    const result = compileDelegationProgram(`class Js extends JsProgram { async run() { ${body} } }`);
+    assert.equal(result.ok, false, label);
+    assert.deepEqual(result.problems, ["literal-delegation.toml: turn 'child' is declared but no flow prompt or tool call reaches it (dead edge)"], label);
+  }
+  const override = compileDelegationProgram(`class Js extends JsProgram {
+  async fork() { return true; }
+  async run() { return ${call}; }
+}`);
+  assert.equal(override.ok, false);
+  assert.match(override.problems.join('\n'), /turn 'child'.*dead edge/);
+  const wrongSurface = compileDelegationProgram(`class Js extends JsProgram { async run() { return ${call}; } }`, 'todowrite-for-orchestrator');
+  assert.equal(wrongSurface.ok, false);
+  assert.match(wrongSurface.problems.join('\n'), /turn 'child'.*dead edge/);
+  const fakeArgument = compileDelegationProgram('class Js extends JsProgram { async run() { return true; } }', 'todowrite-for-manager', true);
+  assert.equal(fakeArgument.ok, false);
+  assert.match(fakeArgument.problems.join('\n'), /turn 'child'.*dead edge/);
+});
+
 
 test('WHAT[verification-system-003] isCountedSseEvent excludes server.heartbeat only', () => {
   assert.equal(isCountedSseEvent({ type: 'server.heartbeat' }), false);
@@ -103,19 +172,19 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
     ['manager-loop.2', 'continue.0'],
   );
 
-  const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'deliver'];
+  const loopTools = ['todowrite-for-manager', 'join', 'horizon', 'review', 'deliver'];
   // The Manager provider surface carries independent assume + todowrite-for-manager.
   const managerTools = [
     'assume',
-    'fork', 'horizon', 'join', 'todowrite-for-manager', 'resume',
+    'horizon', 'join', 'todowrite-for-manager',
     'review', 'skill',  'deliver',
   ];
-  const request = (turn, step) => ({
+  const request = (turn, step, tools = managerTools) => ({
     messages: [
       { role: 'user', content: turn },
       ...Array.from({ length: step }, (_, index) => ({ role: 'assistant', content: `reply-${index}` })),
     ],
-    tools: managerTools.map((name) => ({ name })),
+    tools: tools.map((name) => ({ name })),
   });
   const bindings = new Map([['manager', 'ses_manager']]);
   const context = { sessionId: 'ses_manager' };
@@ -129,6 +198,15 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
     ).matched?.id,
     'manager-join-guard.0',
   );
+  const joinGuardUser = '# Delegated work you sent out has not come back yet. Continue the work.';
+  const invalidManagerTools = [
+    managerTools.filter((name) => name !== 'todowrite-for-manager'),
+    ...['fork', 'resume', 'commission', 'devops'].map((name) => [...managerTools, name]),
+  ];
+  for (const tools of invalidManagerTools) {
+    assert.equal(resolveEntry(request(joinGuardUser, 1, tools), result.scenario.entries, bindings, context).matched,
+      undefined, `The real Manager wire cannot match with tools ${tools.join(',')}`);
+  }
 
   const assessUser =
     '# You are the 2 Manager taking over this mission. A predecessor may already have done\n' +
@@ -137,12 +215,12 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
     '# rather than trusting any inherited claim.\n' +
     '#\n' +
     "# During assessment, you may directly use the review-only read tool todowrite-for-manager, or entrust read-only work to Engineer to establish facts about the predecessor's work";
-  const loopRequest = (turn, step) => ({
+  const loopRequest = (turn, step, tools = loopTools) => ({
     messages: [
       { role: 'user', content: turn },
       ...Array.from({ length: step }, (_, index) => ({ role: 'assistant', content: `reply-${index}` })),
     ],
-    tools: loopTools.map((name) => ({ name })),
+    tools: tools.map((name) => ({ name })),
   });
 
   const reopened0 = byId.get('manager-reopened-loop.0');
@@ -165,6 +243,13 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
     resolveEntry(loopRequest(assessUser, 1), result.scenario.entries, bindings, context).matched?.id,
     'manager-reopened-loop.1',
   );
+  for (const tools of [
+    loopTools.filter((name) => name !== 'todowrite-for-manager'),
+    ...['fork', 'resume', 'commission', 'devops'].map((name) => [...loopTools, name]),
+  ]) {
+    assert.equal(resolveEntry(loopRequest(assessUser, 0, tools), result.scenario.entries, bindings, context).matched,
+      undefined, `The real successor wire cannot match with tools ${tools.join(',')}`);
+  }
 
   // Every live action in the reusable authority-first loop is exact; obsolete
   // explicit repair-resume and the optional join-guard race stay out of must.

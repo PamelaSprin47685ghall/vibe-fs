@@ -241,6 +241,15 @@ type AttachedSessionRuntime
         leases.TryFindByChild(delegateSessionId)
         |> List.tryPick (fun (owner, boundKind) -> if boundKind = kind then Some owner else None)
 
+    member _.TryFindOwnership(delegateSessionId: SessionId) : SessionOwnership option =
+        match
+            leases.TryFindByChild(delegateSessionId)
+            |> List.filter (fun (_, kind) -> List.contains kind ownKinds)
+        with
+        | [] -> None
+        | [ (owner, kind) ] -> Some(SessionOwnership.Attached(owner, kind))
+        | _ -> invalidOp "The attached session has multiple ownership leases"
+
     member _.Remove(ownerSessionId: SessionId, role: SyncDelegateRole) : bool =
         leases.Remove(ownerSessionId, kindOf role)
 
@@ -262,6 +271,9 @@ type AttachedSessionRuntime
 
         member this.TryFindOwner(delegateSessionId, role) =
             this.TryFindOwner(delegateSessionId, role)
+
+        member this.TryFindOwnership(delegateSessionId) =
+            this.TryFindOwnership(delegateSessionId)
 
         member this.Remove(ownerSessionId, role) = this.Remove(ownerSessionId, role)
 

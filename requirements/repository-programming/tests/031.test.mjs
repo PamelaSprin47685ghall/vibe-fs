@@ -94,6 +94,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { withExecutablePlugin, acceptAuthorityRoot } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { scores, withReview } from '../../work/tests/support/plugin.mjs'
+import { executeHostTool } from '../../delegation/tests/support/real-fork.mjs'
 import {
   execute as executeWorkflow,
   caseName,
@@ -104,7 +105,7 @@ import {
   parkedHandles,
   reapSession,
   clearAll,
-} from '../../../dist/Repository/Programming/Js/OpenCode/ParkedSites.js'
+} from '../../../dist/Repository/Programming/Js/ParkedSites.js'
 
 const parkProgram = (tag) => `class Js extends JsProgram {
   async run() {
@@ -127,19 +128,22 @@ test('WHAT[repository-programming-031] a real parked handle blocks deliver and t
   // Execute 之前有 by-design 的调用方权威准入；先建立合法权威，parked 门禁
   // 才谈得上被触达。断言据此区分"parked 拒绝"（具体 code + 真 handle）与
   // "权威缺失"的统一拒绝文案。
-  await withReview(async ({ execute, hooks, runtime, session }) => {
-    assert.match(await execute(scores('PERFECT')), /recorded = true/, 'the reviewed tenure establishes the deliver authority')
-    runtime.pushHostMessage(session, {
-      info: { id: 'parked-gate-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: { created: 9 } },
-      parts: [{ type: 'tool', tool: 'deliver', callID: 'deliver-parked', state: { status: 'pending', input: {} } }],
-    })
-    const context = { sessionID: session, agent: 'manager', callID: 'deliver-parked', messageID: 'parked-gate-run', providerRunID: 'run-parked' }
+  await withReview(async ({ hooks, runtime, session }) => {
+    const reviewed = await executeHostTool(hooks, runtime, session, 'manager', 'user-root',
+      'parked-review-run', 'review', scores('PERFECT'), 'parked-review')
+    assert.match(reviewed, /recorded = true/, 'the reviewed tenure establishes the deliver authority')
+    const review = runtime.messages.find(message => message.info?.id === 'parked-review-run')
+    review.parts.at(-1).state = { ...review.parts.at(-1).state, status: 'completed', output: reviewed }
+    review.info.finish = 'tool-calls'
+    await hooks.event({ event: { type: 'message.updated', properties: { info: review.info } } })
+    const deliver = (call, run) => executeHostTool(hooks, runtime, session, 'manager', 'user-root',
+      run, 'deliver', {}, call)
 
     // LC-008：门禁按会话隔离，park 必须发生在 deliver 的同一 session 下，
     // 门禁才会拦截；无关 session 的 park 不得阻塞本次交付。
     const handle = await parkOne(runtime.directory, session, 'deliver-gate')
     try {
-      const refused = await hooks.tool.deliver.execute({}, context)
+      const refused = await deliver('deliver-parked', 'parked-gate-run')
       assert.match(refused, /parked-deliver-blocked/, 'deliver must reach the parked gate and be refused with its code')
       assert.ok(String(refused).includes(handle), `refusal must list the live handle ${handle}`)
       // 先放弃本 session 的 handle，才轮到外会话对照。
@@ -149,7 +153,7 @@ test('WHAT[repository-programming-031] a real parked handle blocks deliver and t
       // （confirmation_required），不再得到 parked 拒绝。这既证明上下文本来
       // 就能触达业务语义（不是权威拒绝冒充门禁），也排除"恒拒"假门禁。
       clearAll()
-      const released = await hooks.tool.deliver.execute({}, { ...context, callID: 'deliver-cleared', messageID: 'cleared-run', providerRunID: 'run-cleared' })
+      const released = await deliver('deliver-cleared', 'cleared-run')
       assert.ok(!String(released).includes('parked-deliver-blocked'), 'cleared table must release the deliver gate')
       assert.match(released, /confirmation_required = true/, 'the released call must land on the real two-stage deliver path')
 
@@ -157,7 +161,7 @@ test('WHAT[repository-programming-031] a real parked handle blocks deliver and t
       // 放在最后：这次调用穿过门禁后走真实交付路径（上一次调用已提交确认
       // 围栏），其终态不影响前面的断言。
       await parkOne(runtime.directory, 'parked-gate-js-031', 'foreign-gate')
-      const afterForeign = await hooks.tool.deliver.execute({}, { ...context, callID: 'deliver-foreign', messageID: 'foreign-run', providerRunID: 'run-foreign' })
+      const afterForeign = await deliver('deliver-foreign', 'foreign-run')
       assert.ok(!String(afterForeign).includes('parked-deliver-blocked'), 'a foreign session park must not block this deliver')
     } finally {
       clearAll()

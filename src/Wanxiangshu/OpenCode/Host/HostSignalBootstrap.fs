@@ -1,15 +1,24 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Routing
+
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Interaction.Admission
+
+open Wanxiangshu.Foundation.HostSession
+
+open Wanxiangshu.Foundation.TerminalSignal
+
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Execution.Delegation.Handle.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
+open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.ChatExecution
@@ -19,7 +28,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
@@ -65,6 +73,7 @@ module HostSignalBootstrap =
           CancelSignals: SessionId seq -> unit
           BindActiveRun: SessionId -> Role -> string option -> unit
           CurrentPhysicalUserMessage: string -> string option
+          ProviderStepIdentity: ProviderRunIdentity -> (SessionId * PhysicalUserMessageId) option
           ConfirmProviderStarted: ExactProviderStartObservation -> Task
           ChatMessageHook: obj
           ObserveEvent: obj -> Task<unit>
@@ -76,6 +85,7 @@ module HostSignalBootstrap =
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
         (journal: AgentJournal option)
+        (internalLeafOwnerFor: SessionId -> SessionId option)
         (scope: PluginRuntimeScope)
 
         (rootWorkspace: IRootWorkspaceReader)
@@ -112,7 +122,7 @@ module HostSignalBootstrap =
                 let recovery =
                     SessionRecoveryHost(
                         durable,
-                        snapshot,
+                        TranscriptPort.HostTranscriptPort(snapshot),
                         scope.Recovery,
                         None,
                         Some(fun sessionId outcome -> eventPort.NotifyTerminal sessionId outcome |> ignore)
@@ -141,8 +151,18 @@ module HostSignalBootstrap =
 
             let binding = TurnBinding.Store()
 
-            let onTurn =
-                HostTurnObserver.observe observeTurnWorkflow sessionPort rootWorkspace eventPort journal scope
+            let onTurn (context: ReconciledTurnContext) =
+                HostTurnObserver.observe
+                    observeTurnWorkflow
+                    sessionPort
+                    rootWorkspace
+                    eventPort
+                    journal
+                    scope
+                    { context with
+                        Turn =
+                            { context.Turn with
+                                Directory = context.Turn.Directory |> Option.orElse workspaceDirectory } }
 
 
             let compactionProbe: CompactionProbe =
@@ -281,6 +301,13 @@ module HostSignalBootstrap =
                         scope.SignalChatRecovery(
                             ChatExecutionRecoveryLifecycleEvent.ExactAssistantTerminal(evidence, disposition)
                         )
+
+                    // Physical cleanup clears step mappings. Keep this observed terminal's
+                    // exact identity for the downstream work settlement, without a lease.
+                    ModelRouting.rememberProviderStepIdentity
+                        observation.SessionId
+                        observation.PhysicalUserMessageId
+                        observation.ProviderRun
 
                     reconciler.NotifyProjectionChanged(observation.SessionId, observation.PhysicalUserMessageId)
 
@@ -423,7 +450,16 @@ module HostSignalBootstrap =
                     }
                     :> Task
 
-            let onLoopEvent raw = scope.LoopSensor.Observe raw
+            // Host wire edge: the adapter decodes the raw delta into the
+            // neutral `LoopTextDelta` before the product sensor observes it.
+            let onLoopEvent raw =
+                match LoopEventCodec.tryDecodeTextDelta raw with
+                | None -> ()
+                | Some delta ->
+                    scope.LoopSensor.Observe
+                        { Session = delta.SessionId
+                          Message = delta.MessageId
+                          Delta = delta.Delta }
 
             let signalRouter =
                 HostSignalRouter(
@@ -525,12 +561,19 @@ module HostSignalBootstrap =
                       PhysicalUserMessageId = physical
                       ContinuationMessageIds = Set.empty
                       Role = Some role
-                      Directory = directory }
+                      Directory = directory
+                      InheritedAuthorityOwner = None }
 
             let admissionTransaction =
                 journal
                 |> Option.map (fun durable ->
-                    let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+                    let ownershipFor child =
+                        scope.SyncDelegateRuntime
+                        |> Option.bind (fun runtime -> runtime.Attached.TryFindOwnership child)
+
+                    let runtime =
+                        PromptJournalAdapter.createWithOwnership ownershipFor internalLeafOwnerFor durable
+                        |> PromptDispatcher.forPrompts
 
                     let accept managed =
                         runtime.AcceptManagedChatIntent(ChatAdmissionIntent.ofManaged managed)
@@ -737,8 +780,7 @@ module HostSignalBootstrap =
                                 |> Option.bind (fun durable ->
                                     SessionExecutionBinding.tryContinuationAdmission durable state.acceptedEvidence)
                                 |> Option.isSome)))
-                    |> Option.iter (fun state ->
-                        JoinWake.observeAcceptedMessage scope.Sessions.JoinInterrupts state.acceptedEvidence)
+                    |> Option.iter (fun state -> scope.Sessions.ObserveAcceptedMessage state.acceptedEvidence)
 
             let executionKey intent =
                 match intent with
@@ -771,23 +813,34 @@ module HostSignalBootstrap =
             // still uses. It holds no identity, persists nothing, never keeps a
             // lock across capacity waiting, and no same-key serial work waits on
             // it.
-            let admissionInFlight = Dictionary<ChatExecutionKey, ChatAdmissionFlight>()
+            //
+            // The flight is keyed by purpose as well as by exact key: the two
+            // purposes are different admissions of the same physical input. A
+            // `PublishInput` flight only retains a continuation input, while
+            // `EnterProviderStep` must acquire or continue the model-routing
+            // lease for that physical id. Merging them would let the retained
+            // input's flight swallow the provider-step admission, and the
+            // provider step would then run without a committed lease.
+            let admissionInFlight =
+                Dictionary<ChatExecutionKey * ChatAdmissionPurpose, ChatAdmissionFlight>()
+
+            let admissionFlightKey (key: ChatExecutionKey) purpose = (key, purpose)
+
+            let removeAdmissionFlight key purpose flight =
+                lock admissionInFlight (fun () ->
+                    match admissionInFlight.TryGetValue(admissionFlightKey key purpose) with
+                    | true, registered when obj.ReferenceEquals(registered.Work, flight) ->
+                        admissionInFlight.Remove(admissionFlightKey key purpose) |> ignore
+                    | _ -> ())
 
             let admissionSequence = Dictionary<SessionId, Task>()
-
-            let removeAdmissionFlight key flight =
-                lock admissionInFlight (fun () ->
-                    match admissionInFlight.TryGetValue key with
-                    | true, registered when obj.ReferenceEquals(registered.Work, flight) ->
-                        admissionInFlight.Remove(key) |> ignore
-                    | _ -> ())
 
             let projectCommittedAdmission key output =
                 let lease =
                     ModelRouting.tryReadExecution key
                     |> Option.defaultWith (fun () -> invalidOp "managed admission has no exact committed lease")
 
-                ModelRouting.projectHostModel output (ModelRouting.toOpenCodeModel lease.Identity.Target)
+                ModelRouting.projectHostModel output (ModelRouting.toHostModel lease.Identity.Target)
                 |> Result.defaultWith raise
 
             let completeAdmission intent output result =
@@ -802,7 +855,7 @@ module HostSignalBootstrap =
                     projectCommittedAdmission key output
                     continueManagedChatMessage intent output
                 | Ok(ChatAdmissionTransactionOutcome.DeferredInput(_, target)) ->
-                    ModelRouting.projectHostModel output (ModelRouting.toOpenCodeModel target)
+                    ModelRouting.projectHostModel output (ModelRouting.toHostModel target)
                     |> Result.defaultWith raise
 
                     continueManagedChatMessage intent output
@@ -864,7 +917,7 @@ module HostSignalBootstrap =
             let projectAdmissionOutput key result extra =
                 match result with
                 | Ok(ChatAdmissionTransactionOutcome.DeferredInput(_, target)) ->
-                    ModelRouting.projectHostModel extra (ModelRouting.toOpenCodeModel target)
+                    ModelRouting.projectHostModel extra (ModelRouting.toHostModel target)
                     |> Result.defaultWith raise
                 | _ -> projectCommittedAdmission key extra
 
@@ -1031,7 +1084,7 @@ module HostSignalBootstrap =
 
             let admissionFlight durable createTransaction purpose intent managed (key: ChatExecutionKey) output =
                 lock admissionInFlight (fun () ->
-                    match admissionInFlight.TryGetValue key with
+                    match admissionInFlight.TryGetValue(admissionFlightKey key purpose) with
                     | true, existing when existing.Phase.Value = ChatAdmissionFlightPhase.Running ->
                         existing.Outputs.Add output
                         existing.Work
@@ -1053,7 +1106,7 @@ module HostSignalBootstrap =
                                 outputs
                                 phase
 
-                        admissionInFlight.[key] <-
+                        admissionInFlight.[admissionFlightKey key purpose] <-
                             { Work = started
                               Outputs = outputs
                               Phase = phase }
@@ -1076,7 +1129,7 @@ module HostSignalBootstrap =
                         let! _ = flight
                         ()
                     finally
-                        removeAdmissionFlight key flight
+                        removeAdmissionFlight key purpose flight
                 }
 
             let rejectedChatMessage failure =
@@ -1277,6 +1330,7 @@ module HostSignalBootstrap =
                 { RegisterOwned = registerOwned
                   CancelSignals = cancelSignals
                   BindActiveRun = bindActiveRun
+                  ProviderStepIdentity = ModelRouting.tryProviderStepIdentity
                   CurrentPhysicalUserMessage =
                     (fun sessionId ->
                         reconciler.TryPhysicalUserMessage(SessionId.create sessionId)

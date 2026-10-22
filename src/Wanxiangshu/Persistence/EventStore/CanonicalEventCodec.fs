@@ -9,6 +9,13 @@ open Wanxiangshu.Foundation.Identity
 /// contract over EventEnvelope / StorageInvalid. D-04: this codec serves the
 /// single-writer SQLite CAS protocol; multi-writer convergence (CUT-19) is a
 /// separate protocol and is not expressed here.
+[<RequireQualifiedAccess>]
+type StoredLineFault =
+    | UnknownEventType of eventType: string
+    | MissingPayload of payloadRef: PayloadRef
+    | PayloadDigestMismatch of payloadRef: PayloadRef
+    | UnreferencedPayload of payloadRef: PayloadRef
+
 module CanonicalEventCodec =
 
     [<Import("CanonicalEventCodec", "wanxiangli/events")>]
@@ -20,7 +27,9 @@ module CanonicalEventCodec =
     // Stateless library object; one shared instance.
     let private codec: obj = construct codecClass
 
-    let private eventToJs (envelope: EventEnvelope) : obj =
+    /// The wanxiangli/events `EventInput` shape of one envelope. Shared by the
+    /// facades over wanxiangli libraries that take events (codec, convergence).
+    let toLibraryEvent (envelope: EventEnvelope) : obj =
         let payloads =
             if Map.isEmpty envelope.Payloads then
                 []
@@ -49,7 +58,7 @@ module CanonicalEventCodec =
             |> unbox<(string * byte[]) array>
             |> Array.fold (fun acc (key, bytes) -> Map.add (PayloadRef.create key) bytes acc) Map.empty
 
-    let private eventOfJs (value: obj) : EventEnvelope =
+    let ofLibraryEvent (value: obj) : EventEnvelope =
         { EventId = EventId.create (unbox<string> value?id)
           StreamId = EventStreamId.create (unbox<string> value?stream)
           EventType = unbox<string> value?``type``
@@ -64,7 +73,8 @@ module CanonicalEventCodec =
     let private errorText (value: obj) : string =
         if isNull value then "" else string value
 
-    let private invalidOf (error: obj) : StorageInvalid =
+    /// Map a wanxiangli CodecError-shaped value back to StorageInvalid.
+    let invalidOfLibraryError (error: obj) : StorageInvalid =
         match errorText (error?code) with
         | "IdentityCollision" -> StorageInvalid.IdentityCollision(EventId.create (unbox<string> error?eventId))
         | "MissingParent" -> StorageInvalid.MissingParent(EventId.create (unbox<string> error?eventId))
@@ -76,37 +86,37 @@ module CanonicalEventCodec =
 
     /// Canonical JSON text including exactly one trailing LF (§5.0).
     let encode (envelope: EventEnvelope) : string =
-        unbox<string> (codec?encode (eventToJs envelope))
+        unbox<string> (codec?encode (toLibraryEvent envelope))
 
     /// Same EventId with different canonical bytes → IdentityCollision (§5.3).
     /// Distinct EventIds are not a collision (Ok).
     let checkIdentity (left: EventEnvelope) (right: EventEnvelope) : Result<unit, StorageInvalid> =
-        let outcome: obj = codec?checkIdentity (eventToJs left, eventToJs right)
+        let outcome: obj = codec?checkIdentity (toLibraryEvent left, toLibraryEvent right)
 
         if unbox<bool> outcome?ok then
             Ok()
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)
 
     /// Set-union by EventId with identity dedupe. Collision → fail closed.
     /// This is a pure identity utility; writer-stream ordering belongs to EventKWayMerge.
     let mergeByIdentity (events: EventEnvelope list) : Result<EventEnvelope list, StorageInvalid> =
         let outcome: obj =
-            codec?mergeByIdentity (events |> List.map eventToJs |> Array.ofList)
+            codec?mergeByIdentity (events |> List.map toLibraryEvent |> Array.ofList)
 
         if unbox<bool> outcome?ok then
-            Ok((unbox<obj array> outcome?events) |> Array.toList |> List.map eventOfJs)
+            Ok((unbox<obj array> outcome?events) |> Array.toList |> List.map ofLibraryEvent)
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)
 
     /// Decode canonical JSON+LF into EventEnvelope. Re-encode must match (§5.0).
     let tryDecode (text: string) : Result<EventEnvelope, StorageInvalid> =
         let outcome: obj = codec?tryDecode text
 
         if unbox<bool> outcome?ok then
-            Ok(eventOfJs outcome?event)
+            Ok(ofLibraryEvent outcome?event)
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)
 
     let tryDecodeUtf8Text (bytes: byte[]) : Result<string, StorageInvalid> =
         let outcome: obj = codec?tryDecodeUtf8Text bytes
@@ -114,12 +124,37 @@ module CanonicalEventCodec =
         if unbox<bool> outcome?ok then
             Ok(unbox<string> outcome?text)
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)
 
     let tryDecodeUtf8 (bytes: byte[]) : Result<EventEnvelope, StorageInvalid> =
         let outcome: obj = codec?tryDecodeUtf8 bytes
 
         if unbox<bool> outcome?ok then
-            Ok(eventOfJs outcome?event)
+            Ok(ofLibraryEvent outcome?event)
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)
+
+    let private storedLineFaultOf (error: obj) : StoredLineFault =
+        let payloadRef () =
+            PayloadRef.create (unbox<string> error?payloadRef)
+
+        match errorText (error?code) with
+        | "UnknownEventType" -> StoredLineFault.UnknownEventType(unbox<string> error?eventType)
+        | "MissingPayload" -> StoredLineFault.MissingPayload(payloadRef ())
+        | "PayloadDigestMismatch" -> StoredLineFault.PayloadDigestMismatch(payloadRef ())
+        | "UnreferencedPayload" -> StoredLineFault.UnreferencedPayload(payloadRef ())
+        | code -> failwithf "wanxiangli/events checkClosure returned an unknown fault code: %s" code
+
+    /// durable-events-012/027: the one closure rule for stored local lines lives in
+    /// wanxiangli/events (CUT-19); this facade only projects its verdict.
+    let checkStoredClosure
+        (isEventTypeKnown: string -> bool)
+        (events: EventEnvelope list)
+        : Result<unit, StoredLineFault> =
+        let outcome: obj =
+            codec?checkClosure (events |> List.map toLibraryEvent |> Array.ofList, isEventTypeKnown)
+
+        if unbox<bool> outcome?ok then
+            Ok()
+        else
+            Error(storedLineFaultOf outcome?error)

@@ -2,7 +2,7 @@ namespace Wanxiangshu.Interaction.Dispatch
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
@@ -17,4 +17,4 @@ module PromptRecovery =
           PromptKey: PromptKey
           Outcome: ClaimOutcome }
 
-    val reconcile: journal: AgentJournal option -> snapshotOpt: ISessionSnapshotPort option -> Task<Reconciled list>
+    val reconcile: journal: AgentJournal option -> transcriptOpt: ITranscriptPort option -> Task<Reconciled list>

@@ -191,7 +191,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let relayPortOpt = deps.Journal |> Option.map OrchestratorJournalAdapter.forRelay
 
-    let runGit = OrchestratorGit.createRunner ProcessRunner.run
+    let runGit = OrchestratorGit.run
     let gitPort = GitOperations.createWithRepo deps.RepoPath runGit
 
     let onChildCreated (agentId: string) (role: Role) (childId: SessionId) =

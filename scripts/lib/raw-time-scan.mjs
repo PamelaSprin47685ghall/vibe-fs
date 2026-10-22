@@ -42,13 +42,15 @@ export const RAW_TIME_TOKENS = Object.freeze([
  */
 export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Change/Host/Host.fs',
-  'Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs',
+  'Execution/Delegation/Fork/JoinResultRenderer.fs',
   'Execution/Delegation/Fork/OpenCode/JoinTool.fs',
   'Execution/Delegation/Fork/OpenCode/ToolSurface.fs',
+  'Execution/Delegation/Fork/OpenCode/TerminalDeliveryProof.fs',
   'Execution/Delegation/SyncDelegate/Surface.fs',
   'Interaction/Dispatch/PhysicalAcceptance.fs',
   'OpenCode/Host/PairProgrammingThoughtSurface.fs',
   'OpenCode/Host/PluginHost.fs',
+  'Omp/Adapter.fs',
   'OpenCode/Tools/ToolRegistry.fs',
   'Persistence/EventStore/ProcessEventLog.fs',
   'Persistence/Journal/EventStoreJournalWriter.fs',
@@ -64,7 +66,8 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Repository/Investigation/Semble/Stdio.fs',
   'Repository/Programming/Js/OpenCode/BookkeeperTool.fs',
   'Repository/Programming/Js/OpenCode/ToolHost.fs',
-  'Repository/Programming/Js/OpenCode/ToolWorkflow.fs',
+  'Repository/Programming/Js/ToolWorkflow.fs',
+  'Repository/Programming/Js/ToolsBindings.fs',
   'OpenCode/Host/PluginSessionScope.fs',
 ])
 

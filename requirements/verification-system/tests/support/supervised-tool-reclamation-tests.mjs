@@ -45,7 +45,7 @@ export function registerSupervisedToolReclamationTests() {
     { phase: 'initial-capture', captureFailure: 'missing-root', title: 'native incomplete snapshot cannot certify a missing root as fully captured' },
     { phase: 'freeze-confirmation', title: 'native freeze inspection failure preserves its original cause and drains known owned resources while retaining a foreign group' },
     { phase: 'descendant-drain', title: 'native drain inspection failure preserves its original cause and drains captured owned resources while retaining a foreign group' },
-    { phase: 'freeze-confirmation', cleanupFailure: true, title: 'native double inspection failure preserves both original causes and reports incomplete owned cleanup' },
+    { phase: 'freeze-confirmation', cleanupFailure: true, title: 'native double inspection failure preserves both causes and refuses cleanup acceptance despite draining known groups' },
   ]
   for (const scenario of scenarios) registerReclamationTest(scenario)
 }
@@ -71,14 +71,25 @@ function registerReclamationTest(scenario) {
       fs.writeFileSync(toolPath, `import fs from 'node:fs'
 import { execFileSync, spawn } from 'node:child_process'
 const child = spawn(process.execPath, ['-e', ${JSON.stringify(`require('node:fs').watch(${JSON.stringify(directory)}, () => {}); process.stdout.write('ready\\n')`)}], { stdio: ['ignore', 'pipe', 'inherit'] })
-child.stdout.once('data', () => {
-  const pgid = Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(process.pid)], { encoding: 'utf8' }).trim())
-  const childPgid = Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(child.pid)], { encoding: 'utf8' }).trim())
-  const monitorPgid = Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(process.ppid)], { encoding: 'utf8' }).trim())
-  const identity = { pid: process.pid, pgid, childPid: child.pid, childPgid, monitorPid: process.ppid, monitorPgid }
-  fs.writeFileSync(${JSON.stringify(`${ownershipPath}.tmp`)}, JSON.stringify(identity))
-  fs.renameSync(${JSON.stringify(`${ownershipPath}.tmp`)}, ${JSON.stringify(ownershipPath)})
-})
+child.stdout.resume()
+const sleep = ms => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms) }
+function observeOwnedGroups() {
+  const output = execFileSync('ps', ['-o', 'pid=,pgid=', '-p', [process.pid, child.pid, process.ppid].join(',')], { encoding: 'utf8' })
+  return new Map(output.trim().split('\\n').filter(Boolean).map(line => {
+    const fields = line.trim().split(/\\s+/)
+    return [Number(fields[0]), Number(fields[1])]
+  }))
+}
+let observed = observeOwnedGroups()
+const observationDeadline = Date.now() + 2000
+while (!observed.has(process.pid) || !observed.has(child.pid) || !observed.has(process.ppid)) {
+  if (Date.now() >= observationDeadline) throw new Error('The owned tool could not observe its own live identity')
+  sleep(5)
+  observed = observeOwnedGroups()
+}
+const identity = { pid: process.pid, pgid: observed.get(process.pid), childPid: child.pid, childPgid: observed.get(child.pid), monitorPid: process.ppid, monitorPgid: observed.get(process.ppid) }
+fs.writeFileSync(${JSON.stringify(`${ownershipPath}.tmp`)}, JSON.stringify(identity))
+fs.renameSync(${JSON.stringify(`${ownershipPath}.tmp`)}, ${JSON.stringify(ownershipPath)})
 `)
       fs.writeFileSync(foreignPath, `import fs from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -186,10 +197,13 @@ function inspectProcessTree({ phase, timeout }) {
     }
   }
   if (phase === 'failure-drain' && heldMonitor) {
-    const monitor = rows.find(row => row.pid === heldMonitor.pid && row.pgid === heldMonitor.pgid)
-    if (!monitor || !/^[Tt]/.test(monitor.state)) throw new Error('The owned monitor was not observed paused at recovery admission')
-    observation.resumedMonitor = { ...monitor }
-    process.kill(monitor.pid, 'SIGCONT')
+    const monitor = rows.find(row => row.pid === heldMonitor.pid && row.pgid === heldMonitor.pgid && !/^[ZX]/.test(row.state))
+    if (monitor) {
+      if (!/^[Tt]/.test(monitor.state)) throw new Error('The retained owned monitor was not observed paused at recovery admission')
+      observation.retainedMonitor = { ...monitor }
+    } else {
+      observation.absentMonitor = { pid: heldMonitor.pid, pgid: heldMonitor.pgid }
+    }
     heldMonitor = null
   }
   inspections.push(observation)
@@ -302,6 +316,8 @@ if (originalFailure) throw originalFailure.error
       assert.ok(caught.foreignMembers.some(row => row.pid === caught.foreign.pid), 'The unrelated caller-owned group remains alive when silence is caught')
       assert.equal(caught.homeExists, false, 'The exact inner HOME was reclaimed before its caller caught failure')
       if (scenario.phase !== null) {
+        assert.match(output, /post-exit group verification\/reclamation: pid=\d+; elapsedMs=[\d.]+; accepted=false/,
+          'An inspection or cleanup failure cannot report complete owned reclamation')
         const initial = caught.inspections.find(inspection => inspection.phase === 'initial-capture' && !inspection.failed)
         assert.ok(initial, 'The real initial process snapshot was obtained before the native failure')
         assert.ok(initial.rows.some(row => row.pid === caught.tool.pid && row.parent === caught.tool.monitorPid && row.pgid === caught.tool.pgid), 'The initial native snapshot contains the actual tool and monitor lineage')
@@ -336,24 +352,25 @@ if (originalFailure) throw originalFailure.error
             distinctOriginals: caught.nativeErrorsDistinct,
           }, { primaryPreserved: true, cleanupPreserved: true, distinctOriginals: true }, output)
         }
-        assert.ok(caught.monitorMembers.some(row => row.pid === caught.tool.monitorPid && row.pgid === caught.tool.monitorPgid && /^[Tt]/.test(row.state)), 'The observed monitor remains paused; cleanup is explicitly incomplete at caller rejection')
+      }
+      if (scenario.captureFailure) {
+        assert.ok(caught.monitorMembers.some(row => row.pid === caught.tool.monitorPid && row.pgid === caught.tool.monitorPgid && /^[Tt]/.test(row.state)), 'Without a successful root snapshot, the unproven monitor remains paused and cleanup is incomplete')
         assert.deepEqual(caught.toolMembers.map(row => row.pid).sort((a, b) => a - b), [caught.tool.pid, caught.tool.childPid].sort((a, b) => a - b), 'The known tool and descendant remain live while their owned monitor is paused')
-        assert.equal(caught.inspections.some(inspection => inspection.resumedMonitor), false)
+        assert.equal(caught.inspections.some(inspection => inspection.absentMonitor), false)
         if (scenario.captureFailure === 'inspection') {
           assert.equal(caught.inspections.find(inspection => inspection.phase === 'initial-capture' && !inspection.failed).deliveredToSupervisor, false)
           assert.equal(caught.inspections.some(inspection => inspection.phase === 'freeze-confirmation' && !inspection.failed), false, 'Neither native capture supplied a successful snapshot to the supervisor')
         }
-      } else if (scenario.phase !== null) {
-        assert.deepEqual({
-          nativeErrorPreserved: caught.nativeErrorPreserved,
-          toolMembers: caught.toolMembers,
-          monitorMembers: caught.monitorMembers,
-        }, { nativeErrorPreserved: true, toolMembers: [], monitorMembers: [] }, output)
-        const released = caught.inspections.find(inspection => inspection.phase === 'failure-drain' && inspection.resumedMonitor)
-        assert.ok(released, 'Recovery observed the held owned monitor before allowing its natural cleanup')
-        assert.equal(released.resumedMonitor.pid, caught.tool.monitorPid)
-        assert.equal(released.resumedMonitor.pgid, caught.tool.monitorPgid)
-        assert.match(released.resumedMonitor.state, /^[Tt]/)
+      } else {
+        assert.deepEqual(caught.toolMembers, [], `The captured detached tool group must already be empty when its caller catches failure\n${output}`)
+        assert.deepEqual(caught.monitorMembers, [], `The captured monitor group must already be empty when its caller catches failure\n${output}`)
+        if (scenario.phase !== null) {
+          assert.equal(caught.nativeErrorPreserved, true)
+          const termination = caught.inspections.find(inspection => inspection.phase === 'descendant-termination' && !inspection.failed)
+          assert.ok(termination, 'Termination obtained a fresh native snapshot before killing the captured groups')
+          assert.ok(termination.rows.some(row => row.pid === caught.tool.pid && row.pgid === caught.tool.pgid))
+          assert.ok(termination.rows.some(row => row.pid === caught.tool.monitorPid && row.pgid === caught.tool.monitorPgid))
+        }
         if (scenario.phase === 'initial-capture') {
           const initial = caught.inspections.find(inspection => inspection.phase === 'initial-capture' && !inspection.failed)
           assert.equal(initial.deliveredToSupervisor, false, 'The independent initial identity oracle was never supplied to the supervisor')
@@ -365,7 +382,6 @@ if (originalFailure) throw originalFailure.error
           assert.ok(recovered.rows.some(row => row.pid === caught.tool.monitorPid && row.pgid === caught.tool.monitorPgid && /^[Tt]/.test(row.state)))
         }
       }
-      if (!scenario.cleanupFailure && !scenario.captureFailure) assert.deepEqual(caught.toolMembers, [], `The actual detached tool group must already be empty when its caller catches failure\n${output}`)
       assert.deepEqual(JSON.parse(fs.readFileSync(cleanupPath, 'utf8')).live, [])
     } catch (error) {
       failure = { error }

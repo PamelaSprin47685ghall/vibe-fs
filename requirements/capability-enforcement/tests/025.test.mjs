@@ -420,3 +420,79 @@ test('WHAT[capability-enforcement-025] an admitted query keeps its result when r
     }
   })
 })
+
+test('WHAT[capability-enforcement-025] P15_concurrent_physical_rg_overlap_with_review_acceptance_admits_inflight_and_refuses_subsequent', { timeout: 5000 }, async () => {
+  const { default: processes } = await import('node:child_process')
+  const { syncBuiltinESMExports } = await import('node:module')
+  const { watch, existsSync } = await import('node:fs')
+  const { basename } = await import('node:path')
+  await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
+    const sessionID = 'ses-concurrent-inflight-review'
+    await seed(runtime, sessionID, directory)
+    const paused = Promise.withResolvers()
+    const spawn = processes.spawn
+    const marker = join(directory, 'paused-rg.json')
+    const watcher = watch(directory, (_event, filename) => {
+      if (filename !== basename(marker) || !existsSync(marker)) return
+      try { paused.resolve(JSON.parse(readFileSync(marker, 'utf8'))) } catch (error) { paused.reject(error) }
+    })
+    watcher.on('error', paused.reject)
+    let spawns = 0
+    let targetPid = null
+    let pending
+    try {
+      processes.spawn = function (...args) {
+        const supervisorIndex = args[1]?.indexOf('--wanxiangli-supervisor') ?? -1
+        if (supervisorIndex < 0) return spawn.apply(this, args)
+        const request = JSON.parse(readFileSync(join(args[1][supervisorIndex + 1], 'request'), 'utf8'))
+        assert.equal(basename(request.executable), 'rg')
+        spawns += 1
+        const preload = `
+import processes from 'node:child_process'
+import { writeFileSync, renameSync } from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
+const spawn = processes.spawn
+processes.spawn = function (...args) {
+  const child = spawn.apply(this, args)
+  if (args[0] === ${JSON.stringify(request.executable)}) {
+    process.kill(child.pid, 'SIGSTOP')
+    writeFileSync(${JSON.stringify(marker + '.tmp')}, JSON.stringify({ pid: child.pid, executable: args[0], args: args[1] }))
+    renameSync(${JSON.stringify(marker + '.tmp')}, ${JSON.stringify(marker)})
+  }
+  return child
+}
+syncBuiltinESMExports()
+`
+        args[1] = ['--import', 'data:text/javascript,' + encodeURIComponent(preload), ...args[1]]
+        return spawn.apply(this, args)
+      }
+      syncBuiltinESMExports()
+      pending = execute(hooks, sessionID, reads[3], 'concurrent-inflight-rg')
+      const target = await Promise.race([paused.promise, pending.then(result => { throw new Error('rg completed before its physical pause: ' + JSON.stringify(result)) })])
+      targetPid = target.pid
+      assert.ok(Number.isSafeInteger(targetPid) && targetPid > 0)
+      assert.equal(basename(target.executable), 'rg')
+      assert.ok(target.args.includes('review') && target.args.includes('evidence.txt'))
+      process.kill(targetPid, 0)
+      await injectAcceptedAssessment(runtime, sessionID)
+      const overlapped = await execute(hooks, sessionID, reads[3], 'overlapped-after-accept')
+      assert.equal(overlapped.code, 'REVIEW_ONLY', JSON.stringify(overlapped))
+      process.kill(targetPid, 'SIGCONT')
+      const admitted = await pending
+      assert.equal(admitted.code, undefined, JSON.stringify(admitted))
+      assert.equal(admitted.data.exitCode, 0)
+      assert.equal((await execute(hooks, sessionID, reads[3], 'subsequent-rg')).code, 'REVIEW_ONLY')
+      assert.equal(spawns, 1)
+    } finally {
+      watcher.close()
+      if (targetPid !== null) {
+        try { process.kill(targetPid, 'SIGCONT') } catch (error) {
+          if (error.code !== 'ESRCH') throw error
+        }
+      }
+      processes.spawn = spawn
+      syncBuiltinESMExports()
+      await pending
+    }
+  })
+})

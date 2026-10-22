@@ -16,6 +16,10 @@
 
 park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.fs，并发上限 8），由工具编排层 ToolWorkflow 与 session 回收层 PluginSessionScope 共享引用，进程内存活：同进程后续调用仍见其挂起。超出上限的 park 以 `CONCURRENCY_LIMIT` 拒绝，无排队；abandon 释放现场后新 park 可入。现场携带 session owner，会话终结据此 reap。
 
+## 调用面三态互斥（WHAT[repository-programming-064]）
+
+一次编程调用只携带 `program` / `unpark` / `abandon` 之一，三个参数在调用面上都是可选的，模型只发其中之一。同时给出两个及以上（例如同时给 `program` 与 `abandon`）以 `INVALID_ARGUMENT` 拒绝，reason 点名冲突的字段名，且是零效果：程序不跑、不恢复、不放弃、不产生文件效果，也不留待下一请求消费的视图声明，更不消费被点名的 handle——现场原样留在现场表里，等模型用单状态调用处置。一个状态都不给是缺状态，报缺少 program 的错误（`missing 'program' argument`），与“两个状态”的拒绝是两件事。
+
 ## 泄漏兜底三件套（WHAT[repository-programming-031]）
 
 交付硬门禁接在 deliverSpec 执行链，plan/manager 分派之前：存在未处理 parked handle 时拒绝交付并列出全部 handle（资源 `tool/js-program/parked-deliver-blocked`）。每回合提醒经由 PairHint 的 composeMarkerDocument 并入（资源 `tool/js-program/parked-hint`），无载体回合不注入。会话终结在 ClearSession 清理链强制 reap 该 session 名下全部现场，durable 记 Reaped。两个资源均为 zh-CN.md/en.md 成对双语、占位符一致且含 `{{handles}}`；三个调用点只调用 JsParkedSites，不定义现场表。
@@ -24,11 +28,13 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 独立宿主 `mv`/`rm` `ToolSpec`（及 `FileTools`/`FileMutationTools`）已退役，`rm`/`mv` 仅由 Remove/Move capability 在 js 编程面上投影，与 `write` 同属 as-is 逐笔落盘路径：rm 删文件或空目录，mv 按 POSIX 语义移动或重命名并支持覆盖。越界报 `PATH_DENIED` 且源存活；成功渲染报 `removed = [...]` 与 `moved = ["from -> to"]`。每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影。
 
-## js.call 工程执行循环（WHAT[repository-programming-050]、[051]、[052]）
+## js.call（WHAT[repository-programming-050]、[058]）
 
 Exec capability 投影出全局 `js.call` 与 `js.Callable`，程序入口仍为 `async run()`。sanity thunk 返回参数数组，由 Host 实际调用 next/watch 验证终止和否决路径；证明与正式执行使用独立实例。绝对期限、取消、完整采集和真实物理排空继续由本地执行内核承担。watch 可否决或 park，后台范围先 TERM 后按需 KILL；终止请求不代替真实退出。完整编码结果与观察对象受模型预算和实际 Host 窗口共同约束。双语教学在 `tool/js-program/run-rules`，示例在 `tool/js-program/run-recipes` 与 `tool/js-program/ultra-devops`。
 
-`run`/`pty` 宿主工具已整体退役（[058]，GAP-234）：`js.call` 是唯一执行面，`{ send: { name, input } }` 写命名子进程 stdin，`watch(ctx)` 的 `stdout`/`stderr` 是该时间片的增量（前台命令与后台子进程合并），因此 REPL/server 式的交互也走同一循环。
+Exec capability 投影 `this.call(command, planB)`、`this.signal(signal)`、`this.send(input)`。`planB` 是 `call` 的第二个参数，不是工具参数。谁让这次程序 park，`signal` 与 `send` 就作用在谁身上；那条命令已经结束时是 `CALL_CHILD_UNKNOWN`。
+
+两种 call 形态共用本地已验证的进程资源内核；类参数仍执行完整工程循环，字符串参数执行一条命令。工具参数 `name` 为 park 指定可读名称，实际 handle 每次仍唯一，避免旧 unpark 重放误恢复新现场；省略时沿用自动 handle。显式空名或已挂起的同名在程序执行前拒绝。自动 yield park 的载荷带 `{ name, planB, delta: { stdout, stderr } }`。`where` 是字面 `IndexOf`。
 
 ## 委托原语：fork / join / fission / dag（WHAT[repository-programming-056]）
 

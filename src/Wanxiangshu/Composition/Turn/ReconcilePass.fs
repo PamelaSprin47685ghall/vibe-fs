@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
 
 module ReconcilePass =
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as SatelliteSurface from '../../../dist/OpenCode/Host/SatelliteSurface.js'
+import * as SatelliteSurface from '../../../dist/Execution/Session/Attachment/SatelliteSurface.js'
 
 
 

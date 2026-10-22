@@ -16,7 +16,7 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Delegation.Fork
 
 module AgentJournalPortAdapter =
     let forDelegatedToolEstimate (journal: AgentJournal) : DelegatedToolEstimatePort =
@@ -29,8 +29,9 @@ module AgentJournalPortAdapter =
         { ProviderFailureJournalPort.CurrentState =
             fun sessionId ->
                 AgentJournal.snapshot journal
-                |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
-                |> Option.bind (fun session -> session.ProviderFailures)
+                |> fun snapshot ->
+                    PromptAuthorityProjectionQueries.providerFailureBudget sessionId snapshot.AgentProjections
+                |> Option.map snd
           ProviderFailureJournalPort.Append =
             fun sessionId providerRun fact ->
                 task {
@@ -131,7 +132,9 @@ module AgentJournalPortAdapter =
                     PromptAuthorityProjectionQueries.activeProfile sessionId projections
                     |> Option.map (PromptAuthority.withSessionId sessionId)
 
-                let failState = sessionProj |> Option.bind (fun session -> session.ProviderFailures)
+                let failState =
+                    PromptAuthorityProjectionQueries.providerFailureBudget sessionId projections
+                    |> Option.map snd
 
                 let wireState =
                     sessionProj

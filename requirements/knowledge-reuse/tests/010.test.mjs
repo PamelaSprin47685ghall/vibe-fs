@@ -1,3 +1,4 @@
+import * as bookkeeperTool from '../../../dist/Repository/Knowledge/Casebook/OpenCode/BookkeeperToolSurface.js' // CUT-40: tool-binding entries split from BookkeeperSurface
 import test from 'node:test'
 
 {
@@ -42,7 +43,7 @@ const scriptedBookkeeperPort = () => {
       const sid = bookkeeper.sessionValue(childSession)
       const tx = bookkeeper.txIdFor(sid)
       assert.notEqual(tx, '', 'SendPrompt must run against a bound Bookkeeper tx')
-      const out = await bookkeeper.runProgram(
+      const out = await bookkeeperTool.runProgram(
         sid,
         `class Js extends JsProgram { async run() { this.setQuestion(${JSON.stringify(CANONICAL_Q)}); this.setAnswer(${JSON.stringify(CANONICAL_A)}); return { changed: true }; } }`,
       )
@@ -358,14 +359,15 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
       }
 
       lifecycle.notePrompt(delegateId, question)
-      const view = { prefixUntil: 0, thenMap: { 0: `${question}\n${answer}\nturn = ${i + 1}` } }
+      const deliveredMaterial = `question = ${JSON.stringify(question)}\nanswer = ${JSON.stringify(answer)}\nturn = ${i + 1}`
+      const view = { prefixUntil: 0, thenMap: { 0: deliveredMaterial } }
       const delivered = await jsWorkflow.execute(
         dir,
         'Engineer',
         'en',
         delegateId,
         {
-          program: `class Js extends JsProgram { async run() { await this.deliver(${JSON.stringify(view)}); } }`,
+          program: `class Js extends JsProgram { async run() { await this.deliver({ "0": ${JSON.stringify(deliveredMaterial)} }); } }`,
         },
         3000,
         Date.now() + 60_000,
@@ -374,22 +376,28 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
       )
       assert.equal(jsWorkflow.caseName(delivered), 'Succeeded', jsWorkflow.render(delivered))
       assert.deepEqual(jsRuntime.deliveredViewOf(delegateId), view)
-      jsRuntime.recordFencedDeliveredView(delegateId, `asst_q${i + 1}`, `delivery_q${i + 1}`, view)
-      assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', `FORMAL-Q${i + 1}`, `asst_q${i + 1}`), true)
+      await syncDelegate.deliverCurrent(runtime, owner, 'Engineer', `asst_q${i + 1}`, `delivery_q${i + 1}`, `RAW-PROSE-Q${i + 1}`, view.thenMap)
+      assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', `RAW-PROSE-Q${i + 1}`, `asst_q${i + 1}`), true)
       const text = await pending
       assert.match(text, /^# \[\[returned\]\]/, `Engineer Q${i + 1} must return its declared view as reference material`)
       assert.match(text, new RegExp(`turn = ${i + 1}`), `Engineer Q${i + 1} must carry its own delivered turn`)
       assert.match(text, new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-      assert.equal(
-        text.includes(`FORMAL-Q${i + 1}`),
-        true,
-        `Engineer Q${i + 1} must include its own final formal prose`,
+      assert.match(
+        text,
+        new RegExp(`RAW-PROSE-Q${i + 1}`),
+        `Engineer Q${i + 1} must return the assistant prose this deliver owes alongside the material`,
       )
+      // 前次已返回的身份不重复：上一轮的材料与散文都不再出现。
       for (let prior = 0; prior < i; prior += 1) {
         assert.equal(
           text.includes(QUESTIONS[prior][1]),
           false,
-          `Engineer Q${i + 1} must not leak Q${prior + 1} terminal prose into its bounded record`,
+          `Engineer Q${i + 1} must not repeat the Q${prior + 1} material it already returned`,
+        )
+        assert.equal(
+          text.includes(`RAW-PROSE-Q${prior + 1}`),
+          false,
+          `Engineer Q${i + 1} must not repeat the Q${prior + 1} prose it already returned`,
         )
       }
       assert.equal(parseToml(text).error, undefined)
@@ -407,6 +415,13 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('CaseFinalize')), true)
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q1')), true)
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q3')), true)
+    // 归档事实：交付的材料进了 Casebook draft，finalize 把它作为 transcript 交给 Bookkeeper。
+    const finalizePrompt = bookkeeperPort.prompts.map((text) => String(text)).find((text) => text.includes('CaseFinalize'))
+    assert.ok(finalizePrompt, 'the CaseFinalize prompt must be sent to the Bookkeeper lane')
+    for (const [question, answer] of QUESTIONS) {
+      assert.ok(finalizePrompt.includes(question), `the finalized draft must carry Q: ${question}`)
+      assert.ok(finalizePrompt.includes(answer), `the finalized draft must carry A: ${answer}`)
+    }
 
     const store = eventStore.create(join(dir, '.Herdchestra'), 'g6-engineer-charge-fetch')
     const fetched = await casebook.fetchCase(store, 10, delegateId)
@@ -475,6 +490,15 @@ test('WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually
       }
 
       lifecycle.notePrompt(delegateId, question)
+      await syncDelegate.deliverCurrent(
+        runtime,
+        owner,
+        'Engineer',
+        `asst_q${i + 1}`,
+        `call_q${i + 1}`,
+        answer,
+        { 0: answer },
+      )
       assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', answer, `asst_q${i + 1}`), true)
       const done = await pending
       assert.equal(done.ok, true, done.ok ? '' : done.error)

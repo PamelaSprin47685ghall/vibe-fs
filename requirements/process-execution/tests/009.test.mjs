@@ -31,7 +31,7 @@ const tempSpool = (value) => {
 }
 const readSpool = async (spool) => {
   const chunks = spool.path ? await spoolReadPath(spool.path) : await spoolRead(spool)
-  return chunks.map(decode).join('')
+  return decode(chunks.flatMap(chunk => Array.from(chunk)))
 }
 
 test('WHAT[process-execution-009] EXEC_011_collector_concatenates_stdout_stderr_utf8', () => {
@@ -82,6 +82,7 @@ test('WHAT[process-execution-009] EXEC_011_collector_spooled_buffers_are_cleared
   const view = outputView(collector)
   assert.equal(view.stdoutChunks, 0)
   assert.equal(view.stderrChunks, 0)
+  assert.equal(view.bytesHeld, 0, 'once spooled, no output stays in memory')
   spoolDelete(outputBuildResult(collector).spoolPath)
 })
 test('WHAT[process-execution-009] EXEC_011_spool_chunk_count_rounds_up', () => {
@@ -112,6 +113,34 @@ test('WHAT[process-execution-009] EXEC_011_spool_append_tracks_bytes_written', a
   assert.equal(spoolBytesWritten(spool), 2)
   assert.equal(await readSpool(spool), 'ab')
   spoolDelete(spoolPath(spool))
+})
+test('WHAT[process-execution-009] EXEC_011_spool_keeps_every_byte_of_a_large_real_stream', async () => {
+  const collector = create(10, 1024)
+  const expected = []
+  for (let index = 0; index < 64; index++) {
+    const chunk = text(`${index}:${'中'.repeat(4000)}\n`)
+    expected.push(chunk)
+    if (index % 5 === 0) outputAddStderr(collector, chunk)
+    else outputAddStdout(collector, chunk)
+    assert.ok(outputView(collector).bytesHeld <= 1024, 'memory stays bounded while output grows')
+  }
+  const outcome = outputBuildResult(collector)
+  assert.equal(outcome.kind, 'Spooled')
+  const all = Buffer.concat(expected)
+  try {
+    assert.equal(outcome.totalBytes, all.length)
+    assert.equal(await readSpool({ path: outcome.spoolPath }), all.toString('utf8'))
+  } finally {
+    spoolDelete(outcome.spoolPath)
+  }
+})
+test('WHAT[process-execution-009] EXEC_011_late_output_after_build_result_is_not_part_of_the_outcome', () => {
+  const collector = create(10, 1000)
+  outputAddStdout(collector, text('done'))
+  assert.equal(outputBuildResult(collector).stdout, 'done')
+  outputAddStdout(collector, text('late'))
+  assert.equal(outputView(collector).bytesObserved, 4)
+  assert.equal(outputBuildResult(collector).stdout, 'done')
 })
 }
 

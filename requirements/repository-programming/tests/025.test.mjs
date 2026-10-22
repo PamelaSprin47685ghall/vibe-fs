@@ -302,5 +302,164 @@ test('WHAT[repository-programming-025] prepared_cut_committed_match_releases_pen
 })
 }
 
-test.todo('WHAT[repository-programming-025] a real transaction invariant failure settles rollback or cut before one injected fatal incident')
-test.todo('WHAT[repository-programming-025] uncertain persistence and interrupted settlement preserve third-party changes across process restart')
+// Root cause at the settlement boundary: a real `JsTransaction` invariant
+// failure (a malformed `Prepared`/`Committed` payload, or a fault raised while
+// releasing the store lock) must settle the durable cut BEFORE the single
+// injected fatal incident. The physical owner of that settlement is the
+// EventStore's append-payload store: it appends the `ProjectionCutTail`
+// fact (`rule: 'JsTransaction'`) that records the failed event id, so a cold
+// reader can observe the settled cut tail after the process is killed.
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const { randomUUID } = await import("node:crypto");
+const { fileURLToPath } = await import("node:url");
+const { runVerificationToolProbe } = await import('../../../scripts/lib/verification-tool-probe.mjs');
+const child = fileURLToPath(new URL('./support/transaction-cut-child.mjs', import.meta.url));
+
+for (const phase of ['Prepared', 'Committed']) {
+  for (const scenario of ['malformed', 'malformed-release']) {
+    test(`WHAT[repository-programming-025] JS ${phase} actual EventStore port ${scenario} bad-input defense settles rollback or cut before one injected fatal incident`, async t => {
+      const root = mkdtempSync(join(tmpdir(), 'js-real-cut-boundary-'))
+      const commonDir = root
+      const workspace = join(root, 'workspace')
+      mkdirSync(workspace, { recursive: true })
+      // A pre-existing workspace file that the transaction must NOT touch.
+      writeFileSync(join(workspace, 'existing.txt'), 'existing-content', 'utf8')
+      const writer = randomUUID()
+      const env = { ...process.env }
+      delete env.NODE_TEST_CONTEXT
+      delete env.WANXIANGSHU_NO_FATAL_EXIT
+      const probe = (mode, writerId, request) => runVerificationToolProbe(process.execPath,
+        [child, mode, commonDir, writerId, phase, scenario, JSON.stringify(request)], { cwd: root, env, signal: t.signal })
+      try {
+        let outcome
+        try { outcome = { stdout: await probe('measure', writer, {}), stderr: '', exitCode: 0, signal: null } }
+        catch (error) {
+          if (error?.code !== 'verification-tool-probe-failed') throw error
+          outcome = error
+        }
+        const records = outcome.stdout.trim().split('\n').map(line => JSON.parse(line))
+        const settled = records.find(record => record.stage === 'settled')
+        assert.ok(settled, 'the settlement is recorded before the fatal incident')
+        assert.equal(settled.physicalPreconditions, true, outcome.stderr)
+
+        // The durable cut tail is on disk: `ProjectionCutTail` with the
+        // `JsTransaction` rule names the failed event.
+        const cut = settled.facts.find(fact => fact.type === 'ProjectionCutTail')
+        assert.ok(cut, 'the settled cut tail is a durable fact')
+        assert.equal(cut.payload.rule, 'JsTransaction')
+
+        // The pre-existing workspace file is untouched by the failed
+        // transaction: a settled rollback/cut is not a partial write.
+        assert.equal(readFileSync(join(workspace, 'existing.txt'), 'utf8'), 'existing-content')
+
+        // Exactly one injected fatal incident, terminating through the
+        // physical fatal owner AFTER the settlement.
+        assert.equal(outcome.signal, 'SIGKILL')
+        assert.equal(records.some(record => record.stage === 'returned'), false)
+        const fatal = outcome.stderr.trim().split('\n').map(line => {
+          try { return JSON.parse(line) } catch { return null }
+        }).filter(record => record?.operation === 'js-transaction-semantic-cut')
+        assert.equal(fatal.length, 1, 'one JS owner reports the actual rule cut')
+
+        // A cold reader process observes the settled cut tail.
+        const cold = JSON.parse(await probe('cold', randomUUID(), {
+          sourceWriter: writer, bytes: settled.bytes, facts: settled.facts,
+        }))
+        assert.notEqual(cold.pid, settled.pid)
+        assert.equal(cold.preserved, true, 'a separate process accepts the settled cut tail')
+      } finally { rmSync(root, { recursive: true, force: true }) }
+    })
+  }
+}
+}
+
+// Root cause at the uncertain-persistence boundary: the fact layer never
+// rewrites the workspace. A `Prepared` receipt (or an interrupted
+// `malformed-release` settlement that leaves the outcome unknown) is durable
+// evidence, not a licence to touch files. Recovery reads only the durable
+// receipts, so a third-party file that changed while the transaction was
+// uncertain must survive the restart verbatim.
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const { randomUUID } = await import("node:crypto");
+const { create: createEventStore, dispose: disposeEventStore } = await import("../../../dist/Persistence/EventStore/Surface.js");
+const { appendPrepared, appendCommitted, pending } = await import("../../../dist/Repository/Programming/Js/TransactionSurface.js");
+
+const makeDir = (prefix) => mkdtempSync(join(tmpdir(), prefix))
+const openStore = (commonDir) => {
+  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
+  return { handle, close: () => disposeEventStore(handle) }
+}
+const prepared = (id, root, mutation) => ({
+  transactionId: id,
+  workspaceRoot: root,
+  mutation,
+})
+const mutation = (path, originalText, newText) => ({ path, originalText, newText })
+const unwrap = (result) => {
+  assert.equal(result.ok, true, `expected Ok, got ${JSON.stringify(result.error)}`)
+  return result
+}
+
+test('WHAT[repository-programming-025] uncertain persistence and interrupted settlement preserve third-party changes across process restart', async () => {
+  const workspace = makeDir('wxs-uncertain-third-party-')
+  const common = makeDir('wxs-uncertain-third-party-events-')
+  const local = openStore(common)
+  try {
+    writeFileSync(join(workspace, 'shared.txt'), 'initial-shared', 'utf8')
+    writeFileSync(join(workspace, 'third-party.txt'), 'external-edit-v1', 'utf8')
+
+    // The transaction targets shared.txt only; third-party.txt is not part
+    // of the transaction and must never be written by recovery.
+    unwrap(await appendPrepared(local.handle, prepared('tx-uncertain', workspace, mutation('shared.txt', 'initial-shared', 'transaction-shared'))))
+
+    // Uncertain outcome: the Committed receipt is never observed. The
+    // Prepared stays durable and inspectable.
+    local.close()
+
+    // A third party edits its own file while the transaction is uncertain.
+    writeFileSync(join(workspace, 'third-party.txt'), 'external-edit-v2', 'utf8')
+
+    // Cold restart: a fresh handle over the same durable store.
+    const reopened = openStore(common)
+    try {
+      const waiting = pending(reopened.handle)
+      assert.deepEqual(
+        waiting.map(p => p.transactionId),
+        ['tx-uncertain'],
+        'pending prepared state remains inspectable after the restart',
+      )
+      assert.equal(
+        readFileSync(join(workspace, 'third-party.txt'), 'utf8'),
+        'external-edit-v2',
+        'recovery must never overwrite a third-party change',
+      )
+      assert.equal(
+        readFileSync(join(workspace, 'shared.txt'), 'utf8'),
+        'initial-shared',
+        'an uncertain transaction leaves the workspace untouched',
+      )
+
+      // The only legal resolution is an explicit Committed receipt; the
+      // third-party file is still untouched afterwards.
+      unwrap(await appendCommitted(reopened.handle, 'tx-uncertain'))
+      assert.deepEqual(pending(reopened.handle), [])
+      assert.equal(readFileSync(join(workspace, 'third-party.txt'), 'utf8'), 'external-edit-v2')
+    } finally {
+      reopened.close()
+    }
+  } finally {
+    rmSync(workspace, { recursive: true, force: true })
+    rmSync(common, { recursive: true, force: true })
+  }
+})
+}

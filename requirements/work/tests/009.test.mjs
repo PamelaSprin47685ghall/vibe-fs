@@ -6,17 +6,16 @@ import test from 'node:test'
 import { deliverOnce } from './support/contract.mjs'
 import { withReview, scores } from './support/plugin.mjs'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
-import * as scopeMod from '../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
+import { ToolRuntimePhysicalSurface } from '../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import { executeHostTool } from '../../delegation/tests/support/real-fork.mjs'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 const ownershipHost = life
-const verifyOwnership =
-  scopeMod.verifyOwnershipRetirementContract ||
-  (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.verifyOwnershipRetirementContract)
+const verifyOwnership = ToolRuntimePhysicalSurface.verifyOwnershipRetirementContract
 
 test('WHAT[work-009] new pipe ownership blocks the current family while fixed DevOps keeps its own scope across retirement', async () => {
-  const result = await scopeMod.ToolRuntimeScopeSurface.verifyProcessRetirementContract()
+  const result = await ToolRuntimePhysicalSurface.verifyProcessRetirementContract()
   assert.equal(result.admittedEngineer, true)
   assert.equal(result.admittedDevOps, true)
   assert.equal(result.before.filter(value => value.startsWith('tool-owned-work:')).length, 1)
@@ -34,20 +33,23 @@ test('WHAT[work-009] a live owned resource blocks deliver without retiring', () 
 test('WHAT[work-009] the second deliver reports the live blocker instead of reporting an end', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
-    const forked = await hooks.tool.fork.execute(
-      { calling: 'engineer', name: 'Ada', charge: 'implement' },
-      { sessionID: session, callID: 'call-fork', messageID: 'run-fork', agent: 'manager' },
+    // 派工是编程面成员：`this.fork(payload, reportMapping)`，宿主不再注册 fork 工具。
+    const forked = await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-fork-blocker', 'todowrite-for-manager',
+      {
+        program:
+          'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "implement" }, { 1: null }); } }',
+      },
+      'fork-blocker',
     )
-    assert.match(String(forked), /carries this charge now|现已接下这项托付/)
+    assert.match(String(forked), /ok = true/)
+    assert.match(String(forked), /name = "Ada"/)
+    assert.match(String(forked), /outcome = "created"/)
     // The first call only confirms; Algorithm E4 does not read the blocker set.
     assert.match(
-      await hooks.tool.deliver.execute({}, { sessionID: session, callID: 'deliver-confirm', messageID: 'run-confirm', agent: 'manager' }),
+      await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-confirm', 'deliver', {}, 'deliver-confirm'),
       /confirmation_required = true/,
     )
-    const blocked = await hooks.tool.deliver.execute(
-      {},
-      { sessionID: session, callID: 'deliver-call', messageID: 'run-retire', agent: 'manager' },
-    )
+    const blocked = await executeHostTool(hooks, runtime, session, 'manager', 'user-root', 'run-retire', 'deliver', {}, 'deliver-call')
     // Algorithm E8: the blocker is durable and the call reports an unfinished
     // tenure with exactly what to close, so the runner may deliver again.
     assert.match(blocked, /finished = false/)

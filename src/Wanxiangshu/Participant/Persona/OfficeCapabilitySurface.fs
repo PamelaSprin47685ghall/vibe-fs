@@ -12,25 +12,17 @@ module OfficeCapabilitySurface =
     [<Emit("$0 == null")>]
     let private isNullish (value: obj) : bool = jsNative
 
-    let private officeName role =
-        match role with
-        | Role.Engineer -> "engineer"
-        | Role.Coder -> "coder"
-        | Role.Inspector -> "inspector"
-        | Role.DevOps -> "devops"
-        | Role.Browser -> "browser"
-        | Role.Inquiry -> "inquiry"
-        | _ -> failwith "OfficeCapabilitySurface: catalog contains a non-forkable role"
-
     /// office-capability-007 / ARCH-017: the canonical manager fork office consequence set.
     let managerForkableOffices () : string array =
-        ManagedAgentCatalog.managerForkableRoles |> List.map officeName |> List.toArray
+        ManagedAgentCatalog.managerForkableRoles
+        |> List.map Roles.roleLabel
+        |> List.toArray
 
-    /// Sorted permission labels for a role. Unknown role fails closed.
+    /// Sorted permission labels for a role. Unknown role fails closed; historical
+    /// roles hold no office in `wanxiangli/capability` and so return none.
     let permissions (roleLabel: string) : string array =
         match Roles.tryParseRole roleLabel with
-        | None
-        | Some(Role.Coder | Role.Inspector | Role.Browser | Role.Inquiry | Role.Distiller) -> [||]
+        | None -> [||]
         | Some role ->
             OfficeCapability.permissions role
             |> Set.toList
@@ -43,6 +35,46 @@ module OfficeCapabilitySurface =
         match Roles.tryParseRole roleLabel, OfficeCapability.permissionOfLabel permissionLabel with
         | Some role, Some permission when Roles.all |> List.contains role -> OfficeCapability.isAllowed role permission
         | _ -> false
+
+    /// The canonical permission labels, in catalog order, derived from the one
+    /// label function. This list is the single authority: no consumer keeps
+    /// its own copy, because a hand-copied table is a thing to rot. The order
+    /// is the ToolPermission declaration order.
+    let permissionLabels () : string array =
+        [ ToolPermission.Fork
+          ToolPermission.Resume
+          ToolPermission.Join
+          ToolPermission.Horizon
+          ToolPermission.Fission
+          ToolPermission.Read
+          ToolPermission.Write
+          ToolPermission.Edit
+          ToolPermission.Glob
+          ToolPermission.Grep
+          ToolPermission.Move
+          ToolPermission.Remove
+          ToolPermission.Exec
+          ToolPermission.Pty
+          ToolPermission.ReviewAssessment
+          ToolPermission.Fetch
+          ToolPermission.Finality
+          ToolPermission.BashHoneypot
+          ToolPermission.JsPlan
+          ToolPermission.Ask
+          ToolPermission.Deliver
+          ToolPermission.Review
+          ToolPermission.DevOpsConsultation
+          ToolPermission.Advisor ]
+        |> List.map OfficeCapability.permissionLabel
+        |> List.toArray
+
+    /// The canonical label for a permission label, or None when the label is
+    /// not a permission at all. A caller can therefore tell "unknown label"
+    /// apart from "known label that projects no member".
+    let permissionOfLabel (label: string) : string option =
+        match OfficeCapability.permissionOfLabel label with
+        | Some permission -> Some(OfficeCapability.permissionLabel permission)
+        | None -> None
 
     /// capability-enforcement-025: manager gate facts as a plain JS object. The
     /// caller declares the four facts and never sees the F# record.

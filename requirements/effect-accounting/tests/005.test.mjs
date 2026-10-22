@@ -1,10 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { withDispatch, dispatch } from './support/dispatch.mjs'
+import { withDispatch, dispatch, journal } from './support/dispatch.mjs'
 import * as recovery from '../../../dist/Interaction/Dispatch/RecoverySurface.js'
 
 test('WHAT[effect-accounting-005] unreadable absent and mismatched physical evidence retain the claim; exact evidence settles without resend', async () => {
   await withDispatch(async ({ handle, send }) => {
+    const owner = dispatch.projectionObservation(handle, 'owner').activeLogicalRun
+    assert.ok(owner)
+    const linked = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session: owner.session }, null, {
+      family: 'Execution', case: 'HandleLinked', payload: {
+        ParentSessionId: owner.session, ChildSessionId: 'child', Handle: 'accounted-child',
+        TargetAgent: 'engineer', CanonicalRole: 'engineer', Ownership: 'DurableParentHandle',
+      },
+    })
+    assert.equal(linked.ok, true, JSON.stringify(linked.error))
     let sends = 0
     await send({ SendPrompt: async () => {
       sends += 1

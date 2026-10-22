@@ -1,27 +1,61 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { admit, assertCold, forkTool, withForkRuntime } from '../../delegation/tests/support/scoped-work.mjs'
-import { toolModule } from '../../delegation/tests/support/fork-runtime.mjs'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import {
+  childTurn,
+  coldWorkSnapshot,
+  forkCall,
+  observeTerminals,
+  resumeCall,
+  withRealFork,
+  withForkHost,
+} from '../../delegation/tests/support/real-fork.mjs'
+import { acceptAuthorityRoot, openIncumbency, withRestartablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+
+/**
+ * The cold recovery surface: a fresh writer re-opens the durable event log of
+ * the same workspace and settles against the durable facts alone. It never
+ * writes a fabricated fact.
+ */
+const coldConsume = (directory, owner, root, commitment) =>
+  forkTool.coldConsumeWorkWithOutcome(join(directory, '.Herdchestra'), owner, root, commitment)
 
 test('WHAT[managed-session-lifecycle-015] actual admissions and replay retain exact handle child participant binding', async () => {
   const owner = 'scope-stable-binding'
-  await withForkRuntime(owner, async (runtime, directory) => {
-    const a = await admit(runtime, owner, 1, 'FIRST')
-    const before = forkTool.workSnapshot(runtime, owner)
-    const forged = await forkTool.consumeWorkWithOutcome(runtime, owner, 'not-an-accepted-root', 'confirmed')
-    assert.equal(forged.ok, false)
-    assert.equal(forged.error, 'WorkNotAdmitted')
-    assert.deepEqual(forkTool.workSnapshot(runtime, owner), before)
-    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'provider-a'), true)
-    const b = await admit(runtime, owner, 2, 'SECOND')
-    for (const key of ['handle', 'child', 'targetAgent', 'byname', 'role']) assert.equal(b[key], a[key])
-    assert.notEqual(b.root, a.root)
-    assert.equal(forkTool.childCount(runtime), 1)
-    await assertCold(runtime, directory, owner)
-    assert.equal(await forkTool.settle(runtime, owner, 'SECOND-ANSWER', 'provider-b'), true)
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const terminals = await observeTerminals(runtime)
+    try {
+      const first = await forkCall(hooks, owner, 'Ada', 'FIRST')
+      assert.match(first, /Ada/)
+      const child = createdIds[0]
+      const rootA = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      const before = await coldWorkSnapshot(directory, owner)
+
+      // A root that was never admitted is not work: consuming it refuses, and
+      // nothing about the admitted work changes.
+      const forged = await coldConsume(directory, owner, 'not-an-accepted-root', 'confirmed')
+      assert.equal(forged.ok, false)
+      assert.equal(forged.error, 'WorkNotAdmitted')
+      assert.deepEqual(await coldWorkSnapshot(directory, owner), before)
+
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE A', 'FIRST-ANSWER', terminals.awaitRun)
+
+      // The second admission keeps the exact same binding — same handle, same
+      // physical child, same participant — and only the root differs.
+      await resumeCall(hooks, owner, 'Ada', 'SECOND')
+      const rootB = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      const works = await coldWorkSnapshot(directory, owner)
+      const a = works.find((work) => work.root === rootA)
+      const b = works.find((work) => work.root === rootB)
+      for (const key of ['handle', 'child', 'targetAgent', 'byname', 'role']) assert.equal(b[key], a[key])
+      assert.notEqual(b.root, a.root)
+      assert.equal(createdIds.length, 1)
+
+      await childTurn(hooks, runtime, child, `run-${child}-2`, 'PROSE B', 'SECOND-ANSWER', terminals.awaitRun)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
@@ -264,58 +298,97 @@ test('WHAT[managed-session-lifecycle-015] TPOL_linked_child_keeps_exact_handle_a
 })
 }
 
-test('WHAT[managed-session-lifecycle-015] actual recovered fork uses its runtime Agent ID handle and rebinds the same physical child (GAP-133)', async () => {
+test('WHAT[managed-session-lifecycle-015] live resume keeps the runtime Agent ID handle and cold journal binding', async () => {
   const owner = 'scope-cold-rebind'
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-delegation-fork-'))
-  const owners = [{ sessionId: owner, agent: 'manager' }]
-
-  // A is the first process: a real fork leaves the runtime Agent ID handle and
-  // the physical child session on the canonical journal, then A exits.
-  const a = await forkTool.createRuntime(directory, owners)
-  const first = await admit(a, owner, 1, 'COLD-A')
-  assert.equal(await forkTool.settle(a, owner, 'COLD-ANSWER-A', 'provider-a'), true)
-  const durableAtExit = forkTool.workSnapshot(a, owner)
-  await forkTool.disposeRuntime(a)
-
-  try {
-    // A cold-reopened journal (fresh writer, full replay — the shape a
-    // restarted process takes) sees the exact same durable handle facts.
-    assert.deepEqual(await forkTool.coldWorkSnapshot(directory, owner), durableAtExit)
-
-    // B is the restarted process: empty process tables, same journal.
-    const b = await forkTool.createRuntime(directory, owners)
-
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const terminals = await observeTerminals(runtime)
     try {
-      const invocation = forkTool.executeManagerResume(b, toolModule, owner, '', 'Ada', 'COLD-B')
-      await forkTool.awaitPromptCount(b, 1)
-      assert.equal(forkTool.acceptPrompt(b, 0), true)
-      assert.match(await invocation, /Ada/)
+      // The real plugin writes the runtime Agent ID and physical child to the journal.
+      const first = await forkCall(hooks, owner, 'Ada', 'COLD-A')
+      assert.match(first, /Ada/)
+      const child = createdIds[0]
+      const rootA = runtime.messages.filter((message) => message.id?.startsWith(`msg-${child}-`)).at(-1).id
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE A', 'COLD-ANSWER-A', terminals.awaitRun)
+      const durableAtExit = await coldWorkSnapshot(directory, owner)
 
-      // No new physical child was created for the cache miss: B adopted the
-      // durable binding and drove the same child session the fork made.
-      assert.equal(forkTool.childCount(b), 0)
-      assert.equal(forkTool.child(b), first.child)
+      // This read uses a fresh writer, but the plugin runtime remains alive.
+      assert.deepEqual(await coldWorkSnapshot(directory, owner), durableAtExit)
 
-      const works = forkTool.workSnapshot(b, owner)
+      // A live resume addresses the same child without creating a replacement.
+      await resumeCall(hooks, owner, 'Ada', 'COLD-B')
+      assert.equal(createdIds.length, 1)
+      assert.equal(createdIds[0], child)
+
+      const works = await coldWorkSnapshot(directory, owner)
       assert.equal(works.length, 2)
-      assert.equal(works.find(work => work.root === first.root).lifecycle, 'CompletedAwaitingJoin')
-      const second = works.find(work => work.lifecycle === 'Active')
-      assert.equal(second.handle, first.handle)
-      assert.equal(second.child, first.child)
-      assert.equal(second.byname, first.byname)
-      assert.notEqual(second.root, first.root)
+      assert.equal(works.find((work) => work.root === rootA).lifecycle, 'CompletedAwaitingJoin')
+      const second = works.find((work) => work.lifecycle === 'Active')
+      assert.equal(second.handle, durableAtExit[0].handle)
+      assert.equal(second.child, durableAtExit[0].child)
+      assert.equal(second.byname, durableAtExit[0].byname)
+      assert.notEqual(second.root, rootA)
 
       // An unknown byname is a typed refusal, never a silent new person.
-      const unknown = await forkTool.executeManagerResume(b, toolModule, owner, '', 'Nobody', 'COLD-X')
+      const unknown = await resumeCall(hooks, owner, 'Nobody', 'COLD-X')
+      assert.match(unknown, /ok = false/)
       assert.doesNotMatch(unknown, /Nobody/)
-      assert.equal(forkTool.childCount(b), 0)
-      assert.deepEqual(forkTool.workSnapshot(b, owner), works)
+      assert.equal(createdIds.length, 1)
+      assert.deepEqual(await coldWorkSnapshot(directory, owner), works)
 
-      assert.equal(await forkTool.settle(b, owner, 'COLD-ANSWER-B', 'provider-b'), true)
+      await childTurn(hooks, runtime, child, `run-${child}-2`, 'PROSE B', 'COLD-ANSWER-B', terminals.awaitRun)
     } finally {
-      await forkTool.disposeRuntime(b)
+      terminals.dispose()
     }
-  } finally {
-    rmSync(directory, { recursive: true, force: true })
-  }
+  })
+})
+
+test('WHAT[managed-session-lifecycle-015] fresh runtime adopts the exact durable handle and physical child after the original runtime closes (GAP-133)', async () => {
+  const owner = 'scope-fresh-runtime-rebind'
+  await withRestartablePlugin(async (start, directory, shared) => {
+    const firstHooks = await start()
+    let first
+    let durableAtExit
+    await shared.withRuntime(async journal => {
+      const runtime = { ...shared, ...journal }
+      await acceptAuthorityRoot(runtime, owner, 'manager')
+      await openIncumbency(runtime, owner)
+      await withForkHost(firstHooks, runtime, owner, async () => {
+        assert.match(await forkCall(firstHooks, owner, 'Ada', 'COLD-A', 'fresh-fork'), /Ada/)
+        first = (await coldWorkSnapshot(directory, owner))[0]
+        const terminals = await observeTerminals(runtime)
+        try {
+          await childTurn(firstHooks, runtime, first.child, 'fresh-provider-a', 'PROSE A', 'COLD-ANSWER-A', terminals.awaitRun)
+        } finally { terminals.dispose() }
+        durableAtExit = await coldWorkSnapshot(directory, owner)
+      })
+    })
+    await shared.stop(firstHooks)
+    assert.deepEqual(await coldWorkSnapshot(directory, owner), durableAtExit)
+    const createdBeforeRestart = shared.createdIds.length
+    const secondHooks = await start()
+    assert.notEqual(secondHooks, firstHooks, 'the first plugin is disposed before a new incarnation starts')
+    await shared.withRuntime(async journal => {
+      const runtime = { ...shared, ...journal }
+      await withForkHost(secondHooks, runtime, owner, async () => {
+        assert.match(await resumeCall(secondHooks, owner, 'Ada', 'COLD-B', 'fresh-resume'), /Ada/)
+        assert.equal(shared.createdIds.length, createdBeforeRestart, 'restart adopts the durable physical child')
+        const works = await coldWorkSnapshot(directory, owner)
+        assert.equal(works.length, 2)
+        assert.equal(works.find(work => work.root === first.root).lifecycle, 'CompletedAwaitingJoin')
+        const second = works.find(work => work.lifecycle === 'Active')
+        for (const key of ['handle', 'child', 'byname', 'targetAgent', 'role']) assert.equal(second[key], first[key])
+        assert.notEqual(second.root, first.root)
+        const unknown = await resumeCall(secondHooks, owner, 'Nobody', 'COLD-X', 'fresh-unknown')
+        assert.match(unknown, /ok = false/)
+        assert.doesNotMatch(unknown, /Nobody/)
+        assert.equal(shared.createdIds.length, createdBeforeRestart)
+        assert.deepEqual(await coldWorkSnapshot(directory, owner), works)
+        const terminals = await observeTerminals(runtime)
+        try {
+          await childTurn(secondHooks, runtime, first.child, 'fresh-provider-b', 'PROSE B', 'COLD-ANSWER-B', terminals.awaitRun)
+        } finally { terminals.dispose() }
+      })
+    })
+    await shared.stop(secondHooks)
+  })
 })

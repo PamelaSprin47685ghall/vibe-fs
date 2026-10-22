@@ -7,7 +7,6 @@ open Wanxiangshu.Persistence.EventStore
 /// directory exists.
 module CasebookFeature =
 
-    val MarkerDirectory: string
     val isEnabled: workspaceRoot: string -> bool
 
 /// CASE-003/004/005 / KR-004/005/015: Casebook workflow.
@@ -19,7 +18,6 @@ module CasebookWorkflow =
         store: IEventStore -> capacity: int -> identityOrSessionId: string -> Task<Result<Case option, string>>
 
     val fetchCaseByIdentity: store: IEventStore -> identity: string -> Task<Result<Case option, string>>
-    val checkFreshness: stored: Case -> replayed: Observation list -> ReplayResult
 
     val needsRefresh:
         store: IEventStore -> capacity: int -> sessionId: string -> root: string -> Task<Result<bool, string>>

@@ -57,29 +57,18 @@ module Surface =
         | InquiryStatus.Failed _ -> "failed"
         | InquiryStatus.Cancelled _ -> "cancelled"
 
-    let workSpecIdOf (spec: WorkSpec) : WorkId = spec.Id
 
-    let workSpecAttemptOf (spec: WorkSpec) : Attempt = spec.Attempt
 
-    let workSpecFenceOf (spec: WorkSpec) : Fence = spec.Fence
 
-    let workSpecDependenciesOf (spec: WorkSpec) : Set<WorkId> = spec.Dependencies
 
-    let workSpecReservedOf (spec: WorkSpec) : Map<string, float> = spec.Reserved
 
-    let workItemSpecOf (item: WorkItem) : WorkSpec = item.Spec
 
-    let workItemStateOf (item: WorkItem) : WorkState = item.State
 
-    let workItemStateName (item: WorkItem) : string = Work.stateName item.State
 
     let stateGoalOf (state: InquiryState) : GoalSpec = state.Goal
 
-    let stateWorkOf (state: InquiryState) : Map<WorkId, WorkItem> = state.Work
 
-    let stateStatusOf (state: InquiryState) : InquiryStatus = state.Status
 
-    let stateRevisionOf (state: InquiryState) : Revision = state.Revision
 
     /// Reads the first work item in the ready set, if any.
     let firstReadyWork (state: InquiryState) : WorkItem option =
@@ -123,33 +112,20 @@ module Surface =
     // the API is reached by, so a malformed id is caught by the same validator the
     // production path uses.
 
-    let inquiryIdCreate (value: string) : InquiryId = InquiryId.create value
 
     let goalIdCreate (value: string) : GoalId = GoalId.create value
 
-    let planIdCreate (value: string) : PlanId = PlanId.create value
 
-    let workIdCreate (value: string) : WorkId = WorkId.create value
 
-    let roundIdCreate (value: string) : RoundId = RoundId.create value
 
-    let nodeIdCreate (value: string) : NodeId = NodeId.create value
 
-    let certificateIdCreate (value: string) : CertificateId = CertificateId.create value
 
-    let eventIdCreate (value: string) : EventId = EventId.create value
 
-    let observationIdCreate (value: string) : ObservationId = ObservationId.create value
 
-    let attemptIdCreate (value: string) : AttemptId = AttemptId.create value
 
-    let fenceCreate (value: string) : Fence = Fence.create value
 
-    let workIdValue (id: WorkId) : string = WorkId.value id
 
-    let nodeIdValue (id: NodeId) : string = NodeId.value id
 
-    let workIdTryCreate (value: string) : Result<WorkId, string> = WorkId.tryCreate value
 
     // --- Union constructors ---------------------------------------------------
     // Fable emits discriminated unions as `tag` plus `fields`, and the gate on test
@@ -256,29 +232,20 @@ module Surface =
         : Result<GoalSpec, GoalError> =
         Goal.tryAmend authorizedBy addedConstraints replacementText goal
 
-    let goalTryCreate (goal: GoalSpec) : Result<GoalSpec, GoalError> = Goal.tryCreate goal
 
-    let revisionOrigin: Revision = Revision.origin
 
-    let revisionNext (revision: Revision) : Revision = Revision.next revision
 
     let revisionValue (revision: Revision) : int64 = Revision.value revision
 
     let revisionTryCreate (value: int64) : Result<Revision, string> = Revision.tryCreate value
 
-    let attemptFirst: Attempt = Attempt.first
 
-    let attemptValue (attempt: Attempt) : int64 = Attempt.value attempt
 
-    let attemptTryCreate (value: int64) : Result<Attempt, string> = Attempt.tryCreate value
 
     let workStateName (state: WorkState) : string = Work.stateName state
 
-    let workValidateSpec (spec: WorkSpec) : Result<unit, WorkError> = Work.validateSpec spec
 
-    let workIsTerminal (state: WorkState) : bool = Work.isTerminal state
 
-    let budgetValidateSpecs (specs: ResourceSpec list) : Result<unit, BudgetError> = Budget.validateSpecs specs
 
     let budgetSignedFree
         (specs: ResourceSpec list)
@@ -318,9 +285,7 @@ module Surface =
     let certificateValidateGuarantee (guarantee: CertificateGuarantee) : Result<unit, CertificateError> =
         Certificate.validateGuarantee guarantee
 
-    let certificateValidateSlot (slot: CertificateSlot) : Result<unit, CertificateError> = Certificate.validateSlot slot
 
-    let graphRoleName (role: GraphRole) : string = GraphRole.name role
 
     /// A minimal state for one inquiry, built the way the fold builds it. This lets a
     /// caller exercise the state machine without hand-assembling an event.
@@ -357,20 +322,15 @@ module Surface =
 
         Reducer.apply None event
 
-    let reducerFold (events: InquiryEvent list) : Result<InquiryState, CoreError> = Reducer.fold events
 
-    let reducerFoldBatch (events: InquiryEvent list) : Result<InquiryState, CoreError> = Reducer.foldBatch events
 
     let reducerApply (state: InquiryState option) (event: InquiryEvent) : Result<InquiryState, CoreError> =
         Reducer.apply state event
 
-    let projectionSemanticProjection (state: InquiryState) : SemanticProjection = Projection.semanticProjection state
 
     let projectionSemanticHash (state: InquiryState) : string = Projection.semanticHash state
 
-    let projectionStateHash (state: InquiryState) : string = Projection.stateHash state
 
-    let projectionTraceHash (envelopes: string list) : string = Projection.traceHash envelopes
 
     let stateCertificateKey
         (targetRef: string)
@@ -380,17 +340,6 @@ module Surface =
         : string =
         InquiryState.certificateKey targetRef valueSpaceId scopeId semanticsModelRef
 
-    let stateReservationKey (key: ReservationKey) : string = InquiryState.reservationKey key
 
     let stateCommandRevision (state: InquiryState) (commandId: string) : Revision option =
         InquiryState.commandRevision state commandId
-
-    let stateIsTerminal (status: InquiryStatus) : bool = InquiryState.isTerminal status
-
-    let stateReadyWork (state: InquiryState) : WorkItem list = InquiryState.readyWork state
-
-    let eventTransitionType: string = SphinxV2EventTypes.transition
-
-    let eventAllTypes: string list = SphinxV2EventTypes.all
-
-    let eventIsKnown (eventType: string) : bool = SphinxV2EventTypes.isKnown eventType

@@ -41,6 +41,8 @@ module PrefixEpochProjection =
 
     val isTenureReanchored: incumbencyId: string -> state: ActivePrefixEpoch -> bool
 
+    /// HOST-006: the newest observed compaction not yet reanchored, as a proposed
+    /// line. Proposing never changes the projection (wanxiangli/prefix).
     val proposeCompaction:
         observed: ProviderRunIdentity list -> state: ActivePrefixEpoch -> PrefixReanchorCandidate option
 

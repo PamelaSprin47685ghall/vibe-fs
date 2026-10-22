@@ -28,14 +28,6 @@ module JsSandbox =
           ResetDeadline: int64 -> unit
           ParkState: ParkState }
 
-    /// Sentinel family recognized by the wrapper (JS-019: prefix, never
-    /// exception-message sniffing). `__jsAbandoned` is the ABANDONED protocol
-    /// sentinel: rejecting the program promise with it unwinds the stack from
-    /// the await point so native try/finally runs (PLAN S2 step 6 / algorithm F).
-    val abandonedSentinel: string
-
-    val wrapProgram: baseClassSource: string -> modelSource: string -> string
-
     val runSurface:
         baseClassSource: string ->
         modelSource: string ->
@@ -56,10 +48,6 @@ module JsSandbox =
             Task<JsRunHandle>
 
     val awaitResult: handle: JsRunHandle -> outputBoundBytes: int -> Task<Result<string, JsFailure>>
-
-    /// Classify an already-awaited wrapper JSON string (sentinel prefixes and
-    /// output bound) without awaiting the program promise again.
-    val classifyResult: json: string -> outputBoundBytes: int -> Result<string, JsFailure>
 
     val resetDeadline: handle: JsRunHandle -> deadlineEpochMs: int64 -> unit
 

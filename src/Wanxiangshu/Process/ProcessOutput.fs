@@ -16,6 +16,7 @@ module ProcessOutput =
           mutable Spool: Spool.StreamingSpool option
           mutable BytesObserved: int64
           mutable Discarded: bool
+          mutable Finished: CapturedOutput option
           OutputLimit: int64 }
 
     let createWithOutputLimit (outputLimit: int64) : OutputCollector =
@@ -25,6 +26,7 @@ module ProcessOutput =
           Spool = None
           BytesObserved = 0L
           Discarded = false
+          Finished = None
           OutputLimit = outputLimit }
 
     let create (estimate: ProcessEstimate) : OutputCollector =
@@ -67,7 +69,12 @@ module ProcessOutput =
         | None -> appendNewMemory collector target bytes
 
     let private addChunk (collector: OutputCollector) (target: List<byte[]>) (bytes: byte[]) =
-        if not collector.Discarded && not (isNull bytes) && bytes.Length > 0 then
+        if
+            not collector.Discarded
+            && collector.Finished.IsNone
+            && not (isNull bytes)
+            && bytes.Length > 0
+        then
             collector.BytesObserved <- collector.BytesObserved + int64 bytes.Length
             appendInMemory collector target bytes
 
@@ -86,7 +93,7 @@ module ProcessOutput =
     let decodeText (bytes: byte array) : string =
         emitJsExpr bytes "new TextDecoder('utf-8', { ignoreBOM: true }).decode($0)"
 
-    let buildResult (collector: OutputCollector) : CapturedOutput =
+    let private captureResult (collector: OutputCollector) : CapturedOutput =
         match collector.Spool with
         | Some active -> CapturedOutput.Spooled(active.Path, active.BytesWritten, Spool.chunkCount active.BytesWritten)
         | None ->
@@ -96,3 +103,11 @@ module ProcessOutput =
             let stderrText = decodeText stderrBytes
 
             CapturedOutput.InMemory(stdoutText, stderrText)
+
+    let buildResult (collector: OutputCollector) : CapturedOutput =
+        match collector.Finished with
+        | Some output -> output
+        | None ->
+            let output = captureResult collector
+            collector.Finished <- Some output
+            output

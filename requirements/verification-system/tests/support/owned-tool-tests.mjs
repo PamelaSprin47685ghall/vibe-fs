@@ -60,10 +60,220 @@ async function captureTool(executable, argv, options) {
   const owner = spawnOwnedVerificationTool(executable, argv, options)
   let stdout = ''
   let stderr = ''
+  let terminalRecord
   owner.child.stdout.setEncoding('utf8').on('data', chunk => { stdout += chunk })
   owner.child.stderr.setEncoding('utf8').on('data', chunk => { stderr += chunk })
+  owner.child.on('message', message => {
+    if (message?.type === 'verification-tool-terminal') terminalRecord = message
+  })
   const outcome = await owner.completed
-  return { ...outcome, stdout, stderr, monitorPid: owner.child.pid }
+  return { ...outcome, stdout, stderr, monitorPid: owner.child.pid, terminalRecord }
+}
+
+function hasDeadlineFailure(error, deadline) {
+  if (!error || typeof error !== 'object') return false
+  return error.code === 'verification-tool-deadline-exceeded' && error.deadline === deadline ||
+    hasDeadlineFailure(error.cause, deadline) ||
+    Array.isArray(error.errors) && error.errors.some(value => hasDeadlineFailure(value, deadline))
+}
+
+function registerToolDeadlineTests() {
+  test('WHAT[verification-system-006] an invalid or expired absolute tool deadline rejects before any native spawn', () => {
+    const originalSpawn = ChildProcess.prototype.spawn
+    let spawns = 0
+    ChildProcess.prototype.spawn = function (...args) {
+      spawns += 1
+      return Reflect.apply(originalSpawn, this, args)
+    }
+    try {
+      for (const deadline of [NaN, Infinity, 1.5, '1', Number.MAX_SAFE_INTEGER + 1]) {
+        assert.throws(() => spawnOwnedVerificationTool(process.execPath, ['-e', 'process.exit(0)'], {
+          cwd: process.cwd(), env: process.env, deadline,
+        }), TypeError)
+      }
+      const deadline = Date.now() - 1
+      assert.throws(() => spawnOwnedVerificationTool(process.execPath, ['-e', 'process.exit(0)'], {
+        cwd: process.cwd(), env: process.env, deadline,
+      }), error => hasDeadlineFailure(error, deadline))
+      assert.equal(spawns, 0, 'Neither the monitor nor the selected executable can start after preflight rejection')
+    } finally {
+      ChildProcess.prototype.spawn = originalSpawn
+    }
+  })
+
+  test('WHAT[verification-system-006] only the validated deadline option reaches the monitor and never the selected tool environment', async () => {
+    for (const deadline of [undefined, Date.now() + 3000]) {
+      const outcome = await captureTool(process.execPath, ['-e', "console.log(JSON.stringify(process.env.WXS_VERIFICATION_TOOL_DEADLINE_MS ?? null))"], {
+        cwd: process.cwd(), env: { ...process.env, WXS_VERIFICATION_TOOL_DEADLINE_MS: '-1' }, deadline,
+      })
+      assert.equal(outcome.failure, null)
+      assert.equal(outcome.exitCode, 0)
+      assert.equal(JSON.parse(outcome.stdout), null)
+    }
+  })
+
+  test('WHAT[verification-system-006] the actual monitor rejects a deadline consumed by its own startup before selected spawn', {
+    skip: process.platform !== 'linux' && process.platform !== 'darwin',
+  }, async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'owned-tool-start-deadline-'))
+    const monitorMarker = path.join(directory, 'monitor.json')
+    const selectedMarker = path.join(directory, 'selected')
+    const preload = path.join(directory, 'startup-delay.mjs')
+    try {
+      fs.writeFileSync(preload, `import fs from 'node:fs'
+fs.writeFileSync(${JSON.stringify(monitorMarker)}, JSON.stringify({ pid: process.pid }))
+const remaining = Number(process.env.WXS_VERIFICATION_TOOL_DEADLINE_MS) - Date.now() + 25
+if (remaining > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, remaining)
+`)
+      const deadline = Date.now() + 200
+      const outcome = await captureTool(process.execPath, ['-e', `require('node:fs').writeFileSync(${JSON.stringify(selectedMarker)}, 'selected ran')`], {
+        cwd: directory, env: { ...process.env, NODE_OPTIONS: `--import=${preload}` }, deadline,
+      })
+      assert.equal(JSON.parse(fs.readFileSync(monitorMarker, 'utf8')).pid, outcome.monitorPid)
+      assert.equal(fs.existsSync(selectedMarker), false)
+      assert.equal(outcome.exitCode, null)
+      assert.equal(outcome.signal, null)
+      assert.ok(hasDeadlineFailure(outcome.failure, deadline))
+      assert.ok(outcome.terminalRecord.failures.some(error => hasDeadlineFailure(error, deadline)), 'The actual monitor independently rejects the elapsed deadline')
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test('WHAT[verification-system-006] a real exit zero cannot succeed after its actual group drain crosses the fixed deadline', {
+    skip: process.platform !== 'linux' && process.platform !== 'darwin',
+  }, async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'owned-tool-drain-deadline-'))
+    const selectedMarker = path.join(directory, 'selected.json')
+    const cleanupMarker = path.join(directory, 'cleanup.json')
+    const preload = path.join(directory, 'drain-delay.mjs')
+    try {
+      fs.writeFileSync(preload, `import fs from 'node:fs'
+import childProcess from 'node:child_process'
+import { syncBuiltinESMExports } from 'node:module'
+const nativeExec = childProcess.execFileSync
+childProcess.execFileSync = function (executable, argv, options) {
+  if (executable !== '/bin/ps' || argv.join(' ') !== '-eo pid=,pgid=,stat=') return Reflect.apply(nativeExec, this, [executable, argv, options])
+  const startedAt = Date.now()
+  const remaining = Number(process.env.WXS_VERIFICATION_TOOL_DEADLINE_MS) - Date.now() + 25
+  if (remaining > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, remaining)
+  const result = Reflect.apply(nativeExec, this, [executable, argv, options])
+  fs.writeFileSync(${JSON.stringify(cleanupMarker)}, JSON.stringify({ startedAt, finishedAt: Date.now() }))
+  return result
+}
+syncBuiltinESMExports()
+`)
+      const deadline = Date.now() + 500
+      const outcome = await captureTool(process.execPath, ['-e', `require('node:fs').writeFileSync(${JSON.stringify(selectedMarker)}, JSON.stringify({ at: Date.now(), pid: process.pid }))
+process.exit(0)`], {
+        cwd: directory, env: { ...process.env, NODE_OPTIONS: `--import=${preload}` }, deadline,
+      })
+      const selected = JSON.parse(fs.readFileSync(selectedMarker, 'utf8'))
+      const cleanup = JSON.parse(fs.readFileSync(cleanupMarker, 'utf8'))
+      assert.ok(selected.at < deadline, 'The actual selected process exits successfully before the execution deadline')
+      assert.ok(cleanup.startedAt < deadline)
+      assert.ok(cleanup.finishedAt >= deadline)
+      assert.equal(outcome.exitCode, 0, 'The truthful selected exit is retained alongside its deadline failure')
+      assert.equal(outcome.signal, null)
+      assert.ok(hasDeadlineFailure(outcome.failure, deadline))
+      assert.ok(outcome.terminalRecord.failures.some(error => hasDeadlineFailure(error, deadline)), 'A blocked timer cannot turn a late drain into a monitor success')
+      assert.deepEqual(liveProcessRows().filter(row => row.pgid === selected.pid || row.pgid === outcome.monitorPid), [])
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test('WHAT[verification-system-006] the fixed tool deadline reclaims a real hanging process group before return and preserves an unrelated group', {
+    skip: process.platform !== 'linux' && process.platform !== 'darwin',
+  }, async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'owned-tool-hang-deadline-'))
+    const selectedMarker = path.join(directory, 'selected.json')
+    const identities = []
+    let owner
+    let foreign
+    let foreignClosed
+    let failure
+    try {
+      foreign = spawn(process.execPath, ['--input-type=module', '-e', `import fs from 'node:fs'
+fs.watch(${JSON.stringify(directory)}, () => {})`], {
+        detached: true, stdio: 'ignore',
+      })
+      foreignClosed = new Promise((resolve, reject) => {
+        foreign.once('close', (code, signal) => resolve({ code, signal }))
+        foreign.once('error', reject)
+      })
+      foreignClosed.catch(() => {})
+      await new Promise((resolve, reject) => {
+        foreign.once('spawn', resolve)
+        foreign.once('error', reject)
+      })
+      const foreignRow = liveProcessRows().find(row => row.pid === foreign.pid)
+      assert.ok(foreignRow)
+      assert.equal(foreignRow.pgid, foreign.pid)
+      identities.push(foreignRow)
+
+      const descendant = `import fs from 'node:fs'\nfs.watch(${JSON.stringify(directory)}, () => {})\nconsole.log('descendant-ready')`
+      const program = `import fs from 'node:fs'
+import { spawn } from 'node:child_process'
+const child = spawn(process.execPath, ['--input-type=module', '-e', ${JSON.stringify(descendant)}], { stdio: ['ignore', 'pipe', 'inherit'] })
+child.stdout.once('data', () => {
+  fs.writeFileSync(${JSON.stringify(`${selectedMarker}.tmp`)}, JSON.stringify({ pid: process.pid, childPid: child.pid, monitorPid: process.ppid }))
+  fs.renameSync(${JSON.stringify(`${selectedMarker}.tmp`)}, ${JSON.stringify(selectedMarker)})
+})
+`
+      const deadline = Date.now() + 2000
+      owner = spawnOwnedVerificationTool(process.execPath, ['--input-type=module', '-e', program], {
+        cwd: directory, env: process.env, deadline,
+      })
+      owner.child.stdout.resume()
+      owner.child.stderr.resume()
+      const selected = awaitMarker(selectedMarker)
+      const rows = liveProcessRows()
+      const tool = rows.find(row => row.pid === selected.pid && row.parentPid === selected.monitorPid)
+      const child = rows.find(row => row.pid === selected.childPid && row.parentPid === selected.pid)
+      const monitor = rows.find(row => row.pid === selected.monitorPid && row.parentPid === process.pid)
+      assert.ok(tool)
+      assert.ok(child)
+      assert.ok(monitor)
+      assert.equal(monitor.pid, owner.child.pid)
+      assert.equal(monitor.pgid, monitor.pid)
+      assert.equal(tool.pgid, tool.pid)
+      assert.equal(child.pgid, tool.pgid)
+      assert.notEqual(foreignRow.pgid, tool.pgid)
+      identities.push(tool, child, monitor)
+      assert.ok(Date.now() < deadline, 'The actual hanging tool and descendant exist before the fixed deadline')
+
+      const outcome = await owner.completed
+      assert.ok(hasDeadlineFailure(outcome.failure, deadline))
+      assert.equal(outcome.exitCode, null)
+      assert.equal(outcome.signal, 'SIGKILL')
+      const remaining = liveProcessRows()
+      assert.deepEqual(remaining.filter(row => row.pgid === tool.pgid || row.pgid === monitor.pgid), [], 'Actual tool and monitor groups are empty when completion becomes visible')
+      assert.ok(remaining.some(row => row.pid === foreign.pid && row.pgid === foreignRow.pgid), 'Deadline cleanup cannot terminate the unrelated actual group')
+    } catch (error) {
+      failure = error
+    } finally {
+      const cleanupErrors = []
+      try {
+        if (owner) {
+          owner.stop()
+          await owner.completed
+        }
+      } catch (error) { cleanupErrors.push(error) }
+      try {
+        if (foreign && foreign.exitCode === null && foreign.signalCode === null) foreign.kill('SIGKILL')
+        await reclaimObservedProcesses(identities)
+        if (foreignClosed) await foreignClosed
+      } catch (error) { cleanupErrors.push(error) }
+      try { fs.rmSync(directory, { recursive: true, force: true }) }
+      catch (error) { cleanupErrors.push(error) }
+      if (failure) {
+        if (cleanupErrors.length > 0) throw new AggregateError([failure, ...cleanupErrors], 'Tool deadline assertion and final cleanup failed', { cause: failure })
+        throw failure
+      }
+      if (cleanupErrors.length > 0) throw new AggregateError(cleanupErrors, 'Tool deadline final cleanup failed', { cause: cleanupErrors[0] })
+    }
+  })
 }
 
 function registerProbeSetupFailureTest(failCleanup) {
@@ -229,6 +439,7 @@ syncBuiltinESMExports()
 
 export function registerOwnedToolTests() {
   for (const failCleanup of [false, true]) registerProbeSetupFailureTest(failCleanup)
+  registerToolDeadlineTests()
   test('WHAT[verification-system-006] owned tool monitoring preserves actual terminals and rejects missing control evidence', {
     skip: process.platform !== 'linux' && process.platform !== 'darwin',
   }, async t => {

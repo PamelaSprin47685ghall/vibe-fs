@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Mission.Work.OpenCode
+open Wanxiangshu.Mission.Work
 
 module PluginTransformSurface =
     let ordinaryEffects () : Task<string array> =
@@ -41,7 +42,12 @@ module PluginTransformSurface =
                   FreezeProviderAttemptPlan = fun _ _ -> complete "freeze-plan"
                   InjectPairGuideline = fun _ _ _ -> complete "pair"
                   SettleAndReplaceDeferredInspections = fun _ _ -> complete "deferred"
-                  SanitizeMessages = fun _ -> record "sanitize" }
+                  SanitizeMessages = fun _ -> record "sanitize"
+                  AdjudicateDelivery =
+                    fun _ _ ->
+                        record "adjudicate-delivery"
+                        Task.FromResult PluginTransforms.DeliveryAdjudication.ContinueDelivery
+                  StopAfterDelivery = fun _ _ _ _ -> complete "stop-after-delivery" }
 
             do!
                 PluginTransforms.normalTransform

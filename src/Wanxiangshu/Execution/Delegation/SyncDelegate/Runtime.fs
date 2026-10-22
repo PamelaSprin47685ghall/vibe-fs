@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
@@ -38,7 +39,9 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Execution.Routing
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Repository.Programming.Js
 
 module HostForkProse =
@@ -90,37 +93,201 @@ module internal SyncDelegateInternals =
               PhysicalUserMessageId = turn.PhysicalUserMessageId
               AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
               ProviderRun = turn.ProviderRun
-              FormalText = delivered }
+              View = delivered
+              TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
         for invocation in call.Invocations do
             invocation.CaptureResponse |> Option.iter (fun capture -> capture response)
 
+    /// D2: the durable delivery witness of this turn, read through the fence
+    /// subset reader. The witness is the settlement of record: it carries the
+    /// materialized view and survives the process-live cell, so a delivery
+    /// that was already consumed (or that happened in another process) is
+    /// still provable.
+    ///
+    /// Exact provider evidence and an independently observed later step both
+    /// use the work's whole material set. Differing material is ambiguous.
+    let private workDeliveryWitness
+        providerStepIdentity
+        (durable: AgentJournal)
+        (call: SyncDelegateCall)
+        (turn: ReconciledTurn)
+        =
+        providerStepIdentity turn.ProviderRun
+        |> Option.filter (fun (sessionId, physical) ->
+            sessionId = turn.SessionId
+            && physical = turn.PhysicalUserMessageId
+            && call.Acceptance.Owns physical
+            && call.AcceptedAuthorityRoot = Some turn.AuthorityRootUserMessageId)
+        |> Option.bind (fun (_, physical) ->
+            let projections = (AgentJournal.snapshot durable).AgentProjections
+
+            let key: ChatExecutionKey =
+                { SessionId = turn.SessionId
+                  PhysicalUserMessageId = physical }
+
+            ChatExecutionProjection.byKey key projections.ChatExecutions
+            |> Option.map _.acceptedEvidence
+            |> Option.filter (fun accepted ->
+                accepted.AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                && (PromptAuthorityProjectionQueries.activeProfile turn.SessionId projections
+                    |> Option.exists (fun active -> active.LogicalRunId = accepted.LogicalRunId)))
+            |> Option.bind (fun accepted ->
+                TaskDeliveryJournal.tryFindForWork
+                    durable
+                    turn.SessionId
+                    accepted.LogicalRunId
+                    accepted.AuthorityRootUserMessageId
+                    physical
+                    None))
+
+    let private durableWitness providerStepIdentity journal call (turn: ReconciledTurn) =
+        match journal with
+        | None -> None
+        | Some durable ->
+            TaskDeliveryJournal.tryFindByFenceFields
+                durable
+                turn.SessionId
+                turn.ProviderRun
+                None
+                (Some turn.AuthorityRootUserMessageId)
+                (Some turn.PhysicalUserMessageId)
+                None
+                None
+            |> Option.bind (fun witness ->
+                TaskDeliveryJournal.tryFindForWork
+                    durable
+                    turn.SessionId
+                    witness.Fence.LogicalRunId
+                    witness.Fence.AuthorityRoot
+                    witness.Fence.PhysicalUserMessageId
+                    None
+                |> Option.map (fun _ -> witness))
+            |> Option.orElseWith (fun () -> workDeliveryWitness providerStepIdentity durable call turn)
+
+    let private consumeWitnessCache (witness: TaskDeliveryWitness) =
+        let sessionId = SessionId.value witness.Fence.SessionId
+
+        if JsDeliveredValues.peek sessionId = box witness.View then
+            JsDeliveredValues.tryTakeRenderedForCall
+                sessionId
+                witness.Fence.ProviderRun
+                witness.Fence.ToolCallId
+                (Some witness.FormalText)
+            |> ignore
+
+    /// D2: consume the delivery of this turn and settle the call with it.
+    /// `None` means no delivery was found: the obligation is still owed.
+    ///
+    /// The durable witness is consumed first: it is the settlement of record
+    /// and it carries the materialized view directly. The process-live cell
+    /// is the fallback for the journal-less path, where the delivery was
+    /// recorded in the cell and no durable witness exists.
+    ///
+    /// That fallback takes the cell only under its own complete identity:
+    /// the cell of this child session whose provider run is this turn's run,
+    /// matched on the whole fence. The child's deliver call id is NOT
+    /// guessed from the parent's tool-call sequence — that sequence is the
+    /// parent's, and the delivery is the child's. A cell that does not carry
+    /// this turn's run is not taken at all.
+    let private fencedRenderedView (turn: ReconciledTurn) (assistant: string) =
+        match JsDeliveredValues.peekFence (SessionId.value turn.SessionId) with
+        | Some fence when fence.ProviderRun = turn.ProviderRun ->
+            let prose =
+                Option.ofObj assistant
+                |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
+
+            let consume () =
+                JsDeliveredValues.tryTakeRenderedForCall
+                    (SessionId.value turn.SessionId)
+                    turn.ProviderRun
+                    fence.ToolCallId
+                    prose
+                |> ignore
+
+            JsDeliveredValues.tryPeekRenderedWith (SessionId.value turn.SessionId) prose
+            |> Option.map (fun view -> view, consume)
+        | _ -> None
+
+    let private settleExactCall
+        (noteDelegateIfRole: SyncDelegateCall -> SessionId -> string -> unit)
+        (store: SyncDelegateCallStore)
+        (call: SyncDelegateCall)
+        (turn: ReconciledTurn)
+        (record: string)
+        (consume: unit -> unit)
+        : unit =
+        match store.TryPopExactCall call with
+        | Some exact ->
+            consume ()
+            captureResponse exact turn record
+            noteDelegateIfRole exact turn.SessionId record
+            AsyncSupport.trySetResult exact.Answer (Ok record) |> ignore
+        | None -> ()
+
+    let private settleDeliveredFromParts
+        providerStepIdentity
+        (journal: AgentJournal option)
+        (noteDelegateIfRole: SyncDelegateCall -> SessionId -> string -> unit)
+        (store: SyncDelegateCallStore)
+        (call: SyncDelegateCall)
+        (turn: ReconciledTurn)
+        : string option =
+        let assistant = CompletedTurnClassifier.partsText turn.Parts
+
+        let resolved =
+            if
+                turn.Outcome <> ReconcileProgram.TurnCompleted
+                || System.String.IsNullOrWhiteSpace assistant
+            then
+                None
+            else
+                durableWitness providerStepIdentity journal call turn
+                |> Option.map (fun witness -> witness.View, (fun () -> consumeWitnessCache witness))
+                |> Option.orElseWith (fun () ->
+                    if journal.IsNone then
+                        fencedRenderedView turn assistant
+                    else
+                        None)
+
+        match resolved with
+        | Some(record, consume) when journal.IsSome || not (System.String.IsNullOrWhiteSpace record) ->
+            // Claim the call before settling it: a concurrent terminal cannot
+            // discharge the same work unit twice.
+            settleExactCall noteDelegateIfRole store call turn record consume
+            Some record
+        | _ -> None
+
+    /// EXEC-031 / delegation-024: the delivered view is the settlement. A turn
+    /// that completed without a fenced delivery has not discharged the
+    /// obligation: the call keeps its live seat in the store and its wait stays
+    /// open, so the delegate stays active, the unresolved obligation stays
+    /// visible, and the parent can keep waiting instead of receiving a
+    /// terminal that never happened. An undelivered completion is never a
+    /// failure — the same fact the fork side settles as "observation only"
+    /// (LC-004) is settled here as "still owed".
     let settleCompletedFromParts
+        providerStepIdentity
+        (journal: AgentJournal option)
         (noteDelegateIfRole: SyncDelegateCall -> SessionId -> string -> unit)
         (store: SyncDelegateCallStore)
         (call: SyncDelegateCall)
         (turn: ReconciledTurn)
         : bool =
-        let assistant = CompletedTurnClassifier.partsText turn.Parts
+        match settleDeliveredFromParts providerStepIdentity journal noteDelegateIfRole store call turn with
+        | Some _ -> true
+        | None ->
+            // Undelivered: observation only. The call stays live and its wait
+            // stays open — no completion, no failure, the obligation is
+            // still owed and still visible.
+            Diagnostic.emit
+                "sync-delegate-undelivered-obligation-open"
+                [ "session_id", SessionId.value turn.SessionId
+                  "role", SyncDelegate.roleLabel call.Role
+                  "result", "completed without a delivered view; the obligation stays open" ]
 
-        let resolved =
-            JsDeliveredValues.tryTakeRenderedFor
-                (SessionId.value turn.SessionId)
-                turn.ProviderRun
-                (if System.String.IsNullOrWhiteSpace assistant then
-                     None
-                 else
-                     Some assistant)
+            true
 
-        match resolved with
-        | Some record when not (System.String.IsNullOrWhiteSpace record) ->
-            captureResponse call turn record
-            noteDelegateIfRole call turn.SessionId record
-            AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
-            true
-        | _ ->
-            store.FailCall(call, "EXEC-031: Completed without a bounded delivered view")
-            true
 
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
 /// ordinary Completion → bounded delivered view). No return tool / dual-await.
@@ -146,7 +313,8 @@ type SyncDelegateRuntime
         /// Casebook draft hooks (wired from SpikePlugin → CasebookLifecycle; compile-order seam).
         ?onDelegatePrompt: string -> string -> unit,
         ?onDelegateAnswer: string -> string -> unit,
-        ?onDelegateCleanup: string -> unit
+        ?onDelegateCleanup: string -> unit,
+        ?providerStepIdentity: ProviderRunIdentity -> (SessionId * PhysicalUserMessageId) option
     ) =
     let store = SyncDelegateCallStore()
     let directory = workspaceDirectory
@@ -154,6 +322,7 @@ type SyncDelegateRuntime
     let noteDelegatePrompt = defaultArg onDelegatePrompt (fun _ _ -> ())
     let noteDelegateAnswer = defaultArg onDelegateAnswer (fun _ _ -> ())
     let cleanupDelegateDraft = defaultArg onDelegateCleanup (fun _ -> ())
+    let providerStepIdentity = defaultArg providerStepIdentity (fun _ -> None)
 
     let bindContinuationAcceptance (source: ProviderAttemptSource) =
         store.TryPeekCallByDelegate source.SessionId
@@ -185,7 +354,7 @@ type SyncDelegateRuntime
         (scope: ReuseScopeId)
         (role: SyncDelegateRole)
         (agentName: string)
-        (children: OpenCodeChildInfo list)
+        (children: ChildSessionInfo list)
         =
         let expectedTitle = SyncDelegatePhysicalIdentity.title scope role agentName
 
@@ -254,6 +423,13 @@ type SyncDelegateRuntime
     /// interrupt. A failed Host interrupt degrades to today's behaviour (the
     /// old run's next chat.params fails closed) and must not block the
     /// delegation itself.
+    ///
+    /// D5: the interrupt is issued and observed BEFORE the physical execution
+    /// is released. Releasing the lease first would let a stale attempt and
+    /// an admitted continuation exist at the same time: the old run would
+    /// still be alive while the new one was admitted against the same session.
+    /// The failure stays visible — a refused interrupt is reported, never
+    /// swallowed — but it does not fail the delegation.
     let settleInFlightDelegateExecution (sessions: ISessionHostPort) (delegateSession: SessionId) : Task<unit> =
         task {
             match ModelRouting.tryActivePhysical (sessionKey delegateSession) with
@@ -262,7 +438,11 @@ type SyncDelegateRuntime
                 let physicalId = PhysicalUserMessageId.create inFlightPhysical
 
                 ModelRouting.suppressProviderStep delegateSession physicalId
-                ModelRouting.releasePhysicalExecution delegateSession physicalId |> ignore
+
+                Diagnostic.emit
+                    "sync-delegate-interrupt-inflight-issued"
+                    [ "session_id", sessionKey delegateSession
+                      "physical_user_message_id", PhysicalUserMessageId.value physicalId ]
 
                 let! outcome = sessions.InterruptAttempt delegateSession
 
@@ -272,6 +452,11 @@ type SyncDelegateRuntime
                         "sync-delegate-interrupt-inflight-failed"
                         [ "session_id", sessionKey delegateSession; "result", reason ])
                 |> ignore
+
+                // The stale attempt is stopped (or refused) before the lease
+                // is released: the continuation is admitted against a session
+                // whose previous attempt is no longer running.
+                ModelRouting.releasePhysicalExecution delegateSession physicalId |> ignore
         }
 
     let publishObservedAdmission
@@ -465,9 +650,8 @@ type SyncDelegateRuntime
             Error reason
         | Ok _ ->
             response
-            |> Option.filter (fun terminal -> not (String.IsNullOrWhiteSpace terminal.FormalText))
             |> Option.map Ok
-            |> Option.defaultValue (Error "Completed delegation did not supply a formal response")
+            |> Option.defaultValue (Error "Completed delegation did not supply a terminal response")
 
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached
@@ -532,11 +716,31 @@ type SyncDelegateRuntime
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriterUnavailable _))
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriteUnknown _))
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.NoNewWriteReleaseFailed _)) ->
-                return SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn
+                return
+                    SyncDelegateInternals.settleCompletedFromParts
+                        providerStepIdentity
+                        (Some journal)
+                        noteDelegateIfRole
+                        store
+                        call
+                        turn
             | Error error ->
-                store.FailCall(call, sprintf "sync delegate terminal trace capture failed: %A" error)
+                // A capture that cannot be written is a real failure of this
+                // call: claim it and fail it.
+                store.TryPopExactCall call
+                |> Option.iter (fun exact ->
+                    store.FailCall(exact, sprintf "sync delegate terminal trace capture failed: %A" error))
+
                 return true
-            | Ok _ -> return SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn
+            | Ok _ ->
+                return
+                    SyncDelegateInternals.settleCompletedFromParts
+                        providerStepIdentity
+                        (Some journal)
+                        noteDelegateIfRole
+                        store
+                        call
+                        turn
         }
 
     /// Actual acceptance observers bind attempts to the concrete invocation
@@ -545,22 +749,31 @@ type SyncDelegateRuntime
         call.AcceptedAuthorityRoot = Some turn.AuthorityRootUserMessageId
         && call.Acceptance.Owns turn.PhysicalUserMessageId
 
+    /// The turn belongs to this call's work unit: the admitted authority root
+    /// and an accepted physical attempt. No store mutation — the caller decides
+    /// whether the turn settles the call or only observes it.
+    let matchesAcceptance (call: SyncDelegateCall) (turn: ReconciledTurn) : Task<bool> =
+        task {
+            let! expectedRoot = call.AdmissionRoot.Task
+
+            return expectedRoot = Some turn.AuthorityRootUserMessageId && belongsToCall call turn
+        }
+
     let popIfAcceptanceMatches
         (store: SyncDelegateCallStore)
         (turn: ReconciledTurn)
         (call: SyncDelegateCall)
         : Task<SyncDelegateCall option> =
         task {
-            let! expectedRoot = call.AdmissionRoot.Task
+            let! matches = matchesAcceptance call turn
 
-            return
-                if expectedRoot = Some turn.AuthorityRootUserMessageId && belongsToCall call turn then
-                    store.TryPopExactCall call
-                else
-                    None
+            return if matches then store.TryPopExactCall call else None
         }
 
-    let tryConsumeReadyCall (store: SyncDelegateCallStore) (turn: ReconciledTurn) : Task<SyncDelegateCall option> =
+    /// The live call this turn belongs to. The call is not claimed here: an
+    /// undelivered completion must leave it live (delegation-024), so the
+    /// settlement decides whether the call is closed.
+    let tryFindReadyCall (store: SyncDelegateCallStore) (turn: ReconciledTurn) : Task<SyncDelegateCall option> =
         let candidate =
             store.TryPeekCallByDelegate turn.SessionId
             |> Option.filter (fun call ->
@@ -568,7 +781,12 @@ type SyncDelegateRuntime
                 |> List.forall (fun invocation -> invocation.StartCursor.IsSome))
 
         match candidate with
-        | Some call -> popIfAcceptanceMatches store turn call
+        | Some call ->
+            task {
+                let! matches = matchesAcceptance call turn
+
+                return if matches then Some call else None
+            }
         | None -> Task.FromResult None
 
     let failMatchingTerminalCall (turn: ReconciledTurn) error call =
@@ -585,8 +803,47 @@ type SyncDelegateRuntime
 
     let handleCompletedRoleTurn (turn: ReconciledTurn) =
         task {
-            match! tryConsumeReadyCall store turn with
+            match! tryFindReadyCall store turn with
             | Some call -> return! handleCompletedCall turn call
+            | None -> return false
+        }
+
+    let voidInterruptedCall (turn: ReconciledTurn) (call: SyncDelegateCall) =
+        task {
+            let handles = AgentJournal.handleProjection journal call.Owner
+
+            let scoped =
+                handles.Works
+                |> Map.toList
+                |> List.filter (fun (work, _) -> work.ChildSessionId = turn.SessionId)
+
+            let fact =
+                match scoped with
+                | [] ->
+                    ExecutionFact.ChildRunVoided
+                        {| ParentSessionId = call.Owner
+                           ChildSessionId = turn.SessionId |}
+                | _ ->
+                    let work =
+                        scoped
+                        |> List.map fst
+                        |> List.tryFind (fun work -> work.AuthorityRoot = turn.AuthorityRootUserMessageId)
+                        |> Option.bind (fun work -> HandleProjection.tryAdmittedWork work handles |> Result.toOption)
+                        |> Option.defaultWith (fun () -> invalidOp "Interrupted delegate has no exact admitted work")
+
+                    ExecutionFact.ChildWorkVoided
+                        {| ParentSessionId = call.Owner
+                           Work = AdmittedWork.id work |}
+
+            match! AgentJournal.appendAgent (StreamId.Session call.Owner) None fact journal with
+            | Error failure -> return raise (JournalAppendException failure)
+            | Ok _ -> return! failMatchingTerminalCall turn "voided" call
+        }
+
+    let handleAbortedRoleTurn (turn: ReconciledTurn) =
+        task {
+            match! tryFindReadyCall store turn with
+            | Some call -> return! voidInterruptedCall turn call
             | None -> return false
         }
 
@@ -639,12 +896,6 @@ type SyncDelegateRuntime
         store.TryObservedBatch(ownerSessionId, providerRun, role, currentCall)
 
     member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) = attached.TryFind(ownerSessionId, role)
-
-    member _.TryFindDelegateOwner(delegateSessionId: SessionId) : SessionId option =
-        attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Inspector)
-        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Coder))
-        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Engineer))
-        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.DevOps))
 
     member _.TryFindForScopeClose(ownerSessionId: SessionId, role: SyncDelegateRole) =
         match attached.TryFind(ownerSessionId, role) with
@@ -750,7 +1001,7 @@ type SyncDelegateRuntime
                     None
                     prepareProviderPrompt
                     None
-                    (Some(fun terminal -> response.Value <- Some terminal.FormalText))
+                    (Some(fun terminal -> response.Value <- Some terminal))
                     (defaultArg isCancelled (fun () -> false))
                 |> singletonResult
 
@@ -758,8 +1009,8 @@ type SyncDelegateRuntime
                 result
                 |> Result.bind (fun _ ->
                     match response.Value with
-                    | Some text when not (String.IsNullOrWhiteSpace text) -> Ok text
-                    | _ -> Error "Completed delegation did not supply a formal response")
+                    | Some terminal when not (String.IsNullOrWhiteSpace terminal.TurnFormalText) -> Ok terminal.View
+                    | _ -> Error "Completed delegation did not supply an attributed terminal response")
         }
 
     member _.ValidateObservedOwner(ownerSessionId: SessionId) : Result<unit, string> =
@@ -841,12 +1092,26 @@ type SyncDelegateRuntime
             match turn.Role, turn.Outcome with
             | Some(Role.Inspector | Role.Coder | Role.Engineer | Role.DevOps), ReconcileProgram.TurnCompleted ->
                 return! handleCompletedRoleTurn turn
+            // D1: the delivery transform interrupts the delivering delegate
+            // child, so a child that already delivered ends as TurnAborted.
+            // The interruption is not a failure of the delivery: the same
+            // settlement as a completed turn is attempted, and a child that
+            // delivered nothing stays observation only.
+            | Some(Role.Inspector | Role.Coder | Role.Engineer | Role.DevOps), ReconcileProgram.TurnAborted _ ->
+                return! handleAbortedRoleTurn turn
             | Some(Role.Inspector | Role.Coder | Role.Engineer | Role.DevOps), ReconcileProgram.TurnFailed error ->
                 return! handleFailedAttemptTurn turn failure error
             | _ ->
                 // TurnInProgress and TurnNeedsContinuation remain child-local;
                 // a turn outside this call's accepted attempts is not ours.
                 return false
+        }
+
+    member _.ObserveAttemptSettlementFailure(turn: ReconciledTurn, reason: string) : Task<bool> =
+        task {
+            match! tryFindReadyCall store turn with
+            | Some call -> return! failMatchingTerminalCall turn reason call
+            | None -> return false
         }
 
     /// True once the provider-owned opening capture has assigned a bounded cursor.
@@ -866,17 +1131,28 @@ type SyncDelegateRuntime
         | Some call -> Option.map (AuthorityRootUserMessageId.value) call.AcceptedAuthorityRoot
         | None -> None
 
+    member _.OwnsAcceptedPhysical(sessionId: SessionId, physical: PhysicalUserMessageId) : bool =
+        store.TryPeekCallByDelegate sessionId
+        |> Option.exists (fun call -> call.Acceptance.Owns physical)
+
     /// delegation-031: settle a completed turn from its own parts when the terminal
     /// trace capture reports NotCommitted/Unknown. True iff a live call
     /// consumed the turn. The checkpoint stays pending-evidence; the earned
     /// completion is delivered from the turn, never dropped, never re-executed.
+    /// An undelivered turn keeps the call live (delegation-024).
     member _.SettleCompletedFromTurn(turn: ReconciledTurn) : bool =
         store.TryPeekCallByDelegate turn.SessionId
         |> Option.filter (fun call ->
             call.AcceptedAuthorityRoot = Some turn.AuthorityRootUserMessageId
             && belongsToCall call turn)
-        |> Option.bind store.TryPopExactCall
-        |> Option.map (fun call -> SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn)
+        |> Option.map (fun call ->
+            SyncDelegateInternals.settleCompletedFromParts
+                providerStepIdentity
+                (Some journal)
+                noteDelegateIfRole
+                store
+                call
+                turn)
         |> Option.defaultValue false
 
     member _.AwaitAssignmentReady(sessionId: SessionId) : Task<bool> =

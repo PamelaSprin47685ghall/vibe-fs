@@ -9,7 +9,8 @@ import { join } from 'node:path'
 import * as PtySurface from '../../../dist/Execution/Delegation/Fork/Host/HostForkPtySurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
-import * as loadRecovery from '../../../dist/OpenCode/Host/LoadRecoverySurface.js'
+import * as physicalRecovery from '../../../dist/OpenCode/Host/PhysicalRecoverySurface.js'
+import * as workJournal from '../../../dist/Execution/Delegation/Handle/JournalSurface.js'
 import { DatabaseSync } from 'node:sqlite'
 import { withAdmittedChildren, withSharedAdmittedChildren } from './support/admitted-child-work.mjs'
 import { Ownership } from 'wanxiangli/ownership'
@@ -47,19 +48,34 @@ const withRecoveryJournal = async (workspace, action) => {
   const opened = await journalSurface.JournalSurface_acquireSharedForWorkspace(workspace, process.pid, '2026-10-16T00:00:00Z')
   assert.equal(opened.ok, true, JSON.stringify(opened.error))
   const active = () => journalSurface.JournalSurface_snapshot(opened.journal).sessionProjections['devops-pty'].promptAuthority.activeLogicalRun
+  const parentActive = () => journalSurface.JournalSurface_snapshot(opened.journal).sessionProjections['manager-pty'].promptAuthority.activeLogicalRun
   try {
-    return await action(opened.journal, active)
+    return await action(opened.journal, active, parentActive)
   } finally {
     journalSurface.JournalSurface_dispose(opened.journal)
   }
 }
 
-test('WHAT[managed-session-lifecycle-025] load recovery stops admission and keeps work active without a delivery witness', { timeout: 20000 }, async () => {
+const assertVoidedWithoutCompletion = (journal, physical, childBefore, parentBefore) => {
+  const sessions = journalSurface.JournalSurface_snapshot(journal).sessionProjections
+  assert.equal(sessions['devops-pty'].promptAuthority.activeLogicalRun, null)
+  assert.deepEqual(sessions['devops-pty'].promptAuthority.lastAuthorityProfile, childBefore)
+  assert.equal(parentBefore.authorityKind, 'HumanRoot')
+  assert.deepEqual(sessions['manager-pty'].promptAuthority.activeLogicalRun, parentBefore, 'child voiding must preserve the parent HumanRoot')
+  assert.deepEqual(workJournal.snapshot(journal, 'manager-pty', 'devops', 'devops-pty', physical).record, {
+    child: 'devops-pty', lifecycle: 'Abandoned', abandonReason: 'Voided',
+    lifecycleKind: null, completionRef: null, completionDigest: null,
+  })
+}
+
+test('WHAT[managed-session-lifecycle-025] load recovery stops admission and voids unfinishable child work without a completion', { timeout: 20000 }, async () => {
   await withAdmissionWorkers('void-stops-admission', async (producer, _other, workspace) => {
-    await withRecoveryJournal(workspace, async (journal, active) => {
-      assert.ok(active())
-      await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
-      assert.ok(active(), 'resource cleanup cannot fabricate delivery')
+    await withRecoveryJournal(workspace, async (journal, active, parentActive) => {
+      const childBefore = active()
+      const parentBefore = parentActive()
+      assert.ok(childBefore)
+      await physicalRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
+      assertVoidedWithoutCompletion(journal, 'physical-void-stops-admission-devops', childBefore, parentBefore)
       assert.equal((await producer.call('open', 'late-after-void')).ok, false)
       assert.equal(await producer.call('spawns'), 0)
     })
@@ -70,15 +86,16 @@ test('WHAT[managed-session-lifecycle-025] load recovery preserves canonical work
   await withAdmissionWorkers('void-retains-pty', async (producer, _other, workspace) => {
     const opened = await producer.call('open', 'foreign-before-void')
     assert.equal(opened.ok, true, opened.error)
-    await withRecoveryJournal(workspace, async (journal, active) => {
+    await withRecoveryJournal(workspace, async (journal, active, parentActive) => {
       const before = active()
-      await assert.rejects(() => loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra')), /local process binding/)
+      const parentBefore = parentActive()
+      await assert.rejects(() => physicalRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra')), /local process binding/)
       assert.deepEqual(active(), before)
       assert.deepEqual(await producer.call('blockers'), [opened.id])
       assert.equal((await producer.call('open', 'late-before-ended')).ok, false)
       await producer.call('complete', 'foreign-before-void')
-      await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
-      assert.deepEqual(active(), before, 'an Ended PTY is not a task delivery')
+      await physicalRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
+      assertVoidedWithoutCompletion(journal, 'physical-void-retains-pty-devops', before, parentBefore)
       assert.equal((await producer.call('open', 'late-after-ended')).ok, false)
     })
   })
@@ -87,17 +104,18 @@ test('WHAT[managed-session-lifecycle-025] load recovery preserves canonical work
 for (const afterCommit of [false, true]) {
   test(`WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost ${afterCommit ? 'after' : 'before'} COMMIT`, { timeout: 20000 }, async () => {
     await withAdmissionWorkers(`void-unknown-${afterCommit}`, async (producer, _other, workspace) => {
-      await withRecoveryJournal(workspace, async (journal, active) => {
+      await withRecoveryJournal(workspace, async (journal, active, parentActive) => {
         const before = active()
+        const parentBefore = parentActive()
         await loseOwnershipCommit(DatabaseSync, 'Drain', afterCommit, () => assert.rejects(
-          () => loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra')), /Draining was not acknowledged: Unknown/,
+          () => physicalRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra')), /Draining was not acknowledged: Unknown/,
         ))
         assert.deepEqual(active(), before)
         const late = await producer.call('open', 'after-unknown-void')
         assert.equal(late.ok, !afterCommit)
         if (late.ok) await producer.call('complete', 'after-unknown-void')
-        await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
-        assert.ok(active(), 'a confirmed Drain does not complete the task')
+        await physicalRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
+        assertVoidedWithoutCompletion(journal, `physical-void-unknown-${afterCommit}-devops`, before, parentBefore)
         assert.equal((await producer.call('open', 'after-confirmed-void')).ok, false)
       })
     })
@@ -393,9 +411,11 @@ for (const runtime of ['node', 'bun']) {
           }
         }
         if (mode === 'cold-load') {
-          await withRecoveryJournal(workspace, async (journal, active) => {
-            await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
-            assert.ok(active(), 'cold recovery cannot fabricate delivery from process exit')
+          await withRecoveryJournal(workspace, async (journal, active, parentActive) => {
+            const childBefore = active()
+            const parentBefore = parentActive()
+            await physicalRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
+            assertVoidedWithoutCompletion(journal, `physical-restart-${runtime}-${mode}-devops`, childBefore, parentBefore)
           })
         } else {
           const restarted = await start()
@@ -1211,14 +1231,15 @@ test('WHAT[managed-session-lifecycle-025] fixed DevOps work return drains its PT
 })
 
 test('WHAT[managed-session-lifecycle-025] registered production terminal callback drains DevOps once and ignores a late callback after completion', async () => {
-  const scopeMod = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
-  const verify = scopeMod.verifyDevOpsReturnDrain || (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.verifyDevOpsReturnDrain)
+  const { ToolRuntimePhysicalSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js')
+  const verify = ToolRuntimePhysicalSurface.verifyDevOpsReturnDrain
   assert.equal(typeof verify, 'function', 'verifyDevOpsReturnDrain must be exported on ToolRuntimeScope surface')
 
   const res = await withAdmittedChildren('scope-devops-drain', 'manager-road-1', [
     { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
     { agentId: 'engineer-1', sessionId: 'engineer-session-1', role: 'engineer' },
-  ], (journal, _profiles, _directory, _reopen, owner) => verify(journal, {
+  ], (journal, _profiles, directory, _reopen, owner) => verify(journal, {
+    workspace: directory,
     managerSessionId: 'manager-road-1',
     devopsChildSessionId: 'devops-session-1',
     engineerChildSessionId: 'engineer-session-1',
@@ -1249,11 +1270,11 @@ test('WHAT[managed-session-lifecycle-025] registered production terminal callbac
 
 for (const terminalKind of ['Aborted', 'Missing', 'Empty', 'ForeignRoot', 'ForeignChild', 'Failed']) {
   test(`WHAT[managed-session-lifecycle-025] registered ${terminalKind} terminal preserves eligibility and can receive a later valid terminal`, async () => {
-    const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+    const { ToolRuntimePhysicalSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js')
     const res = await withAdmittedChildren(`terminal-${terminalKind}`, 'manager-road-1', [
       { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
       { agentId: 'engineer-1', sessionId: 'engineer-session-1', role: 'engineer' },
-    ], journal => ToolRuntimeScopeSurface.verifyDevOpsReturnDrain(journal, { terminalKind, followWithValid: true }))
+    ], (journal, _profiles, workspace) => ToolRuntimePhysicalSurface.verifyDevOpsReturnDrain(journal, { workspace, terminalKind, followWithValid: true }))
     const validFailure = terminalKind === 'Failed'
     assert.equal(res.finishedAfterFirst, validFailure)
     assert.equal(res.terminationsAfterFirst, validFailure ? 1 : 0)
@@ -1266,7 +1287,7 @@ for (const terminalKind of ['Aborted', 'Missing', 'Empty', 'ForeignRoot', 'Forei
 }
 
 test('WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget durable PTYs without local physical bindings', async () => {
-  const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  const { ToolRuntimePhysicalSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js')
   await withSharedAdmittedChildren('cold-terminal-pty', 'manager-road-1', [
     { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
   ], async (journal, profiles, directory) => {
@@ -1277,7 +1298,7 @@ test('WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget d
     ownershipHost.executeOwnershipDurable(stateRoot, registry, 'open-cold', { type: 'OpenScope', scopeId: child, parentId: null })
     ownershipHost.executeOwnershipDurable(stateRoot, registry, 'open-cold-round', { type: 'OpenScope', scopeId: round, parentId: child })
     ownershipHost.executeOwnershipDurable(stateRoot, registry, 'reserve-cold', { type: 'Reserve', resourceId: 'pty:cold', scopeId: round, kind: 'process' })
-    const result = await ToolRuntimeScopeSurface.coldDevOpsReturn(journal, directory)
+    const result = await ToolRuntimePhysicalSurface.coldDevOpsReturn(journal, directory)
     assert.match(result.failure, /no local process binding/)
     assert.equal(result.finished, false)
     assert.equal(result.delivered, false)
@@ -1288,22 +1309,22 @@ test('WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget d
 })
 
 test('WHAT[managed-session-lifecycle-025] a DevOps terminal cannot silently bypass a missing round-drain capability', async () => {
-  const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  const { ToolRuntimePhysicalSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js')
   await withAdmittedChildren('missing-drain-capability', 'manager-road-1', [
     { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
   ], async journal => {
-    const result = await ToolRuntimeScopeSurface.undrainedDevOpsReturn(journal)
+    const result = await ToolRuntimePhysicalSurface.undrainedDevOpsReturn(journal)
     assert.equal(result.finished, false)
     assert.match(result.failure, /DevOps PTY round drain is unavailable/)
   })
 })
 
 test('WHAT[managed-session-lifecycle-025] a cold return with zero known PTYs still durably stops admission for the exact round', async () => {
-  const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  const { ToolRuntimePhysicalSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimePhysicalSurface.js')
   await withSharedAdmittedChildren('cold-empty-round', 'manager-road-1', [
     { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
   ], async (journal, profiles, workspace) => {
-    const result = await ToolRuntimeScopeSurface.coldDevOpsReturn(journal, workspace)
+    const result = await ToolRuntimePhysicalSurface.coldDevOpsReturn(journal, workspace)
     assert.equal(result.finished, true, result.failure)
     const registry = 'fork-pty:devops-session-1'
     const database = new DatabaseSync(join(workspace, '.Herdchestra', 'wanxiangshu', 'work.sqlite'))
