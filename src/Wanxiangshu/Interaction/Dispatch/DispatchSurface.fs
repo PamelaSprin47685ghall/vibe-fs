@@ -215,12 +215,28 @@ module DispatchSurface =
             | Ok identitySeed ->
                 let sessionId = SessionId.create session
 
+                let closure =
+                    AuthorityLifeClassification.deriveClosureKind "AgentOwnerRoot" false
+                    |> Option.defaultValue (
+                        AuthorityLifeClassification.coarseAgentOwnerLife
+                        |> fun life -> ("AgentOwnerChildWork", Some life)
+                    )
+
+                let ownerLogicalRunId =
+                    match identitySeed with
+                    | PromptAuthority.IdentitySeed.InheritedFromOwner witness ->
+                        Some(LogicalRunId.value witness.OwnerLogicalRunId)
+                    | PromptAuthority.IdentitySeed.RootSelection _ -> None
+
                 let payload: AuthorityRootAcceptedPayload =
-                    { SchemaVersion = 2
+                    { SchemaVersion = 3
                       SessionId = sessionId
                       LogicalRunId = LogicalRunId.create (sprintf "run-%s" session)
                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (sprintf "root-%s" session)
                       AuthorityKind = "AgentOwnerRoot"
+                      ExpectedClosureKind = fst closure
+                      OwnerLogicalRunId = ownerLogicalRunId
+                      AgentOwnerLife = snd closure
                       IdentitySeed = identitySeed }
 
                 let fact = PromptFact.AuthorityRootAccepted payload

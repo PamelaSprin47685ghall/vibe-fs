@@ -49,15 +49,28 @@ module PromptDispatcher =
             describeAuthorityRegistrationFailure failure
 
     let private authorityRootFact (profile: PromptAuthority.AuthorityExecutionProfile) : PromptSessionFact =
+        let authorityKind =
+            match profile.AuthorityKind with
+            | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
+            | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
+
+        let closure =
+            AuthorityLifeClassification.deriveClosureKind authorityKind (profile.CanonicalRole = Role.Manager)
+            |> Option.defaultValue ("HumanRootManagedRun", None)
+
+        let ownerLogicalRunId =
+            PromptAuthority.identitySeedOwner profile.IdentitySeed
+            |> Option.map (fun (_, ownerRun, _) -> LogicalRunId.value ownerRun)
+
         PromptSessionFact.AuthorityRootAccepted
-            { SchemaVersion = 2
+            { SchemaVersion = 3
               SessionId = profile.SessionId
               LogicalRunId = profile.LogicalRunId
               AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
-              AuthorityKind =
-                match profile.AuthorityKind with
-                | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
-                | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
+              AuthorityKind = authorityKind
+              ExpectedClosureKind = fst closure
+              OwnerLogicalRunId = ownerLogicalRunId
+              AgentOwnerLife = snd closure
               IdentitySeed = profile.IdentitySeed }
 
     let private registrationDecision
@@ -627,7 +640,7 @@ module PromptDispatcher =
                     accepted.PromptKey = key
                     && accepted.SessionId = sessionId
                     && accepted.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                                             PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                        PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
             let acceptExisting
                 (accepted: PromptAuthority.AcceptedDispatch)

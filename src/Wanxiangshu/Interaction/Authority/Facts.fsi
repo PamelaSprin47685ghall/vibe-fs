@@ -3,12 +3,20 @@ namespace Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Foundation.Identity
 
 type AuthorityRootAcceptedPayload =
-    { SchemaVersion: int
-      SessionId: SessionId
-      LogicalRunId: LogicalRunId
-      AuthorityRootUserMessageId: AuthorityRootUserMessageId
-      AuthorityKind: string
-      IdentitySeed: PromptIdentitySeed }
+    {
+        SchemaVersion: int
+        SessionId: SessionId
+        LogicalRunId: LogicalRunId
+        AuthorityRootUserMessageId: AuthorityRootUserMessageId
+        AuthorityKind: string
+        /// The single closure kind this root acceptance must close under.
+        ExpectedClosureKind: string
+        /// The owner logical run id of an agent-owner root (None for HumanRoot).
+        OwnerLogicalRunId: string option
+        /// The agent-owner life of an agent-owner root: "Child" | "Attached" | "InternalLeaf".
+        AgentOwnerLife: string option
+        IdentitySeed: PromptIdentitySeed
+    }
 
 type AuthorityLogicalRunClosedPayload =
     { SessionId: SessionId

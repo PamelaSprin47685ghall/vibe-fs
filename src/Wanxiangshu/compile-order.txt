@@ -212,6 +212,8 @@ Interaction/Authority/Origin.fsi
 Interaction/Authority/Origin.fs
 Interaction/Authority/Facts.fsi
 Interaction/Authority/Facts.fs
+Interaction/Authority/LifeClassification.fsi
+Interaction/Authority/LifeClassification.fs
 Interaction/Authority/PromptSessionFact.fsi
 Interaction/Authority/PromptSessionFact.fs
 Participant/Provider/Attempt/Fallback/Facts.fsi

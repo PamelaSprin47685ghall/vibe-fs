@@ -154,6 +154,19 @@ module FactCodecSurface =
 
         match family, case with
         | "Prompt", "AuthorityRootAccepted" ->
+            let identitySeed = identitySeedOfJs (payload?IdentitySeed)
+
+            let authorityKind = text (payload?AuthorityKind)
+
+            let isManager =
+                match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity identitySeed) with
+                | Some role -> role = Roles.Manager
+                | None -> false
+
+            let closure =
+                AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+                |> Option.defaultValue ("HumanRootManagedRun", None)
+
             Fact.Agent(
                 AgentFact.Prompt(
                     PromptFactCases.AuthorityRootAccepted
@@ -162,8 +175,19 @@ module FactCodecSurface =
                           LogicalRunId = LogicalRunId.create (text (payload?LogicalRunId))
                           AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
-                          AuthorityKind = text (payload?AuthorityKind)
-                          IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
+                          AuthorityKind = authorityKind
+                          ExpectedClosureKind =
+                            optionalString (payload?ExpectedClosureKind)
+                            |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
+                            |> Option.defaultValue (fst closure)
+                          OwnerLogicalRunId =
+                            optionalString (payload?OwnerLogicalRunId)
+                            |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
+                          AgentOwnerLife =
+                            optionalString (payload?AgentOwnerLife)
+                            |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value))
+                            |> Option.orElse (snd closure)
+                          IdentitySeed = identitySeed }
                 )
             )
         | "Runtime", "RuntimeStarted" ->
@@ -306,6 +330,9 @@ module FactCodecSurface =
                        LogicalRunId = LogicalRunId.value payload.LogicalRunId
                        AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                        AuthorityKind = payload.AuthorityKind
+                       ExpectedClosureKind = payload.ExpectedClosureKind
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       AgentOwnerLife = payload.AgentOwnerLife
                        IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
         | _ ->
             box

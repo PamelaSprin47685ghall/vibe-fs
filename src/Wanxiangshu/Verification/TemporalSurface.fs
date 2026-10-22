@@ -200,14 +200,39 @@ module TemporalSurface =
 
         match family, caseName with
         | "Prompt", "AuthorityRootAccepted" ->
+            let identitySeed = identitySeedOfJs (payload?IdentitySeed)
+
+            let authorityKind = text (payload?AuthorityKind)
+
+            let isManager =
+                match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity identitySeed) with
+                | Some role -> role = Roles.Manager
+                | None -> false
+
+            let closure =
+                AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+                |> Option.defaultValue ("HumanRootManagedRun", None)
+
             AgentFact.Prompt(
                 PromptFactCases.AuthorityRootAccepted
-                    { SchemaVersion = 2
+                    { SchemaVersion = 3
                       SessionId = sessionIdOf (payload?SessionId)
                       LogicalRunId = logicalRunOf (payload?LogicalRunId)
                       AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
-                      AuthorityKind = text (payload?AuthorityKind)
-                      IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
+                      AuthorityKind = authorityKind
+                      ExpectedClosureKind =
+                        match text (payload?ExpectedClosureKind) with
+                        | "" -> fst closure
+                        | value -> value
+                      OwnerLogicalRunId =
+                        match text (payload?OwnerLogicalRunId) with
+                        | "" -> None
+                        | value -> Some value
+                      AgentOwnerLife =
+                        match text (payload?AgentOwnerLife) with
+                        | "" -> snd closure
+                        | value -> Some value
+                      IdentitySeed = identitySeed }
             )
         | "ProviderFailure", "FailureRecorded" ->
             AgentFact.ProviderFailure(
@@ -351,12 +376,15 @@ module TemporalSurface =
                    case = "AuthorityRootAccepted"
                    payload =
                     box
-                        {| SchemaVersion = 2
+                        {| SchemaVersion = payload.SchemaVersion
                            SessionId = SessionId.value payload.SessionId
                            LogicalRunId = LogicalRunId.value payload.LogicalRunId
                            AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                            AuthorityKind = payload.AuthorityKind
+                           ExpectedClosureKind = payload.ExpectedClosureKind
+                           OwnerLogicalRunId = payload.OwnerLogicalRunId
+                           AgentOwnerLife = payload.AgentOwnerLife
                            IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
         | Fact.Agent(AgentFact.ProviderFailure(ProviderFailureFactCases.FailureRecorded payload)) ->
             box

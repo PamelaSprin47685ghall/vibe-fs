@@ -1,0 +1,86 @@
+namespace Wanxiangshu.Interaction.Authority
+
+/// The closed set of closure kinds and the agent-owner life labels, mirroring
+/// the canonical law in `wanxiangli/src/authority/ClosureLaw.fs`.
+///
+/// The host records the expected closure kind of an accepted authority root
+/// atomically with the acceptance (interaction-authority-018 / C1 closure), so
+/// the law is mirrored here as a pure module rather than reached through the
+/// JavaScript bridge: the bridge only answers for already-rooted lifecycles,
+/// while the host must be able to derive the kind *before* the root exists.
+[<RequireQualifiedAccess>]
+module AuthorityLifeClassification =
+    /// The closed set of expected closure kinds.
+    let closureKindLabels =
+        [ "HumanRootManagerLife"
+          "HumanRootManagedRun"
+          "AgentOwnerChildWork"
+          "AgentOwnerAttachedWork"
+          "AgentOwnerInternalLeaf" ]
+
+    /// The closed set of agent-owner life labels.
+    let agentOwnerLifeLabels = [ "Child"; "Attached"; "InternalLeaf" ]
+
+    /// The root kind label of a closure kind: "HumanRoot" | "AgentOwnerRoot".
+    let rootKindOfKind (closureKind: string) : string =
+        match closureKind with
+        | "HumanRootManagerLife"
+        | "HumanRootManagedRun" -> "HumanRoot"
+        | "AgentOwnerChildWork"
+        | "AgentOwnerAttachedWork"
+        | "AgentOwnerInternalLeaf" -> "AgentOwnerRoot"
+        | other -> invalidArg "closureKind" (sprintf "unknown closure kind '%s'" other)
+
+    /// The closure witness kind a closure of this kind must carry.
+    ///
+    /// A Manager life closes with a life witness; every other closure kind
+    /// closes with a work witness.
+    let witnessKindOf (closureKind: string) : string option =
+        match closureKind with
+        | "HumanRootManagerLife" -> Some "LifeCompleted"
+        | "HumanRootManagedRun"
+        | "AgentOwnerChildWork"
+        | "AgentOwnerAttachedWork"
+        | "AgentOwnerInternalLeaf" -> Some "WorkCompleted"
+        | _ -> None
+
+    /// The coarse agent-owner life used when the host cannot observe the life
+    /// of an agent-owner root at acceptance time.
+    ///
+    /// The durable session-ownership projection does not distinguish the three
+    /// agent-owner lives (child, attached, internal leaf) at the moment of
+    /// acceptance. Rather than record no kind at all — which would admit no
+    /// closure for the root — the coarse default keeps the acceptance atomic
+    /// and the closure admitted, at the cost of losing the life distinction.
+    let coarseAgentOwnerLife = "Child"
+
+    /// The closure kind this root acceptance expects, mirroring
+    /// `ClosureLaw.expectedKind` exactly.
+    ///
+    /// Returns None when the inputs cannot determine a unique kind — in
+    /// particular an agent-owner root without a life, which must fail closed
+    /// rather than close under a guessed kind.
+    let expectedClosureKind (rootKindLabel: string) (isManager: bool) (agentOwnerLife: string option) : string option =
+        match rootKindLabel, agentOwnerLife with
+        | "HumanRoot", None when isManager -> Some "HumanRootManagerLife"
+        | "HumanRoot", None -> Some "HumanRootManagedRun"
+        | "HumanRoot", Some _ -> None
+        | "AgentOwnerRoot", Some "Child" -> Some "AgentOwnerChildWork"
+        | "AgentOwnerRoot", Some "Attached" -> Some "AgentOwnerAttachedWork"
+        | "AgentOwnerRoot", Some "InternalLeaf" -> Some "AgentOwnerInternalLeaf"
+        | "AgentOwnerRoot", None -> None
+        | _ -> None
+
+    /// The closure kind and the agent-owner life of a root acceptance, applying
+    /// the coarse agent-owner default when the life is not observable.
+    ///
+    /// Returns None when the root kind is unknown.
+    let deriveClosureKind (rootKindLabel: string) (isManager: bool) : (string * string option) option =
+        match rootKindLabel with
+        | "HumanRoot" ->
+            expectedClosureKind rootKindLabel isManager None
+            |> Option.map (fun kind -> (kind, None))
+        | "AgentOwnerRoot" ->
+            expectedClosureKind rootKindLabel isManager (Some coarseAgentOwnerLife)
+            |> Option.map (fun kind -> (kind, Some coarseAgentOwnerLife))
+        | _ -> None

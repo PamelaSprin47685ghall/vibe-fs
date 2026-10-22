@@ -23,6 +23,17 @@ module JournalCodecSurface =
     let private text (value: obj) : string =
         if isNull value then "" else string value
 
+    let private optionalText (value: obj) : string option =
+        if isNull value then
+            None
+        else
+            let parsed = string value
+
+            if System.String.IsNullOrWhiteSpace parsed then
+                None
+            else
+                Some parsed
+
     let private streamOfJs (value: obj) : StreamId =
         match text (value?kind) with
         | "Workspace" -> Workspace
@@ -137,6 +148,19 @@ module JournalCodecSurface =
 
         match family, case with
         | "Prompt", "AuthorityRootAccepted" ->
+            let identitySeed = identitySeedOfJs (payload?IdentitySeed)
+
+            let authorityKind = text (payload?AuthorityKind)
+
+            let isManager =
+                match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity identitySeed) with
+                | Some role -> role = Roles.Manager
+                | None -> false
+
+            let closure =
+                AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+                |> Option.defaultValue ("HumanRootManagedRun", None)
+
             Fact.Agent(
                 AgentFact.Prompt(
                     PromptFactCases.AuthorityRootAccepted
@@ -145,8 +169,12 @@ module JournalCodecSurface =
                           LogicalRunId = LogicalRunId.create (text (payload?LogicalRunId))
                           AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
-                          AuthorityKind = text (payload?AuthorityKind)
-                          IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
+                          AuthorityKind = authorityKind
+                          ExpectedClosureKind =
+                            optionalText (payload?ExpectedClosureKind) |> Option.defaultValue (fst closure)
+                          OwnerLogicalRunId = optionalText (payload?OwnerLogicalRunId)
+                          AgentOwnerLife = optionalText (payload?AgentOwnerLife) |> Option.orElse (snd closure)
+                          IdentitySeed = identitySeed }
                 )
             )
         | familyName, caseName -> failwith $"JournalCodecSurface: unknown fact '{familyName}.{caseName}'"
@@ -163,6 +191,9 @@ module JournalCodecSurface =
                        LogicalRunId = LogicalRunId.value payload.LogicalRunId
                        AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                        AuthorityKind = payload.AuthorityKind
+                       ExpectedClosureKind = payload.ExpectedClosureKind
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       AgentOwnerLife = payload.AgentOwnerLife
                        IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
         | _ ->
             box

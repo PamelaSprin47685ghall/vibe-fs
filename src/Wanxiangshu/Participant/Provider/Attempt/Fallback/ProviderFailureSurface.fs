@@ -305,13 +305,32 @@ module ProviderFailureSurface =
         | "AgentOwnerRoot", _ -> invalidArg "identitySeed" "AgentOwnerRoot requires an inherited owner identity seed"
         | kind, _ -> invalidArg "authorityKind" $"unknown authority kind '{kind}'"
 
+        let isManager =
+            match
+                PromptAuthority.identitySeedParticipantIdentity identitySeed
+                |> ParticipantIdentity.role
+            with
+            | Some role -> role = Roles.Manager
+            | None -> false
+
+        let closure =
+            AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+            |> Option.defaultValue ("HumanRootManagedRun", None)
+
+        let ownerLogicalRunId =
+            PromptAuthority.identitySeedOwner identitySeed
+            |> Option.map (fun (_, ownerRun, _) -> LogicalRunId.value ownerRun)
+
         box
             {| kind = "AuthorityRootAccepted"
-               schemaVersion = 2
+               schemaVersion = 3
                session = text (field value "session")
                logicalRun = text (field value "logicalRun")
                authorityRoot = text (field value "authorityRoot")
                authorityKind = authorityKind
+               expectedClosureKind = fst closure
+               ownerLogicalRunId = optionObj ownerLogicalRunId
+               agentOwnerLife = optionObj (snd closure)
                identitySeed = identitySeedView identitySeed |}
 
     let providerFailureRecorded (value: obj) : obj =
@@ -353,13 +372,34 @@ module ProviderFailureSurface =
     let private factOf (value: obj) : AgentFact =
         match text (field value "kind") with
         | "AuthorityRootAccepted" ->
+            let authorityKind = text (field value "authorityKind")
+
+            let identitySeed = identitySeedOf (field value "identitySeed")
+
+            let isManager =
+                match
+                    PromptAuthority.identitySeedParticipantIdentity identitySeed
+                    |> ParticipantIdentity.role
+                with
+                | Some role -> role = Roles.Manager
+                | None -> false
+
+            let closure =
+                AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+                |> Option.defaultValue ("HumanRootManagedRun", None)
+
             PromptFact.AuthorityRootAccepted
-                { SchemaVersion = 2
+                { SchemaVersion = 3
                   SessionId = SessionId.create (text (field value "session"))
                   LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
-                  AuthorityKind = text (field value "authorityKind")
-                  IdentitySeed = identitySeedOf (field value "identitySeed") }
+                  AuthorityKind = authorityKind
+                  ExpectedClosureKind =
+                    optionalText (field value "expectedClosureKind")
+                    |> Option.defaultValue (fst closure)
+                  OwnerLogicalRunId = optionalText (field value "ownerLogicalRunId")
+                  AgentOwnerLife = optionalText (field value "agentOwnerLife") |> Option.orElse (snd closure)
+                  IdentitySeed = identitySeed }
         | "FailureRecorded" ->
             Wanxiangshu.Composition.Durable.ProviderFailureFact.FailureRecorded
                 {| SessionId = SessionId.create (text (field value "session"))

@@ -47,7 +47,7 @@ module PromptFactFold =
         | unknown -> Error(sprintf "unknown authority root kind: %s" unknown)
 
     let private validateAuthorityRootAccepted schemaVersion authorityKind =
-        if schemaVersion <> 2 then
+        if schemaVersion <> 2 && schemaVersion <> 3 then
             Error(sprintf "unsupported AuthorityRootAccepted schema version: %d" schemaVersion)
         else
             parseAuthorityKind authorityKind

@@ -20,11 +20,60 @@ module PromptAuthorityLedger =
         | "AgentOwnerRoot" -> Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot
         | unknown -> Error(sprintf "unknown authority root kind: %s" unknown)
 
+
+    /// The root kind a recorded closure kind belongs to, when the kind is known.
+    let private recordedRootKindOf (closureKind: string) : string option =
+        if AuthorityLifeClassification.closureKindLabels |> List.contains closureKind then
+            Some(AuthorityLifeClassification.rootKindOfKind closureKind)
+        else
+            None
+
+    /// The closure kind the accepted root derives, when it derives one.
+    let private derivedClosureKindOf
+        (payload: AuthorityRootAcceptedPayload)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : string option =
+        AuthorityLifeClassification.expectedClosureKind
+            payload.AuthorityKind
+            (profile.CanonicalRole = Role.Manager)
+            payload.AgentOwnerLife
+
+    /// The closure kind the acceptance recorded must be the kind the root
+    /// derives, and must be the only kind it may close under.
+    let private validateExpectedClosureKind
+        (payload: AuthorityRootAcceptedPayload)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Result<unit, string> =
+        match (recordedRootKindOf payload.ExpectedClosureKind, derivedClosureKindOf payload profile) with
+        | (None, _) ->
+            Error(sprintf "AuthorityRootAccepted expected closure kind is unknown: %s" payload.ExpectedClosureKind)
+        | (Some rootKind, _) when rootKind <> payload.AuthorityKind ->
+            Error(
+                sprintf
+                    "AuthorityRootAccepted expected closure kind %s does not match authority kind %s"
+                    payload.ExpectedClosureKind
+                    payload.AuthorityKind
+            )
+        | (Some _, None) ->
+            Error(
+                sprintf
+                    "AuthorityRootAccepted expected closure kind %s cannot be derived from the accepted root"
+                    payload.ExpectedClosureKind
+            )
+        | (Some _, Some derived) when derived = payload.ExpectedClosureKind -> Ok()
+        | (Some _, Some derived) ->
+            Error(
+                sprintf
+                    "AuthorityRootAccepted expected closure kind %s does not match the derived kind %s"
+                    payload.ExpectedClosureKind
+                    derived
+            )
+
     let foldAuthorityRootAccepted
         (projection: PromptAuthority.PromptAuthorityProjection)
         (payload: AuthorityRootAcceptedPayload)
         : Result<PromptAuthority.PromptAuthorityProjection, string> =
-        if payload.SchemaVersion <> 2 then
+        if payload.SchemaVersion <> 2 && payload.SchemaVersion <> 3 then
             Error(sprintf "unsupported AuthorityRootAccepted schema version: %d" payload.SchemaVersion)
         else
             parseAuthorityKind payload.AuthorityKind
@@ -36,8 +85,10 @@ module PromptAuthorityLedger =
                     authorityKind
                     payload.IdentitySeed)
             |> Result.bind (fun profile ->
-                PromptAuthorityRun.registerAuthority profile projection
-                |> Result.mapError PromptAuthorityRun.describeRegistrationRejection)
+                validateExpectedClosureKind payload profile
+                |> Result.bind (fun () ->
+                    PromptAuthorityRun.registerAuthority profile projection
+                    |> Result.mapError PromptAuthorityRun.describeRegistrationRejection))
 
     let private closeActiveRun (profile: PromptAuthority.AuthorityExecutionProfile) projection =
         match PromptAuthorityRun.closeAuthority profile.LogicalRunId profile.AuthorityRootUserMessageId projection with
