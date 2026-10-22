@@ -8,6 +8,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host.Ports
+open Wanxiangshu.Persistence.Journal
 
 /// Host-neutral adapter over the omp (oh-my-pi) extension API.
 ///
@@ -592,7 +593,12 @@ module Adapter =
             { Id = SessionId.create (fst entry)
               Parent = Some(SessionId.create parent)
               Role = None
-              Title = snd entry })
+              Title = snd entry
+              // omp's live-child map records only the parent and the title.
+              // A child session's own directory is not reported back by the
+              // host here, so the workspace is typed-absent rather than a
+              // fabricated path.
+              Workspace = None })
 
     let private abortHost (ctx: obj) : Task<Result<unit, HostError>> =
         task {
@@ -978,6 +984,11 @@ module Adapter =
                   let invocation =
                       { Session = SessionId.create sid
                         CallId = ToolCallId.create (stringOf callId)
+                        // omp's tool context carries no provider-run
+                        // identity for the call, so the invocation carries
+                        // none: the evidence is absent, never inferred from
+                        // the session's current binding.
+                        ProviderRun = None
                         Workspace = workspace
                         Args = args
                         Cancellation = cancellationOf (orNull signal)
@@ -1033,7 +1044,11 @@ module Adapter =
 
     /// Build the host-neutral ports over the omp extension API, together with
     /// the signal emitter the product hooks publish through.
-    let private createOmpHostPorts (pi: obj) (agents: AgentRoleSpec list) : HostPorts * (HostSignal -> Task<unit>) =
+    let private createOmpHostPorts
+        (pi: obj)
+        (agents: AgentRoleSpec list)
+        (stateRoot: string)
+        : HostPorts * (HostSignal -> Task<unit>) =
         let listeners = ResizeArray<HostSignal -> Task>()
 
         let emit (signal: HostSignal) : Task<unit> =
@@ -1091,22 +1106,17 @@ module Adapter =
             { new ISignalSource with
                 member _.Subscribe(listener) =
                     listeners.Add listener
-                    SignalSubscription(listeners, listener) :> IDisposable }
+                    new SignalSubscription(listeners, listener) :> IDisposable }
 
         let paths: IHostPaths =
-            // The workspace is read once, so the three members cannot
-            // disagree if the context changes between reads.
-            let workspace = ctxCwd (context ())
-
             { new IHostPaths with
-                // omp exposes no host data directory; the product resolves
-                // its own state root from the workspace
-                // (`RuntimePath.forWorkspace`), so this member is not a
-                // journal root and must not be treated as one. The adapter
-                // must not invent a product-private directory name here.
-                member _.StateRoot = WorkspacePath(workspace)
-                member _.ProjectRoot = WorkspacePath(workspace)
-                member _.ProjectId = workspace }
+                // The state root is resolved once, before activation, from
+                // the worktree via `RuntimePath.forWorkspace`; it lands on
+                // `<worktree>/.Herdchestra`. The adapter must not fall back
+                // to the worktree when it cannot be resolved.
+                member _.StateRoot = WorkspacePath(stateRoot)
+                member _.ProjectRoot = WorkspacePath(stateRoot)
+                member _.ProjectId = stateRoot }
 
         let diagnostics: IDiagnosticSink =
             { new IDiagnosticSink with
@@ -1116,7 +1126,21 @@ module Adapter =
 
         let catalog: IAgentCatalog =
             { new IAgentCatalog with
-                member _.Roles() = agents }
+                // The product's role catalogue is handed to the adapter by
+                // the composition root, so it is already the roster the host
+                // exposes.
+                member _.Roles() = Task.FromResult(Ok agents) }
+
+        // HNI P-19: omp's extension API exposes no configuration surface, so
+        // there is nothing to bind the port to. The port refuses every call
+        // explicitly instead of faking a host that stores settings.
+        let config: IHostConfigPort =
+            { new IHostConfigPort with
+                member _.Read(_path: string list) =
+                    Error(HostError.Refused "omp exposes no configuration surface to an extension")
+
+                member _.Apply(_settings: RequiredSetting list) =
+                    Error(HostError.Refused "omp exposes no configuration surface to an extension") }
 
         let ports: HostPorts =
             { Sessions = sessions
@@ -1126,6 +1150,7 @@ module Adapter =
               Signals = signals
               Tools = tools
               Paths = paths
+              Config = config
               Diagnostics = diagnostics
               Agents = catalog
               Capabilities =
@@ -1154,6 +1179,10 @@ module Adapter =
     let private toolCallView (ctx: obj) (callId: obj) (tool: obj) (input: obj) : ToolCallView =
         { Session = SessionId.create (ctxSessionId ctx)
           CallId = ToolCallId.create (stringOf callId)
+          // omp's tool events carry no provider-run identity for the call,
+          // so the view carries none: the fence evidence is absent, never
+          // resolved from the session's current binding.
+          ProviderRun = None
           Tool = stringOf tool
           Args = CanonicalJsonText(if isNull input then "{}" else stringify input)
           Role = None }
@@ -1294,6 +1323,40 @@ module Adapter =
                   Role = role
                   Parts = decodeParts message }
 
+    /// The omp reply to a context edit: nothing when the context stays, the
+    /// replacement messages otherwise.
+    let private editReply (edit: ContextEdit) : obj =
+        match contextEditReply edit with
+        | None -> jsUndefined
+        | Some payload -> payload
+
+    /// The omp reply to a tool-call verdict: nothing when the call is allowed,
+    /// the refusal or the rewritten input otherwise.
+    let private verdictReply (verdict: ToolCallVerdict) : obj =
+        match verdict with
+        | ToolCallVerdict.Allow -> jsUndefined
+        | ToolCallVerdict.Refuse reason -> createObj [ "block", box true; "reason", box reason ]
+        | ToolCallVerdict.Rewrite args -> createObj [ "input", box (parseJson (canonicalOf args)) ]
+
+    /// The text of an omp tool result: its content parts that carry text.
+    let private resultText (event: obj) : string =
+        tryArray (fieldValue event "content")
+        |> Array.choose (fun part ->
+            match optionalString (fieldValue part "type") with
+            | Some "text" -> Some(stringOf (fieldValue part "text"))
+            | _ -> None)
+        |> String.concat "\n"
+
+    /// The omp reply to a tool-result edit: nothing when the host's result
+    /// stands, the replacement result otherwise.
+    let private resultReply (edit: ToolResultEdit) : obj =
+        match edit with
+        | ToolResultEdit.Keep -> jsUndefined
+        | ToolResultEdit.Replace result ->
+            createObj
+                [ "content", box [| createObj [ "type", box "text"; "text", box result.Text ] |]
+                  "isError", box result.IsError ]
+
     /// Register the product hooks on the omp event bus and return the
     /// combined signal emitter: every signal reaches the host subscribers
     /// and the product at the same time.
@@ -1306,99 +1369,102 @@ module Adapter =
         let signal (value: HostSignal) : Task<unit> =
             task {
                 let! _ = emit value
-                do! hooks.OnSignal value
+                // `OnSignal` is optional: the product may not decide what a
+                // host fact means. Absence is declared, so the signal is
+                // delivered to the host subscribers and to nobody else.
+                match hooks.OnSignal with
+                | None -> return ()
+                | Some onSignal -> do! onSignal value
             }
 
         // -- turn admission ---------------------------------------------------------------
         registerEvent pi "input" (fun (event: obj) (ctx: obj) ->
             task {
-                let! verdict =
-                    hooks.Turn.AdmitTurn
-                        { Context = turnContext ctx
-                          Message = None
-                          Text = stringOf (fieldValue event "text")
-                          Correlation = None }
+                match hooks.Turn with
+                | None -> return jsUndefined
+                | Some turn ->
+                    let! verdict =
+                        turn.AdmitTurn
+                            { Context = turnContext ctx
+                              Message = None
+                              Text = stringOf (fieldValue event "text")
+                              Correlation = None }
 
-                return! admissionReply pi ctx verdict
+                    return! admissionReply pi ctx verdict
             }
             |> unbox<obj>)
 
         // -- system prompt ----------------------------------------------------------------
         registerEvent pi "before_agent_start" (fun (event: obj) (ctx: obj) ->
             task {
-                let system = stringList (fieldValue event "systemPrompt")
-                let! prompt = hooks.Turn.SystemPrompt(turnContext ctx, system)
-                return createObj [ "systemPrompt", box (List.toArray prompt) ]
+                match hooks.Turn with
+                | None -> return jsUndefined
+                | Some turn ->
+                    let system = stringList (fieldValue event "systemPrompt")
+                    let! prompt = turn.SystemPrompt(turnContext ctx, system)
+                    return createObj [ "systemPrompt", box (List.toArray prompt) ]
             }
             |> unbox<obj>)
 
         // -- context messages -------------------------------------------------------------
         registerEvent pi "context" (fun (event: obj) (ctx: obj) ->
             task {
-                let messages =
-                    tryArray (fieldValue event "messages")
-                    |> Array.choose contextMessageView
-                    |> Array.toList
-
-                let! edit = hooks.Turn.ContextMessages(turnContext ctx, messages)
-
-                match contextEditReply edit with
+                match hooks.Turn with
                 | None -> return jsUndefined
-                | Some payload -> return payload
+                | Some turn ->
+                    let messages =
+                        tryArray (fieldValue event "messages")
+                        |> Array.choose contextMessageView
+                        |> Array.toList
+
+                    let! edit = turn.ContextMessages(turnContext ctx, messages)
+
+                    return editReply edit
             }
             |> unbox<obj>)
 
         // -- tool gate --------------------------------------------------------------------
         registerEvent pi "tool_call" (fun (event: obj) (ctx: obj) ->
             task {
-                let! verdict =
-                    hooks.ToolGate.BeforeTool(
-                        toolCallView
-                            ctx
-                            (fieldValue event "toolCallId")
-                            (fieldValue event "toolName")
-                            (fieldValue event "input")
-                    )
+                match hooks.ToolGate with
+                | None -> return jsUndefined
+                | Some gate ->
+                    let! verdict =
+                        gate.BeforeTool(
+                            toolCallView
+                                ctx
+                                (fieldValue event "toolCallId")
+                                (fieldValue event "toolName")
+                                (fieldValue event "input")
+                        )
 
-                match verdict with
-                | ToolCallVerdict.Allow -> return jsUndefined
-                | ToolCallVerdict.Refuse reason -> return createObj [ "block", box true; "reason", box reason ]
-                | ToolCallVerdict.Rewrite args -> return createObj [ "input", box (parseJson (canonicalOf args)) ]
+                    return verdictReply verdict
             }
             |> unbox<obj>)
 
         registerEvent pi "tool_result" (fun (event: obj) (ctx: obj) ->
             task {
-                let text =
-                    tryArray (fieldValue event "content")
-                    |> Array.choose (fun part ->
-                        match optionalString (fieldValue part "type") with
-                        | Some "text" -> Some(stringOf (fieldValue part "text"))
-                        | _ -> None)
-                    |> String.concat "\n"
+                match hooks.ToolGate with
+                | None -> return jsUndefined
+                | Some gate ->
+                    let text = resultText event
 
-                let isError = isTrue (fieldValue event "isError")
+                    let isError = isTrue (fieldValue event "isError")
 
-                let! edit =
-                    hooks.ToolGate.AfterTool(
-                        toolCallView
-                            ctx
-                            (fieldValue event "toolCallId")
-                            (fieldValue event "toolName")
-                            (fieldValue event "input"),
-                        { Text = text
-                          Truncated = false
-                          IsError = isError
-                          Details = None }
-                    )
+                    let! edit =
+                        gate.AfterTool(
+                            toolCallView
+                                ctx
+                                (fieldValue event "toolCallId")
+                                (fieldValue event "toolName")
+                                (fieldValue event "input"),
+                            { Text = text
+                              Truncated = false
+                              IsError = isError
+                              Details = None }
+                        )
 
-                match edit with
-                | ToolResultEdit.Keep -> return jsUndefined
-                | ToolResultEdit.Replace result ->
-                    return
-                        createObj
-                            [ "content", box [| createObj [ "type", box "text"; "text", box result.Text ] |]
-                              "isError", box result.IsError ]
+                    return resultReply edit
             }
             |> unbox<obj>)
 
@@ -1553,7 +1619,10 @@ module Adapter =
                         { Id = SessionId.create (ctxSessionId ctx)
                           Parent = None
                           Role = None
-                          Title = None }
+                          Title = None
+                          // The host reports the session's working
+                          // directory, so the signal carries the real one.
+                          Workspace = Some(WorkspacePath(ctxCwd ctx)) }
                 )
         }
 
@@ -1571,7 +1640,9 @@ module Adapter =
 
         let activate (ctx: obj) : Task<unit> =
             task {
-                let ports, emit = createOmpHostPorts pi agents
+                let! stateRoot = RuntimePath.forWorkspace (ctxCwd ctx)
+
+                let ports, emit = createOmpHostPorts pi agents stateRoot
                 let! outcome = guardTask (fun () -> plugin.Activate ports)
 
                 match outcome with

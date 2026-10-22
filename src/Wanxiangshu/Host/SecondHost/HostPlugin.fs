@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Host.Ports
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Mission.Lifecycle
@@ -26,6 +27,13 @@ module HostPlugin =
 
     [<Emit("$0 && typeof $0.text === 'string' ? $0.text : ''")>]
     let private jsonTextField (_value: obj) : string = jsNative
+
+    /// Fable does not emit an export for `Task.Delay` (`fable-library-js` Task.js
+    /// has no `delay`), so a `task { }` delay would break the emitted ESM graph.
+    /// This is the repo's established wait idiom (`Process/JsCallLoop.fs`): a
+    /// self-contained Promise, no library import.
+    [<Emit("new Promise(function(resolve) { setTimeout(function() { resolve(undefined); }, $0); })")>]
+    let private delayMilliseconds (milliseconds: int) : Task<unit> = jsNative
 
     /// The product default role for a root session: the Engineer law. The
     /// product's retired roles carry no provider prompt, so they fall back
@@ -145,9 +153,8 @@ module HostPlugin =
 
     /// The text a tool invocation asks to deliver.
     let private invocationText (invocation: ToolInvocation) : string =
-        match invocation.Args with
-        | CanonicalJsonText raw -> textFieldOf raw
-        | _ -> ""
+        let (CanonicalJsonText raw) = invocation.Args
+        textFieldOf raw
 
     /// The observation of the child's transcript: what was seen, and the
     /// terminal reply if the transcript already carries one.
@@ -167,18 +174,18 @@ module HostPlugin =
         (observation: string)
         (deadline: DateTimeOffset)
         : ToolOutcome option =
-        reply
-        |> Option.map successOutcome
-        |> Option.defaultWith (fun () ->
-            if DateTimeOffset.UtcNow >= deadline then
-                Some(
-                    failureOutcome (
-                        "wxs_deliver timed out after 120s waiting for the child session's terminal reply; "
-                        + observation
-                    )
+        let expired = DateTimeOffset.UtcNow >= deadline
+
+        match reply with
+        | Some text -> Some(successOutcome text)
+        | None when expired ->
+            Some(
+                failureOutcome (
+                    "wxs_deliver timed out after 120s waiting for the child session's terminal reply; "
+                    + observation
                 )
-            else
-                None)
+            )
+        | None -> None
 
     /// The wait for the child's terminal reply: the child's transcript is
     /// polled until it carries a terminal reply or the deadline is reached.
@@ -198,7 +205,7 @@ module HostPlugin =
                 match terminal with
                 | Some outcome -> return outcome
                 | None ->
-                    do! Task.Delay 250
+                    do! delayMilliseconds 250
                     return! poll ()
             }
 
@@ -248,6 +255,97 @@ module HostPlugin =
             childWorkId
             0.0
         |> Result.map ignore
+
+    /// The durable work of the host's own root session. The activation scope
+    /// is opened against the SAME work id, so the scope and the work are one
+    /// durable fact, not two.
+    let private activationWorkId (ports: HostPorts) (root: string) : string =
+        workIdOf (ports.Paths.ProjectId + "|" + root)
+
+    /// The scope that owns this host's activation work. It is a durable fact
+    /// in the ownership registry, not an in-memory flag.
+    let private activationScopeId (ports: HostPorts) : string =
+        "host-activation:" + ports.Paths.ProjectId
+
+    /// Open the host's activation work. The work is a durable fact in the
+    /// machine state directory.
+    let private openActivationWork (stateRoot: string) (workId: string) (root: string) : Result<unit, HostError> =
+        // A session-root opening is not an execution tenure, so the plan
+        // sequence is the right one.
+        let opened =
+            DurableWorkHost.ensureOpened
+                stateRoot
+                workId
+                (workId + ":open:0")
+                root
+                (DurableWorkHost.planSequence ())
+                workId
+                0.0
+
+        match opened with
+        | Error reason ->
+            Error(HostError.Transport("the second host activation failed to open its durable work: " + reason))
+        | Ok _ -> Ok()
+
+    /// Open the ownership scope that owns this host's activation work. The
+    /// scope is a durable fact in the ownership registry, not an in-memory
+    /// flag.
+    let private openActivationScope (ports: HostPorts) (stateRoot: string) : Result<unit, HostError> =
+        let registryId = "host-activation"
+        let scopeId = activationScopeId ports
+
+        let receipt =
+            DurableWorkHost.executeOwnershipDurable
+                stateRoot
+                registryId
+                (scopeId + ":open")
+                (DurableWorkHost.ownershipMessage "OpenScope" [ "scopeId", box scopeId; "parentId", null ])
+
+        let committed =
+            receipt.Status = "Committed"
+            || receipt.Status = "Replayed"
+            // An idempotent re-opening of the same scope is an observation of
+            // the same durable scope, not a failure.
+            || (receipt.Status = "Observed" && receipt.Kind = "ScopeOpened")
+
+        let detail =
+            if String.IsNullOrWhiteSpace receipt.Reason then
+                ""
+            else
+                " (" + receipt.Reason + ")"
+
+        if committed then
+            Ok()
+        else
+            Error(
+                HostError.Transport(
+                    "the second host activation failed to open its ownership scope: "
+                    + receipt.Status
+                    + detail
+                )
+            )
+
+    /// Whether the session's durable work is really open in the journal.
+    /// The evidence is read back from the machine state directory, not an
+    /// in-memory flag: a call whose session has no durable work is not
+    /// admitted.
+    let private ownsActivationWork (stateRoot: string) (sessionId: string) : bool =
+        let inspected =
+            if String.IsNullOrWhiteSpace sessionId then
+                None
+            else
+                DurableWorkHost.inspected stateRoot (workIdOf sessionId)
+
+        match inspected with
+        | Some work -> work.Opened
+        | None -> false
+
+    /// Open the durable work of a session the host announces. Every session
+    /// that talks to this product gets its own durable work, so the tool
+    /// admission can be answered from the journal instead of from a flag.
+    let private openSessionWork (stateRoot: string) (root: string) (sessionId: string) : unit =
+        if not (String.IsNullOrWhiteSpace sessionId) then
+            openChildWork stateRoot root (workIdOf sessionId) |> ignore
 
     /// The delivery to a child session whose durable work is already open.
     let private deliverToChildSession
@@ -308,80 +406,22 @@ module HostPlugin =
                     // codebase the durable journal lives in the state root,
                     // so the state root is the journal's gitCommonDir.
                     let! root = GitSubject.revParseShowToplevel workspace
+                    let! stateRoot = RuntimePath.stateRoot root
 
-                    if String.IsNullOrWhiteSpace root then
-                        return
+                    let opening: Result<unit, HostError> =
+                        if String.IsNullOrWhiteSpace root then
                             Error(
                                 HostError.Transport
                                     "the second host activation failed: Git did not identify a worktree root"
                             )
-
-                    let! stateRoot = RuntimePath.stateRoot root
-
-                    if String.IsNullOrWhiteSpace stateRoot then
-                        return
+                        elif String.IsNullOrWhiteSpace stateRoot then
                             Error(
                                 HostError.Transport
                                     "the second host activation failed: the machine state directory is missing"
                             )
-
-                    let workId = workIdOf (ports.Paths.ProjectId + "|" + root)
-                    let ownerId = workId
-
-                    // The durable work opening of this host's root session.
-                    // A session-root opening is not an execution tenure, so
-                    // the plan sequence is the right one.
-                    match
-                        DurableWorkHost.ensureOpened
-                            stateRoot
-                            workId
-                            (workId + ":open:0")
-                            root
-                            (DurableWorkHost.planSequence ())
-                            ownerId
-                            0.0
-                    with
-                    | Error reason ->
-                        return
-                            Error(
-                                HostError.Transport(
-                                    "the second host activation failed to open its durable work: " + reason
-                                )
-                            )
-                    | Ok _ -> ()
-
-                    // A real Ownership fact: the activation scope is opened in
-                    // the durable ownership registry, so the scope that owns
-                    // this host's work is a durable fact, not an in-memory one.
-                    let registryId = "host-activation"
-                    let scopeId = "host-activation:" + ports.Paths.ProjectId
-
-                    let receipt =
-                        DurableWorkHost.executeOwnershipDurable
-                            stateRoot
-                            registryId
-                            (scopeId + ":open")
-                            (DurableWorkHost.ownershipMessage "OpenScope" [ "scopeId", box scopeId; "parentId", null ])
-
-                    let committed =
-                        receipt.Status = "Committed"
-                        || receipt.Status = "Replayed"
-                        // An idempotent re-opening of the same scope is an
-                        // observation of the same durable scope, not a failure.
-                        || (receipt.Status = "Observed" && receipt.Kind = "ScopeOpened")
-
-                    if not committed then
-                        return
-                            Error(
-                                HostError.Transport(
-                                    "the second host activation failed to open its ownership scope: "
-                                    + receipt.Status
-                                    + (if String.IsNullOrWhiteSpace receipt.Reason then
-                                           ""
-                                       else
-                                           " (" + receipt.Reason + ")")
-                                )
-                            )
+                        else
+                            openActivationWork stateRoot (activationWorkId ports root) root
+                            |> Result.bind (fun () -> openActivationScope ports stateRoot)
 
                     // The one product tool of this host: it hands a message to
                     // a child session and returns the child's reply.
@@ -392,6 +432,15 @@ module HostPlugin =
                             JsonSchema(
                                 "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"}},"
                                 + "\"required\":[\"text\"]}"
+                            )
+                          // The tool is admitted by the session's own durable
+                          // work: only a session whose work is open in the
+                          // journal may deliver. A call without that durable
+                          // evidence is refused.
+                          Admission =
+                            Some(
+                                ToolAdmission.PrivateAttachment(fun invocation ->
+                                    ownsActivationWork stateRoot (Identity.SessionId.value invocation.Session))
                             )
                           Execute =
                             fun invocation ->
@@ -404,9 +453,7 @@ module HostPlugin =
                                         return! deliverToChild ports stateRoot root text (Some invocation.Session)
                                 } }
 
-                    match ports.Tools.Register [ deliverSpec ] with
-                    | Error error -> return Error error
-                    | Ok() -> ()
+                    let registration = ports.Tools.Register [ deliverSpec ]
 
                     let turn: ITurnTransform =
                         { new ITurnTransform with
@@ -421,6 +468,7 @@ module HostPlugin =
                                     let role = roleOf context
 
                                     let english = PromptResources.systemForRole ProviderLanguage.English role
+
                                     let chinese = PromptResources.systemForRole ProviderLanguage.SimplifiedChinese role
 
                                     return system @ [ english; chinese ]
@@ -450,15 +498,16 @@ module HostPlugin =
                                 // No product description/schema rewrite exists
                                 // for this host yet; the neutral default keeps
                                 // the host's definition.
-                                Task.FromResult(ToolDefinitionEdit.Keep) }
+                                ToolDefinitionEdit.Keep }
 
                     let compaction: ICompactionGate =
                         { new ICompactionGate with
                             member _.OnCompacting(_session: SessionId) =
-                                // The product compaction policy (Host/CompactionPolicy)
-                                // owns the contribution; it has no second-host
-                                // binding yet, so the neutral default contributes
-                                // nothing to the host's compaction.
+                                // The product compaction policy
+                                // (Host/CompactionPolicy) owns the contribution;
+                                // it has no second-host binding yet, so the
+                                // neutral default contributes nothing to the
+                                // host's compaction.
                                 Task.FromResult(CompactionContribution.Nothing)
 
                             member _.AutoContinue(_session: SessionId) =
@@ -469,19 +518,27 @@ module HostPlugin =
 
                     let onSignal (signal: HostSignal) : Task =
                         task {
-                            // The product's durable command vocabulary for a
-                            // host's tool and attempt facts (ToolStarted,
-                            // AttemptFinished) is owned by the product's
-                            // per-turn journal; it has no second-host binding
-                            // yet, so no durable command kind is issued here.
-                            // The fact is not silently dropped: the host's
-                            // diagnostic sink records it.
-                            ports.Diagnostics.Emit(
-                                "second-host-signal-unmapped",
-                                [ "signal", string signal
-                                  "reason",
-                                  "no product command kind exists for host tool/attempt facts in the second host" ]
-                            )
+                            match signal with
+                            | HostSignal.SessionCreated info ->
+                                // The host announced a session, so the product
+                                // opens that session's durable work. The journal
+                                // then holds the evidence the tool admission
+                                // reads back.
+                                openSessionWork stateRoot root (Identity.SessionId.value info.Id)
+                            | _ ->
+                                // The product's durable command vocabulary for a
+                                // host's tool and attempt facts (ToolStarted,
+                                // AttemptFinished) is owned by the product's
+                                // per-turn journal; it has no second-host binding
+                                // yet, so no durable command kind is issued here.
+                                // The fact is not silently dropped: the host's
+                                // diagnostic sink records it.
+                                ports.Diagnostics.Emit(
+                                    "second-host-signal-unmapped",
+                                    [ "signal", string signal
+                                      "reason",
+                                      "no product command kind exists for host tool/attempt facts in the second host" ]
+                                )
                         }
 
                     let dispose () : Task =
@@ -490,12 +547,19 @@ module HostPlugin =
                         // machine state directory, not in this process.
                         Task.FromResult()
 
-                    return
-                        Ok
-                            { ToolGate = toolGate
-                              Turn = turn
-                              Compaction = compaction
-                              Spawn = None
-                              OnSignal = onSignal
-                              Dispose = dispose }
+                    let hooks: ProductHooks =
+                        { ToolGate = Some toolGate
+                          Turn = Some turn
+                          Compaction = compaction
+                          Spawn = None
+                          OnSignal = Some onSignal
+                          Dispose = dispose }
+
+                    let outcome: Result<ProductHooks, HostError> =
+                        match opening, registration with
+                        | Error error, _ -> Error error
+                        | Ok(), Error error -> Error error
+                        | Ok(), Ok() -> Ok hooks
+
+                    return outcome
                 } }
