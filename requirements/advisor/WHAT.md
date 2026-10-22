@@ -14,11 +14,11 @@
 2. `view`——调用方**当前区间**按 `reportMapping` 投影出的上下文视图，按仓库统一的 TOML 视图格式渲染（`# ` 注释表头 + `[[new_work_to_record]]` 数据表，`SyntheticToml` 词汇）；
 3. `intent`——本次要顾问裁决的问题，**自成一条 user prompt**，与 view 不合并。
 
-调用面是 `this.advisor(intent, reportMapping)`：第二参数是 **reportMapping**，形态为 `Record<string, null|string>`（键是非负整数锚点编号字符串，值只能是 `null` 或非空摘要字符串），**没有** `prefixUntil` 字段。它等价于统一声明 `{ prefixUntil: 0, thenMap: reportMapping }`（`AnchorSurface.parseReportMapping`）：因此没有受保护的前缀段，锚点 0 本身可被替换，映射里未出现的锚点按保留处理。声明与投影复用 `AnchorSurface.parseReportMapping` / `AnchorSurface.reportMaterial`（只读投影：不消费 pending view、不写永久压缩），语义依 context-compression [031]。
+调用面是 `this.advisor(intent, reportMapping)`：第二参数是 **reportMapping**，形态为 `Record<string, null|string>`（键是非负整数锚点编号字符串，值只能是 `null` 或非空摘要字符串），**没有** `prefixUntil` 字段。它等价于统一声明 `{ prefixUntil: 0, thenMap: reportMapping }`（`AnchorSurface.parseReportMapping`）：因此没有受保护的前缀段，锚点 0 本身可被替换，映射里未出现的锚点不传给顾问。声明与投影复用 `AnchorSurface.parseReportMapping` / `AnchorSurface.reportMaterial`（只读投影：不消费 pending view、不写永久压缩），语义依 context-compression [031]。
 
 `reportMapping` **必填**：缺失（`undefined`/`null`）或形状非法（缺字段、非法编号、非对象映射、非法值或空白摘要）→ 整次调用以 `VIEW_DECLARATION_INVALID` 拒绝，交回数据信封 `{ ok: false, code: "VIEW_DECLARATION_INVALID", reason }`，不咨询顾问、不留下部分效果。**「缺省按空映射静默处理」的宽容路径已退役**：空对象 `{}` 是合法映射（等价于不做任何替换），而缺失的 `reportMapping` 是非法输入。
 
-一次咨询的可见范围 = 调用方自己的当前区间，按 `reportMapping` 投影：被摘要的锚点以其最新完整区间（其代表的原文、无独立锚点的内容及此前并入的摘要）整体替换，`null` 与漏项保留原文，隐含锚点 0 永远指向内容最开头。共享已有压缩状态与存活锚点的最新区间。`reportMapping` 不是内容交付范围，也不是已交付位置：交付的是投影后的视图本身。
+一次咨询的可见范围 = 调用方自己的当前区间，按 `reportMapping` 投影：写了摘要的锚点以其最新完整区间整体替换，`null` 原样保留，没写的锚点不传给顾问。隐含锚点 0 永远指向内容最开头。共享已有压缩状态与存活锚点的最新区间。`reportMapping` 不是内容交付范围，也不是已交付位置：交付的是投影后的视图本身。
 
 `intent` 与 `reportMapping` 是两个分离的提示输入，互不合并：intent 自成一条 user prompt，reportMapping 只决定投影范围，不并入 intent 文本，也不与 view 文本合成一条。
 

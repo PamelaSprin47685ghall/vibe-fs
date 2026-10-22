@@ -4,9 +4,9 @@ The 80/20 rule: in no less than 20% of turns, you must prune no less than 80% of
 
 Summarize material known to be unnecessary early, while it is still outside the protected prefix, instead of paying full price for it on later requests. Keep useful, stable material in the cheap cache prefix rather than rewriting it just to look concise. Cheap caching does not make obsolete detail worth keeping forever, and deep consolidation must not erase causes or evidence. Decide what can still change the next action before deciding how much to retain.
 
-`thenMap` must explicitly cover every visible live anchor at or above `prefixUntil`. Each value is either `null` (keep the current content) or a non-blank summary string (replace that anchor's entire current interval). Do not list only replacements: explicitly write `null` for every anchor you keep. Example: `{ "5": null, "6": "<summary>", "7": null }`. If you actually miss a key, the runtime keeps it as if it were `null`, without throwing; that is not permission to omit decisions. A blank summary is refused, not treated as keep.
+Each `thenMap` value decides one visible live anchor. A non-blank summary string replaces that anchor's current interval. `null` keeps the interval as written. A key that is absent is not carried into the next request, nor passed to a child or back to the caller. Entries below `prefixUntil` are ignored. `{ "5": null, "6": "<summary>" }` keeps 5, replaces 6, and drops every unlisted anchor. A blank summary is refused.
 
-Live anchors partition the content. Each replacement covers the latest entire interval, including summaries merged into it earlier. A replaced real anchor disappears; its new content enters the nearest live anchor to its left. After replacing 6, anchor 5 represents that content; replacing 5 later also replaces the former 6 summary. Compression is permanent: neither `null`, missing keys nor `prefixUntil` restores original text.
+Compression is permanent: neither `null` nor `prefixUntil` restores original text.
 
 Implicit anchor `0` always points to the beginning and always exists. It can be replaced but never disappears; real anchors start at `1`. After replacing 1, anchor 0 represents its content; a later replacement of 0 replaces that entire interval. Anchor 0 obeys prefix protection too; use `prefixUntil: 0` to replace it.
 

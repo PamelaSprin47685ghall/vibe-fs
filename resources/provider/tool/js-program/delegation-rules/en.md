@@ -5,7 +5,7 @@ Every delegation member returns **data**, never rendered text. The harness rende
 { ok: false, code: "..." } refusal (stable kebab code)
 ```
 
-Every member that hands work to someone else — `fork`, `resume`, `commission`, `devops`, `dag`, `advisor` — carries a **report mapping** as its last argument: a `Record<string, null|string>` that maps an anchor number to a summary string or `null` (keep). The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`, so a `{ prefixUntil, thenMap }` wrapper is not accepted. The mapping is the context the host projects into the child; a missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`. The pull-side members — `join`, `horizon`, `fission` — take no report mapping.
+Every member that hands work to someone else — `fork`, `resume`, `commission`, `devops`, `dag`, `advisor` — carries a **report mapping** as its last argument: a `Record<string, null|string>` a summary replaces that anchor, `null` keeps it as written, and an unlisted anchor is not passed to the child. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`, so a `{ prefixUntil, thenMap }` wrapper is not accepted. The mapping is the context the host projects into the child; a missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`. The pull-side members — `join`, `horizon`, `fission` — take no report mapping.
 
 ## fork
 
@@ -15,7 +15,7 @@ await this.fork({ charge: "index the parser", name: "parser-index", calling: "en
 ```
 
 - Payload: string (charge) or `{ charge, name?, calling?, keywords? }`. A missing `name` is derived from the charge.
-- `reportMapping` is required: `Record<string, null|string>` — anchor number → summary or `null`. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+- `reportMapping` is required: `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
 - Result: `{ ok: true, name, agentId, outcome }` with `outcome` `created` | `nudged` | `commissioned`.
 - Refusal codes: `name-required`, `charge-required`, `unknown-calling`, `calling-conflict`, `name-already-belongs`, `warm-start-unavailable`, `context-unavailable`, `not-a-delegation-role`, `placement-failed`, `dispatch-uncertain`.
 
@@ -26,7 +26,7 @@ const resumed = await this.resume({ name: "audit-road", charge: "continue the au
 ```
 
 - Hand the next charge to a delegated worker that already exists. `resume` takes **no `calling`**: it continues the worker already in place instead of calling out to a role, so a payload carrying `calling` is refused. The payload is `{ charge, name }`: `name` names the road to continue and is required — a payload without it refuses with `name-required`.
-- `reportMapping` is required: `Record<string, null|string>` — anchor number → summary or `null`. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+- `reportMapping` is required: `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
 - Result: `{ ok: true, name, agentId, outcome }`.
 
 ## commission
@@ -36,7 +36,7 @@ await this.commission({ charge: "write the interface spec", name: "spec" }, { 1:
 ```
 
 - The orchestrator's own way to hand a charge to a worker: an orchestrator commissions the work instead of doing it. Payload is a string (charge) or `{ charge, name?, calling? }` — the same shape as `fork`, without `keywords`. A missing `name` is derived from the charge; `calling` is derived from the role when omitted, and an explicit `calling` that disagrees with the derivation is refused with `unknown-calling`.
-- `reportMapping` is required: `Record<string, null|string>` — anchor number → summary or `null`. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+- `reportMapping` is required: `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
 - Result: `{ ok: true, name, agentId, outcome }`.
 
 ## devops
@@ -46,7 +46,7 @@ const answer = await this.devops("find the flaky test", { 1: null });
 ```
 
 - A DevOps consultation that runs synchronously inside this call: the host consults DevOps and hands the answer back right away. There is no child to join and nothing is left running. `intent` is the question to ask — it carries no charge, unlike `fork` and `resume`.
-- `reportMapping` is required: `Record<string, null|string>` — anchor number → summary or `null`. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+- `reportMapping` is required: `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
 - Refusal codes: `assessment-pending-for-devops` when the DevOps seat is not bound yet or is already closed.
 - Result: `{ ok: true, record }` — the investigation's record as data.
 
@@ -82,7 +82,7 @@ const outcome = await this.dag({ nodes: [
 ```
 
 - Nodes run in dependency waves: every ready node forks, then one `join` collects the wave; a dependent node's prompt carries its dependencies' records.
-- One `reportMapping` goes to every node: the same mapping is handed to all node workers, and a node cannot replace its own copy. It is required — `Record<string, null|string>`, anchor number → summary or `null`, read by the host as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+- One `reportMapping` goes to every node: the same mapping is handed to all node workers, and a node cannot replace its own copy. It is required — `Record<string, null|string>`, a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on, read by the host as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
 - Result: `{ ok: true, results: { [id]: record }, skipped: [id...] }`.
 - **A node that fails parks the program** — the same recovery channel as `where`. The parked payload is `{ dag, node, code, deps, done, pending }`; the injected value decides:
   - `"retry"` — run the node again;
@@ -108,6 +108,6 @@ const advice = await this.advisor("Is the caching layer's eviction policy sound?
 ```
 
 - Consult this session's **dedicated advisor** — a reviewer holding no tools that answers in prose — before committing to an approach or declaring work done. The same session always reaches the same advisor, and later calls append only the new material plus the new intent, so it keeps the thread.
-- `intent` is a separate question prompt. `reportMapping` is required and is a `Record<string, null|string>` — anchor number → summary or `null`; the host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`, the shared view declaration with `prefixUntil` fixed at `0`. Generate the mapping from the current live intervals first, then take the delta against host-owned delivery facts. The first consult receives the complete material; the mapping is not a delivery boundary. The mapping must cover every visible anchor: `null` keeps, a summary replaces the whole interval, and missing keys default to null. Mapping and intent remain separate prompts.
+- `intent` is a separate question prompt. `reportMapping` is required and is a `Record<string, null|string>` — a summary replaces the anchor, `null` keeps it, an unlisted anchor is not passed on; the host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`, the shared view declaration with `prefixUntil` fixed at `0`. Generate the mapping from the current live intervals first, then take the delta against host-owned delivery facts. The first consult receives the complete material; the mapping is not a delivery boundary. A written summary replaces that anchor, `null` keeps it as written, and an unlisted anchor is not passed to the advisor. Mapping and intent remain separate prompts.
 - Result: `{ ok: true, advice }` (prose as data) or `{ ok: false, code: "advisor-unavailable", reason }`; a missing or invalid report mapping refuses with `VIEW_DECLARATION_INVALID`.
 - Treat the answer as guidance: a plan, a correction, or a stop signal. The consult itself writes nothing into your transcript.

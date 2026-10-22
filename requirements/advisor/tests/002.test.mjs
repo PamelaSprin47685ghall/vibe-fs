@@ -7,21 +7,21 @@ const messages = [1, 2, 3].map((anchor) => ({ anchor, text: 'material-' + anchor
 const request = (prefixUntil, thenMap, history = []) => ({ messages, declaration: { prefixUntil, thenMap }, history })
 const records = (result) => (parse(result.viewPrompt).new_work_to_record ?? []).map((row) => row.record)
 
-test('WHAT[advisor-002] first consult delivers the complete generated view, not a prefixUntil window', () => {
+test('WHAT[advisor-002] an empty mapping passes nothing, whatever prefixUntil says', () => {
   for (const prefixUntil of [0, 2, 3, 99]) {
     const result = plan('en', [], request(prefixUntil, {}))
-    assert.deepEqual(records(result), ['material-1', 'material-2', 'material-3'])
-    assert.deepEqual(result.deliveredAnchors, [1, 2, 3])
+    assert.deepEqual(records(result), [])
+    assert.deepEqual(result.deliveredAnchors, [])
     assert.equal(result.hasNewMaterial, true)
     assert.equal(result.viewPrompt.startsWith('# '), true)
     assert.equal(result.viewPrompt.endsWith('\n'), true)
   }
 })
 
-test('WHAT[advisor-002] shared view protects prefix, accepts null and missing keys, and summarizes at the boundary', () => {
-  const result = plan('en', [], request(2, { 1: 'forbidden', 2: 'summary-two', 3: null }))
-  assert.deepEqual(records(result), ['material-1', 'summary-two', 'material-3'])
-  assert.deepEqual(result.deliveredAnchors, [1, 2, 3])
+test('WHAT[advisor-002] a written summary replaces, null keeps, and an unlisted anchor is not passed', () => {
+  const result = plan('en', [], request(0, { 2: 'summary-two', 3: null }))
+  assert.deepEqual(records(result), ['summary-two', 'material-3'])
+  assert.deepEqual(result.deliveredAnchors, [2, 3])
 })
 
 test('WHAT[advisor-002] prior compression remains and a later replacement covers the latest interval', () => {

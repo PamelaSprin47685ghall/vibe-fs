@@ -274,9 +274,9 @@ Exec capability 投影 `this.call(command, planB)`。`command` 是一条 shell �
 
 顶层上下文整理声明由**两个扁平顶层参数**承载：`prefixUntil` 是非负整数锚点编号（number），`thenMap` 是编号到非空摘要或 null 的映射（record）。生成编程工具的调用面接受这两个可选参数：两者都不给，本次不设声明、保持既有视图；只给其一，或给出残缺的形状，按非法形状处理。**旧的 `view` 包装对象已退役**：调用面残留 `view` 参数直接以 `VIEW_DECLARATION_INVALID` 拒绝（reason 点明改用扁平的 prefixUntil 与 thenMap），不执行程序、不留下部分效果。完整规则由 context-compression [031] 唯一规定：存活锚点划分最新区间，摘要整段替换并永久生效，真实锚点替换后消失，0 隐含且永存。
 
-提示词要求 thenMap 覆盖所有保护范围外的可见锚点，null 表示保留；漏项按 null 保留，不抛错。本轮 map 对小于 prefixUntil 的编号静默忽略，历史压缩不因此逆转。形状非法以 VIEW_DECLARATION_INVALID 拒绝，不保留旧字段或兼容别名。声明在工具调用时捕获，供下一请求消费一次；替换状态持续存在。捕获阶段只校验不写入：声明只在调用成功结算后提交，失败的调用不提交声明，也不覆盖此前已提交的声明；失败调用不留下任何可呈现的记录，已合法提交的声明不得被后续失败抹掉。
+提示词要求 thenMap 对每个要处理的锚点表态：非空摘要替换，`null` 原样保留，没写的不进入下一请求。本轮 map 对小于 prefixUntil 的编号静默忽略，历史压缩不因此逆转。形状非法以 VIEW_DECLARATION_INVALID 拒绝，不保留旧字段或兼容别名。声明在工具调用时捕获，供下一请求消费一次；替换状态持续存在。捕获阶段只校验不写入：声明只在调用成功结算后提交，失败的调用不提交声明，也不覆盖此前已提交的声明；失败调用不留下任何可呈现的记录，已合法提交的声明不得被后续失败抹掉。
 
-成员层的报告材料是另一个形状：`reportMapping` 是 `Record<string, null|string>`（键是非负整数锚点编号字符串，值只能是 null 或非空摘要字符串），**没有 prefixUntil**，也不接受任何其他字段；语义等价于一份 `{ prefixUntil: 0, thenMap: reportMapping }` 的声明（context-compression [032]），因此没有受保护的前缀段、锚点 0 本身可被替换，映射里未出现的锚点按保留处理。reportMapping 必填：缺失或非法（缺字段、非法编号、非对象映射、非法值或空白摘要）→ 数据信封拒绝 `{ ok: false, code: "VIEW_DECLARATION_INVALID", reason }`；空对象 `{}` 是合法映射（等价于不做任何替换性投影）。两层形态不得混用：顶层是 prefixUntil + thenMap 的扁平参数对，成员是单份 reportMapping 记录。规则源唯一，委派路径、advisor 路径与交付路径只引用本条与 context-compression [032]，不各自复制一份形状与拒绝语义的表述。双语教学资源为 tool/js-program/view-declaration-extra。
+成员层的报告材料是另一个形状：`reportMapping` 是 `Record<string, null|string>`（键是非负整数锚点编号字符串，值只能是 null 或非空摘要字符串），**没有 prefixUntil**，也不接受任何其他字段；语义等价于一份 `{ prefixUntil: 0, thenMap: reportMapping }` 的声明（context-compression [032]），因此没有受保护的前缀段、锚点 0 本身可被替换，映射里未出现的锚点不传下去。reportMapping 必填：缺失或非法（缺字段、非法编号、非对象映射、非法值或空白摘要）→ 数据信封拒绝 `{ ok: false, code: "VIEW_DECLARATION_INVALID", reason }`；空对象 `{}` 是合法映射（等价于不做任何替换性投影）。两层形态不得混用：顶层是 prefixUntil + thenMap 的扁平参数对，成员是单份 reportMapping 记录。规则源唯一，委派路径、advisor 路径与交付路径只引用本条与 context-compression [032]，不各自复制一份形状与拒绝语义的表述。双语教学资源为 tool/js-program/view-declaration-extra。
 
 ## [054] deliver 的 reportMapping 交付
 
