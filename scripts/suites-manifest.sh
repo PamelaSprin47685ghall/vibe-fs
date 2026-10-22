@@ -14,10 +14,14 @@
 #
 # Contract:
 #   * REPO must point at a clone/worktree whose `dist/` was produced by
-#       flock /home/hermes/work/vfs-build.lock node scripts/build.mjs --clean
+#       node scripts/build.mjs
 #     The staleness gate refuses to run against a stale build, so build FIRST.
+#     `scripts/build.mjs` compiles the impact closure only and takes the
+#     build lock itself (`.fable-build/build.lock`); there is no external
+#     lock to wrap it in, and `--clean` is not a valid argument (a full
+#     rebuild is forbidden — see scripts/checks/aggregate-retired.mjs).
 #   * The build lock is NOT held here. Tests never run under the build lock.
-#     Compilation is a global singleton and must happen inside ONE build-slot
+#     Compilation is a global singleton and must happen inside ONE build
 #     invocation, so any test that compiles internally is dropped, and the
 #     integration/release tiers are explicitly disabled below.
 #   * Every run is `timeout`-wrapped. No paid / real model calls: the unit
@@ -99,7 +103,7 @@ if [ ! -f "$REPO/$RUNNER" ]; then
   exit 2
 fi
 if [ ! -d "$REPO/dist" ]; then
-  echo "FATAL: $REPO/dist missing - build first (flock /home/hermes/work/vfs-build.lock node scripts/build.mjs --clean)" >&2
+  echo "FATAL: $REPO/dist missing - build first (node scripts/build.mjs)" >&2
   exit 2
 fi
 
@@ -116,8 +120,8 @@ if [ ${#REQUESTED[@]} -eq 0 ]; then
 fi
 
 # Owner rule: every compilation is a global singleton and must run inside ONE
-# flock /home/hermes/work/vfs-build.lock invocation. These test files compile
-# internally (fable / dotnet), so they must NOT be run outside the lock.
+# build invocation. These test files compile internally (fable / dotnet), so
+# they must NOT be run outside the lock.
 # They are dropped here rather than executed against the prebuilt dist.
 COMPILE_EXCLUDED=(
   "requirements/repository-programming/tests/050.test.mjs"

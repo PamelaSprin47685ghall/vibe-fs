@@ -1,6 +1,34 @@
 # Changelog — 版本历史
 
 
+## Unreleased — 构建入口修复（`node scripts/build.mjs` 此前对所有调用都失败）+ 验收命令纠正
+
+- **代码落地（已推 `origin/master`）**：`ff0b22f8c79f5c507958c80bb315e43e782e7192`（范围 `dc5d98b92..ff0b22f8c`），提交标题 `fix(build): repair the build entrypoint the impact-closure change broke`。改动文件只有 `scripts/build.mjs`（+2/-2）。
+- **坏掉的症状**：`node scripts/build.mjs` 对**所有**调用形式都立即失败：
+
+  ```
+  ════════════════════════════════════════════════════════════════════════════════
+    BUILD FAILED
+  ════════════════════════════════════════════════════════════════════════════════
+  clean is not defined
+  ```
+
+  这不是环境问题，是 master 上的真实回归：提交 `9ffb26a66`（`fix(build): compile the impact closure and forbid a full rebuild`，2026-10-22 11:01）删掉了 `main()` 里的 `const clean = process.argv.includes('--clean')`，却保留了 `scripts/build.mjs:774` 的 `await runBuild({ targetRoot: root, clean })` —— 一个自由变量，ReferenceError。
+- **两处修复**：
+  - `scripts/build.mjs:774`：`runBuild({ targetRoot: root, clean })` → `runBuild({ targetRoot: root })`。
+    `runBuild` 本就只走影响闭包，`determineBuildDecision` 自己的 `clean = false` 默认值仍在（`scripts/build.mjs:260`）。**不恢复 `--clean` 旗标**：全量重编必须不可达，`scripts/checks/aggregate-retired.mjs:112-120` 专门禁止 `resetOutputDirectory(` 出现在 build.mjs 里。
+  - `scripts/build.mjs:282`：`existingManifest.compiler?.toolIdentity` → `existingManifest?.compiler?.toolIdentity`。
+    同一提交遗留的第二个崩溃点：没有 build manifest 的树（例如新克隆）在算出影响集之前就对 null 解引用。缺 manifest 现在是「没有基线」，不是崩溃。
+- **验证（实测）**：`node scripts/build.mjs --plan` exit 0、输出合法 plan；`node scripts/checks/aggregate-retired.mjs` → `aggregate-retired: OK`；`node scripts/checks/architecture.mjs` → `architecture: OK`。
+- **验收序列的连带纠正**：`node scripts/build.mjs --clean` **不再是合法命令**（`9ffb26a66` 故意移除 `--clean`，`scripts/build.mjs:741` 现将其作为未知参数拒绝并提示 "full compilation is forbidden"）。正确的构建命令是 `node scripts/build.mjs`（只编译影响闭包）或 `node scripts/build.mjs --plan`（只读预览）。历史验收表（CUT-38 §6 / §7.7）里的 `--clean` 是当时跑的快照，按「不改旧历史快照」保留原文。
+- **`scripts/suites-manifest.sh` 的两处活调用方已改干净**（该脚本是活脚本，不是历史快照）：
+  - 头部 Contract 注释里的示例构建命令；
+  - `dist` 缺失时那条 FATAL 提示里的构建命令。
+  两处原先都写着 `flock /home/hermes/work/vfs-build.lock node scripts/build.mjs --clean` —— 既包含已作废的 `--clean`，又引用了一个**在本仓不存在的外部锁路径**（本仓没有 `locks/` 目录；构建互斥现在由 `scripts/build.mjs` 内部的 `CrossProcessMutex` 持有，锁文件 `.fable-build/build.lock`）。现已改为 `node scripts/build.mjs`，并说明构建自己持锁、无需外部 `flock`。同文件里另外两处提到 `build-slot` / `vfs-build.lock` 的注释一并更正。
+- **实测 smoke（参数路径）**：`bash -n scripts/suites-manifest.sh` 通过；`--help` 输出正常；`REPO` 指向无 `dist` 的目录时打印新的 FATAL 文本并退出 2；`REPO=<本仓> bash scripts/suites-manifest.sh advisor` 正确解析出 4 个 advisor 测试文件并落到 `summary.txt`（该次 group 运行 exit 1 是**运行器自身的陈旧度门**按预期拒绝：`runner: refusing to run. / Compiler inputs changed` —— 当时并发 worker 正在改 `src/`，与本改动无关）。
+- **提交与部署的区别（本条只到「已推」为止）**：**提交成功、已推送 `origin/master`（fast-forward `dc5d98b92..ff0b22f8c`，无 force push）。** 但**尚未部署**、**尚未在合并后的整棵树上通过完整验收**：当前整合树**仍编译不过**（139 个 F# 错误 / 23 个文件），已按文件归属分派给各 owner。`scripts/build.mjs` 的入口修复只保证「构建能启动」，**不构成「构建通过」**。
+
+
 ## Unreleased — vs-006 控制金字塔切片落地（`SessionSnapshotPort.fs` 2 条 match-pyramid 清零）+ 006 红例精确诊断
 
 - **代码落地（已推 `origin/master`）**：`a46af54fda09a53d420671f86d8fc74e5d3f9fdf`（范围 `a2d2787cb..a46af54fd`，1 个文件，+10/-14），提交标题 `refactor(opencode-host): name the session-row identity decision instead of nesting a match`。改动文件只有 `src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs`。
