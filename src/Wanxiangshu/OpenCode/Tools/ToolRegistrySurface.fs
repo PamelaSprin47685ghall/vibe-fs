@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Tool
 open Wanxiangshu.Interaction.Authority
@@ -18,7 +19,7 @@ module ToolRegistrySurface =
     let rolePredicate (toolName: string) (roleLabel: string) : bool =
         match Roles.tryParseRole roleLabel with
         | None -> false
-        | Some role -> ToolAdmissionTable.rolePredicate toolName "surface-session" role
+        | Some role -> ToolAdmissionTable.officeRolePredicate toolName (AgentRole(Roles.roleLabel role))
 
     /// capability-enforcement-006: which authority the execute gate resolves for a tool. `office`
     /// needs the session's established public Role; `private-attachment` is an
@@ -35,7 +36,7 @@ module ToolRegistrySurface =
     /// capability-enforcement-006: the internal-leaf decision for a session holding no public
     /// office profile. Office tools always answer false here.
     let privateAttachmentAdmits (toolName: string) (sessionId: string) : bool =
-        ToolAdmissionTable.privateAttachmentAdmits toolName sessionId
+        ToolAdmissionTable.privateAttachmentAdmitsForSession toolName sessionId
 
     let private requestKindOf (label: string) : ProviderRequestKind option =
         match label.ToLowerInvariant() with

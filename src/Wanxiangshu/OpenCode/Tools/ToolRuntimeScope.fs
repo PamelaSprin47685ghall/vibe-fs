@@ -1120,6 +1120,18 @@ type ToolRuntimeScope
         DeliveryAttemptLedger.hasEstablished sid
         || DeliveryAttemptLedger.hasDurableEstablished journal sid
 
+    static member EstablishedDeliveryCallId(sessionId: string, physicalUserMessageId: string) : string option =
+        let sid = SessionId.create sessionId
+
+        let physical =
+            if String.IsNullOrWhiteSpace physicalUserMessageId then
+                None
+            else
+                Some(PhysicalUserMessageId.create physicalUserMessageId)
+
+        DeliveryAttemptLedger.tryFindEstablished sid physical
+        |> Option.map (fun (fence, _) -> ToolCallId.value fence.CallId)
+
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member _.RunStarted = onStarted
 

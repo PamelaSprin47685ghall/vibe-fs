@@ -1,53 +1,72 @@
 namespace Wanxiangshu.Execution.Tool
 
 open Wanxiangshu.Foundation
-open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Repository.Programming.Js
 
+/// The declared authority of every product tool, as product policy. Host
+/// adapters attach these to the tools they register; they never decide one
+/// themselves.
+///
+/// The role that reaches a predicate is the neutral `AgentRole` the product
+/// projected from the established authority profile. The predicate resolves it
+/// into the product's own role vocabulary and asks the office capability
+/// table; a label the product does not know resolves to no role and therefore
+/// to no permission, so it admits nothing.
 module ToolAdmissions =
 
+    /// Resolve the neutral role into the product role vocabulary. Only the
+    /// product knows which labels exist; an unknown label has no role.
+    let private roleOf (role: AgentRole) : Role option =
+        match role with
+        | AgentRole label -> Roles.tryParseRole label
+
+    let private officeRole (predicate: Role -> bool) : ToolAdmission =
+        ToolAdmission.OfficeRole(fun role ->
+            match roleOf role with
+            | Some productRole -> predicate productRole
+            | None -> false)
+
     let join: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Join)
+        officeRole (fun r -> OfficeCapability.isAllowed r ToolPermission.Join)
 
     let horizon: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Horizon)
+        officeRole (fun r -> OfficeCapability.isAllowed r ToolPermission.Horizon)
 
     let fission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fission)
+        officeRole (fun r -> OfficeCapability.isAllowed r ToolPermission.Fission)
 
     let review: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ role ->
+        officeRole (fun role ->
             OfficeCapability.isAllowed role ToolPermission.ReviewAssessment
             || OfficeCapability.isAllowed role ToolPermission.Review)
 
     let deliver: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ role ->
+        officeRole (fun role ->
             OfficeCapability.isAllowed role ToolPermission.Finality
             || OfficeCapability.isAllowed role ToolPermission.Deliver)
 
     let bashHoneypot: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.BashHoneypot)
+        officeRole (fun r -> OfficeCapability.isAllowed r ToolPermission.BashHoneypot)
 
     let assume: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.admitsUtility role "assume")
+        officeRole (fun role -> OfficeCapability.admitsUtility role "assume")
 
     let fetch: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
+        officeRole (fun r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
 
     /// fork is the manager's own delegation tool; resume also answers the plan
     /// role, and commission is the orchestrator's hand-off.
-    let fork: ToolAdmission = ToolAdmission.OfficeRole(fun _ r -> r = Role.Manager)
+    let fork: ToolAdmission = officeRole (fun r -> r = Role.Manager)
 
-    let resume: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> r = Role.Manager || r = Role.Plan)
+    let resume: ToolAdmission = officeRole (fun r -> r = Role.Manager || r = Role.Plan)
 
-    let commission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> r = Role.Orchestrator)
+    let commission: ToolAdmission = officeRole (fun r -> r = Role.Orchestrator)
 
     let programmingFor (roleName: string) : ToolAdmission =
         // Same predicate as StaticTools.jsPermission and JsToolGenerator: the
         // role's office permissions must project a non-empty programming surface
         // (JsPlan expands inside ofToolCapabilities). No second permission list.
-        ToolAdmission.OfficeRole(fun _ r ->
+        officeRole (fun r ->
             (string r).ToLowerInvariant() = roleName.ToLowerInvariant()
             && JsCapability.admitsProgrammingSurface (OfficeCapability.permissions r))

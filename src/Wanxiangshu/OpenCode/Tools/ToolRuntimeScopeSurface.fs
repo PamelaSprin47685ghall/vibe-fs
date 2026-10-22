@@ -339,10 +339,7 @@ type ToolRuntimeScopeSurface =
     /// hook's delivery adjudication uses), or None when nothing is established there.
     [<CompiledName("establishedDeliveryCallId")>]
     static member establishedDeliveryCallId(sessionId: string, physicalUserMessageId: string) : string option =
-        DeliveryAttemptLedger.tryFindEstablished
-            (SessionId.create sessionId)
-            (Some(PhysicalUserMessageId.create physicalUserMessageId))
-        |> Option.map (fun (fence, _) -> ToolCallId.value fence.CallId)
+        ToolRuntimeScope.EstablishedDeliveryCallId(sessionId, physicalUserMessageId)
 
     [<CompiledName("verifyOwnershipRetirementContract")>]
     static member verifyOwnershipRetirementContract(scenario: obj) : Task<obj> =

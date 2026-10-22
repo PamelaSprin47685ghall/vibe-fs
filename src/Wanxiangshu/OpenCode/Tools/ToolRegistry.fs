@@ -279,7 +279,7 @@ module ToolRegistry =
         /// registered (a Change road's worktree), so the surface follows the
         /// session instead of the plugin's project directory.
         let jsRootOf (sessionId: string) =
-            JsToolSpec.rootForSession sessionDirectories (defaultArg workspaceDirectory "") sessionId
+            JsToolPolicy.rootForSession sessionDirectories (defaultArg workspaceDirectory "") sessionId
 
         let runtime =
             new ToolRuntimeScope(
@@ -1262,8 +1262,8 @@ module ToolRegistry =
               yield! generatedJsSpecs () ]
 
         let gateFacts: ToolGateFacts =
-            { RoleFor = (fun ctx -> runtime.RoleFor ctx)
-              EnsureRoleFor = (fun ctx -> runtime.EnsureRoleFor ctx)
+            { RoleFor = (fun (ctx: HostToolContext) -> runtime.RoleFor ctx)
+              EnsureRoleFor = (fun (ctx: HostToolContext) -> runtime.EnsureRoleFor ctx)
               ManagerFactsFor = (fun sessionId -> runtime.ManagerCapabilityFactsFor sessionId)
               IsRetirementFrozen = (fun sessionId -> runtime.IsRetirementFrozen sessionId)
               IsWaitingForUser = runtime.IsWaitingForUser
@@ -1272,7 +1272,7 @@ module ToolRegistry =
               EndToolExecution = endToolExecution
               RecordedDeliverReplay = recordedDeliverReplay }
 
-        let gateExecute (spec: ToolSpec) =
+        let gateExecute (spec: Wanxiangshu.OpenCode.ToolSpec) =
             let managerPermission =
                 match ManagerReviewTools.requiredPermissions spec.Name with
                 | Some perms -> perms |> Seq.tryHead

@@ -1,12 +1,15 @@
 namespace Wanxiangshu.Execution.Tool
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Ablation
 open Wanxiangshu.Execution.Routing
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.AsyncSupport
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Participant.Provider
 
 /// The part of a product tool the execute gate reads: its product name and its
@@ -151,7 +154,69 @@ module ToolExecuteGate =
                 None
         )
 
+    // GAP-088: one todo-write append tail per (session, provider run). A single
+    // assistant message dispatches several `todowrite-for-*` calls concurrently;
+    // each appends to the same todo file, so they must commit in arrival order
+    // rather than overlap. Two distinct provider runs (including child sessions)
+    // never share a key, so they stay mutually unblocked.
+    // DSL-MUTABLE: single-flight — todo-write tail by (session, provider run).
+    let private todoWriteTailGate = obj ()
+    let private todoWriteTails = Dictionary<string * string, Task>()
 
+    let private awaitTodoWriteTail (tail: Task) =
+        task {
+            try
+                do! tail
+            with _ ->
+                ()
+        }
+
+    let private releaseTodoWriteTail key (completion: TaskCompletionSource<unit>) (completionTask: Task) =
+        trySetResult completion () |> ignore
+
+        lock todoWriteTailGate (fun () ->
+            match todoWriteTails.TryGetValue key with
+            | true, current when obj.ReferenceEquals(current, completionTask) -> todoWriteTails.Remove key |> ignore
+            | _ -> ())
+
+    let private serializeTodoWrite
+        (sessionId: SessionId)
+        (run: ProviderRunIdentity)
+        (body: unit -> Task<string>)
+        : Task<string> =
+        task {
+            let key = SessionId.value sessionId, ProviderRunIdentity.value run
+
+            let completion =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let completionTask = completion.Task :> Task
+
+            let prior =
+                lock todoWriteTailGate (fun () ->
+                    let current =
+                        match todoWriteTails.TryGetValue key with
+                        | true, tail -> Some tail
+                        | false, _ -> None
+
+                    todoWriteTails[key] <- completionTask
+                    current)
+
+            match prior with
+            | Some tail -> do! awaitTodoWriteTail tail
+            | None -> ()
+
+            try
+                return! body ()
+            finally
+                releaseTodoWriteTail key completion completionTask
+        }
+
+    let private executeToolBody (spec: GatedTool<'args>) (args: 'args) (ctx: HostToolContext) : Task<string> =
+        match ctx.ProviderRunId with
+        | Some run when spec.Name.StartsWith "todowrite-for-" ->
+            serializeTodoWrite (SessionId.create ctx.SessionId) run (fun () -> spec.Execute args ctx)
+        | _ -> spec.Execute args ctx
 
     /// capability-enforcement-025: current Manager facts close the office gate.
     /// A frozen retirement keeps Join, Finality and the explicit human Ask; the final incumbent
@@ -171,7 +236,7 @@ module ToolExecuteGate =
             let! replayed = gate.RecordedDeliverReplay ctx
 
             if replayed then
-                return! spec.Execute args ctx
+                return! executeToolBody spec args ctx
             else
                 return denyTaskState ctx spec.Name
         }
@@ -207,7 +272,7 @@ module ToolExecuteGate =
                 return denyTaskState ctx spec.Name
             | Some permission when not (OfficeCapability.isAllowedForManagerFacts managerFacts permission) ->
                 return! refusedOrReplayed gate spec args ctx
-            | _ -> return! spec.Execute args ctx
+            | _ -> return! executeToolBody spec args ctx
         }
 
     let private executeAdmittedRole
@@ -219,9 +284,12 @@ module ToolExecuteGate =
         (role: Role)
         : Task<string> =
         let isExactQuestionReplay =
-            match ctx.ProviderRunId, ctx.ToolCallId with
-            | Some run, Some call -> gate.WaitingQuestionFenceFor ctx.SessionId = Some(run, call)
-            | _ -> false
+            match ctx.ProviderRunId with
+            | Some run ->
+                match ctx.ToolCallId with
+                | Some call -> gate.WaitingQuestionFenceFor ctx.SessionId = Some(run, call)
+                | None -> false
+            | None -> false
 
         let isWaitingReplayExempt =
             (spec.Name = "deliver" || spec.Name.StartsWith "todowrite-for-")
@@ -234,14 +302,14 @@ module ToolExecuteGate =
         elif role = Role.Manager && spec.Name <> "todowrite-for-manager" then
             managerFactsStage gate spec managerPermission args ctx
         else
-            spec.Execute args ctx
+            executeToolBody spec args ctx
 
     /// capability-enforcement-002: office Role then admission then Manager facts.
     let private officeStage
         (gate: ToolGateFacts)
         (spec: GatedTool<'args>)
         (managerPermission: ToolPermission option)
-        (officeAdmission: HostToolContext -> Role -> bool)
+        (officeAdmission: AgentRole -> bool)
         (args: 'args)
         (ctx: HostToolContext)
         : Task<string> =
@@ -252,7 +320,7 @@ module ToolExecuteGate =
                 | None -> gate.EnsureRoleFor ctx
 
             match resolvedRole with
-            | Some role when officeAdmission ctx role ->
+            | Some role when officeAdmission (AgentRole(Roles.roleLabel role)) ->
                 return! executeAdmittedRole gate spec managerPermission args ctx role
             | Some role -> return denyRole ctx spec.Name role
             | None -> return denied ctx spec.Name Path.DeniedUnestablished Map.empty None
@@ -262,15 +330,10 @@ module ToolExecuteGate =
     /// public office Role here would deny the Bookkeeper its own exact tool,
     /// because a HostInternal prompt deliberately installs no public authority
     /// profile.
-    let private attachmentStage
-        (spec: GatedTool<'args>)
-        (attachmentAdmission: HostToolContext -> bool)
-        (args: 'args)
-        (ctx: HostToolContext)
-        : Task<string> =
+    let private attachmentStage (spec: GatedTool<'args>) (args: 'args) (ctx: HostToolContext) : Task<string> =
         task {
-            if attachmentAdmission ctx then
-                return! spec.Execute args ctx
+            if ToolAdmissionTable.privateAttachmentAdmitsForSession spec.Name ctx.SessionId then
+                return! executeToolBody spec args ctx
             else
                 return denied ctx spec.Name Path.DeniedUnestablished Map.empty None
         }
@@ -285,11 +348,11 @@ module ToolExecuteGate =
         match ToolAdmissionTable.tryAdmission spec.Name with
         | Some(ToolAdmission.OfficeRole officeAdmission) ->
             officeStage gate spec managerPermission officeAdmission args ctx
-        | Some(ToolAdmission.PrivateAttachment attachmentAdmission) -> attachmentStage spec attachmentAdmission args ctx
+        | Some(ToolAdmission.PrivateAttachment _) -> attachmentStage spec args ctx
         | None ->
             // An unknown tool name is refused exactly like an office-role
             // denial: same prose, same substitutions, no authority.
-            officeStage gate spec managerPermission (fun _ _ -> false) args ctx
+            officeStage gate spec managerPermission (fun _ -> false) args ctx
 
     let private runAfterAblation
         (gate: ToolGateFacts)

@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 
 /// The part of a product tool the execute gate reads: its product name and its
 /// body. The admission is not carried here; the gate resolves it from the

@@ -86,6 +86,7 @@ type ToolRuntimeScope =
     member RecordDeliveryPresented: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit
 
     member HasEstablishedDelivery: sessionId: string -> bool
+    static member EstablishedDeliveryCallId: sessionId: string * physicalUserMessageId: string -> string option
 
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member RunStarted: (SessionId -> Role -> string option -> unit)
