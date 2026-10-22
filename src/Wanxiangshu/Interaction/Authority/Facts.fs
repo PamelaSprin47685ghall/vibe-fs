@@ -56,6 +56,41 @@ type UserQuestionAnsweredPayload =
       ToolCallId: ToolCallId
       PhysicalUserMessageId: PhysicalUserMessageId }
 
+/// The durable terminal outcome of a managed (non-Manager) HumanRoot run.
+/// It is the unique legal source witness for `HumanRootManagedRun`.
+type AuthorityManagedRunTerminalPayload =
+    { SessionId: SessionId
+      LogicalRunId: LogicalRunId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      FactId: string }
+
+/// The durable terminal outcome of an agent-owner child work.
+type AuthorityChildWorkTerminalPayload =
+    { SessionId: SessionId
+      OwnerLogicalRunId: string
+      ChildLogicalRunId: LogicalRunId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      FactId: string }
+
+/// The durable terminal outcome of an agent-owner attached work.
+type AuthorityAttachedWorkTerminalPayload =
+    { SessionId: SessionId
+      OwnerLogicalRunId: string
+      ChildLogicalRunId: LogicalRunId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      AttachmentKind: string
+      AssociationGeneration: string
+      FactId: string }
+
+/// The durable terminal outcome of an agent-owner internal leaf.
+type AuthorityInternalLeafTerminalPayload =
+    { SessionId: SessionId
+      OwnerLogicalRunId: string
+      LeafLogicalRunId: LogicalRunId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      DecisionOrTransactionId: string
+      FactId: string }
+
 type PromptFactCases =
     | PluginPromptClaimed of
         {| PromptKey: PromptKey
@@ -81,3 +116,7 @@ type PromptFactCases =
     | AuthorityLogicalRunClosed of AuthorityLogicalRunClosedPayload
     | UserQuestionAsked of UserQuestionAskedPayload
     | UserQuestionAnswered of UserQuestionAnsweredPayload
+    | AuthorityManagedRunTerminal of AuthorityManagedRunTerminalPayload
+    | AuthorityChildWorkTerminal of AuthorityChildWorkTerminalPayload
+    | AuthorityAttachedWorkTerminal of AuthorityAttachedWorkTerminalPayload
+    | AuthorityInternalLeafTerminal of AuthorityInternalLeafTerminalPayload

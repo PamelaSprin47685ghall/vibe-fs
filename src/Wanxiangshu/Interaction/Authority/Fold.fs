@@ -284,5 +284,9 @@ module PromptFactFold =
         // ── closure ─────────────────────────────────────────────────────────
 
         | PromptFactCases.AuthorityLogicalRunClosed payload -> foldAuthorityLogicalRunClosed authorityOf payload
+        | PromptFactCases.AuthorityManagedRunTerminal _ -> Ok []
+        | PromptFactCases.AuthorityChildWorkTerminal _ -> Ok []
+        | PromptFactCases.AuthorityAttachedWorkTerminal _ -> Ok []
+        | PromptFactCases.AuthorityInternalLeafTerminal _ -> Ok []
         | PromptFactCases.UserQuestionAsked payload -> foldUserQuestionAsked authorityOf payload
         | PromptFactCases.UserQuestionAnswered payload -> foldUserQuestionAnswered authorityOf payload

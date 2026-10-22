@@ -128,6 +128,102 @@ module PromptFactCodec =
               "SchemaVersion", Encode.int payload.SchemaVersion
               "SessionId", taggedString "SessionId" (SessionId.value payload.SessionId) ]
 
+    let private managedRunTerminalEncoder payload =
+        Encode.object
+            [ "AuthorityRootUserMessageId",
+              taggedString
+                  "AuthorityRootUserMessageId"
+                  (AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId)
+              "FactId", Encode.string payload.FactId
+              "LogicalRunId", taggedString "LogicalRunId" (LogicalRunId.value payload.LogicalRunId)
+              "SessionId", taggedString "SessionId" (SessionId.value payload.SessionId) ]
+
+    let private childWorkTerminalEncoder payload =
+        Encode.object
+            [ "AuthorityRootUserMessageId",
+              taggedString
+                  "AuthorityRootUserMessageId"
+                  (AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId)
+              "ChildLogicalRunId", taggedString "LogicalRunId" (LogicalRunId.value payload.ChildLogicalRunId)
+              "FactId", Encode.string payload.FactId
+              "OwnerLogicalRunId", Encode.string payload.OwnerLogicalRunId
+              "SessionId", taggedString "SessionId" (SessionId.value payload.SessionId) ]
+
+    let private attachedWorkTerminalEncoder payload =
+        Encode.object
+            [ "AssociationGeneration", Encode.string payload.AssociationGeneration
+              "AttachmentKind", Encode.string payload.AttachmentKind
+              "AuthorityRootUserMessageId",
+              taggedString
+                  "AuthorityRootUserMessageId"
+                  (AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId)
+              "ChildLogicalRunId", taggedString "LogicalRunId" (LogicalRunId.value payload.ChildLogicalRunId)
+              "FactId", Encode.string payload.FactId
+              "OwnerLogicalRunId", Encode.string payload.OwnerLogicalRunId
+              "SessionId", taggedString "SessionId" (SessionId.value payload.SessionId) ]
+
+    let private internalLeafTerminalEncoder payload =
+        Encode.object
+            [ "AuthorityRootUserMessageId",
+              taggedString
+                  "AuthorityRootUserMessageId"
+                  (AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId)
+              "DecisionOrTransactionId", Encode.string payload.DecisionOrTransactionId
+              "FactId", Encode.string payload.FactId
+              "LeafLogicalRunId", taggedString "LogicalRunId" (LogicalRunId.value payload.LeafLogicalRunId)
+              "OwnerLogicalRunId", Encode.string payload.OwnerLogicalRunId
+              "SessionId", taggedString "SessionId" (SessionId.value payload.SessionId) ]
+
+    let private managedRunTerminalDecoder =
+        Decode.object (fun get ->
+            { SessionId = get.Required.Field "SessionId" (taggedStringDecoder "SessionId" SessionId.create)
+              LogicalRunId = get.Required.Field "LogicalRunId" (taggedStringDecoder "LogicalRunId" LogicalRunId.create)
+              AuthorityRootUserMessageId =
+                get.Required.Field
+                    "AuthorityRootUserMessageId"
+                    (taggedStringDecoder "AuthorityRootUserMessageId" AuthorityRootUserMessageId.create)
+              FactId = get.Required.Field "FactId" Decode.string })
+
+    let private childWorkTerminalDecoder =
+        Decode.object (fun get ->
+            { SessionId = get.Required.Field "SessionId" (taggedStringDecoder "SessionId" SessionId.create)
+              OwnerLogicalRunId = get.Required.Field "OwnerLogicalRunId" Decode.string
+              ChildLogicalRunId =
+                get.Required.Field "ChildLogicalRunId" (taggedStringDecoder "LogicalRunId" LogicalRunId.create)
+              AuthorityRootUserMessageId =
+                get.Required.Field
+                    "AuthorityRootUserMessageId"
+                    (taggedStringDecoder "AuthorityRootUserMessageId" AuthorityRootUserMessageId.create)
+              FactId = get.Required.Field "FactId" Decode.string })
+
+    let private attachedWorkTerminalDecoder =
+        Decode.object (fun get ->
+            { SessionId = get.Required.Field "SessionId" (taggedStringDecoder "SessionId" SessionId.create)
+              OwnerLogicalRunId = get.Required.Field "OwnerLogicalRunId" Decode.string
+              ChildLogicalRunId =
+                get.Required.Field "ChildLogicalRunId" (taggedStringDecoder "LogicalRunId" LogicalRunId.create)
+              AuthorityRootUserMessageId =
+                get.Required.Field
+                    "AuthorityRootUserMessageId"
+                    (taggedStringDecoder "AuthorityRootUserMessageId" AuthorityRootUserMessageId.create)
+              AttachmentKind = get.Required.Field "AttachmentKind" Decode.string
+              AssociationGeneration = get.Required.Field "AssociationGeneration" Decode.string
+              FactId = get.Required.Field "FactId" Decode.string })
+
+    let private internalLeafTerminalDecoder =
+        Decode.object (fun get ->
+            { SessionId = get.Required.Field "SessionId" (taggedStringDecoder "SessionId" SessionId.create)
+              OwnerLogicalRunId = get.Required.Field "OwnerLogicalRunId" Decode.string
+              LeafLogicalRunId =
+                get.Required.Field "LeafLogicalRunId" (taggedStringDecoder "LogicalRunId" LogicalRunId.create)
+              AuthorityRootUserMessageId =
+                get.Required.Field
+                    "AuthorityRootUserMessageId"
+                    (taggedStringDecoder "AuthorityRootUserMessageId" AuthorityRootUserMessageId.create)
+              DecisionOrTransactionId = get.Required.Field "DecisionOrTransactionId" Decode.string
+              FactId = get.Required.Field "FactId" Decode.string })
+
+
     let private taggedStringDecoder expected create =
         Decode.index 0 Decode.string
         |> Decode.andThen (fun actual ->
@@ -350,6 +446,23 @@ module PromptFactCodec =
         Decode.index 1 authorityPayloadDecoder
         |> Decode.map PromptFactCases.AuthorityRootAccepted
 
+    let private managedRunTerminalFactDecoder =
+        Decode.index 1 managedRunTerminalDecoder
+        |> Decode.map PromptFactCases.AuthorityManagedRunTerminal
+
+    let private childWorkTerminalFactDecoder =
+        Decode.index 1 childWorkTerminalDecoder
+        |> Decode.map PromptFactCases.AuthorityChildWorkTerminal
+
+    let private attachedWorkTerminalFactDecoder =
+        Decode.index 1 attachedWorkTerminalDecoder
+        |> Decode.map PromptFactCases.AuthorityAttachedWorkTerminal
+
+    let private internalLeafTerminalFactDecoder =
+        Decode.index 1 internalLeafTerminalDecoder
+        |> Decode.map PromptFactCases.AuthorityInternalLeafTerminal
+
+
     let withCoder (baseExtra: ExtraCoders) : ExtraCoders =
         let seedExtra = Extra.withCustom identitySeedEncoder identitySeedDecoder baseExtra
 
@@ -363,12 +476,33 @@ module PromptFactCodec =
             match fact with
             | PromptFactCases.AuthorityRootAccepted payload ->
                 Encode.array [| Encode.string "AuthorityRootAccepted"; authorityPayloadEncoder payload |]
+            | PromptFactCases.AuthorityManagedRunTerminal payload ->
+                Encode.array
+                    [| Encode.string "AuthorityManagedRunTerminal"
+                       managedRunTerminalEncoder payload |]
+            | PromptFactCases.AuthorityChildWorkTerminal payload ->
+                Encode.array
+                    [| Encode.string "AuthorityChildWorkTerminal"
+                       childWorkTerminalEncoder payload |]
+            | PromptFactCases.AuthorityAttachedWorkTerminal payload ->
+                Encode.array
+                    [| Encode.string "AuthorityAttachedWorkTerminal"
+                       attachedWorkTerminalEncoder payload |]
+            | PromptFactCases.AuthorityInternalLeafTerminal payload ->
+                Encode.array
+                    [| Encode.string "AuthorityInternalLeafTerminal"
+                       internalLeafTerminalEncoder payload |]
+
             | other -> autoEncoder other
 
         let decoder =
             Decode.index 0 Decode.string
             |> Decode.andThen (function
                 | "AuthorityRootAccepted" -> authorityFactDecoder
+                | "AuthorityManagedRunTerminal" -> managedRunTerminalFactDecoder
+                | "AuthorityChildWorkTerminal" -> childWorkTerminalFactDecoder
+                | "AuthorityAttachedWorkTerminal" -> attachedWorkTerminalFactDecoder
+                | "AuthorityInternalLeafTerminal" -> internalLeafTerminalFactDecoder
                 | _ -> autoDecoder)
 
         Extra.withCustom encoder decoder seedExtra

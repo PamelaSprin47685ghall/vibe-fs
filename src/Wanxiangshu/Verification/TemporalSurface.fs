@@ -234,6 +234,45 @@ module TemporalSurface =
                         | value -> Some value
                       IdentitySeed = identitySeed }
             )
+        | "Prompt", "AuthorityManagedRunTerminal" ->
+            AgentFact.Prompt(
+                PromptFactCases.AuthorityManagedRunTerminal
+                    { SessionId = sessionIdOf (payload?SessionId)
+                      LogicalRunId = logicalRunOf (payload?LogicalRunId)
+                      AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                      FactId = text (payload?FactId) }
+            )
+        | "Prompt", "AuthorityChildWorkTerminal" ->
+            AgentFact.Prompt(
+                PromptFactCases.AuthorityChildWorkTerminal
+                    { SessionId = sessionIdOf (payload?SessionId)
+                      OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                      ChildLogicalRunId = logicalRunOf (payload?ChildLogicalRunId)
+                      AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                      FactId = text (payload?FactId) }
+            )
+        | "Prompt", "AuthorityAttachedWorkTerminal" ->
+            AgentFact.Prompt(
+                PromptFactCases.AuthorityAttachedWorkTerminal
+                    { SessionId = sessionIdOf (payload?SessionId)
+                      OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                      ChildLogicalRunId = logicalRunOf (payload?ChildLogicalRunId)
+                      AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                      AttachmentKind = text (payload?AttachmentKind)
+                      AssociationGeneration = text (payload?AssociationGeneration)
+                      FactId = text (payload?FactId) }
+            )
+        | "Prompt", "AuthorityInternalLeafTerminal" ->
+            AgentFact.Prompt(
+                PromptFactCases.AuthorityInternalLeafTerminal
+                    { SessionId = sessionIdOf (payload?SessionId)
+                      OwnerLogicalRunId = text (payload?OwnerLogicalRunId)
+                      LeafLogicalRunId = logicalRunOf (payload?LeafLogicalRunId)
+                      AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                      DecisionOrTransactionId = text (payload?DecisionOrTransactionId)
+                      FactId = text (payload?FactId) }
+            )
+
         | "ProviderFailure", "FailureRecorded" ->
             AgentFact.ProviderFailure(
                 ProviderFailureFactCases.FailureRecorded
@@ -386,6 +425,56 @@ module TemporalSurface =
                            OwnerLogicalRunId = payload.OwnerLogicalRunId
                            AgentOwnerLife = payload.AgentOwnerLife
                            IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityManagedRunTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityManagedRunTerminal"
+                   payload =
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityChildWorkTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityChildWorkTerminal"
+                   payload =
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           OwnerLogicalRunId = payload.OwnerLogicalRunId
+                           ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityAttachedWorkTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityAttachedWorkTerminal"
+                   payload =
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           OwnerLogicalRunId = payload.OwnerLogicalRunId
+                           ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           AttachmentKind = payload.AttachmentKind
+                           AssociationGeneration = payload.AssociationGeneration
+                           FactId = payload.FactId |} |}
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityInternalLeafTerminal payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityInternalLeafTerminal"
+                   payload =
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           OwnerLogicalRunId = payload.OwnerLogicalRunId
+                           LeafLogicalRunId = LogicalRunId.value payload.LeafLogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           DecisionOrTransactionId = payload.DecisionOrTransactionId
+                           FactId = payload.FactId |} |}
         | Fact.Agent(AgentFact.ProviderFailure(ProviderFailureFactCases.FailureRecorded payload)) ->
             box
                 {| family = "ProviderFailure"

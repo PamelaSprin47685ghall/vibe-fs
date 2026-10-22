@@ -22,3 +22,15 @@ module PromptFact =
 
     let AuthorityLogicalRunClosed (payload: AuthorityLogicalRunClosedPayload) =
         AgentFact.Prompt(PromptFactCases.AuthorityLogicalRunClosed payload)
+
+    let AuthorityManagedRunTerminal (payload: AuthorityManagedRunTerminalPayload) =
+        AgentFact.Prompt(PromptFactCases.AuthorityManagedRunTerminal payload)
+
+    let AuthorityChildWorkTerminal (payload: AuthorityChildWorkTerminalPayload) =
+        AgentFact.Prompt(PromptFactCases.AuthorityChildWorkTerminal payload)
+
+    let AuthorityAttachedWorkTerminal (payload: AuthorityAttachedWorkTerminalPayload) =
+        AgentFact.Prompt(PromptFactCases.AuthorityAttachedWorkTerminal payload)
+
+    let AuthorityInternalLeafTerminal (payload: AuthorityInternalLeafTerminalPayload) =
+        AgentFact.Prompt(PromptFactCases.AuthorityInternalLeafTerminal payload)
