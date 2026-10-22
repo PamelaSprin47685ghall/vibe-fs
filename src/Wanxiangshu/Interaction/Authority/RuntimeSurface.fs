@@ -341,7 +341,10 @@ module RuntimeSurface =
               PhysicalLandings = physicalLandings
               AcceptedContinuationIds = accepted
               ClaimSequences = sequences
-              UserQuestions = Map.empty }
+              UserQuestions = Map.empty
+              AcceptedRootClosures = Map.empty
+              TerminalSources = Map.empty
+              ClosedRuns = Map.empty }
 
     let internal projectionToJs (projection: PromptAuthority.PromptAuthorityProjection) : obj =
         box
@@ -789,6 +792,101 @@ module RuntimeSurface =
             with
             | Ok closed -> projectionToJs closed
             | Error error -> box {| ok = false; error = error |}
+
+    /// interaction-authority-018: the durable source terminal of one
+    /// authority lifecycle, as the fact the journal records.
+    ///
+    /// The fact id is derived from the identity of the lifecycle and the
+    /// outcome, so the same outcome recorded twice names the same source.
+    let terminalSourceFact
+        (sha256: string -> string)
+        (kind: string)
+        (session: string)
+        (logicalRun: string)
+        (authorityRoot: string)
+        (ownerLogicalRunId: string)
+        (attachmentKind: string)
+        (associationGeneration: string)
+        (decisionOrTransactionId: string)
+        (outcome: string)
+        : obj =
+        let identity: AuthorityTerminalSource.TerminalIdentity =
+            { SessionId = SessionId.create session
+              LogicalRunId = LogicalRunId.create logicalRun
+              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRoot }
+
+        let terminalOutcome =
+            match outcome with
+            | "completed" -> AuthorityTerminalSource.TerminalOutcome.Completed
+            | "cancelled" -> AuthorityTerminalSource.TerminalOutcome.Cancelled
+            | "failed" -> AuthorityTerminalSource.TerminalOutcome.Failed
+            | other -> invalidArg "outcome" (sprintf "unknown terminal outcome '%s'" other)
+
+        let caseName, payload =
+            match kind with
+            | "HumanRootManagedRun" ->
+                "AuthorityManagedRunTerminal",
+                let payload =
+                    AuthorityTerminalSource.managedRunTerminal sha256 identity terminalOutcome
+
+                box
+                    {| SessionId = SessionId.value payload.SessionId
+                       LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       FactId = payload.FactId |}
+            | "AgentOwnerChildWork" ->
+                "AuthorityChildWorkTerminal",
+                let payload =
+                    AuthorityTerminalSource.childWorkTerminal sha256 identity ownerLogicalRunId terminalOutcome
+
+                box
+                    {| SessionId = SessionId.value payload.SessionId
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       FactId = payload.FactId |}
+            | "AgentOwnerAttachedWork" ->
+                "AuthorityAttachedWorkTerminal",
+                let payload =
+                    AuthorityTerminalSource.attachedWorkTerminal
+                        sha256
+                        identity
+                        ownerLogicalRunId
+                        attachmentKind
+                        associationGeneration
+                        terminalOutcome
+
+                box
+                    {| SessionId = SessionId.value payload.SessionId
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       ChildLogicalRunId = LogicalRunId.value payload.ChildLogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       AttachmentKind = payload.AttachmentKind
+                       AssociationGeneration = payload.AssociationGeneration
+                       FactId = payload.FactId |}
+            | "AgentOwnerInternalLeaf" ->
+                "AuthorityInternalLeafTerminal",
+                let payload =
+                    AuthorityTerminalSource.internalLeafTerminal
+                        sha256
+                        identity
+                        ownerLogicalRunId
+                        decisionOrTransactionId
+                        terminalOutcome
+
+                box
+                    {| SessionId = SessionId.value payload.SessionId
+                       OwnerLogicalRunId = payload.OwnerLogicalRunId
+                       LeafLogicalRunId = LogicalRunId.value payload.LeafLogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       DecisionOrTransactionId = payload.DecisionOrTransactionId
+                       FactId = payload.FactId |}
+            | other -> invalidArg "kind" (sprintf "unknown terminal source kind '%s'" other)
+
+        box
+            {| family = "Prompt"
+               case = caseName
+               payload = payload |}
 
     let resolveKnownOrigin (physical: string) (promptKey: string) (hostCompaction: bool) (projection: obj) : string =
         match projectionValidation projection with

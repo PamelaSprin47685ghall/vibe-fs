@@ -371,6 +371,45 @@ module PromptAuthority =
             PriorPhysicalInputs: Set<PhysicalUserMessageId>
         }
 
+    /// interaction-authority-018: the closure contract an accepted authority
+    /// root commits to, kept beside the profile so a closure can be judged
+    /// after the active run is gone.
+    ///
+    /// The profile itself cannot carry it: it is the execution identity, and
+    /// the closure contract is the durable answer to "how does this root
+    /// end?". A restart must still be able to tell a repeated closure from a
+    /// conflicting one, so the contract survives the close.
+    type AcceptedRootClosure =
+        { RootKind: string
+          ExpectedClosureKind: string
+          OwnerLogicalRunId: string option
+          AgentOwnerLife: string option
+          AuthorityRootUserMessageId: AuthorityRootUserMessageId }
+
+    /// interaction-authority-018: one recorded durable closure.
+    type AuthorityClosureRecord =
+        { RootKind: string
+          ClosureWitness: string }
+
+    /// interaction-authority-018: one durable source terminal.
+    ///
+    /// The fields are the witness fields of the closure kind this terminal
+    /// belongs to, so a closure can be checked against the exact source and
+    /// not merely against a fact id.
+    type AuthorityTerminalSource =
+        {
+            /// The library's closure kind this terminal is the source of:
+            /// "HumanRootManagedRun" | "AgentOwnerChildWork" |
+            /// "AgentOwnerAttachedWork" | "AgentOwnerInternalLeaf".
+            SourceKind: string
+            OwnerLogicalRunId: string option
+            ChildLogicalRunId: string option
+            AttachmentKind: string option
+            AssociationGeneration: string option
+            DecisionOrTransactionId: string option
+            FactId: string
+        }
+
     type PromptAuthorityProjection =
         {
             LastAuthorityProfile: AuthorityExecutionProfile option
@@ -407,6 +446,27 @@ module PromptAuthority =
             /// Root scopes belong to the session and keep their consumed count.
             ClaimSequences: Map<string, ClaimSequenceCounter>
             UserQuestions: Map<ToolCallId, UserQuestion>
+            /// interaction-authority-018: the closure contract of every
+            /// accepted root, keyed by its logical run.
+            ///
+            /// The accepted root is the only thing that knows which closure
+            /// kind a run may close under, so this map is what a closure is
+            /// judged against once the active run has been cleared.
+            AcceptedRootClosures: Map<LogicalRunId, AcceptedRootClosure>
+            /// interaction-authority-018: the durable source terminals of a
+            /// logical run, keyed by the run and then by the source fact id.
+            ///
+            /// A closure may only cite a source terminal that is already
+            /// durable; a closure that cites nothing durable is refused rather
+            /// than inferred.
+            TerminalSources: Map<LogicalRunId, Map<string, AuthorityTerminalSource>>
+            /// interaction-authority-018: the closure already recorded for a
+            /// logical run.
+            ///
+            /// Kept so a replay after the active run is gone can still tell an
+            /// identical closure (idempotent) from a conflicting one
+            /// (fail-closed).
+            ClosedRuns: Map<LogicalRunId, AuthorityClosureRecord>
         }
 
     let empty: PromptAuthorityProjection =
@@ -417,7 +477,10 @@ module PromptAuthority =
           PhysicalLandings = Map.empty
           AcceptedContinuationIds = Map.empty
           ClaimSequences = Map.empty
-          UserQuestions = Map.empty }
+          UserQuestions = Map.empty
+          AcceptedRootClosures = Map.empty
+          TerminalSources = Map.empty
+          ClosedRuns = Map.empty }
 
     /// Key of one logical dispatch's landing evidence: the session plus the
     /// payload digest both send paths derive identically (`sha256 text`).

@@ -33,6 +33,18 @@ module PromptAuthorityProjectionQueries =
     val lastAuthorityProfile:
         sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.AuthorityExecutionProfile option
 
+    val acceptedRootClosure:
+        sessionId: SessionId ->
+        logicalRunId: LogicalRunId ->
+        agentProjections: AgentProjectionSet ->
+            PromptAuthority.AcceptedRootClosure option
+
+    val terminalSources:
+        sessionId: SessionId ->
+        logicalRunId: LogicalRunId ->
+        agentProjections: AgentProjectionSet ->
+            PromptAuthority.AuthorityTerminalSource list
+
     /// Returns the pending claim for the given session and prompt key.
     val pendingClaim:
         sessionId: SessionId ->

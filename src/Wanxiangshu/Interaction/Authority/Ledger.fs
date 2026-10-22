@@ -89,23 +89,21 @@ module PromptAuthorityLedger =
                 |> Result.bind (fun () ->
                     PromptAuthorityRun.registerAuthority profile projection
                     |> Result.mapError PromptAuthorityRun.describeRegistrationRejection))
-
-    let private closeActiveRun (profile: PromptAuthority.AuthorityExecutionProfile) projection =
-        match PromptAuthorityRun.closeAuthority profile.LogicalRunId profile.AuthorityRootUserMessageId projection with
-        | Ok closed -> closed
-        | Error error -> invalidOp error
-
-    /// Work completion closes HumanRoot authority; AgentOwnerRoot closure belongs to its owner.
-    let closeCompletedHumanRootManager
-        (projection: PromptAuthority.PromptAuthorityProjection)
-        : PromptAuthority.PromptAuthorityProjection =
-        match projection.ActiveLogicalRun with
-        | Some profile when
-            profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-            && profile.CanonicalRole = Role.Manager
-            ->
-            closeActiveRun profile projection
-        | _ -> projection
+            // The closure contract of an accepted root outlives the run it
+            // governs: a closure that arrives after the run was closed must
+            // still be judged against the kind the acceptance committed to.
+            |> Result.map (fun registered ->
+                { registered with
+                    AcceptedRootClosures =
+                        Map.add
+                            payload.LogicalRunId
+                            ({ RootKind = payload.AuthorityKind
+                               ExpectedClosureKind = payload.ExpectedClosureKind
+                               OwnerLogicalRunId = payload.OwnerLogicalRunId
+                               AgentOwnerLife = payload.AgentOwnerLife
+                               AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId }
+                            : PromptAuthority.AcceptedRootClosure)
+                            registered.AcceptedRootClosures })
 
     /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
     ///

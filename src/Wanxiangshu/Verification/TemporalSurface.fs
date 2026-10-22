@@ -206,11 +206,16 @@ module TemporalSurface =
 
             let isManager =
                 match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity identitySeed) with
-                | Some role -> role = Roles.Manager
+                | Some role -> role = Role.Manager
                 | None -> false
 
             let closure =
-                AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+                AuthorityLifeClassification.deriveClosureKind
+                    authorityKind
+                    isManager
+                    (match text (payload?AgentOwnerLife) with
+                     | "" -> None
+                     | value -> Some value)
                 |> Option.defaultValue ("HumanRootManagedRun", None)
 
             AgentFact.Prompt(
@@ -992,24 +997,44 @@ module TemporalSurface =
     let sessionReuseIdentityScenario (firstAccepted: obj) (secondAccepted: obj) : obj =
         let accept (current: ProjectionSet) (fact: obj) = Fold.foldFact current (factOfJs fact)
 
+        /// interaction-authority-018: the prior run closes the way it closes in
+        /// production — a durable source terminal of the accepted root's own
+        /// closure kind, followed by the durable closure that cites it.
+        ///
+        /// The old witness-less close is retired: it released the identity
+        /// binding without any source, which is exactly what WHAT-018 forbids.
         let closeFirst (current: ProjectionSet) (fact: obj) =
             let sessionId = sessionIdOf (fact?payload?SessionId)
+            let logicalRunId = logicalRunOf (fact?payload?LogicalRunId)
+            let authorityRoot = authorityRootOf (fact?payload?AuthorityRootUserMessageId)
 
-            { current with
-                AgentProjections =
-                    match
-                        AgentProjection.tryUpdate
-                            sessionId
-                            (fun session ->
-                                Ok
-                                    { session with
-                                        PromptAuthority =
-                                            session.PromptAuthority
-                                            |> Option.map PromptAuthorityLedger.closeCompletedHumanRootManager })
-                            current.AgentProjections
-                    with
-                    | Ok updated -> updated
-                    | Error _ -> current.AgentProjections }
+            let source: PromptFactCases =
+                PromptFactCases.AuthorityManagedRunTerminal
+                    { SessionId = sessionId
+                      LogicalRunId = logicalRunId
+                      AuthorityRootUserMessageId = authorityRoot
+                      FactId = sprintf "terminal-%s" (LogicalRunId.value logicalRunId) }
+
+            let closure: PromptFactCases =
+                PromptFactCases.AuthorityLogicalRunClosed
+                    { SessionId = sessionId
+                      LogicalRunId = logicalRunId
+                      AuthorityRootUserMessageId = authorityRoot
+                      RootKind = "HumanRoot"
+                      ClosureWitness =
+                        sprintf
+                            "[\"ManagedLogicalRunTerminal\",\"%s\",\"terminal-%s\"]"
+                            (LogicalRunId.value logicalRunId)
+                            (LogicalRunId.value logicalRunId) }
+
+            let afterSource = Fold.foldFact current (Fact.Agent(AgentFact.Prompt source))
+
+            match afterSource with
+            | Error _ -> current
+            | Ok withSource ->
+                match Fold.foldFact withSource (Fact.Agent(AgentFact.Prompt closure)) with
+                | Ok closed -> closed
+                | Error _ -> withSource
 
         let refused reason =
             box

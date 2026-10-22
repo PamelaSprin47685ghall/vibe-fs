@@ -132,6 +132,31 @@ module PromptAuthority =
             PriorPhysicalInputs: Set<PhysicalUserMessageId>
         }
 
+    /// interaction-authority-018: the closure contract an accepted authority
+    /// root commits to, kept beside the profile so a closure can be judged
+    /// after the active run is gone.
+    type AcceptedRootClosure =
+        { RootKind: string
+          ExpectedClosureKind: string
+          OwnerLogicalRunId: string option
+          AgentOwnerLife: string option
+          AuthorityRootUserMessageId: AuthorityRootUserMessageId }
+
+    /// interaction-authority-018: one recorded durable closure.
+    type AuthorityClosureRecord =
+        { RootKind: string
+          ClosureWitness: string }
+
+    /// interaction-authority-018: one durable source terminal.
+    type AuthorityTerminalSource =
+        { SourceKind: string
+          OwnerLogicalRunId: string option
+          ChildLogicalRunId: string option
+          AttachmentKind: string option
+          AssociationGeneration: string option
+          DecisionOrTransactionId: string option
+          FactId: string }
+
     type PromptAuthorityProjection =
         { LastAuthorityProfile: AuthorityExecutionProfile option
           ActiveLogicalRun: AuthorityExecutionProfile option
@@ -140,7 +165,10 @@ module PromptAuthority =
           PhysicalLandings: Map<PhysicalUserMessageId, AcceptedDispatch>
           AcceptedContinuationIds: Map<PhysicalUserMessageId, ContinuationKind>
           ClaimSequences: Map<string, ClaimSequenceCounter>
-          UserQuestions: Map<ToolCallId, UserQuestion> }
+          UserQuestions: Map<ToolCallId, UserQuestion>
+          AcceptedRootClosures: Map<LogicalRunId, AcceptedRootClosure>
+          TerminalSources: Map<LogicalRunId, Map<string, AuthorityTerminalSource>>
+          ClosedRuns: Map<LogicalRunId, AuthorityClosureRecord> }
 
     val empty: PromptAuthorityProjection
     val acceptedDispatchKey: sessionId: SessionId -> payloadDigest: string -> string

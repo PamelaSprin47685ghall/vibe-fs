@@ -47,6 +47,7 @@ module ChildPromptAuthority =
                 turn.SessionId
                 turn.PhysicalUserMessageId
                 claim.IdentitySeed
+                None
             |> TaskValue.map (Result.map ignore)
 
     let ensureForLinkedChild

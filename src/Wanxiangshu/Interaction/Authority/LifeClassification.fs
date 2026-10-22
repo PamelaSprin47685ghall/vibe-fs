@@ -71,16 +71,26 @@ module AuthorityLifeClassification =
         | "AgentOwnerRoot", None -> None
         | _ -> None
 
-    /// The closure kind and the agent-owner life of a root acceptance, applying
-    /// the coarse agent-owner default when the life is not observable.
+    /// The closure kind and the agent-owner life of a root acceptance.
     ///
-    /// Returns None when the root kind is unknown.
-    let deriveClosureKind (rootKindLabel: string) (isManager: bool) : (string * string option) option =
+    /// The life is the one the producer proved; it is never invented here.
+    /// An agent-owner root whose life the producer could not prove yields no
+    /// kind at all, and so admits no closure — the alternative would be a
+    /// closure kind guessed from the root's shape, which is exactly the
+    /// inference WHAT-018 forbids.
+    ///
+    /// Returns None when the root kind is unknown, or when an agent-owner
+    /// root has no proven life.
+    let deriveClosureKind
+        (rootKindLabel: string)
+        (isManager: bool)
+        (agentOwnerLife: string option)
+        : (string * string option) option =
         match rootKindLabel with
         | "HumanRoot" ->
             expectedClosureKind rootKindLabel isManager None
             |> Option.map (fun kind -> (kind, None))
         | "AgentOwnerRoot" ->
-            expectedClosureKind rootKindLabel isManager (Some coarseAgentOwnerLife)
-            |> Option.map (fun kind -> (kind, Some coarseAgentOwnerLife))
+            expectedClosureKind rootKindLabel isManager agentOwnerLife
+            |> Option.map (fun kind -> (kind, agentOwnerLife))
         | _ -> None

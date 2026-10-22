@@ -14,10 +14,6 @@ module PromptAuthorityLedger =
         payload: AuthorityRootAcceptedPayload ->
             Result<PromptAuthority.PromptAuthorityProjection, string>
 
-    /// Complete a human manager after the road.
-    val closeCompletedHumanRootManager:
-        projection: PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection
-
     /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
     val foldPromptSubmitted:
         projection: PromptAuthority.PromptAuthorityProjection ->

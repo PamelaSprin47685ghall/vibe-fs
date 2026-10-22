@@ -25,6 +25,10 @@ module AuthorityLifeClassification =
     /// a unique kind.
     val expectedClosureKind: rootKindLabel: string -> isManager: bool -> agentOwnerLife: string option -> string option
 
-    /// The closure kind and the agent-owner life of a root acceptance, applying
-    /// the coarse agent-owner default when the life is not observable.
-    val deriveClosureKind: rootKindLabel: string -> isManager: bool -> (string * string option) option
+    /// The closure kind and the agent-owner life of a root acceptance.
+    ///
+    /// The life is the one the producer proved; it is never invented here. An
+    /// agent-owner root whose life the producer could not prove yields no
+    /// kind at all, and so admits no closure.
+    val deriveClosureKind:
+        rootKindLabel: string -> isManager: bool -> agentOwnerLife: string option -> (string * string option) option

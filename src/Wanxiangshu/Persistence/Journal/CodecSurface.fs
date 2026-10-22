@@ -154,11 +154,14 @@ module JournalCodecSurface =
 
             let isManager =
                 match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity identitySeed) with
-                | Some role -> role = Roles.Manager
+                | Some role -> role = Role.Manager
                 | None -> false
 
             let closure =
-                AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+                AuthorityLifeClassification.deriveClosureKind
+                    authorityKind
+                    isManager
+                    (optionalText (payload?AgentOwnerLife))
                 |> Option.defaultValue ("HumanRootManagedRun", None)
 
             Fact.Agent(

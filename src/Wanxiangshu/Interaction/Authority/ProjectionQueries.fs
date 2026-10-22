@@ -59,6 +59,45 @@ module PromptAuthorityProjectionQueries =
         projectionFor (profileOwner sessionId agentProjections) agentProjections
         |> Option.bind (fun authority -> authority.LastAuthorityProfile)
 
+    /// interaction-authority-018: the closure contract of an accepted root.
+    ///
+    /// The contract outlives the active run, so a closure that arrives after
+    /// the run was closed is still judged against the kind the acceptance
+    /// committed to.
+    let acceptedRootClosure
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId)
+        (agentProjections: AgentProjectionSet)
+        : PromptAuthority.AcceptedRootClosure option =
+        projectionFor sessionId agentProjections
+        |> Option.bind (fun authority -> Map.tryFind logicalRunId authority.AcceptedRootClosures)
+
+    /// interaction-authority-018: the durable source terminals of one logical
+    /// run.
+    ///
+    /// A closure may only cite a source that is already durable; a closure
+    /// with no durable source is refused rather than inferred.
+    let terminalSources
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId)
+        (agentProjections: AgentProjectionSet)
+        : PromptAuthority.AuthorityTerminalSource list =
+        projectionFor sessionId agentProjections
+        |> Option.bind (fun authority -> Map.tryFind logicalRunId authority.TerminalSources)
+        |> Option.defaultValue Map.empty
+        |> Map.toList
+        |> List.map snd
+
+    /// interaction-authority-018: the closure already recorded for one logical
+    /// run, so a replay can tell a duplicate from a conflict.
+    let closedRun
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId)
+        (agentProjections: AgentProjectionSet)
+        : PromptAuthority.AuthorityClosureRecord option =
+        projectionFor sessionId agentProjections
+        |> Option.bind (fun authority -> Map.tryFind logicalRunId authority.ClosedRuns)
+
     let pendingClaim (sessionId: SessionId) (promptKey: PromptKey) (agentProjections: AgentProjectionSet) =
         projectionFor sessionId agentProjections
         |> Option.bind (fun authority -> Map.tryFind promptKey authority.PendingClaims)

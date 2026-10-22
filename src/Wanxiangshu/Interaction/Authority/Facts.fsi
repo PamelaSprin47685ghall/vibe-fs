@@ -81,6 +81,17 @@ type AuthorityInternalLeafTerminalPayload =
       DecisionOrTransactionId: string
       FactId: string }
 
+/// The durable source terminal of one authority lifecycle.
+///
+/// A lifecycle owner states which kind of terminal it reached; the closure
+/// later cites exactly one of these, and only if its kind matches the kind
+/// the accepted root committed to.
+type AuthorityTerminalSourcePayload =
+    | ManagedRunTerminal of AuthorityManagedRunTerminalPayload
+    | ChildWorkTerminal of AuthorityChildWorkTerminalPayload
+    | AttachedWorkTerminal of AuthorityAttachedWorkTerminalPayload
+    | InternalLeafTerminal of AuthorityInternalLeafTerminalPayload
+
 type PromptFactCases =
     | PluginPromptClaimed of
         {| PromptKey: PromptKey

@@ -148,6 +148,40 @@ module JournalSurface =
                     match str payload?Ownership with
                     | "HostOwnedHidden" -> HandleOwnership.HostOwnedHidden
                     | _ -> HandleOwnership.DurableParentHandle |}
+        | "Prompt", "AuthorityManagedRunTerminal" ->
+            PromptFact.AuthorityManagedRunTerminal
+                { SessionId = sessionIdOf (payload?SessionId)
+                  LogicalRunId = LogicalRunId.create (str payload?LogicalRunId)
+                  AuthorityRootUserMessageId =
+                    AuthorityRootUserMessageId.create (str payload?AuthorityRootUserMessageId)
+                  FactId = str payload?FactId }
+        | "Prompt", "AuthorityChildWorkTerminal" ->
+            PromptFact.AuthorityChildWorkTerminal
+                { SessionId = sessionIdOf (payload?SessionId)
+                  OwnerLogicalRunId = str payload?OwnerLogicalRunId
+                  ChildLogicalRunId = LogicalRunId.create (str payload?ChildLogicalRunId)
+                  AuthorityRootUserMessageId =
+                    AuthorityRootUserMessageId.create (str payload?AuthorityRootUserMessageId)
+                  FactId = str payload?FactId }
+        | "Prompt", "AuthorityAttachedWorkTerminal" ->
+            PromptFact.AuthorityAttachedWorkTerminal
+                { SessionId = sessionIdOf (payload?SessionId)
+                  OwnerLogicalRunId = str payload?OwnerLogicalRunId
+                  ChildLogicalRunId = LogicalRunId.create (str payload?ChildLogicalRunId)
+                  AuthorityRootUserMessageId =
+                    AuthorityRootUserMessageId.create (str payload?AuthorityRootUserMessageId)
+                  AttachmentKind = str payload?AttachmentKind
+                  AssociationGeneration = str payload?AssociationGeneration
+                  FactId = str payload?FactId }
+        | "Prompt", "AuthorityInternalLeafTerminal" ->
+            PromptFact.AuthorityInternalLeafTerminal
+                { SessionId = sessionIdOf (payload?SessionId)
+                  OwnerLogicalRunId = str payload?OwnerLogicalRunId
+                  LeafLogicalRunId = LogicalRunId.create (str payload?LeafLogicalRunId)
+                  AuthorityRootUserMessageId =
+                    AuthorityRootUserMessageId.create (str payload?AuthorityRootUserMessageId)
+                  DecisionOrTransactionId = str payload?DecisionOrTransactionId
+                  FactId = str payload?FactId }
         | _ -> failwith $"JournalSurface: unknown AgentFact {family}.{case}"
 
     let private streamOfJs (value: obj) : StreamId =
@@ -221,7 +255,52 @@ module JournalSurface =
                acceptedDispatchCount = Map.count state.AcceptedDispatches
                physicalLandingCount = Map.count state.PhysicalLandings
                acceptedContinuationCount = Map.count state.AcceptedContinuationIds
-               claimSequenceKeys = state.ClaimSequences |> Map.toList |> List.map fst |> List.toArray |}
+               claimSequenceKeys = state.ClaimSequences |> Map.toList |> List.map fst |> List.toArray
+               // interaction-authority-018: the closure contract of every
+               // accepted root, so a reader can tell which closure kind a
+               // run may close under.
+               acceptedRootClosures =
+                state.AcceptedRootClosures
+                |> Map.toList
+                |> List.map (fun (logicalRunId, contract) ->
+                    box
+                        {| logicalRun = LogicalRunId.value logicalRunId
+                           rootKind = contract.RootKind
+                           expectedClosureKind = contract.ExpectedClosureKind
+                           ownerLogicalRunId = contract.OwnerLogicalRunId
+                           agentOwnerLife = contract.AgentOwnerLife |})
+                |> List.toArray
+               // The durable source terminals of each run, by fact id.
+               terminalSources =
+                state.TerminalSources
+                |> Map.toList
+                |> List.map (fun (logicalRunId, sources) ->
+                    box
+                        {| logicalRun = LogicalRunId.value logicalRunId
+                           sources =
+                            sources
+                            |> Map.toList
+                            |> List.map (fun (factId, source) ->
+                                box
+                                    {| factId = factId
+                                       sourceKind = source.SourceKind
+                                       ownerLogicalRunId = source.OwnerLogicalRunId
+                                       childLogicalRunId = source.ChildLogicalRunId
+                                       attachmentKind = source.AttachmentKind
+                                       associationGeneration = source.AssociationGeneration
+                                       decisionOrTransactionId = source.DecisionOrTransactionId |})
+                            |> List.toArray |})
+                |> List.toArray
+               // The closure already recorded for each run.
+               closedRuns =
+                state.ClosedRuns
+                |> Map.toList
+                |> List.map (fun (logicalRunId, record) ->
+                    box
+                        {| logicalRun = LogicalRunId.value logicalRunId
+                           rootKind = record.RootKind
+                           closureWitness = record.ClosureWitness |})
+                |> List.toArray |}
 
     let private guidelinesToJs (state: GuidelineProjectionState) : obj =
         box
@@ -374,10 +453,14 @@ module JournalSurface =
         }
 
     /// interaction-authority-018: append the exact durable closure of one
-    /// HumanRoot/Manager logical run through the process-local shared journal
-    /// owner. A missing shared entry refuses instead of creating a second
-    /// writer; an already-closed projection is a no-op, so repeated transforms
-    /// stay idempotent.
+    /// logical run through the process-local shared journal owner.
+    ///
+    /// The closure kind is the one the accepted root committed to, and the
+    /// witness is the unique source terminal of that kind. A missing shared
+    /// entry refuses instead of creating a second writer; a closure that
+    /// repeats the one already recorded is a no-op, so repeated transforms
+    /// stay idempotent; a closure that conflicts with the recorded one is
+    /// refused, so it can never release the identity binding.
     let appendAuthorityLogicalRunClosed (commonDir: string) (sessionId: string) (retirementId: string) : Task<unit> =
         task {
             let session = SessionId.create sessionId
@@ -405,35 +488,61 @@ module JournalSurface =
                 // finally below returns it. After the last holder releases, a later closure
                 // append refuses instead of creating a second writer (interaction-authority-018).
                 try
-                    let active =
-                        PromptAuthorityProjectionQueries.activeProfile
-                            session
-                            (AgentJournal.snapshot journal).AgentProjections
+                    let projections = (AgentJournal.snapshot journal).AgentProjections
+                    let active = PromptAuthorityProjectionQueries.activeProfile session projections
 
-                    // interaction-authority-018: only a root whose expected closure kind is
-                    // HumanRootManagerLife is closed by a delivered S4 retirement; the witness
-                    // is the canonical LifeCompleted(life, retirement) (wanxiangli/authority).
-                    match
-                        active
-                        |> Option.bind (fun profile ->
-                            PromptAuthorityRun.managerLifeClosureWitness profile retirementId
-                            |> Option.map (fun witness -> profile, witness))
-                    with
-                    | Some(profile, witness) ->
-                        let fact =
-                            PromptFact.AuthorityLogicalRunClosed
-                                { SessionId = session
-                                  LogicalRunId = profile.LogicalRunId
-                                  AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
-                                  RootKind = "HumanRoot"
-                                  ClosureWitness = witness }
+                    match active with
+                    | None -> return ()
+                    | Some profile ->
+                        let logicalRunId = profile.LogicalRunId
+                        let logicalRunIdText = LogicalRunId.value logicalRunId
 
-                        let! result = AgentJournal.appendAgent (StreamId.Session session) None fact journal
+                        let contract =
+                            PromptAuthorityProjectionQueries.acceptedRootClosure session logicalRunId projections
 
-                        match result with
-                        | Ok _ -> return ()
-                        | Error failure -> return failwith ("authority closure append failed: " + string failure)
-                    | _ -> return ()
+                        match contract with
+                        | None -> return ()
+                        | Some accepted ->
+                            let sources =
+                                PromptAuthorityProjectionQueries.terminalSources session logicalRunId projections
+
+                            let witness =
+                                match accepted.ExpectedClosureKind with
+                                | "HumanRootManagerLife" ->
+                                    // A Manager life closes with its delivered S4
+                                    // retirement, which is the durable source
+                                    // terminal of that life.
+                                    PromptAuthorityRun.managerLifeClosureWitness profile retirementId
+                                | _ ->
+                                    // interaction-authority-018: the witness of a
+                                    // closure is the unique durable source
+                                    // terminal of the accepted root's closure
+                                    // kind. No source and an ambiguous source
+                                    // are both refused; neither is resolved by
+                                    // taking the first candidate.
+                                    PromptAuthorityRun.closureWitnessOfSource
+                                        accepted.ExpectedClosureKind
+                                        sources
+                                        accepted.OwnerLogicalRunId
+                                        logicalRunIdText
+
+                            match witness with
+                            | None -> return ()
+                            | Some witness ->
+                                let fact =
+                                    PromptFact.AuthorityLogicalRunClosed
+                                        { SessionId = session
+                                          LogicalRunId = profile.LogicalRunId
+                                          AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                                          RootKind = accepted.RootKind
+                                          ClosureWitness = witness }
+
+                                let! result = AgentJournal.appendAgent (StreamId.Session session) None fact journal
+
+                                match result with
+                                | Ok _ -> return ()
+                                | Error failure ->
+                                    return failwith ("authority closure append failed: " + string failure)
                 finally
                     SharedAgentJournal.release (Some journal)
         }
@@ -491,6 +600,33 @@ module JournalSurface =
         task {
             let! result =
                 AgentJournal.appendAgent (streamOfJs stream) (providerRunOf run) (agentFactOfJs fact) handle.Journal
+
+            return
+                match result with
+                | Ok projection ->
+                    box
+                        {| ok = true
+                           projection = projectionToJs projection |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           error = error.ToString() |}
+        }
+
+    /// interaction-authority-018: append the durable source terminal of one
+    /// authority lifecycle.
+    ///
+    /// The four lifecycle kinds have one writer each, and this is the only
+    /// place the journal takes such a fact from outside its owner. The fact
+    /// id is the producer's, so a repeated outcome names the same source.
+    let appendAuthorityTerminalSource (handle: JournalHandle) (sessionId: string) (fact: obj) : Task<obj> =
+        task {
+            let! result =
+                AgentJournal.appendAgent
+                    (StreamId.Session(SessionId.create sessionId))
+                    None
+                    (agentFactOfJs fact)
+                    handle.Journal
 
             return
                 match result with

@@ -132,36 +132,49 @@ module internal AuthorityLaw =
         )
         |> originOfView
 
-    /// interaction-authority-018 (CUT-09-b): the closure kind the accepted root
-    /// expects. AgentOwnerRoot lifecycles are not recorded by the host yet, so an
-    /// AgentOwnerRoot has no kind here and no closure of it can be admitted.
-    let expectedClosureKind (profile: PromptAuthority.AuthorityExecutionProfile) : string option =
-        law.expectedClosureKind (kindLabel profile.AuthorityKind, profile.CanonicalRole = Role.Manager, null)
+    /// The agent-owner life the library's law vocabulary uses.
+    let private agentOwnerLifeArg (life: string option) : obj =
+        match life with
+        | Some "Child" -> box "child"
+        | Some "Attached" -> box "attached"
+        | Some "InternalLeaf" -> box "internal-leaf"
+        | _ -> null
+
+    /// interaction-authority-018: the closure kind an accepted root expects.
+    ///
+    /// The kind comes from the durable acceptance contract, not from the
+    /// profile: the profile says who runs, the acceptance says how the run
+    /// ends. An agent-owner root whose life cannot be proven has no kind and
+    /// therefore admits no closure.
+    let expectedClosureKind (rootKind: string) (isManager: bool) (agentOwnerLife: string option) : string option =
+        law.expectedClosureKind (rootKind, isManager, agentOwnerLifeArg agentOwnerLife)
         |> Option.ofObj
         |> Option.map unbox<string>
 
-    let private closing (profile: PromptAuthority.AuthorityExecutionProfile) (kind: string) : obj =
-        let sessionId = SessionId.value profile.SessionId
-
+    let private closing
+        (rootKind: string)
+        (sessionId: string)
+        (logicalRunId: string)
+        (authorityRoot: string)
+        (ownerLogicalRunId: string option)
+        (kind: string)
+        : obj =
         createObj
             [ "kind" ==> kind
               "sessionId" ==> sessionId
-              "logicalRunId" ==> LogicalRunId.value profile.LogicalRunId
-              "rootId" ==> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
-              "ownerLogicalRunId"
-              ==> (PromptAuthority.identitySeedOwner profile.IdentitySeed
-                   |> Option.map (fun (_, ownerRun, _) -> LogicalRunId.value ownerRun)
-                   |> Option.toObj)
+              "logicalRunId" ==> logicalRunId
+              "rootId" ==> authorityRoot
+              "ownerLogicalRunId" ==> (ownerLogicalRunId |> Option.toObj)
               // A Manager life is the life of the Manager's own session.
               "lifeId" ==> (if kind = "HumanRootManagerLife" then sessionId else null) ]
 
     let private admitKnownRootClosure
-        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (closingRoot: obj)
         (kind: string)
         (recordedRootKind: string)
         (witness: string)
         : Result<unit, string> =
-        let verdict = law.admitClosure (closing profile kind, recordedRootKind, witness)
+        let verdict = law.admitClosure (closingRoot, recordedRootKind, witness)
 
         if unbox<bool> verdict?ok then
             Ok()
@@ -170,25 +183,119 @@ module internal AuthorityLaw =
 
     /// Admit a closure (new or durably replayed) for exactly this accepted root.
     let admitClosure
-        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (contract: PromptAuthority.AcceptedRootClosure)
+        (sessionId: string)
+        (logicalRunId: string)
         (recordedRootKind: string)
         (witness: string)
         : Result<unit, string> =
-        match expectedClosureKind profile, recordedRootKind with
-        | None, _ -> Error "the accepted root has no expected closure kind"
-        | Some kind, ("HumanRoot" | "AgentOwnerRoot") -> admitKnownRootClosure profile kind recordedRootKind witness
-        | Some _, other -> Error(sprintf "closure RootKind is unknown: %s" other)
+        match contract.ExpectedClosureKind, recordedRootKind with
+        | "", _ -> Error "the accepted root has no expected closure kind"
+        | _, ("HumanRoot" | "AgentOwnerRoot") ->
+            admitKnownRootClosure
+                (closing
+                    contract.RootKind
+                    sessionId
+                    logicalRunId
+                    (AuthorityRootUserMessageId.value contract.AuthorityRootUserMessageId)
+                    contract.OwnerLogicalRunId
+                    contract.ExpectedClosureKind)
+                contract.ExpectedClosureKind
+                recordedRootKind
+                witness
+        | _, other -> Error(sprintf "closure RootKind is unknown: %s" other)
 
     /// The canonical witness of a completed Manager life: its delivered S4 retirement.
-    let managerLifeWitness (profile: PromptAuthority.AuthorityExecutionProfile) (retirementId: string) : string option =
-        match expectedClosureKind profile with
-        | Some "HumanRootManagerLife" ->
+    let managerLifeWitness (expectedKind: string) (sessionId: string) (retirementId: string) : string option =
+        match expectedKind with
+        | "HumanRootManagerLife" ->
             Some(
                 law.encodeClosureWitness (
                     createObj
                         [ "kind" ==> "LifeCompleted"
-                          "lifeId" ==> SessionId.value profile.SessionId
+                          "lifeId" ==> sessionId
                           "factId" ==> retirementId ]
+                )
+            )
+        | _ -> None
+
+    /// The canonical witness of a managed (non-Manager) HumanRoot run: the
+    /// durable terminal of that run.
+    let managedRunWitness (expectedKind: string) (logicalRunId: string) (factId: string) : string option =
+        match expectedKind with
+        | "HumanRootManagedRun" ->
+            Some(
+                law.encodeClosureWitness (
+                    createObj
+                        [ "kind" ==> "ManagedLogicalRunTerminal"
+                          "logicalRunId" ==> logicalRunId
+                          "factId" ==> factId ]
+                )
+            )
+        | _ -> None
+
+    /// The canonical witness of a completed agent-owner child work.
+    let childWorkWitness
+        (expectedKind: string)
+        (ownerLogicalRunId: string)
+        (childLogicalRunId: string)
+        (factId: string)
+        : string option =
+        match expectedKind with
+        | "AgentOwnerChildWork" ->
+            Some(
+                law.encodeClosureWitness (
+                    createObj
+                        [ "kind" ==> "ChildLogicalRunTerminal"
+                          "ownerLogicalRunId" ==> ownerLogicalRunId
+                          "childLogicalRunId" ==> childLogicalRunId
+                          "factId" ==> factId ]
+                )
+            )
+        | _ -> None
+
+    /// The canonical witness of a completed agent-owner attached work.
+    let attachedWorkWitness
+        (expectedKind: string)
+        (ownerLogicalRunId: string)
+        (childLogicalRunId: string)
+        (attachmentKind: string)
+        (associationGeneration: string)
+        (factId: string)
+        : string option =
+        match expectedKind with
+        | "AgentOwnerAttachedWork" ->
+            Some(
+                law.encodeClosureWitness (
+                    createObj
+                        [ "kind" ==> "AttachedLogicalRunTerminal"
+                          "ownerLogicalRunId" ==> ownerLogicalRunId
+                          "childLogicalRunId" ==> childLogicalRunId
+                          "attachmentKind" ==> attachmentKind
+                          "associationGeneration" ==> associationGeneration
+                          "factId" ==> factId ]
+                )
+            )
+        | _ -> None
+
+    /// The canonical witness of a completed agent-owner internal leaf.
+    let internalLeafWitness
+        (expectedKind: string)
+        (ownerLogicalRunId: string)
+        (leafLogicalRunId: string)
+        (decisionOrTransactionId: string)
+        (factId: string)
+        : string option =
+        match expectedKind with
+        | "AgentOwnerInternalLeaf" ->
+            Some(
+                law.encodeClosureWitness (
+                    createObj
+                        [ "kind" ==> "InternalLeafTerminal"
+                          "ownerLogicalRunId" ==> ownerLogicalRunId
+                          "leafLogicalRunId" ==> leafLogicalRunId
+                          "decisionOrTransactionId" ==> decisionOrTransactionId
+                          "factId" ==> factId ]
                 )
             )
         | _ -> None
@@ -517,10 +624,35 @@ module PromptAuthorityRun =
             Error "child-work closure requires a non-Manager AgentOwnerRoot authority"
         | _ -> closeAuthority logicalRunId authorityRoot projection
 
-    /// Durable replay of `AuthorityLogicalRunClosed`. The verdict is the same
-    /// exact-run law as `closeAuthority` (wanxiangli/authority); a replayed
-    /// closure with no active run changes nothing, whether or not it names the
-    /// last root, and a closure naming another run is rejected.
+    /// Durable replay of `AuthorityLogicalRunClosed`.
+    ///
+    /// The verdict is the same exact-run law as `closeAuthority`
+    /// (wanxiangli/authority), but a replay after the active run is gone is
+    /// still judged: the durable acceptance contract and the durable closure
+    /// record say whether this closure is the one that already happened
+    /// (idempotent) or a different one (conflict, fail-closed).
+    ///
+    /// Silently ignoring a closure that names an unknown run is not allowed:
+    /// that would let a conflicting closure look like a duplicate and release
+    /// the identity binding the run still owns.
+    ///
+    /// Record the closure that has just been applied, so a later replay can
+    /// tell it from a conflicting one.
+    let private recordClosure
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        (logicalRunId: LogicalRunId)
+        (rootKind: string)
+        (closureWitness: string)
+        : PromptAuthority.PromptAuthorityProjection =
+        { projection with
+            ClosedRuns =
+                Map.add
+                    logicalRunId
+                    ({ RootKind = rootKind
+                       ClosureWitness = closureWitness }
+                    : PromptAuthority.AuthorityClosureRecord)
+                    projection.ClosedRuns }
+
     let replayLogicalRunClosed
         (logicalRunId: LogicalRunId)
         (authorityRoot: AuthorityRootUserMessageId)
@@ -535,10 +667,40 @@ module PromptAuthorityRun =
         | "close", Some active ->
             // interaction-authority-018: only the exact source witness of this
             // root's closure kind may close it (wanxiangli/authority, CUT-09-b).
-            AuthorityLaw.admitClosure active rootKind closureWitness
-            |> Result.bind (fun () -> closeAuthority logicalRunId authorityRoot projection)
-            |> Result.map Some
-        | ("already-closed" | "no-authority"), None -> Ok None
+            match Map.tryFind logicalRunId projection.AcceptedRootClosures with
+            | None ->
+                Error(
+                    sprintf
+                        "AuthorityLogicalRunClosed names run %s, whose accepted root recorded no closure kind"
+                        (LogicalRunId.value logicalRunId)
+                )
+            | Some contract ->
+                AuthorityLaw.admitClosure
+                    contract
+                    (SessionId.value active.SessionId)
+                    (LogicalRunId.value logicalRunId)
+                    rootKind
+                    closureWitness
+                |> Result.bind (fun () -> closeAuthority logicalRunId authorityRoot projection)
+                |> Result.map (fun closed -> Some(recordClosure closed logicalRunId rootKind closureWitness))
+        | ("already-closed" | "no-authority"), None ->
+            // The active run is gone. Whether this closure is the one that
+            // already happened is decided by the durable records, never by the
+            // absence of an active run.
+            match Map.tryFind logicalRunId projection.ClosedRuns with
+            | Some recorded when recorded.RootKind = rootKind && recorded.ClosureWitness = closureWitness -> Ok None
+            | Some recorded ->
+                Error(
+                    sprintf
+                        "AuthorityLogicalRunClosed conflicts with the recorded closure of run %s"
+                        (LogicalRunId.value logicalRunId)
+                )
+            | None ->
+                Error(
+                    sprintf
+                        "AuthorityLogicalRunClosed names run %s, which holds no closure and no authority"
+                        (LogicalRunId.value logicalRunId)
+                )
         | "mismatch", Some _ -> Error "AuthorityLogicalRunClosed conflicts with the active logical run"
         | decision, _ -> failwithf "wanxiangli/authority returned an inconsistent closure %s" decision
 
@@ -549,7 +711,138 @@ module PromptAuthorityRun =
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (retirementId: string)
         : string option =
-        AuthorityLaw.managerLifeWitness profile retirementId
+        AuthorityLaw.managerLifeWitness "HumanRootManagerLife" (SessionId.value profile.SessionId) retirementId
+
+    /// interaction-authority-018: the canonical closure witness of a completed
+    /// managed HumanRoot run, a child work, an attached work or an internal
+    /// leaf. `None` when the accepted root does not expect that closure kind.
+    let managedRunClosureWitness (expectedKind: string) (logicalRunId: string) (factId: string) =
+        AuthorityLaw.managedRunWitness expectedKind logicalRunId factId
+
+    let childWorkClosureWitness
+        (expectedKind: string)
+        (ownerLogicalRunId: string)
+        (childLogicalRunId: string)
+        (factId: string)
+        =
+        AuthorityLaw.childWorkWitness expectedKind ownerLogicalRunId childLogicalRunId factId
+
+    let attachedWorkClosureWitness
+        (expectedKind: string)
+        (ownerLogicalRunId: string)
+        (childLogicalRunId: string)
+        (attachmentKind: string)
+        (associationGeneration: string)
+        (factId: string)
+        =
+        AuthorityLaw.attachedWorkWitness
+            expectedKind
+            ownerLogicalRunId
+            childLogicalRunId
+            attachmentKind
+            associationGeneration
+            factId
+
+    let internalLeafClosureWitness
+        (expectedKind: string)
+        (ownerLogicalRunId: string)
+        (leafLogicalRunId: string)
+        (decisionOrTransactionId: string)
+        (factId: string)
+        =
+        AuthorityLaw.internalLeafWitness expectedKind ownerLogicalRunId leafLogicalRunId decisionOrTransactionId factId
+
+    /// interaction-authority-018: the unique durable source terminal a closure
+    /// of this kind may cite.
+    ///
+    /// Exactly one source must match the accepted root's identity: no source
+    /// means the closure has no durable ground, and two sources mean the
+    /// closure would be ambiguous. Both are refused rather than resolved by
+    /// taking the first one.
+    let uniqueTerminalSource
+        (sources: PromptAuthority.AuthorityTerminalSource list)
+        (sourceKind: string)
+        (ownerLogicalRunId: string option)
+        (childLogicalRunId: string)
+        : Result<string * PromptAuthority.AuthorityTerminalSource, string> =
+        let matches =
+            sources
+            |> List.filter (fun source ->
+                source.SourceKind = sourceKind
+                && source.ChildLogicalRunId = Some childLogicalRunId
+                && source.OwnerLogicalRunId = ownerLogicalRunId)
+
+        match matches with
+        | [ source ] ->
+            match ownerLogicalRunId, source.OwnerLogicalRunId with
+            | Some owner, Some matched when owner = matched -> Ok(owner, source)
+            | _ ->
+                Error(
+                    sprintf "the %s source terminal of run %s names no owner logical run" sourceKind childLogicalRunId
+                )
+        | [] ->
+            Error(
+                sprintf "no durable %s source terminal of run %s matches the accepted root" sourceKind childLogicalRunId
+            )
+        | _ ->
+            Error(
+                sprintf
+                    "%s source terminals of run %s are ambiguous; the closure cannot name one"
+                    sourceKind
+                    childLogicalRunId
+            )
+
+    /// interaction-authority-018: the closure witness of one accepted root,
+    /// built from the unique durable source terminal of its closure kind.
+    ///
+    /// `None` when the root expects a kind that has no durable source, when
+    /// the source does not match the root exactly, or when more than one
+    /// source matches. A closure is never written from a guessed source.
+    let closureWitnessOfSource
+        (expectedKind: string)
+        (sources: PromptAuthority.AuthorityTerminalSource list)
+        (ownerLogicalRunId: string option)
+        (childLogicalRunId: string)
+        : string option =
+        let managedWitness (owner: string) (source: PromptAuthority.AuthorityTerminalSource) =
+            managedRunClosureWitness expectedKind childLogicalRunId source.FactId
+
+        let childWitness (owner: string) (source: PromptAuthority.AuthorityTerminalSource) =
+            childWorkClosureWitness expectedKind owner childLogicalRunId source.FactId
+
+        let attachedWitness (owner: string) (source: PromptAuthority.AuthorityTerminalSource) =
+            source.AttachmentKind
+            |> Option.bind (fun attachmentKind ->
+                source.AssociationGeneration
+                |> Option.map (fun generation ->
+                    attachedWorkClosureWitness
+                        expectedKind
+                        owner
+                        childLogicalRunId
+                        attachmentKind
+                        generation
+                        source.FactId))
+            |> Option.flatten
+
+        let internalLeafWitnessFor (owner: string) (source: PromptAuthority.AuthorityTerminalSource) =
+            source.DecisionOrTransactionId
+            |> Option.map (fun decision ->
+                internalLeafClosureWitness expectedKind owner childLogicalRunId decision source.FactId)
+            |> Option.flatten
+
+        let noWitness (owner: string) (source: PromptAuthority.AuthorityTerminalSource) : string option = None
+
+        let sourceKind, witness =
+            match expectedKind with
+            | "HumanRootManagedRun" -> "HumanRootManagedRun", managedWitness
+            | "AgentOwnerChildWork" -> "AgentOwnerChildWork", childWitness
+            | "AgentOwnerAttachedWork" -> "AgentOwnerAttachedWork", attachedWitness
+            | "AgentOwnerInternalLeaf" -> "AgentOwnerInternalLeaf", internalLeafWitnessFor
+            | _ -> "", noWitness
+
+        uniqueTerminalSource sources sourceKind ownerLogicalRunId childLogicalRunId
+        |> Result.toOption
+        |> Option.bind (fun (owner, source) -> witness owner source)
 
     /// Register a claim and consume its ClaimSequence.
     ///

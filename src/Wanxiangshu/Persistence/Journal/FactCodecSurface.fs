@@ -160,11 +160,15 @@ module FactCodecSurface =
 
             let isManager =
                 match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity identitySeed) with
-                | Some role -> role = Roles.Manager
+                | Some role -> role = Role.Manager
                 | None -> false
 
             let closure =
-                AuthorityLifeClassification.deriveClosureKind authorityKind isManager
+                AuthorityLifeClassification.deriveClosureKind
+                    authorityKind
+                    isManager
+                    (optionalString (payload?AgentOwnerLife)
+                     |> Option.filter (fun value -> not (String.IsNullOrWhiteSpace value)))
                 |> Option.defaultValue ("HumanRootManagedRun", None)
 
             Fact.Agent(

@@ -12,6 +12,14 @@ module PromptFactCodec =
     let private taggedString tag value =
         Encode.array [| Encode.string tag; Encode.string value |]
 
+    let private taggedStringDecoder expected create =
+        Decode.index 0 Decode.string
+        |> Decode.andThen (fun actual ->
+            if actual = expected then
+                Decode.index 1 Decode.string |> Decode.map create
+            else
+                Decode.fail (sprintf "expected %s, got %s" expected actual))
+
     let private roleLabel role =
         match role with
         | Some value -> Roles.roleLabel value
@@ -104,7 +112,7 @@ module PromptFactCodec =
         | Some text -> Encode.string text
         | None -> Encode.nil
 
-    let private authorityPayloadEncoder payload =
+    let private authorityPayloadEncoder (payload: AuthorityRootAcceptedPayload) =
         if payload.SchemaVersion <> 2 && payload.SchemaVersion <> 3 then
             failwith (
                 sprintf "AuthorityRootAccepted encoder requires SchemaVersion 2 or 3, got %d" payload.SchemaVersion
@@ -128,7 +136,7 @@ module PromptFactCodec =
               "SchemaVersion", Encode.int payload.SchemaVersion
               "SessionId", taggedString "SessionId" (SessionId.value payload.SessionId) ]
 
-    let private managedRunTerminalEncoder payload =
+    let private managedRunTerminalEncoder (payload: AuthorityManagedRunTerminalPayload) =
         Encode.object
             [ "AuthorityRootUserMessageId",
               taggedString
@@ -138,7 +146,7 @@ module PromptFactCodec =
               "LogicalRunId", taggedString "LogicalRunId" (LogicalRunId.value payload.LogicalRunId)
               "SessionId", taggedString "SessionId" (SessionId.value payload.SessionId) ]
 
-    let private childWorkTerminalEncoder payload =
+    let private childWorkTerminalEncoder (payload: AuthorityChildWorkTerminalPayload) =
         Encode.object
             [ "AuthorityRootUserMessageId",
               taggedString
@@ -149,7 +157,7 @@ module PromptFactCodec =
               "OwnerLogicalRunId", Encode.string payload.OwnerLogicalRunId
               "SessionId", taggedString "SessionId" (SessionId.value payload.SessionId) ]
 
-    let private attachedWorkTerminalEncoder payload =
+    let private attachedWorkTerminalEncoder (payload: AuthorityAttachedWorkTerminalPayload) =
         Encode.object
             [ "AssociationGeneration", Encode.string payload.AssociationGeneration
               "AttachmentKind", Encode.string payload.AttachmentKind
@@ -162,7 +170,7 @@ module PromptFactCodec =
               "OwnerLogicalRunId", Encode.string payload.OwnerLogicalRunId
               "SessionId", taggedString "SessionId" (SessionId.value payload.SessionId) ]
 
-    let private internalLeafTerminalEncoder payload =
+    let private internalLeafTerminalEncoder (payload: AuthorityInternalLeafTerminalPayload) =
         Encode.object
             [ "AuthorityRootUserMessageId",
               taggedString
@@ -182,7 +190,8 @@ module PromptFactCodec =
                 get.Required.Field
                     "AuthorityRootUserMessageId"
                     (taggedStringDecoder "AuthorityRootUserMessageId" AuthorityRootUserMessageId.create)
-              FactId = get.Required.Field "FactId" Decode.string })
+              FactId = get.Required.Field "FactId" Decode.string }
+            : AuthorityManagedRunTerminalPayload)
 
     let private childWorkTerminalDecoder =
         Decode.object (fun get ->
@@ -194,7 +203,8 @@ module PromptFactCodec =
                 get.Required.Field
                     "AuthorityRootUserMessageId"
                     (taggedStringDecoder "AuthorityRootUserMessageId" AuthorityRootUserMessageId.create)
-              FactId = get.Required.Field "FactId" Decode.string })
+              FactId = get.Required.Field "FactId" Decode.string }
+            : AuthorityChildWorkTerminalPayload)
 
     let private attachedWorkTerminalDecoder =
         Decode.object (fun get ->
@@ -208,7 +218,8 @@ module PromptFactCodec =
                     (taggedStringDecoder "AuthorityRootUserMessageId" AuthorityRootUserMessageId.create)
               AttachmentKind = get.Required.Field "AttachmentKind" Decode.string
               AssociationGeneration = get.Required.Field "AssociationGeneration" Decode.string
-              FactId = get.Required.Field "FactId" Decode.string })
+              FactId = get.Required.Field "FactId" Decode.string }
+            : AuthorityAttachedWorkTerminalPayload)
 
     let private internalLeafTerminalDecoder =
         Decode.object (fun get ->
@@ -221,16 +232,9 @@ module PromptFactCodec =
                     "AuthorityRootUserMessageId"
                     (taggedStringDecoder "AuthorityRootUserMessageId" AuthorityRootUserMessageId.create)
               DecisionOrTransactionId = get.Required.Field "DecisionOrTransactionId" Decode.string
-              FactId = get.Required.Field "FactId" Decode.string })
+              FactId = get.Required.Field "FactId" Decode.string }
+            : AuthorityInternalLeafTerminalPayload)
 
-
-    let private taggedStringDecoder expected create =
-        Decode.index 0 Decode.string
-        |> Decode.andThen (fun actual ->
-            if actual = expected then
-                Decode.index 1 Decode.string |> Decode.map create
-            else
-                Decode.fail (sprintf "expected %s, got %s" expected actual))
 
     let private roleDecoder =
         Decode.option Decode.string
@@ -289,15 +293,22 @@ module PromptFactCodec =
 
     let private isManagerSeed seed =
         match ParticipantIdentity.role (PromptAuthority.identitySeedParticipantIdentity seed) with
-        | Some role -> role = Roles.Manager
+        | Some role -> role = Role.Manager
         | None -> false
+
+    /// The closure kind a legacy HumanRoot acceptance derives from its own
+    /// recorded identity: a root whose life cannot be derived has no kind.
+    let private legacyHumanRootClosureKind (seed: PromptIdentitySeed) : Result<string, string> =
+        AuthorityLifeClassification.expectedClosureKind "HumanRoot" (isManagerSeed seed) None
+        |> Option.map Ok
+        |> Option.defaultValue (Error "legacy AuthorityRootAccepted HumanRoot has no derivable closure kind")
 
     /// The closure kind of a legacy schema-2 acceptance, derived from what the
     /// record proves. A legacy agent-owner root is refused: its life cannot be
     /// derived, and a guessed kind would close a life that never was.
-    let private legacyExpectedClosureKind authorityKind seed =
+    let private legacyExpectedClosureKind (authorityKind: string) (seed: PromptIdentitySeed) =
         match authorityKind with
-        | "HumanRoot" -> AuthorityLifeClassification.expectedClosureKind "HumanRoot" (isManagerSeed seed) None
+        | "HumanRoot" -> legacyHumanRootClosureKind seed
         | "AgentOwnerRoot" ->
             Error "legacy AuthorityRootAccepted schema 2 AgentOwnerRoot cannot prove its expected closure kind"
         | unknown -> Error(sprintf "AuthorityRootAccepted AuthorityKind is unknown: %s" unknown)
@@ -305,7 +316,7 @@ module PromptFactCodec =
     /// The closure kind a schema-2 acceptance records: the recorded one when it
     /// proves one, otherwise the kind the record can derive.
     let private schema2ExpectedClosureKind (payload: AuthorityRootAcceptedPayload) : Result<string, string> =
-        if String.IsNullOrEmpty payload.ExpectedClosureKind then
+        if System.String.IsNullOrEmpty payload.ExpectedClosureKind then
             legacyExpectedClosureKind payload.AuthorityKind payload.IdentitySeed
         else
             Ok payload.ExpectedClosureKind
@@ -400,7 +411,7 @@ module PromptFactCodec =
             let _ = get.Optional.Field "PeerAgent" Decode.string
             let _ = get.Optional.Field "EffectiveAgent" Decode.string
 
-            let identity =
+            let identity: LegacyAuthorityRootIdentityV1Input =
                 { AuthorityKind = get.Required.Field "AuthorityKind" Decode.string
                   SelectedAgent = get.Required.Field "SelectedAgent" Decode.string
                   CanonicalRole = get.Required.Field "CanonicalRole" Decode.string }
@@ -420,15 +431,18 @@ module PromptFactCodec =
                 |> Result.bind (fun seed ->
                     legacyExpectedClosureKind legacyIdentity.AuthorityKind seed
                     |> Result.map (fun kind ->
-                        { SchemaVersion = 2
-                          SessionId = sessionId
-                          LogicalRunId = logicalRunId
-                          AuthorityRootUserMessageId = authorityRootUserMessageId
-                          AuthorityKind = legacyIdentity.AuthorityKind
-                          ExpectedClosureKind = kind
-                          OwnerLogicalRunId = None
-                          AgentOwnerLife = None
-                          IdentitySeed = seed }))
+                        let payload: AuthorityRootAcceptedPayload =
+                            { SchemaVersion = 2
+                              SessionId = sessionId
+                              LogicalRunId = logicalRunId
+                              AuthorityRootUserMessageId = authorityRootUserMessageId
+                              AuthorityKind = legacyIdentity.AuthorityKind
+                              ExpectedClosureKind = kind
+                              OwnerLogicalRunId = None
+                              AgentOwnerLife = None
+                              IdentitySeed = seed }
+
+                        payload))
 
             match validated with
             | Ok decoded -> Decode.succeed decoded

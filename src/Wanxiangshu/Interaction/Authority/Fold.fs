@@ -129,8 +129,51 @@ module PromptFactFold =
             currentAuthority
         |> Result.map (function
             | Some closed -> [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, closed) ]
-            | None -> [])
+            | None ->
+                // The closure was already recorded: the replay is idempotent,
+                // but the durable record of what closed this run must survive
+                // the replay, or a later conflicting closure would look like a
+                // closure of a run that never closed.
+                let recorded =
+                    { currentAuthority with
+                        ClosedRuns =
+                            Map.add
+                                payload.LogicalRunId
+                                { RootKind = payload.RootKind
+                                  ClosureWitness = payload.ClosureWitness }
+                                currentAuthority.ClosedRuns }
+
+                [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, recorded) ])
         |> Result.mapError PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected
+
+    /// interaction-authority-018: a durable source terminal of one logical run.
+    ///
+    /// The terminal is evidence, not a closure: it records that the lifecycle
+    /// reached a legal outcome and that the closure may cite it. The closure
+    /// itself is a separate fact, written only against this evidence.
+    let private foldTerminalSource
+        (authorityOf: SessionId -> PromptAuthority.PromptAuthorityProjection option)
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId)
+        (source: PromptAuthority.AuthorityTerminalSource)
+        : Result<PromptAuthorityProjectionChange list, PromptAuthorityFoldRejection> =
+        let currentAuthority =
+            authorityOf sessionId |> Option.defaultValue PromptAuthorityLedger.empty
+
+        if System.String.IsNullOrWhiteSpace source.FactId then
+            Error(PromptAuthorityFoldRejection.AuthorityRootSchemaRejected "a terminal source must name its fact id")
+        else
+            let sources =
+                currentAuthority.TerminalSources
+                |> Map.tryFind logicalRunId
+                |> Option.defaultValue Map.empty
+
+            let updated =
+                { currentAuthority with
+                    TerminalSources =
+                        Map.add logicalRunId (Map.add source.FactId source sources) currentAuthority.TerminalSources }
+
+            Ok [ PromptAuthorityProjectionChange.PromptAuthoritySet(sessionId, updated) ]
 
     let private appendQuestionAsked
         (current: PromptAuthority.PromptAuthorityProjection)
@@ -284,9 +327,53 @@ module PromptFactFold =
         // ── closure ─────────────────────────────────────────────────────────
 
         | PromptFactCases.AuthorityLogicalRunClosed payload -> foldAuthorityLogicalRunClosed authorityOf payload
-        | PromptFactCases.AuthorityManagedRunTerminal _ -> Ok []
-        | PromptFactCases.AuthorityChildWorkTerminal _ -> Ok []
-        | PromptFactCases.AuthorityAttachedWorkTerminal _ -> Ok []
-        | PromptFactCases.AuthorityInternalLeafTerminal _ -> Ok []
+        | PromptFactCases.AuthorityManagedRunTerminal payload ->
+            foldTerminalSource
+                authorityOf
+                payload.SessionId
+                payload.LogicalRunId
+                { SourceKind = "HumanRootManagedRun"
+                  OwnerLogicalRunId = None
+                  ChildLogicalRunId = Some(LogicalRunId.value payload.LogicalRunId)
+                  AttachmentKind = None
+                  AssociationGeneration = None
+                  DecisionOrTransactionId = None
+                  FactId = payload.FactId }
+        | PromptFactCases.AuthorityChildWorkTerminal payload ->
+            foldTerminalSource
+                authorityOf
+                payload.SessionId
+                payload.ChildLogicalRunId
+                { SourceKind = "AgentOwnerChildWork"
+                  OwnerLogicalRunId = Some payload.OwnerLogicalRunId
+                  ChildLogicalRunId = Some(LogicalRunId.value payload.ChildLogicalRunId)
+                  AttachmentKind = None
+                  AssociationGeneration = None
+                  DecisionOrTransactionId = None
+                  FactId = payload.FactId }
+        | PromptFactCases.AuthorityAttachedWorkTerminal payload ->
+            foldTerminalSource
+                authorityOf
+                payload.SessionId
+                payload.ChildLogicalRunId
+                { SourceKind = "AgentOwnerAttachedWork"
+                  OwnerLogicalRunId = Some payload.OwnerLogicalRunId
+                  ChildLogicalRunId = Some(LogicalRunId.value payload.ChildLogicalRunId)
+                  AttachmentKind = Some payload.AttachmentKind
+                  AssociationGeneration = Some payload.AssociationGeneration
+                  DecisionOrTransactionId = None
+                  FactId = payload.FactId }
+        | PromptFactCases.AuthorityInternalLeafTerminal payload ->
+            foldTerminalSource
+                authorityOf
+                payload.SessionId
+                payload.LeafLogicalRunId
+                { SourceKind = "AgentOwnerInternalLeaf"
+                  OwnerLogicalRunId = Some payload.OwnerLogicalRunId
+                  ChildLogicalRunId = Some(LogicalRunId.value payload.LeafLogicalRunId)
+                  AttachmentKind = None
+                  AssociationGeneration = None
+                  DecisionOrTransactionId = Some payload.DecisionOrTransactionId
+                  FactId = payload.FactId }
         | PromptFactCases.UserQuestionAsked payload -> foldUserQuestionAsked authorityOf payload
         | PromptFactCases.UserQuestionAnswered payload -> foldUserQuestionAnswered authorityOf payload
