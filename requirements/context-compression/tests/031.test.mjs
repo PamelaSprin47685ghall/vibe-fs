@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import fc from 'fast-check'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   anchors, applyView, clearAll, countTokens, numberMessage,
   captureView, takeView, carryMaterial, setView,
@@ -195,6 +198,117 @@ test('WHAT[context-compression-031] repeated anchors have distinct prefix positi
     '[ANCHOR: 1]\0\uFEFFone',
     '[ANCHOR: 2]\0\uFEFFtwo',
   ])
+})
+
+test('WHAT[context-compression-031] repeated carry addresses survive durable HOST-013 replay without duplicating guidance', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wanxiang-carry-address-'))
+  const opened = await pair.createJournal(directory)
+  assert.equal(opened.ok, true, opened.error)
+  try {
+    const id = 'msg_167f66a46001l05Pw2Nb0UkjUs'
+    const raw = [user(id, 'evidence')]
+    const initial = await pair.tryInjectWithJournal(opened.journal, session, 'historical hint', raw)
+    assert.equal(initial.ok, true, initial.error)
+    pair.applyAnchorView(session, raw)
+    declare(2, [1, 1])
+    const view = pair.applyAnchorView(session, [...raw, user('current', 'new request')]).messages
+    assert.deepEqual(view.map(row => row.info.id), [id, id, id, 'current'])
+    const saved = structuredClone(view)
+    const inject = messages => pair.tryInjectWithJournal(opened.journal, session, 'current hint', messages)
+    const result = await inject(view)
+    assert.equal(result.ok, true, result.error)
+    const expected = structuredClone(view)
+    expected[2].parts[0].text += '\0\uFEFF<system>\nhistorical hint\n</system>'
+    expected[3].parts[0].text += '\0\uFEFF<system>\ncurrent hint\n</system>'
+    assert.deepEqual(result.value, expected)
+    assert.equal(pair.pairCount(opened.journal, session), 2)
+    assert.deepEqual((await inject(result.value)).value, expected)
+    assert.deepEqual((await inject(view)).value, expected)
+    assert.equal(pair.pairCount(opened.journal, session), 2)
+    assert.deepEqual(view, saved)
+  } finally {
+    pair.disposeJournal(opened.journal)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[context-compression-031] fast-check: carry multiplicity, reordering and boundary growth preserve every row through HOST-013', async () => {
+  const historyRow = fc.record({
+    kind: fc.constantFrom('user', 'completed', 'error'),
+    body: fc.string({ maxLength: 40 }),
+  })
+  const scenario = fc.array(historyRow, { minLength: 1, maxLength: 8 }).chain(rows =>
+    fc.record({
+      rows: fc.constant(rows),
+      cutoff: fc.integer({ min: 0, max: rows.length + 1 }),
+      repeated: fc.integer({ min: 0, max: rows.length - 1 }),
+      references: fc.array(fc.integer({ min: 0, max: rows.length - 1 }), { maxLength: 12 }),
+      growth: fc.boolean(),
+    }))
+  let run = 0
+  await fc.assert(fc.asyncProperty(scenario, async ({ rows, cutoff, repeated, references, growth }) => {
+    clearAll()
+    const sid = `carry-address-property-${++run}`
+    const raw = rows.map(({ kind, body }, index) => kind === 'user'
+      ? user(`host-${index}`, body)
+      : assistant(`host-${index}`, [{
+        type: 'tool', tool: 'read', callID: `read-${index}`,
+        state: kind === 'error'
+          ? { status: 'error', input: {}, error: body }
+          : { status: 'completed', input: {}, output: body },
+      }]))
+    const saved = structuredClone(raw)
+    const inject = messages => pair.tryInject(sid, 'property hint', messages)
+    const initial = await inject(raw)
+    assert.equal(initial.ok, true, initial.error)
+    pair.applyAnchorView(sid, raw)
+    const carry = [repeated, ...references, repeated]
+    assert.equal(captureView(sid, declaration(cutoff, carry.map(index => index + 1))).ok, true)
+    const expanded = structuredClone(raw)
+    if (growth) expanded.at(-1).parts.push({ type: 'text', text: 'new boundary prose' })
+    expanded.push(user('current', 'next request'))
+    const view = pair.applyAnchorView(sid, expanded).messages
+    const expectedIds = [
+      ...raw.slice(0, Math.max(0, cutoff - 1)).map(row => row.info.id),
+      ...carry.map(index => raw[index].info.id),
+      ...(growth ? [raw.at(-1).info.id] : []),
+      'current',
+    ]
+    assert.deepEqual(view.map(row => row.info.id), expectedIds)
+    const expected = structuredClone(view)
+    const historicalIndex = expected.findLastIndex(row =>
+      row.info.id === raw.at(-1).info.id &&
+      (row.info.role === 'user' || row.parts.some(part => part.type === 'tool')))
+    if (historicalIndex >= 0) {
+      const row = expected[historicalIndex]
+      const terminal = row.parts.find(part => part.type === 'tool')
+      if (terminal) {
+        const field = terminal.state.status === 'error' ? 'error' : 'output'
+        terminal.state[field] += '\0\uFEFFproperty hint'
+      } else {
+        row.parts.at(-1).text += '\0\uFEFF<system>\nproperty hint\n</system>'
+      }
+    }
+    expected.at(-1).parts[0].text += '\0\uFEFF<system>\nproperty hint\n</system>'
+    const result = await inject(view)
+    assert.equal(result.ok, true, result.error)
+    assert.deepEqual(result.value, expected)
+    const replay = await inject(result.value)
+    assert.equal(replay.ok, true, replay.error)
+    assert.deepEqual(replay.value, expected)
+    assert.deepEqual(raw, saved)
+  }), { seed: 0x484f5313, numRuns: 1000 })
+})
+
+test('WHAT[context-compression-031] allowing repeated carry rows does not allow an unaddressed transcript row', async () => {
+  const result = await pair.tryInject('carry-missing-address', 'hint', [
+    user('addressed', 'original'),
+    user('addressed', 'copy'),
+    { info: { role: 'user' }, parts: [{ type: 'text', text: 'no address' }] },
+    user('current', 'next'),
+  ])
+  assert.equal(result.ok, false)
+  assert.equal(result.error, 'transcript message without address (HOST-013)')
 })
 
 test('WHAT[context-compression-031] repeated history references cannot acquire different current prose', () => {

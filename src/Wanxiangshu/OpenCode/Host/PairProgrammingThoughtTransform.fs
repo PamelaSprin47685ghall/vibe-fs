@@ -271,25 +271,23 @@ module PairProgrammingThoughtTransform =
     let private syntheticCallIdOf (rawMsg: obj) : string option =
         messageInfo rawMsg |> Option.bind syntheticCallIdFromInfo
 
-    let private claimAddress (seen: Set<string>) (message: obj) : Result<string * Set<string>, string> =
-        match ProviderWireDecode.hostMessageId message with
-        | None -> Error "transcript message without address (HOST-013)"
-        | Some id when Set.contains id seen -> Error(sprintf "duplicate transcript address %s (HOST-013)" id)
-        | Some id -> Ok(id, Set.add id seen)
-
     /// Real messages in transcript order, each carrying its Host message
     /// address (`info.id` / `id`). Every real message must have one — a message
-    /// without an address could never anchor a synthetic half, and a duplicate
-    /// address would make anchors ambiguous.
+    /// without an address could never anchor a synthetic half.
+    ///
+    /// The same address MAY appear more than once: context-compression-031
+    /// `carry` can repeat historical rows. Keep every row. Render Before at
+    /// the first copy and After at the last copy. Cursor uses the last carrier.
     let private addressedRealMessages (realMessages: obj list) : Result<(string * obj) list, string> =
-        let rec loop acc seen =
+        let rec loop acc =
             function
             | [] -> Ok(List.rev acc)
             | message :: rest ->
-                claimAddress seen message
-                |> Result.bind (fun (id, seen') -> loop ((id, message) :: acc) seen' rest)
+                match ProviderWireDecode.hostMessageId message with
+                | None -> Error "transcript message without address (HOST-013)"
+                | Some id -> loop ((id, message) :: acc) rest
 
-        loop [] Set.empty realMessages
+        loop [] realMessages
 
     // ── replay：唯一合法渲染路径 ─────────────────────────────────────────────
 
@@ -823,6 +821,14 @@ module PairProgrammingThoughtTransform =
             |> Seq.toList
             |> fun markerTexts -> projectGuidanceToMessage captures markerTexts message
 
+    let private messageCarriesGuidance (rawMsg: obj) : bool =
+        if messageRole rawMsg = "user" then
+            terminalTextPartIndex (rawParts rawMsg) |> Option.isSome
+        else
+            rawParts rawMsg
+            |> Array.mapi terminalGuidanceIndex
+            |> Array.exists Option.isSome
+
     let private replayAddressed
         captures
         (providerId: string option)
@@ -830,6 +836,22 @@ module PairProgrammingThoughtTransform =
         (pairs: PairGuidanceOccurrence list)
         : obj list =
         let addressSet = addressed |> List.map fst |> Set.ofList
+
+        let firstIndex, lastIndex, carrierIndex =
+            addressed
+            |> List.indexed
+            |> List.fold
+                (fun (first, last, carriers) (index, (address, message)) ->
+                    (if Map.containsKey address first then
+                         first
+                     else
+                         Map.add address index first),
+                    Map.add address index last,
+                    (if messageCarriesGuidance message then
+                         Map.add address index carriers
+                     else
+                         carriers))
+                (Map.empty, Map.empty, Map.empty)
 
         // Both durable anchors must remain present even though ordinary and
         // Cursor only render at ResultGap. CallGap stays durable for placement
@@ -854,10 +876,21 @@ module PairProgrammingThoughtTransform =
         let output = ResizeArray<obj>()
         emitPairs output starts
 
-        for address, message in addressed do
-            emitBucketPairs output before address
-            output.Add(projectCursorMessage captures cursorAfter address message)
-            emitBucketPairs output after address
+        addressed
+        |> List.iteri (fun index (address, message) ->
+            if Map.find address firstIndex = index then
+                emitBucketPairs output before address
+
+            let projected =
+                if Map.tryFind address carrierIndex = Some index then
+                    projectCursorMessage captures cursorAfter address message
+                else
+                    message
+
+            output.Add projected
+
+            if Map.find address lastIndex = index then
+                emitBucketPairs output after address)
 
         Seq.toList output
 
@@ -890,19 +923,6 @@ module PairProgrammingThoughtTransform =
             let address = TranscriptMessageAddress.create id
             Ok(gapCtor address, gapCtor address)
         | None -> Error errorMsg
-
-    /// A message hosts a cursor guidance carrier when the replay renderer can
-    /// actually change its bytes: user messages through a terminal text part,
-    /// every other role through a terminal tool result (HOST-013). A placement
-    /// may only be anchored where the renderer produces bytes — otherwise the
-    /// occurrence is committed but never rendered.
-    let private messageCarriesGuidance (rawMsg: obj) : bool =
-        if messageRole rawMsg = "user" then
-            terminalTextPartIndex (rawParts rawMsg) |> Option.isSome
-        else
-            rawParts rawMsg
-            |> Array.mapi terminalGuidanceIndex
-            |> Array.exists Option.isSome
 
     /// 本轮新 occurrence 的 placement：**最新一条真实消息**，且只有它承载
     /// cursor 呈现时才有 placement；否则本轮不新增 occurrence。

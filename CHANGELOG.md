@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — 修复 carry 重复地址触发 HOST-013 会话终止
+
+- `PairProgrammingThoughtTransform` 不再把压缩视图中重复的 Host 地址当成非法输入；保留所有正文副本与顺序。Before/After 分别取首/末副本，cursor 提示只落在最后一个可承载副本；同消息续写的纯 prose 不吞掉旧 tool result 的提示。缺失地址继续拒绝。
+- `context-compression/tests/031.test.mjs` 固定回归 `msg_167f66a46001l05Pw2Nb0UkjUs`，旧产物实跑复现同一错误；新增 fast-check（seed `0x484f5313`，1000 runs），覆盖重复引用、前缀重叠、重排、user/completed/error 载体、边界续写与重复注入。断言每份正文保留、原始输入不变、提示仅注入一次、durable pair 不重复追加。
+- 验证：Fable build generation 417 成功；031 经正式 runner 为 25 passed / 0 failed；关联 13 文件为 85 passed / 0 failed / 6 原有 TODO，runner 因待证项返回 1，非完整验收。直接运行完整 `maybeInjectGuideline`：同一地址保留三份、历史提示仅一份、重放字节一致、会话终止次数为 0。未调用真实 provider、未部署。
+
 ## Unreleased — AXIOM 整改收尾记录（2026-10-22/23）
 
 本节保存原根目录《整改方案》的实施收尾记录，避免审计工作稿继续留在根目录。全文（审查基线、逐条发现与索引）留在 Git 历史，最后版本为 `c68ce2fad`。

@@ -13,6 +13,6 @@ WHAT 拥有输入、提交与生命周期边界；本文只说明现有测试如
 | 019 | 辅助注入的 epoch 退休与 tentative horizon。 |
 | 023 | typed park 返回及取消；事件驱动依赖与 durable producer 判据仍待完整验证。 |
 | 030 | assume 调用与结果原样保留（未点名移除时原样保留）。 |
-| 031 | ANCHOR 编号稳定、视图声明一次性消费、前缀保留/尾部丢弃/引用重加、无标识消息保守保留、token 经济计数与生成工具的 view 参数捕获。真实 transform 管线内的注入块端到端断言仍待补（当前由 400 例既有 transform 用例证明无回归）。 |
+| 031 | ANCHOR 编号稳定、视图声明一次性消费、前缀保留/尾部丢弃/引用重加、无标识消息保守保留、token 经济计数与生成工具的 view 参数捕获。HOST-013 回归贯通 `applyAnchorView` → durable 注入与幂等 replay；fast-check（seed `0x484f5313`，1000 runs）生成前缀重叠、重复/重排引用、user/completed/error 载体与同消息续写，逐行断言正文、顺序与单次提示落点；缺失地址仍拒绝。真实 provider 传输不在此证据范围内。 |
 
 完成节点后先正式构建，再通过 `requirements/verification-system/tests/run.mjs` 与 `TESTS_MJS_FILES` 运行本目录及受影响所有者。TODO 不计通过，GAP-104/105记录未闭合状态；旧发布清单的DONE不作当前证据。未执行真实 provider 或人工验收。
