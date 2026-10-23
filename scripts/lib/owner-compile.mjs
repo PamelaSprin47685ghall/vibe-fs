@@ -1750,6 +1750,26 @@ function removeRetiredOutputs(outputDir, sourceDirectory, removedSources = []) {
   }
 }
 
+// A source that stopped emitting JavaScript (e.g. reduced to pure interface
+// declarations) leaves its earlier emission in the output directory. The
+// staging copy is the authority for this compile's emission set: for every
+// compiled .fs source whose output is absent from staging but still present
+// in the output directory, drop the output copy, or the module-linkage
+// checks keep judging a phantom module against the current graph.
+function removeUnemittedOutputs(outputDir, stagingOutputDir, sourceDirectory, compileItems) {
+  for (const sourcePath of compileItems) {
+    if (!sourcePath.endsWith('.fs')) continue
+    const relativeSource = path.relative(sourceDirectory, sourcePath)
+    if (path.isAbsolute(relativeSource) || relativeSource === '..' || relativeSource.startsWith(`..${path.sep}`)) {
+      throw new Error(`Compiled source is outside the compile source directory: ${sourcePath}`)
+    }
+    const relativeOutput = relativeSource.replace(/\.fs$/, '.js')
+    if (fs.existsSync(path.join(stagingOutputDir, relativeOutput))) continue
+    fs.rmSync(path.join(outputDir, relativeOutput), { force: true })
+    fs.rmSync(path.join(outputDir, `${relativeOutput}.map`), { force: true })
+  }
+}
+
 /**
  * Executes incremental compilation for specified changed paths.
  * Caller explicitly supplies changedPaths and clean intent; build manifests are not tracked.
@@ -1873,6 +1893,8 @@ export async function compileIncremental({
         const { execFileSync } = await import('node:child_process')
         execFileSync('find', [resolvedOutputDir, '-type', 'f', '-size', '0', '-exec', 'rm', '-f', '{}', '+'], { stdio: 'pipe' })
       } catch {}
+
+      removeUnemittedOutputs(resolvedOutputDir, stagingOutputDir, resolvedProjectDirectory, plan.compileItems)
 
       removeRetiredOutputs(resolvedOutputDir, resolvedProjectDirectory, plan.removedSources)
     }
