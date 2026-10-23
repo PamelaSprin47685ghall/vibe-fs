@@ -346,7 +346,7 @@ integrationTest(`WHAT[delegation-027] installed Host releases Manager Join and a
       })
       assert.equal(JSON.parse(output).physicalCleanup, true)
     } catch (error) {
-      if (typeof error.stderr === 'string') t.diagnostic(error.stderr)
+      if (typeof error.stderr === 'string') console.error(error.stderr)
       throw error
     }
   })

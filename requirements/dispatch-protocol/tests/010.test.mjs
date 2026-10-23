@@ -384,7 +384,7 @@ const { integrationTest } = await import('../../verification-system/tests/suppor
 //   B. a model argument appended to the root send public constructor;
 //   C. a transport receipt offered where the root identity seed is required
 //      (WHAT-003: a receipt is transport acceptance, never authority).
-integrationTest('WHAT[dispatch-protocol-010] compiler rejects adding physical model authority to the opaque root', async () => {
+integrationTest('WHAT[dispatch-protocol-010] compiler rejects adding physical model authority to the opaque root', async t => {
   const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } = await import('node:fs')
   const { createHash } = await import('node:crypto')
   const { dirname: dirnameOf, join: joinPath, relative: relativeOf, resolve: resolveRoot } = await import('node:path')
@@ -568,18 +568,20 @@ integrationTest('WHAT[dispatch-protocol-010] compiler rejects adding physical mo
     // the real root send public constructor all constructed legally. This
     // proves every referenced symbol, every dependency and every value in the
     // negative probes is legal.
-    const positive = await compileOwnerProject({
-      projectPath: DISPATCH_RUNTIME_SHARD,
-      scratchRoot: scratch,
-      stdio: 'pipe',
-      compilePlan: positiveIso.plan,
+    await t.test('WHAT[dispatch-protocol-010] legal root witness and send construction compile', async () => {
+      const positive = await compileOwnerProject({
+        projectPath: DISPATCH_RUNTIME_SHARD,
+        scratchRoot: scratch,
+        stdio: 'pipe',
+        compilePlan: positiveIso.plan,
+      })
+      assert.equal(
+        positive.ok,
+        true,
+        'legal root witness/seed/send construction must compile: ' +
+          String(positive.stdout ?? '').slice(-400),
+      )
     })
-    assert.equal(
-      positive.ok,
-      true,
-      'legal root witness/seed/send construction must compile: ' +
-        String(positive.stdout ?? '').slice(-400),
-    )
 
     // The positive probe already ruled out syntax, missing references and
     // missing dependencies, so each remaining failure below is the type
@@ -587,56 +589,62 @@ integrationTest('WHAT[dispatch-protocol-010] compiler rejects adding physical mo
     const TYPE_BOUNDARY =
       /expected to have type|but here has|should have fields|does not exactly match|type mismatch|incompatible|is not a function|cannot be applied|too many arguments|should not be given this argument|does not contain a field|does not contain a label|field '[^']+' is not defined|FS0001/i
 
-    const witnessModelField = await compileOwnerProject({
-      projectPath: DISPATCH_RUNTIME_SHARD,
-      scratchRoot: scratch,
-      stdio: 'pipe',
-      compilePlan: witnessModelFieldIso.plan,
+    await t.test('WHAT[dispatch-protocol-010] the root identity witness rejects a model field', async () => {
+      const witnessModelField = await compileOwnerProject({
+        projectPath: DISPATCH_RUNTIME_SHARD,
+        scratchRoot: scratch,
+        stdio: 'pipe',
+        compilePlan: witnessModelFieldIso.plan,
+      })
+      assert.equal(
+        witnessModelField.ok,
+        false,
+        'a ModelTarget field must not be expressible on the root identity witness',
+      )
+      assert.match(
+        String(witnessModelField.stdout ?? '') + String(witnessModelField.stderr ?? ''),
+        TYPE_BOUNDARY,
+        'the diagnostic must be a type-boundary rejection, not a syntax or dependency error',
+      )
     })
-    assert.equal(
-      witnessModelField.ok,
-      false,
-      'a ModelTarget field must not be expressible on the root identity witness',
-    )
-    assert.match(
-      String(witnessModelField.stdout ?? '') + String(witnessModelField.stderr ?? ''),
-      TYPE_BOUNDARY,
-      'the diagnostic must be a type-boundary rejection, not a syntax or dependency error',
-    )
 
-    const rootSendModelArgument = await compileOwnerProject({
-      projectPath: DISPATCH_RUNTIME_SHARD,
-      scratchRoot: scratch,
-      stdio: 'pipe',
-      compilePlan: rootSendModelArgumentIso.plan,
+    await t.test('WHAT[dispatch-protocol-010] the root send constructor rejects a model argument', async () => {
+      const rootSendModelArgument = await compileOwnerProject({
+        projectPath: DISPATCH_RUNTIME_SHARD,
+        scratchRoot: scratch,
+        stdio: 'pipe',
+        compilePlan: rootSendModelArgumentIso.plan,
+      })
+      assert.equal(
+        rootSendModelArgument.ok,
+        false,
+        'a model argument must not be admissible on the root send public constructor',
+      )
+      assert.match(
+        String(rootSendModelArgument.stdout ?? '') + String(rootSendModelArgument.stderr ?? ''),
+        TYPE_BOUNDARY,
+        'the diagnostic must be a type-boundary rejection, not a syntax or dependency error',
+      )
     })
-    assert.equal(
-      rootSendModelArgument.ok,
-      false,
-      'a model argument must not be admissible on the root send public constructor',
-    )
-    assert.match(
-      String(rootSendModelArgument.stdout ?? '') + String(rootSendModelArgument.stderr ?? ''),
-      TYPE_BOUNDARY,
-      'the diagnostic must be a type-boundary rejection, not a syntax or dependency error',
-    )
 
-    const receiptAsSeed = await compileOwnerProject({
-      projectPath: DISPATCH_RUNTIME_SHARD,
-      scratchRoot: scratch,
-      stdio: 'pipe',
-      compilePlan: receiptAsSeedIso.plan,
+    await t.test('WHAT[dispatch-protocol-010] a transport receipt cannot replace the identity seed', async () => {
+      const receiptAsSeed = await compileOwnerProject({
+        projectPath: DISPATCH_RUNTIME_SHARD,
+        scratchRoot: scratch,
+        stdio: 'pipe',
+        compilePlan: receiptAsSeedIso.plan,
+      })
+      assert.equal(
+        receiptAsSeed.ok,
+        false,
+        'a transport receipt must not be admissible where the root identity seed is required',
+      )
+      assert.match(
+        String(receiptAsSeed.stdout ?? '') + String(receiptAsSeed.stderr ?? ''),
+        TYPE_BOUNDARY,
+        'the diagnostic must be a type-boundary rejection, not a syntax or dependency error',
+      )
     })
-    assert.equal(
-      receiptAsSeed.ok,
-      false,
-      'a transport receipt must not be admissible where the root identity seed is required',
-    )
-    assert.match(
-      String(receiptAsSeed.stdout ?? '') + String(receiptAsSeed.stderr ?? ''),
-      TYPE_BOUNDARY,
-      'the diagnostic must be a type-boundary rejection, not a syntax or dependency error',
-    )
 
     // Isolation evidence: the real owner sources were never touched.
     const after = [digestOf(realSend), digestOf(realSendSignature), digestOf(realDispatcher)]

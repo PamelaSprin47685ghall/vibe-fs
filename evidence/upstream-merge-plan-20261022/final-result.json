@@ -559,7 +559,7 @@
     "M22-3": "DONE: authority, delivery and recovery regressions passed",
     "M22-4": "DONE: build boundaries, actual Host and Long Stroke passed",
     "M22-5": "DONE for resumed scope: final normal-operation and affected-suite acceptance passed; consolidated CLI history is not relabeled",
-    "M22-6": "PR OPEN: source delivered; exact-head CI is running and is not yet counted as passed"
+    "M22-6": "CI REPAIR: the initial exact-head check failed; the repair remains under local and GitHub validation"
   },
   "sourceDelivery": {
     "mode": "pull-request",
@@ -572,14 +572,39 @@
     "merged": false,
     "receiptOnlyFollowup": true,
     "ci": {
-      "status": "in_progress",
-      "checkedSourceCommit": "70f8aab03445e99580c38c584910f84478448e36",
-      "runId": 39841840768,
-      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39841840768",
+      "status": "failure",
+      "checkedSourceCommit": "02714811358f222544554a8b89cacdcbbc363116",
+      "runId": 39842134321,
+      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39842134321",
       "latestHeadChecks": "https://github.com/dyx13/vibe-fs/pull/1/checks",
       "passed": false
     },
     "creation": "The GitHub connector returned 403 for PR creation; the user's existing local GitHub CLI login created PR 1 successfully. The PR is attached to this task."
+  },
+  "ciRepair": {
+    "status": "validation in progress",
+    "initialHead": "02714811358f222544554a8b89cacdcbbc363116",
+    "initialRun": 39842134321,
+    "initialPassedSteps": ["format:check", "check", "build", "unit"],
+    "initialUnitPassed": 4668,
+    "initialUnitFailed": 0,
+    "initialFailures": [
+      "dispatch-protocol-010 performed four real compiler probes inside one native test; the file produced no completed assertion for more than the unchanged 185000ms integration silence limit.",
+      "Both installed Host guidance cases in delegation-027 failed. Their existing t.diagnostic output was not displayed by the compact reporter; the Linux cause is not yet known."
+    ],
+    "changes": [
+      "Each existing dispatch-protocol-010 compiler probe now completes a named native subtest after all of its original assertions; no heartbeat, timeout increase or assertion removal.",
+      "Failed installed Host guidance probes send their existing captured stderr to the displayed stderr stream."
+    ],
+    "localValidation": {
+      "generation": 45,
+      "concurrency": 4,
+      "buildPassed": true,
+      "affectedFilesCompletedWithoutFailure": ["requirements/dispatch-protocol/tests/010.test.mjs", "requirements/delegation/tests/027.test.mjs"],
+      "completeIntegration": "running",
+      "log": "/private/tmp/m22-pr1-ci-integration45.log"
+    },
+    "runtimeDeployed": false
   },
   "remainingBoundaries": [
     "Node VM afterEvaluate timeout with enabled async_hooks has a reproduced native execution_async_id failure; isolating the test probe does not fix that product runtime combination.",
