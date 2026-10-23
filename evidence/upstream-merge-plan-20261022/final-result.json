@@ -61,6 +61,7 @@
   },
   "localAcceptance": {
     "location": "local-only",
+    "currentAcceptanceRecord": "ciRepair.supervisionRepair",
     "unitSuiteBackstopMs": 900000,
     "ordinaryVerdictSilenceMs": 5000,
     "existingFiniteOperationDeadlinesChanged": false,
@@ -559,7 +560,7 @@
     "M22-3": "DONE: authority, delivery and recovery regressions passed",
     "M22-4": "DONE: build boundaries, actual Host and Long Stroke passed",
     "M22-5": "DONE for resumed scope: final normal-operation and affected-suite acceptance passed; consolidated CLI history is not relabeled",
-    "M22-6": "CI REPAIR: the initial exact-head check failed; the repair remains under local and GitHub validation"
+    "M22-6": "SOURCE DELIVERED: local acceptance complete; the exact-head GitHub verdict at sourceDelivery.ci.latestHeadChecks is the final gate"
   },
   "sourceDelivery": {
     "mode": "pull-request",
@@ -570,19 +571,24 @@
     "commit": "70f8aab03445e99580c38c584910f84478448e36",
     "pushed": true,
     "merged": false,
-    "receiptOnlyFollowup": false,
+    "repairSourceCommit": "77973ac02a65c5021c7997ad260c9e2b228dc335",
+    "receiptOnlyFollowup": true,
     "ci": {
-      "status": "failure",
-      "checkedSourceCommit": "e1997c0ecbc0035bb70ae82864fe7a94c9519680",
-      "runId": 39877228487,
-      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39877228487",
+      "status": "external-live-verdict",
+      "sourceCheckpoint": {
+        "commit": "77973ac02a65c5021c7997ad260c9e2b228dc335",
+        "runId": 39879364573,
+        "url": "https://github.com/dyx13/vibe-fs/actions/runs/39879364573",
+        "observedStatus": "in_progress",
+        "observedAt": "2026-10-23T00:50:38Z"
+      },
       "latestHeadChecks": "https://github.com/dyx13/vibe-fs/pull/1/checks",
-      "passed": false
+      "authority": "Read the live verdict for the exact PR head. This checkpoint does not cache or predict that verdict; the source checkpoint above is historical."
     },
     "creation": "The GitHub connector returned 403 for PR creation; the user's existing local GitHub CLI login created PR 1 successfully. The PR is attached to this task."
   },
   "ciRepair": {
-    "status": "validation in progress",
+    "status": "local acceptance complete; the live GitHub verdict is authoritative at sourceDelivery.ci.latestHeadChecks",
     "initialHead": "02714811358f222544554a8b89cacdcbbc363116",
     "initialRun": 39842134321,
     "initialPassedSteps": ["format:check", "check", "build", "unit"],
@@ -622,9 +628,11 @@
       "generation47": { "passed": 104, "failed": 0, "log": "/private/tmp/m22-pr1-ci-supervision47.log" },
       "harnessGeneration46": { "passed": 295, "failed": 0, "log": "/private/tmp/m22-pr1-ci-harness46.log" },
       "finalGeneration": 48,
-      "status": "scoped validation passed; complete unit and exact-head GitHub validation pending",
+      "status": "local complete-unit, scoped supervision, harness and real Host verification passed",
       "finalUnit": { "passed": 104, "failed": 0, "wallMs": 50740, "reclamationAccepted": true, "reclamationMs": 24.292, "log": "/private/tmp/m22-pr1-ci-supervision48.log" },
       "finalHarness": { "passed": 295, "failed": 0, "wallMs": 12200, "log": "/private/tmp/m22-pr1-ci-harness48.log" },
+      "completeUnit": { "files": 765, "passed": 4765, "failed": 0, "skipped": 112, "todo": 267, "wallMs": 486990, "reclamationAccepted": true, "reclamationMs": 24.294, "log": "/private/tmp/m22-pr1-ci-all-unit48.log" },
+      "realHost": { "passed": 11, "failed": 0, "wallMs": 19580, "ciEnvironment": true, "reclamationAccepted": true, "reclamationMs": 23.858, "log": "/private/tmp/m22-pr1-ci-host-env48.log" },
       "inputDigests": {
         "validation": "9038656693e7ed80f9d62cf2f70c1921915e77db84b3ee3aa76299e78c9c86dd",
         "compiler": "e6209d05833c3f066639e8293fd4a9ffbceefe57261d59c67885e2840cb98643",
