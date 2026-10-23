@@ -68,7 +68,14 @@ module HostForkJoin =
     /// (ParentCancelled) child of the previous process stays invisible after a
     /// restart, as participant-horizon-011 requires.
     let currentProcessHandle (runtime: HostForkRuntime) (record: HandleRecord) =
-        let voided = record.Lifecycle = HandleLifecycle.Abandoned HandleAbandonReason.Voided
+        let summaryRecord =
+            match runtime.Journal with
+            | Some durable ->
+                let projection = AgentJournal.handleProjection durable runtime.ParentId
+                HandleProjection.tryFind record.Handle projection |> Option.defaultValue record
+            | None -> record
+
+        let voided = summaryRecord.Lifecycle = HandleLifecycle.Abandoned HandleAbandonReason.Voided
 
         let owned =
             HandleId.tryAgent record.Handle

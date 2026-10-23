@@ -85,8 +85,8 @@ try {
     send({ jsonrpc: '2.0', method: 'notifications/initialized' })
     const listed = await rpc('tools/list', {}).reply
     const tools = listed.tools.map(tool => tool.name).sort()
-    assert.deepEqual(tools, ['sphinx_inquiry_start', 'sphinx_work_next', 'sphinx_work_submit',
-      'sphinx_inquiry_status', 'sphinx_inquiry_cancel', 'sphinx_inquiry_export', 'sphinx_goal_amend'].sort())
+    assert.deepEqual(tools, ['sphinx_inquiry_start', 'sphinx_work_submit',
+      'sphinx_inquiry_status', 'sphinx_inquiry_cancel', 'sphinx_inquiry_export'].sort())
     const status = await rpc('tools/call', { name: 'sphinx_inquiry_status', arguments: { inquiryId: request.seed.inquiryId } }).reply
     const state = business(status)
     assert.equal(status.isError, false)

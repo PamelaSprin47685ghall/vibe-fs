@@ -4,14 +4,13 @@ open Wanxiangshu.Foundation
 
 type ForkChildAssignment =
     { Assignment: string
-      CommissionerRecord: string list
+      ContextBlocks: LlmFacing.DataBlock list
       Attachment: string option
       RootRequirements: string list
       Payload: string option }
 
 type ForkChildInstructions =
     { Base: string list
-      CommissionerRecord: string
       Attachment: string
       Requirements: string }
 
@@ -19,7 +18,6 @@ type ForkChildInstructions =
 module ForkChildPayload =
 
     let BasePath = "delegation/fork-child-base"
-    let CommissionerRecordPath = "delegation/fork-child-commissioner-record"
     let AttachmentPath = "delegation/fork-child-attachment"
     let RequirementsPath = "delegation/fork-child-requirements"
 
@@ -39,10 +37,6 @@ module ForkChildPayload =
              else
                  [ assignmentText ])
             @ prose.Base
-            @ (if List.isEmpty input.CommissionerRecord then
-                   []
-               else
-                   [ prose.CommissionerRecord ])
             @ (match attachment with
                | Some _ -> [ prose.Attachment ]
                | None -> [])
@@ -59,7 +53,7 @@ module ForkChildPayload =
             @ (match attachment with
                | Some record -> [ LlmFacing.Data.stringField "attached_view" record ]
                | None -> [])
-            @ LlmFacing.Data.textTables "context" input.CommissionerRecord
+            @ input.ContextBlocks
 
         LlmFacing.instructions instructions |> LlmFacing.withData body
 
@@ -69,7 +63,7 @@ module ForkChildPayload =
     let relay
         (prose: ForkChildInstructions)
         (assignment: string)
-        (commissionerRecord: string list)
+        (contextBlocks: LlmFacing.DataBlock list)
         (attachment: string option)
         (requirements: string list)
         (payload: string option)
@@ -77,7 +71,7 @@ module ForkChildPayload =
         render
             prose
             { Assignment = assignment
-              CommissionerRecord = commissionerRecord
+              ContextBlocks = contextBlocks
               Attachment = attachment
               RootRequirements = requirements
               Payload = payload }
@@ -85,7 +79,7 @@ module ForkChildPayload =
     let relayDocument
         (prose: ForkChildInstructions)
         (assignment: string)
-        (commissionerRecord: string list)
+        (contextBlocks: LlmFacing.DataBlock list)
         (attachment: string option)
         (requirements: string list)
         (payload: string option)
@@ -93,7 +87,7 @@ module ForkChildPayload =
         document
             prose
             { Assignment = assignment
-              CommissionerRecord = commissionerRecord
+              ContextBlocks = contextBlocks
               Attachment = attachment
               RootRequirements = requirements
               Payload = payload }

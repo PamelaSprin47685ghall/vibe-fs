@@ -2,6 +2,7 @@
 # requirements/context-compression/** is covered implicitly and must not be listed here.
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
+/src/Wanxiangshu/Context/Scope/**
 /src/Wanxiangshu/Context/Companion/**
 /src/Wanxiangshu/Context/Prefix/**
 /src/Wanxiangshu/Enforcer/Cycle/**

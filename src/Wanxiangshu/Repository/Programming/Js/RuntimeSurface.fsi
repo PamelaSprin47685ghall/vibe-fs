@@ -22,7 +22,7 @@ module JsRuntimeSurface =
         sessionId: string -> delegation: obj -> join: obj -> fission: obj -> horizon: obj -> advisor: obj -> unit
 
     val clearDelegationHost: sessionId: string -> unit
-    /// Test hook: the raw value a program handed over through `this.deliver`.
+    /// Test hook: the raw value handed over through delivery.
     val recordDeliveredView: sessionId: string -> view: obj -> unit
     /// Test hook: record a delivery carrying the exact call fence that produced it.
     val recordFencedDeliveredView: sessionId: string -> providerRun: string -> toolCallId: string -> view: obj -> unit

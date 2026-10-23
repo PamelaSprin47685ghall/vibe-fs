@@ -71,7 +71,7 @@
 
 ## [015] 宿主原生 todowrite 退役，宿主形状不被改写
 
-宿主原生 `todowrite` 已不再是待办写入面，也不产生压缩 checkpoint；待办写入与 compression checkpoint 归携带有效上下文整理声明（顶层 `prefixUntil` 与 `carry`）的编程面调用（`todowrite-for-<role>`，见 obligation-ledger-001）。
+宿主原生 `todowrite` 已彻底退役；待办写入由编程面调用（`todowrite-for-<role>`，见 obligation-ledger-001）承担，不产生压缩 checkpoint。上下文压缩边界由 `resetScope` 宿主工具唯一管理（见 context-compression [033]）。
 
-插件不得为已退役的宿主工具改写、重命名、增补或隐藏任何参数与描述，也不得注入压缩协议字段。
+插件不得为已退役的宿主工具改写、重命名、增补或隐藏任何参数与描述，也不得注入已退役的压缩协议字段。
 

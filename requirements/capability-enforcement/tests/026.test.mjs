@@ -296,6 +296,7 @@ test('WHAT[capability-enforcement-026] D09_relayed_tenure_refuses_new_devops_dis
     await injectAcceptedAssessment(runtime, sessionID) // Stayed
 
     const store = await storeOf(directory)
+    await lifecycle.seedReview(store, sessionID, 'Cleared')
     // Single delivery: Stayed review relays to successor in one deliver call
     const relayed = await lifecycle.seedDeliver(store, sessionID, 'run-d09', 'call-d09-first', 2n)
     assert.equal(relayed.ok, true, relayed.error)

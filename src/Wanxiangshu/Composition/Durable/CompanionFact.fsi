@@ -39,11 +39,6 @@ module CompanionFact =
             AgentFact
 
 module ContextFact =
-    val inline ViewCheckpointCommitted:
-        payload:
-            {| SessionId: SessionId
-               ToolCallId: ToolCallId |} ->
-            AgentFact
 
     val inline ContextReanchored:
         payload:
@@ -60,4 +55,12 @@ module ContextFact =
                NextEpochId: PrefixEpochId
                WorkId: string
                IncumbencyId: string |} ->
+            AgentFact
+
+    val inline ScopeReanchored:
+        payload:
+            {| SessionId: SessionId
+               PreviousEpochId: PrefixEpochId
+               NextEpochId: PrefixEpochId
+               CallId: ToolCallId |} ->
             AgentFact

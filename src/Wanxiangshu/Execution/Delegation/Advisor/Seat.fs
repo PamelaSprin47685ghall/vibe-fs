@@ -1,12 +1,14 @@
 namespace Wanxiangshu.Execution.Delegation.Advisor
 
 open System
+open FsToolkit.ErrorHandling
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
+open Wanxiangshu.Context.Scope
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
@@ -41,13 +43,10 @@ type AdvisorSeatDeps =
 /// adoption described in `requirements/advisor/WHAT.md` phase 2 are deliberately not part
 /// of this contract.
 ///
-/// A consult sends the view prompt and the intent as two separate managed prompts
-/// (advisor-[002]: never concatenated), waits for the child's terminal, then reads the prose
-/// back. Each prompt of a consult is its own authority run: the view's run is closed as soon
-/// as its own terminal arrives, so the intent prompt roots freshly and owns a committed
-/// model-routing lease of its own (F39-02). A terminal that never arrives, a terminal that is
-/// not a completed run, or an empty read-back refuses with "advisor did not answer": the seat
-/// never fabricates advice (advisor-[004]).
+/// A consult sends a single managed prompt containing `# intent` followed by caller `[[context]]`,
+/// waits for the child's natural terminal, and captures the child session TOML view. A terminal that
+/// never arrives, a terminal that is not a completed run, or an unreadable session refuses with
+/// "advisor did not answer": the seat never fabricates advice (advisor-[004]).
 [<RequireQualifiedAccess>]
 module AdvisorSeat =
 
@@ -164,99 +163,6 @@ module AdvisorSeat =
                 seat.ChildTask <- Some pending
                 pending)
 
-    [<AllowNullLiteral>]
-    type private AdvisorAnswerLaw =
-        abstract answer: messages: obj array -> string
-
-    [<Import("AdvisorLaw", "wanxiangli/advisor")>]
-    let private advisorLawClass: obj = jsNative
-
-    [<Emit("new $0()")>]
-    let private construct (cls: obj) : AdvisorAnswerLaw = jsNative
-
-    /// The read-back law (last non-blank assistant prose, role case-insensitive) is owned by
-    /// `wanxiangli/advisor` (CUT-39); this host only flattens Host message parts to text.
-    let private answerLaw = construct advisorLawClass
-
-    let private nonBlank (text: string) : string option =
-        if String.IsNullOrWhiteSpace text then None else Some text
-
-    let private textOfParts (parts: MessagePart array) : string =
-        if isNull parts then
-            ""
-        else
-            parts
-            |> Array.choose (function
-                | MessagePart.Text text -> Some text
-                | _ -> None)
-            |> String.concat ""
-
-    /// advisor-[030]: prose read-back after the fenced terminal. Only this
-    /// consult's own terminal has been processed when this runs, so the last
-    /// non-blank assistant message of the child is this consult's answer.
-    let private latestAssistantProse (messages: SessionMessage list) : string option =
-        messages
-        |> List.map (fun message -> createObj [ "role" ==> message.Role; "text" ==> textOfParts message.Parts ])
-        |> List.toArray
-        |> answerLaw.answer
-        |> Option.ofObj
-
-    let private snapshotProseOf (snapshot: ISessionSnapshotPort) (childId: SessionId) : Task<string option> =
-        task {
-            match! snapshot.GetMessages childId with
-            | Ok messages -> return latestAssistantProse messages
-            | Error _ -> return None
-        }
-
-    let private snapshotProse (deps: AdvisorSeatDeps) (childId: SessionId) : Task<string option> =
-        match deps.Snapshot with
-        | None -> Task.FromResult None
-        | Some snapshot -> snapshotProseOf snapshot childId
-
-    /// advisor-[030]: the read-back happens strictly after the fenced
-    /// terminal settled — the child's delivered view first, the Host
-    /// snapshot as its fallback. Both are empty for an advisor that never
-    /// spoke, and an empty answer is a refusal. Because only this consult's
-    /// terminal has been processed, the last non-blank assistant message is
-    /// this consult's answer, never an older consult's.
-    let private readProse (deps: AdvisorSeatDeps) (childId: SessionId) : Task<string option> =
-        task {
-            let! prose = snapshotProse deps childId
-            let sessionId = SessionId.value childId
-
-            let delivered =
-                deps.Journal
-                |> Option.bind (fun journal ->
-                    JsDeliveredValues.peekFence sessionId
-                    |> Option.bind (fun fence ->
-                        TaskDeliveryJournal.tryFindByFenceFields
-                            journal
-                            childId
-                            fence.ProviderRun
-                            (Some fence.ToolCallId)
-                            None
-                            None
-                            None
-                            None))
-                |> Option.map (fun witness -> witness.View)
-                |> Option.orElseWith (fun () -> JsDeliveredValues.tryPeekMaterialWith sessionId prose)
-                |> Option.map ReturnedMaterial.fullText
-                |> Option.bind nonBlank
-
-            match delivered with
-            | Some advice -> return Some advice
-            | None -> return prose
-        }
-
-    let private readAdvice (deps: AdvisorSeatDeps) (childId: SessionId) : Task<Result<string, string>> =
-        task {
-            let! prose = readProse deps childId
-
-            match prose with
-            | Some advice -> return Ok advice
-            | None -> return Error DidNotAnswer
-        }
-
     /// The prompt a physical user message carries: the dispatcher's key stamped in the Host
     /// snapshot first, the journal's accepted physical landing as its fallback.
     let private promptOfUserMessage
@@ -333,34 +239,6 @@ module AdvisorSeat =
     let private isStaleRun (fence: ConsultFence) (result: AgentRunResult) : bool =
         fence.PriorRun |> Option.exists (fun prior -> prior = result.ProviderRun)
 
-    let private settledAdvice
-        (deps: AdvisorSeatDeps)
-        (childId: SessionId)
-        (completion: TaskCompletionSource<Result<unit, string>>)
-        : Task<Result<string, string>> =
-        task {
-            let! settled = completion.Task
-
-            match settled with
-            | Error reason -> return Error reason
-            | Ok() -> return! readAdvice deps childId
-        }
-
-    let private awaitAdvisorProse
-        (deps: AdvisorSeatDeps)
-        (childId: SessionId)
-        (fence: ConsultFence)
-        (completion: TaskCompletionSource<Result<unit, string>>)
-        : Task<Result<string, string>> =
-        task {
-            let! terminalFirst = NodeTiming.raceExit (completion.Task :> Task) ConsultTimeoutMs
-
-            if terminalFirst then
-                return! settledAdvice deps childId completion
-            else
-                return Error DidNotAnswer
-        }
-
     /// F39-02: close the advisor child's logical run once this consult is over.
     ///
     /// The child keeps its identity, but its logical run is finished: a follow-up
@@ -393,6 +271,44 @@ module AdvisorSeat =
                     |> Result.mapError (fun failure -> sprintf "advisor consult could not close its run: %A" failure)
         }
 
+    let private readChildSessionToml
+        (snapshotOpt: ISessionSnapshotPort option)
+        (childId: SessionId)
+        : Task<Result<string, string>> =
+        taskResult {
+            let! snapshot = snapshotOpt |> Result.requireSome "Snapshot port is unavailable for advisor child"
+            let! messages = snapshot.GetMessages childId |> TaskResult.mapError (sprintf "snapshot read failed: %s")
+            let js = Wanxiangshu.Context.Scope.SessionView.ofSnapshotMessages messages
+            let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box js)
+            let toml = Wanxiangshu.Context.Scope.SessionView.renderJsWithTable "session" filtered
+            do! Result.requireFalse DidNotAnswer (String.IsNullOrWhiteSpace toml)
+            return toml
+        }
+
+    let private buildConsultPrompt (intent: string) (viewPrompt: string) : string =
+        let header = LlmFacing.instruction intent |> LlmFacing.render
+        if String.IsNullOrWhiteSpace viewPrompt then
+            header
+        else
+            header + "\n\n" + viewPrompt
+
+    let private executeConsult
+        (deps: AdvisorSeatDeps)
+        (childId: SessionId)
+        (sendPrompt: string -> Task<Result<PromptKey, string>>)
+        (acceptIntent: PromptKey -> unit)
+        (completion: TaskCompletionSource<Result<unit, string>>)
+        (fullPrompt: string)
+        : Task<Result<string, string>> =
+        taskResult {
+            let! key = sendPrompt fullPrompt
+            acceptIntent key
+            let! arrived = NodeTiming.raceExit (completion.Task :> Task) ConsultTimeoutMs |> TaskResultCE.ofTask
+            do! Result.requireTrue DidNotAnswer arrived
+            let! () = completion.Task
+            return! readChildSessionToml deps.Snapshot childId
+        }
+
     let private runConsult
         (deps: AdvisorSeatDeps)
         (journal: AgentJournal)
@@ -414,11 +330,6 @@ module AdvisorSeat =
             let completion =
                 TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-            // F39-02: the view prompt owns a run of its own. Its terminal ends the view
-            // phase; only then is the child's run closed, so the intent prompt roots
-            // freshly with a committed model-routing lease of its own.
-            let viewCompletion =
-                TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
             let fence =
                 { ChildId = childId
@@ -454,29 +365,15 @@ module AdvisorSeat =
                 if armed.Value && not (isStaleRun fence result) then
                     admitCompleted result
 
-            // F39-02: a view-phase terminal ends the view phase; an intent-phase terminal
-            // is the advice candidate. The fence rejects a sticky replay (an earlier
-            // consult's terminal) and any run that did not answer this consult, so it
-            // can neither end the view phase nor answer the intent.
-            let completeAction (result: AgentRunResult) : unit =
-                let acceptable = armed.Value && not (isStaleRun fence result)
-
-                match phase.Value with
-                | ConsultPhase.View when acceptable -> AsyncSupport.trySetResult viewCompletion (Ok()) |> ignore
-                | ConsultPhase.Intent when acceptable -> observeCompleted result
-                | _ -> ()
-
-            // AG-LISTENER-BEFORE-SEND: the Host port refuses a prompt for a session with no
             // live terminal listener, and the listener must outlive both sends.
             let onTerminal _ outcome =
                 match outcome with
-                | Completed result -> completeAction result
+                | Completed result when armed.Value && not (isStaleRun fence result) -> observeCompleted result
+                | Completed _ -> ()
                 | Aborted _
                 | Failed _ when armed.Value ->
                     AsyncSupport.trySetResult completion (Error DidNotAnswer) |> ignore
-                    AsyncSupport.trySetResult viewCompletion (Error DidNotAnswer) |> ignore
-                | Aborted _
-                | Failed _ -> ()
+                | _ -> ()
 
             use _subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
 
@@ -522,45 +419,6 @@ module AdvisorSeat =
                 | Some _ -> sendManaged text
                 | None -> sendRoot text
 
-            /// A Host that never admits the view must not hang the caller's turn either.
-            let boundedView () : Task<Result<PromptKey, string>> =
-                task {
-                    let viewSend = sendPrompt viewPrompt
-                    let! admitted = NodeTiming.raceExit (viewSend :> Task) ConsultTimeoutMs
-
-                    if admitted then
-                        return! viewSend
-                    else
-                        return Error DidNotAnswer
-                }
-
-            /// F39-02: the view's own terminal must arrive before the intent is sent, and
-            /// the view's run is closed as soon as it does. A terminal that never arrives
-            /// refuses the consult, exactly like an intent that is never answered.
-            let voidOnViewOutcome (outcome: Result<unit, string>) : Task<Result<unit, string>> =
-                match outcome with
-                | Error reason -> Task.FromResult(Error reason)
-                | Ok() ->
-                    // The close is durable: the dispatcher's projection must not see an
-                    // ActiveLogicalRun, or the intent prompt would append to a finished
-                    // run (EMR-010).
-                    voidChildRun journal callerSessionId childId
-
-            let closeAfterView () : Task<Result<unit, string>> =
-                task {
-                    let! arrived = NodeTiming.raceExit (viewCompletion.Task :> Task) ConsultTimeoutMs
-
-                    // A terminal that never arrives refuses the consult, exactly like an
-                    // intent that is never answered.
-                    let! outcome =
-                        if arrived then
-                            viewCompletion.Task
-                        else
-                            Task.FromResult<Result<unit, string>>(Error DidNotAnswer)
-
-                    return! voidOnViewOutcome outcome
-                }
-
             let disposeAcceptance () =
                 let subscriptions = lock acceptance (fun () -> Seq.toList acceptance)
 
@@ -576,24 +434,10 @@ module AdvisorSeat =
                     settle result key false |> ignore
 
             armed.Value <- true
+            let fullPrompt = buildConsultPrompt intent viewPrompt
 
             try
-                return!
-                    taskResult {
-                        let! _ = boundedView ()
-
-                        // F39-02: the view's run is closed when its own terminal arrives, so
-                        // the intent prompt roots freshly instead of appending to a finished
-                        // run (which has no committed model-routing lease and would fail
-                        // closed with EMR-010).
-                        let! _ = closeAfterView ()
-
-                        phase.Value <- ConsultPhase.Intent
-
-                        let! key = sendPrompt intent
-                        acceptIntent key
-                        return! awaitAdvisorProse deps childId fence completion
-                    }
+                return! executeConsult deps childId sendPrompt acceptIntent completion fullPrompt
             finally
                 disposeAcceptance ()
         }

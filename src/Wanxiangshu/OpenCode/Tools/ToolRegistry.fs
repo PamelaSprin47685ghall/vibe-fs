@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Host
+open Wanxiangshu.Context.Scope
 open Wanxiangshu.Foundation.HostSession
 
 open Wanxiangshu.Participant.ManagedAgents
@@ -8,6 +9,7 @@ open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Foundation.TerminalSignal
 
 open System
+open FsToolkit.ErrorHandling
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
@@ -31,7 +33,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Process
 
@@ -72,42 +73,23 @@ module ToolRegistry =
     [<Emit("(() => { const out = {}; const src = $0; if (src === null || src === undefined || typeof src !== 'object') return out; for (const key of Object.keys(src)) { const descriptor = Object.getOwnPropertyDescriptor(src, key); if (descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')) { out[key] = descriptor.value; } } return out; })()")>]
     let private plainRecordCopy (source: obj) : obj = jsNative
 
-    let private carryMaterial (sessionId: string) (carry: obj) : obj =
-        let receipt = AnchorSurface.carryMaterial sessionId carry
+    let private captureContextBlocks (snapshotOpt: ISessionSnapshotPort option) (sessionId: SessionId) : Task<Result<LlmFacing.DataBlock list, string>> =
+        taskResult {
+            let! snapshot = snapshotOpt |> Result.requireSome "Snapshot port is unavailable: cannot capture context blocks"
+            let! messages = snapshot.GetMessages sessionId |> TaskResult.mapError (sprintf "Snapshot read failed: %s")
+            let js = Wanxiangshu.Context.Scope.SessionView.ofSnapshotMessages messages
+            let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box js)
+            return Wanxiangshu.Context.Scope.SessionView.blocksJsWithTable "context" filtered
+        }
 
-        if not (receipt?ok: bool) then
-            receipt
-        else
-            let material: obj array = receipt?material
-
-            createObj
-                [ "ok" ==> true
-                  "record" ==> (material |> Array.map (fun entry -> unbox<string> entry?text)) ]
-
-    let private recordOfReceipt (receipt: obj) : string list =
-        unbox<string array> receipt?record |> Array.toList
-
-    /// Copy sandbox data into the host realm and add the selected context.
-    let private payloadWithRecord (payload: obj) (record: string list) : obj =
-        let raw =
-            if isStringValue payload then
-                createObj [ "charge" ==> payload ]
-            elif isNullish payload then
-                createObj []
-            else
-                plainRecordCopy payload
-
-        withField raw "context" (record |> List.toArray |> box)
-
-    /// The devops intent travels as the program's own text: a plain string
-    /// payload is the intent itself, an object payload carries it under
-    /// `intent`. The object form is read from the normalized host-realm
-    /// record, so the intent of a sandbox-built payload is not lost.
-    let private devopsIntentText (payload: obj) (normalizedPayload: obj) : string =
+    let private devopsIntentText (payload: obj) : string =
         if isStringValue payload then
             unbox<string> payload
+        elif isNullish payload then
+            ""
         else
-            (ToolHostCodec.argumentsOfRaw normalizedPayload).Text "intent"
+            let prop = payload?intent
+            if isNullish prop then "" else string prop
 
     let private advisorIntentText (intent: obj) : string =
         if isStringValue intent then unbox<string> intent else ""
@@ -115,19 +97,19 @@ module ToolRegistry =
     let private advisorRefusal (code: string) (reason: string) : obj =
         createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
 
-    /// Resolve carry from the caller's visible history once. Only a successful
-    /// consultation advances the advisor's delivered-material cursor.
     let private advisorSeatAnswer
         (runtime: ToolRuntimeScope)
         (ctx: HostToolContext)
-        (material: obj array)
         (intent: obj)
         : Task<obj> =
         task {
             let sessionId = ctx.SessionId
-
-            let plan =
-                AdvisorView.plan (ProviderLanguage.label (lang ctx)) (Cursor.delivered sessionId) material
+            let intentText = advisorIntentText intent
+            match! captureContextBlocks runtime.Snapshot (SessionId.create sessionId) with
+            | Error err -> return advisorRefusal "advisor-unavailable" (sprintf "caller context unavailable: %s" err)
+            | Ok callerBlocks ->
+            let callerContextToml =
+                LlmFacing.empty |> LlmFacing.withData callerBlocks |> LlmFacing.render
 
             let deps: AdvisorSeatDeps =
                 { Sessions = runtime.Sessions
@@ -136,12 +118,11 @@ module ToolRegistry =
                   Directory = runtime.WorkspaceDirectory
                   Participant = ManagedAgent.nameOf Role.Advisor }
 
-            let! answered = AdvisorSeat.consult deps sessionId (advisorIntentText intent) plan.ViewPrompt
+            let! answered = AdvisorSeat.consult deps sessionId intentText callerContextToml
 
             match answered with
-            | Ok advice ->
-                Cursor.record sessionId plan.DeliveredMaterial
-                return createObj [ "ok" ==> true; "advice" ==> advice ]
+            | Ok toml ->
+                return createObj [ "ok" ==> true; "context" ==> toml ]
             | Error reason -> return advisorRefusal "advisor-unavailable" reason
         }
 
@@ -149,16 +130,8 @@ module ToolRegistry =
         (runtime: ToolRuntimeScope)
         (ctx: HostToolContext)
         (intent: obj)
-        (carry: obj)
         : Task<obj> =
-        task {
-            let selected = AnchorSurface.carryMaterial ctx.SessionId carry
-
-            if unbox<bool> selected?ok then
-                return! advisorSeatAnswer runtime ctx (unbox<obj array> selected?material) intent
-            else
-                return advisorRefusal (unbox<string> selected?code) (unbox<string> selected?reason)
-        }
+        advisorSeatAnswer runtime ctx intent
 
     let private reviewRefusal (code: string) (reason: string) : obj =
         createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
@@ -707,11 +680,9 @@ module ToolRegistry =
                             let placedDelegate
                                 (execute: _ -> Task<Result<ForkTool.PlacementReceipt, string>>)
                                 (payload: obj)
-                                (record: string list)
                                 : Task<obj> =
                                 task {
-                                    let raw = payloadWithRecord payload record
-                                    let! receipt = execute (ToolHostCodec.argumentsOfRaw raw)
+                                    let! receipt = execute (ToolHostCodec.argumentsOfRaw payload)
                                     return receipt |> Result.map placedFields |> envelopeOrRefusal
                                 }
 
@@ -726,14 +697,16 @@ module ToolRegistry =
                                 | Error reason ->
                                     refusalWithReason "devops-failed" (sprintf "devops failed: %s" reason)
 
-                            let askDevops (payload: obj) (record: string list) (gitCommonDir: string) : Task<obj> =
+                            let askDevops (payload: obj) (gitCommonDir: string) : Task<obj> =
                                 task {
-                                    let raw = payloadWithRecord payload record
-                                    let intentText = devopsIntentText payload raw
+                                    let intentText = devopsIntentText payload
+                                    match! captureContextBlocks runtime.Snapshot (SessionId.create ctx.SessionId) with
+                                    | Error reason -> return refusalWithReason "context-unavailable" (sprintf "devops context unavailable: %s" reason)
+                                    | Ok contextBlocks ->
 
                                     let intent =
                                         LlmFacing.instruction intentText
-                                        |> LlmFacing.withData (LlmFacing.Data.textTables "context" record)
+                                        |> LlmFacing.withData contextBlocks
                                         |> LlmFacing.render
 
                                     let delegateTo = devopsDelegateOf syncDelegateRuntime ctx
@@ -748,7 +721,7 @@ module ToolRegistry =
                                     return devopsAnswer outcome
                                 }
 
-                            let devopsDelegate (payload: obj) (record: string list) : Task<obj> =
+                            let devopsDelegate (payload: obj) : Task<obj> =
                                 task {
                                     let! gitCommonDir = askGitCommonDir workspaceDirectory
 
@@ -758,16 +731,8 @@ module ToolRegistry =
                                                 "devops-failed"
                                                 "devops failed: git common directory is missing"
                                     else
-                                        return! askDevops payload record gitCommonDir
+                                        return! askDevops payload gitCommonDir
                                 }
-
-                            let materialGated (material: obj) (run: string list -> Task<obj>) : Task<obj> =
-                                let materialOk: bool = material?ok
-
-                                if not materialOk then
-                                    Task.FromResult(refusalWithReason (string material?code) (string material?reason))
-                                else
-                                    run (recordOfReceipt material)
 
                             // The commit-side fact of a delivery: the live cell
                             // carries this call's exact fence, so THIS call
@@ -790,25 +755,15 @@ module ToolRegistry =
 
                             let host: JsDelegationHost =
                                 { Delegate =
-                                    fun name payload carry ->
+                                    fun name payload ->
                                         task {
-                                            let material = carryMaterial ctx.SessionId carry
-
                                             match name with
                                             | "fork"
                                             | "commission" ->
-                                                return!
-                                                    materialGated
-                                                        material
-                                                        (placedDelegate (ForkTool.executeReceipt runtime ctx) payload)
+                                                return! placedDelegate (ForkTool.executeReceipt runtime ctx) payload
                                             | "resume" ->
-                                                return!
-                                                    materialGated
-                                                        material
-                                                        (placedDelegate
-                                                            (ForkTool.executeResumeReceipt runtime ctx)
-                                                            payload)
-                                            | "devops" -> return! materialGated material (devopsDelegate payload)
+                                                return! placedDelegate (ForkTool.executeResumeReceipt runtime ctx) payload
+                                            | "devops" -> return! devopsDelegate payload
                                             | _ -> return refusal "unknown-delegate"
                                         }
                                   Join =
@@ -883,7 +838,7 @@ module ToolRegistry =
                                             ))
                                             horizonContext
                                             ctx
-                                  Advisor = fun intent carry -> advisorConsult runtime ctx intent carry
+                                  Advisor = fun intent -> advisorConsult runtime ctx intent
                                   Review = fun findings -> reviewMember runtime ctx findings }
 
                             JsDelegationBridge.install ctx.SessionId host
@@ -1344,6 +1299,7 @@ module ToolRegistry =
               yield deliverTool
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
+              yield ResetScopeTool.spec factory runtime.Journal
 
               yield! casebookToolSpecs
               yield! generatedJsSpecs () ]

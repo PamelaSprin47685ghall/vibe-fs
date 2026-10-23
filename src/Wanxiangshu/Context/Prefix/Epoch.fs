@@ -17,6 +17,7 @@ type ActivePrefixEpoch =
         ReanchoredRuns: Set<ProviderRunIdentity>
         /// Plan tenure incumbencies that already advanced the epoch.
         ReanchoredTenures: Set<string>
+        ReanchoredScopes: Set<string>
     }
 
 /// Why a prefix-epoch line was refused, in this repository's vocabulary.
@@ -26,6 +27,7 @@ type PrefixFoldRejection =
     | NonSequentialPrefixEpoch
     | CompactionAlreadyReanchored of run: ProviderRunIdentity
     | TenureAlreadyReanchored of incumbencyId: string
+    | ScopeAlreadyReanchored of callId: string
 
 /// One proposed epoch-advancing line. Proposing changes nothing; only a fold of
 /// the written line commits it.
@@ -44,7 +46,8 @@ module PrefixEpochProjection =
     let empty =
         { EpochId = PrefixEpochId.initial
           ReanchoredRuns = Set.empty
-          ReanchoredTenures = Set.empty }
+          ReanchoredTenures = Set.empty
+          ReanchoredScopes = Set.empty }
 
     let private epochNumber (epoch: PrefixEpochId) : float = float (PrefixEpochId.value epoch)
 
@@ -52,11 +55,15 @@ module PrefixEpochProjection =
         PrefixEpochId.create (int64 (unbox<float> value))
 
     let private stateView (state: ActivePrefixEpoch) : obj =
-        createObj
-            [ "epoch" ==> epochNumber state.EpochId
-              "compactionRuns"
-              ==> (state.ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value)
-              "tenures" ==> (state.ReanchoredTenures |> Set.toArray) ]
+        let baseObj =
+            createObj
+                [ "epoch" ==> epochNumber state.EpochId
+                  "compactionRuns"
+                  ==> (state.ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value)
+                  "tenures" ==> (state.ReanchoredTenures |> Set.toArray) ]
+        if not (Set.isEmpty state.ReanchoredScopes) then
+            baseObj?scopes <- (state.ReanchoredScopes |> Set.toArray)
+        baseObj
 
     let private stateOf (view: obj) : ActivePrefixEpoch =
         { EpochId = epochOf view?epoch
@@ -64,7 +71,12 @@ module PrefixEpochProjection =
             unbox<string array> view?compactionRuns
             |> Array.map ProviderRunIdentity.create
             |> Set.ofArray
-          ReanchoredTenures = unbox<string array> view?tenures |> Set.ofArray }
+          ReanchoredTenures = unbox<string array> view?tenures |> Set.ofArray
+          ReanchoredScopes =
+            if emitJsExpr view "'scopes' in Object($0)" then
+                unbox<string array> view?scopes |> Set.ofArray
+            else
+                Set.empty }
 
     let private compaction (run: ProviderRunIdentity) : obj =
         createObj [ "kind" ==> "compaction"; "run" ==> ProviderRunIdentity.value run ]
@@ -72,12 +84,16 @@ module PrefixEpochProjection =
     let private tenure (incumbencyId: string) : obj =
         createObj [ "kind" ==> "tenure"; "incumbencyId" ==> incumbencyId ]
 
+    let private scope (callId: string) : obj =
+        createObj [ "kind" ==> "scope"; "callId" ==> callId ]
+
     let private rejectionOf (result: obj) : PrefixFoldRejection =
         let evidence = result?evidence
 
         match string result?error, (if isNull evidence then "" else string evidence?kind) with
         | "StaleEpoch", _ -> PrefixFoldRejection.StalePrefixEpoch(epochOf result?expected, epochOf result?actual)
         | "AlreadyReanchored", "tenure" -> PrefixFoldRejection.TenureAlreadyReanchored(string evidence?incumbencyId)
+        | "AlreadyReanchored", "scope" -> PrefixFoldRejection.ScopeAlreadyReanchored(string evidence?callId)
         | "AlreadyReanchored", _ ->
             PrefixFoldRejection.CompactionAlreadyReanchored(ProviderRunIdentity.create (string evidence?run))
         | _ -> PrefixFoldRejection.NonSequentialPrefixEpoch
@@ -115,6 +131,12 @@ module PrefixEpochProjection =
     let isTenureReanchored (incumbencyId: string) (state: ActivePrefixEpoch) : bool =
         unbox<bool> (prefixOwner?isReanchored (stateView state, tenure incumbencyId))
 
+    let applyScopeReanchor previousEpoch nextEpoch (callId: string) state =
+        commit previousEpoch nextEpoch (scope callId) state
+
+    let isScopeReanchored (callId: string) (state: ActivePrefixEpoch) : bool =
+        unbox<bool> (prefixOwner?isReanchored (stateView state, scope callId))
+
     /// HOST-006: the one compaction among `observed` (oldest first) that still needs
     /// a reanchor line, with the epochs that line must carry.
     let proposeCompaction
@@ -138,6 +160,7 @@ module PrefixEpochProjection =
         match rejection with
         | PrefixFoldRejection.StalePrefixEpoch _
         | PrefixFoldRejection.CompactionAlreadyReanchored _
+        | PrefixFoldRejection.ScopeAlreadyReanchored _
         | PrefixFoldRejection.TenureAlreadyReanchored _ -> None
         | PrefixFoldRejection.NonSequentialPrefixEpoch ->
             Some "prefix epoch is not the successor of the previous one (PERSIST-010)"

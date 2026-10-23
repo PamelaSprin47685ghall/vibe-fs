@@ -19,7 +19,13 @@ test('WHAT[provider-language-005] owned prose follows the live preference while 
         const other = loadBookkeeperSystem(language === 'English' ? 'SimplifiedChinese' : 'English')
         const foreign = 'HOST bytes: exit_code /tmp/中文路径 tool_name'
         const output = await transformBookkeeperSystem(session, [other, foreign])
-        assert.deepEqual(output.system, [expected, foreign])
+        assert.equal(output.system[0], expected)
+        assert.equal(output.system[1], foreign)
+        if (language === 'SimplifiedChinese') {
+          assert.match(output.system[2], /状态闭环/)
+        } else {
+          assert.match(output.system[2], /State Closed-Loop/)
+        }
         const repeated = await transformBookkeeperSystem(session, output.system)
         assert.deepEqual(repeated.system, output.system)
       } finally {

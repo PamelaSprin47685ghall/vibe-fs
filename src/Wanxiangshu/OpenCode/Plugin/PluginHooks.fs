@@ -72,46 +72,6 @@ module PluginHooks =
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
-    let private declaredViewOf (input: obj) : bool =
-        if isNull input then
-            false
-        else
-            let declaration =
-                Wanxiangshu.Repository.Programming.Js.JsToolPolicy.viewDeclarationOf input
-
-            not (isNull declaration)
-            && (Wanxiangshu.Repository.Programming.Js.JsToolWorkflow.conflictingInputReason input
-                |> Option.isNone)
-            && (Wanxiangshu.Repository.Programming.Js.JsToolPolicy.viewFailureOf input declaration
-                |> Option.isNone)
-
-    /// obligation-ledger-005 / context-compression-028: the view checkpoint
-    /// admission law (one append per exact completed call, in-flight duplicates
-    /// join, final failures never rewritten, WriterUnavailable released) is owned
-    /// by wanxiangli/compression; this host keeps the journal write and the
-    /// waiter rendezvous on the one in-flight Task.
-    [<AllowNullLiteral>]
-    type private CheckpointAdmission =
-        abstract observe: terminal: obj -> string
-        abstract settle: call: obj * outcome: obj -> string
-
-    [<AllowNullLiteral>]
-    type private CompressionCheckpoints =
-        abstract checkpoints: unit -> CheckpointAdmission
-
-    [<Import("Compression", "wanxiangli/compression")>]
-    let private createCompression: unit -> CompressionCheckpoints = jsNative
-
-    let private checkpointCall (sessionText: string) (callId: ToolCallId) =
-        createObj [ "session" ==> sessionText; "callId" ==> ToolCallId.value callId ]
-
-    let private appendOutcome (failure: JournalAppendFailure) =
-        match failure with
-        | JournalAppendFailure.WriterUnavailable _ -> "WriterUnavailable"
-        | JournalAppendFailure.WriteUnknown _ -> "WriteUnknown"
-        | JournalAppendFailure.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
-        | JournalAppendFailure.FactRejected _ -> "FactRejected"
-
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
     let private reportOnError (report: 'e -> unit) (result: Result<unit, 'e>) : unit =
@@ -212,13 +172,6 @@ module PluginHooks =
                 | None -> false
 
             // Programming-surface calls carrying a non-empty `view` argument establish
-            // the compression checkpoint: one durable checkpoint per successfully
-            // completed call, keyed by exact call id (admission: wanxiangli/compression).
-            let viewCheckpointAdmission = createCompression().checkpoints ()
-            // obligation-ledger-005: the in-flight append for each identity, so a
-            // concurrent duplicate terminal waits for the same append's final
-            // outcome instead of reporting an early success.
-            let pendingViewCheckpointAppends = Dictionary<SessionId * ToolCallId, Task<unit>>()
 
             let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
                 let toolName = if isNull toolInput then "" else string (toolInput?tool)
@@ -300,7 +253,7 @@ module PluginHooks =
                     let onRunStarted =
                         Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
-                    // A participant's return is the this.deliver view.
+                    // A participant's return is the delivered material view.
                     let deliveredView =
                         Some(fun sessionId ->
                             Task.FromResult(
@@ -384,20 +337,6 @@ module PluginHooks =
                 else
                     string toolInput?(name)
 
-            let appendViewCheckpoint durable sessionText callId =
-                task {
-                    let fact =
-                        ContextFact.ViewCheckpointCommitted
-                            {| SessionId = SessionId.create sessionText
-                               ToolCallId = callId |}
-
-                    match!
-                        AgentJournal.appendAgent (StreamId.Session(SessionId.create sessionText)) None fact durable
-                    with
-                    | Ok _ -> ()
-                    | Error failure -> raise (JournalAppendException failure)
-                }
-
             let eventText (value: obj) =
                 if isNull value then
                     None
@@ -439,36 +378,6 @@ module PluginHooks =
                         |> Option.map ProviderRunIdentity.create
 
                     Some(SessionId.value sessionId, ToolCallId.create callId, status, providerRun)
-                | _ -> None
-
-            let viewTerminalObservation rawInput =
-                let raw = HostEventEnvelope.unwrap rawInput
-                let properties = if isNull raw then null else raw?properties
-                let part = if isNull properties then null else properties?part
-                let state = if isNull part then null else part?state
-                let input = if isNull state then null else state?input
-
-                let declaredView = declaredViewOf input
-
-                let sessionId =
-                    HostEventEnvelope.trySessionId raw
-                    |> Option.orElseWith (fun () ->
-                        firstFieldText part [ "sessionID"; "sessionId" ] |> Option.map SessionId.create)
-
-                let tool = firstFieldText part [ "tool"; "name" ]
-                let callId = firstFieldText part [ "callID"; "callId"; "toolCallId" ]
-
-                let status =
-                    firstFieldText state [ "status" ]
-                    |> Option.map (fun value -> value.ToLowerInvariant())
-
-                match HostEventEnvelope.eventTypeOf raw, sessionId, tool, callId, status with
-                | "message.part.updated", Some sessionId, Some tool, Some callId, Some status when
-                    tool.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
-                    && (status = "completed" || status = "error")
-                    && declaredView
-                    ->
-                    Some(SessionId.value sessionId, ToolCallId.create callId, status)
                 | _ -> None
 
             /// 条款 6：中断未确认是呈现面的失败，不是事实面的失败。提问已经
@@ -536,54 +445,7 @@ module PluginHooks =
                             [ "session_id", sessionId; "result", "unbound" ]
                     | _ -> ()
                 }
-
-            let requiredViewJournal () =
-                journal
-                |> Option.defaultWith (fun () -> invalidOp "view compression checkpoint requires a durable journal")
-
-            let appendTerminalViewCheckpoint key sessionText callId =
-                task {
-                    let call = checkpointCall sessionText callId
-
-                    try
-                        do! appendViewCheckpoint (requiredViewJournal ()) sessionText callId
-                        viewCheckpointAdmission.settle (call, "committed") |> ignore
-                        pendingViewCheckpointAppends.Remove(key) |> ignore
-                    with :? JournalAppendException as appendFailure ->
-                        viewCheckpointAdmission.settle (call, appendOutcome appendFailure.Failure)
-                        |> forgetWhenReleased pendingViewCheckpointAppends key
-
-                        return raise appendFailure
-                }
-
-            /// One durable checkpoint per exact terminal call. A repeated Host
-            /// part update for the same call id is a replay, not a second fact.
-            /// obligation-ledger-005: concurrent duplicates of the same terminal
-            /// share the one in-flight append and observe its final outcome; a
-            /// failed append propagates its error to every waiter. Which terminal
-            /// appends, joins or is skipped, and which outcomes release the call
-            /// for a real retry, is answered by the compression admission ledger.
-            let settleViewCheckpointTerminal (sessionText, callId, status) =
-                let key = SessionId.create sessionText, callId
-
-                let terminal =
-                    createObj
-                        [ "session" ==> sessionText
-                          "callId" ==> ToolCallId.value callId
-                          "status" ==> status ]
-
-                match viewCheckpointAdmission.observe terminal with
-                | "append" ->
-                    let append = appendTerminalViewCheckpoint key sessionText callId
-                    pendingViewCheckpointAppends[key] <- append
-                    append
-                | "join" -> pendingViewCheckpointAppends[key]
-                | _ -> Task.FromResult(())
-
-            let settleViewCheckpointEvent rawInput =
-                viewTerminalObservation rawInput
-                |> Option.map settleViewCheckpointTerminal
-                |> Option.defaultValue (Task.FromResult(()))
+            let firstFieldText = firstFieldText
 
             let checkManagerReviewPermissions toolName toolInput =
                 task {
@@ -892,7 +754,6 @@ module PluginHooks =
             let observeEvent raw =
                 task {
                     recordProviderTokenUse raw
-                    do! settleViewCheckpointEvent raw
                     do! settleUserQuestion raw
                     do! settlePostS3Deliver raw
                     do! wired.ObserveEvent raw

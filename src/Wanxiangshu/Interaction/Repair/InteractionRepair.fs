@@ -161,23 +161,25 @@ module InteractionRepairWorkflow =
         let path =
             match context.Turn.Role with
             | Some Role.Manager -> "work/manager-continue"
-            | Some Role.Engineer -> "work/engineer-continue"
-            | Some Role.DevOps -> "work/devops-continue"
-            | _ -> "work/plan-continue"
+            | Some Role.Plan -> "work/plan-continue"
+            | _ -> ""
 
-        let prompt =
-            ProviderProse.render (ProviderProse.languageOf context.Turn.SessionId) path Map.empty
+        if System.String.IsNullOrEmpty path then
+            Task.FromResult(()) :> Task
+        else
+            let prompt =
+                ProviderProse.render (ProviderProse.languageOf context.Turn.SessionId) path Map.empty
 
-        trySendIdleRepair
-            quiescence
-            context
-            sessionPort
-            rootWorkspace
-            eventPort
-            journal
-            prompt
-            "unfinished-long-work"
-            observer
+            trySendIdleRepair
+                quiescence
+                context
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
+                prompt
+                "unfinished-long-work"
+                observer
 
     let private continuationKindOf (journal: AgentJournal option) (turn: ReconciledTurn) =
         journal
@@ -277,7 +279,12 @@ module InteractionRepairWorkflow =
                 || obs.IsFissionActive context.Turn.SessionId
             | None -> isFissionReplaced journal context.Turn.SessionId
 
-        if fissionReplaced || retryAttemptSuppressesRepair journal observation context.Turn then
+        let exemptRole =
+            match context.Turn.Role with
+            | Some Role.Engineer | Some Role.DevOps -> true
+            | _ -> false
+
+        if exemptRole || fissionReplaced || retryAttemptSuppressesRepair journal observation context.Turn then
             AsyncSupport.completedTask ()
         else
             repairDefect

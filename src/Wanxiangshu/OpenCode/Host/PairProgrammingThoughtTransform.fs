@@ -19,7 +19,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Participant.Provider.Projection
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
@@ -278,16 +277,13 @@ module PairProgrammingThoughtTransform =
     /// The same address MAY appear more than once: context-compression-031
     /// `carry` can repeat historical rows. Keep every row. Render Before at
     /// the first copy and After at the last copy. Cursor uses the last carrier.
-    let private addressedRealMessages (realMessages: obj list) : Result<(string * obj) list, string> =
-        let rec loop acc =
-            function
-            | [] -> Ok(List.rev acc)
-            | message :: rest ->
-                match ProviderWireDecode.hostMessageId message with
-                | None -> Error "transcript message without address (HOST-013)"
-                | Some id -> loop ((id, message) :: acc) rest
+    let private addressOneRealMessage (message: obj) : Result<string * obj, string> =
+        match ProviderWireDecode.hostMessageId message with
+        | None -> Error "transcript message without address (HOST-013)"
+        | Some id -> Ok(id, message)
 
-        loop [] realMessages
+    let private addressedRealMessages (realMessages: obj list) : Result<(string * obj) list, string> =
+        realMessages |> List.traverseResultM addressOneRealMessage
 
     // ── replay：唯一合法渲染路径 ─────────────────────────────────────────────
 
@@ -1157,186 +1153,8 @@ module PairProgrammingThoughtTransform =
                     let callId = tryUnboxString part?callID |> Option.defaultValue (string index)
                     messageId + ":tool:" + callId))
 
-    [<Emit("structuredClone($0)")>]
-    let private copyAnchorSource (raw: obj) : obj = jsNative
-
-    [<Emit("({ info: { id: $0, role: 'user', synthetic: true, source: 'carry-literal' }, parts: [{ type: 'text', text: $1 }] })")>]
-    let private literalMessage (id: string) (text: string) : obj = jsNative
-
-    [<Emit("""(function (previous, current) {
-      if (previous.length === 0) return current;
-      const boundary = previous[previous.length - 1];
-      const identity = row => row?.info?.id ?? row?.id;
-      const boundaryId = identity(boundary);
-      const index = boundaryId === undefined
-        ? previous.length - 1
-        : current.findIndex(row => identity(row) === boundaryId);
-      if (index < 0 || index >= current.length) {
-        throw new Error('The compression request boundary is absent from the Host history');
-      }
-      const oldParts = boundary.parts ?? [];
-      const newParts = current[index].parts ?? [];
-      const added = [];
-      for (let partIndex = 0; partIndex < Math.min(oldParts.length, newParts.length); partIndex++) {
-        const before = oldParts[partIndex];
-        const after = newParts[partIndex];
-        if (JSON.stringify(before) === JSON.stringify(after)) continue;
-        if (typeof before?.text === 'string' && typeof after?.text === 'string'
-            && before.type === after.type && after.text.startsWith(before.text)) {
-          const text = after.text.slice(before.text.length);
-          if (text.length > 0) added.push({ ...after, text });
-        } else {
-          added.push(after);
-        }
-      }
-      added.push(...newParts.slice(oldParts.length));
-      const suffix = current.slice(index + 1);
-      return added.length === 0 ? suffix : [{ ...current[index], parts: added }, ...suffix];
-    })($0, $1)""")>]
-    let private messagesAfterSnapshot (previous: obj array) (current: obj array) : obj array = jsNative
-
-    [<Emit("""(function (raw, messageId, callId, prefixUntil, carry) {
-      if ((raw.info?.id ?? raw.id) !== messageId) return raw;
-      let changed = false;
-      const parts = (raw.parts ?? []).map(part => {
-        const state = part?.state;
-        const input = state?.input;
-        if (part?.type !== 'tool' || part.callID !== callId || typeof part.tool !== 'string'
-            || !part.tool.startsWith('todowrite-for-') || state?.status !== 'completed'
-            || input?.prefixUntil !== prefixUntil || !Array.isArray(input.carry)
-            || input.carry.length !== carry.length
-            || !carry.every((item, index) => Object.is(item, input.carry[index]))) return part;
-        const cleanInput = { ...input };
-        delete cleanInput.carry;
-        changed = true;
-        return { ...part, state: { ...state, input: cleanInput } };
-      });
-      return changed ? { ...raw, parts } : raw;
-    })($0, $1, $2, $3, $4)""")>]
-    let private stripCarry (raw: obj) (messageId: string) (callId: string) (prefixUntil: int) (carry: obj) : obj =
-        jsNative
-
-    /// A user message carries the anchor marker on its first text part (or a new
-    /// leading text part); any other message carries it on its terminal result.
-    let private markedUserAnchorParts (marker: string) (parts: obj array) : obj =
-        let index =
-            parts
-            |> Array.tryFindIndex (fun part ->
-                not (isNull part) && isString part?text && partTypeKind part = Some "text")
-
-        match index with
-        | Some index ->
-            let projected = Array.copy parts
-            let part = emitJsExpr parts.[index] "Object.assign({}, $0)"
-            part?text <- box (marker + unbox<string> parts.[index]?text)
-            projected.[index] <- part
-            box projected
-        | None ->
-            let part = createObj [ "type", box "text"; "text", box marker ]
-            box (Array.append [| part |] parts)
-
-    let private markedTerminalAnchorParts (marker: string) (parts: obj array) : obj =
-        match parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.tryLast with
-        | None -> markedUserAnchorParts marker parts
-        | Some index ->
-            let projected = Array.copy parts
-            projected.[index] <- mapTerminalResultText (fun text -> marker + text) parts.[index]
-            box projected
-
-    let private markedAnchorParts (marker: string) (raw: obj) : obj =
-        let parts = rawParts raw
-
-        if messageRole raw = "user" then
-            markedUserAnchorParts marker parts
-        else
-            markedTerminalAnchorParts marker parts
-
-    let private markAnchors (messages: obj list) =
-        messages
-        |> List.mapFold
-            (fun count raw ->
-                if isNull raw?__contextAnchor then
-                    raw, count
-                else
-                    let count = count + 1
-
-                    let marker =
-                        sprintf "[ANCHOR: %d]" (unbox<int> raw?__contextAnchor)
-                        + cursorGuidanceSeparator
-
-                    let cloned = emitJsExpr raw "Object.assign({}, $0)"
-                    emitJsStatement cloned "delete $0.__contextAnchor"
-                    cloned?parts <- markedAnchorParts marker raw
-                    cloned, count)
-            0
-        |> fst
-
-    let private selectAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
-        let input raw =
-            { AnchorMessage.Id = anchorMessageId raw
-              Text = wireTextOf raw
-              Raw = copyAnchorSource raw }
-
-        let inputs = messages |> List.map input
-
-        let suffix =
-            match AnchorLedger.checkpointSource sessionId with
-            | None -> messages
-            | Some previous ->
-                messagesAfterSnapshot (previous |> List.map _.Raw |> List.toArray) (List.toArray messages)
-                |> Array.toList
-
-        let suffix =
-            match AnchorLedger.checkpointCall sessionId with
-            | None -> suffix
-            | Some(messageId, callId, declaration) ->
-                let carry = AnchorCarry.toValue declaration.Carry
-
-                suffix
-                |> List.map (fun raw -> stripCarry raw messageId callId declaration.PrefixUntil carry)
-
-        let segments = AnchorLedger.project sessionId (suffix |> List.map input)
-        AnchorLedger.remember sessionId inputs segments
-        let declaration = AnchorLedger.takeView sessionId
-
-        let report =
-            AnchorView.report AnchorSurface.countTokens inputs (AnchorLedger.protectedPrefix sessionId) segments
-
-        let projected =
-            segments
-            |> List.collect (fun segment ->
-                segment.Messages
-                |> List.mapi (fun index message ->
-                    let raw =
-                        if isNull message.Raw then
-                            literalMessage (Option.get message.Id) message.Text
-                        else
-                            copyAnchorSource message.Raw
-
-                    if index = 0 then
-                        raw?__contextAnchor <- box segment.Anchor
-
-                    raw))
-
-        let description =
-            declaration
-            |> Option.map (fun declared ->
-                sprintf
-                    "Context updated: prefixUntil=%d; visibleSegments=%d; kept=%d inserted=%d dropped=%d; tokens total=%d used=%d cached=%d. The completed turn is retained."
-                    declared.PrefixUntil
-                    segments.Length
-                    report.Kept
-                    report.Inserted
-                    report.Dropped
-                    report.Total
-                    report.Used
-                    report.Cached)
-
-        projected, description
-
     let applyAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
-        let projected, report = selectAnchorView sessionId messages
-        markAnchors projected, report
+        messages, None
 
     let private markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored =
         // crash-reconciliation-018: the restart guidance is delivered
@@ -1366,10 +1184,7 @@ module PairProgrammingThoughtTransform =
             | Ok(newMessages, anchored) ->
                 markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored
 
-                let marked =
-                    projectionSessionIdOpt
-                    |> Option.map (fun _ -> markAnchors newMessages)
-                    |> Option.defaultValue newMessages
+                let marked = newMessages
 
                 HostMessageProjection.replaceMessagesInPlace outObj marked
             | Error reason -> do! failClosedInject terminateSession projectionSessionIdOpt reason
@@ -1400,10 +1215,7 @@ module PairProgrammingThoughtTransform =
                 |> Option.bind DeclaredContextLimit.tryFind
                 |> Option.map (PairProgrammingCalibration.renderContextLimit language)
 
-            let messages, anchorBlock =
-                match projectionSessionIdOpt with
-                | Some sessionId -> selectAnchorView sessionId messages
-                | None -> messages, None
+            let messages, anchorBlock = messages, None
 
             let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
 

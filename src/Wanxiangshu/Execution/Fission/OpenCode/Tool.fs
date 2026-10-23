@@ -11,6 +11,8 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Ports
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Context.Scope
 open Wanxiangshu.OpenCode.ToolHostCodec
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Execution.Tool
@@ -63,6 +65,22 @@ module FissionTool =
         directory
         |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value laneId, path))
 
+    let private readOwnerView (snapshot: ISessionSnapshotPort) (sessionId: SessionId) : Task<string option> =
+        task {
+            match! snapshot.GetMessages sessionId with
+            | Error _ -> return None
+            | Ok messages ->
+                let js = Wanxiangshu.Context.Scope.SessionView.ofSnapshotMessages messages
+                let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box js)
+                let toml = Wanxiangshu.Context.Scope.SessionView.renderJsWithTable "context" filtered
+                return Some toml
+        }
+
+    let private captureOwnerView (snapshotOpt: ISessionSnapshotPort option) (sessionId: SessionId) : Task<string option> =
+        match snapshotOpt with
+        | None -> Task.FromResult None
+        | Some snapshot -> readOwnerView snapshot sessionId
+
     let private hostPort (scope: ToolRuntimeScope) (ctx: HostToolContext) : FissionHostPort =
         { Sessions = scope.Sessions
           Events = scope.EventPort
@@ -71,7 +89,8 @@ module FissionTool =
           LogicalOwnerFor = scope.LogicalOwnerFor
           OwnerRuns = fun () -> scope.RuntimeFor ctx |> Result.map ownerRunsOf
           RegisterLane = registerLane scope
-          LaneStarted = scope.RunStarted }
+          LaneStarted = scope.RunStarted
+          OwnerView = Some(captureOwnerView scope.Snapshot) }
 
     let private requestOf (ctx: HostToolContext) prompts : FissionLaunchRequest =
         { CallerSessionId = ctx.SessionId

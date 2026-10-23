@@ -64,7 +64,8 @@ module OfficeCapabilitySurface =
           ToolPermission.Deliver
           ToolPermission.Review
           ToolPermission.DevOpsConsultation
-          ToolPermission.Advisor ]
+          ToolPermission.Advisor
+          ToolPermission.ResetScope ]
         |> List.map OfficeCapability.permissionLabel
         |> List.toArray
 

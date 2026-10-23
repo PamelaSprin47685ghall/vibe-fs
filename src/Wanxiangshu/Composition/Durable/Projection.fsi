@@ -33,9 +33,6 @@ type AgentProjectionSet =
         HandleByChildSession: Map<SessionId, HandleRecord>
         Fission: FissionProjectionState
         ChatExecutions: ChatExecutionProjectionState
-        /// Successful view declaration checkpoints still on the raw side of the
-        /// committed prefix. The retain window (K) is a fixed system parameter.
-        ViewCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
         Deliveries: Map<SessionId * ProviderRunIdentity * ToolCallId, Wanxiangshu.Host.TaskDeliveryWitness>
         RuntimeStartCount: int
     }

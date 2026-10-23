@@ -1,5 +1,16 @@
 # Changelog — 版本历史
 
+## Unreleased — resetScope 协议与自然停机返回
+
+- **唯一的上下文边界**：`resetScope(oldScopeVerboseVerbatimExperience?, newScopeObjective, newScopeTurnBudget)` 取代 ANCHOR/`prefixUntil` 视图声明，成为划定上下文的唯一手段；调用即删除上一次 reset（或会话开始）到本次之间的全部内容，只保留用户消息与既往 reset 成对记录，之后的内容进入新 scope。`turnBudget` 在新 scope 上倒计时，工具结果尾部披露 `[Remaining turnBudget: N]`；会话开始要求先估预算再 reset，归零只发弱提醒，不中断在飞工作。
+- **删除的旧机制**：ANCHOR 锚点编号、`prefixUntil`/`prefixCount` 前缀声明、`carry` 数组挑材料、以及配套的压缩重放与 checkpoint 口径一并移除；已退役的旧名字只留在历史条目与本条说明里，不再是现行合同。
+- **前缀 epoch**：`resetScope` 落一条 `ScopeReanchored` durable 事实推进前缀 epoch（Previous→Next），与任期交接的重锚事实并列，不再靠视图声明换 epoch。
+- **父→子传递**：fork/resume/commission/devops 咨询/dag/advisor 一律把指令散文渲染为 `#` 注释头，把发送方本次 scope 之后面向模型的完整视图作为 TOML `[[context]]` 表随文档发出。
+- **子→父传递**：Engineer 与 DevOps 自然停机即为交付——本轮正常停下时，子方完整的 post-scope 视图作为 TOML `[[session]]` 返回，父方 `join` 收取该份；这两个角色没有 `this.deliver`，也不再被追加偷停提醒。Manager 与 Plan 保留生命周期 host tool `deliver`（一次调用完成或接力）。
+- **顾问席**：`advisor(intent)` 收敛为一次请求，形态等同父方问子方一个问题，返回 `{ ok, context }`。
+- **测试证据**：context-compression 36/36、work 188/188、advisor 6/6、delegation 118/118、capability 23/23、prefix-stability 58/58；Fable build generation 81 成功。以上为受影响套件的实测数字，**不表示整树套件结论**——完整套件由另一路 runner 复核中。
+- **未验证**：本轮未调用真实 provider、未部署、未跑真实 Host 链上的端到端会话。
+
 ## Unreleased — 修复 carry 重复地址触发 HOST-013 会话终止
 
 - `PairProgrammingThoughtTransform` 不再把压缩视图中重复的 Host 地址当成非法输入；保留所有正文副本与顺序。Before/After 分别取首/末副本，cursor 提示只落在最后一个可承载副本；同消息续写的纯 prose 不吞掉旧 tool result 的提示。缺失地址继续拒绝。

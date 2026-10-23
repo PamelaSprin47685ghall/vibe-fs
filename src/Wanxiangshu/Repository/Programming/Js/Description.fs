@@ -586,31 +586,31 @@ class JsProgram {"""
                       [ "rethrow_host", rethrowHost ]
               if present capabilities "commission" then
                   fill
-                      """  async commission(payload, extra = []) {
+                      """  async commission(payload) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
 {{name_derivation}}
-    return await this._api.commission(spec, extra);
+    return await this._api.commission(spec);
   }"""
                       [ "name_derivation", deriveNameFromCharge ]
               if present capabilities "fork" then
                   fill
-                      """  async fork(payload, extra = []) {
+                      """  async fork(payload) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
 {{name_derivation}}
-    return await this._api.fork(spec, extra);
+    return await this._api.fork(spec);
   }"""
                       [ "name_derivation", deriveNameFromCharge ]
               if present capabilities "resume" then
                   fill
-                      """  async resume(payload, extra = []) {
+                      """  async resume(payload) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
-    return await this._api.resume(spec, extra);
+    return await this._api.resume(spec);
   }"""
                       []
               if present capabilities "devops" then
                   fill
-                      """  async devops(intent, extra = []) {
-    return await this._api.devops(intent, extra);
+                      """  async devops(intent) {
+    return await this._api.devops(intent);
   }"""
                       []
               if present capabilities "join" then
@@ -627,8 +627,8 @@ class JsProgram {"""
                       []
               if present capabilities "advisor" then
                   fill
-                      """  async advisor(intent, extra = []) {
-    return await this._api.advisor(intent, extra);
+                      """  async advisor(intent) {
+    return await this._api.advisor(intent);
   }"""
                       []
               if present capabilities "review" then
@@ -647,9 +647,7 @@ class JsProgram {"""
               // this.join(), so it is emitted only when Join is projected too.
               if present capabilities "dag" then
                   fill
-                      """  async dag(spec, extra = []) {
-    const parsed = this._api.validateCarry(extra);
-    if (!parsed.ok) return parsed;
+                      """  async dag(spec) {
     const nodes = (spec && spec.nodes) || [];
     if (nodes.length === 0) return { ok: true, results: {}, skipped: [] };
     const byId = {};
@@ -659,7 +657,7 @@ class JsProgram {"""
     let pending = nodes.map((node) => node.id);
     const agentToNode = {};
     const material = (node) => {
-      const items = parsed.carry.slice();
+      const items = [];
       for (const dep of node.deps || []) {
         const record = results[dep];
         if (record && Array.isArray(record.returned) && record.returned.length > 0) {
@@ -765,23 +763,6 @@ class JsProgram {"""
               fill
                   """  async park(payload) {
     return await this._api.park(payload);
-  }"""
-                  []
-              // The current report returns with the optional history selection.
-              fill
-                  """  async deliver(extra = []) {
-    if (arguments.length > 1) {
-      return {
-        ok: false,
-        code: "VIEW_DECLARATION_INVALID",
-        reason: "deliver accepts at most one extra array (received " + arguments.length + " arguments)"
-      };
-    }
-    const parsed = this._api.validateCarry(extra);
-    if (!parsed.ok) return parsed;
-    const err = new Error("delivered");
-    err.__jsDelivered = { carry: parsed.carry };
-    throw err;
   }"""
                   []
               runStub prose ] in

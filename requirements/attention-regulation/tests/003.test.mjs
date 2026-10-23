@@ -35,8 +35,6 @@ test('WHAT[attention-regulation-003] defer is retired from tool registration, Pa
     'resources/provider/attention-regulation must be deleted',
   )
 
-  const viewExtraEn = read('resources/provider/tool/js-program/view-declaration-extra/en.md')
-  const viewExtraZh = read('resources/provider/tool/js-program/view-declaration-extra/zh-CN.md')
-  assert.match(viewExtraEn, /summary/)
-  assert.match(viewExtraZh, /摘要/)
+  assert.equal(existsSync(resolve(root, 'resources/provider/tool/js-program/view-declaration-extra')), false, 'retired view-declaration-extra resource must be absent')
+  assert.ok(existsSync(resolve(root, 'resources/provider/tool/assume/description/en.md')), 'replacement assume contract is present')
 })

@@ -19,7 +19,6 @@ module ForkChildPayloadSurface =
         let l = languageOf lang
 
         { Base = ProviderProse.instructionLines l ForkChildPayload.BasePath Map.empty
-          CommissionerRecord = ProviderProse.render l ForkChildPayload.CommissionerRecordPath Map.empty
           Attachment = ProviderProse.render l ForkChildPayload.AttachmentPath Map.empty
           Requirements = ProviderProse.render l ForkChildPayload.RequirementsPath Map.empty }
 
@@ -33,7 +32,7 @@ module ForkChildPayloadSurface =
         let p = proseOf lang
 
         {| Base = List.toArray p.Base
-           CommissionerRecord = p.CommissionerRecord
+           CommissionerRecord = ""
            Attachment = p.Attachment
            Requirements = p.Requirements |}
 
@@ -73,14 +72,19 @@ module ForkChildPayloadSurface =
             else
                 List.ofArray input.RootRequirements
 
+        let contextBlocks =
+            if isNull input.CommissionerRecord || isUndefined input.CommissionerRecord || Array.isEmpty input.CommissionerRecord then
+                []
+            else
+                input.CommissionerRecord
+                |> Array.toList
+                |> List.map (fun text ->
+                    LlmFacing.Data.tableArray "context" [ LlmFacing.Data.stringMember "text" text ])
+
         ForkChildPayload.render
             prose
             { Assignment = assignment
-              CommissionerRecord =
-                if isNull input.CommissionerRecord || isUndefined input.CommissionerRecord then
-                    []
-                else
-                    List.ofArray input.CommissionerRecord
+              ContextBlocks = contextBlocks
               Attachment = input.Attachment
               RootRequirements = requirements
               Payload = input.Payload }

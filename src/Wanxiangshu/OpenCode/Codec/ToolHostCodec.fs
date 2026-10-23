@@ -57,10 +57,10 @@ module HostIngressCodec =
             Some(descriptorValue descriptor)
 
     let private valueProperty (source: obj) (name: string) =
-        if isNull source || not (isPlainRecord source) then
-            None
+        if isNull source then None
         else
-            dataProperty source name
+            let v = safeHostProperty source name
+            if isNull v then None else Some v
 
     let primitiveNonBlankString (value: obj) =
         if isNull value || not (isString value) then

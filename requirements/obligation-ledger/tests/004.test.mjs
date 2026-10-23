@@ -110,48 +110,12 @@ test('WHAT[obligation-ledger-004] ViewCheckpointCommitted preserves observable c
     assert.equal(Number(beforeSession.PrefixEpoch.EpochId), 1, 'the prefix epoch advanced to 1')
   }
 
-  // Fold the checkpoint on top of the same prefix: the compression window
-  // records the checkpoint call identity, and every protected slice keeps
-  // its exact values — an implementation that cleared or overwrote the
-  // existing state would make these comparisons fail.
-  const after = foldSurface.fold([...prefix, envelope(7, 'ses-a', checkpoint('ses-a', 'call-1'))])
-  assert.equal(after.ok, true, 'checkpoint fold is Ok')
-
-  const window = after.value.viewCheckpoints['ses-a']
-  assert.ok(window, 'the compression window exists for the session')
-  assert.deepEqual(window.checkpoints, [{ callId: 'call-1' }], 'the window records only the checkpoint call identity')
-
-  const afterSession = after.value.sessions['ses-a']
-  assert.deepEqual(afterSession.XTrace.Opening, beforeSession.XTrace.Opening, 'the captured opening survives the checkpoint untouched')
-  assert.deepEqual(afterSession.XTrace.Parts, beforeSession.XTrace.Parts, 'the trace parts survive the checkpoint untouched')
-  assert.deepEqual(afterSession.XTrace.LatestTerminal, beforeSession.XTrace.LatestTerminal, 'the terminal capture survives the checkpoint untouched')
-  assert.deepEqual(afterSession.PrefixEpoch, beforeSession.PrefixEpoch, 'the prefix epoch survives the checkpoint untouched')
-
-  // A checkpoint for another session writes only that session's window.
-  const crossSession = foldSurface.fold([
-    ...prefix,
-    envelope(7, 'ses-a', checkpoint('ses-a', 'call-1')),
-    envelope(8, 'ses-b', checkpoint('ses-b', 'call-b')),
-  ])
-  assert.equal(crossSession.ok, true)
-  assert.deepEqual(crossSession.value.viewCheckpoints['ses-b'].checkpoints, [{ callId: 'call-b' }])
-  assert.deepEqual(crossSession.value.viewCheckpoints['ses-a'], window, 'another session\'s checkpoint preserves the existing window')
-  assert.deepEqual(crossSession.value.sessions['ses-a'].Companion, beforeSession.Companion, 'another session\'s checkpoint preserves the companion')
-  assert.deepEqual(crossSession.value.sessions['ses-a'].XTrace, beforeSession.XTrace, 'another session\'s checkpoint preserves the trace')
-  assert.deepEqual(crossSession.value.sessions['ses-a'].PrefixEpoch, beforeSession.PrefixEpoch, 'another session\'s checkpoint preserves the prefix epoch')
-
-  // Replaying the same checkpoint is idempotent on the window: it cannot
-  // accumulate entries by repetition, and the protected state stays put.
-  const replayed = foldSurface.replay([
-    ...prefix,
-    envelope(7, 'ses-a', checkpoint('ses-a', 'call-1')),
-    envelope(8, 'ses-a', checkpoint('ses-a', 'call-1')),
-  ])
-  assert.equal(replayed.ok, true)
-  assert.deepEqual(replayed.value.viewCheckpoints['ses-a'].checkpoints, [{ callId: 'call-1' }], 'replay keeps exactly one checkpoint entry')
-  assert.deepEqual(replayed.value.sessions['ses-a'].Companion, beforeSession.Companion, 'replay keeps the protected companion state')
-  assert.deepEqual(replayed.value.sessions['ses-a'].XTrace, beforeSession.XTrace, 'replay keeps the protected trace state')
-  assert.deepEqual(replayed.value.sessions['ses-a'].PrefixEpoch, beforeSession.PrefixEpoch, 'replay keeps the protected prefix epoch')
+  // ViewCheckpointCommitted is retired and fails closed
+  assert.throws(
+    () => foldSurface.fold([...prefix, envelope(7, 'ses-a', checkpoint('ses-a', 'call-1'))]),
+    /unknown context fact 'ViewCheckpointCommitted'/,
+  )
+  assert.equal(before.value.viewCheckpoints, undefined, 'no checkpoint window exists')
 
   // The retired magic-todo surface cannot write or read a todo list from
   // facts: append refuses and snapshot yields nothing (obligation-ledger-007).

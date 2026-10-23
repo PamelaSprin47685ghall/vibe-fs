@@ -6,6 +6,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.HostSession
 
 type PendingHostRun =
     { Token: obj
@@ -16,7 +17,8 @@ type PendingHostRun =
       Work: AdmittedWork option
       Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
-      mutable Finished: bool }
+      mutable Finished: bool
+      Snapshot: ISessionSnapshotPort option }
 
 module HostPendingRun =
     val completionSource: unit -> TaskCompletionSource<AgentCompletionOutcome>

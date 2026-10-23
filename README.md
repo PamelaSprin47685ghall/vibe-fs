@@ -148,6 +148,8 @@ Bookkeeper 等内部角色由编排路径调用，不作为单独“安装角色
 
 Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）。精确权限见 `requirements/participant-identity` 与 `requirements/capability-enforcement`。
 
+上下文边界不随角色变化：每个会话都使用 `resetScope(oldScopeVerboseVerbatimExperience?, newScopeObjective, newScopeTurnBudget)` 划定 scope，并在新 scope 上按 `[Remaining turnBudget: N]` 倒计时（预算耗尽只给弱提醒，不封锁动作）。父子之间不再由模型挑材料：父→子（fork/resume/commission/devops/dag/advisor）以 `#` 注释送指令散文、以 TOML `[[context]]` 送发送方完整的 post-scope 视图；Engineer 与 DevOps 没有 `deliver`，自然停机即把子方完整视图作为 TOML `[[session]]` 返回父方；Manager 与 Plan 保留生命周期 `deliver`，一次调用即完成或接力。
+
 ### 运行时数据
 
 领域事实以 journal（按 runtime 的 NDJSON）写入 `.Herdchestra/wanxiangshu/runtimes/`；没有 Git 仓库时使用给定目录，不回退 .git、XDG 或旧日志。随包资源：

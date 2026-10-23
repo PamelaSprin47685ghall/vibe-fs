@@ -52,7 +52,6 @@ test('WHAT[repository-programming-060] LC-007: failure during ledger settlement 
       {
         program: program(`
     this.write('effect.txt', 'mutated-data');
-    await this.deliver(["should-not-persist-view"]);
     return { done: true };
 `),
       },
@@ -102,7 +101,6 @@ test('WHAT[repository-programming-060] LC-007: commit phase append failure also 
       {
         program: program(`
     this.write('target.txt', 'after');
-    await this.deliver(["fenced-report"]);
     return { done: true };
 `),
       },

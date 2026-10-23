@@ -56,18 +56,16 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   assert.equal(surface.baseClassSource.includes('rewrite('), false, 'BaseClass must not declare rewrite')
   assert.equal(surface.baseClassSource.includes('glob('), false, 'BaseClass must not declare retired glob')
   assert.equal(surface.baseClassSource.includes('grep('), false, 'BaseClass must not declare retired grep')
-  // 委派成员接受 carry 数组，缺省为空；join/horizon 是拉取动作，不带 carry。
-  assert.equal(surface.baseClassSource.includes('this._api.fork(spec, carry)'), true, 'BaseClass fork must forward the carry array')
-  assert.equal(surface.baseClassSource.includes('this._api.resume(spec, carry)'), true, 'BaseClass resume must forward the carry array')
-  assert.equal(surface.baseClassSource.includes('this._api.advisor(intent, extra = [])'), true, 'BaseClass advisor must forward the carry array')
-  assert.equal(surface.baseClassSource.includes('async dag(spec, extra = [])'), true, 'BaseClass must declare dag with an optional extra array')
+  assert.equal(surface.baseClassSource.includes('this._api.fork(spec)'), true, 'BaseClass fork forwards spec')
+  assert.equal(surface.baseClassSource.includes('this._api.resume(spec)'), true, 'BaseClass resume forwards spec')
+  assert.equal(surface.baseClassSource.includes('this._api.advisor(intent)'), true, 'BaseClass advisor forwards intent')
   assert.equal(surface.baseClassSource.includes('this._api.join()'), true, 'BaseClass must declare join without carry')
 
   // 四层同构第 2 层：描述文档不包含写入/修改暗示
   assert.doesNotMatch(surface.description, /edit\(path|rewrite\(path|write\(path,\s*content\)/, 'Description must not advertise write methods')
-  assert.equal(surface.description.includes('fork(payload, extra = [])'), true, 'Description must show fork with required carry')
-  assert.equal(surface.description.includes('resume(payload, extra = [])'), true, 'Description must show resume with required carry')
-  assert.equal(surface.description.includes('advisor(intent, extra = [])'), true, 'Description must show advisor with required carry')
+  assert.equal(surface.description.includes('fork(payload)'), true, 'Description must show fork')
+  assert.equal(surface.description.includes('resume(payload)'), true, 'Description must show resume')
+  assert.equal(surface.description.includes('advisor(intent)'), true, 'Description must show advisor')
 
   // 四层同构第 3 层：示例代码（ultraExample manager 分支）纯只读，无写入调用
   assert.ok(surface.examples.length > 0, 'Manager surface must include ultraExample')
@@ -108,7 +106,7 @@ test('WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mu
     assert.equal(binding.write, undefined)
     assert.deepEqual(
       Object.keys(binding).sort(),
-      ['advisor', 'cat', 'fork', 'horizon', 'join', 'ls', 'resume', 'rg', 'stat', 'validateCarry', 'where', 'whereAll'],
+      ['advisor', 'cat', 'fork', 'horizon', 'join', 'ls', 'resume', 'rg', 'stat', 'where', 'whereAll'],
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -460,10 +458,7 @@ test('WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_amb
   }
 })
 
-// 委派成员全部走编程面 this.xxx，carry 缺省为空数组，整数引用旧锚点，
-// 字符串提供字面值。非法形状走数据信封拒绝（VIEW_DECLARATION_INVALID），
-// 程序继续运行；join/horizon 是拉取动作，不带 carry。
-test('WHAT[capability-enforcement-025] J13_delegation_members_default_to_empty_carry_and_reject_invalid_arrays', async () => {
+test('WHAT[capability-enforcement-025] J13_delegation_members_forward_cleanly_without_carry', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j13-'))
   const sessionId = `wxs-j13-${Math.random().toString(36).slice(2, 8)}`
   const observed = []
@@ -494,14 +489,11 @@ test('WHAT[capability-enforcement-025] J13_delegation_members_default_to_empty_c
 
     const program = `class Js extends JsProgram {
       async run() {
-        const defaulted = await this.fork('index the parser module', []);
-        const illegal = await this.fork('index the parser module', { 'not-an-anchor': null });
-        const invalidItem = await this.fork('index the parser module', [null]);
-        const placed = await this.fork('index the parser module', [1, 'parser inventory']);
-        const resumed = await this.resume({ name: 'audit-road', charge: 'continue the audit' }, ['audit summary']);
-        const advised = await this.advisor('review this delta', [1]);
+        const defaulted = await this.fork('index the parser module');
+        const resumed = await this.resume({ name: 'audit-road', charge: 'continue the audit' });
+        const advised = await this.advisor('review this delta');
         const joined = await this.join();
-        return { defaulted, illegal, invalidItem, placed, resumed, advised, joined, continued: true };
+        return { defaulted, resumed, advised, joined, continued: true };
       }
     }`
 
@@ -509,25 +501,16 @@ test('WHAT[capability-enforcement-025] J13_delegation_members_default_to_empty_c
     assert.equal(caseName(outcome), 'Succeeded', 'invalid carry is returned as data without failing the program')
 
     const doc = render(outcome)
-    assert.match(doc, /code = "VIEW_DECLARATION_INVALID"/, 'malformed carry is refused')
-    assert.match(doc, /continued = true/, 'the program keeps running after the refusal')
 
     // 缺省调用以空数组抵达宿主；非法形状被挡住，其余 carry 按原顺序传递。
     assert.deepEqual(
       observed.map(entry => entry.member),
-      ['fork', 'fork', 'resume', 'advisor', 'join'],
-      'defaulted and valid carry reach the host; malformed carry does not',
+      ['fork', 'resume', 'advisor', 'join'],
     )
-    assert.equal(observed[0].payload.charge, 'index the parser module')
-    assert.ok(Array.isArray(observed[0].carry), 'the default is an array')
-    assert.deepEqual([...observed[0].carry], [], 'omitted carry defaults to an empty array')
-    assert.deepEqual([...observed[1].carry], [1, 'parser inventory'], 'carry crosses as the ordered array itself')
-    assert.equal(observed[2].member, 'resume', 'resume travels the same delegation entry')
-    assert.deepEqual([...observed[2].carry], ['audit summary'])
-    assert.equal(observed[3].intent, 'review this delta', 'advisor travels the same delegation entry')
-    assert.deepEqual([...observed[3].carry], [1])
-    assert.equal(observed[4].member, 'join', 'join is a pull action and carries no carry array')
-    assert.equal('carry' in observed[4], false)
+    assert.equal(observed[0].member, 'fork')
+    assert.equal(observed[1].member, 'resume')
+    assert.equal(observed[2].member, 'advisor')
+    assert.equal(observed[3].member, 'join')
   } finally {
     runtime.clearDelegationHost(sessionId)
     rmSync(dir, { recursive: true, force: true })

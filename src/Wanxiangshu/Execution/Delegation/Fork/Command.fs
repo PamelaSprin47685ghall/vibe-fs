@@ -165,7 +165,6 @@ module ForkCommand =
           Name: string
           Charge: string
           Attach: string option
-          CommissionerRecord: string list
           ExpectedToolCalls: int option }
 
     /// The calling session's id text; empty when the host could not name it.
@@ -230,7 +229,6 @@ module ForkCommand =
                   Name = args.Text "name"
                   Charge = args.Text "charge"
                   Attach = args.OptionalText "attach" |> Option.map (fun value -> value.Trim())
-                  CommissionerRecord = args.Texts "context"
                   ExpectedToolCalls = expectedToolCalls }
 
     let private consequence (message: string) = DelegationReply.Refused message
@@ -239,7 +237,6 @@ module ForkCommand =
 
     let private commissionCharge (request: Request) =
         LlmFacing.instruction request.Charge
-        |> LlmFacing.withData (LlmFacing.Data.textTables "context" request.CommissionerRecord)
         |> LlmFacing.render
 
     let private personaBinding (role: Role) =
@@ -274,22 +271,29 @@ module ForkCommand =
             "engineer"
 
     let private prepareForkPromptWithRecord
-        (_host: DelegationEnvironment)
+        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
         (_role: Role)
         (request: Request)
         (attachment: string option)
-        : Task<string> =
-        let baseDocument =
-            ForkChildPayload.relayDocument
-                (forkInstructions runtime.ParentId)
-                request.Charge
-                request.CommissionerRecord
-                attachment
-                []
-                None
-
-        Task.FromResult(LlmFacing.render baseDocument)
+        : Task<Result<string, string>> =
+        task {
+            let callerSessionId = SessionId.create (callerText host)
+            let! contextResult = host.ContextMessagesFor callerSessionId
+            match contextResult with
+            | Error _ -> return Error(refusalCode Path.Fork.ChargeContextUnavailable)
+            | Ok msgs ->
+                let contextBlocks = Wanxiangshu.Context.Scope.SessionView.blocksJsWithTable "context" msgs
+                let baseDocument =
+                    ForkChildPayload.relayDocument
+                        (forkInstructions runtime.ParentId)
+                        request.Charge
+                        contextBlocks
+                        attachment
+                        []
+                        None
+                return Ok(LlmFacing.render baseDocument)
+        }
 
     let private isSelfAttachment (request: Request) =
         request.Attach
@@ -380,7 +384,6 @@ module ForkCommand =
         taskResult {
             let! rendered =
                 prepareForkPromptWithRecord host runtime role request attachment
-                |> TaskResultCE.ofTask
 
             let! result =
                 runtime.Fork(
@@ -409,7 +412,6 @@ module ForkCommand =
         taskResult {
             let! rendered =
                 prepareForkPromptWithRecord host runtime role request attachment
-                |> TaskResultCE.ofTask
 
             return!
                 runtime.Reuse(
@@ -506,12 +508,15 @@ module ForkCommand =
         =
         let prepareAndSend (profile: PromptAuthority.AuthorityExecutionProfile) =
             task {
-                match! resolveAttachment host handles request with
-                | Error path -> return consequence (prose language path)
-                | Ok attachment ->
-                    let! rendered = prepareForkPromptWithRecord host runtime profile.CanonicalRole request attachment
-
-                    return! appendBusyGuidance runtime request language agentId profile rendered
+                let outcome =
+                    taskResult {
+                        let! attachment = resolveAttachment host handles request |> TaskResult.mapError (fun path -> consequence (prose language path))
+                        let! rendered = prepareForkPromptWithRecord host runtime profile.CanonicalRole request attachment |> TaskResult.mapError (fun _ -> consequence (prose language Path.Fork.ChargeContextUnavailable))
+                        return rendered
+                    }
+                match! outcome with
+                | Error early -> return early
+                | Ok rendered -> return! appendBusyGuidance runtime request language agentId profile rendered
             }
 
         match runtime.ActiveGuidanceProfile agentId with
@@ -1222,17 +1227,11 @@ module ForkCommand =
         agentId
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<Result<ForkReceipt, string>> =
-        task {
-            let! attachment = resolveAttachment host handles request
-
-            match attachment with
-            | Error path -> return Error(refusalCode path)
-            | Ok attachment ->
-                let! rendered = prepareForkPromptWithRecord host runtime profile.CanonicalRole request attachment
-
-                let! result = runtime.AppendGuidance(agentId, profile, rendered)
-
-                return placedResumeReceipt request result
+        taskResult {
+            let! attachment = resolveAttachment host handles request |> TaskResult.mapError refusalCode
+            let! rendered = prepareForkPromptWithRecord host runtime profile.CanonicalRole request attachment
+            let! result = runtime.AppendGuidance(agentId, profile, rendered) |> TaskResultCE.ofTask
+            return! placedResumeReceipt request result
         }
 
     /// Busy child: the charge becomes guidance appended to the running turn.

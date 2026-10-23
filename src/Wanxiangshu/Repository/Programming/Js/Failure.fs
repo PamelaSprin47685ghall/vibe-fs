@@ -78,7 +78,6 @@ type JsFailure =
     | CallHostUnavailable
     | AskRefused of string
     | DelegationUnavailable
-    | ViewDeclarationInvalid of string
     /// The delivery of this call did not happen: the durable witness was not
     /// committed, the call has no fence to own the witness, or the delivery
     /// material could not be materialized. The payload says which one.
@@ -154,7 +153,6 @@ module JsFailure =
         | JsFailure.CallHostUnavailable -> "CALL_HOST_UNAVAILABLE"
         | JsFailure.AskRefused _ -> "ASK_REFUSED"
         | JsFailure.DelegationUnavailable -> "DELEGATION_UNAVAILABLE"
-        | JsFailure.ViewDeclarationInvalid _ -> "VIEW_DECLARATION_INVALID"
         | JsFailure.DeliveryNotEstablished _ -> "DELIVERY_NOT_ESTABLISHED"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
@@ -222,8 +220,6 @@ module JsFailure =
         | JsFailure.CallHostUnavailable -> "this.call has no host loop in this execution path"
         | JsFailure.AskRefused detail -> reasonWithMessage "ask was refused" "" detail
         | JsFailure.DelegationUnavailable -> "fork/join is not wired in this execution path"
-        | JsFailure.ViewDeclarationInvalid detail ->
-            reasonWithMessage "view declaration is invalid" "view declaration is invalid: " detail
         | JsFailure.DeliveryNotEstablished detail ->
             reasonWithMessage "delivery was not established" "delivery was not established: " detail
 
@@ -297,6 +293,5 @@ module JsFailure =
         | "CALL_HOST_UNAVAILABLE" -> JsFailure.CallHostUnavailable
         | "ASK_REFUSED" -> JsFailure.AskRefused text
         | "DELEGATION_UNAVAILABLE" -> JsFailure.DelegationUnavailable
-        | "VIEW_DECLARATION_INVALID" -> JsFailure.ViewDeclarationInvalid text
         | "DELIVERY_NOT_ESTABLISHED" -> JsFailure.DeliveryNotEstablished(after "delivery was not established: ")
         | _ -> JsFailure.ProgramFailed text

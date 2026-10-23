@@ -46,9 +46,11 @@ test('WHAT[crash-reconciliation-018] an orphaned child work is voided at load, s
     assert.equal(after[0].lifecycle, 'Abandoned', 'the voided child work is abandoned')
     assert.equal(sends, 1, 'load settlement does not automatically resend or replay')
     const eventCount = async () => {
-      const { readdirSync, readFileSync } = await import('node:fs')
+      const { readdirSync, readFileSync, existsSync } = await import('node:fs')
       const { join } = await import('node:path')
-      const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
+      const candidate1 = join(directory, 'wanxiangshu', 'events')
+      const candidate2 = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
+      const events = existsSync(candidate1) ? candidate1 : candidate2
       return readdirSync(events).filter(name => name.endsWith('.ndjson'))
         .reduce((total, name) => total + readFileSync(join(events, name), 'utf8').split('\n').filter(Boolean).length, 0)
     }

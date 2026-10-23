@@ -6,6 +6,10 @@ namespace Wanxiangshu.Foundation
 [<RequireQualifiedAccess>]
 module ReturnedMaterial =
     val encode: body: string list -> carry: string list -> string
+    val encodeSession: body: string list -> session: obj array -> string
+    val hasSession: encoded: string -> bool
+    val session: encoded: string -> obj array
+    val sessionData: tableName: string -> encoded: string -> LlmFacing.DataBlock list
     val body: encoded: string -> string list
     val carry: encoded: string -> string list
     val fullText: encoded: string -> string

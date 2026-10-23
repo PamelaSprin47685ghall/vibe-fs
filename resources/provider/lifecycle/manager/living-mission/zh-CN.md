@@ -1,4 +1,4 @@
-用 `todowrite-for-manager` 让使命的活义务保持真实。需要压缩时同时提供 `prefixUntil` 与 `carry`：保留原样前缀，再追加所需的历史锚点或字面文本，本回合自动保留。Truth 只负责不让账说谎；只有已经实现的 outcome 才能真正解除 debt。
+用 `todowrite-for-manager` 让使命的活义务保持真实。Truth 只负责不让账说谎；只有已经实现的 outcome 才能真正解除 debt。
 
 当工作、事实或真正的分解已经改变时，再改账。
 

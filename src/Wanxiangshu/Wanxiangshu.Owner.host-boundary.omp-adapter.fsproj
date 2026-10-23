@@ -11,6 +11,14 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-neutral-ports.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.persistence-runtime-path.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-scope.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-composition.composition-durable-contextfact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.mission-obligation-todo-prefixepoch.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-workspaceeventstore.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <Compile Include="Omp/Adapter.fsi"/>
     <Compile Include="Omp/Adapter.fs"/>
   </ItemGroup>

@@ -7,6 +7,7 @@ const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
+const { decodeIngress } = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
 const managerSelection = {
@@ -55,7 +56,7 @@ test('WHAT[dispatch-protocol-012] recovered turn binding restores durable partic
 
       // A process-local binding with a missing role decodes to no explicit
       // agent; the absence must not shadow the durable participant+role.
-      const missing = dispatch.decodeIngress({}, {})
+      const missing = decodeIngress({}, {})
       assert.equal(missing.explicitAgent, null)
       assert.deepEqual(
         dispatch.projectionObservation(opened.journal, session).activeLogicalRun.participantIdentity,
@@ -120,6 +121,7 @@ const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
+const { decodeIngress } = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
 const hash = (value) => `H(${value})`
@@ -299,14 +301,14 @@ test('WHAT[dispatch-protocol-012] DP_012_continuation_inherits_identity_from_pro
   }
 })
 test('WHAT[dispatch-protocol-012] DP_012_ingress_missing_agent_remains_none_without_cache_synthesis', () => {
-  const sessionOnly = dispatch.decodeIngress({ sessionID: 'ses_dp012_ingress' }, {})
+  const sessionOnly = decodeIngress({ sessionID: 'ses_dp012_ingress' }, {})
   assert.equal(sessionOnly.sessionId, 'ses_dp012_ingress')
   assert.equal(
     sessionOnly.explicitAgent,
     null,
     'a missing agent carrier must stay missing: the ingress never synthesizes one from a session cache'
   )
-  assert.equal(dispatch.decodeIngress({}, {}).explicitAgent, null)
+  assert.equal(decodeIngress({}, {}).explicitAgent, null)
 })
 }
 

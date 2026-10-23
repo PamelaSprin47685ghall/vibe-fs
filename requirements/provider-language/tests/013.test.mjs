@@ -51,7 +51,13 @@ test('WHAT[provider-language-013] system repair follows the live global preferen
         prompts.loadForLanguage(otherLanguage).ManagerSystemPrompt,
       ]) {
         const output = await transformRoleSystem(session, 'Manager', [input, foreign])
-        assert.deepEqual(output.system, [expected, foreign])
+        assert.equal(output.system[0], expected)
+        assert.equal(output.system[1], foreign)
+        if (otherLanguage === 'SimplifiedChinese') {
+          assert.match(output.system[2], /状态闭环/)
+        } else {
+          assert.match(output.system[2], /State Closed-Loop/)
+        }
         const repeated = await transformRoleSystem(session, 'Manager', output.system)
         assert.deepEqual(repeated.system, output.system)
       }

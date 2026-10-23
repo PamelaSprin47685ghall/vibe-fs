@@ -94,7 +94,6 @@ module JsSandbox =
     let private hostFailedPrefix = "{\"__jsHostFailed\":"
     let private invalidReturnPrefix = "{\"__jsInvalidReturn\":"
     let private parkedPrefix = "{\"__jsParked\":"
-    let private deliveredPrefix = "{\"__jsDelivered\":"
 
     /// The ABANDONED protocol sentinel. Rejecting the program promise with an
     /// error carrying this marker unwinds the program stack from its await
@@ -148,8 +147,6 @@ module JsSandbox =
             Error(decodeProgramFailed json)
         elif json.StartsWith invalidReturnPrefix then
             Error JsFailure.InvalidReturnValue
-        elif json.StartsWith deliveredPrefix then
-            Ok json
         elif json.StartsWith parkedPrefix then
             Ok json
         elif (nodeBuffer?byteLength (json, "utf8") |> unbox<int>) > outputBoundBytes then

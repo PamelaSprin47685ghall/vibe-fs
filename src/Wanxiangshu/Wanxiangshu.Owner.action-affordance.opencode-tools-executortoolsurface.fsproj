@@ -4,9 +4,17 @@
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj" />
 <ProjectReference Include="Wanxiangshu.Owner.context-compression.companion-host.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-runtimeresources.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-scope.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.durable-composition.composition-durable-contextfact.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.mission-obligation-todo-prefixepoch.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj" />
     <Compile Include="OpenCode/Tools/BashHoneypotTool.fsi" />
     <Compile Include="OpenCode/Tools/BashHoneypotTool.fs" />
     <Compile Include="OpenCode/Tools/AssumeTool.fsi" />
     <Compile Include="OpenCode/Tools/AssumeTool.fs" />
+    <Compile Include="OpenCode/Tools/ResetScopeTool.fsi" />
+    <Compile Include="OpenCode/Tools/ResetScopeTool.fs" />
   </ItemGroup>
 </Project>

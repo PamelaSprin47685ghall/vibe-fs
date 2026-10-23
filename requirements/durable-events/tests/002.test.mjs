@@ -17,6 +17,9 @@ const ROOT_ACCEPTED = {
     LogicalRunId: 'run_a',
     AuthorityRootUserMessageId: 'msg_root_a',
     AuthorityKind: 'HumanRoot',
+    ExpectedClosureKind: 'HumanRootManagedRun',
+    OwnerLogicalRunId: undefined,
+    AgentOwnerLife: undefined,
     IdentitySeed: {
       kind: 'RootSelection',
       ownerSession: null,
@@ -81,6 +84,9 @@ const ROOT_ACCEPTED = {
     LogicalRunId: 'run_a',
     AuthorityRootUserMessageId: 'msg_root_a',
     AuthorityKind: 'HumanRoot',
+    ExpectedClosureKind: 'HumanRootManagedRun',
+    OwnerLogicalRunId: undefined,
+    AgentOwnerLife: undefined,
     IdentitySeed: {
       kind: 'RootSelection',
       ownerSession: null,
@@ -362,6 +368,9 @@ const ROOT_ACCEPTED = {
     LogicalRunId: 'run_meta',
     AuthorityRootUserMessageId: 'msg_root_meta',
     AuthorityKind: 'HumanRoot',
+    ExpectedClosureKind: 'HumanRootManagedRun',
+    OwnerLogicalRunId: undefined,
+    AgentOwnerLife: undefined,
     IdentitySeed: {
       kind: 'RootSelection',
       ownerSession: null,

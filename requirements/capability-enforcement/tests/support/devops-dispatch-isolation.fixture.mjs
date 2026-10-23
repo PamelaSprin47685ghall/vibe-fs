@@ -114,6 +114,7 @@ if (phase === 'produce') {
 
         // 单笔接力交付落盘：后继进程必须读到后继任期已建立这一持久事实。
         const store = await storeOf(directory)
+        await lifecycle.seedReview(store, ISOLATED_SESSION, 'Cleared')
         const relayed = await lifecycle.seedDeliver(store, ISOLATED_SESSION, 'run-devops-isolation', 'call-devops-isolation', 2n)
         assert.equal(relayed.ok, true, relayed.error)
         const view = lifecycle.workView(store, ISOLATED_SESSION)

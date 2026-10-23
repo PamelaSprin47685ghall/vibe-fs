@@ -39,6 +39,7 @@ type ToolPermission =
     /// A consult, not an actor: the caller hands over a view plus an intent
     /// and reads prose back, so the office holding it gains no acting surface.
     | Advisor
+    | ResetScope
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =
@@ -104,6 +105,7 @@ module OfficeCapability =
         | ToolPermission.Review -> "Review"
         | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Advisor -> "Advisor"
+        | ToolPermission.ResetScope -> "ResetScope"
 
     /// Unknown labels are not a permission.
     let permissionOfLabel (label: string) : ToolPermission option =
@@ -132,6 +134,7 @@ module OfficeCapability =
         | "Review" -> Some ToolPermission.Review
         | "DevOpsConsultation" -> Some ToolPermission.DevOpsConsultation
         | "Advisor" -> Some ToolPermission.Advisor
+        | "ResetScope" -> Some ToolPermission.ResetScope
         | _ -> None
 
     let private permissionSet (labels: string array) : ToolPermission Set =

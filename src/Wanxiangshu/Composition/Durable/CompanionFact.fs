@@ -18,11 +18,12 @@ module CompanionFact =
 /// Context fact constructors — bridge from Companion-owned ContextFactCases
 /// into the Composition-owned AgentFact outer routing union.
 module ContextFact =
-    let inline ViewCheckpointCommitted payload =
-        AgentFact.Context(ContextFactCases.ViewCheckpointCommitted payload)
 
     let inline ContextReanchored payload =
         AgentFact.Context(ContextFactCases.ContextReanchored payload)
 
     let inline TenureReanchored payload =
         AgentFact.Context(ContextFactCases.TenureReanchored payload)
+
+    let inline ScopeReanchored payload =
+        AgentFact.Context(ContextFactCases.ScopeReanchored payload)

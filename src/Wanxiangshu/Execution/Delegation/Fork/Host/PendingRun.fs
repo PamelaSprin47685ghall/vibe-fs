@@ -19,6 +19,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.HostSession
 
 /// DSL-state-combination: physical — subscription handle + finished latch are runtime resources
 type PendingHostRun =
@@ -30,7 +31,8 @@ type PendingHostRun =
       Work: AdmittedWork option
       Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
-      mutable Finished: bool }
+      mutable Finished: bool
+      Snapshot: ISessionSnapshotPort option }
 
 module HostPendingRun =
     let completionSource () =

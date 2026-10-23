@@ -129,7 +129,6 @@ const folded = lines => {
   return result.value
 }
 const epochOf = value => value.sessions[session]?.PrefixEpoch ?? null
-const checkpointsOf = value => (value.viewCheckpoints[session]?.checkpoints ?? []).map(c => c.callId)
 
 test('WHAT[prefix-stability-006] CUT_15_a_committed_compaction_line_advances_the_durable_epoch', () => {
   const value = folded([reanchored(0, 1, 'msg_c1')])
@@ -139,14 +138,6 @@ test('WHAT[prefix-stability-006] CUT_15_a_committed_compaction_line_advances_the
   assert.deepEqual(epoch.ReanchoredRuns, ['msg_c1'])
 })
 
-test('WHAT[prefix-stability-006] CUT_15_a_replayed_compaction_line_does_not_clear_rebuilt_checkpoints', () => {
-  // What HostCompactionGate writes on the next reconcile if the epoch never moved:
-  // the same compaction, again against epoch 0.
-  const value = folded([reanchored(0, 1, 'msg_c1'), checkpoint('call-after'), reanchored(0, 1, 'msg_c1')])
-  assert.equal(epochOf(value).EpochId, 1n)
-  assert.deepEqual(checkpointsOf(value), ['call-after'], 'an absorbed replay changes nothing')
-})
-
 test('WHAT[prefix-stability-006] CUT_15_the_gate_candidate_reads_the_committed_projection', () => {
   const value = folded([reanchored(0, 1, 'msg_c1')])
   const handled = new Set(epochOf(value).ReanchoredRuns)
@@ -154,20 +145,6 @@ test('WHAT[prefix-stability-006] CUT_15_the_gate_candidate_reads_the_committed_p
   assert.equal(policy.nextReanchor(['msg_c1', 'msg_c2'], run => handled.has(run)), 'msg_c2')
 })
 
-test('WHAT[prefix-stability-006] CUT_15_tenure_then_compaction_advance_in_sequence_and_a_repeat_tenure_is_absorbed', () => {
-  const value = folded([
-    tenure(0, 1, 'inc-1'),
-    checkpoint('call-1'),
-    reanchored(1, 2, 'msg_c1'),
-    checkpoint('call-2'),
-    tenure(2, 3, 'inc-1'),
-  ])
-  const epoch = epochOf(value)
-  assert.equal(epoch.EpochId, 2n)
-  assert.deepEqual(epoch.ReanchoredTenures, ['inc-1'])
-  assert.deepEqual(epoch.ReanchoredRuns, ['msg_c1'])
-  assert.deepEqual(checkpointsOf(value), ['call-2'], 'only committed advances clear the checkpoint window')
-})
 
 test('WHAT[prefix-stability-006] CUT_15_a_non_successor_epoch_line_is_refused_by_the_fold', () => {
   const result = contextFold.fold([reanchored(0, 3, 'msg_c1')])

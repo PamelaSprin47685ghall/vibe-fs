@@ -82,7 +82,10 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
       modelID: 'engineer-model',
       time: { created: 2 },
     },
-    parts: [{ type: 'text', text: prose }],
+    parts: [
+      { type: 'text', text: prose },
+      ...(material !== null && material !== undefined ? [{ type: 'text', text: String(material) }] : []),
+    ],
   }
   runtime.pushHostMessage(child, assistant)
   const user = {
@@ -100,10 +103,8 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
   if (material !== null && material !== undefined) {
     await hooks.tool[`todowrite-for-${role}`].execute(
       {
-        program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
-          prefixUntil: 0,
-          carry: []
-        },
+        program: `class Js extends JsProgram { async run() { return { answer: ${JSON.stringify(material)} }; } }`,
+      },
       { sessionID: child, agent: role, callID: `call-${run}`, messageID: run },
     )
   }

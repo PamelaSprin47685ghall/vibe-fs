@@ -76,3 +76,16 @@ module RuntimeSurface =
             bool
 
     val validateAuthorityRoot: ownerProfile: obj -> bool
+
+    val terminalSourceFact:
+        sha256: (string -> string) ->
+        kind: string ->
+        session: string ->
+        logicalRun: string ->
+        authorityRoot: string ->
+        ownerLogicalRunId: string ->
+        attachmentKind: string ->
+        associationGeneration: string ->
+        decisionOrTransactionId: string ->
+        outcome: string ->
+            obj

@@ -155,6 +155,14 @@ module JournalSurface =
                   AuthorityRootUserMessageId =
                     AuthorityRootUserMessageId.create (str payload?AuthorityRootUserMessageId)
                   FactId = str payload?FactId }
+        | "Prompt", "AuthorityLogicalRunClosed" ->
+            PromptFact.AuthorityLogicalRunClosed
+                { SessionId = sessionIdOf (payload?SessionId)
+                  LogicalRunId = LogicalRunId.create (str payload?LogicalRunId)
+                  AuthorityRootUserMessageId =
+                    AuthorityRootUserMessageId.create (str payload?AuthorityRootUserMessageId)
+                  RootKind = str payload?RootKind
+                  ClosureWitness = str payload?ClosureWitness }
         | "Prompt", "AuthorityChildWorkTerminal" ->
             PromptFact.AuthorityChildWorkTerminal
                 { SessionId = sessionIdOf (payload?SessionId)
@@ -347,18 +355,6 @@ module JournalSurface =
             |> List.map (fun (sessionId, _) -> SessionId.value sessionId)
             |> List.toArray
 
-        let viewCheckpoints =
-            projection.AgentProjections.ViewCheckpoints
-            |> Map.toList
-            |> List.map (fun (sessionId, window) ->
-                box
-                    {| sessionId = SessionId.value sessionId
-                       checkpoints =
-                        window.Checkpoints
-                        |> List.map (fun checkpoint -> box {| callId = ToolCallId.value checkpoint.ToolCallId |})
-                        |> List.toArray |})
-            |> List.toArray
-
         let sessionProjections =
             projection.AgentProjections.Sessions
             |> Map.toList
@@ -367,7 +363,6 @@ module JournalSurface =
 
         box
             {| sessions = sessions
-               viewCheckpoints = viewCheckpoints
                sessionProjections = sessionProjections |}
 
     let private journalOrError
@@ -474,9 +469,16 @@ module JournalSurface =
                 : Task<Result<AgentJournal, FoldRejection>> =
                 failwith "authority closure refused: no shared journal runtime for this common dir"
 
+            let! runtimeDir =
+                task {
+                    try
+                        return! RuntimePath.forWorkspace commonDir
+                    with _ ->
+                        return RuntimePath.forStateRoot commonDir
+                }
             let! acquired =
                 SharedAgentJournal.acquire
-                    (RuntimePath.forStateRoot commonDir)
+                    runtimeDir
                     0
                     (DateTimeOffset.Parse "1970-01-01T00:00:00Z")
                     refuseMissingEntry

@@ -36,7 +36,7 @@ for (const scenario of ['old-retry', 'fallback-old-retry', 'late-retry', 'fallba
   })
 }
 
-for (const scenario of ['own-missing', 'own-incomplete', 'old-missing', 'old-incomplete', 'late-missing', 'late-incomplete', 'fallback-old-missing', 'fallback-old-incomplete', 'fallback-late-missing', 'fallback-late-incomplete']) {
+for (const scenario of ['own-incomplete', 'old-incomplete', 'late-incomplete', 'fallback-old-incomplete', 'fallback-late-incomplete']) {
   test(`WHAT[delegation-025] production repair ${scenario} preserves invocation-owned accepted successors`, async t => {
     await runRepairRecoveryProcess(scenario, t.signal, message => t.diagnostic(message))
   })

@@ -12,9 +12,6 @@ type WireSessionState =
     {
         XTrace: XTraceProjectionState option
         PrefixEpoch: ActivePrefixEpoch option
-        /// Successful view declaration checkpoints still on the raw side of the
-        /// committed prefix.
-        ViewCheckpoints: PhaseWindow.PhaseCommitWindow
     }
 
 /// Single-snapshot view required by Wire for one call.

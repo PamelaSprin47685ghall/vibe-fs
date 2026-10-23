@@ -533,6 +533,11 @@ module ForkToolSurface =
                     return None
                 }
 
+            let snapshotPort =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages(_sessionId: SessionId) =
+                        Task.FromResult(Ok []) }
+
             let viewForSession sessionId =
                 task {
                     match beforeViewRead with
@@ -555,7 +560,7 @@ module ForkToolSurface =
                     Dictionary<string, string>(),
                     None,
                     Some viewForSession,
-                    None,
+                    Some snapshotPort,
                     cancelSignals,
                     childViewForRun = childViewForRun
                 )
@@ -1050,7 +1055,13 @@ module ForkToolSurface =
                                    |> List.map (fun text -> createObj [ "text" ==> text ])
                                    |> Array.ofList) ]
 
-                    createObj [ "ok" ==> true; "records" ==> (records |> List.map toObj |> Array.ofList) ]
+                    let byName =
+                        records |> List.map (fun r -> r.Name ==> toObj r) |> createObj
+
+                    createObj
+                        [ "ok" ==> true
+                          "records" ==> (records |> List.map toObj |> Array.ofList)
+                          "byName" ==> byName ]
         }
 
     let recordDeliveredValue (sessionId: string) (deliveredValue: obj) : unit =

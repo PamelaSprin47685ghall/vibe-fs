@@ -4,8 +4,8 @@ import { parse as parseToml } from 'smol-toml'
 import * as join from '../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 import { scanText } from '../../../scripts/checks/provider-leak-gate.mjs'
 
-const completed = (agentName, view = '') => ({
-  kind: 'completed', agentId: 'private-agent', agentName, role: 'Engineer', runId: 'private-run', view,
+const completed = (agentName, body = '') => ({
+  kind: 'completed', agentId: 'private-agent', agentName, role: 'Engineer', runId: 'private-run', body,
 })
 
 test('WHAT[participant-horizon-003] actual Join renderer distinguishes return, failure and abandonment without control DTO fields', () => {

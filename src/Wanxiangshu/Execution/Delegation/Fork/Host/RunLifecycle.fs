@@ -19,6 +19,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.HostSession
@@ -35,6 +36,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Programming.Js
 open Fable.Core
+open Fable.Core.JsInterop
 
 /// Per-run terminal lifecycle for HostForkRuntime: install, complete, fail.
 module HostForkRunLifecycle =
@@ -714,6 +716,45 @@ module HostForkRunLifecycle =
         | Some resolution -> resolution ()
         | None -> Task.FromResult None
 
+    /// Capture the child's full provider-facing session view as canonical
+    /// returned material. Reads the Host snapshot, applies the scope barrier
+    /// (filterScopeMessages), and appends the terminal assistant text only when
+    /// the snapshot does not already carry it. Stores structured messages, never
+    /// pre-rendered TOML. Errors (no port, unreadable) fail closed.
+    let private hasTerminalMessage (terminal: string) (messages: SessionMessage list) =
+        let assistantText (m: SessionMessage) =
+            m.Role = "assistant"
+            && (m.Parts
+                |> Array.exists (function
+                    | MessagePart.Text text -> text.Trim() = terminal
+                    | _ -> false))
+        System.String.IsNullOrWhiteSpace terminal || List.exists assistantText messages
+
+    let private appendTerminalIfMissing (messages: SessionMessage list) (js: obj array) (terminal: string) =
+        if hasTerminalMessage terminal messages then
+            js
+        else
+            let assistant =
+                createObj
+                    [ "role" ==> "assistant"
+                      "parts" ==> [| createObj [ "type" ==> "text"; "text" ==> terminal ] |] ]
+            Array.append js [| assistant |]
+
+    let private captureChildSessionView
+        (snapshotOpt: ISessionSnapshotPort option)
+        (childId: SessionId)
+        (terminalText: string)
+        : Task<Result<string, string>> =
+        taskResult {
+            let! snapshot = snapshotOpt |> Result.requireSome "no session snapshot port is wired for the child"
+            let! messages = snapshot.GetMessages childId |> TaskResult.mapError (sprintf "snapshot read failed: %s")
+            let js = Wanxiangshu.Context.Scope.SessionView.ofSnapshotMessages messages
+            let terminal = terminalText.Trim()
+            let withTerminal = appendTerminalIfMissing messages js terminal
+            let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box withTerminal)
+            return ReturnedMaterial.encodeSession [] filtered
+        }
+
     /// Journal-less harness: only this child's own provider run's cell may be taken.
     let private takeOwnRunCell (run: PendingHostRun) (result: AgentRunResult) (prose: string option) =
         match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
@@ -801,6 +842,25 @@ module HostForkRunLifecycle =
                     (Some completedView)
         }
 
+    let private settleUnwitnessedRun
+        gate pendingRuns journal parentId run childId runId handle result view
+        =
+        task {
+            match! captureChildSessionView run.Snapshot childId result.TerminalText with
+            | Ok sessionEncoded ->
+                return!
+                    settleCompletedView
+                        gate pendingRuns journal parentId run childId runId handle result None (Some sessionEncoded)
+            | Error reason when journal.IsNone ->
+                let! resolved = resolveView view
+                let fallback = defaultArg resolved (ReturnedMaterial.encode [] [])
+                return!
+                    settleCompletedView gate pendingRuns journal parentId run childId runId handle result None (Some fallback)
+            | Error reason ->
+                logError "FORK-SETTLE" (sprintf "run %s child session view unavailable: %s" run.AgentId reason)
+                return ()
+        }
+
     let private completeProvenResult
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -827,15 +887,8 @@ module HostForkRunLifecycle =
             let witness = deliveryWitnessOf journal run childId result
 
             match witness with
-            | None when journal.IsNone ->
-                // The journal-less harness path has no witness to ask
-                // for and keeps working. There is no proven fence there,
-                // so the cell may only be taken under its own complete
-                // identity: the cell of this child session whose
-                // provider run is this run's. Another run's cell is never
-                // taken.
-                return! completeHarnessRun gate pendingRuns journal parentId run childId runId handle result view
-            | None -> return ()
+            | None ->
+                return! settleUnwitnessedRun gate pendingRuns journal parentId run childId runId handle result view
             | Some witness ->
                 // D1: the view is resolved only now. The terminal has
                 // been proven to address this run, so its material may
@@ -955,6 +1008,7 @@ module HostForkRunLifecycle =
         (childId: SessionId)
         (role: Role)
         (authorityRoot: AuthorityRootUserMessageId)
+        (snapshot: ISessionSnapshotPort option)
         =
         JsDeliveredValues.clear (SessionId.value childId)
 
@@ -974,7 +1028,8 @@ module HostForkRunLifecycle =
               Work = Some work
               Source = HostPendingRun.completionSource ()
               Subscription = None
-              Finished = false }
+              Finished = false
+              Snapshot = snapshot }
 
         lock gate (fun () -> pendingRuns.[agentId] <- run)
 

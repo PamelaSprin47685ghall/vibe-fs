@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Repository.Programming.Js.Anchor
 
 /// HNI-09: the product decisions of one generated js-* tool.
 ///
@@ -64,65 +63,5 @@ module JsToolPolicy =
     let missingProgramProse () : string =
         JsDescriptionAssets.missingProgram (ProviderLanguageBinding.readGlobalPreference ())
 
-    /// The prose of the flat view declaration's extra field.
-    let viewDeclarationExtraProse () : string =
-        JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ())
-
-    /// A compression declaration keeps history with anchor < prefixUntil and appends carry.
-    let viewDeclarationOf (raw: obj) : obj =
-        // Both prefixUntil and carry are required on every tool call.
-        // An omitted field is refused immediately; there is no implicit "keep existing context".
-        let declaration =
-            createObj [ "prefixUntil" ==> raw?prefixUntil; "carry" ==> raw?carry ]
-
-        AnchorSurface.parse declaration |> Result.defaultValue declaration
-
-    /// Why the declaration is not a valid view declaration, if it is not.
-    let parsedDeclarationFailure (declaration: obj) : JsFailure option =
-        match AnchorSurface.parse declaration with
-        | Ok _ -> None
-        | Error failure -> Some failure
-
-    /// Reject retired fields before the program can run.
-    let viewFailureOf (raw: obj) (declaration: obj) : JsFailure option =
-        if
-            [ "prefixCount"; "thenMap"; "view"; "reportMapping" ]
-            |> List.exists (hasProperty raw)
-        then
-            Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and carry for compression")
-        elif not (isPresent declaration) then
-            None
-        else
-            parsedDeclarationFailure declaration
-
-    /// Commit the declaration to the pending view of the session.
-    let commitView (sessionId: string) (callIdentity: (string * string) option) (declaration: obj) : JsFailure option =
-        match AnchorSurface.setView sessionId callIdentity declaration with
-        | Ok() -> None
-        | Error failure -> Some failure
-
-    /// Commit the declaration only after the program settled: the pending
-    /// view is what the next request projects, and a failed program must
-    /// not be able to present anything.
-    let viewCommitFailure
-        (sessionId: string)
-        (callIdentity: (string * string) option)
-        (declaration: obj)
-        outcome
-        : JsFailure option =
-        match outcome with
-        | JsToolWorkflow.JsToolOutcome.Failed _ -> None
-        | JsToolWorkflow.JsToolOutcome.Succeeded _
-        | JsToolWorkflow.JsToolOutcome.Parked _ -> commitView sessionId callIdentity declaration
-
-    /// The rendered result of a settled call, with the view declaration
-    /// committed when the program settled.
-    let renderCommitted
-        (sessionId: string)
-        (callIdentity: (string * string) option)
-        (declaration: obj)
-        outcome
-        : string =
-        match viewCommitFailure sessionId callIdentity declaration outcome with
-        | Some failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-        | None -> JsToolsResult.render outcome
+    let renderCommitted (sessionId: string) (callIdentity: (string * string) option) (declaration: obj) outcome : string =
+        JsToolsResult.render outcome

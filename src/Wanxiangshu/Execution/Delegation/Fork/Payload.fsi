@@ -4,21 +4,19 @@ open Wanxiangshu.Foundation
 
 type ForkChildAssignment =
     { Assignment: string
-      CommissionerRecord: string list
+      ContextBlocks: LlmFacing.DataBlock list
       Attachment: string option
       RootRequirements: string list
       Payload: string option }
 
 type ForkChildInstructions =
     { Base: string list
-      CommissionerRecord: string
       Attachment: string
       Requirements: string }
 
 [<RequireQualifiedAccess>]
 module ForkChildPayload =
     val BasePath: string
-    val CommissionerRecordPath: string
     val AttachmentPath: string
     val RequirementsPath: string
     val document: prose: ForkChildInstructions -> input: ForkChildAssignment -> LlmFacing.Document
@@ -27,7 +25,7 @@ module ForkChildPayload =
     val relay:
         prose: ForkChildInstructions ->
         assignment: string ->
-        commissionerRecord: string list ->
+        contextBlocks: LlmFacing.DataBlock list ->
         attachment: string option ->
         requirements: string list ->
         payload: string option ->
@@ -36,7 +34,7 @@ module ForkChildPayload =
     val relayDocument:
         prose: ForkChildInstructions ->
         assignment: string ->
-        commissionerRecord: string list ->
+        contextBlocks: LlmFacing.DataBlock list ->
         attachment: string option ->
         requirements: string list ->
         payload: string option ->

@@ -9,5 +9,3 @@ module PhaseWindow =
     type PhaseCommitWindow = { Checkpoints: PhaseCheckpoint list }
 
     val emptyWindow: PhaseCommitWindow
-
-    val appendCheckpoint: callId: ToolCallId -> window: PhaseCommitWindow -> PhaseCommitWindow

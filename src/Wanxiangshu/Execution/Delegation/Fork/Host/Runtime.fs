@@ -888,6 +888,7 @@ type HostForkRuntime
                 childId
                 role
                 authorityRoot
+                sessionSnapshot
 
         runtime.BindChildSession(agentId, childId)
         runStarted childId role (directoryOf agentId)

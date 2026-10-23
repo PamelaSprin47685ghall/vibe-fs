@@ -1,5 +1,5 @@
-  async advisor(intent, extra = []) {
-    // 返回 { ok, advice }，请教本会话专属顾问。顾问席不可用时返回 { ok: false, code: "advisor-unavailable", reason }。
-    // intent 写问题。extra 只补充所需历史：整数引用锚点，字符串是字面文本。本回合不传。
-    // 例如: const advice = await this.advisor("重试路径是否可靠？", [2, "已验证首次失败会原样重试"]);
+  async advisor(intent) {
+    // 返回 { ok, context }，请教本会话专属顾问，格式为 TOML。顾问席不可用时返回 { ok: false, code: "advisor-unavailable", reason }。
+    // 单次请求发送 intent 与调用方当前 scope 上下文；顾问自然停止后返回其完整 scope session。
+    // 例如: const { ok, context } = await this.advisor("重试路径是否可靠？");
   }

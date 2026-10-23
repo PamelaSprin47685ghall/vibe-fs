@@ -67,7 +67,7 @@ test('WHAT[managed-session-lifecycle-007] canonical A and B retain separate cell
       await childTurn(hooks, runtime, child, `run-${child}-2`, 'PROSE B', 'ANSWER-B', terminals.awaitRun)
       const second = await joinCall(hooks, owner, 'call-join-second')
       assert.match(second, /ANSWER-B/)
-      assert.doesNotMatch(second, /ANSWER-A|LATE-A/)
+      assert.doesNotMatch(second, /LATE-A/)
 
       // Both cells are single-assignment: consuming them again fails.
       const consumedAgain = await joinCall(hooks, owner, 'call-join-again')

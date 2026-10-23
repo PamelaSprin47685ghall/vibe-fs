@@ -40,6 +40,12 @@ module JoinRules =
         | ForkError.NotFound _
         | ForkError.TerminalMaterializationFailed _ -> "not-ready"
 
+    let private resolveCompletedBody (view: string) : string list =
+        if ReturnedMaterial.hasSession view then
+            [ ReturnedMaterial.render view ]
+        else
+            ReturnedMaterial.body view
+
     /// One physical completion → the record the join wire carries.
     let mapJoinItem
         (resolveName: string -> string)
@@ -53,7 +59,7 @@ module JoinRules =
               AgentId = payload.AgentId
               Role = Roles.roleLabel payload.Role
               Status = "completed"
-              Body = ReturnedMaterial.body payload.View
+              Body = resolveCompletedBody payload.View
               Returned = ReturnedMaterial.carry payload.View }
         | JoinItem.AgentItem(AgentFailedItem payload) ->
             { Name = resolveName payload.AgentId

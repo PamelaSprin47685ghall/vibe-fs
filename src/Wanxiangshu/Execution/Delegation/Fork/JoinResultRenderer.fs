@@ -179,9 +179,9 @@ module JoinResultRenderer =
         let name =
             byname lang resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
 
-        // AXIOM 7: the child's report is main prose, so it rides the `# `
-        // comment header (exact text, no trim); only the carry material is
-        // data. The byname line stays first, then the report body.
+        // The byname line rides the `# ` comment header. The child's full post-scope
+        // view is returned as structured session data, rendered into [[session]] tables
+        // by ReturnedMaterial.carryData (with body prose for legacy Manager/Plan paths).
         LlmFacing.instructions ([ bynameLine lang Path.AgentReturned name ] @ ReturnedMaterial.body payload.View)
         |> LlmFacing.withData (ReturnedMaterial.carryData payload.View)
 

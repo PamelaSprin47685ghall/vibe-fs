@@ -162,6 +162,7 @@ module HostForkChildDispatch =
         (childViewForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
+        (snapshot: ISessionSnapshotPort option)
         (onRunStarted: SessionId -> Role -> unit)
         (sendChildPrompt:
             string
@@ -201,6 +202,7 @@ module HostForkChildDispatch =
                         childId
                         role
                         authorityRoot
+                        snapshot
 
                 onRunStarted childId role
 
@@ -222,6 +224,7 @@ module HostForkChildDispatch =
         (childViewForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
+        (snapshot: ISessionSnapshotPort option)
         (sendChildPrompt:
             string
                 -> SessionId
@@ -254,6 +257,7 @@ module HostForkChildDispatch =
                         childViewForRun
                         trackOwnedWork
                         runtime
+                        snapshot
                         onRunStarted
                         sendChildPrompt
                         agentId
@@ -281,6 +285,7 @@ module HostForkChildDispatch =
         (childViewForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
+        (snapshot: ISessionSnapshotPort option)
         (sendChildPrompt:
             string
                 -> SessionId
@@ -322,6 +327,7 @@ module HostForkChildDispatch =
                         childViewForRun
                         trackOwnedWork
                         runtime
+                        snapshot
                         sendChildPrompt
                         onRunStarted
                         agentId

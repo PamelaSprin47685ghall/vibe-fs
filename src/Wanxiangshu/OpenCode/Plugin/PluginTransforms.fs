@@ -12,6 +12,7 @@ open Wanxiangshu.Execution.Routing
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Scope
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Prefix.OpenCode
 open Wanxiangshu.Context.Trace
@@ -1062,6 +1063,103 @@ module PluginTransforms =
 
         { RegisterOwned = wired.RegisterOwned }
 
+    let private promptTimestamp (prompt: obj) : float option =
+        if not (isNull prompt?timestamp) && emitJsExpr prompt?timestamp "Number.isFinite($0)" then
+            Some(unbox<float> prompt?timestamp)
+        else
+            None
+
+    let private recordPromptOnIndex (sessionId: string) (rawMessages: obj array) (lastOpIdx: int) =
+        if lastOpIdx <> -1 then
+            let prompt = rawMessages.[lastOpIdx]
+            let key = Surface.promptKey prompt
+            let ts = promptTimestamp prompt
+            let hasReset = Surface.hasResetSinceLastPrompt rawMessages
+            Surface.onNewPrompt sessionId key ts hasReset
+
+    let private recordOperatorTurn (sessionId: string) (rawMessages: obj array) (isSideRequest: bool) =
+        if not isSideRequest then
+            Surface.onTurnStart sessionId
+            recordPromptOnIndex sessionId rawMessages (Surface.lastPromptIndex rawMessages)
+
+    let private isToolResultPartType (pType: string) =
+        pType = "toolResult" || pType = "tool-result" || pType = "tool_result"
+
+    let private suffixToolPart (initialized: bool) (budget: int) (part: obj) : obj =
+        if isNull part then part
+        else
+            let pType = if isNull part?``type`` then "" else string part?``type``
+            if not (isToolResultPartType pType) then part
+            else
+                let text = if not (isNull part?text) then string part?text else ""
+                let suffixed =
+                    if not initialized then Surface.appendUserReminder (box text)
+                    else Surface.appendBudgetReminder (box text) budget
+                let str = unbox<string> suffixed
+                if str <> text then
+                    let cloned = emitJsExpr part "Object.assign({}, $0)"
+                    cloned?text <- str
+                    cloned
+                else
+                    part
+
+    let private suffixToolResultMsg (initialized: bool) (budget: int) (msg: obj) : obj =
+        if isNull msg then msg
+        elif string msg?role = "toolResult" || string msg?role = "tool" then
+            let content = msg?content
+            let suffixed =
+                if not initialized then Surface.appendUserReminder content
+                else Surface.appendBudgetReminder content budget
+            if not (obj.ReferenceEquals(content, suffixed)) then
+                let cloned = emitJsExpr msg "Object.assign({}, $0)"
+                cloned?content <- suffixed
+                cloned
+            else
+                msg
+        elif not (isNull msg?parts) then
+            let parts = unbox<obj array> msg?parts
+            let nextParts = parts |> Array.map (suffixToolPart initialized budget)
+            let changed = Array.exists2 (fun a b -> not (obj.ReferenceEquals(a, b))) parts nextParts
+            if changed then
+                let clonedMsg = emitJsExpr msg "Object.assign({}, $0)"
+                clonedMsg?parts <- nextParts
+                clonedMsg
+            else
+                msg
+        else
+            msg
+
+    let private buildScopeMessages (sessionId: string) (rawMessages: obj array) (isSideRequest: bool) : obj array =
+        let filtered = Surface.stripContradictoryBudgetSuffixes (Surface.filterScopeMessages rawMessages)
+        if not isSideRequest && Surface.hasResetSinceLastPrompt filtered then
+            Surface.markScopeInitialized sessionId true
+        let withReminders = Surface.addUserReminders filtered
+        let withSteer =
+            if not isSideRequest && Surface.isScopeInitialized sessionId && Surface.turnBudget sessionId = 0 then
+                Surface.addBudgetExhaustedSteer withReminders
+            else
+                withReminders
+        let budget = Surface.turnBudget sessionId
+        let initialized = Surface.isScopeInitialized sessionId
+        withSteer |> Array.map (suffixToolResultMsg initialized budget)
+
+    let private tryGetOutMessages (outObj: obj) : obj array option =
+        if not (isNull outObj) && not (isNull outObj?messages) then
+            Some(unbox<obj array> outObj?messages)
+        else
+            None
+
+    let private purgeAndSuffixSession (sessionId: string) (rawMessages: obj array) (outObj: obj) : unit =
+        let isSideRequest = Surface.endsWithSideRequest rawMessages
+        recordOperatorTurn sessionId rawMessages isSideRequest
+        let finalMessages = buildScopeMessages sessionId rawMessages isSideRequest
+        HostMessageProjection.replaceMessagesInPlace outObj (Array.toList finalMessages)
+
+    let private applyScopePurgeAndSuffix (sessionIdOpt: string option) (outObj: obj) : unit =
+        match sessionIdOpt, tryGetOutMessages outObj with
+        | Some sessionId, Some rawMessages -> purgeAndSuffixSession sessionId rawMessages outObj
+        | _ -> ()
+
     /// 普通分支请求的静态管道上下文：预读的物理消息 id 与各 stage 产出的
     /// 会话起点、重放计划、已捕获 XTrace、horizon 只经这份 frame 传递。
     type private TransformFrame =
@@ -1224,6 +1322,11 @@ module PluginTransforms =
                               do! caps.FreezeProviderAttemptPlan frame.SessionId frame.PhysicalUserMessageId
                               return Some frame
                           } }
+                  { Name = "scope-purge"
+                    Run =
+                      fun frame ->
+                          applyScopePurgeAndSuffix frame.SessionId frame.OutObj
+                          Task.FromResult(Some frame) }
                   { Name = "current-auxiliaries"
                     Run =
                       fun frame ->

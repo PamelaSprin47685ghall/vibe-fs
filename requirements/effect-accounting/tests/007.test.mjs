@@ -67,10 +67,10 @@ test('WHAT[effect-accounting-007] P0_CLEAN_BREAK_legacy_aborted_blob_decodes_wit
 })
 test('WHAT[effect-accounting-007] P0_CLEAN_BREAK_v2_terminal_decodes_as_joinable_completion', () => {
   const body = JSON.stringify({
-    schemaVersion: 2,
+    schemaVersion: 4,
     finality: 'completed',
     run_id: 'run-2',
-    view: 'ok',
+    view: JSON.stringify({ body: ['ok'], carry: [] }),
     child_session_id: 'child',
     authority_root: 'root',
     provider_run: 'provider',

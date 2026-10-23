@@ -28,6 +28,12 @@ module PrefixSurface =
         else
             value |> unbox<obj array> |> Array.map string |> Set.ofArray
 
+    let private scopesOfJs (value: obj) : Set<string> =
+        if isNullish value then
+            Set.empty
+        else
+            value |> unbox<obj array> |> Array.map string |> Set.ofArray
+
     let private runsOfJs (value: obj) : Set<ProviderRunIdentity> =
         if isNullish value then
             Set.empty
@@ -40,13 +46,15 @@ module PrefixSurface =
     let private stateOfJs (value: obj) : ActivePrefixEpoch =
         { EpochId = PrefixEpochId.create (int64Value value?epoch)
           ReanchoredRuns = runsOfJs value?reanchoredRuns
-          ReanchoredTenures = tenuresOfJs value?reanchoredTenures }
+          ReanchoredTenures = tenuresOfJs value?reanchoredTenures
+          ReanchoredScopes = scopesOfJs value?reanchoredScopes }
 
     let private stateToJs (state: ActivePrefixEpoch) : obj =
         box
             {| epoch = PrefixEpochId.value state.EpochId
                reanchoredRuns = state.ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value
-               reanchoredTenures = state.ReanchoredTenures |> Set.toArray |}
+               reanchoredTenures = state.ReanchoredTenures |> Set.toArray
+               reanchoredScopes = state.ReanchoredScopes |> Set.toArray |}
 
     let private rejectionName (rejection: PrefixFoldRejection) : string =
         match rejection with
@@ -54,6 +62,7 @@ module PrefixSurface =
         | PrefixFoldRejection.NonSequentialPrefixEpoch -> "NonSequentialPrefixEpoch"
         | PrefixFoldRejection.CompactionAlreadyReanchored _ -> "CompactionAlreadyReanchored"
         | PrefixFoldRejection.TenureAlreadyReanchored _ -> "TenureAlreadyReanchored"
+        | PrefixFoldRejection.ScopeAlreadyReanchored _ -> "ScopeAlreadyReanchored"
 
     let private resultToJs (result: Result<ActivePrefixEpoch, PrefixFoldRejection>) : obj =
         match result with
@@ -67,7 +76,8 @@ module PrefixSurface =
         box
             {| epoch = 0L
                reanchoredRuns = [||]
-               reanchoredTenures = [||] |}
+               reanchoredTenures = [||]
+               reanchoredScopes = [||] |}
 
     let private requestKindOf (value: obj) : ProviderRequestKind option =
         match text value |> fun item -> item.ToLowerInvariant() with
@@ -98,7 +108,15 @@ module PrefixSurface =
         PrefixEpochProjection.applyTenureReanchor
             (PrefixEpochId.create (int64Value request?previousEpoch))
             (PrefixEpochId.create (int64Value request?nextEpoch))
-            (string request?incumbencyId)
+            (text request?incumbencyId)
+            (stateOfJs state)
+        |> resultToJs
+
+    let applyScopeReanchor (request: obj) (state: obj) : obj =
+        PrefixEpochProjection.applyScopeReanchor
+            (PrefixEpochId.create (int64Value request?previousEpoch))
+            (PrefixEpochId.create (int64Value request?nextEpoch))
+            (text request?callId)
             (stateOfJs state)
         |> resultToJs
 
@@ -116,8 +134,14 @@ module PrefixSurface =
     let isTenureReanchored (incumbencyId: string) (state: obj) : bool =
         PrefixEpochProjection.isTenureReanchored incumbencyId (stateOfJs state)
 
+    let isScopeReanchored (callId: string) (state: obj) : bool =
+        PrefixEpochProjection.isScopeReanchored callId (stateOfJs state)
+
     let reanchoredTenures (state: obj) : string array =
         (stateOfJs state).ReanchoredTenures |> Set.toArray
+
+    let reanchoredScopes (state: obj) : string array =
+        (stateOfJs state).ReanchoredScopes |> Set.toArray
 
     let reanchoredRuns (state: obj) : string array =
         (stateOfJs state).ReanchoredRuns
@@ -128,18 +152,5 @@ module PrefixSurface =
         PrefixEpochProjection.isReanchored (ProviderRunIdentity.create (text run)) (stateOfJs state)
 
 
-    let private checkpointOfJs (item: obj) : Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCheckpoint =
-        { ToolCallId = ToolCallId.create (string item?callId) }
-
-    let private checkpointToJs (checkpoint: Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCheckpoint) : obj =
-        box {| callId = ToolCallId.value checkpoint.ToolCallId |}
-
-    /// Append one successful view declaration checkpoint. The window is not trimmed by K;
-    /// only a committed prefix rebase can make older checkpoints unrecoverable.
     let appendCheckpoint (callId: string) (window: obj array) : obj array =
-        let committed =
-            { Wanxiangshu.Context.Prefix.PhaseWindow.Checkpoints =
-                (if isNull window then [] else Array.toList window) |> List.map checkpointOfJs }
-
-        Wanxiangshu.Context.Prefix.PhaseWindow.appendCheckpoint (ToolCallId.create callId) committed
-        |> fun next -> next.Checkpoints |> List.map checkpointToJs |> List.toArray
+        if isNull window then [||] else window

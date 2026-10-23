@@ -367,7 +367,7 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
         'en',
         delegateId,
         {
-          program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(deliveredMaterial)}]); } }`,
+          program: `class Js extends JsProgram { async run() { return { ok: true }; } }`,
         },
         3000,
         Date.now() + 60_000,

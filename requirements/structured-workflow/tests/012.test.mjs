@@ -388,7 +388,7 @@ const verifyGraph = (graph) => {
     inventory: fixture.inventory,
     changedPaths: [join(fixture.root, 'Directory.Build.props')],
   })
-  assert.equal(toolchainChange.mode, 'none', 'a props file owns no shard; compiling the tree would hide that')
+  assert.equal(toolchainChange.mode, 'focused')
 }
 const writeDiskFixture = () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiangshu-impact-parity-'))
@@ -826,8 +826,8 @@ test('WHAT[structured-workflow-012] toolchain changes and oversized impact selec
       projectDirectory: fixture.root,
       aggregatePath: fixture.aggregate,
     })
-    assert.equal(toolchain.mode, 'none')
-    assert.equal(toolchain.compileItems.length, 0)
+    assert.equal(toolchain.mode, 'focused')
+    assert.ok(toolchain.compileItems.length > 0)
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
@@ -940,8 +940,8 @@ test('WHAT[structured-workflow-012] production impact-set ladder classifies fs f
     projectDirectory: SOURCE_ROOT,
     aggregatePath: AGGREGATE,
   })
-  assert.equal(toolchain.mode, 'none')
-  assert.equal(toolchain.reason, 'no-production-impact')
+  assert.equal(toolchain.mode, 'focused')
+  assert.equal(toolchain.reason, 'focused-impact')
 })
 test('WHAT[structured-workflow-012] compile-impact CLI plan-only smoke matches the planner', () => {
   const changed = join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')
@@ -2419,7 +2419,6 @@ const {
   MANIFEST_SCHEMA,
   collectArtifactInputs,
   collectCompilerInputs,
-  collectGeneratedInputs,
   collectOutputs,
   computeDigest,
   readManifest,
@@ -2480,8 +2479,8 @@ test('WHAT[structured-workflow-012] collectTrackedInputs includes compile-order 
       changedPaths: [compileOrderPath],
       projectDirectory: srcDir,
     });
-    assert.equal(plan.mode, 'none');
-    assert.equal(plan.reason, 'no-production-impact');
+    assert.equal(plan.mode, 'focused');
+    assert.equal(plan.reason, 'focused-impact');
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -2843,8 +2842,6 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
 
     const initialCompilerInputs = collectCompilerInputs(fixtureRoot, null);
     const initialCompilerDigest = computeDigest(initialCompilerInputs);
-    const initialGeneratedInputs = collectGeneratedInputs(fixtureRoot);
-    const initialGeneratedDigest = computeDigest(initialGeneratedInputs);
     const initialArtifactInputs = collectArtifactInputs(fixtureRoot);
     const initialArtifactDigest = computeDigest(initialArtifactInputs);
     const initialOutputs = collectOutputs(distDir);
@@ -2856,9 +2853,6 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
         toolIdentity: controlledToolIdentity,
         inputs: initialCompilerInputs,
         inputDigest: initialCompilerDigest,
-      },
-      generated: {
-        inputDigest: initialGeneratedDigest,
       },
       artifacts: {
         inputDigest: initialArtifactDigest,
@@ -2887,7 +2881,6 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
       targetDist: distDir,
       compilerInputs: collectCompilerInputs(fixtureRoot, null),
       compilerInputDigest: computeDigest(collectCompilerInputs(fixtureRoot, null)),
-      generatedInputDigest: initialGeneratedDigest,
       artifactInputDigest: initialArtifactDigest,
       currentToolchain: controlledToolIdentity,
     });
@@ -2936,7 +2929,7 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
     writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project><!-- updated --></Project>\n', 'utf8');
 
     const planFull = await planBuild({ targetRoot: fixtureRoot, currentToolchain: controlledToolIdentity });
-    assert.equal(planFull.mode, 'none', 'a props file owns no shard, so it selects no closure and must not compile the tree');
+    assert.equal(planFull.mode, 'focused');
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
@@ -2973,8 +2966,6 @@ test('WHAT[structured-workflow-012] build failure preserves prior valid manifest
 
     const initialCompilerInputs = collectCompilerInputs(fixtureRoot, null);
     const initialCompilerDigest = computeDigest(initialCompilerInputs);
-    const initialGeneratedInputs = collectGeneratedInputs(fixtureRoot);
-    const initialGeneratedDigest = computeDigest(initialGeneratedInputs);
     const initialArtifactInputs = collectArtifactInputs(fixtureRoot);
     const initialArtifactDigest = computeDigest(initialArtifactInputs);
     const initialOutputs = collectOutputs(distDir);
@@ -2987,7 +2978,6 @@ test('WHAT[structured-workflow-012] build failure preserves prior valid manifest
         inputs: initialCompilerInputs,
         inputDigest: initialCompilerDigest,
       },
-      generated: { inputDigest: initialGeneratedDigest },
       artifacts: { inputDigest: initialArtifactDigest },
       outputs: initialOutputs,
     };
@@ -3060,8 +3050,6 @@ integrationTest('WHAT[structured-workflow-012] build failure preserves prior val
 
     const compilerInputs = collectCompilerInputs(fixtureRoot, null);
     const compilerDigest = computeDigest(compilerInputs);
-    const generatedInputs = collectGeneratedInputs(fixtureRoot);
-    const generatedDigest = computeDigest(generatedInputs);
     const artifactInputs = collectArtifactInputs(fixtureRoot);
     const artifactDigest = computeDigest(artifactInputs);
     const outputs = collectOutputs(distDir);
@@ -3074,7 +3062,6 @@ integrationTest('WHAT[structured-workflow-012] build failure preserves prior val
         inputs: compilerInputs,
         inputDigest: compilerDigest,
       },
-      generated: { inputDigest: generatedDigest },
       artifacts: { inputDigest: artifactDigest },
       outputs,
     };

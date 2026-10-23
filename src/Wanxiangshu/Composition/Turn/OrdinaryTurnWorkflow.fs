@@ -100,13 +100,13 @@ module OrdinaryTurnWorkflow =
             |> Option.isSome
         | None -> false
 
-    /// advisor-[004]: the advisor office holds no tools and answers in prose, so the
-    /// completed turn's prose is its whole delivery. There is no `this.deliver` witness to
-    /// wait for and no unfinished work to nudge: its completed turn is an ordinary terminal
-    /// (an empty answer still fails through `AgentRunResult.IsValid`). Without this the
-    /// advisor child was sent a plan-continue nudge and never published the Completed its
-    /// seat awaits (F39-01).
-    let private deliversByProse (turn: ReconciledTurn) : bool = turn.Role = Some Role.Advisor
+    /// Roles that stop naturally deliver their outcome in prose and session views, so
+    /// their completed turn is an ordinary terminal without requiring an explicit delivery
+    /// witness or nudging unfinished work (an empty answer still fails through AgentRunResult.IsValid).
+    let private deliversByProse (turn: ReconciledTurn) : bool =
+        turn.Role = Some Role.Advisor
+        || turn.Role = Some Role.Engineer
+        || turn.Role = Some Role.DevOps
 
     let private classifyManagerOrPlanTurn (context: ReconciledTurnContext) : LongWorkGate =
         let turn = context.Turn

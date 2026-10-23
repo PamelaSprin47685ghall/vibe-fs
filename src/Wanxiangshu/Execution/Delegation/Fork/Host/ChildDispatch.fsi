@@ -22,6 +22,7 @@ module HostForkChildDispatch =
         childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) ->
         trackOwnedWork: ((unit -> Task) -> unit) ->
         runtime: ForkRuntime ->
+        snapshot: ISessionSnapshotPort option ->
         sendChildPrompt:
             (string
                 -> SessionId

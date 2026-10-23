@@ -152,7 +152,7 @@ test('WHAT[effect-accounting-002] EXEC_join_MissingFinalReport_Failed_keeps_run_
   })
 })
 
-test('WHAT[effect-accounting-002] EXEC_join_empty_Completed_keeps_run_pending_not_failed', async () => {
+test('WHAT[effect-accounting-002] EXEC_join_empty_Completed_completes_on_natural_stop', async () => {
   const owner = 'effect-accounting-002-empty-completed'
   await withRealFork(owner, async ({ hooks, createdIds, runtime }) => {
     const first = await forkCall(hooks, owner, 'Ada', 'EMPTY-COMPLETION-CHARGE', 'call-fork-empty')
@@ -164,36 +164,8 @@ test('WHAT[effect-accounting-002] EXEC_join_empty_Completed_keeps_run_pending_no
 
     const terminals = await observeTerminals(runtime)
     try {
-      // A completed turn that delivered no material: the child owes the parent
-      // a delivery and delivered nothing of substance. Production therefore
-      // publishes no terminal for that turn at all — the outcome is unknown,
-      // not a failure, so the run must stay open and pending. The turn's own
-      // production handling (the session.idle hook returns only after the
-      // terminal decision has been made) is the event barrier.
-      await childTurn(hooks, runtime, child, `run-${child}-1`, 'EMPTY MATERIAL REPORT', null, () => {})
-
-      assertStillPending(recordOf(runtime, owner, agentId, child, root), 'empty Completed')
-
-      // The child was not failed either: an unknown outcome publishes no
-      // terminal of any kind.
-      assert.deepEqual(
-        terminals.seen.filter((entry) => entry.sessionId === child),
-        [],
-        'an undelivered turn must publish no terminal for the child',
-      )
-
-      // The work unit is still open and still deliverable, so no join is
-      // called yet: a join against an open work unit legitimately waits.
-      //
-      // The later proven delivery goes into the SAME admitted work unit: it
-      // runs under the same physical input, so it addresses the same
-      // authority root and settles the ORIGINAL work unit — not a fresh
-      // obligation under a new root. The physical input has already spent
-      // its single provider step, so the delivery does not re-enter the
-      // provider (a second provider step on one physical message fails
-      // closed with EMR-010); it delivers into the open work unit directly.
-      await deliverIntoOpenWork(hooks, runtime, child, `run-${child}-2`, 'REAL REPORT', 'REAL-RECORD with files = 3')
-      await terminals.awaitRun(child, `run-${child}-2`)
+      // A clean natural stop completes the child run without requiring a delivery member.
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'EMPTY MATERIAL REPORT', null, terminals.awaitRun)
 
       const settled = recordOf(runtime, owner, agentId, child, root)
       assert.equal(settled.lifecycle, 'CompletedAwaitingJoin')
@@ -201,10 +173,8 @@ test('WHAT[effect-accounting-002] EXEC_join_empty_Completed_keeps_run_pending_no
       assert.ok(settled.completionDigest, 'the proven delivery records its own identity')
       assert.ok(settled.completionRef)
 
-      // Only now, after the work unit has settled, is a join meaningful.
       const joinReceipt = await joinCall(hooks, owner, 'call-join-empty')
-      assert.match(joinReceipt, /REAL-RECORD with files = 3/)
-      assert.doesNotMatch(joinReceipt, /EMPTY MATERIAL REPORT/)
+      assert.match(joinReceipt, /EMPTY MATERIAL REPORT/)
     } finally {
       terminals.dispose()
     }

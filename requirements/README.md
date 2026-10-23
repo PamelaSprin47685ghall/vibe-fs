@@ -60,7 +60,7 @@ grounding 由 `requirement-system` package 拥有。
 | [participant-horizon](participant-horizon/WHAT.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |
 | [cognitive-environment](cognitive-environment/WHAT.md) | 长期认知层与瞬时 runtime/mission 分开；knowledge 不创造 authority。 |
 | [cognitive-workspace](cognitive-workspace/WHAT.md) | 持久认知画板已经退休；本包只保留负向合同，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
-| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume`、编程面 `carry` 与当前回合文本，本包只保留负向边界。 |
+| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume`、编程面与活跃 scope 文本，本包只保留负向边界。 |
 | [action-affordance](action-affordance/WHAT.md) | 决策点必须知道 act 的正负边界、成功后果与参数意义。 |
 | [provider-language](provider-language/WHAT.md) | 一个 life 一个稳定 natural-language world；protocol identifiers 不翻译。 |
 | [provider-projection](provider-projection/WHAT.md) | typed semantic intent 经唯一确定性投影成为 provider representation，表示不反向创造 authority。 |
@@ -104,8 +104,8 @@ grounding 由 `requirement-system` package 拥有。
 ### 9. Mission / work
 | Package | 一句话 WHY |
 |---|---|
-| [obligation-ledger](obligation-ledger/WHAT.md) | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的有效上下文整理声明（`prefixUntil` 与 `carry`）；插件不维护第二份待办真相。 |
-| [work](work/WHAT.md) | Work 与 Plan 共用一套生命周期：S1–S3 一段 deliver，S4 两段 deliver；review 返回 pairs，后继剥除前任 assistant 与 tool。 |
+| [obligation-ledger](obligation-ledger/WHAT.md) | 待办消极边界：宿主原生 `todowrite` 退役，待办推进归各角色编程面 `todowrite-for-<role>`；原视图声明与 compression checkpoint 退役，插件不维护第二份待办真相。 |
+| [work](work/WHAT.md) | Work 与 Plan 生命周期：S1–S3 晋级接力与 S4 交付；接力不主动清除上下文，由 `resetScope` 协议管理；Engineer 与 DevOps 免除 nudge 且自然停机完成，Manager 与 Plan 保持长程连续性。 |
 
 ### 10. Feedback
 | Package | 一句话 WHY |

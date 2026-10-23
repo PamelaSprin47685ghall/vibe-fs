@@ -302,6 +302,9 @@ const currentPayload = {
   LogicalRunId: 'run-authority-v2',
   AuthorityRootUserMessageId: 'root-authority-v2',
   AuthorityKind: 'HumanRoot',
+  ExpectedClosureKind: 'HumanRootManagedRun',
+  OwnerLogicalRunId: undefined,
+  AgentOwnerLife: undefined,
   IdentitySeed: {
     kind: 'RootSelection',
     ownerSession: null,
@@ -456,7 +459,7 @@ test('WHAT[interaction-authority-003] repeated legacy HumanRoot replay upgrades 
 test('WHAT[interaction-authority-003] unknown authority schema fails closed precisely', () => {
   assert.throws(
     () => factCodec.encode(currentFact({ ...currentPayload, SchemaVersion: 1 })),
-    /AuthorityRootAccepted encoder requires SchemaVersion 2, got 1/,
+    /AuthorityRootAccepted encoder requires SchemaVersion 2( or 3)?, got 1/,
   )
 
   const unknown = replacePayload(factCodec.encode(currentFact()), (payload) => {

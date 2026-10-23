@@ -18,7 +18,6 @@ open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Repository.Programming.Js.Anchor
 
 /// Same-participant physical replacement, host-neutral. Fission never calls the
 /// host session fork endpoint: it creates fresh sibling sessions, starts them
@@ -587,18 +586,13 @@ module FissionLaunch =
     /// Fission is the same identity on another execution lane, so the lanes
     /// inherit the owner's current conversation context unconditionally. The
     /// source is the session context itself, not the last delivered record.
-    let private ownerViewPort (sessionId: SessionId) =
+    let private ownerViewPort (port: FissionHostPort) (sessionId: SessionId) =
         task {
-            let context =
-                AnchorLedger.context (SessionId.value sessionId)
-                |> List.map (fun (_, text) -> text)
-                |> List.filter (fun text -> not (String.IsNullOrWhiteSpace text))
-                |> String.concat "\n"
-
-            if String.IsNullOrWhiteSpace context then
-                return Ok None
-            else
-                return Ok(Some context)
+            match port.OwnerView with
+            | Some viewOf ->
+                let! view = viewOf sessionId
+                return Ok view
+            | None -> return Ok None
         }
 
     let private createLanePort
@@ -783,7 +777,7 @@ module FissionLaunch =
 
             let deps: FissionAdmissionDependencies =
                 { ParentOf = port.Sessions.TryGetParentSession
-                  OwnerView = ownerViewPort
+                  OwnerView = ownerViewPort port
                   CreateLane = createLanePort port groupId owner profile.SelectedAgent directory parsed.Count
                   StartLane = startLanePort port durable profile directory
                   AbortLane = abortLanePort port

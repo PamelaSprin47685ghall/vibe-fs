@@ -127,7 +127,7 @@ test('WHAT[work-019] 有任期且评审尚未接纳时只读与观察放行，�
     // Unreviewed S4 cannot complete via nextOwner absence; deliver is refused and leaves the tenure active.
     await assert.rejects(
       () => hooks.tool.deliver.execute({}, bound(sessionID, 'call-unreviewed')),
-      /无法安全结束|finish-failed/,
+      /无法安全结束|finish-failed|unable to finish safely/i,
     )
     const after = lifecycle.workView(await storeOf(directory), sessionID)
     assert.equal(after.delivered, false)

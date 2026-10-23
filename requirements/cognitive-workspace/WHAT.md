@@ -22,9 +22,9 @@
 
 生产编译图不得包含 `Participant/Cognition` runtime、workspace、codec、admission、fold、TodoSink；包依赖中不得包含 `jq-wasm`。
 
-## [006] assume 不再形成压缩阶段
+## [006] assume 不产生 compression 边界
 
-`assume` 成功不产生 compression checkpoint。上下文压缩的 checkpoint 只来自携带有效上下文整理声明（顶层 `prefixUntil` 与 `carry`）并成功完成的编程面调用（`todowrite-for-<role>`），语义遵循 context-compression [031] 与 obligation-ledger [001]。
+`assume` 成功不产生 compression 边界。原视图声明与 compression checkpoint 准入已彻底退役，上下文压缩边界唯一由显式 `resetScope` 宿主工具调用划定（见 context-compression [033] 与 obligation-ledger [001]）。
 
 ## [007] 待办写入不通过 canvas 兼容桥
 

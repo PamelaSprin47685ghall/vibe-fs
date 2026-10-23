@@ -7,7 +7,7 @@ const { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } = await impo
 const { tmpdir } = await import("node:os");
 const { join, resolve } = await import("node:path");
 const { default: test } = await import("node:test");
-const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA, computeDigest, collectCompilerInputs, collectGeneratedInputs, collectArtifactInputs } = await import("../../../scripts/lib/build-state.mjs");
+const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA, computeDigest, collectCompilerInputs, collectArtifactInputs } = await import("../../../scripts/lib/build-state.mjs");
 const { planImpactCompile, resetOutputDirectory } = await import("../../../scripts/lib/owner-compile.mjs");
 const { runBuild, determineBuildDecision } = await import("../../../scripts/build.mjs");
 const { assertProductionSourcesAssigned } = await import("../../../scripts/lib/compile-shards.mjs");
@@ -32,8 +32,6 @@ test('WHAT[verification-system-008] assertBuildFresh succeeds on current reposit
 
     const compilerInputs = collectCompilerInputs(root)
     const compilerInputDigest = computeDigest(compilerInputs)
-    const generatedInputs = collectGeneratedInputs(root)
-    const generatedInputDigest = computeDigest(generatedInputs)
     const artifactInputs = collectArtifactInputs(root)
     const artifactInputDigest = computeDigest(artifactInputs)
 
@@ -43,7 +41,6 @@ test('WHAT[verification-system-008] assertBuildFresh succeeds on current reposit
       outputDir: 'dist',
       generation: 1,
       compiler: { inputDigest: compilerInputDigest, inputs: compilerInputs },
-      generated: { inputDigest: generatedInputDigest, inputs: generatedInputs },
       artifacts: { inputDigest: artifactInputDigest, inputs: artifactInputs },
       outputs,
     }
@@ -52,7 +49,6 @@ test('WHAT[verification-system-008] assertBuildFresh succeeds on current reposit
     const freshness = assertBuildFresh({ root })
     assert.ok(freshness.generation >= 1)
     assert.ok(typeof freshness.compilerInputDigest === 'string')
-    assert.ok(typeof freshness.generatedInputDigest === 'string')
     assert.ok(typeof freshness.artifactInputDigest === 'string')
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -77,8 +73,6 @@ test('WHAT[verification-system-008] no-op mode preserves manifest and generation
 
     const compilerInputs = collectCompilerInputs(root)
     const compilerInputDigest = computeDigest(compilerInputs)
-    const generatedInputs = collectGeneratedInputs(root)
-    const generatedInputDigest = computeDigest(generatedInputs)
     const artifactInputs = collectArtifactInputs(root)
     const artifactInputDigest = computeDigest(artifactInputs)
 
@@ -94,7 +88,6 @@ test('WHAT[verification-system-008] no-op mode preserves manifest and generation
         inputDigest: compilerInputDigest,
         inputs: compilerInputs,
       },
-      generated: { inputDigest: generatedInputDigest, inputs: generatedInputs },
       artifacts: { inputDigest: artifactInputDigest, inputs: artifactInputs },
       outputs,
     }
@@ -110,7 +103,6 @@ test('WHAT[verification-system-008] no-op mode preserves manifest and generation
       targetDist: distDir,
       compilerInputs,
       compilerInputDigest,
-      generatedInputDigest,
       artifactInputDigest,
       currentToolchain: controlledToolIdentity,
     })
@@ -161,7 +153,6 @@ test('WHAT[verification-system-008] missing or stale output entry causes assertB
       outputDir: 'dist',
       generation: 1,
       compiler: { inputDigest: 'test', inputs: [] },
-      generated: { inputDigest: 'test', inputs: [] },
       artifacts: { inputDigest: 'test', inputs: [] },
       outputs,
     }

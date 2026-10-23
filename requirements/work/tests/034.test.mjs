@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict'
-import { join } from 'node:path'
 import test from 'node:test'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
-import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
-import { clearAll } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
-import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import {
   assistantText,
   cursors,
@@ -165,9 +161,6 @@ test('WHAT[work-034] a current assistant row with a Host id but no first-observa
     openingCursor: 20n,
     isFreshHandover: false,
   }
-  // info.id is present. The empty cursor map means this physical message has
-  // not been captured yet. That is not a missing identity, so assembly keeps
-  // the row and does not fail the exchange.
   const result = assemble(rawMessages, tenure, {})
   assert.ok(ids(result.messages).includes('a-no-cursor'))
   assert.equal(result.messages.filter((m) => msgId(m).startsWith('synthetic-prev-')).length, 0)
@@ -382,11 +375,6 @@ test('WHAT[work-034] successor projection strips earlier assistant and tool mess
 })
 
 test('WHAT[work-034] post-S3 projection strips all S3-and-earlier context and injects no synthetic record', () => {
-  // The delivered Plan work carries no active tenure. Its isolation is keyed on
-  // the delivered retirement frontier: tenureForPostS3 sets OpeningCursor to
-  // frontier + 1. Every assistant/tool exchange observed at-or-before the
-  // frontier is stripped, the historical user inputs survive, and no synthetic
-  // record is injected.
   const deliveredFrontier = 40n
   const rawMessages = [
     userText('u-history', 'Original user request'),
@@ -422,132 +410,3 @@ test('WHAT[work-034] post-S3 projection strips all S3-and-earlier context and in
     assert.ok(!kept.includes(prior), `${prior} (S3-and-earlier) must be stripped`)
   }
 })
-
-test('WHAT[work-034] a relaying tenure declaring carry commits ViewCheckpointCommitted and delivers the declared context to the successor request', async () => {
-  clearAll()
-  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
-    const planRoot = join(commonDir, 'wanxiangshu')
-    const sessionID = 'ses-plan-view-handover-034'
-    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root-034')
-
-    const userRoot = {
-      info: { id: 'user-plan-root-034', role: 'user', sessionID, agent: 'plan', time: { created: 1 } },
-      parts: [{ id: 'part-034-u1', type: 'text', text: 'Plan the tenure handover.' }],
-    }
-    const asstRoot = {
-      info: {
-        id: 'asst-plan-root-034',
-        sessionID,
-        parentID: 'user-plan-root-034',
-        role: 'assistant',
-        agent: 'plan',
-        providerID: 'provider',
-        modelID: 'plan-model',
-        time: { created: 2 },
-      },
-      parts: [],
-    }
-    runtime.pushHostMessage(sessionID, userRoot)
-    runtime.pushHostMessage(sessionID, asstRoot)
-    await hooks['chat.message']({ sessionID, agent: 'plan' }, { message: userRoot.info, parts: userRoot.parts })
-    await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [structuredClone(userRoot)] })
-
-    const declaredCarry = 'HANDOVER_VIEW_034: verify the recorded S1 trade-offs.'
-    const viewToolMsg = {
-      info: { id: 'run-034-view', role: 'assistant', sessionID, parentID: 'user-plan-root-034', time: { created: 2 } },
-      parts: [
-        {
-          id: 'part-034-view',
-          type: 'tool',
-          tool: 'todowrite-for-plan',
-          callID: 'call-034-view',
-          state: {
-            status: 'completed',
-            input: {
-              program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-              prefixUntil: 0,
-              carry: [declaredCarry],
-            },
-            output: 'ok',
-          },
-        },
-      ],
-    }
-    runtime.pushHostMessage(sessionID, viewToolMsg)
-    await hooks.tool['todowrite-for-plan'].execute(
-      {
-        program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        prefixUntil: 0,
-        carry: [declaredCarry],
-      },
-      { sessionID, agent: 'plan', callID: 'call-034-view', messageID: 'run-034-view', providerRunID: 'run-034-view' },
-    )
-    await hooks.event({
-      event: {
-        type: 'message.part.updated',
-        properties: { sessionID, part: viewToolMsg.parts[0] },
-      },
-    })
-
-    assert.deepEqual(
-      journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
-      [{ sessionId: sessionID, checkpoints: [{ callId: 'call-034-view' }] }],
-      'relaying tenure view declaration commits a durable ViewCheckpointCommitted',
-    )
-
-    const relayMsg = {
-      info: { id: 'run-034-deliver', role: 'assistant', sessionID, parentID: 'user-plan-root-034', time: { created: 3 } },
-      parts: [
-        {
-          id: 'part-034-deliver',
-          type: 'tool',
-          tool: 'deliver',
-          callID: 'call-034-deliver',
-          state: { status: 'completed', input: {}, output: 'relayed' },
-        },
-      ],
-    }
-    runtime.pushHostMessage(sessionID, relayMsg)
-    await hooks.tool.deliver.execute(
-      {},
-      { sessionID, agent: 'plan', callID: 'call-034-deliver', messageID: 'run-034-deliver', providerRunID: 'run-034-deliver' },
-    )
-
-    const followup = {
-      info: { id: 'user-034-followup', role: 'user', sessionID, agent: 'plan', time: { created: 4 } },
-      parts: [{ id: 'part-034-u2', type: 'text', text: 'Proceed in the new tenure.' }],
-    }
-    const asstFollowup = {
-      info: {
-        id: 'asst-034-followup',
-        sessionID,
-        parentID: 'user-034-followup',
-        role: 'assistant',
-        agent: 'plan',
-        providerID: 'provider',
-        modelID: 'plan-model',
-        time: { created: 5 },
-      },
-      parts: [],
-    }
-    runtime.pushHostMessage(sessionID, followup)
-    runtime.pushHostMessage(sessionID, asstFollowup)
-    await hooks['chat.message']({ sessionID, agent: 'plan' }, { message: followup.info, parts: followup.parts })
-    const successorOut = {
-      messages: [structuredClone(userRoot), structuredClone(viewToolMsg), structuredClone(relayMsg), structuredClone(followup)],
-    }
-    await hooks['experimental.chat.messages.transform']({ sessionID }, successorOut)
-
-    assert.ok(
-      !successorOut.messages.some((m) => String(m?.info?.id ?? '').startsWith('synthetic-prev-')),
-      'no synthetic-prev-* message is injected for the successor tenure',
-    )
-    assert.equal(
-      JSON.stringify(successorOut.messages).split(declaredCarry).length - 1,
-      1,
-      'successor request carries the declared literal once, without a duplicate in the retained call',
-    )
-  })
-})
-

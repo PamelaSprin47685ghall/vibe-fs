@@ -241,7 +241,7 @@ test('WHAT[repository-programming-056] a missing host yields the DELEGATION_UNAV
   }
 })
 
-test('WHAT[repository-programming-056] omitted carry starts a delegate with no old context', async () => {
+test('WHAT[repository-programming-056] fork starts a delegate with payload alone', async () => {
   const { dir, cleanup } = sandbox()
   const sessionId = `sess-no-carry-${Math.random().toString(36).slice(2, 8)}`
   try {
@@ -249,7 +249,7 @@ test('WHAT[repository-programming-056] omitted carry starts a delegate with no o
     install(sessionId, host)
     const outcome = await runProgram(
       dir,
-      `    const placed = await this.fork("index the parser module", []);
+      `    const placed = await this.fork("index the parser module");
     const continued = "kept-running";
     return { placed, continued };`,
       sessionId,
@@ -259,36 +259,12 @@ test('WHAT[repository-programming-056] omitted carry starts a delegate with no o
     assert.match(doc, /outcome = "created"/)
     assert.match(doc, /continued = "kept-running"/)
     assert.equal(host.calls.length, 1)
-    assert.deepEqual(host.calls[0].carry, [])
   } finally {
     clearDelegationHost(sessionId)
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-056] a retired map is refused before the delegate starts', async () => {
-  const { dir, cleanup } = sandbox()
-  const sessionId = `sess-bad-carry-${Math.random().toString(36).slice(2, 8)}`
-  try {
-    const host = fakeHost()
-    install(sessionId, host)
-    const outcome = await runProgram(
-      dir,
-      `    const refused = await this.fork("index the parser module", { "not-an-anchor": null });
-    const continued = "kept-running";
-    return { refused, continued };`,
-      sessionId,
-    )
-    assert.equal(caseName(outcome), 'Succeeded', 'an invalid carry returns a refusal envelope')
-    const doc = render(outcome)
-    assert.match(doc, /code = "VIEW_DECLARATION_INVALID"/)
-    assert.match(doc, /continued = "kept-running"/, 'the program keeps running after the refusal')
-    assert.equal(host.calls.length, 0, 'invalid carry never reaches the delegation host')
-  } finally {
-    clearDelegationHost(sessionId)
-    cleanup()
-  }
-})
 
 test('WHAT[repository-programming-056] dag runs dependencies in waves and carries their records', async () => {
   const { dir, cleanup } = sandbox()
@@ -301,7 +277,7 @@ test('WHAT[repository-programming-056] dag runs dependencies in waves and carrie
       `    return await this.dag({ nodes: [
       { id: "spec", charge: "write the interface spec" },
       { id: "impl", charge: "implement it", deps: ["spec"] },
-    ] }, [1]);`,
+    ] });`,
       sessionId,
     )
     assert.equal(caseName(outcome), 'Succeeded')
@@ -310,7 +286,6 @@ test('WHAT[repository-programming-056] dag runs dependencies in waves and carrie
     assert.match(doc, /record:impl/)
     assert.match(doc, /skipped = \[\]/)
     assert.equal(host.calls[1].payload.charge, 'implement it', 'the task contains only its own intent')
-    assert.deepEqual(host.calls[1].carry, [1, 'Dependency spec:', 'record:spec'])
     assert.doesNotMatch(doc, /byName|view =/, 'returned entries have one structured representation')
   } finally {
     clearDelegationHost(sessionId)

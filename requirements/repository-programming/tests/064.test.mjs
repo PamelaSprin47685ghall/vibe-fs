@@ -12,10 +12,6 @@ import {
   handlesForSession,
   clearAll,
 } from '../../../dist/Repository/Programming/Js/ParkedSites.js'
-import {
-  takeView,
-  clearAll as clearViews,
-} from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 import * as language from '../../../dist/Participant/Provider/LanguageSurface.js'
 
 // 调用面的三态互斥：一次编程调用只携带 program / unpark / abandon 之一。
@@ -38,7 +34,6 @@ test.beforeEach(() => {
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   language.refreshGlobalLanguage()
   clearAll()
-  clearViews()
 })
 
 test.afterEach(() => {
@@ -110,7 +105,7 @@ test('WHAT[repository-programming-064] a call carrying two states is refused wit
 
     const result = await execute(
       registered,
-      { program: probeProgram, abandon: { handle } },
+      { name: 'two-states', program: probeProgram, abandon: { handle } },
       { sessionID: session },
     )
 
@@ -130,14 +125,8 @@ test('WHAT[repository-programming-064] a call carrying two states is refused wit
       [ handle ],
       'a refused call must not consume the handle it named',
     )
-    assert.equal(
-      takeView(session),
-      null,
-      'a refused call must not leave a view declaration behind for the next request',
-    )
   } finally {
     clearAll()
-    clearViews()
     cleanup()
   }
 })
@@ -159,7 +148,6 @@ test('WHAT[repository-programming-064] abandon alone still clears the handle', a
     )
   } finally {
     clearAll()
-    clearViews()
     cleanup()
   }
 })
@@ -191,7 +179,6 @@ test('WHAT[repository-programming-064] unpark alone still resumes the parked pro
     )
   } finally {
     clearAll()
-    clearViews()
     cleanup()
   }
 })
@@ -213,7 +200,6 @@ test('WHAT[repository-programming-064] program alone still runs the program', as
     )
   } finally {
     clearAll()
-    clearViews()
     cleanup()
   }
 })
@@ -239,7 +225,6 @@ test('WHAT[repository-programming-064] a call with no state at all is the missin
     )
   } finally {
     clearAll()
-    clearViews()
     cleanup()
   }
 })

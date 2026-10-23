@@ -21,6 +21,7 @@ module internal AuthorityLaw =
         abstract resolveOrigin: input: obj -> obj
         abstract expectedClosureKind: rootKind: string * isManager: bool * agentOwnerLife: obj -> obj
         abstract encodeClosureWitness: witness: obj -> string
+        abstract decodeClosureWitness: witnessText: string -> obj
         abstract admitClosure: closing: obj * recordedRootKind: string * witnessText: string -> obj
 
     [<Import("Authority", "wanxiangli/authority")>]
@@ -204,6 +205,8 @@ module internal AuthorityLaw =
                 recordedRootKind
                 witness
         | _, other -> Error(sprintf "closure RootKind is unknown: %s" other)
+
+    let decodeClosureWitness (witnessText: string) : obj = law.decodeClosureWitness witnessText
 
     /// The canonical witness of a completed Manager life: its delivered S4 retirement.
     let managerLifeWitness (expectedKind: string) (sessionId: string) (retirementId: string) : string option =
@@ -653,6 +656,31 @@ module PromptAuthorityRun =
                     : PromptAuthority.AuthorityClosureRecord)
                     projection.ClosedRuns }
 
+    let private verifyNonManagerClosureSource
+        (logicalRunId: LogicalRunId)
+        (factId: string)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : Result<unit, string> =
+        let hasSource =
+            projection.TerminalSources
+            |> Map.tryFind logicalRunId
+            |> Option.exists (fun sources -> Map.containsKey factId sources)
+        if hasSource then Ok()
+        else Error(sprintf "closure witness cites absent source %s" factId)
+
+    let private verifyClosureContract
+        (contract: PromptAuthority.AcceptedRootClosure)
+        (logicalRunId: LogicalRunId)
+        (closureWitness: string)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : Result<unit, string> =
+        if contract.ExpectedClosureKind = "HumanRootManagerLife" then
+            Ok()
+        else
+            let decoded = AuthorityLaw.decodeClosureWitness closureWitness
+            let factId = unbox<string> decoded?factId
+            verifyNonManagerClosureSource logicalRunId factId projection
+
     let replayLogicalRunClosed
         (logicalRunId: LogicalRunId)
         (authorityRoot: AuthorityRootUserMessageId)
@@ -681,6 +709,7 @@ module PromptAuthorityRun =
                     (LogicalRunId.value logicalRunId)
                     rootKind
                     closureWitness
+                |> Result.bind (fun () -> verifyClosureContract contract logicalRunId closureWitness projection)
                 |> Result.bind (fun () -> closeAuthority logicalRunId authorityRoot projection)
                 |> Result.map (fun closed -> Some(recordClosure closed logicalRunId rootKind closureWitness))
         | ("already-closed" | "no-authority"), None ->
@@ -759,7 +788,19 @@ module PromptAuthorityRun =
     /// Exactly one source must match the accepted root's identity: no source
     /// means the closure has no durable ground, and two sources mean the
     /// closure would be ambiguous. Both are refused rather than resolved by
-    /// taking the first one.
+
+    let private ownerOfTerminalSource
+        (sourceKind: string)
+        (ownerLogicalRunId: string option)
+        (childLogicalRunId: string)
+        (source: PromptAuthority.AuthorityTerminalSource)
+        : Result<string * PromptAuthority.AuthorityTerminalSource, string> =
+        match sourceKind, ownerLogicalRunId, source.OwnerLogicalRunId with
+        | "HumanRootManagedRun", _, _ -> Ok("", source)
+        | _, Some owner, Some matched when owner = matched -> Ok(owner, source)
+        | _ ->
+            Error(sprintf "the %s source terminal of run %s names no owner logical run" sourceKind childLogicalRunId)
+
     let uniqueTerminalSource
         (sources: PromptAuthority.AuthorityTerminalSource list)
         (sourceKind: string)
@@ -773,16 +814,8 @@ module PromptAuthorityRun =
                 && source.ChildLogicalRunId = Some childLogicalRunId
                 && source.OwnerLogicalRunId = ownerLogicalRunId)
 
-        let ownerOfSource (source: PromptAuthority.AuthorityTerminalSource) =
-            match ownerLogicalRunId, source.OwnerLogicalRunId with
-            | Some owner, Some matched when owner = matched -> Ok(owner, source)
-            | _ ->
-                Error(
-                    sprintf "the %s source terminal of run %s names no owner logical run" sourceKind childLogicalRunId
-                )
-
         match matches with
-        | [ source ] -> ownerOfSource source
+        | [ source ] -> ownerOfTerminalSource sourceKind ownerLogicalRunId childLogicalRunId source
         | [] ->
             Error(
                 sprintf "no durable %s source terminal of run %s matches the accepted root" sourceKind childLogicalRunId

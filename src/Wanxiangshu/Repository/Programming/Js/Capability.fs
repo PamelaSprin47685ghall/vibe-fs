@@ -41,7 +41,6 @@ type JsCapability =
     /// A lifecycle capability, not a ToolPermission projection: `deliver`
     /// ends a program by handing over its view. Like `park`, every generated
     /// surface carries it unconditionally.
-    | Deliver
     | Park
 
 module JsCapability =
@@ -82,7 +81,6 @@ module JsCapability =
         | "Advisor" -> Some JsCapability.Advisor
         | "Ask" -> Some JsCapability.Ask
         | "Review" -> Some JsCapability.Review
-        | "Deliver" -> Some JsCapability.Deliver
         | "Park" -> Some JsCapability.Park
         | _ -> None
 
@@ -105,7 +103,6 @@ module JsCapability =
         | JsCapability.Advisor -> "Advisor"
         | JsCapability.Ask -> "Ask"
         | JsCapability.Review -> "Review"
-        | JsCapability.Deliver -> "Deliver"
         | JsCapability.Park -> "Park"
 
     /// The only ToolPermission → JsCapability mapping (library-owned).
@@ -280,12 +277,6 @@ module JsFragmentRegistry =
         { Capability = JsCapability.Park
           MemberName = "park" }
 
-    /// deliver fragment — the terminal view handoff. A lifecycle member like
-    /// park: not the projection of a ToolPermission, carried by every
-    /// generated surface, and never part of a role's capability members.
-    let deliver: JsCapabilityFragment =
-        { Capability = JsCapability.Deliver
-          MemberName = "deliver" }
 
     /// Canonical member order inside capability families. Filtering this list
     /// is the deterministic projection; never rebuild member order elsewhere.
@@ -312,5 +303,4 @@ module JsFragmentRegistry =
           advisor
           ask
           review
-          deliver
           park ]

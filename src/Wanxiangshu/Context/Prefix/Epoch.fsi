@@ -6,7 +6,8 @@ open Wanxiangshu.Foundation
 type ActivePrefixEpoch =
     { EpochId: PrefixEpochId
       ReanchoredRuns: Set<ProviderRunIdentity>
-      ReanchoredTenures: Set<string> }
+      ReanchoredTenures: Set<string>
+      ReanchoredScopes: Set<string> }
 
 [<RequireQualifiedAccess>]
 type PrefixFoldRejection =
@@ -14,6 +15,7 @@ type PrefixFoldRejection =
     | NonSequentialPrefixEpoch
     | CompactionAlreadyReanchored of run: ProviderRunIdentity
     | TenureAlreadyReanchored of incumbencyId: string
+    | ScopeAlreadyReanchored of callId: string
 
 type PrefixReanchorCandidate =
     { PreviousEpochId: PrefixEpochId
@@ -40,6 +42,15 @@ module PrefixEpochProjection =
             Result<ActivePrefixEpoch, PrefixFoldRejection>
 
     val isTenureReanchored: incumbencyId: string -> state: ActivePrefixEpoch -> bool
+
+    val applyScopeReanchor:
+        previousEpoch: PrefixEpochId ->
+        nextEpoch: PrefixEpochId ->
+        callId: string ->
+        state: ActivePrefixEpoch ->
+            Result<ActivePrefixEpoch, PrefixFoldRejection>
+
+    val isScopeReanchored: callId: string -> state: ActivePrefixEpoch -> bool
 
     /// HOST-006: the newest observed compaction not yet reanchored, as a proposed
     /// line. Proposing never changes the projection (wanxiangli/prefix).

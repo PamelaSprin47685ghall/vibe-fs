@@ -2,11 +2,15 @@
 
 ## [001] 同 epoch append-only prefix law
 
-同一 PrefixEpoch 内，没有显式压缩声明时，前一次 provider wire 已保留的前缀必须是后一次的精确字节前缀。有声明时，`prefixUntil` 指定的前若干可见历史区间仍须逐字节保留，`carry` 只能追加在它们之后；减少保留数量是显式选择，不授权宿主改写留下的前缀。比较范围见 [013]；tools 必须完全一致，不以追加工具视为前缀稳定。
+同一 PrefixEpoch 内，未发生 `ScopeReanchored`、`ContextReanchored` 或 `TenureReanchored` 重锚时，前一次 provider wire 已保留的前缀必须是后一次的精确字节前缀。比较范围见 [013]；tools 必须完全一致，不以追加工具视为前缀稳定。请求级上下文清理统一由 `resetScope` 驱动并作为 `ScopeReanchored` 冷边界推进 epoch，不授权宿主在同 epoch 内改写留下的前缀。
 
 ## [002] 冷边界只有已提交证据与显式 view 取代
 
-Epoch 只由 Host compaction 重锚（`ContextReanchored`）或 Plan tenure 交接重锚（`TenureReanchored`）推进，且每次恰好加一；请求级前缀裁剪与重排仅由模型显式提交的 `prefixUntil` 与 `carry` 声明（context-compression [031]）驱动。不得按容量或 Token 数由宿主主动估算切换。Plan tenure 交接重锚：Planner 任期交接触发 `TenureReanchored` 事件，epoch 加一、清除旧快照；同一 incumbencyId 不重锚两次。
+Epoch 只由 Host compaction 重锚（`ContextReanchored`）、Plan tenure 交接重锚（`TenureReanchored`）或显式 scope 重置重锚（`ScopeReanchored`）推进，且每次恰好加一。不得按容量或 Token 数由宿主主动估算切换。
+
+- Scope 重锚：模型调用 `resetScope` 产生 `ScopeReanchored` 事实（context-compression [035]），epoch 加一、清除旧 wire 快照；同一 `toolCallId` 不重锚两次。
+- Plan tenure 交接重锚：Planner 任期交接触发 `TenureReanchored` 事件，epoch 加一、清除旧快照；同一 incumbencyId 不重锚两次。
+- Host compaction 重锚：Host compaction 触发 `ContextReanchored` 事件，epoch 加一、清除旧快照；同一 compaction 不重锚两次。
 
 ## [003] 废除 Y 候选 probe 与 FrozenRecordPrefix
 
@@ -18,6 +22,7 @@ Epoch 只由 Host compaction 重锚（`ContextReanchored`）或 Plan tenure 交�
 
 ## [006] Host compaction 与 Plan tenure 重锚
 
+Scope 重置通过 `ScopeReanchored` 收容：epoch 加一、清除旧快照。记录已处理 `toolCallId`，同一 scope reset 不重锚两次。
 Plan tenure 交接通过 `TenureReanchored` 收容：epoch 加一、清除旧快照。记录已处理 incumbencyId，同一任期不重锚两次。Host compaction 只通过 `ContextReanchored` 收容：epoch 加一、清除旧快照。记录已处理 run，同一 compaction 不重锚两次。
 
 ## [007] 同 Life system prompt byte-identical
@@ -26,15 +31,19 @@ Plan tenure 交接通过 `TenureReanchored` 收容：epoch 加一、清除旧快
 
 ## [009] 稳定 Host 消息身份与 retry 行保真
 
-消息裁剪与取代按 stable Host message identity 及 ANCHOR 编号定位，不把锚点编号当 provider 数组下标。
+消息裁剪与保留按 stable Host message identity 定位。
 
-`ProviderRetryAttempt` 不进入业务主历史；同一 Current horizon 保留已进入 provider prefix 的 retry rows，仅新的重锚边界可按 stable Host id 退休旧 rows，且保留触发本次切换的当前 physical retry。
+`ProviderRetryAttempt` 不进入业务主历史；同一 Current horizon 保留已进入 provider prefix 的 retry rows，仅新的重锚边界（`ScopeReanchored`、`ContextReanchored`、`TenureReanchored`）可按 stable Host id 退休旧 rows，且保留触发本次切换的当前 physical retry。
 
 ## [010] 标记注入原位、原字节 replay
 
-所有 provider 共用 cursor 呈现，不生成 synthetic skill 消息。标记注入只能附在**本次请求最新一条真实消息**上，且只有该消息本身承载呈现时才有载体：用户消息附于其末尾并使用无 name 属性的 `<system>` 包装；其余角色附于其每一个 terminal 工具结果（completed/error）的 NUL+BOM 后缀；同一消息内的多工具返回各自承载同一提示，不只附在最后一个结果上。最新消息不承载载体时，本轮不生成新 occurrence，也不留下任何无法呈现的 durable 事实；不得把 occurrence 记在渲染器改不动的位置（`Before(user)`、`After(assistant 文本)` 等）上。
+所有 provider 共用统一呈现注入，不生成 synthetic skill 消息。
 
-同一未重锚 horizon 按 durable occurrence 原位、原字节回放，不删除、过滤、去重、搬移或叠加第二后缀；placement 判定先剥离后缀，再精确重附。`ContextReanchored` 退休旧 occurrence 的可见性：旧 occurrence 不再呈现，新 occurrence 以新序号追加到新的载体；新 horizon 下同一位置承载新字节属于退休而非改写，不构成对未重锚回放律的违反。
+1. **工具结果倒计时后缀**：附于每个 terminal 工具结果（completed/error）的末尾，使用 `\0\uFEFF` 分隔拼接 `[Remaining turnBudget: N]`（context-compression [034]）。同一消息内的多工具返回各自承载同一后缀；已带预算后缀时不重复拼接。
+2. **用户消息尾巴提醒**：发往模型的请求副本中，每条 operator 用户消息末尾均拼接 scope 初始化提醒（`[System: Estimate the turnBudget...]`），同一消息已带该尾巴时不重复，持久化用户消息不改写。最新 operator 用户消息后尚未发生 reset 时，非 reset 工具结果重复该初始化提醒。
+3. **零预算弱提醒**：在活跃 scope 内且预算为 0 时追加弱提醒用户消息（`steering: true`，仅存在于请求副本，不持久化）。
+
+同一未重锚 horizon 按 durable occurrence 原位、原字节回放，不删除、过滤、去重、搬移或叠加第二后缀；placement 判定先剥离后缀，再精确重附。任何重锚事件（`ScopeReanchored`、`ContextReanchored`、`TenureReanchored`）退休旧 occurrence 的可见性：旧 occurrence 不再呈现，新 horizon 下同一位置承载新字节属于退休而非改写，不构成对未重锚回放律的违反。
 
 ## [011] 不用冷边界掩盖漂移
 
@@ -42,7 +51,7 @@ Plan tenure 交接通过 `TenureReanchored` 收容：epoch 加一、清除旧快
 
 ## [012] 已提交前缀事实不可逆
 
-合法提交的 `ContextReanchored` 与 `TenureReanchored` 不因后续 provider Failed 或 Aborted 而撤销。
+合法提交的 `ScopeReanchored`、`ContextReanchored` 与 `TenureReanchored` 不因后续 provider Failed 或 Aborted 而撤销。
 
 ## [013] prefix identity 的比较范围
 
@@ -52,5 +61,5 @@ Plan tenure 交接通过 `TenureReanchored` 收容：epoch 加一、清除旧快
 
 ## [014] 标记后缀正文不进入业务 trace
 
-标记后缀正文只参与 provider 呈现，不进入业务消息快照、TOML 视图渲染或 compaction 输入。仅其 durable occurrence 投影参与恢复。
+工具结果倒计时后缀（`[Remaining turnBudget: N]`）与辅助提示标记后缀只参与 provider 请求呈现，不进入业务消息快照、TOML 视图渲染或 compaction 输入。仅其 durable occurrence 投影参与恢复。
 

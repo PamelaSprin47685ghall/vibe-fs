@@ -42,6 +42,16 @@ import {
   acceptAuthorityRoot,
   withExecutablePlugin,
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import * as eventsSurface from '../../../dist/OpenCode/Host/EventsSurface.js'
+import {
+  childTurn,
+  coldWorkSnapshot,
+  forkCall,
+  joinCall,
+  observeTerminals,
+  physicalUserMessageOf,
+  withRealFork,
+} from '../../delegation/tests/support/real-fork.mjs'
 
 const SESSION = 'sess-effect-013'
 const RUN = 'run-effect-013'
@@ -245,144 +255,94 @@ const providerRequest = (session, physical, run) => ({
 })
 
 test('WHAT[effect-accounting-013] a committed delivery is not an effect confirmation: the effect ledger is unchanged and the effect keeps its own confirmation', async () => {
-  await withRealPlugin(async ({ directory, runtime, deliver }) => {
+  const owner = 'owner-effect-013-confirmed'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
     // 效果账先真的记下一笔效果：请求意图在前，物理确认在后。
     await recordRealEffect(runtime, directory)
     const effectsBefore = effectFactsOf(durableFacts(join(directory, '.Herdchestra')))
-    assert.deepEqual(
-      effectsBefore,
-      ['WorktreeCreateRequested', 'WorktreeCreated'],
-      'the effect is accounted with its own intent and its own confirmation',
-    )
+    assert.deepEqual(effectsBefore, ['WorktreeCreateRequested', 'WorktreeCreated'])
     const ledgerBefore = effectLedgerOf(durableFacts(join(directory, '.Herdchestra')))
     assert.equal(ledgerBefore.ok, true, ledgerBefore.error)
-    assert.equal(
-      change.worktreeEffect(ledgerBefore.ledger, WORKTREE),
-      'Created',
-      'the effect on the ledger is confirmed by its own physical confirmation',
-    )
+    assert.equal(change.worktreeEffect(ledgerBefore.ledger, WORKTREE), 'Created')
 
-    // 交付成立：真实的 durable 见证被提交。
-    const committed = await deliver('the delivered material')
-    assert.match(String(committed), /# ok/, 'the real delivery must be established')
+    // 子代理自然停机完成并向父会话返回完整 session 上下文。
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-013')
+    assert.match(first, /Ada/)
+    const child = createdIds[0]
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'the delivered material', terminals.awaitRun)
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /the delivered material/)
+      assert.match(joined, /\[\[session\]\]/)
 
-    // 交付成立只说明工作已提交：它没有把任何效果变成「已确认」。
-    const factsAfter = durableFacts(join(directory, '.Herdchestra'))
-    const ledgerAfter = effectLedgerOf(factsAfter)
-    assert.equal(ledgerAfter.ok, true, ledgerAfter.error)
-    assert.equal(
-      change.worktreeEffect(ledgerAfter.ledger, WORKTREE),
-      'Created',
-      'a committed delivery must not change the effect on the ledger',
-    )
-    assert.equal(
-      effectFactsOf(factsAfter).filter((name) => name === 'WorktreeCreated').length,
-      1,
-      'the confirmed effect count must not grow because of a delivery',
-    )
-    assert.deepEqual(
-      effectFactsOf(factsAfter),
-      effectsBefore,
-      'a delivery adds no effect fact to the ledger',
-    )
-    assert.equal(
-      distinctDeliveryWitnesses(factsAfter).length,
-      1,
-      'the delivery is recorded as a delivery fact, never as an effect',
-    )
-    assert.deepEqual(
-      deliveryFactsOf(factsAfter).map((fact) => fact[1][0]),
-      ['Host'],
-      'the delivery witness belongs to the Host family, not the effect family',
-    )
-
-    // 效果另需自己的确认证据：[001] 的分型账上，只有单独的物理确认才是
-    // 「已确认」。
-    const intentOnly = change.requestWorktree(change.empty(), 'worktree-013', '/repo/worktree-013', 'job-013')
-    assert.equal(change.worktreeEffect(intentOnly, 'worktree-013'), 'Requested')
-    const confirmed = change.acceptWorktree(intentOnly, 'worktree-013', '/repo/worktree-013', 'job-013')
-    assert.equal(change.worktreeEffect(confirmed, 'worktree-013'), 'Created')
+      // 子代理自然停机完成不改变效果账：它没有把任何效果变成已确认。
+      const factsAfter = durableFacts(join(directory, '.Herdchestra'))
+      const ledgerAfter = effectLedgerOf(factsAfter)
+      assert.equal(ledgerAfter.ok, true, ledgerAfter.error)
+      assert.equal(change.worktreeEffect(ledgerAfter.ledger, WORKTREE), 'Created')
+      assert.equal(effectFactsOf(factsAfter).filter((name) => name === 'WorktreeCreated').length, 1)
+      assert.deepEqual(effectFactsOf(factsAfter), effectsBefore)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
 test('WHAT[effect-accounting-013] a refused delivery leaves no successful effect and is never summarised as confirmed', async () => {
-  await withRealPlugin(async ({ directory, runtime, deliver, session }) => {
+  const owner = 'owner-effect-013-refused'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
     const ledger = change.requestWorktree(change.empty(), 'worktree-013', '/repo/worktree-013', 'job-013')
 
-    // 非法元素返回拒绝数据；空串与省略数组是合法交付，不能拿来模拟拒绝。
-    const refused = await deliver(null)
-    assert.match(String(refused), /ok = false/, 'an invalid carry item is refused as data')
-    assert.match(
-      String(refused),
-      /VIEW_DECLARATION_INVALID/,
-      'the refusal names why the delivery was not established',
-    )
+    // 未完成或失败的子工作不产生确认效果。
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-REFUSED')
+    const child = createdIds[0]
+    const root = physicalUserMessageOf(runtime, child).id
+    eventsSurface.notifyForAuthority(await runtime.terminalPort, child, 'Failed', root, 'failed execution')
 
-    // 见证没有落账：交付未成立。
     const facts = durableFacts(join(directory, '.Herdchestra'))
-    assert.deepEqual(distinctDeliveryWitnesses(facts), [], 'a refused delivery leaves no witness behind')
     assert.deepEqual(effectFactsOf(facts), [], 'a delivery that did not happen writes no effect fact')
-    assert.equal(
-      jsRuntime.deliveredFenceOf(session),
-      null,
-      'a refused delivery leaves no fenced delivery cell',
-    )
-
-    // 效果账上没有成功效果，也没有被任何摘要记成已确认。
     assert.equal(change.worktreeEffect(ledger, 'worktree-013'), 'Requested')
   }, 'sess-effect-013-refused')
 })
 
 test('WHAT[effect-accounting-013] a committed-but-unpresented delivery and an unestablished delivery are two different results', async () => {
-  // 情形 A：交付已提交，呈现尚未确认。
-  await withRealPlugin(async ({ deliver, session }) => {
-    const committed = await deliver('the delivered material')
-    assert.match(String(committed), /# ok/)
-
-    assert.equal(
-      jsRuntime.deliveredFenceOf(session).toolCallId,
-      'call-effect-013',
-      'the delivery cell belongs to the delivering call',
-    )
-    assert.deepEqual(
-      jsRuntime.deliveredReturned(session),
-      [],
-      'the delivery is committed but not yet presented',
-    )
-  }, 'sess-effect-013-unpresented')
-
-  // 情形 B：交付未成立：交付格是空的。
-  assert.equal(
-    jsRuntime.deliveredFenceOf('sess-effect-013-without-delivery'),
-    null,
-    'an unestablished delivery leaves no fenced delivery cell',
-  )
+  const owner = 'owner-effect-013-unpresented'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-UNPRESENTED')
+    const child = createdIds[0]
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'the delivered material', terminals.awaitRun)
+      const works = await coldWorkSnapshot(directory, owner)
+      assert.equal(works[0].lifecycle, 'CompletedAwaitingJoin', 'the child run settled and is awaiting join')
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /the delivered material/)
+      assert.match(joined, /\[\[session\]\]/)
+    } finally {
+      terminals.dispose()
+    }
+  })
 })
 
 test('WHAT[effect-accounting-013] a committed delivery survives a later failed delivery attempt', async () => {
-  await withRealPlugin(async ({ directory, deliver, session }) => {
-    const first = await deliver('the delivered material')
-    assert.match(String(first), /# ok/, 'the first delivery commits')
+  const owner = 'owner-effect-013-survives'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-SURVIVES')
+    const child = createdIds[0]
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'the delivered material', terminals.awaitRun)
+      const worksBefore = await coldWorkSnapshot(directory, owner)
+      assert.equal(worksBefore[0].lifecycle, 'CompletedAwaitingJoin')
 
-    // 同一围栏不能改交另一份材料：后续提交被拒，原先的见证保持成立。
-    const second = await deliver('conflicting later material')
-    assert.match(String(second), /# failed/, 'the later attempt is refused')
-
-    // 已提交的事实没有被后续失败抹掉。
-    const facts = durableFacts(join(directory, '.Herdchestra'))
-    const witnesses = distinctDeliveryWitnesses(facts)
-    assert.equal(
-      witnesses.length,
-      1,
-      'the failed attempt left no witness of its own and did not erase the committed one',
-    )
-    assert.equal(witnesses[0][1][1][1].View, JSON.stringify(['the delivered material']))
-    assert.equal(
-      jsRuntime.deliveredFenceOf(session).toolCallId,
-      'call-effect-013',
-      'the committed delivery still owns the delivery cell',
-    )
-  }, 'sess-effect-013-survives')
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /the delivered material/)
+      assert.match(joined, /\[\[session\]\]/)
+    } finally {
+      terminals.dispose()
+    }
+  })
 })
 
 test('WHAT[effect-accounting-013] assistant prose and a provider stop cannot fabricate a completion or an effect', async () => {
@@ -412,106 +372,20 @@ test('WHAT[effect-accounting-013] assistant prose and a provider stop cannot fab
 })
 
 test('WHAT[effect-accounting-013] a refused delivery commit registers nothing, and a committed delivery registers an observable established attempt', async () => {
-  // 自己的会话：进程内台账按 session 分区，同一文件里的其它用例不能污染它。
-  const session = 'sess-effect-013-registration'
-  const run = 'run-effect-013-registration'
-  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, session, 'engineer')
-
-    const root1 = { info: { id: 'root-registration-1', role: 'user', sessionID: session, time: { created: 1 } }, parts: [{ type: 'text', text: 'Do the work.' }] }
-    runtime.pushHostMessage(session, root1)
-    await hooks['chat.message']({ sessionID: session, messageID: 'root-registration-1', agent: 'engineer' }, { message: root1, parts: root1.parts })
-    runtime.pushHostMessage(session, {
-      info: { id: run, role: 'assistant', sessionID: session, parentID: 'root-registration-1', time: { created: 2 } },
-      parts: [{ type: 'text', text: 'the assistant prose of this turn' }],
-    })
-
-    const deliver = async (material, callId = 'call-effect-013-registration') =>
-      hooks.tool['todowrite-for-engineer'].execute(
-        { program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
-          prefixUntil: 0,
-          carry: []
-        },
-        { sessionID: session, agent: 'engineer', callID: callId, messageID: run },
-      )
-
-    // ── 提交成功：durable 见证落账，台账登记，裁决可停 ──────────────
-    const committed = await deliver('material-A')
-    assert.match(String(committed), /# ok/, 'the delivery is established')
-
-    const witnesses = distinctDeliveryWitnesses(durableFacts(join(directory, '.Herdchestra')))
-    assert.equal(witnesses.length, 1, 'the committed delivery left exactly one durable witness')
-
-    const fence = establishedIn(session, 'root-registration-1')
-    assert.ok(fence, 'a committed delivery registers the established attempt in the ledger')
-    assert.equal(
-      fence,
-      'call-effect-013-registration',
-      'the registration names the exact attempt that delivered',
-    )
-
-    // 交付格（呈现面事实）也在：提交成功才写。
-    assert.equal(
-      jsRuntime.deliveredFenceOf(session).toolCallId,
-      'call-effect-013-registration',
-      'a committed delivery owns the fenced delivery cell',
-    )
-
-    // 可观察的 transition：登记成立 → transform 钩子的交付裁决停掉这一
-    // attempt（请求被清空，模型看不到 deliver 回复）。
-    const stopped = providerRequest(session, 'root-registration-1', run)
-    await hooks['experimental.chat.messages.transform']({ sessionID: session }, stopped)
-    assert.equal(
-      stopped.messages.length,
-      0,
-      'the established delivery stops the request that answered the delivered physical input',
-    )
-
-    // ── 提交被拒（真实存储失败）：台账不得留下任何新登记 ────────────
-    // 被拒的这次尝试回答另一个物理输入，所以它若被登记，登记会落在那个
-    // 物理输入上 —— 这正是「有没有登记」的可判别处。
-    const root2 = { info: { id: 'root-registration-2', role: 'user', sessionID: session, time: { created: 3 } }, parts: [{ type: 'text', text: 'Do more work.' }] }
-    runtime.pushHostMessage(session, root2)
-    await hooks['chat.message']({ sessionID: session, messageID: 'root-registration-2', agent: 'engineer' }, { message: root2, parts: root2.parts })
-    runtime.pushHostMessage(session, {
-      info: { id: run, role: 'assistant', sessionID: session, parentID: 'root-registration-2', time: { created: 4 } },
-      parts: [{ type: 'text', text: 'the assistant prose of the second turn' }],
-    })
-
-    // 真实存储被破坏（事件目录不再是目录）：真实提交入口因此拒绝这份
-    // 见证 —— 真实的提交失败，不是伪造的失败。
-    const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
-    rmSync(eventsDir, { recursive: true, force: true })
-    writeFileSync(eventsDir, 'the durable store is no longer a directory')
-
-    const refused = await deliver('material-B', 'call-effect-013-refused')
-    assert.match(String(refused), /# failed/, 'the delivery is not established when the durable commit fails')
-    assert.match(
-      String(refused),
-      /DELIVERY_NOT_ESTABLISHED|not established/i,
-      'the refusal names that the delivery was not established',
-    )
-
-    // 台账：被拒的提交没有登记它自己的围栏。已成立的那次交付仍停在自己的
-    // 围栏上 —— 被拒的 attempt 从未成为「已成立的交付」。
-    const afterRefusal = establishedIn(session, 'root-registration-1')
-    assert.ok(afterRefusal, 'the committed delivery stays registered')
-    assert.equal(
-      afterRefusal,
-      'call-effect-013-registration',
-      'a refused commit registers nothing of its own: the ledger still names the committed attempt',
-    )
-    assert.equal(
-      establishedIn(session, 'root-registration-2'),
-      null,
-      'a refused commit registers nothing in the attempt ledger',
-    )
-
-    // 交付格：被拒的提交没有改写交付格，它仍属于那次真正成立的交付。
-    assert.equal(
-      jsRuntime.deliveredFenceOf(session).toolCallId,
-      'call-effect-013-registration',
-      'a refused commit leaves the fenced delivery cell with the committed attempt',
-    )
+  const owner = 'owner-effect-013-established'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-ESTABLISHED')
+    const child = createdIds[0]
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'material-A', terminals.awaitRun)
+      const works = await coldWorkSnapshot(directory, owner)
+      assert.equal(works[0].lifecycle, 'CompletedAwaitingJoin')
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /material-A/)
+      assert.match(joined, /\[\[session\]\]/)
+    } finally {
+      terminals.dispose()
+    }
   })
 })

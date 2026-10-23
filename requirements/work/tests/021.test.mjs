@@ -19,7 +19,7 @@ test('WHAT[work-021] Plan separates human ask from devops investigation and deni
 
   // WHAT[work-021]: ask asks the human; devops delegates an investigation.
   // resume and handoff are no longer part of the plan surface.
-  const expectedPermissions = ['Ask', 'DevOpsConsultation', 'Deliver', 'JsPlan', 'Review']
+  const expectedPermissions = ['Ask', 'DevOpsConsultation', 'Deliver', 'JsPlan', 'ResetScope', 'Review']
   assert.deepEqual(
     [...allowed].sort(),
     expectedPermissions.sort(),
@@ -72,8 +72,8 @@ test('WHAT[work-021] the devops verb survives as a Plan programming-surface memb
   const planMembers = plan.members.map((member) => member.memberName)
   assert.ok(planMembers.includes('devops'), 'the Plan surface carries the devops member')
   assert.ok(
-    plan.baseClassSource.includes('async devops(intent, extra = [])'),
-    'the Plan base class declares devops with a optional extra array',
+    plan.baseClassSource.includes('async devops(intent)'),
+    'the Plan base class declares devops without extra array',
   )
 
   // 其它角色没有这个成员：DevOps 调查只对 Plan 开放。
@@ -85,40 +85,14 @@ test('WHAT[work-021] the devops verb survives as a Plan programming-surface memb
   }
 })
 
-test('WHAT[work-021] the Plan devops member refuses malformed carry as data', async () => {
+test('WHAT[work-021] non-Plan role has no devops member and call fails closed', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const sessionID = 'ses-work-021-devops-carry'
-    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
-
-    const runPlan = async (body) =>
-      String(
-        await hooks.tool['todowrite-for-plan'].execute(
-          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-carry',
-          prefixUntil: 0,
-          carry: []
-        },
-          { sessionID, agent: 'plan' },
-        ),
-      )
-
-    const malformed = await runPlan('return await this.devops("find the flaky test", { "not-an-anchor": null });')
-    assert.match(malformed, /ok = false/)
-    assert.match(malformed, /code = "VIEW_DECLARATION_INVALID"/)
-    assert.match(malformed, /array/)
-
-    const invalidItem = await runPlan('return await this.devops("find the flaky test", [null]);')
-    assert.match(invalidItem, /ok = false/)
-    assert.match(invalidItem, /code = "VIEW_DECLARATION_INVALID"/)
-
     // 非 Plan 角色没有这个成员：调用在编程面直接失败关闭，而不是静默成功。
     const engineerSession = 'ses-work-021-devops-engineer'
     await acceptAuthorityRoot(runtime, engineerSession, 'engineer', 'user-engineer-root')
     const engineer = String(
       await hooks.tool['todowrite-for-engineer'].execute(
-        { program: 'class Js extends JsProgram { async run() { return await this.devops("find the flaky test", []); } }', name: 'engineer-devops',
-          prefixUntil: 0,
-          carry: []
-        },
+        { program: 'class Js extends JsProgram { async run() { return await this.devops("find the flaky test"); } }', name: 'engineer-devops' },
         { sessionID: engineerSession, agent: 'engineer' },
       ),
     )

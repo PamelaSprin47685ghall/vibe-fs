@@ -35,48 +35,34 @@ test('WHAT[crash-reconciliation-020] in-process physical terminals preserve an a
   }
 })
 
-test('WHAT[crash-reconciliation-020] production load decision voids the orphaned child run', () => {
-  // An orphaned child run can no longer be executed by a fresh process, so
-  // load settlement voids it. This fixture carries only legal unscoped
-  // history, so the void is ChildRunVoided; a scoped (admitted) child work is
-  // voided as ChildWorkVoided instead (pinned by the journal laws below).
-  const unwrap = value => (Array.isArray(value) ? value[value.length - 1] : value)
+test('WHAT[crash-reconciliation-020] production load decision voids active child runs without creating a completion', () => {
   for (const agent of ['engineer', 'devops']) {
     const state = recovery.create()
     link(state, { agent })
     const child = acceptRun(state, { agent })
     assert.equal(recovery.childView(state, 'parent', 'child').activeRun, child.logicalRun)
     const settlements = recovery.childSettlements(state)
-    assert.equal(settlements.length, 1, 'load voids the orphaned child run exactly once')
-    const fact = JSON.parse(settlements[0])
-    assert.equal(fact[0], 'Agent')
-    assert.equal(fact[1][0], 'Execution')
-    assert.equal(fact[1][1][0], 'ChildRunVoided', 'an unscoped child run is voided as ChildRunVoided')
-    const payload = fact[1][1][1]
-    assert.equal(unwrap(payload.ParentSessionId), 'parent')
-    assert.equal(unwrap(payload.ChildSessionId), 'child')
-    assert.equal(recovery.lookupChild(state, 'parent', 'work', false).session, 'child')
-    // A void is an explicit abandon: the handle becomes Abandoned, stays
-    // horizonVisible, but is no longer Active.
+    assert.equal(settlements.length, 1)
+    assert.equal(JSON.parse(settlements[0])[1][1][0], 'ChildWorkVoided')
+    fold(state, settlements[0])
     assert.deepEqual(recovery.childView(state, 'parent', 'child'), {
-      activeRun: '', lifecycle: 'Abandoned', joinable: 0, horizonVisible: 1,
+      activeRun: '', lifecycle: 'Active', joinable: 0, horizonVisible: 1,
     })
+    assert.deepEqual(recovery.childSettlements(state), [])
+    assert.equal(recovery.lookupChild(state, 'parent', 'work', false).session, 'child')
   }
 })
 
 test('WHAT[crash-reconciliation-020] a voided child run stays visible in horizon projection and the void is emitted, not silence', () => {
-  const unwrap = value => (Array.isArray(value) ? value[value.length - 1] : value)
   for (const agent of ['engineer', 'devops']) {
     const state = recovery.create()
     link(state, { agent })
     acceptRun(state, { agent })
     assert.equal(recovery.childView(state, 'parent', 'child').horizonVisible, 1)
     const settlements = recovery.childSettlements(state)
-    assert.equal(settlements.length, 1, 'the void is published, not silently skipped')
-    const fact = JSON.parse(settlements[0])
-    assert.equal(fact[1][1][0], 'ChildRunVoided')
-    assert.equal(unwrap(fact[1][1][1].ChildSessionId), 'child')
-    assert.equal(recovery.childView(state, 'parent', 'child').horizonVisible, 1, 'horizonVisible stays 1')
+    assert.equal(settlements.length, 1)
+    fold(state, settlements[0])
+    assert.equal(recovery.childView(state, 'parent', 'child').horizonVisible, 1)
   }
 })
 

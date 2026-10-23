@@ -48,7 +48,6 @@ module HostForkProse =
         let lang = SessionProviderLanguage.languageOf sessionId
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
-          CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
           Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
           Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
@@ -211,7 +210,18 @@ module internal SyncDelegateInternals =
     /// open, so the delegate stays active, the unresolved obligation stays
     /// visible, and the parent can keep waiting instead of receiving a
     /// terminal that never happened. An undelivered completion is never a
-    /// failure — the same fact the fork side settles as "observation only"
+
+    let private messagePartToObj (p: MessagePart) : obj =
+        match p with
+        | MessagePart.Text t -> createObj [ "type" ==> "text"; "text" ==> t ]
+        | MessagePart.Reasoning t -> createObj [ "type" ==> "reasoning"; "text" ==> t ]
+        | MessagePart.ToolCall(callId, name, args) ->
+            createObj [ "type" ==> "toolCall"; "id" ==> callId; "name" ==> name; "arguments" ==> args ]
+        | MessagePart.ToolResult(callId, res) ->
+            createObj [ "type" ==> "toolResult"; "id" ==> callId; "result" ==> res ]
+        | MessagePart.Activity kind ->
+            createObj [ "type" ==> "text"; "text" ==> sprintf "[activity: %s]" kind ]
+
     /// (LC-004) is settled here as "still owed".
     let settleCompletedFromParts
         (journal: AgentJournal option)
@@ -222,16 +232,14 @@ module internal SyncDelegateInternals =
         : bool =
         match settleDeliveredFromParts journal noteDelegateIfRole store call turn with
         | Some _ -> true
+        | None when Array.isEmpty turn.Parts -> false
         | None ->
-            // Undelivered: observation only. The call stays live and its wait
-            // stays open — no completion, no failure, the obligation is
-            // still owed and still visible.
-            Diagnostic.emit
-                "sync-delegate-undelivered-obligation-open"
-                [ "session_id", SessionId.value turn.SessionId
-                  "role", SyncDelegate.roleLabel call.Role
-                  "result", "completed without a delivered view; the obligation stays open" ]
-
+            let parts: obj array = turn.Parts |> Array.map messagePartToObj
+            let role = SyncDelegate.roleLabel call.Role
+            let jsMsg = createObj [ "id" ==> ("turn-" + Guid.NewGuid().ToString("N")); "role" ==> role; "parts" ==> parts ]
+            let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box [| jsMsg |])
+            let record = ReturnedMaterial.encodeSession [] filtered
+            settleExactCall noteDelegateIfRole store call turn record
             true
 
     /// D1: a delegate child that was interrupted after it delivered. The
@@ -672,7 +680,7 @@ type SyncDelegateRuntime
         task {
             // Completion marker for ManagerLife. HandleTurn
             // does not use Terminal to build the inspect payload;
-            // the terminal record comes from this.deliver (with turn parts fallback).
+            // the terminal record comes from the delivered view or captured session view.
             match! XTraceCapture.captureTerminalWithReceipt (Some journal) turn with
             // delegation-031: the terminal trace write is settlement evidence, not
             // the completion itself. WriterUnavailable/WriteUnknown means the

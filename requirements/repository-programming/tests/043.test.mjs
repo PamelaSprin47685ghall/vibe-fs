@@ -26,13 +26,13 @@ const resourcePath = (name) => ({
 // provider-language-006/007：占位符集合按 {{name}} 形态提取比较。
 const placeholders = (text) => [...text.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort()
 
-// 生命周期成员：deliver 与 park 同级，随每个生成面携带，不按 capability 投影。
-const LIFECYCLE_MEMBERS = ['deliver', 'park']
+// 生命周期成员：park 随每个生成面携带，不按 capability 投影（deliver 已废除）。
+const LIFECYCLE_MEMBERS = ['park']
 
 // capability 成员的 canonical 序（WHAT[repository-programming-002]）。
 const CANONICAL_MEMBERS = [
   'write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call',
-  'fork', 'resume', 'commission', 'devops', 'dag', 'join', 'fission', 'horizon', 'advisor', 'ask',
+  'fork', 'resume', 'commission', 'devops', 'dag', 'join', 'fission', 'horizon', 'advisor', 'ask', 'review',
 ]
 
 test('WHAT[repository-programming-043] rm and mv ship paired bilingual resources with identical placeholder sets and no unreplaced residue', () => {
@@ -104,18 +104,15 @@ test('WHAT[repository-programming-043] JsFragmentRegistry carries the rm/mv frag
   assert.match(capability, /MemberName = "mv" }/, 'the mv fragment must name the member mv')
 })
 
-test('WHAT[repository-programming-043] the member registry holds the delegation members and the lifecycle members deliver and park', () => {
+test('WHAT[repository-programming-043] the member registry holds the delegation members and lifecycle member park without deliver', () => {
   const capability = read(join(SOURCE_ROOT, 'Repository/Programming/Js/Capability.fs'))
 
   const allBlock = capability.match(/let all: JsCapabilityFragment list =\s*\[([\s\S]*?)\]/)
   assert.ok(allBlock, 'the fragment registry must declare the canonical member list')
   const names = allBlock[1].split(/\s+/).filter(Boolean)
 
-  // deliver 与 park 同为生命周期成员，在 registry 中并存：两者都随每个生成面
-  // 携带，不由 capability 投影。
-  assert.ok(names.includes('deliver'), 'deliver is a registry member')
+  assert.equal(names.includes('deliver'), false, 'deliver is retired from registry')
   assert.ok(names.includes('park'), 'park is a registry member')
-  assert.match(capability, /MemberName = "deliver"/, 'the deliver fragment must name the member deliver')
   assert.match(capability, /MemberName = "park"/, 'the park fragment must name the member park')
 
   // capability 成员保持 canonical 序：生命周期成员不插在其中。

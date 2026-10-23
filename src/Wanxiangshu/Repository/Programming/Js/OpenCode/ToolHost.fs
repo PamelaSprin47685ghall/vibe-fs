@@ -112,9 +112,6 @@ module JsToolSpec =
         let abandonSchema =
             ToolHostCodec.optionalObjectSchema [ "handle", ToolHostCodec.stringSchema factory ] factory
 
-        let carrySchema =
-            ToolHostCodec.carrySchema (JsToolPolicy.viewDeclarationExtraProse ()) factory
-
         let callFenceOf (ctx: HostToolContext) =
             match ctx.ProviderRunId, ctx.ToolCallId with
             | Some providerRun, Some toolCallId -> Some(providerRun, toolCallId)
@@ -173,13 +170,7 @@ module JsToolSpec =
                 return JsToolPolicy.renderCommitted ctx.SessionId callIdentity declaration outcome
             }
 
-        // Clause 6: a failed call must not leave a presentable
-        // view declaration behind. The declaration is validated
-        // here — an invalid one is still refused before anything
-        // runs — but it is committed to the pending view only
-        // after the program settled, so a program that threw, exited
-        // non-zero or never settled leaves the pending view empty.
-        let admitProgramCall (args: HostToolArguments) (ctx: HostToolContext) (input: obj) =
+        let admitProgramCall (_args: HostToolArguments) (ctx: HostToolContext) (input: obj) =
             let hasProgram = isPresent (input?program)
 
             let noState =
@@ -187,22 +178,12 @@ module JsToolSpec =
                 && not (isPresent (input?unpark))
                 && not (isPresent (input?abandon))
 
-            let declaration = JsToolPolicy.viewDeclarationOf args.Raw
-
-            match JsToolPolicy.viewFailureOf args.Raw declaration with
-            | Some failure ->
-                Task.FromResult(JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])))
-            | None when noState ->
+            if noState then
                 Task.FromResult(
                     ToolResultText.tomlObject [ "error", ToolResultText.TString(JsToolPolicy.missingProgramProse ()) ]
                 )
-            | None ->
-                match
-                    Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.validateView ctx.SessionId declaration
-                with
-                | Error failure ->
-                    Task.FromResult(JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], [])))
-                | Ok() -> runProgramCall ctx input declaration
+            else
+                runProgramCall ctx input null
 
         { Name = surface.ToolName
           Description = surface.Description
@@ -211,9 +192,7 @@ module JsToolSpec =
               "name", ToolHostCodec.optionalStringSchemaDescribed (JsToolPolicy.argNameProse ()) factory
               "planB", ToolHostCodec.optionalStringSchema factory
               "unpark", unparkSchema
-              "abandon", abandonSchema
-              "prefixUntil", ToolHostCodec.nonNegativeIntegerSchemaDescribed (JsToolPolicy.viewDeclarationExtraProse ()) factory
-              "carry", carrySchema ]
+              "abandon", abandonSchema ]
           Execute =
             fun args ctx ->
                 task {

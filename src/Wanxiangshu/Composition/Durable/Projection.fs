@@ -30,10 +30,8 @@ type SessionAgentProjection =
         Companion: CompanionProjection option
         /// COMPANION-003 / HOST-005: the XTrace — the session's unique raw
         /// semantic trajectory. It is the raw record itself, not a compressed
-        /// view of it: what the provider is shown is decided by the model's own
-        /// prefixCount and carry declaration, and the
-        /// compressed result handed back to a caller is the delivered
-        /// `this.deliver` view.
+        /// view of it: post-scope compaction is managed via resetScope, and the
+        /// material handed back to a caller is the captured session view.
         XTrace: XTraceProjectionState option
 
         /// COMPANION-009: which provider-visible prefix generation is in force.
@@ -73,11 +71,6 @@ type AgentProjectionSet =
         Fission: FissionProjectionState
         /// Exact durable managed-chat executions, keyed by physical user message.
         ChatExecutions: ChatExecutionProjectionState
-        /// context-compression-028: successful view declaration checkpoints that
-        /// are still on the raw side of the committed prefix. Each checkpoint
-        /// carries the K chosen on that call; a committed rebase prunes only
-        /// checkpoints it has actually crossed.
-        ViewCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
 
         /// Task-delivery witnesses keyed by (session, provider run, tool call),
         /// folded from Host facts by `HostFactFold`.
@@ -108,7 +101,6 @@ module AgentProjection =
           HandleByChildSession = Map.empty
           Fission = FissionProjection.empty
           ChatExecutions = ChatExecutionProjection.empty
-          ViewCheckpoints = Map.empty
           Deliveries = Map.empty
           RuntimeStartCount = 0 }
 

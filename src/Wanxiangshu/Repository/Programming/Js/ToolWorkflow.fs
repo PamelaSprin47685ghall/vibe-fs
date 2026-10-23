@@ -109,16 +109,7 @@ module JsToolsData =
         with _ ->
             Error JsFailure.InvalidReturnValue
 
-    /// Delivery has a separate payload; its tool receipt does not repeat it.
-    let private deliveredPrefix = "{\"__jsDelivered\":"
-
-    let isDelivered (json: string) = json.StartsWith deliveredPrefix
-
-    let parseOutcome (json: string) : Result<obj, JsFailure> =
-        if isDelivered json then
-            Ok(createObj [ "delivered" ==> true ])
-        else
-            parse json
+    let parseOutcome (json: string) : Result<obj, JsFailure> = parse json
 
 /// The task a delivery serves. The durable witness names the same three
 /// references; this layer states them in its own vocabulary because it runs
@@ -337,25 +328,13 @@ module JsToolWorkflow =
             None
 
     let private parseRawCarry (json: string) : Result<obj, JsFailure> =
-        try
-            Ok((JS.JSON.parse json)?carry)
-        with _ ->
-            Error(JsFailure.ViewDeclarationInvalid "delivered carry did not parse")
+        Error(JsFailure.ProgramFailed "delivered carry is retired")
 
     let private validateDeliveredCarry (sessionId: string) (carry: obj) : Result<obj option, JsFailure> =
-        let selected =
-            Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.carryMaterial sessionId carry
-
-        if selected?ok then
-            Ok(Some carry)
-        else
-            Error(JsFailure.ViewDeclarationInvalid(selected?reason))
+        Ok None
 
     let private deliveredCarry (sessionId: string) (json: string) : Result<obj option, JsFailure> =
-        if not (JsToolsData.isDelivered json) then
-            Ok None
-        else
-            parseRawCarry json |> Result.bind (validateDeliveredCarry sessionId)
+        Ok None
 
     let private parkedDeliveryFailure (sessionId: string) : JsFailure option =
         let blockers = JsParkedSites.deliveryBlockersWithChoicesForSession sessionId
@@ -395,15 +374,11 @@ module JsToolWorkflow =
     /// sentinel JSON is captured in `deliveredJson` so the cell write can
     /// happen only after settlement.
     let private validateDeliverGate
-        (deliveredJson: string option ref)
-        (sessionId: string)
-        (json: string)
+        (_deliveredJson: string option ref)
+        (_sessionId: string)
+        (_json: string)
         (parsed: Result<obj, JsFailure>)
-        : Result<obj, JsFailure> =
-        if not (JsToolsData.isDelivered json) then
-            parsed
-        else
-            gateDelivered deliveredJson sessionId json parsed
+        : Result<obj, JsFailure> = parsed
 
     /// Clear only what this call produced (deliver clause 6). A delivery
     /// another call of the same session made is evidence and stays: a later
@@ -449,7 +424,7 @@ module JsToolWorkflow =
         then
             Error(
                 JsFailure.DeliveryNotEstablished(
-                    "no assistant prose body was output before this.deliver; write the report in assistant prose first, then call deliver"
+                    "no assistant prose body was output before delivery; write the report in assistant prose first, then deliver"
                 )
             )
         else
@@ -605,7 +580,7 @@ module JsToolWorkflow =
         task {
             match deliveredCarry sessionId json with
             | Error failure -> return Error failure
-            | Ok None -> return Error(JsFailure.ViewDeclarationInvalid "the delivered carry array is missing")
+            | Ok None -> return Error(JsFailure.ProgramFailed "the delivered carry array is missing")
             | Ok(Some view) -> return! settleView sessionId fence settlement view
         }
 

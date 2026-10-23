@@ -4,12 +4,11 @@ open System.Collections.Generic
 open System.Threading.Tasks
 
 type JsDelegationHost =
-    { // Each delegate receives its intent and an explicit carry array.
-      Delegate: string -> obj -> obj -> Task<obj>
+    { Delegate: string -> obj -> Task<obj>
       Join: unit -> Task<obj>
       Fission: obj -> Task<obj>
       Horizon: unit -> Task<obj>
-      Advisor: obj -> obj -> Task<obj> // (intent, carry)
+      Advisor: obj -> Task<obj>
       Review: obj -> Task<obj> } // (findings)
 
 module JsDelegationBridge =

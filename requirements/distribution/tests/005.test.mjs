@@ -8,7 +8,7 @@ import test from 'node:test'
 const { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs')
 const { tmpdir } = await import('node:os')
 const { join } = await import('node:path')
-const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA, collectCompilerInputs, collectGeneratedInputs, collectArtifactInputs, computeDigest } = await import('../../../scripts/lib/build-state.mjs')
+const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA, collectCompilerInputs, collectArtifactInputs, computeDigest } = await import('../../../scripts/lib/build-state.mjs')
 const { resetOutputDirectory } = await import('../../../scripts/lib/owner-compile.mjs')
 const { runBuild, checkOutputsValid, determineBuildDecision, stagedBackupDirFor, stageDistForFullRebuild, restoreStagedDist, recoverStaleStagedDist } = await import('../../../scripts/build.mjs')
 const { execFileSync } = await import('node:child_process')
@@ -41,8 +41,6 @@ test('WHAT[distribution-005] assertBuildFresh succeeds on current repository bui
     const { distDir } = writeOrphanScenario(root)
     const compilerInputs = collectCompilerInputs(root, null)
     const compilerInputDigest = computeDigest(compilerInputs)
-    const generatedInputs = collectGeneratedInputs(root)
-    const generatedInputDigest = computeDigest(generatedInputs)
     const artifactInputs = collectArtifactInputs(root)
     const artifactInputDigest = computeDigest(artifactInputs)
 
@@ -54,7 +52,6 @@ test('WHAT[distribution-005] assertBuildFresh succeeds on current repository bui
         outputDir: 'dist',
         generation: 1,
         compiler: { inputDigest: compilerInputDigest, inputs: compilerInputs },
-        generated: { inputDigest: generatedInputDigest, inputs: generatedInputs },
         artifacts: { inputDigest: artifactInputDigest, inputs: artifactInputs },
         outputs: collectOutputs(distDir),
       },
@@ -63,7 +60,6 @@ test('WHAT[distribution-005] assertBuildFresh succeeds on current repository bui
     const freshness = assertBuildFresh({ root })
     assert.ok(freshness.generation >= 1)
     assert.ok(typeof freshness.compilerInputDigest === 'string')
-    assert.ok(typeof freshness.generatedInputDigest === 'string')
     assert.ok(typeof freshness.artifactInputDigest === 'string')
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -75,7 +71,6 @@ test('WHAT[distribution-005] no-op mode preserves manifest and generation', asyn
   try {
     const { distDir } = writeOrphanScenario(root)
     const compilerInputs = collectCompilerInputs(root, null)
-    const generatedInputs = collectGeneratedInputs(root)
     const artifactInputs = collectArtifactInputs(root)
     writeManifest({
       root,
@@ -90,7 +85,6 @@ test('WHAT[distribution-005] no-op mode preserves manifest and generation', asyn
           inputDigest: computeDigest(compilerInputs),
           inputs: compilerInputs,
         },
-        generated: { inputDigest: computeDigest(generatedInputs), inputs: generatedInputs },
         artifacts: { inputDigest: computeDigest(artifactInputs), inputs: artifactInputs },
         outputs: collectOutputs(distDir),
       },
@@ -261,7 +255,6 @@ test('WHAT[distribution-005] full rebuild staged swap clears orphans, restores p
     stageDistForFullRebuild(distDir)
     writeFileSync(join(distDir, 'Uncommitted.js'), 'export const incomplete = true\n', 'utf8')
     const compilerInputs = collectCompilerInputs(root, null)
-    const generatedInputs = collectGeneratedInputs(root)
     const artifactInputs = collectArtifactInputs(root)
     writeManifest({
       root,
@@ -273,7 +266,6 @@ test('WHAT[distribution-005] full rebuild staged swap clears orphans, restores p
           inputDigest: computeDigest(compilerInputs),
           inputs: compilerInputs,
         },
-        generated: { inputDigest: computeDigest(generatedInputs) },
         artifacts: { inputDigest: computeDigest(artifactInputs) },
         outputs: collectOutputs(backupDir),
       },

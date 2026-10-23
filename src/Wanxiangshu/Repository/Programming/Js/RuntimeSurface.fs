@@ -94,12 +94,12 @@ module JsRuntimeSurface =
         JsDelegationBridge.install
             sessionId
             { Delegate =
-                fun name payload carry ->
-                    unbox<Task<obj>> (emitJsExpr (delegation, name, payload, carry) "$0($1,$2,$3)")
+                fun name payload ->
+                    unbox<Task<obj>> (emitJsExpr (delegation, name, payload) "$0($1,$2)")
               Join = fun () -> unbox<Task<obj>> (emitJsExpr join "$0()")
               Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)")
               Horizon = fun () -> unbox<Task<obj>> (emitJsExpr horizon "$0()")
-              Advisor = fun intent carry -> unbox<Task<obj>> (emitJsExpr (advisor, intent, carry) "$0($1,$2)")
+              Advisor = fun intent -> unbox<Task<obj>> (emitJsExpr (advisor, intent) "$0($1)")
               // The test hook installs no review host: `this.review` is a
               // production-only member wired in ToolRegistry. A program that
               // calls it under this hook gets the unavailable envelope.
@@ -171,7 +171,7 @@ module JsRuntimeSurface =
     let deliveredCellIsMine (sessionId: string) (providerRun: string) (toolCallId: string) : bool =
         JsDeliveredValues.ownsCell sessionId (ProviderRunIdentity.create providerRun) (ToolCallId.create toolCallId)
 
-    /// Test hook: the raw value a program handed over through `this.deliver`,
+    /// Test hook: the raw value handed over through delivery,
     /// as it stands right now — a delivery or a staged render cache. This is
     /// the staged view: presentation only. The delivery evidence is the
     /// fenced cell, read by `deliveredFenceOf` and consumed by

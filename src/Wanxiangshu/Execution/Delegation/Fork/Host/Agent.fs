@@ -314,6 +314,7 @@ module HostForkAgent =
                         runtime.ChildViewOfRun
                         runtime.TrackOwnedWork
                         runtime.Runtime
+                        runtime.SessionSnapshot
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
@@ -407,6 +408,7 @@ module HostForkAgent =
                         runtime.ChildViewOfRun
                         runtime.TrackOwnedWork
                         runtime.Runtime
+                        runtime.SessionSnapshot
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))

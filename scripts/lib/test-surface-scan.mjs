@@ -60,6 +60,7 @@ export const HOST_PHYSICAL_CANARY_FILES = new Set([
   'requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs',
   'requirements/host-boundary/tests/magic-todo-host-canaries.test.mjs',
   'requirements/host-boundary/tests/session-snapshot-locality.test.mjs',
+  'requirements/host-boundary/tests/omp-scope-seam.test.mjs',
   // Physical-exit canary: the child must reach the real Diagnostic.fatal and
   // FatalProcess.trip links — a wire-level invariant, not a test seam.
   'requirements/host-boundary/tests/fixtures/fatal-process-child.fixture.mjs',
@@ -77,6 +78,14 @@ export const HOST_PHYSICAL_CANARY_FILES = new Set([
  * a test wants access (TASK.md §9/§10, PR 4).
  */
 export const SURFACE_MANIFEST = [
+  {
+    module: 'Context/Scope/Surface.js',
+    owner: 'context-compression',
+    laws: ['CONTEXT-COMPRESSION-033', 'CONTEXT-COMPRESSION-034'],
+    source: 'src/Wanxiangshu/Context/Scope/Surface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
   {
     module: 'Composition/Omp/OmpExtension.js',
     owner: 'time-capability',
@@ -230,14 +239,6 @@ export const SURFACE_MANIFEST = [
     source: 'src/Wanxiangshu/Execution/Session/Recovery/Surface.fs',
     representation: 'json',
     kind: 'pure',
-  },
-  {
-    module: 'Execution/Delegation/Advisor/Surface.js',
-    owner: 'advisor',
-    laws: ['advisor-002', 'advisor-003'],
-    source: 'src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fs',
-    representation: 'json',
-    kind: 'resource',
   },
   {
     module: 'Execution/Session/OpenCode/HorizonSurface.js',
@@ -833,14 +834,6 @@ export const SURFACE_MANIFEST = [
       'CONTEXT-COMPRESSION-013',
     ],
     source: 'src/Wanxiangshu/Context/Companion/CompressionSurface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
-    module: 'Repository/Programming/Js/Anchor/AnchorSurface.js',
-    owner: 'context-compression',
-    laws: ['CONTEXT-COMPRESSION-031'],
-    source: 'src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fs',
     representation: 'json',
     kind: 'pure',
   },

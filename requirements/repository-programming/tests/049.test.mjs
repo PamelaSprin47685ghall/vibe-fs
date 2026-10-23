@@ -22,16 +22,6 @@ const withTool = (check) => {
   }
 }
 
-test('WHAT[repository-programming-049] the public tool exposes required carry and prefixUntil without legacy aliases', () => {
-  withTool((registered) => {
-    const names = argumentNames(registered)
-    assert.ok(names.includes('prefixUntil'), names)
-    assert.ok(names.includes('carry'), names)
-    assert.ok(!names.includes('prefixCount'), names)
-    assert.ok(!names.includes('thenMap'), names)
-    assert.ok(!names.includes('view'), names)
-  })
-})
 
 test('WHAT[repository-programming-049] program, unpark and abandon can each be sent alone', () => {
   withTool((registered) => {
@@ -63,21 +53,6 @@ test('WHAT[repository-programming-049] abandon declares only the handle', () => 
   })
 })
 
-test('WHAT[repository-programming-049] carry and prefixUntil are required with real schemas', () => {
-  withTool((registered) => {
-    const prefix = argumentSchema(registered, 'prefixUntil')
-    const carry = argumentSchema(registered, 'carry')
-    assert.equal(prefix.safeParse(undefined).success, false)
-    assert.equal(prefix.safeParse(0).success, true)
-    assert.equal(prefix.safeParse(-1).success, false)
-    assert.equal(carry.safeParse(undefined).success, false)
-    assert.equal(carry.safeParse([]).success, true)
-    assert.deepEqual(carry.parse([7, '7', '', '  ', 0]), [7, '7', '', '  ', 0])
-    for (const value of [{}, null, [null], [true], [-1], [1.5], [NaN], [Infinity], [[]], [{}]]) {
-      assert.equal(carry.safeParse(value).success, false, String(value))
-    }
-  })
-})
 
 test('WHAT[repository-programming-049] the description states who owns injected JSON', () => {
   withTool((registered) => {

@@ -107,38 +107,17 @@ const foldOk = (envelopes) => {
 }
 
 test('WHAT[durable-events-015] PERSIST_010_companion_online_and_codec_replay_are_identical', () => {
-  const envelopes = [openingFact(), partFact(), terminalFact(), checkpointFact('call-1')]
+  const envelopes = [openingFact(), partFact(), terminalFact()]
 
   assert.deepEqual(contextFold.replay(envelopes), contextFold.fold(envelopes))
 })
 
-test('WHAT[durable-events-015] PERSIST_010 view checkpoints fold in order and replay identically', () => {
-  const envelopes = [checkpointFact('call-1'), checkpointFact('call-2')]
+test('WHAT[durable-events-015] PERSIST_010 view checkpoints are rejected and no checkpoint window exists', () => {
+  assert.throws(() => contextFold.fold([checkpointFact('call-1')]), /unknown context fact 'ViewCheckpointCommitted'/)
 
-  assert.deepEqual(contextFold.replay(envelopes), contextFold.fold(envelopes))
-
-  const value = contextFold.fold(envelopes).value
-  assert.deepEqual(
-    value.viewCheckpoints[SESSION].checkpoints.map((checkpoint) => checkpoint.callId),
-    ['call-1', 'call-2'],
-  )
-})
-
-test('WHAT[durable-events-015] PERSIST_010 a replayed checkpoint keeps one entry and a reanchor clears the window', () => {
-  const replayed = contextFold.fold([checkpointFact('call-1'), checkpointFact('call-1')]).value
-  assert.deepEqual(
-    replayed.viewCheckpoints[SESSION].checkpoints.map((checkpoint) => checkpoint.callId),
-    ['call-1'],
-  )
-
-  const reanchored = contextFold.fold([
-    openingFact(),
-    partFact(),
-    checkpointFact('call-1'),
-    reanchorFact({ previousEpoch: 0, nextEpoch: 1 }),
-  ]).value
-  assert.equal(reanchored.viewCheckpoints[SESSION], undefined)
-  assert.equal(reanchored.sessions[SESSION].XTrace.Parts.length, 1)
+  const validFold = contextFold.fold([openingFact(), partFact(), terminalFact()])
+  assert.equal(validFold.ok, true)
+  assert.equal(validFold.value.viewCheckpoints, undefined)
 })
 
 test('WHAT[durable-events-015] PERSIST_010_companion_facts_fold_into_the_owned_projection', () => {

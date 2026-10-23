@@ -138,10 +138,7 @@ module AgentJournalPortAdapter =
                     |> Option.map (fun s ->
                         { XTrace = s.XTrace
                           PrefixEpoch = s.PrefixEpoch
-                          ViewCheckpoints =
-                            projections.ViewCheckpoints
-                            |> Map.tryFind sessionId
-                            |> Option.defaultValue PhaseWindow.emptyWindow })
+                        })
 
                 { State = wireState
                   IsCompanion = isComp

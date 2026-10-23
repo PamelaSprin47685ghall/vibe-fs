@@ -28,7 +28,7 @@ const contextReanchor = (overrides = {}) => ({
 test('WHAT[context-compression-019] Context_fold_accepts_plain_envelopes_and_replays_the_line_codec', () => {
   const folded = contextFold.fold([contextReanchor()])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
-  assert.equal(folded.value.viewCheckpoints.ses_context, undefined)
+  assert.equal(folded.value.viewCheckpoints, undefined)
 
   const replayed = contextFold.replay([contextReanchor()])
   assert.equal(replayed.ok, true, replayed.ok ? '' : JSON.stringify(replayed.error))

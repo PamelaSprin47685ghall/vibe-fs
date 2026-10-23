@@ -106,6 +106,7 @@ const cognitiveUtilityAllowFor = (_role) => COGNITIVE_UTILITY_ALLOW
 //   Orchestrator 持有 commission。只有 `devops` 离开了权限目录。
 const ROLE_ALLOW = {
   Manager: [
+    'resetScope',
     'fork',
     'resume',
     'join',
@@ -114,9 +115,10 @@ const ROLE_ALLOW = {
     'review',
     'todowrite-for-manager',
   ],
-  Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
-  Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
+  Orchestrator: ['resetScope', 'commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
+  Engineer: ['resetScope', 'bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
+    'resetScope',
     'join',
     'horizon',
     'todowrite-for-devops',
@@ -147,6 +149,7 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
   const DIRECT_PERMISSION_ONLY = new Set(['Edit', 'Ask', 'JsPlan'])
   const permissionOf = (toolName) =>
     ({
+      resetScope: 'ResetScope',
       fork: 'Fork',
       resume: 'Resume',
       commission: 'Fork',
@@ -174,6 +177,7 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       Resume: 'Resume',
       Commission: 'Fork',
       DevOps: 'DevOpsConsultation',
+      Review: 'ReviewAssessment',
     }
     const officeLabel = (capability) =>
       OFFICE_LABEL_OF_SURFACE_CAPABILITY[capability] ?? capability

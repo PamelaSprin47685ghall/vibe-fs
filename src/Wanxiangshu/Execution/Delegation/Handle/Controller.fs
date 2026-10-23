@@ -5,6 +5,7 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session
 
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
@@ -330,30 +331,25 @@ module HandleController =
         | AlreadyCompleted
         | AlreadyAbandoned -> NotJoinable reason
 
-    let private consumeAdmittedWork (journal: AgentJournalPort) parentId work record =
-        // Observe tombstones committed by another journal instance before deciding.
-        // The consumption cell is taken from that durable work, not from `record`:
-        // a stale caller lifecycle would otherwise write HandleWorkConsumed that
-        // fold rejects with ConsumptionMismatch and FatalProcess journal-semantic-cut.
-        let prepared =
-            journal.RefreshProjection()
-            |> Result.mapError AppendFailed
-            |> Result.bind (fun () ->
-                match HandleProjection.tryWork work (journal.HandleProjection parentId) with
-                | None -> Error(NotJoinable WorkNotAdmitted)
-                | Some { Lifecycle = Retired } -> Error AlreadyRetired
-                | Some durable ->
-                    match consumptionExpected durable.Lifecycle with
-                    | None -> Error(NotJoinable NotCompleted)
-                    | Some cell ->
-                        let consumptionId = System.Guid.NewGuid().ToString("N")
-                        let projection = journal.HandleProjection parentId
+    let private requireDurableWork projection (work: HandleWorkId) =
+        match HandleProjection.tryWork work projection with
+        | None -> Error(NotJoinable WorkNotAdmitted)
+        | Some { Lifecycle = Retired } -> Error AlreadyRetired
+        | Some durable -> Ok durable
 
-                        match HandleProjection.consumeWork work consumptionId cell projection with
-                        | Error reason -> Error(refuseConsume reason)
-                        | Ok _ -> Ok(cell, consumptionId))
+    let private prepareConsumption (journal: AgentJournalPort) (parentId: SessionId) (work: HandleWorkId) =
+        result {
+            do! journal.RefreshProjection() |> Result.mapError AppendFailed
+            let projection = journal.HandleProjection parentId
+            let! durable = requireDurableWork projection work
+            let! cell = consumptionExpected durable.Lifecycle |> Result.requireSome (NotJoinable NotCompleted)
+            let consumptionId = System.Guid.NewGuid().ToString("N")
+            let! _ = HandleProjection.consumeWork work consumptionId cell projection |> Result.mapError refuseConsume
+            return (cell, consumptionId)
+        }
 
-        match prepared with
+    let private consumeAdmittedWork (journal: AgentJournalPort) (parentId: SessionId) (work: HandleWorkId) record =
+        match prepareConsumption journal parentId work with
         | Error reason -> Task.FromResult(Error reason)
         | Ok(cell, consumptionId) -> appendConsumption journal parentId work cell consumptionId record
 

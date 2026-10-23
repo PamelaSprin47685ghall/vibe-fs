@@ -100,7 +100,8 @@ module HorizonTool =
           NewHandleId = None
           OpenManagerJob = (None: (ManagerJobId * string * string * string * int option -> HostResult<string>) option)
           ContinueManagerJob =
-            (None: (ManagerJobId * string * ProviderRunIdentity * ToolCallId * int option -> HostResult<string>) option) }
+            (None: (ManagerJobId * string * ProviderRunIdentity * ToolCallId * int option -> HostResult<string>) option)
+          ContextMessagesFor = fun _ -> Task.FromResult (Error "horizon does not provide context messages") }
 
     let private execute (runtimeCtx: HorizonRuntimeContext) (_args: HostToolArguments) context =
         task {

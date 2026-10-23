@@ -6,7 +6,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Repository.Programming.Js.Anchor
 
 /// JS-010/JS-016: the api object injected into the sandbox — the only
 /// authority a model program sees. Every member returns a JSON-compatible
@@ -1080,35 +1079,12 @@ module JsToolsBindings =
         else
             host.Dispose()
 
-    /// Copy the validated carry into a fresh native array. User-defined
-    /// serialization hooks must never change the declaration after validation.
-    let private carryReceipt (carry: obj) : obj =
-        let carry =
-            // Member extra is optional: omitted or undefined means [].
-            if isJsUndefined carry then
-                box [||]
-            else
-                carry
-
-        match AnchorDeclarationRule.parseCarry carry with
-        | Error failure -> failureObj failure
-        | Ok parsed -> createObj [ "ok" ==> true; "carry" ==> AnchorCarry.toValue parsed ]
-
-    let private withCarry (carry: obj) (run: obj -> obj) : obj =
-        let receipt = carryReceipt carry
-
-        if receipt?ok then
-            run receipt?carry
-        else
-            box (task { return receipt })
-
-    /// Validate the carry array before the host can start a delegate.
     let private makeDelegateMember (host: JsDelegationHost option) (name: string) =
         name
-        ==> fun (payload: obj) (carry: obj) ->
+        ==> fun (payload: obj) ->
             match host with
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
-            | Some delegation -> withCarry carry (fun normalized -> box (delegation.Delegate name payload normalized))
+            | Some delegation -> box (delegation.Delegate name payload)
 
     let private makeJoinMember (host: JsDelegationHost option) =
         "join"
@@ -1135,13 +1111,12 @@ module JsToolsBindings =
             | Some delegation -> box (delegation.Horizon())
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
-    /// Advisor context follows the same carry rule as other delegates.
     let makeAdvisorMember (host: JsDelegationHost option) : (string * obj) =
         "advisor"
-        ==> fun (intent: obj) (carry: obj) ->
+        ==> fun (intent: obj) ->
             match host with
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
-            | Some delegation -> withCarry carry (fun normalized -> box (delegation.Advisor intent normalized))
+            | Some delegation -> box (delegation.Advisor intent)
 
     let private createApiCore
         (capabilities: Set<JsCapability>)
@@ -1163,8 +1138,7 @@ module JsToolsBindings =
         let present (memberName: string) = Array.contains memberName directory
 
         let members =
-            [ "validateCarry" ==> fun (carry: obj) -> carryReceipt carry
-              if present "cat" then
+            [ if present "cat" then
                   makeCatMember root readSnapshots explicitReads
               if present "stat" then
                   makeStatMember root

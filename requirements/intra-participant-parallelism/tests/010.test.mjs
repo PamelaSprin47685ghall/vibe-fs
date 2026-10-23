@@ -53,10 +53,8 @@ test('WHAT[intra-participant-parallelism-010] an interrupted Fission group is se
     const forked = await hooks1.tool['todowrite-for-manager'].execute(
       {
         program:
-          'class Js extends JsProgram { async run() { return await this.fork({ name: "ruling-materials", charge: "collect seven materials" }, []); } }',
-          prefixUntil: 0,
-          carry: []
-        },
+          'class Js extends JsProgram { async run() { return await this.fork({ name: "ruling-materials", charge: "collect seven materials" }); } }',
+      },
       { sessionID: managerSession, agent: 'manager' },
     )
     assert.match(forked, /ok = true/)
@@ -99,7 +97,7 @@ test('WHAT[intra-participant-parallelism-010] an interrupted Fission group is se
       hooks2.tool.join.execute({}, { sessionID: managerSession, agent: 'manager' }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('join hung on a settled fission group')), 5000)),
     ])
-    assert.doesNotMatch(String(joined), /ruling-materials/, 'a settled fission group owes no joinable work')
+    assert.match(String(joined), /ruling-materials.*已被作废|voided/i, 'a settled fission group is reported as voided')
 
     const horizon = await Promise.race([
       hooks2.tool.horizon.execute({}, { sessionID: managerSession, agent: 'manager' }),

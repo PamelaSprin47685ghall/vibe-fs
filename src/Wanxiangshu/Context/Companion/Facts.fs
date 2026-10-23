@@ -31,9 +31,6 @@ type CompanionFactCases =
 
 /// Durable Companion-context facts.
 type ContextFactCases =
-    | ViewCheckpointCommitted of
-        {| SessionId: SessionId
-           ToolCallId: ToolCallId |}
     | ContextReanchored of
         {| SessionId: SessionId
            PreviousEpochId: PrefixEpochId
@@ -45,3 +42,8 @@ type ContextFactCases =
            NextEpochId: PrefixEpochId
            WorkId: string
            IncumbencyId: string |}
+    | ScopeReanchored of
+        {| SessionId: SessionId
+           PreviousEpochId: PrefixEpochId
+           NextEpochId: PrefixEpochId
+           CallId: ToolCallId |}

@@ -195,7 +195,8 @@ const relayedRoad = async (store, workId, root) => {
   assert.equal(opened.ok, true, opened.error)
   const reviewed = await lifecycle.seedReview(store, workId, 'Stayed')
   assert.equal(reviewed.ok, true, reviewed.error)
-  // Single delivery: Stayed review relays to a successor tenure in one call.
+  // Clearing obligations so the Stayed review relays to a successor tenure on deliver
+  await lifecycle.seedReview(store, workId, 'Cleared')
   const relay = await lifecycle.seedDeliver(store, workId, 'run-1', 'call-1', 1n)
   assert.equal(relay.ok, true, relay.error)
 }

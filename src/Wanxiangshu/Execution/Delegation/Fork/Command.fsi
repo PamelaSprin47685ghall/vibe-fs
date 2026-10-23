@@ -89,7 +89,6 @@ module ForkCommand =
           Name: string
           Charge: string
           Attach: string option
-          CommissionerRecord: string list
           ExpectedToolCalls: int option }
 
     /// Whether an office holding this role may call the command.

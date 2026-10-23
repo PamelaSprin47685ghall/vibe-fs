@@ -61,4 +61,7 @@ type DelegationEnvironment =
         /// Carry a new charge to an existing Manager job for this exact tool call.
         ContinueManagerJob:
             ((ManagerJobId * string * ProviderRunIdentity * ToolCallId * int option) -> HostResult<string>) option
+
+        /// Full post-scope LLM-facing messages for a session, captured from the snapshot.
+        ContextMessagesFor: SessionId -> Task<Result<obj array, string>>
     }

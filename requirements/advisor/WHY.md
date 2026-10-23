@@ -4,17 +4,17 @@
 
 顾问因此是按调用 session 归属的常驻专席：同一个 session 的请求永远落到同一个 advisor，首次咨询按需建立，之后逐次复用，历史随调用累积。专席由调用者的 child session 通道建立，物理父级是家族根而不是调用者本身（与 `delegation-007` 的压平规则同源：儿子生的儿子仍是儿子），所以子会话请顾问不会生出 sub-subagent，顾问的可见面也不会因为调用者自己的层级而改变。
 
-请求由三样彼此独立的材料组成，绝不合并：顾问自己的 law（角色资源，由 Host agent 配置与 system transform 投影）、调用者交出的 view（按统一的 TOML 视图形状渲染：`# ` 注释表头加每记录一张 `[[new_work_to_record]]` 数据表），以及本轮 intent（自成一条 user prompt）。合并会同时坏掉两件事：调用者的自述会被读成对顾问的行为规范，而"这一轮到底问什么"会被长 view 淹没。分开之后，顾问能分清哪一段是它必须遵守的 law、哪一段只是待评审的材料、哪一段是它要回答的问题——role law 也据此把 view 明确标成材料而非指令。
+请求由顾问独立的 law（角色资源，由 Host agent 配置与 system transform 投影）以及一份单一的 user 请求文档组成（与 fork 载荷形式一致）：意图散文作为 `# ...` 注释头承载问题，调用方当前的完整 post-scope 消息视图作为 TOML `[[context]]` 表承载背景数据。顾问据此分清哪一段是它必须遵守的 law、哪一段只是待评审的材料、哪一段是它要回答的问题——role law 也据此把背景明确标成材料而非指令。
 
-follow-up 追加而不是重发：只把 view 相对上次已交付部分的增量渲染成新的 view prompt，随后追加新的 intent。整张 view 重发一遍既让每次追问按完整上下文计价，也让"已经交底过什么"失去边界——顾问会重新读到它已经排除过的材料，旧判断与新证据混在一起。已交付游标按（调用 session, 顾问 session）记录，顾问看到的永远是它已被交底的部分加上新增部分。
+每次咨询均发送调用方当前最新完整的 post-scope 视图；顾问自然停机后，将其完整的 post-scope TOML 视图作为完成结果交回。
 
-顾问不产生任何授权副作用：它读不到仓库、跑不了命令、改不了任何东西，也不介入调用者的授权——请求顾问不改变调用者的 capability、不创建 Interaction Authority Root、不写调用者的会话历史。顾问的回答就是散文本身；空回答按失败处理，不伪造建议，"advisor did not answer" 是拒绝而不是一份意见。
+顾问不产生任何授权副作用：它读不到仓库、跑不了命令、改不了任何东西，也不介入调用者的授权——请求顾问不改变调用者的 capability、不创建 Interaction Authority Root、不写调用者的会话历史。顾问在返回的完整上下文中的终态散文作为意见；空回答按失败处理，不伪造建议，"advisor did not answer" 是拒绝而不是一份意见。
 
-调用面是 `js.advisor(intent, view)`：与其他 `js.*` 成员一致返回数据（`{ ok, advice }`，或 `{ ok: false, code, reason }` 的拒绝信封），渲染只在工具结果边界发生，成员本身不产出 provider 词汇。没有该能力的表面不携带这个成员；能力缺失时以显式拒绝收场，而不是静默降级成"没有建议"。
+调用面是 `this.advisor(intent)`：与其他 `js.*` 成员一致返回数据（`{ ok: true, context }`，或 `{ ok: false, code, reason }` 的拒绝信封），返回的 `context` 为顾问自然停机后的完整 post-scope TOML 视图。渲染只在工具结果边界发生，成员本身不产出 provider 词汇。没有该能力的表面不携带这个成员；能力缺失时以显式拒绝收场，而不是静默降级成"没有建议"。
 
-## 边界与关系
+## 边界与复用
 
-- view 的 TOML 渲染归本包，声明解析与区间投影复用 repository-programming 的 AnchorSurface / AnchorView，不另定义语义。prefixUntil 不是交付边界：先生成完整 view，再按宿主已交付事实取 delta。首次交付完整 view。
+- view 的 TOML 渲染归本包。系统废除已退役的局部 Anchor 投影与 delta 游标，调用方与顾问之间的背景传递统一采用完整的 post-scope 视图并渲染为 TOML。
 - 顾问"不携带任何 ToolPermission"的效力来自 `office-capability`（`Role.Advisor` 的 office 为空集）与 `capability-enforcement`（provider 看见的能力与 runtime 真能执行的能力同源且不扩大）；本包不通过呈现创造或取消任何权限。
 - 专席的建立与收束走 Host 的 session 通道（`host-boundary`、`managed-session-lifecycle`），advisor child 的生命周期归 Host 所有；本包不维护第二套会话拓扑，也不把 seat 当成 durable 事实。
 - 名册与 `js.horizon` 的呈现归 `participant-horizon`；语言选择与双语 law 的成对性归 `provider-language`。

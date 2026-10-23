@@ -39,7 +39,7 @@
 | `advisor` | 顾问是按需请来的第二意见：同一 session 专用、无工具的评审参与者，读调用者交出的 view 与 intent 只回散文，不持有任何工具、不产生授权副作用。 |
 | `cognitive-environment` | 世界观、身份、自我职责与继承知识必须按稳定认知层组织，瞬时 runtime/mission 不能伪装成长期身份。 |
 | `cognitive-workspace` | 持久认知画板已退休；只保留负向边界，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
-| `attention-regulation` | `enough`、`abandon` 与 `defer` 工具及 `Attention` 持久投影已退休；注意力动作并入 `assume`、编程面 `carry` 与当前回合文本，本包只保留负向边界。 |
+| `attention-regulation` | `enough`、`abandon` 与 `defer` 工具及 `Attention` 持久投影已退休；注意力动作并入 `assume`、编程面与活跃 scope 文本，本包只保留负向边界。 |
 | `action-affordance` | participant 在采取一个 action 的决策点必须知道该 act 的正边界、负边界、成功后果与参数意义。 |
 | `provider-language` | 语言由全局设置唯一决定，无会话绑定与持久化记录，改设置即改下一次渲染的语言；protocol identity 保持语言不变，核心角色双语 Prompt 语义同源一致。 |
 | `provider-projection` | 已决定可见的 typed semantic intent 必须经唯一确定性投影变成 provider representation，表示不能反向创造 authority。 |
@@ -88,8 +88,8 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `obligation-ledger` | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的有效上下文整理声明（`prefixUntil` 与 `carry`）；插件不改写原始调用参数，只按 Host 终态追加 checkpoint，不维护第二份 todo 真相。 |
-| `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，交棒由前任声明的 ANCHOR 视图承担，不注入机器物化的合成记录。Plan 的编程面、devops 调查、任期隔离、阶段资源、review 与持权交付，以及 Manager/Plan 禁止静默停止、ask 显式用户等待同属本包。 |
+| `obligation-ledger` | 待办消极边界：宿主原生 `todowrite` 退役，待办推进归各角色编程面 `todowrite-for-<role>`；原视图声明与 compression checkpoint 退役，插件不维护第二份待办真相。 |
+| `work` | Work 与 Plan 生命周期只有一套事件：S1–S3 晋级接力与 S4 交付；接力不主动清除上下文，由 `resetScope` 协议管理；Engineer 与 DevOps 免除 nudge 且自然停机完成，Manager 与 Plan 保持长程连续性与生命周期 deliver。Plan 编程面、devops 调查、任期隔离、review 与交付同属本包。 |
 
 
 
@@ -150,15 +150,15 @@
 | 25 | `durable-events` | 28 | durable-events-001 ~ 028 |
 | 26 | `effect-accounting` | 11 | effect-accounting-001 ~ 008、010、012、013（交付成功不是效果） |
 | 27 | `durable-convergence` | 11 | durable-convergence-001 ~ 011 |
-| 28 | `delegation` | 31 | delegation-001 ~ 015、017、019 ~ 033（033：投递后中断前先以交付见证结算子运行，父方 join 仍收到返回） |
-| 58 | `advisor` | 6 | advisor-001 ~ 006（专席归属与家族根父级、law/view/intent 三材料独立 prompt、view 增量与已交付游标、无工具散文、无授权副作用、`js.advisor` 编程面成员） |
+| 28 | `delegation` | 31 | delegation-001 ~ 015、017、019 ~ 033（021 只读背景由完整 post-scope 视图承载；033 子智能体自然停机完成与结算，无 deliver/nudge） |
+| 58 | `advisor` | 6 | advisor-001 ~ 006（专席归属与家族根父级、002 单一请求文档与 post-scope 全视图、003 自然停机返回顾问全视图 TOML、004 无工具、005 无授权副作用、006 this.advisor(intent) 编程面成员返回 { ok, context }） |
 | 29 | `intra-participant-parallelism` | 17 | intra-participant-parallelism-001 ~ 015、017 ~ 018 |
 | 30 | `process-execution` | 17 | process-execution-001 ~ 017；通用工具结果边界归 host-boundary |
 | 31 | `change-integration` | 14 | change-integration-001 ~ 009、011、013 ~ 015、017 |
 | 32 | `semantic-trace` | 13 | semantic-trace-001 ~ 010、semantic-trace-011（Fission keyed convergence 与多 Present 轨迹归并）、semantic-trace-012（独立 Invocation 范围与 Resume 边界）、semantic-trace-013（交付见证是可重放的语义事实） |
 
-| 34 | `context-compression` | 31 | context-compression-001 ~ 027、context-compression-028（逐次 view checkpoint K 窗口）、context-compression-029（落后不丢 raw）、context-compression-030（assume call/result 原文保留）、context-compression-031（ANCHOR 编址、视图声明与 token 经济） |
-| 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015；view checkpoint 窗口见 context-compression-028 |
+| 34 | `context-compression` | 35 | context-compression-001 ~ 030（001 不推导容量/向模型披露 turnBudget 与常数、002 不预测溢出、003 废除独立 Y 轴、030 assume 调用活跃 scope 内保留）、033（resetScope 屏障与原文保留）、034（turnBudget 递减/后缀与用户提醒）、035（ScopeReanchored 冷前缀边界）、036（跨会话 full post-scope view 的 TOML 承载）、037（子会话自然停机终态与免除 nudge/deliver） |
+| 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015（001 同 epoch 前缀追加律、002 ScopeReanchored/ContextReanchored/TenureReanchored 冷边界推进 epoch、006 Scope 重置收容、010 工具结果 turnBudget 后缀与用户提醒） |
 | 36 | `execution-failure-policy` | 14 | execution-failure-policy-001 ~ 014 |
 | 37 | `provider-attempt-recovery` | 24 | provider-attempt-recovery-001 ~ 023、provider-attempt-recovery-024（已接受但未启动的执行必须定夺） |
 | 38 | `host-provider-failure-ownership` | 7 | host-provider-failure-ownership-001 ~ 007 |
@@ -170,12 +170,12 @@
 | 48 | institutional-learning（已退役） | 0 | 随 WP-036 整包退役，目录与条款已删除 |
 | 49 | `repository-investigation` | 9 | repository-investigation-001 ~ 009 |
 | 50 | `knowledge-reuse` | 16 | knowledge-reuse-001 ~ 016 |
-| 51 | `repository-programming` | 60 | 原 001 ~ 027 不变；028 起 programPromise/deadline 可重置、029 起 As-Is 逐笔落盘与失败清单形态、030 ~ 036 park/unpark/abandon 全周期、037 ~ 039 Parked 渲染/投影/现场表、040 ~ 044 rm/mv POSIX 与双语四层接线、045 ~ 047 九个文件原语、where 歧义即 park 与组合教学、048 ~ 049 parked source 与 unpark 自由值、050 ~ 052 js.call 宿主循环/多进程代数/wget 断点续传剧本、053 view 声明捕获、054 deliver 显式终值、055 vm 并行边界、056 委托原语 fork/join/fission/dag（全部返回数据信封，dag 节点失败 park）、057 ls 的 ignore 语义与 glob/grep 退役、058 js.call 的交互形态与唯一执行面、059 js.deliver 的终值记录、060 "js" 机器词汇的终局裁决 |
+| 51 | `repository-programming` | 57 | 原 001 ~ 027 不变；028 起 programPromise/deadline 可重置、029 起 As-Is 逐笔落盘与失败清单形态、030 ~ 036 park/unpark/abandon 全周期、037 ~ 039 Parked 渲染/投影/现场表、040 ~ 044 rm/mv POSIX 与双语四层接线、045 ~ 047 九个文件原语、where 歧义即 park 与组合教学、048 ~ 049 parked source 与 unpark 自由值、050 ~ 052 js.call 宿主循环/多进程代数/wget 断点续传剧本、055 vm 并行边界、056 委托原语 fork/join/fission/dag（全部返回数据信封，背景为 post-scope 全视图）、057 ls 的 ignore 语义与 glob/grep 退役、058 js.call 交互形态、060 "js" 机器词汇终局 |
 
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |
 | 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |
 | 56 | `distribution` | 11 | distribution-001 ~ 011（010 打包资源与活动注册同步、011 安装产物闭包在场） |
-| 57 | `advisor` | 6 | advisor-001 ~ 006（001 专席归属与「孙子变儿子」、002 请求三材料不合并、003 follow-up 追加增量、004 无工具散文返回、005 无授权副作用、006 js.advisor 编程面成员） |
+| 57 | `advisor` | 6 | advisor-001 ~ 006（001 专席归属与「孙子变儿子」、002 单一请求文档与 post-scope 全视图、003 自然停机返回顾问全视图 TOML、004 无工具、005 无授权副作用、006 this.advisor(intent) 编程面成员返回 { ok, context }） |
 
 # 依赖骨架
 

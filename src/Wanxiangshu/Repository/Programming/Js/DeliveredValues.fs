@@ -28,6 +28,12 @@ module JsDeliveredValues =
 
     type ReturnedPiece = { Key: string; Text: string }
 
+    [<Emit("Array.isArray($0)")>]
+    let private isArray (_v: obj) : bool = jsNative
+
+    [<Emit("typeof $0")>]
+    let private valueType (_v: obj) : string = jsNative
+
     [<AllowNullLiteral>]
     type private DeliveryMessages =
         abstract stage: sessionId: string * view: obj -> unit
@@ -88,14 +94,18 @@ module JsDeliveredValues =
 
     /// Only selected history enters a transfer. Current prose is added separately.
     let select (sessionId: string) (view: obj option) (already: Set<string>) : ReturnedPiece list =
-        match view |> Option.map (Anchor.AnchorSurface.carryMaterial sessionId) with
-        | None -> []
-        | Some selected when not selected?ok -> invalidOp ((selected?code: string) + ": " + (selected?reason: string))
-        | Some selected ->
-            (selected?material: obj array)
+        match view with
+        | Some raw when not (isNull raw) ->
+            let items: obj array =
+                if isArray raw then unbox<obj array> raw
+                else [||]
+            items
             |> Array.toList
-            |> List.map (fun entry -> historyPiece entry?text)
+            |> List.map (fun entry ->
+                let text = if isNull entry then "" elif valueType entry = "string" then unbox<string> entry else string entry?text
+                historyPiece text)
             |> List.filter (fun piece -> not (Set.contains piece.Key already))
+        | _ -> []
 
     /// The report prose piece keys start `turn:`/`prose:`; carry material
     /// piece keys start `material:`. This is the provenance, not the text

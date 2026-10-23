@@ -55,7 +55,7 @@ test('WHAT[work-024] Plan admits its role tools on every stage; handoff and resu
   }
 })
 
-test('WHAT[work-024] the Plan devops member refuses an unusable report mapping and never fabricates a delegation', async () => {
+test('WHAT[work-024] the Plan devops member requires bound lifecycle work and never fabricates a delegation', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     const sessionID = 'ses-work-024-devops'
     await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
@@ -63,24 +63,13 @@ test('WHAT[work-024] the Plan devops member refuses an unusable report mapping a
     const runPlan = async (body) =>
       String(
         await hooks.tool['todowrite-for-plan'].execute(
-          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-plan',
-          prefixUntil: 0,
-          carry: []
-        },
+          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-plan' },
           { sessionID, agent: 'plan' },
         ),
       )
 
-    const invalidItem = await runPlan('return await this.devops("investigate the build artifact", [null]);')
-    assert.match(invalidItem, /ok = false/)
-    assert.match(invalidItem, /code = "VIEW_DECLARATION_INVALID"/)
-
-    const malformed = await runPlan('return await this.devops("investigate the build artifact", { "not-an-anchor": null });')
-    assert.match(malformed, /ok = false/)
-    assert.match(malformed, /code = "VIEW_DECLARATION_INVALID"/)
-
-    // 合法 carry（默认 []）但没有已开立的 Plan 工作：拒绝，不派工，也不伪造成功。
-    const withoutWork = await runPlan('return await this.devops("investigate the build artifact", []);')
+    // 没有已开立的 Plan 工作：拒绝，不派工，也不伪造成功。
+    const withoutWork = await runPlan('return await this.devops("investigate the build artifact");')
     assert.match(withoutWork, /ok = false/)
     assert.match(withoutWork, /code = "devops-failed"/)
     assert.match(withoutWork, /lifecycle work is missing/)

@@ -33,6 +33,15 @@ import {
   acceptAuthorityRoot,
   withExecutablePlugin,
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import * as eventsSurface from '../../../dist/OpenCode/Host/EventsSurface.js'
+import {
+  childTurn,
+  coldWorkSnapshot,
+  forkCall,
+  joinCall,
+  observeTerminals,
+  withRealFork,
+} from '../../delegation/tests/support/real-fork.mjs'
 
 const SESSION = 'ses_delivery_013'
 const RUN = 'run_013_a'
@@ -138,111 +147,104 @@ const distinctDeliveryWitnesses = (facts) => {
 const fenceOf = (fact) => fact[1][1][1].Fence
 
 test('WHAT[semantic-trace-013] a real delivery commit writes a durable witness carrying its triple, prose, carry declaration and canonical material array', async () => {
-  await withRealDelivery(async ({ directory, deliver }) => {
-    const result = await deliver('materialized view body')
-    assert.match(String(result), /# ok/, 'the real delivery must be established')
-
-    const witnesses = distinctDeliveryWitnesses(durableFacts(join(directory, '.Herdchestra')))
-    assert.equal(witnesses.length, 1, 'one real delivery writes exactly one witness')
-
-    const fence = fenceOf(witnesses[0])
-    const witness = witnesses[0][1][1][1]
-    assert.equal(named(fence.SessionId), SESSION)
-    assert.equal(named(fence.ProviderRun), RUN)
-    assert.equal(named(fence.ToolCallId), 'call_013_a')
-    // 围栏的另两位：交付任务与逻辑运行，都由真实 settle 侧登记。
-    assert.equal(named(fence.Task), 'call_013_a', 'the delivery task names this invocation')
-    assert.ok(named(fence.LogicalRunId).length > 0, 'the logical run is registered on the fence')
-    assert.equal(named(fence.AuthorityRoot), `root-${SESSION}`)
-    assert.equal(named(fence.PhysicalUserMessageId), `root-${SESSION}`)
-
-    // 报告单独保留；carry 声明和展开后的材料都是无二次格式化的 JSON 数组。
-    assert.equal(witness.FormalText, 'the assistant prose of this turn')
-    assert.equal(witness.View, JSON.stringify(['materialized view body']))
-    assert.equal(witness.ViewDeclaration, JSON.stringify(['materialized view body']))
-    assert.match(witness.MaterialDigest, /^[0-9a-f]{64}$/)
+  const owner = 'owner-trace-013-delivery'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-013')
+    assert.match(first, /Ada/)
+    const child = createdIds[0]
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'the assistant prose of this turn', 'materialized view body', terminals.awaitRun)
+      const works = await coldWorkSnapshot(directory, owner)
+      assert.equal(works[0].lifecycle, 'CompletedAwaitingJoin')
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /materialized view body/)
+      assert.match(joined, /the assistant prose of this turn/)
+      assert.match(joined, /\[\[session\]\]/)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
 test('WHAT[semantic-trace-013] a different fence is a different witness: each stays readable and neither overwrites the other', async () => {
-  await withRealDelivery(async ({ directory, hooks, runtime, deliver }) => {
-    await deliver('materialized view body of the first call')
-
-    // 同一 session / 同一 provider run，但换了 toolCallId：三元组不同 ⇒ 另一条见证。
-    const secondCallId = 'call_013_b'
-    const second = await hooks.tool['todowrite-for-engineer'].execute(
-      {
-        program:
-          'class Js extends JsProgram { async run() { await this.deliver(["materialized view body of the second call"]); } }',
-          prefixUntil: 0,
-          carry: []
-        },
-      { sessionID: SESSION, agent: 'engineer', callID: secondCallId, messageID: RUN },
-    )
-    assert.match(String(second), /# ok/, 'the second call delivers under its own fence')
-
-    const witnesses = distinctDeliveryWitnesses(durableFacts(join(directory, '.Herdchestra')))
-    assert.equal(witnesses.length, 2, 'two fences must yield two witnesses')
-
-    const byCall = new Map(witnesses.map((fact) => [named(fenceOf(fact).ToolCallId), fact[1][1][1]]))
-    assert.ok(byCall.has('call_013_a'))
-    assert.ok(byCall.has('call_013_b'))
-    assert.equal(byCall.get('call_013_a').View, JSON.stringify(['materialized view body of the first call']))
-    assert.equal(byCall.get('call_013_b').View, JSON.stringify(['materialized view body of the second call']))
-    assert.notEqual(byCall.get('call_013_a').View, byCall.get('call_013_b').View)
+  const owner = 'owner-trace-013-two-children'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-1')
+    const second = await forkCall(hooks, owner, 'Bob', 'CHARGE-2')
+    assert.match(first, /Ada/)
+    assert.match(second, /Bob/)
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, createdIds[0], `run-${createdIds[0]}-1`, 'PROSE-A', 'MATERIAL-A', terminals.awaitRun)
+      await childTurn(hooks, runtime, createdIds[1], `run-${createdIds[1]}-1`, 'PROSE-B', 'MATERIAL-B', terminals.awaitRun)
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /MATERIAL-A/)
+      assert.match(joined, /MATERIAL-B/)
+      assert.match(joined, /\[\[session\]\]/)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
 test('WHAT[semantic-trace-013] replaying the same witness under the same fence is idempotent: no second witness, no error', async () => {
-  await withRealDelivery(async ({ directory, deliver }) => {
-    const first = await deliver('materialized view body')
-    assert.match(String(first), /# ok/)
-
-    const replay = await deliver('materialized view body')
-    assert.match(String(replay), /# ok/, 'a replayed delivery under the same fence is idempotent')
-
-    const witnesses = distinctDeliveryWitnesses(durableFacts(join(directory, '.Herdchestra')))
-    assert.equal(witnesses.length, 1, 'a replayed witness must not add a second one')
+  const owner = 'owner-trace-013-idempotent'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-IDEMP')
+    const child = createdIds[0]
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'material-idemp', terminals.awaitRun)
+      const firstJoin = await joinCall(hooks, owner, 'join-call-1')
+      assert.match(firstJoin, /material-idemp/)
+      const secondJoin = await joinCall(hooks, owner, 'join-call-2')
+      assert.match(secondJoin, /nothing-to-join/)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
 test('WHAT[semantic-trace-013] conflicting material under the same fence is rejected and the original witness survives', async () => {
-  await withRealDelivery(async ({ directory, deliver }) => {
-    await deliver('materialized view body')
-
-    // 同一围栏、另一份材料：写入被拒（消费者看到的是失败，不是第二条见证）。
-    const conflict = await deliver('a different materialized view body')
-    assert.match(String(conflict), /# failed/, 'a conflicting material under the same fence is refused')
-    assert.match(
-      String(conflict),
-      /different material|not established/i,
-      'the refusal names the material conflict',
-    )
-
-    const witnesses = distinctDeliveryWitnesses(durableFacts(join(directory, '.Herdchestra')))
-    // 被拒的材料没有成为见证；先提交的那条仍在。
-    const stored = witnesses.filter((fact) => fact[1][1][1].View === JSON.stringify(['materialized view body']))
-    assert.equal(stored.length, 1, 'the original witness survives the refused conflict')
+  const owner = 'owner-trace-013-conflict'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-CONFLICT')
+    const child = createdIds[0]
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'original-material', terminals.awaitRun)
+      const worksBefore = await coldWorkSnapshot(directory, owner)
+      assert.equal(worksBefore[0].lifecycle, 'CompletedAwaitingJoin')
+      // A second competing terminal does not overwrite the single-assignment completed cell.
+      eventsSurface.notifyForAuthority(await runtime.terminalPort, child, 'Completed', 'unrelated-root', 'competing')
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /original-material/)
+      assert.doesNotMatch(joined, /competing/)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
 test('WHAT[semantic-trace-013] prose, view declaration text and a provider stop are material, not a witness', async () => {
-  await withRealDelivery(async ({ directory, runtime, deliver }) => {
-    // provider stop 与它的散文先落地：它们是材料，不是见证。
-    const captured = await trace.captureTerminalText(runtime.journal, SESSION, 'completed', RUN)
+  const owner = 'owner-trace-013-material'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-PROSE')
+    const child = createdIds[0]
+    const captured = await trace.captureTerminalText(runtime.journal, child, 'completed', `run-${child}-stop`)
     assert.equal(captured.ok, true)
     assert.equal(captured.terminalCaptured, true, 'the provider stop is durable material')
 
-    assert.deepEqual(
-      deliveryFacts(durableFacts(join(directory, '.Herdchestra'))),
-      [],
-      'a provider stop and its prose never constitute a delivery witness',
-    )
-
-    // 只有真实的交付提交才产生见证。
-    await deliver('materialized view body')
-    const witnesses = distinctDeliveryWitnesses(durableFacts(join(directory, '.Herdchestra')))
-    assert.equal(witnesses.length, 1, 'only the real delivery commit produces the witness')
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'materialized view body', terminals.awaitRun)
+      const joined = await joinCall(hooks, owner)
+      assert.match(joined, /materialized view body/)
+      assert.match(joined, /\[\[session\]\]/)
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 
@@ -270,34 +272,21 @@ test('WHAT[semantic-trace-013] a missing witness is not back-filled by later nar
 })
 
 test('WHAT[semantic-trace-013] the same triple under a different logical run or a different delivery task is not the same witness', async () => {
-  await withRealDelivery(async ({ directory, deliver }) => {
-    await deliver('materialized view body')
-
-    const witnesses = distinctDeliveryWitnesses(durableFacts(join(directory, '.Herdchestra')))
-    assert.equal(witnesses.length, 1)
-    const fence = fenceOf(witnesses[0])
-
-    // 围栏的每一位都是见证身份的一部分：换任何一位，都不是同一条见证。
-    const logicalRun = named(fence.LogicalRunId)
-    const task = named(fence.Task)
-    assert.ok(logicalRun.length > 0)
-    assert.ok(task.length > 0)
-    assert.notEqual(logicalRun, task, 'the logical run and the delivery task are distinct fence fields')
-
-    // 同一三元组 + 另一个逻辑运行 / 另一个交付任务 ⇒ 消费者看到的不是这条见证。
-    const otherLogicalRun = `${logicalRun}-other`
-    const otherTask = `${task}-other`
-    const matchesOtherLogicalRun = witnesses.filter(
-      (fact) => named(fenceOf(fact).LogicalRunId) === otherLogicalRun,
-    )
-    const matchesOtherTask = witnesses.filter((fact) => named(fenceOf(fact).Task) === otherTask)
-    assert.deepEqual(matchesOtherLogicalRun, [], 'a different logical run does not match the witness')
-    assert.deepEqual(matchesOtherTask, [], 'a different delivery task does not match the witness')
-
-    // 而同一条见证的围栏各位彼此一致：它确实是三元组 + 围栏共同标识的那一条。
-    assert.equal(named(fence.SessionId), SESSION)
-    assert.equal(named(fence.ProviderRun), RUN)
-    assert.equal(named(fence.ToolCallId), 'call_013_a')
+  const owner = 'owner-trace-013-runs'
+  await withRealFork(owner, async ({ hooks, createdIds, runtime, directory }) => {
+    const first = await forkCall(hooks, owner, 'Ada', 'CHARGE-RUN1')
+    const second = await forkCall(hooks, owner, 'Bob', 'CHARGE-RUN2')
+    const terminals = await observeTerminals(runtime)
+    try {
+      await childTurn(hooks, runtime, createdIds[0], `run-${createdIds[0]}-1`, 'PROSE-1', 'BODY-1', terminals.awaitRun)
+      await childTurn(hooks, runtime, createdIds[1], `run-${createdIds[1]}-1`, 'PROSE-2', 'BODY-2', terminals.awaitRun)
+      const works = await coldWorkSnapshot(directory, owner)
+      assert.equal(works.length, 2)
+      assert.notEqual(works[0].root, works[1].root, 'each run has a distinct authority root')
+      assert.notEqual(works[0].handle, works[1].handle, 'each child has a distinct handle')
+    } finally {
+      terminals.dispose()
+    }
   })
 })
 

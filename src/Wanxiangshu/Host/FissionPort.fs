@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Host.Ports
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.Identity
@@ -70,4 +71,6 @@ type FissionHostPort =
         RegisterLane: SessionId -> SessionId option -> string option -> unit
         /// Tell the host a lane run started under this role and directory.
         LaneStarted: SessionId -> Role -> string option -> unit
+        /// Full post-scope rendered view of the owner session, when available.
+        OwnerView: (SessionId -> Task<string option>) option
     }

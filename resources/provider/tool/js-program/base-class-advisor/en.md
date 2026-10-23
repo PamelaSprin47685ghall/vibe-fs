@@ -1,5 +1,5 @@
-  async advisor(intent, extra = []) {
-    // Returns { ok, advice } from this session's advisor. An unavailable seat returns { ok: false, code: "advisor-unavailable", reason }.
-    // intent states the question. extra adds needed history: integers reference anchors; strings supply literal text. The current turn is not sent.
-    // Example: const advice = await this.advisor("is the retry path sound?", [2, "Verified: the first failure retries unchanged"]);
+  async advisor(intent) {
+    // Returns { ok, context } from this session's advisor as TOML. An unavailable seat returns { ok: false, code: "advisor-unavailable", reason }.
+    // Sends a single request containing intent and caller post-scope context; the advisor's natural stop returns its full post-scope session.
+    // Example: const { ok, context } = await this.advisor("is the retry path sound?");
   }

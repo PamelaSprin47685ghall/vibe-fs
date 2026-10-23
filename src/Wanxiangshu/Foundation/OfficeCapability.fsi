@@ -31,6 +31,7 @@ type ToolPermission =
     /// A consult, not an actor: the caller hands over a view plus an intent
     /// and reads prose back, so the office holding it gains no acting surface.
     | Advisor
+    | ResetScope
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =

@@ -45,7 +45,7 @@ const isSome = (value) => value !== null
 // park and deliver are lifecycle members: every generated surface carries them
 // in its base class, but they are not the projection of a ToolPermission, so
 // they are never counted among the capability members of a role.
-const LIFECYCLE_MEMBERS = ['deliver', 'park']
+const LIFECYCLE_MEMBERS = ['park']
 
 const projectedMembers = (s) => memberNames(s).filter((name) => !LIFECYCLE_MEMBERS.includes(name))
 
@@ -69,6 +69,8 @@ const MEMBERS_BY_PERMISSION = {
   Horizon: ['horizon'],
   Advisor: ['advisor'],
   Ask: ['ask'],
+  Review: ['review'],
+  ReviewAssessment: ['review'],
 }
 
 const MEMBER_ORDER = [
@@ -76,7 +78,7 @@ const MEMBER_ORDER = [
   'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where',
   'call',
   'fork', 'resume', 'commission', 'devops', 'dag',
-  'join', 'fission', 'horizon', 'advisor', 'ask',
+  'join', 'fission', 'horizon', 'advisor', 'ask', 'review',
 ]
 
 // The offices that hold at least one programming-surface permission, with the
@@ -97,7 +99,7 @@ const EXPECTED_MEMBERS = [
   {
     role: 'Manager',
     label: 'manager',
-    members: ['reviewOnly.cat', 'reviewOnly.ls', 'reviewOnly.rg', 'reviewOnly.stat', 'whereAll', 'where', 'fork', 'resume', 'dag', 'join', 'horizon', 'advisor'],
+    members: ['reviewOnly.cat', 'reviewOnly.ls', 'reviewOnly.rg', 'reviewOnly.stat', 'whereAll', 'where', 'fork', 'resume', 'dag', 'join', 'horizon', 'advisor', 'review'],
   },
   {
     role: 'Orchestrator',
@@ -107,7 +109,7 @@ const EXPECTED_MEMBERS = [
   {
     role: 'Plan',
     label: 'plan',
-    members: ['write', 'cat', 'stat', 'mkdir', 'whereAll', 'where', 'devops', 'ask'],
+    members: ['write', 'cat', 'stat', 'mkdir', 'whereAll', 'where', 'devops', 'ask', 'review'],
   },
 ]
 
@@ -189,12 +191,11 @@ test('WHAT[repository-programming-001] JS001_lifecycle_members_are_carried_by_ev
     const result = surface(office.role, rolePermissions(office.label))
     assert.equal(isSome(result), true, `${office.role} must get a js-* surface`)
     assert.match(result.baseClassSource, /async park\(payload\)/, `${office.role} carries park`)
-    assert.match(result.baseClassSource, /async deliver\(extra = \[\]\)/, `${office.role} carries deliver`)
   }
 })
 
 test('WHAT[repository-programming-001] JS001_non_projected_permissions_never_produce_members', () => {
-  for (const name of ['Edit', 'Pty', 'Fetch', 'ReviewAssessment', 'Review', 'Finality']) {
+  for (const name of ['Edit', 'Pty', 'Fetch', 'Finality', 'ResetScope', 'BashHoneypot']) {
     const result = generate('Engineer', caps(name), 'en')
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)
   }

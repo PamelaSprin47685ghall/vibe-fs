@@ -131,102 +131,57 @@ test('WHAT[work-027] a missing lifecycle projection is not evidence that the Man
   }, { session: 'manager-missing-projection-fixture' })
 })
 
-test('WHAT[work-027] Engineer/DevOps/Orchestrator progress stop cannot count as complete without TaskDelivery witness', async () => {
-  // 合法进度 stop 不能当完成：无 witness 的 TurnCompleted 不写完成事实且 logical run 保持活跃。
-  //
-  // 被删除的对内部表示的断言（原先直接 import dist/Context/Trace/TerminalReporter.js、
-  // dist/Composition/Turn/{Observation,Program}.js、dist/Foundation/{Identity,Roles}.js、
-  // dist/Foundation/HostMessage.js，并断言终态 union 的 case 标签）：终态裁决没有已
-  // 注册的公开等价入口（没有任何已注册的 Surface 包装
-  // TerminalReporter.completeWithEvidence），且它断言的只是内部 union 的标签。
-  // 同一事实改由消费者可见的两条证据表达：
-  //   * 「无交付 ⇒ 没有 durable 交付见证事实」—— 经已注册的 EventStore Surface
-  //     读回真实 journal 的普通 JSON 事实；
-  //   * 「无交付 ⇒ logical run 仍活跃」—— 经已注册的 DispatchSurface
-  //     projectionObservation 读回活跃逻辑运行。
-  // 真实交付（this.deliver）作为对照：它写下唯一一条见证。
-  const nonPlanExecutors = ['engineer', 'devops', 'orchestrator']
+test('WHAT[work-027] Engineer/DevOps natural stop completes cleanly without requiring a child delivery member', async () => {
+  const nonPlanExecutors = ['engineer', 'devops']
 
   for (const name of nonPlanExecutors) {
-    for (const delivered of [false, true]) {
-      await withExecutablePlugin(async (hooks, directory, created, runtime) => {
-        const session = `${name}-progress-stop-${delivered ? 'with' : 'without'}-witness`
-        const physical = `phys-${session}`
-        await acceptAuthorityRoot(runtime, session, name, physical)
+    await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+      const session = `${name}-progress-stop-natural`
+      const physical = `phys-${session}`
+      await acceptAuthorityRoot(runtime, session, name, physical)
 
-        const user = {
-          info: {
-            id: physical,
-            role: 'user',
-            sessionID: session,
-            agent: name,
-            model: { providerID: 'provider', modelID: `${name}-model` },
-            time: { created: 1 },
-          },
-          parts: [{ type: 'text', text: 'Do the work.' }],
-        }
-        runtime.pushHostMessage(session, user)
-        await hooks['chat.message'](
-          { sessionID: session, messageID: physical, agent: name },
-          { message: user, parts: user.parts },
-        )
-
-        const run = `run-${session}`
-        runtime.pushHostMessage(session, {
-          info: {
-            id: run,
-            role: 'assistant',
-            sessionID: session,
-            parentID: physical,
-            agent: name,
-            providerID: 'provider',
-            modelID: `${name}-model`,
-            time: { created: 2, completed: 3 },
-            finish: 'stop',
-          },
-          parts: [
-            {
-              type: 'text',
-              text: `${name} progress report: implementation stepped forward, no deliver called.`,
-            },
-          ],
-        })
-
-        const before = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
-        assert.ok(before !== null, `${name} logical run must start active`)
-
-        const program = delivered
-          ? 'class Js extends JsProgram { async run() { await this.deliver(["the delivered view"]); } }'
-          : 'class Js extends JsProgram { async run() { return 1; } }'
-        await hooks.tool[`todowrite-for-${name}`].execute(
-          { program,
-          prefixUntil: 0,
-          carry: []
+      const user = {
+        info: {
+          id: physical,
+          role: 'user',
+          sessionID: session,
+          agent: name,
+          model: { providerID: 'provider', modelID: `${name}-model` },
+          time: { created: 1 },
         },
-          { sessionID: session, agent: name, callID: `call-${session}`, messageID: run },
-        )
+        parts: [{ type: 'text', text: 'Do the work.' }],
+      }
+      runtime.pushHostMessage(session, user)
+      await hooks['chat.message'](
+        { sessionID: session, messageID: physical, agent: name },
+        { message: user, parts: user.parts },
+      )
 
-        const witnesses = deliveryWitnesses(join(directory, '.Herdchestra'))
-        if (delivered) {
-          assert.equal(witnesses.length, 1, `${name} a real delivery writes exactly one witness`)
-          const fence = witnesses[0][1][1][1].Fence
-          const named = (value) => (Array.isArray(value) ? value[1] : value)
-          assert.equal(
-            named(fence.LogicalRunId),
-            before.logicalRun,
-            `${name} the witness is bound to this logical run`,
-          )
-        } else {
-          assert.deepEqual(
-            witnesses,
-            [],
-            `${name} an undelivered progress stop writes no delivery witness`,
-          )
-        }
-
-        const after = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
-        assert.deepEqual(after, before, `${name} logical run must not close without delivery witness`)
+      const run = `run-${session}`
+      runtime.pushHostMessage(session, {
+        info: {
+          id: run,
+          role: 'assistant',
+          sessionID: session,
+          agent: name,
+          parentID: physical,
+          model: { providerID: 'provider', modelID: `${name}-model` },
+          time: { created: 2 },
+        },
+        parts: [
+          {
+            type: 'text',
+            text: `${name} progress report: implementation stepped forward.`,
+          },
+        ],
       })
-    }
+
+      const program = 'class Js extends JsProgram { async run() { return 1; } }'
+      const executed = await hooks.tool[`todowrite-for-${name}`].execute(
+        { program },
+        { sessionID: session, agent: name, callID: `call-${session}`, messageID: run },
+      )
+      assert.match(String(executed), /# ok/)
+    })
   }
 })

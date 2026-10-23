@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Omp
 
 open System
+open FsToolkit.ErrorHandling
+open Wanxiangshu.Foundation
 open System.Threading
 open System.Threading.Tasks
 open Fable.Core
@@ -9,6 +11,11 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host.Ports
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Context.Scope
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Prefix
 
 /// Host-neutral adapter over the omp (oh-my-pi) extension API.
 ///
@@ -23,6 +30,15 @@ module Adapter =
     // ------------------------------------------------------------------
     // JS interop helpers
     // ------------------------------------------------------------------
+
+    [<Import("pid", "node:process")>]
+    let private processId: int = jsNative
+
+    [<Emit("typeof $0 === 'string'")>]
+    let private isString (_value: obj) : bool = jsNative
+
+    [<Emit("Array.isArray($0)")>]
+    let private isArray (_value: obj) : bool = jsNative
 
     [<Emit("$0 == null ? undefined : $0[$1]")>]
     let private fieldValue (carrier: obj) (name: string) : obj = jsNative
@@ -1011,6 +1027,144 @@ module Adapter =
         with ex ->
             Error(HostError.Transport ex.Message)
 
+    let private openOmpJournal store (runtimeId: RuntimeId) (pid: int) (startedAt: DateTimeOffset) =
+        taskResult {
+            let! (writer, _, projection) =
+                Wanxiangshu.Persistence.Journal.EventStoreJournalWriter.resumeOrCreate (runtimeId, pid, startedAt, store)
+            return! AgentJournal.createFromProjection writer projection
+        }
+
+    let private tryAcquireOmpJournal (stateRoot: string) : Task<AgentJournal option> =
+        task {
+            try
+                let runtimeDir = RuntimePath.forStateRoot stateRoot
+                let writerId = Guid.NewGuid().ToString("N")
+                let integrator =
+                    Wanxiangshu.Persistence.EventStore.CanonicalIntegrator.createWithRules
+                        Wanxiangshu.Persistence.EventStore.CanonicalIntegrator.baseRules
+                        Wanxiangshu.Persistence.EventStore.AuthoritativeEventTypes.isKnown
+                let store = Wanxiangshu.Persistence.EventStore.EventStore.createLocal stateRoot writerId integrator
+                let! acquired = SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow (openOmpJournal store)
+                return Result.toOption acquired
+            with _ ->
+                return None
+        }
+
+    let private acquireOmpJournal (stateRoot: string) : Task<AgentJournal option> =
+        if String.IsNullOrWhiteSpace stateRoot then
+            Task.FromResult None
+        else
+            tryAcquireOmpJournal stateRoot
+
+    let private registerResetScopeTool (pi: obj) (journalOpt: AgentJournal option) : unit =
+        let resetScopeDef =
+            createObj
+                [ "name", box "resetScope"
+                  "label", box "Reset Scope"
+                  "concurrency", box "exclusive"
+                  "loadMode", box "essential"
+                  "approval", box "read"
+                  "description",
+                  box "Execution barrier and context garbage collector. Deletes everything between the previous resetScope call (or session start) and this call, keeping only user messages and prior resetScope pairs; everything after this call is the new scope. Also sets the turnBudget for the new scope."
+                  "parameters",
+                  box (
+                      createObj
+                          [ "type", box "object"
+                            "properties",
+                            box (
+                                createObj
+                                    [ "oldScopeVerboseVerbatimExperience",
+                                      box (
+                                          createObj
+                                              [ "type", box [| "string"; "null" |]
+                                                "description",
+                                                box "Verbose experience and findings from the closing scope: everything between the previous resetScope call (or session start) and this call. Null/omitted if there is no prior work. If any exact text (function signatures, error stack traces, exact line numbers) is needed in the next scope, it MUST be copied VERBATIM here." ]
+                                      )
+                                      "newScopeObjective",
+                                      box (
+                                          createObj
+                                              [ "type", box "string"
+                                                "description", box "The state closed-loop (状态闭环) objective for the new scope." ]
+                                      )
+                                      "newScopeTurnBudget",
+                                      box (
+                                          createObj
+                                              [ "type", box "integer"
+                                                "minimum", box 0
+                                                "description", box "Estimated LLM turns (1 LLM request = 1 turn) for the new scope." ]
+                                      ) ]
+                            )
+                            "required", box [| "newScopeObjective"; "newScopeTurnBudget" |] ]
+                  )
+                  "execute",
+                  box (
+                      Func<obj, obj, obj, obj, obj, obj>(fun callId arguments signal onUpdate toolCtx ->
+                          let ctx = orNull toolCtx
+                          let sid = ctxSessionId ctx
+                          let budget =
+                              if not (isNull arguments) && not (isNull arguments?newScopeTurnBudget) then
+                                  max 0 (unbox<int> arguments?newScopeTurnBudget)
+                              else 0
+                          let objective =
+                              if not (isNull arguments) && not (isNull arguments?newScopeObjective) then
+                                  stringOf arguments?newScopeObjective
+                              else ""
+                          let experience =
+                              if not (isNull arguments) && not (isNull arguments?oldScopeVerboseVerbatimExperience) then
+                                  Some(stringOf arguments?oldScopeVerboseVerbatimExperience)
+                              else None
+
+                          // 1. Update in-memory session state
+                          Surface.resetScopeState sid budget
+
+                          // 2. Append durable ScopeReanchored fact using real journal and toolCallId
+                          let toolCallIdStr = stringOf callId
+                          if String.IsNullOrWhiteSpace toolCallIdStr then
+                              failwith "resetScope requires an exact tool call id (HOST-011)"
+
+                          let journal =
+                              match journalOpt with
+                              | Some j -> j
+                              | None ->
+                                  failwith "resetScope requires a durable agent journal for ScopeReanchored prefix epoch advance"
+
+                          let sessionId = SessionId.create sid
+                          let toolCallId = ToolCallId.create toolCallIdStr
+                          let snapshot = AgentJournal.snapshot journal
+                          let epoch =
+                              match AgentProjection.tryFind sessionId snapshot.AgentProjections with
+                              | None -> PrefixEpochProjection.empty
+                              | Some session -> session.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
+
+                          let nextEpoch = PrefixEpochId.next epoch.EpochId
+                          let fact =
+                              ContextFact.ScopeReanchored
+                                  {| SessionId = sessionId
+                                     PreviousEpochId = epoch.EpochId
+                                     NextEpochId = nextEpoch
+                                     CallId = toolCallId |}
+
+                          task {
+                              let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal
+                              match appended with
+                              | Ok _ -> ()
+                              | Error failure -> raise (JournalAppendException failure)
+
+                              let content =
+                                  Surface.appendBudgetReminder
+                                      (box [| createObj [ "type", box "text"; "text", box $"Scope reset. Objective: %s{objective}" ] |])
+                                      budget
+                              let details =
+                                  createObj
+                                      [ "objective", box objective
+                                        "turnBudget", box budget
+                                        "archived", box experience.IsSome ]
+                              return createObj [ "content", content; "details", details ]
+                          }
+                          |> unbox<obj>)
+                  ) ]
+        registerTool pi resetScopeDef
+
     // ------------------------------------------------------------------
     // Host ports over omp
     // ------------------------------------------------------------------
@@ -1126,13 +1280,21 @@ module Adapter =
                 member _.Emit(operation, fields) =
                     call2 (fieldValue (fieldValue pi "logger") "debug") (box operation) (box (entriesOf fields))
                     |> ignore }
+        let effectiveAgents =
+            agents
+            |> List.map (fun agent ->
+                let policy =
+                    match agent.ToolPolicy with
+                    | None -> Map [ ("resetScope", true) ]
+                    | Some m -> Map.add "resetScope" true m
+                { agent with ToolPolicy = Some policy })
 
         let catalog: IAgentCatalog =
             { new IAgentCatalog with
                 // The product's role catalogue is handed to the adapter by
                 // the composition root, so it is already the roster the host
                 // exposes.
-                member _.Roles() = Task.FromResult(Ok agents) }
+                member _.Roles() = Task.FromResult(Ok effectiveAgents) }
 
         // HNI P-19: omp's extension API exposes no configuration surface, so
         // there is nothing to bind the port to. The port refuses every call
@@ -1360,6 +1522,146 @@ module Adapter =
                 [ "content", box [| createObj [ "type", box "text"; "text", box result.Text ] |]
                   "isError", box result.IsError ]
 
+    let private isTextOnlyPart (part: TranscriptPart) : bool =
+        match part with
+        | TranscriptPart.Text _ -> true
+        | _ -> false
+
+    let private textOfParts (parts: TranscriptPart list) : string =
+        parts
+        |> List.choose (fun part ->
+            match part with
+            | TranscriptPart.Text text -> Some text
+            | _ -> None)
+        |> String.concat "\n"
+
+    let private replaceStringContent (raw: obj) (newText: string) (rawContent: obj) : obj =
+        if unbox<string> rawContent <> newText then
+            let cloned = emitJsExpr raw "Object.assign({}, $0)"
+            cloned?content <- newText
+            cloned
+        else
+            raw
+
+    let private replaceArrayContent (raw: obj) (newText: string) (arr: obj array) : obj =
+        let hasNonText =
+            arr |> Array.exists (fun block ->
+                let t = fieldValue block "type"
+                isNull t || stringOf t <> "text")
+        let oldText =
+            arr
+            |> Array.choose (fun block ->
+                let t = fieldValue block "type"
+                if not (isNull t) && stringOf t = "text" then Some(stringOf (fieldValue block "text"))
+                else None)
+            |> String.concat "\n"
+        if hasNonText || oldText = newText then
+            raw
+        else
+            let cloned = emitJsExpr raw "Object.assign({}, $0)"
+            cloned?content <- box [| createObj [ "type", box "text"; "text", box newText ] |]
+            cloned
+
+    let private replaceRawContent (raw: obj) (newText: string) : obj =
+        let rawContent = fieldValue raw "content"
+        if isString rawContent then
+            replaceStringContent raw newText rawContent
+        elif isArray rawContent then
+            replaceArrayContent raw newText (unbox<obj array> rawContent)
+        else
+            raw
+
+    let private mergeOneContextItem (raw: obj, rep: ContextMessage) : Result<obj, unit> =
+        if isNull raw || not (List.forall isTextOnlyPart rep.Parts) then
+            Error ()
+        else
+            let newText = textOfParts rep.Parts
+            Ok(replaceRawContent raw newText)
+
+    let private selectChangedMerged (rawArray: obj array) (mergedList: obj list) : obj array option =
+        let merged = List.toArray mergedList
+        let anyChanged = Array.exists2 (fun orig m -> not (obj.ReferenceEquals(orig, m))) rawArray merged
+        if anyChanged then Some merged else None
+
+    let private mergeContextPairs (rawArray: obj array) (replacements: ContextMessage list) : obj array option =
+        let pairs = Array.zip rawArray (List.toArray replacements) |> Array.toList
+        pairs
+        |> List.traverseResultM mergeOneContextItem
+        |> Result.toOption
+        |> Option.bind (selectChangedMerged rawArray)
+
+    let private mergeContextReplacements (rawArray: obj array) (replacements: ContextMessage list) : obj array option =
+        if rawArray.Length <> replacements.Length then None
+        else mergeContextPairs rawArray replacements
+
+    let private replaceLegacyScopeHeader (scopeProtocol: string) (text: string) : string =
+        if text.Contains("## Scope & Context Management") then scopeProtocol else text
+
+    let private updateSystemPromptScope (system: string list) (scopeProtocol: string) : string list =
+        let hasScope = system |> List.exists (fun text -> text.Contains("## Scope & Context Management (`resetScope`)"))
+        let hasLegacy = system |> List.exists (fun text -> text.Contains("## Scope & Context Management"))
+        if hasScope then
+            system
+        elif hasLegacy then
+            system |> List.map (replaceLegacyScopeHeader scopeProtocol)
+        else
+            system @ [ scopeProtocol ]
+
+    let private ompPromptTimestamp (prompt: obj) : float option =
+        if not (isNull prompt?timestamp) && emitJsExpr prompt?timestamp "Number.isFinite($0)" then
+            Some(unbox<float> prompt?timestamp)
+        else
+            None
+
+    let private recordOmpPromptAt (sid: string) (filtered: obj array) (boundary: int) =
+        if boundary <> -1 then
+            let prompt = filtered.[boundary]
+            let key = Surface.promptKey prompt
+            let ts = ompPromptTimestamp prompt
+            let hasReset = Surface.hasResetSinceLastPrompt filtered
+            Surface.onNewPrompt sid key ts hasReset
+            if hasReset then Surface.markScopeInitialized sid true
+
+    let private recordOmpPrompt (sid: string) (filtered: obj array) =
+        recordOmpPromptAt sid filtered (Surface.lastPromptIndex filtered)
+
+    let private contextMessagesReply (rawList: obj) (withSteer: obj array) : obj =
+        if Surface.isUnchanged withSteer (Surface.toObjArray rawList) then
+            jsUndefined
+        else
+            createObj [ "messages", box withSteer ]
+
+    let private applyContextReplacements (rawList: obj) (withSteer: obj array) (replacements: ContextMessage list) : obj =
+        match mergeContextReplacements withSteer replacements with
+        | Some merged -> createObj [ "messages", box merged ]
+        | None -> contextMessagesReply rawList withSteer
+
+    let private applyContextEdit (rawList: obj) (withSteer: obj array) (edit: ContextEdit) : obj =
+        match edit with
+        | ContextEdit.Keep -> contextMessagesReply rawList withSteer
+        | ContextEdit.Replace replacements -> applyContextReplacements rawList withSteer replacements
+
+    let private suffixOmpToolContent (sid: string) (toolName: string) (content: obj) : obj =
+        if not (Surface.isScopeInitialized sid) && toolName <> "resetScope" then
+            Surface.appendUserReminder content
+        else
+            Surface.appendBudgetReminder content (Surface.turnBudget sid)
+
+    let private toolContentReply (content: obj) (newContent: obj) : obj =
+        if not (obj.ReferenceEquals(content, newContent)) then
+            createObj [ "content", newContent ]
+        else
+            jsUndefined
+
+    let private applyToolResultEdit (sid: string) (toolName: string) (content: obj) (newContent: obj) (edit: ToolResultEdit) : obj =
+        match edit with
+        | ToolResultEdit.Keep -> toolContentReply content newContent
+        | ToolResultEdit.Replace result ->
+            let suffixed = suffixOmpToolContent sid toolName (box result.Text)
+            createObj
+                [ "content", box [| createObj [ "type", box "text"; "text", suffixed ] |]
+                  "isError", box result.IsError ]
+
     /// Register the product hooks on the omp event bus and return the
     /// combined signal emitter: every signal reaches the host subscribers
     /// and the product at the same time.
@@ -1367,7 +1669,20 @@ module Adapter =
         (pi: obj)
         (hooks: ProductHooks)
         (emit: HostSignal -> Task<unit>)
+        (journalOpt: AgentJournal option)
         : (HostSignal -> Task<unit>) =
+
+        registerResetScopeTool pi journalOpt
+
+        registerEvent pi "session_start" (fun (_event: obj) (ctx: obj) ->
+            Surface.clearSessionState (ctxSessionId ctx)
+            Task.FromResult(jsUndefined) |> unbox<obj>)
+        registerEvent pi "session_switch" (fun (_event: obj) (ctx: obj) ->
+            Surface.clearSessionState (ctxSessionId ctx)
+            Task.FromResult(jsUndefined) |> unbox<obj>)
+        registerEvent pi "session_branch" (fun (_event: obj) (ctx: obj) ->
+            Surface.clearSessionState (ctxSessionId ctx)
+            Task.FromResult(jsUndefined) |> unbox<obj>)
 
         let signal (value: HostSignal) : Task<unit> =
             task {
@@ -1400,11 +1715,16 @@ module Adapter =
         // -- system prompt ----------------------------------------------------------------
         registerEvent pi "before_agent_start" (fun (event: obj) (ctx: obj) ->
             task {
+                let sid = ctxSessionId ctx
+                let lang = ProviderLanguageBinding.forSessionText sid
+                let scopeProtocol = ProviderProse.render lang "host/scope-protocol" Map.empty
+                let system = stringList (fieldValue event "systemPrompt")
+                let updated = updateSystemPromptScope system scopeProtocol
                 match hooks.Turn with
-                | None -> return jsUndefined
+                | None ->
+                    return createObj [ "systemPrompt", box (List.toArray updated) ]
                 | Some turn ->
-                    let system = stringList (fieldValue event "systemPrompt")
-                    let! prompt = turn.SystemPrompt(turnContext ctx, system)
+                    let! prompt = turn.SystemPrompt(turnContext ctx, updated)
                     return createObj [ "systemPrompt", box (List.toArray prompt) ]
             }
             |> unbox<obj>)
@@ -1412,17 +1732,27 @@ module Adapter =
         // -- context messages -------------------------------------------------------------
         registerEvent pi "context" (fun (event: obj) (ctx: obj) ->
             task {
+                let sid = ctxSessionId ctx
+                let rawList = fieldValue event "messages"
+                let isSideRequest = Surface.endsWithSideRequest rawList
+
+                let filtered = Surface.stripContradictoryBudgetSuffixes (Surface.filterScopeMessages rawList)
+                if not isSideRequest then
+                    recordOmpPrompt sid filtered
+
+                let withReminders = Surface.addUserReminders filtered
+                let withSteer =
+                    if not isSideRequest && Surface.isScopeInitialized sid && Surface.turnBudget sid = 0 then
+                        Surface.addBudgetExhaustedSteer withReminders
+                    else
+                        withReminders
+
                 match hooks.Turn with
-                | None -> return jsUndefined
+                | None -> return contextMessagesReply rawList withSteer
                 | Some turn ->
-                    let messages =
-                        tryArray (fieldValue event "messages")
-                        |> Array.choose contextMessageView
-                        |> Array.toList
-
+                    let messages = withSteer |> Array.choose contextMessageView |> Array.toList
                     let! edit = turn.ContextMessages(turnContext ctx, messages)
-
-                    return editReply edit
+                    return applyContextEdit rawList withSteer edit
             }
             |> unbox<obj>)
 
@@ -1447,27 +1777,28 @@ module Adapter =
 
         registerEvent pi "tool_result" (fun (event: obj) (ctx: obj) ->
             task {
+                let sid = ctxSessionId ctx
+                let toolName = if isNull (fieldValue event "toolName") then "" else stringOf (fieldValue event "toolName")
+                let content = fieldValue event "content"
+                let newContent = suffixOmpToolContent sid toolName content
+
                 match hooks.ToolGate with
-                | None -> return jsUndefined
+                | None -> return toolContentReply content newContent
                 | Some gate ->
                     let text = resultText event
-
                     let isError = isTrue (fieldValue event "isError")
-
+                    let callView =
+                        toolCallView
+                            ctx
+                            (fieldValue event "toolCallId")
+                            (fieldValue event "toolName")
+                            (fieldValue event "input")
                     let! edit =
                         gate.AfterTool(
-                            toolCallView
-                                ctx
-                                (fieldValue event "toolCallId")
-                                (fieldValue event "toolName")
-                                (fieldValue event "input"),
-                            { Text = text
-                              Truncated = false
-                              IsError = isError
-                              Details = None }
+                            callView,
+                            { Text = text; Truncated = false; IsError = isError; Details = None }
                         )
-
-                    return resultReply edit
+                    return applyToolResultEdit sid toolName content newContent edit
             }
             |> unbox<obj>)
 
@@ -1507,6 +1838,8 @@ module Adapter =
         // -- host facts ---------------------------------------------------------------------
         registerEvent pi "turn_start" (fun (_event: obj) (ctx: obj) ->
             task {
+                let sid = ctxSessionId ctx
+                Surface.onTurnStart sid
                 do!
                     signal (
                         HostSignal.AttemptStarted
@@ -1612,9 +1945,10 @@ module Adapter =
     /// snapshots the listener list when it starts emitting `session_start`, so
     /// a listener registered during that emission is never called for this
     /// session.
-    let private mountHooks (pi: obj) (emit: HostSignal -> Task<unit>) (hooks: ProductHooks) (ctx: obj) : Task<unit> =
+    let private mountHooks (pi: obj) (emit: HostSignal -> Task<unit>) (hooks: ProductHooks) (ctx: obj) (stateRoot: string) : Task<unit> =
         task {
-            let signal = registerProductHooks pi hooks emit
+            let! journalOpt = acquireOmpJournal stateRoot
+            let signal = registerProductHooks pi hooks emit journalOpt
 
             do!
                 signal (
@@ -1658,7 +1992,7 @@ module Adapter =
 
                     do!
                         runActivationStep pi "wanxiangshu hook registration failed" (fun () ->
-                            mountHooks pi emit hooks ctx :> Task)
+                            mountHooks pi emit hooks ctx stateRoot :> Task)
 
                     return ()
             }

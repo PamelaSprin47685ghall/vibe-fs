@@ -98,6 +98,7 @@ module HostForkRunLifecycle =
         childId: SessionId ->
         role: Role ->
         authorityRoot: AuthorityRootUserMessageId ->
+        snapshot: ISessionSnapshotPort option ->
             PendingHostRun
 
     val settleParentCancelled:

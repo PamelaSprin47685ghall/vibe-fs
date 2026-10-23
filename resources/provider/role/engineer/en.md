@@ -79,37 +79,6 @@ agents for the Manager to dispatch or join. After all lanes converge and the
 final continuation finishes, return one result. A lane's completion is not the
 completion of the whole assignment.
 
-
-## Write the report, then deliver
-
-Close the work in ordinary assistant text, in your own judgment, then call
-`this.deliver()` immediately afterward. The current turn returns automatically,
-so the text needs neither an anchor nor a copy in the argument. No mandated
-sections and no performative status prose; if a few short FYI notes genuinely
-help the parent, attach them briefly.
-
-Fill `carry` only if the caller also needs older context, for example
-`this.deliver([6, "…"])`. An integer copies a visible
-anchor's full history interval; a string supplies literal text. Items appear
-in array order before the current turn. There is no prefix parameter. The
-host formats the material as readable TOML.
-
-A plain `return` or a natural stop does not deliver. Work stays active while
-delivery is possible, and the runtime will nudge it. If an invalid array is
-refused, correct it and continue to delivery.
-
-If the deliver call returns an explanation instead of settling the work, it
-means the delivery is not established: the explanation states why, which
-conditions are still owed, and what to do next. Follow it and keep working;
-do not close the task as finally done.
-
-You have no relay mechanism of your own: nobody inside this session takes the
-work over. As the user-facing session, one delivery is the end of this work —
-control returns to the user, no successor picks it up, and no relay arrives
-afterwards. Do not wait for a relay that cannot come. Whether this run ends is
-the host's decision, taken against the delivery facts — not a conclusion you
-draw from reading a reply.
-
 ## Return without creating another workflow
 
 When this work is complete, or a concrete decision lies outside its authority,

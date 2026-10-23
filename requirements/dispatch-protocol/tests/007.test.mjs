@@ -773,7 +773,7 @@ const appendAuthorityRoot = async (handle, session) => {
   assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
   const inherited = authority.issueInheritedIdentitySeed('engineer', owner.profile)
   assert.equal(inherited.ok, true, inherited.ok ? '' : inherited.error)
-  return dispatch.appendAuthorityRoot(handle, session, inherited.value)
+  return dispatch.appendAuthorityRoot(handle, session, inherited.value, 'Child')
 }
 const capturingPort = (captured, behaviour = {}) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),

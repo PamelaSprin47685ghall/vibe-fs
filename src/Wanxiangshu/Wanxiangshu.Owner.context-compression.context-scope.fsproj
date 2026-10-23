@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>context</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>context-scope</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>context-compression</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>context-scope</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>model</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-wire.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-snapshot-contract.fsproj"/>
+    <Compile Include="Context/Scope/Model.fsi"/>
+    <Compile Include="Context/Scope/Model.fs"/>
+    <Compile Include="Context/Scope/Protocol.fsi"/>
+    <Compile Include="Context/Scope/Protocol.fs"/>
+    <Compile Include="Context/Scope/SessionView.fsi"/>
+    <Compile Include="Context/Scope/SessionView.fs"/>
+    <Compile Include="Context/Scope/Surface.fsi"/>
+    <Compile Include="Context/Scope/Surface.fs"/>
+  </ItemGroup>
+</Project>

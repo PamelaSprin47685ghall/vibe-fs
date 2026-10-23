@@ -129,11 +129,13 @@ module ContextFoldSurface =
                        WorkId = text (payload?WorkId)
                        IncumbencyId = text (payload?IncumbencyId) |}
             )
-        | "ViewCheckpointCommitted" ->
+        | "ScopeReanchored" ->
             AgentFact.Context(
-                ContextFactCases.ViewCheckpointCommitted
+                ContextFactCases.ScopeReanchored
                     {| SessionId = sessionId (payload?SessionId)
-                       ToolCallId = ToolCallId.create (text (payload?ToolCallId)) |}
+                       PreviousEpochId = prefixEpoch (payload?PreviousEpochId)
+                       NextEpochId = prefixEpoch (payload?NextEpochId)
+                       CallId = ToolCallId.create (text (payload?CallId)) |}
             )
         | other -> failwith $"ContextFoldSurface: unknown context fact '{other}'"
 
@@ -312,25 +314,8 @@ module ContextFoldSurface =
         |> List.map (fun (sessionId, session) -> SessionId.value sessionId, sessionToJs session)
         |> createObj
 
-    /// obligation-ledger-004: the compression checkpoint windows as plain JS,
-    /// so a test can observe what the checkpoint facts actually wrote without
-    /// reading the durable projection's internal representation.
-    let private viewCheckpointsToJs (projection: ProjectionSet) : obj =
-        projection.AgentProjections.ViewCheckpoints
-        |> Map.toList
-        |> List.map (fun (sessionId, window) ->
-            SessionId.value sessionId,
-            box
-                {| checkpoints =
-                    window.Checkpoints
-                    |> List.map (fun checkpoint -> box {| callId = ToolCallId.value checkpoint.ToolCallId |})
-                    |> Array.ofList |})
-        |> createObj
-
     let private okState projection =
-        box
-            {| sessions = projectionToJs projection
-               viewCheckpoints = viewCheckpointsToJs projection |}
+        box {| sessions = projectionToJs projection |}
 
     let private rejectionToJs (rejection: FoldRejection) : obj =
         box

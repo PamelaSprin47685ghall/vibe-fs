@@ -75,7 +75,8 @@ module StaticTools =
           "todowrite-for-orchestrator"
           "todowrite-for-devops"
           "todowrite-for-bookkeeper"
-          "todowrite-for-plan" ]
+          "todowrite-for-plan"
+          "resetScope" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     /// The office half comes from the one reverse lookup; utility tools read the

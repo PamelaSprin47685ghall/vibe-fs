@@ -41,6 +41,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.repository-investigation-semble-mcp.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-scope.fsproj"/>
     <Compile Include="Execution/Delegation/Join.fsi"/>
     <Compile Include="Execution/Delegation/Join.fs"/>
     <Compile Include="Execution/Delegation/Fork/JoinGuard.fsi"/>

@@ -28,30 +28,6 @@ module JsToolPolicy =
     /// The localized prose of the refusal of a call that carries no state.
     val missingProgramProse: unit -> string
 
-    /// The localized prose of the flat view declaration's extra field.
-    val viewDeclarationExtraProse: unit -> string
-
-    /// The flat view declaration of a call: required prefixUntil cutoff and
-    /// carry array. Omitting either field is refused.
-    val viewDeclarationOf: raw: obj -> obj
-
-    /// Why the declaration is not a valid view declaration, if it is not.
-    val parsedDeclarationFailure: declaration: obj -> JsFailure option
-
-    /// Why this call's view declaration is refused, if it is refused.
-    val viewFailureOf: raw: obj -> declaration: obj -> JsFailure option
-
-    /// Commit the declaration and its owning (message ID, tool call ID) pair.
-    val commitView: sessionId: string -> callIdentity: (string * string) option -> declaration: obj -> JsFailure option
-
-    /// Commit the declaration only after the program settled.
-    val viewCommitFailure:
-        sessionId: string ->
-        callIdentity: (string * string) option ->
-        declaration: obj ->
-        outcome: JsToolWorkflow.JsToolOutcome ->
-            JsFailure option
-
     /// The rendered result of a settled call, with the view declaration
     /// committed when the program settled.
     val renderCommitted:

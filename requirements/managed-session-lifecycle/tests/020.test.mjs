@@ -1,5 +1,7 @@
 import test from 'node:test'
 
+process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { spawnSync } = await import("node:child_process");

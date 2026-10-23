@@ -419,7 +419,7 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
 
     const layers = layersOf(result)
     assert.equal(layers.advisor.binding, 'advisor', `${role}: advisor binding key`)
-    assert.match(result.description, /async advisor\(intent, carry/, `${role}: advisor pseudocode signature`)
+    assert.match(result.description, /advisor\(intent/, `${role}: advisor pseudocode signature`)
     for (const [member, layer] of Object.entries(layers)) {
       const baseClassMarker = SUGAR_MEMBERS.includes(member)
         ? `async ${member}(`
@@ -455,22 +455,18 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
   }
 })
 
-test('WHAT[repository-programming-002] dispatch members accept carry; pull members take no selection', () => {
+test('WHAT[repository-programming-002] dispatch members accept no carry parameter; pull members take no selection', () => {
   const manager = surface('Manager', rolePermissions('manager'))
   assert.equal(isSome(manager), true)
 
-  // Dispatch members: the report material travels with the call.
+  // Dispatch members: context travels via full post-scope view, not carry.
   for (const member of ['fork', 'resume', 'dag', 'advisor']) {
     assert.match(
       manager.baseClassSource,
-      new RegExp(`async ${member}\\([^)]*carry`),
-      `${member} takes carry`,
+      new RegExp(`async ${member}\\(`),
+      `${member} is in base class`,
     )
-    const prose = memberProse(manager.description, member)
-    assert.ok(prose, `${member} is documented in the description`)
-    assert.match(prose, /carry/, `${member} documents carry`)
   }
-
   // Pull members collect completed work without a history selection.
   for (const member of ['join', 'horizon']) {
     assert.match(
@@ -549,8 +545,8 @@ test('WHAT[repository-programming-002] resume does not derive the name from a si
       dir,
       'Manager',
       sessionId,
-      `    const derived = await this.resume("resume the audit", [1]);
-    const explicit = await this.resume({ charge: "resume the audit", name: "audit-road" }, [1]);
+      `    const derived = await this.resume("resume the audit");
+    const explicit = await this.resume({ charge: "resume the audit", name: "audit-road" });
     return { derived, explicit };`,
     )
     assert.equal(caseName(resumed), 'Succeeded')
@@ -568,46 +564,19 @@ test('WHAT[repository-programming-002] resume does not derive the name from a si
     )
     assert.equal(resumeCalls[0].payload.name, undefined, 'the nameless resume carries no name value')
     assert.equal(resumeCalls[1].payload.name, 'audit-road', 'an explicit name is kept')
-    assert.deepEqual(resumeCalls[0].carry, [1], 'carry travels unchanged')
-    assert.deepEqual(resumeCalls[1].carry, [1], 'carry travels unchanged')
   } finally {
     clearDelegationHost(sessionId)
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-002] deliver refuses a second argument and never hands over', async () => {
-  const { dir, cleanup } = sandbox()
-  const sessionId = `sess-deliver-2nd-${Math.random().toString(36).slice(2, 8)}`
-  const acceptedSessionId = `${sessionId}-accepted`
-  try {
-    clearDeliveredValue(sessionId)
-    clearDeliveredValue(acceptedSessionId)
-
-    const refused = await runProgram(
-      dir,
-      'Engineer',
-      sessionId,
-      `    const refusal = await this.deliver(["final report"], "second argument");
-    return { refusal };`,
-    )
-    assert.match(render(refused), /VIEW_DECLARATION_INVALID/, 'the second argument is refused')
-    assert.equal(deliveredValue(sessionId), null, 'a refused delivery never populates the delivery cell')
-
-    // The single-argument form still hands over: the refusal is about the
-    // second argument, not about delivery itself.
-    const accepted = await runProgram(
-      dir,
-      'Engineer',
-      acceptedSessionId,
-      `    await this.deliver(["final report"]);`,
-    )
-    assert.equal(caseName(accepted), 'Succeeded')
-    assert.deepEqual(deliveredViewOf(acceptedSessionId), ['final report'])
-  } finally {
-    clearDeliveredValue(sessionId)
-    clearDeliveredValue(acceptedSessionId)
-    cleanup()
+test('WHAT[repository-programming-002] deliver is not a programming surface member for sub-agents', () => {
+  for (const role of ['Engineer', 'DevOps', 'Manager', 'Orchestrator', 'Plan']) {
+    const s = surface(role, rolePermissions(role.toLowerCase()))
+    if (isSome(s)) {
+      assert.equal(memberNames(s).includes('deliver'), false, `${role} surface must not have deliver member`)
+      assert.doesNotMatch(s.baseClassSource, /async deliver\(/, `${role} base class has no deliver method`)
+    }
   }
 })
 
@@ -623,6 +592,6 @@ test('WHAT[repository-programming-002] the devops member documents the { ok, kin
     /\bok\b[\s\S]{0,40}?kind\b[\s\S]{0,40}?status\b[\s\S]{0,40}?returned\b/,
     'the documented devops result names ok, kind, status and returned',
   )
-  assert.match(plan.baseClassSource, /async devops\(intent, carry = \[\]\)/, 'devops takes an intent and required carry')
+  assert.match(plan.baseClassSource, /async devops\(intent\)/, 'devops takes an intent')
 })
 

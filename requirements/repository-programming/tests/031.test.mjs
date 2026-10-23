@@ -129,7 +129,7 @@ test('WHAT[repository-programming-031] a real parked handle blocks deliver and t
   // 才谈得上被触达。断言据此区分"parked 拒绝"（具体 code + 真 handle）与
   // "权威缺失"的统一拒绝文案。
   await withReview(async ({ execute, hooks, runtime, session }) => {
-    assert.match(await execute(scores('PERFECT')), /recorded = true/, 'the reviewed tenure establishes the deliver authority')
+    assert.match(await execute(scores('PERFECT')), /outcome = "Promoted"|recorded = true/, 'the reviewed tenure establishes the deliver authority')
     runtime.pushHostMessage(session, {
       info: { id: 'parked-gate-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: { created: 9 } },
       parts: [{ type: 'tool', tool: 'deliver', callID: 'deliver-parked', state: { status: 'pending', input: {} } }],

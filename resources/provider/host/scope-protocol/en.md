@@ -1,0 +1,9 @@
+## Scope & Context Management (`resetScope`)
+
+- **Turn & Budget**: 1 LLM request = 1 turn. Tool results end with the remaining `turnBudget`; before the latest user message has a `resetScope`, they end with the initialization reminder instead. Call `resetScope` before `turnBudget` reaches 0.
+- **Exhausted Budget**: At 0 remaining, a weak steer may suggest `resetScope` if you are idle. It is optional — never interrupt or abandon in-flight work for it; reset when convenient.
+- **Context Deletion**: Calling `resetScope` deletes everything between the previous `resetScope` call (or the start of the session) and this call. Only user messages and prior `resetScope` call/result pairs survive that window; everything after this call is the new scope.
+- **User Messages Are Not Barriers**: User prompts and mid-run steers are never deleted. Every new user message invalidates `turnBudget` and requires an immediate `resetScope` that archives the scope between the previous `resetScope` and this one; afterwards only that user message sits between the two `resetScope` calls.
+- **Concurrency Barrier**: `resetScope` acts as an execution Barrier. In concurrent tool calls within a single turn, tools before `resetScope` execute first and their context is wiped by `resetScope`; tools after `resetScope` execute after the barrier and remain in the new scope's context.
+- **State Closed-Loop (状态闭环)**: Each Scope must be a self-contained state closed-loop (e.g., "pure exploration to locate files and understand their logic" is one closed-loop; "reading and modifying files" is another).
+- **Verbatim Retention**: Because raw context from the old scope will be deleted, if any critical exact text (such as function signatures, error stack traces, error line numbers, or exact line numbers) is needed in the next scope, you MUST copy it verbatim into `oldScopeVerboseVerbatimExperience`.

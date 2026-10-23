@@ -4,17 +4,17 @@
 
 严禁从自身观察推导、估算或缓存任何模型上下文窗口大小；禁止上下文余量、模型容量表，或把字节/token 换算成窗口比例的逻辑。唯一允许的字节计量为合法的文件与进程计量。
 
-可以披露的只有两类事实：已经发生的计量，与 provider 自己声明的常量。宿主向模型披露本次请求的计量数字（`total / used / cached`，见 [031]），以及在 chat.params 屏障处读到的 provider 对当前模型声明的 context limit（opencode 模型配置里的值，宿主只读不推）。二者都只是模型判断自身状态的 datum——模型是唯一知道哪些上下文对任务重要的主体，披露把选择权交给它。宿主不得由这些数字推导窗口大小、剩余预算，也不得替模型做出压缩决定。
+可以披露的只有两类事实：已经发生的计量，与 provider 自己声明的常量。宿主向模型披露本次工具结果的 `turnBudget` 倒计时后缀（见 [034]），并在 chat.params 屏障处读取并由 Pair Hint 披露 provider 对当前模型声明的 context limit（opencode 模型配置里的值，宿主只读不推）以及 provider 实际计费的缓存命中与未命中。二者都只是模型判断自身状态的 datum——模型是唯一知道哪些上下文对任务重要的主体，披露把选择权交给它。宿主不得由这些数字推导窗口大小、剩余预算，也不得替模型做出压缩决定。
 
 ## [002] 不主动预测溢出
 
-在请求发送前，宿主严禁判断是否接近容量上限，禁止根据投影长度比例、剩余预算或累计 Token 主动选择压缩点。真实的 provider attempt 失败是唯一的恢复触发信号。
+在请求发送前，宿主严禁判断是否接近容量上限，禁止根据投影长度比例、剩余预算或累计 Token 主动选择压缩点或触发自动裁剪。真实的 provider attempt 失败是唯一的恢复触发信号。
 
-向模型披露计量（[001]）不构成溢出预测：披露不改变起点，不产生任何自动压缩动作；模型在视图声明中的选择是显式请求，不是宿主预测。
+向模型披露计量（[001]）与工具结果携带的 `turnBudget` 后缀（[034]）不构成溢出预测：披露不改变起点，不产生任何自动压缩动作；上下文重置仅由模型在显式调用 `resetScope` 宿主工具（见 [033]）时触发，不是宿主预测。
 
 ## [003] 取消独立 Y 轴与 200 KiB Blogger delta 合同
 
-系统不再设独立的 Y 轴、Blogger、Chronicle、200 KiB delta 切块或 `MemoryPreamble` / `FrozenRecordPrefix` 物化管线。历史截断与保留完全由模型在编程面显式提交的 `prefixUntil` 与 `carry` 声明（见 [031]）决定；当前回合按请求快照划界并自动保留，不另设独立的 Y 物化覆盖证明。
+系统不再设独立的 Y 轴、Blogger、Chronicle、200 KiB delta 切块或 `MemoryPreamble` / `FrozenRecordPrefix` 物化管线。上下文的清理边界完全由模型显式调用 `resetScope` 宿主工具作为唯一执行屏障（见 [033]）决定；最新一次 reset 之后的活跃 scope 原样保留，不另设独立的 Y 物化覆盖证明。
 
 ## [004] 输出预算属 provider
 
@@ -34,59 +34,85 @@
 
 ## [008] 主工作会话不发压缩请求
 
-主工作会话（Work Session）严禁向主模型发送请求压缩历史的指令。上下文裁剪与保留完全由模型在 [031] 的压缩声明中自主选择。
+主工作会话（Work Session）严禁向主模型发送请求压缩历史的指令，宿主绝不在后台自行发起上下文裁剪。上下文重置完全由模型在细粒度任务块（状态闭环）的自然边界显式调用 `resetScope` 工具（见 [033]）自主决定。
 
 ## [013] 诊断不是控制输入
 
 可观测诊断日志严禁作为控制流输入，不得使用任何诊断字段驱动 retry 的分支决策。
 
-## [017] 真实用户消息与压缩声明
+## [017] 真实用户消息与 scope 清理
 
-没有显式压缩声明时，真实 Host 内容保持现有可见状态；有声明时按 [031] 组合原样前缀、`carry` 材料与当前回合。历史中无独立编号的内容归所属区间，不得借缺少编号在区间选择之外另行删除。
+用户消息不是上下文清理的边界，且永不删除。在执行 `resetScope` 清理时，所有 operator 用户消息（包括干净 prompt 与 steer）必须全部按原序保留在两个 `resetScope` 调用之间；活跃 scope 内最新一次 `resetScope` 之后的全部消息原样保留。
+
+最新一次 `resetScope` 之前，除所有保留的用户消息与历次成对保留的 `resetScope` 调用及其结果之外，全部 assistant 文本、thinking、非 `resetScope` 工具调用及结果均被彻底清除。系统不得借缺少编号在保留规则之外另行删除用户消息。
 
 ## [019] 重锚边界与辅助注入可见性
 
-任何代表上下文重锚的操作（如 `ContextReanchored` 或 `TenureReanchored`），必须将旧 provider horizon 中的辅助注入可见性归零。持久化事件保留作为审计事实，但新 horizon 的初始消息不再回放旧辅助材料，仅在后续各自正常触发时逐步重新生成。
-
+任何代表上下文重锚的操作（如 `ScopeReanchored`、`ContextReanchored` 或 `TenureReanchored`），必须将旧 provider horizon 中的辅助注入可见性归零。持久化事件保留作为审计事实，但新 horizon 的初始消息不再回放旧辅助材料，仅在后续各自正常触发时逐步重新生成。
 ## [023] retry 全事件驱动且时间无关
 
 Provider retry 的 correctness path 严禁读取 wall clock、构造 `TimeSpan`、调用 timer/deadline/Delay 或以超时作为状态转换。已废除等待 Blogger open producer 的阻塞逻辑，确认失败且宿主停止重试后即按有界预算推进原样重试或拉黑 Provider 后重试。
 
 ## [030] assume 调用原样保留
 
-`assume` 是短小但高价值的判断承诺点。在未被模型显式压缩之前，承载 `assume` 调用的原始 Host 消息与对应 result 消息原封不动保留；不得把 assumption 文本抽出来重写、不得重新渲染参数。
+`assume` 是短小但高价值的判断承诺点。在活跃 scope 内，承载 `assume` 调用的原始 Host 消息与对应 result 消息原封不动保留；不得把 assumption 文本抽出来重写、不得重新渲染参数。
 
-## [031] ANCHOR 编址、压缩声明与 token 经济
+当调用 `resetScope` 进行上下文重置时，旧 scope 内的 `assume` 调用与其他非 resetScope 工具调用一并被清理；若模型在下一个 scope 仍需沿用关键假设或确切判断，必须由模型将其作为经验发现逐字原样抄写进 `oldScopeVerboseVerbatimExperience`。
 
-带稳定 Host 消息 id 的 user 消息及带终态 tool result 的消息获得锚点编号，从 1 开始，按首次观察顺序递增；同一 session 的同一消息 id 复用编号。tool call、assistant thinking 与 prose 不获得独立锚点，其内容归所属历史区间。开头的未编号内容由隐含锚点 0 表示。进程重启重置编号与进程内压缩状态。
+## [033] resetScope 屏障与原文逐字保留
 
-请求快照划定历史与当前回合的边界。历史区间从锚点位置到下一个可见锚点之前，末段止于该快照边界；本次请求之后产生的当前回合不归入任何可选历史区间。模型无法用锚点选择当前回合的去留。
+`resetScope` 是系统核心宿主工具（loadMode: "essential", concurrency: "exclusive", approval: "read"），其签名如下：
 
-生成工具的顶层参数 `prefixUntil` 与 `carry` 在每次调用上均为必填。省略任一字段以 `VIEW_DECLARATION_INVALID` 拒绝，不存在“不压缩”的默认。`prefixUntil` 是非负整数锚点截止值：保留所有锚点编号严格小于它的可见历史区间（恰好不包含截止锚点本身）。`carry` 是数组：非负整数引用对应锚点的完整可见历史区间，字符串表示字面文本，空串与空白也按字面保留。没有对象映射、包装对象或兼容别名。
+```ts
+resetScope(
+  oldScopeVerboseVerbatimExperience?: string | null,
+  newScopeObjective: string,
+  newScopeTurnBudget: number
+)
+```
 
-压缩结果严格按以下顺序组成：锚点编号 `< prefixUntil` 的历史区间按原可见顺序原样保留，然后按 `carry` 的数组顺序展开引用与字面文本，最后追加当前回合；重复引用与重排原样生效。既不在前缀也不在 `carry` 中的历史内容不进入下一请求。字符串不绑定输入锚点，不是对某个区间的替换指令；新形成的字面区间得到新编号。所引用的内容来自本次请求已经可见的历史；不可见的旧原文不能借引用复活。
+最新一次 `resetScope` 调用是**唯一**的上下文边界。在发往 provider 的每次请求副本中，清理上一次 `resetScope`（或 session 起点）到本次调用之间的全部上下文，但**必须且仅**保留：
+1. 所有 operator 编写的 `role: "user"` 消息（干净 prompt、steer，以及具有 user 归属的消息），按原始顺序夹在历次 `resetScope` 调用之间；
+2. 历次 `resetScope` 调用及其成对的工具结果（按 `tool_call_id` 成对保留，清除旧调用上的 thinking 块）。
 
-同一 Host 消息地址可因重复引用、与保留前缀重叠或同消息续写而出现多次；辅助提示重放不得因此终止会话，也不得去重、改名或丢弃正文副本。按地址定位的 Before gap 取首个副本，After gap 取最后副本；Pair Hint 的 cursor 后缀只落到该地址最后一个可承载提示的副本（user text 或终态 tool result），不在每份副本重复注入。缺失地址仍是非法输入。
+并发屏障规则：包含最新 `resetScope` 的同批工具调用中，`resetScope` 作为执行 Barrier。排在它之前的工具调用先执行并随旧 scope 一并被清理，排在它之后的工具调用在其返回后执行并保留在新 scope 中。最新一次 `resetScope` 之后产生的活跃 scope 消息原样保留。
 
-当前回合自动保留。模型可以先用普通文本写下新的结论，再提交压缩声明；若这些文本已经表达所需信息，`carry` 无需重复加入表达相同信息的旧证据。呈现保留的当前回合时，移除压缩工具调用的顶层 `carry` 参数，避免字面文本同时出现在新上下文和调用记录中；其余文本与调用语义保留，原始 Host 记录不改写。
+关键原文逐字保留义务：由于旧 scope 的原始工具输出与过程文本在清理后被彻底删除，如果函数签名、报错堆栈、精确行号或关键事实在下一个 scope 仍须逐字使用，模型必须将其原样抄写进 `oldScopeVerboseVerbatimExperience`。
 
-声明在执行程序前完成形状与引用校验，非法或缺失声明以 `VIEW_DECLARATION_INVALID` 拒绝，不执行程序、不留下部分效果。声明只在调用成功结算后提交；失败的调用既不提交声明，也不覆盖此前已提交的声明。声明只供下一请求消费一次；压缩后的可见状态继续保留，不自行恢复已经移除的历史。后来的消息不受旧声明追溯选择。
+工具执行成功后返回 `Scope reset. Objective: <newScopeObjective>`，且工具结果在返回时即拼接新预算的倒计时后缀（见 [034]）。
 
-应用回执披露保留、字面内容与移除内容的计数，以及 token 经济 `total / used / cached`。`used` 是本次实际内容的 token 数，`cached` 是原样保留前缀的 token 数，`total` 是投影前消息的 token 数；计量用 gpt-tokenizer o200k_base。这些计量不承诺 provider 实际缓存命中。
+## [034] turnBudget 递减、后缀与提醒
 
-锚点以 `[ANCHOR: N]` 后紧接实际 NUL（U+0000）和 BOM（U+FEFF）的格式呈现在所属 user 消息及 tool result 内容的开头，不在尾部另列消息 ID 映射。N 是同一进程内稳定的引用编号。开头的非空 0 区间显示 `[ANCHOR: 0]`，为空则不显示。标记只属于请求投影，不写回原始 Host 消息。提示词教模型把锚点编号 N 填入 `prefixUntil` 以截到该锚点之前，并利用当前回合自动保留；不要求模型计算隐藏区间或了解存储内部实现。
+1 次 LLM 请求计为 1 turn。会话状态机在 `turn_start` 时将当前活跃 `turnBudget` 减 1，下限为 0。
 
-Pair Hint 另披露 provider 实际计费的缓存命中、未命中 token 数及其声明的 context limit（[001]）。这些都是 datum，不授予宿主预测溢出或自动压缩的权力。
+1. **结果后缀**：每条非 `resetScope` 工具结果末尾均使用 `\0\uFEFF` 分隔拼接 `[Remaining turnBudget: N]`；已带预算后缀时不重复拼接。`resetScope` 工具结果自身返回时即携带新设置的预算后缀。
+2. **用户消息尾巴与预算作废**：当新的 operator 用户消息（干净 prompt 或 steer）到达时，旧预算立即作废（归零）。在发往模型的请求副本中，每条 operator 用户消息末尾均拼接提醒：
+   `[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop), and call resetScope immediately before doing anything else.]`
+   持久化存储中的原始用户消息不被改写。
+3. **未初始化提醒**：当最新 operator 用户消息之后尚未发生 `resetScope` 调用时，所有非 `resetScope` 工具结果末尾均重复上述初始化提醒，而不显示预算后缀，直到模型完成一次 `resetScope`。
+4. **零预算弱提示**：当 scope 已初始化且 `turnBudget` 降至 0 时，若当前请求不是 side-request 快照，宿主可在请求副本末尾追加一条弱提醒用户消息（`steering: true`，不持久化），建议模型在当前任务状态闭环的自然边界调用 `resetScope` 开启新闭环并换取新预算。该弱提醒绝对不得强行中断、暂停或阻断正在进行的工具工作。
 
-## [032] 上下文传递是只读材料选择
+## [035] ScopeReanchored 冷前缀边界
 
-父子传递与子父交付使用成员参数 `extra` 数组（可选，默认 `[]`），不接受前缀参数或包装对象。数组规则与顶层布局 `carry` 的元素形态相同：整数引用完整可见历史区间，字符串表示字面文本，按数组顺序展开。传递只读取本次请求快照中的可见历史，不消费待应用的压缩声明，也不改变发送方的压缩状态。相同快照上的相同数组得到相同材料。
+`resetScope` 调用的落地构成明确的冷前缀边界（Cold Prefix Boundary）。
 
-父子传递只包含数组指定的材料，不附加父方当前回合。子工作的任务由 `intent` 或相应委派参数表达一次；不把整个 fork 调用及其任务再作为上下文发送。向子方传递既不隐式继承全部历史，也不隐式继承当前回合。
+当执行并提交一次合法的 `resetScope` 时，系统向持久化日志追加一条不可逆的 `ScopeReanchored` 事实，记录前一 epoch、新 epoch 以及本次 `resetScope` 的精确调用身份（`toolCallId`）。`ActivePrefixEpoch` 恰好加一，且系统幂等清空已缓存的 provider wire 前缀快照。
 
-子父交付在数组材料之后自动附加子方当前回合的正文报告。惯用法是先用普通文本写最终报告，随即调用 `this.deliver()`；报告天然回传，无需复制到参数。仅在还需要附加旧上下文材料时填写非空 `extra`，例如 `this.deliver([6, "补充结论"])`。交付回执不重复回显调用参数。
+`prefix-stability` 将重锚后的下一次请求视为全新 epoch 的起点，重新建立精确字节前缀，不把旧 scope 清理造成的历史字节缺失判定为前缀漂移或违反同 epoch 前缀追加律（prefix-stability [001]）。同一 `toolCallId` 严禁重复产生重锚事实。
 
-材料保持结构化数据直到最终呈现，统一 pretty print 为合法 TOML；表名由接收方载荷决定，多行文本使用合法的多行表示。不得先把材料拼成一段 TOML，再塞入另一个字符串字段，形成带转义符的伪 TOML。字面文本始终作为内容保留，不把其中看似 TOML 的文字再次解析为指令或结构。
+## [036] 跨会话传递 full post-scope view 的 TOML 承载
 
-非法数组元素与无效锚点在传递前以 `VIEW_DECLARATION_INVALID` 拒绝，不产生部分委派或交付。空数组是合法的：父子传递不附加历史材料，子父交付仍附加当前回合。本条是材料选择与方向差异的唯一规则源；委派、advisor 与交付路径复用它，不再各自实现一套规则。
+所有跨会话上下文传递统一遵循 AXIOM 7（prose 属于指令与主报告，骑乘 `# ...` 注释头；材料属于结构化参考数据，骑乘 TOML 数据平面表格）：
+
+1. **父到子委派（`fork` / `resume` / `commission` / `devops` / `dag`）**：调用方传入的 charge / intent 散文按原样渲染为 `# ...` 注释头；调用方当前的完整 post-scope LLM 可见消息视图（经最新 `resetScope` 清理后的全部保留消息）作为只读背景材料渲染为合法的 Synthetic TOML（如 `[[context]]` 表）。子会话不隐式继承父会话的物理工具调用，也不接受局部材料过滤选择。
+2. **顾问咨询（`advisor`）**：与 fork 载荷形式一致，由单一请求文档承载：咨询意图作为 `# ...` 注释头，调用方当前的完整 post-scope 消息视图渲染为 TOML 数据平面（如 `[[context]]` 表）；顾问自然停机后捕获其完整 post-scope TOML 视图作为 `context` 返回。
+3. 传递的数据在最终边界统一 pretty print 为合法 TOML，禁止将拼好的 TOML 作为转义字符串嵌套在字段中。
+
+## [037] 子会话自然停机终态与 deliver 工具分立
+
+子代理会话与生命周期管理实行完成机制与工具分立：
+
+1. **子代理自然停机完成**：Engineer 与 DevOps 角色彻底移除子代理 `this.deliver` 成员与相关工具。子代理完成工作后自然停止输出（无未决工具调用的干净终态）；宿主在观察到子代理自然停机后，确定性捕获其当前完整的 post-scope LLM 可见消息视图并渲染为 TOML（如 `[[session]]`），作为完成材料交回给父会话的 `join`。
+2. **免除子代理催促**：Engineer 与 DevOps 免除任何完成催促（nudge），允许自然停机。仓内所有教导子代理如何调用 deliver 返回、如何撰写特定交付语法的提示词全部删除。
+3. **Manager 与 Plan 的生命周期 deliver 保持**：宿主保留供 Plan（S1–S3 晋级与接力）及 Manager（S4 交付执行）使用的宿主生命周期工具 `deliver`（见 `work` [025]–[026]）。该工具仅用于驱动任期接力与阶段推进事实，不挂接任何上下文或材料选择数组。
 

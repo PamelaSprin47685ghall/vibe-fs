@@ -647,14 +647,6 @@ Repository/Programming/Js/TransactionStore.fsi
 Repository/Programming/Js/TransactionStore.fs
 
 
-Repository/Programming/Js/Anchor/AnchorModel.fsi
-Repository/Programming/Js/Anchor/AnchorModel.fs
-Repository/Programming/Js/Anchor/AnchorLedger.fsi
-Repository/Programming/Js/Anchor/AnchorLedger.fs
-Repository/Programming/Js/Anchor/AnchorView.fsi
-Repository/Programming/Js/Anchor/AnchorView.fs
-Repository/Programming/Js/Anchor/AnchorSurface.fsi
-Repository/Programming/Js/Anchor/AnchorSurface.fs
 Repository/Programming/Js/DeliveredValues.fsi
 Repository/Programming/Js/DeliveredValues.fs
 Repository/Programming/Js/ParkedSites.fsi
@@ -825,6 +817,14 @@ Composition/Turn/Observation.fsi
 Composition/Turn/Observation.fs
 Foundation/HostSessionSnapshot.fsi
 Foundation/HostSessionSnapshot.fs
+Context/Scope/Model.fsi
+Context/Scope/Model.fs
+Context/Scope/Protocol.fsi
+Context/Scope/Protocol.fs
+Context/Scope/SessionView.fsi
+Context/Scope/SessionView.fs
+Context/Scope/Surface.fsi
+Context/Scope/Surface.fs
 OpenCode/Host/SessionSnapshotPort.fsi
 OpenCode/Host/SessionSnapshotPort.fs
 OpenCode/Host/TranscriptPort.fsi
@@ -945,12 +945,6 @@ Execution/Delegation/Handle/JoinDrain.fsi
 Execution/Delegation/Handle/JoinDrain.fs
 Execution/Delegation/ChildRecoveryWorkflow.fsi
 Execution/Delegation/ChildRecoveryWorkflow.fs
-Execution/Delegation/Advisor/Cursor.fsi
-Execution/Delegation/Advisor/Cursor.fs
-Execution/Delegation/Advisor/View.fsi
-Execution/Delegation/Advisor/View.fs
-Execution/Delegation/Advisor/Surface.fsi
-Execution/Delegation/Advisor/Surface.fs
 Execution/Delegation/Fork/Host/RunLifecycle.fsi
 Execution/Delegation/Fork/Host/RunLifecycle.fs
 Execution/Delegation/Fork/Host/ChildDispatch.fsi
@@ -1122,6 +1116,8 @@ OpenCode/Tools/BashHoneypotTool.fsi
 OpenCode/Tools/BashHoneypotTool.fs
 OpenCode/Tools/AssumeTool.fsi
 OpenCode/Tools/AssumeTool.fs
+OpenCode/Tools/ResetScopeTool.fsi
+OpenCode/Tools/ResetScopeTool.fs
 OpenCode/Tools/ToolSurface.fsi
 OpenCode/Tools/ToolSurface.fs
 Repository/Programming/Js/Utf8Fs.fsi

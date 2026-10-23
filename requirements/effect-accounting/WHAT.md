@@ -30,7 +30,7 @@
 
 ## [008] 效果家族
 
-工作区创建与分支发布分别使用 WorktreeCreateRequested/WorktreeCreated、PublishClaimed/Published 表达意图与确认。编程面调用（`todowrite-for-<role>`）的待办与视图写入由 Host executor 完成；插件不改写其原始 provider 参数，不在 before/after 产生 checkpoint。只有 Host 随后的 `message.part.updated` 明确给出该 exact call 的 `completed` ToolPart（且 `state.input` 携带有效顶层 `prefixUntil` 与 `carry` 声明），才追加 `ViewCheckpointCommitted`；`error` 只关闭候选而不推进压缩。呈现保留回合时剥离 `carry` 不改变原始调用证据。各领域负责具体证据。
+工作区创建与分支发布分别使用 WorktreeCreateRequested/WorktreeCreated、PublishClaimed/Published 表达意图与确认。编程面调用（`todowrite-for-<role>`）的待办写入由 Host executor 完成；插件不改写其原始 provider 参数，不在 before/after 产生 checkpoint。上下文边界由 `resetScope` 宿主工具唯一管理（见 context-compression [033]）。各领域负责具体证据。
 
 ## [010] 拒绝旧通用事实
 
@@ -42,5 +42,5 @@
 
 ## [013] 交付成功不是效果
 
-交付只表示工作已提交，本身不构成任何效果的确认；效果仍须按 [001] 另行分型记账，并另有确认证据。交付未成立不得留下成功效果，也不得以任何摘要把它记成已确认。提交、呈现与中断分开取证：「交付已提交而呈现或中断未确认」与「交付未成立」是两种不同结果，不得混成同一个终态。前者保留已提交事实，不因后续物理中断失败而被抹掉；后者是零交付，不得凭散文或 provider stop 补造完成。恢复只依据真实交付与接力事实判断。
+交付或子工作完成（Manager/Plan 的生命周期 `deliver` 或子代理自然停机）只表示工作已提交，本身不构成任何效果的确认；效果仍须按 [001] 另行分型记账，并另有确认证据。未成立的交付或未完成的工作不得留下成功效果，也不得以任何摘要把它记成已确认。提交、呈现与中断分开取证：「交付已提交而呈现或中断未确认」与「交付未成立」是两种不同结果，不得混成同一个终态。前者保留已提交事实，不因后续物理中断失败而被抹掉；后者是零交付，不得凭散文补造完成。恢复只依据真实交付、自然停机与接力事实判断。
 

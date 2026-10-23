@@ -103,34 +103,6 @@ module CompanionProjectionBridge =
 
 module ContextProjectionBridge =
 
-    let private checkpointWindowOf (projection: AgentProjectionSet) (sessionId: SessionId) =
-        projection.ViewCheckpoints
-        |> Map.tryFind sessionId
-        |> Option.defaultValue PhaseWindow.emptyWindow
-
-    let private setCheckpointWindow
-        (sessionId: SessionId)
-        (window: PhaseWindow.PhaseCommitWindow)
-        (projection: AgentProjectionSet)
-        =
-        let checkpoints =
-            if List.isEmpty window.Checkpoints then
-                Map.remove sessionId projection.ViewCheckpoints
-            else
-                Map.add sessionId window projection.ViewCheckpoints
-
-        { projection with
-            ViewCheckpoints = checkpoints }
-
-    let private appendCheckpoint projection sessionId callId =
-        checkpointWindowOf projection sessionId
-        |> PhaseWindow.appendCheckpoint callId
-        |> fun updated -> setCheckpointWindow sessionId updated projection
-
-    let private clearCheckpointGeneration projection sessionId =
-        { projection with
-            ViewCheckpoints = Map.remove sessionId projection.ViewCheckpoints }
-
     /// context-compression-019: a reanchor retires the auxiliary injection
     /// visibility of the old provider horizon. The durable facts stay as audit
     /// history; only the visible floor moves.
@@ -143,13 +115,11 @@ module ContextProjectionBridge =
     /// it can neither clear rebuilt checkpoints nor retire visibility a second time.
     let private reanchor factName projection sessionId apply =
         match ProjectionUpdate.tryUpdatePrefix sessionId apply projection with
-        | Ok advanced -> Ok(clearCheckpointGeneration (retireAuxiliaryVisibility advanced sessionId) sessionId)
+        | Ok advanced -> Ok(retireAuxiliaryVisibility advanced sessionId)
         | Error rejection -> ProjectionUpdate.prefixOutcome factName projection (Error rejection)
 
     let fold (projection: AgentProjectionSet) (fact: ContextFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
-        | ContextFactCases.ViewCheckpointCommitted payload ->
-            Ok(appendCheckpoint projection payload.SessionId payload.ToolCallId)
         | ContextFactCases.ContextReanchored payload ->
             reanchor
                 "ContextReanchored"
@@ -168,3 +138,12 @@ module ContextProjectionBridge =
                     payload.PreviousEpochId
                     payload.NextEpochId
                     payload.IncumbencyId)
+        | ContextFactCases.ScopeReanchored payload ->
+            reanchor
+                "ScopeReanchored"
+                projection
+                payload.SessionId
+                (PrefixEpochProjection.applyScopeReanchor
+                    payload.PreviousEpochId
+                    payload.NextEpochId
+                    (ToolCallId.value payload.CallId))
