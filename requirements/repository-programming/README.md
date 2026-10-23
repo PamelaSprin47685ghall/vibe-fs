@@ -6,6 +6,8 @@
 
 沙箱启动与结果等待解耦：`runSurface` 返回持有 `ProgramPromise` 与可变 `DeadlineRef` 的句柄，调用方可跨调用持有 promise 而不在启动处 await 到底。`resetDeadline` 在不重包、不重跑程序的前提下重置后续 api 调用的超时窗口，也能让在跑的程序过期。
 
+`deadlineEpochMs = 0` 表示不设总时限。所有 `todowrite-for-*` 调用（含 unpark）使用此模式，`join` 可长期等待；每个同步执行片段仍受 10 秒保护，具体操作保留各自的限制。显式 abandon 的清理窗口仍有界。
+
 ## park/unpark/abandon 生命周期（WHAT[repository-programming-030]、[032]-[036]、[038]、[039]）
 
 旧成员 `file`/`glob`/`edit`/`rewrite` 退役后，文件系统主原语的 canonical member 序列为 `write, rm, mv, cat, ls, rg, stat, mkdir, whereAll, where`

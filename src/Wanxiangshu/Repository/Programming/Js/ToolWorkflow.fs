@@ -1181,7 +1181,7 @@ module JsToolWorkflow =
 
     /// Resume a parked site (algorithm E). `handle` must exist; the deferred
     /// promise is resolved with `value`, the handle is removed (one-shot), and
-    /// the deadline is reset to now+10s. If the program parks again the result
+    /// the invocation's deadline is restored. If the program parks again the result
     /// is a new parked payload with a new handle.
     /// A present `planB` (including empty) reprices the resumed wait: UTF-8
     /// bytes * 50 ms, and a later yield echoes that new planB. `None` does not
@@ -1193,6 +1193,7 @@ module JsToolWorkflow =
         (value: obj)
         (baseClassSource: string)
         (deadlineMs: int)
+        (deadlineEpochMs: int64)
         (outputBoundBytes: int)
         (planB: string option)
         : Task<JsToolOutcome> =
@@ -1200,9 +1201,12 @@ module JsToolWorkflow =
             Wanxiangshu.Process.JsSandbox.unpark site.RunHandle.ParkState value
             JsParkedSites.remove site.Handle
 
-            // Reset the deadline to now+10s (algorithm E5).
             let now = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            Wanxiangshu.Process.JsSandbox.resetDeadline site.RunHandle (now + int64 (max 1000 deadlineMs))
+
+            let resumedDeadline =
+                if deadlineEpochMs = 0L then 0L else now + int64 (max 1000 deadlineMs)
+
+            Wanxiangshu.Process.JsSandbox.resetDeadline site.RunHandle resumedDeadline
 
             // Install a fresh park signal and race the program promise against
             // it: the resumed program may park again (algorithm E5).
@@ -1460,7 +1464,7 @@ module JsToolWorkflow =
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
-                        unparkSite site fence settlement value baseClassSource deadlineMs outputBoundBytes planB)
+                        unparkSite site fence settlement value baseClassSource deadlineMs deadlineEpochMs outputBoundBytes planB)
             | ToolWorkflowInvocation.Abandon handle ->
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->

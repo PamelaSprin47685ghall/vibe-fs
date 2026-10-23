@@ -52,6 +52,7 @@ module JsSandbox =
     /// output bound) without awaiting the program promise again.
     val classifyResult: json: string -> outputBoundBytes: int -> Result<string, JsFailure>
 
+    /// Zero disables the total deadline; synchronous execution remains bounded.
     val resetDeadline: handle: JsRunHandle -> deadlineEpochMs: int64 -> unit
 
     /// Mark the suspended model-source line with `>| ` (others ` | `).

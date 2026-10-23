@@ -131,9 +131,6 @@ module JsToolSpec =
 
         let runProgramCall (ctx: HostToolContext) (input: obj) (declaration: obj) =
             task {
-                // 10 s sandbox deadline; 1 MiB output bound (JS-054).
-                let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
-
                 // The session's own directory wins over the plugin workspace:
                 // a road's deliverable belongs in the worktree that session was
                 // created in, not in the target's checkout.
@@ -167,7 +164,7 @@ module JsToolSpec =
                         surface.BaseClassSource
                         input
                         10000
-                        deadlineEpochMs
+                        0L
                         (1 <<< 20)
                         persistence
                         lifecyclePersistence

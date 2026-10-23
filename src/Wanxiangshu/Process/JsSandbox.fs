@@ -83,7 +83,7 @@ module JsSandbox =
             (sandboxLaw, api, deadlineMs, deadlineEpochMs, baseClassSource, modelSource)
             """
 (function(law, api, deadlineMs, deadlineEpochMs, baseClass, model) {
-  var handle = law.run(api, Number(deadlineMs), Number(deadlineEpochMs), baseClass, model);
+  var handle = law.run(api, Number(deadlineMs), Number(deadlineEpochMs) === 0 ? Infinity : Number(deadlineEpochMs), baseClass, model);
   return { SandboxHandle: handle, ProgramPromise: handle.programPromise };
 })($0, $1, $2, $3, $4, $5)
 """
@@ -245,7 +245,7 @@ module JsSandbox =
     /// handle; subsequent api member calls re-check that deadline, so the new
     /// epoch takes effect without re-wrapping or re-running the program.
     let resetDeadline (handle: JsRunHandle) (deadlineEpochMs: int64) : unit =
-        emitJsExpr (sandboxLaw, handle.SandboxHandle, deadlineEpochMs) "$0.extendDeadline($1, Number($2))"
+        emitJsExpr (sandboxLaw, handle.SandboxHandle, deadlineEpochMs) "$0.extendDeadline($1, Number($2) === 0 ? Infinity : Number($2))"
 
     /// The program-script line a stack frame reports, if the frame is one.
     ///
