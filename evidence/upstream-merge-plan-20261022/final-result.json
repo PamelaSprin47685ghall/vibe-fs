@@ -570,12 +570,12 @@
     "commit": "70f8aab03445e99580c38c584910f84478448e36",
     "pushed": true,
     "merged": false,
-    "receiptOnlyFollowup": true,
+    "receiptOnlyFollowup": false,
     "ci": {
       "status": "failure",
-      "checkedSourceCommit": "02714811358f222544554a8b89cacdcbbc363116",
-      "runId": 39842134321,
-      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39842134321",
+      "checkedSourceCommit": "e1997c0ecbc0035bb70ae82864fe7a94c9519680",
+      "runId": 39877228487,
+      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39877228487",
       "latestHeadChecks": "https://github.com/dyx13/vibe-fs/pull/1/checks",
       "passed": false
     },
@@ -594,15 +594,44 @@
     ],
     "changes": [
       "Each existing dispatch-protocol-010 compiler probe now completes a named native subtest after all of its original assertions; no heartbeat, timeout increase or assertion removal.",
-      "Failed installed Host guidance probes send their existing captured stderr to the displayed stderr stream."
+      "Failed installed Host guidance probes send their existing captured stderr to the displayed stderr stream.",
+      "The harness gate writer prefixes PID digits with p, preserving the production ban on a writer suffix that looks like a four-digit segment ordinal. A deterministic boundary regression uses the actual EventStore.",
+      "Every real TestContext registers before its body. Registration binds an unused native invocation and grants no time. A begin request uses that exact token; a later same-name context cannot license a previous unused invocation. Original silence, absolute operation deadlines, duplicate-token rejection and physical cleanup remain."
     ],
     "localValidation": {
       "generation": 45,
       "concurrency": 4,
       "buildPassed": true,
       "affectedFilesCompletedWithoutFailure": ["requirements/dispatch-protocol/tests/010.test.mjs", "requirements/delegation/tests/027.test.mjs"],
-      "completeIntegration": "running",
+      "completeIntegration": "40 suites and distribution passed; the harness failed and remains recorded below",
+      "suites": { "files": 40, "passed": 726, "failed": 0, "skipped": 7, "todo": 7, "wallMs": 545710 },
+      "reclamation": { "pid": 79303, "accepted": true, "wallMs": 24.470 },
+      "harness": { "passed": 293, "failed": 2, "reason": "Four-digit physical child PIDs produced invalid verification-gate-<pid> writer IDs." },
+      "ciEnvironmentHostProof": { "passed": 11, "failed": 0, "reclamationAccepted": true, "log": "/private/tmp/m22-pr1-ci-host-env45.log" },
       "log": "/private/tmp/m22-pr1-ci-integration45.log"
+    },
+    "failedRepairRun": {
+      "head": "e1997c0ecbc0035bb70ae82864fe7a94c9519680",
+      "runId": 39877228487,
+      "unitPassed": 4667,
+      "unitFailed": 1,
+      "integrationStarted": false,
+      "reason": "A current same-name context's begin arrived before the previous native complete, licensing the previous unused invocation. Its subsequent completion correctly failed without an end acknowledgement."
+    },
+    "supervisionRepair": {
+      "generation47": { "passed": 104, "failed": 0, "log": "/private/tmp/m22-pr1-ci-supervision47.log" },
+      "harnessGeneration46": { "passed": 295, "failed": 0, "log": "/private/tmp/m22-pr1-ci-harness46.log" },
+      "finalGeneration": 48,
+      "status": "scoped validation passed; complete unit and exact-head GitHub validation pending",
+      "finalUnit": { "passed": 104, "failed": 0, "wallMs": 50740, "reclamationAccepted": true, "reclamationMs": 24.292, "log": "/private/tmp/m22-pr1-ci-supervision48.log" },
+      "finalHarness": { "passed": 295, "failed": 0, "wallMs": 12200, "log": "/private/tmp/m22-pr1-ci-harness48.log" },
+      "inputDigests": {
+        "validation": "9038656693e7ed80f9d62cf2f70c1921915e77db84b3ee3aa76299e78c9c86dd",
+        "compiler": "e6209d05833c3f066639e8293fd4a9ffbceefe57261d59c67885e2840cb98643",
+        "generated": "63a9e8f0b20604c1f552807181e7a96a93e2e7d3685ec5dee5e25f76b7b67800",
+        "artifact": "7296ae8ccf8b216315a74ec4564ee2cdf126ae29cf53cb54ded3f46a1c6fbf05"
+      },
+      "productArtifactDigestUnchanged": true
     },
     "runtimeDeployed": false
   },

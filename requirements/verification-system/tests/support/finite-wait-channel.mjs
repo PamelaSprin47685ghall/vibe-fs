@@ -31,7 +31,7 @@ export async function createFiniteWaitChannel({ entryFile, onRequest, onError })
       let frame
       try { frame = JSON.parse(buffer.subarray(0, end).toString('utf8')) } catch { return socket.destroy() }
       if (!frame || typeof frame !== 'object' || Array.isArray(frame) ||
-          frame.capability !== capability || !['begin', 'end'].includes(frame.phase)) return socket.destroy()
+          frame.capability !== capability || !['register', 'begin', 'end'].includes(frame.phase)) return socket.destroy()
       sequence += 1
       request = { entryFile: resolve(entryFile), runId, requestId: sequence,
         contextToken: frame.contextToken, phase: frame.phase, name: frame.name,

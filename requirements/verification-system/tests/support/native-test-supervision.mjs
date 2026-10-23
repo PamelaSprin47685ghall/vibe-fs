@@ -207,7 +207,7 @@ export class NativeTestSupervision {
       entry.lastProgressAt = now
       this.lastProgressAt = entry.lastProgressAt
     }
-    return this.bindPending(entry, now)
+    return this.bindPending(entry)
   }
 
   reply(request, ok, reason) {
@@ -235,35 +235,47 @@ export class NativeTestSupervision {
       wait.ended = true
       return [this.reply(request, true)]
     }
-    if (request.phase !== 'begin') return [this.reply(request, false, 'Unknown physical wait phase')]
-    try { validatePhysicalWait(request.operation, request.limitMs) }
-    catch (error) { return [this.reply(request, false, error.message)] }
     if (typeof request.contextToken !== 'string' || !/^[a-f0-9]{32}$/.test(request.contextToken)) {
       return [this.reply(request, false, 'Invalid registered context token')]
+    }
+    if (request.phase === 'begin') {
+      try { validatePhysicalWait(request.operation, request.limitMs) }
+      catch (error) { return [this.reply(request, false, error.message)] }
+      const invocation = entry.invocations.find(value => value.contextToken === request.contextToken)
+      if (!invocation || entry.invocations.length !== 1 || invocation.ambiguous ||
+          invocation.nesting !== 0 || request.fullName !== request.name || invocation.name !== request.name) {
+        return [this.reply(request, false, 'No unique ordinary top-level native invocation')]
+      }
+      if (invocation.spent || entry.allowance) return [this.reply(request, false, 'Physical wait was already consumed')]
+      invocation.spent = true
+      entry.allowance = { contextToken: request.contextToken, operation: request.operation,
+        occurrence: invocation.occurrence, deadline: now + request.limitMs, ended: false }
+      return [this.reply(request, true)]
+    }
+    if (request.phase !== 'register') return [this.reply(request, false, 'Unknown physical wait phase')]
+    if (request.fullName !== request.name) {
+      return [this.reply(request, false, 'No unique ordinary top-level native invocation')]
     }
     if (entry.usedTokens.has(request.contextToken) || entry.pending || (entry.allowance && !entry.allowance.ended)) {
       return [this.reply(request, false, 'Physical wait was already declared for this invocation')]
     }
     entry.usedTokens.add(request.contextToken)
     entry.pending = request
-    return this.bindPending(entry, now)
+    return this.bindPending(entry)
   }
 
-  bindPending(entry, now) {
+  bindPending(entry) {
     const request = entry.pending
-    if (!request || entry.allowance) return []
-    const matching = entry.invocations.filter(value => value.name === request.name)
+    if (!request) return []
+    const matching = entry.invocations.filter(value => value.name === request.name && !value.contextToken)
     if (matching.length === 0) return []
     entry.pending = null
     const invocation = matching[0]
-    if (matching.length !== 1 || entry.invocations.length !== 1 || invocation.ambiguous ||
+    if (matching.length !== 1 || invocation.ambiguous ||
         invocation.nesting !== 0 || request.fullName !== request.name) {
       return [this.reply(request, false, 'No unique ordinary top-level native invocation')]
     }
-    if (invocation.spent) return [this.reply(request, false, 'Physical wait was already consumed')]
-    invocation.spent = true
-    entry.allowance = { contextToken: request.contextToken, operation: request.operation,
-      occurrence: invocation.occurrence, deadline: now + request.limitMs, ended: false }
+    invocation.contextToken = request.contextToken
     return [this.reply(request, true)]
   }
 

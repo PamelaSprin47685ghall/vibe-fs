@@ -19,6 +19,7 @@ export function installFinitePhysicalWait(value) {
       fullName: context.fullName, spent: false, sealed: context.signal.aborted }
     contexts.set(context, entry)
     context.signal.addEventListener('abort', () => { entry.sealed = true }, { once: true })
+    return request(context, entry, 'register').catch(error => { entry.registrationFailure = error })
   })
   afterEach(context => {
     const entry = contexts.get(context)
@@ -78,6 +79,7 @@ export async function withFinitePhysicalWait(context, { operation, limitMs }, ac
   if (descriptor === null) return action()
   const entry = contexts.get(context)
   if (!entry || entry.sealed) throw new Error('Physical wait requires the live registered TestContext')
+  if (entry.registrationFailure) throw entry.registrationFailure
   if (entry.spent) throw new Error('Physical wait was already declared for this invocation')
   entry.spent = true
   await request(context, entry, 'begin', operation, limitMs)

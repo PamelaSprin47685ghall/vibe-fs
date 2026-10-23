@@ -16,6 +16,7 @@ const native = (type, sequence, entryFile = file, name = 'probe', extra = {}) =>
 const begin = (extra = {}) => ({ entryFile: file, runId: 'run-a', requestId: 1,
   phase: 'begin', contextToken: token, operation: 'bounded process drain', limitMs: 1000,
   name: 'probe', fullName: 'probe', ...extra })
+const registration = (extra = {}) => begin({ phase: 'register', ...extra })
 
 function model(files = [file]) {
   let time = 0
@@ -86,6 +87,10 @@ async function ackBoundary(mode) {
       onRequest: request => {
         requests.push(request.phase)
         if (request.phase === 'cancel') return
+        if (request.phase === 'register') {
+          channel.reply({ ...request, ok: true })
+          return
+        }
         if (request.phase === 'end') {
           if (mode !== 'end-lost') channel.reply({ ...request, ok: true })
         } else {
@@ -142,6 +147,7 @@ export function registerFiniteWaitTests() {
     const m = model([file, other])
     m.start(other)
     m.owner.observe(native('test:dequeue', 1))
+    assert.equal(m.owner.control(registration())[0].ok, true)
     assert.equal(m.owner.control(begin())[0].ok, true)
     assert.deepEqual(m.owner.nextDeadline(), { at: 100, file: other, kind: 'silence' })
     m.at(99)
@@ -155,6 +161,7 @@ export function registerFiniteWaitTests() {
   test('WHAT[verification-system-006] finite end does not renew or release its absolute deadline', () => {
     const m = model()
     m.owner.observe(native('test:dequeue', 1))
+    m.owner.control(registration())
     assert.equal(m.owner.control(begin())[0].ok, true)
     m.at(900)
     assert.equal(m.owner.control(begin({ phase: 'end' }))[0].ok, true)
@@ -168,13 +175,14 @@ export function registerFiniteWaitTests() {
     assert.equal(m.owner.nextDeadline().at, 1099)
   })
 
-  test('WHAT[verification-system-006] the next physical request waits for the previous native completion after end ACK', () => {
+  test('WHAT[verification-system-006] the next context registration waits for the previous native completion after end ACK', () => {
     const m = model()
     m.owner.observe(native('test:dequeue', 1))
+    m.owner.control(registration())
     assert.equal(m.owner.control(begin())[0].ok, true)
     m.at(20)
     assert.equal(m.owner.control(begin({ phase: 'end' }))[0].ok, true)
-    const next = begin({ contextToken: 'b'.repeat(32), requestId: 2 })
+    const next = registration({ contextToken: 'b'.repeat(32), requestId: 2 })
     assert.deepEqual(m.owner.control(next), [])
     assert.equal(m.owner.nextDeadline().at, 1000, 'queued control cannot replace the previous absolute bound')
     assert.deepEqual(m.owner.observe(native('test:complete', 2)), [])
@@ -182,20 +190,23 @@ export function registerFiniteWaitTests() {
     m.at(30)
     assert.deepEqual(m.owner.observe(native('test:dequeue', 3)),
       [m.owner.reply(next, true)])
+    assert.equal(m.owner.nextDeadline().at, 120, 'registration does not extend ordinary silence')
+    assert.equal(m.owner.control(begin({ contextToken: next.contextToken }))[0].ok, true)
     assert.equal(m.owner.nextDeadline().at, 1030)
-    assert.equal(m.owner.control(next)[0].ok, false, 'one native invocation cannot be renewed')
+    assert.equal(m.owner.control(begin({ contextToken: next.contextToken }))[0].ok, false, 'one native invocation cannot be renewed')
   })
 
   test('WHAT[verification-system-006] ended physical waits admit only one pending token and never renew the old invocation', () => {
     const m = model()
     m.owner.observe(native('test:dequeue', 1))
+    m.owner.control(registration())
     assert.equal(m.owner.control(begin())[0].ok, true)
-    assert.equal(m.owner.control(begin({ contextToken: 'b'.repeat(32), requestId: 2 }))[0].ok, false)
+    assert.equal(m.owner.control(registration({ contextToken: 'b'.repeat(32), requestId: 2 }))[0].ok, false)
     assert.equal(m.owner.control(begin({ phase: 'end' }))[0].ok, true)
     assert.equal(m.owner.control(begin())[0].ok, false, 'the spent context token remains spent after end')
-    const next = begin({ contextToken: 'c'.repeat(32), requestId: 3, name: 'next probe', fullName: 'next probe' })
+    const next = registration({ contextToken: 'c'.repeat(32), requestId: 3, name: 'next probe', fullName: 'next probe' })
     assert.deepEqual(m.owner.control(next), [])
-    assert.equal(m.owner.control(begin({ contextToken: 'd'.repeat(32), requestId: 4 }))[0].ok, false)
+    assert.equal(m.owner.control(registration({ contextToken: 'd'.repeat(32), requestId: 4 }))[0].ok, false)
     m.at(1000)
     assert.throws(() => m.owner.observe(native('test:complete', 2)), /deadline expired/)
   })
@@ -204,6 +215,7 @@ export function registerFiniteWaitTests() {
     for (const event of ['begin', 'end', 'complete', 'drain', 'summary', 'exit']) {
       const m = model()
       m.owner.observe(native('test:dequeue', 1))
+      m.owner.control(registration())
       if (event !== 'begin') m.owner.control(begin())
       m.at(event === 'begin' ? 100 : 1000)
       const transition = event === 'begin' || event === 'end'
@@ -219,33 +231,56 @@ export function registerFiniteWaitTests() {
   test('WHAT[verification-system-006] native completion requires end and a single real occurrence', () => {
     const m = model()
     m.owner.observe(native('test:dequeue', 1))
+    m.owner.control(registration())
     m.owner.control(begin())
     assert.throws(() => m.owner.observe(native('test:complete', 2)), /without its end/)
     const concurrent = model()
     concurrent.owner.observe(native('test:dequeue', 1))
+    assert.equal(concurrent.owner.control(registration())[0].ok, true)
     concurrent.owner.observe(native('test:dequeue', 2))
     assert.equal(concurrent.owner.control(begin())[0].ok, false)
     const nested = model()
     nested.owner.observe(native('test:dequeue', 1, file, 'probe', { nesting: 1 }))
+    assert.equal(nested.owner.control(registration())[0].ok, false)
     assert.equal(nested.owner.control(begin())[0].ok, false)
     const granted = model()
     granted.owner.observe(native('test:dequeue', 1))
+    granted.owner.control(registration())
     granted.owner.control(begin())
     assert.throws(() => granted.owner.observe(native('test:dequeue', 2, file, 'other')), /Another native/)
   })
 
   test('WHAT[verification-system-006] delayed dequeue binding cannot give pending requests provisional time', () => {
     const m = model()
-    assert.deepEqual(m.owner.control(begin()), [])
+    assert.deepEqual(m.owner.control(registration()), [])
     assert.equal(m.owner.nextDeadline().at, 100)
-    assert.deepEqual(m.owner.control(begin({ phase: 'cancel' })), [])
+    assert.deepEqual(m.owner.control(registration({ phase: 'cancel' })), [])
     assert.deepEqual(m.owner.observe(native('test:dequeue', 1)), [])
-    assert.equal(m.owner.control(begin())[0].ok, false)
+    assert.equal(m.owner.control(registration())[0].ok, false)
     const ready = model()
-    assert.deepEqual(ready.owner.control(begin()), [])
+    assert.deepEqual(ready.owner.control(registration()), [])
     ready.at(20)
     assert.equal(ready.owner.observe(native('test:dequeue', 1))[0].ok, true)
+    assert.equal(ready.owner.nextDeadline().at, 100, 'registration is not causal progress or a physical allowance')
+    assert.equal(ready.owner.control(begin())[0].ok, true)
     assert.equal(ready.owner.nextDeadline().at, 1020)
+  })
+
+  test('WHAT[verification-system-006] a later same-name context cannot borrow an unused native invocation', () => {
+    const m = model()
+    m.owner.observe(native('test:dequeue', 1))
+    assert.equal(m.owner.control(registration())[0].ok, true)
+    const next = registration({ contextToken: 'b'.repeat(32), requestId: 2 })
+    assert.deepEqual(m.owner.control(next), [])
+    assert.equal(m.owner.control(begin({ contextToken: next.contextToken }))[0].ok, false)
+    assert.equal(m.owner.nextDeadline().at, 100)
+    m.at(20)
+    assert.deepEqual(m.owner.observe(native('test:complete', 2)), [])
+    assert.deepEqual(m.owner.observe(native('test:dequeue', 3)), [m.owner.reply(next, true)])
+    assert.equal(m.owner.control(begin())[0].ok, false, 'the closed native invocation cannot be claimed')
+    assert.equal(m.owner.control(begin({ contextToken: next.contextToken }))[0].ok, true)
+    m.owner.control(begin({ contextToken: next.contextToken, phase: 'end' }))
+    assert.deepEqual(m.owner.observe(native('test:complete', 4)), [])
   })
 
   test('WHAT[verification-system-006] only native complete advances once despite nested testNumber reuse', () => {
