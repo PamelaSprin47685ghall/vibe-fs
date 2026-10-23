@@ -72,8 +72,8 @@ test('WHAT[work-021] the devops verb survives as a Plan programming-surface memb
   const planMembers = plan.members.map((member) => member.memberName)
   assert.ok(planMembers.includes('devops'), 'the Plan surface carries the devops member')
   assert.ok(
-    plan.baseClassSource.includes('async devops(intent, carry)'),
-    'the Plan base class declares devops with a required carry array',
+    plan.baseClassSource.includes('async devops(intent, extra = [])'),
+    'the Plan base class declares devops with a optional extra array',
   )
 
   // 其它角色没有这个成员：DevOps 调查只对 Plan 开放。

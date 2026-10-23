@@ -167,7 +167,7 @@ test('WHAT[context-compression-031] transfer projection neither consumes the pen
   assert.deepEqual(render(rows), ['compressed'])
 })
 
-test('WHAT[context-compression-031] marker positions expose prefixCount and raw source remains unchanged', () => {
+test('WHAT[context-compression-031] markers expose only the anchor number and raw source remains unchanged', () => {
   const raw = [
     user('u', 'question'),
     assistant('a', [{ type: 'text', text: 'answer' }]),
@@ -175,9 +175,9 @@ test('WHAT[context-compression-031] marker positions expose prefixCount and raw 
   ]
   const saved = structuredClone(raw)
   const first = pair.applyAnchorView(session, raw)
-  assert.equal(first.messages[0].parts[0].text, '[ANCHOR: 1; prefixCount: 1]\0\uFEFFquestion')
+  assert.equal(first.messages[0].parts[0].text, '[ANCHOR: 1]\0\uFEFFquestion')
   assert.deepEqual(first.messages[1], raw[1])
-  assert.equal(first.messages[2].parts[0].state.output, '[ANCHOR: 2; prefixCount: 2]\0\uFEFFresult')
+  assert.equal(first.messages[2].parts[0].state.output, '[ANCHOR: 2]\0\uFEFFresult')
   assert.deepEqual(raw, saved)
   declare(3, [])
   const next = pair.applyAnchorView(session, [...raw, user('u2', 'next')])
@@ -191,9 +191,9 @@ test('WHAT[context-compression-031] repeated anchors have distinct prefix positi
   declare(0, [2, 1, 2])
   const result = pair.applyAnchorView(session, raw)
   assert.deepEqual(result.messages.map((row) => row.parts[0].text), [
-    '[ANCHOR: 2; prefixCount: 1]\0\uFEFFtwo',
-    '[ANCHOR: 1; prefixCount: 2]\0\uFEFFone',
-    '[ANCHOR: 2; prefixCount: 3]\0\uFEFFtwo',
+    '[ANCHOR: 2]\0\uFEFFtwo',
+    '[ANCHOR: 1]\0\uFEFFone',
+    '[ANCHOR: 2]\0\uFEFFtwo',
   ])
 })
 
@@ -210,7 +210,7 @@ test('WHAT[context-compression-031] repeated history references cannot acquire d
   assert.notEqual(currentAnchor, 1)
   assert.deepEqual(carryMaterial(session, [1]).material.map((piece) => piece.text), ['original evidence'])
   assert.deepEqual(carryMaterial(session, [currentAnchor]).material.map((piece) => piece.text), ['new independent report'])
-  assert.match(projected.messages[2].parts[0].text, new RegExp(`ANCHOR: ${currentAnchor}; prefixCount: 3`))
+  assert.match(projected.messages[2].parts[0].text, new RegExp(`ANCHOR: ${currentAnchor}`))
   const replay = pair.applyAnchorView(session, expanded)
   assert.deepEqual(replay.messages, projected.messages)
 })
@@ -318,7 +318,7 @@ test('WHAT[context-compression-031] bilingual guidance explains only the current
     assert.match(prose, /carry/)
     assert.match(prose, /prefixUntil/)
     assert.doesNotMatch(prose, /thenMap|reportMapping/)
-    assert.match(prose, /prefixCount/)
+    assert.doesNotMatch(prose, /prefixCount/)
     assert.match(prose, language === 'en' ? /current turn|this turn/ : /本回合|当前回合/)
   }
 })

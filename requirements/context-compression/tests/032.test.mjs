@@ -83,18 +83,16 @@ test('WHAT[context-compression-032] invalid carry and unknown anchors place no c
   })
 })
 
-test('WHAT[context-compression-032] empty carry sends only the task; omitted carry is refused', async () => {
+test('WHAT[context-compression-032] omitted and empty extra send only the task, with no implicit history or current turn', async () => {
   await withForkMember(async (call) => {
     applyView(session, visible())
-    const omitted = await call(undefined, 'omitted')
-    assert.match(omitted.reply, /ok = false/)
-    assert.match(omitted.reply, /code = "VIEW_DECLARATION_INVALID"/)
-    assert.equal(omitted.child, null)
-    const empty = await call('[]', 'empty')
-    assert.match(empty.reply, /ok = true/)
-    assert.ok(empty.child)
-    assert.deepEqual(empty.context.text, [])
-    assert.doesNotMatch(empty.context.wire, /second line/)
+    for (const [index, extra] of [undefined, '[]'].entries()) {
+      const result = await call(extra, 'empty' + index)
+      assert.match(result.reply, /ok = true/)
+      assert.ok(result.child)
+      assert.deepEqual(result.context.text, [])
+      assert.doesNotMatch(result.context.wire, /second line/)
+    }
   })
 })
 

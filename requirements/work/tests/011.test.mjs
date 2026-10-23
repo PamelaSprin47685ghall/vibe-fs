@@ -235,7 +235,7 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     await hooks['experimental.chat.messages.transform']({ sessionID }, humanRequest)
 
     // Step 4: After human input, the dispatch member must NOT be denied.
-    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, carry)`。
+    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, extra = [])`。
     const forkSuccessor = await hooks.tool['todowrite-for-manager'].execute(
       {
         program:

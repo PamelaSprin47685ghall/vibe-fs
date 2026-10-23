@@ -5,9 +5,16 @@ Delegation members return data. The host formats results as TOML.
 { ok: false, code: "..." }  // refusal
 ```
 
-The last argument of `fork`, `resume`, `commission`, `devops`, `dag`, and `advisor` is an optional `carry` array, defaulting to `[]`. An integer copies a visible anchor's full history interval; a string supplies literal text. Items are sent in array order. Include only the background the recipient needs.
+**Do not confuse slots.**
 
-**The parent's current turn is not sent to the child.** State the task once in `charge` or `intent` as ordinary prose; do not repeat it in `carry`. The message is prose, not structured fields — say what the work suggests, plain and clear. There is no prefix parameter. The recipient receives material as readable TOML tables. An invalid array or an invisible anchor returns `VIEW_DECLARATION_INVALID` before any work is created. `join`, `horizon`, and `fission` take no `carry`.
+| Slot | Where | Required? | Purpose |
+|------|--------|-----------|---------|
+| `prefixUntil` + `carry` | **Tool top-level** every `todowrite-for-*` call | both required | Layout of **this session's next request** |
+| `extra` | Last argument of `fork` / `resume` / `commission` / `devops` / `dag` / `advisor` / `deliver` | optional, default `[]` | Background sent to the **child** (or into delivery), not a history rewrite of the parent |
+
+The last argument of `fork`, `resume`, `commission`, `devops`, `dag`, and `advisor` is an optional `extra` array, defaulting to `[]`. An integer copies a visible anchor's full history interval; a string supplies literal text. Items are sent in array order. Include only the background the recipient needs.
+
+**The parent's current turn is not sent to the child.** State the task once in `charge` or `intent` as ordinary prose; do not repeat it in `extra`. The message is prose, not structured fields — say what the work suggests, plain and clear. There is no member-level prefix parameter. The recipient receives material as readable TOML tables. An invalid array or an invisible anchor returns `VIEW_DECLARATION_INVALID` before any work is created. `join`, `horizon`, and `fission` take no `extra`.
 
 ## fork
 
@@ -24,6 +31,8 @@ await this.fork({ charge: "index the parser", name: "parser-index", calling: "en
 
 ```js
 const resumed = await this.resume({ name: "audit-road", charge: "continue the audit" }, [4, "Parser entries have been checked"]);
+// or omit extra:
+await this.resume({ name: "audit-road", charge: "continue the audit" });
 ```
 
 - Payload `{ charge, name }` gives the next task to an existing worker. `name` is required. `calling` is not accepted because this call continues existing work.
@@ -79,7 +88,7 @@ const outcome = await this.dag({ nodes: [
 ```
 
 - Nodes run in dependency waves. Ready nodes `fork`, then one `join` collects the wave. Dependents receive their prerequisite nodes' records.
-- All nodes receive the same `carry`; a node cannot override it.
+- All nodes receive the same `extra`; a node cannot override it.
 - Result: `{ ok: true, results: { [id]: record }, skipped: [id...] }`.
 - A failed node calls `park` with `{ dag, node, code, deps, done, pending }`. Inject `"retry"` to repeat it, `"skip"` to skip it (dependents see `null`), `{ abort: reason }` to fail the program, or another value to replace that node's result.
 
@@ -100,7 +109,7 @@ const { agents, ptys } = await this.horizon();
 const advice = await this.advisor("Is the cache eviction policy sound?", [1, "The current policy is LRU"]);
 ```
 
-- Consult this session's dedicated advisor. The advisor has no tools and answers in prose. State the question in `intent`; use `carry` for the history needed to judge it.
+- Consult this session's dedicated advisor. The advisor has no tools and answers in prose. State the question in `intent`; use `extra` for the history needed to judge it.
 - The same session keeps the same advisor. The host appends material not delivered before and the new question; you need not track a delivery cursor.
 - Result: `{ ok: true, advice }` or `{ ok: false, code: "advisor-unavailable", reason }`.
 - Use the answer to inform the next decision. The consultation does not itself rewrite your transcript.

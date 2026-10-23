@@ -189,7 +189,7 @@ test('WHAT[repository-programming-001] JS001_lifecycle_members_are_carried_by_ev
     const result = surface(office.role, rolePermissions(office.label))
     assert.equal(isSome(result), true, `${office.role} must get a js-* surface`)
     assert.match(result.baseClassSource, /async park\(payload\)/, `${office.role} carries park`)
-    assert.match(result.baseClassSource, /async deliver\(carry = \[\]\)/, `${office.role} carries deliver`)
+    assert.match(result.baseClassSource, /async deliver\(extra = \[\]\)/, `${office.role} carries deliver`)
   }
 })
 

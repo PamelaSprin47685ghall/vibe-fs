@@ -24,7 +24,7 @@ test('WHAT[work-009] a live owned resource blocks deliver without retiring', () 
 test('WHAT[work-009] deliver reports the live blocker instead of reporting an end', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
-    // 派工是编程面成员：`this.fork(payload, carry)`，宿主不再注册 fork 工具。
+    // 派工是编程面成员：`this.fork(payload, extra = [])`，宿主不再注册 fork 工具。
     const forked = await hooks.tool['todowrite-for-manager'].execute(
       {
         program:

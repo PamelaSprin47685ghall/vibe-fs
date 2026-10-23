@@ -33,10 +33,10 @@ test('WHAT[capability-enforcement-009] FORK_programming_surface_exposes_expected
   const orchestratorMembers = orchestrator.members.map((member) => member.memberName)
   assert.equal(orchestratorMembers.includes('commission'), true, 'the orchestrator surface carries the commission member')
 
-  assert.equal(manager.baseClassSource.includes('async fork(payload, carry)'), true, 'the manager base class declares the fork member')
-  assert.equal(manager.baseClassSource.includes('async resume(payload, carry)'), true, 'the manager base class declares the resume member')
+  assert.equal(manager.baseClassSource.includes('async fork(payload, extra = [])'), true, 'the manager base class declares the fork member')
+  assert.equal(manager.baseClassSource.includes('async resume(payload, extra = [])'), true, 'the manager base class declares the resume member')
   assert.equal(manager.baseClassSource.includes('async commission('), false, 'the manager base class declares no commission member')
-  assert.equal(orchestrator.baseClassSource.includes('async commission(payload, carry)'), true, 'the orchestrator base class declares the commission member')
+  assert.equal(orchestrator.baseClassSource.includes('async commission(payload, extra = [])'), true, 'the orchestrator base class declares the commission member')
 
   const managerFork = memberDoc(manager.description, 'fork')
   assert.equal(managerFork.includes('keywords'), false, 'fork must not carry warm-start keywords')

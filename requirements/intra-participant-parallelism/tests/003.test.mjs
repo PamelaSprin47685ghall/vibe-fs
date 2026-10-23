@@ -51,7 +51,7 @@ test('WHAT[intra-participant-parallelism-003] actual Host-created Fission lanes 
     await acceptAuthorityRoot(runtime, managerSession, 'manager')
     await openIncumbency(runtime, managerSession)
 
-    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, carry)`。
+    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, extra = [])`。
     const forked = await hooks.tool['todowrite-for-manager'].execute(
       {
         program:

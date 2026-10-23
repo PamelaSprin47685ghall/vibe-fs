@@ -37,6 +37,9 @@ module JsToolsBindings =
     [<Emit("$0 === undefined || $0 === null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
+    [<Emit("$0 === undefined")>]
+    let private isJsUndefined (value: obj) : bool = jsNative
+
     let internal failureObj (failure: JsFailure) : obj =
         createObj
             [ "ok" ==> false
@@ -1080,6 +1083,13 @@ module JsToolsBindings =
     /// Copy the validated carry into a fresh native array. User-defined
     /// serialization hooks must never change the declaration after validation.
     let private carryReceipt (carry: obj) : obj =
+        let carry =
+            // Member extra is optional: omitted or undefined means [].
+            if isJsUndefined carry then
+                box [||]
+            else
+                carry
+
         match AnchorDeclarationRule.parseCarry carry with
         | Error failure -> failureObj failure
         | Ok parsed -> createObj [ "ok" ==> true; "carry" ==> AnchorCarry.toValue parsed ]

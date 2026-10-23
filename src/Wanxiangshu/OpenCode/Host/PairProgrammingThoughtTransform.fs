@@ -1241,7 +1241,7 @@ module PairProgrammingThoughtTransform =
                     let count = count + 1
 
                     let marker =
-                        sprintf "[ANCHOR: %d; prefixCount: %d]" (unbox<int> raw?__contextAnchor) count
+                        sprintf "[ANCHOR: %d]" (unbox<int> raw?__contextAnchor)
                         + cursorGuidanceSeparator
 
                     let cloned = emitJsExpr raw "Object.assign({}, $0)"

@@ -49,7 +49,7 @@ test('WHAT[intra-participant-parallelism-010] an interrupted Fission group is se
     })
 
     // 派工是编程面成员（宿主 fork 工具已整体退役）：
-    // `this.fork(payload, carry)`。
+    // `this.fork(payload, extra = [])`。
     const forked = await hooks1.tool['todowrite-for-manager'].execute(
       {
         program:

@@ -60,7 +60,7 @@ const waitFor = async (read, what, timeoutMs = 2000) => {
   }
 }
 
-test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone while fork forwards its required carry array', async () => {
+test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone while fork forwards its optional extra array', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-fission-member-'))
   const engineerSession = `ses-fission-member-${Math.random().toString(36).slice(2, 8)}`
   const managerSession = `${engineerSession}-manager`
@@ -148,7 +148,7 @@ test('WHAT[intra-participant-parallelism-018] a fission lane inherits the curren
       await openIncumbency(runtime, managerSession)
 
       // 派工是编程面成员（宿主 fork 工具已整体退役）：
-      // `this.fork(payload, carry)`。
+      // `this.fork(payload, extra = [])`。
       const forked = await hooks.tool['todowrite-for-manager'].execute(
         {
           program:

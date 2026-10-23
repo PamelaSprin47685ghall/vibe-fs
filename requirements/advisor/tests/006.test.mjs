@@ -11,14 +11,14 @@ const program = (body) => 'class Js extends JsProgram { async run() { ' + body +
 const managerRun = (dir, body, sessionId) =>
   execute(dir, 'Manager', 'en', sessionId, { name: 'advisor contract probe', program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
 
-test('WHAT[advisor-006] advisor is capability-gated and documents the required carry array', () => {
+test('WHAT[advisor-006] advisor is capability-gated and documents the optional extra array', () => {
   const surface = generateRole('manager', 'en')
   assert.equal(surface.toolName, 'todowrite-for-manager')
   assert.equal(surface.capabilities.includes('Advisor'), true)
   assert.equal(surface.members.filter((member) => member.memberName === 'advisor').length, 1)
-  assert.match(surface.description, /advisor\(intent, carry/)
-  assert.match(surface.baseClassSource, /async advisor\(intent, carry\)/)
-  assert.match(surface.baseClassSource, /this\._api\.advisor\(intent, carry\)/)
+  assert.match(surface.description, /advisor\(intent, extra/)
+  assert.match(surface.baseClassSource, /async advisor\(intent, extra = \[\]\)/)
+  assert.match(surface.baseClassSource, /this\._api\.advisor\(intent, extra\)/)
   const withoutAdvisor = generate('Manager', ['Read'], 'en')
   assert.equal(withoutAdvisor.members.some((member) => member.memberName === 'advisor'), false)
   assert.doesNotMatch(withoutAdvisor.baseClassSource, /this\._api\.advisor/)

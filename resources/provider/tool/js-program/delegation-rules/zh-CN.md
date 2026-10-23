@@ -5,9 +5,9 @@
 { ok: false, code: "..." }  // 拒绝
 ```
 
-`fork`、`resume`、`commission`、`devops`、`dag`、`advisor` 的最后一个参数都是可选的 `carry` 数组，默认 `[]`。整数引用可见锚点的完整历史区间，字符串表示字面文本，按数组顺序传递。只加入对方需要的背景。
+`fork`、`resume`、`commission`、`devops`、`dag`、`advisor` 的最后一个参数都是可选的 `extra` 数组，默认 `[]`。整数引用可见锚点的完整历史区间，字符串表示字面文本，按数组顺序传递。只加入对方需要的背景。
 
-**父方本回合不传给子方。** 任务只写在 `charge` 或 `intent` 中，用普通散文表达，无需在 `carry` 里再说一遍。消息是散文，不是结构化字段——工作本身提示什么就说什么，朴素清晰。传递没有前缀参数；接收方看到的是排版清晰的 TOML 材料表。非法数组或不可见锚点返回 `VIEW_DECLARATION_INVALID`，不会创建部分工作。`join`、`horizon`、`fission` 不带 `carry`。
+**父方本回合不传给子方。** 任务只写在 `charge` 或 `intent` 中，用普通散文表达，无需在 `extra` 里再说一遍。消息是散文，不是结构化字段——工作本身提示什么就说什么，朴素清晰。传递没有前缀参数；接收方看到的是排版清晰的 TOML 材料表。非法数组或不可见锚点返回 `VIEW_DECLARATION_INVALID`，不会创建部分工作。`join`、`horizon`、`fission` 不带 `extra`。
 
 ## fork
 
@@ -79,7 +79,7 @@ const outcome = await this.dag({ nodes: [
 ```
 
 - 节点按依赖波次推进：本波就绪节点各自 `fork`，随后一次 `join` 收拢；下游收到依赖节点的记录。
-- 同一份 `carry` 发给全部节点，节点不得覆盖它。
+- 同一份 `extra` 发给全部节点，节点不得覆盖它。
 - 结果：`{ ok: true, results: { [id]: record }, skipped: [id...] }`。
 - 失败节点使程序 `park`，载荷为 `{ dag, node, code, deps, done, pending }`。注入 `"retry"` 重跑，`"skip"` 跳过（下游看到 `null`），`{ abort: reason }` 使程序失败，其他值作为该节点的替代结果。
 
@@ -100,7 +100,7 @@ const { agents, ptys } = await this.horizon();
 const advice = await this.advisor("缓存淘汰策略是否合理？", [1, "目前采用 LRU"]);
 ```
 
-- 请教本会话的专属顾问；顾问没有工具，以散文作答。`intent` 单独写问题，`carry` 补充判断需要的历史。
+- 请教本会话的专属顾问；顾问没有工具，以散文作答。`intent` 单独写问题，`extra` 补充判断需要的历史。
 - 同一会话持续使用同一位顾问，宿主只追加尚未交过的材料和新问题，无需你维护交付游标。
 - 结果：`{ ok: true, advice }` 或 `{ ok: false, code: "advisor-unavailable", reason }`。
 - 把回答作为后续判断的依据；本次请教不会自行改写你的会话记录。
