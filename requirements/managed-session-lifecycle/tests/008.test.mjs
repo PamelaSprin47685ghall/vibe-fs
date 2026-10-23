@@ -238,7 +238,6 @@ test('WHAT[managed-session-lifecycle-008] fold_refuses_unknown_fact_case', () =>
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const HandleFoldSurface = await import("../../../dist/Execution/Delegation/Handle/FoldSurface.js");
 const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
 
 const makeActive = () => {
@@ -341,3 +340,160 @@ test('WHAT[managed-session-lifecycle-008] actual join withholds payload until re
     }
   })
 })
+
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { default: fc } = await import("fast-check");
+const HandleJournalSurface = await import("../../../dist/Execution/Delegation/Handle/JournalSurface.js");
+const { HandleLifecycleLaw } = await import("../../../wanxiangli/dist/handle-lifecycle/HandleLifecycleLaw.js");
+const { withAdmittedChildren } = await import("./support/admitted-child-work.mjs");
+const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
+const { hostPort } = await import("../../interaction-authority/tests/support/authority.mjs");
+
+const PARENT = 'ses_parent_consume_cell'
+const CHILD = 'ses_child_consume_cell'
+const AGENT = 'h1'
+const law = new HandleLifecycleLaw()
+const hexToken = fc
+  .array(fc.constantFrom(...'abcdef0123456789'), { minLength: 8, maxLength: 24 })
+  .map((characters) => characters.join(''))
+const kindArb = fc.constantFrom('Terminal', 'SendFailure')
+const propertyOptions = { seed: 0x48434f4e, numRuns: 2_000 }
+
+/** Fold-level consume of a completed work cell: the production controller must
+ *  only ever emit a fact that this pure transition would accept. */
+const lawConsume = (expected, cellEqualsExpected, consumptionId = 'c'.repeat(32)) =>
+  law.work({
+    event: 'consume',
+    phase: 'CompletedAwaitingJoin',
+    legacy: false,
+    consumptionId,
+    expected,
+    cellEqualsExpected,
+  })
+
+test('WHAT[managed-session-lifecycle-008] fast-check: matching durable cell always retires; mismatched cell is only ConsumptionMismatch', () => {
+  fc.assert(
+    fc.property(kindArb, hexToken, hexToken, hexToken, (kind, ref, digest, other) => {
+      fc.pre(ref !== other)
+      const expected = { kind, hasRef: true, hasDigest: true }
+      assert.deepEqual(lawConsume(expected, true), { verdict: 'set', phase: 'Retired' })
+      assert.deepEqual(lawConsume(expected, false), { verdict: 'reject', rejection: 'ConsumptionMismatch' })
+      assert.deepEqual(lawConsume({ kind, hasRef: false, hasDigest: true }, true), {
+        verdict: 'set',
+        phase: 'Retired',
+      }, 'law trusts the caller-reported cellEqualsExpected flag; the F# owner must set it from durable equality')
+      // Blank consumption id is always mismatch, even with a true cell flag.
+      assert.deepEqual(lawConsume(expected, true, '   '), { verdict: 'reject', rejection: 'ConsumptionMismatch' })
+      assert.deepEqual(lawConsume(expected, true, ''), { verdict: 'reject', rejection: 'ConsumptionMismatch' })
+      // Abandoned shape without equality flag stays closed.
+      assert.deepEqual(
+        law.work({
+          event: 'consume',
+          phase: 'Abandoned',
+          legacy: false,
+          consumptionId: 'a'.repeat(32),
+          expected: { kind: 'Terminal', hasRef: true, hasDigest: true },
+          cellEqualsExpected: false,
+        }),
+        { verdict: 'reject', rejection: 'ConsumptionMismatch' },
+      )
+      assert.deepEqual(
+        law.work({
+          event: 'consume',
+          phase: 'Abandoned',
+          legacy: false,
+          consumptionId: 'a'.repeat(32),
+          expected: { kind: 'Cancelled', hasRef: false, hasDigest: false },
+          cellEqualsExpected: false,
+        }),
+        { verdict: 'set', phase: 'Retired' },
+      )
+      void other
+      void digest
+    }),
+    propertyOptions,
+  )
+})
+
+test('WHAT[managed-session-lifecycle-008] production consume ignores a stale caller cell and never journal-cuts on ConsumptionMismatch', async () => {
+  await withAdmittedChildren(
+    'consume-stale-cell',
+    PARENT,
+    [{ agentId: AGENT, sessionId: CHILD, role: 'engineer' }],
+    async (journal, profiles) => {
+      const samples = fc.sample(
+        fc
+          .record({
+            kind: kindArb,
+            ref: hexToken,
+            digest: hexToken,
+            staleRef: hexToken,
+            staleDigest: hexToken,
+          })
+          .filter((cell) => cell.ref !== cell.staleRef || cell.digest !== cell.staleDigest),
+        64,
+      )
+
+      let profile = profiles.get(AGENT)
+      for (const [index, cell] of samples.entries()) {
+        const root = profile.authorityRoot
+        const completed = await HandleJournalSurface.recordWorkCompletion(
+          journal,
+          PARENT,
+          AGENT,
+          CHILD,
+          root,
+          cell.kind,
+          cell.ref,
+          cell.digest,
+        )
+        assert.equal(completed.ok, true, `complete[${index}]: ${JSON.stringify(completed)}`)
+        assert.equal(
+          HandleJournalSurface.snapshot(journal, PARENT, AGENT, CHILD, root).record.lifecycle,
+          'CompletedAwaitingJoin',
+        )
+
+        const mismatched = await HandleJournalSurface.consumeWork(journal, PARENT, AGENT, CHILD, root, {
+          kind: cell.kind,
+          completionRef: cell.staleRef,
+          completionDigest: cell.staleDigest,
+        })
+        assert.equal(
+          mismatched.ok,
+          true,
+          `stale-cell consume[${index}] must ignore caller cell: ${JSON.stringify(mismatched)}`,
+        )
+        assert.equal(
+          HandleJournalSurface.snapshot(journal, PARENT, AGENT, CHILD, root).record.lifecycle,
+          'Retired',
+        )
+
+        const again = await HandleJournalSurface.consumeWork(journal, PARENT, AGENT, CHILD, root, null)
+        assert.equal(again.ok, false)
+        assert.match(String(again.error), /AlreadyRetired/)
+
+        // Next Active work on the same road for the next sample.
+        const sent = await dispatch.sendAgentOwnerRootAwait(
+          hostPort(async () => dispatch.admittedWithReceipt(`consume-stale-next-${index}`)),
+          journal,
+          CHILD,
+          `NEXT-${index}`,
+          profile.identitySeed,
+        )
+        assert.equal(sent.ok, true, sent.error)
+        const accepted = await dispatch.acceptAgentOwnerRoot(
+          journal,
+          CHILD,
+          sent.key,
+          `physical-consume-stale-${index}`,
+        )
+        assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
+        profile = accepted.profile
+      }
+    },
+  )
+})
+}

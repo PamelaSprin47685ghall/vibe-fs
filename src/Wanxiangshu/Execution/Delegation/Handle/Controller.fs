@@ -265,15 +265,20 @@ module HandleController =
 
         Task.FromResult result
 
-    let private consumptionCell (record: HandleRecord) =
-        match record.Lifecycle with
+    /// Evidence a successful HandleWorkConsumed may carry. Taken only from the
+    /// durable work lifecycle after refresh — never from the caller's possibly
+    /// stale HandleRecord — so fold's cellEqualsExpected cannot disagree with
+    /// the fact and trip journal-semantic-cut.
+    let private consumptionExpected (lifecycle: HandleLifecycle) =
+        match lifecycle with
         | CompletedAwaitingJoin cell -> Some cell
         | Abandoned _ ->
             Some
                 { Kind = HandleCompletionKind.Cancelled
                   CompletionRef = None
                   CompletionDigest = None }
-        | _ -> None
+        | Active
+        | Retired -> None
 
     let private confirmConsumption (journal: AgentJournalPort) parentId work consumptionId record =
         // Confirm the receipt against refreshed durable facts rather than a stale projection.
@@ -288,11 +293,15 @@ module HandleController =
         | Ok(Some { Lifecycle = Retired }) -> Error AlreadyRetired
         | Ok _ -> Error(AppendFailed "exact consumption receipt was not confirmed")
 
-    let private appendConsumption (journal: AgentJournalPort) parentId work (cell: HandleCompletion) record =
+    let private appendConsumption
+        (journal: AgentJournalPort)
+        parentId
+        work
+        (cell: HandleCompletion)
+        (consumptionId: string)
+        record
+        =
         task {
-            // Identifies this consumption attempt, not a work generation or ordering key.
-            let consumptionId = System.Guid.NewGuid().ToString("N")
-
             match!
                 journal.AppendExecutionFact
                     parentId
@@ -308,20 +317,45 @@ module HandleController =
             | Ok() -> return confirmConsumption journal parentId work consumptionId record
         }
 
+    let private refuseConsume (reason: HandleTransitionRejection) =
+        match reason with
+        | HandleIsRetired -> AlreadyRetired
+        | NotCompleted
+        | WorkNotAdmitted
+        | WorkStillActive
+        | ConsumptionMismatch
+        | LegacyWorkAmbiguous
+        | UnknownHandle
+        | HandleIdentityConflict
+        | AlreadyCompleted
+        | AlreadyAbandoned -> NotJoinable reason
+
     let private consumeAdmittedWork (journal: AgentJournalPort) parentId work record =
         // Observe tombstones committed by another journal instance before deciding.
-        let current =
+        // The consumption cell is taken from that durable work, not from `record`:
+        // a stale caller lifecycle would otherwise write HandleWorkConsumed that
+        // fold rejects with ConsumptionMismatch and FatalProcess journal-semantic-cut.
+        let prepared =
             journal.RefreshProjection()
             |> Result.mapError AppendFailed
-            |> Result.map (fun () ->
-                HandleProjection.tryWork work (journal.HandleProjection parentId), consumptionCell record)
+            |> Result.bind (fun () ->
+                match HandleProjection.tryWork work (journal.HandleProjection parentId) with
+                | None -> Error(NotJoinable WorkNotAdmitted)
+                | Some { Lifecycle = Retired } -> Error AlreadyRetired
+                | Some durable ->
+                    match consumptionExpected durable.Lifecycle with
+                    | None -> Error(NotJoinable NotCompleted)
+                    | Some cell ->
+                        let consumptionId = System.Guid.NewGuid().ToString("N")
+                        let projection = journal.HandleProjection parentId
 
-        match current with
+                        match HandleProjection.consumeWork work consumptionId cell projection with
+                        | Error reason -> Error(refuseConsume reason)
+                        | Ok _ -> Ok(cell, consumptionId))
+
+        match prepared with
         | Error reason -> Task.FromResult(Error reason)
-        | Ok(Some { Lifecycle = Retired }, _) -> Task.FromResult(Error AlreadyRetired)
-        | Ok(None, _) -> Task.FromResult(Error(NotJoinable WorkNotAdmitted))
-        | Ok(_, None) -> Task.FromResult(Error(NotJoinable NotCompleted))
-        | Ok(Some _, Some cell) -> appendConsumption journal parentId work cell record
+        | Ok(cell, consumptionId) -> appendConsumption journal parentId work cell consumptionId record
 
     /// Read the current durable binding of a handle after a refresh.
     let private refreshBinding

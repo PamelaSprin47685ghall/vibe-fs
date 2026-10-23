@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
@@ -53,6 +54,126 @@ module JournalSurface =
                     match result with
                     | Ok() -> box {| ok = true |}
                     | Error error -> failure error
+        }
+
+    let private completionKind name =
+        match name with
+        | "Terminal" -> Ok HandleCompletionKind.Terminal
+        | "SendFailure" -> Ok HandleCompletionKind.SendFailure
+        | "Cancelled" -> Ok HandleCompletionKind.Cancelled
+        | other -> Error $"unknown completion kind '{other}'"
+
+    let private optionalBlob create value =
+        match value with
+        | null -> None
+        | _ ->
+            let text = string value
+            if System.String.IsNullOrWhiteSpace text then None else Some(create text)
+
+    /// Append one exact work completion. Used by property tests to plant the
+    /// durable cell that consume must retire against.
+    let recordWorkCompletion
+        (handle: JournalHandle)
+        (parent: string)
+        (agent: string)
+        (child: string)
+        (root: string)
+        (kindName: string)
+        (completionRef: string)
+        (completionDigest: string)
+        : Task<obj> =
+        task {
+            match completionKind kindName with
+            | Error error -> return failure error
+            | Ok kind ->
+                let parentId = SessionId.create parent
+                let work = workId agent child root
+
+                let! result =
+                    (AgentJournalPortAdapter.fromAgentJournal handle.Journal).AppendExecutionFact
+                        parentId
+                        (ExecutionFactCases.HandleWorkCompleted
+                            {| ParentSessionId = parentId
+                               Work = work
+                               Kind = kind
+                               CompletionRef = optionalBlob BlobRef.create completionRef
+                               CompletionDigest = optionalBlob BlobDigest.create completionDigest |})
+
+                return
+                    match result with
+                    | Ok() -> box {| ok = true |}
+                    | Error error -> failure error
+        }
+
+    /// Produce a HandleRecord for consumeWork. When `stale` is provided it is a
+    /// completion cell the *caller* believes is durable; the controller must
+    /// ignore it and read the real work cell after refresh.
+    let private consumeRecord
+        (projection: AgentLinkageProjection)
+        (work: HandleWorkId)
+        (stale: obj)
+        : Result<HandleRecord, string> =
+        match HandleProjection.tryWork work projection with
+        | None -> Error "WorkNotAdmitted"
+        | Some durable ->
+            match Map.tryFind work.Handle projection.Handles with
+            | None -> Error "UnknownHandle"
+            | Some binding ->
+                let fromDurable =
+                    { binding with
+                        Work = Some durable.Work
+                        Lifecycle = durable.Lifecycle
+                        LastCompletion = durable.LastCompletion }
+
+                if isNull stale then
+                    Ok fromDurable
+                else
+                    match completionKind (string (stale?kind)) with
+                    | Error error -> Error error
+                    | Ok kind ->
+                        let cell =
+                            { Kind = kind
+                              CompletionRef = optionalBlob BlobRef.create (stale?completionRef)
+                              CompletionDigest = optionalBlob BlobDigest.create (stale?completionDigest) }
+
+                        Ok
+                            { fromDurable with
+                                Lifecycle = CompletedAwaitingJoin cell
+                                LastCompletion = Some cell }
+
+    let private consumeRejection (reason: HandleConsumeRejection) =
+        match reason with
+        | AlreadyRetired -> "AlreadyRetired"
+        | NotJoinable inner -> sprintf "%A" inner
+        | AppendFailed message -> message
+
+    /// Production consume of one admitted work. Optional `stale` completion is a
+    /// deliberately wrong caller cell — consume must still succeed from durable.
+    let consumeWork
+        (handle: JournalHandle)
+        (parent: string)
+        (agent: string)
+        (child: string)
+        (root: string)
+        (stale: obj)
+        : Task<obj> =
+        task {
+            let parentId = SessionId.create parent
+            let work = workId agent child root
+            let journal = AgentJournalPortAdapter.fromAgentJournal handle.Journal
+
+            match journal.RefreshProjection() with
+            | Error error -> return failure error
+            | Ok() ->
+                match consumeRecord (journal.HandleProjection parentId) work stale with
+                | Error error -> return failure error
+                | Ok record ->
+                    let! outcome = HandleController.consumeWork journal parentId record
+
+                    return
+                        match outcome with
+                        | Ok _ -> box {| ok = true |}
+                        | Error reason -> failure (consumeRejection reason)
         }
 
     let private lifecycle =

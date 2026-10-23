@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — HandleWorkConsumed 不再因过期 cell 触发 journal semantic cut
+
+- **根因**：`HandleController.consumeAdmittedWork` 在 `RefreshProjection` 之后仍用调用方传入的过期 `HandleRecord.Lifecycle` 作为 `HandleWorkConsumed` 的 expected cell。fold 用 durable `CompletedAwaitingJoin`/`Abandoned` 与 fact 做 `cellEqualsExpected`；调用方 cell 与 durable 不一致时 `ConsumptionMismatch` → journal fact reject → `FatalProcess.trip "journal-semantic-cut"`。
+- **修复**：consumption evidence 只取 refresh 后 durable work 的 cell；append 前对同一 cell 做 `HandleProjection.consumeWork` dry-run，会 reject 的不写 fact（软失败，不 cut）。
+- **证明**：`008.test.mjs` fast-check（seed `0x48434f4e`，2000 runs）覆盖 matching/mismatch/blank-id/Abandoned 形状；production 路径 64 组「durable cell ≠ stale caller cell」全部 consume 成功且重复 consume 为 `AlreadyRetired`，无 journal-cut。
+- **验证**：`node --test --test-name-pattern='matching durable|stale caller|EXEC_009_a_replayed|EXEC_004_a_retirement|fold_refuses|retirement removes|consume_abandoned' requirements/managed-session-lifecycle/tests/008.test.mjs` → 7/7 pass。fork 路径 `VIEW_DECLARATION_INVALID`（prefixUntil）为既有工作区问题，非本改。
+
 ## Unreleased — 评审成员化与义务台账收敛、免确认流、Plan 起草门禁与工程守卫清理
 
 - **评审成员能力化（`this.review`）与纯数据回执**：
