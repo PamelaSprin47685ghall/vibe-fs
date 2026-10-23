@@ -171,17 +171,20 @@ module PublicationLaw =
         (claimExpected: CommitHash)
         (record: ManagerJobProjection option)
         : ClaimReentry =
-        if claimTargetRef <> jobTargetRef then
-            ClaimReentry.Refused ClaimReentryRefusal.TargetMismatch
-        else
-            match record with
-            | None -> ClaimReentry.Refused ClaimReentryRefusal.MissingRecord
-            | Some job ->
-                match job.RebasedCandidateReady with
-                | None -> ClaimReentry.Refused ClaimReentryRefusal.MissingRebased
-                | Some rebased when rebased.RebasedCommit = claimRebased && rebased.TargetHeadSnapshot = claimExpected ->
-                    ClaimReentry.VerifyHead
-                | Some _ -> ClaimReentry.RunLoop
+        let rebasedCandidateReentry (job: ManagerJobProjection) =
+            match job.RebasedCandidateReady with
+            | None -> ClaimReentry.Refused ClaimReentryRefusal.MissingRebased
+            | Some rebased when
+                rebased.RebasedCommit = claimRebased
+                && rebased.TargetHeadSnapshot = claimExpected
+                ->
+                ClaimReentry.VerifyHead
+            | Some _ -> ClaimReentry.RunLoop
+
+        match record with
+        | _ when claimTargetRef <> jobTargetRef -> ClaimReentry.Refused ClaimReentryRefusal.TargetMismatch
+        | None -> ClaimReentry.Refused ClaimReentryRefusal.MissingRecord
+        | Some job -> rebasedCandidateReentry job
 
     /// A prepared candidate publishes only when the latest rebased record pins
     /// exactly this candidate on exactly this target head; otherwise it rebases.
@@ -286,41 +289,45 @@ module OrchestratorProjection =
         let sameOwner (recordedJobId: ManagerJobId) (recordedPath: WorktreePath) =
             recordedJobId = jobId && recordedPath = path
 
-        let reject failure = WorktreeReconciliationDecision.Reject failure
+        let reject failure =
+            WorktreeReconciliationDecision.Reject failure
 
-        match observation with
-        | WorktreeReconciliationObservation.NoDurableEffect ->
-            WorktreeReconciliationDecision.RequestThenCreate
-        | WorktreeReconciliationObservation.CreatedReceipt(recordedJobId, recordedPath)
-            when sameOwner recordedJobId recordedPath ->
-            WorktreeReconciliationDecision.AdoptCreated
-        | WorktreeReconciliationObservation.CreatedReceipt _
-        | WorktreeReconciliationObservation.RequestedConflict _ ->
-            reject WorktreeReconciliationFailure.DurableOwnershipConflict
-        | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, Error error)
-            when not (sameOwner recordedJobId recordedPath) ->
-            reject WorktreeReconciliationFailure.DurableOwnershipConflict
-        | WorktreeReconciliationObservation.RequestedAmbiguity(_, _, Error error) ->
-            reject(WorktreeReconciliationFailure.WorktreeQueryFailed error)
-        | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, Ok entries)
-            when not (sameOwner recordedJobId recordedPath) ->
-            reject WorktreeReconciliationFailure.DurableOwnershipConflict
-        | WorktreeReconciliationObservation.RequestedAmbiguity(_, _, Ok entries) ->
+        let reconcileAmbiguousEntries entries =
             let relevant =
                 entries
                 |> List.filter (fun (observedPath, observedIdentity) ->
                     observedPath = path || observedIdentity = Some identity)
 
+            let matchesCanonical (observedPath, observedIdentity) =
+                observedPath = path && observedIdentity = Some identity
+
             if List.isEmpty relevant then
                 WorktreeReconciliationDecision.CreateAfterProvenMissing
-            elif
-                relevant
-                |> List.forall (fun (observedPath, observedIdentity) ->
-                    observedPath = path && observedIdentity = Some identity)
-            then
+            elif List.forall matchesCanonical relevant then
                 WorktreeReconciliationDecision.AdoptThenRecordCreated
             else
                 reject WorktreeReconciliationFailure.PhysicalIdentityPathConflict
+
+        match observation with
+        | WorktreeReconciliationObservation.NoDurableEffect -> WorktreeReconciliationDecision.RequestThenCreate
+        | WorktreeReconciliationObservation.CreatedReceipt(recordedJobId, recordedPath) when
+            sameOwner recordedJobId recordedPath
+            ->
+            WorktreeReconciliationDecision.AdoptCreated
+        | WorktreeReconciliationObservation.CreatedReceipt _
+        | WorktreeReconciliationObservation.RequestedConflict _ ->
+            reject WorktreeReconciliationFailure.DurableOwnershipConflict
+        | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, Error error) when
+            not (sameOwner recordedJobId recordedPath)
+            ->
+            reject WorktreeReconciliationFailure.DurableOwnershipConflict
+        | WorktreeReconciliationObservation.RequestedAmbiguity(_, _, Error error) ->
+            reject (WorktreeReconciliationFailure.WorktreeQueryFailed error)
+        | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, Ok entries) when
+            not (sameOwner recordedJobId recordedPath)
+            ->
+            reject WorktreeReconciliationFailure.DurableOwnershipConflict
+        | WorktreeReconciliationObservation.RequestedAmbiguity(_, _, Ok entries) -> reconcileAmbiguousEntries entries
 
     let requestWorktree
         (identity: WorktreeIdentity)

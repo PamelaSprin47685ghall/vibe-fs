@@ -1,7 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Foundation.HostSession
-
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
@@ -82,10 +80,6 @@ type PluginRuntimeScope
     // DSL-MUTABLE: single-flight — HOST-006 startup probe one-shot latch
     let mutable startupProbeDone = false
 
-    /// degeneration-guard-008: process-local armed anomaly lives inside the sensor.
-    /// Optional until HostSignalBootstrap wires abort + ownership.
-    // DSL-MUTABLE: resource — loop sensor attachment slot
-    let mutable loopSensor: ILoopSensor option = None
     // DSL-MUTABLE: resource — message-visibility hub attachment slot
     let mutable messageVisibility: MessageVisibilityHub option = None
     // DSL-MUTABLE: resource — sync-delegate runtime attachment slot
@@ -183,18 +177,11 @@ type PluginRuntimeScope
 
     member _.SyncDelegateRuntime = syncDelegateRuntime
 
-    member _.AttachLoopSensor(sensor: ILoopSensor) = loopSensor <- Some sensor
-
     member _.AttachMessageVisibility(hub: MessageVisibilityHub) = messageVisibility <- Some hub
 
     /// None until the signal stack wires the hub; the catch-up re-read then
     /// falls back to its bounded immediate form.
     member _.MessageVisibility = messageVisibility
-
-    member _.LoopSensor: ILoopSensor =
-        match loopSensor with
-        | Some sensor -> sensor
-        | None -> invalidOp "LoopSensor must be attached by Host composition before use"
 
     /// Current-process join admission only; no cross-process tool recovery.
     member this.RequireCurrentProcessJoin(root: SessionId) : Task<FamilyRecovery> =
@@ -409,8 +396,6 @@ type PluginRuntimeScope
             do! attempt (fun () -> sessions.ClearSession sessionId)
 
             attemptSync (fun () -> recovery.ClearSession sessionId)
-
-            attemptSync (fun () -> this.LoopSensor.DropSession(SessionId.create sessionId))
 
             attemptSync (fun () -> recovery.ClearAttemptPlansFor sessionId)
 

@@ -45,8 +45,8 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
 
   assert.deepEqual(
     surface.capabilities.sort(),
-    ['Advisor', 'Fork', 'Glob', 'Grep', 'Horizon', 'Join', 'Read', 'Resume'],
-    'Manager capabilities must be {Read, Glob, Grep} plus the delegation primitives {Fork, Resume, Join, Horizon, Advisor}',
+    ['Advisor', 'Fork', 'Glob', 'Grep', 'Horizon', 'Join', 'Read', 'Resume', 'Review'],
+    'Manager capabilities must be {Read, Glob, Grep} plus the delegation primitives {Fork, Resume, Join, Horizon, Advisor} and the review member',
   )
 
   // 四层同构第 1 层：生成的 JsProgram 基类中不声明任何写方法

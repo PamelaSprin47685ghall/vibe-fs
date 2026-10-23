@@ -268,9 +268,7 @@ module SyncDelegateSurface =
 
                 try
                     match plugin with
-                    | Some owner ->
-                        children |> Seq.iter owner.LoopSensor.DropSession
-                        do! owner.DisposeAsync()
+                    | Some owner -> do! owner.DisposeAsync()
                     | None -> ()
                 finally
                     (scope :> IDisposable).Dispose()
@@ -940,10 +938,6 @@ module SyncDelegateSurface =
 
             plugin |> Option.iter (fun owner -> owner.AttachSyncDelegateRuntime runtime)
 
-            plugin
-            |> Option.iter (fun owner ->
-                HostTurnObserver.attachLoopSensor sessions rootWorkspace (Some journal) owner (fun _ _ -> ()))
-
             let scope =
                 new ToolRuntimeScope(
                     sessions,
@@ -1085,32 +1079,7 @@ module SyncDelegateSurface =
                 return! createWithAdmissions directory None RetryHarnessMode.ProviderRecovery admissions
             }
 
-    let createForGuardRecovery (directory: string) (owners: obj) : Task<obj> =
-        createForProviderRecovery directory owners
-
     let closeRecovery (value: obj) : Task = (unbox<Harness> value).CloseRecovery()
-
-    let closeGuardRecovery (value: obj) : Task = closeRecovery value
-
-    let observeGuardDelta (value: obj) (raw: obj) : unit =
-        match LoopEventCodec.tryDecodeTextDelta raw with
-        | None -> ()
-        | Some delta ->
-            (unbox<Harness> value).Plugin.Value.LoopSensor.Observe
-                { Session = delta.SessionId
-                  Message = delta.MessageId
-                  Delta = delta.Delta }
-
-    let awaitGuardInterrupt (value: obj) session providerRun : Task =
-        match
-            (unbox<Harness> value)
-                .Plugin.Value.LoopSensor.ActiveInterruptTask(
-                    SessionId.create session,
-                    ProviderRunIdentity.create providerRun
-                )
-        with
-        | Some running -> running
-        | None -> raise (InvalidOperationException "no guard interrupt exists for the exact provider run")
 
     /// D5: the session-control calls this harness's Host boundary received —
     /// every abort and every interrupt, with the session it aimed at, the
@@ -1687,7 +1656,7 @@ module SyncDelegateSurface =
 
         handleTurn harness turn.SessionId (Some ExecutionFailure.ProviderTransient) turn
 
-    let private observeRecoveryTurn (harness: Harness) abortCause context : Task =
+    let private observeRecoveryTurn (harness: Harness) context : Task =
         let owner = harness.Plugin |> Option.get
 
         TurnWorkflow.observe
@@ -1699,29 +1668,7 @@ module SyncDelegateSurface =
             harness.NudgeSent
             harness.JoinGuardNudges
             (fun _ -> false)
-            abortCause
             (harness.Gate :> ISessionQuiescenceGate)
-            context
-
-    let observeExactGuardAbort (value: obj) session physical authorityRoot providerRun : Task =
-        let harness = unbox<Harness> value
-
-        let context: ReconciledTurnContext =
-            { Turn =
-                { exactTerminalTurn session physical authorityRoot providerRun [||] with
-                    Directory = harness.RootWorkspace.TryRead()
-                    Outcome = ReconcileProgram.TurnAborted "guard interrupt" }
-              Failure = None
-              Quiescence = None
-              Delivery = ReconciledTurnDelivery.Observation }
-
-        HostTurnObserver.observe
-            (observeRecoveryTurn harness)
-            (harness.Sessions :> ISessionHostPort)
-            harness.RootWorkspace
-            harness.EventPort
-            (Some harness.Journal)
-            harness.Plugin.Value
             context
 
 
@@ -1780,7 +1727,7 @@ module SyncDelegateSurface =
                 | "idle" -> ReconciledTurnDelivery.IdleRevisit
                 | _ -> raise (ArgumentException "unknown repair delivery") }
 
-        observeRecoveryTurn harness AbortCause.External context
+        observeRecoveryTurn harness context
 
     let private settleReadyChild
         (harness: Harness)

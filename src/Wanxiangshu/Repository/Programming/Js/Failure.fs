@@ -58,6 +58,7 @@ type JsFailure =
     | InvalidReturnValue
     | ReadOnlyMutationRejected
     | ReviewOnly
+    | DraftWriteLocked
     | FileChanged of string
     | TransactionPrepareFailed
     | TransactionCommitFailed
@@ -132,6 +133,7 @@ module JsFailure =
         | JsFailure.InvalidReturnValue -> "INVALID_RETURN_VALUE"
         | JsFailure.ReadOnlyMutationRejected -> "READ_ONLY_MUTATION_REJECTED"
         | JsFailure.ReviewOnly -> "REVIEW_ONLY"
+        | JsFailure.DraftWriteLocked -> "DRAFT_WRITE_LOCKED"
         | JsFailure.FileChanged _ -> "FILE_CHANGED"
         | JsFailure.TransactionPrepareFailed -> "TRANSACTION_PREPARE_FAILED"
         | JsFailure.TransactionCommitFailed -> "TRANSACTION_COMMIT_FAILED"
@@ -194,6 +196,7 @@ module JsFailure =
         | JsFailure.InvalidReturnValue -> "run() return value is not JSON-compatible"
         | JsFailure.ReadOnlyMutationRejected -> "mutations are rejected on read-only surface"
         | JsFailure.ReviewOnly -> "This repository operation is available only during the current unaccepted review."
+        | JsFailure.DraftWriteLocked -> "Draft writes are locked until this tenure's first review is finished."
         | JsFailure.FileChanged path -> "target changed since the read snapshot; no implicit retry: " + path
         | JsFailure.TransactionPrepareFailed -> "transaction prepare failed"
         | JsFailure.TransactionCommitFailed -> "transaction commit failed"
@@ -275,6 +278,7 @@ module JsFailure =
         | "INVALID_RETURN_VALUE" -> JsFailure.InvalidReturnValue
         | "READ_ONLY_MUTATION_REJECTED" -> JsFailure.ReadOnlyMutationRejected
         | "REVIEW_ONLY" -> JsFailure.ReviewOnly
+        | "DRAFT_WRITE_LOCKED" -> JsFailure.DraftWriteLocked
         | "FILE_CHANGED" -> JsFailure.FileChanged(after "target changed since the read snapshot; no implicit retry: ")
         | "TRANSACTION_PREPARE_FAILED" -> JsFailure.TransactionPrepareFailed
         | "TRANSACTION_COMMIT_FAILED" -> JsFailure.TransactionCommitFailed

@@ -28,7 +28,7 @@ type TaskDeliveryWitness =
         Fence: TaskDeliveryFence
         FormalText: string
         ViewDeclaration: string
-        /// Canonical JSON string array owned by ReturnedMaterial.
+        /// Canonical { body, carry } JSON object owned by ReturnedMaterial.
         View: string
         MaterialDigest: string
         RetirementId: string option

@@ -46,11 +46,9 @@ test('WHAT[host-boundary-027] production inventory closes Host codec audiences w
 
   const envelope = requireShard(projects, 'host-event-envelope')
   const message = requireShard(projects, 'host-message-codec')
-  const loop = requireShard(projects, 'loop-event-codec')
 
   assert.equal(envelope.subsystem, 'host')
   assert.equal(message.subsystem, 'host')
-  assert.equal(loop.subsystem, 'host')
 
   assert.deepEqual(relSources(envelope), ['src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs'])
   assert.deepEqual(relSources(message), ['src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs'])
@@ -63,10 +61,6 @@ test('WHAT[host-boundary-027] production inventory closes Host codec audiences w
     'src/Wanxiangshu/Host/Digest.fs',
   ])
     assert.ok(!messageSources.has(unrelated), `message codec must not acquire ${unrelated}`)
-  assert.deepEqual(relSources(loop), ['src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs'])
-  // LoopEventCodec produces JournalAppendOutcome-shaped values — its decode path legitimately
-  // references the runtime-platform Outcome vocabulary (retagged JS codec tier authority).
-  assert.deepEqual(refShards(loop, projects), ['host-event-envelope', 'identity', 'outcome'])
 
   for (const id of ['host-session-runtime', 'authority-runtime-surface', 'opencode-codec-providerprojectionsurface']) {
     const consumer = requireShard(projects, id)
@@ -74,16 +68,9 @@ test('WHAT[host-boundary-027] production inventory closes Host codec audiences w
     assert.ok(!refShards(consumer, projects).includes('host-signal-adapter'), `${id} must not consume the wide signal adapter`)
   }
 
-  const loopRuntime = requireShard(projects, 'execution-session-loopdetector')
-  assert.ok(refShards(loopRuntime, projects).includes('loop-event-codec'))
-  assert.ok(!refShards(loopRuntime, projects).includes('host-signal-adapter'))
-  assert.ok(!refShards(loopRuntime, projects).includes('host-diagnostics-runtime'))
-
   const signalAdapter = requireShard(projects, 'host-signal-adapter')
   assert.ok(refShards(signalAdapter, projects).includes('host-event-envelope'))
-  assert.ok(refShards(signalAdapter, projects).includes('loop-event-codec'))
   assert.ok(!relSources(signalAdapter).includes('src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs'))
-  assert.ok(!relSources(signalAdapter).includes('src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs'))
 
   const visibility = requireShard(projects, 'opencode-host-messagevisibility')
   assert.ok(refShards(visibility, projects).includes('host-event-envelope'))

@@ -17,7 +17,6 @@ open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Repository.Investigation.WarmStart
 
 /// Manager fork & resume / Orchestrator commission: the product rules behind
 /// the three delegation commands, host-neutral. A host reaches them through
@@ -39,9 +38,6 @@ module ForkCommand =
 
             [<Literal>]
             let ArgCharge = "tool/fork/arg-charge"
-
-            [<Literal>]
-            let ArgKeywords = "tool/fork/arg-keywords"
 
             [<Literal>]
             let ArgAttach = "delegation/fork-attach-argument"
@@ -168,7 +164,6 @@ module ForkCommand =
         { Calling: string
           Name: string
           Charge: string
-          Keywords: string
           Attach: string option
           CommissionerRecord: string list
           ExpectedToolCalls: int option }
@@ -234,7 +229,6 @@ module ForkCommand =
                 { Calling = args.Text "calling"
                   Name = args.Text "name"
                   Charge = args.Text "charge"
-                  Keywords = args.Text "keywords"
                   Attach = args.OptionalText "attach" |> Option.map (fun value -> value.Trim())
                   CommissionerRecord = args.Texts "context"
                   ExpectedToolCalls = expectedToolCalls }
@@ -279,19 +273,10 @@ module ForkCommand =
         else
             "engineer"
 
-    let private hasKeywords (request: Request) =
-        not (String.IsNullOrWhiteSpace request.Keywords)
-
-    let private warmStartAllowed (role: Role) =
-        match role with
-        | Role.Engineer
-        | Role.DevOps -> true
-        | _ -> false
-
     let private prepareForkPromptWithRecord
-        (host: DelegationEnvironment)
+        (_host: DelegationEnvironment)
         (runtime: HostForkRuntime)
-        (role: Role)
+        (_role: Role)
         (request: Request)
         (attachment: string option)
         : Task<string> =
@@ -304,16 +289,7 @@ module ForkCommand =
                 []
                 None
 
-        if hasKeywords request then
-            RepositoryWarmStart.appendToBaseDocument
-                runtime.ParentId
-                role
-                (Option.map (fun (WorkspacePath path) -> path) host.WorkspaceDirectory)
-                request.Keywords
-                baseDocument
-            |> TaskValue.map (Result.defaultWith invalidOp >> LlmFacing.render)
-        else
-            Task.FromResult(LlmFacing.render baseDocument)
+        Task.FromResult(LlmFacing.render baseDocument)
 
     let private isSelfAttachment (request: Request) =
         request.Attach
@@ -324,6 +300,11 @@ module ForkCommand =
         handles
         |> Option.bind (HandleProjection.tryFindByByname attach)
         |> Result.requireSome Path.Fork.AttachUnknown
+
+    let private readAttachedView (host: DelegationEnvironment) (childSessionId: SessionId) =
+        match host.ViewForSession with
+        | None -> TaskResultCE.ofTask (Task.FromResult None)
+        | Some viewForSession -> viewForSession childSessionId |> TaskResultCE.ofTask
 
     let private resolveAttachment
         (host: DelegationEnvironment)
@@ -336,12 +317,9 @@ module ForkCommand =
             taskResult {
                 let! record = resolveAttachmentRecord handles attach
 
-                let! view =
-                    match host.ViewForSession with
-                    | None -> TaskResultCE.ofTask (Task.FromResult None)
-                    | Some viewForSession -> viewForSession record.ChildSessionId |> TaskResultCE.ofTask
+                let! view = readAttachedView host record.ChildSessionId
 
-                return view |> Option.map (ReturnedMaterial.texts >> String.concat "\n\n")
+                return view |> Option.map ReturnedMaterial.fullText
             }
 
     let private appendFissionAffinity durable (host: DelegationEnvironment) (lane: FissionLaneBinding) handleId =
@@ -442,6 +420,33 @@ module ForkCommand =
                 )
         }
 
+    let private placementWire (language) (request: Request) (result: ForkResult) =
+        match result with
+        | ForkResult.DispatchUncertain _ ->
+            consequence (namedProse language Path.Fork.ChargePlacementUncertain (request.Name.Trim()))
+        | _ -> successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
+
+    let private resolveNewManagerPlacement
+        (host: DelegationEnvironment)
+        (runtime: HostForkRuntime)
+        (request: Request)
+        language
+        (managed: ManagedAgent)
+        role
+        attachment
+        =
+        match host.NewHandleId with
+        | None -> Task.FromResult(Ok(consequence (prose language Path.Fork.ChargeContextUnavailable)))
+        | Some newHandleId ->
+            let handleId = newHandleId ()
+
+            taskResult {
+                do! recordFissionAffinity host handleId
+                let! result = runManagerFork host runtime role request language attachment handleId managed
+                announceChild runtime host handleId
+                return placementWire language request result
+            }
+
     let private commitNewManagerFork
         (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
@@ -452,26 +457,7 @@ module ForkCommand =
         attachment
         =
         task {
-            let! placement =
-                match host.NewHandleId with
-                | None -> Task.FromResult(Ok(consequence (prose language Path.Fork.ChargeContextUnavailable)))
-                | Some newHandleId ->
-                    let handleId = newHandleId ()
-
-                    taskResult {
-                        do! recordFissionAffinity host handleId
-                        let! result = runManagerFork host runtime role request language attachment handleId managed
-                        announceChild runtime host handleId
-
-                        return
-                            match result with
-                            | ForkResult.DispatchUncertain _ ->
-                                consequence (
-                                    namedProse language Path.Fork.ChargePlacementUncertain (request.Name.Trim())
-                                )
-                            | _ ->
-                                successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
-                    }
+            let! placement = resolveNewManagerPlacement host runtime request language managed role attachment
 
             match placement with
             | Ok wire -> return wire
@@ -501,12 +487,7 @@ module ForkCommand =
         handles
         (managed: ManagedAgent)
         =
-        let role = managed.Role
-
-        if hasKeywords request && not (warmStartAllowed role) then
-            Task.FromResult(consequence (prose language Path.Fork.WarmStartUnavailable))
-        else
-            finishNewManagerFork host runtime request language handles managed role
+        finishNewManagerFork host runtime request language handles managed managed.Role
 
     let private appendBusyGuidance (runtime: HostForkRuntime) (request: Request) language agentId profile rendered =
         task {
@@ -582,12 +563,6 @@ module ForkCommand =
             | Ok attachment -> return! commitIdleReuse host runtime request language role agentId attachment
         }
 
-    let private validateWarmStart (request: Request) (role: Role) language =
-        if hasKeywords request && not (warmStartAllowed role) then
-            Error(consequence (prose language Path.Fork.WarmStartUnavailable))
-        else
-            Ok()
-
     let private reuseWhileAllowed
         (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
@@ -597,9 +572,7 @@ module ForkCommand =
         (role: Role)
         agentId
         =
-        match validateWarmStart request role language with
-        | Error err -> Task.FromResult err
-        | Ok() -> reuseWhileIdle host runtime request language handles role agentId
+        reuseWhileIdle host runtime request language handles role agentId
 
     let private reuseResolvedAgent
         (host: DelegationEnvironment)
@@ -721,7 +694,7 @@ module ForkCommand =
     let private devopsDispatchRefusal (facts: ManagerCapabilityFacts) : string option =
         if not facts.HasAssessment then
             Some Path.Resume.AssessmentPendingForDevOps
-        elif facts.IsFinalIncumbent || facts.HasConfirmation then
+        elif facts.IsFinalIncumbent then
             Some Path.Resume.DispatchClosed
         else
             None
@@ -731,16 +704,16 @@ module ForkCommand =
         parentSessionId
         isDevOps
         : Task<string option> =
-        task {
-            if isDevOps then
-                match host.ManagerCapabilityFactsFor with
-                | None -> return None
-                | Some factsFor ->
+        let readRefusal () =
+            match host.ManagerCapabilityFactsFor with
+            | None -> Task.FromResult None
+            | Some factsFor ->
+                task {
                     let! facts = factsFor parentSessionId
                     return devopsDispatchRefusal facts
-            else
-                return None
-        }
+                }
+
+        if isDevOps then readRefusal () else Task.FromResult None
 
     let private bindWorkDevOpsIfNeeded (host: DelegationEnvironment) parentSessionId isDevOps =
         task {
@@ -922,7 +895,6 @@ module ForkCommand =
                       (prose language Path.Fork.ArgCalling)
                   argument "name" ArgumentShape.Text (prose language Path.Fork.ArgName)
                   argument "charge" ArgumentShape.Text (prose language Path.Fork.ArgCharge)
-                  argument "keywords" ArgumentShape.OptionalText (prose language Path.Fork.ArgKeywords)
                   argument "attach" ArgumentShape.OptionalText (prose language Path.Fork.ArgAttach)
                   expectedToolCallsArgument language ] }
         | Command.Resume ->
@@ -931,7 +903,6 @@ module ForkCommand =
               Arguments =
                 [ argument "name" ArgumentShape.Text (prose language Path.Fork.ArgName)
                   argument "charge" ArgumentShape.Text (prose language Path.Fork.ArgCharge)
-                  argument "keywords" ArgumentShape.OptionalText (prose language Path.Fork.ArgKeywords)
                   argument "attach" ArgumentShape.OptionalText (prose language Path.Fork.ArgAttach)
                   expectedToolCallsArgument language ] }
         | Command.Commission ->
@@ -1020,12 +991,7 @@ module ForkCommand =
         handles
         (managed: ManagedAgent)
         : Task<Result<ForkReceipt, string>> =
-        let role = managed.Role
-
-        if hasKeywords request && not (warmStartAllowed role) then
-            Task.FromResult(Error(refusalCode Path.Fork.WarmStartUnavailable))
-        else
-            finishNewManagerForkReceipt host runtime request language handles managed role
+        finishNewManagerForkReceipt host runtime request language handles managed managed.Role
 
     let private resolveDerivedManagedCalling bindings derived =
         match tryCalling bindings derived with
@@ -1204,19 +1170,21 @@ module ForkCommand =
         | Error _, _ -> Task.FromResult(Error "placement-failed")
         | _ -> Task.FromResult(Error "not-a-delegation-role")
 
+    let private executeReceiptForRole (host: DelegationEnvironment) (args: ICommandArguments) (roleOpt: Role option) =
+        match roleOpt with
+        | None -> Task.FromResult(Error "not-a-delegation-role")
+        | Some role ->
+            let language = lang host
+            let decoded = decode language args
+            dispatchRoleReceipt host role decoded
+
     let receipt (host: DelegationEnvironment) (args: ICommandArguments) : Task<Result<ForkReceipt, string>> =
         task {
             match host.CallerRole with
             | None -> return Error "not-a-delegation-role"
             | Some callerRole ->
                 let! roleOpt = callerRole ()
-
-                match roleOpt with
-                | None -> return Error "not-a-delegation-role"
-                | Some role ->
-                    let language = lang host
-                    let decoded = decode language args
-                    return! dispatchRoleReceipt host role decoded
+                return! executeReceiptForRole host args roleOpt
         }
 
     let private resumeResultReceipt (request: Request) (result: ForkResult) : Result<ForkReceipt, string> =
@@ -1314,10 +1282,7 @@ module ForkCommand =
         (role: Role)
         agentId
         : Task<Result<ForkReceipt, string>> =
-        if hasKeywords request && not (warmStartAllowed role) then
-            Task.FromResult(Error(refusalCode Path.Fork.WarmStartUnavailable))
-        else
-            resumeIdleAttachedReceipt host runtime request handles role agentId
+        resumeIdleAttachedReceipt host runtime request handles role agentId
 
     /// The agent id behind a handle, or the person-unknown refusal.
     let private handleAgentId (handle: HandleRecord) : Result<AgentHandleId, string> =

@@ -67,20 +67,6 @@ One more hidden trap: the dictionary order of an event's identity number is numb
 
 The merge must come out clean: however many journals, whichever machine, whatever order they are fed in, the folded situation must be identical, every single time. Said, done, and done the same way every time.
 
-## Stop losses before degeneration
-
-People sometimes lose their grip: the words grow more and more repetitive, the same few sentences over and over; or they drift further and further loose, characters scattered past any human shape.
-
-This world does not wait for them to hit the wall.
-
-What counts as normal? Not by some lord's fiat. The measure is this repository's own ordinary output: two empirical quantile boundaries drawn from the measured corpus. Inside the boundary is normal; outside it is degeneration — repetition pushed past form, or randomness pushed past form; both directions count. Sitting exactly on the line still counts as inside. The boundary does not loosen because of who is speaking or in what language, and nobody may quietly widen it at runtime.
-
-Once the line is crossed, decide on the spot: interrupt the current physical attempt and cut the pollution off while it is still thin. This is not about success or failure. It is stopping losses.
-
-Who owns the continuation after the cut? The guard itself. It knows why it acted, so it picks the thread up where it stands and says only one thing: say it another way. Every other rescue route — coaxing, retrying, downgrading — stands aside. No second hand may meddle in this attempt. And the continuation happens exactly once; once said, it is said.
-
-The cause of a cut belongs to that attempt alone: it is not journalled, not inherited, and the next attempt tells its own story.
-
 ## A finding is not another recitation
 
 A fault stands only when the triggering fact, a counterexample that fits, and the point that separates it from a nearby case are all present. Missing any one of them, it is a guess, not a diagnosis. A diagnosis standing is not by itself a reason to send the same words again.

@@ -78,6 +78,23 @@ export const HOST_PHYSICAL_CANARY_FILES = new Set([
  */
 export const SURFACE_MANIFEST = [
   {
+    module: 'Composition/Omp/OmpExtension.js',
+    owner: 'time-capability',
+    laws: ['TIME-004', 'HOST-BOUNDARY-035'],
+    lawOwners: { 'HOST-BOUNDARY-035': 'host-boundary' },
+    source: 'src/Wanxiangshu/Composition/Omp/OmpExtension.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
+    module: 'Interaction/Authority/LifeClassification.js',
+    owner: 'interaction-authority',
+    laws: ['INTERACTION-AUTHORITY-018'],
+    source: 'src/Wanxiangshu/Interaction/Authority/LifeClassification.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Interaction/Authority/Surface.js',
     owner: 'participant-identity',
     laws: ['PID-005', 'PID-002'],
@@ -705,14 +722,7 @@ export const SURFACE_MANIFEST = [
     representation: 'opaque-capability',
     kind: 'resource',
   },
-  {
-    module: 'OpenCode/Host/LoopSensorSurface.js',
-    owner: 'degeneration-guard',
-    laws: ['DG-001', 'DG-002', 'DG-006', 'DG-007', 'DG-008', 'DG-009', 'DG-010', 'DG-013'],
-    source: 'src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs',
-    representation: 'opaque-capability',
-    kind: 'resource',
-  },
+
   {
     module: 'Composition/Turn/ReconcileSurface.js',
     owner: 'structured-workflow',
@@ -942,7 +952,6 @@ export const SURFACE_MANIFEST = [
       'INTERACTION-AUTHORITY-009',
       'INTERACTION-AUTHORITY-010',
       'INTERACTION-AUTHORITY-011',
-      'INTERACTION-AUTHORITY-012',
       'INTERACTION-AUTHORITY-013',
       'INTERACTION-AUTHORITY-014',
       'INTERACTION-AUTHORITY-015',
@@ -1435,14 +1444,7 @@ export const SURFACE_MANIFEST = [
     representation: 'json',
     kind: 'pure',
   },
-  {
-    module: 'Execution/Session/LoopDetectorSurface.js',
-    owner: 'degeneration-guard',
-    laws: ['DG-001', 'DG-003', 'DG-004', 'DG-005', 'DG-006'],
-    source: 'src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs',
-    representation: 'opaque-capability',
-    kind: 'resource',
-  },
+
   {
     module: 'Change/Host/Surface.js',
     owner: 'change-integration',

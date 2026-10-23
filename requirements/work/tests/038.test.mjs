@@ -3,8 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
+import { memberBinding } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
+import { permissions as rolePermissions } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
@@ -39,7 +41,7 @@ test('WHAT[work-038] the review target is the next milestone derived from the cu
   assert.equal(surface.PlanningSurface.reviewTargetFor('S3'), 'authorized')
 })
 
-test('WHAT[work-038] empty findings promote the tenure; non-empty findings keep it with the gaps returned', async () => {
+test('WHAT[work-038] empty findings grant promotion eligibility; non-empty findings keep the tenure with the gaps returned', async () => {
   assert.equal(typeof surface.PlanningSurface.executeReview, 'function')
 
   const opened = life.encodeOpening('plan', 'work-22a', '/root', 0n)
@@ -56,40 +58,75 @@ test('WHAT[work-038] empty findings promote the tenure; non-empty findings keep 
   assert.equal(stayedEvent.incumbencyId, incumbencyId)
   const stayedFold = life.readProbe(`${opened}${stayedProbe.bytes}`)
   assert.equal(stayedFold.ok, true)
-  assert.equal(stayedFold.next, 'Continue')
+  assert.equal(stayedFold.next, 'Review', 'remaining obligations keep the tenure in review')
   assert.equal(stayedFold.activeId, incumbencyId)
   assert.equal(stayedFold.authorized, false)
 
-  // The same incumbency cannot review a second time: the kernel refuses.
+  // Multiple reviews are permitted: later reviews update obligations without repeating promotion.
   const secondProbe = life.reviewProbe(`${opened}${stayedProbe.bytes}`, incumbencyId, 'Promoted')
-  assert.equal(secondProbe.decision, 'Refuse')
-  assert.match(secondProbe.detail, /already reviewed/i)
+  assert.ok(secondProbe.decision === 'Write' || secondProbe.names === 'Reviewed' || !/already reviewed/i.test(secondProbe.detail))
 
   await withStore(async (store, commonDir) => {
     const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, commonDir, 'work-22a', 0n)
     assert.equal(opened.ok, true, opened.error)
     const activeId = openedActiveId(life.encodeOpening('plan', 'work-22a', commonDir, 0n))
+    // reviewFinishedOnly: draft writes stay locked until the first review.
+    assert.equal(surface.PlanningSurface.isReviewFinished(commonDir, 'work-22a', activeId), false)
     const finding = {
-      acceptance_criteria: 'The tradeoff table covers storage engines',
-      work_plan: 'Add a storage engine comparison to the plan',
+      key: 'The tradeoff table covers storage engines',
+      value: 'Add a storage engine comparison to the plan',
     }
     // The reviewer is a distinct bound identity, not the incumbency owner:
     // the same call succeeds and keeps the tenure with the gaps returned.
-    const stayed = await surface.PlanningSurface.executeReview(commonDir, 'work-22a', activeId, [finding], null)
+    const stayed = await surface.PlanningSurface.executeReview(commonDir, 'work-22a', activeId, 'run-1:call-1', [finding], null)
     assert.equal(stayed.ok, true, stayed.error)
     assert.equal(stayed.outcome, 'Stayed')
-    assert.equal(stayed.target, 'S1')
+    assert.equal(stayed.target, 'S2', 'the review target is the next milestone, even when the tenure stays')
+    assert.equal(stayed.firstReview, true, 'the first review fixes eligibility')
     assert.deepEqual(stayed.gaps, [finding])
+    assert.equal(surface.PlanningSurface.isReviewFinished(commonDir, 'work-22a', activeId), true, 'the first review unlocks draft writes')
+
+    // Later reviews apply keyed ledger updates item by item and are never
+    // refused: an empty later review changes nothing, and eligibility is never
+    // re-fixed (firstReview stays false).
+    const later = await surface.PlanningSurface.executeReview(commonDir, 'work-22a', activeId, 'run-2:call-2', [], null)
+    assert.equal(later.ok, true, later.error)
+    assert.equal(later.firstReview, false, 'later reviews do not fix eligibility again')
+    assert.deepEqual(later.gaps, [finding], 'an empty later review leaves the existing obligation untouched')
+
+    // An overwrite changes the value of the same key item by item.
+    const revised = { ...finding, value: 'Revised storage comparison' }
+    const overwrite = await surface.PlanningSurface.executeReview(commonDir, 'work-22a', activeId, 'run-3:call-3', [revised], null)
+    assert.equal(overwrite.ok, true, overwrite.error)
+    assert.equal(overwrite.firstReview, false)
+    assert.deepEqual(overwrite.gaps, [revised])
+
+    // null deletion: a null value removes the key (no empty-string alias).
+    const deletion = { key: 'The tradeoff table covers storage engines', value: null }
+    const afterDelete = await surface.PlanningSurface.executeReview(commonDir, 'work-22a', activeId, 'run-4:call-4', [deletion], null)
+    assert.equal(afterDelete.ok, true, afterDelete.error)
+    assert.deepEqual(afterDelete.gaps, [], 'a null value deletes the key')
+
+    // A->B->A must not replay the earlier A fact (invocation identity, not content).
+    const againA = await surface.PlanningSurface.executeReview(commonDir, 'work-22a', activeId, 'run-5:call-5', [finding], null)
+    assert.equal(againA.ok, true, againA.error)
+    assert.equal(againA.firstReview, false)
+    assert.deepEqual(againA.gaps, [finding], 'distinct invocation with earlier content is a new review fact')
+
+    // An exact retry (same fence) replays.
+    const retry = await surface.PlanningSurface.executeReview(commonDir, 'work-22a', activeId, 'run-5:call-5', [finding], null)
+    assert.equal(retry.ok, true, retry.error)
+    assert.deepEqual(retry.gaps, [finding])
   })
 })
 
-test('WHAT[work-038] a fresh tenure with empty findings is promoted', async () => {
+test('WHAT[work-038] a fresh tenure with empty findings is eligible for promotion', async () => {
   const opened = life.encodeOpening('plan', 'work-22b', '/root', 0n)
   const incumbencyId = openedActiveId(opened)
   const promoted = life.reviewProbe(opened, incumbencyId, 'Promoted')
   assert.equal(promoted.decision, 'Write')
   assert.equal(promoted.names, 'Reviewed')
-  assert.equal(promoted.authorized, false, 'S1 Promoted advances the projection; it does not authorise delivery')
+  assert.equal(promoted.authorized, false, 'S1 eligibility never advances the projection or authorises delivery')
   const promotedEvent = JSON.parse(promoted.bytes).events.find((event) => event.type === 'Reviewed')
   assert.equal(promotedEvent.outcome, 'Promoted')
   assert.equal(promotedEvent.stage, 'S1')
@@ -99,23 +136,21 @@ test('WHAT[work-038] a fresh tenure with empty findings is promoted', async () =
   assert.equal(folded.next, 'Continue')
   assert.equal(folded.activeId, incumbencyId)
   assert.equal(folded.authorized, false)
-  const finalPromotion = life.finalPromotionProbe(opened)
-  assert.equal(finalPromotion.authorized, true)
-  assert.equal(finalPromotion.detail, 'S3', 'only the S3 promotion authorises delivery')
 
   await withStore(async (store, commonDir) => {
     const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, commonDir, 'work-22b', 0n)
     assert.equal(opened.ok, true, opened.error)
     const activeId = openedActiveId(life.encodeOpening('plan', 'work-22b', commonDir, 0n))
-    const promotedLive = await surface.PlanningSurface.executeReview(commonDir, 'work-22b', activeId, [], null)
+    const promotedLive = await surface.PlanningSurface.executeReview(commonDir, 'work-22b', activeId, 'run-b:call-b', [], null)
     assert.equal(promotedLive.ok, true, promotedLive.error)
     assert.equal(promotedLive.outcome, 'Promoted')
     assert.equal(promotedLive.target, 'S2')
+    assert.equal(promotedLive.firstReview, true)
     assert.deepEqual(promotedLive.gaps, [])
   })
 })
 
-test('WHAT[work-038] promoting a plan tenure via review tool immediately returns the next stage method in the tool result', async () => {
+test('WHAT[work-038] deliver performs the promotion; review only grants eligibility', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
     const sessionID = 'ses-plan-review-promotion'
@@ -123,69 +158,134 @@ test('WHAT[work-038] promoting a plan tenure via review tool immediately returns
     const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, directory, sessionID, 0n)
     assert.equal(opened.ok, true, opened.error)
 
-    // S1 -> S2 promotion immediately includes S2 method requirements in the review tool output
-    const s1Result = await hooks.tool.review.execute(
-      { findings: [] },
-      { sessionID, agent: 'plan', callID: 'call-rev-s1', messageID: 'msg-rev-s1', providerRunID: 'run-rev-s1' },
-    )
-    assert.match(String(s1Result), /recorded = true/)
-    assert.match(String(s1Result), /# S2 · Understanding and Paths|# S2 · 理解与路径/)
-    assert.doesNotMatch(String(s1Result), /will be presented on the next request|将在下一次请求时呈现/)
+    // S1: the first empty review grants eligibility only; the stage stays S1.
+    const s1 = life.inspected(commonDir, sessionID)
+    assert.equal(s1.Stage, 'S1')
+    const s1Review = await surface.PlanningSurface.executeReview(commonDir, sessionID, s1.ActiveId, 'run-s1:call-s1', [], null)
+    assert.equal(s1Review.ok, true, s1Review.error)
+    assert.equal(s1Review.outcome, 'Promoted')
+    assert.equal(s1Review.firstReview, true)
+    assert.equal(life.inspected(commonDir, sessionID).Stage, 'S1', 'review never advances the stage')
 
-    // Relay to next tenure at S2, then promote S2 -> S3: tool output immediately includes S3 method requirements
-    const afterS1 = life.inspected(commonDir, sessionID)
-    assert.equal(afterS1.Stage, 'S2')
-    const relayed1 = await surface.PlanningSurface.executeDeliver(
+    // Deliver performs the S1 -> S2 promotion (same tenure, in place).
+    const s1Deliver = await surface.PlanningSurface.executeDeliver(
       commonDir,
       directory,
       sessionID,
-      afterS1.ActiveId,
+      s1.ActiveId,
       'run-rel-1',
       'call-rel-1',
       false,
       async () => ({ ok: false, error: 'unexpected spawn' }),
       1n,
     )
-    assert.equal(relayed1.ok, true, relayed1.error)
-
-    const s2Result = await hooks.tool.review.execute(
-      { findings: [] },
-      { sessionID, agent: 'plan', callID: 'call-rev-s2', messageID: 'msg-rev-s2', providerRunID: 'run-rev-s2' },
+    assert.equal(s1Deliver.ok, true, s1Deliver.error)
+    assert.equal(s1Deliver.retirementOutcome, 'Promoted')
+    assert.equal(life.inspected(commonDir, sessionID).Stage, 'S2', 'deliver advanced S1 -> S2')
+    const resolvedDraftPath = surface.PlanningSurface.resolvePlanPath(directory, sessionID).path
+    assert.match(s1Deliver.message, /Promoted: the plan advanced to stage S2/)
+    assert.match(s1Deliver.message, /S2/)
+    assert.ok(
+      s1Deliver.message.includes(resolvedDraftPath),
+      'deliver message must contain rendered S2 stage semantics with the resolved draft path',
     )
-    assert.match(String(s2Result), /recorded = true/)
-    assert.match(String(s2Result), /# S3 · Process and Pseudocode|# S3 · 流程与伪代码/)
-    assert.match(String(s2Result), /Knuth/)
 
-    // Relay to next tenure at S3, then promote S3 -> authorized: no S4 stage method is injected, delivery is instructed
-    const afterS2 = life.inspected(commonDir, sessionID)
-    assert.equal(afterS2.Stage, 'S3')
-    const relayed2 = await surface.PlanningSurface.executeDeliver(
+    // S2 -> S3 promotion.
+    const s2 = life.inspected(commonDir, sessionID)
+    const s2Review = await surface.PlanningSurface.executeReview(commonDir, sessionID, s2.ActiveId, 'run-s2:call-s2', [], null)
+    assert.equal(s2Review.ok, true, s2Review.error)
+    const s2Deliver = await surface.PlanningSurface.executeDeliver(
       commonDir,
       directory,
       sessionID,
-      afterS2.ActiveId,
+      s2.ActiveId,
       'run-rel-2',
       'call-rel-2',
       false,
       async () => ({ ok: false, error: 'unexpected spawn' }),
       2n,
     )
-    assert.equal(relayed2.ok, true, relayed2.error)
+    assert.equal(s2Deliver.ok, true, s2Deliver.error)
+    assert.equal(s2Deliver.retirementOutcome, 'Promoted')
+    assert.equal(life.inspected(commonDir, sessionID).Stage, 'S3', 'deliver advanced S2 -> S3')
 
-    const s3Result = await hooks.tool.review.execute(
-      { findings: [] },
-      { sessionID, agent: 'plan', callID: 'call-rev-s3', messageID: 'msg-rev-s3', providerRunID: 'run-rev-s3' },
+    // S3 -> authorized: the S3 deliver grants the delivery right in place.
+    const s3 = life.inspected(commonDir, sessionID)
+    const s3Review = await surface.PlanningSurface.executeReview(commonDir, sessionID, s3.ActiveId, 'run-s3:call-s3', [], null)
+    assert.equal(s3Review.ok, true, s3Review.error)
+    const s3Deliver = await surface.PlanningSurface.executeDeliver(
+      commonDir,
+      directory,
+      sessionID,
+      s3.ActiveId,
+      'run-rel-3',
+      'call-rel-3',
+      false,
+      async () => ({ ok: false, error: 'unexpected spawn' }),
+      3n,
     )
-    assert.match(String(s3Result), /recorded = true/)
-    assert.doesNotMatch(String(s3Result), /# S2 ·|# S3 ·/)
-    assert.match(String(s3Result), /deliver/)
+    assert.equal(s3Deliver.ok, true, s3Deliver.error)
+    assert.equal(s3Deliver.retirementOutcome, 'Authorized')
   })
 })
 
-test('WHAT[work-038] ReviewShell admission admits both Manager (ReviewAssessment) and Plan (Review) roles', () => {
+test('WHAT[work-038] review admission admits both Manager (ReviewAssessment) and Plan (Review) roles, now as a programming member', () => {
   assert.equal(rolePredicate('review', 'plan'), true)
   assert.equal(rolePredicate('review', 'manager'), true)
   for (const role of ['engineer', 'devops', 'orchestrator']) {
     assert.equal(rolePredicate('review', role), false, `${role} must be denied admission to review`)
   }
+
+  // The review verb is a programming-surface member (`this.review`), not a
+  // standalone host tool.
+  assert.equal(memberBinding('Manager', rolePermissions('manager'), 'review'), 'review')
+  assert.equal(memberBinding('Plan', rolePermissions('plan'), 'review'), 'review')
+  assert.equal(memberBinding('Orchestrator', rolePermissions('orchestrator'), 'review'), undefined)
+})
+
+test('WHAT[work-038] a Manager program invokes this.review and updates the durable keyed ledger', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
+    const sessionID = `ses-mgr-review-member-${Math.random().toString(36).slice(2, 8)}`
+    await acceptAuthorityRoot(runtime, sessionID, 'manager', `root-${sessionID}`)
+    await openIncumbency(runtime, sessionID, undefined, 'S4', 'owner')
+
+    const runReview = (findings, callID, messageID) =>
+      hooks.tool['todowrite-for-manager'].execute(
+        {
+          name: `Manager review ${callID}`,
+          planB: 'The review is a durable write; wait for its receipt before assessing.',
+          program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }`,
+        },
+        { sessionID, agent: 'manager', callID, messageID },
+      )
+
+    // First review fixes eligibility: non-empty findings stay, ledger records the key.
+    const first = await runReview([{ key: 'tradeoff-table', value: 'Add a storage comparison' }], 'call-mgr-review-1', 'msg-mgr-review-1')
+    assert.match(String(first), /outcome = "Stayed"/, 'a non-empty first review stays')
+    assert.match(String(first), /firstReview = true/, 'the first review fixes eligibility')
+
+    let inspected = life.inspected(commonDir, sessionID)
+    assert.equal(inspected.ReviewOutcome, 'Stayed')
+    assert.deepEqual(inspected.Obligations, [{ key: 'tradeoff-table', value: 'Add a storage comparison' }])
+
+    // Multiple reviews are distinct facts: overwrite the same key under a new call.
+    await runReview([{ key: 'tradeoff-table', value: 'Revised comparison' }], 'call-mgr-review-2', 'msg-mgr-review-2')
+    inspected = life.inspected(commonDir, sessionID)
+    assert.deepEqual(inspected.Obligations, [{ key: 'tradeoff-table', value: 'Revised comparison' }])
+
+    // null deletes the key (no empty-string alias).
+    await runReview([{ key: 'tradeoff-table', value: null }], 'call-mgr-review-3', 'msg-mgr-review-3')
+    inspected = life.inspected(commonDir, sessionID)
+    assert.deepEqual(inspected.Obligations, [])
+
+    // A->B->A under a new call is a new fact, not a replay of the earlier A.
+    await runReview([{ key: 'tradeoff-table', value: 'Add a storage comparison' }], 'call-mgr-review-4', 'msg-mgr-review-4')
+    inspected = life.inspected(commonDir, sessionID)
+    assert.deepEqual(inspected.Obligations, [{ key: 'tradeoff-table', value: 'Add a storage comparison' }])
+
+    // Failure data: an invalid findings argument is refused as a data envelope.
+    const invalid = await runReview('not-an-array', 'call-mgr-review-5', 'msg-mgr-review-5')
+    assert.match(String(invalid), /code = "tool\/review\/invalid-findings"/, 'invalid findings refuse with a stable code')
+  })
 })

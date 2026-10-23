@@ -264,7 +264,6 @@ test('WHAT[interaction-authority-005] IA_005_every_continuation_kind_is_parseabl
     'HumanMessage',
     'ManagedDelegationAssignment',
     'ProviderRetryAttempt',
-    'DegenerationGuard',
     'FissionHandoff',
   ]
 

@@ -25,7 +25,6 @@ module TurnWorkflow =
         nudgeSent: HashSet<string> ->
         joinGuardNudges: HashSet<string> ->
         hasLivePty: (string -> bool) ->
-        abortCause: AbortCause ->
         quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
             Task

@@ -2,10 +2,16 @@ import { withExecutablePlugin, acceptAuthorityRoot, openIncumbency } from '../..
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
-// A non-empty findings array is the only failing shape; an empty array passes.
-export const findings = grade => grade === 'REVISE'
-  ? { findings: [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }] }
-  : { findings: [] }
+// Keyed findings: findings is an array of { key, value }. A null value deletes the key.
+export const findings = (grade, key = 'target-gap') => {
+  if (grade === 'REVISE') {
+    return { findings: [{ key, value: 'close the remaining gap' }] }
+  }
+  if (grade === 'CLEAR') {
+    return { findings: [{ key, value: null }] }
+  }
+  return { findings: [] }
+}
 export const scores = findings
 // ModelRouting is a process singleton: a test that supersedes a physical
 // message keeps it superseded for later tests, so isolated callers pass their own session.
@@ -24,11 +30,20 @@ export const withReview = async (body, {ownerId, session = 'review-manager'} = {
       parts: [
         {type: 'reasoning', text: 'private reasoning is not public evidence'},
         {type: 'text', text: before},
-        {type: 'tool', tool: 'review', callID: call, state: {status: 'pending', input}},
+        {type: 'tool', tool: 'todowrite-for-manager', callID: call, state: {status: 'pending', input: {}}},
         {type: 'text', text: after},
       ],
     })
-    const result = await hooks.tool.review.execute(input, {sessionID: session, callID: call, messageID: run, agent: 'manager'})
+    const findingsArray = Array.isArray(input) ? input : (input?.findings ?? [])
+    const program = `class Js extends JsProgram {
+      async run() {
+        return await this.review(${JSON.stringify(findingsArray)});
+      }
+    }`
+    const result = await hooks.tool['todowrite-for-manager'].execute(
+      { name: 'review-member', program },
+      { sessionID: session, callID: call, messageID: run, agent: 'manager' },
+    )
     // The review run is finished once its tool returns. A later provider request
     // of the same user message must not see it as a second unsealed assistant.
     const pushed = runtime.messages.find(message => (message.info?.id ?? message.id) === run)

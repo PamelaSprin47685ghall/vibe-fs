@@ -1,6 +1,6 @@
 # Tool · deliver
 
-End the current incumbency via relay or completion, or proceed to execution when authorized.
+Promote or complete the current incumbency when eligible, or relay it; deliver performs the promotion itself, and refuses while blockers or obligations remain.
 
 ## Contract and Usage
 
@@ -9,15 +9,15 @@ End the current incumbency via relay or completion, or proceed to execution when
    - An unanswered user `ask` is an explicit wait, not completion.
    - For delivery, the plan artifact `P` must be present and non-empty; delivery is forbidden while `P` is empty or missing.
 
-2. **Relay vs Completion**:
-   - Naming a successor relays the work; naming none completes it.
-   - One delivery intent is enough: a single call completes or relays atomically without a double-deliver or confirmation ritual.
-   - Review is a recorded collaboration fact, not a precondition: unreviewed relays are permitted and succeed without forcing an assessment.
+2. **Promotion, Relay, Completion**:
+   - Review grants eligibility; `deliver` performs the promotion. When eligible and the obligation ledger is empty, deliver advances the stage (`S1`→`S2`, `S2`→`S3`, `S3`→delivery authority) and its return presents the next stage's method.
+   - For an execution (`S4`) tenure, an eligible deliver completes the work; an ineligible deliver (or one naming a successor) relays atomically to a successor at the same stage.
+   - `deliver` refuses — returning the outstanding items — while a resource is still blocked or the obligation ledger is not empty. There is no double-deliver and no confirmation ritual.
    - If history needs organizing before handover, supply both top-level programming parameters `prefixCount` and `carry` to keep what the successor needs; the current turn is kept automatically.
-   - `deliver` retires this incumbency atomically and opens the successor at the same stage. A retired tenure cannot close or affect the new one.
+   - A retired tenure cannot close or affect the new one.
 
 3. **Delivery Governed by User Grant**:
-   - Calling `deliver` with delivery authorization (after `S3` review passes and non-empty `P` is verified) proceeds according to the user's grant:
+   - Calling `deliver` with delivery authorization (after `S3` gains authority and non-empty `P` is verified) proceeds according to the user's grant:
      - **Plan-Only Grant**: The system closes out the current incumbency and stops the attempt; the retired run is no longer nudged, and the finished plan `P` is returned.
      - **Plan-Then-Execute Grant**: When the user explicitly granted execution authority, the system launches the `S4` (Manager) execution session directly without forcing the user to repeat the decision or ask twice.
    - The delivery path is forbidden without authority; an unauthorized delivery relays rather than delivers.

@@ -13,18 +13,6 @@ module PlanPath =
     [<Import("readFileSync", "node:fs")>]
     let private readFileSync (path: string, encoding: string) : string = jsNative
 
-    [<Import("writeFileSync", "node:fs")>]
-    let private writeFileSync (path: string, data: string, encoding: string) : unit = jsNative
-
-    [<Import("renameSync", "node:fs")>]
-    let private renameSync (source: string, destination: string) : unit = jsNative
-
-    [<Import("mkdirSync", "node:fs")>]
-    let private mkdirSyncPhysical (path: string, options: obj) : unit = jsNative
-
-    [<Import("dirname", "node:path")>]
-    let private dirnamePhysical (path: string) : string = jsNative
-
     let validateWorkId (workId: string) : Result<string, string> =
         if String.IsNullOrWhiteSpace workId then
             Error "Work ID cannot be empty or whitespace"
@@ -75,46 +63,3 @@ module PlanPath =
 
     let readPlan (root: string) (workId: string) : Result<string, string> =
         resolvePlanPath root workId |> Result.bind readPlanFile
-
-    let private ensureDir (dir: string) : unit =
-        if not (existsSync dir) then
-            mkdirSyncPhysical (dir, box {| recursive = true |})
-
-    let private writePlanFile (content: string) (path: string) : Result<string * string, string> =
-        try
-            let dir = dirnamePhysical path
-            ensureDir dir
-            let tmpFile = path + ".tmp." + Guid.NewGuid().ToString("N")
-            writeFileSync (tmpFile, content, "utf8")
-            renameSync (tmpFile, path)
-            let digest = HostDigest.sha256Hex content
-            Ok(path, digest)
-        with ex ->
-            Error(sprintf "Atomic write of plan failed: %s" ex.Message)
-
-    let rewritePlanAtomic (root: string) (workId: string) (content: string) : Result<string * string, string> =
-        if String.IsNullOrWhiteSpace content then
-            Error "Plan content cannot be empty"
-        else
-            resolvePlanPath root workId |> Result.bind (writePlanFile content)
-
-    let private applySinglePatch (text: string) (find: string, put: string) : Result<string, string> =
-        if not (text.Contains find) then
-            Error(sprintf "Patch find target not found: '%s'" find)
-        else
-            Ok(text.Replace(find, put))
-
-    let private applyPatches (text: string) (patches: (string * string) list) : Result<string, string> =
-        let folder acc patch =
-            acc |> Result.bind (fun t -> applySinglePatch t patch)
-
-        List.fold folder (Ok text) patches
-
-    let editPlanAtomic
-        (root: string)
-        (workId: string)
-        (patches: (string * string) list)
-        : Result<string * string, string> =
-        readPlan root workId
-        |> Result.bind (fun current -> applyPatches current patches)
-        |> Result.bind (rewritePlanAtomic root workId)

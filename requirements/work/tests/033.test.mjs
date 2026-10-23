@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 import { SqliteJournal } from 'wanxiangli/eventstore'
@@ -140,7 +140,8 @@ test('WHAT[work-033] lifecycle payload keys are ordered by Unicode code point', 
 
   const reviewed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Promoted')
   const review = eventsOf(reviewed.bytes)[0]
-  assert.deepEqual(Object.keys(review), ['incumbencyId', 'outcome', 'stage', 'type'])
+  assert.deepEqual(Object.keys(review), sorted(Object.keys(review)))
+  assert.deepEqual(Object.keys(review), ['incumbencyId', 'outcome', 'stage', 'type', 'updates'])
 
   const relayed = surface.deliverProbe(`${opened}${reviewed.bytes}`, 'run-1', 'call-1', 100n)
   const [retired, successor] = eventsOf(relayed.bytes)
@@ -162,18 +163,22 @@ test('WHAT[work-033] lifecycle payload keys are ordered by Unicode code point', 
       text = `${text}${reviewStep.bytes}${relayStep.bytes}`
     }
     const last = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
+    const auth = surface.deliverProbe(`${text}${last.bytes}`, 'run-auth', 'call-auth', 49n)
+    text = `${text}${last.bytes}${auth.bytes}`
     const planRoot = mkdtempSync(join(tmpdir(), 'wxs-work-033-keys-'))
     let receipt
     try {
-      const written = planning.PlanningSurface.rewritePlanAtomic(planRoot, 'work-1', '# plan\n')
-      assert.equal(written.ok, true, written.error)
+      const planPath = planning.PlanningSurface.resolvePlanPath(planRoot, 'work-1')
+      assert.equal(planPath.ok, true, planPath.error)
+      mkdirSync(dirname(planPath.path), { recursive: true })
+      writeFileSync(planPath.path, '# plan\n')
       const selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-1')
       assert.equal(selected.ok, true, selected.error)
-      receipt = surface.deliverStateProbe(`${text}${last.bytes}`, 'run-final', 'call-final', 50n, { digest: selected.digest, path: selected.path })
+      receipt = surface.deliverStateProbe(text, 'run-final', 'call-final', 50n, { digest: selected.digest, path: selected.path })
     } finally {
       rmSync(planRoot, { recursive: true, force: true })
     }
-    const reopened = surface.reopenProbe(`${text}${last.bytes}${receipt.bytes}`, incumbencyIdOf(text))
+    const reopened = surface.reopenProbe(`${text}${receipt.bytes}`, incumbencyIdOf(text))
     return { receipt, reopened }
   })()
   const receipt = eventsOf(full.receipt.bytes).find((event) => event.type === 'IncumbencyRetired')
@@ -214,13 +219,16 @@ test('WHAT[work-033] real bytes fold through the codec and the live store', asyn
     text = `${text}${reviewed.bytes}${relayed.bytes}`
   }
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
-  text = `${text}${reviewed.bytes}`
+  const authorized = surface.deliverProbe(`${text}${reviewed.bytes}`, 'run-auth', 'call-auth', 25n)
+  text = `${text}${reviewed.bytes}${authorized.bytes}`
   const planRoot = mkdtempSync(join(tmpdir(), 'wxs-work-033-plan-'))
   let delivered
   let selected
   try {
-    const written = planning.PlanningSurface.rewritePlanAtomic(planRoot, 'work-demo', '# plan\n')
-    assert.equal(written.ok, true, written.error)
+    const planPath = planning.PlanningSurface.resolvePlanPath(planRoot, 'work-demo')
+    assert.equal(planPath.ok, true, planPath.error)
+    mkdirSync(dirname(planPath.path), { recursive: true })
+    writeFileSync(planPath.path, '# plan\n')
     selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-demo')
     assert.equal(selected.ok, true, selected.error)
     delivered = surface.deliverStateProbe(text, 'run-demo', 'call-demo', 30n, { digest: selected.digest, path: selected.path })
@@ -253,10 +261,13 @@ test('WHAT[work-033] real bytes fold through the codec and the live store', asyn
       assert.equal(review.ok, true, review.error)
       const relay = await surface.seedDeliver(store, 'work-demo', `run-${step}`, `call-${step}`, BigInt((step + 1) * 10))
       assert.equal(relay.ok, true, relay.error)
-      assert.equal(relay.decision, 'relayed')
+      assert.equal(relay.decision, 'Promoted')
     }
     const last = await surface.seedReview(store, 'work-demo', 'Promoted')
     assert.equal(last.ok, true, last.error)
+    const auth = await surface.seedDeliver(store, 'work-demo', 'run-auth', 'call-auth', 25n)
+    assert.equal(auth.ok, true, auth.error)
+    assert.equal(auth.decision, 'Authorized')
     const blocked = await surface.seedDeliver(store, 'work-demo', 'run-demo', 'call-demo', 30n)
     assert.equal(blocked.ok, false, 'an authorized tenure does not deliver without a draft and a session')
     assert.match(blocked.error, /draft|session/i)

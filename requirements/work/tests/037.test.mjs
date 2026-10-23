@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
@@ -24,12 +24,16 @@ const deliveredOf = (workId) => {
   }
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
   assert.equal(reviewed.decision, 'Write', reviewed.detail)
-  text = `${text}${reviewed.bytes}`
+  const auth = surface.deliverProbe(`${text}${reviewed.bytes}`, 'run-auth', 'call-auth', 25n)
+  assert.equal(auth.decision, 'Write', auth.detail)
+  text = `${text}${reviewed.bytes}${auth.bytes}`
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-037-'))
   let delivered
   try {
-    const written = planning.PlanningSurface.rewritePlanAtomic(root, workId, '# plan\n')
-    assert.equal(written.ok, true, written.error)
+    const planPath = planning.PlanningSurface.resolvePlanPath(root, workId)
+    assert.equal(planPath.ok, true, planPath.error)
+    mkdirSync(dirname(planPath.path), { recursive: true })
+    writeFileSync(planPath.path, '# plan\n')
     const selected = planning.PlanningSurface.readAndValidatePlan(root, workId)
     assert.equal(selected.ok, true, selected.error)
     delivered = surface.deliverStateProbe(text, 'run-final', 'call-final', 30n, { digest: selected.digest, path: selected.path })
@@ -86,9 +90,11 @@ test('WHAT[work-037] reopening without a delivery is rejected', () => {
   assert.match(active.detail, /Only an inactive delivered work can reopen|No retirement to reopen/)
 
   const stayed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Stayed')
-  const relayed = surface.deliverProbe(`${opened}${stayed.bytes}`, 'run-relay', 'call-relay', 10n)
+  const cleared = surface.reviewProbe(`${opened}${stayed.bytes}`, incumbencyIdOf(opened), 'Cleared')
+  assert.equal(cleared.decision, 'Write', cleared.detail)
+  const relayed = surface.deliverProbe(`${opened}${stayed.bytes}${cleared.bytes}`, 'run-relay', 'call-relay', 10n)
   assert.equal(relayed.decision, 'Write', relayed.detail)
-  const successorText = `${opened}${stayed.bytes}${relayed.bytes}`
+  const successorText = `${opened}${stayed.bytes}${cleared.bytes}${relayed.bytes}`
   const relayedReopen = surface.reopenProbe(successorText, incumbencyIdOf(opened))
   assert.equal(relayedReopen.decision, 'Refuse', 'a Relayed retirement is not a delivery')
   assert.match(relayedReopen.detail, /Only an inactive delivered work can reopen|No retirement to reopen/)
@@ -108,19 +114,23 @@ test('WHAT[work-037] reopen keeps the predecessor range and not the tenure own d
   assert.equal(surface.documentView(text).predecessor, '10,20')
 
   const third = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
+  const auth = surface.deliverProbe(`${text}${third.bytes}`, 'run-auth', 'call-auth', 25n)
+  text = `${text}${third.bytes}${auth.bytes}`
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-037-range-'))
   let delivered
   try {
-    const written = planning.PlanningSurface.rewritePlanAtomic(root, 'work-21d', '# plan\n')
-    assert.equal(written.ok, true, written.error)
+    const planPath = planning.PlanningSurface.resolvePlanPath(root, 'work-21d')
+    assert.equal(planPath.ok, true, planPath.error)
+    mkdirSync(dirname(planPath.path), { recursive: true })
+    writeFileSync(planPath.path, '# plan\n')
     const selected = planning.PlanningSurface.readAndValidatePlan(root, 'work-21d')
     assert.equal(selected.ok, true, selected.error)
-    delivered = surface.deliverStateProbe(`${text}${third.bytes}`, 'run-3', 'call-3', 30n, { digest: selected.digest, path: selected.path })
+    delivered = surface.deliverStateProbe(text, 'run-3', 'call-3', 30n, { digest: selected.digest, path: selected.path })
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
   assert.equal(delivered.decision, 'Write', delivered.detail)
-  const deliveredText = `${text}${third.bytes}${delivered.bytes}`
+  const deliveredText = `${text}${delivered.bytes}`
   const deliveredView = surface.documentView(deliveredText)
   assert.equal(deliveredView.latestRetirement, '20,30', 'the delivered retirement is the tenure own range')
   assert.equal(deliveredView.active, false)

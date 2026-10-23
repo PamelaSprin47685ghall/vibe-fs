@@ -211,6 +211,7 @@ module DeliveryFlow =
             // hands the work to a successor tenure; otherwise (promoted or no
             // review), it delivers and completes the work in one step.
             let isRelay = prepared.ReviewOutcome = Some "Stayed"
+
             let nextOwnerFields =
                 if isRelay then
                     [ "nextOwnerId", box (SessionId.value prepared.Fence.SessionId) ]
@@ -321,8 +322,7 @@ module DeliveryFlow =
 
             match journalDir with
             | None -> return Error "lifecycle journal directory is unavailable"
-            | Some dir when String.IsNullOrWhiteSpace dir ->
-                return Error "lifecycle journal directory is unavailable"
+            | Some dir when String.IsNullOrWhiteSpace dir -> return Error "lifecycle journal directory is unavailable"
             | Some dir -> return! runFrozenDeliver runtime prepared journal dir
         }
 

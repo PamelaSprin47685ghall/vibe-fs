@@ -68,7 +68,8 @@ module Mcp =
     [<Emit("$0.optional()")>]
     let private zOptional (schema: obj) : obj = jsNative
 
-    let private zListOptional (item: obj) (description: string) : obj = zListOf zod item description |> zOptional
+    let private zListOptional (item: obj) (description: string) : obj =
+        zListOf zod item description |> zOptional
 
     [<Emit("$0.registerTool($1, $2, $3)")>]
     let private registerTool (server: obj) (name: string) (config: obj) (handler: obj) : obj = jsNative
@@ -357,13 +358,14 @@ module Mcp =
                   "profileRef" ==> zString "The declared profile this inquiry runs under"
                   "steps"
                   ==> zListOptional
-                      (zObjectOf zod
-                          (createObj
-                              [ "id" ==> zString "A step identity"
-                                "title" ==> zString "What the step does"
-                                "dependsOn"
-                                ==> zList (zString "a step id this step waits for") "Steps that must succeed first" ]))
-                      "The plan the user selected, in execution order; the last step is the answer" ]
+                          (zObjectOf
+                              zod
+                              (createObj
+                                  [ "id" ==> zString "A step identity"
+                                    "title" ==> zString "What the step does"
+                                    "dependsOn"
+                                    ==> zList (zString "a step id this step waits for") "Steps that must succeed first" ]))
+                          "The plan the user selected, in execution order; the last step is the answer" ]
 
         let workSubmitSchema =
             createObj

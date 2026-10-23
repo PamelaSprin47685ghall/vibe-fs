@@ -178,9 +178,12 @@ module JsCanonicalDescription =
         let BaseClassAsk = "tool/js-program/base-class-ask"
 
         [<Literal>]
+        let BaseClassReview = "tool/js-program/base-class-review"
+
+        [<Literal>]
         let BaseClassLifecycle = "tool/js-program/base-class-lifecycle"
 
-        /// The Plan role's own surface prose (PLAN_PATH, the DevOps
+        /// The Plan role's own surface prose (the draft path, the DevOps
         /// delegation shape, the read-only-until-review rule). It is a
         /// separate resource tree because it only describes the Plan
         /// surface, and it is rendered for the Plan role alone.
@@ -242,6 +245,7 @@ module JsCanonicalDescription =
           BaseClassHorizon: string
           BaseClassAdvisor: string
           BaseClassAsk: string
+          BaseClassReview: string
           BaseClassLifecycle: string
 
           JsPlan: string }
@@ -286,8 +290,7 @@ class JsProgram {"""
             .Replace("this.rg(", "this.reviewOnly.rg(")
 
     let publicBaseClass (prose: Prose) (capabilities: Set<JsCapability>) : string =
-        "const PLAN_PATH = \"plan.md\";\n"
-        + fill
+        fill
             prose.BaseClass
             [ "baseClassCallable", (if present capabilities "call" then "" else "")
               "baseClassRead",
@@ -376,6 +379,11 @@ class JsProgram {"""
               "baseClassAsk",
               if present capabilities "ask" then
                   prose.BaseClassAsk
+              else
+                  ""
+              "baseClassReview",
+              if present capabilities "review" then
+                  prose.BaseClassReview
               else
                   ""
               "baseClassLifecycle", prose.BaseClassLifecycle ]
@@ -498,8 +506,7 @@ class JsProgram {"""
                     "guard", guardOf "rg" ] ]
 
     let private runtimeBaseClassCore reviewOnly (prose: Prose) (capabilities: Set<JsCapability>) : string =
-        "const PLAN_PATH = \"plan.md\";\n"
-        + let methods =
+        let methods =
             [ if reviewOnly then
                   "  constructor(api) { this._api = api; this.reviewOnly = new ReviewOnly(api.reviewOnly); }"
               else
@@ -556,8 +563,8 @@ class JsProgram {"""
                       [ "rethrow_host", rethrowHost ]
               if present capabilities "call" then
                   fill
-                      """  async call(command, timeoutOrOptions) {
-    return await this._api.call(command, timeoutOrOptions);
+                      """  async call(command, planB) {
+    return await this._api.call(command, planB);
   }"""
                       []
               if has capabilities JsCapability.Exec then
@@ -622,6 +629,12 @@ class JsProgram {"""
                   fill
                       """  async advisor(intent, carry = []) {
     return await this._api.advisor(intent, carry);
+  }"""
+                      []
+              if present capabilities "review" then
+                  fill
+                      """  async review(findings) {
+    return await this._api.review(findings);
   }"""
                       []
               if present capabilities "fission" then
@@ -773,23 +786,23 @@ class JsProgram {"""
                   []
               runStub prose ] in
 
-          let reviewClass =
-              if reviewOnly then
-                  String.concat
-                      "\n\n"
-                      ([ "class ReviewOnly {"; "  constructor(api) { this._api = api; }" ]
-                       // The constructor already receives the review namespace
-                       // itself (api.reviewOnly), so the members read through
-                       // it directly. The guard checks the same expression it
-                       // guards: a namespace that cannot serve the member
-                       // refuses with the REVIEW_ONLY envelope.
-                       @ runtimeFileMethods capabilities "this._api" missingMemberGuard
-                       @ [ "}" ])
-                  + "\n\n"
-              else
-                  "" in
+        let reviewClass =
+            if reviewOnly then
+                String.concat
+                    "\n\n"
+                    ([ "class ReviewOnly {"; "  constructor(api) { this._api = api; }" ]
+                     // The constructor already receives the review namespace
+                     // itself (api.reviewOnly), so the members read through
+                     // it directly. The guard checks the same expression it
+                     // guards: a namespace that cannot serve the member
+                     // refuses with the REVIEW_ONLY envelope.
+                     @ runtimeFileMethods capabilities "this._api" missingMemberGuard
+                     @ [ "}" ])
+                + "\n\n"
+            else
+                "" in
 
-          reviewClass + String.concat "\n\n" (classOpen :: methods @ [ "}" ])
+        reviewClass + String.concat "\n\n" (classOpen :: methods @ [ "}" ])
 
     let runtimeBaseClass prose capabilities =
         runtimeBaseClassCore false prose capabilities
@@ -852,7 +865,7 @@ class JsProgram {"""
             | "plan" -> Some(set [ JsCapability.Read ], prose.UltraPlan)
             // Manager's admission set must list every capability the manager
             // role currently projects: the manager capability set is
-            // { Advisor, Fork, Glob, Grep, Horizon, Join, Read, Resume }, and
+            // { Advisor, Fork, Glob, Grep, Horizon, Join, Read, Resume, Review }, and
             // `Set.isSubset capabilities admission` fails (so the ultra
             // example disappears) as soon as the role gains a capability this
             // set does not mention. Resume was added to the manager role
@@ -870,7 +883,8 @@ class JsProgram {"""
                           JsCapability.Resume
                           JsCapability.Join
                           JsCapability.Horizon
-                          JsCapability.Advisor ])
+                          JsCapability.Advisor
+                          JsCapability.Review ])
                 && not (Set.isEmpty capabilities)
                 ->
                 Some(set [ JsCapability.Read; JsCapability.Glob ], prose.UltraManagerInvestigation)
@@ -903,7 +917,7 @@ class JsProgram {"""
                   prose.ReviewOnlyRules
               contract prose toolName capabilities
               // The Plan surface has rules the shared contract does not
-              // carry (PLAN_PATH, the DevOps delegation shape, the
+              // carry (the draft path, the DevOps delegation shape, the
               // read-only-until-review rule). They belong to the Plan role
               // alone; every other role's description stays byte-identical.
               if roleName.Trim().ToLowerInvariant() = "plan" then

@@ -33,6 +33,7 @@ module JsParkedSites =
     val remove: handle: string -> unit
     val parkedHandles: unit -> string list
     val handlesForSession: sessionId: string -> string list
+
     [<RequireQualifiedAccess>]
     type ParkResourceClassification =
         | ProvenSideEffectFreePause of reason: string
@@ -40,6 +41,7 @@ module JsParkedSites =
         | ActiveChildCommand of detail: string
         | AmbiguitySearch of needle: string
         | UnclassifiedDeclaredPause of payloadKind: string
+
     val classifySite: site: JsParkedSite -> ParkResourceClassification
     val isDeliveryBlocker: site: JsParkedSite -> bool
     val deliveryBlockersWithChoicesForSession: sessionId: string -> (string * string) list

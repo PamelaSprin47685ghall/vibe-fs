@@ -167,8 +167,7 @@ module Surface =
                    Rank = item.Rank }
                 : PlanEstimate))
 
-        let chosen =
-            Decision.choose scopeId estimates []
+        let chosen = Decision.choose scopeId estimates []
 
         match chosen with
         | Ok outcome ->
@@ -184,13 +183,18 @@ module Surface =
                    TieBreak = receipt.TieBreak |> Option.defaultValue null
                    EstimateRefs =
                     receipt.EstimateRefs
-                    |> List.map (fun (planId, kind) -> box {| PlanId = PlanId.value planId; Kind = kind |})
+                    |> List.map (fun (planId, kind) ->
+                        box
+                            {| PlanId = PlanId.value planId
+                               Kind = kind |})
                     |> List.toArray
                     |> box
                    UnestimatedPlans =
                     receipt.UnestimatedPlans
                     |> List.map (fun plan ->
-                        box {| PlanId = PlanId.value plan.PlanId; Reason = plan.Reason |})
+                        box
+                            {| PlanId = PlanId.value plan.PlanId
+                               Reason = plan.Reason |})
                     |> List.toArray
                     |> box |}
         | Error fault -> box {| error = fault.Code |}

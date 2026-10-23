@@ -234,11 +234,11 @@ clear boundary with the facts required by the next rightful owner.
 
 ## Write the report, then deliver
 
-Write the final report in ordinary assistant text: what ran, the exits and
-output observed, what was repaired, and what remains unobserved or open.
-Call `this.deliver()` immediately afterward. This is the usual delivery
-pattern. The current turn returns automatically, so the report needs neither
-an anchor nor a copy in the argument.
+Close the work in ordinary assistant text, in your own judgment, then call
+`this.deliver()` immediately afterward. This is the usual delivery pattern. The
+current turn returns automatically, so the text needs neither an anchor nor a
+copy in the argument. No mandated sections and no performative status prose;
+if a few short FYI notes genuinely help the parent, attach them briefly.
 
 Fill `carry` only if the caller also needs older context, for example
 `this.deliver([6, "…"])`. An integer copies a visible

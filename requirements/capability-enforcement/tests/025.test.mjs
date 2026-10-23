@@ -32,16 +32,18 @@ test('WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_
   // OfficeCapabilitySurface 构造已接纳评审事实（HasActiveIncumbency=true, HasAssessment=true）
   const facts = managerFacts(true, true, false, undefined)
 
-  // N-04: 评审接纳后，只读能力 Read/Glob/Grep 均保持允许（读能力不因评审消失）
-  assert.equal(isAllowedForManagerFacts(facts, 'Read'), true, 'Read must be allowed after assessment accepted')
-  assert.equal(isAllowedForManagerFacts(facts, 'Glob'), true, 'Glob must be allowed after assessment accepted')
-  assert.equal(isAllowedForManagerFacts(facts, 'Grep'), true, 'Grep must be allowed after assessment accepted')
+  // 评审接纳后，只读能力 Read/Glob/Grep 均不被允许（reviewOnly 仅限第一次评审前使用）
+  assert.equal(isAllowedForManagerFacts(facts, 'Read'), false, 'Read must be denied after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Glob'), false, 'Glob must be denied after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Grep'), false, 'Grep must be denied after assessment accepted')
   // 评审接纳后，Join/Fork 等管理与编排权限仍被允许
   assert.equal(isAllowedForManagerFacts(facts, 'Fork'), true, 'Fork must remain allowed after assessment accepted')
   assert.equal(isAllowedForManagerFacts(facts, 'Resume'), true, 'Resume must remain allowed after assessment accepted')
   assert.equal(isAllowedForManagerFacts(facts, 'Join'), true, 'Join must remain allowed after assessment accepted')
   assert.equal(isAllowedForManagerFacts(facts, 'Horizon'), true, 'Horizon must remain allowed after assessment accepted')
   assert.equal(isAllowedForManagerFacts(facts, 'Finality'), true, 'Finality must remain allowed after assessment accepted')
+  // 评审接纳后，Review 仍被允许，以便后续更新义务账
+  assert.equal(isAllowedForManagerFacts(facts, 'ReviewAssessment'), true, 'ReviewAssessment must remain allowed after assessment accepted')
 })
 
 test('WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny', () => {
@@ -113,12 +115,13 @@ test('WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retain
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
 
-    // 驱动 malformed review 尝试：传入无效评分或缺少规范字段
-    const reviewResult = await hooks.tool.review.execute(
-      { findings: 'invalid-findings-malformed' },
-      { sessionID, agent: 'manager' },
+    // 驱动 malformed review 尝试：`this.review` 成员接收 findings 数组，传入非数组
+    // 即为无效评审（standalone `review` 宿主工具已随编程面迁移退役）。
+    const reviewResult = await hooks.tool['todowrite-for-manager'].execute(
+      { name: 'manager-review', program: "class Js extends JsProgram { async run() { return await this.review('invalid-findings-malformed'); } }" },
+      { sessionID, agent: 'manager', callID: 'call-p03-review', messageID: 'msg-p03-review' },
     )
-    // 评审未被接纳（返回 recorded = false 或拒绝提示）
+    // 评审未被接纳（返回数据信封 ok = false + 稳定 code 或拒绝提示）
     assert.match(String(reviewResult), /false|invalid|missing|有效评分|valid ratings/i)
 
     // 评审未被接纳前，todowrite-for-manager 专用只读工具仍准入，不得误封
@@ -174,9 +177,9 @@ test('WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbenc
 
 test('WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_and_closeout_permissions', () => {
   // 末任：已接纳空集 findings 的评估（HasAssessment = true, IsFinalIncumbent = true）。
-  // 读、清理与收口类动作必须放行。
+  // 读、清理与收口类动作必须放行，且保留 ReviewAssessment 以便在终局前更新或清空义务账。
   const facts = managerFacts(true, true, true, undefined)
-  for (const permission of ['Read', 'Glob', 'Grep', 'Horizon', 'Join', 'Finality']) {
+  for (const permission of ['Read', 'Glob', 'Grep', 'Horizon', 'Join', 'Finality', 'ReviewAssessment']) {
     assert.equal(
       isAllowedForManagerFacts(facts, permission),
       true,
@@ -186,9 +189,9 @@ test('WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_an
 })
 
 test('WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability', () => {
-  // 末任不得开新工作：委托、续做与评审一律拒绝。
+  // 末任不得开新工作：委托与续做一律拒绝（review 仍允许用于修改义务账）。
   const facts = managerFacts(true, true, true, undefined)
-  for (const permission of ['Fork', 'Resume', 'ReviewAssessment']) {
+  for (const permission of ['Fork', 'Resume']) {
     assert.equal(
       isAllowedForManagerFacts(facts, permission),
       false,
@@ -228,7 +231,7 @@ const reads = [
   "return await this.reviewOnly.rg(['review', 'evidence.txt']);",
 ]
 
-test('WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads admitted', async () => {
+test('WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed', async () => {
   await withRestartablePlugin(async (start, directory, { stop, withRuntime }) => {
     const sessionID = 'ses-reopen-review'
     const first = await start()
@@ -239,13 +242,12 @@ test('WHAT[capability-enforcement-025] P11_restart keeps the entry open and the 
     await stop(first)
     const reopened = await start()
     assert.equal((await execute(reopened, sessionID, 'return 7;')).data, 7)
-    // N-04: Granted read capability must not disappear because a review happened.
-    for (const body of reads) assert.ok((await execute(reopened, sessionID, body)).data !== undefined)
+    for (const body of reads) assert.equal((await execute(reopened, sessionID, body)).code, 'REVIEW_ONLY')
     await stop(reopened)
   })
 })
 
-test('WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and remains admitted after review', async () => {
+test('WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review', async () => {
   await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
     const sessionID = 'ses-each-operation'
     await seed(runtime, sessionID, directory)
@@ -261,14 +263,18 @@ test('WHAT[capability-enforcement-025] P13_each physical operation is admitted b
     await injectAcceptedAssessment(runtime, sessionID)
     await hooks['tool.execute.before']({ tool: MANAGER_REVIEW_TOOL, sessionID, callID: 'after-review' }, input)
     assert.equal((await execute(hooks, sessionID, 'return 7;')).data, 7)
-    // N-04: Read capabilities survive review acceptance.
-    for (const body of reads) assert.ok((await execute(hooks, sessionID, body)).data !== undefined)
+    for (const body of reads) assert.equal((await execute(hooks, sessionID, body)).code, 'REVIEW_ONLY')
     const pure = await execute(hooks, sessionID, "return this.whereAll('a b', 'b');")
     assert.deepEqual(pure.data, [[2, 3]])
+    const scope = await execute(hooks, sessionID, "return { cat: typeof this.cat, raw: typeof this._api.cat, stat: typeof this.stat, ls: typeof this.ls, rg: typeof this.rg, review: typeof this.reviewOnly.cat };")
+    assert.deepEqual(scope.data, { cat: 'undefined', raw: 'undefined', stat: 'undefined', ls: 'undefined', rg: 'undefined', review: 'function' })
+    for (const name of ['cat', 'stat', 'ls', 'rg']) {
+      assert.equal((await execute(hooks, sessionID, 'return await this.' + name + "('evidence.txt');")).code, 'PROGRAM_FAILED')
+    }
   })
 })
 
-test('WHAT[capability-enforcement-025] P14_saved object, method and raw binding remain admitted after park and review', async () => {
+test('WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park', async () => {
   await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
     const sessionID = 'ses-park-review'
     await seed(runtime, sessionID, directory)
@@ -281,19 +287,24 @@ test('WHAT[capability-enforcement-025] P14_saved object, method and raw binding 
       assert.ok(paused.handle)
       if (index === 0) await injectAcceptedAssessment(runtime, sessionID)
       const result = await execute(hooks, sessionID, { unpark: { handle: paused.handle, value: null } }, 'resume-' + index)
-      assert.equal(result.data, 'review evidence')
+      if (index === 2) assert.equal(result.data, 'REVIEW_ONLY')
+      else assert.equal(result.code, 'REVIEW_ONLY')
     }
   })
 })
 
-test('WHAT[capability-enforcement-025] P15_final incumbent keeps read capability under N-04', async () => {
+test('WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception', async () => {
   await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
     const sessionID = 'ses-final-review'
     await seed(runtime, sessionID, directory)
     await injectAcceptedAssessment(runtime, sessionID, 'inc-' + sessionID, 'Promoted')
     assert.equal((await execute(hooks, sessionID, 'return 7;')).data, 7)
-    // N-04: Final incumbent retains Read/Glob/Grep; reading existing evidence succeeds.
-    assert.equal((await execute(hooks, sessionID, reads[0])).data, 'review evidence')
+    for (const body of [
+      "return await this.reviewOnly.cat('../outside');",
+      "return await this.reviewOnly.stat('missing');",
+      "return await this.reviewOnly.ls('missing');",
+      "return await this.reviewOnly.rg(['--invalid-option', 'missing']);",
+    ]) assert.equal((await execute(hooks, sessionID, body)).code, 'REVIEW_ONLY')
     const paused = await execute(hooks, sessionID, 'await this.park({ done: true }); return 9;')
     assert.ok(paused.handle)
     assert.equal((await execute(hooks, sessionID, { unpark: { handle: paused.handle, value: null } })).data, 9)
@@ -316,7 +327,7 @@ test('WHAT[capability-enforcement-025] identity and cross-role denial remain ind
   })
 })
 
-test('WHAT[capability-enforcement-025] repository read calls remain admitted and spawn real rg after review', async () => {
+test('WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg', async () => {
   const { default: fs } = await import('node:fs')
   const { default: processes } = await import('node:child_process')
   const { syncBuiltinESMExports } = await import('node:module')
@@ -357,13 +368,9 @@ test('WHAT[capability-enforcement-025] repository read calls remain admitted and
       await injectAcceptedAssessment(runtime, sessionID)
       touches = 0
       rgSpawns = 0
-      // N-04: Granted read capability must not disappear because a review happened.
-      for (const operation of operations) {
-        const result = await execute(hooks, sessionID, operation)
-        assert.equal(result.code, undefined, JSON.stringify(result))
-      }
-      assert.ok(touches > 0, 'admitted calls continue to touch the physical target after review')
-      assert.equal(rgSpawns, 1, 'admitted rg spawns a real child process')
+      for (const operation of operations) assert.equal((await execute(hooks, sessionID, operation)).code, 'REVIEW_ONLY')
+      assert.equal(touches, 0, 'refused calls must not touch the physical target')
+      assert.equal(rgSpawns, 0, 'refused rg must not start a child process')
     } finally {
       for (const [name, original] of saved) fs[name] = original
       processes.spawn = spawn
@@ -372,7 +379,7 @@ test('WHAT[capability-enforcement-025] repository read calls remain admitted and
   })
 })
 
-test('WHAT[capability-enforcement-025] an admitted physical rg finishes and later calls remain admitted under N-04', { timeout: 5000 }, async () => {
+test('WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused', { timeout: 5000 }, async () => {
   const { default: processes } = await import('node:child_process')
   const { syncBuiltinESMExports } = await import('node:module')
   await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
@@ -405,10 +412,8 @@ test('WHAT[capability-enforcement-025] an admitted physical rg finishes and late
       const admitted = await pending
       assert.equal(admitted.code, undefined, JSON.stringify(admitted))
       assert.equal(admitted.data.exitCode, 0)
-      // N-04: Read capability is retained after review acceptance; a later call is also admitted.
-      const later = await execute(hooks, sessionID, reads[3], 'late-rg')
-      assert.equal(later.code, undefined, JSON.stringify(later))
-      assert.equal(spawns, 2)
+      assert.equal((await execute(hooks, sessionID, reads[3], 'late-rg')).code, 'REVIEW_ONLY')
+      assert.equal(spawns, 1)
     } finally {
       released.resolve()
       processes.spawn = spawn
@@ -417,7 +422,7 @@ test('WHAT[capability-enforcement-025] an admitted physical rg finishes and late
   })
 })
 
-test('WHAT[capability-enforcement-025] P15_concurrent_physical_rg_overlap_with_review_acceptance_admits_inflight_and_subsequent_under_N04', { timeout: 5000 }, async () => {
+test('WHAT[capability-enforcement-025] P15_concurrent_physical_rg_overlap_with_review_acceptance_admits_inflight_and_refuses_subsequent', { timeout: 5000 }, async () => {
   const { default: processes } = await import('node:child_process')
   const { syncBuiltinESMExports } = await import('node:module')
   await withExecutablePlugin(async (hooks, directory, _ids, runtime) => {
@@ -445,10 +450,13 @@ test('WHAT[capability-enforcement-025] P15_concurrent_physical_rg_overlap_with_r
       assert.equal(child.exitCode, null, 'the rg child must still be in flight')
       assert.equal(child.signalCode, null, 'the rg child must not be signalled')
       await injectAcceptedAssessment(runtime, sessionID)
+      const overlapped = await execute(hooks, sessionID, reads[3], 'overlapped-after-accept')
+      assert.equal(overlapped.code, 'REVIEW_ONLY', JSON.stringify(overlapped))
       process.kill(child.pid, 'SIGCONT')
       const admitted = await pending
       assert.equal(admitted.code, undefined, JSON.stringify(admitted))
       assert.equal(admitted.data.exitCode, 0)
+      assert.equal((await execute(hooks, sessionID, reads[3], 'subsequent-rg')).code, 'REVIEW_ONLY')
       assert.equal(spawns, 1)
     } finally {
       if (liveChild !== null && liveChild.exitCode === null && liveChild.signalCode === null) {

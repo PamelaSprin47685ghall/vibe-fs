@@ -10,11 +10,13 @@ export const messageId = message => message.id ?? message.info?.id
 
 export const withSuccessor = async body => withReview(async context => {
   const {execute, hooks, runtime, session} = context
-  assert.match(await execute(scores('REVISE')), /recorded = true/)
+  assert.match(await execute(scores('REVISE')), /ok = true/)
+  // Non-empty review must be explicitly cleared key-by-key before relay
+  assert.match(await execute(scores('CLEAR'), { call: 'clear-call', run: 'clear-run' }), /ok = true/)
   const retirement = toolMessage()
   retirement.info.sessionID = session
   retirement.info.parentID = 'user-root'
-  retirement.info.time = {created: 3}
+  retirement.info.time = {created: 4}
   runtime.pushHostMessage(session, retirement)
   // Single delivery: deliver directly relays to successor tenure in one call.
   assert.match(await hooks.tool.deliver.execute({}, {

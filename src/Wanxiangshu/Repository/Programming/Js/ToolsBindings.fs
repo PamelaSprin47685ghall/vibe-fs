@@ -52,17 +52,8 @@ module JsToolsBindings =
     [<Emit("Promise.resolve($0).then(function(value) { if (value && value.ok === false) { const err = new Error(value.reason || value.code); err.__jsFailure = { code: value.code, reason: value.reason || value.code }; throw err; } return value; })")>]
     let private rejectCallFailure (promise: obj) : obj = jsNative
 
-    let defaultCallTimeoutMs = 10000
-
-    let private resolveCallTimeoutMs (optionArg: obj) : int =
-        if isNull optionArg || emitJsExpr optionArg "typeof $0 === 'undefined'" then
-            defaultCallTimeoutMs
-        elif emitJsExpr optionArg "typeof $0 === 'number' && Number.isFinite($0) && $0 > 0" then
-            int (unbox<float> optionArg)
-        elif emitJsExpr optionArg "typeof $0 === 'object' && $0 !== null && typeof $0.timeoutMs === 'number' && Number.isFinite($0.timeoutMs) && $0.timeoutMs > 0" then
-            int (unbox<float> (optionArg?timeoutMs))
-        else
-            defaultCallTimeoutMs
+    [<Emit("new TextEncoder().encode($0).length * 50")>]
+    let private planBBudgetMs (planB: string) : int = jsNative
 
     [<Emit("setTimeout($0, $1)")>]
     let private armYield (callback: unit -> unit) (budgetMs: int) : obj = jsNative
@@ -86,10 +77,9 @@ module JsToolsBindings =
     /// is PATH_DENIED (JS-007 capability boundary).
     let private resolveInside (root: string) (path: string) : Result<string, JsFailure> =
         let full =
-            if System.String.IsNullOrEmpty path then
-                pathResolve root
-            else
-                pathResolve (pathJoin root path)
+            if System.String.IsNullOrEmpty path then pathResolve root
+            elif pathIsAbsolute path then pathResolve path
+            else pathResolve (pathJoin root path)
 
         let rel = pathRelative root full
 
@@ -648,26 +638,32 @@ module JsToolsBindings =
             }
             |> renderOutcome
 
+    /// Advance past one match: a missing match parks past the end so the loop
+    /// exits; an in-range match is recorded before advancing past the needle.
+    let private advanceWhereMatch
+        (spans: ResizeArray<int * int>)
+        (needle: string)
+        (fromIndex: int)
+        (contentLength: int)
+        (found: int)
+        : int =
+        match found < 0, found >= fromIndex with
+        | true, _ -> contentLength + 1
+        | false, true ->
+            spans.Add(found, found + needle.Length)
+            found + max 1 needle.Length
+        | false, false -> found + max 1 needle.Length
+
     let private whereSpans (content: string) (needle: string) (fromIndex: int) =
-        if needle.Length = 0 then
-            []
-        else
-            // 字面匹配：needle 与 content 原样 IndexOf，不折叠空白、不 trim。
-            let spans = ResizeArray<int * int>()
-            let mutable cursor = max 0 fromIndex
+        // 字面匹配：needle 与 content 原样 IndexOf，不折叠空白、不 trim。
+        let spans = ResizeArray<int * int>()
+        let mutable cursor = max 0 fromIndex
 
-            while cursor <= content.Length - needle.Length do
-                let found = content.IndexOf(needle, cursor)
+        while needle.Length > 0 && cursor <= content.Length - needle.Length do
+            let found = content.IndexOf(needle, cursor)
+            cursor <- advanceWhereMatch spans needle fromIndex content.Length found
 
-                if found < 0 then
-                    cursor <- content.Length + 1
-                else
-                    if found >= fromIndex then
-                        spans.Add(found, found + needle.Length)
-
-                    cursor <- found + max 1 needle.Length
-
-            List.ofSeq spans
+        List.ofSeq spans
 
     let private computeRowCell (aChar: char) (bChar: char) (leftDist: int) (aboveDist: int) (diagDist: int) =
         let substitution = if aChar = bChar then 0 else 1
@@ -938,6 +934,13 @@ module JsToolsBindings =
 
                 rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
 
+    let makeReviewMember (host: JsDelegationHost option) : (string * obj) =
+        "review"
+        ==> fun (findings: obj) ->
+            match host with
+            | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+            | Some delegation -> box (delegation.Review findings)
+
     /// The host loop behind `call`. The closure is injected by the workflow
     /// (Process.JsCallLoop) so this module stays free of process interop.
     /// `Children` is the process table owned for one programming call; every
@@ -951,51 +954,79 @@ module JsToolsBindings =
           TakeDelta: unit -> obj
           Dispose: unit -> Task<unit> }
 
+    let private fireYield (state: Wanxiangshu.Process.JsSandbox.ParkState) (makePayload: unit -> obj) : unit =
+        if not (isNull state.ParkSignalResolve) && not state.ParkRequested then
+            let payload = makePayload ()
+            state.ParkRequested <- true
+            state.ParkPayload <- payload
+            emitJsExpr (state.ParkSignalResolve, payload) "$0($1)" |> ignore
+
+    let private armYieldTimer
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (budgetMs: int)
+        (makePayload: unit -> obj)
+        : obj =
+        match parkState with
+        | None -> null
+        | Some state -> armYield (fun () -> fireYield state makePayload) budgetMs
+
+    let private runStartedCall
+        (injected: JsCallHost)
+        (started: obj)
+        (planB: string)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        : obj =
+        let budgetMs = planBBudgetMs planB
+
+        let timer =
+            armYieldTimer parkState budgetMs (fun () ->
+                createObj
+                    [ "__jsYield" ==> true
+                      "planB" ==> planB
+                      "budgetMs" ==> budgetMs
+                      "delta" ==> (injected.TakeDelta()) ])
+
+        let waiting = injected.Wait(started?ticket)
+
+        box (
+            task {
+                let! value = waiting
+
+                if not (isNull timer) then
+                    disarmYield timer
+
+                return value
+            }
+        )
+
+    let private settleCallWithHost
+        (injected: JsCallHost)
+        (command: obj)
+        (planB: string)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        : obj =
+        match injected.Start command with
+        | started when unbox<bool> (started?ok) -> runStartedCall injected started planB parkState
+        | failed -> box (task { return failed })
+
+    let private settleCall
+        (host: JsCallHost option)
+        (command: obj)
+        (planB: obj)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        : obj =
+        match host with
+        | None -> box (task { return failureObj JsFailure.CallHostUnavailable })
+        | Some _ when
+            isNull (box planB)
+            || not (emitJsExpr planB "typeof $0 === 'string' && $0.trim().length > 0")
+            ->
+            box (task { return failureObj (JsFailure.CallCommandUnsupported "this.call requires non-empty planB") })
+        | Some injected -> settleCallWithHost injected command (string planB) parkState
+
     let private makeCallMember (host: JsCallHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
-        let settled =
-            fun (command: obj) (timeoutOrOptions: obj) ->
-                match host with
-                | Some injected ->
-                    match injected.Start command with
-                    | started when unbox<bool> (started?ok) ->
-                        let timeoutMs = resolveCallTimeoutMs timeoutOrOptions
-
-                        let timer =
-                            match parkState with
-                            | None -> null
-                            | Some state ->
-                                armYield
-                                    (fun () ->
-                                        if not (isNull state.ParkSignalResolve) && not state.ParkRequested then
-                                            let payload =
-                                                createObj
-                                                    [ "__jsYield" ==> true
-                                                      "timeoutMs" ==> timeoutMs
-                                                      "delta" ==> (injected.TakeDelta()) ]
-
-                                            state.ParkRequested <- true
-                                            state.ParkPayload <- payload
-                                            emitJsExpr (state.ParkSignalResolve, payload) "$0($1)" |> ignore)
-                                    timeoutMs
-
-                        let waiting = injected.Wait(started?ticket)
-
-                        box (
-                            task {
-                                let! value = waiting
-
-                                if not (isNull timer) then
-                                    disarmYield timer
-
-                                return value
-                            }
-                        )
-                    | failed -> box (task { return failed })
-                | None -> box (task { return failureObj JsFailure.CallHostUnavailable })
-
         "call"
-        ==> fun (command: obj) (timeoutOrOptions: obj) ->
-            rejectCallFailure (settled command timeoutOrOptions)
+        ==> fun (command: obj) (planB: obj) -> rejectCallFailure (settleCall host command planB parkState)
 
     let private makeSignalMember (host: JsCallHost option) =
         let settled =
@@ -1183,6 +1214,9 @@ module JsToolsBindings =
               if present "ask" then
                   makeAskMember parkState askInvoke
 
+              if present "review" then
+                  makeReviewMember delegationHost
+
               match parkState with
               | Some state -> makeParkMember state
               | None -> () ]
@@ -1253,20 +1287,30 @@ module JsToolsBindings =
         api
 
 module JsReviewOnly =
-    let scopeReviewOnly (check: unit -> Task<bool>) (api: obj) : obj =
+    let private planGuardUnary (check: unit -> bool) (invoke: obj) : obj =
+        emitJsExpr
+            (check, invoke, JsToolsBindings.failureObj JsFailure.DraftWriteLocked)
+            "((check, invoke, locked) => (a0) => check() ? invoke(a0) : locked)($0, $1, $2)"
+
+    let private planGuardBinary (check: unit -> bool) (invoke: obj) : obj =
+        emitJsExpr
+            (check, invoke, JsToolsBindings.failureObj JsFailure.DraftWriteLocked)
+            "((check, invoke, locked) => (a0, a1) => check() ? invoke(a0, a1) : locked)($0, $1, $2)"
+
+    let private makeGuardedRead (check: unit -> Task<bool>) (invoke: obj) : obj =
+        box (fun (argument: obj) ->
+            task {
+                let! allowed = check ()
+
+                if not allowed then
+                    return JsToolsBindings.failureObj JsFailure.ReviewOnly
+                else
+                    return! unbox<Task<obj>> (emitJsExpr (invoke, argument) "Promise.resolve($0($1))")
+            })
+
+    let scopeManagerReviewOnly (check: unit -> Task<bool>) (api: obj) : obj =
         let guarded name =
-            let invoke: obj = api?(name)
-
-            name
-            ==> fun (argument: obj) ->
-                task {
-                    let! allowed = check ()
-
-                    if not allowed then
-                        return JsToolsBindings.failureObj JsFailure.ReviewOnly
-                    else
-                        return! unbox<Task<obj>> (emitJsExpr (invoke, argument) "Promise.resolve($0($1))")
-                }
+            name ==> makeGuardedRead check api?(name)
 
         let review = [ "cat"; "stat"; "ls"; "rg" ] |> List.map guarded |> createObj
 
@@ -1275,3 +1319,17 @@ module JsReviewOnly =
 
         api?reviewOnly <- review
         api
+
+    let scopePlanWriteOnly (check: unit -> bool) (api: obj) : obj =
+        if emitJsExpr api "'write' in $0" then
+            api?write <- planGuardBinary check api?write
+
+        if emitJsExpr api "'rm' in $0" then
+            api?rm <- planGuardUnary check api?rm
+
+        if emitJsExpr api "'mv' in $0" then
+            api?mv <- planGuardBinary check api?mv
+
+        api
+
+    let scopeReviewOnly (check: unit -> Task<bool>) (api: obj) : obj = scopeManagerReviewOnly check api

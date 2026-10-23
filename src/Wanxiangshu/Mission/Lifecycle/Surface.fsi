@@ -51,8 +51,6 @@ module LifecycleSurface =
     val seedDeliver:
         store: obj -> workId: string -> providerRunId: string -> toolCallId: string -> head: int64 -> Task<obj>
 
-    /// Seed the illegal fact "confirmation without review" directly.
-    val seedConfirmation: store: obj -> workId: string -> providerRunId: string -> toolCallId: string -> Task<obj>
     /// Read-only host view of one seeded work.
     val workView: store: obj -> workId: string -> obj
     /// Folded view of one lifecycle document, including durable receipt fields.

@@ -78,7 +78,7 @@ test('WHAT[repository-programming-050] the host runs one foreground command and 
   try {
     const doc = await runText(
       dir,
-      `    return await this.call("echo hello");`,
+      `    return await this.call("echo hello", "read the file directly");`,
     )
     assert.match(doc, /# ok/)
     assert.match(doc, /status = "completed"/)
@@ -94,7 +94,7 @@ test('WHAT[repository-programming-050] non-zero exit code is reported as data wi
   try {
     const doc = await runText(
       dir,
-      `    return await this.call("exit 4");`,
+      `    return await this.call("exit 4", "read the file directly");`,
     )
     assert.match(doc, /# ok/)
     assert.match(doc, /exitCode = 4/)
@@ -104,18 +104,20 @@ test('WHAT[repository-programming-050] non-zero exit code is reported as data wi
   }
 })
 
-test('WHAT[repository-programming-050] timeout expiry parks as yield with timeoutMs and reports delta', async () => {
+test('WHAT[repository-programming-050] planB text bytes price the automatic yield window', async () => {
   const { dir, cleanup } = sandbox()
   let outcome = null
   try {
     outcome = await runProgram(
       dir,
-      `    return await this.call("sleep 5", { timeoutMs: 80 });`,
+      `    return await this.call("sleep 5", "ab");`,
     )
     assert.equal(caseName(outcome), 'Parked')
     const payload = parkedPayload(outcome)
     assert.equal(payload.__jsYield, true)
-    assert.equal(payload.timeoutMs, 80)
+    assert.equal(payload.planB, 'ab')
+    assert.equal(payload.budgetMs, 2 * 50)
+    assert.ok(payload.delta, 'yield payload must carry delta')
   } finally {
     const handle = outcome && parkedHandle(outcome)
     if (handle) {
@@ -126,19 +128,25 @@ test('WHAT[repository-programming-050] timeout expiry parks as yield with timeou
   }
 })
 
-test('WHAT[repository-programming-050] long note vs empty note vs no note behaves identically without text pricing', async () => {
+test('WHAT[repository-programming-050] a missing planB is refused and planB byte length prices the budget', async () => {
   const { dir, cleanup } = sandbox()
+  let outcome = null
   try {
-    const docNoNote = await runText(dir, `    return await this.call("printf identical");`)
-    const docEmptyNote = await runText(dir, `    return await this.call("printf identical", "");`)
-    const docLongNote = await runText(dir, `    return await this.call("printf identical", "note".repeat(1000));`)
-    assert.match(docNoNote, /identical/)
-    assert.match(docEmptyNote, /identical/)
-    assert.match(docLongNote, /identical/)
-    assert.match(docNoNote, /exitCode = 0/)
-    assert.match(docEmptyNote, /exitCode = 0/)
-    assert.match(docLongNote, /exitCode = 0/)
+    const missing = await runText(dir, `    return await this.call("printf identical");`)
+    assert.match(missing, /CALL_COMMAND_UNSUPPORTED/)
+
+    outcome = await runProgram(dir, `    return await this.call("sleep 5", "abcdef");`)
+    assert.equal(caseName(outcome), 'Parked')
+    const payload = parkedPayload(outcome)
+    assert.equal(payload.__jsYield, true)
+    assert.equal(payload.planB, 'abcdef')
+    assert.equal(payload.budgetMs, 6 * 50)
   } finally {
+    const handle = outcome && parkedHandle(outcome)
+    if (handle) {
+      await execute(dir, 'DevOps', 'en', 'sess-050', { abandon: { handle } }, 2000, Date.now() + 60_000, 1 << 20, null)
+    }
+    clearParkedSites()
     cleanup()
   }
 })

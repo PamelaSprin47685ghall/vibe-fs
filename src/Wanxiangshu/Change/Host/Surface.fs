@@ -228,7 +228,13 @@ module OrchestratorHostSurface =
         worktreePathValue (field value "path"), identity
 
     let private gitPort (raw: obj) : GitPort =
-        { CreateWorktree =
+        { IsDirty =
+            fun path ->
+                task {
+                    let! value = invokeRawTask raw "IsDirty" [| box (WorktreePath.value path) |]
+                    return plainResult value (fun item -> arrayOf item |> Array.toList |> List.map stringOf)
+                }
+          CreateWorktree =
             fun job path sourceRef ->
                 task {
                     let! value =

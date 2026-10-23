@@ -151,8 +151,7 @@ module DeliverPolicy =
                     ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) BindingUnavailable Map.empty
                 )
 
-        fenceReplay
-        |> Option.defaultWith (fun () -> activeEntry)
+        fenceReplay |> Option.defaultWith (fun () -> activeEntry)
 
     /// The refusal text for a call that may not be bound at all.
     let refusalText (path: string) : string =

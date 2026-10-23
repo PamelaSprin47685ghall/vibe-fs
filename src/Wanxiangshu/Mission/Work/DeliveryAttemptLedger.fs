@@ -203,7 +203,7 @@ module DeliveryAttemptLedger =
             | true, record -> record.Interrupt
             | _ -> emptyFacts)
 
-    /// 本 session 精确 run 的自有中断任务（对照 LoopSensor.ActiveInterruptTask）：
+    /// 本 session 精确 run 的自有中断任务：
     /// 观察者等待的是自己发起的那个中断任务，run 不匹配时等待不到别的。
     let activeInterruptTask sessionId providerRun =
         lock gate (fun () ->

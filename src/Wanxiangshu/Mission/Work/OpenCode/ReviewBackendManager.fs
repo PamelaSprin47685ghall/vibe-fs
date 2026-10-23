@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Work.OpenCode
 
 open System
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
@@ -270,10 +271,9 @@ module ReviewBackendManager =
                 workOpt
                 |> requireSome BindingUnavailable
                 |> Result.bind (fun work ->
-                    match work.ActiveId, work.Reviewed with
-                    | None, _ -> Error BindingUnavailable
-                    | Some _, true -> Error AlreadySubmitted
-                    | Some activeId, false ->
+                    match work.ActiveId with
+                    | None -> Error BindingUnavailable
+                    | Some activeId ->
                         scope.ActiveProfileFor sessionId
                         |> Option.map (fun profile ->
                             AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
@@ -299,36 +299,72 @@ module ReviewBackendManager =
                 return Error BindingUnavailable
         }
 
-    let private acceptedResult (findings: ReviewFindings) =
-        let instructionPath =
-            if ReviewFindings.isEmpty findings then
-                Path.Finish
-            else
-                Path.Work
+    let private acceptedResult (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) =
+        let outcome =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "outcome"
 
-        let substitutions =
-            if instructionPath = Path.Finish then
-                // The review just recorded, so no confirmation is durable yet.
-                Map [ "closeout", Wanxiangshu.Mission.Manager.ManagerWorkflow.finishCloseoutText false ]
-            else
-                Map.empty
+        let firstReview =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "firstReview"
+
+        let instructionPath = if outcome = "Promoted" then Path.Finish else Path.Work
 
         ToolResultText.tomlObjectWithInstructions
-            [ providerText instructionPath substitutions ]
-            [ "recorded", ToolResultText.TBool true ]
+            [ providerText instructionPath Map.empty ]
+            [ "recorded", ToolResultText.TBool true
+              "outcome", ToolResultText.TString outcome
+              "first_review", ToolResultText.TString firstReview ]
 
-    /// The write receipt decides the result. A duplicate review is a structured
-    /// failure; a committed or replayed write is accepted.
+    /// The write receipt decides the result. Multiple reviews per tenure are
+    /// legal; a committed or replayed write is accepted.
     let private reviewOutcome
-        (findings: ReviewFindings)
         (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
         : Result<string, ReviewFailure> =
-        if receipt.Reason = "Incumbency already reviewed" then
-            Error RecordFailed
-        elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
-            Ok(acceptedResult findings)
+        if receipt.Status = "Committed" || receipt.Status = "Replayed" then
+            Ok(acceptedResult receipt)
         else
             Error RecordFailed
+
+    /// The review member's failure envelope: a stable code plus a localized
+    /// reason. Data path only — the standalone tool renders TOML instead.
+    let private memberFailure (failure: ReviewFailure) : obj =
+        createObj
+            [ "ok" ==> false
+              "code" ==> failurePath failure
+              "reason" ==> providerText (failurePath failure) Map.empty ]
+
+    let private boolField (result: obj) (name: string) : bool =
+        let field = if isNull result then null else result?(name)
+        not (isNull field) && emitJsExpr field "!!$0"
+
+    let private obligationsField (result: obj) : obj array =
+        let obligations = if isNull result then null else result?obligations
+
+        if isNull obligations || not (emitJsExpr obligations "Array.isArray($0)") then
+            [||]
+        else
+            unbox<obj array> obligations
+
+    /// The review member's success envelope: outcome, firstReview and the
+    /// remaining keyed obligation ledger, all read from the durable receipt.
+    let private memberAccepted (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) : obj =
+        createObj
+            [ "ok" ==> true
+              "outcome"
+              ==> Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "outcome"
+              "firstReview" ==> boolField receipt.Result "firstReview"
+              "obligations" ==> obligationsField receipt.Result ]
+
+    /// Keyed nullable updates: a null value deletes the key (the kernel folds
+    /// a null into a removal); an empty string is NOT a deletion alias.
+    let private updatesOf (findings: ReviewFindings) : obj =
+        findings
+        |> Wanxiangshu.Mission.Work.ReviewFindings.values
+        |> List.map (fun finding ->
+            createObj
+                [ "key", box finding.Key
+                  "value", finding.Value |> Option.map box |> Option.toObj ])
+        |> List.toArray
+        |> box
 
     let private runRecorded
         (context: HostToolContext)
@@ -340,12 +376,22 @@ module ReviewBackendManager =
             | Some _ ->
                 let! gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot prepared.Bound.Directory
 
-                let requestId = prepared.IncumbencyId + ":review"
+                // The request identity is the exact invocation fence, not the
+                // incumbency alone and not a content hash: two distinct calls
+                // with identical findings are two distinct review facts, while
+                // an exact retry replays.
+                let requestId =
+                    ProviderRunIdentity.value prepared.Bound.ProviderRun
+                    + ":"
+                    + ToolCallId.value prepared.Bound.ToolCallId
 
-                let findings =
+                let updates =
                     prepared.Bound.Findings
                     |> Wanxiangshu.Mission.Work.ReviewFindings.values
-                    |> List.map (fun finding -> finding.AcceptanceCriteria + "\n" + finding.WorkPlan)
+                    |> List.map (fun finding ->
+                        createObj
+                            [ "key", box finding.Key
+                              "value", finding.Value |> Option.map box |> Option.toObj ])
                     |> List.toArray
                     |> box
 
@@ -354,7 +400,7 @@ module ReviewBackendManager =
                         "Review"
                         [ "incumbencyId", box prepared.IncumbencyId
                           "reviewerId", box ReviewerId
-                          "findings", findings ]
+                          "updates", updates ]
 
                 let receipt =
                     Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
@@ -363,7 +409,7 @@ module ReviewBackendManager =
                         requestId
                         command
 
-                return reviewOutcome prepared.Bound.Findings receipt
+                return reviewOutcome receipt
         }
 
     /// The one review write: send `Review` to the wanxiangli work owner. The
@@ -405,4 +451,87 @@ module ReviewBackendManager =
                 }
 
             return renderExecution outcome
+        }
+
+    let private receiptMemberOutcome (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) : obj =
+        if receipt.Status = "Committed" || receipt.Status = "Replayed" then
+            memberAccepted receipt
+        else
+            memberFailure RecordFailed
+
+    let private recordMemberCommand
+        (directory: string)
+        (sessionId: string)
+        (incumbencyId: string)
+        (requestId: string)
+        (findings: ReviewFindings)
+        : Task<obj> =
+        task {
+            let! gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot directory
+
+            if String.IsNullOrWhiteSpace gitCommonDir then
+                return memberFailure RecordFailed
+            else
+                let command =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                        "Review"
+                        [ "incumbencyId", box incumbencyId
+                          "reviewerId", box ReviewerId
+                          "updates", updatesOf findings ]
+
+                let receipt =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir sessionId requestId command
+
+                return receiptMemberOutcome receipt
+        }
+
+    let private resolveMemberIncumbency (directory: string) (sessionId: string) : Task<string option> =
+        task {
+            let! workOpt = lifecycleWorkOf directory sessionId
+            return workOpt |> Option.bind (fun work -> work.ActiveId)
+        }
+
+    let private executeInDirectory
+        (directory: string)
+        (sessionId: string)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId)
+        (findings: ReviewFindings)
+        : Task<obj> =
+        task {
+            match! resolveMemberIncumbency directory sessionId with
+            | Some incumbencyId ->
+                let requestId =
+                    ProviderRunIdentity.value providerRun + ":" + ToolCallId.value toolCallId
+
+                return! recordMemberCommand directory sessionId incumbencyId requestId findings
+            | None -> return memberFailure BindingUnavailable
+        }
+
+    let private executeParsedMember
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (findings: ReviewFindings)
+        : Task<obj> =
+        match context.ToolCallId, context.ProviderRunId, scope.WorkspaceDirectory with
+        | Some toolCallId, Some providerRun, Some directory ->
+            executeInDirectory directory context.SessionId providerRun toolCallId findings
+        | _ -> Task.FromResult(memberFailure BindingUnavailable)
+
+    /// The `this.review(findings)` member path. `findings` is a plain JS array
+    /// of `{ key: string, value: string | null }`; a null value deletes the
+    /// key. Returns a data envelope (`{ ok, outcome, firstReview, obligations }`
+    /// or `{ ok: false, code, reason }`), never rendered prose.
+    let executeMember (scope: ToolRuntimeScope) (context: HostToolContext) (findings: obj) : Task<obj> =
+        task {
+            let parsed =
+                if isNull findings then
+                    Error InvalidFindings
+                else
+                    Model.tryParse (createObj [ "findings" ==> findings ])
+                    |> Result.mapError (fun _ -> InvalidFindings)
+
+            match parsed with
+            | Error failure -> return memberFailure failure
+            | Ok findings -> return! executeParsedMember scope context findings
         }

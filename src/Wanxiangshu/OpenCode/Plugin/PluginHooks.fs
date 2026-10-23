@@ -175,7 +175,7 @@ module PluginHooks =
                 | "S3", Some _ -> Some "planning/s3"
                 | _ -> None
 
-            let planStageFor (sessionId: SessionId) : Task<string option> =
+            let planStageFor (sessionId: SessionId) : Task<(string * string) option> =
                 task {
                     match roleFor sessionId, workspaceDirectory with
                     | Some Role.Plan, Some workspace ->
@@ -185,7 +185,18 @@ module PluginHooks =
                             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected
                                 commonDir
                                 (SessionId.value sessionId)
-                            |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
+                            |> Option.bind (fun work ->
+                                stagePathFor work.Stage work.ActiveId
+                                |> Option.map (fun stagePath ->
+                                    let draftPath =
+                                        Wanxiangshu.Mission.Planning.PlanPath.resolvePlanPath
+                                            workspace
+                                            (SessionId.value sessionId)
+                                        |> Result.defaultValue (
+                                            workspace + "/plan/" + SessionId.value sessionId + "/plan.md"
+                                        )
+
+                                    (stagePath, draftPath)))
                     | _ -> return None
                 }
 

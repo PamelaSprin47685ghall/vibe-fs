@@ -8,9 +8,10 @@ import { join } from 'node:path'
 import * as eventStore from '../../../../../dist/Persistence/EventStore/Surface.js'
 
 export const hexId = (n) => n.toString(16).padStart(40, '0')
+export const gateFactWriterId = (pid) => `verification-gate-p${pid}`
 
 export function openGateFactStore(workDir) {
-  const store = eventStore.create(join(workDir, '.Herdchestra'), `verification-gate-${process.pid}`)
+  const store = eventStore.create(join(workDir, '.Herdchestra'), gateFactWriterId(process.pid))
   let seq = 0
   let lastId = null
   let serial = Promise.resolve()

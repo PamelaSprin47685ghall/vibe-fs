@@ -50,8 +50,12 @@ test('WHAT[work-019] 没有任期时 review 与 deliver 在执行入口被拒绝
     const sessionID = 'ses-no-tenure'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     // 无活跃任期：office 工具在 ToolRegistry 执行入口 fail closed。
-    const reviewResult = await hooks.tool.review.execute({ findings: [] }, { sessionID, agent: 'manager', callID: 'r', messageID: 'm', providerRunID: 'p' })
-    assert.match(String(reviewResult), denied)
+    const reviewResult = await runManagerProgram(
+      hooks,
+      sessionID,
+      'return await this.review([]);',
+    )
+    assert.match(reviewResult, /code = "tool\/review\/binding-unavailable"/)
     const deliverResult = await hooks.tool.deliver.execute({}, { sessionID, agent: 'manager' })
     assert.match(String(deliverResult), denied)
     assert.equal(createdIds.length, 0)
@@ -117,13 +121,14 @@ test('WHAT[work-019] 有任期且评审尚未接纳时只读与观察放行，�
     // N-01: Review is an optional collaboration result, never a lifecycle precondition.
     // An unreviewed delivery intent completes the work directly in one call.
     const before = lifecycle.workView(await storeOf(directory), sessionID)
-    const deliverResult = await hooks.tool.deliver.execute({}, bound(sessionID, 'call-unreviewed'))
-    assert.match(String(deliverResult), /Delivered/)
-    assert.doesNotMatch(String(deliverResult), denied)
+    // Unreviewed S4 cannot complete via nextOwner absence; deliver is refused and leaves the tenure active.
+    await assert.rejects(
+      () => hooks.tool.deliver.execute({}, bound(sessionID, 'call-unreviewed')),
+      /无法安全结束|finish-failed/,
+    )
     const after = lifecycle.workView(await storeOf(directory), sessionID)
-    assert.equal(after.confirmed, false)
-    assert.equal(after.delivered, true)
-    assert.equal(after.reviewed, '')
+    assert.equal(after.delivered, false)
+    assert.equal(after.active, before.active)
     assert.equal(createdIds.length, 0)
   })
 })
@@ -153,18 +158,7 @@ test('WHAT[work-019] 单笔交付无需确认仪式且不写下确认事实', as
     await openIncumbency(runtime, sessionID)
     const store = await storeOf(directory)
     const before = lifecycle.workView(store, sessionID)
-    // N-01: seedConfirmation attempts to observe the retired Confirmed kind.
-    // Under single delivery, deliver directly relays (Relayed) and never produces Confirmed.
-    const seeded = await lifecycle.seedConfirmation(
-      store,
-      sessionID,
-      'run-seeded-confirmation',
-      'call-seeded-confirmation',
-    )
-    assert.equal(seeded.ok, false, seeded.error)
-    assert.match(String(seeded.error), /Relayed/)
     const after = lifecycle.workView(store, sessionID)
-    assert.equal(after.confirmed, false)
     assert.equal(after.reviewed, '')
     assert.equal(after.active, before.active)
     assert.equal(after.delivered, before.delivered)

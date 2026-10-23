@@ -2,6 +2,7 @@ namespace Wanxiangshu.Composition.Omp
 
 open System.Threading.Tasks
 open Fable.Core
+open Wanxiangshu.Host.SecondHost
 
 /// The omp extension entrypoint.
 ///
@@ -17,6 +18,9 @@ module OmpExtension =
     /// The returned task settles once the adapter has been wired; the product
     /// itself is activated on the first `session_start` event.
     val activate: pi: obj -> Task<unit>
+
+    /// Compose the product with caller-owned clock and per-activation timer factories.
+    val activateWithTiming: pi: obj -> clock: IClockPort -> createTimer: (unit -> ITimerPort) -> Task<unit>
 
     /// The omp extension factory: `export default (pi) => …`.
     ///

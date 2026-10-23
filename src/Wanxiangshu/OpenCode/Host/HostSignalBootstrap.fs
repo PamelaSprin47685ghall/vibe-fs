@@ -79,7 +79,7 @@ module HostSignalBootstrap =
           EnsureVisibleInputAdmission: obj -> Task<unit> }
 
     let wire
-        (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
+        (observeTurnWorkflow: ReconciledTurnContext -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
@@ -196,7 +196,6 @@ module HostSignalBootstrap =
                     match tryObserveCurrentIdle key attempt with
                     | None -> ()
                     | Some permit ->
-                        scope.LoopSensor.ResetDetector sessionId
                         reconciler.SignalIdle(sessionId, permit)
                         do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.PhysicalExecutionQuiesced key)
                 }
@@ -259,11 +258,6 @@ module HostSignalBootstrap =
 
                         })
 
-
-            // LOOP-002/006 and HOST-027 share one raw Host subscription but own
-            // disjoint stream fields. Both abort physically; only their typed armed
-            // marks decide the later reconciled-turn meaning.
-            HostTurnObserver.attachLoopSensor sessionPort rootWorkspace journal scope Diagnostic.emit
 
             let exactStarted (key: ChatExecutionKey) : ProviderStartedEvidence option =
                 journal
@@ -431,22 +425,10 @@ module HostSignalBootstrap =
                     }
                     :> Task
 
-            // Host wire edge: the adapter decodes the raw delta into the
-            // neutral `LoopTextDelta` before the product sensor observes it.
-            let onLoopEvent raw =
-                match LoopEventCodec.tryDecodeTextDelta raw with
-                | None -> ()
-                | Some delta ->
-                    scope.LoopSensor.Observe
-                        { Session = delta.SessionId
-                          Message = delta.MessageId
-                          Delta = delta.Delta }
-
             let signalRouter =
                 HostSignalRouter(
                     scope.Sessions.OwnedSessions,
                     onSignal,
-                    onLoopEvent = onLoopEvent,
                     onExactAssistantObservation =
                         (fun
                             (started: ExactProviderStartObservation)
@@ -1298,10 +1280,7 @@ module HostSignalBootstrap =
                     }
 
             let cancelSignals (ids: SessionId seq) =
-                ids
-                |> Seq.iter (fun id ->
-                    scope.LoopSensor.DropSession id
-                    signalRouter.UnregisterOwned id)
+                ids |> Seq.iter (fun id -> signalRouter.UnregisterOwned id)
 
             return
                 { RegisterOwned = registerOwned

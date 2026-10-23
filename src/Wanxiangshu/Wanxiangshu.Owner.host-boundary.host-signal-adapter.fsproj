@@ -12,7 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-event-envelope.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.loop-event-codec.fsproj"/>
+
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/>
         <ProjectReference Include="Wanxiangshu.Owner.action-affordance.persistence-runtime-path.fsproj"/>
 <Compile Include="Execution/Session/ChatExecution/ProviderObservation.fsi"/>

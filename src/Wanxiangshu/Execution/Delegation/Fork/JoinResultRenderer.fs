@@ -53,6 +53,9 @@ module JoinResultRenderer =
         let OrchestratorPublished = "tool/join/orchestrator-published"
 
         [<Literal>]
+        let OrchestratorRejectedDirty = "tool/join/orchestrator-rejected-dirty"
+
+        [<Literal>]
         let OrchestratorIntegrationFailed = "tool/join/orchestrator-integration-failed"
 
         [<Literal>]
@@ -176,7 +179,11 @@ module JoinResultRenderer =
         let name =
             byname lang resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
 
-        entry [ bynameLine lang Path.AgentReturned name ] (ReturnedMaterial.data payload.View)
+        // AXIOM 7: the child's report is main prose, so it rides the `# `
+        // comment header (exact text, no trim); only the carry material is
+        // data. The byname line stays first, then the report body.
+        LlmFacing.instructions ([ bynameLine lang Path.AgentReturned name ] @ ReturnedMaterial.body payload.View)
+        |> LlmFacing.withData (ReturnedMaterial.carryData payload.View)
 
     let private renderAgentFailed
         (lang: ProviderLanguage)
@@ -399,6 +406,7 @@ module JoinResultRenderer =
             | OrchestratorVerdict.Published _ -> Path.OrchestratorPublished
             | OrchestratorVerdict.PublishedPendingCleanup _ -> Path.OrchestratorPublished
             | OrchestratorVerdict.Cancelled _ -> Path.OrchestratorEmpty
+            | OrchestratorVerdict.RejectedDirty _ -> Path.OrchestratorRejectedDirty
             | OrchestratorVerdict.IntegrationFailed _ -> Path.OrchestratorIntegrationFailed
             | OrchestratorVerdict.Empty -> Path.OrchestratorEmpty
 

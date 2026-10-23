@@ -48,6 +48,15 @@ module JsParkedSites =
 
     let private abandonExpired () =
         lock timerLock (fun () ->
+            let abandonHandle (handle: string) =
+                match table.TryGetValue handle with
+                | true, site ->
+                    Wanxiangshu.Process.JsSandbox.abandon site.RunHandle.ParkState |> ignore
+                    table.Remove handle |> ignore
+                | _ -> ()
+
+                expiry.Remove handle |> ignore
+
             let expired =
                 expiry
                 |> Seq.filter (fun kv -> kv.Value <= nowMs ())
@@ -55,19 +64,20 @@ module JsParkedSites =
                 |> Seq.toList
 
             for handle in expired do
-                match table.TryGetValue handle with
-                | true, site ->
-                    Wanxiangshu.Process.JsSandbox.abandon site.RunHandle.ParkState |> ignore
-                    table.Remove handle |> ignore
-                    expiry.Remove handle |> ignore
-                | _ -> expiry.Remove handle |> ignore
+                abandonHandle handle
 
             stopSweeperIfEmpty ())
 
     let private ensureSweeper () =
         if sweeper.IsNone then
             let callback = fun () -> abandonExpired ()
-            sweeper <- Some(emitJsExpr callback "(function(cb) { const t = setInterval(cb, 60000); if (t && typeof t.unref === 'function') t.unref(); return t; })($0)")
+
+            sweeper <-
+                Some(
+                    emitJsExpr
+                        callback
+                        "(function(cb) { const t = setInterval(cb, 60000); if (t && typeof t.unref === 'function') t.unref(); return t; })($0)"
+                )
 
     /// Register a parked site under its handle. Refuses with CONCURRENCY_LIMIT
     /// when the table already holds `concurrencyLimit` sites (no queue).
@@ -149,19 +159,20 @@ module JsParkedSites =
     /// Classify a parked site by its real resource ownership.
     let classifySite (site: JsParkedSite) : ParkResourceClassification =
         let payload = site.RunHandle.ParkState.ParkPayload
+
         if isKnownNoEffectPayload payload then
             // EXPLICIT ALLOW-LIST ONLY: Proven side-effect-free observation checkpoint.
             ParkResourceClassification.ProvenSideEffectFreePause "runtime-verified side-effect-free pause"
         elif isAskPayload payload then
-            ParkResourceClassification.PendingUserAsk (askQuestionText payload)
+            ParkResourceClassification.PendingUserAsk(askQuestionText payload)
         elif isYieldPayload payload then
             ParkResourceClassification.ActiveChildCommand "command execution yield"
         elif isAmbiguityPayload payload then
             // Ambiguity cannot be statically proven side-effect-free in general.
-            ParkResourceClassification.AmbiguitySearch (ambiguityNeedleText payload)
+            ParkResourceClassification.AmbiguitySearch(ambiguityNeedleText payload)
         else
             // Default: any other declared pause is blocked to avoid silently discarding caller's pause.
-            ParkResourceClassification.UnclassifiedDeclaredPause (payloadKindText payload)
+            ParkResourceClassification.UnclassifiedDeclaredPause(payloadKindText payload)
 
     let isDeliveryBlocker (site: JsParkedSite) : bool =
         match classifySite site with
@@ -173,20 +184,44 @@ module JsParkedSites =
     /// Returns the list of auto-settled handle names. Uncleared blockers remain.
     let deliveryBlockersWithChoicesForSession (sessionId: string) : (string * string) list =
         abandonExpired ()
+
         table.Values
         |> Seq.filter (fun site -> site.SessionId = sessionId)
         |> Seq.choose (fun site ->
             match classifySite site with
             | ParkResourceClassification.PendingUserAsk question ->
-                Some(site.Handle, sprintf "handle '%s' is waiting for user answer to question '%s'; answer with unpark({ handle, value }) or cancel with abandon({ handle })" site.Handle question)
+                Some(
+                    site.Handle,
+                    sprintf
+                        "handle '%s' is waiting for user answer to question '%s'; answer with unpark({ handle, value }) or cancel with abandon({ handle })"
+                        site.Handle
+                        question
+                )
             | ParkResourceClassification.ActiveChildCommand detail ->
-                Some(site.Handle, sprintf "handle '%s' holds an active background command (%s); wait for completion, send signal, or cancel with abandon({ handle })" site.Handle detail)
+                Some(
+                    site.Handle,
+                    sprintf
+                        "handle '%s' holds an active background command (%s); wait for completion, send signal, or cancel with abandon({ handle })"
+                        site.Handle
+                        detail
+                )
             | ParkResourceClassification.AmbiguitySearch needle ->
-                Some(site.Handle, sprintf "handle '%s' is paused on where ambiguity search for '%s'; resolve with unpark({ handle, value }) or cancel with abandon({ handle })" site.Handle needle)
+                Some(
+                    site.Handle,
+                    sprintf
+                        "handle '%s' is paused on where ambiguity search for '%s'; resolve with unpark({ handle, value }) or cancel with abandon({ handle })"
+                        site.Handle
+                        needle
+                )
             | ParkResourceClassification.UnclassifiedDeclaredPause kind ->
-                Some(site.Handle, sprintf "handle '%s' declared an unresolved pause of kind '%s'; resume with unpark({ handle, value }) or cancel with abandon({ handle })" site.Handle kind)
-            | ParkResourceClassification.ProvenSideEffectFreePause _ ->
-                None)
+                Some(
+                    site.Handle,
+                    sprintf
+                        "handle '%s' declared an unresolved pause of kind '%s'; resume with unpark({ handle, value }) or cancel with abandon({ handle })"
+                        site.Handle
+                        kind
+                )
+            | ParkResourceClassification.ProvenSideEffectFreePause _ -> None)
         |> Seq.toList
         |> List.sortBy fst
 
@@ -195,16 +230,18 @@ module JsParkedSites =
 
     let autoSettleForSession (sessionId: string) : string list =
         abandonExpired ()
+
         let settleable =
             table.Values
             |> Seq.filter (fun site ->
-                site.SessionId = sessionId &&
-                match classifySite site with
-                | ParkResourceClassification.ProvenSideEffectFreePause _ -> true
-                | _ -> false)
+                site.SessionId = sessionId
+                && match classifySite site with
+                   | ParkResourceClassification.ProvenSideEffectFreePause _ -> true
+                   | _ -> false)
             |> Seq.toList
 
         let settled = ResizeArray<string>()
+
         for site in settleable do
             Wanxiangshu.Process.JsSandbox.abandon site.RunHandle.ParkState
             remove site.Handle

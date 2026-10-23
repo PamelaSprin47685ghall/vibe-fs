@@ -67,19 +67,7 @@ module ManagerWorkflow =
                 |> Option.exists (fun work -> List.contains (ProviderRunIdentity.value providerRun) work.RetiredRuns)
         }
 
-    /// An unreviewed S4 tenure whose confirmation already landed cannot
-    /// happen through the library's own gate; treat it as no action.
-    let private unreviewedResource (confirmed: bool) =
-        if confirmed then None else Some assessPath
-
-    /// The resource for a reviewed, unconfirmed S4 tenure, by review outcome.
-    let private reviewedResource (outcome: string option) =
-        match outcome with
-        | Some "Stayed" -> Some workPath
-        | Some "Promoted" -> Some finishPath
-        | _ -> None
-
-    // Algorithm H reads the opening sequence plus tenure, review outcome, and confirmation.
+    // Algorithm H reads the opening sequence plus tenure, review state, and obligations.
     // S1–S3 do not enter the S4 resource match. Certificates are not an input.
     let private resourceForCurrentAction (directory: string option) (sessionId: SessionId) =
         task {
@@ -90,34 +78,15 @@ module ManagerWorkflow =
                 | None -> None
                 | Some work when work.Sequence <> [ "S4" ] -> None
                 | Some work when work.ActiveId.IsNone -> None
-                | Some work when work.Reviewed |> not -> unreviewedResource work.Confirmed
-                | Some work when not work.Confirmed -> reviewedResource work.ReviewOutcome
-                | Some _ -> Some finishPath
+                | Some work when not work.Reviewed -> Some assessPath
+                | Some work when work.ReviewOutcome = Some "Promoted" && Array.isEmpty work.Obligations ->
+                    Some finishPath
+                | Some _ -> Some workPath
         }
 
 
     let private activeResourcePath (directory: string option) (sessionId: SessionId) =
         resourceForCurrentAction directory sessionId
-
-    /// The closeout instruction substituted into `runtime/manager-finish`. The
-    /// two-stage deliver is the point: the first call only records confirmation,
-    /// a later call with a different tool call is what closes out.
-    let finishCloseoutText (confirmed: bool) : string =
-        match ProviderLanguageBinding.readGlobalPreference () with
-        | ProviderLanguage.English when confirmed ->
-            "Confirmation is already recorded. A later deliver with a different call may close out. Closing is not written in this prompt."
-        | ProviderLanguage.English -> "This call only records confirmation. It does not end."
-        | _ when confirmed -> "确认已经落下。下一次不同调用的 deliver 才收口。收束不写在本提示里。"
-        | _ -> "这一次调用只落下确认，不结束。"
-
-    /// The closeout substitution reads the confirmation bit from the work the
-    /// closeout targets. A missing work is still unconfirmed.
-    let private closeoutSubstitutions (turn: ReconciledTurn) =
-        task {
-            let! workOpt = lifecycleWork turn.Directory (SessionId.value turn.SessionId)
-            let confirmed = workOpt |> Option.exists (fun work -> work.Confirmed)
-            return Map [ "closeout", finishCloseoutText confirmed ]
-        }
 
     let private sendNudge
         (quiescence: ISessionQuiescenceGate)
@@ -135,8 +104,6 @@ module ManagerWorkflow =
                         let! ordinal = iterationOrdinalText turn.Directory turn.SessionId
                         return Map [ "ordinal", ordinal ]
                     }
-                elif resourcePath = finishPath then
-                    closeoutSubstitutions turn
                 else
                     Task.FromResult Map.empty
 

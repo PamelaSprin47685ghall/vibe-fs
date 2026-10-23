@@ -39,7 +39,7 @@ module SpikePlugin =
                 // needs a static reference to the relay turn-workflow module
                 // (host -> relay stays one-way: plugin -> workflow -> host types).
                 let observeTurnWorkflow =
-                    fun sessionPort eventPort rootWorkspace cause (context: Turn.ReconciledTurnContext) ->
+                    fun sessionPort eventPort rootWorkspace (context: Turn.ReconciledTurnContext) ->
                         Turn.TurnWorkflow.observe
                             sessionPort
                             rootWorkspace
@@ -49,7 +49,6 @@ module SpikePlugin =
                             boot.Scope.Sessions.NudgeSent
                             boot.Scope.Sessions.JoinGuardNudges
                             (fun s -> boot.Scope.HasLivePty s)
-                            cause
                             boot.Scope.Sessions.Quiescence
                             context
 

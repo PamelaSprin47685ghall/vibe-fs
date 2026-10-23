@@ -282,11 +282,11 @@ export const runCli = (argv = process.argv.slice(2)) => {
   const entries = collectControlPyramidEntries(ROOT, options.root)
   const hits = scanControlPyramidEntries(entries)
   if (hits.length === 0) {
-    console.log('fsharp-control-pyramid (opt-in analysis): clean (0 nested decisions)')
+    console.log('fsharp-control-pyramid: clean (0 nested decisions)')
     return 0
   }
-  console.log(renderFailure(hits, `fsharp-control-pyramid (opt-in analysis): ${hits.length} hotspot(s)`))
-  return 0
+  console.log(renderFailure(hits))
+  return 1
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

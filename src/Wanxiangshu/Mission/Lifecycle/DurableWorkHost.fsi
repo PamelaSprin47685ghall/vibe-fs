@@ -40,37 +40,37 @@ module DurableWorkHost =
           Expected: string
           Next: string }
 
+    type HostObligation = { Key: string; Value: string }
+
     type InspectedWork =
-        {
-            Opened: bool
-            Sequence: string list
-            Stage: string
-            ActiveId: string option
-            OpeningStage: string option
-            Reviewed: bool
-            ReviewOutcome: string option
-            OpeningCursor: float option
-            PredecessorRange: (float * float) option
-            LastRetirementCursor: float option
-            DeliveryAuthorized: bool
-            Delivered: bool
-            PendingDelivery: bool
-            PendingOperationId: string option
-            PendingExecSessionId: string option
-            PendingDigest: string option
-            PendingPath: string option
-            RoundCount: int
-            RetiredRuns: string list
-            DevOpsId: string option
-            DevOpsTarget: string option
-            Authority: string
-            Confirmed: bool
-            BlockerDigest: string option
-            Root: string option
-            Retirements: HostRetirement list
-            ProjectionCut: HostRunFence option
-            Advances: HostAdvance list
-        }
+        { Opened: bool
+          Sequence: string list
+          Stage: string
+          ActiveId: string option
+          OpeningStage: string option
+          Reviewed: bool
+          ReviewOutcome: string option
+          Obligations: obj array
+          OpeningCursor: float option
+          PredecessorRange: (float * float) option
+          LastRetirementCursor: float option
+          DeliveryAuthorized: bool
+          Delivered: bool
+          PendingDelivery: bool
+          PendingOperationId: string option
+          PendingExecSessionId: string option
+          PendingDigest: string option
+          PendingPath: string option
+          RoundCount: int
+          RetiredRuns: string list
+          DevOpsId: string option
+          DevOpsTarget: string option
+          Authority: string
+          BlockerDigest: string option
+          Root: string option
+          Retirements: HostRetirement list
+          ProjectionCut: HostRunFence option
+          Advances: HostAdvance list }
 
     val inspected: gitCommonDir: string -> workId: string -> InspectedWork option
 

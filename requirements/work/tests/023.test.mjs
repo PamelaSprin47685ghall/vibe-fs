@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
@@ -18,71 +18,53 @@ const open = (workId) => {
   return text
 }
 
-const promoteAndRelay = (text, step) => {
+// An empty first review fixes eligibility; deliver performs the promotion and
+// relays to a fresh per-stage tenure (each stage starts read-only again).
+const reviewThenDeliver = (text, step, expect) => {
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
   assert.equal(reviewed.decision, 'Write', reviewed.detail)
-  const relayed = surface.deliverProbe(`${text}${reviewed.bytes}`, `run-${step}`, `call-${step}`, BigInt(step) * 10n + 10n)
-  assert.equal(relayed.decision, 'Write', relayed.detail)
-  assert.equal(relayed.detail, 'Relayed')
-  return { reviewed, relayed, text: `${text}${reviewed.bytes}${relayed.bytes}` }
+  const reviewedText = `${text}${reviewed.bytes}`
+  const delivered = surface.deliverProbe(reviewedText, `run-${step}`, `call-${step}`, BigInt(step) * 10n, null)
+  assert.equal(delivered.decision, 'Write', delivered.detail)
+  assert.equal(delivered.detail, expect)
+  return `${reviewedText}${delivered.bytes}`
 }
 
-test('WHAT[work-023] the projection advances only on Promoted, and only the final S1-S3 element authorizes delivery', () => {
+test('WHAT[work-023] review grants eligibility; deliver performs the stage promotion', () => {
   const opened = open('work-1')
   assert.equal(surface.documentView(opened).projection, 'S1')
   assert.equal(surface.documentView(opened).authorized, false)
 
-  const stayed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Stayed')
-  assert.equal(stayed.decision, 'Write')
-  const stayedView = surface.documentView(`${opened}${stayed.bytes}`)
-  assert.equal(stayedView.projection, 'S1', 'Stayed keeps the stage')
-  assert.equal(stayedView.authorized, false)
-  assert.equal(stayedView.openingStage, 'S1', 'review does not rewrite the opening stage')
+  const s1Id = incumbencyIdOf(opened)
+  const eligible = surface.reviewProbe(opened, s1Id, 'Promoted')
+  assert.equal(eligible.decision, 'Write')
+  assert.equal(eligible.authorized, false, 'eligibility never authorises delivery')
+  const eligibleView = surface.documentView(`${opened}${eligible.bytes}`)
+  assert.equal(eligibleView.projection, 'S1', 'eligibility never advances the stage')
 
-  const first = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Promoted')
-  assert.equal(first.decision, 'Write')
-  assert.equal(first.authorized, false, 'an S1 promotion grants the next stage, not delivery authorization')
-  const s2 = surface.documentView(`${opened}${first.bytes}`)
-  assert.equal(s2.projection, 'S2')
-  assert.equal(s2.activeId, incumbencyIdOf(opened), 'promotion stays on the same incumbency')
+  let text = `${opened}${eligible.bytes}`
+  const s1Deliver = surface.deliverProbe(text, 'run-1', 'call-1', 10n, null)
+  assert.equal(s1Deliver.decision, 'Write', s1Deliver.detail)
+  assert.equal(s1Deliver.detail, 'Promoted')
+  text = `${text}${s1Deliver.bytes}`
+  const s2View = surface.documentView(text)
+  assert.equal(s2View.projection, 'S2', 'deliver advanced S1 -> S2')
+  assert.notEqual(s2View.activeId, s1Id, 'promotion relays to a fresh S2 tenure')
 
-  const relay1 = surface.deliverProbe(`${opened}${first.bytes}`, 'run-1', 'call-1', 10n)
-  assert.equal(relay1.decision, 'Write', relay1.detail)
-  assert.equal(eventsOf(relay1.bytes)[1].stage, 'S2', 'relay opens the successor at the retired projection')
-  const s2Tenure = surface.documentView(`${opened}${first.bytes}${relay1.bytes}`)
-  assert.equal(s2Tenure.projection, 'S2')
-  assert.equal(s2Tenure.authorized, false)
+  text = reviewThenDeliver(text, 2, 'Promoted')
+  assert.equal(surface.documentView(text).projection, 'S3', 'deliver advanced S2 -> S3')
 
-  const second = surface.reviewProbe(`${opened}${first.bytes}${relay1.bytes}`, incumbencyIdOf(`${opened}${first.bytes}${relay1.bytes}`), 'Promoted')
-  assert.equal(second.decision, 'Write')
-  assert.equal(second.authorized, false, 'an S2 promotion is not the final element')
-  assert.equal(surface.documentView(`${opened}${first.bytes}${relay1.bytes}${second.bytes}`).projection, 'S3')
-
-  const relay2 = surface.deliverProbe(
-    `${opened}${first.bytes}${relay1.bytes}${second.bytes}`,
-    'run-2',
-    'call-2',
-    20n,
-  )
-  assert.equal(relay2.decision, 'Write', relay2.detail)
-  const s3Text = `${opened}${first.bytes}${relay1.bytes}${second.bytes}${relay2.bytes}`
-  assert.equal(surface.documentView(s3Text).authorized, false, 'the S3 tenure is unauthorized before its own review')
-
-  const third = surface.reviewProbe(s3Text, incumbencyIdOf(s3Text), 'Promoted')
-  assert.equal(third.decision, 'Write')
-  assert.equal(third.authorized, true, 'the final S1-S3 element sets delivery authorization')
-  const authorized = surface.documentView(`${s3Text}${third.bytes}`)
-  assert.equal(authorized.projection, 'S3', 'the final promotion does not invent a fourth stage')
-  assert.equal(authorized.openingStage, 'S3')
+  text = reviewThenDeliver(text, 3, 'Authorized')
+  const authorized = surface.documentView(text)
+  assert.equal(authorized.projection, 'S3', 'authorization does not invent a fourth stage')
+  assert.equal(authorized.authorized, true)
 })
 
-test('WHAT[work-023] delivery and reopen do not touch the stage', () => {
+test('WHAT[work-023] delivery and reopen do not touch the stage beyond the promotion', () => {
   let text = open('work-2')
-  text = promoteAndRelay(text, 1).text
-  text = promoteAndRelay(text, 2).text
-  const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
-  assert.equal(reviewed.decision, 'Write', reviewed.detail)
-  text = `${text}${reviewed.bytes}`
+  text = reviewThenDeliver(text, 1, 'Promoted')
+  text = reviewThenDeliver(text, 2, 'Promoted')
+  text = reviewThenDeliver(text, 3, 'Authorized')
   const before = surface.documentView(text)
   assert.equal(before.projection, 'S3')
   assert.equal(before.authorized, true)
@@ -90,11 +72,13 @@ test('WHAT[work-023] delivery and reopen do not touch the stage', () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-023-'))
   let delivered
   try {
-    const written = planning.PlanningSurface.rewritePlanAtomic(root, 'work-2', '# plan\n')
-    assert.equal(written.ok, true, written.error)
+    const resolved = planning.PlanningSurface.resolvePlanPath(root, 'work-2')
+    assert.equal(resolved.ok, true, resolved.error)
+    mkdirSync(dirname(resolved.path), { recursive: true })
+    writeFileSync(resolved.path, '# plan\n', 'utf8')
     const selected = planning.PlanningSurface.readAndValidatePlan(root, 'work-2')
     assert.equal(selected.ok, true, selected.error)
-    delivered = surface.deliverStateProbe(text, 'run-deliver', 'call-deliver', 30n, { digest: selected.digest, path: selected.path })
+    delivered = surface.deliverStateProbe(text, 'run-deliver', 'call-deliver', 40n, { digest: selected.digest, path: selected.path })
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -121,21 +105,19 @@ test('WHAT[work-023] illegal stage and review transitions are rejected', () => {
   assert.equal(ghost.decision, 'Refuse', 'review of an unknown incumbency is rejected')
   assert.match(ghost.detail, /mismatch/i)
 
-  const promoted = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Promoted')
-  const relayed = surface.deliverProbe(`${opened}${promoted.bytes}`, 'run-3', 'call-3', 10n)
+  // A non-eligible deliver relays: the successor tenure opens fresh (read-only again).
+  const relayed = surface.deliverProbe(opened, 'run-3', 'call-3', 10n, null)
   assert.equal(relayed.decision, 'Write', relayed.detail)
-  const retiredText = `${opened}${promoted.bytes}${relayed.bytes}`
+  assert.equal(relayed.detail, 'Relayed')
+  const retiredText = `${opened}${relayed.bytes}`
+  const paired = surface.readProbe(retiredText)
+  assert.equal(paired.next, 'Review')
+
+  // Reviewing the retired tenure's id is rejected.
   const retiredId = incumbencyIdOf(opened)
-  const firstReviewRequestId = JSON.parse(promoted.bytes).requestId
-  const lateRequestId = `review:${retiredId}:Stayed`
-  assert.notEqual(lateRequestId, firstReviewRequestId)
   const late = surface.reviewProbe(retiredText, retiredId, 'Stayed')
   assert.equal(late.decision, 'Refuse')
-  assert.equal(late.detail, 'Incumbency mismatch')
-
-  assert.equal(eventsOf(relayed.bytes)[1].stage, 'S2', 'the kernel opens the successor at the retired projection, not S3')
-  const paired = surface.readProbe(`${opened}${promoted.bytes}${relayed.bytes}`)
-  assert.equal(paired.next, 'Review')
+  assert.match(late.detail, /mismatch/i)
 
   const execution = surface.encodeOpening('S4', 'work-s4', '/root', 3n)
   const executionPromotion = surface.reviewProbe(execution, incumbencyIdOf(execution), 'Promoted')

@@ -92,58 +92,6 @@ module PlanningSurface =
                    path = null
                    error = err |}
 
-    let readPlan (root: string) (workId: string) : obj =
-        match PlanPath.readPlan root workId with
-        | Ok content ->
-            box
-                {| ok = true
-                   content = content
-                   error = null |}
-        | Error err ->
-            box
-                {| ok = false
-                   content = null
-                   error = err |}
-
-    let rewritePlanAtomic (root: string) (workId: string) (content: string) : obj =
-        match PlanPath.rewritePlanAtomic root workId content with
-        | Ok(path, digest) ->
-            box
-                {| ok = true
-                   path = path
-                   digest = digest
-                   error = null |}
-        | Error err ->
-            box
-                {| ok = false
-                   path = null
-                   digest = null
-                   error = err |}
-
-    let editPlanAtomic (root: string) (workId: string) (patches: obj) : obj =
-        let patchList =
-            if isNull patches then
-                []
-            else
-                let arr = unbox<obj array> patches
-
-                arr
-                |> Array.toList
-                |> List.map (fun p -> (unbox<string> p?find, unbox<string> p?put))
-
-        match PlanPath.editPlanAtomic root workId patchList with
-        | Ok(path, digest) ->
-            box
-                {| ok = true
-                   path = path
-                   digest = digest
-                   error = null |}
-        | Error err ->
-            box
-                {| ok = false
-                   path = null
-                   digest = null
-                   error = err |}
 
     let private extractStringOpt (v: obj) : string option =
         if isNull v then
@@ -390,38 +338,12 @@ module PlanningSurface =
                                error = null |}
         }
 
-    let executeJsPlan (root: string) (workId: string) (action: string) (content: obj) (patches: obj) : obj =
-        let contentOpt = extractStringOpt content
-
-        let patchList =
-            if isNull patches then
-                None
-            else
-                let arr = unbox<obj array> patches
-
-                Some(
-                    arr
-                    |> Array.toList
-                    |> List.map (fun p -> (unbox<string> p?find, unbox<string> p?put))
-                )
-
-        match PlanTools.executeJsPlan root workId action contentOpt patchList with
-        | Ok res ->
-            box
-                {| ok = true
-                   output = res
-                   error = null |}
-        | Error err ->
-            box
-                {| ok = false
-                   output = null
-                   error = err |}
 
     let reviewTargetFor (stage: string) : string = ReviewPlanBackend.reviewTargetFor stage
 
-    let private parseFindings (findingsVal: obj) : Result<(string * string) list, string> =
+    let private parseFindings (findingsVal: obj) : Result<(string * string option) list, string> =
         if isNull findingsVal then
-            Error "findings must be an array of {acceptance_criteria, work_plan} pairs"
+            Error "findings must be an array of {key, value} pairs"
         elif emitJsExpr findingsVal "Array.isArray($0)" then
             let arr = unbox<obj array> findingsVal
 
@@ -429,36 +351,38 @@ module PlanningSurface =
                 arr
                 |> Array.toList
                 |> List.map (fun (item: obj) ->
-                    let acceptance: obj = item?acceptance_criteria
-                    let workPlan: obj = item?work_plan
+                    let key: obj = item?key
+                    let value: obj = item?value
 
                     if
-                        isNull acceptance
-                        || isNull workPlan
-                        || not (emitJsExpr acceptance "typeof $0 === 'string'")
-                        || not (emitJsExpr workPlan "typeof $0 === 'string'")
-                        || String.IsNullOrEmpty(unbox<string> acceptance)
-                        || String.IsNullOrWhiteSpace(unbox<string> workPlan)
+                        isNull key
+                        || not (emitJsExpr key "typeof $0 === 'string'")
+                        || String.IsNullOrWhiteSpace(unbox<string> key)
                     then
                         None
                     else
-                        Some(unbox<string> acceptance, unbox<string> workPlan))
+                        let valueOpt =
+                            if isNull value then
+                                None
+                            elif emitJsExpr value "typeof $0 === 'string'" then
+                                Some(unbox<string> value)
+                            else
+                                None
+
+                        Some(unbox<string> key, valueOpt))
 
             let valid = items |> List.choose id
 
             if valid.Length <> items.Length then
-                Error "each finding requires non-empty acceptance_criteria and work_plan strings"
+                Error "each finding requires a non-empty key; value may be a string or null (to delete)"
             else
                 Ok valid
         else
-            Error "findings must be an array of {acceptance_criteria, work_plan} pairs"
+            Error "findings must be an array of {key, value} pairs"
 
     let private gapsToJs (gaps: (string * string) list) : obj array =
         gaps
-        |> List.map (fun (acceptance, workPlan) ->
-            box
-                {| acceptance_criteria = acceptance
-                   work_plan = workPlan |})
+        |> List.map (fun (key, value) -> box {| key = key; value = value |})
         |> Array.ofList
 
     let private renderReviewOutcome (outcome: PlanReviewOutcome) : string =
@@ -470,6 +394,7 @@ module PlanningSurface =
         (gitCommonDir: string)
         (workId: string)
         (incumbencyId: string)
+        (requestId: string)
         (findings: obj)
         (note: obj)
         : Task<obj> =
@@ -492,7 +417,7 @@ module PlanningSurface =
                                gaps = null
                                error = "git common directory is missing" |}
                 else
-                    match! ReviewPlanBackend.executeReview gitCommonDir workId incumbencyId gaps with
+                    match! ReviewPlanBackend.executeReview gitCommonDir workId incumbencyId requestId gaps with
                     | Error err ->
                         return
                             box
@@ -507,8 +432,12 @@ module PlanningSurface =
                                    outcome = renderReviewOutcome review.Outcome
                                    target = review.Target
                                    gaps = gapsToJs review.Gaps
+                                   firstReview = review.FirstReview
                                    error = Unchecked.defaultof<string> |}
         }
+
+    let isReviewFinished (gitCommonDir: string) (workId: string) (incumbencyId: string) : bool =
+        ReviewPlanBackend.isReviewFinished gitCommonDir workId incumbencyId
 
     let PlanningSurface: obj =
         box
@@ -516,15 +445,12 @@ module PlanningSurface =
                validateWorkId = validateWorkId
                canonicalWorkKey = canonicalWorkKey
                resolvePlanPath = resolvePlanPath
-               readPlan = readPlan
                readAndValidatePlan = readAndValidatePlan
-               rewritePlanAtomic = rewritePlanAtomic
-               editPlanAtomic = editPlanAtomic
                ensurePlanWorkOpened = ensurePlanWorkOpened
                executeDeliver = executeDeliver
                startPostS3Execution = startPostS3Execution
                reconcileBoundExecution = reconcileBoundExecution
                executeAsk = executeAsk
-               executeJsPlan = executeJsPlan
                executeReview = executeReview
-               reviewTargetFor = reviewTargetFor |}
+               reviewTargetFor = reviewTargetFor
+               isReviewFinished = isReviewFinished |}

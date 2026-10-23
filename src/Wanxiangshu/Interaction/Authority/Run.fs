@@ -773,14 +773,16 @@ module PromptAuthorityRun =
                 && source.ChildLogicalRunId = Some childLogicalRunId
                 && source.OwnerLogicalRunId = ownerLogicalRunId)
 
-        match matches with
-        | [ source ] ->
+        let ownerOfSource (source: PromptAuthority.AuthorityTerminalSource) =
             match ownerLogicalRunId, source.OwnerLogicalRunId with
             | Some owner, Some matched when owner = matched -> Ok(owner, source)
             | _ ->
                 Error(
                     sprintf "the %s source terminal of run %s names no owner logical run" sourceKind childLogicalRunId
                 )
+
+        match matches with
+        | [ source ] -> ownerOfSource source
         | [] ->
             Error(
                 sprintf "no durable %s source terminal of run %s matches the accepted root" sourceKind childLogicalRunId

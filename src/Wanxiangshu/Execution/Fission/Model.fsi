@@ -81,7 +81,6 @@ type FissionSettlementObservation =
     | OngoingExecution
     | NeedsContinuation
     | ProviderFailed
-    | DegenerationInterrupted
     | ExternalAbort of string
     | Completed
 

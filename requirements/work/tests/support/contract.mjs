@@ -4,7 +4,6 @@ export const EVENTS = [
   'WorkOpened',
   'DevOpsBound',
   'IncumbencyOpened',
-  'ConfirmationCommitted',
   'IncumbencyRetired',
   'Reviewed',
   'Reopened',

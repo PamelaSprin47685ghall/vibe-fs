@@ -32,7 +32,7 @@ module HandleCompletionCodec =
                 ReturnedMaterial.validate payload.View
                 |> Result.defaultWith (invalidArg "outcome")
 
-                [ "schemaVersion", box 3
+                [ "schemaVersion", box 4
                   "finality", str "completed"
                   "run_id", str runId
                   "view", str payload.View
@@ -52,7 +52,7 @@ module HandleCompletionCodec =
                   )
                   "directory", str (payload.Directory |> Option.defaultValue "") ]
             | AgentFailed payload ->
-                [ "schemaVersion", box 3
+                [ "schemaVersion", box 4
                   "finality", str "failed"
                   "run_id", str runId
                   "code", str payload.Code
@@ -60,9 +60,9 @@ module HandleCompletionCodec =
                   "child_session_id",
                   str (payload.ChildSessionId |> Option.map SessionId.value |> Option.defaultValue "") ]
             | AgentAbandoned(agentId, reason) ->
-                // Abandoned is not a durable completion blob; keep a minimal failed v3
+                // Abandoned is not a durable completion blob; keep a minimal failed v4
                 // shape only if a caller mistakenly encodes one (should not reach journal).
-                [ "schemaVersion", box 3
+                [ "schemaVersion", box 4
                   "finality", str "failed"
                   "run_id", str runId
                   "code", str "ABANDONED"
@@ -161,7 +161,7 @@ module HandleCompletionCodec =
         =
         match schemaVersion with
         | None -> Invalid CompletionDecodeError.MissingSchemaVersion
-        | Some version when version <> "3" -> Invalid(CompletionDecodeError.UnknownSchemaVersion version)
+        | Some version when version <> "4" -> Invalid(CompletionDecodeError.UnknownSchemaVersion version)
         | Some _ -> decodeFinality finalityField runId raw json
 
     let private decodeParsed (raw: obj) (json: string) =

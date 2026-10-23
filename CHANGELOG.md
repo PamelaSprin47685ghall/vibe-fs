@@ -1,5 +1,34 @@
 # Changelog — 版本历史
 
+## Unreleased — 评审成员化与义务台账收敛、免确认流、Plan 起草门禁与工程守卫清理
+
+- **评审成员能力化（`this.review`）与纯数据回执**：
+  - 撤除独立 `review` 宿主工具注册（`ReviewShell` 退出独立工具清单）；评审能力作为 `JsCapability.Review` 直接投影入 Manager 与 Plan 的编程面（`this.review(findings)`），由 `wanxiangli/programming` 统一将 `ReviewAssessment` 与 `Review` 投影为 `Review` 能力与 `review` 成员。
+  - **接口与删除语义**：入参为按键对象数组 `[{ key: string, value: string | null }]`；`value: null` 显式删除对应键，空数组 `[]` 提交不抹去既有台账；禁止空串删除别名与旧版遗留字段。
+  - **宿主闭包**：通过 `this._api.review(findings)` 返回纯数据包（`{ ok: true, outcome: "Promoted" | "Stayed", firstReview: bool, obligations: [...] }`），支持单 attempt 内多次更新，不再输出独立渲染 prose。
+- **首次空定资格与新任期投递晋级**：
+  - 首次评审定资格（first-empty eligibility）：仅在任期内**首次评审**且生成台账为空时确立晋级资格（`ReviewOutcome = Some "Promoted"`）；台账非空则定为 `Stayed`；后续调用仅作逐键台账增删，不改变已定资格。
+  - 评审本身不推进工作阶段，晋级与完成统一由后续新任期内的 `deliver` 动作执行。
+- **全面免除二次确认门禁（No confirmation）**：
+  - 彻底清理 `seedConfirmation`、`hasConfirmation`、`confirmation` 状态与参数残留；合规请求直接执行流转，不再增设阻断合规动作或重复审批已决事项的伪防呆门禁，严格恪守公理一。
+- **Plan 普通起草路径与写入门禁（Plan draft path / write gate）**：
+  - Plan 角色起草流程收拢至统一草稿路径；增设评审前置写入围栏（`isReviewFinished` 为真后方可解锁草稿写入，`reviewFinishedOnly`）；普通起草路径与 deliver 读取同源。
+- **PlanB 字节预算与调用门禁（planB byte budget）**：
+  - 执行与工具调用层对 planB 注入与回退执行严格字节预算与格式门禁，拦截超规 planB 污染上下文。
+- **工作树干净状态门禁（Worktree dirty gate）**：
+  - 交付与变更集成流程接入工作树状态检查，执行前校验未受管修改与残余产物，阻止脏工作树泄漏。
+- **退化守卫（Degeneration Guard）彻底退役与统计删除**：
+  - 彻底移除 `degeneration-guard` 子系统、相关测试及规范文档；删除 `LoopDetector`、`LoopSensor`、`LoopEventCodec` 及包导入 `#wanxiangshu-loop-detector-envelope`；清理 `Foundation/HostSession` 中 `AbortCause`、`DegenerationKind`、`LoopTextDelta` 等遗留符号与退化统计。
+- **强制控制金字塔检查（Mandatory pyramid gate）**：
+  - `scripts/checks/fsharp-control-pyramid.mjs` 正式入闸为强制静态检查，对 F# 代码分支深度（`if` 链与嵌套模式匹配）执行扁平化限制，禁止深层分支金字塔结构。
+- **A2A 纯文本主散文、carry 字段与空体中止**：
+  - 代理间（A2A）消息规范为自然纯文本散文，严禁伪结构化字段与汇报模板，信息取舍由发送方自主裁定；结构化上下文仅允许通过 `carry` 数组携带（整数引用历史锚点，字符串为字面量）；空消息体触发 `empty-body abort`，坚决拦截无实质散文的静默停机。
+- **PR 63 选择性采纳（PR63 selective adoption）**：
+  - **采纳**：CI 缓存与运行条件优化、SecondHost 计时器抽象与适配（`HostPlugin.create clock createTimer` 与 `nodeClockPort`/`nodeTimerPort` 适配）、持久化写入者标识隔离（writer-ID）、测试夹具与离线探针健全性补丁（`time/004`、`verification/006`、`durable/005`、`dispatch/010`、`delegation/027`）。
+  - **跳过**：排除旧版生命周期与退化守卫代码复活尝试、Fork `.gitmodules`/`gitlink` 覆盖，以及与当前公理体系（无二次确认、按键台账门禁、A2A 顶层散文）冲突的旧版回退实现。
+- **落地现状与验证状态**：
+  - 本批次能力定义、模版资源、退化守卫清理、PR 63 选择性采纳及静态门禁已全部闭环；全量单元测试与端到端测试均已通过验证。历史变更记录全量保留。
+
 ## Unreleased — Authority 接收不再落错 closure kind（journal semantic cut 根因）
 
 - **根因**：`Dispatcher.authorityRootFact` 与三个 wire codec（`CodecSurface`、`FactCodecSurface`、`ProviderFailureSurface`，以及 `TemporalSurface`）在 AgentOwnerRoot 无法证明 life 时，把 `ExpectedClosureKind` 默认成 `HumanRootManagedRun`。该值属于 HumanRoot，`PromptFactCodec` 的校验因此拒绝接收（`ExpectedClosureKind ... does not match AuthorityKind AgentOwnerRoot`），journal 写 semantic cut 并 `FatalProcess.trip`。

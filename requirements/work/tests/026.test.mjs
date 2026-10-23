@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
@@ -60,8 +60,9 @@ const providerRequest = (sessionID, userMessageId, assistantMessageId) => ({
 test('WHAT[work-026] authorized deliver without retirement evidence fails closed with no spawn', async () => {
   await withWorkspace(async (store, root, commonDir) => {
     const workId = 'work-d3'
-    const written = surface.PlanningSurface.rewritePlanAtomic(root, workId, '# Plan content')
-    assert.equal(written.ok, true)
+    const planPath = surface.PlanningSurface.resolvePlanPath(root, workId).path
+    mkdirSync(dirname(planPath), { recursive: true })
+    writeFileSync(planPath, '# Plan content')
     const activeId = await openWork(store, commonDir, workId)
     let spawnCalls = 0
     const res = await surface.PlanningSurface.executeDeliver(
@@ -101,20 +102,19 @@ test('WHAT[work-026] S3 authorized deliver enters post-S3 state without starting
     // Advance S1 -> S2 -> S3 -> authorized
     for (let stage = 1; stage <= 3; stage += 1) {
       const activeId = life.inspected(commonDir, sessionID).ActiveId
-      const rev = await surface.PlanningSurface.executeReview(commonDir, sessionID, activeId, [], null)
+      const rev = await surface.PlanningSurface.executeReview(commonDir, sessionID, activeId, `rev-s${stage}:run`, [], null)
       assert.equal(rev.ok, true, rev.error)
-      if (stage < 3) {
-        const rel = await surface.PlanningSurface.executeDeliver(
-          commonDir, planRoot, sessionID, activeId, `run-s${stage}`, `call-s${stage}`, false,
-          { create: async () => 'unexpected', prompt: async () => ({ kind: 'Started' }), discard: async () => {} },
-          0n,
-        )
-        assert.equal(rel.ok, true, rel.error)
-      }
+      const rel = await surface.PlanningSurface.executeDeliver(
+        commonDir, planRoot, sessionID, activeId, `run-s${stage}`, `call-s${stage}`, false,
+        { create: async () => 'unexpected', prompt: async () => ({ kind: 'Started' }), discard: async () => {} },
+        0n,
+      )
+      assert.equal(rel.ok, true, rel.error)
     }
 
-    const written = surface.PlanningSurface.rewritePlanAtomic(planRoot, sessionID, '# Final S3 Plan\n\nAlgorithm A.\n')
-    assert.equal(written.ok, true, written.error)
+    const planPath = surface.PlanningSurface.resolvePlanPath(planRoot, sessionID).path
+    mkdirSync(dirname(planPath), { recursive: true })
+    writeFileSync(planPath, '# Final S3 Plan\n\nAlgorithm A.\n')
     assert.equal(life.inspected(commonDir, sessionID).DeliveryAuthorized, true)
 
     // Push owning exchange for S3 deliver
@@ -244,16 +244,16 @@ test('WHAT[work-026] a new user input after the delivery is not stopped by that 
 
     for (let stage = 1; stage <= 3; stage += 1) {
       const activeId = life.inspected(commonDir, sessionID).ActiveId
-      await surface.PlanningSurface.executeReview(commonDir, sessionID, activeId, [], null)
-      if (stage < 3) {
-        await surface.PlanningSurface.executeDeliver(
-          commonDir, planRoot, sessionID, activeId, `run-s${stage}`, `call-s${stage}`, false,
-          { create: async () => 'unexpected', prompt: async () => ({ kind: 'Started' }), discard: async () => {} },
-          0n,
-        )
-      }
+      await surface.PlanningSurface.executeReview(commonDir, sessionID, activeId, `rev-s${stage}:run`, [], null)
+      await surface.PlanningSurface.executeDeliver(
+        commonDir, planRoot, sessionID, activeId, `run-s${stage}`, `call-s${stage}`, false,
+        { create: async () => 'unexpected', prompt: async () => ({ kind: 'Started' }), discard: async () => {} },
+        0n,
+      )
     }
-    surface.PlanningSurface.rewritePlanAtomic(planRoot, sessionID, '# Final S3 Plan\n\nAlgorithm A.\n')
+    const planPath2 = surface.PlanningSurface.resolvePlanPath(planRoot, sessionID).path
+    mkdirSync(dirname(planPath2), { recursive: true })
+    writeFileSync(planPath2, '# Final S3 Plan\n\nAlgorithm A.\n')
 
     runtime.pushHostMessage(sessionID, {
       info: { id: 'run-s3-deliver', role: 'assistant', sessionID, parentID: 'user-plan-root', time: { created: 2 } },

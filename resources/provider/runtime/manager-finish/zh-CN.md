@@ -1,1 +1,1 @@
-你的评审已被接受，findings 为空集：你是最后一任 Manager，后继无人。`this.reviewOnly` 的仓库访问已关闭，`todowrite-for-manager` 程序入口仍可用；你仍可查看、清理并收口所负责的执行资源；不得开新工作。确认资源收束后，{{closeout}}
+首次评审已被接受且 findings 为空集：你已赢得完工与终局资格，是最后一任 Manager，后继无人。`this.reviewOnly` 的仓库访问已关闭，`todowrite-for-manager` 程序入口仍可用；进行实质收束与加固，清理并收口所负责的执行资源，确保义务账已为空且无资源泄漏；不得开新工作。确认资源收束后，通过单次 deliver 交付终局，无需二次确认。

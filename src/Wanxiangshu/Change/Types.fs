@@ -15,6 +15,7 @@ type OrchestratorVerdict =
     | Published of jobId: ManagerJobId * head: CommitHash
     | PublishedPendingCleanup of jobId: ManagerJobId * head: CommitHash * cleanupError: string
     | Cancelled of jobId: ManagerJobId
+    | RejectedDirty of reason: string
     | IntegrationFailed of jobId: ManagerJobId * errorDetails: string
     | Empty
 
@@ -29,6 +30,12 @@ type OrchestratorHandle =
 /// built for, and ORCH-008's frozen target branch belongs to exactly one repo.
 type GitPort =
     {
+        /// Whether the worktree at `path` has uncommitted, staged, untracked or
+        /// dirty-submodule content. The main worktree must be clean before an
+        /// isolated worktree is created from it, so the refusal can name the
+        /// exact paths that block.
+        IsDirty: WorktreePath -> Task<Result<string list, string>>
+
         /// Creates the worktree from `sourceRef` and returns its stable identity
         /// (ORCH-006).
         ///

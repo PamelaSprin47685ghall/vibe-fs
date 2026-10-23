@@ -4,7 +4,7 @@
   }
 
   async deliver(carry = []) {
-    // 惯用法：先用助手正文写最终报告，再立即 this.deliver()。本回合自动回传，不用复制报告或指定锚点。
+    // 惯用法：按自己的判断先用助手正文收束工作，再立即 this.deliver()。本回合自动回传，不用复制正文或指定锚点。不设固定章节。
     // carry 仅补充旧上下文：整数引用锚点，字符串是字面文本。交付结束程序；非法数组返回 VIEW_DECLARATION_INVALID，修正后重试。
     // 例如: await this.deliver();
   }

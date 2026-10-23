@@ -618,7 +618,6 @@ type ToolRuntimeScope
     let defaultEmptyManagerFacts: ManagerCapabilityFacts =
         { HasActiveIncumbency = false
           HasAssessment = false
-          HasConfirmation = false
           IsFinalIncumbent = false
           CleanupBlockerDigest = None }
 
@@ -666,7 +665,6 @@ type ToolRuntimeScope
                     | Some _, reviewed ->
                         { HasActiveIncumbency = true
                           HasAssessment = reviewed
-                          HasConfirmation = work.Confirmed
                           IsFinalIncumbent = work.ReviewOutcome = Some "Promoted"
                           CleanupBlockerDigest = work.BlockerDigest })
                 |> Option.defaultValue defaultEmptyManagerFacts

@@ -175,7 +175,7 @@ module HorizonRoster =
         match deliveredView journal handle with
         | None -> Task.FromResult(labeled language Path.NoWorkYet label)
         | Some material ->
-            let text = ReturnedMaterial.texts material |> String.concat "\n\n"
+            let text = ReturnedMaterial.fullText material
             Task.FromResult(ProviderProse.render language Path.LatestWork (Map [ "label", label; "record", text ]))
 
     let private viewData
@@ -185,7 +185,7 @@ module HorizonRoster =
         : Task<string * string> =
         match deliveredView journal handle with
         | None -> Task.FromResult("none", "")
-        | Some material -> Task.FromResult("latest", ReturnedMaterial.texts material |> String.concat "\n\n")
+        | Some material -> Task.FromResult("latest", ReturnedMaterial.fullText material)
 
     /// The terminal name a pty is known by, when the runtime snapshot carries
     /// one. The prose line names a generic terminal when it does not; the data

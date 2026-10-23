@@ -80,7 +80,7 @@ test('WHAT[effect-accounting-003] worktree creation is blocked when the Worktree
 
     let createCalls = 0
     const git = {
-      IsDirty: async () => ({ ok: true, value: false }),
+      IsDirty: async () => ({ ok: true, value: [] }),
       FreezeTargetBranch: async () => ({ ok: true, value: 'refs/heads/main' }),
       ListManagerBranches: async () => ({ ok: true, value: [] }),
       DeleteBranch: async () => ({ ok: true }),
@@ -135,7 +135,7 @@ test('WHAT[effect-accounting-003] the worktree intent is durable before the phys
       let createCalls = 0
       let removeCalls = 0
       const git = {
-        IsDirty: async () => ({ ok: true, value: false }),
+        IsDirty: async () => ({ ok: true, value: [] }),
         FreezeTargetBranch: async () => ({ ok: true, value: 'refs/heads/main' }),
         ListManagerBranches: async () => ({ ok: true, value: [] }),
         DeleteBranch: async () => ({ ok: true }),

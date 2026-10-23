@@ -13,41 +13,6 @@ type ContinuationAcceptanceObserver =
     { Notify: PhysicalUserMessageId -> unit
       AttachDisposable: System.IDisposable -> unit }
 
-[<RequireQualifiedAccess>]
-type DegenerationKind =
-    | TooRepetitive
-    | TooRandom
-
-/// Host boundary outcome for an abort observed by reconciliation. A guarded
-/// abort has already transferred recovery ownership to LoopSensor.
-[<RequireQualifiedAccess>]
-type AbortCause =
-    | DegenerationGuard of DegenerationKind
-    | External
-
-/// Host-neutral streaming text delta. `Message` carries the host message id
-/// that identifies the exact provider run; it is absent when the host did not
-/// report one. The delta text is already decoded — the host adapter owns the
-/// wire format.
-type LoopTextDelta =
-    { Session: SessionId
-      Message: string option
-      Delta: string }
-
-/// Process-local streaming degeneration sensor port.
-type ILoopSensor =
-    abstract Observe: delta: LoopTextDelta -> unit
-
-    abstract ConsumeAbortCause:
-        source: ProviderAttemptSource * directory: string option * observer: ContinuationAcceptanceObserver option ->
-            System.Threading.Tasks.Task<AbortCause>
-
-    abstract DropSession: sessionId: SessionId -> unit
-    abstract ResetDetector: sessionId: SessionId -> unit
-
-    abstract ActiveInterruptTask:
-        sessionId: SessionId * expectedRun: ProviderRunIdentity -> System.Threading.Tasks.Task option
-
 /// HOST-004: process-local side-effect admission capability.
 type ISessionQuiescenceGate =
     abstract BeginProviderAttempt: sessionId: SessionId -> unit

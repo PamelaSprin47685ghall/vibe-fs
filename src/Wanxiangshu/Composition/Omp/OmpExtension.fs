@@ -14,14 +14,19 @@ open Wanxiangshu.Omp
 /// decision: it only wires the pieces together.
 module OmpExtension =
 
+    let activateWithTiming (pi: obj) (clock: IClockPort) (createTimer: unit -> ITimerPort) : Task<unit> =
+        let plugin: IHostPlugin = HostPlugin.create clock createTimer
+        Adapter.activateOnOmp pi plugin []
+
     /// Activate the product inside an omp extension runtime.
     ///
     /// `pi` is the omp `ExtensionAPI` object an extension factory receives.
     /// The returned task settles once the adapter has been wired; the product
     /// itself is activated on the first `session_start` event.
     let activate (pi: obj) : Task<unit> =
-        let plugin: IHostPlugin = HostPlugin.plugin
-        Adapter.activateOnOmp pi plugin []
+        let clock = HostPlugin.nodeClockPort ()
+
+        activateWithTiming pi clock (fun () -> HostPlugin.nodeTimerPort ())
 
     /// The omp extension factory: `export default (pi) => …`.
     ///

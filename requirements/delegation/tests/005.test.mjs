@@ -16,6 +16,20 @@ test('WHAT[delegation-005] completed wire presents Byname and record without exp
   }
 })
 
+test('WHAT[delegation-005] completed wire renders body prose as top comments and returned as carry data table', () => {
+  for (const language of ['english', 'zh-CN']) {
+    const wire = join.renderBatch(language, [{
+      kind: 'completed', agentId: 'PHYSICAL-AGENT-ID', agentName: 'Ada',
+      role: 'Engineer', runId: 'PHYSICAL-RUN-ID',
+      body: 'Report from child agent Ada.',
+      returned: [{ text: 'carry artifact' }],
+    }])
+    assert.match(wire, /^# Report from child agent Ada\.$/m)
+    assert.deepEqual(parseToml(wire), { returned: [{ text: 'carry artifact' }] })
+    assert.equal(parseToml(wire).body, undefined)
+  }
+})
+
 test('WHAT[delegation-005] abandoned wire without a display name falls back to generic prose, never the physical agent id', () => {
   for (const language of ['english', 'zh-CN']) {
     const wire = join.renderBatch(language, [{

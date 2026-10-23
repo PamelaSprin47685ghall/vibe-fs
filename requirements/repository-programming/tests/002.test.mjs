@@ -60,6 +60,8 @@ const MEMBERS_BY_PERMISSION = {
   Horizon: ['horizon'],
   Advisor: ['advisor'],
   Ask: ['ask'],
+  Review: ['review'],
+  ReviewAssessment: ['review'],
 }
 
 const BINDING_BY_MEMBER = {
@@ -84,6 +86,7 @@ const BINDING_BY_MEMBER = {
   horizon: 'horizon',
   advisor: 'advisor',
   ask: 'ask',
+  review: 'review',
   deliver: 'deliver',
   park: 'park',
 }
@@ -94,6 +97,7 @@ const MEMBER_ORDER = [
   'call',
   'fork', 'resume', 'commission', 'devops', 'dag',
   'join', 'fission', 'horizon', 'advisor', 'ask',
+  'review',
 ]
 
 // The offices that hold at least one programming-surface permission, with the
@@ -103,9 +107,9 @@ const MEMBER_ORDER = [
 const EXPECTED_MEMBERS = {
   engineer: ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'fission', 'advisor'],
   devops: ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call', 'join', 'horizon', 'advisor'],
-  manager: ['reviewOnly.cat', 'reviewOnly.ls', 'reviewOnly.rg', 'reviewOnly.stat', 'whereAll', 'where', 'fork', 'resume', 'dag', 'join', 'horizon', 'advisor'],
+  manager: ['reviewOnly.cat', 'reviewOnly.ls', 'reviewOnly.rg', 'reviewOnly.stat', 'whereAll', 'where', 'fork', 'resume', 'dag', 'join', 'horizon', 'advisor', 'review'],
   orchestrator: ['commission', 'join', 'horizon', 'advisor'],
-  plan: ['write', 'cat', 'stat', 'mkdir', 'whereAll', 'where', 'devops', 'ask'],
+  plan: ['write', 'cat', 'stat', 'mkdir', 'whereAll', 'where', 'devops', 'ask', 'review'],
 }
 
 // Sugar members are compiled inside the base class itself instead of

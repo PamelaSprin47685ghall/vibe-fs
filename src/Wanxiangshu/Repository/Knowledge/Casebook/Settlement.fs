@@ -72,8 +72,7 @@ type CasebookSemanticCutIncident private (failure: CasebookAppendFailure) =
 
     /// Evidence for a failure that is not a Casebook-scoped cut (a broken
     /// shared log, for instance): the same carrier, without the cut reading.
-    static member OfFailure(failure: CasebookAppendFailure) =
-        CasebookSemanticCutIncident failure
+    static member OfFailure(failure: CasebookAppendFailure) = CasebookSemanticCutIncident failure
 
 [<RequireQualifiedAccess>]
 module CasebookSemanticCutIncident =

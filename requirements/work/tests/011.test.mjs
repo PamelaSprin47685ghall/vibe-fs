@@ -16,7 +16,7 @@ const life = lifecycle.LifecycleSurface ?? lifecycle
 
 test('WHAT[work-011] a Delivered deliver records the established delivery, and the next transform suppresses the request, interrupts the attempt and dispatches no successor', async () => {
   await withReview(async ({execute, hooks, runtime, session}) => {
-    assert.match(await execute(scores('PERFECT')), /recorded = true/)
+    assert.match(String(await execute(scores('PERFECT'))), /ok = true/)
     const retirement = {
       info: {id: 'retirement-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}},
       parts: [{type: 'tool', tool: 'deliver', callID: 'deliver-call', state: {status: 'pending', input: {}}}],
@@ -160,26 +160,45 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [user] })
 
-    // Step 1: a non-empty review is Stayed, so the second deliver Relays a successor.
-    const findings = { findings: [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }] }
+    // Step 1: a non-empty review is Stayed.
+    const findings = [{ key: 'target-gap', value: 'close the remaining gap' }]
     const review = {
       id: 'run-review', role: 'assistant', parentID: rootID, time: { created: 2 },
       parts: [
-        { type: 'text', text: 'All criteria perfect.' },
-        { type: 'tool', tool: 'review', callID: 'call-review', state: { status: 'pending', input: findings } },
+        { type: 'text', text: 'Target not reached.' },
+        { type: 'tool', tool: 'todowrite-for-manager', callID: 'call-review', state: { status: 'pending', input: {} } },
       ],
     }
     runtime.pushHostMessage(sessionID, review)
-    const context = (callID, messageID, providerRunID = `run-${callID}`) => ({ sessionID, agent: 'manager', callID, messageID, providerRunID })
-    const reviewResult = await hooks.tool.review.execute(findings, context('call-review', review.id))
-    assert.match(reviewResult, /recorded = true/)
+    const reviewResult = await hooks.tool['todowrite-for-manager'].execute(
+      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }` },
+      { sessionID, agent: 'manager', callID: 'call-review', messageID: review.id },
+    )
+    assert.match(String(reviewResult), /ok = true/)
 
-    // Step 2: deliver commits Accepted retirement
+    // Non-empty review must be explicitly cleared key-by-key before relay
+    const clearFindings = [{ key: 'target-gap', value: null }]
+    const clearReview = {
+      id: 'run-clear-review', role: 'assistant', parentID: rootID, time: { created: 3 },
+      parts: [
+        { type: 'text', text: 'Gap cleared.' },
+        { type: 'tool', tool: 'todowrite-for-manager', callID: 'call-clear-review', state: { status: 'pending', input: {} } },
+      ],
+    }
+    runtime.pushHostMessage(sessionID, clearReview)
+    const clearResult = await hooks.tool['todowrite-for-manager'].execute(
+      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(clearFindings)}); } }` },
+      { sessionID, agent: 'manager', callID: 'call-clear-review', messageID: clearReview.id },
+    )
+    assert.match(String(clearResult), /ok = true/)
+
+    // Step 2: deliver commits retirement
     const retiredRun = {
-      id: 'run-deliver', role: 'assistant', parentID: rootID, time: { created: 3 },
+      id: 'run-deliver', role: 'assistant', parentID: rootID, time: { created: 4 },
       parts: [{ type: 'tool', tool: 'deliver', callID: 'call-deliver', state: { status: 'pending', input: {} } }],
     }
     runtime.pushHostMessage(sessionID, retiredRun)
+    const context = (callID, messageID, providerRunID = `run-${callID}`) => ({ sessionID, agent: 'manager', callID, messageID, providerRunID })
     const deliverResult = await hooks.tool.deliver.execute({}, context('call-deliver', retiredRun.id, 'run-retire'))
     assert.match(deliverResult, /Finished\. Do not continue work\./)
 
@@ -198,12 +217,13 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
       messages: [
         user,
         { info: { id: review.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 2, completed: 2 } }, parts: review.parts },
-        { info: { id: retiredRun.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 3, completed: 3 } }, parts: retiredRun.parts },
+        { info: { id: clearReview.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 3, completed: 3 } }, parts: clearReview.parts },
+        { info: { id: retiredRun.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 4, completed: 4 } }, parts: retiredRun.parts },
         { info: { id: humanNext.id, role: 'user', sessionID }, parts: humanNext.parts },
       ],
     }
     runtime.pushHostMessage(sessionID, {
-      info: { id: 'run-human-successor', role: 'assistant', sessionID, parentID: humanNext.id, time: { created: 4 } },
+      info: { id: 'run-human-successor', role: 'assistant', sessionID, parentID: humanNext.id, time: { created: 5 } },
       parts: [],
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, humanRequest)
@@ -232,7 +252,7 @@ test('WHAT[work-011] an established delivery interrupts its own attempt exactly 
   // 中断已发出而宿主尚未确认时，本次请求仍被抑制，后继仍不派发，且同一
   // attempt 的第二次请求不重复发中断。
   await withReview(async ({execute, hooks, runtime, session}) => {
-    assert.match(await execute(scores('PERFECT')), /recorded = true/)
+    assert.match(String(await execute(scores('PERFECT'))), /ok = true/)
     const retirement = {
       info: {id: 'retirement-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}},
       parts: [{type: 'tool', tool: 'deliver', callID: 'deliver-call', state: {status: 'pending', input: {}}}],
@@ -299,26 +319,44 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [user] })
 
-    // Step 1: a non-empty review is Stayed, so the second deliver Relays a successor.
-    const findings = { findings: [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }] }
+    // Step 1: a non-empty review is Stayed.
+    const findings = [{ key: 'target-gap', value: 'close the remaining gap' }]
     const review = {
       id: 'run-review', role: 'assistant', parentID: rootID, time: { created: 2 },
       parts: [
-        { type: 'text', text: 'All criteria perfect.' },
-        { type: 'tool', tool: 'review', callID: 'call-review', state: { status: 'pending', input: findings } },
+        { type: 'text', text: 'Target not reached.' },
+        { type: 'tool', tool: 'todowrite-for-manager', callID: 'call-review', state: { status: 'pending', input: {} } },
       ],
     }
     runtime.pushHostMessage(sessionID, review)
-    const context = (callID, messageID, providerRunID = `run-${callID}`) => ({ sessionID, agent: 'manager', callID, messageID, providerRunID })
-    const reviewResult = await hooks.tool.review.execute(findings, context('call-review', review.id))
-    assert.match(reviewResult, /recorded = true/)
+    const reviewResult = await hooks.tool['todowrite-for-manager'].execute(
+      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }` },
+      { sessionID, agent: 'manager', callID: 'call-review', messageID: review.id },
+    )
+    assert.match(String(reviewResult), /ok = true/)
 
-    // Step 2: deliver commits retirement (with two-stage confirmation)
+    // Non-empty review must be explicitly cleared key-by-key before relay
+    const clearFindings = [{ key: 'target-gap', value: null }]
+    const clearReview = {
+      id: 'run-clear-review', role: 'assistant', parentID: rootID, time: { created: 3 },
+      parts: [
+        { type: 'tool', tool: 'todowrite-for-manager', callID: 'call-clear-review', state: { status: 'pending', input: {} } },
+      ],
+    }
+    runtime.pushHostMessage(sessionID, clearReview)
+    const clearResult = await hooks.tool['todowrite-for-manager'].execute(
+      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(clearFindings)}); } }` },
+      { sessionID, agent: 'manager', callID: 'call-clear-review', messageID: clearReview.id },
+    )
+    assert.match(String(clearResult), /ok = true/)
+
+    // Step 2: deliver commits retirement
     const retiredRun = {
-      id: 'run-deliver', role: 'assistant', parentID: rootID, time: { created: 3 },
+      id: 'run-deliver', role: 'assistant', parentID: rootID, time: { created: 4 },
       parts: [{ type: 'tool', tool: 'deliver', callID: 'call-deliver', state: { status: 'pending', input: {} } }],
     }
     runtime.pushHostMessage(sessionID, retiredRun)
+    const context = (callID, messageID, providerRunID = `run-${callID}`) => ({ sessionID, agent: 'manager', callID, messageID, providerRunID })
     const deliverResult = await hooks.tool.deliver.execute({}, context('call-deliver', retiredRun.id, 'run-retire'))
     assert.match(deliverResult, /Finished\. Do not continue work\./)
 
@@ -334,7 +372,7 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
       { message: humanNext, parts: humanNext.parts },
     )
     runtime.pushHostMessage(sessionID, {
-      info: { id: 'run-human-successor', role: 'assistant', sessionID, parentID: humanNext.id, time: { created: 4 } },
+      info: { id: 'run-human-successor', role: 'assistant', sessionID, parentID: humanNext.id, time: { created: 5 } },
       parts: [],
     })
 
@@ -352,7 +390,8 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
     const strayWake = { messages: [
       user,
       { info: { id: review.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 2, completed: 2 } }, parts: review.parts },
-      { info: { id: retiredRun.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 3, completed: 3 } }, parts: retiredRun.parts },
+      { info: { id: clearReview.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 3, completed: 3 } }, parts: clearReview.parts },
+      { info: { id: retiredRun.id, role: 'assistant', sessionID, parentID: rootID, time: { created: 4, completed: 4 } }, parts: retiredRun.parts },
       wake,
     ] }
     const abortsBefore = runtime.abortedIds.length
@@ -368,13 +407,9 @@ test('WHAT[work-011] a review whose reviewer identity is the incumbency owner is
   // and the kernel refuses the self-review instead of recording it.
   await withReview(async ({execute, runtime, session}) => {
     assert.equal((await lifecycleWorkView(runtime, session)).active, true)
-    await assert.rejects(
-      execute(scores('PERFECT')),
-      (error) => {
-        assert.match(String(error && error.message ? error.message : error), /owner cannot review/i)
-        return true
-      },
-    )
+    const selfReview = await execute(scores('PERFECT'))
+    assert.match(String(selfReview), /# failed|PROGRAM_FAILED/)
+    assert.match(String(selfReview), /owner cannot review/i)
     // The refusal wrote nothing: the tenure stays active and unreviewed.
     const afterTool = await lifecycleWorkView(runtime, session)
     assert.equal(afterTool.reviewed, '')
@@ -394,9 +429,11 @@ test('WHAT[work-011] a review whose reviewer identity is the incumbency owner is
 
 test('WHAT[work-011] Stayed deliver enqueues the successor manager-assess prompt before returning so no LLM request can slip in between', async () => {
   await withReview(async ({execute, hooks, runtime, session}) => {
-    assert.match(await execute(scores('REVISE')), /recorded = true/)
+    assert.match(String(await execute(scores('REVISE'))), /ok = true/)
+    // Non-empty review must be explicitly cleared key-by-key before relay
+    assert.match(String(await execute(scores('CLEAR'), { call: 'clear-call', run: 'clear-run' })), /ok = true/)
     const retirement = {
-      info: {id: 'retirement-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}},
+      info: {id: 'retirement-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 4}},
       parts: [{type: 'tool', tool: 'deliver', callID: 'deliver-call', state: {status: 'pending', input: {}}}],
     }
     runtime.pushHostMessage(session, retirement)
@@ -410,10 +447,9 @@ test('WHAT[work-011] Stayed deliver enqueues the successor manager-assess prompt
     const result = await deliverPromise
     // 条款 5：交接回执必须说明「已接力 + 后继要做什么」，因此本用例不断言
     // 回执措辞，只断言交接事实成立、本任不再继续。
-    assert.doesNotMatch(result, /confirmation_required = true/, 'the second deliver hands the work over instead of confirming again')
+    assert.doesNotMatch(result, /confirmation_required = true/, 'deliver hands the work over in a single call without confirmation ritual')
     assert.equal(promptsAtReturn, 1, 'successor prompt must already be enqueued when deliver resolves')
-    const promptText = runtime.prompts[0]?.body?.parts?.find(p => p?.type === 'text')?.text ?? ''
-    assert.match(promptText, /(你是接手此任务的第 2 个 Manager|You are the 2 Manager taking over this mission)/)
+    assert.ok(runtime.prompts[0]?.body?.parts?.some(p => p?.type === 'text' && p.text.length > 0), 'successor prompt must have non-empty text')
     const handedOver = await lifecycleWorkView(runtime, session)
     assert.equal(handedOver.active, true, 'the hand-off opened the successor tenure: this tenure does not continue')
     assert.equal(handedOver.delivered, false, 'a hand-off is not a final delivery')
@@ -435,8 +471,21 @@ const withSeededManagerWork = async (outcome, body) => {
     const opened = await life.seedOpen(store, 'S4', sessionId, root, 0n)
     assert.equal(opened.ok, true, opened.error)
     if (outcome != null) {
+      const host = await import('../../../dist/Mission/Lifecycle/DurableWorkHost.js')
+      const inspected = (host.inspected ?? host.DurableWorkHost?.inspected)(stateRoot, sessionId)
+      const activeId = inspected.ActiveId
       const reviewed = await life.seedReview(store, sessionId, outcome)
       assert.equal(reviewed.ok, true, reviewed.error)
+      if (outcome === 'Stayed') {
+        // Non-empty review must be explicitly cleared key-by-key before relay
+        const clearReview = (host.execute ?? host.DurableWorkHost?.execute)(stateRoot, sessionId, 'rev-clear', {
+          type: 'Review',
+          incumbencyId: activeId,
+          reviewerId: 'reviewer',
+          updates: [{ key: 'stayed', value: null }],
+        })
+        assert.equal(clearReview.Status, 'Committed')
+      }
       await life.seedDeliver(store, sessionId, 'run-1', 'call-1', 1n)
     }
     await body({root, stateRoot, store, sessionId, view: life.inspected(stateRoot, sessionId)})

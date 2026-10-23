@@ -28,15 +28,15 @@ test('WHAT[work-013] 一段式无评审的 deliver 不得写成 Delivered，也�
 })
 test('WHAT[work-013] S4 退休载荷出现 retirementCursor 必须被拒', () => {
   const s4 = surface.encodeOpening('S4', 'work-cursor', '/repo', 4n)
-  const reviewed = surface.reviewProbe(s4, incumbencyIdOf(s4), 'Stayed')
-  const confirmed = surface.deliverProbe(s4 + reviewed.bytes, 'run-c', 'call-c', 5n)
-  const retired = surface.deliverProbe(s4 + reviewed.bytes + confirmed.bytes, 'run-c', 'call-d', 6n)
-  assert.equal(retired.decision, 'Write')
-  const frame = JSON.parse(retired.bytes)
+  const reviewed = surface.reviewProbe(s4, incumbencyIdOf(s4), 'Promoted')
+  const delivered = surface.deliverProbe(s4 + reviewed.bytes, 'run-c', 'call-c', 5n)
+  assert.equal(delivered.decision, 'Write')
+  assert.equal(delivered.detail, 'Delivered')
+  const frame = JSON.parse(delivered.bytes)
   const event = frame.events.find((item) => item.type === 'IncumbencyRetired')
   event.retirementCursor = 6
   const mutated = `${canonical(frame)}\n`
-  const read = surface.readProbe(s4 + reviewed.bytes + confirmed.bytes + mutated)
+  const read = surface.readProbe(s4 + reviewed.bytes + mutated)
   assert.equal(read.ok, false)
   assert.equal(read.opened, false)
   assert.equal(read.names, '')

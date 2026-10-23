@@ -44,8 +44,7 @@ type DecisionReceiptBody =
       EstimateRefs: (PlanId * string) list
       ExcludedPlans: ExcludedPlan list
       UnestimatedPlans: UnestimatedPlan list
-      TieBreak: string option
-    }
+      TieBreak: string option }
 
 type SelectionOutcome =
     { Selected: PlanEstimate
@@ -64,7 +63,8 @@ module Decision =
     ///
     /// It is deliberately free of any seed: the outcome is a function of the input
     /// alone, so the same candidates always select the same plan.
-    let selectionRule = "lowest rank first; an equal rank is settled by plan id ascending"
+    let selectionRule =
+        "lowest rank first; an equal rank is settled by plan id ascending"
 
     /// The tie-break this module applies, named exactly as it is applied.
     let tieBreakRule = "plan id ascending"
@@ -74,8 +74,7 @@ module Decision =
 
     /// The operation key that settles an equal rank. It is a property of the plan
     /// itself, so it needs no randomness and no seed.
-    let private operationKey (estimate: PlanEstimate) : string =
-        PlanId.value estimate.PlanId
+    let private operationKey (estimate: PlanEstimate) : string = PlanId.value estimate.PlanId
 
     /// The selected plan, and whether an equal rank actually occurred. A tie that
     /// never happened is not recorded as handled.

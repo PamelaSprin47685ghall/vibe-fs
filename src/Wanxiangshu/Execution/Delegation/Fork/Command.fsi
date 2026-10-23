@@ -88,7 +88,6 @@ module ForkCommand =
         { Calling: string
           Name: string
           Charge: string
-          Keywords: string
           Attach: string option
           CommissionerRecord: string list
           ExpectedToolCalls: int option }

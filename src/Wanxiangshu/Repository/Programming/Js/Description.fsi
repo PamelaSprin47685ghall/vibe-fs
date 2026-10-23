@@ -167,6 +167,9 @@ module JsCanonicalDescription =
         val BaseClassAsk: string = "tool/js-program/base-class-ask"
 
         [<Literal>]
+        val BaseClassReview: string = "tool/js-program/base-class-review"
+
+        [<Literal>]
         val BaseClassLifecycle: string = "tool/js-program/base-class-lifecycle"
 
         [<Literal>]
@@ -227,6 +230,7 @@ module JsCanonicalDescription =
           BaseClassHorizon: string
           BaseClassAdvisor: string
           BaseClassAsk: string
+          BaseClassReview: string
           BaseClassLifecycle: string
 
           JsPlan: string }

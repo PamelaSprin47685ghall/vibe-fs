@@ -7,7 +7,7 @@ Delegation members return data. The host formats results as TOML.
 
 The last argument of `fork`, `resume`, `commission`, `devops`, `dag`, and `advisor` is an optional `carry` array, defaulting to `[]`. An integer copies a visible anchor's full history interval; a string supplies literal text. Items are sent in array order. Include only the background the recipient needs.
 
-**The parent's current turn is not sent to the child.** State the task once in `charge` or `intent`; do not repeat it in `carry`. There is no prefix parameter. The recipient receives material as readable TOML tables. An invalid array or an invisible anchor returns `VIEW_DECLARATION_INVALID` before any work is created. `join`, `horizon`, and `fission` take no `carry`.
+**The parent's current turn is not sent to the child.** State the task once in `charge` or `intent` as ordinary prose; do not repeat it in `carry`. The message is prose, not structured fields — say what the work suggests, plain and clear. There is no prefix parameter. The recipient receives material as readable TOML tables. An invalid array or an invisible anchor returns `VIEW_DECLARATION_INVALID` before any work is created. `join`, `horizon`, and `fission` take no `carry`.
 
 ## fork
 
@@ -16,7 +16,7 @@ await this.fork("index the parser module");
 await this.fork({ charge: "index the parser", name: "parser-index", calling: "engineer" }, [1, "List public entries only"]);
 ```
 
-- Payload: a charge string or `{ charge, name?, calling?, keywords? }`. A missing `name` is derived from the charge.
+- Payload: a charge string, or `{ charge, name?, calling? }` where `name` and `calling` are routing metadata and `charge` carries the message as prose. A missing `name` is derived from the charge. No content-shaped fields.
 - Result: `{ ok: true, name, agentId, outcome }`, with `outcome` `created` | `nudged` | `commissioned`.
 - Refusal codes: `name-required`, `charge-required`, `unknown-calling`, `calling-conflict`, `name-already-belongs`, `warm-start-unavailable`, `context-unavailable`, `not-a-delegation-role`, `placement-failed`, `dispatch-uncertain`.
 
@@ -35,7 +35,7 @@ const resumed = await this.resume({ name: "audit-road", charge: "continue the au
 await this.commission({ charge: "audit the parser independently", name: "parser-audit" }, [1]);
 ```
 
-- Entrust an independent purpose to a Manager road. Payload is a charge string or `{ charge, name?, calling? }`, without `keywords`. A missing `name` comes from the charge. The role determines an omitted `calling`; an explicit value that disagrees is refused with `unknown-calling`.
+- Entrust an independent purpose to a Manager road. Payload is a charge string or `{ charge, name?, calling? }`, where `name` and `calling` are routing metadata and `charge` carries the message as prose. A missing `name` comes from the charge. The role determines an omitted `calling`; an explicit value that disagrees is refused with `unknown-calling`.
 - Result: `{ ok: true, name, agentId, outcome }`.
 
 ## devops
@@ -54,7 +54,7 @@ const { records } = await this.join();
 ```
 
 - Result: `{ ok: true, records: [{ name, agentId, role, status, returned: [{ text }] }] }`.
-- Collects children created by this session. `status` is `completed` | `failed` | `abandoned` | `voided`. Completion requires both valid delivery and a proven terminal. A child that can still deliver remains active and keeps `join` waiting. A child whose delivery has become impossible is settled and reported once as `voided`. Read each record's `returned` items in order; they contain the child's delivered material and current report. Other terminal states return an empty array.
+- Collects children created by this session. `status` is `completed` | `failed` | `abandoned` | `voided`. Completion requires both valid delivery and a proven terminal. A child that can still deliver remains active and keeps `join` waiting. A child whose delivery has become impossible is settled and reported once as `voided`. Read each record's `returned` items in order; they transport the child's prose report verbatim — there is no report schema and no mandated sections. Other terminal states return an empty array.
 - Refusal codes: `context-unavailable`, `not-ready`, `nothing-to-join`, `join-in-progress`, `interrupted`, `abandoned`.
 
 ## fission

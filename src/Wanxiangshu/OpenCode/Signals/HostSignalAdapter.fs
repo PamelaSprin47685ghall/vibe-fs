@@ -36,10 +36,6 @@ type HostSignalRouter
     (
         ownedSessions: HashSet<string>,
         onSignal: HostSignal -> unit,
-        // LOOP-009 edge callback. Typed as `obj -> unit` so this
-        // adapter routes raw Host events without owning sensor business state.
-        // Drop-session cleanup is the composition root's job.
-        ?onLoopEvent: obj -> unit,
         ?onExactAssistantObservation:
             ExactProviderStartObservation -> bool -> ExactProviderTerminalObservation option -> Task<unit>
     ) =
@@ -80,19 +76,12 @@ type HostSignalRouter
         let key = SessionId.value sessionId
         ownedSessions.Remove key |> ignore
 
-    /// LOOP-009 text detection observes textual stream deltas.
     /// The SDK subscription carries coarse wakeups only. Exact assistant
     /// lifecycle evidence is owned by the awaited public event Hook below.
-    member _.Observe(raw: obj) =
-        match onLoopEvent with
-        | Some observe when LoopEventCodec.isLoopTextDelta raw -> observe raw
-        | _ -> emitAdaptedSignal raw
+    member _.Observe(raw: obj) = emitAdaptedSignal raw
 
     member _.ObserveLocal(raw: obj) =
         task {
             do! observeExactAssistant raw
-
-            match onLoopEvent with
-            | Some observe when LoopEventCodec.isLoopTextDelta raw -> observe raw
-            | _ -> emitAdaptedSignal raw
+            emitAdaptedSignal raw
         }

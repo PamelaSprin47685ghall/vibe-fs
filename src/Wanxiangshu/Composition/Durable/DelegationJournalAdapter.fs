@@ -79,11 +79,22 @@ module TaskDeliveryJournal =
         =
         tryFindByFenceFields journal sessionId providerRun None None None None None
 
+    let private failureCommitResult (reason: string) (failure: JournalAppendFailure) : TaskDeliveryCommitResult =
+        match failure with
+        | JournalAppendFailure.WriteUnknown _ -> TaskDeliveryCommitResult.Unknown reason
+        | JournalAppendFailure.WriterUnavailable _
+        | JournalAppendFailure.FactRejected _
+        | JournalAppendFailure.NoNewWriteReleaseFailed _ -> TaskDeliveryCommitResult.NotCommitted reason
+
+    let private appendCommitResult (appended: Result<ProjectionSet, JournalAppendFailure>) : TaskDeliveryCommitResult =
+        match appended with
+        | Ok _ -> TaskDeliveryCommitResult.Committed
+        | Error failure -> failureCommitResult (JournalAppendFailure.describe failure) failure
+
     let commit (journal: AgentJournal) (witness: TaskDeliveryWitness) : Task<TaskDeliveryCommitResult> =
         task {
             match TaskDelivery.validate HostDigest.sha256Hex witness with
-            | Error reason ->
-                return TaskDeliveryCommitResult.NotCommitted reason
+            | Error reason -> return TaskDeliveryCommitResult.NotCommitted reason
             | Ok() ->
                 let! appended =
                     AgentJournal.appendAgent
@@ -92,16 +103,5 @@ module TaskDeliveryJournal =
                         (AgentFact.Host(HostFactCases.TaskDeliveryCommitted witness))
                         journal
 
-                match appended with
-                | Ok _ ->
-                    return TaskDeliveryCommitResult.Committed
-                | Error failure ->
-                    let reason = JournalAppendFailure.describe failure
-                    match failure with
-                    | JournalAppendFailure.WriteUnknown _ ->
-                        return TaskDeliveryCommitResult.Unknown reason
-                    | JournalAppendFailure.WriterUnavailable _
-                    | JournalAppendFailure.FactRejected _
-                    | JournalAppendFailure.NoNewWriteReleaseFailed _ ->
-                        return TaskDeliveryCommitResult.NotCommitted reason
+                return appendCommitResult appended
         }

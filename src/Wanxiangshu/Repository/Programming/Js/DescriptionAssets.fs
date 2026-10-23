@@ -9,8 +9,7 @@ module JsDescriptionAssets =
     let private text (lang: ProviderLanguage) (path: string) =
         ProviderProse.render lang path Map.empty
 
-    let private template (lang: ProviderLanguage) (path: string) =
-        ProviderResources.readText lang path
+    let private template (lang: ProviderLanguage) (path: string) = ProviderResources.readText lang path
 
     let load (lang: ProviderLanguage) : JsCanonicalDescription.Prose =
         { Header = text lang JsCanonicalDescription.Path.Header
@@ -67,6 +66,7 @@ module JsDescriptionAssets =
           BaseClassHorizon = template lang JsCanonicalDescription.Path.BaseClassHorizon
           BaseClassAdvisor = template lang JsCanonicalDescription.Path.BaseClassAdvisor
           BaseClassAsk = template lang JsCanonicalDescription.Path.BaseClassAsk
+          BaseClassReview = template lang JsCanonicalDescription.Path.BaseClassReview
           BaseClassLifecycle = template lang JsCanonicalDescription.Path.BaseClassLifecycle
           JsPlan = text lang JsCanonicalDescription.Path.JsPlan }
 

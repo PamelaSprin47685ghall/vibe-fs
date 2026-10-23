@@ -4,7 +4,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
-import { loopDetectorRepositoryInputFiles } from './loop-detector-repository-corpus.mjs'
 import { collectTrackedInputs, computeFileHash } from './owner-compile.mjs'
 import { rejectSymbolicVerificationInput } from './verification-input-path.mjs'
 
@@ -26,7 +25,6 @@ export function computeDigest(entries) {
   const hasher = crypto.createHash('sha256')
   for (const entry of sorted) {
     const hash = entry.sha256 ?? entry.hash
-    if (entry.loopDetectorCorpus) hasher.update('loop-detector-corpus\0')
     hasher.update(`${entry.path}:${hash}\n`)
   }
   return hasher.digest('hex')
@@ -129,10 +127,6 @@ export function collectVerificationInputs(root = REPO_ROOT) {
     }
   }
 
-  for (const entry of collectGeneratedInputs(resolvedRoot)) {
-    collectedMap.set(entry.path, { ...entry, loopDetectorCorpus: true })
-  }
-
   return Array.from(collectedMap.values()).sort((a, b) => a.path.localeCompare(b.path))
 }
 
@@ -152,9 +146,6 @@ export function diffVerificationInputs(before, after) {
     if (bEntry.sha256 !== aEntry.sha256) {
       return { equal: false, reason: `content-changed:${p}` }
     }
-    if (Boolean(bEntry.loopDetectorCorpus) !== Boolean(aEntry.loopDetectorCorpus)) {
-      return { equal: false, reason: `corpus-membership-changed:${p}` }
-    }
   }
 
   return { equal: true }
@@ -173,27 +164,6 @@ export function collectCompilerInputs(root = REPO_ROOT, aggregatePath) {
     if (fs.existsSync(abs)) {
       const stat = fs.statSync(abs)
       const sha256 = computeFileHash(abs)
-      results.push({
-        path: relPath(resolvedRoot, abs),
-        sha256,
-        mtimeMs: stat.mtimeMs,
-        size: stat.size,
-      })
-    }
-  }
-  return results.sort((a, b) => a.path.localeCompare(b.path))
-}
-
-export function collectGeneratedInputs(root = REPO_ROOT) {
-  const resolvedRoot = path.resolve(root)
-  const files = loopDetectorRepositoryInputFiles(resolvedRoot)
-
-  const results = []
-  for (const abs of files) {
-    if (fs.existsSync(abs)) {
-      const stat = fs.statSync(abs)
-      const content = fs.readFileSync(abs)
-      const sha256 = crypto.createHash('sha256').update(content).digest('hex')
       results.push({
         path: relPath(resolvedRoot, abs),
         sha256,
@@ -414,17 +384,6 @@ export function assertBuildFresh({ root = REPO_ROOT, manifestPath } = {}) {
     )
   }
 
-  // Verify generated inputs
-  const currentGeneratedInputs = collectGeneratedInputs(resolvedRoot)
-  const currentGeneratedDigest = computeDigest(currentGeneratedInputs)
-  if (currentGeneratedDigest !== manifest.generated?.inputDigest) {
-    throw createFreshnessError(
-      'generated-input-stale',
-      resolvedManifestPath,
-      `Generated inputs changed (digest mismatch: expected ${manifest.generated?.inputDigest}, got ${currentGeneratedDigest})`,
-    )
-  }
-
   // Verify artifact inputs
   const currentArtifactInputs = collectArtifactInputs(resolvedRoot)
   const currentArtifactDigest = computeDigest(currentArtifactInputs)
@@ -439,7 +398,6 @@ export function assertBuildFresh({ root = REPO_ROOT, manifestPath } = {}) {
   return {
     generation: manifest.generation ?? 1,
     compilerInputDigest: currentCompilerDigest,
-    generatedInputDigest: currentGeneratedDigest,
     artifactInputDigest: currentArtifactDigest,
   }
 }

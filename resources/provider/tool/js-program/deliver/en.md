@@ -1,6 +1,6 @@
 deliver(carry = []) — deliver this work and end the program. Later statements do not run.
 
-**Use this pattern: write the final report in ordinary assistant text, then call `this.deliver()` immediately.** The current turn, including that report, is returned automatically. It needs no anchor and no copy in the argument. State what was done, the evidence, and what remains open.
+**`deliver` is the child→parent channel.** Close the work in your own words in ordinary assistant text, then call `this.deliver()` immediately. The parent receives that current turn plus whatever `carry` adds. There is no report schema; say what the work itself suggests, plain and clear. A few short FYI notes are welcome if they genuinely help; keep them brief.
 
 Fill `carry` only when the caller also needs older context. An integer copies a visible anchor's full history interval; a string supplies literal text. Items appear in array order. For example: `this.deliver([6, "…"])`. There is no prefix parameter. An empty or omitted array returns the current turn alone. The host formats the material as readable TOML.
 

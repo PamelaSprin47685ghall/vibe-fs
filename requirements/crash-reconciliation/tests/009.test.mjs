@@ -24,12 +24,12 @@ test('WHAT[crash-reconciliation-009] actual durable completion decoder rejects l
   assert.deepEqual(codec.decode('{broken'), { case: 'Invalid' })
 })
 
-test('WHAT[crash-reconciliation-009] completion schema 3 requires canonical returned material', () => {
+test('WHAT[crash-reconciliation-009] completion schema 4 requires canonical returned material', () => {
   const current = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     finality: 'completed',
     run_id: 'run',
-    view: JSON.stringify(['old evidence\nexact line', 'final report']),
+    view: JSON.stringify({ body: ['final report'], carry: ['old evidence\nexact line'] }),
     child_session_id: 'child',
     authority_root: 'root',
     provider_run: 'provider-run',
@@ -37,11 +37,11 @@ test('WHAT[crash-reconciliation-009] completion schema 3 requires canonical retu
   }
   assert.deepEqual(codec.decode(JSON.stringify(current)), { case: 'Current' })
   assert.equal(codec.tryDecode('handle', JSON.stringify(current)).ok, true)
-  assert.deepEqual(codec.decode(JSON.stringify({ ...current, view: '[]' })), { case: 'Current' })
-  for (const view of ['old text', '{}', '["text",2]', '[ "text" ]']) {
+  assert.deepEqual(codec.decode(JSON.stringify({ ...current, view: JSON.stringify({ body: [], carry: [] }) })), { case: 'Current' })
+  for (const view of ['old text', '{}', '["text",2]', '[ "text" ]', JSON.stringify({ carry: [] })]) {
     assert.deepEqual(codec.decode(JSON.stringify({ ...current, view })), { case: 'Invalid' }, view)
   }
-  assert.deepEqual(codec.decode(JSON.stringify({ ...current, schemaVersion: 2 })), { case: 'Invalid' })
+  assert.deepEqual(codec.decode(JSON.stringify({ ...current, schemaVersion: 3 })), { case: 'Invalid' })
   const { schemaVersion, ...legacy } = current
   assert.deepEqual(codec.decode(JSON.stringify(legacy)), { case: 'Invalid' })
 })

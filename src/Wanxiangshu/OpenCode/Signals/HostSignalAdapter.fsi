@@ -13,7 +13,6 @@ type HostSignalRouter =
     new:
         ownedSessions: HashSet<string> *
         onSignal: (HostSignal -> unit) *
-        ?onLoopEvent: (obj -> unit) *
         ?onExactAssistantObservation:
             (ExactProviderStartObservation -> bool -> ExactProviderTerminalObservation option -> Task<unit>) ->
             HostSignalRouter

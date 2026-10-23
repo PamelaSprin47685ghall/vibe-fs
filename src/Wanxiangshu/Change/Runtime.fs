@@ -129,6 +129,16 @@ type Orchestrator
             let integration failurePrefix error =
                 OrchestratorVerdict.IntegrationFailed(jobId, sprintf "%s: %s" failurePrefix error)
 
+            let! blocking =
+                git.IsDirty(WorktreePath.create repoPath)
+                |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to inspect target cleanliness")
+
+            do!
+                match blocking with
+                | [] -> Ok()
+                | paths ->
+                    Error(OrchestratorVerdict.RejectedDirty(sprintf "Worktree is dirty: %s" (String.concat ", " paths)))
+
             let path = defaultArg worktreePath (defaultWorktreePath jobId)
             // PERSIST-009: effect identity is deterministic before git runs.
             let identity = WorktreeCommands.identityOf jobId

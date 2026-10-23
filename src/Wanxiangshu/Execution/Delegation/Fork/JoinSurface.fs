@@ -68,6 +68,16 @@ module JoinSurface =
                 )
             )
         | "completed", Some role, Some runId ->
+            let body =
+                let raw = text (value?body)
+                if String.IsNullOrWhiteSpace raw then [] else [ raw ]
+
+            let carry =
+                if isNull (value?returned) then
+                    []
+                else
+                    ReturnedMaterial.carry (ReturnedMaterial.ofEntries value?returned)
+
             Some(
                 AgentItem(
                     AgentCompletedItem
@@ -77,7 +87,7 @@ module JoinSurface =
                           Role = role
                           AuthorityRoot = None
                           ProviderRun = None
-                          View = ReturnedMaterial.ofEntries value?returned
+                          View = ReturnedMaterial.encode body carry
                           Directory = None }
                 )
             )
@@ -207,6 +217,7 @@ module JoinSurface =
                         "cleanup-failed"
                     )
                 | "Cancelled" -> OrchestratorVerdict.Cancelled(ManagerJobId.create "job")
+                | "RejectedDirty" -> OrchestratorVerdict.RejectedDirty "dirty"
                 | "IntegrationFailed" -> OrchestratorVerdict.IntegrationFailed(ManagerJobId.create "job", "failed")
                 | _ -> OrchestratorVerdict.Empty)
             |> Array.toList
@@ -440,6 +451,7 @@ module JoinSurface =
                 | AgentCompleted payload ->
                     createObj
                         [ "status" ==> "completed"
+                          "body" ==> (ReturnedMaterial.body payload.View |> String.concat "\n")
                           "returned" ==> ReturnedMaterial.entries payload.View ]
                 | AgentFailed payload -> createObj [ "status" ==> "failed"; "reason" ==> payload.Message ]
                 | AgentAbandoned(_, reason) -> createObj [ "status" ==> "abandoned"; "reason" ==> reason ]

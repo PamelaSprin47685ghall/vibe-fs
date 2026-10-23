@@ -21,9 +21,7 @@ module RetirementId =
 module ManagerLoopGate =
     val gateKind: retirementId: RetirementId -> string
 
-type ReviewFinding =
-    { AcceptanceCriteria: string
-      WorkPlan: string }
+type ReviewFinding = { Key: string; Value: string option }
 
 type ReviewFindings
 

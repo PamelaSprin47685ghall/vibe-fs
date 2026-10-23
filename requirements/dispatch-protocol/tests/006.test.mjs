@@ -83,7 +83,7 @@ test('WHAT[dispatch-protocol-006] DP_006_claim_sequence_advances_on_registration
   const scope = authority.claimScopeDigest(
     SESSION,
     root.logicalRun,
-    promptOrigin('DegenerationGuard'),
+    promptOrigin('ManagerGuard'),
     'pd-same',
   )
 
@@ -91,7 +91,7 @@ test('WHAT[dispatch-protocol-006] DP_006_claim_sequence_advances_on_registration
   assert.equal(authority.nextClaimSequence(scope, projection), 1)
 
   const claimAt = (n) =>
-    authority.claimContinuation(`pk_${n}`, SESSION, 'DegenerationGuard', root, 'pd-same')
+    authority.claimContinuation(`pk_${n}`, SESSION, 'ManagerGuard', root, 'pd-same')
 
   projection = authority.registerClaim(claimAt(1), projection)
   assert.equal(authority.nextClaimSequence(scope, projection), 2)

@@ -10,10 +10,11 @@ open Wanxiangshu.Participant.Provider
 
 module ProviderSystemTransform =
     /// planStage resolves the current incumbency's stage-method semantic path
-    /// ("planning/s1" | "planning/s2" | "planning/s3") for Plan sessions and
-    /// None otherwise (work-031 stage guidance).
+    /// ("planning/s1" | "planning/s2" | "planning/s3") plus the derived draft
+    /// path (substituted as `{{draft_path}}` in the stage guidance) for Plan
+    /// sessions, and None otherwise (work-031 stage guidance).
     val createWith:
         role: (SessionId -> Role option) ->
-        planStage: (SessionId -> Task<string option>) ->
+        planStage: (SessionId -> Task<(string * string) option>) ->
 
             (obj -> obj -> Task<unit>)

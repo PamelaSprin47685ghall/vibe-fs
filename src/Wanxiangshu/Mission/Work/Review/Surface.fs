@@ -8,8 +8,8 @@ module Surface =
 
     let private findingObject (finding: ReviewFinding) =
         box
-            {| acceptance_criteria = finding.AcceptanceCriteria
-               work_plan = finding.WorkPlan |}
+            {| key = finding.Key
+               value = finding.Value |> Option.toObj |}
 
     let parse (value: obj) =
         match Model.tryParse value with

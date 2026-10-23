@@ -120,51 +120,52 @@ module Tool =
 
     /// One plan step: an id, a description and the ids it depends on. Decoding only
     /// checks shape; the Runtime resolves the dependency graph and refuses a cycle.
-    let private stepsField raw : Result<PlanStep list, ToolRefusal> =
-        if not (hasField raw "steps") then
-            Ok []
+    let private stepAt index (entry: obj) : Result<PlanStep, ToolRefusal> =
+        let isObject =
+            emitJsExpr entry "typeof $0 === 'object' && $0 !== null && !Array.isArray($0)"
+
+        if not isObject then
+            Error(fromText (sprintf "steps[%d]" index) "each step must be an object")
         else
-            let stepsValue = field raw "steps"
-
-            let isRecord =
-                emitJsExpr stepsValue "Array.isArray($0)"
-
-            if not isRecord then
-                Error(fromText "steps" "steps must be an array of {id, title, dependsOn}")
-            else
-                let stepAt index (entry: obj) : Result<PlanStep, ToolRefusal> =
-                    let isObject =
-                        emitJsExpr entry "typeof $0 === 'object' && $0 !== null && !Array.isArray($0)"
-
-                    if not isObject then
-                        Error(fromText (sprintf "steps[%d]" index) "each step must be an object")
-                    else
-                        Decode.stringField entry "id"
+            Decode.stringField entry "id"
+            |> Result.mapError fromWire
+            |> Result.bind (fun id ->
+                WorkId.tryCreate id
+                |> Result.mapError (fromText (sprintf "steps[%d].id" index))
+                |> Result.bind (fun stepId ->
+                    Decode.stringField entry "title"
+                    |> Result.mapError fromWire
+                    |> Result.bind (fun title ->
+                        Decode.uniqueStringListField entry "dependsOn"
                         |> Result.mapError fromWire
-                        |> Result.bind (fun id ->
-                            WorkId.tryCreate id
-                            |> Result.mapError (fromText (sprintf "steps[%d].id" index))
-                            |> Result.bind (fun stepId ->
-                                Decode.stringField entry "title"
-                                |> Result.mapError fromWire
-                                |> Result.bind (fun title ->
-                                    Decode.uniqueStringListField entry "dependsOn"
-                                    |> Result.mapError fromWire
-                                    |> Result.map (fun dependsOn ->
-                                        { Id = WorkId.value stepId
-                                          Title = title
-                                          DependsOn = dependsOn }))))
+                        |> Result.map (fun dependsOn ->
+                            { Id = WorkId.value stepId
+                              Title = title
+                              DependsOn = dependsOn }))))
 
-                let raw = unbox<obj array> stepsValue
+    let private collectSteps (raw: obj array) : Result<PlanStep list, ToolRefusal> =
+        let rec collect index accepted remaining =
+            match remaining with
+            | [] -> Ok(List.rev accepted)
+            | entry :: rest ->
+                stepAt index entry
+                |> Result.bind (fun step -> collect (index + 1) (step :: accepted) rest)
 
-                let rec collect index accepted remaining =
-                    match remaining with
-                    | [] -> Ok(List.rev accepted)
-                    | entry :: rest ->
-                        stepAt index entry
-                        |> Result.bind (fun step -> collect (index + 1) (step :: accepted) rest)
+        collect 0 [] (Array.toList raw)
 
-                collect 0 [] (Array.toList raw)
+    let private decodeStepsArray (stepsValue: obj) : Result<PlanStep list, ToolRefusal> =
+        let isRecord = emitJsExpr stepsValue "Array.isArray($0)"
+
+        if not isRecord then
+            Error(fromText "steps" "steps must be an array of {id, title, dependsOn}")
+        else
+            collectSteps (unbox<obj array> stepsValue)
+
+    let private stepsField raw : Result<PlanStep list, ToolRefusal> =
+        if hasField raw "steps" then
+            decodeStepsArray (field raw "steps")
+        else
+            Ok []
 
     let decodeStart (raw: obj) : Result<StartArgs, ToolRefusal> =
         Decode.stringField raw "commandId"
@@ -218,6 +219,95 @@ module Tool =
             )
         | None -> Ok()
 
+    let private failedCanonicalResult
+        (raw: obj)
+        commandId
+        inquiryId
+        workId
+        attempt
+        fence
+        (reason: string)
+        : Result<WorkSubmitArgs, ToolRefusal> =
+        let value = field raw "canonicalResult"
+        let isString = emitJsExpr value "typeof $0 === 'string'"
+
+        let workSubmit canonicalResult =
+            { CommandId = commandId
+              InquiryId = inquiryId
+              WorkId = workId
+              Attempt = attempt
+              Fence = fence
+              CanonicalResult = canonicalResult
+              Outcome = WorkOutcome.Failed
+              Reason = Some reason }
+
+        if not (hasField raw "canonicalResult") then
+            Ok(workSubmit "")
+        elif isString then
+            Ok(workSubmit (unbox<string> value))
+        else
+            Error(fromText "canonicalResult" "canonicalResult must be a string")
+
+    let private submitOutcome (raw: obj) : Result<string, ToolRefusal> =
+        if hasField raw "outcome" then
+            Decode.stringField raw "outcome" |> Result.mapError fromWire
+        else
+            Ok "succeeded"
+
+    let private decodeWorkSubmitBody (raw: obj) : Result<WorkSubmitArgs, ToolRefusal> =
+        let commandId = Decode.stringField raw "commandId" |> Result.mapError fromWire
+
+        let inquiryId = inquiryIdField raw
+
+        let workId = Decode.stringField raw "workId" |> Result.mapError fromWire
+
+        let attempt =
+            Decode.nonNegativeIntegerField raw "attempt"
+            |> Result.mapError fromWire
+            |> Result.bind (Attempt.tryCreate >> Result.mapError (fromText "attempt"))
+
+        let fence =
+            Decode.stringField raw "fence"
+            |> Result.mapError fromWire
+            |> Result.bind (Fence.tryCreate >> Result.mapError (fromText "fence"))
+
+        let outcome = submitOutcome raw
+
+        /// A failed step has no result bytes; a blank canonical result is
+        /// only lawful when the worker reports failure.
+        let result commandId inquiryId workId attempt fence outcome =
+            match outcome with
+            | "succeeded" ->
+                Decode.stringField raw "canonicalResult"
+                |> Result.mapError fromWire
+                |> Result.map (fun canonicalResult ->
+                    { CommandId = commandId
+                      InquiryId = inquiryId
+                      WorkId = workId
+                      Attempt = attempt
+                      Fence = fence
+                      CanonicalResult = canonicalResult
+                      Outcome = WorkOutcome.Succeeded
+                      Reason = None })
+            | "failed" ->
+                Decode.stringField raw "reason"
+                |> Result.mapError fromWire
+                |> Result.bind (failedCanonicalResult raw commandId inquiryId workId attempt fence)
+            | _ -> Error(fromText "outcome" "outcome must be succeeded or failed")
+
+        commandId
+        |> Result.bind (fun commandId ->
+            inquiryId
+            |> Result.bind (fun inquiryId ->
+                workId
+                |> Result.bind (fun workId ->
+                    attempt
+                    |> Result.bind (fun attempt ->
+                        fence
+                        |> Result.bind (fun fence ->
+                            outcome
+                            |> Result.bind (fun outcome -> result commandId inquiryId workId attempt fence outcome))))))
+
     let decodeWorkSubmit (raw: obj) : Result<WorkSubmitArgs, ToolRefusal> =
         match forbiddenResultFields |> List.tryFind (fun name -> hasField raw name) with
         | Some name ->
@@ -228,94 +318,7 @@ module Tool =
                     sprintf
                         "field %s is outside what a work result may carry: a worker submits answers, not certificates, budgets, events or goal revisions"
                         name }
-        | None ->
-            let outcome () =
-                let commandId =
-                    Decode.stringField raw "commandId" |> Result.mapError fromWire
-
-                let inquiryId = inquiryIdField raw
-
-                let workId =
-                    Decode.stringField raw "workId" |> Result.mapError fromWire
-
-                let attempt =
-                    Decode.nonNegativeIntegerField raw "attempt"
-                    |> Result.mapError fromWire
-                    |> Result.bind (Attempt.tryCreate >> Result.mapError (fromText "attempt"))
-
-                let fence =
-                    Decode.stringField raw "fence"
-                    |> Result.mapError fromWire
-                    |> Result.bind (Fence.tryCreate >> Result.mapError (fromText "fence"))
-
-                let outcome =
-                    if hasField raw "outcome" then
-                        Decode.stringField raw "outcome" |> Result.mapError fromWire
-                    else
-                        Ok "succeeded"
-
-                /// A failed step has no result bytes; a blank canonical result is
-                /// only lawful when the worker reports failure.
-                let result commandId inquiryId workId attempt fence outcome =
-                    match outcome with
-                    | "succeeded" ->
-                        Decode.stringField raw "canonicalResult"
-                        |> Result.mapError fromWire
-                        |> Result.map (fun canonicalResult ->
-                            { CommandId = commandId
-                              InquiryId = inquiryId
-                              WorkId = workId
-                              Attempt = attempt
-                              Fence = fence
-                              CanonicalResult = canonicalResult
-                              Outcome = WorkOutcome.Succeeded
-                              Reason = None })
-                    | "failed" ->
-                        Decode.stringField raw "reason"
-                        |> Result.mapError fromWire
-                        |> Result.bind (fun reason ->
-                            let value = field raw "canonicalResult"
-                            let isString = emitJsExpr value "typeof $0 === 'string'"
-
-                            if not (hasField raw "canonicalResult") then
-                                Ok
-                                    { CommandId = commandId
-                                      InquiryId = inquiryId
-                                      WorkId = workId
-                                      Attempt = attempt
-                                      Fence = fence
-                                      CanonicalResult = ""
-                                      Outcome = WorkOutcome.Failed
-                                      Reason = Some reason }
-                            elif isString then
-                                Ok
-                                    { CommandId = commandId
-                                      InquiryId = inquiryId
-                                      WorkId = workId
-                                      Attempt = attempt
-                                      Fence = fence
-                                      CanonicalResult = unbox<string> value
-                                      Outcome = WorkOutcome.Failed
-                                      Reason = Some reason }
-                            else
-                                Error(fromText "canonicalResult" "canonicalResult must be a string"))
-                    | _ -> Error(fromText "outcome" "outcome must be succeeded or failed")
-
-                commandId
-                |> Result.bind (fun commandId ->
-                    inquiryId
-                    |> Result.bind (fun inquiryId ->
-                        workId
-                        |> Result.bind (fun workId ->
-                            attempt
-                            |> Result.bind (fun attempt ->
-                                fence
-                                |> Result.bind (fun fence ->
-                                    outcome
-                                    |> Result.bind (fun outcome ->
-                                        result commandId inquiryId workId attempt fence outcome))))))
-
-            outcome ()
+        | None -> decodeWorkSubmitBody raw
 
     let decodeStatus (raw: obj) : Result<StatusArgs, ToolRefusal> =
         rejectReadMutation raw
@@ -355,4 +358,3 @@ module Tool =
                         { Code = "EXPORT_MODE_UNKNOWN"
                           Path = "mode"
                           Message = sprintf "mode must be summary or full, not %s" mode }))
-

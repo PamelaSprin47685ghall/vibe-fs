@@ -13,6 +13,10 @@ open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
 open Wanxiangshu.Git
+open Wanxiangshu.Process
+
+type IClockPort = Wanxiangshu.Foundation.IClockPort
+type ITimerPort = Wanxiangshu.Foundation.ITimerPort
 
 /// The product composition root for the second host (HNI P-11).
 ///
@@ -22,18 +26,17 @@ open Wanxiangshu.Git
 /// have no second-host binding yet.
 module HostPlugin =
 
+    let nodeClockPort () : IClockPort =
+        Wanxiangshu.Process.NodeTiming.nodeClockPort ()
+
+    let nodeTimerPort () : ITimerPort =
+        Wanxiangshu.Process.NodeTiming.nodeTimerPort ()
+
     [<Emit("JSON.parse($0)")>]
     let private parseJson (_text: string) : obj = jsNative
 
     [<Emit("$0 && typeof $0.text === 'string' ? $0.text : ''")>]
     let private jsonTextField (_value: obj) : string = jsNative
-
-    /// Fable does not emit an export for `Task.Delay` (`fable-library-js` Task.js
-    /// has no `delay`), so a `task { }` delay would break the emitted ESM graph.
-    /// This is the repo's established wait idiom (`Process/JsCallLoop.fs`): a
-    /// self-contained Promise, no library import.
-    [<Emit("new Promise(function(resolve) { setTimeout(function() { resolve(undefined); }, $0); })")>]
-    let private delayMilliseconds (milliseconds: int) : Task<unit> = jsNative
 
     /// The product default role for a root session: the Engineer law. The
     /// product's retired roles carry no provider prompt, so they fall back
@@ -170,11 +173,12 @@ module HostPlugin =
     /// The terminal outcome of one transcript observation, if the wait for
     /// the child's reply is over.
     let private terminalOutcome
+        (clock: IClockPort)
         (reply: string option)
         (observation: string)
-        (deadline: DateTimeOffset)
+        (deadline: Deadline)
         : ToolOutcome option =
-        let expired = DateTimeOffset.UtcNow >= deadline
+        let expired = Deadline.isExpired clock.UtcNow deadline
 
         match reply with
         | Some text -> Some(successOutcome text)
@@ -187,12 +191,24 @@ module HostPlugin =
             )
         | None -> None
 
+    let private waitPoll (clock: IClockPort) (timer: ITimerPort) (deadline: Deadline) : Task<unit> =
+        task {
+            let delay = timer.Delay(min 250 (Deadline.nextWaitMs clock.UtcNow deadline))
+
+            try
+                do! delay.Delay
+            finally
+                delay.Cancel()
+        }
+
     /// The wait for the child's terminal reply: the child's transcript is
     /// polled until it carries a terminal reply or the deadline is reached.
     let private pollTranscript
+        (clock: IClockPort)
+        (timer: ITimerPort)
         (ports: HostPorts)
         (childSession: SessionId)
-        (deadline: DateTimeOffset)
+        (deadline: Deadline)
         : Task<ToolOutcome> =
         let rec poll () : Task<ToolOutcome> =
             task {
@@ -200,12 +216,12 @@ module HostPlugin =
 
                 let observation, reply = observeTranscript messages
 
-                let terminal = terminalOutcome reply observation deadline
+                let terminal = terminalOutcome clock reply observation deadline
 
                 match terminal with
                 | Some outcome -> return outcome
                 | None ->
-                    do! delayMilliseconds 250
+                    do! waitPoll clock timer deadline
                     return! poll ()
             }
 
@@ -213,15 +229,26 @@ module HostPlugin =
 
     /// The child's terminal reply, or the timeout outcome when it never
     /// arrives.
-    let private awaitChildReply (ports: HostPorts) (childSession: SessionId) : Task<ToolOutcome> =
+    let private awaitChildReply
+        (clock: IClockPort)
+        (timer: ITimerPort)
+        (ports: HostPorts)
+        (childSession: SessionId)
+        : Task<ToolOutcome> =
         task {
-            let deadline = DateTimeOffset.UtcNow.AddSeconds 120.0
-            let! outcome = pollTranscript ports childSession deadline
+            let deadline = Deadline.ofBudget (clock.UtcNow()) (TimeSpan.FromSeconds 120.0)
+            let! outcome = pollTranscript clock timer ports childSession deadline
             return outcome
         }
 
     /// The delivery of one message to the child session.
-    let private sendToChild (ports: HostPorts) (childSession: SessionId) (text: string) : Task<ToolOutcome> =
+    let private sendToChild
+        clock
+        timer
+        (ports: HostPorts)
+        (childSession: SessionId)
+        (text: string)
+        : Task<ToolOutcome> =
         task {
             let! sent =
                 ports.Prompts.Send(
@@ -240,7 +267,7 @@ module HostPlugin =
             | Outcome.Retryable reason -> return failureOutcome ("wxs_deliver could not deliver the message: " + reason)
             | Outcome.AcceptanceUnknown reason ->
                 return failureOutcome ("wxs_deliver could not confirm the delivery: " + reason)
-            | _ -> return! awaitChildReply ports childSession
+            | _ -> return! awaitChildReply clock timer ports childSession
         }
 
     /// The child session's own durable work, derived from its session id so
@@ -349,6 +376,8 @@ module HostPlugin =
 
     /// The delivery to a child session whose durable work is already open.
     let private deliverToChildSession
+        clock
+        timer
         (ports: HostPorts)
         (stateRoot: string)
         (root: string)
@@ -361,7 +390,7 @@ module HostPlugin =
             match openChildWork stateRoot root childWorkId with
             | Error reason ->
                 return failureOutcome ("wxs_deliver could not open the child session's durable work: " + reason)
-            | Ok() -> return! sendToChild ports childSession text
+            | Ok() -> return! sendToChild clock timer ports childSession text
         }
 
     /// The child session that carries the delivery.
@@ -375,6 +404,8 @@ module HostPlugin =
 
     /// The delivery of one message to a newly created child session.
     let private deliverToChild
+        clock
+        timer
         (ports: HostPorts)
         (stateRoot: string)
         (root: string)
@@ -386,15 +417,15 @@ module HostPlugin =
 
             match child with
             | Error error -> return failureOutcome ("wxs_deliver could not create the child session: " + string error)
-            | Ok childSession -> return! deliverToChildSession ports stateRoot root text childSession
+            | Ok childSession -> return! deliverToChildSession clock timer ports stateRoot root text childSession
         }
 
     /// The plugin value. `Activate` performs the durable product wiring and
     /// returns the product hooks for the second host.
-    let plugin: IHostPlugin =
+    let private createWithTimer clock (timer: ITimerPort) : IHostPlugin =
         { new IHostPlugin with
             member _.Activate(ports: HostPorts) : HostResult<ProductHooks> =
-                task {
+                taskResult {
                     let workspace =
                         match ports.Paths.ProjectRoot with
                         | WorkspacePath path -> path
@@ -405,23 +436,27 @@ module HostPlugin =
                     // opening (`Mission/Manager/Workflow.fs`); in this
                     // codebase the durable journal lives in the state root,
                     // so the state root is the journal's gitCommonDir.
-                    let! root = GitSubject.revParseShowToplevel workspace
-                    let! stateRoot = RuntimePath.stateRoot root
+                    let! root = GitSubject.revParseShowToplevel workspace |> ofTask
 
-                    let opening: Result<unit, HostError> =
-                        if String.IsNullOrWhiteSpace root then
+                    if String.IsNullOrWhiteSpace root then
+                        return!
                             Error(
                                 HostError.Transport
                                     "the second host activation failed: Git did not identify a worktree root"
                             )
-                        elif String.IsNullOrWhiteSpace stateRoot then
+
+                    let! stateRoot = RuntimePath.stateRoot root |> ofTask
+
+                    if String.IsNullOrWhiteSpace stateRoot then
+                        return!
                             Error(
                                 HostError.Transport
                                     "the second host activation failed: the machine state directory is missing"
                             )
-                        else
-                            openActivationWork stateRoot (activationWorkId ports root) root
-                            |> Result.bind (fun () -> openActivationScope ports stateRoot)
+
+                    do!
+                        openActivationWork stateRoot (activationWorkId ports root) root
+                        |> Result.bind (fun () -> openActivationScope ports stateRoot)
 
                     // The one product tool of this host: it hands a message to
                     // a child session and returns the child's reply.
@@ -450,10 +485,18 @@ module HostPlugin =
                                     if String.IsNullOrWhiteSpace text then
                                         return failureOutcome "wxs_deliver requires a non-empty `text` field."
                                     else
-                                        return! deliverToChild ports stateRoot root text (Some invocation.Session)
+                                        return!
+                                            deliverToChild
+                                                clock
+                                                timer
+                                                ports
+                                                stateRoot
+                                                root
+                                                text
+                                                (Some invocation.Session)
                                 } }
 
-                    let registration = ports.Tools.Register [ deliverSpec ]
+                    do! ports.Tools.Register [ deliverSpec ]
 
                     let turn: ITurnTransform =
                         { new ITurnTransform with
@@ -479,26 +522,6 @@ module HostPlugin =
 
                             member _.ProviderParams(_context: TurnContext, _parameters: ProviderParams) =
                                 Task.FromResult(ParamsVerdict.Accept) }
-
-                    let toolGate: IToolGate =
-                        { new IToolGate with
-                            member _.BeforeTool(_call: ToolCallView) =
-                                // The product gate for tool admission is owned by
-                                // the host-boundary admission surface; it has no
-                                // second-host binding yet, so the neutral default
-                                // applies: no restriction, no rewrite.
-                                Task.FromResult(ToolCallVerdict.Allow)
-
-                            member _.AfterTool(_call: ToolCallView, _result: ToolOutcome) =
-                                // No product result rewrite exists for this host
-                                // yet; the neutral default keeps the host's result.
-                                Task.FromResult(ToolResultEdit.Keep)
-
-                            member _.DefineTool(_definition: ToolDefinitionView) =
-                                // No product description/schema rewrite exists
-                                // for this host yet; the neutral default keeps
-                                // the host's definition.
-                                ToolDefinitionEdit.Keep }
 
                     let compaction: ICompactionGate =
                         { new ICompactionGate with
@@ -542,24 +565,45 @@ module HostPlugin =
                         }
 
                     let dispose () : Task =
-                        // Nothing is held open across the activation: the
-                        // durable work and the ownership scope live in the
-                        // machine state directory, not in this process.
+                        timer.Dispose()
                         Task.FromResult()
 
-                    let hooks: ProductHooks =
-                        { ToolGate = Some toolGate
+                    return
+                        { ToolGate = None
                           Turn = Some turn
                           Compaction = compaction
                           Spawn = None
                           OnSignal = Some onSignal
                           Dispose = dispose }
+                } }
 
-                    let outcome: Result<ProductHooks, HostError> =
-                        match opening, registration with
-                        | Error error, _ -> Error error
-                        | Ok(), Error error -> Error error
-                        | Ok(), Ok() -> Ok hooks
+    [<Emit("new AggregateError([$0, $1], 'Second-host activation and timer cleanup failed', { cause: $0 })")>]
+    let private activationCleanupFailure (original: obj) (cleanup: exn) : exn = jsNative
 
-                    return outcome
+    let private disposeAfterFailure (timer: ITimerPort) (original: obj) =
+        try
+            timer.Dispose()
+        with cleanup ->
+            raise (activationCleanupFailure original cleanup)
+
+    let create (clock: IClockPort) (createTimer: unit -> ITimerPort) : IHostPlugin =
+        { new IHostPlugin with
+            member _.Activate(ports: HostPorts) =
+                task {
+                    let timer = createTimer ()
+
+                    let! outcome =
+                        task {
+                            try
+                                return! (createWithTimer clock timer).Activate ports
+                            with original ->
+                                disposeAfterFailure timer (box original)
+                                return raise original
+                        }
+
+                    match outcome with
+                    | Ok _ -> return outcome
+                    | Error original ->
+                        disposeAfterFailure timer (box original)
+                        return outcome
                 } }

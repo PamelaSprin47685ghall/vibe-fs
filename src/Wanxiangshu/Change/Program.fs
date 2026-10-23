@@ -195,9 +195,7 @@ module OrchestratorProgram =
         : Result<CommitHash option, OrchestratorVerdict> =
         // Only the pinned candidate lands; the declared target-moved error is a
         // retryable miss.
-        match
-            PublicationLaw.fastForward merge evidence.CandidateCommit OrchestratorConstants.targetRefMovedError
-        with
+        match PublicationLaw.fastForward merge evidence.CandidateCommit OrchestratorConstants.targetRefMovedError with
         | FastForwardOutcome.TargetMoved -> Ok None
         | FastForwardOutcome.Failed error -> Error(failed job (sprintf "FF merge failed: %s" error))
         | FastForwardOutcome.LandedMismatch landed ->
@@ -748,12 +746,7 @@ module OrchestratorProgram =
             let record = currentRecord deps job
 
             match
-                PublicationLaw.reenterClaim
-                    job.TargetRef
-                    claim.TargetRef
-                    claim.RebasedCommit
-                    claim.ExpectedHead
-                    record
+                PublicationLaw.reenterClaim job.TargetRef claim.TargetRef claim.RebasedCommit claim.ExpectedHead record
             with
             | ClaimReentry.Refused ClaimReentryRefusal.TargetMismatch ->
                 return failed job "Publish claim target mismatch; refusing publish recovery"
@@ -761,7 +754,8 @@ module OrchestratorProgram =
                 return failed job "No record found for publish claim reentry"
             | ClaimReentry.Refused ClaimReentryRefusal.MissingRebased ->
                 return failed job "Missing RebasedCandidateReady evidence for publish claim reentry"
-            | ClaimReentry.VerifyHead -> return! continueReentryWithEvidence deps job (buildClaimPublicationEvidence job claim)
+            | ClaimReentry.VerifyHead ->
+                return! continueReentryWithEvidence deps job (buildClaimPublicationEvidence job claim)
             | ClaimReentry.RunLoop -> return! runManagerLoop deps job
         }
 

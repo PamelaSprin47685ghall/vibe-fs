@@ -37,31 +37,35 @@ type CasebookSettlementOwner(onConflict: CasebookSemanticCutIncident -> unit) =
         with _ ->
             ()
 
+    let settleStorageInvalid (failure: CasebookAppendFailure) =
+        // The shared log's own integrity is broken. Appends to it stop at
+        // the store; this owner reports the scope and never claims the
+        // case was written.
+        let incident, firstDelivery = claim (CasebookSemanticCutIncident.OfFailure failure)
+
+        if firstDelivery then
+            report incident
+
+        CasebookSettlementOutcome.LogScopeFailure
+
+    let settleCandidate (candidate: CasebookSemanticCutIncident) =
+        let _, firstDelivery = claim candidate
+
+        if firstDelivery then
+            report candidate
+            CasebookSettlementOutcome.CaseUnavailable
+        else
+            CasebookSettlementOutcome.CaseUnavailableKnown
+
+    let settleSemantic (failure: CasebookAppendFailure) =
+        match CasebookSemanticCutIncident.tryFromSettlement failure with
+        | None -> CasebookSettlementOutcome.Unscoped
+        | Some candidate -> settleCandidate candidate
+
     member _.Observe(failure: CasebookAppendFailure) : CasebookSettlementOutcome =
         match failure.Error with
-        | AppendError.StorageInvalid _ ->
-            // The shared log's own integrity is broken. Appends to it stop at
-            // the store; this owner reports the scope and never claims the
-            // case was written.
-            let incident, firstDelivery = claim (CasebookSemanticCutIncident.OfFailure failure)
-
-            if firstDelivery then
-                report incident
-
-            CasebookSettlementOutcome.LogScopeFailure
-        | _ ->
-            match CasebookSemanticCutIncident.tryFromSettlement failure with
-            | None -> CasebookSettlementOutcome.Unscoped
-            | Some candidate ->
-                let _, firstDelivery = claim candidate
-
-                if firstDelivery then
-                    report candidate
-
-                if firstDelivery then
-                    CasebookSettlementOutcome.CaseUnavailable
-                else
-                    CasebookSettlementOutcome.CaseUnavailableKnown
+        | AppendError.StorageInvalid _ -> settleStorageInvalid failure
+        | _ -> settleSemantic failure
 
     /// Re-observe an incident this owner already settled: no new notification
     /// and no new archive.

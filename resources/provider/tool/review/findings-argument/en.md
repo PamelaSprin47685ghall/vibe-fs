@@ -1,1 +1,1 @@
-Gap list. Each element describes one unclosed gap: acceptance_criteria formalizes the target state, work_plan states the work to close that gap; both must be non-empty strings. An empty array means the target is reached and the gap set is empty.
+Keyed obligation ledger updates. Each element is `{ key, value }`: `key` names one obligation, `value` is the remaining work for it, or `null` to delete that key. An existing key is overwritten, a missing key is added, and a `null` value deletes it. Item-by-item, not whole-set replacement.

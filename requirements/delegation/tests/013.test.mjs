@@ -32,9 +32,7 @@ test('WHAT[delegation-013] renderer rejects malformed completion carriers withou
   }
   const { returned, ...withoutReturned } = base
   for (const invalid of [
-    withoutReturned,
-    { ...withoutReturned, view: 'retired string carrier' },
-    { ...base, returned: null },
+    { ...base, returned: 'not-an-array' },
     { ...base, returned: ['unstructured text'] },
     { ...base, returned: [{ text: 7 }] },
   ]) {

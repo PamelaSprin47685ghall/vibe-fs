@@ -32,9 +32,10 @@ test('WHAT[work-007] the retirement identity is recomputed from the same fence a
   // S4 delivery directly retires in a single call without a confirmation step.
   const s4 = life.encodeOpening('S4', 'work-007-identity', '/repo', 4n)
   const reviewed = life.reviewProbe(s4, incumbencyIdOf(s4), 'Stayed')
-  const s4Retirement = life.deliverProbe(s4 + reviewed.bytes, 'run-007', 'call-007', 9n)
+  const cleared = life.reviewProbe(`${s4}${reviewed.bytes}`, incumbencyIdOf(s4), 'Cleared')
+  const s4Retirement = life.deliverProbe(`${s4}${reviewed.bytes}${cleared.bytes}`, 'run-007', 'call-007', 9n)
   assert.equal(s4Retirement.decision, 'Write')
-  assert.equal(s4Retirement.names.includes('ConfirmationCommitted'), false)
+  assert.equal(s4Retirement.names, 'IncumbencyRetired,IncumbencyOpened')
   assert.notEqual(
     retirementIdOf(s4Retirement.bytes),
     retirementIdOf(oneshot.bytes),
@@ -45,6 +46,7 @@ test('WHAT[work-007] the retirement identity is recomputed from the same fence a
 test('WHAT[work-007] a settled fence replays its recorded state instead of the tenure the retirement removed', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
+    await execute(scores('CLEAR'), { call: 'clear-call', run: 'clear-run' })
     assert.match(await hooks.tool.deliver.execute({}, call(session, 'deliver-call', 'run-retire')), /Finished\. Do not continue work\./)
 
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(runtime.directory)
@@ -102,6 +104,7 @@ test('WHAT[work-007] a retried delivered fence is answered by the fold, not by t
 test('WHAT[work-007] a settled fence whose expected advance moved is refused with no write', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
+    await execute(scores('CLEAR'), { call: 'clear-call', run: 'clear-run' })
     await hooks.tool.deliver.execute({}, call(session, 'deliver-call', 'run-retire'))
 
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(runtime.directory)
@@ -111,7 +114,7 @@ test('WHAT[work-007] a settled fence whose expected advance moved is refused wit
         type: 'Review',
         incumbencyId: successor,
         reviewerId: 'reviewer',
-        findings: [],
+        updates: [],
       }),
     )
     const before = life.inspected(commonDir, session)

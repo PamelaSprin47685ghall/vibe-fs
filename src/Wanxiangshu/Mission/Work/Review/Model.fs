@@ -6,7 +6,7 @@ open Wanxiangshu.Mission.Work
 
 module Model =
     let schemaJson =
-        """{"type":"object","additionalProperties":false,"required":["findings"],"properties":{"findings":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["acceptance_criteria","work_plan"],"properties":{"acceptance_criteria":{"type":"string"},"work_plan":{"type":"string"}}}},"note":{"type":"string"}}}"""
+        """{"type":"object","additionalProperties":false,"required":["findings"],"properties":{"findings":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["key"],"properties":{"key":{"type":"string"},"value":{"type":["string","null"]}}}},"note":{"type":"string"}}}"""
 
     let private keys (value: obj) : string array =
         emitJsExpr value "Object.keys($0 ?? {})"
@@ -24,14 +24,22 @@ module Model =
         else
             Error("review finding field must be a string: " + name)
 
+    let private readNullableString (value: obj) (name: string) : Result<string option, string> =
+        let raw = property value name
+
+        if emitJsExpr raw "$0 === null" then
+            Ok None
+        elif isStringValue raw then
+            Ok(Some(unbox<string> raw))
+        else
+            Error("review finding field must be a string or null: " + name)
+
     let private readFinding (value: obj) : Result<ReviewFinding, string> =
         result {
-            let! acceptanceCriteria = readString value "acceptance_criteria"
-            let! workPlan = readString value "work_plan"
+            let! key = readString value "key"
+            let! value = readNullableString value "value"
 
-            return
-                { AcceptanceCriteria = acceptanceCriteria
-                  WorkPlan = workPlan }
+            return { Key = key; Value = value }
         }
 
     let private readFindings (value: obj) : Result<ReviewFinding list, string> =

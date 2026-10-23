@@ -36,6 +36,11 @@ module WorktreeCommands =
     /// The branch a job's worktree lives on IS its stable identity (ORCH-006).
     val identityOf: jobId: ManagerJobId -> WorktreeIdentity
 
+    /// The paths that block creating an isolated worktree from the main worktree.
+    /// Empty list means clean.
+    val isDirty:
+        runner: (Command -> Task<int * string * string>) -> path: WorktreePath -> Task<Result<string list, string>>
+
     val create:
         runner: (Command -> Task<int * string * string>) ->
         repo: string ->

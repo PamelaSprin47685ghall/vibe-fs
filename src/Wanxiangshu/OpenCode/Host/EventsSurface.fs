@@ -20,6 +20,7 @@ module EventsSurface =
                 Events.newTerminalSource ()
             else
                 terminalSource
+
         box (Events.HostEventPort(source))
 
     let private terminal (sessionId: string) (kind: string) (providerRun: string) (text: string) : TerminalOutcome =

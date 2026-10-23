@@ -116,6 +116,49 @@ module WorktreeCommands =
     let private failure stdout stderr =
         if String.IsNullOrWhiteSpace stderr then stdout else stderr
 
+    let private renamedTarget (path: string) =
+        let arrow = path.IndexOf(" -> ", StringComparison.Ordinal)
+
+        if arrow >= 0 then
+            path.Substring(arrow + 4).Trim()
+        else
+            path
+
+    let private pathOfRenamed (renamed: string) =
+        if String.IsNullOrWhiteSpace renamed then
+            None
+        else
+            Some renamed
+
+    let private singleBlockingPath (line: string) =
+        if line.Length <= 3 then
+            None
+        else
+            let path = line.Substring(3).Trim()
+            pathOfRenamed (renamedTarget path)
+
+    /// The paths that block creating an isolated worktree from the main
+    /// worktree: staged, unstaged, untracked and dirty-submodule changes.
+    /// `git status --porcelain` prints `XY <path>`; a rename or copy prints
+    /// `old -> new`, and the new name is the one that blocks. An empty list
+    /// means the worktree is clean.
+    let isDirty
+        (runner: Command -> Task<int * string * string>)
+        (path: WorktreePath)
+        : Task<Result<string list, string>> =
+        task {
+            let! code, stdout, stderr = runner (command (Some(WorktreePath.value path)) [ "status"; "--porcelain" ])
+
+            if code <> 0 then
+                return Error(failure stdout stderr)
+            else
+                return
+                    stdout.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
+                    |> Array.choose singleBlockingPath
+                    |> Array.toList
+                    |> Ok
+        }
+
     /// The isolated worktree is created from `sourceRef`, so the source it sees
     /// is that ref's committed content. Another worktree's uncommitted changes
     /// are not part of it — and are not touched by this command either.

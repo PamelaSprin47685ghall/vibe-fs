@@ -7,7 +7,7 @@
 
 `fork`、`resume`、`commission`、`devops`、`dag`、`advisor` 的最后一个参数都是可选的 `carry` 数组，默认 `[]`。整数引用可见锚点的完整历史区间，字符串表示字面文本，按数组顺序传递。只加入对方需要的背景。
 
-**父方本回合不传给子方。** 任务只写在 `charge` 或 `intent` 中，无需在 `carry` 里再说一遍。传递没有前缀参数；接收方看到的是排版清晰的 TOML 材料表。非法数组或不可见锚点返回 `VIEW_DECLARATION_INVALID`，不会创建部分工作。`join`、`horizon`、`fission` 不带 `carry`。
+**父方本回合不传给子方。** 任务只写在 `charge` 或 `intent` 中，用普通散文表达，无需在 `carry` 里再说一遍。消息是散文，不是结构化字段——工作本身提示什么就说什么，朴素清晰。传递没有前缀参数；接收方看到的是排版清晰的 TOML 材料表。非法数组或不可见锚点返回 `VIEW_DECLARATION_INVALID`，不会创建部分工作。`join`、`horizon`、`fission` 不带 `carry`。
 
 ## fork
 
@@ -16,7 +16,7 @@ await this.fork("为解析器模块建索引");
 await this.fork({ charge: "为解析器建索引", name: "parser-index", calling: "engineer" }, [1, "只需列出公开入口"]);
 ```
 
-- 载荷：字符串（任务）或 `{ charge, name?, calling?, keywords? }`；缺 `name` 时由任务文本派生。
+- 载荷：字符串（任务），或 `{ charge, name?, calling? }`，其中 `name`、`calling` 是路由元数据，`charge` 以散文承载消息。缺 `name` 时由任务文本派生。没有内容形态的结构化字段。
 - 结果：`{ ok: true, name, agentId, outcome }`，`outcome` 为 `created` | `nudged` | `commissioned`。
 - 拒绝码：`name-required`、`charge-required`、`unknown-calling`、`calling-conflict`、`name-already-belongs`、`warm-start-unavailable`、`context-unavailable`、`not-a-delegation-role`、`placement-failed`、`dispatch-uncertain`。
 
@@ -35,7 +35,7 @@ const resumed = await this.resume({ name: "audit-road", charge: "继续那轮审
 await this.commission({ charge: "独立审计解析器", name: "parser-audit" }, [1]);
 ```
 
-- 把目的独立的工作托付给一条 Manager 道路。载荷是任务字符串或 `{ charge, name?, calling? }`，不含 `keywords`；缺 `name` 时由任务派生。`calling` 省略时按角色推导，显式给出与推导不一致时以 `unknown-calling` 拒绝。
+- 把目的独立的工作托付给一条 Manager 道路。载荷是任务字符串或 `{ charge, name?, calling? }`，其中 `name`、`calling` 是路由元数据，`charge` 以散文承载消息；缺 `name` 时由任务派生。`calling` 省略时按角色推导，显式给出与推导不一致时以 `unknown-calling` 拒绝。
 - 结果：`{ ok: true, name, agentId, outcome }`。
 
 ## devops
@@ -54,7 +54,7 @@ const { records } = await this.join();
 ```
 
 - 结果：`{ ok: true, records: [{ name, agentId, role, status, returned: [{ text }] }] }`。
-- 收拢本会话创建的子工作。`status` 为 `completed` | `failed` | `abandoned` | `voided`；完成要求有效交付与已证明的终态同时成立。仍能交付的子工作保持活跃，`join` 等待；交付已不可能时以 `voided` 结清并报告一次。逐条阅读 `returned` 即得子方交回的材料与当前报告，非完成状态时该数组为空。
+- 收拢本会话创建的子工作。`status` 为 `completed` | `failed` | `abandoned` | `voided`；完成要求有效交付与已证明的终态同时成立。仍能交付的子工作保持活跃，`join` 等待；交付已不可能时以 `voided` 结清并报告一次。逐条阅读 `returned`，它们逐字运送子方的散文报告——没有报告模板，也没有固定章节；非完成状态时该数组为空。
 - 拒绝码：`context-unavailable`、`not-ready`、`nothing-to-join`、`join-in-progress`、`interrupted`、`abandoned`。
 
 ## fission

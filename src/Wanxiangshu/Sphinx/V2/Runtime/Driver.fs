@@ -218,28 +218,29 @@ module Driver =
             let refinableOutcome () =
                 AdvanceOutcome.RefinementPending(pendingInterpretationCount state)
 
-            let awaitingOutcome () =
-                AdvanceOutcome.AwaitingResults(pending)
+            let awaitingOutcome () = AdvanceOutcome.AwaitingResults(pending)
 
             let idleOutcome () =
-                match blockedBy state with
-                | Some reason -> AdvanceOutcome.NoRunnalbeWork reason
-                | None ->
-                    match awaitingRoundNote state with
-                    | Some _ -> AdvanceOutcome.AwaitingResults(openRounds state |> List.length)
-                    | None -> AdvanceOutcome.NoRunnalbeWork "no dispatchable work"
+                match blockedBy state, awaitingRoundNote state with
+                | Some reason, _ -> AdvanceOutcome.NoRunnalbeWork reason
+                | None, Some _ -> AdvanceOutcome.AwaitingResults(openRounds state |> List.length)
+                | None, None -> AdvanceOutcome.NoRunnalbeWork "no dispatchable work"
 
-            match cancelling with
-            | true -> AdvanceOutcome.NoRunnalbeWork "cancellation requested; no new work is dispatched"
-            | false ->
+            let blockedOrAwaiting () =
+                match blockedBy state, actuallyAwaiting with
+                | Some reason, false -> AdvanceOutcome.NoRunnalbeWork reason
+                | _ when pending > 0 -> awaitingOutcome ()
+                | _ -> idleOutcome ()
+
+            let dispatchOutcome () =
                 match refinable, List.isEmpty ready with
                 | true, _ -> refinableOutcome ()
                 | false, false -> awaitingOutcome ()
-                | false, true ->
-                    match blockedBy state, actuallyAwaiting with
-                    | Some reason, false -> AdvanceOutcome.NoRunnalbeWork reason
-                    | _ when pending > 0 -> awaitingOutcome ()
-                    | _ -> idleOutcome ()
+                | false, true -> blockedOrAwaiting ()
+
+            match cancelling with
+            | true -> AdvanceOutcome.NoRunnalbeWork "cancellation requested; no new work is dispatched"
+            | false -> dispatchOutcome ()
 
         let chosenOutcome = outcome ()
 

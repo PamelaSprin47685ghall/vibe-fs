@@ -96,13 +96,3 @@ module PlanTools =
         intent: string ->
         delegateTo: (string -> Task<string>) ->
             Task<Result<AskResult, string>>
-
-    /// work-029: js-plan operates on the single derived plan path with
-    /// read / edit / rewrite.
-    val executeJsPlan:
-        root: string ->
-        workId: string ->
-        action: string ->
-        content: string option ->
-        patches: (string * string) list option ->
-            Result<string, string>

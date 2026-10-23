@@ -245,9 +245,7 @@ module JsSandbox =
     /// handle; subsequent api member calls re-check that deadline, so the new
     /// epoch takes effect without re-wrapping or re-running the program.
     let resetDeadline (handle: JsRunHandle) (deadlineEpochMs: int64) : unit =
-        emitJsExpr
-            (sandboxLaw, handle.SandboxHandle, deadlineEpochMs)
-            "$0.extendDeadline($1, Number($2))"
+        emitJsExpr (sandboxLaw, handle.SandboxHandle, deadlineEpochMs) "$0.extendDeadline($1, Number($2))"
 
     /// The program-script line a stack frame reports, if the frame is one.
     ///

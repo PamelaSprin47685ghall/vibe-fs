@@ -50,7 +50,7 @@
 
 ## [013] Stream Sensor 专属识别与单 Run 触发限制
 
-流式传感器（如 LoopSensor）仅识别对应分段中的专属标识与模式，普通正文与工具输出均不触发；每个运行周期内至多触发一次，且仅限中断当前子会话的物理尝试。
+流式传感器仅识别对应分段中的专属标识与模式，普通正文与工具输出均不触发；每个运行周期内至多触发一次，且仅限中断当前子会话的物理尝试。
 
 ## [014] 零 Host 源码修改与 Typed Hook Membrane
 
@@ -109,7 +109,6 @@ Host subsystem 的公开 Contract、Runtime 与物理 Adapter 必须保持编译
 - `Host.SDK.Types`（`host-opencode-types`）：独立发布 `OpencodeTypes` SDK 数据类型与 `HostModel` 宿主中立模型词汇（原 `OpencodeModel`，HNI-10 于 2026-10-22 就地改名），不携带消息词汇、终端事件或物理 Host 能力。
 - `Host.Event.Envelope`（`host-event-envelope`）：只发布 raw Host envelope unwrap、event type、session identity 与 message-session identity 的唯一无状态公式；不得修改输入对象。
 - `Host.Message.Codec`（`host-message-codec`）：只发布 raw Host message part → `MessagePart` 的无状态 decode；其 bounded audience 只包含实际 message consumer。
-- `Host.Loop.Event.Codec`（`loop-event-codec`）：只发布 loop text-delta decode/query，并单向依赖 `Host.Event.Envelope`；不得获得完整 provider failure/terminal codec。
 - `Host.Fatal.Effect`（`host-fatal-effect`）：进程级 fatal fuse（`Foundation/FatalProcess`）的窄物理效果边界，不是纯合同；其 capability 注入、唯一物理实现与结算顺序遵守 HOST-BOUNDARY-029。
 - `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`）：封闭 Hook 策略元数据与因果诊断单向消费 Contract，不得反向侵入应用契约闭包。
 - `Host.Signal.Adapter`（`host-signal-adapter`）：宿主信号词汇 `HostSignal`、完整 provider failure/terminal `HostEventCodec`、信号路由（`HostSignalAdapter`）、物理订阅与事件总线适配器（`SharedTerminalBus`/`Events`）；按实际知识消费窄 codec contract，不向 message/loop consumer 输出自身完整闭包，也不编入工具注册实现。
@@ -123,7 +122,7 @@ Host subsystem 的公开 Contract、Runtime 与物理 Adapter 必须保持编译
 
 ## [027] Host codec 按语义与consumer cohort切片
 
-无状态`HostEventEnvelope`是raw Host envelope unwrap、event type与session/message-session identity读取的唯一公式；`HostEventCodec`与`LoopEventCodec`都必须消费该contract，禁止复制dynamic field parser。`HostMessageCodec`与`LoopEventCodec`分别形成独立bounded contract；前者只服务message consumer，后者只发布loop text-delta语义。`Host.Session.Runtime`不得为message codec引用完整signal adapter；loop runtime不得获得完整Host failure/terminal codec或diagnostics implementation；signal adapter不得反向引用diagnostics runtime。
+无状态`HostEventEnvelope`是raw Host envelope unwrap、event type与session/message-session identity读取的唯一公式；`HostEventCodec`必须消费该contract，禁止复制dynamic field parser。`HostMessageCodec`形成独立bounded contract，只服务message consumer。`Host.Session.Runtime`不得为message codec引用完整signal adapter；signal adapter不得反向引用diagnostics runtime。
 
 ## [028] signal subscription 与optional diagnostic 必须分型
 

@@ -53,6 +53,7 @@ type JsFailure =
     | InvalidReturnValue
     | ReadOnlyMutationRejected
     | ReviewOnly
+    | DraftWriteLocked
     | FileChanged of string
     | TransactionPrepareFailed
     | TransactionCommitFailed

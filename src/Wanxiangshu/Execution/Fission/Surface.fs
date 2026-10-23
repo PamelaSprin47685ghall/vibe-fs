@@ -276,7 +276,6 @@ module FissionSurface =
             | "running" -> FissionSettlementObservation.OngoingExecution
             | "needs-continuation" -> FissionSettlementObservation.NeedsContinuation
             | "provider-failed" -> FissionSettlementObservation.ProviderFailed
-            | "degeneration-interrupted" -> FissionSettlementObservation.DegenerationInterrupted
             | "external-abort" -> FissionSettlementObservation.ExternalAbort "external abort"
             | "completed" -> FissionSettlementObservation.Completed
             | _ -> invalidArg "observation" "unknown Fission settlement observation"

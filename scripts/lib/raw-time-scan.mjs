@@ -47,6 +47,7 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Execution/Delegation/Fork/OpenCode/ToolSurface.fs',
   'Execution/Delegation/SyncDelegate/Surface.fs',
   'Interaction/Dispatch/PhysicalAcceptance.fs',
+  'Omp/Adapter.fs',
   'OpenCode/Host/PairProgrammingThoughtSurface.fs',
   'OpenCode/Host/PluginHost.fs',
   'OpenCode/Tools/ToolRegistry.fs',
@@ -62,6 +63,8 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Repository/Investigation/Semble/Stdio.fs',
   'Repository/Programming/Js/OpenCode/BookkeeperTool.fs',
   'Repository/Programming/Js/OpenCode/ToolHost.fs',
+  'Repository/Programming/Js/ParkedSites.fs',
+  'Repository/Programming/Js/ToolsBindings.fs',
   'Repository/Programming/Js/ToolWorkflow.fs',
   'OpenCode/Host/PluginSessionScope.fs',
 ])

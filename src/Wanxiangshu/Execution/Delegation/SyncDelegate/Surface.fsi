@@ -28,11 +28,7 @@ module SyncDelegateSurface =
     /// calling process's already-isolated configuration.
     val createForProviderRecovery: directory: string -> owners: obj -> Task<obj>
 
-    val createForGuardRecovery: directory: string -> owners: obj -> Task<obj>
     val closeRecovery: value: obj -> Task
-    val closeGuardRecovery: value: obj -> Task
-    val observeGuardDelta: value: obj -> raw: obj -> unit
-    val awaitGuardInterrupt: value: obj -> session: string -> providerRun: string -> Task
 
     /// The session-control calls this harness's Host boundary received: every
     /// abort and interrupt, with the session it aimed at, the provider run it
@@ -47,9 +43,6 @@ module SyncDelegateSurface =
     /// session and provider run — the interrupt the delegate child received
     /// after its delivery.
     val awaitDeliveryInterrupt: value: obj -> session: string -> providerRun: string -> Task
-
-    val observeExactGuardAbort:
-        value: obj -> session: string -> physical: string -> authorityRoot: string -> providerRun: string -> Task
 
     val observeRepairTurn:
         value: obj ->

@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Planning
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Host
+open Wanxiangshu.Participant.Provider
 
 type DeliverResult =
     { Ok: bool
@@ -230,6 +231,39 @@ module PlanTools =
 
     let private deliveredMessage =
         "Delivered: the delivery is committed and this tenure is retired; control returns to the caller."
+
+    /// WHAT[work-023]/[038]: an eligible tenure's deliver performs the
+    /// promotion. S1→S2 and S2→S3 retire the tenure and open a fresh
+    /// successor at the new stage; the receipt names the new stage.
+    let private promotedStageMessage (root: string) (workId: string) (stage: string) =
+        let header =
+            sprintf
+                "Promoted: the plan advanced to stage %s; a fresh successor tenure now owns stage %s work."
+                stage
+                stage
+
+        match stage.ToUpperInvariant() with
+        | "S1"
+        | "S2"
+        | "S3" ->
+            let draftPath =
+                PlanPath.resolvePlanPath root workId
+                |> Result.defaultValue (root + "/plan/" + workId + "/plan.md")
+
+            let stageMethod =
+                ProviderProse.render
+                    (ProviderLanguageBinding.readGlobalPreference ())
+                    ("planning/" + stage.ToLowerInvariant())
+                    (Map.ofList [ "draft_path", draftPath ])
+
+            header + "\n\n" + stageMethod
+        | _ -> header
+
+    /// WHAT[work-023]/[038]: the S3 tenure's deliver grants the delivery
+    /// right. The tenure stays active; its next deliver reserves the post-S3
+    /// execution handoff.
+    let private authorizedMessage =
+        "Authorized: this tenure now holds the delivery right; deliver again to reserve the post-S3 execution handoff."
 
     /// The execution was accepted, but live resources still hold the Plan
     /// tenure. The execution is not undone by that blockage, so the receipt is
@@ -514,6 +548,39 @@ module PlanTools =
                         else
                             reason
                     )
+            elif receipt.Kind = "Promoted" then
+                // WHAT[work-023]/[038]: an eligible S1 or S2 tenure's deliver
+                // retired it and opened a fresh successor at the new stage.
+                // Rebind the active tenure to the successor.
+                let stage = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "stage"
+
+                return
+                    Ok
+                        { Ok = true
+                          Relayed = true
+                          Delivered = false
+                          RetiredIncumbencyId = retiredIncumbencyOf receipt
+                          RetirementOutcome = "Promoted"
+                          Digest = ""
+                          Path = ""
+                          ExecSessionId = ""
+                          NextIncumbencyId = relaySuccessorOf receipt
+                          Message = promotedStageMessage root workId stage }
+            elif receipt.Kind = "Authorized" then
+                // WHAT[work-023]/[038]: the S3 tenure's deliver grants the
+                // delivery right; the same tenure stays active at S3.
+                return
+                    Ok
+                        { Ok = true
+                          Relayed = false
+                          Delivered = false
+                          RetiredIncumbencyId = ""
+                          RetirementOutcome = "Authorized"
+                          Digest = ""
+                          Path = ""
+                          ExecSessionId = ""
+                          NextIncumbencyId = ""
+                          Message = authorizedMessage }
             elif receipt.Kind = "Blocked" then
                 return
                     Ok
@@ -599,6 +666,7 @@ module PlanTools =
 
     let private settlePostS3Transition
         (gitCommonDir: string)
+        (root: string)
         (workId: string)
         (retirementBlockers: unit -> string array)
         (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
@@ -640,6 +708,32 @@ module PlanTools =
 
         elif receipt.Kind = "ReviewRequired" then
             Error "assessment required"
+        elif receipt.Kind = "Promoted" then
+            let stage = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "stage"
+
+            Ok
+                { Ok = true
+                  Relayed = true
+                  Delivered = false
+                  RetiredIncumbencyId = retiredIncumbencyOf receipt
+                  RetirementOutcome = "Promoted"
+                  Digest = ""
+                  Path = ""
+                  ExecSessionId = ""
+                  NextIncumbencyId = relaySuccessorOf receipt
+                  Message = promotedStageMessage root workId stage }
+        elif receipt.Kind = "Authorized" then
+            Ok
+                { Ok = true
+                  Relayed = false
+                  Delivered = false
+                  RetiredIncumbencyId = ""
+                  RetirementOutcome = "Authorized"
+                  Digest = ""
+                  Path = ""
+                  ExecSessionId = ""
+                  NextIncumbencyId = ""
+                  Message = authorizedMessage }
         elif receipt.Kind = "Blocked" then
             Ok
                 { Ok = true
@@ -700,10 +794,11 @@ module PlanTools =
             let receipt =
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
 
-            settlePostS3Transition gitCommonDir workId retirementBlockers receipt
+            settlePostS3Transition gitCommonDir root workId retirementBlockers receipt
 
     let private executePostS3RelayOrBlocked
         (gitCommonDir: string)
+        (root: string)
         (workId: string)
         (incumbencyId: string)
         (providerRunId: string)
@@ -727,7 +822,7 @@ module PlanTools =
         let receipt =
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
 
-        settlePostS3Transition gitCommonDir workId retirementBlockers receipt
+        settlePostS3Transition gitCommonDir root workId retirementBlockers receipt
 
     let private executePostS3ForWork
         (gitCommonDir: string)
@@ -756,6 +851,7 @@ module PlanTools =
         else
             executePostS3RelayOrBlocked
                 gitCommonDir
+                root
                 workId
                 incumbencyId
                 providerRunId
@@ -1038,6 +1134,51 @@ module PlanTools =
                 return! startPendingDelivery gitCommonDir root workId createSession promptSession discardSession
         }
 
+    let private authorizeAndDeliverReopenedPostS3
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (retirementBlockers: unit -> string array)
+        (createSession: string -> string -> Task<Result<string, string>>)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        (retirementCursor: int64)
+        (activeId: string)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            let authCmd =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "Deliver"
+                    [ "incumbencyId", box activeId
+                      "providerRunId", box (providerRunId + "-auth")
+                      "toolCallId", box (toolCallId + "-auth")
+                      "cursor", box (float retirementCursor)
+                      "blockers", box ([||]: string array)
+                      "nextOwnerId", box "owner" ]
+
+            let authReceipt =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId (activeId + ":auth") authCmd
+
+            if authReceipt.Status <> "Committed" && authReceipt.Status <> "Replayed" then
+                return Error(receiptRefusal authReceipt)
+            else
+                return!
+                    executeDeliver
+                        gitCommonDir
+                        root
+                        workId
+                        activeId
+                        providerRunId
+                        toolCallId
+                        retirementBlockers
+                        createSession
+                        promptSession
+                        discardSession
+                        retirementCursor
+        }
+
     let private reviewAndDeliverReopenedPostS3
         (gitCommonDir: string)
         (root: string)
@@ -1057,7 +1198,7 @@ module PlanTools =
                     "Review"
                     [ "incumbencyId", box activeId
                       "reviewerId", box "plan-reviewer"
-                      "findings", box ([||]: string array) ]
+                      "updates", box ([||]: obj array) ]
 
             let reviewed =
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
@@ -1070,11 +1211,10 @@ module PlanTools =
                 return Error(receiptRefusal reviewed)
             else
                 return!
-                    executeDeliver
+                    authorizeAndDeliverReopenedPostS3
                         gitCommonDir
                         root
                         workId
-                        activeId
                         providerRunId
                         toolCallId
                         retirementBlockers
@@ -1082,6 +1222,7 @@ module PlanTools =
                         promptSession
                         discardSession
                         retirementCursor
+                        activeId
         }
 
     let private reopenPostS3ActiveId
@@ -1493,27 +1634,3 @@ module PlanTools =
         match validated with
         | Error err -> Task.FromResult(Error err)
         | Ok work -> beginPendingAsk gitCommonDir workId (Option.defaultValue "" work.ActiveId) intent delegateTo
-
-    let executeJsPlan
-        (root: string)
-        (workId: string)
-        (action: string)
-        (content: string option)
-        (patches: (string * string) list option)
-        : Result<string, string> =
-        match action.ToLowerInvariant() with
-        | "read"
-        | "js-plan.read" -> PlanPath.readPlan root workId
-        | "rewrite"
-        | "js-plan.rewrite" ->
-            content
-            |> requireOpt "Missing content for rewrite"
-            |> Result.bind (PlanPath.rewritePlanAtomic root workId)
-            |> Result.map (fun (path, digest) -> sprintf "Plan rewritten at %s (digest: %s)" path digest)
-        | "edit"
-        | "js-plan.edit" ->
-            patches
-            |> requireOpt "Missing patches for edit"
-            |> Result.bind (PlanPath.editPlanAtomic root workId)
-            |> Result.map (fun (path, digest) -> sprintf "Plan edited at %s (digest: %s)" path digest)
-        | _ -> Error(sprintf "Unknown js-plan action: %s" action)

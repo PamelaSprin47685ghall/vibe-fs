@@ -34,19 +34,26 @@ module ProviderSystemTransform =
 
     let private planStagePaths = [ "planning/s1"; "planning/s2"; "planning/s3" ]
 
-    let private planStageGuidanceFor (lang: ProviderLanguage) (stagePath: string) =
-        ProviderProse.render lang stagePath Map.empty
+    let private planStageGuidanceFor (lang: ProviderLanguage) (stagePath: string) (substitutions: Map<string, string>) =
+        ProviderProse.render lang stagePath substitutions
 
-    let private applyPlanStageGuidance (lang: ProviderLanguage) (currentSystem: string array) (stagePath: string) =
+    let private applyPlanStageGuidance
+        (lang: ProviderLanguage)
+        (currentSystem: string array)
+        (stagePath: string)
+        (draftPath: string)
+        =
         let expected =
             [ for path in planStagePaths do
                   for stageLang in [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ] do
-                      canonical (planStageGuidanceFor stageLang path) ]
+                      canonical (planStageGuidanceFor stageLang path Map.empty) ]
 
         let isStageLine (text: string) =
             expected |> List.contains (canonical text)
 
-        let nextGuidance = planStageGuidanceFor lang stagePath
+        let nextGuidance =
+            planStageGuidanceFor lang stagePath (Map.ofList [ "draft_path", draftPath ])
+
         let hasStageLine = currentSystem |> Array.exists isStageLine
 
         // Same stage + same language replays the same bytes in place
@@ -187,7 +194,7 @@ module ProviderSystemTransform =
 
     let private transformSystem
         (role: SessionId -> Role option)
-        (planStage: SessionId -> Task<string option>)
+        (planStage: SessionId -> Task<(string * string) option>)
         sessionText
         system
         : Task<unit> =
@@ -201,13 +208,13 @@ module ProviderSystemTransform =
                 replaceRoleSystem role sid lang system
 
             match! planStage sid with
-            | Some stagePath -> applyPlanStageGuidance lang system stagePath
+            | Some(stagePath, draftPath) -> applyPlanStageGuidance lang system stagePath draftPath
             | None -> ()
         }
 
     let createWith
         (role: SessionId -> Role option)
-        (planStage: SessionId -> Task<string option>)
+        (planStage: SessionId -> Task<(string * string) option>)
         : obj -> obj -> Task<unit> =
         fun input output ->
             task {

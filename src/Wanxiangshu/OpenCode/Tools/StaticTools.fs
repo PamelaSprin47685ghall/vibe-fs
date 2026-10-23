@@ -51,10 +51,10 @@ module StaticTools =
     /// fully retired. `devops` left the catalog with its ToolSpec: the host
     /// devops tool is fully retired, and the verb survives only as a
     /// programming-surface member (this.devops) projected by `Capability.fs`.
-    /// `fork` / `resume` / `commission` stay in the catalog because their
-    /// ToolSpec constructors are retained — they are no longer registered as
-    /// host provider tools (the delegation line runs on the programming
-    /// surface), yet every ToolSpec owner name must appear here
+    /// `fork` / `resume` / `commission` / `review` stay in the catalog because
+    /// their ToolSpec constructors are retained — they are no longer registered
+    /// as host provider tools (the delegation and review lines run on the
+    /// programming surface), yet every ToolSpec owner name must appear here
     /// (tool-referential-integrity). Their permission entries are therefore
     /// harmless: they match no registered tool.
     let knownToolNames =

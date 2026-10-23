@@ -46,7 +46,7 @@ const sendWithRegistration = (path, port, handle, context, onAccepted, attachReg
     )
   : dispatchObserved.sendContinuationWithAcceptanceRegistration(
       port, handle, context.session, 'attach continuation acceptance before Host effect',
-      'DegenerationGuard', context.profile, 'Detached', onAccepted, attachRegistration,
+      'ManagerGuard', context.profile, 'Detached', onAccepted, attachRegistration,
     )
 
 test('WHAT[dispatch-protocol-007] accepting another real root preserves an earlier native Unknown root claim through cold reopen', async () => {
@@ -130,17 +130,17 @@ test('WHAT[dispatch-protocol-007] the pure authority owner preserves an unlanded
     'establishing B cannot classify A logicalRun=None as a closed prior run')
   assertObserved.equal(authorityObserved.nextClaimSequence(firstScope, state), 2)
 
-  const continuationOrigin = authorityObserved.originForContinuation('DegenerationGuard')
+  const continuationOrigin = authorityObserved.originForContinuation('ManagerGuard')
   const continuationScope = authorityObserved.claimScopeDigest(session, root.logicalRun, continuationOrigin, 'B-continuation')
   const landedKey = authorityObserved.derivePromptKey(hash, session, root.logicalRun, root.authorityRoot,
     continuationOrigin, 'B-continuation', 1)
   const pendingKey = authorityObserved.derivePromptKey(hash, session, root.logicalRun, root.authorityRoot,
     continuationOrigin, 'B-continuation', 2)
   state = authorityObserved.registerClaim(
-    authorityObserved.claimContinuation(landedKey, session, 'DegenerationGuard', root, 'B-continuation'), state)
+    authorityObserved.claimContinuation(landedKey, session, 'ManagerGuard', root, 'B-continuation'), state)
   state = authorityObserved.acceptClaim(landedKey, 'pure-physical-B-continuation', state)
   state = authorityObserved.registerClaim(
-    authorityObserved.claimContinuation(pendingKey, session, 'DegenerationGuard', root, 'B-continuation'), state)
+    authorityObserved.claimContinuation(pendingKey, session, 'ManagerGuard', root, 'B-continuation'), state)
   assertObserved.equal(authorityObserved.nextClaimSequence(continuationScope, state), 3)
   assertObserved.equal(authorityObserved.resolveKnownOrigin('pure-physical-B-continuation', landedKey, false, state), 'Continuation')
 
@@ -296,7 +296,7 @@ for (const path of ['root', 'continuation']) {
           )
         : await dispatchObserved.sendContinuationWithAcceptance(
             port, handle, context.session, 'Await unknown successor keeps independent waiter',
-            'DegenerationGuard', context.profile, 'Await', physical => seen.push(physical),
+            'ManagerGuard', context.profile, 'Await', physical => seen.push(physical),
             registration => ownAcceptanceRegistration(handle, registration),
           )
       assertObserved.equal(sent.ok, false)

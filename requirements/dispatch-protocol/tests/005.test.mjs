@@ -96,7 +96,7 @@ test('WHAT[dispatch-protocol-005] DP_005_prompt_key_is_deterministic_and_moves_w
     session: { ...base, session: 'ses_b' },
     run: { ...base, run: 'another-logical-run' },
     authorityRootId: { ...base, authorityRootId: 'another-authority-root' },
-    origin: { ...base, origin: promptOrigin('DegenerationGuard') },
+    origin: { ...base, origin: promptOrigin('BusyAgentNudge') },
     payload: { ...base, payload: 'pd-2' },
     sequence: { ...base, sequence: 2 },
   }

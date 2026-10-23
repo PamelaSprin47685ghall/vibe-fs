@@ -314,8 +314,6 @@ Host/Contract/CompactionPolicySurface.fsi
 Host/Contract/CompactionPolicySurface.fs
 Interaction/Dispatch/Nudge.fsi
 Interaction/Dispatch/Nudge.fs
-Execution/Session/LoopDetector.fsi
-Execution/Session/LoopDetector.fs
 Execution/Delegation/Fork/Payload.fsi
 Execution/Delegation/Fork/Payload.fs
 
@@ -403,10 +401,8 @@ Mission/Planning/PlanPath.fsi
 Mission/Planning/PlanPath.fs
 Mission/Planning/PlanWorkOpen.fsi
 Mission/Planning/PlanWorkOpen.fs
-Mission/Planning/PlanTools.fsi
-Mission/Planning/PlanTools.fs
-Mission/Planning/ReviewPlanBackend.fsi
-Mission/Planning/ReviewPlanBackend.fs
+Mission/Planning/PlanKernelSeam.fsi
+Mission/Planning/PlanKernelSeam.fs
 Persistence/EventStore/RetentionSurface.fsi
 Persistence/EventStore/RetentionSurface.fs
 Participant/Persona/ManagedAgent.fsi
@@ -769,6 +765,10 @@ OpenCode/Codec/ProviderWireCapture.fsi
 OpenCode/Codec/ProviderWireCapture.fs
 OpenCode/Codec/ProjectionMessageEdit.fsi
 OpenCode/Codec/ProjectionMessageEdit.fs
+Mission/Planning/PlanTools.fsi
+Mission/Planning/PlanTools.fs
+Mission/Planning/ReviewPlanBackend.fsi
+Mission/Planning/ReviewPlanBackend.fs
 Mission/Planning/Surface.fsi
 Mission/Planning/Surface.fs
 Participant/Provider/Projection/Surface.fsi
@@ -811,10 +811,6 @@ Execution/Session/ChatExecution/ProviderObservation.fsi
 Execution/Session/ChatExecution/ProviderObservation.fs
 OpenCode/Codec/HostEventCodec.fsi
 OpenCode/Codec/HostEventCodec.fs
-OpenCode/Codec/LoopEventCodec.fsi
-OpenCode/Codec/LoopEventCodec.fs
-Execution/Session/LoopDetectorSurface.fsi
-Execution/Session/LoopDetectorSurface.fs
 OpenCode/Codec/HostMessageCodec.fsi
 OpenCode/Codec/HostMessageCodec.fs
 OpenCode/Signals/HostSignalAdapter.fsi
@@ -981,10 +977,6 @@ Execution/Delegation/Fork/Host/Pty.fsi
 Execution/Delegation/Fork/Host/Pty.fs
 Interaction/Repair/Port.fsi
 Interaction/Repair/Port.fs
-Execution/Session/LoopSensor.fsi
-Execution/Session/LoopSensor.fs
-OpenCode/Host/LoopSensorSurface.fsi
-OpenCode/Host/LoopSensorSurface.fs
 OpenCode/Host/MessageVisibility.fsi
 OpenCode/Host/MessageVisibility.fs
 OpenCode/Host/MessageVisibilitySurface.fsi

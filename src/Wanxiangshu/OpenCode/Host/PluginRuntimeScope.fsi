@@ -1,6 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Foundation.HostSession
 open Wanxiangshu.Foundation.TerminalSignal
 
 open System
@@ -58,15 +57,11 @@ type PluginRuntimeScope =
 
     member SyncDelegateRuntime: SyncDelegateRuntime option
 
-    member AttachLoopSensor: sensor: ILoopSensor -> unit
-
     member AttachMessageVisibility: hub: MessageVisibilityHub -> unit
 
     /// None until the signal stack wires the hub; the catch-up re-read then
     /// falls back to its bounded immediate form.
     member MessageVisibility: MessageVisibilityHub option
-
-    member LoopSensor: ILoopSensor
 
     /// Current-process join admission only; no cross-process tool recovery.
     member RequireCurrentProcessJoin: root: SessionId -> Task<FamilyRecovery>

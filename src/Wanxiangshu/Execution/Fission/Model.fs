@@ -171,7 +171,6 @@ type FissionSettlementObservation =
     | OngoingExecution
     | NeedsContinuation
     | ProviderFailed
-    | DegenerationInterrupted
     | ExternalAbort of string
     | Completed
 
@@ -198,7 +197,6 @@ module FissionSettlement =
             | FissionSettlementObservation.OngoingExecution -> "OngoingExecution", ""
             | FissionSettlementObservation.NeedsContinuation -> "NeedsContinuation", ""
             | FissionSettlementObservation.ProviderFailed -> "ProviderFailed", ""
-            | FissionSettlementObservation.DegenerationInterrupted -> "DegenerationInterrupted", ""
             | FissionSettlementObservation.ExternalAbort reason -> "ExternalAbort", reason
             | FissionSettlementObservation.Completed -> "Completed", ""
 

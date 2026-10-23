@@ -12,7 +12,6 @@ type PromptContinuationKind =
     | HumanMessage
     | ManagedDelegationAssignment
     | ProviderRetryAttempt
-    | DegenerationGuard
     | FissionHandoff
 
 type PromptOrigin =

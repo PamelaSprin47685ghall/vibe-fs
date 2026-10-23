@@ -26,6 +26,30 @@ registerSupervisedToolReclamationTests()
 registerNormalExitResidualTest()
 registerOwnedToolTests()
 
+test('WHAT[verification-system-006] gate fact writer identities remain legal across PID digit boundaries', async () => {
+  const { gateFactWriterId } = await import('./integration/harness/event-store-gate-facts.mjs')
+  const eventStore = await import('../../../dist/Persistence/EventStore/Surface.js')
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-fact-writer-identity-'))
+  const pids = [1, 999, 1000, 4242, 9999, 10000, 4194304]
+  try {
+    assert.equal(new Set(pids.map(gateFactWriterId)).size, pids.length)
+    for (const pid of pids) {
+      const store = eventStore.create(directory, gateFactWriterId(pid))
+      try {
+        assert.deepEqual(eventStore.heads(store, 'absent-stream'), [])
+      } finally {
+        eventStore.dispose(store)
+      }
+    }
+    for (const pid of [1000, 4242, 9999]) {
+      assert.throws(() => eventStore.create(directory, `verification-gate-${pid}`),
+        /WriterId must not end with a hyphen and four digits/)
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[verification-system-006] event safety ceilings validate input and count actual non-heartbeat events', () => {
   assert.deepEqual(normalizeEventCeilings({}), {})
   assert.deepEqual(normalizeEventCeilings({ maxJournalEvents: 12, maxSseEvents: 34 }),

@@ -256,7 +256,7 @@ parked 载荷的 `source` 字段携带完整程序与执行点标记（[037]）�
 
 ## [050] js.call：一条命令
 
-Exec capability 投影 `this.call(command, timeoutOrOptions)`。`command` 是一条 shell 字符串。可选的 `timeoutOrOptions` 显式指定超时时限（毫秒数值或 `{ timeoutMs }` 对象），缺省时使用统一稳定默认时限（10000ms）。文本长度不计价等待时限。缺 command、函数或类参数以 `CALL_COMMAND_UNSUPPORTED` 失败；合法的无 planB 命令正常完成。工具参数不带超时或 planB。
+Exec capability 投影 `this.call(command, planB)`。`command` 是一条 shell 字符串。`planB` 必填，是不跑这条命令时的替代方案，UTF-8 字节数 × 50ms 是这次 call 的自动 yield 时限。缺 planB、空字符串、函数或类参数以 `CALL_COMMAND_UNSUPPORTED` 失败。工具参数不带 planB。
 
 成功结局是 `{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }`。`stdout` 与 `stderr` 是上一次自动 park 的 `delta` 之后的新输出。等待就是 `await this.call(command)`。宿主未注入时以 `CALL_HOST_UNAVAILABLE` 失败。
 

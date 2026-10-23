@@ -963,42 +963,44 @@ module Adapter =
               "loadMode", box "essential"
               "parameters", box (parseJson (jsonSchemaOf spec.Schema))
               "execute",
-              box (fun (callId: obj) (arguments: obj) (signal: obj) (onUpdate: obj) (toolCtx: obj) ->
-                  let ctx = orNull toolCtx
-                  let sid = ctxSessionId ctx
-                  let workspace = WorkspacePath(ctxCwd ctx)
-                  let args = CanonicalJsonText(if isNull arguments then "{}" else stringify arguments)
+              box (
+                  Func<obj, obj, obj, obj, obj, obj>(fun callId arguments signal onUpdate toolCtx ->
+                      let ctx = orNull toolCtx
+                      let sid = ctxSessionId ctx
+                      let workspace = WorkspacePath(ctxCwd ctx)
+                      let args = CanonicalJsonText(if isNull arguments then "{}" else stringify arguments)
 
-                  let progress =
-                      match orNull onUpdate with
-                      | null -> None
-                      | update ->
-                          Some(fun line ->
-                              call1
-                                  update
-                                  (createObj
-                                      [ "content", box [| createObj [ "type", box "text"; "text", box line ] |]
-                                        "details", box null ])
-                              |> ignore)
+                      let progress =
+                          match orNull onUpdate with
+                          | null -> None
+                          | update ->
+                              Some(fun line ->
+                                  call1
+                                      update
+                                      (createObj
+                                          [ "content", box [| createObj [ "type", box "text"; "text", box line ] |]
+                                            "details", box null ])
+                                  |> ignore)
 
-                  let invocation =
-                      { Session = SessionId.create sid
-                        CallId = ToolCallId.create (stringOf callId)
-                        // omp's tool context carries no provider-run
-                        // identity for the call, so the invocation carries
-                        // none: the evidence is absent, never inferred from
-                        // the session's current binding.
-                        ProviderRun = None
-                        Workspace = workspace
-                        Args = args
-                        Cancellation = cancellationOf (orNull signal)
-                        Progress = progress }
+                      let invocation =
+                          { Session = SessionId.create sid
+                            CallId = ToolCallId.create (stringOf callId)
+                            // omp's tool context carries no provider-run
+                            // identity for the call, so the invocation carries
+                            // none: the evidence is absent, never inferred from
+                            // the session's current binding.
+                            ProviderRun = None
+                            Workspace = workspace
+                            Args = args
+                            Cancellation = cancellationOf (orNull signal)
+                            Progress = progress }
 
-                  task {
-                      let! outcome = spec.Execute invocation
-                      return toolOutcome outcome
-                  }
-                  |> unbox<obj>) ]
+                      task {
+                          let! outcome = spec.Execute invocation
+                          return toolOutcome outcome
+                      }
+                      |> unbox<obj>)
+              ) ]
 
     /// Register product tools with omp. The port is synchronous: the omp
     /// registration itself never awaits, so the outcome is known inline.
@@ -1047,6 +1049,7 @@ module Adapter =
     let private createOmpHostPorts
         (pi: obj)
         (agents: AgentRoleSpec list)
+        (workspace: string)
         (stateRoot: string)
         : HostPorts * (HostSignal -> Task<unit>) =
         let listeners = ResizeArray<HostSignal -> Task>()
@@ -1115,8 +1118,8 @@ module Adapter =
                 // `<worktree>/.Herdchestra`. The adapter must not fall back
                 // to the worktree when it cannot be resolved.
                 member _.StateRoot = WorkspacePath(stateRoot)
-                member _.ProjectRoot = WorkspacePath(stateRoot)
-                member _.ProjectId = stateRoot }
+                member _.ProjectRoot = WorkspacePath(workspace)
+                member _.ProjectId = workspace }
 
         let diagnostics: IDiagnosticSink =
             { new IDiagnosticSink with
@@ -1640,9 +1643,10 @@ module Adapter =
 
         let activate (ctx: obj) : Task<unit> =
             task {
-                let! stateRoot = RuntimePath.forWorkspace (ctxCwd ctx)
+                let workspace = ctxCwd ctx
+                let! stateRoot = RuntimePath.stateRoot workspace
 
-                let ports, emit = createOmpHostPorts pi agents stateRoot
+                let ports, emit = createOmpHostPorts pi agents workspace stateRoot
                 let! outcome = guardTask (fun () -> plugin.Activate ports)
 
                 match outcome with

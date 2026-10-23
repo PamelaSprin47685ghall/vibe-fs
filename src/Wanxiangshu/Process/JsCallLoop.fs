@@ -41,6 +41,12 @@ module JsCallLoop =
     [<Emit("try { process.kill(-$0.pid, $1); } catch (error) { try { $0.kill($1); } catch (fallback) {} }")>]
     let private killChildGroup (child: obj) (signal: string) : unit = jsNative
 
+    let private normalizePayload (text: string) : string =
+        if text = "" || text.EndsWith "\n" then
+            text
+        else
+            text + "\n"
+
     [<Emit("try { if ($0.stdout) { $0.stdout.destroy(); } } catch (error) {} try { if ($0.stderr) { $0.stderr.destroy(); } } catch (error) {}")>]
     let private releaseChildStreams (child: obj) : unit = jsNative
 
@@ -294,17 +300,16 @@ module JsCallLoop =
         member _.SignalParked(signal: obj) : Task<obj> =
             let key = if isNull parkedTicket then "" else parkedTicket
 
+            let signalText =
+                if isString signal && string signal <> "" then
+                    string signal
+                else
+                    "SIGTERM"
+
             match children.TryGetValue key with
-            | false, _ ->
-                Task.FromResult(failure "CALL_CHILD_UNKNOWN" "signal needs the call that parked this program")
+            | false, _ -> Task.FromResult(failure "CALL_CHILD_UNKNOWN" "signal needs the call that parked this program")
             | true, managed ->
                 task {
-                    let signalText =
-                        if isString signal && string signal <> "" then
-                            string signal
-                        else
-                            "SIGTERM"
-
                     killManaged managed signalText
                     return outcome "signalled" None "" "" false 0 0L
                 }
@@ -312,18 +317,12 @@ module JsCallLoop =
         member _.SendParked(input: obj) : Task<obj> =
             task {
                 let key = if isNull parkedTicket then "" else parkedTicket
+                let text = if isNullish input then "" else string input
+                let payload = normalizePayload text
 
                 match children.TryGetValue key with
                 | false, _ -> return failure "CALL_CHILD_UNKNOWN" "send needs the call that parked this program"
                 | true, managed ->
-                    let text = if isNullish input then "" else string input
-
-                    let payload =
-                        if text = "" || text.EndsWith "\n" then
-                            text
-                        else
-                            text + "\n"
-
                     writeChildStdin managed.Child payload
                     return outcome "sent" None "" "" false 0 0L
             }
@@ -337,6 +336,4 @@ module JsCallLoop =
                 stdout.Add(entry.SliceStdout.Take())
                 stderr.Add(entry.SliceStderr.Take())
 
-            createObj
-                [ "stdout" ==> String.concat "" stdout
-                  "stderr" ==> String.concat "" stderr ]
+            createObj [ "stdout" ==> String.concat "" stdout; "stderr" ==> String.concat "" stderr ]

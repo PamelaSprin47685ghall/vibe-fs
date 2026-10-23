@@ -6,7 +6,6 @@ import * as events from '../../../dist/OpenCode/Host/EventsSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import { withSyncRuntime } from './support/sync-runtime.mjs'
 import { runRecoveryProcess } from './support/recovery-process.mjs'
-import { runGuardRecoveryProcess } from './support/guard-recovery-process.mjs'
 import { runRepairRecoveryProcess } from './support/repair-recovery-process.mjs'
 
 // The delivered view is the settlement: a terminal that carries no fenced
@@ -34,12 +33,6 @@ test('WHAT[delegation-025] an invocation completes from its own genuinely accept
 for (const scenario of ['old-retry', 'fallback-old-retry', 'late-retry', 'fallback-late-retry']) {
   test(`WHAT[delegation-025] ${scenario} cannot deliver an earlier genuinely accepted retry to a reused same-root invocation`, async t => {
     await runRecoveryProcess(scenario, t.signal, message => t.diagnostic(message))
-  })
-}
-
-for (const scenario of ['own-guard', 'old-guard', 'fallback-old-guard', 'late-guard', 'fallback-late-guard']) {
-  test(`WHAT[delegation-025] production ${scenario} preserves invocation-owned accepted successors`, async t => {
-    await runGuardRecoveryProcess(scenario, t.signal, message => t.diagnostic(message))
   })
 }
 

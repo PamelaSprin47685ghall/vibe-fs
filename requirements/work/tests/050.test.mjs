@@ -79,8 +79,11 @@ test('WHAT[work-050] this.ask in an S1 plan program records the question and par
 test('WHAT[work-050] this.ask outside S1 is refused with ASK_REFUSED', async () => {
   await withPlanSession(async ({ hooks, runtime, session }) => {
     const store = workspaceEventStoreSurface.acquire(await journalSurface.JournalSurface_initializeStateRoot(runtime.directory))
-    const promoted = await lifecycleSurface.seedReviewAs(store, session, 'Promoted', 'reviewer')
-    assert.equal(promoted.reviewed, true, 'the S1 tenure is promoted into S2')
+    const reviewed = await lifecycleSurface.seedReviewAs(store, session, 'Promoted', 'reviewer')
+    assert.equal(reviewed.reviewed, true, 'the S1 tenure gains promotion eligibility')
+    const advanced = await lifecycleSurface.seedDeliver(store, session, 'run-promote', 'call-promote', 1n)
+    assert.equal(advanced.ok, true, advanced.error)
+    assert.equal(advanced.decision, 'Promoted', 'deliver performs the S1 -> S2 promotion')
     runtime.client.tui = { showToast: async () => ({}) }
 
     const output = await hooks.tool['todowrite-for-plan'].execute(

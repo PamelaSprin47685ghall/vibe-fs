@@ -26,7 +26,8 @@ module JsToolSpec =
     /// `modelSourceProvider` supplies the model program (the tool arguments);
     /// the first version reads it from the Host arguments payload.
     let private createCore
-        (reviewCheck: (HostToolContext -> Task<bool>) option)
+        (readCheck: (HostToolContext -> Task<bool>) option)
+        (writeCheck: (HostToolContext -> bool) option)
         (factory: HostToolFactory)
         (surface: JsSurface)
         (workspaceRoot: string)
@@ -36,8 +37,8 @@ module JsToolSpec =
         (rootOf: string -> string)
         (settlementOf: HostToolContext -> Task<DeliverySettlement option>)
         : ToolSpec =
-        let reviewCheck =
-            match reviewCheck with
+        let readCheck =
+            match readCheck with
             | None when surface.RoleName.Trim().ToLowerInvariant() = "manager" -> Some(fun _ -> Task.FromResult false)
             | configured -> configured
 
@@ -88,7 +89,12 @@ module JsToolSpec =
                 | Some abandonValue -> Some("abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ])
                 | None -> None
 
-            [ programEntry; nameEntry; unparkEntry; abandonEntry ]
+            let planBEntry =
+                match args.OptionalText "planB" with
+                | Some planB -> Some("planB" ==> box planB)
+                | None -> None
+
+            [ programEntry; nameEntry; planBEntry; unparkEntry; abandonEntry ]
             |> List.choose id
             |> createObj
 
@@ -121,7 +127,7 @@ module JsToolSpec =
         let settlementFor (ctx: HostToolContext) fence : DeliverySettlement option =
             match fence with
             | None -> None
-            | Some _ -> Some (DeliverySettlement.DeferredDelivery (fun () -> settlementOf ctx))
+            | Some _ -> Some(DeliverySettlement.DeferredDelivery(fun () -> settlementOf ctx))
 
         let runProgramCall (ctx: HostToolContext) (input: obj) (declaration: obj) =
             task {
@@ -141,10 +147,18 @@ module JsToolSpec =
 
                 let settlement = settlementFor ctx fence
 
+                let reviewGates =
+                    if readCheck.IsNone && writeCheck.IsNone then
+                        None
+                    else
+                        Some
+                            { ReadGate = readCheck |> Option.map (fun check -> fun () -> check ctx)
+                              WriteGate = writeCheck |> Option.map (fun check -> fun () -> check ctx) }
+
                 // Without a settlement this is exactly executeWithReviewCheck.
                 let! outcome =
                     JsToolWorkflow.executeWithReviewCheckAndDelivery
-                        (reviewCheck |> Option.map (fun check -> fun () -> check ctx))
+                        reviewGates
                         settlement
                         ctx.SessionId
                         fence
@@ -198,6 +212,7 @@ module JsToolSpec =
           Arguments =
             [ "program", ToolHostCodec.optionalStringSchemaDescribed (JsToolPolicy.argProgramProse ()) factory
               "name", ToolHostCodec.optionalStringSchemaDescribed (JsToolPolicy.argNameProse ()) factory
+              "planB", ToolHostCodec.optionalStringSchema factory
               "unpark", unparkSchema
               "abandon", abandonSchema
               "prefixCount", ToolHostCodec.optionalNumberSchema factory
@@ -207,15 +222,24 @@ module JsToolSpec =
                 task {
                     let input =
                         let raw = inputOf args
-                        if not (isNull raw) && not (isNull raw?program) && (isNull raw?name || string raw?name = "") then
+
+                        if
+                            not (isNull raw)
+                            && not (isNull raw?program)
+                            && (isNull raw?name || string raw?name = "")
+                        then
                             let defaultName =
                                 ctx.ToolCallId
                                 |> Option.map ToolCallId.value
-                                |> Option.orElseWith (fun () -> ctx.ProviderRunId |> Option.map ProviderRunIdentity.value)
+                                |> Option.orElseWith (fun () ->
+                                    ctx.ProviderRunId |> Option.map ProviderRunIdentity.value)
                                 |> Option.defaultValue ("call-" + ctx.SessionId)
+
                             createObj
                                 [ "program" ==> raw?program
-                                  "name" ==> defaultName ]
+                                  "name" ==> defaultName
+                                  if isPresent raw?planB then
+                                      "planB" ==> raw?planB ]
                         else
                             raw
 
@@ -244,6 +268,7 @@ module JsToolSpec =
         =
         createCore
             None
+            None
             factory
             surface
             workspaceRoot
@@ -265,6 +290,30 @@ module JsToolSpec =
         settlementOf
         =
         createCore
+            (Some check)
+            None
+            factory
+            surface
+            workspaceRoot
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+            rootOf
+            settlementOf
+
+    let createWithPlanWriteCheck
+        check
+        factory
+        surface
+        workspaceRoot
+        persistence
+        lifecyclePersistence
+        fileAccessObservation
+        rootOf
+        settlementOf
+        =
+        createCore
+            None
             (Some check)
             factory
             surface

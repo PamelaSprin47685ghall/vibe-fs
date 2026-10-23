@@ -18,7 +18,7 @@ type XTraceTerminalCompletion =
 
 /// Physical terminal materialisation: ReconciledTurn → AgentRunResult →
 /// XTrace capture → NotifyTerminal. No Fallback / Manager /
-/// lifecycle / JoinGuard / IdleRepair / LoopSensor.
+/// lifecycle / JoinGuard / IdleRepair.
 module TerminalReporter =
 
     /// Runs the durable-terminal capture through the port, or yields the deterministic

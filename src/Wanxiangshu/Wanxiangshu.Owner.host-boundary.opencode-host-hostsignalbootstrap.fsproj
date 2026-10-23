@@ -25,7 +25,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-root-workspace-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.loop-event-codec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-signal-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-fissionhostsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
@@ -47,7 +46,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
 
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.degeneration-guard.execution-session-loopdetector.fsproj"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fsi"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>
   </ItemGroup>

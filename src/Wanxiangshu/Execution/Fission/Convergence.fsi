@@ -56,6 +56,5 @@ module FissionHost =
         joinGuardNudges: HashSet<string> ->
         quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit option ->
-        abortCause: AbortCause ->
         turn: ReconciledTurn ->
             Task<bool>

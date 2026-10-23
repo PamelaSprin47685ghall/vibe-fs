@@ -152,7 +152,7 @@ Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）
 
 领域事实写入 Git common directory 下插件私有 `wanxiangshu-next/runtimes/` 路径中的 journal（按 runtime 的 NDJSON；取不到 common dir 时回退 XDG state home），不在业务 workspace 强制创建插件私有目录。随包资源：
 
-- `resources/provider/`（Common Law / Role Law / Tool Law / Delegation Law / Office Library，加 Casebook、Attention Regulation、Concern Routing；EN + zh-CN）；`resources/ablation/{fact-map,nodes,profiles,tool-map}.json`（feature-ablation 拓扑）；`resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md`；`resources/git/wanxiang-hook.mjs`；`resources/wanxiangshu.mjs`（model routing 模板）；`resources/degeneration-guard/envelope/LoopDetectorEnvelope.js`（入库的 loop detector envelope；构建复制到 `dist/`）。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
+- `resources/provider/`（Common Law / Role Law / Tool Law / Delegation Law / Office Library，加 Casebook、Attention Regulation、Concern Routing；EN + zh-CN）；`resources/ablation/{fact-map,nodes,profiles,tool-map}.json`（feature-ablation 拓扑）；`resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md`；`resources/git/wanxiang-hook.mjs`；`resources/wanxiangshu.mjs`（model routing 模板）。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
 - journal 与事实名默认冻结；升级前阅读 [CHANGELOG](CHANGELOG.md)。
 
 
@@ -226,7 +226,6 @@ npm run verify:release      # 发布验证
 |------|------|
 | `npm run format` | Fantomas 写盘（与 `format:check` 的相对面：一个改文件，一个只判失败） |
 | `node scripts/build.mjs --plan` | 只读计划报告：`mode`/`reason`/`changedInputs`/`selectedShards`/`compileItems`/`fableCompileInvocations`，不写 `dist/` |
-| `node scripts/derive-envelope.mjs` | 手动派生 loop detector envelope，更新入库产物 `resources/degeneration-guard/envelope/LoopDetectorEnvelope.js`。构建不自动派生，把入库产物复制到 `dist/Execution/Session/LoopDetectorEnvelope.js`；入库产物缺失时构建会提示运行本命令 |
 
 ### 测试分层
 

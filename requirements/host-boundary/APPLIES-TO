@@ -27,7 +27,6 @@
 /src/Wanxiangshu/Execution/Session/ChatExecution/ProviderObservation.fs
 /src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs
 /src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs
-/src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs
 /src/Wanxiangshu/Foundation/HostModel.fs
 /src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs
 /src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs

@@ -13,34 +13,6 @@ type ContinuationAcceptanceObserver =
     { Notify: PhysicalUserMessageId -> unit
       AttachDisposable: System.IDisposable -> unit }
 
-[<RequireQualifiedAccess>]
-type DegenerationKind =
-    | TooRepetitive
-    | TooRandom
-
-[<RequireQualifiedAccess>]
-type AbortCause =
-    | DegenerationGuard of DegenerationKind
-    | External
-
-type LoopTextDelta =
-    { Session: SessionId
-      Message: string option
-      Delta: string }
-
-type ILoopSensor =
-    abstract Observe: delta: LoopTextDelta -> unit
-
-    abstract ConsumeAbortCause:
-        source: ProviderAttemptSource * directory: string option * observer: ContinuationAcceptanceObserver option ->
-            System.Threading.Tasks.Task<AbortCause>
-
-    abstract DropSession: sessionId: SessionId -> unit
-    abstract ResetDetector: sessionId: SessionId -> unit
-
-    abstract ActiveInterruptTask:
-        sessionId: SessionId * expectedRun: ProviderRunIdentity -> System.Threading.Tasks.Task option
-
 type ISessionQuiescenceGate =
     abstract BeginProviderAttempt: sessionId: SessionId -> unit
     abstract BeginToolExecution: sessionId: SessionId -> unit

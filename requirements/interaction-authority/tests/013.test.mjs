@@ -6,7 +6,7 @@ import { rootFor } from './support/authority.mjs'
 test('WHAT[interaction-authority-013] accepted continuation preserves complete identity evidence within the exact run', () => {
   const root = rootFor()
   let state = authority.registerAuthority(root, authority.empty)
-  const claim = authority.claimContinuation('continuation', root.session, 'DegenerationGuard', root, 'payload-digest')
+  const claim = authority.claimContinuation('continuation', root.session, 'ManagerGuard', root, 'payload-digest')
   state = authority.registerClaim(claim, state)
   assert.deepEqual(state.activeLogicalRun, root)
   state = authority.acceptClaim('continuation', 'next-physical-message', state)

@@ -44,25 +44,21 @@ const forbiddenExecution = () => ({
   discard: async () => {},
 })
 
-test('WHAT[work-025] deliver without authorization relays: retires Relayed and opens the next tenure at the same stage', async () => {
+test('WHAT[work-025] deliver without eligibility relays: retires Relayed and opens the next tenure at the same stage', async () => {
   const text = life.encodeOpening('plan', 'work-h1', '/repo/root', 0n)
-  const promoted = life.reviewProbe(text, openedActiveId(text), 'Promoted')
-  assert.equal(promoted.decision, 'Write')
-  assert.equal(promoted.names, 'Reviewed')
-  const relayed = life.deliverProbe(`${text}${promoted.bytes}`, 'run-1', 'call-1', 10n)
+  const relayed = life.deliverProbe(text, 'run-1', 'call-1', 10n)
   assert.equal(relayed.decision, 'Write')
   assert.equal(relayed.detail, 'Relayed')
   assert.equal(relayed.names, 'IncumbencyRetired,IncumbencyOpened')
-  assert.equal(relayed.bytes.includes('ConfirmationCommitted'), false)
   assert.equal(relayed.bytes.includes('Delivered'), false)
 
-  const folded = life.readProbe(`${text}${promoted.bytes}${relayed.bytes}`)
+  const folded = life.readProbe(`${text}${relayed.bytes}`)
   assert.equal(folded.ok, true)
   assert.equal(folded.next, 'Review')
   assert.equal(folded.activeId.length > 0, true)
   const written = eventsOf(relayed.bytes)
   assert.equal(written[0].outcome, 'Relayed')
-  assert.equal(written[1].stage, 'S2', 'relay keeps the promoted stage')
+  assert.equal(written[1].stage, 'S1', 'relay keeps the stage')
   assert.equal(written[1].openingCursor, written[0].retirementCursor)
 })
 
@@ -78,6 +74,8 @@ test('WHAT[work-025] an unauthorised durable deliver relays instead of refusing 
     assert.equal(view.found, true)
     const reviewed = await life.seedReview(store, 'work-relay-owner', 'Stayed')
     assert.equal(reviewed.ok, true, reviewed.error)
+    const cleared = await life.seedReview(store, 'work-relay-owner', 'Cleared')
+    assert.equal(cleared.ok, true, cleared.error)
     const host = await import('../../../dist/Mission/Lifecycle/DurableWorkHost.js')
     const inspected = (host.inspected ?? host.DurableWorkHost?.inspected)(commonDir, 'work-relay-owner')
     const incumbencyId = inspected.ActiveId
@@ -96,7 +94,7 @@ test('WHAT[work-025] an unauthorised durable deliver relays instead of refusing 
   }
 })
 
-test('WHAT[work-025] continuous reviewed relay advances tenures at the same stage without spawning', () => {
+test('WHAT[work-025] continuous stayed relay advances tenures at the same stage without spawning', () => {
   let text = life.encodeOpening('plan', 'work-ladder', '/repo/root', 0n)
   let cursor = 0n
   for (let step = 0; step < 3; step += 1) {
@@ -104,6 +102,11 @@ test('WHAT[work-025] continuous reviewed relay advances tenures at the same stag
     const reviewed = life.reviewProbe(text, openedActiveId(text), 'Stayed')
     assert.equal(reviewed.decision, 'Write', reviewed.detail)
     text = `${text}${reviewed.bytes}`
+    // A stayed review leaves a non-empty ledger; a clearing review empties it so
+    // deliver can relay. Eligibility stays locked as Stayed.
+    const cleared = life.reviewProbe(text, openedActiveId(text), 'Cleared')
+    assert.equal(cleared.decision, 'Write', cleared.detail)
+    text = `${text}${cleared.bytes}`
     const relayed = life.deliverProbe(text, `run-ladder-${step}`, `call-ladder-${step}`, cursor)
     assert.equal(relayed.decision, 'Write', relayed.detail)
     assert.equal(relayed.detail, 'Relayed')
@@ -120,20 +123,17 @@ test('WHAT[work-025] continuous reviewed relay advances tenures at the same stag
   }
 })
 
-test('WHAT[work-025] consecutive unreviewed relays succeed because review is an optional collaboration result', () => {
+test('WHAT[work-025] consecutive unreviewed relays succeed at the same stage (empty ledger)', () => {
   let text = life.encodeOpening('plan', 'work-noop', '/repo/root', 0n)
-  const promoted = life.reviewProbe(text, openedActiveId(text), 'Promoted')
-  assert.equal(promoted.decision, 'Write', promoted.detail)
-  text = `${text}${promoted.bytes}`
-  // First relay: the reviewed tenure hands off; the chain is not yet unreviewed.
+  // First relay: an unreviewed tenure has an empty ledger, so it relays.
   const first = life.deliverProbe(text, 'run-1', 'call-1', 10n)
   assert.equal(first.detail, 'Relayed', first.detail)
   text = `${text}${first.bytes}`
-  // Second relay: an unreviewed successor directly relays.
+  // Second relay: an unreviewed successor also relays at the same stage.
   const second = life.deliverProbe(text, 'run-2', 'call-2', 20n)
   assert.equal(second.detail, 'Relayed', second.detail)
   text = `${text}${second.bytes}`
-  // Third relay: review is not a lifecycle precondition, consecutive relays succeed.
+  // Third relay: consecutive relays stay at the same stage and succeed.
   const third = life.deliverProbe(text, 'run-3', 'call-3', 30n)
   assert.equal(third.decision, 'Write', third.detail)
   assert.equal(third.detail, 'Relayed')

@@ -20,5 +20,6 @@ class JsProgram {
 {{baseClassHorizon}}
 {{baseClassAdvisor}}
 {{baseClassAsk}}
+{{baseClassReview}}
 {{baseClassLifecycle}}
 }

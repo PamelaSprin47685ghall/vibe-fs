@@ -240,7 +240,7 @@ module AdvisorSeat =
                             None))
                 |> Option.map (fun witness -> witness.View)
                 |> Option.orElseWith (fun () -> JsDeliveredValues.tryPeekMaterialWith sessionId prose)
-                |> Option.map (ReturnedMaterial.texts >> String.concat "\n\n")
+                |> Option.map ReturnedMaterial.fullText
                 |> Option.bind nonBlank
 
             match delivered with

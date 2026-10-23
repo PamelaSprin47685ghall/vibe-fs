@@ -19,7 +19,7 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
-/// SessionDeleted teardown: LoopSensor / SyncDelegate / Quiescence / Dispose.
+/// SessionDeleted teardown: SyncDelegate / Quiescence / Dispose.
 /// Caller supplies `signalReconciler` so this module never owns the Scheduler.
 module HostSessionDeletion =
 
@@ -123,9 +123,7 @@ module HostSessionDeletion =
             // without a second archive), so reporting the scope and retaining
             // the identity here preserves that invariant without killing the
             // host or revoking the finished engineering result.
-            Diagnostic.emit
-                "case-finalization-pending"
-                [ "session_id", SessionId.value delegateId; "result", reason ]
+            Diagnostic.emit "case-finalization-pending" [ "session_id", SessionId.value delegateId; "result", reason ]
 
     let private finalizeStagedDelegate
         (scope: PluginRuntimeScope)
@@ -177,8 +175,6 @@ module HostSessionDeletion =
         (onSessionDeleted: (SessionId -> unit) option)
         (SessionDeletionPreparation(parentSessionIdOpt, stagedDelegate, _))
         : Task =
-        scope.LoopSensor.DropSession sessionId
-
         // STRENGTH-004/011: owner deletion cancels the decision-local
         // InternalLeaf immediately. CancelOwner completes the waiting
         // decision before its best-effort physical abort, so no deleted

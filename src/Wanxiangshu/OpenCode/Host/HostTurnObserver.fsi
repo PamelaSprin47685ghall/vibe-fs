@@ -13,16 +13,8 @@ open Wanxiangshu.Persistence.Journal
 /// Turn observation policy for one reconciled turn (RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
 
-    val attachLoopSensor:
-        sessionPort: ISessionHostPort ->
-        rootWorkspace: IRootWorkspaceReader ->
-        journal: AgentJournal option ->
-        scope: PluginRuntimeScope ->
-        emitDiagnostic: (string -> (string * string) list -> unit) ->
-            unit
-
     val observe:
-        observeTurnWorkflow: (AbortCause -> ReconciledTurnContext -> Task) ->
+        observeTurnWorkflow: (ReconciledTurnContext -> Task) ->
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->

@@ -251,6 +251,9 @@ module DurableWorkHost =
           Expected: string
           Next: string }
 
+    /// One keyed obligation entry of the active tenure's ledger.
+    type HostObligation = { Key: string; Value: string }
+
     /// Fields the old readers already used, plus the retirement list,
     /// confirmation identity, projection cut, and advance history the
     /// recovery points need.
@@ -263,6 +266,9 @@ module DurableWorkHost =
             OpeningStage: string option
             Reviewed: bool
             ReviewOutcome: string option
+            /// The active tenure's keyed obligation ledger. A non-empty ledger
+            /// blocks deliver; each review updates it item by item.
+            Obligations: obj array
             OpeningCursor: float option
             PredecessorRange: (float * float) option
             LastRetirementCursor: float option
@@ -278,7 +284,6 @@ module DurableWorkHost =
             DevOpsId: string option
             DevOpsTarget: string option
             Authority: string
-            Confirmed: bool
             BlockerDigest: string option
             Root: string option
             Retirements: HostRetirement list
@@ -306,13 +311,10 @@ module DurableWorkHost =
             if seen = "" then None else Some seen
 
     let private openingCursorOf (active: obj) : float option =
-        if isNull active then
+        if isNull active || isNull active?openingCursor then
             None
         else
             Some(unbox<float> active?openingCursor)
-
-    let private confirmedOf (active: obj) : bool =
-        not (isNull active) && unbox<bool> active?confirmed
 
     let private pendingText (pending: obj) (name: string) : string option =
         if isNull pending then
@@ -403,10 +405,15 @@ module DurableWorkHost =
         | _ when isNull (rounds.[rounds.Length - 1]?retirementCursor) -> None
         | _ -> Some(unbox<float> (rounds.[rounds.Length - 1]?retirementCursor))
 
-    let private lastRetiredReviewOf (rounds: obj array) : string option =
-        match rounds with
-        | [||] -> None
-        | _ -> optionalText (textOf rounds.[rounds.Length - 1]?reviewOutcome)
+    let private obligationsOf (active: obj) : obj array =
+        if isNull active || isNull active?obligations then
+            [||]
+        else
+            unbox<obj array> active?obligations
+            |> Array.map (fun entry ->
+                box
+                    {| key = textOf entry?key
+                       value = textOf entry?value |})
 
     let private projectedWork (snapshot: obj) (work: obj) : InspectedWork =
         let active: obj = snapshot?active
@@ -424,6 +431,7 @@ module DurableWorkHost =
           OpeningStage = openingStageOf active
           Reviewed = outcome.IsSome
           ReviewOutcome = outcome
+          Obligations = obligationsOf active
           OpeningCursor = openingCursorOf active
           PredecessorRange = predecessorRangeOf activeId rounds
           LastRetirementCursor = lastRetirementCursorOf rounds
@@ -442,7 +450,6 @@ module DurableWorkHost =
             |> Array.tryLast
             |> Option.bind (fun event -> optionalText (textOf event?target))
           Authority = textOf snapshot?authority
-          Confirmed = false
           BlockerDigest = blockerDigestOf activeId history
           Root = optionalText (textOf snapshot?root)
           Retirements = retirements |> Array.map hostRetirementOf |> Array.toList

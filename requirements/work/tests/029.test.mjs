@@ -41,50 +41,49 @@ test('WHAT[work-029] Plan path derivation resolves deterministically and rejects
   }
 })
 
-test('WHAT[work-029] P is read, rewritten atomically with exclusive temp file, and edited with patch replacement', () => {
+test('WHAT[work-029] the draft is read and validated at the canonical resolved path', () => {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-test-'))
 
   try {
     const workId = 'work-e2e-plan'
 
-    // 1. Initially plan file does not exist
-    const readMissing = surface.PlanningSurface.readPlan(tmpRoot, workId)
-    assert.equal(readMissing.ok, false)
+    // 1. Initially plan file does not exist: validation fails closed
+    const missing = surface.PlanningSurface.readAndValidatePlan(tmpRoot, workId)
+    assert.equal(missing.ok, false)
+    assert.match(missing.error, /empty or missing/)
 
-    // 2. Rewrite plan atomically
+    // 2. Resolve canonical plan path via public helper and write draft via ordinary tools
+    const resolved = surface.PlanningSurface.resolvePlanPath(tmpRoot, workId)
+    assert.equal(resolved.ok, true)
+    fs.mkdirSync(path.dirname(resolved.path), { recursive: true })
     const initialContent = '# Initial Plan\n- Step 1: Survey facts\n- Step 2: Formalize goal'
-    const writeRes = surface.PlanningSurface.rewritePlanAtomic(tmpRoot, workId, initialContent)
-    assert.equal(writeRes.ok, true)
-    assert.ok(typeof writeRes.digest === 'string' && writeRes.digest.length === 64, 'digest must be 64-char sha256')
-    assert.ok(fs.existsSync(writeRes.path), 'plan.md must exist on disk')
+    fs.writeFileSync(resolved.path, initialContent)
 
-    // 3. Read back verified
-    const readBack = surface.PlanningSurface.readPlan(tmpRoot, workId)
-    assert.equal(readBack.ok, true)
-    assert.equal(readBack.content, initialContent)
+    // 3. Validation via readAndValidatePlan verifies path and sha256 digest
+    const validated = surface.PlanningSurface.readAndValidatePlan(tmpRoot, workId)
+    assert.equal(validated.ok, true)
+    assert.equal(validated.path, resolved.path)
+    assert.ok(typeof validated.digest === 'string' && validated.digest.length === 64, 'digest must be 64-char sha256')
 
-    // 4. Edit plan with patches
-    const patches = [
-      { find: '- Step 2: Formalize goal', put: '- Step 2: Formalize goal\n- Step 3: Implement' },
-    ]
-    const editRes = surface.PlanningSurface.editPlanAtomic(tmpRoot, workId, patches)
-    assert.equal(editRes.ok, true)
+    // 4. Ordinary file update updates validated digest
+    const updatedContent = initialContent + '\n- Step 3: Implement'
+    fs.writeFileSync(resolved.path, updatedContent)
+    const revalidated = surface.PlanningSurface.readAndValidatePlan(tmpRoot, workId)
+    assert.equal(revalidated.ok, true)
+    assert.equal(revalidated.path, resolved.path)
+    assert.notEqual(revalidated.digest, validated.digest)
 
-    const readEdited = surface.PlanningSurface.readPlan(tmpRoot, workId)
-    assert.equal(readEdited.ok, true)
-    assert.ok(readEdited.content.includes('- Step 3: Implement'))
-
-    // 5. Missing patch find target returns error
-    const badPatch = [{ find: 'non-existent target string', put: 'replacement' }]
-    const badEdit = surface.PlanningSurface.editPlanAtomic(tmpRoot, workId, badPatch)
-    assert.equal(badEdit.ok, false)
-    assert.match(badEdit.error, /Patch find target not found/)
+    // 5. Empty or whitespace draft is rejected
+    fs.writeFileSync(resolved.path, '   \n')
+    const emptyRes = surface.PlanningSurface.readAndValidatePlan(tmpRoot, workId)
+    assert.equal(emptyRes.ok, false)
+    assert.match(emptyRes.error, /plan artifact is empty/)
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true })
   }
 })
 
-test('WHAT[work-029] shared Plan interface permits only PLAN_PATH and rejects retired members', async () => {
+test('WHAT[work-029] shared Plan interface reads the ordinary draft path and rejects retired members', async () => {
   // The shared Plan interface is exercised through the REAL Plan programming
   // surface (`todowrite-for-plan`), which is the only Plan entry the host
   // registers. The retired legacy Plan entry is gone, so this is also the
@@ -95,6 +94,7 @@ test('WHAT[work-029] shared Plan interface permits only PLAN_PATH and rejects re
     await openIncumbency(runtime, sessionID, 'inc-work-029', 'S1')
 
     const commonDir = await journalSurface.JournalSurface_initializeStateRoot(directory)
+    const planRoot = path.join(commonDir, 'wanxiangshu')
     const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, directory, sessionID, 0n)
     assert.equal(opened.ok, true, opened.error)
 
@@ -103,11 +103,15 @@ test('WHAT[work-029] shared Plan interface permits only PLAN_PATH and rejects re
       { sessionID, agent: 'plan', callID: 'call-work-029', messageID: 'run-work-029', providerRunID: 'run-work-029' },
     )
 
-    // The draft P lives at the live surface's own plan path.
-    const draft = path.join(directory, 'plan.md')
+    // The draft lives at the live surface's derived plan path (.Herdchestra/wanxiangshu/plan/<sessionID>/plan.md).
+    const draftRes = surface.PlanningSurface.resolvePlanPath(planRoot, sessionID)
+    assert.equal(draftRes.ok, true, draftRes.error)
+    const draft = draftRes.path
+    fs.mkdirSync(path.dirname(draft), { recursive: true })
     fs.writeFileSync(draft, '# Draft')
 
-    const read = String(await run('return { text: await this.cat(PLAN_PATH), retired: [typeof this.file, typeof this.edit, typeof this.rewrite] };'))
+    const relDraft = path.relative(directory, draft)
+    const read = String(await run(`return { text: await this.cat(${JSON.stringify(relDraft)}), retired: [typeof this.file, typeof this.edit, typeof this.rewrite, typeof this.reviewOnly] };`))
     assert.match(read, /# Draft/)
     assert.match(read, /undefined/)
 
@@ -120,7 +124,7 @@ test('WHAT[work-029] localized Plan pseudocode describes the same shared interfa
   for (const language of ['en', 'zh-CN']) {
     const description = registry.jsPlanDescription(language)
     assert.equal(description.includes('{{'), false)
-    for (const signature of ['PLAN_PATH', 'async cat(path)', 'write(path, content)', 'async ask(question)']) {
+    for (const signature of ['async cat(path)', 'write(path, content)', 'async ask(question)']) {
       assert.ok(description.includes(signature), signature)
     }
     for (const retired of ['this.file(', 'this.edit(', 'this.rewrite(']) assert.equal(description.includes(retired), false)

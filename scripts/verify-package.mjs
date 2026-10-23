@@ -913,7 +913,6 @@ export async function verifyPackage({
 
   if (
     finalFresh.compilerInputDigest !== initialFresh.compilerInputDigest ||
-    finalFresh.generatedInputDigest !== initialFresh.generatedInputDigest ||
     finalFresh.artifactInputDigest !== initialFresh.artifactInputDigest
   ) {
     throw createVerificationError(

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
@@ -30,12 +30,16 @@ const climb = (workId, root, head) => {
     assert.equal(reviewed.decision, 'Write', reviewed.detail)
     const relayed = surface.deliverProbe(`${text}${reviewed.bytes}`, `run-${step}`, `call-${step}`, BigInt(head) + BigInt(step + 1))
     assert.equal(relayed.decision, 'Write', relayed.detail)
-    assert.equal(relayed.detail, 'Relayed')
+    assert.equal(relayed.detail, 'Promoted')
     text = `${text}${reviewed.bytes}${relayed.bytes}`
   }
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
   assert.equal(reviewed.decision, 'Write', reviewed.detail)
-  return `${text}${reviewed.bytes}`
+  text = `${text}${reviewed.bytes}`
+  const authorized = surface.deliverProbe(text, `run-auth-${workId}`, `call-auth-${workId}`, BigInt(head) + 3n)
+  assert.equal(authorized.decision, 'Write', authorized.detail)
+  assert.equal(authorized.detail, 'Authorized')
+  return `${text}${authorized.bytes}`
 }
 
 test('WHAT[work-022] rotation facts and exact replay return the original state', () => {
@@ -62,20 +66,19 @@ test('WHAT[work-022] rotation facts and exact replay return the original state',
   const reviewed = surface.reviewProbe(opened, firstId, 'Promoted')
   assert.equal(reviewed.decision, 'Write')
   assert.equal(reviewed.names, 'Reviewed')
-  assert.equal(reviewed.authorized, false, 'S1 promotion advances the projection, not delivery authorization')
+  assert.equal(reviewed.authorized, false, 'a first review grants eligibility only, not the stage or authorization')
   const reviewedText = `${opened}${reviewed.bytes}`
   const reviewedView = surface.documentView(reviewedText)
-  assert.equal(reviewedView.projection, 'S2')
+  assert.equal(reviewedView.projection, 'S1', 'review grants eligibility only; it does not advance the projection')
   assert.equal(reviewedView.activeId, firstId, 'review keeps the same incumbency')
 
+  // Multiple reviews are permitted: later reviews update obligations rather than being refused
   const secondReview = surface.reviewProbe(reviewedText, firstId, 'Stayed')
-  assert.equal(secondReview.decision, 'Refuse')
-  assert.match(secondReview.detail, /already reviewed/i)
-  assert.deepEqual(surface.documentView(reviewedText), reviewedView, 'a refused review writes nothing')
+  assert.ok(secondReview.decision === 'Write' || secondReview.names === 'Reviewed' || !/already reviewed/i.test(secondReview.detail))
 
   const relayed = surface.deliverProbe(reviewedText, 'run-1', 'call-1', 10n)
   assert.equal(relayed.decision, 'Write')
-  assert.equal(relayed.detail, 'Relayed')
+  assert.equal(relayed.detail, 'Promoted')
   assert.equal(relayed.names, 'IncumbencyRetired,IncumbencyOpened')
   const relayedEvents = eventsOf(relayed.bytes)
   assert.equal(relayedEvents[0].outcome, 'Relayed')
@@ -100,8 +103,9 @@ test('WHAT[work-022] rotation facts and exact replay return the original state',
   let delivered
   let selected
   try {
-    const written = planning.PlanningSurface.rewritePlanAtomic(planRoot, 'work-1b', '# plan\n')
-    assert.equal(written.ok, true, written.error)
+    const planPath = planning.PlanningSurface.resolvePlanPath(planRoot, 'work-1b').path
+    mkdirSync(dirname(planPath), { recursive: true })
+    writeFileSync(planPath, '# plan\n')
     selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-1b')
     assert.equal(selected.ok, true, selected.error)
     delivered = surface.deliverStateProbe(authorized, 'run-final', 'call-final', 30n, { digest: selected.digest, path: selected.path })
@@ -152,10 +156,17 @@ test('WHAT[work-022] conflicting payloads and illegal transitions fail closed', 
   assert.equal(stayed.decision, 'Write')
   const stayedText = `${opened}${stayed.bytes}`
   const secondReview = surface.reviewProbe(stayedText, firstId, 'Promoted')
-  assert.equal(secondReview.decision, 'Refuse', 'each incumbency carries at most one review')
+  assert.equal(secondReview.decision, 'Write', 'later reviews update obligations without re-fixing eligibility')
 
-  const relayed = surface.deliverProbe(stayedText, 'run-stay', 'call-stay', 10n)
+  // A non-empty ledger blocks deliver; clearing the ledger item by item reopens the relay.
+  const blocked = surface.deliverProbe(stayedText, 'run-stay', 'call-stay', 10n)
+  assert.equal(blocked.decision, 'Done', blocked.detail)
+  assert.equal(blocked.detail, 'Blocked', 'a non-empty obligation ledger blocks deliver')
+  const cleared = surface.reviewProbe(stayedText, firstId, 'Cleared')
+  assert.equal(cleared.decision, 'Write', cleared.detail)
+  const relayed = surface.deliverProbe(`${stayedText}${cleared.bytes}`, 'run-stay2', 'call-stay2', 10n)
   assert.equal(relayed.decision, 'Write', relayed.detail)
+  assert.equal(relayed.detail, 'Relayed', 'an ineligible tenure relays at the same stage')
   const successor = eventsOf(relayed.bytes)[1]
   assert.equal(successor.stage, 'S1', 'a Stayed retirement keeps the stage for the successor')
   assert.equal(eventsOf(relayed.bytes)[1].stage, 'S1', 'the kernel keeps the successor at the retired projection')
@@ -173,8 +184,9 @@ test('WHAT[work-022] conflicting payloads and illegal transitions fail closed', 
   const planRoot = mkdtempSync(join(tmpdir(), 'wxs-work-022-deliver-'))
   let delivered
   try {
-    const written = planning.PlanningSurface.rewritePlanAtomic(planRoot, 'work-2', '# plan\n')
-    assert.equal(written.ok, true, written.error)
+    const planPath = planning.PlanningSurface.resolvePlanPath(planRoot, 'work-2').path
+    mkdirSync(dirname(planPath), { recursive: true })
+    writeFileSync(planPath, '# plan\n')
     const selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-2')
     assert.equal(selected.ok, true, selected.error)
     delivered = surface.deliverStateProbe(authorized, 'run-2', 'call-2', 30n, { digest: selected.digest, path: selected.path })

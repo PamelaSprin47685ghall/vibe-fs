@@ -72,7 +72,11 @@ module OpenCodePortAdapter =
 
     let private childrenFromResponse (data: obj) : ChildSessionInfo list =
         let items: obj array = if isNull data then [||] else unbox data
-        items |> Array.choose tryChildInfo |> Array.map ChildSession.toInfo |> Array.toList
+
+        items
+        |> Array.choose tryChildInfo
+        |> Array.map ChildSession.toInfo
+        |> Array.toList
 
     let private readParentId (body: obj) : Result<SessionId option, string> =
         if isNull body then

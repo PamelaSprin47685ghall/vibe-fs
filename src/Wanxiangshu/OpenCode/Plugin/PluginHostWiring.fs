@@ -87,7 +87,7 @@ module PluginHostWiring =
     /// returns the turn-workflow observation task. Keeps Host-side modules
     /// free of any static reference to the relay turn-workflow module.
     type ObserveTurnWorkflowSupplier =
-        ISessionHostPort -> IEventObservationPort -> IRootWorkspaceReader -> AbortCause -> ReconciledTurnContext -> Task
+        ISessionHostPort -> IEventObservationPort -> IRootWorkspaceReader -> ReconciledTurnContext -> Task
 
     let create (observeTurnWorkflowFor: ObserveTurnWorkflowSupplier) (boot: PluginBoot.Boot) : Task<Host> =
         task {

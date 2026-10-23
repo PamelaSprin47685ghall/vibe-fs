@@ -30,7 +30,7 @@ const anchorOf = (session, messageId) => anchors(session).find((entry) => entry.
 
 test('WHAT[intra-participant-parallelism-014] production settlement decision yields nonfinal observations to the ordinary turn owner', () => {
   for (const phase of ['lane', 'takeover']) {
-    for (const observation of ['running', 'needs-continuation', 'provider-failed', 'degeneration-interrupted']) {
+    for (const observation of ['running', 'needs-continuation', 'provider-failed']) {
       assert.equal(fission.settlementDecision(phase, observation), 'yield-to-turn-workflow')
     }
     assert.equal(fission.settlementDecision(phase, 'external-abort'), 'fail-group')

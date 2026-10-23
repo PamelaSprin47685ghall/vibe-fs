@@ -99,7 +99,19 @@ module JsRuntimeSurface =
               Join = fun () -> unbox<Task<obj>> (emitJsExpr join "$0()")
               Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)")
               Horizon = fun () -> unbox<Task<obj>> (emitJsExpr horizon "$0()")
-              Advisor = fun intent carry -> unbox<Task<obj>> (emitJsExpr (advisor, intent, carry) "$0($1,$2)") }
+              Advisor = fun intent carry -> unbox<Task<obj>> (emitJsExpr (advisor, intent, carry) "$0($1,$2)")
+              // The test hook installs no review host: `this.review` is a
+              // production-only member wired in ToolRegistry. A program that
+              // calls it under this hook gets the unavailable envelope.
+              Review =
+                fun _ ->
+                    task {
+                        return
+                            box
+                                {| ok = false
+                                   code = "DELEGATION_UNAVAILABLE"
+                                   reason = "review is not wired in this runtime surface" |}
+                    } }
 
     let clearDelegationHost (sessionId: string) : unit = JsDelegationBridge.clear sessionId
 
@@ -157,10 +169,7 @@ module JsRuntimeSurface =
     /// Test hook: observe whether the current cell belongs to this very
     /// call. Nothing is taken and the returned cursor does not move.
     let deliveredCellIsMine (sessionId: string) (providerRun: string) (toolCallId: string) : bool =
-        JsDeliveredValues.ownsCell
-            sessionId
-            (ProviderRunIdentity.create providerRun)
-            (ToolCallId.create toolCallId)
+        JsDeliveredValues.ownsCell sessionId (ProviderRunIdentity.create providerRun) (ToolCallId.create toolCallId)
 
     /// Test hook: the raw value a program handed over through `this.deliver`,
     /// as it stands right now — a delivery or a staged render cache. This is

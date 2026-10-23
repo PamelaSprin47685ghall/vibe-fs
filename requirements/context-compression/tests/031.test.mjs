@@ -3,9 +3,8 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import {
   anchors, applyView, clearAll, countTokens, numberMessage,
-  captureView, takeView, carryMaterial,
+  captureView, takeView, carryMaterial, setView,
 } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
-import { commitView } from '../../../dist/Repository/Programming/Js/JsToolPolicy.js'
 import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
 
 const session = 'carry-compression'
@@ -16,8 +15,8 @@ const declare = (prefixCount, carry) => {
   assert.equal(result.ok, true, JSON.stringify(result))
 }
 const declareForCall = (messageId, callId, prefixCount, carry) => {
-  const failure = commitView(session, [messageId, callId], declaration(prefixCount, carry))
-  assert.ok(failure == null, String(failure))
+  const result = setView(session, [messageId, callId], declaration(prefixCount, carry))
+  assert.ok(result, String(result))
 }
 const render = (rows) => applyView(session, rows).entries.map((entry) =>
   entry.kind === 'kept' ? entry.message.text : entry.text)

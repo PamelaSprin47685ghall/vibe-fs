@@ -498,7 +498,6 @@ module PromptAuthority =
         | Continuation HumanMessage -> "HumanMessage"
         | Continuation ManagedDelegationAssignment -> "ManagedDelegationAssignment"
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
-        | Continuation DegenerationGuard -> "DegenerationGuard"
         | Continuation FissionHandoff -> "FissionHandoff"
         | HostInternal -> "HostInternal"
         | UnknownOrigin -> "UnknownOrigin"
@@ -512,7 +511,6 @@ module PromptAuthority =
         | "HumanMessage" -> Some HumanMessage
         | "ManagedDelegationAssignment" -> Some ManagedDelegationAssignment
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
-        | "DegenerationGuard" -> Some DegenerationGuard
         | "FissionHandoff" -> Some FissionHandoff
         | _ -> None
 

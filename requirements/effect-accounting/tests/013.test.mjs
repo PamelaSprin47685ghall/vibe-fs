@@ -188,7 +188,7 @@ const effectLedgerOf = (facts) => {
 // 真实的编排面：它在 journal 上写下效果的请求意图与物理确认 —— 效果账因此真的
 // 有一笔「已确认」。
 const gitPortStub = () => ({
-  IsDirty: async () => ({ ok: true, value: false }),
+  IsDirty: async () => ({ ok: true, value: [] }),
   FreezeTargetBranch: async () => ({ ok: true, value: 'refs/heads/main' }),
   ListManagerBranches: async () => ({ ok: true, value: [] }),
   DeleteBranch: async () => ({ ok: true }),

@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Repository.Knowledge.Casebook
 
-/// SessionDeleted teardown: LoopSensor / SyncDelegate / Quiescence / Dispose.
+/// SessionDeleted teardown: SyncDelegate / Quiescence / Dispose.
 /// Caller supplies `signalReconciler` so this module never owns the Scheduler.
 module HostSessionDeletion =
 

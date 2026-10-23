@@ -77,6 +77,7 @@ module Surface =
 
     let submitResults (handle: RuntimeHandle) (args: obj) : Task<obj> =
         Commands.store handle |> ignore
+
         task {
             match Tool.decodeWorkSubmit args with
             | Error refusal -> return refused refusal

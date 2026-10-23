@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import { rolePermissionRules, toolSpecNames } from '../../../dist/OpenCode/Tools/ToolSurface.js'
@@ -22,7 +22,8 @@ const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-024-'))
   execFileSync('git', ['init', '--quiet', root])
   try {
-    await body(workspace.acquire(await journalSurface.JournalSurface_initializeStateRoot(root)), root)
+    const commonDir = await journalSurface.JournalSurface_initializeStateRoot(root)
+    await body(workspace.acquire(commonDir), root, commonDir)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -85,9 +86,10 @@ test('WHAT[work-024] the Plan devops member refuses an unusable report mapping a
   })
 })
 
-test('WHAT[work-024] an unreviewed tenure may read the draft', async () => {
+test('WHAT[work-024] an unreviewed tenure may read the draft but cannot write it until first review', async () => {
   // The real Plan programming surface is the only Plan entry the host
-  // registers; an unreviewed tenure may still READ the draft through it.
+  // registers; an unreviewed tenure may still READ the draft through it,
+  // but reviewFinishedOnly locks writing until the first review finishes.
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ses-work-024-unreviewed'
     await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
@@ -99,30 +101,96 @@ test('WHAT[work-024] an unreviewed tenure may read the draft', async () => {
 
     const before = surface.workView(workspace.acquire(commonDir), sessionID)
     assert.equal(before.reviewed, '')
+    assert.equal(planning.PlanningSurface.isReviewFinished(commonDir, sessionID, 'inc-work-024'), false, 'reviewFinishedOnly locks writing before first review')
 
     const read = await hooks.tool['todowrite-for-plan'].execute(
       { program: `class Js extends JsProgram {
       async run() {
-        return { ok: true };
+        return { ok: true, hasReviewOnly: typeof this.reviewOnly !== 'undefined' };
       }
     }`, name: 'read-draft' },
       { sessionID, agent: 'plan', callID: 'call-work-024', messageID: 'run-work-024', providerRunID: 'run-work-024' },
     )
     assert.match(String(read), /# ok/)
+    assert.match(String(read), /hasReviewOnly = false/)
   })
 })
 
-test('WHAT[work-024] a reviewed tenure records its review; a second review stays refused', async () => {
-  await withStore(async (store, root) => {
+test('WHAT[work-024] first empty review grants eligibility, later reviews overwrite the keyed ledger, deliver advances', async () => {
+  await withStore(async (store, root, commonDir) => {
     const seeded = await surface.seedOpen(store, 'plan', 'work-24b', root, 0n)
     assert.equal(seeded.ok, true, seeded.error)
-    const reviewed = await surface.seedReview(store, 'work-24b', 'Stayed')
-    assert.equal(reviewed.ok, true, reviewed.error)
+    const host = await import('../../../dist/Mission/Lifecycle/DurableWorkHost.js')
+    const inspected = (host.inspected ?? host.DurableWorkHost?.inspected)(commonDir, 'work-24b')
+    const activeId = inspected.ActiveId
+    assert.ok(activeId, 'must have active incumbency')
 
-    const again = await surface.seedReview(store, 'work-24b', 'Promoted')
-    assert.equal(again.ok, false, 'a tenure carries one review')
-    assert.equal(again.error, 'RequestIdConflict')
-    assert.equal(surface.workView(store, 'work-24b').reviewed, 'Stayed')
+    // 1. First review with empty findings grants eligibility only; stage remains S1
+    const firstReview = (host.execute ?? host.DurableWorkHost?.execute)(commonDir, 'work-24b', 'rev-1', {
+      type: 'Review',
+      incumbencyId: activeId,
+      reviewerId: 'reviewer',
+      updates: [],
+    })
+    assert.equal(firstReview.Status, 'Committed')
+    assert.equal(firstReview.Kind, 'Reviewed')
+    const afterFirst = (host.inspected ?? host.DurableWorkHost?.inspected)(commonDir, 'work-24b')
+    assert.equal(afterFirst.Reviewed, true)
+    assert.equal(afterFirst.ReviewOutcome, 'Promoted')
+    assert.equal(afterFirst.Stage, 'S1', 'first review grants eligibility only; it does not advance stage')
+    assert.equal(afterFirst.DeliveryAuthorized, false)
+    assert.deepEqual(afterFirst.Obligations, [])
+
+    // 2. Later review overwrites the keyed obligation ledger item by item
+    const secondReview = (host.execute ?? host.DurableWorkHost?.execute)(commonDir, 'work-24b', 'rev-2', {
+      type: 'Review',
+      incumbencyId: activeId,
+      reviewerId: 'reviewer',
+      updates: [{ key: 'arch-tradeoff', value: 'detail SQLite concurrency limits' }],
+    })
+    assert.equal(secondReview.Status, 'Committed')
+    const afterSecond = (host.inspected ?? host.DurableWorkHost?.inspected)(commonDir, 'work-24b')
+    assert.equal(afterSecond.ReviewOutcome, 'Promoted', 'later reviews do not change initial promotion eligibility')
+    assert.deepEqual(afterSecond.Obligations, [{ key: 'arch-tradeoff', value: 'detail SQLite concurrency limits' }])
+
+    // Deliver is refused while obligations remain
+    const deliverBlocked = (host.execute ?? host.DurableWorkHost?.execute)(commonDir, 'work-24b', 'del-blocked', {
+      type: 'Deliver',
+      incumbencyId: activeId,
+      toolCallId: 'call-b',
+      providerRunId: 'run-b',
+      cursor: 10,
+      blockers: [],
+      nextOwnerId: 'owner',
+    })
+    assert.equal(deliverBlocked.Status, 'Observed')
+    assert.equal(deliverBlocked.Kind, 'Blocked')
+
+    // Third review clears the obligation by key with null (keyed ledger delete)
+    const thirdReview = (host.execute ?? host.DurableWorkHost?.execute)(commonDir, 'work-24b', 'rev-3', {
+      type: 'Review',
+      incumbencyId: activeId,
+      reviewerId: 'reviewer',
+      updates: [{ key: 'arch-tradeoff', value: null }],
+    })
+    assert.equal(thirdReview.Status, 'Committed')
+    const afterThird = (host.inspected ?? host.DurableWorkHost?.inspected)(commonDir, 'work-24b')
+    assert.deepEqual(afterThird.Obligations, [], 'null value deletes the obligation from the ledger')
+
+    // 3. Deliver advances the stage once eligible and ledger is empty
+    const deliverAdvance = (host.execute ?? host.DurableWorkHost?.execute)(commonDir, 'work-24b', 'del-advance', {
+      type: 'Deliver',
+      incumbencyId: activeId,
+      toolCallId: 'call-adv',
+      providerRunId: 'run-adv',
+      cursor: 20,
+      blockers: [],
+      nextOwnerId: 'owner',
+    })
+    assert.equal(deliverAdvance.Status, 'Committed')
+    assert.equal(deliverAdvance.Kind, 'Promoted')
+    const afterAdvance = (host.inspected ?? host.DurableWorkHost?.inspected)(commonDir, 'work-24b')
+    assert.equal(afterAdvance.Stage, 'S2', 'deliver performs the actual promotion to S2')
   })
 
   const opened = surface.encodeOpening('plan', 'work-24c', '/root', 0n)
@@ -134,11 +202,18 @@ test('WHAT[work-024] a reviewed tenure records its review; a second review stays
   }
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
   text = `${text}${reviewed.bytes}`
+  // The S3 eligible deliver grants delivery authority in place; the next
+  // deliver reserves the execution handoff against the draft.
+  const authorized = surface.deliverProbe(text, 'run-auth', 'call-auth', 30n)
+  assert.equal(authorized.decision, 'Write', authorized.detail)
+  assert.equal(authorized.detail, 'Authorized')
+  text = `${text}${authorized.bytes}`
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-024-draft-'))
   let delivered
   try {
-    const written = planning.PlanningSurface.rewritePlanAtomic(root, 'work-24c', '# plan\n')
-    assert.equal(written.ok, true, written.error)
+    const planPath = planning.PlanningSurface.resolvePlanPath(root, 'work-24c').path
+    mkdirSync(dirname(planPath), { recursive: true })
+    writeFileSync(planPath, '# plan\n')
     const selected = planning.PlanningSurface.readAndValidatePlan(root, 'work-24c')
     assert.equal(selected.ok, true, selected.error)
     delivered = surface.deliverStateProbe(text, 'run-final', 'call-final', 30n, { digest: selected.digest, path: selected.path })
@@ -165,8 +240,14 @@ test('WHAT[work-024] deliver refuses a blocker and an unauthorized tenure relays
   assert.equal(eventsOf(blocked.bytes)[0].outcome, 'Relayed')
 
   const reviewed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Stayed')
-  const stayed = surface.deliverProbe(`${opened}${reviewed.bytes}`, 'run-stay', 'call-stay', 11n)
+  // A stayed review leaves a non-empty ledger, so deliver refuses; clearing the
+  // ledger (eligibility stays locked as Stayed) reopens the relay path.
+  const stayedBlocked = surface.deliverProbe(`${opened}${reviewed.bytes}`, 'run-stay', 'call-stay', 11n)
+  assert.equal(stayedBlocked.decision, 'Done', stayedBlocked.detail)
+  assert.equal(stayedBlocked.detail, 'Blocked', 'a non-empty ledger blocks deliver')
+  const cleared = surface.reviewProbe(`${opened}${reviewed.bytes}`, incumbencyIdOf(`${opened}${reviewed.bytes}`), 'Cleared')
+  const stayed = surface.deliverProbe(`${opened}${reviewed.bytes}${cleared.bytes}`, 'run-stay2', 'call-stay2', 12n)
   assert.equal(stayed.decision, 'Write', stayed.detail)
-  assert.equal(stayed.detail, 'Relayed', 'Stayed keeps the unauthorized relay path on every stage')
-  assert.equal(surface.documentView(`${opened}${reviewed.bytes}${stayed.bytes}`).projection, 'S1')
+  assert.equal(stayed.detail, 'Relayed', 'a cleared ledger reopens the relay path at the same stage')
+  assert.equal(surface.documentView(`${opened}${reviewed.bytes}${cleared.bytes}${stayed.bytes}`).projection, 'S1')
 })

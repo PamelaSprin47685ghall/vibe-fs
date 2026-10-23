@@ -284,12 +284,9 @@ module ToolExecuteGate =
         (role: Role)
         : Task<string> =
         let isExactQuestionReplay =
-            match ctx.ProviderRunId with
-            | Some run ->
-                match ctx.ToolCallId with
-                | Some call -> gate.WaitingQuestionFenceFor ctx.SessionId = Some(run, call)
-                | None -> false
-            | None -> false
+            match ctx.ProviderRunId, ctx.ToolCallId with
+            | Some run, Some call -> gate.WaitingQuestionFenceFor ctx.SessionId = Some(run, call)
+            | _ -> false
 
         let isWaitingReplayExempt =
             (spec.Name = "deliver" || spec.Name.StartsWith "todowrite-for-")

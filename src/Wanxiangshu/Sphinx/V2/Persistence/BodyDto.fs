@@ -405,12 +405,7 @@ module internal BodyDto =
 
     let private slot: Decoder<CertificateSlot> =
         exact
-            [ "slot"
-              "producer"
-              "schema"
-              "canonicalPayload"
-              "revision"
-              "guarantee" ]
+            [ "slot"; "producer"; "schema"; "canonicalPayload"; "revision"; "guarantee" ]
             (Decode.object (fun get ->
                 { Slot = get.Required.Field "slot" nonBlank
                   Producer = get.Required.Field "producer" nonBlank

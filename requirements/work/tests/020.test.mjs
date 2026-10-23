@@ -20,7 +20,7 @@ import {
 
 // WHAT[work-020] fixes the closed input set a Plan runner receives:
 // U (verbatim, original order), current-tenure interactions, the predecessor's
-// declared ANCHOR view (durable ViewCheckpointCommitted + carry), and P
+// declared ANCHOR view (durable ViewCheckpointCommitted + carry), and the draft
 // (the only writable surface, reached through todowrite-for-plan only); no
 // synthetic predecessor message is ever injected.
 
@@ -110,16 +110,16 @@ test('WHAT[work-020] assembled messages come only from U and current-tenure inte
       `assembled message id ${msgId(m)} must originate from the physical input messages`,
     )
   }
-  // The draft P is reachable only through the todowrite-for-plan tool surface; the
+  // The draft is reachable only through the todowrite-for-plan tool surface; the
   // assembled request never carries its content as an injected message.
   assert.equal(result.messages.length, rawMessages.length)
 })
 
-test('WHAT[work-020] the plan runner holds no write capability beyond P', () => {
+test('WHAT[work-020] the plan runner holds no write capability beyond the draft', () => {
   for (const perm of ['Write', 'Edit', 'Move', 'Remove', 'Exec', 'Pty']) {
     assert.equal(isAllowed('plan', perm), false, `plan must be denied ${perm}`)
   }
-  // P itself is reached through the todowrite-for-plan programming surface.
+  // The draft itself is reached through the todowrite-for-plan programming surface.
   assert.equal(isAllowed('plan', 'JsPlan'), true)
 })
 

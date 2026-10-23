@@ -329,10 +329,16 @@ for (const byname of ['Ada', 'devops']) {
 for (const phase of ['GUIDANCE', 'GUIDANCE_STOP']) {
   integrationTest(`WHAT[delegation-027] installed Host releases Manager Join and appends guidance after the child ${phase === 'GUIDANCE_STOP' ? 'final output' : 'tool step'}`, () => {
     const runner = fileURLToPath(new URL('../../host-boundary/tests/support/run-user-input-canary.mjs', import.meta.url))
-    const launched = spawnSync(process.execPath, [runner, '--phase', phase], {
-      encoding: 'utf8', timeout: 120000,
-    })
-    assert.equal(launched.status, 0, `${launched.error ?? ''}\n${launched.stdout}\n${launched.stderr}`)
-    assert.equal(JSON.parse(launched.stdout.trim()).physicalCleanup, true)
+    try {
+      const launched = spawnSync(process.execPath, [runner, '--phase', phase], {
+        encoding: 'utf8', timeout: 120000,
+      })
+      if (launched.status !== 0 && typeof launched.stderr === 'string') console.error(launched.stderr)
+      assert.equal(launched.status, 0, `${launched.error ?? ''}\n${launched.stdout}\n${launched.stderr}`)
+      assert.equal(JSON.parse(launched.stdout.trim()).physicalCleanup, true)
+    } catch (error) {
+      if (typeof error?.stderr === 'string') console.error(error.stderr)
+      throw error
+    }
   })
 }

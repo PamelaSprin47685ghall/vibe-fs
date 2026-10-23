@@ -84,7 +84,7 @@ work-049 的 `ask` 是模型主动请求的人类等待，不是“新用户输�
 
 HandleAbandoned 表示 child 不会再沿当前 handle 返回，只由已确认的 logical parent/session 终止或 child 永久丢失证据授权。
 
-Attempt/TurnAborted、provider failure/retry、degeneration-guard、Fission、插件卸载、进程 shutdown 或 runtime dispose 均无此权限，只结束当前观察者/attempt 或 detach 本地资源，保留 durable Active handle 供恢复与 Join/Horizon。未知停止信号不升级成 ParentCancelled。
+Attempt/TurnAborted、provider failure/retry、Fission、插件卸载、进程 shutdown 或 runtime dispose 均无此权限，只结束当前观察者/attempt 或 detach 本地资源，保留 durable Active handle 供恢复与 Join/Horizon。未知停止信号不升级成 ParentCancelled。
 
 放弃原因（`HandleAbandonReason`）的合法集合是四项：`ParentCancelled`、`DeadlineExceeded`、`HostSessionGone` 与 `Voided`。`Voided`（作废）是 2026-10-21 裁决新增的一项：它表示该 child 工作**已无法交付**、因此以作废结清父方的未解除工作义务。**两类作废事实都走 abandon，没有一类是 abandon 规则的例外**，差别只在于被 abandon 的是工作单元格还是 handle 绑定：对 scoped 工作，其具体工作单元格转为 `Abandoned(Voided)`，它承载的那份**工作义务已是终态**；底层 handle 绑定仍**可复用**（它标识可再次参与的参与者身份，不是被作废的那份工作）；对无 scope 历史，被 abandon 的就是该 handle 绑定自身，它转为 `Abandoned(Voided)`。两种情形都是 join 报告恰好一次 `voided` 之后退役；**结算按孤儿幂等，重启的进程不得再次作废同一份孤儿工作**（每个孤儿一生只产生一条作废事实），报告之后该 handle 经 `durableLifecycleByname` 读出 `Retired`——**这是经 `summary` 投影读出的终态**，不是从原始 handle 绑定直接读出的。作废不是完成，它不写完成正文。这四项是 `wanxiangli/handle-lifecycle` 的 `recoverChild()` 所接受的 `durableReason` 全集——**已被 2026-10-21 作废裁决取代的旧口径**是「只有 `ParentCancelled`/`DeadlineExceeded`/`HostSessionGone` 三项」，现已作废，见 `requirements/delegation/tests/README.md` 的「未交付子工作的作废结清」一节。库侧已发布 0.66.0（`handle-lifecycle` 接受 `Voided`），**主仓的 `wanxiangli` gitlink 也已随 `cfa8d0dad` 前移到 0.66.0（`663ba59`）**（该 bump 已随行为泳道的 `6ccc761c2` 进入 `origin/master`），主仓把 `durableReason = "Voided"` 交给库的那条恢复路径现在交到的就是已发布并接受它的库版本。
 
@@ -141,7 +141,7 @@ Session 收束（`PluginSessionScope.ClearSession`，覆盖宿主 `SessionDelete
 - 允许后果：取消只移除该 session 名下的保留，并以 exact `admissionOwner.ReleasePhysical` 路径回放其挂起的旧 key 归还；最后一份保留撤销后旧 credit 立即归还，borrowed credit 不退休 lender。归还完成后旧 execution 不得再出现在 shared capacity 快照中。
 - 禁止后果：不得使用 `ReleaseExecution`/`ReleaseSession` 等 force 路径；不得 session-wide blind release、计数减一或以时间猜测释放；保留未取消时不得宣称归还完成；取消操作不得取消无关的 pending demand 或触碰其他 session 的保留。
 - 失败后果：取消回放对 `AlreadyApplied` 与 `StaleFence` 按幂等结果接受，视同归还完成并清除挂起记录；对 `Conflict` 不得吞没——以带 exact key 信息文本的 `InvalidOperationException` 显式暴露（风格对齐 [026] 的 `SessionRecoveryHost.release`），且暴露时保留挂起记录，使「取消已完成、归还未完成」的状态不被静默吞掉。重复收束幂等：保留已取消时不产生第二次释放副作用；除真实所有权冲突外不抛错。
-- 失败隔离：收束链的任一步失败只隔离该步自身，不得跳过其余独立义务。`ClearSession` 内，Main 自身的结算、保留取消或释放失败不得跳过 linked Attached InternalLeaf 的结算、保留取消与 exact 释放；任一作用域的失败也不得跳过本次收束的无条件 per-session 清理组（registry 条目、quiescence、join-interrupt、companion 等）。`PluginRuntimeScope.DisposeSession` 承接 `ClearSession` 失败后仍必须执行其后续清理组（recovery scope、attempt plan、parked sites、LoopSensor 等）。失败在完成其余义务后仍显式暴露：首个真实失败被保留并在其余义务完成后重新抛出；上一段的真冲突例外语义不因隔离被吞掉或降级。重复收束继续幂等，已消费的失败源不得在第二次收束中再次产生副作用或吞掉新的失败。
+- 失败隔离：收束链的任一步失败只隔离该步自身，不得跳过其余独立义务。`ClearSession` 内，Main 自身的结算、保留取消或释放失败不得跳过 linked Attached InternalLeaf 的结算、保留取消与 exact 释放；任一作用域的失败也不得跳过本次收束的无条件 per-session 清理组（registry 条目、quiescence、join-interrupt、companion 等）。`PluginRuntimeScope.DisposeSession` 承接 `ClearSession` 失败后仍必须执行其后续清理组（recovery scope、attempt plan、parked sites 等）。失败在完成其余义务后仍显式暴露：首个真实失败被保留并在其余义务完成后重新抛出；上一段的真冲突例外语义不因隔离被吞掉或降级。重复收束继续幂等，已消费的失败源不得在第二次收束中再次产生副作用或吞掉新的失败。
 
 ## [028] Child 终态结算必须可观察
 

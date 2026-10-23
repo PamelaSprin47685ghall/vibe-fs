@@ -100,7 +100,6 @@ grounding 由 `requirement-system` package 拥有。
 | [provider-attempt-recovery](provider-attempt-recovery/WHAT.md) | attempt 失败后可 bounded 换 execution binding，不改变 authority/personhood。 |
 | [host-provider-failure-ownership](host-provider-failure-ownership/WHAT.md) | 万象术启用时接管 provider 失败恢复；Host 重试归零，claimed 错误抑制默认弹窗。 |
 | [crash-reconciliation](crash-reconciliation/WHAT.md) | 中断后只从 durable facts + 可信物理观察重入普通程序。 |
-| [degeneration-guard](degeneration-guard/WHAT.md) | 未结束 attempt 病态重复时主动止损再交正常 recovery。 |
 
 ### 9. Mission / work
 | Package | 一句话 WHY |

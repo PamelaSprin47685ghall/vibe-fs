@@ -276,7 +276,7 @@ module HostForkRunLifecycle =
             // without the material and strand the run.
             let delivered = peekDeliveredView run result prose
 
-            return chooseView delivered (observed |> Option.map (fun text -> ReturnedMaterial.ofTexts [ text ]))
+            return chooseView delivered (observed |> Option.map (fun text -> ReturnedMaterial.encode [ text ] []))
         }
 
     let viewForOutcome

@@ -31,8 +31,7 @@ type DecisionReceiptBody =
       EstimateRefs: (PlanId * string) list
       ExcludedPlans: ExcludedPlan list
       UnestimatedPlans: UnestimatedPlan list
-      TieBreak: string option
-    }
+      TieBreak: string option }
 
 type SelectionOutcome =
     { Selected: PlanEstimate

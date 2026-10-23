@@ -76,7 +76,7 @@ type PluginSessionScope
     member val JoinGuardNudges = HashSet<string>()
     // DSL-MUTABLE: resource — per-instance aborted session set.
     // HOST-004: process-local idle-derived continuation admission. Per plugin
-    // instance like NudgeSent / LoopSensor; never journalled (HOST-007). A
+    // instance like NudgeSent; never journalled (HOST-007). A
     // worktree owner transfer starts a fresh gate — no old permit survives.
     // DSL-MUTABLE: resource — per-instance quiescence gate instance.
     member val Quiescence = SessionQuiescenceGate()

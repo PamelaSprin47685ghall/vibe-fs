@@ -8,9 +8,7 @@ module PlanningSurface =
     val validateWorkId: workId: string -> obj
     val canonicalWorkKey: workId: string -> obj
     val resolvePlanPath: root: string -> workId: string -> obj
-    val readPlan: root: string -> workId: string -> obj
-    val rewritePlanAtomic: root: string -> workId: string -> content: string -> obj
-    val editPlanAtomic: root: string -> workId: string -> patches: obj -> obj
+    val readAndValidatePlan: root: string -> workId: string -> obj
 
     val ensurePlanWorkOpened:
         gitCommonDir: string -> root: string -> sessionId: string -> observedHead: obj -> Task<obj>
@@ -49,10 +47,19 @@ module PlanningSurface =
     /// work-028: `delegateTo` is a plain JavaScript function
     /// `(intent) => Promise<string>` returning the DevOps delivered view.
     val executeAsk: gitCommonDir: string -> workId: string -> intent: string -> delegateTo: obj -> Task<obj>
-    val executeJsPlan: root: string -> workId: string -> action: string -> content: obj -> patches: obj -> obj
     val reviewTargetFor: stage: string -> string
 
     val executeReview:
-        gitCommonDir: string -> workId: string -> incumbencyId: string -> findings: obj -> note: obj -> Task<obj>
+        gitCommonDir: string ->
+        workId: string ->
+        incumbencyId: string ->
+        requestId: string ->
+        findings: obj ->
+        note: obj ->
+            Task<obj>
+
+    /// reviewFinishedOnly: true once the named incumbency has finished its
+    /// first review, which unlocks draft writes for that tenure.
+    val isReviewFinished: gitCommonDir: string -> workId: string -> incumbencyId: string -> bool
 
     val PlanningSurface: obj

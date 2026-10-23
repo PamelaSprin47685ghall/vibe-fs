@@ -8,9 +8,6 @@
   "exports": {
     ".": "./dist/OpenCode/Plugin/Plugin.js"
   },
-  "imports": {
-    "#wanxiangshu-loop-detector-envelope": "./dist/Execution/Session/LoopDetectorEnvelope.js"
-  },
   "files": [
     "dist/",
     "resources/"

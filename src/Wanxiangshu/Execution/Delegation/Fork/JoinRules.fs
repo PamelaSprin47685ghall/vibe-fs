@@ -13,11 +13,18 @@ module JoinRules =
 
     /// One joined child, reduced to the fields the join wire carries.
     type JoinRecord =
-        { Name: string
-          AgentId: string
-          Role: string
-          Status: string
-          Returned: string list }
+        {
+            Name: string
+            AgentId: string
+            Role: string
+            Status: string
+            /// The main prose (report) the child returned, as raw text entries.
+            /// Never pre-rendered TOML; the final boundary renders it as a
+            /// `# ` comment header.
+            Body: string list
+            /// Structured carry material, separate from the report prose.
+            Returned: string list
+        }
 
     let private plain text = if isNull text then [] else [ text ]
 
@@ -46,36 +53,42 @@ module JoinRules =
               AgentId = payload.AgentId
               Role = Roles.roleLabel payload.Role
               Status = "completed"
-              Returned = ReturnedMaterial.texts payload.View }
+              Body = ReturnedMaterial.body payload.View
+              Returned = ReturnedMaterial.carry payload.View }
         | JoinItem.AgentItem(AgentFailedItem payload) ->
             { Name = resolveName payload.AgentId
               AgentId = payload.AgentId
               Role = resolveRole payload.AgentId payload.Role
               Status = "failed"
-              Returned = plain payload.Message }
+              Body = plain payload.Message
+              Returned = [] }
         | JoinItem.AgentItem(AgentAbandonedItem(agentId, reason)) ->
             { Name = resolveName agentId
               AgentId = agentId
               Role = resolveRole agentId None
               Status = if reason = "Voided" then "voided" else "abandoned"
+              Body = []
               Returned = [] }
         | JoinItem.PtyItem(PtyExited payload) ->
             { Name = resolveLabel payload.PtyId
               AgentId = payload.PtyId
               Role = Roles.roleLabel Role.DevOps
               Status = "completed"
+              Body = []
               Returned = plain payload.Outcome }
         | JoinItem.PtyItem(PtyFailed payload) ->
             { Name = resolveLabel payload.PtyId
               AgentId = payload.PtyId
               Role = Roles.roleLabel Role.DevOps
               Status = "failed"
+              Body = []
               Returned = plain payload.Message }
         | JoinItem.PtyItem(PtyAborted payload) ->
             { Name = resolveLabel payload.PtyId
               AgentId = payload.PtyId
               Role = Roles.roleLabel Role.DevOps
               Status = "abandoned"
+              Body = []
               Returned = plain payload.Message }
 
     /// One orchestrator verdict → the record the join wire carries.
@@ -87,22 +100,33 @@ module JoinRules =
               AgentId = ManagerJobId.value jobId
               Role = Roles.roleLabel Role.Manager
               Status = "completed"
+              Body = []
               Returned = [ CommitHash.value head ] }
         | OrchestratorVerdict.Cancelled jobId ->
             { Name = resolveJobName jobId
               AgentId = ManagerJobId.value jobId
               Role = Roles.roleLabel Role.Manager
               Status = "abandoned"
+              Body = []
+              Returned = [] }
+        | OrchestratorVerdict.RejectedDirty reason ->
+            { Name = ""
+              AgentId = ""
+              Role = Roles.roleLabel Role.Manager
+              Status = "failed"
+              Body = plain reason
               Returned = [] }
         | OrchestratorVerdict.IntegrationFailed(jobId, errorDetails) ->
             { Name = resolveJobName jobId
               AgentId = ManagerJobId.value jobId
               Role = Roles.roleLabel Role.Manager
               Status = "failed"
-              Returned = plain errorDetails }
+              Body = plain errorDetails
+              Returned = [] }
         | OrchestratorVerdict.Empty ->
             { Name = ""
               AgentId = ""
               Role = Roles.roleLabel Role.Manager
               Status = "abandoned"
+              Body = []
               Returned = [] }

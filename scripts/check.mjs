@@ -15,6 +15,7 @@ export const checks = [
   join(root, 'checks/provider-projection-boundary.mjs'),
   join(root, 'checks/subsystems.mjs'),
   join(root, 'checks/fatal-inventory-gate.mjs'),
+  join(root, 'checks/fsharp-control-pyramid.mjs'),
   join(root, 'checks/retry-owner.mjs'),
   join(root, 'checks/hook-policy.mjs'),
   join(root, 'checks/causal-wait-boundary.mjs'),

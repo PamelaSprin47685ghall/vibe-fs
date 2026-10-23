@@ -130,13 +130,20 @@ module JsWorkflowSurface =
                         Some(JsTransactionSurface.lifecyclePersistenceOf store)
 
                 let input =
-                    if not (isNull input) && not (isNull input?program) && (isNull input?name || string input?name = "") then
+                    if
+                        not (isNull input)
+                        && not (isNull input?program)
+                        && (isNull input?name || string input?name = "")
+                    then
                         harnessNameSeq <- harnessNameSeq + 1
+
                         createObj
                             [ "program" ==> input?program
                               "name" ==> ("test-" + sessionId + "-" + string harnessNameSeq)
-                              if not (isNull input?prefixCount) then "prefixCount" ==> input?prefixCount
-                              if not (isNull input?carry) then "carry" ==> input?carry ]
+                              if not (isNull input?prefixCount) then
+                                  "prefixCount" ==> input?prefixCount
+                              if not (isNull input?carry) then
+                                  "carry" ==> input?carry ]
                     else
                         input
 

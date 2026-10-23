@@ -102,17 +102,18 @@ module LifecycleSurface =
               "openingCursor", box head ]
 
     let private reviewCommand (incumbencyId: string) (outcome: string) (reviewerId: string) =
-        let findings: obj =
+        let updates: obj =
             match outcome with
             | "Promoted" -> box ([||]: string array)
-            | "Stayed" -> box [| "stayed" |]
+            | "Stayed" -> box [| createObj [ "key", box "stayed"; "value", box "stayed" ] |]
+            | "Cleared" -> box [| createObj [ "key", box "stayed"; "value", null ] |]
             | _ -> null
 
         command
             "Review"
             [ "incumbencyId", box incumbencyId
               "reviewerId", box reviewerId
-              "findings", findings ]
+              "updates", updates ]
 
     let private deliverCommand
         (incumbencyId: string)
@@ -311,7 +312,8 @@ module LifecycleSurface =
     let reviewProbe (text: string) (incumbencyId: string) (outcome: string) =
         match outcome with
         | "Promoted"
-        | "Stayed" ->
+        | "Stayed"
+        | "Cleared" ->
             let records = recordsOf text
 
             attempt
@@ -801,7 +803,7 @@ module LifecycleSurface =
     let private seedReviewWith (store: obj) (workId: string) (outcome: string) (reviewerId: string) : Task<obj> =
         task {
             match stampedDir store, outcome with
-            | Some dir, ("Promoted" | "Stayed") ->
+            | Some dir, ("Promoted" | "Stayed" | "Cleared") ->
                 try
                     match DurableWorkHost.inspected dir workId with
                     | None ->
@@ -823,7 +825,7 @@ module LifecycleSurface =
                                 DurableWorkHost.execute
                                     dir
                                     workId
-                                    ("review:" + incumbencyId)
+                                    ("review:" + incumbencyId + ":" + outcome)
                                     (reviewCommand incumbencyId outcome reviewerId)
 
                             if receipt.Status = "Committed" || receipt.Status = "Replayed" then
@@ -1070,60 +1072,6 @@ module LifecycleSurface =
             | Some cursor -> return! seedDeliverAt store workId providerRunId toolCallId cursor
         }
 
-    let seedConfirmation (store: obj) (workId: string) (providerRunId: string) (toolCallId: string) : Task<obj> =
-        task {
-            match stampedDir store with
-            | Some dir ->
-                try
-                    match DurableWorkHost.inspected dir workId with
-                    | None ->
-                        return
-                            box
-                                {| ok = false
-                                   error = "lifecycle work is missing" |}
-                    | Some work ->
-                        let incumbencyId = work.ActiveId |> Option.defaultValue ""
-
-                        let receipt =
-                            DurableWorkHost.execute
-                                dir
-                                workId
-                                ("deliver:" + providerRunId + ":" + toolCallId)
-                                (deliverCommand incumbencyId providerRunId toolCallId (asNumber 1L) None)
-
-                        if
-                            (receipt.Status = "Committed" || receipt.Status = "Replayed")
-                            && receipt.Kind = "Confirmed"
-                        then
-                            return box {| ok = true; error = "" |}
-                        else
-                            let refusal =
-                                if receipt.Kind.Length > 0 then receipt.Kind
-                                elif receipt.Reason.Length > 0 then receipt.Reason
-                                else receipt.Status
-
-                            return box {| ok = false; error = refusal |}
-                with error ->
-                    return box {| ok = false; error = error.Message |}
-            | None ->
-                if (recall workId).Length = 0 then
-                    return
-                        box
-                            {| ok = false
-                               error = "lifecycle work is missing" |}
-                else
-                    let! delivered = seedDeliver store workId providerRunId toolCallId 1L
-                    let admitted = unbox<bool> delivered?ok
-
-                    if admitted && string delivered?decision = "Confirmed" then
-                        return box {| ok = true; error = "" |}
-                    else
-                        return
-                            box
-                                {| ok = false
-                                   error = string delivered?decision + " " + string delivered?error |}
-        }
-
     let private roundRange (round: obj) =
         string round?openingCursor + "," + string round?retirementCursor
 
@@ -1242,7 +1190,6 @@ module LifecycleSurface =
                sequence = ""
                active = false
                reviewed = ""
-               confirmed = false
                delivered = false |}
 
     let private presentWorkView (work: DurableWorkHost.InspectedWork) =
@@ -1251,7 +1198,6 @@ module LifecycleSurface =
                sequence = String.concat "," work.Sequence
                active = work.ActiveId.IsSome
                reviewed = work.ReviewOutcome |> Option.defaultValue ""
-               confirmed = work.Confirmed
                delivered = work.Delivered |}
 
     let private namesOfEnvelope (line: string) =

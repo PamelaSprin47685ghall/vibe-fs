@@ -16,7 +16,6 @@ import { fileURLToPath } from 'node:url'
 import {
   assertBuildFresh,
   collectCompilerInputs,
-  collectGeneratedInputs,
   collectArtifactInputs,
   computeDigest,
 } from './lib/build-state.mjs'
@@ -84,7 +83,6 @@ export async function runCoverage(options = {}) {
   // Record initial input digests for INPUT_CHANGED check
   const collectInputs = options.collectInputsFn ?? (() => ({
     compiler: computeDigest(collectCompilerInputs(root)),
-    generated: computeDigest(collectGeneratedInputs(root)),
     artifact: computeDigest(collectArtifactInputs(root)),
   }))
   const initialDigests = collectInputs()
@@ -227,14 +225,11 @@ export async function runCoverage(options = {}) {
   const currentDigests = collectInputs()
   if (
     currentDigests.compiler !== initialDigests.compiler ||
-    currentDigests.generated !== initialDigests.generated ||
     currentDigests.artifact !== initialDigests.artifact
   ) {
     console.error(`coverage: input files changed during coverage run (INPUT_CHANGED):`)
     if (currentDigests.compiler !== initialDigests.compiler)
       console.error(`  compiler: ${initialDigests.compiler} -> ${currentDigests.compiler}`)
-    if (currentDigests.generated !== initialDigests.generated)
-      console.error(`  generated: ${initialDigests.generated} -> ${currentDigests.generated}`)
     if (currentDigests.artifact !== initialDigests.artifact)
       console.error(`  artifact: ${initialDigests.artifact} -> ${currentDigests.artifact}`)
     return { ok: false, code: 'INPUT_CHANGED' }

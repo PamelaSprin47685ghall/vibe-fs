@@ -691,7 +691,6 @@ module ForkToolSurface =
                         {| calling = if String.IsNullOrWhiteSpace calling then null else calling
                            name = byname
                            charge = charge
-                           keywords = null
                            attach = null
                            expected_tool_calls = null |}
                 )
@@ -717,7 +716,6 @@ module ForkToolSurface =
                         {| calling = if String.IsNullOrWhiteSpace calling then null else calling
                            name = byname
                            charge = charge
-                           keywords = null
                            attach = null
                            expected_tool_calls = null |}
                 )
@@ -742,7 +740,6 @@ module ForkToolSurface =
                     {| calling = null
                        name = byname
                        charge = charge
-                       keywords = null
                        attach = attach
                        expected_tool_calls = null |}
             )
@@ -1047,6 +1044,7 @@ module ForkToolSurface =
                               "agentId" ==> record.AgentId
                               "role" ==> record.Role
                               "status" ==> record.Status
+                              "body" ==> (record.Body |> String.concat "\n")
                               "returned"
                               ==> (record.Returned
                                    |> List.map (fun text -> createObj [ "text" ==> text ])

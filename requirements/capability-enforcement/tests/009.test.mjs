@@ -21,7 +21,7 @@ const memberDoc = (description, memberName) => {
   return description.slice(start, end === -1 ? description.length : end)
 }
 
-test('WHAT[capability-enforcement-009] FORK_programming_surface_exposes_expected_members_and_only_manager_fork_carries_keywords', async () => {
+test('WHAT[capability-enforcement-009] FORK_programming_surface_exposes_expected_members_and_neither_manager_fork_nor_commission_carries_keywords', async () => {
   const manager = generateRole('manager', 'en')
   const orchestrator = generateRole('orchestrator', 'en')
 
@@ -39,7 +39,7 @@ test('WHAT[capability-enforcement-009] FORK_programming_surface_exposes_expected
   assert.equal(orchestrator.baseClassSource.includes('async commission(payload, carry = [])'), true, 'the orchestrator base class declares the commission member')
 
   const managerFork = memberDoc(manager.description, 'fork')
-  assert.match(managerFork, /keywords\?/, 'the fork payload carries the warm-start keywords')
+  assert.equal(managerFork.includes('keywords'), false, 'fork must not carry warm-start keywords')
   const orchestratorCommission = memberDoc(orchestrator.description, 'commission')
   assert.match(orchestratorCommission, /payload is \{ charge, name\?, calling\? \}/, 'the commission payload states its own shape')
   assert.equal(orchestratorCommission.includes('keywords'), false, 'commission must not carry warm-start keywords')

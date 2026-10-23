@@ -17,17 +17,12 @@ import {
 import {
   MANIFEST_SCHEMA,
   collectCompilerInputs,
-  collectGeneratedInputs,
   collectArtifactInputs,
   collectOutputs,
   computeDigest,
   readManifest,
   writeManifest,
 } from './lib/build-state.mjs'
-import {
-  loopDetectorEnvelopeDistPath,
-  loopDetectorEnvelopeRepositoryPath,
-} from './lib/loop-detector-envelope-paths.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
@@ -130,22 +125,6 @@ export class CrossProcessMutex {
 
 // ── Resource & Artifact Verification ─────────────────────────────────────────
 
-export function materializeLoopDetectorEnvelope(targetRoot = root) {
-  // degeneration-guard-004: the envelope is derived manually into the tracked
-  // repository artifact. The build never auto-derives it and never checks
-  // whether it changed; it copies the repository artifact verbatim into dist.
-  const source = path.join(targetRoot, loopDetectorEnvelopeRepositoryPath)
-  const target = path.join(targetRoot, loopDetectorEnvelopeDistPath)
-  if (!fs.existsSync(source)) {
-    throw new Error(
-      `missing repository loop detector envelope artifact: ${source}\n` +
-        'Run `node scripts/derive-envelope.mjs` to derive it from the repository corpus.',
-    )
-  }
-  fs.mkdirSync(path.dirname(target), { recursive: true })
-  fs.copyFileSync(source, target)
-}
-
 async function verifyArtifacts(targetRoot = root) {
   // Fable 在 Linux 容器内可能生成权限异常（--w-------）的 0 字节产物，
   // 导致后续 surface/linkage 遍历 readFileSync 报 EACCES/ENOENT。
@@ -154,8 +133,6 @@ async function verifyArtifacts(targetRoot = root) {
     const { execFileSync } = await import('node:child_process')
     execFileSync('find', [path.join(targetRoot, 'dist'), '-type', 'f', '-size', '0', '-exec', 'rm', '-f', '{}', '+'], { stdio: 'pipe' })
   } catch {}
-
-  materializeLoopDetectorEnvelope(targetRoot)
 
   const entry = path.join(targetRoot, 'dist/OpenCode/Plugin/Plugin.js')
   if (!fs.existsSync(entry)) throw new Error(`missing entry artifact: ${entry}`)
@@ -207,17 +184,6 @@ function getToolchainIdentity() {
   return `dotnet ${dotnetVer} / fable ${fableVer}`
 }
 
-function computeCorpusDigest(generatedInputs, targetRoot) {
-  const hasher = crypto.createHash('sha256')
-  for (const entry of generatedInputs) {
-    const abs = path.resolve(targetRoot, entry.path)
-    if (fs.existsSync(abs)) {
-      hasher.update(fs.readFileSync(abs))
-    }
-  }
-  return hasher.digest('hex')
-}
-
 // ── Build Mode Decision ──────────────────────────────────────────────────────
 
 export function checkOutputsValid(existingManifest, targetDist) {
@@ -263,7 +229,6 @@ export function determineBuildDecision({
   targetDist,
   compilerInputs,
   compilerInputDigest,
-  generatedInputDigest,
   artifactInputDigest,
   currentToolchain,
 }) {
@@ -347,12 +312,10 @@ export function determineBuildDecision({
     }
   }
 
-  const generatedMatch =
-    generatedInputDigest === existingManifest.generated?.inputDigest
   const artifactMatch =
     artifactInputDigest === existingManifest.artifacts?.inputDigest
 
-  if (generatedMatch && artifactMatch) {
+  if (artifactMatch) {
     return {
       mode: 'no-op',
       reason: 'build up-to-date',
@@ -459,9 +422,6 @@ export async function runBuild({
     const compilerInputs = collectCompilerInputs(resolvedRoot, null)
     const compilerInputDigest = computeDigest(compilerInputs)
 
-    const generatedInputs = collectGeneratedInputs(resolvedRoot)
-    const generatedInputDigest = computeDigest(generatedInputs)
-
     const artifactInputs = collectArtifactInputs(resolvedRoot)
     const artifactInputDigest = computeDigest(artifactInputs)
 
@@ -471,7 +431,6 @@ export async function runBuild({
       targetDist,
       compilerInputs,
       compilerInputDigest,
-      generatedInputDigest,
       artifactInputDigest,
       currentToolchain: getToolchainIdentity(),
     })
@@ -526,12 +485,6 @@ export async function runBuild({
       throw new Error('Mid-build mutation detected: compiler inputs changed during compilation')
     }
 
-    const finalGeneratedInputs = collectGeneratedInputs(resolvedRoot)
-    const finalGeneratedDigest = computeDigest(finalGeneratedInputs)
-    if (finalGeneratedDigest !== generatedInputDigest) {
-      throw new Error('Mid-build mutation detected: generated inputs changed during compilation')
-    }
-
     const finalArtifactInputs = collectArtifactInputs(resolvedRoot)
     const finalArtifactDigest = computeDigest(finalArtifactInputs)
     if (finalArtifactDigest !== artifactInputDigest) {
@@ -553,13 +506,6 @@ export async function runBuild({
         toolIdentity: getToolchainIdentity(),
         inputDigest: finalCompilerDigest,
         inputs: finalCompilerInputs,
-      },
-      generated: {
-        inputDigest: finalGeneratedDigest,
-        corpusPathList: finalGeneratedInputs.map((e) => e.path),
-        corpusDigest: computeCorpusDigest(finalGeneratedInputs, resolvedRoot),
-        generatorIdentity: 'derive-loop-detector-envelope.mjs@v1',
-        tokenizerIdentity: 'gpt-tokenizer@4.0.0',
       },
       artifacts: {
         inputDigest: finalArtifactDigest,
@@ -636,8 +582,6 @@ export async function planBuild({
   const manifest = readManifest({ root: resolvedRoot })
   const compilerInputs = collectCompilerInputs(resolvedRoot, null)
   const compilerInputDigest = computeDigest(compilerInputs)
-  const generatedInputs = collectGeneratedInputs(resolvedRoot)
-  const generatedInputDigest = computeDigest(generatedInputs)
   const artifactInputs = collectArtifactInputs(resolvedRoot)
   const artifactInputDigest = computeDigest(artifactInputs)
 
@@ -648,7 +592,6 @@ export async function planBuild({
     targetDist,
     compilerInputs,
     compilerInputDigest,
-    generatedInputDigest,
     artifactInputDigest,
     currentToolchain,
   })
@@ -663,7 +606,6 @@ export async function planBuild({
       fableCompileInvocations: 0,
       manifestPath,
       compilerInputDigest,
-      generatedInputDigest,
       artifactInputDigest,
     }
   }
@@ -678,7 +620,6 @@ export async function planBuild({
       fableCompileInvocations: 0,
       manifestPath,
       compilerInputDigest,
-      generatedInputDigest,
       artifactInputDigest,
       missingDist: decision.missingDist,
     }
@@ -700,7 +641,6 @@ export async function planBuild({
     fableCompileInvocations: 1,
     manifestPath,
     compilerInputDigest,
-    generatedInputDigest,
     artifactInputDigest,
     missingDist: decision.missingDist,
   }

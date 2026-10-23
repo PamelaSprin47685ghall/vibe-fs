@@ -9,7 +9,8 @@ type JsDelegationHost =
       Join: unit -> Task<obj>
       Fission: obj -> Task<obj>
       Horizon: unit -> Task<obj>
-      Advisor: obj -> obj -> Task<obj> } // (intent, carry)
+      Advisor: obj -> obj -> Task<obj> // (intent, carry)
+      Review: obj -> Task<obj> } // (findings)
 
 module JsDelegationBridge =
 

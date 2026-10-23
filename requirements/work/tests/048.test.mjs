@@ -41,19 +41,17 @@ const seedPendingDelivery = async (control, directory, workId, execSessionId, co
       type: 'Review',
       incumbencyId: active,
       reviewerId: 'reviewer',
-      findings: [],
+      updates: [],
     })
-    if (stage < 3) {
-      execute(`relay-${stage}`, {
-        type: 'Deliver',
-        incumbencyId: active,
-        providerRunId: `relay-run-${stage}`,
-        toolCallId: `relay-call-${stage}`,
-        cursor: stage * 10,
-        blockers: [],
-        nextOwnerId: workId,
-      })
-    }
+    execute(`relay-${stage}`, {
+      type: 'Deliver',
+      incumbencyId: active,
+      providerRunId: `relay-run-${stage}`,
+      toolCallId: `relay-call-${stage}`,
+      cursor: stage * 10,
+      blockers: [],
+      nextOwnerId: workId,
+    })
   }
 
   const active = life.inspected(commonDir, workId).ActiveId
@@ -142,7 +140,7 @@ test('WHAT[work-048] startup batch inspection preserves corrupt-work isolation a
     assert.throws(() => life.inspected(stateRoot, 'bad'), /checksum mismatch/i)
 
     accepted(life.execute(stateRoot, 'good', 'review', {
-      type: 'Review', incumbencyId: before.ActiveId, reviewerId: 'reviewer', findings: [],
+      type: 'Review', incumbencyId: before.ActiveId, reviewerId: 'reviewer', updates: [],
     }))
     const later = new Map(workHost.inspectedMany(stateRoot, ['good'])).get('good')
     assert.equal(later.toJSON()[0], 'Ok')

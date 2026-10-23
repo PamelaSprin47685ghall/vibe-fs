@@ -1,6 +1,6 @@
 # delegation 测试与证明范围
 
-2026-10-06 A2-R0/R1/R2有限验收完成：025以实际PluginScope/LoopSensor、同一managed owner和隔离配置驱动retry、guard及两类repair，四种恢复各五场景共20项通过；旧/晚successor的16个业务红已修。typed source在effect前交给具体call，actual PhysicalAccepted才登记其successor；旧same-root+历史kind宽匹配已删除。每次注册有独立opaque lease，关闭只释放该call资源；相邻Unknown Root和Fork边界另取证。gen184相关246/246、1290pass/0fail、28skip/137TODO，原预算及并发保留，见[正式记录](../../../proposals/archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)。实际安装版Host、物理终止/OS crash、完整025/T111/GAP-153及Sphinx答案仍未闭合；下一施工从[08接手卡](../../../proposals/TODO施工分册-2026-10-03/08-Sphinx真实Host接手.md)开始。
+2026-10-06 A2-R0/R1/R2有限验收完成：025以实际PluginScope、同一managed owner和隔离配置驱动retry及两类repair通过；旧/晚successor的16个业务红已修。typed source在effect前交给具体call，actual PhysicalAccepted才登记其successor；旧same-root+历史kind宽匹配已删除。每次注册有独立opaque lease，关闭只释放该call资源；相邻Unknown Root和Fork边界另取证。gen184相关246/246、1290pass/0fail、28skip/137TODO，原预算及并发保留，见[正式记录](../../../proposals/archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)。实际安装版Host、物理终止/OS crash、完整025/T111/GAP-153及Sphinx答案仍未闭合；下一施工从[08接手卡](../../../proposals/TODO施工分册-2026-10-03/08-Sphinx真实Host接手.md)开始。
 
 历史A2-D1证据：gen163六个真实业务红后，gen165定向004/007/009为36pass/0fail、1TODO；独立TCS、超时只释放自己，callback抛错仍广播exact Accepted并传播原异常。见[dispatch记录](../../../proposals/archive/2026-10-05/Sphinx确认等待隔离-2026-10-06.md)。D1本身不是025来源证明，本轮R0/R1/R2另取证，不重复施工底层确认。
 

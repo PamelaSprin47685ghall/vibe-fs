@@ -360,6 +360,7 @@ export function planOwnerCompile({ projectPath, aggregatePath = null } = {}) {
     candidatePath: resolvedProjectPath,
     projectPath: resolvedProjectPath,
     candidateBasename: path.basename(resolvedProjectPath),
+    projectDirectory: path.dirname(resolvedProjectPath),
     aggregatePath: resolvedAggregatePath,
     projectPaths: sortedProjectPaths,
     compileItems: orderedCompileItems,
@@ -397,6 +398,25 @@ function discoverOwnerProjects(projectDirectory, aggregatePath) {
     .sort()
 }
 
+const SHARED_COMPILER_INPUTS = new Set([
+  'Directory.Build.props',
+  'Directory.Build.targets',
+  'package.json',
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  'global.json',
+  'compile-order.txt',
+])
+
+function isSharedCompilerInput(changedPath, aggregatePath) {
+  return changedPath === aggregatePath
+    || SHARED_COMPILER_INPUTS.has(path.basename(changedPath))
+    || /(?:^|\/)\.config\/dotnet-tools\.json$/.test(changedPath)
+    || /(?:^|\/)scripts\/build\.mjs$/.test(changedPath)
+    || /(?:^|\/)scripts\/lib\/(?:owner-compile|compile-shards|build-state)\.mjs$/.test(changedPath)
+}
+
 function impactPlan({
   mode,
   aggregate,
@@ -405,6 +425,7 @@ function impactPlan({
   selectedProjects,
   changedPaths,
   reason,
+  projectDirectory,
 }) {
   const selectedSources = new Set(
     [...selectedProjects].flatMap((projectPath) => projects.get(projectPath).compileItems),
@@ -427,6 +448,7 @@ function impactPlan({
     candidatePath: aggregate.path ?? 'impact-generated/Wanxiangshu.Impact.fsproj',
     projectPath: aggregate.path ?? 'impact-generated/Wanxiangshu.Impact.fsproj',
     candidateBasename: 'Wanxiangshu.Impact.fsproj',
+    projectDirectory,
     aggregatePath: aggregate.path,
     projectPaths,
     compileItems,
@@ -500,11 +522,16 @@ export function planImpactCompile({
     const extension = path.extname(changedPath).toLowerCase()
     return (extension === '.fs' || extension === '.fsi') && !fs.existsSync(changedPath)
   })
+  const missingDeclaredSources = removedSources.filter((sourcePath) => inventory.sourceOwner.has(sourcePath))
+  if (missingDeclaredSources.length > 0) {
+    throw new Error(`Declared production source is missing: ${missingDeclaredSources.join(', ')}`)
+  }
   const liveChanges = changedPaths.filter((changedPath) => !removedSources.includes(norm(changedPath)))
   if (liveChanges.length === 0) {
     return {
       mode: 'none',
       reason: 'source-removed',
+      projectDirectory: inventory.projectDirectory,
       changedPaths: removedSources,
       removedSources,
       rootProjectPaths: [],
@@ -823,6 +850,10 @@ export function planImpactFromInventory({ inventory, changedPaths, signatureRisk
 
   const normalizedChanges = [...new Set(changedPaths.map((changedPath) => norm(changedPath)))].sort()
   const roots = new Set()
+  const sharedInputChanged = normalizedChanges.some((changedPath) => isSharedCompilerInput(changedPath, aggregate.path))
+  if (sharedInputChanged) {
+    for (const projectPath of projectPaths) roots.add(projectPath)
+  }
 
   const addRoot = (projectPath) => {
     if (!roots.has(projectPath)) roots.add(projectPath)
@@ -881,6 +912,7 @@ export function planImpactFromInventory({ inventory, changedPaths, signatureRisk
       selectedProjects: new Set(),
       changedPaths: normalizedChanges,
       reason: 'no-production-impact',
+      projectDirectory: inventory.projectDirectory,
     })
   }
 
@@ -925,7 +957,7 @@ export function planImpactFromInventory({ inventory, changedPaths, signatureRisk
     }
   }
 
-  return impactPlan({
+  const plan = impactPlan({
     mode: 'focused',
     aggregate,
     projects,
@@ -933,7 +965,10 @@ export function planImpactFromInventory({ inventory, changedPaths, signatureRisk
     selectedProjects,
     changedPaths: normalizedChanges,
     reason: 'focused-impact',
+    projectDirectory: inventory.projectDirectory,
   })
+  if (sharedInputChanged) plan.forceCompileCache = false
+  return plan
 }
 
 /**
@@ -1046,10 +1081,15 @@ export function materializeOwnerCompile(plan, {
   // `artifactFingerprint` is the emitted-JS identity: restore fingerprint
   // plus each compile item's bytes — exactly the inputs Fable needs to
   // decide whether to emit again.
+  const flatAnchor = plan.aggregatePath ? path.dirname(plan.aggregatePath) : plan.projectDirectory
+  if (typeof flatAnchor !== 'string' || flatAnchor.length === 0) {
+    throw new Error('Compile plan must declare its source project directory')
+  }
   const restoreHasher = crypto.createHash('sha256')
   restoreHasher.update(`schema:${SCHEMA_VERSION}\n`)
   restoreHasher.update(`candidate:${plan.candidatePath}\n`)
   restoreHasher.update(`aggregatePath:${plan.aggregatePath}\n`)
+  restoreHasher.update(`sourceAnchor:${flatAnchor}\n`)
   restoreHasher.update(`aggregateContent:${plan.aggregateContent}\n`)
   restoreHasher.update(`rootPropsPath:${resolvedRootPropsPath}\n`)
   restoreHasher.update(`rootPropsContent:${rootPropsContent}\n`)
@@ -1081,8 +1121,6 @@ export function materializeOwnerCompile(plan, {
   const artifactDir = norm(path.join(resolvedScratchRoot, `artifact-${artifactFingerprint}`))
   const outputCompileInstance = crypto.createHash('sha256').update(artifactDir).digest('hex').slice(0, 16)
   // Anchor flat-project output under the source directory; with the wrapper
-  // aggregate retired, we no longer have its path to anchor against.
-  const flatAnchor = plan.aggregatePath ? path.dirname(plan.aggregatePath) : path.resolve(REPO_ROOT, 'src/Wanxiangshu')
   // Project working directory is anchored by structural identity (restoreFingerprint)
   // rather than source content bytes, preserving Fable's internal cache across body-only edits.
   const generatedProjectDir = outputDir
@@ -1204,23 +1242,42 @@ export function isSuccessMarkerValid(markerPath, expectedFingerprint, outputDir)
     if (parsed.fingerprint !== expectedFingerprint) {
       return false
     }
-    if (parsed.schema && parsed.schema !== SCHEMA_VERSION) {
+    if (parsed.schema !== SCHEMA_VERSION || !parsed.outputs) {
       return false
     }
+    const outputs = collectEmittedOutputs(outputDir)
+    const paths = Object.keys(outputs)
+    return paths.length > 0
+      && paths.length === Object.keys(parsed.outputs).length
+      && paths.every((relativePath) => outputs[relativePath] === parsed.outputs[relativePath])
   } catch {
     return false
   }
-  return hasEmittedJsFiles(outputDir)
+}
+
+function collectEmittedOutputs(outputDir) {
+  const outputs = {}
+  const visit = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const filename = path.join(directory, entry.name)
+      if (entry.isDirectory()) visit(filename)
+      else if (entry.isFile()) outputs[path.relative(outputDir, filename)] = computeFileHash(filename)
+      else throw new Error(`Emitted output is not a regular file or directory: ${filename}`)
+    }
+  }
+  visit(outputDir)
+  return outputs
 }
 
 /**
  * Atomically writes the success marker for the given fingerprint.
  */
-export function writeSuccessMarker(markerPath, fingerprint) {
+export function writeSuccessMarker(markerPath, fingerprint, outputDir) {
   const content = JSON.stringify(
     {
       schema: SCHEMA_VERSION,
       fingerprint,
+      outputs: collectEmittedOutputs(outputDir),
     },
     null,
     2,
@@ -1294,7 +1351,7 @@ export async function compileOwnerProject({
   const materialized = materializeOwnerCompile(plan, { scratchRoot, rootPropsPath, outputDir })
 
   // Check if success marker is valid for the computed fingerprint and output contains JS
-  const isWarm = isSuccessMarkerValid(
+  const isWarm = plan.forceCompileCache !== false && isSuccessMarkerValid(
     materialized.markerPath,
     materialized.fingerprint,
     materialized.outputPath,
@@ -1353,6 +1410,7 @@ export async function compileOwnerProject({
     '-o',
     materialized.outputPath,
     '--noGitignore',
+    '--noCache',
   ]
 
   if (plan.forceCompileCache === false) {
@@ -1440,7 +1498,7 @@ export async function compileOwnerProject({
       }
     } else {
       // Atomically write marker
-      writeSuccessMarker(materialized.markerPath, materialized.fingerprint)
+      writeSuccessMarker(materialized.markerPath, materialized.fingerprint, materialized.outputPath)
     }
   } else {
     // Nonzero or signal: remove marker and partial scratch output
@@ -1672,6 +1730,26 @@ export function rebaseEmittedImports(stagingDir, targetDir) {
   }
 }
 
+function removeRetiredOutputs(outputDir, sourceDirectory, removedSources = []) {
+  for (const sourcePath of removedSources) {
+    if (!sourcePath.endsWith('.fs')) continue
+    const relativeSource = path.relative(sourceDirectory, sourcePath)
+    if (path.isAbsolute(relativeSource) || relativeSource === '..' || relativeSource.startsWith(`..${path.sep}`)) {
+      throw new Error(`Removed source is outside the compile source directory: ${sourcePath}`)
+    }
+    const outputPath = path.join(outputDir, relativeSource.replace(/\.fs$/, '.js'))
+    let directory = path.dirname(outputPath)
+    while (directory !== path.dirname(outputDir)) {
+      const entry = fs.lstatSync(directory, { throwIfNoEntry: false })
+      if (entry && !entry.isDirectory()) throw new Error(`Output root must be a real directory: ${directory}`)
+      if (directory === outputDir) break
+      directory = path.dirname(directory)
+    }
+    fs.rmSync(outputPath, { force: true })
+    fs.rmSync(`${outputPath}.map`, { force: true })
+  }
+}
+
 /**
  * Executes incremental compilation for specified changed paths.
  * Caller explicitly supplies changedPaths and clean intent; build manifests are not tracked.
@@ -1720,6 +1798,7 @@ export async function compileIncremental({
   })
 
   if (plan.mode === 'none') {
+    removeRetiredOutputs(targetOutputDir, resolvedProjectDirectory, plan.removedSources)
     return {
       ok: true,
       code: 0,
@@ -1770,6 +1849,7 @@ export async function compileIncremental({
       } catch {}
 
       rebaseEmittedImports(stagingOutputDir, resolvedOutputDir)
+      writeSuccessMarker(result.markerPath, result.fingerprint, stagingOutputDir)
 
       // Do not wipe the output tree. A deleted source's JavaScript is removed
       // by the caller that knows which file left the shard; wiping every
@@ -1793,6 +1873,8 @@ export async function compileIncremental({
         const { execFileSync } = await import('node:child_process')
         execFileSync('find', [resolvedOutputDir, '-type', 'f', '-size', '0', '-exec', 'rm', '-f', '{}', '+'], { stdio: 'pipe' })
       } catch {}
+
+      removeRetiredOutputs(resolvedOutputDir, resolvedProjectDirectory, plan.removedSources)
     }
   } finally {
     // A failed compile leaves no reusable marker. Drop its staging so the

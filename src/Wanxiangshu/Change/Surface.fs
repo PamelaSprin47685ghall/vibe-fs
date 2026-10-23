@@ -1051,6 +1051,10 @@ module ChangeSurface =
             box
                 {| kind = "Cancelled"
                    detail = "cancelled" |}
+        | OrchestratorVerdict.RejectedDirty reason ->
+            box
+                {| kind = "RejectedDirty"
+                   detail = reason |}
         | OrchestratorVerdict.IntegrationFailed(_, detail) ->
             box
                 {| kind = "IntegrationFailed"
@@ -1156,7 +1160,8 @@ module ChangeSurface =
                         Ok value
 
             let git: GitPort =
-                { CreateWorktree = fun _ _ _ -> Task.FromResult(Ok worktreeIdentity)
+                { IsDirty = fun _ -> Task.FromResult(Ok [])
+                  CreateWorktree = fun _ _ _ -> Task.FromResult(Ok worktreeIdentity)
                   FreezeTargetBranch = fun () -> Task.FromResult(Ok targetRef)
                   Rebase =
                     fun _ _ ->
@@ -1531,6 +1536,12 @@ module ChangeSurface =
         | Ok value -> box {| ok = true; value = valueOf value |}
         | Error error -> box {| ok = false; error = error |}
 
+    let gitIsDirty (git: obj) (path: string) : Task<obj> =
+        task {
+            let! result = (git :?> GitHandle).Port.IsDirty(WorktreePath.create path)
+            return resultObject result (fun values -> values |> List.toArray |> Array.map box |> box)
+        }
+
     let gitFreezeTargetBranch (git: obj) : Task<obj> =
         task {
             let! result = (git :?> GitHandle).Port.FreezeTargetBranch()
@@ -1741,6 +1752,7 @@ module ChangeSurface =
                 stringField value [ "cleanupError"; "error"; "detail" ]
             )
         | "Cancelled" -> OrchestratorVerdict.Cancelled job
+        | "RejectedDirty" -> OrchestratorVerdict.RejectedDirty(stringField value [ "detail"; "reason"; "error" ])
         | "IntegrationFailed" ->
             OrchestratorVerdict.IntegrationFailed(job, stringField value [ "errorDetails"; "detail"; "error" ])
         | "Empty" -> OrchestratorVerdict.Empty

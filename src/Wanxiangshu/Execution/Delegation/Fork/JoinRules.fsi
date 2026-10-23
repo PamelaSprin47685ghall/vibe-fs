@@ -12,11 +12,16 @@ module JoinRules =
 
     /// One joined child, reduced to the fields the join wire carries.
     type JoinRecord =
-        { Name: string
-          AgentId: string
-          Role: string
-          Status: string
-          Returned: string list }
+        {
+            Name: string
+            AgentId: string
+            Role: string
+            Status: string
+            /// The main prose (report) the child returned, as raw text entries.
+            Body: string list
+            /// Structured carry material, separate from the report prose.
+            Returned: string list
+        }
 
     /// Join failure → the stable wire code the caller reports.
     val mapForkError: error: ForkError -> string

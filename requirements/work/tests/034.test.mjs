@@ -288,14 +288,16 @@ test('WHAT[work-034] S1 retirement preserves its opening range for the next tenu
   const opened = life.encodeOpening('plan', 'w1', '/tmp/plan-test', 7n)
   const reviewed = life.reviewProbe(opened, incumbencyIdOf(opened), 'Stayed')
   assert.equal(reviewed.decision, 'Write', reviewed.detail)
-  const relayed = life.deliverProbe(`${opened}${reviewed.bytes}`, 'run-034', 'call-034', 25n)
+  const cleared = life.reviewProbe(`${opened}${reviewed.bytes}`, incumbencyIdOf(opened), 'Cleared')
+  assert.equal(cleared.decision, 'Write', cleared.detail)
+  const relayed = life.deliverProbe(`${opened}${reviewed.bytes}${cleared.bytes}`, 'run-034', 'call-034', 25n)
   assert.equal(relayed.decision, 'Write', relayed.detail)
   const retired = eventsOf(relayed.bytes)[0]
   const successor = eventsOf(relayed.bytes)[1]
   assert.equal(retired.retirementCursor, 25)
   assert.equal(successor.openingCursor, 25)
   assert.equal(successor.stage, 'S1', 'Stayed keeps the opening stage for the successor')
-  const view = life.documentView(`${opened}${reviewed.bytes}${relayed.bytes}`)
+  const view = life.documentView(`${opened}${reviewed.bytes}${cleared.bytes}${relayed.bytes}`)
   assert.equal(view.latestRetirement, '7,25')
   assert.equal(view.predecessor, '7,25')
   assert.equal(view.openingCursor, 25)

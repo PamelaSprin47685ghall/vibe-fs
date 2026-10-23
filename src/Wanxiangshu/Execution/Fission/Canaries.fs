@@ -191,7 +191,6 @@ module FissionCanaries =
                     (HashSet<string>())
                     (quiescenceFactory ())
                     None
-                    AbortCause.External
                     turn
 
             let context =
@@ -209,7 +208,6 @@ module FissionCanaries =
                     None
                     (HashSet<string>())
                     (fun _ -> false)
-                    AbortCause.External
                     (quiescenceFactory ())
                     context
                     None

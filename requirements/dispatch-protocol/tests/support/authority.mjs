@@ -111,7 +111,7 @@ export const sendWithAcceptanceObserver = (path, port, handle, context, onAccept
     )
   : dispatch.sendContinuationWithAcceptance(
       port, handle, context.session, 'observe the real detached successor',
-      'DegenerationGuard', context.profile, 'Detached', onAccepted,
+      'ManagerGuard', context.profile, 'Detached', onAccepted,
       registration => ownAcceptanceRegistration(handle, registration),
     )
 

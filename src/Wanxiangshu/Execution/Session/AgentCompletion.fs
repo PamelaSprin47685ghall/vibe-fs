@@ -171,7 +171,7 @@ module AgentCompletion =
               Role = role
               AuthorityRoot = None
               ProviderRun = None
-              View = ReturnedMaterial.ofTexts [ text ]
+              View = ReturnedMaterial.encode [ text ] []
               Directory = None }
 
     let ofSimpleError (agentId: string) (runId: string) (role: Role) (message: string) =

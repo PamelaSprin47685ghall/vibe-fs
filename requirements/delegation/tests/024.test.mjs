@@ -42,8 +42,10 @@ test('WHAT[delegation-024] pre-join resume preserves both public join delivered 
       // The delivered view of each turn reaches the join records once, as the
       // returned body of that turn (the view names the material twice: as the
       // anchor id and as its text).
-      assert.equal((records.match(/text = \\"DELIVERED-A\\"/g) ?? []).length, 1)
-      assert.equal((records.match(/text = \\"DELIVERED-B\\"/g) ?? []).length, 1)
+      assert.equal((records.match(/text = "DELIVERED-A"/g) ?? []).length, 1)
+      assert.equal((records.match(/text = "DELIVERED-B"/g) ?? []).length, 1)
+      assert.match(records, /body = "WORK REPORT A"/)
+      assert.match(records, /body = "WORK REPORT B"/)
     } finally {
       terminals.dispose()
     }

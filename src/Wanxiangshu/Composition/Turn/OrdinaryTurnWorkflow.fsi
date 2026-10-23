@@ -32,7 +32,6 @@ module OrdinaryTurnWorkflow =
         observation: TurnObservationJournalPort option ->
         joinGuardNudges: HashSet<string> ->
         hasLivePty: (string -> bool) ->
-        abortCause: AbortCause ->
         quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
         observer: ContinuationAcceptanceObserver option ->

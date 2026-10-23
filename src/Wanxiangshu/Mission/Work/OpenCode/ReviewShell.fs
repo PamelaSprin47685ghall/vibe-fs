@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Mission.Work.Review
 open Wanxiangshu.Mission.Planning
@@ -32,21 +33,8 @@ module ReviewShell =
         [<Literal>]
         let PlanStayed = "tool/review/plan-stayed"
 
-        [<Literal>]
-        let PlanS2 = "planning/s2"
-
-        [<Literal>]
-        let PlanS3 = "planning/s3"
-
     let private providerText (path: string) substitutions =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path substitutions
-
-    let private promotedStageInstructions (target: string) =
-        match target with
-        | "S2" -> [ providerText Path.PlanS2 Map.empty ]
-        | "S3" -> [ providerText Path.PlanS3 Map.empty ]
-        | _ -> []
-
 
     let private planRejected path =
         ToolResultText.tomlObjectWithInstructions
@@ -55,24 +43,21 @@ module ReviewShell =
 
     let private rejectionPath (error: PlanReviewError) =
         match error with
-        | PlanReviewError.AlreadyReviewed _ -> ReviewBackendManager.Path.AlreadySubmitted
         | PlanReviewError.NoActiveIncumbency
         | PlanReviewError.IncumbencyMismatch _ -> ReviewBackendManager.Path.BindingUnavailable
         | PlanReviewError.RecordFailed _ -> ReviewBackendManager.Path.RecordFailed
 
     let private gapLine gap =
-        let (acceptance, workPlan) = gap
-        sprintf "- acceptance_criteria: %s | work_plan: %s" acceptance workPlan
+        let (key, value) = gap
+        sprintf "- key: %s | value: %s" key value
 
     let private planAccepted (review: PlanReviewResult) =
-        // work-038: the gaps return to the model as repair obligations,
-        // echoed verbatim below the outcome instruction; a promotion to a new
-        // stage returns that stage's method in the same tool response so the
-        // current tenure can begin its stretch immediately.
+        // work-038: review grants promotion eligibility only, never the stage
+        // advance itself. Deliver performs the promotion and returns the next
+        // stage method; review echoes the remaining obligations verbatim.
         let instructions =
             if review.Outcome = PlanReviewOutcome.Promoted then
                 [ providerText Path.PlanPromoted Map.empty ]
-                @ promotedStageInstructions review.Target
             else
                 [ providerText Path.PlanStayed Map.empty ] @ (review.Gaps |> List.map gapLine)
 
@@ -100,9 +85,14 @@ module ReviewShell =
         |> Option.bind (fun work -> work.ActiveId)
         |> activeIncumbencyId
 
-    let private gapsOf (findings: ReviewFindings) : (string * string) list =
+    let private gapsOf (findings: ReviewFindings) : (string * string option) list =
         ReviewFindings.values findings
-        |> List.map (fun finding -> (finding.AcceptanceCriteria, finding.WorkPlan))
+        |> List.map (fun finding -> (finding.Key, finding.Value))
+
+    let private reviewRequestIdOf (incumbencyId: string) (context: HostToolContext) : string =
+        match context.ProviderRunId, context.ToolCallId with
+        | Some run, Some call -> ProviderRunIdentity.value run + ":" + ToolCallId.value call
+        | _ -> incumbencyId + ":review"
 
     // One preparation chain: findings and the durable active incumbency resolve
     // to the exact review invocation. The old workspace EventStore is not a
@@ -111,22 +101,23 @@ module ReviewShell =
         (gitCommonDir: string)
         (args: HostToolArguments)
         (context: HostToolContext)
-        : Result<string * (string * string) list, string> =
+        : Result<string * (string * string option) list * string, string> =
         if String.IsNullOrWhiteSpace gitCommonDir then
             Error "git common directory is missing"
         else
             parseFindings args
             |> Result.bind (fun findings ->
                 resolveActiveIncumbency gitCommonDir context.SessionId
-                |> Result.map (fun incumbencyId -> (incumbencyId, gapsOf findings)))
+                |> Result.map (fun incumbencyId ->
+                    (incumbencyId, gapsOf findings, reviewRequestIdOf incumbencyId context)))
 
     let private executePlan (gitCommonDir: string) (args: HostToolArguments) (context: HostToolContext) : Task<string> =
         task {
             // work-038 binding: workId is the caller's session.
             match preparePlanReview gitCommonDir args context with
             | Error path -> return planRejected path
-            | Ok(incumbencyId, gaps) ->
-                let! result = ReviewPlanBackend.executeReview gitCommonDir context.SessionId incumbencyId gaps
+            | Ok(incumbencyId, gaps, requestId) ->
+                let! result = ReviewPlanBackend.executeReview gitCommonDir context.SessionId incumbencyId requestId gaps
 
                 return renderPlanReview result
         }
@@ -134,8 +125,8 @@ module ReviewShell =
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let findingSchema =
             ToolHostCodec.objectSchemaOf
-                [ "acceptance_criteria", ToolHostCodec.stringSchema factory
-                  "work_plan", ToolHostCodec.stringSchema factory ]
+                [ "key", ToolHostCodec.stringSchema factory
+                  "value", ToolHostCodec.anySchema factory ]
                 factory
 
         let findingsSchema =

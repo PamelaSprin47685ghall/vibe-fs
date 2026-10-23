@@ -195,7 +195,7 @@ test('WHAT[capability-enforcement-010] FORK_delegation_verbs_are_no_longer_host_
   // the Host registry carries no such tool at all. The authority refusal they
   // used to raise belongs to the member call surface, not to a host tool.
   await withPlugin(async (hooks) => {
-    for (const tool of ['fork', 'resume', 'commission', 'devops']) {
+    for (const tool of ['fork', 'resume', 'commission', 'devops', 'review']) {
       assert.equal(hooks.tool[tool], undefined, `${tool} must not be a host-registered tool`)
     }
   })

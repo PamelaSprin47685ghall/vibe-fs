@@ -75,6 +75,10 @@ type DeliverySettlement =
     | ContextUnavailable of reason: string
     | DeferredDelivery of resolve: (unit -> Task<DeliverySettlement option>)
 
+type JsReviewGates =
+    { ReadGate: (unit -> Task<bool>) option
+      WriteGate: (unit -> bool) option }
+
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
 /// sandbox execution, as-is per-write persistence, durable accounting and the
 /// commit fact (JS-012/JS-013/JS-015). With `store = None` the workflow is
@@ -147,7 +151,7 @@ module JsToolWorkflow =
             Task<JsToolOutcome>
 
     val executeWithReviewCheck:
-        reviewCheck: (unit -> Task<bool>) option ->
+        reviewGates: JsReviewGates option ->
         sessionId: string ->
         fence: (Wanxiangshu.Foundation.Identity.ProviderRunIdentity * Wanxiangshu.Foundation.Identity.ToolCallId) option ->
         capabilities: Set<JsCapability> ->
@@ -165,7 +169,7 @@ module JsToolWorkflow =
     /// The review-checked invocation whose delivery commits a durable
     /// delivery witness.
     val executeWithReviewCheckAndDelivery:
-        reviewCheck: (unit -> Task<bool>) option ->
+        reviewGates: JsReviewGates option ->
         settlement: DeliverySettlement option ->
         sessionId: string ->
         fence: (Wanxiangshu.Foundation.Identity.ProviderRunIdentity * Wanxiangshu.Foundation.Identity.ToolCallId) option ->

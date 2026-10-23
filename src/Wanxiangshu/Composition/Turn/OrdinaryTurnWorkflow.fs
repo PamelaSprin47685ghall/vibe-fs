@@ -287,42 +287,30 @@ module OrdinaryTurnWorkflow =
             dispatchIdleTurn quiescence sessionPort rootWorkspace eventPort journal observation context observer
 
     /// Own the reconciled ordinary-turn outcome match.
-    /// `abortCause` is the Host boundary typed outcome consumed exactly once (structured-workflow-017 ①).
-    /// Guard armed state is not exposed; CE branches on the typed abort outcome.
-    let private handleAborted
-        (eventPort: IEventObservationPort)
-        (abortCause: AbortCause)
-        (turn: ReconciledTurn)
-        (reason: string)
-        =
-        // degeneration-guard-009: degeneration-guard already owns its successor. Application must
-        // not become a second recovery owner. External aborts retain normal cleanup.
-        match abortCause with
-        | AbortCause.DegenerationGuard _ -> AsyncSupport.completedTask ()
-        | AbortCause.External ->
-            task {
-                // managed-session-lifecycle-018: TurnAborted is an attempt observation, not
-                // proof that the logical parent/session ceased to exist. Do not
-                // escalate ambiguous AbortError into ParentCancelled and do not
-                // physically destroy background children. SessionDeleted or an
-                // explicit successor-less termination owns that irreversible act.
+    let private handleAborted (eventPort: IEventObservationPort) (turn: ReconciledTurn) (reason: string) =
+        task {
+            // managed-session-lifecycle-018: TurnAborted is an attempt observation, not
+            // proof that the logical parent/session ceased to exist. Do not
+            // escalate ambiguous AbortError into ParentCancelled and do not
+            // physically destroy background children. SessionDeleted or an
+            // explicit successor-less termination owns that irreversible act.
 
-                // 027 (HNI interruption payload, ruling 2026-10-22): the stop
-                // carries the identity of the interrupted round itself —
-                // `turn.ProviderRun` is a fact about this turn, never inferred
-                // from anywhere else. Settlement (`RunLifecycle.complete`) may
-                // match a durable delivery witness by exact fence with it; this
-                // is NOT a terminal fact source and decides no closure.
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Aborted(
-                        TerminalStop.forAuthorityRun turn.AuthorityRootUserMessageId turn.ProviderRun reason
-                    ))
-                |> ignore
+            // 027 (HNI interruption payload, ruling 2026-10-22): the stop
+            // carries the identity of the interrupted round itself —
+            // `turn.ProviderRun` is a fact about this turn, never inferred
+            // from anywhere else. Settlement (`RunLifecycle.complete`) may
+            // match a durable delivery witness by exact fence with it; this
+            // is NOT a terminal fact source and decides no closure.
+            eventPort.NotifyTerminal
+                turn.SessionId
+                (TerminalOutcome.Aborted(
+                    TerminalStop.forAuthorityRun turn.AuthorityRootUserMessageId turn.ProviderRun reason
+                ))
+            |> ignore
 
-                return ()
-            }
-            :> Task
+            return ()
+        }
+        :> Task
 
     let private applyJoinGuardNudge
         (sessionPort: ISessionHostPort)
@@ -479,7 +467,6 @@ module OrdinaryTurnWorkflow =
         (observation: TurnObservationJournalPort option)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (abortCause: AbortCause)
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (completeAgent: unit -> Task<XTraceTerminalCompletion>)
@@ -511,7 +498,7 @@ module OrdinaryTurnWorkflow =
                 journal
                 observation
                 observer
-        | ReconcileProgram.TurnAborted reason -> handleAborted eventPort abortCause turn reason
+        | ReconcileProgram.TurnAborted reason -> handleAborted eventPort turn reason
         | ReconcileProgram.TurnFailed error ->
             handleFailedTurn sessionPort rootWorkspace eventPort journal context error
         | ReconcileProgram.TurnCompleted ->
@@ -541,7 +528,6 @@ module OrdinaryTurnWorkflow =
         (observation: TurnObservationJournalPort option)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (abortCause: AbortCause)
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (observer: ContinuationAcceptanceObserver option)
@@ -593,7 +579,6 @@ module OrdinaryTurnWorkflow =
                         observation
                         joinGuardNudges
                         hasLivePty
-                        abortCause
                         quiescence
                         context
                         completeAgent
@@ -608,7 +593,6 @@ module OrdinaryTurnWorkflow =
         (observation: TurnObservationJournalPort option)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (abortCause: AbortCause)
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (observer: ContinuationAcceptanceObserver option)
@@ -630,7 +614,6 @@ module OrdinaryTurnWorkflow =
                 observation
                 joinGuardNudges
                 hasLivePty
-                abortCause
                 quiescence
                 context
                 observer

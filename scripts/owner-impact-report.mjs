@@ -21,7 +21,6 @@ export const OWNER_IMPACT_STABLE_CASE_IDS = Object.freeze([
   'fatal-process-implementation',
   'host-signal-adapter',
   'host-signal-bootstrap',
-  'loop-detector-runtime',
 ])
 
 export const OWNER_IMPACT_CONTROL_CASE_IDS = Object.freeze([
@@ -69,12 +68,6 @@ export const OWNER_IMPACT_STABLE_CASES = Object.freeze([
     baseline_changed_path: 'src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs',
     change_kind: 'composition-implementation',
     coverage: 'high-or-full-fallback',
-  },
-  {
-    id: 'loop-detector-runtime',
-    baseline_changed_path: 'src/Wanxiangshu/Execution/Session/LoopDetector.fs',
-    change_kind: 'runtime-implementation',
-    coverage: 'medium-closure',
   },
 ])
 

@@ -63,7 +63,7 @@ test('WHAT[repository-programming-058] this.call automatic park carries incremen
   try {
     outcome = await runProgram(
       dir,
-      `    return await this.call("node -e \\"process.stdout.write('hello-delta\\\\n'); setTimeout(() => process.exit(0), 1000);\\"", { timeoutMs: 100 });`,
+      `    return await this.call("node -e \\"process.stdout.write('hello-delta\\\\n'); setTimeout(() => process.exit(0), 1000);\\"", "ab");`,
     )
     assert.equal(caseName(outcome), 'Parked')
     const payload = parkedPayload(outcome)

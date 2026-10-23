@@ -37,6 +37,7 @@ type JsCapability =
     | Advisor
     /// The one question a program may put to the user (`this.ask`).
     | Ask
+    | Review
     /// A lifecycle capability, not a ToolPermission projection: `deliver`
     /// ends a program by handing over its view. Like `park`, every generated
     /// surface carries it unconditionally.
@@ -80,6 +81,7 @@ module JsCapability =
         | "Horizon" -> Some JsCapability.Horizon
         | "Advisor" -> Some JsCapability.Advisor
         | "Ask" -> Some JsCapability.Ask
+        | "Review" -> Some JsCapability.Review
         | "Deliver" -> Some JsCapability.Deliver
         | "Park" -> Some JsCapability.Park
         | _ -> None
@@ -102,6 +104,7 @@ module JsCapability =
         | JsCapability.Horizon -> "Horizon"
         | JsCapability.Advisor -> "Advisor"
         | JsCapability.Ask -> "Ask"
+        | JsCapability.Review -> "Review"
         | JsCapability.Deliver -> "Deliver"
         | JsCapability.Park -> "Park"
 
@@ -266,6 +269,10 @@ module JsFragmentRegistry =
         { Capability = JsCapability.Ask
           MemberName = "ask" }
 
+    let review: JsCapabilityFragment =
+        { Capability = JsCapability.Review
+          MemberName = "review" }
+
     /// park fragment — the pause/resume mechanism (PLAN S1 B.7/B.17). Unlike
     /// the filesystem members this is not a ToolPermission projection: it is a
     /// lifecycle capability every js-* surface carries.
@@ -304,5 +311,6 @@ module JsFragmentRegistry =
           horizon
           advisor
           ask
+          review
           deliver
           park ]

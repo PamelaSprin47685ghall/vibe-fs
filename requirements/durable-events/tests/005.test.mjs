@@ -31,6 +31,30 @@ const withTemp = (fn) => {
   return fn(base)
 }
 
+test('WHAT[durable-events-005] native crash cold-reader identities stay legal across PID digit boundaries', async () => {
+  const { coldReaderWriterId } = await import('./support/native-crash.mjs')
+  const root = mkdtempSync(join(tmpdir(), 'wxs-cold-reader-identity-'))
+  const pids = [1, 999, 1000, 4242, 9999, 10000, 4194304]
+  try {
+    assert.equal(new Set(pids.map(coldReaderWriterId)).size, pids.length)
+    for (const pid of pids) {
+      const writerId = coldReaderWriterId(pid)
+      const handle = eventStore.create(join(root, 'state'), writerId)
+      try {
+        assert.deepEqual(eventStore.heads(handle, 'absent-stream'), [])
+      } finally {
+        eventStore.dispose(handle)
+      }
+    }
+    for (const suffix of ['0000', '0001', '0999', '1000', '4242', '9999']) {
+      assert.throws(() => eventStore.create(join(root, 'state'), `cold-reader-${suffix}`),
+        /WriterId must not end with a hyphen and four digits/)
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[durable-events-005] small_history_stays_one_segment_named_with_seq_suffix', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'one-file-law')

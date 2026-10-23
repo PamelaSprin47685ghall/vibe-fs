@@ -233,7 +233,11 @@ module Reducer =
                 Work = work
                 // The first plan this inquiry sees is the user's plan, in the order
                 // they gave it; the last entry is the step whose result is the answer.
-                Plan = if List.isEmpty state.Plan then specs |> List.map (fun spec -> spec.Id) else state.Plan })
+                Plan =
+                    if List.isEmpty state.Plan then
+                        specs |> List.map (fun spec -> spec.Id)
+                    else
+                        state.Plan })
 
     let private currentWork (state: InquiryState) (workId: WorkId) : Result<WorkItem, CoreError> =
         match state.Work |> Map.tryFind workId with

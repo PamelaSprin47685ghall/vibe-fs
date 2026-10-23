@@ -22,9 +22,7 @@ module ManagerLoopGate =
     let gateKind (retirementId: RetirementId) =
         "manager-loop:" + RetirementId.value retirementId
 
-type ReviewFinding =
-    { AcceptanceCriteria: string
-      WorkPlan: string }
+type ReviewFinding = { Key: string; Value: string option }
 
 type ReviewFindings = private ReviewFindings of ReviewFinding list
 
@@ -32,13 +30,11 @@ module ReviewFindings =
     let tryCreate (findings: ReviewFinding list) =
         if
             findings
-            |> List.forall (fun finding ->
-                not (System.String.IsNullOrWhiteSpace finding.AcceptanceCriteria)
-                && not (System.String.IsNullOrWhiteSpace finding.WorkPlan))
+            |> List.forall (fun finding -> not (System.String.IsNullOrWhiteSpace finding.Key))
         then
             Ok(ReviewFindings findings)
         else
-            Error "ReviewFinding requires non-empty acceptance criteria and work plan"
+            Error "ReviewFinding requires a non-empty key"
 
     let values (ReviewFindings findings) = findings
 

@@ -24,6 +24,11 @@ module JsToolsBindings =
     /// installed host's data envelope. A missing host is unavailable.
     val makeAdvisorMember: host: JsDelegationHost option -> (string * obj)
 
+    /// `review(findings)`: submit this tenure's stage review through the
+    /// installed host closure; returns the host's data envelope. A missing
+    /// host is unavailable.
+    val makeReviewMember: host: JsDelegationHost option -> (string * obj)
+
     val createApi:
         capabilities: Set<JsCapability> ->
         root: string ->
@@ -59,4 +64,6 @@ module JsToolsBindings =
     val readStashedDelta: api: obj -> obj
 
 module JsReviewOnly =
+    val scopeManagerReviewOnly: check: (unit -> Task<bool>) -> api: obj -> obj
+    val scopePlanWriteOnly: check: (unit -> bool) -> api: obj -> obj
     val scopeReviewOnly: check: (unit -> Task<bool>) -> api: obj -> obj

@@ -160,6 +160,59 @@ module ToolRegistry =
                 return advisorRefusal (unbox<string> selected?code) (unbox<string> selected?reason)
         }
 
+    let private reviewRefusal (code: string) (reason: string) : obj =
+        createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
+
+    let private executePlanReviewWithIncumbency
+        (gitCommonDir: string)
+        (ctx: HostToolContext)
+        (incumbencyId: string)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId)
+        (findings: obj)
+        : Task<obj> =
+        let requestId =
+            ProviderRunIdentity.value providerRun + ":" + ToolCallId.value toolCallId
+
+        PlanningSurface.executeReview gitCommonDir ctx.SessionId incumbencyId requestId findings null
+
+    let private executePlanReviewWithContext
+        (runtime: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (directory: string)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId)
+        (findings: obj)
+        : Task<obj> =
+        task {
+            let! gitCommonDir = RuntimePath.stateRoot directory
+            let! work = runtime.LifecycleWorkFor ctx.SessionId
+            let activeIdOpt = work |> Option.bind (fun inspected -> inspected.ActiveId)
+
+            match activeIdOpt with
+            | Some incumbencyId ->
+                return! executePlanReviewWithIncumbency gitCommonDir ctx incumbencyId providerRun toolCallId findings
+            | None -> return reviewRefusal "review-unavailable" "no active incumbency for this plan work"
+        }
+
+    let private executePlanReview (runtime: ToolRuntimeScope) (ctx: HostToolContext) (findings: obj) : Task<obj> =
+        match runtime.WorkspaceDirectory, ctx.ProviderRunId, ctx.ToolCallId with
+        | Some directory, Some providerRun, Some toolCallId ->
+            executePlanReviewWithContext runtime ctx directory providerRun toolCallId findings
+        | _ ->
+            Task.FromResult(reviewRefusal "review-unavailable" "review requires an owning provider call and workspace")
+
+    /// The `this.review(findings)` member host closure. Plan dispatches to the
+    /// plan review backend (already data-shaped); every other admitted caller
+    /// dispatches to the Manager backend. The request identity is the exact
+    /// provider-run / tool-call fence, so distinct calls are distinct facts
+    /// and an exact retry replays.
+    let private reviewMember (runtime: ToolRuntimeScope) (ctx: HostToolContext) (findings: obj) : Task<obj> =
+        if runtime.IsRole(ctx, Role.Plan) then
+            executePlanReview runtime ctx findings
+        else
+            ReviewBackendManager.executeMember runtime ctx findings
+
     let create
         (toolModule: obj)
         (sessionPort: ISessionHostPort)
@@ -239,6 +292,19 @@ module ToolRegistry =
                     | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
                     | Some runtime -> return! invokeRuntime runtime intent
                 }
+
+        let mutable cachedGitCommonDir: string option = None
+
+        let populateStateRoot (ws: string) : Task<unit> =
+            task {
+                let! dir = RuntimePath.stateRoot ws
+                cachedGitCommonDir <- Some dir
+            }
+
+        let ensureStateRoot (workspace: string option) : Task<unit> =
+            match cachedGitCommonDir, workspace with
+            | None, Some ws -> populateStateRoot ws
+            | _ -> Task.FromResult()
 
         let askGitCommonDir (directory: string option) : Task<string> =
             task {
@@ -412,11 +478,8 @@ module ToolRegistry =
                 beforeOwner
                 |> List.skip (index + 1)
                 |> List.rev
-                |> List.tryPick (fun candidate ->
-                    if candidate.Role = "assistant" then
-                        formalTextOf candidate
-                    else
-                        None)
+                |> List.tryFind (fun candidate -> candidate.Role = "assistant")
+                |> Option.bind formalTextOf
 
         let messageAttribution
             (ctx: HostToolContext)
@@ -484,8 +547,7 @@ module ToolRegistry =
                 let! loaded = loadMessages ()
 
                 match loaded with
-                | Error err ->
-                    return Some (DeliverySettlement.ContextUnavailable (sprintf "%A" err))
+                | Error err -> return Some(DeliverySettlement.ContextUnavailable(sprintf "%A" err))
                 | Ok messages ->
                     return!
                         attributedSettlement
@@ -508,57 +570,70 @@ module ToolRegistry =
         /// present a return the caller's join cannot receive. Only a host
         /// without a journal is the harness case and keeps the cell-only
         /// behaviour.
+        let unwrapAttributed (attributed: DeliverySettlement option) : DeliverySettlement option =
+            match attributed with
+            | Some settlement -> Some settlement
+            | None ->
+                Some(
+                    UnattributedDelivery
+                        "the delivering assistant message carries no prose or physical input to own the witness"
+                )
+
+        let settlementFromSnapshot
+            (ctx: HostToolContext)
+            (durable: AgentJournal)
+            (snapshotPort: ISessionSnapshotPort)
+            (providerRun: ProviderRunIdentity)
+            (toolCallId: ToolCallId)
+            : Task<DeliverySettlement option> =
+            let sessionId = SessionId.create ctx.SessionId
+
+            Wanxiangshu.Interaction.Authority.PromptAuthorityProjectionQueries.activeProfile
+                sessionId
+                (AgentJournal.snapshot durable).AgentProjections
+            |> Option.map (fun profile -> profile.LogicalRunId, profile.AuthorityRootUserMessageId)
+            |> Option.filter (fun (logicalRunId, authorityRoot) ->
+                not (
+                    String.IsNullOrWhiteSpace(LogicalRunId.value logicalRunId)
+                    || String.IsNullOrWhiteSpace(AuthorityRootUserMessageId.value authorityRoot)
+                ))
+            |> Option.map (fun (logicalRunId, authorityRoot) ->
+                task {
+                    let! attributed =
+                        loadedSettlement
+                            ctx
+                            durable
+                            sessionId
+                            providerRun
+                            toolCallId
+                            (fun () -> snapshotPort.GetMessages sessionId)
+                            logicalRunId
+                            authorityRoot
+
+                    return unwrapAttributed attributed
+                })
+            |> Option.defaultValue (
+                Task.FromResult(
+                    Some(UnattributedDelivery "the delivery call has no active logical run or authority root")
+                )
+            )
+
+        let settlementOfDurable (ctx: HostToolContext) (durable: AgentJournal) : Task<DeliverySettlement option> =
+            match runtime.Snapshot, ctx.ProviderRunId, ctx.ToolCallId with
+            | Some snapshotPort, Some providerRun, Some toolCallId ->
+                settlementFromSnapshot ctx durable snapshotPort providerRun toolCallId
+            | _ ->
+                Task.FromResult(
+                    Some(
+                        UnattributedDelivery
+                            "the delivery call has no provider run, tool call or host snapshot to be attributed"
+                    )
+                )
+
         let settlementOf (ctx: HostToolContext) : Task<DeliverySettlement option> =
             match journal with
             | None -> Task.FromResult None
-            | Some durable ->
-                match runtime.Snapshot, ctx.ProviderRunId, ctx.ToolCallId with
-                | Some snapshotPort, Some providerRun, Some toolCallId ->
-                    let sessionId = SessionId.create ctx.SessionId
-
-                    Wanxiangshu.Interaction.Authority.PromptAuthorityProjectionQueries.activeProfile
-                        sessionId
-                        (AgentJournal.snapshot durable).AgentProjections
-                    |> Option.map (fun profile -> profile.LogicalRunId, profile.AuthorityRootUserMessageId)
-                    |> Option.filter (fun (logicalRunId, authorityRoot) ->
-                        not (
-                            String.IsNullOrWhiteSpace(LogicalRunId.value logicalRunId)
-                            || String.IsNullOrWhiteSpace(AuthorityRootUserMessageId.value authorityRoot)
-                        ))
-                    |> Option.map (fun (logicalRunId, authorityRoot) ->
-                        task {
-                            let! attributed =
-                                loadedSettlement
-                                    ctx
-                                    durable
-                                    sessionId
-                                    providerRun
-                                    toolCallId
-                                    (fun () -> snapshotPort.GetMessages sessionId)
-                                    logicalRunId
-                                    authorityRoot
-
-                            return
-                                match attributed with
-                                | Some settlement -> Some settlement
-                                | None ->
-                                    Some(
-                                        UnattributedDelivery
-                                            "the delivering assistant message carries no prose or physical input to own the witness"
-                                    )
-                        })
-                    |> Option.defaultValue (
-                        Task.FromResult(
-                            Some(UnattributedDelivery "the delivery call has no active logical run or authority root")
-                        )
-                    )
-                | _ ->
-                    Task.FromResult(
-                        Some(
-                            UnattributedDelivery
-                                "the delivery call has no provider run, tool call or host snapshot to be attributed"
-                        )
-                    )
+            | Some durable -> settlementOfDurable ctx durable
 
         let generatedJsSpecFor (role: Role) =
             JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse
@@ -570,14 +645,31 @@ module ToolRegistry =
 
                         return
                             facts.HasActiveIncumbency
+                            && not facts.HasAssessment
                             && facts.CleanupBlockerDigest.IsNone
                             && not frozen
                     }
+
+                // reviewFinishedOnly: a Plan tenure's draft writes are locked
+                // until its first review is finished. Ordinary reads stay
+                // available; only write/rm/mv are gated by scopePlanWriteOnly.
+                let isWorkReviewFinished (gitCommonDir: string) (sessionId: string) : bool =
+                    match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId with
+                    | Some work when work.ActiveId.IsSome ->
+                        ReviewPlanBackend.isReviewFinished gitCommonDir sessionId work.ActiveId.Value
+                    | _ -> false
+
+                let planWriteCheck (ctx: HostToolContext) : bool =
+                    match cachedGitCommonDir with
+                    | Some gitCommonDir when gitCommonDir <> "" -> isWorkReviewFinished gitCommonDir ctx.SessionId
+                    | _ -> failwith "Plan draft write gate called without resolved state root"
 
                 let spec =
                     let createSpec =
                         if role = Role.Manager then
                             JsToolSpec.createWithReviewCheck reviewAllowed
+                        elif role = Role.Plan then
+                            JsToolSpec.createWithPlanWriteCheck planWriteCheck
                         else
                             JsToolSpec.create
 
@@ -629,6 +721,7 @@ module ToolRegistry =
                                     envelopeOk
                                         [ "kind" ==> answer.Kind
                                           "status" ==> answer.Status
+                                          "body" ==> (ReturnedMaterial.body answer.View |> String.concat "\n")
                                           "returned" ==> ReturnedMaterial.entries answer.View ]
                                 | Error reason ->
                                     refusalWithReason "devops-failed" (sprintf "devops failed: %s" reason)
@@ -732,6 +825,7 @@ module ToolRegistry =
                                                               "agentId" ==> record.AgentId
                                                               "role" ==> record.Role
                                                               "status" ==> record.Status
+                                                              "body" ==> (record.Body |> String.concat "\n")
                                                               "returned"
                                                               ==> (record.Returned
                                                                    |> List.map (fun text ->
@@ -789,7 +883,8 @@ module ToolRegistry =
                                             ))
                                             horizonContext
                                             ctx
-                                  Advisor = fun intent carry -> advisorConsult runtime ctx intent carry }
+                                  Advisor = fun intent carry -> advisorConsult runtime ctx intent carry
+                                  Review = fun findings -> reviewMember runtime ctx findings }
 
                             JsDelegationBridge.install ctx.SessionId host
 
@@ -797,6 +892,8 @@ module ToolRegistry =
                                 runtime.AskUser(ctx, question))
 
                             task {
+                                do! ensureStateRoot workspaceDirectory
+
                                 try
                                     let! outcome = spec.Execute args ctx
 
@@ -811,10 +908,11 @@ module ToolRegistry =
             [ for role in Roles.all do
                   yield! generatedJsSpecFor role |> Option.toList ]
 
-        // Clean-break: all host delegation and lifecycle verbs (fork, resume,
-        // commission, devops, join, horizon, fission, review, deliver, fetch)
-        // are retired from host registration and live exclusively as
-        // programming-surface members.
+        // Clean-break: the delegate verbs (fork, resume, commission, devops)
+        // and the review verb are retired from host registration and live
+        // exclusively as programming-surface members. Join, horizon, fission
+        // and deliver stay registered: join/horizon/fission are production
+        // host tools (not delegates), and deliver is the lifecycle close-out.
         let resolvePlanGitCommonDir () : Task<string option> =
             task {
                 match workspaceDirectory with
@@ -1243,7 +1341,6 @@ module ToolRegistry =
 
               yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime
-              yield ReviewShell.spec factory runtime
               yield deliverTool
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory

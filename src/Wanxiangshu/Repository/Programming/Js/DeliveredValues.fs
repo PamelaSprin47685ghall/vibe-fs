@@ -97,8 +97,19 @@ module JsDeliveredValues =
             |> List.map (fun entry -> historyPiece entry?text)
             |> List.filter (fun piece -> not (Set.contains piece.Key already))
 
+    /// The report prose piece keys start `turn:`/`prose:`; carry material
+    /// piece keys start `material:`. This is the provenance, not the text
+    /// content, so the body/carry split is structural and never inferred.
+    let private isBodyKey (key: string) =
+        key.StartsWith("turn:", System.StringComparison.Ordinal)
+        || key.StartsWith("prose:", System.StringComparison.Ordinal)
+
     let private encodePieces (pieces: ReturnedPiece list) : string =
-        pieces |> List.map (fun piece -> piece.Text) |> ReturnedMaterial.ofTexts
+        let body, carry = pieces |> List.partition (fun piece -> isBodyKey piece.Key)
+
+        ReturnedMaterial.encode
+            (body |> List.map (fun piece -> piece.Text))
+            (carry |> List.map (fun piece -> piece.Text))
 
     let private pieceValue (piece: ReturnedPiece) : obj =
         createObj [ "key" ==> piece.Key; "text" ==> piece.Text ]
@@ -115,7 +126,7 @@ module JsDeliveredValues =
 
     let private currentPiece (sessionId: string) (fence: DeliveryFence option) (assistant: string option) =
         assistant
-        |> Option.filter (fun prose -> prose.Length > 0)
+        |> Option.filter (fun prose -> not (String.IsNullOrWhiteSpace prose))
         |> Option.map (fun prose ->
             let key =
                 match fence with
@@ -155,27 +166,26 @@ module JsDeliveredValues =
     let private claimTicket (sessionId: string) (request: obj) : obj option =
         let outcome = owner.claim (sessionId, request)
 
-        if claimSucceeded outcome then
-            Some outcome?ticket
-        else
-            None
+        if claimSucceeded outcome then Some outcome?ticket else None
 
     /// The owner decides whether the cell may be handed off in this mode and
     /// which selected pieces were not yet returned; selection itself stays
     /// here because it reads the anchor ledger.
+    let private handoffCarry (sessionId: string) (ticket: obj) (assistant: string option) : string option =
+        match optionalView ticket?view with
+        | None ->
+            handOffPieces ticket [] |> ignore
+            None
+        | Some carry ->
+            let candidates =
+                materialPieces sessionId (Some carry) (fenceOf ticket?fence) assistant (alreadyReturned sessionId)
+
+            handOffPieces ticket candidates
+
     let private handoff (sessionId: string) (request: obj) (assistant: string option) : string option =
         match claimTicket sessionId request with
         | None -> None
-        | Some ticket ->
-            match optionalView ticket?view with
-            | None ->
-                handOffPieces ticket [] |> ignore
-                None
-            | Some carry ->
-                let candidates =
-                    materialPieces sessionId (Some carry) (fenceOf ticket?fence) assistant (alreadyReturned sessionId)
-
-                handOffPieces ticket candidates
+        | Some ticket -> handoffCarry sessionId ticket assistant
 
     let private cacheRequest () : obj = createObj [ "mode" ==> "cache" ]
 
@@ -189,10 +199,10 @@ module JsDeliveredValues =
         : obj =
         createObj
             [ "mode" ==> "run"
-              "fence" ==>
-                createObj
-                    [ "providerRun" ==> Identity.ProviderRunIdentity.value providerRun
-                      "toolCallId" ==> Identity.ToolCallId.value toolCallId ] ]
+              "fence"
+              ==> createObj
+                      [ "providerRun" ==> Identity.ProviderRunIdentity.value providerRun
+                        "toolCallId" ==> Identity.ToolCallId.value toolCallId ] ]
 
     /// A read-only observation of the exact call: the owner answers whether
     /// the current cell is this call's delivery, without taking anything.
@@ -202,10 +212,10 @@ module JsDeliveredValues =
         : obj =
         createObj
             [ "mode" ==> "observe"
-              "fence" ==>
-                createObj
-                    [ "providerRun" ==> Identity.ProviderRunIdentity.value providerRun
-                      "toolCallId" ==> Identity.ToolCallId.value toolCallId ] ]
+              "fence"
+              ==> createObj
+                      [ "providerRun" ==> Identity.ProviderRunIdentity.value providerRun
+                        "toolCallId" ==> Identity.ToolCallId.value toolCallId ] ]
 
     let peekFence (sessionId: string) : DeliveryFence option = owner.fence sessionId |> fenceOf
 
@@ -238,16 +248,19 @@ module JsDeliveredValues =
         | None -> None
         | Some ticket ->
             let fence = fenceOf ticket?fence
-            let texts = ReturnedMaterial.texts material
+            let carryTexts = ReturnedMaterial.carry material
+            let bodyTexts = ReturnedMaterial.body material
             let current = currentPiece sessionId fence (Some assistant)
-            let finalIndex = List.length texts - 1
+            let bodyLastIndex = List.length bodyTexts - 1
 
-            let candidates =
-                texts
+            let bodyPieces =
+                bodyTexts
                 |> List.mapi (fun index text ->
                     current
-                    |> Option.filter (fun piece -> index = finalIndex && piece.Text = text)
+                    |> Option.filter (fun piece -> index = bodyLastIndex && piece.Text = text)
                     |> Option.defaultWith (fun () -> historyPiece text))
+
+            let candidates = (carryTexts |> List.map historyPiece) @ bodyPieces
 
             handOffPieces ticket candidates
 

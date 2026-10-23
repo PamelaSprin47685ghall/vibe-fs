@@ -234,8 +234,8 @@ module HandleController =
     /// Abandoned as non-joinable and return an explicit abandon outcome.
     ///
     /// Call only for irreversible loss (parent cancel, deadline, host session
-    /// gone). Never from degeneration-guard interrupt, provider-retry wake, or any path
-    /// that may continue the same handle through an independently owned control path.
+    /// gone). Never from provider-retry wake, or any path that may continue the
+    /// same handle through an independently owned control path.
     let recordAbandon
         (journal: AgentJournalPort option)
         (parentId: SessionId)

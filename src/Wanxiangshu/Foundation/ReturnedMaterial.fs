@@ -1,8 +1,14 @@
 namespace Wanxiangshu.Foundation
 
 /// Delivered material crosses persistence and wait cells as one canonical
-/// JSON string array. Decode only here; render TOML only at a presentation
-/// boundary, so rendered TOML can never become another quoted data field.
+/// JSON object separating main prose (body) from structured carry material.
+/// Decode only here; render TOML only at a presentation boundary, so rendered
+/// TOML can never become another quoted data field.
+///
+/// AXIOM 7: prose -> `# ` comment header (whole prose verbatim); carry and
+/// other material -> data field body; one blank line between header and body;
+/// parseable TOML; report body never triple-quoted. The body/carry split is
+/// structural here and is never inferred from the text content.
 [<RequireQualifiedAccess>]
 module ReturnedMaterial =
     open Fable.Core
@@ -17,36 +23,63 @@ module ReturnedMaterial =
     [<Emit("typeof $0")>]
     let private valueType (value: obj) : string = jsNative
 
-    let ofTexts (texts: string list) : string =
-        texts |> List.toArray |> JS.JSON.stringify
+    [<Emit("$0 === null")>]
+    let private isNull (value: obj) : bool = jsNative
 
-    let texts (encoded: string) : string list =
-        let value: obj = JS.JSON.parse encoded
+    [<Emit("({ body: $0, carry: $1 })")>]
+    let private createContainer (body: string array) (carry: string array) : obj = jsNative
 
+    [<Emit("$0[$1]")>]
+    let private getProperty (target: obj) (name: string) : obj = jsNative
+
+    let private stringListOf (label: string) (value: obj) : string list =
         if not (isArray value) then
-            invalidArg "encoded" "returned material must be a JSON string array"
+            invalidArg "encoded" (sprintf "returned material %s must be a JSON string array" label)
 
         let values: obj array = unbox value
 
         if values |> Array.exists (fun item -> valueType item <> "string") then
-            invalidArg "encoded" "returned material must contain only strings"
+            invalidArg "encoded" (sprintf "returned material %s must contain only strings" label)
 
         values |> Array.map unbox<string> |> Array.toList
+
+    /// Canonical storage: a JSON object `{ "body": [...], "carry": [...] }`.
+    /// `body` is the main prose (report/instructions); `carry` is structured
+    /// material. Both are string lists. The distinction is explicit and never
+    /// read back from what the text looks like.
+    let encode (body: string list) (carry: string list) : string =
+        JS.JSON.stringify (createContainer (body |> List.toArray) (carry |> List.toArray))
+
+    let private decoded (encoded: string) : obj =
+        let value: obj = JS.JSON.parse encoded
+
+        if isNull value || valueType value <> "object" || isArray value then
+            invalidArg "encoded" "returned material must be a JSON object of { body: string[], carry: string[] }"
+
+        value
+
+    let body (encoded: string) : string list =
+        let value = decoded encoded
+        stringListOf "body" (getProperty value "body")
+
+    let carry (encoded: string) : string list =
+        let value = decoded encoded
+        stringListOf "carry" (getProperty value "carry")
 
     let validate (encoded: string) : Result<unit, string> =
         let canonical =
             try
-                Some(ofTexts (texts encoded))
+                Some(encode (body encoded) (carry encoded))
             with _ ->
                 None
 
         match canonical with
         | Some value when value = encoded -> Ok()
-        | Some _ -> Error "returned material must use the canonical JSON string array encoding"
-        | None -> Error "returned material must be a canonical JSON string array"
+        | Some _ -> Error "returned material must use the canonical { body, carry } JSON object encoding"
+        | None -> Error "returned material must be a canonical { body: string[], carry: string[] } JSON object"
 
     let entries (encoded: string) : obj array =
-        texts encoded |> List.map (fun text -> box {| text = text |}) |> List.toArray
+        carry encoded |> List.map (fun text -> box {| text = text |}) |> List.toArray
 
     let private entryText (entry: obj) : string =
         if isNull entry || valueType entry <> "object" then
@@ -63,10 +96,27 @@ module ReturnedMaterial =
         if not (isArray entries) then
             invalidArg "entries" "returned must be an array of text entries"
 
-        (unbox<obj array> entries) |> Array.map entryText |> Array.toList |> ofTexts
+        (unbox<obj array> entries)
+        |> Array.map entryText
+        |> Array.toList
+        |> fun carry -> encode [] carry
 
-    let data (encoded: string) : LlmFacing.DataBlock list =
-        texts encoded |> LlmFacing.Data.textTables "returned"
+    /// Carry material as the join `[[returned]]` data plane.
+    let carryData (encoded: string) : LlmFacing.DataBlock list =
+        carry encoded |> LlmFacing.Data.textTables "returned"
 
+    /// The whole delivered view: body prose as a `# ` comment header, carry
+    /// material as `[[returned]]` data after the one blank line.
     let render (encoded: string) : string =
-        LlmFacing.empty |> LlmFacing.withData (data encoded) |> LlmFacing.render
+        LlmFacing.instructions (body encoded)
+        |> LlmFacing.withData (carryData encoded)
+        |> LlmFacing.render
+
+    /// The main prose as a `# ` comment header only.
+    let renderBody (encoded: string) : string =
+        LlmFacing.instructions (body encoded) |> LlmFacing.render
+
+    /// Body and carry as raw text blocks (not rendered `# ` bytes), joined for
+    /// consumers that present the whole delivered content verbatim.
+    let fullText (encoded: string) : string =
+        body encoded @ carry encoded |> String.concat "\n\n"

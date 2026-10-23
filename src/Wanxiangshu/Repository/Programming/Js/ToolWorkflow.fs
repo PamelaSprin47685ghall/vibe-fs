@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
@@ -186,6 +187,12 @@ type DeliverySettlement =
     | ContextUnavailable of reason: string
     | DeferredDelivery of resolve: (unit -> Task<DeliverySettlement option>)
 
+/// The review gates for one sandbox run. Manager gates reads (async check);
+/// Plan gates draft writes (synchronous check, fresh per mutation).
+type JsReviewGates =
+    { ReadGate: (unit -> Task<bool>) option
+      WriteGate: (unit -> bool) option }
+
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
 /// sandbox execution, staging, preflight, durable prepare, commit and the
 /// commit fact (JS-012/JS-013/JS-015). With `store = None` the workflow is
@@ -355,11 +362,7 @@ module JsToolWorkflow =
 
         if not (List.isEmpty blockers) then
             let reasons = blockers |> List.map snd |> String.concat "; "
-            Some(
-                JsFailure.ProgramFailed(
-                    sprintf "delivery is blocked by unresolved resources: %s" reasons
-                )
-            )
+            Some(JsFailure.ProgramFailed(sprintf "delivery is blocked by unresolved resources: %s" reasons))
         else
             let _ = JsParkedSites.autoSettleForSession sessionId
             None
@@ -427,6 +430,12 @@ module JsToolWorkflow =
     /// over. Every field comes from one of those three sources — nothing
     /// here is invented, and what the settle point cannot know is missing
     /// rather than filled in.
+    let private isChildDelivery (task: DeliveryTaskReference) =
+        match task with
+        | DeliveryTaskReference.Lifecycle _ -> false
+        | DeliveryTaskReference.ChildWork _
+        | DeliveryTaskReference.Invocation _ -> true
+
     let private fencedDeliveryWitness
         (sessionId: string)
         (providerRun: ProviderRunIdentity)
@@ -434,30 +443,41 @@ module JsToolWorkflow =
         (attribution: DeliveryAttribution)
         (view: obj)
         : Result<DeliveryWitness, JsFailure> =
-        let declaration = declarationText view
+        if
+            isChildDelivery attribution.Task
+            && String.IsNullOrWhiteSpace attribution.FormalText
+        then
+            Error(
+                JsFailure.DeliveryNotEstablished(
+                    "no assistant prose body was output before this.deliver; write the report in assistant prose first, then call deliver"
+                )
+            )
+        else
+            let declaration = declarationText view
 
-        let material =
-            JsDeliveredValues.materialize
-                sessionId
-                view
-                (Some
-                    { JsDeliveredValues.DeliveryFence.ProviderRun = providerRun
-                      JsDeliveredValues.DeliveryFence.ToolCallId = toolCallId })
-                (Some attribution.FormalText)
+            let material =
+                JsDeliveredValues.materialize
+                    sessionId
+                    view
+                    (Some
+                        { JsDeliveredValues.DeliveryFence.ProviderRun = providerRun
+                          JsDeliveredValues.DeliveryFence.ToolCallId = toolCallId })
+                    (Some attribution.FormalText)
 
-        // An empty carry and an empty report still form a valid delivery.
-        Ok
-            { SessionId = SessionId.create sessionId
-              LogicalRunId = attribution.LogicalRunId
-              AuthorityRoot = attribution.AuthorityRoot
-              PhysicalUserMessageId = attribution.PhysicalUserMessageId
-              ProviderRun = providerRun
-              ToolCallId = toolCallId
-              Task = attribution.Task
-              FormalText = attribution.FormalText
-              ViewDeclaration = declaration
-              View = material
-              RetirementId = attribution.RetirementId }
+            // Child delivery requires assistant prose body; lifecycle deliveries
+            // (e.g. Plan intermediate stage promotion) are exempt and may deliver with empty prose.
+            Ok
+                { SessionId = SessionId.create sessionId
+                  LogicalRunId = attribution.LogicalRunId
+                  AuthorityRoot = attribution.AuthorityRoot
+                  PhysicalUserMessageId = attribution.PhysicalUserMessageId
+                  ProviderRun = providerRun
+                  ToolCallId = toolCallId
+                  Task = attribution.Task
+                  FormalText = attribution.FormalText
+                  ViewDeclaration = declaration
+                  View = material
+                  RetirementId = attribution.RetirementId }
 
     let private deliveryWitness
         (sessionId: string)
@@ -496,7 +516,9 @@ module JsToolWorkflow =
                 return
                     Error(
                         JsFailure.DeliveryNotEstablished(
-                            "the durable delivery witness was not committed (" + reason + "); repeating the delivery with the same operation identity is safe"
+                            "the durable delivery witness was not committed ("
+                            + reason
+                            + "); repeating the delivery with the same operation identity is safe"
                         )
                     )
             | DeliveryCommitResult.Unknown reason ->
@@ -504,7 +526,9 @@ module JsToolWorkflow =
                 return
                     Error(
                         JsFailure.DeliveryNotEstablished(
-                            "the durable delivery witness commit outcome is unknown (" + reason + "); the delivery may have succeeded — do not retry blindly, observe the original operation first"
+                            "the durable delivery witness commit outcome is unknown ("
+                            + reason
+                            + "); the delivery may have succeeded — do not retry blindly, observe the original operation first"
                         )
                     )
         }
@@ -550,9 +574,7 @@ module JsToolWorkflow =
                 // The session snapshot or context could not be read: the
                 // delivery outcome cannot be attributed. Report the real cause
                 // instead of claiming the message had no prose.
-                return
-                    Error(
-                        JsFailure.DeliveryNotEstablished("session context could not be read: " + reason))
+                return Error(JsFailure.DeliveryNotEstablished("session context could not be read: " + reason))
             | Some(UnattributedDelivery reason) ->
                 // A durable host that could not attribute this call has no
                 // witness to commit. The delivery did not happen, and the
@@ -869,6 +891,27 @@ module JsToolWorkflow =
           ExplicitReads: ResizeArray<JsExplicitFileRead>
           Ledger: JsAsIsLedger }
 
+    let private fireProgramYield
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        (makePayload: unit -> obj)
+        : unit =
+        if not (isNull parkState.ParkSignalResolve) && not parkState.ParkRequested then
+            let payload = makePayload ()
+            parkState.ParkRequested <- true
+            parkState.ParkPayload <- payload
+            emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
+        else
+            ()
+
+    let private armProgramYieldTimer
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        (budgetMs: int)
+        (makePayload: unit -> obj)
+        : unit =
+        let callback = fun () -> fireProgramYield parkState makePayload
+        let _ = emitJsExpr (callback, budgetMs) "setTimeout($0, $1)"
+        ()
+
     let private runProgramCore
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
@@ -883,6 +926,8 @@ module JsToolWorkflow =
         (persistence: IJsTransactionPersistence option)
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: FileAccessObservation option)
+        (yieldBudgetMs: int option)
+        (planB: string option)
         (name: string)
         (makeApi: RunBuffers -> Wanxiangshu.Process.JsSandbox.ParkState -> obj)
         : Task<JsToolOutcome> =
@@ -923,6 +968,22 @@ module JsToolWorkflow =
             // Fable has no Task.WhenAny; Promise.race is the established
             // pattern (Await.fs / FinalityController).
             let parkSignal = JsSandbox.installParkSignal parkState
+
+            let budgetMs = defaultArg yieldBudgetMs 0
+            let planBText = defaultArg planB ""
+
+            // A present planB (including the empty string) always arms the
+            // yield timer. Zero milliseconds still parks immediately as kind
+            // yield; None means this entry did not buy time (legacy callers).
+            if planB.IsSome then
+                armProgramYieldTimer parkState budgetMs (fun () ->
+                    createObj
+                        [ "__jsYield" ==> true
+                          "planB" ==> planBText
+                          "budgetMs" ==> budgetMs
+                          "elapsedMs" ==> float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                          "delta" ==> (JsToolsBindings.readStashedDelta api)
+                          "name" ==> name ])
 
             let! runHandle =
                 JsSandbox.runSurfaceWithPark baseClassSource modelSource api deadlineMs deadlineEpochMs (Some parkState)
@@ -1026,10 +1087,23 @@ module JsToolWorkflow =
                 return! settleDeliveryOf sessionId fence settlement deliveredJson settled
         }
 
+    let private applyReadGate (readGate: (unit -> Task<bool>) option) (api: obj) : obj =
+        match readGate with
+        | Some check -> JsReviewOnly.scopeManagerReviewOnly check api
+        | None -> api
+
+    let private applyWriteGate (writeGate: (unit -> bool) option) (api: obj) : obj =
+        match writeGate with
+        | Some check -> JsReviewOnly.scopePlanWriteOnly check api
+        | None -> api
+
+    let private applyReviewGates (gates: JsReviewGates) (api: obj) : obj =
+        api |> applyReadGate gates.ReadGate |> applyWriteGate gates.WriteGate
+
     /// The generated-surface api factory: bindings own the file members and
     /// the host loop.
     let private bindingsApiFactory
-        (reviewCheck: (unit -> Task<bool>) option)
+        (reviewGates: JsReviewGates option)
         (sessionId: string)
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -1058,12 +1132,17 @@ module JsToolWorkflow =
             (JsDelegationBridge.hostFor sessionId)
             (JsDelegationBridge.askFor sessionId)
         |> fun api ->
-            reviewCheck
-            |> Option.map (fun check -> JsReviewOnly.scopeReviewOnly check api)
-            |> Option.defaultValue api
+            match reviewGates with
+            | Some gates -> applyReviewGates gates api
+            | None -> api
+
+    /// UTF-8 byte length of planB / 20 seconds, i.e. bytes * 50 ms.
+    /// Empty planB is 0 ms and still arms the yield timer.
+    [<Emit("new TextEncoder().encode($0).length * 50")>]
+    let private planBYieldBudgetMs (planB: string) : int = jsNative
 
     let private runProgramWithPark
-        (reviewCheck: (unit -> Task<bool>) option)
+        (reviewGates: JsReviewGates option)
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
         (settlement: DeliverySettlement option)
@@ -1077,6 +1156,7 @@ module JsToolWorkflow =
         (persistence: IJsTransactionPersistence option)
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: FileAccessObservation option)
+        (planB: string option)
         (name: string)
         : Task<JsToolOutcome> =
         runProgramCore
@@ -1093,14 +1173,19 @@ module JsToolWorkflow =
             persistence
             lifecyclePersistence
             fileAccessObservation
+            (planB |> Option.map planBYieldBudgetMs)
+            planB
             name
-            (fun buffers parkState -> bindingsApiFactory reviewCheck sessionId capabilities root buffers parkState)
+            (fun buffers parkState -> bindingsApiFactory reviewGates sessionId capabilities root buffers parkState)
 
 
     /// Resume a parked site (algorithm E). `handle` must exist; the deferred
     /// promise is resolved with `value`, the handle is removed (one-shot), and
     /// the deadline is reset to now+10s. If the program parks again the result
     /// is a new parked payload with a new handle.
+    /// A present `planB` (including empty) reprices the resumed wait: UTF-8
+    /// bytes * 50 ms, and a later yield echoes that new planB. `None` does not
+    /// arm a new yield timer.
     let private unparkSite
         (site: JsParkedSites.JsParkedSite)
         (fence: (ProviderRunIdentity * ToolCallId) option)
@@ -1109,6 +1194,7 @@ module JsToolWorkflow =
         (baseClassSource: string)
         (deadlineMs: int)
         (outputBoundBytes: int)
+        (planB: string option)
         : Task<JsToolOutcome> =
         task {
             Wanxiangshu.Process.JsSandbox.unpark site.RunHandle.ParkState value
@@ -1121,6 +1207,19 @@ module JsToolWorkflow =
             // Install a fresh park signal and race the program promise against
             // it: the resumed program may park again (algorithm E5).
             let parkSignal = JsSandbox.installParkSignal site.RunHandle.ParkState
+
+            if planB.IsSome then
+                let planBText = planB.Value
+                let budgetMs = planBYieldBudgetMs planBText
+                let parkState = site.RunHandle.ParkState
+
+                armProgramYieldTimer parkState budgetMs (fun () ->
+                    createObj
+                        [ "__jsYield" ==> true
+                          "planB" ==> planBText
+                          "budgetMs" ==> budgetMs
+                          "elapsedMs" ==> float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                          "delta" ==> (JsToolsBindings.readStashedDelta site.RunHandle.Api) ])
 
             let taggedProgram: Task<obj> =
                 task {
@@ -1213,8 +1312,8 @@ module JsToolWorkflow =
 
     [<RequireQualifiedAccess>]
     type private ToolWorkflowInvocation =
-        | Program of source: string * name: string
-        | Unpark of handle: string * value: obj
+        | Program of source: string * planB: string option * name: string
+        | Unpark of handle: string * value: obj * planB: string option
         | Abandon of handle: string
         | Invalid of reason: string
 
@@ -1223,6 +1322,7 @@ module JsToolWorkflow =
 
     /// The states a js-* input carries, in protocol order. A state is present
     /// when its key holds a value; null and undefined are absences.
+    /// `planB` is not a state: it rides on the same object as program or unpark.
     let private inputStates (input: obj) : (string * obj) list =
         if isNull input then
             []
@@ -1231,6 +1331,19 @@ module JsToolWorkflow =
             |> List.choose (fun key ->
                 let value = input?(key)
                 if isPresent value then Some(key, value) else None)
+
+    /// A new planB on an unpark input reprices the resumed wait. Missing means
+    /// do not arm a new yield timer.
+    let private unparkPlanB (input: obj) : string option =
+        if isNull input then
+            None
+        else
+            let value = input?planB
+            if isPresent value then Some(string value) else None
+
+    /// planB on the invocation object. Absent or null is the empty alternative
+    /// (0 ms), not "skip the timer".
+    let private programPlanB (input: obj) : string option = unparkPlanB input
 
     /// Why a js-* input is contradictory: it carries more than one of
     /// program / unpark / abandon. The reason names the conflicting states.
@@ -1252,18 +1365,21 @@ module JsToolWorkflow =
         else
             None
 
+    let private parseProgramInvocation (input: obj) (source: obj) : ToolWorkflowInvocation =
+        let given = input?name
+        let name = if isNull given then "" else string given
+
+        if System.String.IsNullOrWhiteSpace name then
+            ToolWorkflowInvocation.Invalid "name is required"
+        else
+            ToolWorkflowInvocation.Program(string source, programPlanB input, name)
+
     let private parseWorkflowInvocation (input: obj) : ToolWorkflowInvocation =
         match inputStates input with
         | [] -> ToolWorkflowInvocation.Invalid "no program, unpark, or abandon input"
-        | [ ("program", source) ] ->
-            let given = input?name
-            let name = if isNull given then "" else string given
-
-            if System.String.IsNullOrWhiteSpace name then
-                ToolWorkflowInvocation.Invalid "name is required"
-            else
-                ToolWorkflowInvocation.Program(string source, name)
-        | [ ("unpark", unpark) ] -> ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value)
+        | [ ("program", source) ] -> parseProgramInvocation input source
+        | [ ("unpark", unpark) ] ->
+            ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value, unparkPlanB input)
         | [ ("abandon", abandon) ] -> ToolWorkflowInvocation.Abandon(string (abandon?handle))
         | states -> ToolWorkflowInvocation.Invalid(conflictReason states)
 
@@ -1288,7 +1404,12 @@ module JsToolWorkflow =
     /// Execute one js-* tool invocation under the three-state input protocol
     /// (PLAN S2 step 5). The `input` object carries one of:
     ///   { program: string }
+    ///   { program: string, planB?: string }
+    ///   { unpark: { handle: string, value: obj }, planB?: string }
     ///   { abandon: { handle: string } }
+    /// planB's UTF-8 byte length * 50 is the yield budget in milliseconds.
+    /// Missing planB on a program is the empty alternative (0 ms, still armed).
+    /// unpark/abandon do not require planB; a planB on unpark reprices the resume.
     /// `sessionId` tags newly created parked sites so session close can reap
     /// them. `lifecyclePersistence` records Parked/Unparked/Abandoned audit
     /// traces (best-effort; a failed audit never fails the tool call); Reaped
@@ -1299,7 +1420,7 @@ module JsToolWorkflow =
     /// delivered, and a delivery that cannot commit one presents as not
     /// established (clauses 3 and 6).
     let executeWithReviewCheckAndDelivery
-        (reviewCheck: (unit -> Task<bool>) option)
+        (reviewGates: JsReviewGates option)
         (settlement: DeliverySettlement option)
         (sessionId: string)
         (fence: (ProviderRunIdentity * ToolCallId) option)
@@ -1316,10 +1437,10 @@ module JsToolWorkflow =
         : Task<JsToolOutcome> =
         task {
             match parseWorkflowInvocation input with
-            | ToolWorkflowInvocation.Program(programSource, name) ->
+            | ToolWorkflowInvocation.Program(programSource, planB, name) ->
                 return!
                     runProgramWithPark
-                        reviewCheck
+                        reviewGates
                         sessionId
                         fence
                         settlement
@@ -1333,12 +1454,13 @@ module JsToolWorkflow =
                         persistence
                         lifecyclePersistence
                         fileAccessObservation
+                        planB
                         name
-            | ToolWorkflowInvocation.Unpark(handle, value) ->
+            | ToolWorkflowInvocation.Unpark(handle, value, planB) ->
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
-                        unparkSite site fence settlement value baseClassSource deadlineMs outputBoundBytes)
+                        unparkSite site fence settlement value baseClassSource deadlineMs outputBoundBytes planB)
             | ToolWorkflowInvocation.Abandon handle ->
                 return!
                     dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
@@ -1351,7 +1473,7 @@ module JsToolWorkflow =
     /// settlement: no durable store stands behind the delivery, so the
     /// process-live cell is its only evidence.
     let executeWithReviewCheck
-        reviewCheck
+        reviewGates
         sessionId
         fence
         capabilities
@@ -1366,7 +1488,7 @@ module JsToolWorkflow =
         fileAccessObservation
         =
         executeWithReviewCheckAndDelivery
-            reviewCheck
+            reviewGates
             None
             sessionId
             fence

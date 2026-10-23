@@ -432,7 +432,7 @@ module FissionLaunch =
                 |> Option.map (fun witness -> witness.View)
                 |> Option.orElseWith (fun () ->
                     JsDeliveredValues.tryPeekMaterialWith (SessionId.value childId) (Some terminal.TerminalText))
-                |> Option.map ReturnedMaterial.render
+                |> Option.map ReturnedMaterial.fullText
 
             let payload = payloadFromView view terminal.TerminalText
 

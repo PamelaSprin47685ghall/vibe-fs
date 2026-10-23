@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
@@ -42,23 +42,22 @@ const authorize = (root, commonDir, workId, content) => {
       type: 'Review',
       incumbencyId: active,
       reviewerId: 'reviewer',
-      findings: [],
+      updates: [],
     })
-    if (stage < 3) {
-      execute(`relay-${stage}`, {
-        type: 'Deliver',
-        incumbencyId: active,
-        providerRunId: `relay-run-${stage}`,
-        toolCallId: `relay-call-${stage}`,
-        cursor: stage * 10,
-        blockers: [],
-        nextOwnerId: workId,
-      })
-    }
+    execute(`relay-${stage}`, {
+      type: 'Deliver',
+      incumbencyId: active,
+      providerRunId: `relay-run-${stage}`,
+      toolCallId: `relay-call-${stage}`,
+      cursor: stage * 10,
+      blockers: [],
+      nextOwnerId: workId,
+    })
   }
 
-  const written = surface.rewritePlanAtomic(root, workId, content)
-  assert.equal(written.ok, true, written.error)
+  const planPath = surface.resolvePlanPath(root, workId).path
+  mkdirSync(dirname(planPath), { recursive: true })
+  writeFileSync(planPath, content)
   const work = host.inspected(commonDir, workId)
   assert.equal(work.DeliveryAuthorized, true)
   return work.ActiveId

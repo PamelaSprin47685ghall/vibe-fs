@@ -65,6 +65,29 @@ test('WHAT[delegation-003] FORK_TOOL_defaults_blank_calling_from_name_and_resume
   }
 })
 
+test('WHAT[delegation-003] FORK_and_RESUME_command_schemas_and_execution_clean_break_obsolete_keywords', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-smoke-'))
+  const owner = 'manager-fork-smoke'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  try {
+    const pending = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'PROSE-CHARGE-SMOKE')
+    await waitForPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    const result = await pending
+    assert.match(result, /carries this charge now|现已接下这项托付/i)
+    assert.equal(forkTool.childCount(runtime), 1)
+
+    const resumePending = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'PROSE-RESUME-SMOKE')
+    await waitForPromptCount(runtime, 2)
+    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
+    assert.match(await resumePending, /carries this charge now|现已接下这项托付|Guidance for Ada|已将给 Ada 的指引/i)
+  } finally {
+    forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[delegation-003] FORK_TOOL_derives_devops_from_a_devops_name_and_refuses_to_fork_it', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-derive-devops-'))
   const owner = 'manager-fork-derive-devops'

@@ -51,10 +51,6 @@
 
 每次执行的 `AttemptExecutionProfile` 必须原子携带 exact SessionId、LogicalRunId、AuthorityRootId、当前 per-physical target/lease，以及 `AuthorityRootAccepted` 中 participant-identity owner 准备的完整版本化 `ParticipantIdentityEvidence`。Authority fold 向 Host/execution 消费者逐字段精确暴露固定 participant、Role、稳定 Persona 与 provenance/version，但不拥有、重新解析或修改这些字段；当前 per-physical target/lease 只来自 execution binding。禁止从 Session cache、物理 parent、显式 agent 文本或分散消息拼装 profile。
 
-## [012] degeneration-guard 是 continuation 而非 fallback 失败
-
-degeneration-guard 自恢复消息（`DegenerationGuard`）等属于强类型 Continuation。它们延续当前 LogicalRun，复用既有 Root 与 Profile，不得建立新 Root、不得改变 per-physical target/lease、亦不得计入模型重试失败次数。`DegenerationGuard` 不得伪装成 `ProviderRetryAttempt`。
-
 ## [013] 显式 continuation 绑定保持 authority continuity
 
 同一 LogicalRun 下的强类型 continuation 推进属于权限连续演进：仅 execution binding 的 per-physical target/lease 可按规则变化；participant、Root、identity evidence 与 Profile 关联全部保持不变。SessionId 相同但 LogicalRun 不同不构成 continuity。新物理目标的路由绝不改变 participant。

@@ -14,8 +14,7 @@ test('WHAT[work-014] S4 一段式交付直接完成，同一 fence 重放返回�
   // 一段式交付：无需两段式确认，一次 deliver 即原子写入退休与后继
   const deliver = surface.deliverProbe(s4, 'run-a', 'call-a', 5n)
   assert.equal(deliver.decision, 'Write')
-  assert.equal(deliver.names.includes('IncumbencyRetired'), true)
-  assert.equal(deliver.names.includes('ConfirmationCommitted'), false)
+  assert.equal(deliver.names, 'IncumbencyRetired,IncumbencyOpened')
 
   // 同一 fence 重放：返回原记录，零追加，不重复结束
   const replay = surface.replayProbe(s4 + deliver.bytes, 'run-a', 'call-a', 5n)

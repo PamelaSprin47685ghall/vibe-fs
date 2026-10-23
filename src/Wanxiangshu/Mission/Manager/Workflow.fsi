@@ -55,6 +55,3 @@ module ManagerWorkflow =
         stopRetiredAttempt: (SessionId -> Task<unit>) ->
         sessionId: SessionId ->
             Task<unit>
-
-    /// The closeout instruction substituted into `runtime/manager-finish`.
-    val finishCloseoutText: confirmed: bool -> string
