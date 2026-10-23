@@ -8,26 +8,26 @@
   - **宿主闭包**：通过 `this._api.review(findings)` 返回纯数据包（`{ ok: true, outcome: "Promoted" | "Stayed", firstReview: bool, obligations: [...] }`），支持单 attempt 内多次更新，不再输出独立渲染 prose。
 - **首次空定资格与新任期投递晋级**：
   - 首次评审定资格（first-empty eligibility）：仅在任期内**首次评审**且生成台账为空时确立晋级资格（`ReviewOutcome = Some "Promoted"`）；台账非空则定为 `Stayed`；后续调用仅作逐键台账增删，不改变已定资格。
-  - 评审本身不推进工作阶段，晋级与完成统一由后续新任期内的 `deliver` 动作执行。
+  - 评审本身不推进工作阶段，晋级与完成由当前持有资格的任期执行 `deliver` 动作；对于 Plan 流程，合格任期的 `deliver` 退休当前任期并在推进后的阶段开启后继新任期（S1/S2 写 `IncumbencyRetired(Relayed)` 与 `IncumbencyOpened(stage + 1)`，S3 写 `PlanAuthorized`）。
 - **全面免除二次确认门禁（No confirmation）**：
   - 彻底清理 `seedConfirmation`、`hasConfirmation`、`confirmation` 状态与参数残留；合规请求直接执行流转，不再增设阻断合规动作或重复审批已决事项的伪防呆门禁，严格恪守公理一。
 - **Plan 普通起草路径与写入门禁（Plan draft path / write gate）**：
   - Plan 角色起草流程收拢至统一草稿路径；增设评审前置写入围栏（`isReviewFinished` 为真后方可解锁草稿写入，`reviewFinishedOnly`）；普通起草路径与 deliver 读取同源。
-- **PlanB 字节预算与调用门禁（planB byte budget）**：
-  - 执行与工具调用层对 planB 注入与回退执行严格字节预算与格式门禁，拦截超规 planB 污染上下文。
-- **工作树干净状态门禁（Worktree dirty gate）**：
-  - 交付与变更集成流程接入工作树状态检查，执行前校验未受管修改与残余产物，阻止脏工作树泄漏。
+- **PlanB 文本字节等待预算（planB byte wait budget）**：
+  - `this.call(command, planB)` 要求必填非空 `planB`，按 UTF-8 字节数 × 50ms 定价武装让出定时器；程序级调用 `{ program, planB? }` 缺省为无定时器（避免万能零定时器），传入非空 `planB` 时武装让出定时器；`unpark` 支持以新 `planB` 重新定价等待时长。空串与空白字符 `planB` 拒绝执行（`CALL_COMMAND_UNSUPPORTED`）。
+- **工作树创建前干净状态门禁（Worktree clean gate）**：
+  - 变更集成流程在创建隔离工作树（`git worktree add`）前严格校验主工作树状态，检测到未受管修改、未暂存、未追踪或脏子模块时直接在创建前拒绝，防止脏工作树泄漏入新环境。
 - **退化守卫（Degeneration Guard）彻底退役与统计删除**：
   - 彻底移除 `degeneration-guard` 子系统、相关测试及规范文档；删除 `LoopDetector`、`LoopSensor`、`LoopEventCodec` 及包导入 `#wanxiangshu-loop-detector-envelope`；清理 `Foundation/HostSession` 中 `AbortCause`、`DegenerationKind`、`LoopTextDelta` 等遗留符号与退化统计。
 - **强制控制金字塔检查（Mandatory pyramid gate）**：
   - `scripts/checks/fsharp-control-pyramid.mjs` 正式入闸为强制静态检查，对 F# 代码分支深度（`if` 链与嵌套模式匹配）执行扁平化限制，禁止深层分支金字塔结构。
-- **A2A 纯文本主散文、carry 字段与空体中止**：
-  - 代理间（A2A）消息规范为自然纯文本散文，严禁伪结构化字段与汇报模板，信息取舍由发送方自主裁定；结构化上下文仅允许通过 `carry` 数组携带（整数引用历史锚点，字符串为字面量）；空消息体触发 `empty-body abort`，坚决拦截无实质散文的静默停机。
+- **A2A 顶层散文注释与 body/carry schema4**：
+  - 代理间（A2A）消息以文档顶部的 `# ` 注释承载主散文（指令、指导与报告），严禁把散文塞入字段值或使用汇报模板；`ReturnedMaterial` 规范为 `{ body: string[], carry: string[] }` 纯文本拆分（`CompletionCodec` schemaVersion 4，拒绝旧格式）；空消息体触发 `empty-body abort` 拦截，防止无散文交付。
 - **PR 63 选择性采纳（PR63 selective adoption）**：
   - **采纳**：CI 缓存与运行条件优化、SecondHost 计时器抽象与适配（`HostPlugin.create clock createTimer` 与 `nodeClockPort`/`nodeTimerPort` 适配）、持久化写入者标识隔离（writer-ID）、测试夹具与离线探针健全性补丁（`time/004`、`verification/006`、`durable/005`、`dispatch/010`、`delegation/027`）。
   - **跳过**：排除旧版生命周期与退化守卫代码复活尝试、Fork `.gitmodules`/`gitlink` 覆盖，以及与当前公理体系（无二次确认、按键台账门禁、A2A 顶层散文）冲突的旧版回退实现。
 - **落地现状与验证状态**：
-  - 本批次能力定义、模版资源、退化守卫清理、PR 63 选择性采纳及静态门禁已全部闭环；全量单元测试与端到端测试均已通过验证。历史变更记录全量保留。
+  - 本批次能力定义、模版资源、退化守卫清理、PR 63 选择性采纳及静态门禁已全部闭环；本轮聚焦验收套件（work 191/191、change-integration 002 15/15、repository-programming 050/058 10/10、context-compression 031/032 27/27、obligation-ledger 17/17 + 1 todo、advisor 15/15、wanxiangli lifecycle/capability 67/67，共 342 题通过、0 失败）及各安装工具 smoke 均已通过实跑验证。历史变更记录全量保留。
 
 ## Unreleased — Authority 接收不再落错 closure kind（journal semantic cut 根因）
 
