@@ -47,7 +47,7 @@ consumers remain on legacy `ISessionHostPort` / `ChildSessionOptions` / `ChildSe
 slice C) across four clusters:
 (1) Fork (`Execution/Delegation/Fork/Host/Agent.fs`, `HostForkRuntime`), (2) SyncDelegate (`Execution/Delegation/SyncDelegate/Runtime.fs`),
 (3) Advisor (`Execution/Delegation/Advisor/Seat.fs`), (4) OpenCode host wiring (`OpenCode/Host/Sessions.fs`, `PluginHost.fs`).
-These consumers are precisely documented as left (in `保姆级交接与展望.md` and `REGISTRY.md`) rather than cut over in an
+These consumers are precisely documented as left (in `evidence/session-port-leftovers.md` and `REGISTRY.md`) rather than cut over in an
 unverified cross-lane sweep: `AdvisorSeat` requires terminal event subscription (`SubscribeTerminal`) which `ISessionPort`
 does not provide, `InjectedSessionPort` still manages family roots and process-local ancestry, and `ChildSessionOptions`/
 `ChildSessionInfo` have 36 live references across 17 files, which prevents retirement of the *types* at this
@@ -89,7 +89,7 @@ is preserved. The legacy `ISessionSnapshotPort` / `SessionMessage` contract stay
 (126 call sites across `JoinTool`, `DeliverTool`, `ReviewBackendManager`), and tools like `ReviewBackendManager` rely on snapshot-specific
 `SessionToolPart` / `ToolParts` / `locateToolCall` absent from neutral `TranscriptPart.ToolUse`. Per HNI policy against broad multi-lane
 fanout and lossy reverse projection, fork recovery remains on `ISessionSnapshotPort` until downstream tools complete domain extraction.
-Full leftover inventory (44 files) documented in root `保姆级交接与展望.md`. Remaining consumers (turn reconcile, prefix wire, delegation
+Full leftover inventory (44 files) documented in `evidence/session-port-leftovers.md`. Remaining consumers (turn reconcile, prefix wire, delegation
 advisor, tools, fork host restart) are still to be routed onto P-03.
 `Host/Ports/*` is unchanged, so the next free port id stays **P-20**. Gates: architecture OK, adapter-thinness 139
 files / 33004 lines, product-reference 589 (baseline 689), without-port 134 (baseline 149), fsharp-control-pyramid 2
