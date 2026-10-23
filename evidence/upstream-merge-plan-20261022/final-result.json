@@ -61,7 +61,7 @@
   },
   "localAcceptance": {
     "location": "local-only",
-    "currentAcceptanceRecord": "ciRepair.supervisionRepair",
+    "currentAcceptanceRecord": "ciRepair",
     "unitSuiteBackstopMs": 900000,
     "ordinaryVerdictSilenceMs": 5000,
     "existingFiniteOperationDeadlinesChanged": false,
@@ -560,7 +560,7 @@
     "M22-3": "DONE: authority, delivery and recovery regressions passed",
     "M22-4": "DONE: build boundaries, actual Host and Long Stroke passed",
     "M22-5": "DONE for resumed scope: final normal-operation and affected-suite acceptance passed; consolidated CLI history is not relabeled",
-    "M22-6": "SOURCE DELIVERED: local acceptance complete; the exact-head GitHub verdict at sourceDelivery.ci.latestHeadChecks is the final gate"
+    "M22-6": "SOURCE DELIVERED: full CI now uses two workers; the exact-head GitHub verdict at sourceDelivery.ci.latestHeadChecks is the final gate"
   },
   "sourceDelivery": {
     "mode": "pull-request",
@@ -571,16 +571,16 @@
     "commit": "70f8aab03445e99580c38c584910f84478448e36",
     "pushed": true,
     "merged": false,
-    "repairSourceCommit": "77973ac02a65c5021c7997ad260c9e2b228dc335",
-    "receiptOnlyFollowup": true,
+    "supervisionRepairCommit": "77973ac02a65c5021c7997ad260c9e2b228dc335",
+    "receiptOnlyFollowup": false,
     "ci": {
       "status": "external-live-verdict",
       "sourceCheckpoint": {
         "commit": "77973ac02a65c5021c7997ad260c9e2b228dc335",
         "runId": 39879364573,
         "url": "https://github.com/dyx13/vibe-fs/actions/runs/39879364573",
-        "observedStatus": "in_progress",
-        "observedAt": "2026-10-23T00:50:38Z"
+        "observedStatus": "failure",
+        "observedAt": "2026-10-23T01:02:15Z"
       },
       "latestHeadChecks": "https://github.com/dyx13/vibe-fs/pull/1/checks",
       "authority": "Read the live verdict for the exact PR head. This checkpoint does not cache or predict that verdict; the source checkpoint above is historical."
@@ -588,7 +588,7 @@
     "creation": "The GitHub connector returned 403 for PR creation; the user's existing local GitHub CLI login created PR 1 successfully. The PR is attached to this task."
   },
   "ciRepair": {
-    "status": "local acceptance complete; the live GitHub verdict is authoritative at sourceDelivery.ci.latestHeadChecks",
+    "status": "unit and scoped fixes passed; CI worker allocation changed from four to two after reproducing Host startup contention; the live exact-head GitHub verdict is authoritative",
     "initialHead": "02714811358f222544554a8b89cacdcbbc363116",
     "initialRun": 39842134321,
     "initialPassedSteps": ["format:check", "check", "build", "unit"],
@@ -602,7 +602,8 @@
       "Each existing dispatch-protocol-010 compiler probe now completes a named native subtest after all of its original assertions; no heartbeat, timeout increase or assertion removal.",
       "Failed installed Host guidance probes send their existing captured stderr to the displayed stderr stream.",
       "The harness gate writer prefixes PID digits with p, preserving the production ban on a writer suffix that looks like a four-digit segment ordinal. A deterministic boundary regression uses the actual EventStore.",
-      "Every real TestContext registers before its body. Registration binds an unused native invocation and grants no time. A begin request uses that exact token; a later same-name context cannot license a previous unused invocation. Original silence, absolute operation deadlines, duplicate-token rejection and physical cleanup remain."
+      "Every real TestContext registers before its body. Registration binds an unused native invocation and grants no time. A begin request uses that exact token; a later same-name context cannot license a previous unused invocation. Original silence, absolute operation deadlines, duplicate-token rejection and physical cleanup remain.",
+      "CI runs the same complete release entry with two test workers. The original 5000ms Host readiness deadline, all assertions and the suite backstops are unchanged; file scheduling no longer admits three compiler jobs beside one Host or two compiler jobs beside two Hosts."
     ],
     "localValidation": {
       "generation": 45,
@@ -640,6 +641,33 @@
         "artifact": "7296ae8ccf8b216315a74ec4564ee2cdf126ae29cf53cb54ded3f46a1c6fbf05"
       },
       "productArtifactDigestUnchanged": true
+    },
+    "hostReadiness": {
+      "ciRun": 39879364573,
+      "ciHead": "77973ac02a65c5021c7997ad260c9e2b228dc335",
+      "ciUnit": { "files": 765, "passed": 4670, "failed": 0 },
+      "ciIntegration": { "files": 40, "passed": 707, "failed": 3, "logUrl": "https://github.com/dyx13/vibe-fs/actions/runs/39879364573" },
+      "ciFailures": "Two delegation-027 guidance canaries and the host-boundary-032 review-tools canary exceeded project initialization readiness before any provider request. They ran beside three Fable compiler files or two compiler files plus a second Host file.",
+      "localFourWorkerReproduction": { "generation": 48, "files": 40, "passed": 725, "failed": 1, "skipped": 7, "todo": 7, "reclamationAccepted": true, "reclamationMs": 24.616, "reason": "The same host-boundary-032 project-readiness failure while compiler and Host files overlapped.", "log": "/private/tmp/m22-pr1-ci-integration48.log" },
+      "localIsolatedProof": { "files": 2, "passed": 29, "failed": 0, "wallMs": 34140, "reclamationAccepted": true, "reclamationMs": 27.592, "log": "/private/tmp/m22-pr1-ci-isolated-host48.log" },
+      "resourceInference": "Overlapping compiler and Host startup exhausts the cold-start headroom. Two-worker CI tests this resource diagnosis without changing the acceptance criterion.",
+      "configuredWorkers": 2,
+      "hostReadinessMs": 5000,
+      "acceptanceBudgetsChanged": false,
+      "testsRemovedOrDisabled": []
+    },
+    "ciResourceRepair": {
+      "generation": 49,
+      "buildPassed": true,
+      "affectedWorkflowTests": { "files": 2, "passed": 35, "failed": 0, "wallMs": 3540, "reclamationAccepted": true, "log": "/private/tmp/m22-pr1-ci-workflow49.log" },
+      "inputDigests": {
+        "validation": "1b289dc7a8b8b1e150952863117930e559eb7cb91b052de5357aaf9edd85a1dd",
+        "compiler": "e6209d05833c3f066639e8293fd4a9ffbceefe57261d59c67885e2840cb98643",
+        "generated": "3af5402ad13cf14105b84daa9e990153209b85ca9b4746977f4b71454e471268",
+        "artifact": "7296ae8ccf8b216315a74ec4564ee2cdf126ae29cf53cb54ded3f46a1c6fbf05"
+      },
+      "productArtifactDigestUnchanged": true,
+      "fullReleaseAuthority": "sourceDelivery.ci.latestHeadChecks"
     },
     "runtimeDeployed": false
   },
