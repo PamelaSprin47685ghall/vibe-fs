@@ -99,7 +99,10 @@ test('WHAT[work-029] shared Plan interface reads the ordinary draft path and rej
     assert.equal(opened.ok, true, opened.error)
 
     const run = body => hooks.tool['todowrite-for-plan'].execute(
-      { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'plan-read' },
+      { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'plan-read',
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent: 'plan', callID: 'call-work-029', messageID: 'run-work-029', providerRunID: 'run-work-029' },
     )
 

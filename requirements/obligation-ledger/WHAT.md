@@ -2,15 +2,15 @@
 
 本包规定编程面（`todowrite-for-<role>`）的 ANCHOR 上下文整理声明与上下文压缩 checkpoint 的确认边界。宿主原生 `todowrite` 已退役，不进入 `StaticTools.knownToolNames`、能力权限矩阵、投机调查分类或 ablation 映射；插件也不维护第二份待办账本。唯一产生压缩 checkpoint 的来源是携带**有效**上下文整理声明并成功完成的编程面调用：每次 exact 调用确认后追加一条持久化 `ViewCheckpointCommitted` 事实，进入 checkpoint 窗口；裁剪边界由该声明自身决定。
 
-声明的调用面是两个顶层参数 `prefixCount: number` 与 `carry: (number|string)[]`（形态见 repository-programming [053]）：两者都不给即无声明，提供其中一个时必须同时提供另一个；非法声明以 `VIEW_DECLARATION_INVALID` 拒绝，不构成 checkpoint。
+声明的调用面是两个顶层参数 `prefixUntil: number` 与 `carry: (number|string)[]`（形态见 repository-programming [053]）：每次调用均须同时提供两者；非法或缺失声明以 `VIEW_DECLARATION_INVALID` 拒绝，不构成 checkpoint。
 
 ## [001] 宿主原生 todowrite 退役，编程面上下文整理声明为唯一 checkpoint 来源
 
-宿主原生 `todowrite` 已彻底退役，不在 `StaticTools.knownToolNames`、`permissionFor`、`requestToolMap`、`InvestigationEstimateContract.classifyTool` 或 `resources/ablation/tool-map.json` 中登记或放行。各角色的活规划与工作推进由其 `todowrite-for-<role>` 编程面承担；唯有前缀为 `todowrite-for-` 且 `state.input` 携带有效上下文整理声明的调用具备压缩 checkpoint 资格：声明的存在以 `prefixCount` 或 `carry` 任一出现为准，有效性由与调用面相同的声明校验器判定。未声明、非法数组或前缀长度、缺少其中一个参数、program/unpark/abandon 三态冲突，或非 `todowrite-for-*` 工具的终态事件，均不产生 `ViewCheckpointCommitted`。
+宿主原生 `todowrite` 已彻底退役，不在 `StaticTools.knownToolNames`、`permissionFor`、`requestToolMap`、`InvestigationEstimateContract.classifyTool` 或 `resources/ablation/tool-map.json` 中登记或放行。各角色的活规划与工作推进由其 `todowrite-for-<role>` 编程面承担；唯有前缀为 `todowrite-for-` 且 `state.input` 携带有效上下文整理声明（同时给出合法的 `prefixUntil` 与 `carry`）的调用具备压缩 checkpoint 资格；有效性由与调用面相同的声明校验器判定。非法数组或截止值、缺少其中一个参数、program/unpark/abandon 三态冲突，或非 `todowrite-for-*` 工具的终态事件，均不产生 `ViewCheckpointCommitted`。
 
 ## [002] 编程面上下文整理声明驱动真实 Host 终态与 checkpoint 记录
 
-编程面调用携带的 `prefixCount` 与 `carry` 按原样进入执行与原始 Host ToolPart 状态；当 Host 发出 `message.part.updated` 的 `completed` 终态且 `state.input` 携带有效声明时，插件为该 exact `ToolCallId` 追加一条 `ViewCheckpointCommitted`，进入 `ViewCheckpoints` 窗口。窗口只记录成功声明的 checkpoint 身份与顺序；上下文保留由声明决定，宿主不按固定计数替模型裁剪历史。呈现保留的当前回合时剥离 `carry`，不改写这份原始终态证据。
+编程面调用携带的 `prefixUntil` 与 `carry` 按原样进入执行与原始 Host ToolPart 状态；当 Host 发出 `message.part.updated` 的 `completed` 终态且 `state.input` 携带有效声明时，插件为该 exact `ToolCallId` 追加一条 `ViewCheckpointCommitted`，进入 `ViewCheckpoints` 窗口。窗口只记录成功声明的 checkpoint 身份与顺序；上下文保留由声明决定，宿主不按固定计数替模型裁剪历史。呈现保留的当前回合时剥离 `carry`，不改写这份原始终态证据。
 
 ## [003] 不维护第二份 desired/applied 待办投影
 

@@ -466,7 +466,7 @@ test('WHAT[work-034] a relaying tenure declaring carry commits ViewCheckpointCom
             status: 'completed',
             input: {
               program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-              prefixCount: 0,
+              prefixUntil: 0,
               carry: [declaredCarry],
             },
             output: 'ok',
@@ -478,7 +478,7 @@ test('WHAT[work-034] a relaying tenure declaring carry commits ViewCheckpointCom
     await hooks.tool['todowrite-for-plan'].execute(
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        prefixCount: 0,
+        prefixUntil: 0,
         carry: [declaredCarry],
       },
       { sessionID, agent: 'plan', callID: 'call-034-view', messageID: 'run-034-view', providerRunID: 'run-034-view' },

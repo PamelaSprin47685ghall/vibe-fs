@@ -80,6 +80,8 @@ const withRealPlugin = async (body, session = SESSION) => {
       hooks.tool['todowrite-for-engineer'].execute(
         {
           program: `class Js extends JsProgram { async run() { return await this.deliver([${JSON.stringify(material)}]); } }`,
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: session, agent: 'engineer', callID: callId, messageID: run },
       )
@@ -426,7 +428,10 @@ test('WHAT[effect-accounting-013] a refused delivery commit registers nothing, a
 
     const deliver = async (material, callId = 'call-effect-013-registration') =>
       hooks.tool['todowrite-for-engineer'].execute(
-        { program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }` },
+        { program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
+          prefixUntil: 0,
+          carry: []
+        },
         { sessionID: session, agent: 'engineer', callID: callId, messageID: run },
       )
 

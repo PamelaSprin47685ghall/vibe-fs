@@ -38,9 +38,9 @@ const failureOf = (result) => {
   return document
 }
 
-test('WHAT[repository-programming-053] prefixCount and carry preserve literal order and exact text', async () => {
+test('WHAT[repository-programming-053] prefixUntil and carry preserve literal order and exact text', async () => {
   await withTool(async (registered) => {
-    const declaration = { prefixCount: 0, carry: ['second', 'first\nlast', '', '  '] }
+    const declaration = { prefixUntil: 0, carry: ['second', 'first\nlast', '', '  '] }
     const result = await execute(registered, { program, ...declaration }, { sessionID: 'ses-053-order' })
     assert.equal(result.startsWith('# ok'), true, result)
     assert.deepEqual(takeView('ses-053-order'), declaration)
@@ -51,7 +51,7 @@ test('WHAT[repository-programming-053] retired names are rejected even beside a 
   await withTool(async (registered) => {
     for (const legacy of [
       { view: {} },
-      { prefixUntil: 0 },
+      { prefixCount: 0 },
       { thenMap: {} },
       { reportMapping: {} },
       { thenMap: null },
@@ -59,25 +59,25 @@ test('WHAT[repository-programming-053] retired names are rejected even beside a 
     ]) {
       const result = await execute(
         registered,
-        { program, prefixCount: 0, carry: [], ...legacy },
+        { program, prefixUntil: 0, carry: [], ...legacy },
         { sessionID: 'ses-053-retired' },
       )
       const document = failureOf(result)
-      assert.match(document.reason, /prefixCount/)
+      assert.match(document.reason, /prefixUntil/)
       assert.match(document.reason, /carry/)
       assert.equal(takeView('ses-053-retired'), null)
     }
   })
 })
 
-test('WHAT[repository-programming-053] a call without a declaration preserves the existing pending view', async () => {
+test('WHAT[repository-programming-053] a call missing the required declaration is refused and leaves pending view untouched', async () => {
   await withTool(async (registered) => {
     const context = { sessionID: 'ses-053-absent' }
-    await execute(registered, { program }, context)
+    failureOf(await execute(registered, { program }, context))
     assert.equal(takeView(context.sessionID), null)
-    const declaration = { prefixCount: 0, carry: ['keep me'] }
-    await execute(registered, { program, ...declaration }, context)
-    await execute(registered, { program }, context)
+    const declaration = { prefixUntil: 0, carry: ['keep me'] }
+    assert.equal((await execute(registered, { program, ...declaration }, context)).startsWith('# ok'), true)
+    failureOf(await execute(registered, { program }, context))
     assert.deepEqual(takeView(context.sessionID), declaration)
   })
 })
@@ -86,25 +86,24 @@ test('WHAT[repository-programming-053] invalid declarations cannot run the progr
   await withTool(async (registered, dir) => {
     const context = { sessionID: 'ses-053-invalid' }
     const cases = [
-      { prefixCount: -1, carry: [] },
-      { prefixCount: 1.5, carry: [] },
-      { prefixCount: Number.MAX_SAFE_INTEGER + 1, carry: [] },
-      { prefixCount: 1, carry: [] },
+      { prefixUntil: -1, carry: [] },
+      { prefixUntil: 1.5, carry: [] },
+      { prefixUntil: Number.MAX_SAFE_INTEGER + 1, carry: [] },
       { prefixCount: 0 },
       { carry: [] },
-      { prefixCount: 0, carry: {} },
-      { prefixCount: 0, carry: null },
-      { prefixCount: 0, carry: [null] },
-      { prefixCount: 0, carry: [true] },
-      { prefixCount: 0, carry: [-1] },
-      { prefixCount: 0, carry: [1.5] },
-      { prefixCount: 0, carry: [999] },
-      { prefixCount: 0, carry: [[]] },
-      { prefixCount: 0, carry: [{ toJSON: () => 'forged literal' }] },
+      { prefixUntil: 0, carry: {} },
+      { prefixUntil: 0, carry: null },
+      { prefixUntil: 0, carry: [null] },
+      { prefixUntil: 0, carry: [true] },
+      { prefixUntil: 0, carry: [-1] },
+      { prefixUntil: 0, carry: [1.5] },
+      { prefixUntil: 0, carry: [999] },
+      { prefixUntil: 0, carry: [[]] },
+      { prefixUntil: 0, carry: [{ toJSON: () => 'forged literal' }] },
     ]
     const probe = 'class Js extends JsProgram { async run() { await this.write("must-not-exist.txt", "ran"); return "ran"; } }'
     for (const args of cases) {
-      const declaration = { prefixCount: 0, carry: ['saved'] }
+      const declaration = { prefixUntil: 0, carry: ['saved'] }
       await execute(registered, { program, ...declaration }, context)
       failureOf(await execute(registered, { program: probe, ...args }, context))
       assert.equal(existsSync(join(dir, 'must-not-exist.txt')), false)
@@ -119,7 +118,7 @@ test('WHAT[repository-programming-053] a failed call cannot inherit a different 
     const messageID = 'shared-assistant'
     const history = [{ info: { id: 'old-user', role: 'user' }, parts: [{ type: 'text', text: 'old evidence' }] }]
     pair.applyAnchorView(sessionID, history)
-    const accepted = { name: 'carry-declaration-test', program, prefixCount: 0, carry: ['shared literal'] }
+    const accepted = { name: 'carry-declaration-test', program, prefixUntil: 0, carry: ['shared literal'] }
     const refused = {
       ...accepted,
       program: 'class Js extends JsProgram { async run() { throw new Error("program failed"); } }',
@@ -186,7 +185,7 @@ fs.writeFileSync("admission-ready", "ready")
     const planB = 'If the admission barrier command cannot run, stop this verification and report that the original carry array could not be mutated while a real admitted program was suspended; preserve the pending declaration and do not replace this check with a synthetic delay.'
     const pending = execute(registered, {
       program: 'class Js extends JsProgram { async run() { return await this.call(' + JSON.stringify(command) + ', ' + JSON.stringify(planB) + '); } }',
-      prefixCount: 0,
+      prefixUntil: 0,
       carry,
     }, context)
 
@@ -207,7 +206,7 @@ fs.writeFileSync("admission-ready", "ready")
     const result = await pending
     assert.equal(admitted, true, 'the real command must reach the admission barrier: ' + result)
     assert.equal(result.startsWith('# ok'), true, result)
-    assert.deepEqual(takeView(context.sessionID), { prefixCount: 0, carry: ['accepted literal'] })
+    assert.deepEqual(takeView(context.sessionID), { prefixUntil: 0, carry: ['accepted literal'] })
   }, 'DevOps')
 })
 

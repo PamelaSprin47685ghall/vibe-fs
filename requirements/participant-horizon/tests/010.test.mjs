@@ -34,7 +34,10 @@ integrationTest('WHAT[participant-horizon-010] actual fork and commission schema
     await acceptAuthorityRoot(runtime, orchestrator, 'orchestrator')
     let call = 0
     const run = async (tool, sessionID, agent, verb, payload) => String(await hooks.tool[tool].execute(
-      { program: memberProgram(verb, payload) },
+      { program: memberProgram(verb, payload),
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent, callID: `call-010-${++call}`, messageID: `msg-010-${call}` },
     ))
     const fork = (calling, name) => run('todowrite-for-manager', manager, 'manager', 'fork', { calling, name, charge: 'x' })

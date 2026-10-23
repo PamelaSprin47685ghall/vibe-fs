@@ -8,7 +8,7 @@ type AnchorCarryItem =
     | Literal of string
 
 type AnchorViewDeclaration =
-    { PrefixCount: int
+    { PrefixUntil: int
       Carry: AnchorCarryItem list }
 
 type AnchorMessage =

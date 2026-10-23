@@ -22,13 +22,16 @@ const bound = (sessionID, callID) => ({ sessionID, agent: 'manager', callID, mes
 
 const storeOf = async (directory) => workspaceEvents.acquire(await journalSurface.JournalSurface_initializeStateRoot(directory))
 
-// 派工是编程面成员，不是宿主工具：`this.fork(payload, carry = [])` /
-// `this.resume(payload, carry = [])`。宿主不再注册 fork/resume，
+// 派工是编程面成员，不是宿主工具：`this.fork(payload, carry)` /
+// `this.resume(payload, carry)`。宿主不再注册 fork/resume，
 // 拒绝与放行都必须从成员调用的返回信封里观察。
 const runManagerProgram = async (hooks, sessionID, body) =>
   String(
     await hooks.tool['todowrite-for-manager'].execute(
-      { program: `class Js extends JsProgram { async run() { ${body} } }` },
+      { program: `class Js extends JsProgram { async run() { ${body} } }`,
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent: 'manager' },
     ),
   )

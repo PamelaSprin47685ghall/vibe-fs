@@ -41,7 +41,7 @@ integrationTest(
                 status: 'completed',
                 input: {
                   program: 'class Js extends JsProgram { async run() { return {}; } }',
-                  prefixCount: 0,
+                  prefixUntil: 0,
                   carry: ['prose that must not be persisted'],
                 },
               },

@@ -162,7 +162,7 @@ test('WHAT[work-020] synthetic rows are stripped and never re-injected during as
   assert.deepEqual(ids(result.messages), ['u-1', 'a-1'])
 })
 
-test('WHAT[work-020] a relaying tenure declaring prefixCount and carry commits ViewCheckpointCommitted and carries the handover summary into the successor request', async () => {
+test('WHAT[work-020] a relaying tenure declaring prefixUntil and carry commits ViewCheckpointCommitted and carries the handover summary into the successor request', async () => {
   clearAll()
   const life = lifecycle.LifecycleSurface ?? lifecycle
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -208,7 +208,7 @@ test('WHAT[work-020] a relaying tenure declaring prefixCount and carry commits V
             status: 'completed',
             input: {
               program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-              prefixCount: 0,
+              prefixUntil: 0,
               carry: [handoverProse],
             },
             output: 'ok',
@@ -220,7 +220,7 @@ test('WHAT[work-020] a relaying tenure declaring prefixCount and carry commits V
     await hooks.tool['todowrite-for-plan'].execute(
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        prefixCount: 0,
+        prefixUntil: 0,
         carry: [handoverProse],
       },
       { sessionID, agent: 'plan', callID: 'call-plan-view-1', messageID: 'run-plan-view-1', providerRunID: 'run-plan-view-1' },
@@ -294,7 +294,7 @@ test('WHAT[work-020] a relaying tenure declaring prefixCount and carry commits V
 
     const wireIds = successorOut.messages.map((m) => m?.info?.id ?? '')
     assert.ok(!wireIds.some((id) => id.startsWith('synthetic-prev-')), 'successor request must never contain a synthetic-prev-* message')
-    assert.ok(!wireIds.includes('user-plan-root'), 'prefixCount zero replaces the previous history')
+    assert.ok(!wireIds.includes('user-plan-root'), 'prefixUntil zero replaces the previous history')
     assert.ok(wireIds.includes('run-plan-view-1'), 'the compression call belongs to the retained current turn')
     assert.ok(wireIds.includes('run-plan-deliver-1'), 'the relay call belongs to the retained current turn')
     const serialized = JSON.stringify(successorOut.messages)
@@ -303,7 +303,7 @@ test('WHAT[work-020] a relaying tenure declaring prefixCount and carry commits V
   })
 })
 
-test('WHAT[work-020] a flat prefixCount/carry declaration commits the durable ViewCheckpointCommitted, and a call without or with an invalid declaration commits none', async () => {
+test('WHAT[work-020] a flat prefixUntil/carry declaration commits the durable ViewCheckpointCommitted, and a call without or with an invalid declaration commits none', async () => {
   clearAll()
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses-plan-view-flat-020'
@@ -335,11 +335,11 @@ test('WHAT[work-020] a flat prefixCount/carry declaration commits the durable Vi
     assert.deepEqual(
       checkpoints(),
       [],
-      'a call without prefixCount and carry commits no ViewCheckpointCommitted',
+      'a call without prefixUntil and carry commits no ViewCheckpointCommitted',
     )
 
     // An invalid declaration never committed a view, so it commits no checkpoint.
-    await terminalEvent('call-flat-invalid', { program, prefixCount: 0, carry: [null] })
+    await terminalEvent('call-flat-invalid', { program, prefixUntil: 0, carry: [null] })
     assert.deepEqual(
       checkpoints(),
       [],
@@ -348,7 +348,7 @@ test('WHAT[work-020] a flat prefixCount/carry declaration commits the durable Vi
 
     // The flat declaration the call surface accepts commits exactly one durable checkpoint.
     const result = await hooks.tool['todowrite-for-plan'].execute(
-      { program, prefixCount: 0, carry: ['FLAT_VIEW_020: carry supplies the handover summary.'] },
+      { program, prefixUntil: 0, carry: ['FLAT_VIEW_020: carry supplies the handover summary.'] },
       { sessionID, agent: 'plan', callID: 'call-flat-valid', messageID: 'run-plan-view-flat-1', providerRunID: 'run-plan-view-flat-1' },
     )
     assert.doesNotMatch(
@@ -359,7 +359,7 @@ test('WHAT[work-020] a flat prefixCount/carry declaration commits the durable Vi
 
     await terminalEvent('call-flat-valid', {
       program,
-      prefixCount: 0,
+      prefixUntil: 0,
       carry: ['FLAT_VIEW_020: carry supplies the handover summary.'],
     })
     assert.deepEqual(

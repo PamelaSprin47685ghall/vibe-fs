@@ -98,6 +98,10 @@ module ToolHostSurface =
         ToolHostCodec.optionalNumberSchema (factory toolModule)
         |> ToolHostCodec.schemaValue
 
+    let schemaNonNegativeIntegerDescribed toolModule description =
+        ToolHostCodec.nonNegativeIntegerSchemaDescribed description (factory toolModule)
+        |> ToolHostCodec.schemaValue
+
     let schemaOptionalNonNegativeIntegerDescribed toolModule description =
         ToolHostCodec.optionalNonNegativeIntegerSchemaDescribed description (factory toolModule)
         |> ToolHostCodec.schemaValue

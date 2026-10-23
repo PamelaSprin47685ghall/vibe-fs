@@ -37,6 +37,8 @@ Use, copying, modification, and distribution are governed by LICENSE.
 
 ## 用户指南
 
+使用入门见 [功能导览](docs/功能导览.md)；运行与验收巡检见 [人工巡检指南](docs/人工巡检.md)。
+
 ### 产品简介
 
 万象术作为 OpenCode 插件加载后，为 Host 会话提供多角色协作、任务分叉与汇合、审阅与恢复。公开入口：
@@ -82,7 +84,7 @@ npm install wanxiangshu --registry <your-private-registry>
 
 1. 在可解析 peer 插件 API 的环境中安装本包。
 2. 按 Host 的 plugin 配置挂载入口（包名 `wanxiangshu` 或已安装包的 `main`）。
-3. 启动 Host。插件初始化时加载 `resources/` 下 system prompt 与 Enforcer catalog；资源缺失或非法则启动失败（fail fast），无代码内置副本兜底。
+3. 启动 Host。插件初始化时加载 `resources/` 下 system prompt；资源缺失或非法则启动失败（fail fast），无代码内置副本兜底。
 
 配置以 Host 文档与 `peerDependencies` 为准。角色与 Prompt 语义以 [requirements/README.md](requirements/README.md) 为高级参考；安装与挂载不依赖阅读条款正文。
 
@@ -91,14 +93,12 @@ npm install wanxiangshu --registry <your-private-registry>
 | 变量 | 作用 |
 |------|------|
 | `WANXIANGSHU_SKIP_AUTO_INJECTED=1` | 跳过 HOST-013 新的 `auto-injected` 伪工具注入；已落盘历史 pair 仍会 replay |
-| `WANXIANGSHU_PROCESS_HARD_LIMIT_SECS` | executor 单进程硬超时上限（秒） |
 | `WANXIANGSHU_NO_FATAL_EXIT=1` | 抑制 fatal 的物理进程退出（`SIGKILL` / `process.exit`）；测试用 |
 | `WANXIANGSHU_PROVIDER_LANGUAGE` | provider 语言偏好显式设置（`en` / `zh-CN`），位于全局语言阶梯最高优先级 |
 | `WANXIANGSHU_ADMISSION_TIMEOUT_MS` | prompt 物理 acceptance 等待超时（毫秒，默认 10000） |
 | `WANXIANGSHU_DIAG=1` | 让内部诊断记录经 stderr 可见；只观测，不改变任何决策 |
 | `WANXIANGSHU_ABLATION_PROFILE` | feature-ablation 拓扑 profile 选择（配 `resources/ablation/`） |
 | `WANXIANGSHU_ABLATION_<node>` | feature-ablation 单节点三态覆盖（`ablated` / `borrowed` / `active`）；仍过 DAG 校验 |
-| `WANXIANGSHU_DISABLE_GIT_HOOKS=1` | 关闭 git-hook 安装与同步；启动时移除已安装的自有 hook，保留外部 hook |
 | `SPHINX_COMMON_DIR` | Sphinx MCP 独立进程的 durable workspace；缺失即启动失败 |
 | `SPHINX_START_CONFIG` | Sphinx MCP start 配置 JSON；缺失时只允许读取类工具（start 返回 `CONFIG_REQUIRED`） |
 
@@ -136,7 +136,7 @@ Bookkeeper 等内部角色由编排路径调用，不作为单独“安装角色
 
 ### 智能体角色
 
-核心活跃角色与 `requirements/office-capability`、`requirements/capability-enforcement` 一致。工具面由 `OfficeCapability.permissions` 定义（`src/Wanxiangshu/Foundation/OfficeCapability.fs`；`Roles.fs` 只承载 Role 词汇）：
+核心活跃角色与 `requirements/office-capability`、`requirements/capability-enforcement` 一致。工具面由 `OfficeCapability.permissions` 定义（`src/Wanxiangshu/Foundation/OfficeCapability.fs`；`src/Wanxiangshu/Foundation/Roles.fs` 只承载 Role 词汇）：
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
@@ -150,9 +150,9 @@ Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）
 
 ### 运行时数据
 
-领域事实写入 Git common directory 下插件私有 `wanxiangshu-next/runtimes/` 路径中的 journal（按 runtime 的 NDJSON；取不到 common dir 时回退 XDG state home），不在业务 workspace 强制创建插件私有目录。随包资源：
+领域事实以 journal（按 runtime 的 NDJSON）写入 `.Herdchestra/wanxiangshu/runtimes/`；没有 Git 仓库时使用给定目录，不回退 .git、XDG 或旧日志。随包资源：
 
-- `resources/provider/`（Common Law / Role Law / Tool Law / Delegation Law / Office Library，加 Casebook、Attention Regulation、Concern Routing；EN + zh-CN）；`resources/ablation/{fact-map,nodes,profiles,tool-map}.json`（feature-ablation 拓扑）；`resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md`；`resources/git/wanxiang-hook.mjs`；`resources/wanxiangshu.mjs`（model routing 模板）。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
+- `resources/provider/`（world / role / tool / delegation / host / lifecycle / runtime / library / casebook / planning / work；EN + zh-CN）；`resources/ablation/{fact-map,nodes,profiles,tool-map}.json`（feature-ablation 拓扑）；`resources/wanxiangshu.mjs`（model routing 模板）。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
 - journal 与事实名默认冻结；升级前阅读 [CHANGELOG](CHANGELOG.md)。
 
 
@@ -174,7 +174,7 @@ Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）
 src/           生产源码
 resources/     随包运行时资源
 requirements/  normative 语义树（48 个活跃包，另 1 个历史包 epistemic-reasoning）：每包必备 WHY.md、WHAT.md 与 tests/
-人工审订语义指南的保姆级多人协作实现法/  过程规范：000 手册与 001 指南
+docs/          功能导览与人工巡检指南
 proposals/     现行施工计划、未来提案与 archive 历史记录（用户管理）
 万象体系/     投资人材料（DOC.html、PPT.html）
 scripts/       构建与少量仓库检查
@@ -262,16 +262,14 @@ resources/provider/
   runtime/<scenario>/{en,zh-CN}.md
   library/<office>/{en,zh-CN}.md
   casebook/<step>/{en,zh-CN}.md
-  attention-regulation/<entry>/{en,zh-CN}.md
-  concern-routing/<entry>/{en,zh-CN}.md
+  planning/<step>/{en,zh-CN}.md
+  work/<scenario>/{en,zh-CN}.md
   README.md
 resources/ablation/{fact-map,nodes,profiles,tool-map}.json
-resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md
-resources/git/wanxiang-hook.mjs
 resources/wanxiangshu.mjs
 ```
 
-加载：`Resources/`（`PackageResources`、`ProviderResources`、`PromptResources`、`EnforcerCatalogResource`、`RuntimeResources`）；插件初始化 load/install 一次。
+加载：`Resources/`（`PackageResources`、`ProviderResources`、`PromptResources`、`RuntimeResourceAssembly`、`RuntimeResources`）；插件初始化 load/install 一次。
 旧 `resources/prompts/*-system.md` 已删除；生产 system 仅由 Common Law → Role Law → Office Library 组成。
 
 ### 构建与打包
@@ -307,4 +305,4 @@ Git 工作树须干净。验证输出留存本地 `.fable-build/verify-logs/` �
 
 专有商业软件。见 [LICENSE](LICENSE)。`private: true`；分发受 LICENSE 与商业合同约束。
 
-更多：[requirements/README.md](requirements/README.md) · [计划与提案](proposals/README.md) · [历史归档](proposals/archive/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · [AGENTS.md](AGENTS.md)
+更多：[功能导览](docs/功能导览.md) · [人工巡检指南](docs/人工巡检.md) · [requirements/README.md](requirements/README.md) · [计划与提案](proposals/README.md) · [历史归档](proposals/archive/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · [AGENTS.md](AGENTS.md)

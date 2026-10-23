@@ -60,7 +60,7 @@ const waitFor = async (read, what, timeoutMs = 2000) => {
   }
 }
 
-test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone while fork forwards its optional carry array', async () => {
+test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone while fork forwards its required carry array', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-fission-member-'))
   const engineerSession = `ses-fission-member-${Math.random().toString(36).slice(2, 8)}`
   const managerSession = `${engineerSession}-manager`
@@ -118,7 +118,7 @@ test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone
       'Manager',
       'en',
       managerSession,
-      { program: program(`    await this.fork("default carry");
+      { program: program(`    await this.fork("default carry", []);
     await this.fork("explicit carry", ["background"]);
     return { forkArity: String(this.fork.length) };`) },
       3000,
@@ -148,11 +148,13 @@ test('WHAT[intra-participant-parallelism-018] a fission lane inherits the curren
       await openIncumbency(runtime, managerSession)
 
       // 派工是编程面成员（宿主 fork 工具已整体退役）：
-      // `this.fork(payload, carry = [])`。
+      // `this.fork(payload, carry)`。
       const forked = await hooks.tool['todowrite-for-manager'].execute(
         {
           program:
-            'class Js extends JsProgram { async run() { return await this.fork({ name: "fission-context", charge: "collect the lane materials" }); } }',
+            'class Js extends JsProgram { async run() { return await this.fork({ name: "fission-context", charge: "collect the lane materials" }, []); } }',
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: managerSession, agent: 'manager' },
       )

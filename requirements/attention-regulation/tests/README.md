@@ -1,6 +1,6 @@
 # attention-regulation 测试与证明范围
 
-本目录不定义额外规则。`enough`、`abandon` 与 `defer` 均已退役，职责由 `assume` 与编程面的 `prefixCount`、`carry` 声明承接。
+本目录不定义额外规则。`enough`、`abandon` 与 `defer` 均已退役，职责由 `assume` 与编程面的 `prefixUntil`、`carry` 声明承接。
 
 测试验证：
 - `001.test.mjs` / `002.test.mjs`：`enough` 与 `abandon` 不在工具目录或权限矩阵中暴露，其语义由 `assume` 描述资源承载。

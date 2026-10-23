@@ -1175,7 +1175,7 @@ module PairProgrammingThoughtTransform =
     })($0, $1)""")>]
     let private messagesAfterSnapshot (previous: obj array) (current: obj array) : obj array = jsNative
 
-    [<Emit("""(function (raw, messageId, callId, prefixCount, carry) {
+    [<Emit("""(function (raw, messageId, callId, prefixUntil, carry) {
       if ((raw.info?.id ?? raw.id) !== messageId) return raw;
       let changed = false;
       const parts = (raw.parts ?? []).map(part => {
@@ -1183,7 +1183,7 @@ module PairProgrammingThoughtTransform =
         const input = state?.input;
         if (part?.type !== 'tool' || part.callID !== callId || typeof part.tool !== 'string'
             || !part.tool.startsWith('todowrite-for-') || state?.status !== 'completed'
-            || input?.prefixCount !== prefixCount || !Array.isArray(input.carry)
+            || input?.prefixUntil !== prefixUntil || !Array.isArray(input.carry)
             || input.carry.length !== carry.length
             || !carry.every((item, index) => Object.is(item, input.carry[index]))) return part;
         const cleanInput = { ...input };
@@ -1193,7 +1193,7 @@ module PairProgrammingThoughtTransform =
       });
       return changed ? { ...raw, parts } : raw;
     })($0, $1, $2, $3, $4)""")>]
-    let private stripCarry (raw: obj) (messageId: string) (callId: string) (prefixCount: int) (carry: obj) : obj =
+    let private stripCarry (raw: obj) (messageId: string) (callId: string) (prefixUntil: int) (carry: obj) : obj =
         jsNative
 
     /// A user message carries the anchor marker on its first text part (or a new
@@ -1273,7 +1273,7 @@ module PairProgrammingThoughtTransform =
                 let carry = AnchorCarry.toValue declaration.Carry
 
                 suffix
-                |> List.map (fun raw -> stripCarry raw messageId callId declaration.PrefixCount carry)
+                |> List.map (fun raw -> stripCarry raw messageId callId declaration.PrefixUntil carry)
 
         let segments = AnchorLedger.project sessionId (suffix |> List.map input)
         AnchorLedger.remember sessionId inputs segments
@@ -1300,10 +1300,10 @@ module PairProgrammingThoughtTransform =
 
         let description =
             declaration
-            |> Option.map (fun _ ->
+            |> Option.map (fun declared ->
                 sprintf
-                    "Context updated: prefixCount=%d; visibleSegments=%d; kept=%d inserted=%d dropped=%d; tokens total=%d used=%d cached=%d. The completed turn is retained."
-                    report.PrefixCount
+                    "Context updated: prefixUntil=%d; visibleSegments=%d; kept=%d inserted=%d dropped=%d; tokens total=%d used=%d cached=%d. The completed turn is retained."
+                    declared.PrefixUntil
                     segments.Length
                     report.Kept
                     report.Inserted

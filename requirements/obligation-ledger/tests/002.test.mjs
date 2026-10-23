@@ -16,13 +16,13 @@ integrationTest('WHAT[obligation-ledger-002] programming-surface view declaratio
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
 
     const calls = [
-      { callID: 'view-cp-1', tool: 'todowrite-for-engineer', prefixCount: 0, carry: [] },
-      { callID: 'view-cp-2', tool: 'todowrite-for-devops', prefixCount: 0, carry: [] },
-      { callID: 'view-cp-3', tool: 'todowrite-for-manager', prefixCount: 0, carry: [] },
-      { callID: 'view-cp-4', tool: 'todowrite-for-plan', prefixCount: 0, carry: [] },
+      { callID: 'view-cp-1', tool: 'todowrite-for-engineer', prefixUntil: 0, carry: [] },
+      { callID: 'view-cp-2', tool: 'todowrite-for-devops', prefixUntil: 0, carry: [] },
+      { callID: 'view-cp-3', tool: 'todowrite-for-manager', prefixUntil: 0, carry: [] },
+      { callID: 'view-cp-4', tool: 'todowrite-for-plan', prefixUntil: 0, carry: [] },
     ]
 
-    for (const { callID, tool, prefixCount, carry } of calls) {
+    for (const { callID, tool, prefixUntil, carry } of calls) {
       await hooks.event({
         event: {
           type: 'message.part.updated',
@@ -34,7 +34,7 @@ integrationTest('WHAT[obligation-ledger-002] programming-surface view declaratio
               callID,
               state: {
                 status: 'completed',
-                input: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixCount, carry },
+                input: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixUntil, carry },
               },
             },
           },

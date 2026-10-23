@@ -60,14 +60,14 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   assert.equal(surface.baseClassSource.includes('this._api.fork(spec, carry)'), true, 'BaseClass fork must forward the carry array')
   assert.equal(surface.baseClassSource.includes('this._api.resume(spec, carry)'), true, 'BaseClass resume must forward the carry array')
   assert.equal(surface.baseClassSource.includes('this._api.advisor(intent, carry)'), true, 'BaseClass advisor must forward the carry array')
-  assert.equal(surface.baseClassSource.includes('async dag(spec, carry = [])'), true, 'BaseClass must declare dag with an optional carry array')
+  assert.equal(surface.baseClassSource.includes('async dag(spec, carry)'), true, 'BaseClass must declare dag with an required carry array')
   assert.equal(surface.baseClassSource.includes('this._api.join()'), true, 'BaseClass must declare join without carry')
 
   // 四层同构第 2 层：描述文档不包含写入/修改暗示
   assert.doesNotMatch(surface.description, /edit\(path|rewrite\(path|write\(path,\s*content\)/, 'Description must not advertise write methods')
-  assert.equal(surface.description.includes('fork(payload, carry = [])'), true, 'Description must show fork with optional carry')
-  assert.equal(surface.description.includes('resume(payload, carry = [])'), true, 'Description must show resume with optional carry')
-  assert.equal(surface.description.includes('advisor(intent, carry = [])'), true, 'Description must show advisor with optional carry')
+  assert.equal(surface.description.includes('fork(payload, carry)'), true, 'Description must show fork with required carry')
+  assert.equal(surface.description.includes('resume(payload, carry)'), true, 'Description must show resume with required carry')
+  assert.equal(surface.description.includes('advisor(intent, carry)'), true, 'Description must show advisor with required carry')
 
   // 四层同构第 3 层：示例代码（ultraExample manager 分支）纯只读，无写入调用
   assert.ok(surface.examples.length > 0, 'Manager surface must include ultraExample')
@@ -494,7 +494,7 @@ test('WHAT[capability-enforcement-025] J13_delegation_members_default_to_empty_c
 
     const program = `class Js extends JsProgram {
       async run() {
-        const defaulted = await this.fork('index the parser module');
+        const defaulted = await this.fork('index the parser module', []);
         const illegal = await this.fork('index the parser module', { 'not-an-anchor': null });
         const invalidItem = await this.fork('index the parser module', [null]);
         const placed = await this.fork('index the parser module', [1, 'parser inventory']);

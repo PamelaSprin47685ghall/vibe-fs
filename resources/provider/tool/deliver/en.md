@@ -13,7 +13,7 @@ Promote or complete the current incumbency when eligible, or relay it; deliver p
    - Review grants eligibility; `deliver` performs the promotion. When eligible and the obligation ledger is empty, deliver advances the stage (`S1`→`S2`, `S2`→`S3`, `S3`→delivery authority) and its return presents the next stage's method.
    - For an execution (`S4`) tenure, an eligible deliver completes the work; an ineligible deliver (or one naming a successor) relays atomically to a successor at the same stage.
    - `deliver` refuses — returning the outstanding items — while a resource is still blocked or the obligation ledger is not empty. There is no double-deliver and no confirmation ritual.
-   - If history needs organizing before handover, supply both top-level programming parameters `prefixCount` and `carry` to keep what the successor needs; the current turn is kept automatically.
+   - If history needs organizing before handover, supply both top-level programming parameters `prefixUntil` and `carry` to keep what the successor needs; the current turn is kept automatically.
    - A retired tenure cannot close or affect the new one.
 
 3. **Delivery Governed by User Grant**:

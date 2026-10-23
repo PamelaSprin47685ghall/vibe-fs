@@ -67,6 +67,8 @@ test('WHAT[delegation-032] Manager fork refuses a DevOps calling at the role bou
         {
           program:
             'class Js extends JsProgram { async run() { return await this.fork({ name: "devops", charge: "DEVOPS-CHARGE" }, { 1: null }); } }',
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: owner, agent: 'manager', callID: 'call-fork-devops-pending', messageID: 'msg-call-fork-devops-pending' },
       )
@@ -100,6 +102,8 @@ test('WHAT[delegation-032] Manager fork refuses a DevOps calling at the role bou
         {
           program:
             'class Js extends JsProgram { async run() { return await this.fork({ name: "devops", charge: "DEVOPS-CHARGE" }, { 1: null }); } }',
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: owner, agent: 'manager', callID: 'call-fork-devops', messageID: 'msg-call-fork-devops' },
       )

@@ -14,7 +14,7 @@
 2. `view`——调用方用 `carry` 从可见历史中选择的背景材料，保持结构化条目直到 pretty print 为合法 TOML；
 3. `intent`——本次要顾问裁决的问题，**自成一条 user prompt**，与 view 不合并。
 
-调用面是 `this.advisor(intent, carry = [])`。第二参数按 context-compression [032] 的统一数组规则选择材料：整数引用可见历史锚点的完整区间，字符串表示字面文本，按数组顺序展开。没有前缀参数，也不附加调用方当前回合；问题在 `intent` 中表达一次。材料选择只读，不消费待应用的压缩声明，不改变调用方的可见历史。
+调用面是 `this.advisor(intent, carry)`。第二参数按 context-compression [032] 的统一数组规则选择材料：整数引用可见历史锚点的完整区间，字符串表示字面文本，按数组顺序展开。没有前缀参数，也不附加调用方当前回合；问题在 `intent` 中表达一次。材料选择只读，不消费待应用的压缩声明，不改变调用方的可见历史。
 
 省略 `carry` 等同于 `[]`。非法数组或无效锚点返回 `{ ok: false, code: "VIEW_DECLARATION_INVALID", reason }`，不咨询顾问、不留下部分效果。数组不会被当作对象映射解释，也不接受包装对象。
 
@@ -36,7 +36,7 @@
 
 ## [006] `this.advisor` 是编程面成员
 
-调用面是 `this.advisor(intent, carry = [])`：与其他基类成员一致，返回 `{ ok, advice }` 数据信封；拒绝时是 `{ ok: false, code, reason }`，如非法数组的 `VIEW_DECLARATION_INVALID`。渲染只在工具结果边界发生。advisor 不另设独立 Host 工具注册，宿主经成员闭包 `JsDelegationHost.Advisor` 承接调用。`this.horizon` 同样以成员身份返回名册数据（含每个子智能体的四数校准）。
+调用面是 `this.advisor(intent, carry)`：与其他基类成员一致，返回 `{ ok, advice }` 数据信封；拒绝时是 `{ ok: false, code, reason }`，如非法数组的 `VIEW_DECLARATION_INVALID`。渲染只在工具结果边界发生。advisor 不另设独立 Host 工具注册，宿主经成员闭包 `JsDelegationHost.Advisor` 承接调用。`this.horizon` 同样以成员身份返回名册数据（含每个子智能体的四数校准）。
 
 ## 施工分期（继任者按此续作）
 

@@ -199,7 +199,10 @@ test('WHAT[work-027] Engineer/DevOps/Orchestrator progress stop cannot count as 
           ? 'class Js extends JsProgram { async run() { await this.deliver(["the delivered view"]); } }'
           : 'class Js extends JsProgram { async run() { return 1; } }'
         await hooks.tool[`todowrite-for-${name}`].execute(
-          { program },
+          { program,
+          prefixUntil: 0,
+          carry: []
+        },
           { sessionID: session, agent: name, callID: `call-${session}`, messageID: run },
         )
 

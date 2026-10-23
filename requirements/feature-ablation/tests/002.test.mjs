@@ -221,7 +221,10 @@ test('WHAT[feature-ablation-002] ABL_002_ablated_package_tool_is_refused_at_the_
         process.env[override] = 'station-05'
         Ablation.resetRegistry()
         const result = await hooks.tool['todowrite-for-engineer'].execute(
-          { program: 'class Js extends JsProgram { async run() { return null; } }' },
+          { program: 'class Js extends JsProgram { async run() { return null; } }',
+          prefixUntil: 0,
+          carry: []
+        },
           { sessionID: 'ses-ablation-gate', agent: 'engineer' },
         )
         assert.match(result, /消融|ablated/i)

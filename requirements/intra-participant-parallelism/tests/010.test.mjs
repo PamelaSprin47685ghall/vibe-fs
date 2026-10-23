@@ -49,12 +49,14 @@ test('WHAT[intra-participant-parallelism-010] an interrupted Fission group is se
     })
 
     // 派工是编程面成员（宿主 fork 工具已整体退役）：
-    // `this.fork(payload, carry = [])`。
+    // `this.fork(payload, carry)`。
     const forked = await hooks1.tool['todowrite-for-manager'].execute(
       {
         program:
-          'class Js extends JsProgram { async run() { return await this.fork({ name: "ruling-materials", charge: "collect seven materials" }); } }',
-      },
+          'class Js extends JsProgram { async run() { return await this.fork({ name: "ruling-materials", charge: "collect seven materials" }, []); } }',
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID: managerSession, agent: 'manager' },
     )
     assert.match(forked, /ok = true/)

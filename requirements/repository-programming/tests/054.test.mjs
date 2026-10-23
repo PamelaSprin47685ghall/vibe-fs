@@ -41,13 +41,13 @@ test('WHAT[repository-programming-054] deliver stores carry without echoing it o
   }
 })
 
-test('WHAT[repository-programming-054] deliver without an argument selects no old material', async () => {
+test('WHAT[repository-programming-054] deliver without an argument is refused', async () => {
   const { dir, cleanup } = sandbox()
   try {
     clearDeliveredValue('sess-054')
-    const outcome = await runProgram(dir, `    await this.deliver();`)
-    assert.equal(caseName(outcome), 'Succeeded')
-    assert.deepEqual(deliveredViewOf('sess-054'), [])
+    const outcome = await runProgram(dir, `    return await this.deliver();`)
+    assert.match(render(outcome), /code = "VIEW_DECLARATION_INVALID"/)
+    assert.equal(deliveredValue('sess-054'), null)
   } finally {
     clearDeliveredValue('sess-054')
     cleanup()
@@ -133,7 +133,7 @@ test('WHAT[repository-programming-054] array serialization hooks cannot replace 
 test('WHAT[repository-programming-054] every generated surface carries deliver beside park', async () => {
   const { generateSurfaceForRole } = await import('../../../dist/Repository/Programming/Js/GeneratorSurface.js')
   const surface = generateSurfaceForRole('Engineer', ['Read'])
-  assert.equal(surface.baseClassSource.includes('async deliver(carry = [])'), true)
+  assert.equal(surface.baseClassSource.includes('async deliver(carry)'), true)
   assert.match(surface.description, /deliver\(carry/)
 })
 

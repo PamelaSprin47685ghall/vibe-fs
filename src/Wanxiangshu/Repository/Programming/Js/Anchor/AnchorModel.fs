@@ -10,7 +10,7 @@ type AnchorCarryItem =
     | Literal of string
 
 type AnchorViewDeclaration =
-    { PrefixCount: int
+    { PrefixUntil: int
       Carry: AnchorCarryItem list }
 
 type AnchorMessage =
@@ -77,7 +77,7 @@ module AnchorDeclarationRule =
             let view = parsed?view
 
             Ok
-                { PrefixCount = view?prefixCount
+                { PrefixUntil = view?prefixUntil
                   Carry = carryOf view?carry }
         else
             Error(JsFailure.ViewDeclarationInvalid parsed?reason)
@@ -118,7 +118,4 @@ module AnchorHistory =
         loop items []
 
     let validate (segments: AnchorSegment list) (declaration: AnchorViewDeclaration) =
-        if declaration.PrefixCount > List.length segments then
-            Error(JsFailure.ViewDeclarationInvalid "prefixCount exceeds the visible history segment count")
-        else
-            select segments declaration.Carry |> Result.map ignore
+        select segments declaration.Carry |> Result.map ignore

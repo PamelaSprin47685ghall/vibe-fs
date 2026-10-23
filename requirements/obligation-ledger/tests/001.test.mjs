@@ -37,7 +37,7 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a v
             type: 'tool',
             tool: 'todowrite',
             callID: 'retired-native-call',
-            state: { status: 'completed', input: { todos: [{ content: 'x', status: 'pending' }], prefixCount: 0, carry: [] } },
+            state: { status: 'completed', input: { todos: [{ content: 'x', status: 'pending' }], prefixUntil: 0, carry: [] } },
           },
         },
       },
@@ -47,9 +47,9 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a v
     // invalid flat declaration, commits nothing.
     for (const [callID, input] of [
       ['call-no-declaration', { program: 'class Js extends JsProgram { async run() { return 1; } }' }],
-      ['call-prefix-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixCount: 0 }],
+      ['call-prefix-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixUntil: 0 }],
       ['call-carry-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', carry: [] }],
-      ['call-invalid-carry', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixCount: 0, carry: [null] }],
+      ['call-invalid-carry', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixUntil: 0, carry: [null] }],
     ]) {
       await hooks.event({
         event: {
@@ -87,7 +87,7 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a v
               status: 'completed',
               input: {
                 program: 'class Js extends JsProgram { async run() { return 1; } }',
-                prefixCount: 0,
+                prefixUntil: 0,
                 carry: ['keep the verified context'],
               },
             },

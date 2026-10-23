@@ -31,8 +31,8 @@ module JsToolPolicy =
     /// The localized prose of the flat view declaration's extra field.
     val viewDeclarationExtraProse: unit -> string
 
-    /// The flat view declaration of a call: the protected prefix and carry
-    /// array. A call that declares neither carries none.
+    /// The flat view declaration of a call: required prefixUntil cutoff and
+    /// carry array. Omitting either field is refused.
     val viewDeclarationOf: raw: obj -> obj
 
     /// Why the declaration is not a valid view declaration, if it is not.

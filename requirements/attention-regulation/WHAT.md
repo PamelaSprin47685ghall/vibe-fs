@@ -1,6 +1,6 @@
 # attention-regulation — WHAT
 
-本包现为退休边界：`enough`、`abandon` 与 `defer` 工具及其 `Attention` 持久投影均已退役，职责由 `assume` 与编程面的 `prefixCount`、`carry` 声明承接。保留这些条款，是为了锚定替代路径并防止已退役的注意力状态机回流生产路径。
+本包现为退休边界：`enough`、`abandon` 与 `defer` 工具及其 `Attention` 持久投影均已退役，职责由 `assume` 与编程面的 `prefixUntil`、`carry` 声明承接。保留这些条款，是为了锚定替代路径并防止已退役的注意力状态机回流生产路径。
 
 ## [001] enough 语义并入 assume
 

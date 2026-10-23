@@ -37,7 +37,10 @@ const storeOf = async (target) => workspaceEvents.acquire(await journalSurface.J
 // 程序内调用 `this.resume`。
 const runManagerProgram = async (hooks, sessionID, body) =>
   await hooks.tool['todowrite-for-manager'].execute(
-    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-dispatch-test' },
+    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-dispatch-test',
+          prefixUntil: 0,
+          carry: []
+        },
     { sessionID, agent: 'manager' },
   )
 

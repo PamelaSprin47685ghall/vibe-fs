@@ -249,7 +249,7 @@ test('WHAT[repository-programming-056] omitted carry starts a delegate with no o
     install(sessionId, host)
     const outcome = await runProgram(
       dir,
-      `    const placed = await this.fork("index the parser module");
+      `    const placed = await this.fork("index the parser module", []);
     const continued = "kept-running";
     return { placed, continued };`,
       sessionId,

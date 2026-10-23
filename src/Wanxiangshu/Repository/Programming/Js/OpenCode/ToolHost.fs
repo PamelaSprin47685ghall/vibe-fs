@@ -113,7 +113,7 @@ module JsToolSpec =
             ToolHostCodec.optionalObjectSchema [ "handle", ToolHostCodec.stringSchema factory ] factory
 
         let carrySchema =
-            ToolHostCodec.optionalCarrySchema (JsToolPolicy.viewDeclarationExtraProse ()) factory
+            ToolHostCodec.carrySchema (JsToolPolicy.viewDeclarationExtraProse ()) factory
 
         let callFenceOf (ctx: HostToolContext) =
             match ctx.ProviderRunId, ctx.ToolCallId with
@@ -215,7 +215,7 @@ module JsToolSpec =
               "planB", ToolHostCodec.optionalStringSchema factory
               "unpark", unparkSchema
               "abandon", abandonSchema
-              "prefixCount", ToolHostCodec.optionalNumberSchema factory
+              "prefixUntil", ToolHostCodec.nonNegativeIntegerSchemaDescribed (JsToolPolicy.viewDeclarationExtraProse ()) factory
               "carry", carrySchema ]
           Execute =
             fun args ctx ->

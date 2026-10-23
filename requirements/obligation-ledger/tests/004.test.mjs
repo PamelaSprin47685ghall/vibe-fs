@@ -174,7 +174,7 @@ const terminalEvent = (sessionID, callID, status) => ({
           status,
           input: {
             program: 'class Js extends JsProgram { async run() { return {}; } }',
-            prefixCount: 0,
+            prefixUntil: 0,
             carry: [],
           },
         },
@@ -187,7 +187,7 @@ const todoCall = (hooks, sessionID, callID) => {
   const output = {
     args: {
       program: 'class Js extends JsProgram { async run() { return {}; } }',
-      prefixCount: 0,
+      prefixUntil: 0,
       carry: [],
     },
   }

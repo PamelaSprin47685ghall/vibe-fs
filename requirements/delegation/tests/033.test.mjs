@@ -87,6 +87,8 @@ test('WHAT[delegation-033] the committed delivery settles the delivering run bef
         {
           name: 'deliver-test-report',
           program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); return { done: true }; } }`,
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: child, agent: 'engineer', callID: call, messageID: run },
       )
@@ -127,7 +129,9 @@ test('WHAT[delegation-033] an unattributed durable delivery is refused, not left
         name: 'unattributed-delivery',
         program:
           'class Js extends JsProgram { async run() { await this.deliver(["UNATTRIBUTED MATERIAL"]); return { done: true }; } }',
-      },
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID: session, agent: 'engineer', callID: call, messageID: 'unattributed-missing-run' },
     )
 
@@ -191,7 +195,9 @@ test('WHAT[delegation-033] the turn prose before the deliver call attributes its
         name: 'deliver-turn-report',
         program:
           'class Js extends JsProgram { async run() { await this.deliver(); return { done: true }; } }',
-      },
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID: session, agent: 'engineer', callID: call, messageID: run },
     )
     assert.match(String(result), /ok/i)
@@ -234,6 +240,8 @@ test('WHAT[delegation-033] absent or whitespace assistant body stops child deliv
           name: 'empty-body-delivery',
           program:
             'class Js extends JsProgram { async run() { await this.deliver(); await this.write("suffix-never-runs.txt", "leak"); return { done: true }; } }',
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: session, agent: 'engineer', callID: call, messageID: run },
       )
@@ -285,7 +293,9 @@ test('WHAT[delegation-033] carry string alone does not substitute for absent ass
         name: 'carry-only-delivery',
         program:
           'class Js extends JsProgram { async run() { await this.deliver(["CARRY STRING ALONE"]); return { done: true }; } }',
-      },
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID: session, agent: 'engineer', callID: call, messageID: run },
     )
 

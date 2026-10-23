@@ -25,7 +25,9 @@ const advisorCall = (hooks, owner, intent, callID) =>
       name: `Advisor consultation ${callID}`,
       planB: ADVISOR_PLAN_B,
       program: `class Js extends JsProgram { async run() { const advised = await this.advisor(${JSON.stringify(intent)}, []); return { advised }; } }`,
-    },
+          prefixUntil: 0,
+          carry: []
+        },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
 

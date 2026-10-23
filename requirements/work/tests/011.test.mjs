@@ -171,7 +171,10 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     }
     runtime.pushHostMessage(sessionID, review)
     const reviewResult = await hooks.tool['todowrite-for-manager'].execute(
-      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }` },
+      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }`,
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent: 'manager', callID: 'call-review', messageID: review.id },
     )
     assert.match(String(reviewResult), /ok = true/)
@@ -187,7 +190,10 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     }
     runtime.pushHostMessage(sessionID, clearReview)
     const clearResult = await hooks.tool['todowrite-for-manager'].execute(
-      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(clearFindings)}); } }` },
+      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(clearFindings)}); } }`,
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent: 'manager', callID: 'call-clear-review', messageID: clearReview.id },
     )
     assert.match(String(clearResult), /ok = true/)
@@ -229,13 +235,15 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     await hooks['experimental.chat.messages.transform']({ sessionID }, humanRequest)
 
     // Step 4: After human input, the dispatch member must NOT be denied.
-    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, carry = [])`。
+    // 派工是编程面成员（宿主 fork 工具已整体退役）：`this.fork(payload, carry)`。
     const forkSuccessor = await hooks.tool['todowrite-for-manager'].execute(
       {
         program:
           'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "alice", charge: "implement" }, []); } }',
         name: 'fork-successor',
-      },
+          prefixUntil: 0,
+          carry: []
+        },
       context('call-fork-successor', 'msg-successor'),
     )
     // 断言「不是拒绝」这一可观察事实：调用以成功信封返回，不含拒绝信封。
@@ -330,7 +338,10 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
     }
     runtime.pushHostMessage(sessionID, review)
     const reviewResult = await hooks.tool['todowrite-for-manager'].execute(
-      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }` },
+      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }`,
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent: 'manager', callID: 'call-review', messageID: review.id },
     )
     assert.match(String(reviewResult), /ok = true/)
@@ -345,7 +356,10 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
     }
     runtime.pushHostMessage(sessionID, clearReview)
     const clearResult = await hooks.tool['todowrite-for-manager'].execute(
-      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(clearFindings)}); } }` },
+      { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(clearFindings)}); } }`,
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent: 'manager', callID: 'call-clear-review', messageID: clearReview.id },
     )
     assert.match(String(clearResult), /ok = true/)

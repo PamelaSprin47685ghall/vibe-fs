@@ -72,8 +72,8 @@ test('WHAT[work-021] the devops verb survives as a Plan programming-surface memb
   const planMembers = plan.members.map((member) => member.memberName)
   assert.ok(planMembers.includes('devops'), 'the Plan surface carries the devops member')
   assert.ok(
-    plan.baseClassSource.includes('async devops(intent, carry = [])'),
-    'the Plan base class defaults devops to an empty carry array',
+    plan.baseClassSource.includes('async devops(intent, carry)'),
+    'the Plan base class declares devops with a required carry array',
   )
 
   // 其它角色没有这个成员：DevOps 调查只对 Plan 开放。
@@ -93,7 +93,10 @@ test('WHAT[work-021] the Plan devops member refuses malformed carry as data', as
     const runPlan = async (body) =>
       String(
         await hooks.tool['todowrite-for-plan'].execute(
-          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-carry' },
+          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-carry',
+          prefixUntil: 0,
+          carry: []
+        },
           { sessionID, agent: 'plan' },
         ),
       )
@@ -112,7 +115,10 @@ test('WHAT[work-021] the Plan devops member refuses malformed carry as data', as
     await acceptAuthorityRoot(runtime, engineerSession, 'engineer', 'user-engineer-root')
     const engineer = String(
       await hooks.tool['todowrite-for-engineer'].execute(
-        { program: 'class Js extends JsProgram { async run() { return await this.devops("find the flaky test", []); } }', name: 'engineer-devops' },
+        { program: 'class Js extends JsProgram { async run() { return await this.devops("find the flaky test", []); } }', name: 'engineer-devops',
+          prefixUntil: 0,
+          carry: []
+        },
         { sessionID: engineerSession, agent: 'engineer' },
       ),
     )

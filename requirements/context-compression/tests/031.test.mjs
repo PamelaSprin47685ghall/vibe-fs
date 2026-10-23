@@ -9,13 +9,13 @@ import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface
 
 const session = 'carry-compression'
 const input = (...texts) => texts.map((text, index) => ({ id: String(index + 1), text }))
-const declaration = (prefixCount, carry) => ({ prefixCount, carry })
-const declare = (prefixCount, carry) => {
-  const result = captureView(session, declaration(prefixCount, carry))
+const declaration = (prefixUntil, carry) => ({ prefixUntil, carry })
+const declare = (prefixUntil, carry) => {
+  const result = captureView(session, declaration(prefixUntil, carry))
   assert.equal(result.ok, true, JSON.stringify(result))
 }
-const declareForCall = (messageId, callId, prefixCount, carry) => {
-  const result = setView(session, [messageId, callId], declaration(prefixCount, carry))
+const declareForCall = (messageId, callId, prefixUntil, carry) => {
+  const result = setView(session, [messageId, callId], declaration(prefixUntil, carry))
   assert.ok(result, String(result))
 }
 const render = (rows) => applyView(session, rows).entries.map((entry) =>
@@ -33,19 +33,20 @@ test('WHAT[context-compression-031] anchor identities remain stable and declarat
   render(rows)
   assert.equal(numberMessage(session, '1'), 1)
   assert.equal(numberMessage(session, '1'), 1)
-  declare(1, [2])
-  assert.deepEqual(takeView(session), declaration(1, [2]))
+  declare(2, [2])
+  assert.deepEqual(takeView(session), declaration(2, [2]))
   assert.equal(takeView(session), null)
   assert.deepEqual(render(rows), ['one', 'two'])
 })
 
-test('WHAT[context-compression-031] prefixCount counts visible segments rather than anchor numbers', () => {
+test('WHAT[context-compression-031] prefixUntil keeps anchors strictly less than the cutoff', () => {
   numberMessage('other-session', 'gap')
   const rows = input('one', 'two', 'three')
   render(rows)
   const ids = anchors(session).map((row) => row.anchor)
   assert.deepEqual(ids, [2, 3, 4])
-  declare(2, ['replacement', ids[2]])
+  // keep anchors < 4 → 2 and 3; carry references the third visible anchor
+  declare(4, ['replacement', ids[2]])
   assert.deepEqual(render(rows), ['one', 'two', 'replacement', 'three'])
 })
 
@@ -61,17 +62,17 @@ test('WHAT[context-compression-031] unknown anchors and malformed declarations l
   const rows = input('one', 'two')
   render(rows)
   const bad = [
-    {}, { prefixCount: 0 }, { carry: [] }, { prefixCount: '0', carry: [] },
-    { prefixCount: -1, carry: [] }, { prefixCount: 0.5, carry: [] },
-    { prefixCount: Number.MAX_SAFE_INTEGER + 1, carry: [] }, { prefixCount: 3, carry: [] },
-    { prefixCount: 0, carry: {} }, { prefixCount: 0, carry: null },
-    { prefixCount: 0, carry: [null] }, { prefixCount: 0, carry: [true] },
-    { prefixCount: 0, carry: [-1] }, { prefixCount: 0, carry: [1.5] },
-    { prefixCount: 0, carry: [NaN] }, { prefixCount: 0, carry: [Infinity] },
-    { prefixCount: 0, carry: [999] }, { prefixCount: 0, carry: [[]] },
-    { prefixCount: 0, carry: [{ toJSON() { return 'fake' } }] },
-    { prefixCount: 0, carry: [], thenMap: {} },
-    { prefixUntil: 0, thenMap: {} },
+    {}, { prefixUntil: 0 }, { carry: [] }, { prefixUntil: '0', carry: [] },
+    { prefixUntil: -1, carry: [] }, { prefixUntil: 0.5, carry: [] },
+    { prefixUntil: Number.MAX_SAFE_INTEGER + 1, carry: [] },
+    { prefixCount: 0, carry: [] },
+    { prefixUntil: 0, carry: {} }, { prefixUntil: 0, carry: null },
+    { prefixUntil: 0, carry: [null] }, { prefixUntil: 0, carry: [true] },
+    { prefixUntil: 0, carry: [-1] }, { prefixUntil: 0, carry: [1.5] },
+    { prefixUntil: 0, carry: [NaN] }, { prefixUntil: 0, carry: [Infinity] },
+    { prefixUntil: 0, carry: [999] }, { prefixUntil: 0, carry: [[]] },
+    { prefixUntil: 0, carry: [{ toJSON() { return 'fake' } }] },
+    { prefixUntil: 0, carry: [], thenMap: {} },
   ]
   for (const value of bad) {
     declare(0, ['last valid'])
@@ -110,7 +111,7 @@ test('WHAT[context-compression-031] later history cannot resurrect discarded con
   assert.equal(captureView(session, declaration(0, [1])).ok, false)
   const expanded = [...rows, { id: '4', text: 'new evidence' }]
   assert.deepEqual(render(expanded), ['two', 'summary', 'new evidence'])
-  declare(3, [])
+  declare(6, [])
   assert.deepEqual(render(expanded), ['two', 'summary', 'new evidence'])
 })
 
@@ -140,7 +141,7 @@ test('WHAT[context-compression-031] the implicit opening counts only when it con
 test('WHAT[context-compression-031] token accounting measures rendered material and the preserved prefix', () => {
   const rows = input('one', 'two')
   render(rows)
-  declare(1, ['short'])
+  declare(2, ['short'])
   const result = applyView(session, rows)
   assert.equal(result.report.total, countTokens('one') + countTokens('two'))
   assert.equal(result.report.used, countTokens('one') + countTokens('short'))
@@ -151,7 +152,7 @@ test('WHAT[context-compression-031] token accounting measures rendered material 
 test('WHAT[context-compression-031] current prose appended to a kept segment is not counted as cached', () => {
   const rows = input('kept history')
   render(rows)
-  declare(1, [])
+  declare(2, [])
   const result = applyView(session, [...rows, { text: 'new prose outside the snapshot' }])
   assert.equal(result.report.cached, countTokens('kept history'))
   assert.equal(result.report.used, countTokens('kept history') + countTokens('new prose outside the snapshot'))
@@ -178,10 +179,10 @@ test('WHAT[context-compression-031] marker positions expose prefixCount and raw 
   assert.deepEqual(first.messages[1], raw[1])
   assert.equal(first.messages[2].parts[0].state.output, '[ANCHOR: 2; prefixCount: 2]\0\uFEFFresult')
   assert.deepEqual(raw, saved)
-  declare(2, [])
+  declare(3, [])
   const next = pair.applyAnchorView(session, [...raw, user('u2', 'next')])
   assert.deepEqual(next.messages.slice(0, raw.length), first.messages)
-  assert.match(next.report, /prefixCount=2/)
+  assert.match(next.report, /prefixUntil=3/)
 })
 
 test('WHAT[context-compression-031] repeated anchors have distinct prefix positions', () => {
@@ -221,7 +222,7 @@ test('WHAT[context-compression-031] successful compression strips only its retai
   declareForCall('current', 'compress-call', 0, [literal])
   const current = assistant('current', [
     { type: 'text', text: 'FINAL REPORT KEPT NATURALLY' },
-    tool('compress-call', { program: 'return true;', prefixCount: 0, carry: [literal] }, 'ok'),
+    tool('compress-call', { program: 'return true;', prefixUntil: 0, carry: [literal] }, 'ok'),
   ])
   const expanded = [...raw, current]
   const saved = structuredClone(expanded)
@@ -233,7 +234,7 @@ test('WHAT[context-compression-031] successful compression strips only its retai
     const retained = result.messages.find((row) => row.info.id === 'current')
     assert.equal(Object.hasOwn(retained.parts[1].state.input, 'carry'), false)
     assert.equal(retained.parts[1].state.input.program, 'return true;')
-    assert.equal(retained.parts[1].state.input.prefixCount, 0)
+    assert.equal(retained.parts[1].state.input.prefixUntil, 0)
   }
   assert.deepEqual(expanded, saved)
 })
@@ -256,18 +257,18 @@ test('WHAT[context-compression-031] compression does not strip matching fields f
   const raw = [user('u', 'old context')]
   pair.applyAnchorView(session, raw)
   declareForCall('current', 'other-call', 0, ['literal'])
-  const other = tool('other-call', { prefixCount: 0, carry: ['literal'] }, 'received')
+  const other = tool('other-call', { prefixUntil: 0, carry: ['literal'] }, 'received')
   other.tool = 'send-payload'
   const result = pair.applyAnchorView(session, [...raw, assistant('current', [other])])
   const kept = result.messages.find((row) => row.info.id === 'current')
-  assert.deepEqual(kept.parts[0].state.input, { prefixCount: 0, carry: ['literal'] })
+  assert.deepEqual(kept.parts[0].state.input, { prefixUntil: 0, carry: ['literal'] })
 })
 
 test('WHAT[context-compression-031] only the committing message and call lose carry among matching tools', () => {
   const raw = [user('u', 'old context')]
   pair.applyAnchorView(session, raw)
   declareForCall('shared', 'committed', 0, ['literal'])
-  const args = { prefixCount: 0, carry: ['literal'] }
+  const args = { prefixUntil: 0, carry: ['literal'] }
   const expanded = [
     ...raw,
     assistant('shared', [
@@ -292,7 +293,7 @@ test('WHAT[context-compression-031] a declaration without an owning call never s
   const raw = [user('u', 'old context')]
   pair.applyAnchorView(session, raw)
   declare(0, ['literal'])
-  const args = { prefixCount: 0, carry: ['literal'] }
+  const args = { prefixUntil: 0, carry: ['literal'] }
   const current = assistant('current', [tool('unattributed', structuredClone(args), 'ok')])
   const result = pair.applyAnchorView(session, [...raw, current])
   const retained = result.messages.find((row) => row.info.id === 'current')
@@ -315,8 +316,9 @@ test('WHAT[context-compression-031] bilingual guidance explains only the current
   for (const language of ['en', 'zh-CN']) {
     const prose = readFileSync(new URL('../../../resources/provider/tool/js-program/view-declaration-extra/' + language + '.md', import.meta.url), 'utf8')
     assert.match(prose, /carry/)
+    assert.match(prose, /prefixUntil/)
+    assert.doesNotMatch(prose, /thenMap|reportMapping/)
     assert.match(prose, /prefixCount/)
-    assert.doesNotMatch(prose, /thenMap|reportMapping|prefixUntil/)
     assert.match(prose, language === 'en' ? /current turn|this turn/ : /本回合|当前回合/)
   }
 })

@@ -623,6 +623,6 @@ test('WHAT[repository-programming-002] the devops member documents the { ok, kin
     /\bok\b[\s\S]{0,40}?kind\b[\s\S]{0,40}?status\b[\s\S]{0,40}?returned\b/,
     'the documented devops result names ok, kind, status and returned',
   )
-  assert.match(plan.baseClassSource, /async devops\(intent, carry = \[\]\)/, 'devops takes an intent and optional carry')
+  assert.match(plan.baseClassSource, /async devops\(intent, carry = \[\]\)/, 'devops takes an intent and required carry')
 })
 

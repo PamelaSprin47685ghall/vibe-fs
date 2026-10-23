@@ -18,7 +18,7 @@
 
 ## 成员与信封
 
-`this.advisor(intent, carry = [])` 由 `JsCapability.Advisor` 投影：注册表提供成员名，本地化基类伪代码提供接口、说明与例子，运行时按同一能力集提供绑定，`ToolsBindings.makeAdvisorMember` 把宿主闭包（`JsDelegationHost.Advisor`）注入成员，两处 install 分别在 `ToolRegistry` 的生成面宿主与 `RuntimeSurface`。宿主校验数组后调用 `AdvisorView.plan` 与 `AdvisorSeat.consult`，成功后推进游标，返回 `{ ok: true, advice }` 或 `{ ok: false, code, reason }`；非法数组为 `VIEW_DECLARATION_INVALID`，席位无法作答为 `advisor-unavailable`，宿主缺席为 `DELEGATION_UNAVAILABLE`。拒绝是数据，程序不需要为它写 catch；渲染只在工具结果边界发生。
+`this.advisor(intent, carry)` 由 `JsCapability.Advisor` 投影：注册表提供成员名，本地化基类伪代码提供接口、说明与例子，运行时按同一能力集提供绑定，`ToolsBindings.makeAdvisorMember` 把宿主闭包（`JsDelegationHost.Advisor`）注入成员，两处 install 分别在 `ToolRegistry` 的生成面宿主与 `RuntimeSurface`。宿主校验数组后调用 `AdvisorView.plan` 与 `AdvisorSeat.consult`，成功后推进游标，返回 `{ ok: true, advice }` 或 `{ ok: false, code, reason }`；非法数组为 `VIEW_DECLARATION_INVALID`，席位无法作答为 `advisor-unavailable`，宿主缺席为 `DELEGATION_UNAVAILABLE`。拒绝是数据，程序不需要为它写 catch；渲染只在工具结果边界发生。
 
 ## 无工具与无副作用
 

@@ -10,6 +10,7 @@ module AnchorLedger =
 
     type private Checkpoint =
         { Source: AnchorMessage list
+          PrefixSegments: AnchorSegment list
           Segments: AnchorSegment list
           Declaration: AnchorViewDeclaration
           CallIdentity: (string * string) option
@@ -65,7 +66,7 @@ module AnchorLedger =
 
     let protectedPrefix sessionId =
         match checkpoints.TryGetValue sessionId with
-        | true, checkpoint -> checkpoint.Segments |> List.take checkpoint.Declaration.PrefixCount
+        | true, checkpoint -> checkpoint.PrefixSegments
         | false, _ -> []
 
     let private leadingAnchorFor sessionId (checkpoint: Checkpoint) =
@@ -107,6 +108,7 @@ module AnchorLedger =
         (declaration: AnchorViewDeclaration)
         : Result<unit, JsFailure> =
         let segments = visible sessionId
+        let prefixSegments = segments |> List.filter (fun s -> s.Anchor < declaration.PrefixUntil)
 
         validate sessionId declaration
         |> Result.map (fun () ->
@@ -132,7 +134,8 @@ module AnchorLedger =
 
             checkpoints.[sessionId] <-
                 { Source = source
-                  Segments = (segments |> List.take declaration.PrefixCount) @ carried
+                  PrefixSegments = prefixSegments
+                  Segments = prefixSegments @ carried
                   Declaration = declaration
                   CallIdentity = callIdentity
                   LeadingAnchor = None }

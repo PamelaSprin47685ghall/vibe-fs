@@ -56,7 +56,10 @@ test('WHAT[work-050] this.ask in an S1 plan program records the question and par
     runtime.client.tui = { showToast: async ({ body }) => { notices.push(body); return {} } }
 
     const parked = await hooks.tool['todowrite-for-plan'].execute(
-      { program: program(`    const answer = await this.ask('Which deployment environment should this target?');\n    return { answer };`), name: 'ask-deploy' },
+      { program: program(`    const answer = await this.ask('Which deployment environment should this target?');\n    return { answer };`), name: 'ask-deploy',
+          prefixUntil: 0,
+          carry: []
+        },
       context(session),
     )
 
@@ -87,7 +90,10 @@ test('WHAT[work-050] this.ask outside S1 is refused with ASK_REFUSED', async () 
     runtime.client.tui = { showToast: async () => ({}) }
 
     const output = await hooks.tool['todowrite-for-plan'].execute(
-      { program: program(`    await this.ask('Out of stage?');\n    return { unreachable: true };`), name: 'ask-s2' },
+      { program: program(`    await this.ask('Out of stage?');\n    return { unreachable: true };`), name: 'ask-s2',
+          prefixUntil: 0,
+          carry: []
+        },
       context(session, 'plan-call-s2', 'plan-run-s2'),
     )
 
@@ -102,7 +108,10 @@ test('WHAT[work-050] a pending question blocks every new plan call until the use
   await withPlanSession(async ({ hooks, runtime, session }) => {
     runtime.client.tui = { showToast: async () => ({}) }
     const parked = await hooks.tool['todowrite-for-plan'].execute(
-      { program: program(`    await this.ask('Still waiting?');\n    return { done: true };`), name: 'ask-wait' },
+      { program: program(`    await this.ask('Still waiting?');\n    return { done: true };`), name: 'ask-wait',
+          prefixUntil: 0,
+          carry: []
+        },
       context(session),
     )
     assert.match(parked, /# parked/)

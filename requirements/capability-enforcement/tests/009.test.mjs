@@ -33,10 +33,10 @@ test('WHAT[capability-enforcement-009] FORK_programming_surface_exposes_expected
   const orchestratorMembers = orchestrator.members.map((member) => member.memberName)
   assert.equal(orchestratorMembers.includes('commission'), true, 'the orchestrator surface carries the commission member')
 
-  assert.equal(manager.baseClassSource.includes('async fork(payload, carry = [])'), true, 'the manager base class declares the fork member')
-  assert.equal(manager.baseClassSource.includes('async resume(payload, carry = [])'), true, 'the manager base class declares the resume member')
+  assert.equal(manager.baseClassSource.includes('async fork(payload, carry)'), true, 'the manager base class declares the fork member')
+  assert.equal(manager.baseClassSource.includes('async resume(payload, carry)'), true, 'the manager base class declares the resume member')
   assert.equal(manager.baseClassSource.includes('async commission('), false, 'the manager base class declares no commission member')
-  assert.equal(orchestrator.baseClassSource.includes('async commission(payload, carry = [])'), true, 'the orchestrator base class declares the commission member')
+  assert.equal(orchestrator.baseClassSource.includes('async commission(payload, carry)'), true, 'the orchestrator base class declares the commission member')
 
   const managerFork = memberDoc(manager.description, 'fork')
   assert.equal(managerFork.includes('keywords'), false, 'fork must not carry warm-start keywords')
@@ -49,7 +49,10 @@ test('WHAT[capability-enforcement-009] FORK_disposed_or_unbound_execution_surfac
     // The delegation verb is a programming-surface member now: the program
     // carries the payload and the report mapping.
     const result = await hooks.tool['todowrite-for-manager'].execute(
-      { program: 'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "do work" }, { 1: null }); } }' },
+      { program: 'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "do work" }, { 1: null }); } }',
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID: '', agent: 'engineer' },
     )
     assert.match(result, /cannot be placed from this execution context|caller's authority is established|调用方权威确立之前/i)

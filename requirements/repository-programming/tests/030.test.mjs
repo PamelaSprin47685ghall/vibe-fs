@@ -91,7 +91,7 @@ test('WHAT[repository-programming-030] another session parking does not block th
     assert.equal(caseName(parked), 'Parked')
     const handle = parkedHandle(parked)
 
-    const blocked = await runProgram(dir, `    await this.deliver();`, 'sess-030-a')
+    const blocked = await runProgram(dir, `    await this.deliver([]);`, 'sess-030-a')
     assert.equal(caseName(blocked), 'Failed')
     assert.equal(failureCode(blocked), 'PROGRAM_FAILED')
     assert.match(failureReason(blocked), /delivery is blocked by unresolved resources/)
@@ -100,7 +100,7 @@ test('WHAT[repository-programming-030] another session parking does not block th
     assert.match(failureReason(blocked), /resume with unpark\(\{ handle, value \}\) or cancel with abandon\(\{ handle \}\)/)
 
     // ...while session B's deliver goes through untouched by A's park.
-    const other = await runProgram(dir, `    await this.deliver();`, 'sess-030-b')
+    const other = await runProgram(dir, `    await this.deliver([]);`, 'sess-030-b')
     assert.equal(caseName(other), 'Succeeded')
   } finally {
     clearParkedSites()
@@ -128,7 +128,7 @@ test('WHAT[repository-programming-030] auto-settle observes finally cleanup of a
     assert.equal(existsSync(join(dir, 'cleanup.marker')), false, 'cleanup marker not yet written while parked')
 
     // Delivering auto-settles the side-effect-free pause: continuation is abandoned and finally runs
-    const outcome = await runProgram(dir, `    await this.deliver();`, 'sess-030-cleanup')
+    const outcome = await runProgram(dir, `    await this.deliver([]);`, 'sess-030-cleanup')
     assert.equal(caseName(outcome), 'Succeeded', 'deliver succeeds without manual intervention')
     assert.equal(existsSync(join(dir, 'cleanup.marker')), true, 'finally block cleanup was observed on disk')
     assert.equal(readFileSync(join(dir, 'cleanup.marker'), 'utf8'), 'cleaned-up-ok')
@@ -149,7 +149,7 @@ test('WHAT[repository-programming-030] where ambiguity pause is blocked because 
     const parked = await runProgram(dir, `    const span = await this.where('foo bar foo', 'foo');`, 'sess-030-where')
     assert.equal(caseName(parked), 'Parked')
 
-    const blocked = await runProgram(dir, `    await this.deliver();`, 'sess-030-where')
+    const blocked = await runProgram(dir, `    await this.deliver([]);`, 'sess-030-where')
     assert.equal(caseName(blocked), 'Failed')
     assert.equal(failureCode(blocked), 'PROGRAM_FAILED')
     assert.match(failureReason(blocked), /delivery is blocked by unresolved resources/)
@@ -172,7 +172,7 @@ test('WHAT[repository-programming-030] command yield pause holds active resource
     assert.equal(caseName(parked), 'Parked')
     const handle = parkedHandle(parked)
 
-    const blocked = await runProgram(dir, `    await this.deliver();`, 'sess-030-yield')
+    const blocked = await runProgram(dir, `    await this.deliver([]);`, 'sess-030-yield')
     assert.equal(caseName(blocked), 'Failed')
     assert.equal(failureCode(blocked), 'PROGRAM_FAILED')
     assert.match(failureReason(blocked), /delivery is blocked by unresolved resources/)

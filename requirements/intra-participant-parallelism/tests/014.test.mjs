@@ -86,7 +86,9 @@ test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empt
       const forked = await hooks.tool['todowrite-for-manager'].execute(
         {
           program:
-            'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "fission owner cell" }); } }',
+            'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "fission owner cell" }, []); } }',
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: managerSession, agent: 'manager' },
       )
@@ -154,7 +156,9 @@ test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empt
         await hooks.tool['todowrite-for-engineer'].execute(
           {
             program: `class Js extends JsProgram { async run() { await this.deliver([${laneAnchor}, "LANE-MATERIAL-${index}"]); } }`,
-          },
+          prefixUntil: 0,
+          carry: []
+        },
           { sessionID: laneSession, agent: 'engineer', callID: `call-${laneSession}-1`, messageID: `run-${laneSession}-1` },
         )
       }
@@ -220,6 +224,8 @@ test('WHAT[intra-participant-parallelism-014] the owner delivery cell stays empt
       await hooks.tool['todowrite-for-engineer'].execute(
         {
           program: `class Js extends JsProgram { async run() { await this.deliver([${ownerAnchor}, "OWNER-MATERIAL"]); } }`,
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: ownerSession, agent: 'engineer', callID: `call-${ownerSession}-1`, messageID: `run-${ownerSession}-1` },
       )
@@ -276,7 +282,9 @@ test('WHAT[intra-participant-parallelism-014] the real takeover settles the owne
       const forked = await hooks.tool['todowrite-for-manager'].execute(
         {
           program:
-            'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "fission takeover" }); } }',
+            'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada", charge: "fission takeover" }, []); } }',
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: managerSession, agent: 'manager' },
       )
@@ -343,7 +351,9 @@ test('WHAT[intra-participant-parallelism-014] the real takeover settles the owne
         await hooks.tool['todowrite-for-engineer'].execute(
           {
             program: `class Js extends JsProgram { async run() { await this.deliver([${anchor}, "LANE-MATERIAL-${index}"]); } }`,
-          },
+          prefixUntil: 0,
+          carry: []
+        },
           { sessionID: lane, agent: 'engineer', callID: `call-${run}`, messageID: run },
         )
         assistant.info.time.completed = 3
@@ -420,6 +430,8 @@ test('WHAT[intra-participant-parallelism-014] the real takeover settles the owne
       await hooks.tool['todowrite-for-engineer'].execute(
         {
           program: `class Js extends JsProgram { async run() { await this.deliver([${takeoverAnchor}, "INTEGRATED-MATERIAL"]); } }`,
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: takeoverLane, agent: 'engineer', callID: `call-${takeoverRun}`, messageID: takeoverRun },
       )

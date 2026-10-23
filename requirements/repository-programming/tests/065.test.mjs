@@ -106,11 +106,17 @@ test('WHAT[repository-programming-065] two tool calls of one assistant message c
     // 值，所以 call1 先被派发、call2 后被派发，而两者在产品侧同时在飞。
     const [first, second] = await Promise.all([
       hooks.tool['todowrite-for-engineer'].execute(
-        { name: 'call1', program: appendProgram('call1') },
+        { name: 'call1', program: appendProgram('call1'),
+          prefixUntil: 0,
+          carry: []
+        },
         { sessionID: SESSION, agent: 'engineer', callID: 'call-017-1', messageID: RUN },
       ),
       hooks.tool['todowrite-for-engineer'].execute(
-        { name: 'call2', program: appendProgram('call2') },
+        { name: 'call2', program: appendProgram('call2'),
+          prefixUntil: 0,
+          carry: []
+        },
         { sessionID: SESSION, agent: 'engineer', callID: 'call-017-2', messageID: RUN },
       ),
     ])

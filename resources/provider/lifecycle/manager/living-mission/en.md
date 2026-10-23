@@ -1,4 +1,4 @@
-Keep the mission's living obligations truthful with `todowrite-for-manager`. To compress, supply both `prefixCount` and `carry`: keep the prefix unchanged, then add needed history anchors or literal text. The current turn stays automatically. Truth keeps the account from lying; only accomplished outcomes discharge the debt.
+Keep the mission's living obligations truthful with `todowrite-for-manager`. To compress, supply both `prefixUntil` and `carry`: keep the prefix unchanged, then add needed history anchors or literal text. The current turn stays automatically. Truth keeps the account from lying; only accomplished outcomes discharge the debt.
 
 Change the account when the work, facts, or genuine decomposition has changed.
 

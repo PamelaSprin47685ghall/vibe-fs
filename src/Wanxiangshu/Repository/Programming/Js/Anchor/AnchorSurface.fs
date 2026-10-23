@@ -31,7 +31,7 @@ module AnchorSurface =
 
     let private declarationValue (declaration: AnchorViewDeclaration) : obj =
         createObj
-            [ "prefixCount" ==> declaration.PrefixCount
+            [ "prefixUntil" ==> declaration.PrefixUntil
               "carry" ==> AnchorCarry.toValue declaration.Carry ]
 
     let parseDeclaration (value: obj) : obj =
@@ -39,7 +39,7 @@ module AnchorSurface =
         | Ok declaration ->
             createObj
                 [ "ok" ==> true
-                  "prefixCount" ==> declaration.PrefixCount
+                  "prefixUntil" ==> declaration.PrefixUntil
                   "carry" ==> AnchorCarry.toValue declaration.Carry ]
         | Error failure -> failureReceipt failure
 

@@ -101,7 +101,9 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
     await hooks.tool[`todowrite-for-${role}`].execute(
       {
         program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
-      },
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID: child, agent: role, callID: `call-${run}`, messageID: run },
     )
   }
@@ -143,7 +145,9 @@ export const deliverIntoOpenWork = async (hooks, runtime, child, run, prose, mat
   await hooks.tool[`todowrite-for-${role}`].execute(
     {
       program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
-    },
+          prefixUntil: 0,
+          carry: []
+        },
     { sessionID: child, agent: role, callID: `call-${run}`, messageID: run },
   )
   assistant.info.time.completed = 5
@@ -156,8 +160,10 @@ export const deliverIntoOpenWork = async (hooks, runtime, child, run, prose, mat
 export const forkCall = (hooks, owner, name, charge, callID = 'call-fork') =>
   hooks.tool['todowrite-for-manager'].execute(
     {
-      program: `class Js extends JsProgram { async run() { return await this.fork({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)} }); } }`,
-    },
+      program: `class Js extends JsProgram { async run() { return await this.fork({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)} }, []); } }`,
+          prefixUntil: 0,
+          carry: []
+        },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
 
@@ -165,15 +171,20 @@ export const forkCall = (hooks, owner, name, charge, callID = 'call-fork') =>
 export const resumeCall = (hooks, owner, name, charge, callID = 'call-resume', attach) =>
   hooks.tool['todowrite-for-manager'].execute(
     {
-      program: `class Js extends JsProgram { async run() { return await this.resume({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)}${attach === undefined ? '' : `, attach: ${JSON.stringify(attach)}`} }); } }`,
-    },
+      program: `class Js extends JsProgram { async run() { return await this.resume({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)}${attach === undefined ? '' : `, attach: ${JSON.stringify(attach)}`} }, []); } }`,
+          prefixUntil: 0,
+          carry: []
+        },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
 
 /** `this.join` through the real plugin surface. */
 export const joinCall = (hooks, owner, callID = 'call-join') =>
   hooks.tool['todowrite-for-manager'].execute(
-    { program: 'class Js extends JsProgram { async run() { return await this.join(); } }' },
+    { program: 'class Js extends JsProgram { async run() { return await this.join(); } }',
+          prefixUntil: 0,
+          carry: []
+        },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
 

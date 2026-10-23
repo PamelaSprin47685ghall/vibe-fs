@@ -68,15 +68,14 @@ module JsToolPolicy =
     let viewDeclarationExtraProse () : string =
         JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ())
 
-    /// A compression declaration keeps a prefix and appends a carry array.
+    /// A compression declaration keeps history with anchor < prefixUntil and appends carry.
     let viewDeclarationOf (raw: obj) : obj =
-        if not (hasProperty raw "prefixCount") && not (hasProperty raw "carry") then
-            null
-        else
-            let declaration =
-                createObj [ "prefixCount" ==> raw?prefixCount; "carry" ==> raw?carry ]
+        // Both prefixUntil and carry are required on every tool call.
+        // An omitted field is refused immediately; there is no implicit "keep existing context".
+        let declaration =
+            createObj [ "prefixUntil" ==> raw?prefixUntil; "carry" ==> raw?carry ]
 
-            AnchorSurface.parse declaration |> Result.defaultValue declaration
+        AnchorSurface.parse declaration |> Result.defaultValue declaration
 
     /// Why the declaration is not a valid view declaration, if it is not.
     let parsedDeclarationFailure (declaration: obj) : JsFailure option =
@@ -87,10 +86,10 @@ module JsToolPolicy =
     /// Reject retired fields before the program can run.
     let viewFailureOf (raw: obj) (declaration: obj) : JsFailure option =
         if
-            [ "prefixUntil"; "thenMap"; "view"; "reportMapping" ]
+            [ "prefixCount"; "thenMap"; "view"; "reportMapping" ]
             |> List.exists (hasProperty raw)
         then
-            Some(JsFailure.ViewDeclarationInvalid "use prefixCount and carry for compression")
+            Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and carry for compression")
         elif not (isPresent declaration) then
             None
         else

@@ -217,7 +217,10 @@ const withCompletedEngineer = async (action, { beforeCreate } = {}) => {
       // production write the durable delivery witness the parent awaits. The
       // harness used to fake this delivery, so the parent never saw a proven
       // delivery and the case hung.
-      await hooks.tool['todowrite-for-engineer'].execute({ program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(answer)}]); } }` },
+      await hooks.tool['todowrite-for-engineer'].execute({ program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(answer)}]); } }`,
+          prefixUntil: 0,
+          carry: []
+        },
         { sessionID: sent.child, agent: 'engineer', callID: 'd0p-engineer-delivery', messageID: assistant.info.id })
 
       assistant.parts.push({ id: 'd0p-answer-part', type: 'text', text: answer })
@@ -354,7 +357,10 @@ test('WHAT[managed-session-lifecycle-022] original child and owner deletion arch
       try {
         if (!programAttempted) {
           programAttempted = true
-          const output = await hooks.tool['todowrite-for-bookkeeper'].execute({ program }, {
+          const output = await hooks.tool['todowrite-for-bookkeeper'].execute({ program,
+          prefixUntil: 0,
+          carry: []
+        }, {
             sessionID: child, agent: 'bookkeeper', messageID: bookkeeperAssistant.info.id,
             callID: 'd0g-bookkeeper-program',
           })

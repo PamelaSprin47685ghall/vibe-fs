@@ -16,8 +16,8 @@ import { UNIT_VERDICT_SILENCE_MS } from '../../verification-system/tests/e2e/sup
 // gate + ForkTool 工具体）生效，状态来自统一 Lifecycle EventStore。
 //
 // 委派动词不再是宿主注册的工具：`fork` / `resume` 是 Manager 编程面的成员，
-// 由 `todowrite-for-manager` 的程序调用（`this.fork(payload, carry = [])`、
-// `this.resume(payload, carry = [])`）。成员返回数据信封，不渲染散文：成功
+// 由 `todowrite-for-manager` 的程序调用（`this.fork(payload, carry)`、
+// `this.resume(payload, carry)`）。成员返回数据信封，不渲染散文：成功
 // 是 `{ ok: true, name, agentId, outcome }`，拒绝是 `{ ok: false, code }`。
 // 拒绝码是稳定的 kebab 码，本文件按码断言，不再匹配散文。
 
@@ -35,7 +35,10 @@ const storeOf = async (directory) => workspaceEvents.acquire(await journalSurfac
 // 程序内调用 `this.fork` / `this.resume`。返回渲染后的 TOML 字符串。
 const runManagerProgram = async (hooks, sessionID, body) =>
   await hooks.tool['todowrite-for-manager'].execute(
-    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'manager-program' },
+    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'manager-program',
+          prefixUntil: 0,
+          carry: []
+        },
     { sessionID, agent: 'manager' },
   )
 

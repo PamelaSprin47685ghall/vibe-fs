@@ -295,6 +295,12 @@ module ToolHostCodec =
     [<Emit("$0.schema.number().int().min($1).max($2).describe($3)")>]
     let private rawBoundedIntegerSchema (tool: obj) (minimum: int) (maximum: int) (description: string) : obj = jsNative
 
+    [<Emit("$0.schema.number().int().nonnegative().describe($1)")>]
+    let private rawNonNegativeIntegerSchemaDescribed (tool: obj) (description: string) : obj = jsNative
+
+    [<Emit("$0.schema.number().int().nonnegative().describe($1).optional()")>]
+    let private rawOptionalNonNegativeIntegerSchemaDescribed (tool: obj) (description: string) : obj = jsNative
+
     [<Emit("$0.schema.boolean()")>]
     let private rawBooleanSchema (tool: obj) : obj = jsNative
 
@@ -325,9 +331,6 @@ module ToolHostCodec =
     [<Emit("$0.schema.number().optional()")>]
     let private rawOptionalNumberSchema (tool: obj) : obj = jsNative
 
-    [<Emit("$0.schema.number().int().nonnegative().describe($1).optional()")>]
-    let private rawOptionalNonNegativeIntegerSchemaDescribed (tool: obj) (description: string) : obj = jsNative
-
     [<Emit("$0.schema.array($0.schema.string()).optional()")>]
     let private rawOptionalStringArraySchema (tool: obj) : obj = jsNative
 
@@ -343,8 +346,8 @@ module ToolHostCodec =
     [<Emit("$0.schema.array($1).describe($2)")>]
     let private rawArraySchemaOf (tool: obj) (item: obj) (description: string) : obj = jsNative
 
-    [<Emit("$0.schema.array($0.schema.union([$0.schema.number().int().nonnegative(), $0.schema.string()])).describe($1).optional()")>]
-    let private rawOptionalCarrySchema (tool: obj) (description: string) : obj = jsNative
+    [<Emit("$0.schema.array($0.schema.union([$0.schema.number().int().nonnegative(), $0.schema.string()])).describe($1)")>]
+    let private rawCarrySchema (tool: obj) (description: string) : obj = jsNative
 
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
@@ -488,6 +491,9 @@ module ToolHostCodec =
     let optionalNonNegativeIntegerSchemaDescribed description (HostToolFactory factory) =
         HostSchema(rawOptionalNonNegativeIntegerSchemaDescribed factory description)
 
+    let nonNegativeIntegerSchemaDescribed description (HostToolFactory factory) =
+        HostSchema(rawNonNegativeIntegerSchemaDescribed factory description)
+
     let optionalStringArraySchema (HostToolFactory factory) =
         HostSchema(rawOptionalStringArraySchema factory)
 
@@ -510,8 +516,8 @@ module ToolHostCodec =
     let arraySchemaOf (HostSchema item) description (HostToolFactory factory) =
         HostSchema(rawArraySchemaOf factory item description)
 
-    let optionalCarrySchema description (HostToolFactory factory) =
-        HostSchema(rawOptionalCarrySchema factory description)
+    let carrySchema description (HostToolFactory factory) =
+        HostSchema(rawCarrySchema factory description)
 
     let register (HostToolFactory factory) (spec: ToolSpec) =
         let args =

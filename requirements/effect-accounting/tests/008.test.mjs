@@ -13,7 +13,7 @@ integrationTest('WHAT[effect-accounting-008] programming surface with view commi
     const beforeOutput = {
       args: {
         program: 'class Js extends JsProgram { async run() { return {}; } }',
-        prefixCount: 0,
+        prefixUntil: 0,
         carry: [],
       },
     }
@@ -47,7 +47,7 @@ integrationTest('WHAT[effect-accounting-008] programming surface with view commi
               status: 'completed',
               input: {
                 program: 'class Js extends JsProgram { async run() { return {}; } }',
-                prefixCount: 0,
+                prefixUntil: 0,
                 carry: [],
               },
             },
@@ -75,7 +75,7 @@ integrationTest('WHAT[effect-accounting-008] programming surface failure does no
     const beforeOutput = {
       args: {
         program: 'class Js extends JsProgram { async run() { return {}; } }',
-        prefixCount: 0,
+        prefixUntil: 0,
         carry: [],
       },
     }
@@ -100,7 +100,7 @@ integrationTest('WHAT[effect-accounting-008] programming surface failure does no
               status: 'error',
               input: {
                 program: 'class Js extends JsProgram { async run() { return {}; } }',
-                prefixCount: 0,
+                prefixUntil: 0,
                 carry: [],
               },
             },

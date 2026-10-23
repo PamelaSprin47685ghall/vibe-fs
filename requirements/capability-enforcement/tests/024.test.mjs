@@ -29,7 +29,9 @@ const runManagerProgram = async (hooks, sessionID, body) => {
     await hooks.tool['todowrite-for-manager'].execute(
       {
         program: 'class Js extends JsProgram { async run() { ' + body + ' } }',
-      },
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent: 'manager', callID, messageID: 'msg-' + callID },
     ),
   )

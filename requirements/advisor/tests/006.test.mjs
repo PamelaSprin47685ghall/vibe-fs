@@ -11,20 +11,20 @@ const program = (body) => 'class Js extends JsProgram { async run() { ' + body +
 const managerRun = (dir, body, sessionId) =>
   execute(dir, 'Manager', 'en', sessionId, { name: 'advisor contract probe', program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
 
-test('WHAT[advisor-006] advisor is capability-gated and documents the optional carry array', () => {
+test('WHAT[advisor-006] advisor is capability-gated and documents the required carry array', () => {
   const surface = generateRole('manager', 'en')
   assert.equal(surface.toolName, 'todowrite-for-manager')
   assert.equal(surface.capabilities.includes('Advisor'), true)
   assert.equal(surface.members.filter((member) => member.memberName === 'advisor').length, 1)
   assert.match(surface.description, /advisor\(intent, carry/)
-  assert.match(surface.baseClassSource, /async advisor\(intent, carry = \[\]\)/)
+  assert.match(surface.baseClassSource, /async advisor\(intent, carry\)/)
   assert.match(surface.baseClassSource, /this\._api\.advisor\(intent, carry\)/)
   const withoutAdvisor = generate('Manager', ['Read'], 'en')
   assert.equal(withoutAdvisor.members.some((member) => member.memberName === 'advisor'), false)
   assert.doesNotMatch(withoutAdvisor.baseClassSource, /this\._api\.advisor/)
 })
 
-test('WHAT[advisor-006] carry crosses as an ordered array, and omitted carry is empty', async () => {
+test('WHAT[advisor-006] carry crosses as an ordered array, and empty carry is explicit', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-advisor-carry-'))
   const session = 'advisor-carry-member'
   const observed = []
@@ -36,7 +36,7 @@ test('WHAT[advisor-006] carry crosses as an ordered array, and omitted carry is 
     })
     for (const body of [
       'return await this.advisor("review evidence", [3, "literal", 3, "", "  "]);',
-      'return await this.advisor("review only this intent");',
+      'return await this.advisor("review only this intent", []);',
     ]) {
       const outcome = await managerRun(dir, body, session)
       assert.equal(caseName(outcome), 'Succeeded')
@@ -75,7 +75,7 @@ test('WHAT[advisor-006] absent host returns DELEGATION_UNAVAILABLE', async () =>
   const dir = mkdtempSync(join(tmpdir(), 'wxs-advisor-nohost-'))
   try {
     clearDelegationHost('advisor-nohost')
-    const outcome = await managerRun(dir, 'return await this.advisor("review");', 'advisor-nohost')
+    const outcome = await managerRun(dir, 'return await this.advisor("review", []);', 'advisor-nohost')
     assert.equal(caseName(outcome), 'Succeeded')
     assert.match(render(outcome), /code = "DELEGATION_UNAVAILABLE"/)
   } finally {

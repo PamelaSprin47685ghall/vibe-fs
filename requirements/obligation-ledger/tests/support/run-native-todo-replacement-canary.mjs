@@ -45,7 +45,7 @@ const isTitleRequest = (body) => {
 }
 
 // The current call surface takes the context-compression declaration as two
-// flat top-level arguments: `prefixCount` and `carry`.
+// flat top-level arguments: `prefixUntil` and `carry`.
 const jsViewCall = (id, declaration) =>
   buildToolCallChunks(
     id,
@@ -86,11 +86,11 @@ const provider = await startHttpServer(async (request, response) => {
       return
     }
     if (text.includes('OL002_A_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-a-view', { prefixCount: 0, carry: ['OL002_A_VIEW'] }))
+      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 0, carry: ['OL002_A_VIEW'] }))
       return
     }
     if (text.includes('OL002_B_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-b-view', { prefixCount: 0, carry: ['OL002_B_VIEW'] }))
+      sendSSE(response, jsViewCall('ol002-b-view', { prefixUntil: 0, carry: ['OL002_B_VIEW'] }))
       return
     }
     sendJSON(response, 500, { error: `unexpected prompt text: ${text.slice(0, 200)}` })

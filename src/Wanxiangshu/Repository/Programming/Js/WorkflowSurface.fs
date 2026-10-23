@@ -140,8 +140,8 @@ module JsWorkflowSurface =
                         createObj
                             [ "program" ==> input?program
                               "name" ==> ("test-" + sessionId + "-" + string harnessNameSeq)
-                              if not (isNull input?prefixCount) then
-                                  "prefixCount" ==> input?prefixCount
+                              if not (isNull input?prefixUntil) then
+                                  "prefixUntil" ==> input?prefixUntil
                               if not (isNull input?carry) then
                                   "carry" ==> input?carry ]
                     else

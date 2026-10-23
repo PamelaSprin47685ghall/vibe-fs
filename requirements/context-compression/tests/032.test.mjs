@@ -29,6 +29,8 @@ const withForkMember = async (body) => {
         {
           name: 'carry-transfer-test',
           program: 'class Js extends JsProgram { async run() { return await this.fork({ name: "Ada' + callId + '", charge: "DO THE WORK CURRENT INTENT" }' + argument + '); } }',
+          prefixUntil: 0,
+          carry: [],
         },
         { sessionID: session, agent: 'manager', callID: callId, messageID: 'run-' + callId },
       )
@@ -81,30 +83,33 @@ test('WHAT[context-compression-032] invalid carry and unknown anchors place no c
   })
 })
 
-test('WHAT[context-compression-032] omitted and empty carry send only the task, with no implicit history or current turn', async () => {
+test('WHAT[context-compression-032] empty carry sends only the task; omitted carry is refused', async () => {
   await withForkMember(async (call) => {
     applyView(session, visible())
-    for (const [index, carry] of [undefined, '[]'].entries()) {
-      const result = await call(carry, 'empty' + index)
-      assert.match(result.reply, /ok = true/)
-      assert.ok(result.child)
-      assert.deepEqual(result.context.text, [])
-      assert.doesNotMatch(result.context.wire, /second line/)
-    }
+    const omitted = await call(undefined, 'omitted')
+    assert.match(omitted.reply, /ok = false/)
+    assert.match(omitted.reply, /code = "VIEW_DECLARATION_INVALID"/)
+    assert.equal(omitted.child, null)
+    const empty = await call('[]', 'empty')
+    assert.match(empty.reply, /ok = true/)
+    assert.ok(empty.child)
+    assert.deepEqual(empty.context.text, [])
+    assert.doesNotMatch(empty.context.wire, /second line/)
   })
 })
 
-test('WHAT[context-compression-032] a read-only transfer leaves a pending compression declaration untouched', async () => {
+test('WHAT[context-compression-032] transfer reads the snapshot without consuming it while the tool commits its own declaration', async () => {
   await withForkMember(async (call) => {
     applyView(session, visible())
-    assert.equal(captureView(session, { prefixCount: 1, carry: ['later summary'] }).ok, true)
+    assert.equal(captureView(session, { prefixUntil: 2, carry: ['later summary'] }).ok, true)
     const result = await call('[2, "extra"]', 'readonly')
     assert.match(result.reply, /ok = true/)
     assert.deepEqual(result.context.text, ['two\nsecond line', 'extra'])
-    assert.deepEqual(takeView(session), { prefixCount: 1, carry: ['later summary'] })
+    // Successful tool calls always commit their required declaration.
+    assert.deepEqual(takeView(session), { prefixUntil: 0, carry: [] })
     assert.equal(takeView(session), null)
     const after = applyView(session, visible())
-    assert.deepEqual(after.entries.map((entry) => entry.kind === 'kept' ? entry.message.text : entry.text), ['one', 'later summary'])
+    assert.deepEqual(after.entries.map((entry) => entry.kind === 'kept' ? entry.message.text : entry.text), [])
   })
 })
 

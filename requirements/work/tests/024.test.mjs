@@ -63,7 +63,10 @@ test('WHAT[work-024] the Plan devops member refuses an unusable report mapping a
     const runPlan = async (body) =>
       String(
         await hooks.tool['todowrite-for-plan'].execute(
-          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-plan' },
+          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-plan',
+          prefixUntil: 0,
+          carry: []
+        },
           { sessionID, agent: 'plan' },
         ),
       )
@@ -77,7 +80,7 @@ test('WHAT[work-024] the Plan devops member refuses an unusable report mapping a
     assert.match(malformed, /code = "VIEW_DECLARATION_INVALID"/)
 
     // 合法 carry（默认 []）但没有已开立的 Plan 工作：拒绝，不派工，也不伪造成功。
-    const withoutWork = await runPlan('return await this.devops("investigate the build artifact");')
+    const withoutWork = await runPlan('return await this.devops("investigate the build artifact", []);')
     assert.match(withoutWork, /ok = false/)
     assert.match(withoutWork, /code = "devops-failed"/)
     assert.match(withoutWork, /lifecycle work is missing/)
@@ -108,7 +111,10 @@ test('WHAT[work-024] an unreviewed tenure may read the draft but cannot write it
       async run() {
         return { ok: true, hasReviewOnly: typeof this.reviewOnly !== 'undefined' };
       }
-    }`, name: 'read-draft' },
+    }`, name: 'read-draft',
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent: 'plan', callID: 'call-work-024', messageID: 'run-work-024', providerRunID: 'run-work-024' },
     )
     assert.match(String(read), /# ok/)

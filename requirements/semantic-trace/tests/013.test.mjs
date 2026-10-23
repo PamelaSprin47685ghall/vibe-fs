@@ -63,6 +63,8 @@ const withRealDelivery = async (body, { callId = 'call_013_a', view = 'materiali
       hooks.tool['todowrite-for-engineer'].execute(
         {
           program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
+          prefixUntil: 0,
+          carry: []
         },
         { sessionID: SESSION, agent: 'engineer', callID: callId, messageID: RUN },
       )
@@ -172,7 +174,9 @@ test('WHAT[semantic-trace-013] a different fence is a different witness: each st
       {
         program:
           'class Js extends JsProgram { async run() { await this.deliver(["materialized view body of the second call"]); } }',
-      },
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID: SESSION, agent: 'engineer', callID: secondCallId, messageID: RUN },
     )
     assert.match(String(second), /# ok/, 'the second call delivers under its own fence')

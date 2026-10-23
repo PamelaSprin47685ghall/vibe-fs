@@ -118,7 +118,10 @@ test('WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retain
     // 驱动 malformed review 尝试：`this.review` 成员接收 findings 数组，传入非数组
     // 即为无效评审（standalone `review` 宿主工具已随编程面迁移退役）。
     const reviewResult = await hooks.tool['todowrite-for-manager'].execute(
-      { name: 'manager-review', program: "class Js extends JsProgram { async run() { return await this.review('invalid-findings-malformed'); } }" },
+      { name: 'manager-review', program: "class Js extends JsProgram { async run() { return await this.review('invalid-findings-malformed'); } }",
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID, agent: 'manager', callID: 'call-p03-review', messageID: 'msg-p03-review' },
     )
     // 评审未被接纳（返回数据信封 ok = false + 稳定 code 或拒绝提示）
@@ -320,7 +323,10 @@ test('WHAT[capability-enforcement-025] identity and cross-role denial remain ind
     const unknown = await execute(hooks, 'ses-unknown', 'return 7;')
     assert.equal(Object.hasOwn(unknown, 'data'), false)
     const wrongRole = await hooks.tool['todowrite-for-devops'].execute(
-      { program: 'class Js extends JsProgram { async run() { return 7; } }', name: 'devops-wrong' },
+      { program: 'class Js extends JsProgram { async run() { return 7; } }', name: 'devops-wrong',
+          prefixUntil: 0,
+          carry: []
+        },
       { sessionID: 'ses-no-life', agent: 'manager' },
     )
     assert.doesNotMatch(String(wrongRole), /data = 7/)

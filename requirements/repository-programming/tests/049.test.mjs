@@ -22,11 +22,14 @@ const withTool = (check) => {
   }
 }
 
-test('WHAT[repository-programming-049] the public tool exposes carry and prefixCount without legacy aliases', () => {
+test('WHAT[repository-programming-049] the public tool exposes required carry and prefixUntil without legacy aliases', () => {
   withTool((registered) => {
-    assert.deepEqual(argumentNames(registered), [
-      'program', 'name', 'unpark', 'abandon', 'prefixCount', 'carry',
-    ])
+    const names = argumentNames(registered)
+    assert.ok(names.includes('prefixUntil'), names)
+    assert.ok(names.includes('carry'), names)
+    assert.ok(!names.includes('prefixCount'), names)
+    assert.ok(!names.includes('thenMap'), names)
+    assert.ok(!names.includes('view'), names)
   })
 })
 
@@ -60,13 +63,15 @@ test('WHAT[repository-programming-049] abandon declares only the handle', () => 
   })
 })
 
-test('WHAT[repository-programming-049] carry has the real integer-or-string array schema', () => {
+test('WHAT[repository-programming-049] carry and prefixUntil are required with real schemas', () => {
   withTool((registered) => {
-    const prefix = argumentSchema(registered, 'prefixCount')
+    const prefix = argumentSchema(registered, 'prefixUntil')
     const carry = argumentSchema(registered, 'carry')
-    assert.equal(prefix.safeParse(undefined).success, true)
+    assert.equal(prefix.safeParse(undefined).success, false)
     assert.equal(prefix.safeParse(0).success, true)
-    assert.equal(carry.safeParse(undefined).success, true)
+    assert.equal(prefix.safeParse(-1).success, false)
+    assert.equal(carry.safeParse(undefined).success, false)
+    assert.equal(carry.safeParse([]).success, true)
     assert.deepEqual(carry.parse([7, '7', '', '  ', 0]), [7, '7', '', '  ', 0])
     for (const value of [{}, null, [null], [true], [-1], [1.5], [NaN], [Infinity], [[]], [{}]]) {
       assert.equal(carry.safeParse(value).success, false, String(value))
