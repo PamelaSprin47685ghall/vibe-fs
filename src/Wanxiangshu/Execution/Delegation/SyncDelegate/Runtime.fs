@@ -48,13 +48,12 @@ module HostForkProse =
         let lang = SessionProviderLanguage.languageOf sessionId
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
-          Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
           Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
     /// delegation-019: the default charge prompt is the fork-child convention —
     /// the assignment instruction plus the shared fork-child Base guidance — so a
-    /// plain charge delegation reads exactly like a fork first prompt. The parent
-    /// delta rides along at send time as `commissioner_record` (DelegationHandoff).
+    /// plain charge delegation reads exactly like a fork first prompt. No
+    /// commissioner_record or post-scope context is carried with this charge.
     let chargeDocument (owner: SessionId) (charge: string) : LlmFacing.Document =
         let prose = forkInstructions owner
         LlmFacing.instructions [ charge ] |> LlmFacing.withInstructions prose.Base
@@ -491,7 +490,8 @@ type SyncDelegateRuntime
             for inv in call.Invocations do
                 inv.StartCursor <- Some startCursor
 
-            let providerPrompt = LlmFacing.render request.ProviderPrompt
+            Wanxiangshu.Context.Scope.Surface.bindDelegation (SessionId.value call.Delegate) (SessionId.value call.Owner)
+            let providerPrompt = request.ProviderPrompt |> LlmFacing.instructionsOnly |> LlmFacing.render
 
             let! identitySeed = issueCurrentOwnerIdentitySeed call.Owner call.Agent
             do! requireLiveCall ()

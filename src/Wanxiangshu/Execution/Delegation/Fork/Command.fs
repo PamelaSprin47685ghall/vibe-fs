@@ -271,29 +271,17 @@ module ForkCommand =
             "engineer"
 
     let private prepareForkPromptWithRecord
-        (host: DelegationEnvironment)
         (runtime: HostForkRuntime)
-        (_role: Role)
         (request: Request)
-        (attachment: string option)
         : Task<Result<string, string>> =
-        task {
-            let callerSessionId = SessionId.create (callerText host)
-            let! contextResult = host.ContextMessagesFor callerSessionId
-            match contextResult with
-            | Error _ -> return Error(refusalCode Path.Fork.ChargeContextUnavailable)
-            | Ok msgs ->
-                let contextBlocks = Wanxiangshu.Context.Scope.SessionView.blocksJsWithTable "context" msgs
-                let baseDocument =
-                    ForkChildPayload.relayDocument
-                        (forkInstructions runtime.ParentId)
-                        request.Charge
-                        contextBlocks
-                        attachment
-                        []
-                        None
-                return Ok(LlmFacing.render baseDocument)
-        }
+        let prompt =
+            ForkChildPayload.relayDocument
+                (forkInstructions runtime.ParentId)
+                request.Charge
+                []
+            |> LlmFacing.render
+
+        Task.FromResult(Ok prompt)
 
     let private isSelfAttachment (request: Request) =
         request.Attach
@@ -305,26 +293,18 @@ module ForkCommand =
         |> Option.bind (HandleProjection.tryFindByByname attach)
         |> Result.requireSome Path.Fork.AttachUnknown
 
-    let private readAttachedView (host: DelegationEnvironment) (childSessionId: SessionId) =
-        match host.ViewForSession with
-        | None -> TaskResultCE.ofTask (Task.FromResult None)
-        | Some viewForSession -> viewForSession childSessionId |> TaskResultCE.ofTask
-
+    /// The attach argument may bind a known handle, but MUST NOT copy its
+    /// previous view into the new assignment. Clarifications use negotiate.
     let private resolveAttachment
-        (host: DelegationEnvironment)
+        (_host: DelegationEnvironment)
         (handles: AgentLinkageProjection option)
         (request: Request)
         : Task<Result<string option, string>> =
-        match request.Attach with
-        | None -> Task.FromResult(Ok None)
-        | Some attach ->
-            taskResult {
-                let! record = resolveAttachmentRecord handles attach
-
-                let! view = readAttachedView host record.ChildSessionId
-
-                return view |> Option.map ReturnedMaterial.fullText
-            }
+        let outcome =
+            match request.Attach with
+            | None -> Ok None
+            | Some name -> resolveAttachmentRecord handles name |> Result.map (fun _ -> None)
+        Task.FromResult outcome
 
     let private appendFissionAffinity durable (host: DelegationEnvironment) (lane: FissionLaneBinding) handleId =
         taskResult {
@@ -383,7 +363,7 @@ module ForkCommand =
         =
         taskResult {
             let! rendered =
-                prepareForkPromptWithRecord host runtime role request attachment
+                prepareForkPromptWithRecord runtime request
 
             let! result =
                 runtime.Fork(
@@ -411,7 +391,7 @@ module ForkCommand =
         =
         taskResult {
             let! rendered =
-                prepareForkPromptWithRecord host runtime role request attachment
+                prepareForkPromptWithRecord runtime request
 
             return!
                 runtime.Reuse(
@@ -511,7 +491,7 @@ module ForkCommand =
                 let outcome =
                     taskResult {
                         let! attachment = resolveAttachment host handles request |> TaskResult.mapError (fun path -> consequence (prose language path))
-                        let! rendered = prepareForkPromptWithRecord host runtime profile.CanonicalRole request attachment |> TaskResult.mapError (fun _ -> consequence (prose language Path.Fork.ChargeContextUnavailable))
+                        let! rendered = prepareForkPromptWithRecord runtime request |> TaskResult.mapError (fun _ -> consequence (prose language Path.Fork.ChargeContextUnavailable))
                         return rendered
                     }
                 match! outcome with
@@ -1229,7 +1209,7 @@ module ForkCommand =
         : Task<Result<ForkReceipt, string>> =
         taskResult {
             let! attachment = resolveAttachment host handles request |> TaskResult.mapError refusalCode
-            let! rendered = prepareForkPromptWithRecord host runtime profile.CanonicalRole request attachment
+            let! rendered = prepareForkPromptWithRecord runtime request
             let! result = runtime.AppendGuidance(agentId, profile, rendered) |> TaskResultCE.ofTask
             return! placedResumeReceipt request result
         }

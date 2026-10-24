@@ -15,6 +15,7 @@ module ToolAdmissions =
     val assume: ToolAdmission
     val fetch: ToolAdmission
     val resetScope: ToolAdmission
+    val negotiate: ToolAdmission
 
     /// fork is the manager's own delegation tool; resume also answers the plan
     /// role, and commission is the orchestrator's hand-off.

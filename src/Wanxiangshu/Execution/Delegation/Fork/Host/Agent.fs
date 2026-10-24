@@ -72,7 +72,7 @@ module HostForkAgent =
         Task.FromResult(
             Ok(
                 requirements,
-                ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt [] None requirements payload
+                ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt requirements
             )
         )
 
@@ -154,6 +154,7 @@ module HostForkAgent =
             lock runtime.Gate (fun () -> runtime.Children.[agentId] <- childId)
 
             runtime.ChildCreated agentId role childId
+            Wanxiangshu.Context.Scope.Surface.bindDelegation (SessionId.value childId) (SessionId.value runtime.ParentId)
             runtime.ChildCreatedDir agentId childId (runtime.DirectoryOf agentId)
 
             if isFirstPrompt then
@@ -369,7 +370,7 @@ module HostForkAgent =
         match renderedPrompt with
         | Some rendered -> Task.FromResult(Some rendered)
         | None ->
-            Task.FromResult(Some(ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt [] None [] None))
+            Task.FromResult(Some(ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt []))
 
     let private reuseWithManagedAgent
         (runtime: HostForkRuntime)
@@ -440,6 +441,7 @@ module HostForkAgent =
         expectedToolCalls
         =
         task {
+            Wanxiangshu.Context.Scope.Surface.bindDelegation (SessionId.value childId) (SessionId.value runtime.ParentId)
             do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
             let agentName = "devops"
             let role = Role.DevOps

@@ -76,7 +76,8 @@ module StaticTools =
           "todowrite-for-devops"
           "todowrite-for-bookkeeper"
           "todowrite-for-plan"
-          "resetScope" ]
+          "resetScope"
+          "negotiate" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     /// The office half comes from the one reverse lookup; utility tools read the
@@ -88,7 +89,9 @@ module StaticTools =
         knownToolNames
         |> List.map (fun name ->
             name,
-            (OfficeCapability.admitsUtility role name
+            (name = "negotiate"
+             || (name = "resetScope" && role = Role.Advisor)
+             || OfficeCapability.admitsUtility role name
              || (permissionOfToolName role name
                  |> Option.exists (fun permission -> Set.contains permission allowed))))
         |> Map.ofList
@@ -122,6 +125,8 @@ module StaticTools =
         // Orchestrator's Fork duty runs on the programming surface, and its
         // host verb is `commission` (no office permission of its own).
         | true, "fork", Role.Orchestrator -> "deny"
+        | true, "negotiate", _ -> "allow"
+        | true, "resetScope", Role.Advisor -> "allow"
         | true, "commission", Role.Orchestrator -> "allow"
         | true, name, role when List.contains name OfficeCapability.utilityToolNames -> utilityPermission role name
         | true, "todowrite-for-bookkeeper", _ -> "deny"
@@ -137,7 +142,7 @@ module StaticTools =
         // stops permission.asked prompts on paths outside the project directory.
         let pairs =
             [ yield "*", box "deny"
-              yield "external_directory", box "allow"
+              yield "external_directory", box (if role = Role.Advisor then "deny" else "allow")
               for name in knownToolNames do
                   yield name, box (permissionFor registry allowed role name) ]
 
@@ -198,5 +203,5 @@ module StaticTools =
 
     let planAgentConfig (prompt: string option) : obj = primaryAgent Role.Plan prompt
 
-    /// The advisor is an internal reviewer runtime: hidden, no tools, prose out.
+    /// The advisor has only the non-authorizing negotiation protocol tool.
     let advisorAgentConfig (prompt: string) : obj = hiddenAgent Role.Advisor prompt

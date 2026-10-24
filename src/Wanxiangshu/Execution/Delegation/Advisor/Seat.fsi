@@ -13,7 +13,8 @@ type AdvisorSeatDeps =
       Snapshot: ISessionSnapshotPort option
       Journal: AgentJournal option
       Directory: string option
-      Participant: string }
+      Participant: string
+      BindDelegation: string -> string -> unit }
 
 /// advisor-[001]/[002]/[004]: one caller session's dedicated advisor seat.
 ///
@@ -39,8 +40,7 @@ module AdvisorSeat =
         deps: AdvisorSeatDeps ->
         callerSessionId: string ->
         intent: string ->
-        viewPrompt: string ->
-            Task<Result<string, string>>
+                Task<Result<string, string>>
 
     /// Drop one caller session's seat (tests + session close). The advisor child itself is left to
     /// the Host's own session teardown: the seat owns no durable link to close.

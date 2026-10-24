@@ -6,13 +6,13 @@ import * as join from '../../../dist/Execution/Delegation/Fork/JoinSurface.js'
 
 // WHAT[delegation-034] Bidirectional renderer smoke:
 // - Parent->child: main prose (task assignment) renders at TOP as `# ` comment lines;
-//   carry/material renders as TOML data fields; parent task appears exactly once.
+//   caller carry/material is NEVER forwarded; parent task appears exactly once.
 // - Child->parent: main prose (child report) renders at TOP as `# ` comment lines;
 //   carry renders as TOML data fields (`[[returned]]`); child report is NEVER
 //   quoted in a data field.
 // - Both directions: parseable TOML; exact text not double-escaped.
 
-test('WHAT[delegation-034] parent->child: multiline prose at top as comments, carry as fields, task appears once', () => {
+test('WHAT[delegation-034] parent->child: current prose and requirements only, inherited carry is absent', () => {
   const multilineTask = 'First line of assignment.\nSecond line with "quotes" & \\backslashes.\nThird line.'
   const carryEvidence = 'Durable material evidence from prior work.'
   const payloadContent = 'Raw reference payload string.'
@@ -38,10 +38,12 @@ test('WHAT[delegation-034] parent->child: multiline prose at top as comments, ca
     assert.ok(document.includes('# Second line with "quotes" & \\backslashes.'))
     assert.ok(!document.includes('\\"quotes\\"'), 'comment line must not escape double quotes')
 
-    // 4. Carry/material renders as data fields after top comments
-    assert.equal(parsed.content, payloadContent, 'Payload renders as content data field')
-    assert.equal(parsed.attached_view, 'peer-work-record-token', 'Attachment renders as attached_view data field')
-    assert.deepEqual(parsed.context, [{ text: carryEvidence }], 'CommissionerRecord renders as context table')
+    // 4. Clean break: no parent history can enter the data plane.
+    assert.deepEqual(parsed, {}, 'fork child request must have NO historical data plane')
+    for (const historical of [payloadContent, carryEvidence, 'peer-work-record-token']) {
+      assert.ok(!document.includes(historical), 'historical material must be absent')
+    }
+    assert.match(document, /^# Preserve existing invariants\.$/m)
 
     // 5. Parent task appears exactly once across the whole document
     const matches = document.match(/First line of assignment/g)

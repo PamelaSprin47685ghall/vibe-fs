@@ -73,14 +73,6 @@ module ToolRegistry =
     [<Emit("(() => { const out = {}; const src = $0; if (src === null || src === undefined || typeof src !== 'object') return out; for (const key of Object.keys(src)) { const descriptor = Object.getOwnPropertyDescriptor(src, key); if (descriptor && Object.prototype.hasOwnProperty.call(descriptor, 'value')) { out[key] = descriptor.value; } } return out; })()")>]
     let private plainRecordCopy (source: obj) : obj = jsNative
 
-    let private captureContextBlocks (snapshotOpt: ISessionSnapshotPort option) (sessionId: SessionId) : Task<Result<LlmFacing.DataBlock list, string>> =
-        taskResult {
-            let! snapshot = snapshotOpt |> Result.requireSome "Snapshot port is unavailable: cannot capture context blocks"
-            let! messages = snapshot.GetMessages sessionId |> TaskResult.mapError (sprintf "Snapshot read failed: %s")
-            let filtered = Wanxiangshu.Context.Scope.SnapshotScope.filterSnapshot messages
-            return Wanxiangshu.Context.Scope.SessionView.blocksJsWithTable "context" filtered
-        }
-
     let private devopsIntentText (payload: obj) : string =
         if isStringValue payload then
             unbox<string> payload
@@ -104,20 +96,15 @@ module ToolRegistry =
         task {
             let sessionId = ctx.SessionId
             let intentText = advisorIntentText intent
-            match! captureContextBlocks runtime.Snapshot (SessionId.create sessionId) with
-            | Error err -> return advisorRefusal "advisor-unavailable" (sprintf "caller context unavailable: %s" err)
-            | Ok callerBlocks ->
-            let callerContextToml =
-                LlmFacing.empty |> LlmFacing.withData callerBlocks |> LlmFacing.render
-
             let deps: AdvisorSeatDeps =
                 { Sessions = runtime.Sessions
                   Snapshot = runtime.Snapshot
                   Journal = runtime.Journal
                   Directory = runtime.WorkspaceDirectory
-                  Participant = ManagedAgent.nameOf Role.Advisor }
+                  Participant = ManagedAgent.nameOf Role.Advisor
+                  BindDelegation = Surface.bindDelegation }
 
-            let! answered = AdvisorSeat.consult deps sessionId intentText callerContextToml
+            let! answered = AdvisorSeat.consult deps sessionId intentText
 
             match answered with
             | Ok advice ->
@@ -699,14 +686,7 @@ module ToolRegistry =
                             let askDevops (payload: obj) (gitCommonDir: string) : Task<obj> =
                                 task {
                                     let intentText = devopsIntentText payload
-                                    match! captureContextBlocks runtime.Snapshot (SessionId.create ctx.SessionId) with
-                                    | Error reason -> return refusalWithReason "context-unavailable" (sprintf "devops context unavailable: %s" reason)
-                                    | Ok contextBlocks ->
-
-                                    let intent =
-                                        LlmFacing.instruction intentText
-                                        |> LlmFacing.withData contextBlocks
-                                        |> LlmFacing.render
+                                    let intent = LlmFacing.instruction intentText |> LlmFacing.render
 
                                     let delegateTo = devopsDelegateOf syncDelegateRuntime ctx
 
@@ -1284,8 +1264,15 @@ module ToolRegistry =
                 | _ -> return false
             }
 
+        let negotiateSpec: ToolSpec =
+            { Name = "negotiate"
+              Description = "Ask your delegator clarifying questions. The first call is required before resetScope initialization; later calls are optional and can happen at any time. Pass all questions together in questions (plural). The call immediately acknowledges sending and does not wait for an answer. The answer later arrives as a user steer and does not block ongoing work."
+              Arguments = [ "questions", ToolHostCodec.stringSchemaDescribed "Ask all clarifying questions in this single argument, verbosely enough to avoid ambiguity. Several related questions are welcome." factory ]
+              Execute = fun args ctx -> Task.FromResult(runtime.Negotiate(ctx.SessionId, args.Text "questions")) }
+
         let baseSpecs =
-            [ yield JoinTool.spec runtime
+            [ yield negotiateSpec
+              yield JoinTool.spec runtime
 
               let horizonContext: HorizonTool.HorizonRuntimeContext =
                   { RuntimeFor = runtime.RuntimeFor

@@ -18,6 +18,7 @@
     "todowrite-for-bookkeeper": "knowledge-reuse",
     "todowrite-for-plan": "work",
     "deliver": "work",
-    "resetScope": "context-compression"
+    "resetScope": "context-compression",
+    "negotiate": "context-compression"
   }
 }

@@ -12,7 +12,6 @@ open Wanxiangshu.Host.Ports
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Foundation.HostSession
-open Wanxiangshu.Context.Scope
 
 /// OpenCode adapter for the fork / resume / commission commands: builds one
 /// `DelegationEnvironment` per OpenCode tool call and registers the
@@ -25,13 +24,6 @@ module ForkTool =
             member _.OptionalText name = args.OptionalText name
             member _.Texts name = args.Texts name
             member _.OptionalCount name = args.OptionalNonNegativeInteger name }
-
-    let private captureContextMessages (snapshotOpt: ISessionSnapshotPort option) (sessionId: SessionId) : Task<Result<obj array, string>> =
-        taskResult {
-            let! port = snapshotOpt |> Result.requireSome "Snapshot port is unavailable: cannot capture context messages"
-            let! messages = port.GetMessages sessionId |> TaskResult.mapError (sprintf "Snapshot read failed: %s")
-            return Wanxiangshu.Context.Scope.SnapshotScope.filterSnapshot messages
-        }
 
     let private environment (scope: ToolRuntimeScope) (context: HostToolContext) : DelegationEnvironment =
         { Caller =
@@ -55,8 +47,6 @@ module ForkTool =
           EnsureWorkDevOpsBound = scope.EnsureWorkDevOpsBound
 
           WorkspaceDirectory = scope.WorkspaceDirectory |> Option.map (fun path -> WorkspacePath path)
-
-          ViewForSession = Some(fun sessionId -> scope.ViewForSession(SessionId.value sessionId))
 
           ManagerCapabilityFactsFor = Some(fun sessionId -> scope.ManagerCapabilityFactsFor(SessionId.value sessionId))
 
@@ -94,7 +84,7 @@ module ForkTool =
 
                     return Result.mapError (fun reason -> HostError.Refused reason) result
                 })
-          ContextMessagesFor = captureContextMessages scope.Snapshot }
+        }
 
     let private schema factory (argument: CommandArgument) =
         let describe =

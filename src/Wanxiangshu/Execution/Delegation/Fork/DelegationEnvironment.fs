@@ -43,9 +43,6 @@ type DelegationEnvironment =
         /// The working directory the caller's own session runs in, when known.
         WorkspaceDirectory: WorkspacePath option
 
-        /// The rendered view of a session, used as an attachment.
-        ViewForSession: (SessionId -> Task<string option>) option
-
         /// The manager capabilities of a session, as the product sees them.
         ManagerCapabilityFactsFor: (SessionId -> Task<ManagerCapabilityFacts>) option
 
@@ -62,6 +59,4 @@ type DelegationEnvironment =
         ContinueManagerJob:
             ((ManagerJobId * string * ProviderRunIdentity * ToolCallId * int option) -> HostResult<string>) option
 
-        /// Full post-scope LLM-facing messages for a session, captured from the snapshot.
-        ContextMessagesFor: SessionId -> Task<Result<obj array, string>>
     }

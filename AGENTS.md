@@ -563,6 +563,15 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **绿灯必须注明层级。** 库内单测、`node scripts/build.mjs` 的 Fable 编译、相关 WHAT、前缀重放、语言校验和 `node scripts/check.mjs` 分别验证不同事情；长命令 park/yield 不代表退出成功，需追踪真实进程及最终构建状态。TODO/GAP 不能记作通过。本包当时离线测试通过，却未用真实模型 canary 证实并发执行 barrier；静态检查还留有与本包无关的 `Host/FissionPort.fs` namespace-tier 问题。这些边界只能如实记账，不能说成全绿，更不能顺手改掉别人的 P-17 来掩盖。
 - **两仓交付按职责精确暂存。** 修改前检查两棵工作树、未提交 diff、子模块指针和正在运行的构建。混有 Advisor/Delegation 等其他人的改动时只暂存属于本包的文件或 hunk，不使用一把 `git add -A`；先确认 `git diff --cached --check` 和暂存清单，再提交库、推送库、提交主仓精确 gitlink，均不强推。此次迁移凭证为 wanxiangli `e48678d`、wanxiangshu `89bc2739b`，只说明 2026-10-24 的已提交状态，未来使用时仍要重新验收。
 
+
+### 6.7 跨参与者只传当前指令：借问句复用父 prefix（2026-10-24）
+
+- **上下文不是移交物，而是协商来源。** 父→子、SyncDelegate、DevOps、Advisor 只给当前 charge/intent，不交 post-scope 历史、TOML `[[context]]`、`attached_view` 或过滤后的背景副本。Fork 的 typed `ForkChildPayload` 和 HNI `DelegationEnvironment` 不能再保留可读取这类背景的参数或能力；`LlmFacing.instructionsOnly` 是最后一道纯语义净化门。子代理确有歧义，使用 `negotiate(questions: string)` 集中提出多个问题，不靠吞下整段历史猜测。
+- **第一次必须问，后续随时可问。** 受委托方的首次 `negotiate` 是强制步骤，发问即得到投递受理回执，不同步等待。只有带精确回执、代际、接收方身份的真实回答 steer 进入接收方请求，才解除首轮 `resetScope` 抑制；以后 `negotiate` 可选且绝不暂停正常 `resetScope`。同一对委托／受委托会话复用不重置首轮协商，换委托者或删除会话必须废弃旧回执。
+- **缓存前缀复用应发生在 provider 物理边界。** 从委托者最后一次实际出站请求扣留 system、messages、model（包括已观察的 variant）**只读副本**；临时孙会话在 OpenCode 层只存一个协商问题，发 LLM 前在两种 transform 中把父 system、messages 原位热替换，并把唯一问题追加在末尾。保持原数组身份、既有字节和父会话历史不变；任一快照缺失必须拒绝复用，不能临时猜另一模型或重新渲染旧材料。父子层级本身不等于 provider cache 命中，最终命中仍要读真实 provider 数据。
+- **工具定义不为临时 BTW 改动，执行绝不越界。** 临时会话使用父方实际模型/agent 配置，不通过 `tools: {}` 破坏前缀；但 `tool.execute.before` 对该会话任意工具调用必定在副作用前拒绝。记录拒绝事实，再用提示让临时回合重新尝试文本回答；任何原始工具体都不得跑。SDK 报错、无答案、迟到问答与用户消息落地必须分别验收；不能以发问受理回执冒充 answer steer。
+- **测实际连接而不只测 helper。** 库内 `src/pair-hint/tests/008.test.mjs` 验证协商代际和首次/后续状态；主仓 `requirements/host-boundary/tests/scope-hni-physical.test.mjs` 应经实际注册的 OpenCode hooks 检查父前缀热替换、工具前置拒绝、重试、物理 steer 和首轮 reset 激活；Fork/Advisor 的真实物理 prompt 还须断言不携带父历史。离线字节相等不自动证明提供商真实缓存率，临时会话是否 UI 不可见也不能仅凭 parentID 推断。
+
 ---
 
 ## 7. 迁移来源文件全量清单与保留/删除边界

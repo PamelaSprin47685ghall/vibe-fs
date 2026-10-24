@@ -62,6 +62,8 @@ type ToolRuntimeScope =
     member EventPort: IEventObservationPort option
     member WorkspaceDirectory: string option
     member ActiveProfileFor: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
+    member AttachNegotiationTransport: ask: (string -> string -> string -> Task<Result<string,string>>) * steer: (string -> string -> string -> Task<Result<unit,string>>) -> unit
+    member Negotiate: recipient: string * questions: string -> string
     member AttachQuestionNotifier: notify: (string -> Task<Result<unit, string>>) -> unit
     member IsWaitingForUser: sessionId: string -> bool
     /// LC-017: the pending question's exact fence for a waiting session.

@@ -29,6 +29,13 @@ module Surface =
     let resetScopeState (sessionId: string) (budget: int) : unit = owner?resetSession(sessionId, budget)
     let clearSessionState (sessionId: string) : unit = owner?clearSession(sessionId)
     let planRequest (sessionId: string) (messages: obj) : obj = owner?planRequest(sessionId, messages)
+    let bindDelegation (recipient: string) (delegator: string) : unit = owner?bindDelegation(recipient, delegator)
+    let askNegotiation (recipient: string) (questions: string) : obj = owner?askNegotiation(recipient, questions)
+    let prepareNegotiationReply (receipt: string) (answer: string) : obj = owner?prepareNegotiationReply(receipt, answer)
+    let completeNegotiationReply (receipt: string) : bool = owner?completeNegotiationReply(receipt)
+    let confirmNegotiationSteer (receipt: string) (recipient: string) : bool =
+        owner?confirmNegotiationSteer(receipt, recipient)
+    let negotiationRequired (recipient: string) : bool = owner?negotiationRequired(recipient)
     let planFilter (messages: obj) : obj array = owner?planFilter(messages)
     let appendTailOnce (content: obj) (suffix: string) : obj = owner?appendTailOnce(content, suffix)
     let writeUserHint (message: obj) (texts: string array) : obj = owner?writeUserHint(message, texts)

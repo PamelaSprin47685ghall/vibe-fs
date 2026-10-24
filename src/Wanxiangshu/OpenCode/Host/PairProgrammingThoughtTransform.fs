@@ -1066,7 +1066,13 @@ module PairProgrammingThoughtTransform =
 
             let messages, anchorBlock = messages, None
 
-            let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
+            let initial = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
+            let guideline =
+                if projectionSessionIdOpt |> Option.exists Wanxiangshu.Context.Scope.Surface.negotiationRequired then
+                    initial.Split('\n')
+                    |> Array.filter (fun line -> not (line.Contains("Then call resetScope immediately")))
+                    |> String.concat "\n"
+                else initial
 
             let elapsedMilliseconds =
                 sessionStartedAt

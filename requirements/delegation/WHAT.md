@@ -72,17 +72,15 @@ Join 只在新输入已由 Host 保存、且属于该 owner 的已接纳物理�
 
 ## [019] Typed 首提示词
 
-fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与只读背景。父到子背景由调用方当前的完整 post-scope LLM 可见视图承载，保持结构化条目直到 pretty print 成 TOML 的 `[[context]]` 表；不得把拼好的 TOML 再包进字符串字段，亦不得接受局部材料过滤数组。子到父完成项则是子代理末轮的 assistant 散文（渲染为 `# ...` 注释），不返回子方的完整 post-scope 消息视图，不得混淆方向。
+fork 首 prompt typed 渲染的正文**只有本次 Assignment 指令**，不再携带调用方的完整 post-scope LLM 可见视图、`[[context]]`、attachment view 或其他历史摘要；`resume`、commission、同步委托、dag 与忙碌追加指导同样只交本次指令。需要消歧义时，被委托方必须先通过 `negotiate(questions: string)` 真正向委托者提问，而不是预先复制历史。子到父完成项仍是子代理末轮 assistant 散文（渲染为 `# ...` 注释），不返回子方完整 post-scope 视图。
 
 ## [020] 语义不依赖物理工具名
 
 工具改名或替换不改变委托的权能、所有权与生命周期合同。委派成员一律走编程面（`this.fork`/`this.resume`/`this.commission`/`this.devops`/`this.dag`），不再有独立的 Host 工具注册；工具名不变，但调用面、物理注册与工具名都不改变委托语义。
 
-## [021] 只读背景由完整 post-scope 视图承载
+## [021] 父到子只传当前指令、历史依靠主动协商
 
-父 → 子上下文（包括父已从同伴交回的材料）由父方当前的完整 post-scope LLM 可见视图单独承载。宿主保留结构化背景，在子方载荷的最终边界统一 pretty print 为 TOML（如 `[[context]]` 表）；不得进行局部材料过滤，亦不得附加父方当前未完成的活跃回合。
-
-charge 只承载任务本身（以 `# ...` 注释头呈现）。背景只作背景：不把其中未竟工作转成新任务义务，不克隆 authority。
+父到子、同步委托、dag、DevOps 与 Advisor 请求只发送本次 charge / intent，**不传任何调用方历史、完整 post-scope 视图、`[[context]]`、筛选数组或附件 view**，也不附加父方未完成的活跃回合。子方只能从收到的当前指令开始，缺少必要事实时用 `negotiate(questions: string)` 向委托者提问；不得擅自推定未提供的上下文。charge 是任务本身（以 `# ...` 注释头呈现），协商返回的事实只是新的 steer，并不克隆 authority。
 
 ## [022] 建议性工具次数
 
@@ -96,7 +94,7 @@ charge 只承载任务本身（以 `# ...` 注释头呈现）。背景只作背�
 
 复用 participant 的每个新工作是独立 direct-CE invocation，不建立 durable Stage/Phase/ActiveWorkUnit 或第二状态机。resume route 由 Byname 标识，SyncDelegate route 由 caller scope + dedicated role 标识；物理 SessionId 不拥有 handoff 连续性。
 
-输入为新 charge 与任务选项。charge 承载任务本身（以 `# ...` 注释头呈现）；父 → 子背景按 [021] 由父方完整 post-scope 视图单独传递。SyncDelegate 与 dag 使用同一规则，dag 的全部节点收到同一份背景。
+输入为新 charge 与任务选项。charge 承载任务本身（以 `# ...` 注释头呈现）；父 → 子不再转发任何历史背景，SyncDelegate 与 dag 使用同一规则，每个节点仅收到自己的当前指令，后续通过 `negotiate` 消歧义。
 
 委派成员全部走编程面：`this.fork(payload)`、`this.resume(payload)`、`this.commission(payload)`、`this.devops(intent)`；不再有独立的 Host 工具注册，语义不因工具名变化而改变（[020]）。委派调用不得包含局部背景数组参数。
 
@@ -128,7 +126,7 @@ Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真
 
 同一 logical route 同时至多一个 active work unit。对忙碌 participant 调用 `resume` 时，charge 作为 `BusyAgentNudge` 追加到既有 LogicalRun，在 Host 保存后进入下一次尚未开始准备的 LLM 请求，不中断当前输出或工具。Engineer 与固定 DevOps 均允许此行为；保留原 work 的 Root、身份与完成订阅，不创建新 assignment，不因提示文本与旧 charge 相同而假装发送成功。
 
-忙碌提示随调用带上调用方当前的完整 post-scope 视图作为背景。它不改写既有 work 的背景，也不新建 assignment。
+忙碌提示只包含本次追加指令，不再夹带调用方任何 post-scope 历史；它不改写既有 work，也不新建 assignment。已有真实回复后的可选 `negotiate` 不抑制正常 `resetScope`。
 
 前一 work unit 完成后，`resume` 才承接下一项，不依赖 join 消费或重建 participant。忙碌提示的发送路径不得因异步准备期间任务结束而自动改走新 assignment。
 
@@ -164,3 +162,11 @@ Engineer 完成工作或到达需 Manager 决定的边界即返回，不自行�
 - 禁止后果：严禁要求子代理调用交付工具；不得向已停止输出的子代理发送完成催促（nudge）；不得因子代理没有特定的交付调用而扣留完成或报告未完成；
 - 边界：Manager / Plan 的生命周期 deliver（见 work [025]–[026]）没有父 join，本条只约束有 handle 链接的子会话。
 
+
+## [034] 首轮协商代替全文上下文传输
+
+父→子首 prompt 的当前任务与当前 RootRequirements 以顶层 `# ...` 指令行渲染，任务正文恰好呈现一次，**不再生成任何 `content`、`context` 或 `attached_view` 数据字段**；子→父自然停机报告仍由 assistant 散文与允许的返回 carry 独立呈现，两方向不得混淆。
+
+受委托的新工作先接收**当前指令**，接收方必须首次调用单参数 `negotiate(questions: string)`，鼓励把相关的多个问题集中问出；工具调用立刻返回「已接受发送」的回执，不等待委托者回答。问题在委托者上下文上的临时、不开副作用的模型回合里解答，答复可能迟到数轮；只有作为真实 user steer 被接收方会话接受后，才开始要求尽快调用 `resetScope`。在此之前，`resetScope` 初始化提示暂不激活，也不得提交 `ScopeReanchored`。首轮真实答复之后可随时再次 `negotiate`，但不会抑制或重启已激活的 `resetScope`。
+
+OpenCode 暂时建立一个作为接收方子会话的临时孙会话，Host 中仅有本次协商问题；在发往 LLM 的 provider transform 把这条消息扩展为委托者最后一次出站请求的只读 system、messages 与已观察的模型身份，工具定义不因临时任务而改写。临时会话任何工具调用都必须在 `tool.execute.before` 阶段无条件拒绝；一旦确实尝试工具或没有普通文本回复，应在临时回合重新提示、直到正常文本回答，而不能执行工具或伪造答复。实际回答由 SDK 作为带不可见协商回执身份的 user steer 发送给接收方；只有在物理消息证实并且协商代际身份匹配后才能解锁首轮 scope。该机制是对历史传输的 clean-break，不得把「工具已发送」或临时会话已创建等同于答复已送达。

@@ -63,6 +63,7 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
+open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 open Wanxiangshu.OpenCode.Host
@@ -94,6 +95,253 @@ module PluginHooks =
         match ctx.ProviderRunId, ctx.ToolCallId with
         | Some run, Some call -> Some(run, call)
         | _ -> None
+
+
+    let private negotiationSdk (session: obj) (methodName: string) (payload: obj) : Task<obj> =
+        let action = emitJsExpr (session, methodName) "$0[$1]"
+        if isNull action then failwith ("session." + methodName + " unavailable")
+        else emitJsExpr (session, action, payload) "$1.call($0, $2)" |> unbox<Task<obj>>
+
+    let private negotiationResponse (reply: obj) =
+        if isNull reply then null elif isNull reply?data then reply else reply?data
+
+    let private negotiationSessionPayload (sessionId: string) (body: (string * obj) list) =
+        let fields = [ "sessionID", box sessionId; "path", box (createObj [ "id", box sessionId ]) ]
+        createObj (fields @ [ "body", box (createObj body) ] @ body)
+
+    let private negotiationResultText (response: obj) =
+        let body = negotiationResponse response
+        let parts = if isNull body || isNull body?parts then [||] else unbox<obj array> body?parts
+        parts
+        |> Array.filter (fun p -> not (isNull p) && emitJsExpr p "$0?.type === 'text'")
+        |> Array.map (fun part -> if isNull part?text then "" else string part?text)
+        |> String.concat "\n"
+
+    let private negotiationPromptText (questions: string) =
+        "<btw>Ephemeral clarification on a delegate's current assignment. Answer the questions from this conversation context. Do not call ANY tools. Do not ask follow-up questions. Reply in plain text immediately.\nQuestions:\n"
+        + questions + "\n</btw>"
+
+    [<RequireQualifiedAccess>]
+    type private TemporaryAnswer =
+        | Replied of string
+        | Retry
+        | Failed of string
+
+    let private classifyTemporaryAnswer (text: string) (blocked: bool) =
+        if blocked || String.IsNullOrWhiteSpace text then TemporaryAnswer.Retry
+        else TemporaryAnswer.Replied text
+
+    let private classifyTemporaryFailure (ex: exn) (blocked: bool) =
+        if blocked then TemporaryAnswer.Retry
+        else TemporaryAnswer.Failed ex.Message
+
+    let private temporaryPromptPayload (tempId: string) (agentName: string) (model: obj) (prose: string) =
+        let parts = box [| createObj [ "type", box "text"; "text", box prose ] |]
+        let body = [ "agent", box agentName; "parts", parts ]
+        let physicalModel =
+            if isNull model then null
+            else createObj [ "providerID", model?providerID; "modelID", model?modelID ]
+        let request =
+            if isNull model then body
+            elif isNull model?variant then body @ [ "model", physicalModel ]
+            else body @ [ "model", physicalModel; "variant", model?variant ]
+        negotiationSessionPayload tempId request
+
+    let private tryTemporaryAnswer (session: obj) (tempId: string) (payload: obj) : Task<TemporaryAnswer> =
+        task {
+            let before = PluginTransforms.negotiationToolViolationCount tempId
+            try
+                let! result = negotiationSdk session "prompt" payload
+                let text = negotiationResultText result
+                let blocked = PluginTransforms.negotiationToolViolationCount tempId > before
+                return classifyTemporaryAnswer text blocked
+            with ex ->
+                let blocked = PluginTransforms.negotiationToolViolationCount tempId > before
+                return classifyTemporaryFailure ex blocked
+        }
+
+    let private runTemporaryQuestion
+        (session: obj)
+        (tempId: string)
+        (agentName: string)
+        (model: obj)
+        (questions: string)
+        : Task<Result<string, string>> =
+        let retryText =
+            "The preceding ephemeral response attempted a forbidden tool or lacked a plain-text answer. Do NOT use any tools; answer the delegated questions from your existing context immediately."
+        let rec run prose =
+            if not (PluginTransforms.negotiationIsTemporary tempId) then
+                Task.FromResult(Error "temporary negotiation was cancelled")
+            else runCandidate prose
+        and runCandidate prose =
+            task {
+                let payload = temporaryPromptPayload tempId agentName model prose
+                let! result = tryTemporaryAnswer session tempId payload
+                match result with
+                | TemporaryAnswer.Replied text -> return Ok text
+                | TemporaryAnswer.Retry -> return! run retryText
+                | TemporaryAnswer.Failed error -> return Error error
+            }
+        run (negotiationPromptText questions)
+
+    let private temporarySessionId (created: obj) : Result<string, string> =
+        let data = negotiationResponse created
+        let value = if isNull data || isNull data?id then "" else string data?id
+        if String.IsNullOrWhiteSpace value then Error "temporary session create yielded no identity"
+        else Ok value
+
+    let private createTemporarySession (session: obj) (recipient: string) : Task<Result<string, string>> =
+        task {
+            let options = createObj [ "parentID", box recipient; "title", box "negotiation" ]
+            try
+                let! created = negotiationSdk session "create" (createObj [ "body", options; "parentID", box recipient ])
+                return temporarySessionId created
+            with ex -> return Error ex.Message
+        }
+
+    let private deleteTemporarySession (session: obj) (tempId: string) : Task<unit> =
+        task {
+            try
+                let! _ = negotiationSdk session "delete" (negotiationSessionPayload tempId [])
+                return ()
+            with _ -> return ()
+        }
+
+    let private runLinkedTemporary
+        (session: obj) (delegator: string) (tempId: string) (agentName: string) (questions: string)
+        : Task<Result<string, string>> =
+        task {
+            let linked = PluginTransforms.negotiationStartTemporary tempId delegator
+            let! answer =
+                match linked with
+                | Error reason -> Task.FromResult(Error reason)
+                | Ok() ->
+                    let model = PluginTransforms.negotiationModelFor delegator
+                    runTemporaryQuestion session tempId agentName model questions
+            PluginTransforms.negotiationFinishTemporary tempId
+            do! deleteTemporarySession session tempId
+            return answer
+        }
+
+    let private createAndRunTemporary
+        (session: obj) (delegator: string) (recipient: string) (agentName: string) (questions: string)
+        : Task<Result<string, string>> =
+        task {
+            let! created = createTemporarySession session recipient
+            match created with
+            | Error reason -> return Error reason
+            | Ok tempId -> return! runLinkedTemporary session delegator tempId agentName questions
+        }
+
+    /// The Host temp session contains only the question. Provider transform
+    /// inserts the immutable delegator wire before the LLM request.
+    let private negotiateBtw
+        (client: obj)
+        (roleFor: SessionId -> Role option)
+        (delegator: string)
+        (recipient: string)
+        (questions: string)
+        : Task<Result<string, string>> =
+        let session = if isNull client then null else client?session
+        match roleFor (SessionId.create delegator) with
+        | None -> Task.FromResult(Error "delegator has no verified model agent identity")
+        | Some _ when isNull session -> Task.FromResult(Error "OpenCode SDK session transport unavailable")
+        | Some role ->
+            createAndRunTemporary session delegator recipient (ManagedAgent.nameOf role) questions
+
+    /// Deliver the answer as a real Host user steer to the recipient session.
+    /// A busy child receives a noReply user message without interrupting tools.
+
+    [<Emit("new Promise(resolve => setTimeout(resolve, $0))")>]
+    let private waitNegotiationReceipt (_milliseconds: int) : Task<unit> = jsNative
+
+    let private negotiationReplyIsLanded (session: obj) (recipient: string) (receipt: string) : Task<bool> =
+        let rec check attempts =
+            task {
+                if attempts <= 0 then return false
+                else
+                    let payload =
+                        createObj
+                            [ "sessionID", box recipient
+                              "path", box (createObj [ "id", box recipient ])
+                              "limit", box 50
+                              "query", box (createObj [ "limit", box 50 ]) ]
+                    let! result = negotiationSdk session "messages" payload
+                    let raw = negotiationResponse result
+                    let entries =
+                        if not (isNull raw) && emitJsExpr raw "Array.isArray($0)" then
+                            unbox<obj array> raw
+                        else [||]
+                    let found =
+                        entries
+                        |> Array.exists (fun entry ->
+                            let info = if isNull entry then null else entry?info
+                            let role =
+                                if not (isNull info) && not (isNull info?role) then string info?role
+                                elif not (isNull entry) && not (isNull entry?role) then string entry?role
+                                else ""
+                            let parts =
+                                if isNull entry || isNull entry?parts then [||]
+                                else unbox<obj array> entry?parts
+                            role = "user"
+                            && (parts |> Array.exists (fun part ->
+                                not (isNull part)
+                                && not (isNull part?metadata)
+                                && not (isNull part?metadata?wanxiangshu_negotiation_receipt)
+                                && string part?metadata?wanxiangshu_negotiation_receipt = receipt)))
+                    if found then return true
+                    else
+                        do! waitNegotiationReceipt 250
+                        return! check (attempts - 1)
+            }
+        check 40
+
+    let private acceptedNegotiationSteer (response: obj) : Result<unit, string> =
+        if isNull response || isNull response?error then Ok()
+        else Error(string response?error)
+
+    let private provenNegotiationSteer (landed: bool) : Result<unit, string> =
+        if landed then Ok()
+        else Error "negotiation reply has no proven physical Host user message; resetScope remains suppressed"
+
+    let private busyNegotiationRecipient (statuses: obj) (recipient: string) : bool =
+        let status = negotiationResponse statuses
+        let active = if isNull status then null else emitJsExpr (status, recipient) "$0[$1]"
+        not (isNull active) && emitJsExpr active "$0?.type === 'busy'"
+
+    let private negotiationSteerPayload (recipient: string) (text: string) (receiptId: string) (busy: bool) =
+        let stamp = createObj [ "wanxiangshu_negotiation_receipt", box receiptId ]
+        let parts = box [| createObj [ "type", box "text"; "text", box text; "metadata", stamp ] |]
+        negotiationSessionPayload recipient [ "parts", parts; "noReply", box busy ]
+
+    let private sendAndVerifyNegotiationSteer
+        (session: obj) (recipient: string) (text: string) (receiptId: string)
+        : Task<Result<unit, string>> =
+        task {
+            let! statuses = negotiationSdk session "status" (createObj [])
+            let busy = busyNegotiationRecipient statuses recipient
+            let payload = negotiationSteerPayload recipient text receiptId busy
+            let! sent = negotiationSdk session "promptAsync" payload
+            if Result.isError (acceptedNegotiationSteer sent) then
+                return acceptedNegotiationSteer sent
+            else
+                let! landed = negotiationReplyIsLanded session recipient receiptId
+                return provenNegotiationSteer landed
+        }
+
+    let private negotiateSteer
+        (client: obj)
+        (recipient: string)
+        (text: string)
+        (receiptId: string)
+        : Task<Result<unit, string>> =
+        let session = if isNull client then null else client?session
+        if isNull session then Task.FromResult(Error "OpenCode SDK session transport unavailable")
+        else
+            task {
+                try return! sendAndVerifyNegotiationSteer session recipient text receiptId
+                with ex -> return Error ex.Message
+            }
 
     let create
         (boot: PluginBoot.Boot)
@@ -161,7 +409,15 @@ module PluginHooks =
                     | _ -> return None
                 }
 
-            let systemTransform = ProviderSystemTransform.createWith roleFor planStageFor
+            let transformOrdinarySystem = ProviderSystemTransform.createWith roleFor planStageFor
+            let systemTransform (input: obj) (output: obj) : Task<unit> =
+                task {
+                    if PluginTransforms.negotiationProjectSystem input output then
+                        ()
+                    else
+                        do! transformOrdinarySystem input output
+                        PluginTransforms.negotiationRememberSystem input output
+                }
 
 
             // CASE-003: typed capture at the tool boundary — shared
@@ -304,6 +560,10 @@ module PluginHooks =
                             userNotify
 
                     toolRegistration.Runtime.AttachQuestionNotifier(fun question -> showQuestionToast question)
+                    toolRegistration.Runtime.AttachNegotiationTransport(
+                        negotiateBtw client roleFor,
+                        negotiateSteer client
+                    )
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
 
@@ -541,6 +801,9 @@ module PluginHooks =
                 task {
                     let sessionId = toolField toolInput "sessionID"
                     let toolName = toolField toolInput "tool"
+                    if PluginTransforms.negotiationIsTemporary sessionId then
+                        PluginTransforms.negotiationRecordToolViolation sessionId
+                        invalidOp "Ephemeral negotiation is read-only: do not use tools. Reply in plain text to the delegation questions immediately."
 
                     // capability-enforcement-002/007: a Host-declared external
                     // (MCP) tool holds no office capability, so it is advertised
@@ -607,8 +870,12 @@ module PluginHooks =
             let chatMessage =
                 registeredHook HookKey.ChatMessage (curriedHook wired.ChatMessageHook)
 
+            let rememberModelParams (input: obj) (output: obj) =
+                emitJsExpr (chatParams, input, output) "$0($1, $2)" |> ignore
+                PluginTransforms.negotiationRememberModel input
+
             let chatParamsRegistration =
-                registeredHook HookKey.ChatParams (curriedHook chatParams)
+                registeredHook HookKey.ChatParams (curriedHook (box rememberModelParams))
 
             let messagesTransform =
                 registeredHook HookKey.MessagesTransform (curriedHook (box ownedTransform))
@@ -756,7 +1023,9 @@ module PluginHooks =
                 let raw = HostEventEnvelope.unwrap rawInput
                 if HostEventEnvelope.eventTypeOf raw = "session.deleted" then
                     HostEventEnvelope.trySessionId raw
-                    |> Option.iter (fun sessionId -> Surface.clearSessionState (SessionId.value sessionId))
+                    |> Option.iter (fun sessionId ->
+                        Surface.clearSessionState (SessionId.value sessionId)
+                        PluginTransforms.negotiationForgetSession (SessionId.value sessionId))
 
             let observeEvent raw =
                 task {

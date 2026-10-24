@@ -14,6 +14,7 @@ module LlmFacing =
     val empty: Document
     val instructions: texts: string list -> Document
     val instruction: text: string -> Document
+    val instructionsOnly: document: Document -> Document
     val withInstructions: texts: string list -> document: Document -> Document
     val withInstruction: text: string -> document: Document -> Document
     val withData: blocks: DataBlock list -> document: Document -> Document

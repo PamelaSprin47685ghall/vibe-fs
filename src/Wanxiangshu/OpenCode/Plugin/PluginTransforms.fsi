@@ -9,6 +9,20 @@ open Wanxiangshu.Mission.Work
 
 module PluginTransforms =
 
+    /// The outgoing parent provider-wire prefix; temp sessions only append an ephemeral question.
+    val negotiationIsTemporary: sessionId: string -> bool
+    val negotiationToolViolationCount: sessionId: string -> int
+    val negotiationRecordToolViolation: sessionId: string -> unit
+    val negotiationRememberSystem: input: obj -> output: obj -> unit
+    val negotiationRememberModel: input: obj -> unit
+    val negotiationModelFor: sessionId: string -> obj
+    val negotiationStartTemporary: tempId: string -> delegatorId: string -> Result<unit, string>
+    val negotiationFinishTemporary: tempId: string -> unit
+    val negotiationForgetSession: sessionId: string -> unit
+    val negotiationProjectSystem: input: obj -> output: obj -> bool
+    val negotiationRememberMessages: sessionId: string -> outObj: obj -> unit
+    val negotiationProjectMessages: sessionId: string -> outObj: obj -> bool
+
     type TraceTransformCapture =
         { RawMessages: obj list
           Current: XTraceProjectionState option

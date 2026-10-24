@@ -137,6 +137,10 @@ type ToolRuntimeScope
     // composition root supplies the real workflow. A missing capability
     // fails closed: a silent no-op success would advance the loop without
     // authority.
+    // Host-only BTW transport. The scope/negotiation actor retains all protocol state.
+    let mutable askDelegator: (string -> string -> string -> Task<Result<string, string>>) option = None
+    let mutable steerRecipient: (string -> string -> string -> Task<Result<unit, string>>) option = None
+
     let continueManagerLoop =
         defaultArg continueManagerLoop (fun _ _ ->
             Task.FromResult(Error "continue manager loop unavailable") :> Task<Result<unit, string>>)
@@ -888,6 +892,50 @@ type ToolRuntimeScope
             let key = SessionId.value parentSessionId
             obtainWorkDevOpsTask parentSessionId key
 
+    let settleNegotiationReceipt (receipt: string) (result: Result<unit, string>) : unit =
+        match result with
+        | Ok() -> Wanxiangshu.Context.Scope.Surface.completeNegotiationReply receipt |> ignore
+        | Error _ -> ()
+
+    let deliverNegotiationReply
+        (receipt: string)
+        (answer: string)
+        (steer: string -> string -> string -> Task<Result<unit, string>>)
+        : Task<unit> =
+        task {
+            let prepared = Wanxiangshu.Context.Scope.Surface.prepareNegotiationReply receipt answer
+            let admitted = not (isNull prepared?ok) && unbox<bool> prepared?ok
+            if admitted then
+                let! result = steer (string prepared?recipient) (string prepared?steer) receipt
+                settleNegotiationReceipt receipt result
+        }
+
+    let settleNegotiationAnswer
+        (receipt: string)
+        (steer: string -> string -> string -> Task<Result<unit, string>>)
+        (result: Result<string, string>) : Task<unit> =
+        match result with
+        | Ok answer -> deliverNegotiationReply receipt answer steer
+        | Error _ -> Task.FromResult()
+
+    let dispatchNegotiation
+        (delegator: string) (recipient: string) (questions: string) (receipt: string)
+        (ask: string -> string -> string -> Task<Result<string, string>>)
+        (steer: string -> string -> string -> Task<Result<unit, string>>) : Task<unit> =
+        task {
+            try
+                let! result = ask delegator recipient questions
+                do! settleNegotiationAnswer receipt steer result
+            with _ -> ()
+        }
+
+    let tryDispatchNegotiation (delegator: string) (recipient: string) (questions: string) (receipt: string) =
+        match askDelegator, steerRecipient with
+        | Some ask, Some steer ->
+            dispatchNegotiation delegator recipient questions receipt ask steer |> ignore
+            true
+        | _ -> false
+
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
     member _.RootWorkspace = rootWorkspace
@@ -896,6 +944,20 @@ type ToolRuntimeScope
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
     member _.ActiveProfileFor(sessionId: SessionId) = activeProfileFor sessionId
+
+    member _.AttachNegotiationTransport
+        (ask: string -> string -> string -> Task<Result<string, string>>, steer: string -> string -> string -> Task<Result<unit, string>>) =
+        askDelegator <- Some ask
+        steerRecipient <- Some steer
+
+    member _.Negotiate(recipient: string, questions: string) : string =
+        let admitted = Wanxiangshu.Context.Scope.Surface.askNegotiation recipient questions
+        let accepted = not (isNull admitted?ok) && unbox<bool> admitted?ok
+        if not accepted then
+            if isNull admitted?reason then "negotiate refused" else "negotiate refused: " + string admitted?reason
+        elif tryDispatchNegotiation (string admitted?delegator) recipient questions (string admitted?receipt) then
+            "Questions accepted for delivery to delegator. Continue working; their answer will arrive as a steer."
+        else "negotiate transport unavailable; question has not been sent"
 
     member _.AttachQuestionNotifier(notify: string -> Task<Result<unit, string>>) = questionNotifier <- Some notify
 

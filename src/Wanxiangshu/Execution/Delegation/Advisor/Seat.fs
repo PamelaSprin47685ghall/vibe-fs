@@ -8,7 +8,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
-open Wanxiangshu.Context.Scope
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
@@ -27,7 +26,8 @@ type AdvisorSeatDeps =
       Snapshot: ISessionSnapshotPort option
       Journal: AgentJournal option
       Directory: string option
-      Participant: string }
+      Participant: string
+      BindDelegation: string -> string -> unit }
 
 /// advisor-[001]: one caller session's dedicated advisor seat.
 ///
@@ -60,13 +60,6 @@ module AdvisorSeat =
     [<Literal>]
     let private ConsultTimeoutMs = 120_000
 
-
-    /// DSL-MUTABLE: resource — which prompt of the consult is in flight. The view prompt
-    /// runs first and the intent prompt only after the view's own terminal closed its run.
-    [<RequireQualifiedAccess>]
-    type private ConsultPhase =
-        | View
-        | Intent
 
     /// AGENT-001: the managed agent this seat's child runs as.
     let private advisorAgent = ManagedAgent.nameOf Role.Advisor
@@ -272,13 +265,6 @@ module AdvisorSeat =
                     |> Result.mapError (fun failure -> sprintf "advisor consult could not close its run: %A" failure)
         }
 
-    let private buildConsultPrompt (intent: string) (viewPrompt: string) : string =
-        let header = LlmFacing.instruction intent |> LlmFacing.render
-        if String.IsNullOrWhiteSpace viewPrompt then
-            header
-        else
-            header + "\n\n" + viewPrompt
-
     let private executeConsult
         (sendPrompt: string -> Task<Result<PromptKey, string>>)
         (acceptIntent: PromptKey -> unit)
@@ -303,7 +289,6 @@ module AdvisorSeat =
         (callerSessionId: string)
         (childId: SessionId)
         (intent: string)
-        (viewPrompt: string)
         : Task<Result<string, string>> =
         task {
             let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create journal)
@@ -329,7 +314,6 @@ module AdvisorSeat =
             // in flight; `intentKey` is the accepted intent prompt; `early` holds fresh
             // Completeds seen before the intent key was known.
             let armed = ref false
-            let phase = ref ConsultPhase.View
             let intentKey: PromptKey option ref = ref None
             let early = ResizeArray<AgentRunResult>()
 
@@ -422,7 +406,7 @@ module AdvisorSeat =
                     settle result key false |> ignore
 
             armed.Value <- true
-            let fullPrompt = buildConsultPrompt intent viewPrompt
+            let fullPrompt = LlmFacing.instruction intent |> LlmFacing.render
 
             try
                 return! executeConsult sendPrompt acceptIntent completion fullPrompt
@@ -451,10 +435,9 @@ module AdvisorSeat =
         (callerSessionId: string)
         (childId: SessionId)
         (intent: string)
-        (viewPrompt: string)
         : Task<Result<string, string>> =
         task {
-            let! outcome = attempt (fun () -> runConsult deps journal callerSessionId childId intent viewPrompt)
+            let! outcome = attempt (fun () -> runConsult deps journal callerSessionId childId intent)
 
             let! closed = voidChildRun journal callerSessionId childId
 
@@ -474,26 +457,26 @@ module AdvisorSeat =
         (journal: AgentJournal)
         (callerSessionId: string)
         (intent: string)
-        (viewPrompt: string)
         : Task<Result<string, string>> =
         task {
             let! created = ensureSeatChild deps (seatFor callerSessionId)
 
             match created with
             | Error reason -> return Error reason
-            | Ok childId -> return! runConsultAndVoid deps journal callerSessionId childId intent viewPrompt
+            | Ok childId ->
+                deps.BindDelegation (SessionId.value childId) callerSessionId
+                return! runConsultAndVoid deps journal callerSessionId childId intent
         }
 
     let private consultCore
         (deps: AdvisorSeatDeps)
         (callerSessionId: string)
         (intent: string)
-        (viewPrompt: string)
         : Task<Result<string, string>> =
         task {
             match requireJournal deps with
             | Error reason -> return Error reason
-            | Ok journal -> return! openSeat deps journal callerSessionId intent viewPrompt
+            | Ok journal -> return! openSeat deps journal callerSessionId intent
         }
 
 
@@ -501,9 +484,8 @@ module AdvisorSeat =
         (deps: AdvisorSeatDeps)
         (callerSessionId: string)
         (intent: string)
-        (viewPrompt: string)
         : Task<Result<string, string>> =
-        attempt (fun () -> consultCore deps callerSessionId intent viewPrompt)
+        attempt (fun () -> consultCore deps callerSessionId intent)
 
     let clear (callerSessionId: string) : unit =
         lock registryGate (fun () -> seats.Remove callerSessionId |> ignore)

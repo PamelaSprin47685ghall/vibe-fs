@@ -8,7 +8,7 @@ import {
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 // advisor-[004] / F39-01: `this.advisor` through the real plugin. The seat creates its advisor
-// child, sends the view and the intent as two Host prompts, and returns the prose the advisor
+// child, sends ONLY the current intent as one Host prompt, and returns the prose the advisor
 // child's run actually produced once the production terminal path publishes that run.
 // The fixture only plays the Host: it appends the advisor's assistant message (HOST-010/011:
 // its id is the provider run, its parentID the user message it answers) and the Host events.
@@ -17,7 +17,7 @@ import {
 const PROMPT_KEY = 'wanxiangshu_prompt_key'
 const SETTLE_MS = 20_000
 const ADVISOR_PLAN_B =
-  'The advisor consultation is still running. Keep waiting for the answer to this consultation’s own intent prompt. Do not treat a view acknowledgement, an earlier consultation, or reuse of the same child session as evidence that the current question is answered. If no answer arrives within the fixture deadline, report the outstanding prompt and run identities instead of returning old prose. The host sends the view and intent as separate prompts; wait for the intent prompt’s completed run before assessing the advice.'
+  'The advisor consultation is still running. Keep waiting for the answer to this consultation’s own intent prompt. Do not treat a view acknowledgement, an earlier consultation, or reuse of the same child session as evidence that the current question is answered. If no answer arrives within the fixture deadline, report the outstanding prompt and run identities instead of returning old prose. The host sends only the current intent; wait for its own physical completed run before assessing the advice.'
 
 const advisorCall = (hooks, owner, intent, callID) =>
   hooks.tool['todowrite-for-manager'].execute(
@@ -122,6 +122,9 @@ test('WHAT[advisor-004] a consult returns the prose of the advisor run that answ
     const pending = advisorCall(hooks, owner, 'is the rewrite safe?', 'call-advisor-1')
     const child = await waitForChild(createdIds)
     const [prompt] = await waitForPrompts(runtime, child, 1)
+    const sent = prompt.parts.map(part => part.text ?? '').join('\n')
+    assert.match(sent, /is the rewrite safe\?/, 'current intent is present')
+    assert.doesNotMatch(sent, /review the parser rewrite|\[\[context\]\]|attached_view/, 'no caller history reaches Advisor')
 
     await advisorRun(hooks, runtime, child, 'run-advisor-answer-1', prompt, 'ADVICE-ONE: ship it behind a flag', 20)
 
@@ -153,6 +156,9 @@ test('WHAT[advisor-004] the earlier consult\'s sticky Completed never answers a 
 
     const followUpPrompts = await waitForPrompts(runtime, child, 2)
     const followUpIntent = followUpPrompts[1]
+    const text = followUpIntent.parts.map(part => part.text ?? '').join('\n')
+    assert.match(text, /second question/)
+    assert.doesNotMatch(text, /first question|\[\[context\]\]/, 'no previous intent or prior history copied into a follow-up')
 
     // Replayed at subscribe time, the earlier consult's terminal must not answer the new intent.
     assert.equal(await within(second, 300), null, 'an earlier consult\'s Completed never answers the follow-up')

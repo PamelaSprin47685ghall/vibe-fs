@@ -10,8 +10,9 @@ open Wanxiangshu.Participant.Provider
 ///
 /// Directional delivered-view plane (delegation-013 / delegation-019 / provider-projection-009):
 /// child → parent join MUST keep the delivered view in Instruction Plane. Do NOT
-/// wrap it in `view = …` or any other TOML data field. Parent → child fork payload is the opposite contract
-/// (`commissioner_record` / `attached_view` fields) — do not conflate.
+/// wrap it in `view = …` or any other TOML data field. Parent → child fork
+/// is a current-assignment-only instruction without any inherited data plane;
+/// child → parent may still return the verified delivered material.
 module JoinResultRenderer =
 
     [<RequireQualifiedAccess>]

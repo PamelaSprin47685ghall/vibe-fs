@@ -49,6 +49,181 @@ open PluginHostInterop
 
 module PluginTransforms =
 
+
+    // The real Host session contains ONLY its negotiation question. This
+    // process-live view is what the model receives instead, reusing the last
+    // complete delegator wire as an immutable prefix. No mutation of Host history.
+    type private NegotiationView =
+        { Delegator: string
+          Messages: obj array
+          System: string array }
+
+    let private negotiationGate = obj ()
+    let private recordedMessages = Dictionary<string, obj array>()
+    let private recordedSystems = Dictionary<string, string array>()
+    let private recordedModels = Dictionary<string, obj>()
+    let private temporaryNegotiations = Dictionary<string, NegotiationView>()
+    let private temporaryToolViolations = Dictionary<string, int>()
+
+    [<Emit("structuredClone($0)")>]
+    let private cloneNegotiationWire (_value: obj) : obj = jsNative
+
+    let private negotiationMessages (outObj: obj) : obj array =
+        if isNull outObj || isNull outObj?messages then [||]
+        else unbox<obj array> outObj?messages
+
+    let private negotiationSessionId (input: obj) : string option =
+        if isNull input then None
+        else
+            let session = if isNull input?sessionID then input?sessionId else input?sessionID
+            if isNull session then None
+            else
+                let id = string session
+                if String.IsNullOrWhiteSpace id then None else Some id
+
+    let private toolViolationsFor (sessionId: string) : int =
+        match temporaryToolViolations.TryGetValue sessionId with
+        | true, seen -> seen
+        | false, _ -> 0
+
+    let negotiationToolViolationCount (sessionId: string) : int =
+        lock negotiationGate (fun () -> toolViolationsFor sessionId)
+
+    let private incrementToolViolations (sessionId: string) : unit =
+        temporaryToolViolations[sessionId] <- toolViolationsFor sessionId + 1
+
+    let negotiationRecordToolViolation (sessionId: string) : unit =
+        lock negotiationGate (fun () ->
+            if temporaryNegotiations.ContainsKey sessionId then
+                incrementToolViolations sessionId)
+
+    let negotiationIsTemporary (sessionId: string) : bool =
+        lock negotiationGate (fun () -> temporaryNegotiations.ContainsKey sessionId)
+
+    let private modelIdentity (input: obj) : obj option =
+        let model = if isNull input then null else input?model
+        let provider = if isNull model then null else model?providerID
+        let identifier = if isNull model then null elif isNull model?modelID then model?id else model?modelID
+        let message = if isNull input then null else input?message
+        let messageModel = if isNull message then null else message?model
+        let variant =
+            if not (isNull messageModel) && not (isNull messageModel?variant) then messageModel?variant
+            elif not (isNull model) then model?variant
+            else null
+        if isNull provider || isNull identifier then None
+        else
+            let fields = [ "providerID", provider; "modelID", identifier ]
+            let options = if isNull variant then fields else fields @ [ "variant", variant ]
+            Some(createObj options)
+
+    let private storeObservedModel (sessionId: string) (model: obj) : unit =
+        lock negotiationGate (fun () ->
+            if not (temporaryNegotiations.ContainsKey sessionId) then
+                recordedModels[sessionId] <- model)
+
+    let negotiationRememberModel (input: obj) : unit =
+        match negotiationSessionId input, modelIdentity input with
+        | Some sessionId, Some model -> storeObservedModel sessionId model
+        | _ -> ()
+
+    let negotiationModelFor (sessionId: string) : obj =
+        lock negotiationGate (fun () ->
+            match recordedModels.TryGetValue sessionId with
+            | true, model -> cloneNegotiationWire model
+            | false, _ -> null)
+
+    let private storeObservedSystem (sessionId: string) (system: obj) : unit =
+        lock negotiationGate (fun () ->
+            if not (temporaryNegotiations.ContainsKey sessionId) then
+                recordedSystems[sessionId] <-
+                    unbox<string array> (cloneNegotiationWire system))
+
+    let negotiationRememberSystem (input: obj) (output: obj) : unit =
+        let observed = if isNull output then null else output?system
+        match negotiationSessionId input with
+        | Some sessionId when not (isNull observed) -> storeObservedSystem sessionId observed
+        | _ -> ()
+
+    let private storeObservedMessages (sessionId: string) (messages: obj array) : unit =
+        lock negotiationGate (fun () ->
+            if not (temporaryNegotiations.ContainsKey sessionId) then
+                recordedMessages[sessionId] <-
+                    unbox<obj array> (cloneNegotiationWire (box messages)))
+
+    let negotiationRememberMessages (sessionId: string) (outObj: obj) : unit =
+        let messages = negotiationMessages outObj
+        if messages.Length > 0 then storeObservedMessages sessionId messages
+
+    let negotiationStartTemporary (tempId: string) (delegatorId: string) : Result<unit, string> =
+        lock negotiationGate (fun () ->
+            match recordedMessages.TryGetValue delegatorId, recordedSystems.TryGetValue delegatorId, recordedModels.TryGetValue delegatorId with
+            | (true, messages), (true, system), (true, model) when messages.Length > 0 && system.Length > 0 && not (isNull model) ->
+                temporaryNegotiations[tempId] <-
+                    { Delegator = delegatorId
+                      Messages = unbox<obj array> (cloneNegotiationWire (box messages))
+                      System = unbox<string array> (cloneNegotiationWire (box system)) }
+                Ok()
+            | _ -> Error "delegator has no complete provider-wire snapshot (messages, system and actual model) to reuse")
+
+    let negotiationFinishTemporary (tempId: string) : unit =
+        lock negotiationGate (fun () ->
+            temporaryNegotiations.Remove tempId |> ignore
+            temporaryToolViolations.Remove tempId |> ignore)
+
+    let negotiationForgetSession (sessionId: string) : unit =
+        lock negotiationGate (fun () ->
+            recordedMessages.Remove sessionId |> ignore
+            recordedSystems.Remove sessionId |> ignore
+            recordedModels.Remove sessionId |> ignore
+            temporaryNegotiations.Remove sessionId |> ignore
+            temporaryToolViolations.Remove sessionId |> ignore)
+
+    let negotiationProjectSystem (input: obj) (output: obj) : bool =
+        negotiationSessionId input
+        |> Option.bind (fun sid ->
+            lock negotiationGate (fun () ->
+                match temporaryNegotiations.TryGetValue sid with
+                | true, view -> Some(cloneNegotiationWire (box view.System))
+                | false, _ -> None))
+        |> Option.map (fun system ->
+            let existing = if isNull output then null else output?system
+            if not (isNull existing) && emitJsExpr existing "Array.isArray($0)" then
+                emitJsStatement (existing, system) "$0.length = 0; $0.push(...$1)"
+            else output?system <- system
+            true)
+        |> Option.defaultValue false
+
+    let private latestTemporaryQuestion (outObj: obj) : obj option =
+        negotiationMessages outObj
+        |> Array.tryFindBack (fun message ->
+            if isNull message then false
+            else
+                let info = message?info
+                not (isNull info)
+                && not (isNull info?role)
+                && string info?role = "user")
+
+    let private applyTemporaryQuestion (outObj: obj) (oldWire: obj) : bool =
+        match latestTemporaryQuestion outObj with
+        | None -> invalidOp "temporary negotiation has no actual Host user question"
+        | Some question ->
+            let previous = unbox<obj array> oldWire
+            let projected = Array.append previous [| cloneNegotiationWire question |]
+            HostMessageProjection.replaceMessagesInPlace
+                outObj
+                (HostMessageProjection.sanitizeMessages (Array.toList projected))
+            true
+
+    let negotiationProjectMessages (sessionId: string) (outObj: obj) : bool =
+        let inherited =
+            lock negotiationGate (fun () ->
+                match temporaryNegotiations.TryGetValue sessionId with
+                | true, view -> Some(cloneNegotiationWire (box view.Messages))
+                | false, _ -> None)
+        match inherited with
+        | None -> false
+        | Some oldWire -> applyTemporaryQuestion outObj oldWire
+
     type private SessionTermination = SessionId -> string -> Task<Result<unit, string>>
 
     [<RequireQualifiedAccess>]
@@ -1208,7 +1383,20 @@ module PluginTransforms =
                   "attribution", box "agent" ]
         Array.append messages [| steer |]
 
+    /// The answer becomes a real scope boundary only after its exact receipt
+    /// appears in a Host-persisted user message participating in this request.
+    let private observeNegotiationSteers (sessionId: string) (messages: obj array) : unit =
+        messages
+        |> Array.filter (fun message -> scopeRole message = "user")
+        |> Array.collect scopeParts
+        |> Array.iter (fun part ->
+            let metadata = scopeField part "metadata"
+            let receipt = scopeField metadata "wanxiangshu_negotiation_receipt"
+            if not (isNull receipt) then
+                Surface.confirmNegotiationSteer (scopeText receipt) sessionId |> ignore)
+
     let private prepareNeutralScope (sessionId: string) (raw: obj array) : obj array =
+        observeNegotiationSteers sessionId raw
         let normal = raw |> Array.map neutralScopeMessage
         let plan = Surface.planRequest sessionId (box normal)
         let staged = Array.copy raw
@@ -1432,6 +1620,7 @@ module PluginTransforms =
                   TracedXTrace = None }
 
             do! runOrdinaryStages stages frame
+            projectionSessionIdOpt |> Option.iter (fun sid -> negotiationRememberMessages sid outObj)
 
         }
 
@@ -1453,8 +1642,12 @@ module PluginTransforms =
                         else
                             None)
 
-                projectionSessionIdOpt |> Option.iter branches.RegisterOwned
-                do! normalTransform caps projectionSessionIdOpt inObj outObj
+                match projectionSessionIdOpt with
+                | Some sessionId when negotiationIsTemporary sessionId ->
+                    negotiationProjectMessages sessionId outObj |> ignore
+                | _ ->
+                    projectionSessionIdOpt |> Option.iter branches.RegisterOwned
+                    do! normalTransform caps projectionSessionIdOpt inObj outObj
             }
 
     /// Provider-facing transform composition: order only.

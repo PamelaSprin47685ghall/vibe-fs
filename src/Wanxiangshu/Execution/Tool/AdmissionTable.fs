@@ -31,6 +31,7 @@ module ToolAdmissionTable =
           "bash-honeypot", ToolAdmissions.bashHoneypot
           "assume", ToolAdmissions.assume
           "resetScope", ToolAdmissions.resetScope
+          "negotiate", ToolAdmissions.negotiate
           "fetch", ToolAdmissions.fetch
           "fork", ToolAdmissions.fork
           "resume", ToolAdmissions.resume

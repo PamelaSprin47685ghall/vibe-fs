@@ -150,3 +150,252 @@ test('WHAT[prefix-stability-016] OpenCode provider transform preserves old compl
     'raw Host history must remain untouched even though the outgoing array changed')
   clearSessionState(sid)
 })
+
+
+test('WHAT[delegation-negotiation-001] the Host records only the question while the provider sees an immutable parent prefix', async () => {
+  const {
+    negotiationRememberSystem, negotiationRememberMessages,
+    negotiationRememberModel, negotiationModelFor,
+    negotiationStartTemporary, negotiationProjectSystem,
+    negotiationProjectMessages, negotiationIsTemporary,
+    negotiationFinishTemporary, negotiationForgetSession,
+  } = await import('../../../dist/OpenCode/Plugin/PluginTransforms.js')
+  const parent = 'ses-neg-parent-001', temporary = 'ses-neg-grandchild-001'
+  const prefix = [
+    { info: { id: 'u1', sessionID: parent, role: 'user' }, parts: [{ type: 'text', text: 'Existing instruction' }] },
+    { info: { id: 'a1', sessionID: parent, role: 'assistant' }, parts: [{ type: 'text', text: 'Already answered' }] },
+  ]
+  const originalBytes = JSON.stringify(prefix)
+  const system = ['Common law', 'Role law', 'Provider configuration']
+  negotiationRememberSystem({ sessionID: parent }, { system })
+  negotiationRememberMessages(parent, { messages: prefix })
+  const withoutModel = negotiationStartTemporary(temporary, parent)
+  assert.equal(withoutModel.tag, 1, 'do not improvise a different model when the delegator model is unknown')
+  negotiationRememberModel({ sessionID: parent, model: { providerID: 'provider', id: 'deep-model' }, message: {model:{variant:'high'}} })
+  assert.deepEqual(negotiationModelFor(parent), { providerID: 'provider', modelID: 'deep-model', variant: 'high' })
+  const admitted = negotiationStartTemporary(temporary, parent)
+  assert.equal(admitted.tag, 0, 'the parent must have a complete provider wire')
+  assert.equal(negotiationIsTemporary(temporary), true)
+
+  const hostRecord = { info: { id: 'tmp-question', sessionID: temporary, role: 'user' }, parts: [{ type: 'text', text: 'Which parser?' }] }
+  const outgoing = { messages: [hostRecord] }
+  const hostArray = outgoing.messages
+  const tmpSystem = { system: ['Different grandchild system'] }
+  const liveSystemArray = tmpSystem.system
+  assert.equal(negotiationProjectSystem({ sessionID: temporary }, tmpSystem), true)
+  assert.equal(tmpSystem.system, liveSystemArray, 'OpenCode may retain the original system array identity')
+  assert.deepEqual(tmpSystem.system, system, 'system bytes are exactly the last parent provider system')
+  assert.equal(negotiationProjectMessages(temporary, outgoing), true)
+  assert.equal(outgoing.messages, hostArray, 'Host retains the same array object')
+  assert.deepEqual(outgoing.messages.slice(0, prefix.length), prefix, 'provider sees byte-identical parent prefix')
+  assert.equal(outgoing.messages.at(-1).parts[0].text, 'Which parser?')
+  assert.equal(JSON.stringify(prefix), originalBytes, 'source provider cache snapshot never changes')
+  assert.equal(JSON.stringify(hostRecord), JSON.stringify(hostArray.at(-1)), 'the temporary Host user record is untouched')
+
+  negotiationFinishTemporary(temporary)
+  assert.equal(negotiationIsTemporary(temporary), false)
+  negotiationForgetSession(parent)
+})
+
+test('WHAT[delegation-negotiation-001] temporary session tool calls are forbidden before execution', async () => {
+  const {
+    negotiationRememberSystem, negotiationRememberMessages, negotiationRememberModel,
+    negotiationStartTemporary, negotiationFinishTemporary, negotiationForgetSession,
+    negotiationToolViolationCount,
+  } = await import('../../../dist/OpenCode/Plugin/PluginTransforms.js')
+  await withExecutablePlugin(async (hooks) => {
+    const parent = 'ses-neg-tool-parent', temp = 'ses-neg-tool-temp'
+    negotiationRememberSystem({ sessionID: parent }, { system: ['system'] })
+    negotiationRememberMessages(parent, { messages: [user('parent-u', 'task', 42)] })
+    negotiationRememberModel({ sessionID: parent, model: { providerID: 'provider', modelID: 'deep-model' } })
+    assert.equal(negotiationStartTemporary(temp, parent).tag, 0)
+    assert.equal(negotiationToolViolationCount(temp), 0)
+    try {
+      await assert.rejects(
+        Promise.resolve().then(() => hooks['tool.execute.before'](
+          { sessionID: temp, tool: 'read', callID: 'forbidden-1', args: {} },
+          {},
+        )),
+        /Ephemeral negotiation is read-only/,
+      )
+      assert.equal(negotiationToolViolationCount(temp), 1, 'a vetoed tool call is recorded for retry')
+    } finally {
+      negotiationFinishTemporary(temp)
+      negotiationForgetSession(parent)
+    }
+  })
+})
+
+
+test('WHAT[delegation-negotiation-002] first answer steer activates resetScope in the very request that contains it', async () => {
+  const {
+    bindDelegation, askNegotiation, prepareNegotiationReply,
+    negotiationRequired, clearSessionState,
+  } = await import('../../../dist/Context/Scope/Surface.js')
+  const recipient = 'ses-neg-steer-002'
+  const delegator = 'ses-neg-parent-002'
+  clearSessionState(recipient)
+  bindDelegation(recipient, delegator)
+  const initial = user('a-original', 'Implement parser', 1)
+  const first = await outbound(recipient, [initial])
+  assert.equal(negotiationRequired(recipient), true)
+  assert.match(first[0].parts[0].text, /negotiate\(questions: string\) NOW/)
+  assert.doesNotMatch(first[0].parts[0].text, /Then call resetScope immediately/)
+
+  const request = askNegotiation(recipient, 'Which parser and byte invariant?')
+  assert.equal(request.ok, true)
+  assert.equal(prepareNegotiationReply(request.receipt, 'Use the parser module. Preserve input bytes.').ok, true)
+
+  const reply = {
+    info: { id: 'u-answer', role: 'user', sessionID: recipient, time: { created: 2 } },
+    parts: [{
+      type: 'text',
+      text: 'Delegator answered negotiate(questions):\nUse the parser module. Preserve input bytes.',
+      metadata: { wanxiangshu_negotiation_receipt: request.receipt },
+    }],
+  }
+  const now = await outbound(recipient, [initial, reply])
+  assert.equal(negotiationRequired(recipient), false, 'scope must unlock before this same provider request is sent')
+  assert.match(now.at(-1).parts[0].text, /Then call resetScope immediately/)
+  assert.equal(reply.parts[0].text.includes('Preserve input bytes'), true)
+  clearSessionState(recipient)
+})
+
+
+test('WHAT[delegation-negotiation-003] OpenCode registered provider hooks replay the parent system and transcript for a temp grandchild', async () => {
+  const {
+    negotiationRememberSystem, negotiationRememberMessages, negotiationRememberModel,
+    negotiationStartTemporary, negotiationFinishTemporary, negotiationForgetSession,
+  } = await import('../../../dist/OpenCode/Plugin/PluginTransforms.js')
+  await withExecutablePlugin(async (hooks) => {
+    const parent = 'ses-btw-hook-parent', temp = 'ses-btw-hook-grandchild'
+    const original = [
+      { info: { role: 'user', sessionID: parent, id: 'host-u-1' }, parts: [{ type: 'text', text: 'Prior parent task' }] },
+      { info: { role: 'assistant', sessionID: parent, id: 'host-a-1' }, parts: [{ type: 'text', text: 'Prior parent result' }] },
+    ]
+    const originalBytes = JSON.stringify(original)
+    const savedSystem = ['Parent common law', 'Parent actual provider system']
+    negotiationRememberSystem({ sessionID: parent }, { system: savedSystem })
+    negotiationRememberMessages(parent, { messages: original })
+    negotiationRememberModel({ sessionID: parent, model: { providerID: 'provider', modelID: 'parent-model' } })
+    assert.equal(negotiationStartTemporary(temp, parent).tag, 0)
+    try {
+      const input = { sessionID: temp }
+      const system = { system: ['Temporary session system'] }
+      const sameSystem = system.system
+      await hooks['experimental.chat.system.transform'](input, system)
+      assert.equal(system.system, sameSystem)
+      assert.deepEqual(system.system, savedSystem)
+      const question = { info: { role: 'user', sessionID: temp, id: 'host-btw-question' }, parts: [{ type: 'text', text: 'Where is the parser?' }] }
+      const messages = { messages: [question] }
+      const sameMessages = messages.messages
+      await hooks['experimental.chat.messages.transform'](input, messages)
+      assert.equal(messages.messages, sameMessages)
+      assert.deepEqual(messages.messages.slice(0, original.length), original)
+      assert.equal(messages.messages.at(-1).parts[0].text, 'Where is the parser?')
+      assert.equal(JSON.stringify(original), originalBytes, 'the parent provider snapshot remains immutable')
+    } finally {
+      negotiationFinishTemporary(temp)
+      negotiationForgetSession(parent)
+    }
+  })
+})
+
+test('WHAT[delegation-negotiation-004] registered negotiate sends ephemeral BTW and delivers an authenticated steer after a vetoed tool attempt', async () => {
+  const { acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const { bindDelegation, negotiationRequired, clearSessionState } =
+    await import('../../../dist/Context/Scope/Surface.js')
+  const {
+    negotiationRememberSystem, negotiationRememberMessages,
+    negotiationRememberModel, negotiationForgetSession,
+  } = await import('../../../dist/OpenCode/Plugin/PluginTransforms.js')
+
+  await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
+    const parent = 'ses-negotiate-real-parent', child = 'ses-negotiate-real-child'
+    await acceptAuthorityRoot(runtime, parent, 'manager')
+    await acceptAuthorityRoot(runtime, child, 'engineer')
+    clearSessionState(child)
+    bindDelegation(child, parent)
+    const transcript = [
+      { info: { id: 'parent-u', role: 'user', sessionID: parent }, parts: [{ type: 'text', text: 'Known parent history' }] },
+    ]
+    negotiationRememberSystem({ sessionID: parent }, { system: ['Reusable parent system'] })
+    negotiationRememberMessages(parent, { messages: transcript })
+    negotiationRememberModel({ sessionID: parent, model: { providerID: 'provider', modelID: 'parent-model' } })
+
+    const session = runtime.client.session
+    const sentSteers = []
+    let prompts = 0
+    let blocked = 0
+    session.status = async () => ({ data: { [child]: { type: 'busy' } } })
+    session.prompt = async (args) => {
+      prompts += 1
+      const tempId = args.path.id
+      const system = { system: ['temporary system'] }
+      await hooks['experimental.chat.system.transform']({ sessionID: tempId }, system)
+      assert.deepEqual(system.system, ['Reusable parent system'])
+      const messages = { messages: [{ info: { role: 'user', sessionID: tempId }, parts: args.body.parts }] }
+      await hooks['experimental.chat.messages.transform']({ sessionID: tempId }, messages)
+      assert.deepEqual(messages.messages[0], transcript[0])
+      assert.equal(args.body.model?.modelID, 'parent-model')
+      if (prompts === 1) {
+        await assert.rejects(
+          hooks['tool.execute.before']({ sessionID: tempId, tool: 'read', callID: 'btw-forbidden' }, { args: {} }),
+          /Ephemeral negotiation is read-only/,
+        )
+        blocked += 1
+        throw new Error('tool call intercepted before execution')
+      }
+      return { data: { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'Use the byte-preserving parser.' }] } }
+    }
+    session.promptAsync = async (args) => {
+      sentSteers.push(args)
+      runtime.pushHostMessage(args.path.id, {
+        info: { id: 'steer-from-delegator', role: 'user', sessionID: args.path.id },
+        parts: args.body.parts,
+      })
+      return {}
+    }
+    const premature = await hooks.tool.resetScope.execute(
+      { newScopeObjective: 'too early', newScopeTurnBudget: 2 },
+      { sessionID: child, agent: 'engineer', callID: 'premature-reset' },
+    )
+    assert.match(premature, /unavailable until the first negotiate/)
+    assert.equal(negotiationRequired(child), true, 'a rejected reset cannot unlock the initial gate')
+    const result = await hooks.tool.negotiate.execute(
+      { questions: 'Which parser? Preserve which invariant?' },
+      { sessionID: child, agent: 'engineer', callID: 'negotiate-1' },
+    )
+    assert.match(result, /Questions accepted/)
+    for (let i = 0; i < 80 && sentSteers.length === 0; i++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    assert.equal(blocked, 1, 'the first ephemeral tool call was vetoed before execution')
+    assert.equal(prompts, 2, 'the temporary answer retried without losing the cached parent prefix')
+    assert.equal(sentSteers.length, 1)
+    assert.equal(sentSteers[0].body.noReply, true, 'busy recipient receives noninterrupting steer')
+    assert.match(sentSteers[0].body.parts[0].text, /byte-preserving parser/)
+    const receipt = sentSteers[0].body.parts[0].metadata?.wanxiangshu_negotiation_receipt
+    assert.ok(receipt)
+    assert.equal(negotiationRequired(child), false, 'the physically landed reply unlocks the initial reset')
+    negotiationForgetSession(parent)
+    clearSessionState(child)
+  })
+})
+
+
+test('WHAT[delegation-negotiation-005] Advisor Host permissions expose only negotiate and resetScope', async () => {
+  const { advisorAgentConfig } = await import('../../../dist/OpenCode/Tools/StaticTools.js')
+  const { rolePredicate } = await import('../../../dist/OpenCode/Tools/ToolRegistrySurface.js')
+  const agent = advisorAgentConfig('Advisor role law')
+  const permission = agent.permission
+  const allowed = Object.entries(permission).filter(([, status]) => status === 'allow').map(([name]) => name).sort()
+  assert.deepEqual(allowed, ['negotiate', 'resetScope'])
+  assert.equal(permission.external_directory, 'deny', 'Advisor never receives broad external path permission')
+  for (const name of ['skill', 'assume', 'fetch', 'bash-honeypot', 'todowrite-for-engineer']) {
+    assert.equal(permission[name], 'deny', name + ' must be explicitly denied in Host agent config')
+    assert.equal(rolePredicate(name, 'advisor'), false, name + ' must be denied at the product tool admission layer')
+  }
+  assert.equal(rolePredicate('negotiate', 'advisor'), true)
+  assert.equal(rolePredicate('resetScope', 'advisor'), true)
+})

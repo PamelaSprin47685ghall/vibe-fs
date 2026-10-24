@@ -15,6 +15,12 @@ module Surface =
     val resetScopeState: sessionId: string -> budget: int -> unit
     val clearSessionState: sessionId: string -> unit
     val planRequest: sessionId: string -> messages: obj -> obj
+    val bindDelegation: recipient: string -> delegator: string -> unit
+    val askNegotiation: recipient: string -> questions: string -> obj
+    val prepareNegotiationReply: receipt: string -> answer: string -> obj
+    val completeNegotiationReply: receipt: string -> bool
+    val confirmNegotiationSteer: receipt: string -> recipient: string -> bool
+    val negotiationRequired: recipient: string -> bool
     val planFilter: messages: obj -> obj array
     val appendTailOnce: content: obj -> suffix: string -> obj
     val writeUserHint: message: obj -> texts: string array -> obj

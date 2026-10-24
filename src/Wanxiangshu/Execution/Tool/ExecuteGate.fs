@@ -296,7 +296,7 @@ module ToolExecuteGate =
             Task.FromResult(
                 ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId) "tool/ask-waiting" Map.empty
             )
-        elif role = Role.Manager && spec.Name <> "todowrite-for-manager" && spec.Name <> "resetScope" then
+        elif role = Role.Manager && spec.Name <> "todowrite-for-manager" && spec.Name <> "resetScope" && spec.Name <> "negotiate" then
             managerFactsStage gate spec managerPermission args ctx
         else
             executeToolBody spec args ctx

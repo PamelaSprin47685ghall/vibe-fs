@@ -22,7 +22,7 @@ module ResetScopeTool =
             |> Option.map (fun num -> max 0 (int num))
             |> Option.defaultValue 0
 
-    let private execute (journalOpt: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+    let private executeCommitted (journalOpt: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
         task {
             let objective = args.Text "newScopeObjective"
             let budget = resolveBudget args
@@ -67,6 +67,12 @@ module ResetScopeTool =
             // Tool results stay raw; the provider-request view receives its budget suffix.
             return $"Scope reset. Objective: %s{objective}"
         }
+
+    let private execute (journalOpt: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+        if Surface.negotiationRequired ctx.SessionId then
+            Task.FromResult("resetScope is unavailable until the first negotiate(questions) reply has arrived as a user steer. Ask the delegator clarifying questions now, and continue while the reply is pending.")
+        else
+            executeCommitted journalOpt args ctx
 
     let spec (factory: HostToolFactory) (journal: AgentJournal option) : ToolSpec =
         { Name = Surface.ResetScopeTool
