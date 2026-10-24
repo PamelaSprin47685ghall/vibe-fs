@@ -784,6 +784,21 @@ module PairProgrammingThoughtTransform =
     ///
     /// 空 transcript 无 placement；最新消息不是载体（例如末尾是纯 assistant
     /// 文本）本轮不生成 occurrence，等下一次出现载体的请求再追加。
+    let private isAnonymousScopeSteer (message: obj) : bool =
+        not (isNull message)
+        && messageRole message = "user"
+        && emitJsExpr message "$0.steering === true"
+        && tryUnboxString message?attribution = Some "agent"
+        && (ProviderWireDecode.hostMessageId message |> Option.isNone)
+
+    /// Scope adds these request-only rows at the end. They are not Host
+    /// transcript messages and can neither anchor nor displace durable hints.
+    let private separateScopeSteers (messages: obj list) : obj list * obj list =
+        let reversed = List.rev messages
+        let steers = reversed |> List.takeWhile isAnonymousScopeSteer |> List.rev
+        let addressed = reversed |> List.skipWhile isAnonymousScopeSteer |> List.rev
+        addressed, steers
+
     let decideCurrentPlacement (realMessages: obj list) : Result<(TranscriptGap * TranscriptGap) option, unit> =
         match List.rev realMessages with
         | [] -> Ok None
@@ -861,16 +876,19 @@ module PairProgrammingThoughtTransform =
                 |> List.filter (isPairProgrammingThought >> not)
                 |> sanitizeActiveToolCalls lang
 
+            let addressableMessages, scopeSteers = separateScopeSteers realMessages
+
             let transcript =
-                { Carrier = decideCurrentPlacement realMessages
+                { Carrier = decideCurrentPlacement addressableMessages
                   SyntheticCallIds =
                     rawMessages
                     |> List.filter isPairProgrammingThought
                     |> List.choose syntheticCallIdOf
                   InternalAuthor = rawMessages |> List.exists messageRoleIsInternal }
 
-            let replayMessages =
-                replay captures (providerIdFromMessages realMessages) realMessages
+            let replayMessages pairs =
+                replay captures (providerIdFromMessages addressableMessages) addressableMessages pairs
+                |> Result.map (fun rendered -> rendered @ scopeSteers)
 
             return!
                 PairGuidanceOccurrences.occur

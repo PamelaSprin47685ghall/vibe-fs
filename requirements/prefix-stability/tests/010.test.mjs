@@ -664,3 +664,117 @@ test('WHAT[prefix-stability-010] PPT_tryInject_without_session_id_still_appends_
   assert.equal(twice.ok, true)
   assert.deepEqual(twice.value, once.value)
  })
+
+
+{
+const assert = (await import('node:assert/strict')).default
+const fc = (await import('fast-check')).default
+const pair = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js')
+
+const weakSteer = (text) => ({
+  info: { role: 'user', sessionID: 'test-session' },
+  parts: [{ type: 'text', text }],
+  steering: true,
+  attribution: 'agent',
+})
+const realMessage = (id, kind, text) => {
+  if (kind === 'terminal') {
+    return {
+      info: { id, role: 'assistant' },
+      parts: [{
+        type: 'tool',
+        tool: 'read',
+        callID: 'call-' + id,
+        state: { status: 'completed', output: text },
+      }],
+    }
+  }
+  return {
+    info: { id, role: kind },
+    parts: [{ type: 'text', text }],
+  }
+}
+
+test('WHAT[prefix-stability-010] HOST-013 scope weak steer has no durable address and cannot kill its DevOps session', async () => {
+  const directory = (await import('node:fs')).mkdtempSync(
+    (await import('node:path')).join((await import('node:os')).tmpdir(), 'wxs-weak-steer-'),
+  )
+  const opened = await pair.createJournal(directory)
+  assert.equal(opened.ok, true)
+  try {
+    const session = 'weak-steer-devops'
+    const user = realMessage('physical-user', 'user', 'real request')
+    const weak = weakSteer('budget exhausted')
+    const once = await pair.tryInjectWithJournal(opened.journal, session, 'guidance', [user, weak])
+    assert.equal(once.ok, true, once.error)
+    assert.equal(once.value[0].parts[0].text, 'real request\0\uFEFF<system>\nguidance\n</system>')
+    assert.deepEqual(once.value[1], weak)
+    assert.equal(pair.pairCount(opened.journal, session), 1)
+
+    const again = await pair.tryInjectWithJournal(opened.journal, session, 'changed guidance', once.value)
+    assert.equal(again.ok, true, again.error)
+    assert.deepEqual(again.value, once.value)
+    assert.equal(pair.pairCount(opened.journal, session), 1)
+  } finally {
+    pair.disposeJournal(opened.journal)
+    const fs = await import('node:fs')
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[prefix-stability-010] HOST-013 generated weak steers preserve anchors across random transcript shapes', async () => {
+  const scenario = fc.record({
+    history: fc.array(fc.constantFrom('user', 'assistant', 'terminal'), { maxLength: 12 }),
+    newest: fc.constantFrom('user', 'assistant', 'terminal'),
+    weakCount: fc.integer({ min: 1, max: 4 }),
+    text: fc.string({ maxLength: 35 }),
+  })
+  let sample = 0
+  await fc.assert(fc.asyncProperty(scenario, async ({ history, newest, weakCount, text }) => {
+    const session = 'weak-steer-property-' + sample++
+    const real = history.map((kind, index) => realMessage('past-' + index, kind, text))
+    real.push(realMessage('latest', newest, text))
+    const anonymous = Array.from({ length: weakCount }, (_, index) => weakSteer('weak-' + index))
+    const input = [...real, ...anonymous]
+    const once = await pair.tryInject(session, 'guidance', input)
+    assert.equal(once.ok, true, once.error)
+    assert.equal(once.value.length, input.length)
+    assert.deepEqual(once.value.slice(-weakCount), anonymous)
+    assert.deepEqual(input, [...real, ...anonymous], 'the input must remain unchanged')
+    const withoutSteers = await pair.tryInject(session + '-reference', 'guidance', real)
+    assert.equal(withoutSteers.ok, true, withoutSteers.error)
+    assert.deepEqual(
+      once.value.slice(0, -weakCount),
+      withoutSteers.value,
+      'request-only steers cannot change any addressable guidance placement',
+    )
+
+    const latest = once.value[real.length - 1]
+    if (newest === 'user') {
+      assert.equal(latest.parts[0].text, text + '\0\uFEFF<system>\nguidance\n</system>')
+    } else if (newest === 'terminal') {
+      assert.equal(latest.parts[0].state.output, text + '\0\uFEFFguidance')
+    } else {
+      assert.deepEqual(latest, real.at(-1))
+    }
+
+    const again = await pair.tryInject(session, 'different guidance', once.value)
+    assert.equal(again.ok, true, again.error)
+    assert.deepEqual(again.value, once.value, 'replay must keep its exact bytes')
+  }), { numRuns: 3000 })
+})
+
+test('WHAT[prefix-stability-010] HOST-013 anonymous scope steer without a real transcript is not anchored', async () => {
+  const steer = weakSteer('zero remaining budget')
+  const result = await pair.tryInject('weak-steer-only', 'guidance', [steer])
+  assert.equal(result.ok, true, result.error)
+  assert.deepEqual(result.value, [steer])
+})
+
+test('WHAT[prefix-stability-010] HOST-013 unknown unaddressed user remains fail-closed', async () => {
+  const missing = { info: { role: 'user' }, parts: [{ type: 'text', text: 'unidentified' }] }
+  const result = await pair.tryInject('missing-physical-address', 'hint', [missing])
+  assert.equal(result.ok, false)
+  assert.match(result.error, /guidance carrier without transcript address/)
+})
+}
