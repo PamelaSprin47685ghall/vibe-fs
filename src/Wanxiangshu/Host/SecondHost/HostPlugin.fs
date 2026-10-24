@@ -8,6 +8,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Ports
+open Wanxiangshu.Host.Domain
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Persistence.Journal
@@ -414,15 +415,128 @@ module HostPlugin =
         : Task<ToolOutcome> =
         task {
             let! child = createChild ports parent
-
             match child with
-            | Error error -> return failureOutcome ("wxs_deliver could not create the child session: " + string error)
-            | Ok childSession -> return! deliverToChildSession clock timer ports stateRoot root text childSession
+            | Error err ->
+                return failureOutcome ("wxs_deliver could not create the child session: " + string err)
+            | Ok childSession ->
+                parent |> Option.iter (fun p ->
+                    Wanxiangshu.Context.Scope.Surface.bindDelegation (Identity.SessionId.value childSession) (Identity.SessionId.value p))
+                return! deliverToChildSession clock timer ports stateRoot root text childSession
         }
+
+    let private negotiatePromptText (questions: string) : string =
+        let cleaned =
+            if String.IsNullOrWhiteSpace questions then
+                "Please clarify your intent."
+            else
+                questions.Trim()
+        "<btw>\n" +
+        "The assistant currently executing the task on your behalf requires clarification:\n" +
+        cleaned + "\n\n" +
+        "Answer directly and concisely from this conversation context. " +
+        "Do not call tools. Do not ask follow-up questions. Output plain text only.\n" +
+        "</btw>"
+
+    let negotiateRetryText (questions: string) : string =
+        let cleaned =
+            if String.IsNullOrWhiteSpace questions then
+                "Please clarify your intent."
+            else
+                questions.Trim()
+        "<btw>\n" +
+        "A tool call was attempted or the response was empty. " +
+        "Ephemeral clarification turns MUST NOT call tools. " +
+        "Please provide a plain text direct clarification answering:\n" +
+        cleaned + "\n" +
+        "</btw>"
+
+    let private extractQuestions (args: CanonicalJsonText) : string =
+        let (CanonicalJsonText raw) = args
+        try
+            let parsed: obj = Fable.Core.JS.JSON.parse raw
+            let q: obj = Fable.Core.JsInterop.emitJsExpr (parsed, "questions") "$0[$1]"
+            if isNull q then "" else string q
+        with _ ->
+            ""
+
+    let private isDynamicOk (d: obj) : bool =
+        let v: obj = Fable.Core.JsInterop.emitJsExpr (d, "ok") "$0[$1]"
+        not (isNull v) && unbox<bool> v
+
+    let private dynamicField (d: obj) (name: string) : string =
+        let v: obj = Fable.Core.JsInterop.emitJsExpr (d, name) "$0[$1]"
+        if isNull v then "" else string v
+
+    let private processNegotiationDelivery
+        (transport: INegotiationTransport)
+        (sid: string)
+        (readyReceipt: string)
+        (reply: string)
+        : Task<unit> =
+        task {
+            let steerReq =
+                { SteerDeliveryRequest.RecipientSessionId = sid
+                  Receipt = readyReceipt
+                  SteerText = reply
+                  CorrelationKey = PromptKey.create ("wxs:negotiate:" + readyReceipt) }
+            let! deliverRes = transport.DeliverAndObserve steerReq
+            match deliverRes with
+            | Ok () ->
+                Wanxiangshu.Context.Scope.Surface.confirmNegotiationSteer readyReceipt sid |> ignore
+            | Error _ -> ()
+        }
+
+    let private launchNegotiationBackground
+        (transport: INegotiationTransport)
+        (sid: string)
+        (questions: string)
+        (delegator: string)
+        (receipt: string)
+        : unit =
+        let run () =
+            task {
+                let req =
+                    { EphemeralTurnRequest.DelegatorSessionId = delegator
+                      Receipt = receipt
+                      PromptText = negotiatePromptText questions
+                      RetryPromptText = negotiateRetryText questions }
+                let! ephemeralRes = transport.AskEphemeral req
+                let proseOpt = match ephemeralRes with | Ok prose -> Some prose | Error _ -> None
+                let prepOpt = proseOpt |> Option.bind (fun prose ->
+                    let prep: obj = Wanxiangshu.Context.Scope.Surface.prepareNegotiationReply receipt prose
+                    if isDynamicOk prep then Some prep else None)
+                match prepOpt with
+                | None -> ()
+                | Some prep ->
+                    let readyReceipt = dynamicField prep "receipt"
+                    let reply = dynamicField prep "steer"
+                    do! processNegotiationDelivery transport sid readyReceipt reply
+            }
+        run () |> ignore
+
+    let private evaluateNegotiation
+        (transport: INegotiationTransport)
+        (sid: string)
+        (questions: string)
+        : ToolOutcome =
+        let admitted: obj = Wanxiangshu.Context.Scope.Surface.askNegotiation sid questions
+        let isAdmitted = isDynamicOk admitted
+        let reason = dynamicField admitted "reason"
+        let delegator = dynamicField admitted "delegator"
+        let receipt = dynamicField admitted "receipt"
+        let canNegotiate = isAdmitted && transport.CanNegotiate delegator
+        if not isAdmitted then
+            failureOutcome (if reason = "" then "negotiation refused" else reason)
+        elif not canNegotiate then
+            failureOutcome "Negotiation refused: delegator context is not available for ephemeral turn."
+        else
+            launchNegotiationBackground transport sid questions delegator receipt
+            successOutcome ("Clarification requested (receipt " + receipt + "). Awaiting delegator steer.")
 
     /// The plugin value. `Activate` performs the durable product wiring and
     /// returns the product hooks for the second host.
-    let private createWithTimer clock (timer: ITimerPort) : IHostPlugin =
+    let private createWithTimerAndTransport clock (timer: ITimerPort) (initialTransport: INegotiationTransport option) : IHostPlugin =
+        let mutable transportOpt = initialTransport
         { new IHostPlugin with
             member _.Activate(ports: HostPorts) : HostResult<ProductHooks> =
                 taskResult {
@@ -496,7 +610,23 @@ module HostPlugin =
                                                 (Some invocation.Session)
                                 } }
 
-                    do! ports.Tools.Register [ deliverSpec ]
+                    let negotiateSpec: ToolSpec =
+                        { Name = "negotiate"
+                          Description = "Ask clarifying questions to the delegating agent via an ephemeral side turn."
+                          Schema = JsonSchema("{\"type\":\"object\",\"properties\":{\"questions\":{\"type\":\"string\"}},\"required\":[\"questions\"]}")
+                          Admission = None
+                          Execute = fun (invocation: ToolInvocation) ->
+                            task {
+                                match transportOpt with
+                                | None ->
+                                    return failureOutcome "Negotiation refused: transport unavailable."
+                                | Some transport ->
+                                    let sid = Identity.SessionId.value invocation.Session
+                                    let questions = extractQuestions invocation.Args
+                                    return evaluateNegotiation transport sid questions
+                            } }
+
+                    do! ports.Tools.Register [ deliverSpec; negotiateSpec ]
 
                     let turn: ITurnTransform =
                         { new ITurnTransform with
@@ -575,7 +705,10 @@ module HostPlugin =
                           Spawn = None
                           OnSignal = Some onSignal
                           Dispose = dispose }
-                } }
+                }
+          interface INegotiationTransportConsumer with
+            member _.AttachTransport(transport: INegotiationTransport) =
+                transportOpt <- Some transport }
 
     [<Emit("new AggregateError([$0, $1], 'Second-host activation and timer cleanup failed', { cause: $0 })")>]
     let private activationCleanupFailure (original: obj) (cleanup: exn) : exn = jsNative
@@ -586,16 +719,19 @@ module HostPlugin =
         with cleanup ->
             raise (activationCleanupFailure original cleanup)
 
-    let create (clock: IClockPort) (createTimer: unit -> ITimerPort) : IHostPlugin =
+    let private createInternal (clock: IClockPort) (createTimer: unit -> ITimerPort) (initialTransport: INegotiationTransport option) : IHostPlugin =
+        let pluginRef: IHostPlugin option ref = ref None
         { new IHostPlugin with
             member _.Activate(ports: HostPorts) =
                 task {
                     let timer = createTimer ()
+                    let underlying = createWithTimerAndTransport clock timer initialTransport
+                    pluginRef := Some underlying
 
                     let! outcome =
                         task {
                             try
-                                return! (createWithTimer clock timer).Activate ports
+                                return! underlying.Activate ports
                             with original ->
                                 disposeAfterFailure timer (box original)
                                 return raise original
@@ -606,4 +742,13 @@ module HostPlugin =
                     | Error original ->
                         disposeAfterFailure timer (box original)
                         return outcome
-                } }
+                }
+          interface INegotiationTransportConsumer with
+            member _.AttachTransport(transport: INegotiationTransport) =
+                emitJsExpr (pluginRef.Value, transport) "if ($0 && typeof $0.AttachTransport === 'function') { $0.AttachTransport($1); }" }
+
+    let create (clock: IClockPort) (createTimer: unit -> ITimerPort) : IHostPlugin =
+        createInternal clock createTimer None
+
+    let createWithTransport (clock: IClockPort) (createTimer: unit -> ITimerPort) (transport: INegotiationTransport) : IHostPlugin =
+        createInternal clock createTimer (Some transport)

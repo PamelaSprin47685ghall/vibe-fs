@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Host.SecondHost
 
 open Wanxiangshu.Foundation
+open Wanxiangshu.Host.Domain
 
 type IClockPort = Wanxiangshu.Foundation.IClockPort
 type ITimerPort = Wanxiangshu.Foundation.ITimerPort
@@ -14,3 +15,9 @@ module HostPlugin =
 
     /// Each activation owns one timer from the factory and disposes it with its hooks.
     val create: clock: IClockPort -> createTimer: (unit -> ITimerPort) -> Wanxiangshu.Host.Ports.IHostPlugin
+
+    val createWithTransport:
+        clock: IClockPort ->
+        createTimer: (unit -> ITimerPort) ->
+        transport: INegotiationTransport ->
+            Wanxiangshu.Host.Ports.IHostPlugin

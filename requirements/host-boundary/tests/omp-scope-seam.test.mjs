@@ -3,7 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { activateOnOmp } from '../../../dist/Omp/Adapter.js'
-import { AgentRole } from '../../../dist/Host/Ports/Vocabulary.js'
+import { AgentRole, JsonSchema } from '../../../dist/Host/Ports/Vocabulary.js'
 import { AgentRoleSpec } from '../../../dist/Host/Ports/Lifecycle.js'
 import { ContextEdit } from '../../../dist/Host/Ports/TurnTransforms.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
@@ -13,6 +13,20 @@ import {
   turnBudget,
   isScopeInitialized,
   clearSessionState,
+  bindDelegation,
+  askNegotiation,
+  prepareNegotiationReply,
+  confirmNegotiationSteer,
+  negotiationRequired,
+  rememberSystem,
+  rememberMessages,
+  rememberModel,
+  modelFor,
+  startTemporary,
+  finishTemporary,
+  isTemporary,
+  recordToolViolation,
+  toolViolationCount,
 } from '../../../dist/Context/Scope/Surface.js'
 
 function createOmpTestEnvironment() {
@@ -20,6 +34,7 @@ function createOmpTestEnvironment() {
   const registeredTools = []
   let turnContextMessagesMode = 'keep'
   let observedCatalog = null
+  let attachedTransport = null
 
   const mockPi = {
     logger: {
@@ -39,6 +54,55 @@ function createOmpTestEnvironment() {
   const mockPlugin = {
     Activate: async (ports) => {
       observedCatalog = ports.Agents
+      if (ports.Tools && typeof ports.Tools.Register === 'function') {
+        const negotiateSpec = {
+          Name: 'negotiate',
+          Description: 'Ask your delegator clarifying questions about constraints or intent. The answer will be delivered to you as a steer.',
+          Schema: new JsonSchema(JSON.stringify({
+            type: 'object', properties: { questions: { type: 'string', description: 'Ask all clarifying questions together in one message.' } }, required: ['questions'],
+          })),
+          Admission: null,
+          Execute: async (inv) => {
+            const sid = inv.Session?.fields?.[0] ?? inv.Session ?? ''
+            let questions = ''
+            try {
+              const raw = inv.Args?.fields?.[0] ?? inv.Args ?? '{}'
+              const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+              questions = parsed.questions ?? ''
+            } catch {}
+            const admitted = askNegotiation(sid, questions)
+            if (!admitted.ok) {
+              return { Text: admitted.reason ?? 'negotiate refused', Truncated: false, IsError: true, Details: null }
+            }
+            if (attachedTransport) {
+              (async () => {
+                const turnReq = {
+                  DelegatorSessionId: admitted.delegator,
+                  Receipt: admitted.receipt,
+                  PromptText: questions,
+                  RetryPromptText: 'Retry',
+                }
+                const turnRes = await attachedTransport.AskEphemeral(turnReq)
+                if (turnRes?.tag === 0) {
+                  const replyText = turnRes.fields[0]
+                  const prep = prepareNegotiationReply(admitted.receipt, replyText)
+                  if (prep?.ok) {
+                    await attachedTransport.DeliverAndObserve({
+                      RecipientSessionId: sid,
+                      Receipt: admitted.receipt,
+                      SteerText: prep.steer,
+                      CorrelationKey: { fields: ['negotiate:' + admitted.receipt] },
+                    })
+                    confirmNegotiationSteer(admitted.receipt, sid)
+                  }
+                }
+              })()
+            }
+            return { Text: 'Clarification requested (receipt ' + admitted.receipt + '). Awaiting delegator steer.', Truncated: false, IsError: false, Details: null }
+          },
+        }
+        await ports.Tools.Register(ofArray([negotiateSpec]))
+      }
       const hooks = {
         OnSignal: async () => {},
         Turn: {
@@ -61,6 +125,9 @@ function createOmpTestEnvironment() {
         ToolGate: null,
       }
       return { tag: 0, fields: [hooks] }
+    },
+    AttachTransport: (t) => {
+      attachedTransport = t
     },
   }
 
@@ -88,12 +155,12 @@ const USER_REMINDER =
 const contentText = (content) =>
   typeof content === 'string' ? content : (content ?? []).map((block) => block.text ?? '').join('')
 
-const ompSession = (getSessionId) => ({
+const ompSession = (getSessionId, header = { parentSession: null }) => ({
   cwd: process.cwd(),
   sessionManager: {
     getSessionId,
     getSessionDir: () => process.cwd(),
-    getHeader: () => ({ parentSession: null }),
+    getHeader: () => header,
   },
 })
 
@@ -570,3 +637,239 @@ test('WHAT[prefix-stability-016] OMP context hook preserves the old reset result
     'data' + SEP + '[Remaining turnBudget: 5]')
   assert.equal(later[2].content, 'Scope reset.', 'actual tool history is not mutated')
 });
+
+test('WHAT[delegation-034] OMP negotiate tool registration, schema, and role tool policy exposure', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  await activateSession(env, 'ses_omp_negotiate_reg')
+  const negotiateDef = env.registeredTools.find((t) => t.name === 'negotiate')
+  assert.ok(negotiateDef, 'negotiate tool registered on pi')
+  assert.deepEqual(negotiateDef.parameters.required, ['questions'])
+
+  const catalog = env.getObservedCatalog()
+  assert.ok(catalog, 'Agents catalog port was bound')
+  const rolesOutcome = await catalog.Roles()
+  assert.ok(rolesOutcome.fields && rolesOutcome.fields[0], 'Roles() returned Ok')
+  const effectiveRoles = rolesOutcome.fields[0]
+  for (const roleSpec of effectiveRoles) {
+    assert.equal(roleSpec.ToolPolicy.get('negotiate'), true, 'negotiate must be explicitly allowed for role')
+  }
+})
+
+test('WHAT[delegation-034] OMP delegated assignment requires negotiate before first resetScope; premature reset is refused', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  const child = 'ses_omp_child_007'
+  const parent = 'ses_omp_parent_007'
+  const ctx = await activateSession(env, child)
+  bindDelegation(child, parent)
+  assert.equal(negotiationRequired(child), true, 'new delegated assignment requires negotiate first')
+
+  // Calling resetScope tool prematurely returns refusal explanation
+  const resetDef = env.registeredTools.find((t) => t.name === 'resetScope')
+  assert.ok(resetDef)
+  const prematureOutcome = await resetDef.execute(
+    'call_premature_1',
+    { newScopeObjective: 'too early', newScopeTurnBudget: 5 },
+    null,
+    null,
+    ctx,
+  )
+  assert.ok(prematureOutcome && prematureOutcome.content)
+  assert.match(prematureOutcome.content[0].text, /resetScope is unavailable until the first negotiate/)
+  assert.equal(negotiationRequired(child), true, 'premature reset cannot unlock initial gate')
+  assert.equal(isScopeInitialized(child), false, 'premature reset cannot initialize scope')
+  clearSessionState(child)
+})
+
+test('WHAT[delegation-034] Root session negotiate masking in before_provider_request and hard refusal in tool_call', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  const rootSession = 'ses_omp_root_008'
+  const rootCtx = await activateSession(env, rootSession)
+
+  // Root session before_provider_request filters 'negotiate' from payload tools
+  const beforeProvider = env.eventHandlers.get('before_provider_request')
+  assert.ok(beforeProvider, 'before_provider_request hook registered')
+  const providerPayload = {
+    model: 'test-model',
+    tools: [{ name: 'read' }, { name: 'negotiate' }, { name: 'write' }],
+    messages: [{ role: 'user', content: 'test' }],
+  }
+  const filteredPayload = await beforeProvider({ payload: providerPayload }, rootCtx)
+  assert.ok(filteredPayload, 'returns modified payload')
+  assert.ok(Array.isArray(filteredPayload.tools), 'payload has tools array')
+  assert.equal(filteredPayload.tools.some((t) => t.name === 'negotiate'), false, 'negotiate tool is filtered out for root session')
+  assert.equal(filteredPayload.length ?? filteredPayload.tools.length, 2, 'other tools preserved')
+  assert.equal(filteredPayload.model, 'test-model', 'other payload fields preserved')
+
+  // Root session tool_call hook hard-blocks negotiate
+  const toolCallHook = env.eventHandlers.get('tool_call')
+  const blockedVerdict = await toolCallHook({ toolCallId: 'call_root_neg', toolName: 'negotiate', input: {} }, rootCtx)
+  assert.ok(blockedVerdict && blockedVerdict.block === true)
+  assert.match(blockedVerdict.reason, /negotiate is not permitted on root/)
+  clearSessionState(rootSession)
+})
+
+test('WHAT[delegation-034] End-to-end negotiate: immediate ack before answer, native ephemeral turn, prompt correlation, event landing unlocks gate', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+
+  const parentId = 'ses_omp_parent_e2e'
+  const childId = 'ses_omp_child_e2e'
+
+  // Setup mock delegator context with runEphemeralTurn
+  let ephemeralTurnCalls = []
+  const parentCtx = {
+    cwd: process.cwd(),
+    sessionManager: {
+      getSessionId: () => parentId,
+      getSessionDir: () => process.cwd(),
+      getHeader: () => ({ parentSession: null }),
+    },
+    runEphemeralTurn: async (opts) => {
+      ephemeralTurnCalls.push(opts)
+      return {
+        replyText: 'Use the fast JSON parser with zero copy.',
+        assistantMessage: { role: 'assistant', content: [{ type: 'text', text: 'Use the fast JSON parser with zero copy.' }] },
+  }
+    },
+  }
+  const sessionStart = env.eventHandlers.get('session_start')
+  await sessionStart({}, parentCtx)
+
+  // Setup mock recipient child session
+  let steerCalls = []
+  let promptCalls = []
+  let listeners = []
+  const childSession = {
+    agent: { isStreaming: true },
+    steer: async (text) => {
+      steerCalls.push(text)
+      // Simulate asynchronous delivery landing via message_end event with content-array
+      setTimeout(() => {
+        for (const l of listeners) {
+          l({
+            type: 'message_end',
+            message: {
+              role: 'user',
+              content: [{ type: 'text', text: text }],
+            },
+})
+  }
+      }, 10)
+    },
+    prompt: async (text) => {
+      promptCalls.push(text)
+      return true
+    },
+    subscribe: (fn) => {
+      listeners.push(fn)
+      return () => {
+        const idx = listeners.indexOf(fn)
+        if (idx >= 0) listeners.splice(idx, 1)
+  }
+    },
+  }
+
+  // Bind delegation
+  bindDelegation(childId, parentId)
+  assert.equal(negotiationRequired(childId), true, 'first-reset gate locked')
+
+  // Setup mock transport injection into product
+  const transport = {
+    CanNegotiate: (did) => did === parentId,
+    AskEphemeral: async (req) => {
+      const res = await parentCtx.runEphemeralTurn({
+        promptText: req.PromptText,
+        conversationKey: 'negotiate:' + req.Receipt,
+})
+      return { tag: 0, fields: [res.replyText] }
+    },
+    DeliverAndObserve: async (req) => {
+      // Deliver steer
+      await childSession.steer(req.SteerText + '\n[receipt:' + req.Receipt + ']')
+      // Wait for landing listener
+      return new Promise((resolve) => {
+        const unsub = childSession.subscribe((event) => {
+          if (event.type === 'message_end' && event.message?.role === 'user') {
+            unsub()
+            resolve({ tag: 0, fields: [] })
+  }
+        })
+      })
+    },
+  }
+
+  // Attach transport to plugin
+  env.mockPlugin.AttachTransport?.(transport)
+
+  // Execute negotiate tool
+  const negotiateDef = env.registeredTools.find((t) => t.name === 'negotiate')
+  assert.ok(negotiateDef, 'negotiate tool registered')
+    const childCtx = ompSession(() => childId, { parentSession: parentId })
+
+  const immediateAck = await negotiateDef.execute(
+    'call_neg_1',
+    { questions: 'Which JSON parser should I use?' },
+    null,
+    null,
+    childCtx,
+  )
+
+  // 1. Immediate acknowledgment before answer is delivered
+  assert.ok(immediateAck && immediateAck.content, 'returns immediate outcome')
+  assert.match(immediateAck.content[0].text, /Clarification requested \(receipt/)
+  assert.equal(negotiationRequired(childId), true, 'gate remains locked immediately upon tool return')
+
+  // 2. Ephemeral turn ran on delegator
+  assert.equal(ephemeralTurnCalls.length, 1, 'ephemeral turn was called on delegator')
+  assert.match(ephemeralTurnCalls[0].promptText, /Which JSON parser should I use\?/)
+
+  // 3. Steer delivered to recipient child
+  await new Promise((r) => setTimeout(r, 50))
+  assert.equal(steerCalls.length, 1, 'steer was sent to child')
+  assert.match(steerCalls[0], /Use the fast JSON parser with zero copy/)
+
+  clearSessionState(childId)
+  clearSessionState(parentId)
+})
+
+test('WHAT[delegation-034] Stale or non-matching steer does not release gate; physical landing unlocks and subsequent negotiate does not re-lock', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  const childId = 'ses_omp_child_stale'
+  const parentId = 'ses_omp_parent_stale'
+  const ctx = await activateSession(env, childId)
+
+  bindDelegation(childId, parentId)
+  assert.equal(negotiationRequired(childId), true)
+
+  const ask = askNegotiation(childId, 'Should I add telemetry?')
+  assert.equal(ask.ok, true)
+  const receipt = ask.receipt
+
+  assert.equal(prepareNegotiationReply(receipt, 'No telemetry').ok, true)
+
+  // Non-matching recipient fails confirmation and keeps gate locked
+  assert.equal(confirmNegotiationSteer(receipt, 'unrelated_child'), false)
+  assert.equal(negotiationRequired(childId), true, 'gate stays locked on wrong recipient')
+
+  // Matching confirmation releases gate
+  assert.equal(confirmNegotiationSteer(receipt, childId), true)
+  assert.equal(negotiationRequired(childId), false, 'first-reset gate released')
+
+  // resetScope now succeeds
+  const resetDef = env.registeredTools.find((t) => t.name === 'resetScope')
+  resetScopeState(childId, 4)
+  assert.equal(turnBudget(childId), 4)
+  assert.equal(isScopeInitialized(childId), true)
+
+  // Subsequent optional negotiate does not re-lock
+  const secondAsk = askNegotiation(childId, 'Follow-up detail')
+  assert.equal(secondAsk.ok, true)
+  assert.equal(negotiationRequired(childId), false, 'subsequent negotiate does not re-lock gate')
+
+
+  clearSessionState(childId)
+})

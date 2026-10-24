@@ -735,8 +735,6 @@ Execution/Routing/ModelCapacity/Surface.fsi
 Execution/Routing/ModelCapacity/Surface.fs
 Execution/Routing/ModelRouting.fsi
 Execution/Routing/ModelRouting.fs
-OpenCode/Host/ExternalToolNamespace.fsi
-OpenCode/Host/ExternalToolNamespace.fs
 OpenCode/Host/ManagedAgentConfig.fsi
 OpenCode/Host/ManagedAgentConfig.fs
 OpenCode/Host/ManagedAgentConfigSurface.fsi
@@ -1225,6 +1223,8 @@ Host/Domain/CommandDeclaration.fsi
 Host/Domain/CommandDeclaration.fs
 Host/Domain/DelegationCommand.fsi
 Host/Domain/DelegationCommand.fs
+Host/Domain/NegotiationTransport.fsi
+Host/Domain/NegotiationTransport.fs
 Execution/Delegation/Fork/Command.fsi
 Execution/Delegation/Fork/Command.fs
 Execution/Delegation/Fork/OpenCode/Tool.fsi

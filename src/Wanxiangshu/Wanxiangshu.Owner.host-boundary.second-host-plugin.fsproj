@@ -12,6 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptresources.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-recovery-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>

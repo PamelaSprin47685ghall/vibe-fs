@@ -171,6 +171,13 @@ Engineer 完成工作或到达需 Manager 决定的边界即返回，不自行�
 
 OpenCode 暂时建立一个作为接收方子会话的临时孙会话，Host 中仅有本次协商问题；在发往 LLM 的 provider transform 把这条消息扩展为委托者最后一次出站请求的只读 system、messages 与已观察的模型身份，工具定义不因临时任务而改写。临时会话任何工具调用都必须在 `tool.execute.before` 阶段无条件拒绝；一旦确实尝试工具或没有普通文本回复，应在临时回合重新提示、直到正常文本回答，而不能执行工具或伪造答复。实际回答**必须复用父→子追加指导的真实发送接口**：忙碌子会话走 `HostForkBusyNudge → PromptDispatcher.SendContinuation(BusyAgentNudge, Detached)`；已经关闭当前 Logical Run 的接收方则经同一 PromptDispatcher 建立新的受控 AgentOwnerRoot。文本成为宿主拥有的可见 user 消息，带持久 PromptKey，并排队供之后的 LLM 请求自然消费。严禁私自调用 SDK `session.promptAsync`、猜测 busy/noReply、轮询 `session.messages` 伪造回复到达，更严禁通过 provider transform 偷偷注入协商答案。
 
+**omp (oh-my-pi) 宿主实现机制：**
+
+- 澄清回合不派生孙会话或空会话投影，而是直接调用委托者 `ExtensionContext.runEphemeralTurn` 原生单轮边转（闭包持有 delegator 真实会话、模型与上下文历史），省略 `tools: false` 以保留工具目录并维持 Prompt Cache 前缀一致性（SDK 原生剥离 toolCall 且绝不执行工具）。遇到空白回复或工具调用尝试则带入前序历史进行有界重新提示。
+- 回答交付经由中立域缝 `INegotiationTransport.DeliverAndObserve` 派发：在接收方子会话写入 PromptKey 关联项（`pi.appendEntry("wxs.prompt-key", ...)`）。
+- 交付实体观测：在发送前通过 `session.subscribe` 挂载事件监听器，观测接收方实体通道产生的 `message_end`（role="user" 且包含收据标识文本），观测到实体着陆后再行调用 `Surface.confirmNegotiationSteer` 解锁门禁；若 `turn_end` 结束仍未观测到收据则判定失败关闭。严禁伪造 metadata 并在 entries 轮询。
+- 根会话防护：在 `before_provider_request` 钩子中对根会话/非受管会话执行浅拷贝并自 `tools` 列表过滤掉 `negotiate` 工具；在 `tool_call` 拦截阶段对于未受管会话硬拦截拒绝。
+
 `Detached` 回执仅证明本次调用已提交持久发送，**不等于真实回答已抵达子会话**；只有 Dispatcher 的 `PhysicalAccepted` 观察者在真实物理用户消息被接纳后，按接收方、回执、委派代际确认，才可以解锁首次 `resetScope`。伪造的 part.metadata 或出站 provider 文本绝不能解锁。该机制是对历史传输的 clean-break，不得把「工具已发送」或临时会话已创建等同于答复已送达。
 
 **user-facing session 不提供协商工具。** 在 OpenCode 的 `chat.message` 钩子里，凡 `IsManagedChild = false` 的根会话，其真实 `UserMessage.tools.negotiate` 必须显式为 `false`，因此工具不进入该次 LLM 请求可用列表；`tool.execute.before` 仍必须对根会话伪造的协商调用硬拒绝。受委托子会话和 Advisor 必须保留工具。本判定按真实物理会话父子身份，**不能按 Manager / Engineer 等角色统一禁用**，以免误杀同角色子代理的首次协商。

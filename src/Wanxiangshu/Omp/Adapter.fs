@@ -10,6 +10,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host.Ports
+open Wanxiangshu.Host.Domain
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Context.Scope
@@ -266,6 +267,7 @@ module Adapter =
           Title: string option }
 
     let private liveChildren = System.Collections.Generic.Dictionary<string, Child>()
+    let private sessionContexts = System.Collections.Generic.Dictionary<string, obj>()
 
     let private childOf (id: string) : Result<Child, HostError> =
         match liveChildren.TryGetValue id with
@@ -330,6 +332,8 @@ module Adapter =
                 { Session = session
                   Parent = parent
                   Title = title }
+            parent |> Option.filter (fun p -> not (String.IsNullOrEmpty p))
+                   |> Option.iter (fun p -> Surface.bindDelegation persisted p |> ignore)
 
             Ok persisted
 
@@ -1115,6 +1119,22 @@ module Adapter =
                               else None
 
                           // The budget changes only after the durable reanchor commits.
+                          if Surface.negotiationRequired sid then
+                              let msg =
+                                  "resetScope is unavailable until the first negotiate(questions) reply has arrived as a user steer. Ask the delegator clarifying questions now, and continue while the reply is pending."
+                              let content =
+                                  box [| createObj [ "type", box "text"; "text", box msg ] |]
+                              let details =
+                                  createObj
+                                      [ "objective", box ""
+                                        "turnBudget", box 0
+                                        "archived", box false
+                                        "refused", box true ]
+                              task {
+                                  return createObj [ "content", content; "details", details ]
+                              }
+                              |> unbox<obj>
+                          else
 
                           // 2. Append durable ScopeReanchored fact using real journal and toolCallId
                           let toolCallIdStr = stringOf callId
@@ -1284,8 +1304,8 @@ module Adapter =
             |> List.map (fun agent ->
                 let policy =
                     match agent.ToolPolicy with
-                    | None -> Map [ ("resetScope", true) ]
-                    | Some m -> Map.add "resetScope" true m
+                    | None -> Map [ ("resetScope", true); ("negotiate", true) ]
+                    | Some m -> m |> Map.add "resetScope" true |> Map.add "negotiate" true
                 { agent with ToolPolicy = Some policy })
 
         let catalog: IAgentCatalog =
@@ -1737,6 +1757,256 @@ module Adapter =
                 [ "content", box [| createObj [ "type", box "text"; "text", box result.Text ] |]
                   "isError", box result.IsError ]
 
+    let private latestAssistantText (entries: obj array) : string =
+        entries
+        |> Array.filter (fun e -> stringOf (fieldValue e "type") = "message")
+        |> Array.choose (fun e ->
+            let msg = fieldValue e "message"
+            let role = stringOf (fieldValue msg "role")
+            if role = "assistant" then
+                let content = fieldValue msg "content"
+                if isString content then Some(stringOf content)
+                elif isArray content then
+                    let extractTextPart (p: obj) =
+                        if stringOf (fieldValue p "type") = "text" then Some(stringOf (fieldValue p "text")) else None
+                    let texts = unbox<obj array> content |> Array.choose extractTextPart
+                    if texts.Length > 0 then Some(String.concat "\n" texts) else None
+                else None
+            else None)
+        |> Array.tryLast
+        |> Option.defaultValue ""
+
+    let private appendHistoryEntry (histOpt: obj option) (userText: string) (assistantMsg: obj) =
+        let userMsg =
+            createObj [
+                "role", box "user"
+                "content", box [| createObj [ "type", box "text"; "text", box userText ] |]
+            ]
+        match histOpt with
+        | Some h when isArray h ->
+            Array.append (unbox<obj array> h) [| userMsg; assistantMsg |]
+        | _ -> [| userMsg; assistantMsg |]
+
+    let private extractMessageContent (message: obj) : string =
+        let content = if isNull message then null else fieldValue message "content"
+        let isArr = isArray content
+        let isStr = isString content
+        if isNull content then ""
+        elif isStr then stringOf content
+        elif isArr then
+            unbox<obj array> content
+            |> Array.choose (fun p ->
+                let isText = stringOf (fieldValue p "type") = "text"
+                if isText then Some (stringOf (fieldValue p "text")) else None)
+            |> String.concat "\n"
+        else ""
+
+    let private recordPromptOutcome
+        (outcome: Result<bool, HostError>)
+        (tcs: System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>)
+        : unit =
+        match outcome with
+        | Error err -> tcs.TrySetResult(Error ("prompt failed: " + reasonOf err)) |> ignore
+        | Ok false -> tcs.TrySetResult(Error "omp dropped prompt before dispatch") |> ignore
+        | Ok true -> ()
+
+    let private observeIdlePrompt
+        (child: Child)
+        (payload: string)
+        (tcs: System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>)
+        : Task<unit> =
+        task {
+            try
+                let! outcome = promptLiveChild child payload
+                recordPromptOutcome outcome tcs
+            with ex ->
+                tcs.TrySetResult(Error ex.Message) |> ignore
+        }
+
+    let private observeStreamingSteer
+        (session: obj)
+        (payload: string)
+        (tcs: System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>)
+        : Task<unit> =
+        task {
+            try
+                let! _ = awaitObj (callMethod session "steer" (box payload))
+                ()
+            with ex ->
+                tcs.TrySetResult(Error ex.Message) |> ignore
+        }
+
+    let private dispatchDeliveryAttempt
+        (session: obj)
+        (child: Child)
+        (payload: string)
+        (isStreaming: bool)
+        (tcs: System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>)
+        : unit =
+        if isStreaming then
+            observeStreamingSteer session payload tcs |> ignore
+        else
+            observeIdlePrompt child payload tcs |> ignore
+
+    let private deliverWithObservedAcceptance
+        (session: obj)
+        (child: Child)
+        (payload: string)
+        (receipt: string)
+        (isStreaming: bool)
+        : Task<Result<unit, string>> =
+        task {
+            let tcs = System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>()
+            let unsubscribeRef: (unit -> unit) option ref = ref None
+            let listener =
+                Func<obj, unit>(fun event ->
+                    let eventType = stringOf (fieldValue event "type")
+                    let message = fieldValue event "message"
+                    let role = if isNull message then "" else stringOf (fieldValue message "role")
+                    let contentText = extractMessageContent message
+                    if eventType = "message_end" && role = "user" && contentText.Contains(receipt) then
+                        unsubscribeRef.Value |> Option.iter (fun u -> u ())
+                        tcs.TrySetResult(Ok ()) |> ignore
+                    elif eventType = "agent_end" || eventType = "session_shutdown" then
+                        unsubscribeRef.Value |> Option.iter (fun u -> u ())
+                        tcs.TrySetResult(Error "child session terminated before steer landed") |> ignore
+                )
+            let unsubObj = callMethod session "subscribe" (box listener)
+            unsubscribeRef := Some (fun () -> callMethod unsubObj "call" null |> ignore)
+            dispatchDeliveryAttempt session child payload isStreaming tcs
+            let! res = tcs.Task
+            unsubscribeRef.Value |> Option.iter (fun u -> u ())
+            return res
+        }
+
+    let private isToolCallBlock (b: obj) =
+        stringOf (fieldValue b "type") = "toolCall"
+
+    let private historyEntries (historyOpt: obj option) =
+        match historyOpt with
+        | Some h -> [ "history", h ]
+        | None -> []
+
+    let private messageHasToolCall (msg: obj) =
+        let content = if isNull msg then null else fieldValue msg "content"
+        if isArray content then
+            unbox<obj array> content |> Array.exists isToolCallBlock
+        else false
+
+    let private executeEphemeralTurn (delegatorCtx: obj) (promptText: string) (conversationKey: string) (historyOpt: obj option) =
+        task {
+            let histEntries = historyEntries historyOpt
+            try
+                let options =
+                    createObj ([
+                        "promptText", box promptText
+                        "conversationKey", box conversationKey
+                    ] @ histEntries)
+                let! result = awaitObj (callMethod delegatorCtx "runEphemeralTurn" options)
+                return Ok result
+            with ex ->
+                return Error ex.Message
+        }
+
+    let private processTurnResult
+        (result: obj)
+        (promptText: string)
+        (historyOpt: obj option)
+        (retry: obj option -> Task<Result<string, string>>)
+        : Task<Result<string, string>> =
+        let replyText = stringOf (fieldValue result "replyText")
+        let assistantMsg = fieldValue result "assistantMessage"
+        let isBlankOrTool = String.IsNullOrWhiteSpace replyText || messageHasToolCall assistantMsg
+        if isBlankOrTool then
+            let historyArr = appendHistoryEntry historyOpt promptText assistantMsg
+            retry (Some (box historyArr))
+        else
+            Task.FromResult(Ok replyText)
+
+    let private handleTurnOutcome
+        (turnRes: Result<obj, string>)
+        (promptText: string)
+        (historyOpt: obj option)
+        (retry: obj option -> Task<Result<string, string>>)
+        : Task<Result<string, string>> =
+        match turnRes with
+        | Error err -> Task.FromResult(Error err)
+        | Ok result -> processTurnResult result promptText historyOpt retry
+
+    let private runEphemeralDelegatorQuestion
+        (delegatorCtx: obj)
+        (promptText: string)
+        (retryPromptText: string)
+        (receipt: string)
+        : Task<Result<string, string>> =
+        let conversationKey = "negotiate:" + receipt
+        let rec step currentPrompt (historyOpt: obj option) remaining =
+            task {
+                if remaining <= 0 then
+                    return Error "ephemeral negotiation retry budget exhausted"
+                else
+                    let! turnRes = executeEphemeralTurn delegatorCtx currentPrompt conversationKey historyOpt
+                    return! handleTurnOutcome turnRes currentPrompt historyOpt (fun hist -> step retryPromptText hist (remaining - 1))
+            }
+        step promptText None 3
+
+    let private deliverNegotiationSteerToChild
+        (pi: obj)
+        (recipient: string)
+        (child: Child)
+        (steerText: string)
+        (receipt: string)
+        (correlationKey: PromptKey)
+        : Task<Result<unit, string>> =
+        task {
+            let! appended = tryAppendCorrelationEntry pi recipient correlationKey
+            match appended with
+            | Error err ->
+                return Error ("failed to write prompt correlation entry: " + reasonOf err)
+            | Ok () ->
+                let payload = steerText + "\n[receipt:" + receipt + "]"
+                let session = child.Session
+                let isStreaming = isTrue (fieldValue (fieldValue session "agent") "isStreaming")
+                return! deliverWithObservedAcceptance session child payload receipt isStreaming
+        }
+
+    let private createNegotiationTransport
+        (pi: obj)
+        (liveChildren: System.Collections.Generic.Dictionary<string, Child>)
+        : INegotiationTransport =
+        { new INegotiationTransport with
+            member _.CanNegotiate(delegatorSessionId: string) =
+                sessionContexts.ContainsKey delegatorSessionId
+
+            member _.AskEphemeral(request: EphemeralTurnRequest) =
+                task {
+                    match sessionContexts.TryGetValue request.DelegatorSessionId with
+                    | false, _ ->
+                        return Error ("Delegator context not found for " + request.DelegatorSessionId)
+                    | true, ctx ->
+                        return! runEphemeralDelegatorQuestion ctx request.PromptText request.RetryPromptText request.Receipt
+                }
+
+            member _.DeliverAndObserve(request: SteerDeliveryRequest) =
+                task {
+                    match liveChildren.TryGetValue request.RecipientSessionId with
+                    | false, _ ->
+                        return Error ("Recipient child not found: " + request.RecipientSessionId)
+                    | true, child ->
+                        return! deliverNegotiationSteerToChild pi request.RecipientSessionId child request.SteerText request.Receipt request.CorrelationKey
+                } }
+
+    let private toolNameOf (t: obj) : string =
+        if isNull t then ""
+        elif not (isNull (fieldValue t "name")) then stringOf (fieldValue t "name")
+        elif not (isNull (fieldValue (fieldValue t "function") "name")) then
+            stringOf (fieldValue (fieldValue t "function") "name")
+        else ""
+
+    let private filterOutNegotiate (tools: obj) =
+        unbox<obj array> tools
+        |> Array.filter (fun t -> toolNameOf t <> "negotiate")
+
     /// Register the product hooks on the omp event bus and return the
     /// combined signal emitter: every signal reaches the host subscribers
     /// and the product at the same time.
@@ -1749,25 +2019,55 @@ module Adapter =
 
         registerResetScopeTool pi journalOpt
 
+        let refreshSessionState (ctx: obj) =
+            let sid = ctxSessionId ctx
+            Surface.clearSessionState sid
+            sessionContexts.[sid] <- ctx
+            Surface.forgetSession sid
+            let hasChild, child = liveChildren.TryGetValue sid
+            if hasChild then
+                child.Parent |> Option.iter (fun p -> Surface.bindDelegation sid p |> ignore)
+            else
+                let sm = sessionManagerOf ctx
+                let header = if isNull sm then null else callMethod sm "getHeader" null
+                let parentSession = if isNull header then null else fieldValue header "parentSession"
+                let parentStr = if isNull parentSession then "" else stringOf parentSession
+                if not (String.IsNullOrEmpty parentStr) then Surface.bindDelegation sid parentStr |> ignore
+            Task.FromResult(jsUndefined) |> unbox<obj>
+
         registerEvent pi "session_start" (fun (_event: obj) (ctx: obj) ->
-            Surface.clearSessionState (ctxSessionId ctx)
-            Task.FromResult(jsUndefined) |> unbox<obj>)
+            refreshSessionState ctx)
         registerEvent pi "session_switch" (fun (_event: obj) (ctx: obj) ->
-            Surface.clearSessionState (ctxSessionId ctx)
-            Task.FromResult(jsUndefined) |> unbox<obj>)
+            refreshSessionState ctx)
         registerEvent pi "session_branch" (fun (_event: obj) (ctx: obj) ->
-            Surface.clearSessionState (ctxSessionId ctx)
-            Task.FromResult(jsUndefined) |> unbox<obj>)
+            refreshSessionState ctx)
+
+        // -- provider request: mask negotiate on root / unmanaged sessions ----------------
+        registerEvent pi "before_provider_request" (fun (event: obj) (ctx: obj) ->
+            task {
+                let sid = ctxSessionId ctx
+                let isManaged = liveChildren.ContainsKey sid
+                let payload = fieldValue event "payload"
+                let tools = if isNull payload then null else fieldValue payload "tools"
+                let shouldFilter = not isManaged && not (isNull payload) && isArray tools
+                if shouldFilter then
+                    let filtered = filterOutNegotiate tools
+                    let cloned = emitJsExpr (payload, filtered) "Object.assign({}, $0, { tools: $1 })"
+                    return cloned
+                else
+                    return jsUndefined
+            } |> unbox<obj>)
 
         let signal (value: HostSignal) : Task<unit> =
+            task { return () }
+
+        let dispatchToolGate (ctx: obj) (event: obj) =
             task {
-                let! _ = emit value
-                // `OnSignal` is optional: the product may not decide what a
-                // host fact means. Absence is declared, so the signal is
-                // delivered to the host subscribers and to nobody else.
-                match hooks.OnSignal with
-                | None -> return ()
-                | Some onSignal -> do! onSignal value
+                match hooks.ToolGate with
+                | None -> return jsUndefined
+                | Some gate ->
+                    let! verdict = gate.BeforeTool(toolCallView ctx (fieldValue event "toolCallId") (fieldValue event "toolName") (fieldValue event "input"))
+                    return verdictReply verdict
             }
 
         // -- turn admission ---------------------------------------------------------------
@@ -1791,6 +2091,7 @@ module Adapter =
         registerEvent pi "before_agent_start" (fun (event: obj) (ctx: obj) ->
             task {
                 let sid = ctxSessionId ctx
+                sessionContexts.[sid] <- ctx
                 let lang = ProviderLanguageBinding.forSessionText sid
                 let scopeProtocol = ProviderProse.render lang "host/scope-protocol" Map.empty
                 let system = stringList (fieldValue event "systemPrompt")
@@ -1801,16 +2102,15 @@ module Adapter =
                 | Some turn ->
                     let! prompt = turn.SystemPrompt(turnContext ctx, updated)
                     return createObj [ "systemPrompt", box (List.toArray prompt) ]
-            }
-            |> unbox<obj>)
+            } |> unbox<obj>)
 
         // -- context messages -------------------------------------------------------------
         registerEvent pi "context" (fun (event: obj) (ctx: obj) ->
             task {
                 let sid = ctxSessionId ctx
+                sessionContexts.[sid] <- ctx
                 let rawList = fieldValue event "messages"
                 let scoped = ompScopeRequest sid rawList
-
                 match hooks.Turn with
                 | None -> return contextMessagesReply rawList scoped
                 | Some turn ->
@@ -1823,19 +2123,13 @@ module Adapter =
         // -- tool gate --------------------------------------------------------------------
         registerEvent pi "tool_call" (fun (event: obj) (ctx: obj) ->
             task {
-                match hooks.ToolGate with
-                | None -> return jsUndefined
-                | Some gate ->
-                    let! verdict =
-                        gate.BeforeTool(
-                            toolCallView
-                                ctx
-                                (fieldValue event "toolCallId")
-                                (fieldValue event "toolName")
-                                (fieldValue event "input")
-                        )
-
-                    return verdictReply verdict
+                let sid = ctxSessionId ctx
+                sessionContexts.[sid] <- ctx
+                let toolName = stringOf (fieldValue event "toolName")
+                if toolName = "negotiate" && not (liveChildren.ContainsKey sid) then
+                    return createObj [ "block", box true; "reason", box "negotiate is not permitted on root or unmanaged sessions." ]
+                else
+                    return! dispatchToolGate ctx event
             }
             |> unbox<obj>)
 
@@ -2040,6 +2334,9 @@ module Adapter =
                 let! stateRoot = RuntimePath.stateRoot workspace
 
                 let ports, emit = createOmpHostPorts pi agents workspace stateRoot
+                let negotiationTransport = createNegotiationTransport pi liveChildren
+                emitJsExpr (plugin, negotiationTransport) "if (typeof $0.AttachTransport === 'function') { $0.AttachTransport($1); }"
+
                 let! outcome = guardTask (fun () -> plugin.Activate ports)
 
                 match outcome with
