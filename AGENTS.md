@@ -547,6 +547,21 @@ CUT36_OMP_REAL_SMOKE=1 \
    - **预运行基线锁定 (journalBaseline)**：在宿主启动前预先抓取 journal 各 stream 的最大修订号 `max(revision)` 形成基线快照。若基线缺失或损坏直接判定失败 (fail closed)。
    - **作用域与版本严格绑定**：Ownership 记录的 `scopeId` 必须等于 `host-activation:<workspace>`；子会话 durable work 流名称必须为 `host2-<sha256(childSessionId)[0:32]>`，且其 revision 必须严格大于预运行基线。
 
+### 6.6 Scope / Pair Hint clean-break 的实证反例（2026-10-24）
+
+本节记录这次迁移中实际出现过的错误、反例和修复方法，不建立另一份领域规范；具体承诺仍以 `requirements/context-compression/WHAT.md` [033]–[041]、`wanxiangli/src/pair-hint/AGENTS.md` 为准。以下验证来自离线构建和物理适配器测试，不等于真实模型并发调用已被证明。
+
+- **先定注入时机，再设计接口。** 起初分别考虑过 OMP `tool_result` 和 OpenCode `tool.execute.after`；最终两宿主统一只在**发往 LLM 的请求副本**热修正。用户消息和已完成／失败工具结果是两条独立的文本写入线；真实工具回调结果、原始用户消息及持久化历史不承受提醒尾巴。Pair Hint 的 durable occurrence 事实仍由原 owner 管理，不能和这两条可见文本线混为同一种副作用。
+- **搬走状态，也搬走判断。** `wanxiangli/pair-hint` 的自治 `PairHint()` / `ScopeSession` 私有保存每个会话的 prompt 身份、初始化状态和 `turnBudget`；`planRequest` / `planFilter` 只消费中立消息并返回保留槽位、后缀目标和弱提示。中立输入仅描述 `kind`、操作员归属、时间、调用 ID、`resultFor` 和 part 位置等；OMP `role/content` 与 OpenCode `info/parts/state.output` 只能在各自物理适配器中解码和回写。曾出现 `Surface → Protocol → library` 逐层转发和重复 raw filter，必须连旧实现、旧状态容器及全部消费者一起 clean-break 删除；不能把搬函数当成搬权威。HNI 中立计划不凭空增加 `P-xx` 宿主端口。
+- **OpenCode 的数组身份和消息身份不同。** provider hook 的宿主持有原 `messages` 数组绑定，单纯 `output.messages = replacement` 可能对发出的请求无效；必须在原数组里替换元素（`HostMessageProjection.replaceMessagesInPlace`）。但被替换的 message、part、tool state 要复制，旧对象和持久历史不能被原地修改。物理测试应同时断言「数组引用不变」和「原消息对象的内容不变」。OMP context hook 走返回请求副本的另一种物理约定。
+- **reset 的调用与结果必须按身份配对。** `SessionView.ofSnapshotMessages` 可把历史 tool call 与 tool result 装进同一条 assistant 消息的不同 parts。初版过滤只保留了旧 `resetScope` 调用，丢失其同消息结果；专门做出的两项反例先红后绿，修复是在中立 part 中携带 `resultFor`，按 toolCallId 同时保留历次 reset 调用／结果。最新 reset 同批之前的普通工作删去，同批之后的工作保留。注意**上下文中的排序与切分不证明真实工具执行屏障**，后者必须另做宿主实测。
+- **用户消息不是 reset 边界。** 原始 operator prompt 与 steer 按序存活；新的真实操作员消息使旧预算失效，但 agent side-request、陈旧 snapshot 不得回退当前 prompt、重复扣预算或添加零预算 steer。「新用户消息后先估算首个状态闭环，再立即 `resetScope`」是强初始化指令；预算耗尽只是自然边界上的弱建议，不得打断正在做的工具工作，也不得误写成每回合强制 reset。
+- **持久提交先于状态公布。** `resetScope` 只有在 `ScopeReanchored` 确实提交后，才能把新的预算和初始化事实写进内存 actor；反序会在 Journal 失败时制造虚假的已重置状态。会话生命周期由宿主发事实：OpenCode `session.deleted` 只清掉该会话的 actor，其他会话的预算不受影响。重复、失败、迟到和侧路事件都要有独立反例。
+- **提示词用语和字节本身也是协议。** `oldScopeVerboseVerbatimExperience` 里的 `verbose` 允许不怕烦地写，`verbatim` 要求原文不改，`experience` 容纳尚未提炼为结论的经历；不要为了英语更规整换成 `handoff/excerpts` 或加上 `critical` 等筛选门槛。Pair Hint 的 `<system>` 包裹、NUL+BOM 分隔、历史 marker 原位重放、去重和剥离都有确定性语义，不能只以某个提示词「出现过」作为测试终点。
+- **先打破假设，再验收。** 库内 `src/pair-hint/tests/` 验证中立规划和写入器；主仓 `requirements/context-compression/tests/038.test.mjs` 验证中立契约，`requirements/host-boundary/tests/omp-scope-seam.test.mjs`、`scope-hni-physical.test.mjs` 验证真实 OMP/OpenCode envelope、旧消息不变、同消息 reset 配对与会话删除。Fable union 和深层 dist 的物理表征只能放进明确列入 Host physical canary 的测试；普通语义测试不得靠扩大 `js-boundary-gate` 豁免获得绿灯。遇到红态先核对形状和调用时序，不为测试便利复活旧接口。
+- **绿灯必须注明层级。** 库内单测、`node scripts/build.mjs` 的 Fable 编译、相关 WHAT、前缀重放、语言校验和 `node scripts/check.mjs` 分别验证不同事情；长命令 park/yield 不代表退出成功，需追踪真实进程及最终构建状态。TODO/GAP 不能记作通过。本包当时离线测试通过，却未用真实模型 canary 证实并发执行 barrier；静态检查还留有与本包无关的 `Host/FissionPort.fs` namespace-tier 问题。这些边界只能如实记账，不能说成全绿，更不能顺手改掉别人的 P-17 来掩盖。
+- **两仓交付按职责精确暂存。** 修改前检查两棵工作树、未提交 diff、子模块指针和正在运行的构建。混有 Advisor/Delegation 等其他人的改动时只暂存属于本包的文件或 hunk，不使用一把 `git add -A`；先确认 `git diff --cached --check` 和暂存清单，再提交库、推送库、提交主仓精确 gitlink，均不强推。此次迁移凭证为 wanxiangli `e48678d`、wanxiangshu `89bc2739b`，只说明 2026-10-24 的已提交状态，未来使用时仍要重新验收。
+
 ---
 
 ## 7. 迁移来源文件全量清单与保留/删除边界
