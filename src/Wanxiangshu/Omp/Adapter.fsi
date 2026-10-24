@@ -23,3 +23,5 @@ module Adapter =
         plugin: Wanxiangshu.Host.Ports.IHostPlugin ->
         agents: Wanxiangshu.Host.Ports.AgentRoleSpec list ->
             System.Threading.Tasks.Task<unit>
+
+    val getLiveChildren: unit -> System.Collections.Generic.Dictionary<string, obj>

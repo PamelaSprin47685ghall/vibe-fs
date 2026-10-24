@@ -28,3 +28,15 @@ module Surface =
     val stripKnownHints: message: obj -> texts: string array -> obj
     val userCanCarryHint: message: obj -> bool
     val toolCanCarryHint: message: obj -> bool
+    val rememberSystem: sessionId: string -> system: string array -> unit
+    val rememberMessages: sessionId: string -> messages: obj array -> unit
+    val rememberModel: sessionId: string -> model: obj -> unit
+    val modelFor: sessionId: string -> obj
+    val startTemporary: tempId: string -> delegatorId: string -> obj
+    val isTemporary: sessionId: string -> bool
+    val finishTemporary: tempId: string -> unit
+    val recordToolViolation: tempId: string -> unit
+    val toolViolationCount: tempId: string -> int
+    val forgetSession: sessionId: string -> unit
+    val projectSystem: tempId: string -> current: string array -> string array option
+    val projectMessages: tempId: string -> question: obj -> obj array option

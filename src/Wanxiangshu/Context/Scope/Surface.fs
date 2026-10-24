@@ -43,3 +43,40 @@ module Surface =
     let stripKnownHints (message: obj) (texts: string array) : obj = owner?stripKnownHints(message, texts)
     let userCanCarryHint (message: obj) : bool = owner?userCanCarryHint(message)
     let toolCanCarryHint (message: obj) : bool = owner?toolCanCarryHint(message)
+    let rememberSystem (sessionId: string) (system: string array) : unit =
+        owner?rememberSystem(sessionId, system)
+
+    let rememberMessages (sessionId: string) (messages: obj array) : unit =
+        owner?rememberMessages(sessionId, messages)
+
+    let rememberModel (sessionId: string) (model: obj) : unit =
+        owner?rememberModel(sessionId, model)
+
+    let modelFor (sessionId: string) : obj =
+        owner?modelFor(sessionId)
+
+    let startTemporary (tempId: string) (delegatorId: string) : obj =
+        owner?startTemporary(tempId, delegatorId)
+
+    let isTemporary (sessionId: string) : bool =
+        owner?isTemporary(sessionId)
+
+    let finishTemporary (tempId: string) : unit =
+        owner?finishTemporary(tempId)
+
+    let recordToolViolation (tempId: string) : unit =
+        owner?recordToolViolation(tempId)
+
+    let toolViolationCount (tempId: string) : int =
+        owner?toolViolationCount(tempId)
+
+    let forgetSession (sessionId: string) : unit =
+        owner?forgetSession(sessionId)
+
+    let projectSystem (tempId: string) (current: string array) : string array option =
+        let r = owner?projectSystem(tempId, current)
+        if isNull r then None else Some(unbox<string array> r)
+
+    let projectMessages (tempId: string) (question: obj) : obj array option =
+        let r = owner?projectMessages(tempId, question)
+        if isNull r then None else Some(unbox<obj array> r)

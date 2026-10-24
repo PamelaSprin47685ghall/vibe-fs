@@ -508,7 +508,7 @@ module HostPlugin =
                 match prepOpt with
                 | None -> ()
                 | Some prep ->
-                    let readyReceipt = dynamicField prep "receipt"
+                    let readyReceipt = receipt
                     let reply = dynamicField prep "steer"
                     do! processNegotiationDelivery transport sid readyReceipt reply
             }
@@ -721,11 +721,12 @@ module HostPlugin =
 
     let private createInternal (clock: IClockPort) (createTimer: unit -> ITimerPort) (initialTransport: INegotiationTransport option) : IHostPlugin =
         let pluginRef: IHostPlugin option ref = ref None
+        let transportRef: INegotiationTransport option ref = ref initialTransport
         { new IHostPlugin with
             member _.Activate(ports: HostPorts) =
                 task {
                     let timer = createTimer ()
-                    let underlying = createWithTimerAndTransport clock timer initialTransport
+                    let underlying = createWithTimerAndTransport clock timer transportRef.Value
                     pluginRef := Some underlying
 
                     let! outcome =
@@ -745,6 +746,7 @@ module HostPlugin =
                 }
           interface INegotiationTransportConsumer with
             member _.AttachTransport(transport: INegotiationTransport) =
+                transportRef := Some transport
                 emitJsExpr (pluginRef.Value, transport) "if ($0 && typeof $0.AttachTransport === 'function') { $0.AttachTransport($1); }" }
 
     let create (clock: IClockPort) (createTimer: unit -> ITimerPort) : IHostPlugin =

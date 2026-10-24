@@ -44,6 +44,9 @@ module Adapter =
     [<Emit("$0 == null ? undefined : $0[$1]")>]
     let private fieldValue (carrier: obj) (name: string) : obj = jsNative
 
+    [<Emit("Boolean($0 && typeof $0 === 'object' && typeof $0[$1] === 'function')")>]
+    let private hasMethod (target: obj) (name: string) : bool = jsNative
+
     [<Emit("$0($1)")>]
     let private call1 (target: obj) (arg: obj) : obj = jsNative
 
@@ -1804,36 +1807,36 @@ module Adapter =
     let private recordPromptOutcome
         (outcome: Result<bool, HostError>)
         (tcs: System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>)
-        : unit =
+        (resolve: Result<unit, string> -> unit) =
         match outcome with
-        | Error err -> tcs.TrySetResult(Error ("prompt failed: " + reasonOf err)) |> ignore
-        | Ok false -> tcs.TrySetResult(Error "omp dropped prompt before dispatch") |> ignore
-        | Ok true -> ()
+        | Error err -> resolve (Error ("prompt failed: " + reasonOf err))
+        | Ok false -> resolve (Error "omp dropped prompt before dispatch")
+        | Ok true -> resolve (Ok ())
 
     let private observeIdlePrompt
         (child: Child)
         (payload: string)
-        (tcs: System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>)
+        (resolve: Result<unit, string> -> unit)
         : Task<unit> =
         task {
             try
                 let! outcome = promptLiveChild child payload
-                recordPromptOutcome outcome tcs
+                recordPromptOutcome outcome null resolve
             with ex ->
-                tcs.TrySetResult(Error ex.Message) |> ignore
+                resolve (Error ex.Message)
         }
 
     let private observeStreamingSteer
         (session: obj)
         (payload: string)
-        (tcs: System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>)
+        (resolve: Result<unit, string> -> unit)
         : Task<unit> =
         task {
             try
                 let! _ = awaitObj (callMethod session "steer" (box payload))
                 ()
             with ex ->
-                tcs.TrySetResult(Error ex.Message) |> ignore
+                resolve (Error ex.Message)
         }
 
     let private dispatchDeliveryAttempt
@@ -1841,12 +1844,12 @@ module Adapter =
         (child: Child)
         (payload: string)
         (isStreaming: bool)
-        (tcs: System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>)
+        (resolve: Result<unit, string> -> unit)
         : unit =
         if isStreaming then
-            observeStreamingSteer session payload tcs |> ignore
+            observeStreamingSteer session payload resolve |> ignore
         else
-            observeIdlePrompt child payload tcs |> ignore
+            observeIdlePrompt child payload resolve |> ignore
 
     let private deliverWithObservedAcceptance
         (session: obj)
@@ -1857,7 +1860,13 @@ module Adapter =
         : Task<Result<unit, string>> =
         task {
             let tcs = System.Threading.Tasks.TaskCompletionSource<Result<unit, string>>()
+            let settled = ref false
             let unsubscribeRef: (unit -> unit) option ref = ref None
+            let resolve (res: Result<unit, string>) =
+                if not settled.Value then
+                    settled.Value <- true
+                    unsubscribeRef.Value |> Option.iter (fun u -> u ())
+                    tcs.SetResult res
             let listener =
                 Func<obj, unit>(fun event ->
                     let eventType = stringOf (fieldValue event "type")
@@ -1865,15 +1874,15 @@ module Adapter =
                     let role = if isNull message then "" else stringOf (fieldValue message "role")
                     let contentText = extractMessageContent message
                     if eventType = "message_end" && role = "user" && contentText.Contains(receipt) then
-                        unsubscribeRef.Value |> Option.iter (fun u -> u ())
-                        tcs.TrySetResult(Ok ()) |> ignore
+                        resolve (Ok ())
+                    elif eventType = "message_start" && role = "user" && contentText.Contains(receipt) then
+                        resolve (Ok ())
                     elif eventType = "agent_end" || eventType = "session_shutdown" then
-                        unsubscribeRef.Value |> Option.iter (fun u -> u ())
-                        tcs.TrySetResult(Error "child session terminated before steer landed") |> ignore
+                        resolve (Error "child session terminated before steer landed")
                 )
             let unsubObj = callMethod session "subscribe" (box listener)
             unsubscribeRef := Some (fun () -> callMethod unsubObj "call" null |> ignore)
-            dispatchDeliveryAttempt session child payload isStreaming tcs
+            dispatchDeliveryAttempt session child payload isStreaming resolve
             let! res = tcs.Task
             unsubscribeRef.Value |> Option.iter (fun u -> u ())
             return res
@@ -1902,8 +1911,17 @@ module Adapter =
                         "promptText", box promptText
                         "conversationKey", box conversationKey
                     ] @ histEntries)
-                let! result = awaitObj (callMethod delegatorCtx "runEphemeralTurn" options)
-                return Ok result
+                let target =
+                    if hasMethod delegatorCtx "runEphemeralTurn" then
+                        Some delegatorCtx
+                    else
+                        let sess = fieldValue delegatorCtx "session"
+                        if hasMethod sess "runEphemeralTurn" then Some sess else None
+                match target with
+                | None -> return Error "Neither delegatorCtx nor delegatorCtx.session exposes runEphemeralTurn"
+                | Some t ->
+                    let! result = awaitObj (callMethod t "runEphemeralTurn" options)
+                    return Ok result
             with ex ->
                 return Error ex.Message
         }
@@ -2384,3 +2402,9 @@ module Adapter =
     /// Activate the product on an omp extension.
     let activateOnOmp (pi: obj) (plugin: IHostPlugin) (agents: AgentRoleSpec list) : Task<unit> =
         startOnOmp pi plugin agents
+
+    let getLiveChildren () : System.Collections.Generic.Dictionary<string, obj> =
+        let dict = System.Collections.Generic.Dictionary<string, obj>()
+        for kv in liveChildren do
+            dict.Add(kv.Key, box kv.Value)
+        dict
