@@ -63,7 +63,7 @@ const notes = []
 if (process.env[OPT_IN] !== "1") {
   console.error(
     `${OPT_IN} is not set. This smoke starts a REAL omp session and spends model quota.\n` +
-      `It is opt-in by design. Re-run with ${OPT_IN}=1 (see proposals/host-neutral-interface/smoke/README.md).`,
+      `It is opt-in by design. Re-run with ${OPT_IN}=1 (see AGENTS_MIGRATION.md).`,
   )
   process.exit(2)
 }

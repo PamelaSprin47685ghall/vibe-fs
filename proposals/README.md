@@ -1,10 +1,10 @@
 # 计划与提案入口
 
-## 多人抽吸的当前入口（2026-10-15）
+## 抽取与 HNI 迁移的唯一入口
 
-Lifecycle cutover 已进入 master。下一轮多人切刀从[保姆级施工指南](extraction-kanban/README.md)开始，在[唯一看板](extraction-kanban/BOARD.md)认领，再读[职责卡](extraction-kanban/CARDS.md)、[范围与旧计划对账](extraction-kanban/COVERAGE.md)和[可复制模板](extraction-kanban/TEMPLATES.md)。蓝图覆盖当前职责，分别记录独立库、主仓接线、旧实现退出，以及须先裁决的保留/删除项。
+`wanxiangshu → wanxiangli` 抽取、Lifecycle cutover 与 HNI 的边界、状态、未闭合项和验收统一见 [AGENTS_MIGRATION.md](../AGENTS_MIGRATION.md)。原分散施工指南、看板、职责卡和迁移证据说明已合并，不再维护第二套迁移文档。
 
-下方旧队列和各 T/WP/GAP 继续保留原始证据与证明义务，不作为第二张抽吸排班表。已有 owner 的相同工作先交接、合并认领，不重复施工；计划不增减正式 WHAT。当前基线及净改进合并条件见 [cutover 收尾记录](lifecycle-cutover-closeout.md)。
+下方旧队列和各 T/WP/GAP 保留非迁移产品工作的原始证据与证明义务，不作为第二张迁移排班表。已有 owner 的相同工作先交接、合并认领，不重复施工；迁移指南不增减正式 WHAT。
 
 ## 原有施工材料与历史队列
 

@@ -290,7 +290,7 @@ const { default: test } = await import("node:test");
 const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
 
 // CUT-10: the protocol-2 ABI is owned by wanxiangli/routing. These cases were
-// accepted by the host before the cut (see proposals/extraction-kanban/cards/CUT-10.md).
+// accepted by the host before the cut (see AGENTS_MIGRATION.md, CUT-10).
 const withConfig = async (body, run) => {
   const root = await mkdtemp(join(tmpdir(), 'wanxiangshu-routing-cut10-'))
   const path = join(root, 'nested', 'wanxiangshu.mjs')
