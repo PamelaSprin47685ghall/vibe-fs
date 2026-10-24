@@ -71,7 +71,7 @@ test('WHAT[managed-session-lifecycle-007] canonical A and B retain separate cell
 
       // Both cells are single-assignment: consuming them again fails.
       const consumedAgain = await joinCall(hooks, owner, 'call-join-again')
-      assert.match(consumedAgain, /nothing-to-join/)
+      assert.match(consumedAgain, /There is nothing away to receive|目前没有在外可接收的工作/)
 
       const finalCold = await coldWorkSnapshot(directory, owner)
       assert.equal(workOf(finalCold, rootA).lifecycle, 'Retired')

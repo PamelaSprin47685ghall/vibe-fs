@@ -45,7 +45,7 @@ const isSome = (value) => value !== null
 // park and deliver are lifecycle members: every generated surface carries them
 // in its base class, but they are not the projection of a ToolPermission, so
 // they are never counted among the capability members of a role.
-const LIFECYCLE_MEMBERS = ['park']
+const LIFECYCLE_MEMBERS = ['park', 'unpark', 'abandon']
 
 const projectedMembers = (s) => memberNames(s).filter((name) => !LIFECYCLE_MEMBERS.includes(name))
 
@@ -60,11 +60,10 @@ const MEMBERS_BY_PERMISSION = {
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
-  Exec: ['call'],
+  Exec: ['call', 'signal', 'send'],
   Fork: ['fork'],
   Resume: ['resume'],
   DevOpsConsultation: ['devops'],
-  Join: ['join'],
   Fission: ['fission'],
   Horizon: ['horizon'],
   Advisor: ['advisor'],
@@ -76,9 +75,9 @@ const MEMBERS_BY_PERMISSION = {
 const MEMBER_ORDER = [
   'write', 'rm', 'mv',
   'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where',
-  'call',
+  'call', 'signal', 'send',
   'fork', 'resume', 'commission', 'devops', 'dag',
-  'join', 'fission', 'horizon', 'advisor', 'ask', 'review',
+  'fission', 'horizon', 'advisor', 'ask', 'review',
 ]
 
 // The offices that hold at least one programming-surface permission, with the
@@ -94,17 +93,17 @@ const EXPECTED_MEMBERS = [
   {
     role: 'DevOps',
     label: 'devops',
-    members: ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call', 'join', 'horizon', 'advisor'],
+    members: ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call', 'signal', 'send', 'horizon', 'advisor'],
   },
   {
     role: 'Manager',
     label: 'manager',
-    members: ['reviewOnly.cat', 'reviewOnly.ls', 'reviewOnly.rg', 'reviewOnly.stat', 'whereAll', 'where', 'fork', 'resume', 'dag', 'join', 'horizon', 'advisor', 'review'],
+    members: ['reviewOnly.cat', 'reviewOnly.ls', 'reviewOnly.rg', 'reviewOnly.stat', 'whereAll', 'where', 'fork', 'resume', 'horizon', 'advisor', 'review'],
   },
   {
     role: 'Orchestrator',
     label: 'orchestrator',
-    members: ['commission', 'join', 'horizon', 'advisor'],
+    members: ['commission', 'horizon', 'advisor'],
   },
   {
     role: 'Plan',
@@ -129,7 +128,7 @@ test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_ca
   assert.equal(isNone(orchestrator), false, 'Orchestrator gets the delegation-only surface')
   assert.deepEqual(
     projectedMembers(orchestrator),
-    ['commission', 'join', 'horizon', 'advisor'],
+    ['commission', 'horizon', 'advisor'],
   )
 })
 
@@ -158,7 +157,7 @@ test('WHAT[repository-programming-001] JS001_manager_carries_the_delegation_memb
 
   // Manager holds Fork/Resume/Join/Horizon/Advisor, so it carries the
   // dispatch members and the pull members alike.
-  for (const member of ['fork', 'dag', 'resume', 'join', 'horizon', 'advisor']) {
+  for (const member of ['fork', 'resume', 'horizon', 'advisor']) {
     assert.ok(names.includes(member), `Manager carries ${member}`)
     assert.equal(memberBinding('Manager', permissions, member), member, `Manager: ${member} runtime gate`)
   }
@@ -195,7 +194,7 @@ test('WHAT[repository-programming-001] JS001_lifecycle_members_are_carried_by_ev
 })
 
 test('WHAT[repository-programming-001] JS001_non_projected_permissions_never_produce_members', () => {
-  for (const name of ['Edit', 'Pty', 'Fetch', 'Finality', 'ResetScope', 'BashHoneypot']) {
+  for (const name of ['Join', 'Edit', 'Pty', 'Fetch', 'Finality', 'ResetScope', 'BashHoneypot']) {
     const result = generate('Engineer', caps(name), 'en')
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)
   }

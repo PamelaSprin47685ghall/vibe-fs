@@ -107,7 +107,6 @@ module JsCanonicalDescription =
         val BaseClass: string = "tool/js-program/base-class"
 
         [<Literal>]
-        val BaseClassCallable: string = "tool/js-program/base-class-callable"
 
         [<Literal>]
         val BaseClassRead: string = "tool/js-program/base-class-read"
@@ -137,9 +136,6 @@ module JsCanonicalDescription =
         val BaseClassFork: string = "tool/js-program/base-class-fork"
 
         [<Literal>]
-        val BaseClassDag: string = "tool/js-program/base-class-dag"
-
-        [<Literal>]
         val BaseClassResume: string = "tool/js-program/base-class-resume"
 
         [<Literal>]
@@ -147,9 +143,6 @@ module JsCanonicalDescription =
 
         [<Literal>]
         val BaseClassDevOps: string = "tool/js-program/base-class-devops"
-
-        [<Literal>]
-        val BaseClassJoin: string = "tool/js-program/base-class-join"
 
         [<Literal>]
         val BaseClassFission: string = "tool/js-program/base-class-fission"
@@ -208,7 +201,6 @@ module JsCanonicalDescription =
           Park: string
           ParkedPayload: string
           BaseClass: string
-          BaseClassCallable: string
           BaseClassRead: string
           BaseClassAnchors: string
           BaseClassGlob: string
@@ -218,11 +210,9 @@ module JsCanonicalDescription =
           BaseClassMove: string
           BaseClassExec: string
           BaseClassFork: string
-          BaseClassDag: string
           BaseClassResume: string
           BaseClassCommission: string
           BaseClassDevOps: string
-          BaseClassJoin: string
           BaseClassFission: string
           BaseClassHorizon: string
           BaseClassAdvisor: string

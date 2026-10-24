@@ -44,9 +44,9 @@ const withPlanSession = async (body, session = `jsask-${Math.random().toString(3
   })
 }
 
-const handleOf = (doc) => {
-  const match = doc.match(/handle = "([^"]+)"/)
-  assert.ok(match, `parked document must carry a handle: ${doc}`)
+const nameOf = (doc) => {
+  const match = doc.match(/^name = "([^"]+)"/m)
+  assert.ok(match, `parked document must carry its program name: ${doc}`)
   return match[1]
 }
 
@@ -57,8 +57,7 @@ test('WHAT[work-050] this.ask in an S1 plan program records the question and par
 
     const parked = await hooks.tool['todowrite-for-plan'].execute(
       { program: program(`    const answer = await this.ask('Which deployment environment should this target?');\n    return { answer };`), name: 'ask-deploy',
-          prefixUntil: 0,
-          carry: []
+          planB: 'Record the question and retain the paused program until the real user reply arrives.'
         },
       context(session),
     )
@@ -71,7 +70,7 @@ test('WHAT[work-050] this.ask in an S1 plan program records the question and par
     // 等待门禁要求真实用户输入先到达；此后 unpark 注入的值即 await 的值。
     await humanInput(hooks, runtime, session, 'user-reply', 'staging')
     const resumed = await hooks.tool['todowrite-for-plan'].execute(
-      { unpark: { handle: handleOf(parked), value: 'staging' } },
+      { name: 'resume-question', planB: 'Resume the original question with the real user reply under this new request window.', program: program('return await this.unpark(' + JSON.stringify(nameOf(parked)) + ', "staging");') },
       context(session, 'plan-call-reply', 'plan-run-reply'),
     )
     assert.match(resumed, /# ok/)
@@ -91,8 +90,7 @@ test('WHAT[work-050] this.ask outside S1 is refused with ASK_REFUSED', async () 
 
     const output = await hooks.tool['todowrite-for-plan'].execute(
       { program: program(`    await this.ask('Out of stage?');\n    return { unreachable: true };`), name: 'ask-s2',
-          prefixUntil: 0,
-          carry: []
+          planB: 'Record the question and retain the paused program until the real user reply arrives.'
         },
       context(session, 'plan-call-s2', 'plan-run-s2'),
     )
@@ -109,15 +107,14 @@ test('WHAT[work-050] a pending question blocks every new plan call until the use
     runtime.client.tui = { showToast: async () => ({}) }
     const parked = await hooks.tool['todowrite-for-plan'].execute(
       { program: program(`    await this.ask('Still waiting?');\n    return { done: true };`), name: 'ask-wait',
-          prefixUntil: 0,
-          carry: []
+          planB: 'Record the question and retain the paused program until the real user reply arrives.'
         },
       context(session),
     )
     assert.match(parked, /# parked/)
 
     const blocked = await hooks.tool['todowrite-for-plan'].execute(
-      { abandon: { handle: handleOf(parked) } },
+      { name: 'abandon-question', planB: 'Request cleanup only if the pending-question gate admits this operation.', program: program('return await this.abandon(' + JSON.stringify(nameOf(parked)) + ');') },
       context(session, 'plan-call-abandon', 'plan-run-abandon'),
     )
     assert.match(String(blocked), /等待|waiting|不能/)

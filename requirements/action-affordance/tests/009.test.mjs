@@ -17,8 +17,8 @@ integrationTest('WHAT[action-affordance-009] commission descriptions do not adve
     await acceptAuthorityRoot(runtime, sessionID, 'orchestrator')
     const commission = async (calling) => String(await hooks.tool['todowrite-for-orchestrator'].execute(
       { program: commissionProgram({ calling, name: 'North Road', charge: 'x' }),
-          prefixUntil: 0,
-          carry: []
+          name: `commission-${calling}`,
+          planB: 'Observe this role-specific commission result before continuing.'
         },
       { sessionID, agent: 'orchestrator', callID: `call-009-${calling}`, messageID: `msg-009-${calling}` },
     ))

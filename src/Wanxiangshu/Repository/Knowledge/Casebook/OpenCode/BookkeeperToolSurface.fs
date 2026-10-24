@@ -12,9 +12,8 @@ open Wanxiangshu.Repository.Programming.Js.OpenCode
 /// `HostToolArguments`/`ToolHostCodec`.
 module CasebookBookkeeperToolSurface =
 
-    let runProgram (sessionId: string) (program: string) : Task<string> =
-        let args =
-            Wanxiangshu.OpenCode.HostToolArguments(createObj [ "program" ==> program ])
+    let runProgram (sessionId: string) (input: obj) : Task<string> =
+        let args = Wanxiangshu.OpenCode.HostToolArguments input
 
         task {
             let! result = JsBookkeeperTool.execute args (SessionId.create sessionId)

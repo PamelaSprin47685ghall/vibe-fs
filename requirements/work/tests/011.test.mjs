@@ -172,8 +172,8 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     runtime.pushHostMessage(sessionID, review)
     const reviewResult = await hooks.tool['todowrite-for-manager'].execute(
       { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }`,
-          prefixUntil: 0,
-          carry: []
+          name: 'review-findings',
+          planB: 'Wait for the actual review or delegation receipt under the admitted deadline.'
         },
       { sessionID, agent: 'manager', callID: 'call-review', messageID: review.id },
     )
@@ -191,8 +191,8 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
     runtime.pushHostMessage(sessionID, clearReview)
     const clearResult = await hooks.tool['todowrite-for-manager'].execute(
       { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(clearFindings)}); } }`,
-          prefixUntil: 0,
-          carry: []
+          name: 'clear-findings',
+          planB: 'Wait for the actual review or delegation receipt under the admitted deadline.'
         },
       { sessionID, agent: 'manager', callID: 'call-clear-review', messageID: clearReview.id },
     )
@@ -241,8 +241,7 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
         program:
           'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "alice", charge: "implement" }, []); } }',
         name: 'fork-successor',
-          prefixUntil: 0,
-          carry: []
+          planB: 'Wait for the actual review or delegation receipt under the admitted deadline.'
         },
       context('call-fork-successor', 'msg-successor'),
     )
@@ -339,8 +338,8 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
     runtime.pushHostMessage(sessionID, review)
     const reviewResult = await hooks.tool['todowrite-for-manager'].execute(
       { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }`,
-          prefixUntil: 0,
-          carry: []
+          name: 'review-findings',
+          planB: 'Wait for the actual review or delegation receipt under the admitted deadline.'
         },
       { sessionID, agent: 'manager', callID: 'call-review', messageID: review.id },
     )
@@ -357,8 +356,8 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
     runtime.pushHostMessage(sessionID, clearReview)
     const clearResult = await hooks.tool['todowrite-for-manager'].execute(
       { program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(clearFindings)}); } }`,
-          prefixUntil: 0,
-          carry: []
+          name: 'clear-findings',
+          planB: 'Wait for the actual review or delegation receipt under the admitted deadline.'
         },
       { sessionID, agent: 'manager', callID: 'call-clear-review', messageID: clearReview.id },
     )

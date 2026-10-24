@@ -4,12 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 /// Ephemeral staging, all-or-nothing commit and rollback, bridged to
-/// `wanxiangli/fs` (CUT-24). The write/rollback algorithm lives in the
+/// `wanxiangli/runtime` (CUT-24). The write/rollback algorithm lives in the
 /// library; this module keeps the main-repo signature stable. Durable facts
 /// never live here; EventStore owns them (JS-012).
 module JsMutationFs =
 
-    [<Import("Filesystem", "wanxiangli/fs")>]
+    [<Import("Filesystem", "wanxiangli/runtime")>]
     let private Filesystem: obj = jsNative
 
     [<Emit("$0({ root: $1 })")>]

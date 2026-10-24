@@ -30,8 +30,7 @@ test('WHAT[work-009] deliver reports the live blocker instead of reporting an en
         program:
           'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "implement" }, []); } }',
         name: 'fork-ada',
-          prefixUntil: 0,
-          carry: []
+          planB: 'Wait for the manager fork receipt before checking the live delivery blocker.'
         },
       { sessionID: session, agent: 'manager' },
     )

@@ -1,7 +1,5 @@
-park(payload) —— 在这个 await 点挂起程序，把控制权交还编排层。返回的 `{ handle, payload }` 是挂起结果，不是另一种工具入参。`todowrite-for-*` 只接收必填 `program` 字符串；恢复或放弃挂起现场应经程序生命周期的专用接口，不得把 `unpark` 或 `abandon` 放入工具顶层参数。
+park(payload) 把本程序停在原表达式，回执包含 name、state、reason、payload 和完整源码，已落盘写保留。
 
-程序视角里 park 只是一次对外部输入的普通 await：恢复值就是调用方经 unpark 注入的东西。现场在宿主中保持存活，直到被恢复或放弃；挂起的程序不算结束，已落盘的写保持原样（as-is）。
+另提交含 name、program、planB 的工具请求，在新控制程序内调用 `return await this.unpark("target", value)`。只有显式 park（含 where 歧义）接收 value；call 取得原命令真实结果。目标共用控制者期限，之后只恢复控制者不会隐式再恢复目标。
 
-`unpark.value` 是任意 JSON：含义与消费方式由 park 点定义。注入错了由下游自然失败；宿主不做预校验。`where` 的歧义分支走同一通道（载荷是 `{ needle, candidates, nearest }`）。
-
-parked 载荷到达时，按从便宜到昂贵的顺序决策：先读载荷。`where` 的歧义携带 `candidates`/`nearest`——诊断指向正确位置就 unpark 注入该 span，程序从原 await 处继续；这是日常结局，代价只是一次调用。abandon 是重武器：它拆掉存活现场、整个程序得重新发起——只在程序逻辑本身必须重写时才用它，那种情况下程序自己的不变量也会拒绝恢复。
+where 歧义先读 candidates 和 nearest，再注入选定 span。取消时由新命名程序调用 `this.abandon("target")`，确认收尾后才报告 abandoned；强制终止不保证 finally。名字和终态回执保留至会话清理，结果未知的副作用不重跑。

@@ -25,7 +25,7 @@ test('WHAT[repository-programming-031] deliver hard gate is wired at the deliver
   // 无关 session 的 park 不得阻塞本次交付（LC-008）。
   assert.match(registry, /deliveryBlockers.*ForSession ctx\.SessionId/)
   assert.match(registry, /if not \(List\.isEmpty blockers\)/)
-  assert.match(registry, /parked_handles/, 'refusal must carry the parked handle list')
+  assert.match(registry, /program_names/, 'refusal must carry the pending program names')
   assert.match(registry, /Path\.DeliverBlockedByParked/)
   assert.match(registry, /Some \[ "S1"; "S2"; "S3" \] -> return! planSpec\.Execute args ctx/)
 })
@@ -37,11 +37,11 @@ test('WHAT[repository-programming-031] parked reminder rides the PairHint compos
   assert.match(transform, /ParkedHintPath = "tool\/js-program\/parked-hint"/)
 
   // 提醒并入 composeMarkerDocument：只查询本 session 的未表态 handle，非空
-  // 时渲染提醒并追加为 marker 文档指令；全局 parkedHandles 消费已按 LC-008
+  // 时渲染提醒并追加为 marker 文档指令；全局 parkedNames 消费已按 LC-008
   // 移除。无载体回合不走到 composeMarkerDocument（由既有
   // decideCurrentPlacement 保证），因此不会凭空注入。
-  assert.match(transform, /JsParkedSites\.handlesForSession sessionId/)
-  assert.doesNotMatch(transform, /JsParkedSites\.parkedHandles \(\)/)
+  assert.match(transform, /JsPrograms\.pendingNames sessionId/)
+  assert.doesNotMatch(transform, /JsPrograms\.parkedNames \(\)/)
   assert.match(transform, /LlmFacing\.withInstructions parkedHint/)
   assert.match(transform, /ProviderProse\.render language ParkedHintPath/)
 })
@@ -51,8 +51,8 @@ test('WHAT[repository-programming-031] session close force-reaps parked sites ow
 
   // G3：ClearSession 清理链中调用 lane-a-core 的 reap 接口，对 session 名下
   // 全部 Parked 现场执行算法 F，durable 记 Reaped。
-  assert.match(scope, /JsParkedSites\.reapSession sessionId/)
-  assert.match(scope, /do! attempt \(fun \(\) -> JsParkedSites\.reapSession sessionId\)/)
+  assert.match(scope, /JsPrograms\.closeSession sessionId/)
+  assert.match(scope, /let! names = JsPrograms\.closeSession sessionId/)
 })
 
 test('WHAT[repository-programming-031] parked reminder and deliver-block resources are paired bilingual files', () => {
@@ -77,17 +77,17 @@ test('WHAT[repository-programming-031] the three call sites stay within the owne
   const transform = read(join(SOURCE_ROOT, 'OpenCode/Host/PairProgrammingThoughtTransform.fs'))
   const scope = read(join(SOURCE_ROOT, 'OpenCode/Host/PluginSessionScope.fs'))
 
-  // 调用方身份：只调用 JsParkedSites，不定义现场表或 reap 接口本身。
+  // 调用方身份：只调用 JsPrograms，不定义现场表或 reap 接口本身。
   for (const source of [ registry, transform, scope ]) {
     assert.doesNotMatch(source, /type JsParkedSite\b/, 'caller must not define the parked site type')
-    assert.doesNotMatch(source, /module JsParkedSites\s*=|module JsParkedSites\b[^\n]*=/, 'caller must not define the parked site table module')
+    assert.doesNotMatch(source, /module JsPrograms\s*=|module JsPrograms\b[^\n]*=/, 'caller must not define the parked site table module')
   }
 })
 
 // ── 行为级三用例（GAP-2）：真现场、真调用、真拒绝，不用源码形状冒充 ──────────
 // 上面的接线用例继续守护调用点位置；下面三个用例守护同一批语义在真实执行下的
 // 效果。park 现场通过 WorkflowSurface 的真实沙箱执行进入进程级现场表
-// （JsParkedSites），与 plugin fixture 的 deliver / messages.transform 在
+// （JsPrograms），与 plugin fixture 的 deliver / messages.transform 在
 // 同一进程共享这张表——这正是被测耦合本身。
 
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -97,27 +97,27 @@ import { scores, withReview } from '../../work/tests/support/plugin.mjs'
 import {
   execute as executeWorkflow,
   caseName,
-  parkedHandle,
+  parkedName,
 } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 import {
-  handlesForSession,
-  parkedHandles,
-  reapSession,
-  clearAll,
-} from '../../../dist/Repository/Programming/Js/ParkedSites.js'
+  pendingNames,
+  closeSession,
+  closeAll,
+} from '../../../dist/Repository/Programming/Js/Programs.js'
 
+const WAIT = 'Wait for this named lifecycle operation and preserve its target if the shared request deadline expires.'
 const parkProgram = (tag) => `class Js extends JsProgram {
   async run() {
     const decision = await this.park({ stage: '${tag}' });
-    return { decided: decision.value };
+    return { decided: decision };
   }
 }`
 
 const parkOne = async (dir, sessionId, tag) => {
   const name = `park-${tag}`
-  const outcome = await executeWorkflow(dir, 'Engineer', 'en', sessionId, { name, program: parkProgram(tag) }, 2000, Date.now() + 60_000, 1 << 20, null)
+  const outcome = await executeWorkflow(dir, 'Engineer', 'en', sessionId, { name, program: parkProgram(tag), planB: WAIT }, 2000, Date.now() + 60_000, 1 << 20, null)
   assert.equal(caseName(outcome), 'Parked', `park for ${tag} must produce a real parked site`)
-  const handle = parkedHandle(outcome)
+  const handle = parkedName(outcome)
   assert.ok(typeof handle === 'string' && handle.length > 0, 'the parked payload must carry a non-empty handle')
   return handle
 }
@@ -144,12 +144,12 @@ test('WHAT[repository-programming-031] a real parked handle blocks deliver and t
       assert.match(refused, /parked-deliver-blocked/, 'deliver must reach the parked gate and be refused with its code')
       assert.ok(String(refused).includes(handle), `refusal must list the live handle ${handle}`)
       // 先放弃本 session 的 handle，才轮到外会话对照。
-      await executeWorkflow(runtime.directory, 'Engineer', 'en', session, { abandon: { handle } }, 2000, Date.now() + 60_000, 1 << 20, null)
+      await executeWorkflow(runtime.directory, 'Engineer', 'en', session, { name: 'abandon-deliver-gate', planB: WAIT, program: 'class Js extends JsProgram { async run() { return await this.abandon(' + JSON.stringify(handle) + '); } }' }, 2000, Date.now() + 60_000, 1 << 20, null)
 
       // 反向对照：清空现场后，同一合法权威的另一次调用直接落到正常两段确认
       // （confirmation_required），不再得到 parked 拒绝。这既证明上下文本来
       // 就能触达业务语义（不是权威拒绝冒充门禁），也排除"恒拒"假门禁。
-      clearAll()
+      await closeAll()
       const released = await hooks.tool.deliver.execute({}, { ...context, callID: 'deliver-cleared', messageID: 'cleared-run', providerRunID: 'run-cleared' })
       assert.ok(!String(released).includes('parked-deliver-blocked'), 'cleared table must release the deliver gate')
       assert.match(released, /outcome = "Delivered"|confirmation_required = true/, 'the released call must land on the real deliver path')
@@ -161,7 +161,7 @@ test('WHAT[repository-programming-031] a real parked handle blocks deliver and t
       const afterForeign = await hooks.tool.deliver.execute({}, { ...context, callID: 'deliver-foreign', messageID: 'foreign-run', providerRunID: 'run-foreign' })
       assert.ok(!String(afterForeign).includes('parked-deliver-blocked'), 'a foreign session park must not block this deliver')
     } finally {
-      clearAll()
+      await closeAll()
     }
   }, { session: 'parked-deliver-gate-031' })
 })
@@ -204,7 +204,7 @@ test('WHAT[repository-programming-031] a live parked handle is folded into the P
 
       // 对照：另一个同样合法 bootstrap 的会话、现场已清空——注入链照走
       // （cursor 后缀在场）但不出现任何 park- handle。
-      clearAll()
+      await closeAll()
       const clean = 'parked-hint-031-clean'
       const second = await bootstrap(hooks, runtime, clean)
       const cleanMessages = [second]
@@ -215,26 +215,26 @@ test('WHAT[repository-programming-031] a live parked handle is folded into the P
       assert.ok(cleanText.includes('\u0000\ufeff'), 'the clean round must still run the injection chain')
       assert.ok(!cleanText.includes('park-'), 'a cleared table must not inject any parked reminder')
     } finally {
-      clearAll()
+      await closeAll()
     }
   })
 })
 
-test('WHAT[repository-programming-031] reapSession consumes every site of its session from the real table', async () => {
+test('WHAT[repository-programming-031] closeSession consumes every site of its session from the real table', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-reap-031-'))
   try {
     const session = 'reap-session-031'
     const handle = await parkOne(dir, session, 'reap-site')
 
     // 现场携带 session owner：按会话枚举能看见它（G3 的 durable 记账输入）。
-    assert.deepEqual(Array.from(handlesForSession(session)), [ handle ], 'the site must be owned by its session')
+    assert.deepEqual(Array.from(pendingNames(session)), [ handle ], 'the site must be owned by its session')
 
     // 真实现场表喂给 reap：清场必须发生在全局查询里，不只是本会话视图。
-    await reapSession(session)
-    assert.ok(!Array.from(parkedHandles()).includes(handle), 'reapSession must consume the parked site from the table')
-    assert.deepEqual(Array.from(handlesForSession(session)), [], 'no site of the reaped session may survive')
+    await closeSession(session)
+    assert.deepEqual(Array.from(pendingNames(session)), [], 'closeSession must confirm resource cleanup')
+    assert.deepEqual(Array.from(pendingNames(session)), [], 'no site of the reaped session may survive')
   } finally {
-    clearAll()
+    await closeAll()
     rmSync(dir, { recursive: true, force: true })
   }
 })

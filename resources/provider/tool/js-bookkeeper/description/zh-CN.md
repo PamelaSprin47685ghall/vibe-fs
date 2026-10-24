@@ -1,3 +1,5 @@
+工具参数 name、program、planB 均为必填字符串。顶层 planB 按 UTF-8 字节数 × 50 ms 确定整个程序的一次准入期限，成员不能续期。
+
 用一次原子的 JavaScript transformation 编写 staged Case 的下一形态。
 
 本次 transaction 中 Case 已经冻结。question(matches = []) 与 answer(matches = []) 返回带有序 anchor 的不可变文本视图。view.text(from = "^", to = "$") 切出精确文本；anchor 名可以使用截断后的 +N/-N 偏移（N 是 JS 字符串下标增量，不是行号）。

@@ -4,12 +4,12 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Deterministic gitignore-aware glob, bridged to `wanxiangli/fs` (CUT-24).
+/// Deterministic gitignore-aware glob, bridged to `wanxiangli/runtime` (CUT-24).
 /// The enumeration algorithm lives in the library; this module keeps the
 /// main-repo signature stable.
 module JsGlobFs =
 
-    [<Import("Filesystem", "wanxiangli/fs")>]
+    [<Import("Filesystem", "wanxiangli/runtime")>]
     let private Filesystem: obj = jsNative
 
     [<Emit("$0({ root: $1 })")>]

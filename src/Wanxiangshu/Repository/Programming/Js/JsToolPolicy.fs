@@ -47,26 +47,23 @@ module JsToolPolicy =
         && JsCapability.admitsProgrammingSurface (OfficeCapability.permissions role)
 
     /// Manager cannot read by default.
-    let defaultReadCheck (roleName: string) (readCheck: ('context -> Task<bool>) option) : ('context -> Task<bool>) option =
+    let defaultReadCheck
+        (roleName: string)
+        (readCheck: ('context -> Task<bool>) option)
+        : ('context -> Task<bool>) option =
         match readCheck with
         | None when roleName.Trim().ToLowerInvariant() = "manager" -> Some(fun _ -> Task.FromResult false)
         | configured -> configured
 
-    /// Default invocation name when not specified.
-    let defaultInvocationName
-        (toolCallId: ToolCallId option)
-        (providerRunId: ProviderRunIdentity option)
-        (sessionId: string)
-        : string =
-        toolCallId
-        |> Option.map ToolCallId.value
-        |> Option.orElseWith (fun () ->
-            providerRunId |> Option.map ProviderRunIdentity.value)
-        |> Option.defaultValue ("call-" + sessionId)
+    let argNameProse () : string =
+        ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) "tool/js-program/arg-name" Map.empty
 
     /// The prose of the `program` argument, already localized for the host.
     let argProgramProse () : string =
         JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ())
+
+    let argPlanBProse () : string =
+        ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) "tool/js-program/arg-planB" Map.empty
 
     /// The prose of the refusal of a call that carries no state at all.
     let missingProgramProse () : string =
@@ -76,5 +73,10 @@ module JsToolPolicy =
     let missingProgramResult () : string =
         ToolResultText.tomlObject [ "error", ToolResultText.TString(missingProgramProse ()) ]
 
-    let renderCommitted (sessionId: string) (callIdentity: (string * string) option) (declaration: obj) outcome : string =
+    let renderCommitted
+        (sessionId: string)
+        (callIdentity: (string * string) option)
+        (declaration: obj)
+        outcome
+        : string =
         JsToolsResult.render outcome

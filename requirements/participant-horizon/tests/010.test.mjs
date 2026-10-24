@@ -35,8 +35,8 @@ integrationTest('WHAT[participant-horizon-010] actual fork and commission schema
     let call = 0
     const run = async (tool, sessionID, agent, verb, payload) => String(await hooks.tool[tool].execute(
       { program: memberProgram(verb, payload),
-          prefixUntil: 0,
-          carry: []
+          name: `horizon-010-${call + 1}`,
+          planB: 'Observe this delegation receipt before reading the participant horizon.'
         },
       { sessionID, agent, callID: `call-010-${++call}`, messageID: `msg-010-${call}` },
     ))

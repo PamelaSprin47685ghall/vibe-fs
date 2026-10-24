@@ -153,7 +153,7 @@ test('WHAT[repository-programming-023] JS_EDIT_preserves_a_consistent_CRLF_file_
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\r\nbeta\r\n', 'utf8')
     const outcome = await execute(dir, `    const text = await this.cat('a.txt');
-    const [begin, end] = await this.where(text, 'alpha\\nbeta');
+    const [begin, end] = await this.where(text, 'alpha\\r\\nbeta');
     this.write('a.txt', text.slice(0, begin) + 'alpha\\r\\ngamma\\r\\nbeta' + text.slice(end));`)
 
     assert.equal(caseName(outcome), 'Succeeded')

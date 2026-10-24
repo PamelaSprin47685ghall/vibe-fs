@@ -1,10 +1,18 @@
-  async park(payload) {
-    // 在此 await 点挂起并交回 { handle, payload }。公开工具入参始终只有 { program: string }；恢复／放弃走专用生命周期接口，不是 Host 工具参数。
-    // 例如: const decision = await this.park({ stage: "review" });
+async park(payload) {
+    // 停在当前表达式；只有显式 park（含 where 歧义）接收恢复值。
+  }
+
+  async unpark(name, value) {
+    // 恢复原命名程序；value 可省略，只交给显式 park。
+    // 目标共用本次请求已有期限；没有预算参数。
+    // 后续恢复控制者，不会隐式再次恢复它的目标。
+  }
+
+  async abandon(name) {
+    // 请求取消并报告真实收尾，确认资源结清后才报告 abandoned。
+    // 正常展开运行 finally，强制终止不能保证它执行。
   }
 
   async run() {
-    // 程序入口：你的类实现它，返回值即本程序的结果（须是 JSON 兼容值）。
-    // 例如: async run() { return { ok: true }; }
+    // 返回 JSON 兼容数据；return 不代替业务 deliver。
   }
-

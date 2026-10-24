@@ -7,7 +7,7 @@ import { parse as parseToml } from 'smol-toml'
 import {
   execute,
   caseName,
-  parkedHandle,
+  closePrograms,
   render,
 } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 import {
@@ -26,12 +26,12 @@ ${body}
   }
 }`
 
+let nextProgram = 0
+const WAIT = 'Wait for this delegated operation and preserve its original outcome if the shared deadline expires.'
 const runProgram = (dir, body, sessionId) =>
-  execute(dir, 'Manager', 'en', sessionId, { name: 'delegation-envelope', program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
+  execute(dir, 'Manager', 'en', sessionId, { name: 'delegation-' + (++nextProgram), program: program(body), planB: WAIT }, 3000, Date.now() + 60_000, 1 << 20, null)
 
-// A stateful fake host: every delegation member travels the single
-// `(name, payload, carry)` entry; delegated charges are remembered
-// until the next join consumes them.
+// The host receives structured delegation messages; join is a separate tool.
 const fakeHost = () => {
   const pending = []
   const calls = []
@@ -53,19 +53,6 @@ const fakeHost = () => {
       pending.push({ name: payload.name, agentId, member: name })
       return { ok: true, name: payload.name, agentId, outcome: 'created' }
     },
-    join: async () => {
-      const records = pending.splice(0)
-      return {
-        ok: true,
-        records: records.map((entry) => ({
-          name: entry.name,
-          agentId: entry.agentId,
-          role: 'engineer',
-          status: 'completed',
-          returned: [{ text: `record:${entry.name}` }],
-        })),
-      }
-    },
     fission: async (payload) => ({
       ok: true,
       groupId: 'group-1',
@@ -77,7 +64,7 @@ const fakeHost = () => {
 }
 
 const install = (sessionId, host) =>
-  installDelegationHost(sessionId, host.delegate, host.join, host.fission, host.horizon, host.advisor)
+  installDelegationHost(sessionId, host.delegate, host.fission, host.horizon, host.advisor)
 
 test('WHAT[repository-programming-056] delegation members return data envelopes, never prose', async () => {
   const { dir, cleanup } = sandbox()
@@ -87,18 +74,16 @@ test('WHAT[repository-programming-056] delegation members return data envelopes,
     install(sessionId, host)
     const outcome = await runProgram(
       dir,
-      `    const placed = await this.fork("index the parser module", [1]);
-    const joined = await this.join();
-    return { placed, joined };`,
+      `    const placed = await this.fork("index the parser module");
+    return { placed, join: typeof this.join, dag: typeof this.dag };`,
       sessionId,
     )
     assert.equal(caseName(outcome), 'Succeeded')
     const doc = render(outcome)
     assert.match(doc, /name = "index-the-parser-module"/, 'the name is derived from the charge')
     assert.match(doc, /outcome = "created"/)
-    assert.match(doc, /record:index-the-parser-module/, 'join returns the delivered view')
-    assert.deepEqual(parseToml(doc).data.joined.records[0].returned, [{ text: 'record:index-the-parser-module' }])
-    assert.match(doc, /\[\[data\.joined\.records\.returned\]\]/, 'returned entries are actual TOML tables')
+    assert.equal(parseToml(doc).data.join, 'undefined')
+    assert.equal(parseToml(doc).data.dag, 'undefined')
 
     // fission belongs to roles that hold the Fission permission (Engineer).
     install(`${sessionId}-fission`, host)
@@ -109,6 +94,7 @@ test('WHAT[repository-programming-056] delegation members return data envelopes,
       `${sessionId}-fission`,
       {
         name: 'fission-envelope',
+        planB: WAIT,
         program: program(
           `    return await this.fission({ charge: "explore three designs", lanes: 2 });`,
         ),
@@ -124,6 +110,7 @@ test('WHAT[repository-programming-056] delegation members return data envelopes,
     assert.match(fissionDoc, /sessionId = "lane-0"/)
   } finally {
     clearDelegationHost(sessionId)
+    await closePrograms()
     cleanup()
   }
 })
@@ -155,7 +142,6 @@ test('WHAT[repository-programming-056] this.horizon serves the installed host ro
       sessionId,
       notExercised,
       notExercised,
-      notExercised,
       async () => roster,
       notExercised,
     )
@@ -172,11 +158,12 @@ test('WHAT[repository-programming-056] this.horizon serves the installed host ro
     assert.match(render(unwired), /code = "DELEGATION_UNAVAILABLE"/)
   } finally {
     clearDelegationHost(sessionId)
+    await closePrograms()
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-056] fork and dag require the Fork capability', async () => {
+test('WHAT[repository-programming-056] fork requires the Fork capability and dag is absent', async () => {
   const { dir, cleanup } = sandbox()
   const sessionId = `sess-nofork-${Math.random().toString(36).slice(2, 8)}`
   try {
@@ -187,7 +174,7 @@ test('WHAT[repository-programming-056] fork and dag require the Fork capability'
       'Engineer',
       'en',
       sessionId,
-      { name: 'fork-capability', program: program(`    return { allowFork: typeof this.fork, allowDag: typeof this.dag };`) },
+      { name: 'fork-capability', planB: WAIT, program: program(`    return { allowFork: typeof this.fork, allowDag: typeof this.dag };`) },
       3000,
       Date.now() + 60_000,
       1 << 20,
@@ -199,6 +186,7 @@ test('WHAT[repository-programming-056] fork and dag require the Fork capability'
     assert.match(doc, /allowDag = "undefined"/)
   } finally {
     clearDelegationHost(sessionId)
+    await closePrograms()
     cleanup()
   }
 })
@@ -221,6 +209,7 @@ test('WHAT[repository-programming-056] a refusal envelope reaches the program as
     assert.match(doc, /continued = true/, 'a refusal does not throw; the program keeps running')
   } finally {
     clearDelegationHost(sessionId)
+    await closePrograms()
     cleanup()
   }
 })
@@ -237,6 +226,7 @@ test('WHAT[repository-programming-056] a missing host yields the DELEGATION_UNAV
     const doc = render(outcome)
     assert.match(doc, /code = "DELEGATION_UNAVAILABLE"/)
   } finally {
+    await closePrograms()
     cleanup()
   }
 })
@@ -261,165 +251,7 @@ test('WHAT[repository-programming-056] fork starts a delegate with payload alone
     assert.equal(host.calls.length, 1)
   } finally {
     clearDelegationHost(sessionId)
+    await closePrograms()
     cleanup()
   }
 })
-
-
-test('WHAT[repository-programming-056] dag runs dependencies in waves and carries their records', async () => {
-  const { dir, cleanup } = sandbox()
-  const sessionId = `sess-dag-${Math.random().toString(36).slice(2, 8)}`
-  try {
-    const host = fakeHost()
-    install(sessionId, host)
-    const outcome = await runProgram(
-      dir,
-      `    return await this.dag({ nodes: [
-      { id: "spec", charge: "write the interface spec" },
-      { id: "impl", charge: "implement it", deps: ["spec"] },
-    ] });`,
-      sessionId,
-    )
-    assert.equal(caseName(outcome), 'Succeeded')
-    const doc = render(outcome)
-    assert.match(doc, /record:spec/)
-    assert.match(doc, /record:impl/)
-    assert.match(doc, /skipped = \[\]/)
-    assert.equal(host.calls[1].payload.charge, 'implement it', 'the task contains only its own intent')
-    assert.doesNotMatch(doc, /byName|view =/, 'returned entries have one structured representation')
-  } finally {
-    clearDelegationHost(sessionId)
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-056] a failed dag node parks and the injected skip decides', async () => {
-  const { dir, cleanup } = sandbox()
-  const sessionId = `sess-dagpark-${Math.random().toString(36).slice(2, 8)}`
-  try {
-    const host = fakeHost()
-    // The "impl" node's child fails at terminal.
-    const failingJoin = async () => {
-      const records = host.pending.splice(0)
-      return {
-        ok: true,
-        records: records.map((entry) => ({
-          name: entry.name,
-          agentId: entry.agentId,
-          role: 'engineer',
-          status: entry.name === 'impl' ? 'failed' : 'completed',
-          returned: entry.name === 'impl' ? [] : [{ text: `record:${entry.name}` }],
-        })),
-      }
-    }
-    installDelegationHost(sessionId, host.delegate, failingJoin, host.fission, host.horizon, host.advisor)
-
-    const parked = await runProgram(
-      dir,
-      `    return await this.dag({ nodes: [
-      { id: "spec", charge: "write the interface spec" },
-      { id: "impl", charge: "implement it", deps: ["spec"] },
-    ] }, [1]);`,
-      sessionId,
-    )
-    assert.equal(caseName(parked), 'Parked')
-    const doc = render(parked)
-    assert.match(doc, /code = "node-failed"/)
-    assert.match(doc, /# parked/)
-
-    const resumed = await execute(
-      dir,
-      'Manager',
-      'en',
-      sessionId,
-      { name: 'skip-failed-dag-node', unpark: { handle: parkedHandle(parked), value: 'skip' } },
-      3000,
-      Date.now() + 60_000,
-      1 << 20,
-      null,
-    )
-    assert.equal(caseName(resumed), 'Succeeded')
-    const resumedDoc = render(resumed)
-    assert.match(resumedDoc, /skipped = \["impl"\]/)
-  } finally {
-    clearDelegationHost(sessionId)
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-056] a voided child reports status voided in join and parks dag on node-voided', async () => {
-  const { dir, cleanup } = sandbox()
-  const sessionId = `sess-dagvoided-${Math.random().toString(36).slice(2, 8)}`
-  let implAgentId = null
-  try {
-    const host = fakeHost()
-    const voidedJoin = async () => {
-      const records = host.pending.splice(0)
-      const mapped = records.map((entry) => ({
-        name: entry.name,
-        agentId: entry.agentId,
-        role: 'engineer',
-        status: entry.name === 'impl' ? 'voided' : 'completed',
-        returned: entry.name === 'impl' ? [] : [{ text: `record:${entry.name}` }],
-      }))
-      return {
-        ok: true,
-        records: mapped,
-      }
-    }
-    // 已作废（voided）的子工作已结算：父方被告知一次，自行决定重试、跳过或替换。
-    const trackingDelegate = async (name, payload, carry) => {
-      const res = await host.delegate(name, payload, carry)
-      if (res.ok && res.name === 'impl') {
-        implAgentId = res.agentId
-      }
-      return res
-    }
-    installDelegationHost(sessionId, trackingDelegate, voidedJoin, host.fission, host.horizon, host.advisor)
-
-    const joinOutcome = await runProgram(
-      dir,
-      `    await this.fork({ charge: "implement it", name: "impl" }, [1]);
-    return await this.join();`,
-      sessionId,
-    )
-    assert.equal(caseName(joinOutcome), 'Succeeded')
-    const joinDoc = render(joinOutcome)
-    assert.match(joinDoc, /status = "voided"/)
-    assert.match(joinDoc, /returned = \[\]/)
-    // voided 表示子工作已作废而非完成：义务已结清，父方被告知一次后决定重试/跳过/替换。
-    assert.ok(implAgentId !== null, 'forked agent id must be tracked')
-
-    const parked = await runProgram(
-      dir,
-      `    return await this.dag({ nodes: [
-      { id: "spec", charge: "write the interface spec" },
-      { id: "impl", charge: "implement it", deps: ["spec"] },
-    ] }, [1]);`,
-      sessionId,
-    )
-    assert.equal(caseName(parked), 'Parked')
-    const doc = render(parked)
-    assert.match(doc, /code = "node-voided"/)
-    assert.match(doc, /# parked/)
-
-    const resumed = await execute(
-      dir,
-      'Manager',
-      'en',
-      sessionId,
-      { name: 'replace-voided-dag-node', unpark: { handle: parkedHandle(parked), value: { returned: [{ text: 'manual-impl' }] } } },
-      3000,
-      Date.now() + 60_000,
-      1 << 20,
-      null,
-    )
-    assert.equal(caseName(resumed), 'Succeeded')
-    const resumedDoc = render(resumed)
-    assert.match(resumedDoc, /manual-impl/)
-  } finally {
-    clearDelegationHost(sessionId)
-    cleanup()
-  }
-})
-

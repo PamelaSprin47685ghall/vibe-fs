@@ -89,7 +89,8 @@ test('WHAT[managed-session-lifecycle-013] a stale-projection consumer is arbitra
       // payload left to hand out), and the tombstone itself is read back from
       // the durable facts below.
       const stale = await joinCall(hooks, owner)
-      assert.match(stale, /ok = false/)
+      assert.match(stale, /There is nothing away to receive|目前没有在外可接收的工作/)
+      assert.doesNotMatch(stale, /RACE-ANSWER/)
       assert.doesNotMatch(stale, /RACE-ANSWER/)
 
       // Durable replay keeps a single terminal: a fresh cold reader sees the

@@ -1,12 +1,16 @@
-  async call(command, planB) {
-    // Returns { ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }. command is one shell string. planB is required: the alternative if this command is not run. Its UTF-8 byte length × 50ms is the automatic yield budget. A missing planB is CALL_COMMAND_UNSUPPORTED. stdout and stderr are the increment since the previous automatic park.
-    // Example: const outcome = await this.call("printf ok", "read the file directly");
+async call(command) {
+    // Drain this program's earlier SDK operations, then start one shell command.
+    // Blocks this program even without await. Both stages and every later call
+    // share the remaining time of the top-level planB window. Expiry does not kill the command.
+    // Final result retains stdout/stderr, real exitCode or signal, bytes, durationMs,
+    // explicit truncation and raw outputFiles. Delta does not consume it.
   }
 
-  async signal(signal) {
-    // Signals the call that parked this program. CALL_CHILD_UNKNOWN when that command has already ended.
+  async signal(name, signal) {
+    // Signal the named program's current command without resuming its code.
   }
 
-  async send(input) {
-    // Writes keyboard input to the call that parked this program, appending a newline when missing. CALL_CHILD_UNKNOWN when that command has already ended.
+  async send(name, input) {
+    // Send input without resuming the target; append a missing newline.
+    // Acceptance does not prove the command processed it.
   }

@@ -33,11 +33,11 @@ const storeOf = async (directory) => workspaceEvents.acquire(await journalSurfac
 
 // 编程面成员的唯一入口：Manager 的 `todowrite-for-manager` 工具执行一段程序，
 // 程序内调用 `this.fork` / `this.resume`。返回渲染后的 TOML 字符串。
+let programSequence = 0
 const runManagerProgram = async (hooks, sessionID, body) =>
   await hooks.tool['todowrite-for-manager'].execute(
-    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'manager-program',
-          prefixUntil: 0,
-          carry: []
+    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'manager-program-' + (++programSequence),
+          planB: 'Wait for the actual manager dispatch receipt without extending the request window.'
         },
     { sessionID, agent: 'manager' },
   )

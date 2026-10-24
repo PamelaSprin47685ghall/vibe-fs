@@ -35,15 +35,10 @@ module JsToolSpec =
         : ToolSpec =
         let readCheck = JsToolPolicy.defaultReadCheck surface.RoleName readCheck
 
-        /// The Host exposes one mandatory source argument. A physical tool-call
-        /// fence supplies the runtime name; no recovery state is modeled as a
-        /// top-level tool argument.
-        let inputOf (args: HostToolArguments) (ctx: HostToolContext) : obj option =
-            args.OptionalText "program"
-            |> Option.map (fun source ->
-                createObj
-                    [ "program" ==> box source
-                      "name" ==> box (JsToolPolicy.defaultInvocationName ctx.ToolCallId ctx.ProviderRunId ctx.SessionId) ])
+        let inputOf (args: HostToolArguments) : obj option =
+            match args.OptionalText "name", args.OptionalText "program", args.OptionalText "planB" with
+            | Some _, Some _, Some _ -> Some args.Raw
+            | _ -> None
 
         let callFenceOf (ctx: HostToolContext) =
             match ctx.ProviderRunId, ctx.ToolCallId with
@@ -64,7 +59,7 @@ module JsToolSpec =
                 // The session's own directory wins over the plugin workspace:
                 // a road's deliverable belongs in the worktree that session was
                 // created in, not in the target's checkout.
-                let (Ports.WorkspacePath rootPath) = Ports.WorkspacePath (rootOf ctx.SessionId)
+                let (Ports.WorkspacePath rootPath) = Ports.WorkspacePath(rootOf ctx.SessionId)
                 let root = rootPath
                 let fence = callFenceOf ctx
 
@@ -107,10 +102,12 @@ module JsToolSpec =
         { Name = surface.ToolName
           Description = surface.Description
           Arguments =
-            [ "program", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argProgramProse ()) factory ]
+            [ "name", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argNameProse ()) factory
+              "program", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argProgramProse ()) factory
+              "planB", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argPlanBProse ()) factory ]
           Execute =
             fun args ctx ->
-                match inputOf args ctx with
+                match inputOf args with
                 | Some input -> runProgramCall ctx input null
                 | None -> Task.FromResult(JsToolPolicy.missingProgramResult ()) }
 

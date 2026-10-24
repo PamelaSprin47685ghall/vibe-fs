@@ -88,14 +88,11 @@ module ToolRegistry =
     let private advisorRefusal (code: string) (reason: string) : obj =
         createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
 
-    let private advisorSeatAnswer
-        (runtime: ToolRuntimeScope)
-        (ctx: HostToolContext)
-        (intent: obj)
-        : Task<obj> =
+    let private advisorSeatAnswer (runtime: ToolRuntimeScope) (ctx: HostToolContext) (intent: obj) : Task<obj> =
         task {
             let sessionId = ctx.SessionId
             let intentText = advisorIntentText intent
+
             let deps: AdvisorSeatDeps =
                 { Sessions = runtime.Sessions
                   Snapshot = runtime.Snapshot
@@ -107,16 +104,11 @@ module ToolRegistry =
             let! answered = AdvisorSeat.consult deps sessionId intentText
 
             match answered with
-            | Ok advice ->
-                return createObj [ "ok" ==> true; "advice" ==> advice ]
+            | Ok advice -> return createObj [ "ok" ==> true; "advice" ==> advice ]
             | Error reason -> return advisorRefusal "advisor-unavailable" reason
         }
 
-    let private advisorConsult
-        (runtime: ToolRuntimeScope)
-        (ctx: HostToolContext)
-        (intent: obj)
-        : Task<obj> =
+    let private advisorConsult (runtime: ToolRuntimeScope) (ctx: HostToolContext) (intent: obj) : Task<obj> =
         advisorSeatAnswer runtime ctx intent
 
     let private reviewRefusal (code: string) (reason: string) : obj =
@@ -741,34 +733,10 @@ module ToolRegistry =
                                             | "commission" ->
                                                 return! placedDelegate (ForkTool.executeReceipt runtime ctx) payload
                                             | "resume" ->
-                                                return! placedDelegate (ForkTool.executeResumeReceipt runtime ctx) payload
+                                                return!
+                                                    placedDelegate (ForkTool.executeResumeReceipt runtime ctx) payload
                                             | "devops" -> return! devopsDelegate payload
                                             | _ -> return refusal "unknown-delegate"
-                                        }
-                                  Join =
-                                    fun () ->
-                                        task {
-                                            let! receipt = JoinTool.executeReceipt runtime ctx
-
-                                            return
-                                                match receipt with
-                                                | Ok records ->
-                                                    let toObj (record: JoinTool.JoinRecord) =
-                                                        createObj
-                                                            [ "name" ==> record.Name
-                                                              "agentId" ==> record.AgentId
-                                                              "role" ==> record.Role
-                                                              "status" ==> record.Status
-                                                              "body" ==> (record.Body |> String.concat "\n")
-                                                              "returned"
-                                                              ==> (record.Returned
-                                                                   |> List.map (fun text ->
-                                                                       createObj [ "text" ==> text ])
-                                                                   |> List.toArray) ]
-
-                                                    envelopeOk
-                                                        [ "records" ==> (records |> List.map toObj |> Array.ofList) ]
-                                                | Error code -> refusal code
                                         }
                                   Fission =
                                     fun payload ->
@@ -1227,9 +1195,8 @@ module ToolRegistry =
                     fun args ctx ->
                         task {
                             // Algorithm G1: the deliver gate based on real resource ownership.
-                            // Only handles with uncleared resources (e.g. pending user questions) block.
-                            // Side-effect-free pauses are auto-settled.
-                            let blockers = JsParkedSites.deliveryBlockersWithChoicesForSession ctx.SessionId
+                            // Pending named programs must be resumed or abandoned before delivery.
+                            let blockers = JsPrograms.deliveryBlockersWithChoicesForSession ctx.SessionId
 
                             if not (List.isEmpty blockers) then
                                 let handles = blockers |> List.map fst |> String.concat ", "
@@ -1242,10 +1209,9 @@ module ToolRegistry =
                                               Path.DeliverBlockedByParked
                                               (Map [ "handles", handles; "reasons", reasons ]) ]
                                         [ "code", ToolResultText.TString Path.DeliverBlockedByParked
-                                          "parked_handles", ToolResultText.TString handles
+                                          "program_names", ToolResultText.TString handles
                                           "reasons", ToolResultText.TString reasons ]
                             else
-                                let _ = JsParkedSites.autoSettleForSession ctx.SessionId
                                 return! executeDeliverRoute ctx args
                         } }
 
@@ -1266,8 +1232,13 @@ module ToolRegistry =
 
         let negotiateSpec: ToolSpec =
             { Name = "negotiate"
-              Description = "Ask your delegator clarifying questions. The first call is required before resetScope initialization; later calls are optional and can happen at any time. Pass all questions together in questions (plural). The call immediately acknowledges sending and does not wait for an answer. The answer later arrives as a user steer and does not block ongoing work."
-              Arguments = [ "questions", ToolHostCodec.stringSchemaDescribed "Ask all clarifying questions in this single argument, verbosely enough to avoid ambiguity. Several related questions are welcome." factory ]
+              Description =
+                "Ask your delegator clarifying questions. The first call is required before resetScope initialization; later calls are optional and can happen at any time. Pass all questions together in questions (plural). The call immediately acknowledges sending and does not wait for an answer. The answer later arrives as a user steer and does not block ongoing work."
+              Arguments =
+                [ "questions",
+                  ToolHostCodec.stringSchemaDescribed
+                      "Ask all clarifying questions in this single argument, verbosely enough to avoid ambiguity. Several related questions are welcome."
+                      factory ]
               Execute = fun args ctx -> Task.FromResult(runtime.Negotiate(ctx.SessionId, args.Text "questions")) }
 
         let baseSpecs =

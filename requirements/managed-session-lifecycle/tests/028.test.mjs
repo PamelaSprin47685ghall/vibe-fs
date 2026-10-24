@@ -156,7 +156,7 @@ test('WHAT[managed-session-lifecycle-028] a faulted view read degrades to an emp
       assert.equal(works[0].lifecycle, 'CompletedAwaitingJoin', 'the completion cell is joinable')
 
       const joined = await joinWithin(hooks, owner)
-      assert.match(joined, /ok = true/, `the join resolved with an explicit outcome: ${joined}`)
+      assert.match(joined, /Ada/, `the join names the returning participant: ${joined}`)
       assert.match(joined, /WORK-RECORD-FAULT-DONE/, 'the delivered material is returned')
     } finally {
       terminals.dispose()
@@ -199,8 +199,8 @@ test('WHAT[managed-session-lifecycle-028] a proven terminal that faults during s
       // The join must terminate: the completion is consumable or the failure
       // is explicit, never an endless wait.
       const joined = await joinWithin(hooks, owner)
-      assert.match(joined, /ok = false/, `the join surfaced an explicit failure: ${joined}`)
-      assert.match(joined, /code = "not-ready"/, `the join reported the settlement failure: ${joined}`)
+      assert.match(joined, /No one by that name is away|没有叫这个名字的人在外/, `the join did not claim a return: ${joined}`)
+      assert.doesNotMatch(joined, /DELIVERY-FAULT-DONE/, 'a failed settlement must not publish the result')
 
       // The failed settlement releases nothing: the work unit stays joinable
       // and its durable completion is untouched.
@@ -265,8 +265,8 @@ test('WHAT[managed-session-lifecycle-028] a PERSIST-settled Source with durable 
       // The join wakes on the settled Source; it does not wait for a journal
       // revision that can never advance.
       const joined = await joinWithin(hooks, owner)
-      assert.match(joined, /ok = false/, `the join surfaced the settlement failure: ${joined}`)
-      assert.match(joined, /code = "not-ready"/, `the join reported the settlement failure: ${joined}`)
+      assert.match(joined, /A return could not be gathered|一次归来未能被收集/, `the join reported materialization failure: ${joined}`)
+      assert.doesNotMatch(joined, /PERSIST-SOURCE-ANSWER/, 'uncommitted work must not appear as a successful return')
 
       // The durable work is NOT released: it stays Active. An unknown durable
       // commit must not permit new work or masquerade as a success.

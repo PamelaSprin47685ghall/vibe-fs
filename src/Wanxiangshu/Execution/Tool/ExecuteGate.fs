@@ -154,69 +154,8 @@ module ToolExecuteGate =
                 None
         )
 
-    // GAP-088: one todo-write append tail per (session, provider run). A single
-    // assistant message dispatches several `todowrite-for-*` calls concurrently;
-    // each appends to the same todo file, so they must commit in arrival order
-    // rather than overlap. Two distinct provider runs (including child sessions)
-    // never share a key, so they stay mutually unblocked.
-    // DSL-MUTABLE: single-flight — todo-write tail by (session, provider run).
-    let private todoWriteTailGate = obj ()
-    let private todoWriteTails = Dictionary<string * string, Task>()
-
-    let private awaitTodoWriteTail (tail: Task) =
-        task {
-            try
-                do! tail
-            with _ ->
-                ()
-        }
-
-    let private releaseTodoWriteTail key (completion: TaskCompletionSource<unit>) (completionTask: Task) =
-        trySetResult completion () |> ignore
-
-        lock todoWriteTailGate (fun () ->
-            match todoWriteTails.TryGetValue key with
-            | true, current when obj.ReferenceEquals(current, completionTask) -> todoWriteTails.Remove key |> ignore
-            | _ -> ())
-
-    let private serializeTodoWrite
-        (sessionId: SessionId)
-        (run: ProviderRunIdentity)
-        (body: unit -> Task<string>)
-        : Task<string> =
-        task {
-            let key = SessionId.value sessionId, ProviderRunIdentity.value run
-
-            let completion =
-                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let completionTask = completion.Task :> Task
-
-            let prior =
-                lock todoWriteTailGate (fun () ->
-                    let current =
-                        match todoWriteTails.TryGetValue key with
-                        | true, tail -> Some tail
-                        | false, _ -> None
-
-                    todoWriteTails[key] <- completionTask
-                    current)
-
-            match prior with
-            | Some tail -> do! awaitTodoWriteTail tail
-            | None -> ()
-
-            try
-                return! body ()
-            finally
-                releaseTodoWriteTail key completion completionTask
-        }
-
     let private executeToolBody (spec: GatedTool<'args>) (args: 'args) (ctx: HostToolContext) : Task<string> =
-        match ctx.ProviderRunId with
-        | Some run when spec.Name.StartsWith "todowrite-for-" ->
-            serializeTodoWrite (SessionId.create ctx.SessionId) run (fun () -> spec.Execute args ctx)
-        | _ -> spec.Execute args ctx
+        spec.Execute args ctx
 
     /// capability-enforcement-025: current Manager facts close the office gate.
     /// A frozen retirement keeps Join, Finality and the explicit human Ask; the final incumbent
@@ -296,7 +235,12 @@ module ToolExecuteGate =
             Task.FromResult(
                 ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId) "tool/ask-waiting" Map.empty
             )
-        elif role = Role.Manager && spec.Name <> "todowrite-for-manager" && spec.Name <> "resetScope" && spec.Name <> "negotiate" then
+        elif
+            role = Role.Manager
+            && spec.Name <> "todowrite-for-manager"
+            && spec.Name <> "resetScope"
+            && spec.Name <> "negotiate"
+        then
             managerFactsStage gate spec managerPermission args ctx
         else
             executeToolBody spec args ctx

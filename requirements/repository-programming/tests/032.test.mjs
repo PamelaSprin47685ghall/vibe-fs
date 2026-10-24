@@ -1,102 +1,26 @@
-import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import {
-  execute,
-  caseName,
-  parkedHandle,
-  parkedPayload,
-  failureCode,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import { fixture, assert, data, caseName, failureCode, parkedName, parkedPayload, parkedSource, render, created, readFileSync, writeFileSync, existsSync, pendingNames } from './support/named-program.fixture.mjs'
 
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-unpark-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-const program = (body) => `class Js extends JsProgram {
-  async run() {
-${body}
-    return { done: true };
-  }
-}`
-
-const runProgram = (dir, body, sessionId = 'sess-032') =>
-  execute(dir, 'Coder', 'en', sessionId, { program: program(body) }, 2000, Date.now() + 60_000, 1 << 20, null)
-
-const unpark = (dir, handle, value, sessionId = 'sess-032') =>
-  execute(dir, 'Coder', 'en', sessionId, { unpark: { handle, value } }, 2000, Date.now() + 60_000, 1 << 20, null)
-
-test('WHAT[repository-programming-032] unpark resumes a parked program with the injected value', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const parked = await runProgram(dir, `    const decision = await this.park({ stage: 'review' });
-    return { decided: decision.value };`)
-    assert.equal(caseName(parked), 'Parked')
-    const handle = parkedHandle(parked)
-
-    const resumed = await unpark(dir, handle, { go: 'ahead' })
-    assert.equal(caseName(resumed), 'Succeeded', 'unpark returns the continued program result')
-    assert.deepEqual(parkedHandle(resumed), null)
-  } finally {
-    cleanup()
-  }
+test('WHAT[repository-programming-032] unpark passes the value directly to the original expression', async t => {
+  const h=fixture(t,'032')
+  await h.run('target',"const value=await this.park({stage:'review'});this.write('decision',JSON.stringify(value));return value;")
+  const result=await h.unpark('target',{go:'ahead'})
+  assert.equal(caseName(result),'Succeeded')
+  assert.deepEqual(data(result).value,{go:'ahead'})
+  assert.equal(readFileSync(h.file('decision'),'utf8'),'{"go":"ahead"}')
+  assert.deepEqual(Array.from(created(result)),[],'target effects stay in its receipt')
+  assert.equal(data(result).effects.created.includes('decision'),true)
 })
-
-test('WHAT[repository-programming-032] the resumed await evaluates to the injected value', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const parked = await runProgram(dir, `    const decision = await this.park({ stage: 'review' });
-    this._result = decision.value;`)
-    const handle = parkedHandle(parked)
-
-    // The program writes the injected value into a file so the resumed result
-    // is observable on disk as-is.
-    const body = `    const decision = await this.park({ stage: 'review' });
-    this.write('decision.txt', JSON.stringify(decision.value));`
-    const parked2 = await runProgram(dir, body)
-    assert.equal(caseName(parked2), 'Parked')
-    const handle2 = parkedHandle(parked2)
-
-    const resumed = await unpark(dir, handle2, { go: 'ahead' })
-    assert.equal(caseName(resumed), 'Succeeded')
-    assert.equal(parkedHandle(resumed), null)
-    assert.ok(true, 'unpark path executed')
-  } finally {
-    cleanup()
-  }
+test('WHAT[repository-programming-032] another park retains the target name and requires another explicit resume', async t => {
+  const h=fixture(t,'032-again')
+  await h.run('target',"const first=await this.park({n:1});const second=await this.park({n:2});return {first,second};")
+  const next=data(await h.unpark('target','one'))
+  assert.equal(next.state,'parked');assert.equal(next.name,'target');assert.deepEqual(next.payload,{n:2})
+  const final=data(await h.unpark('target','two'))
+  assert.equal(final.state,'completed');assert.deepEqual(final.value,{first:'one',second:'two'})
 })
-
-test('WHAT[repository-programming-032] unpark of an unknown handle reports HANDLE_UNKNOWN', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const resumed = await unpark(dir, 'park-999999', { go: 'ahead' })
-    assert.equal(caseName(resumed), 'Failed')
-    assert.equal(failureCode(resumed), 'HANDLE_UNKNOWN')
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-032] a resumed program that parks again returns a new parked payload with a new handle', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const body = `    const first = await this.park({ n: 1 });
-    const second = await this.park({ n: 2 });
-    return { first: first.value, second: second.value };`
-    const parked = await runProgram(dir, body)
-    assert.equal(caseName(parked), 'Parked')
-    const firstHandle = parkedHandle(parked)
-    assert.deepEqual(parkedPayload(parked), { n: 1 })
-
-    const resumed = await unpark(dir, firstHandle, { step: 1 })
-    assert.equal(caseName(resumed), 'Parked', 'the resumed program parks again')
-    const secondHandle = parkedHandle(resumed)
-    assert.notEqual(secondHandle, firstHandle, 'the second park gets a fresh handle')
-    assert.deepEqual(parkedPayload(resumed), { n: 2 })
-  } finally {
-    cleanup()
-  }
+test('WHAT[repository-programming-032] unknown names are explicit failures', async t => {
+  const h=fixture(t,'032-unknown')
+  const result=await h.unpark('missing')
+  assert.equal(caseName(result),'Succeeded');assert.equal(data(result).state,'failed');assert.equal(data(result).code,'PROGRAM_UNKNOWN')
 })

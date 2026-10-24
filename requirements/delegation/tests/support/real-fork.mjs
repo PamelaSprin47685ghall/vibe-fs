@@ -4,8 +4,8 @@
 // 剩下的路。它不含任何业务判定，也不读写任何持久事实：
 //
 //   物理 user 消息 → assistant 消息 → `experimental.chat.messages.transform`
-//   （provider start 准入）→ 真实 `this.deliver`（由生产落唯一一条 durable
-//   交付见证）→ `message.updated` → `session.idle`（生产发布终态）
+//   （provider start 准入）→ 真实程序执行与助手材料 → `message.updated`
+//   → `session.idle`（由生产裁决并发布子工作终态）。普通 return 不是业务交付。
 //
 // 终态由生产自己发布到共享终端端口；夹具**只观察**该端口，从不发布终态、
 // 从不写 durable 见证。
@@ -101,12 +101,15 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
   }
   await hooks['experimental.chat.messages.transform']({ sessionID: child }, { messages: [user] })
   if (material !== null && material !== undefined) {
-    await hooks.tool[`todowrite-for-${role}`].execute(
+    const result = await hooks.tool[`todowrite-for-${role}`].execute(
       {
+        name: `child-program-${run}`,
+        planB: 'Observe this child program result before the host reports the provider turn ending.',
         program: `class Js extends JsProgram { async run() { return { answer: ${JSON.stringify(material)} }; } }`,
       },
       { sessionID: child, agent: role, callID: `call-${run}`, messageID: run },
     )
+    assert.match(String(result), /^# ok/)
   }
   assistant.info.time.completed = 3
   assistant.info.finish = 'stop'
@@ -115,77 +118,34 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
   if (awaitTerminal) await awaitTerminal(child, run)
 }
 
-/**
- * A later delivery into an ALREADY admitted work unit, under the SAME
- * physical input (hence the same authority root).
- *
- * The physical input has already spent its single provider step, so this
- * delivery does not re-enter the provider: it delivers into the open work
- * unit directly, and the turn's own terminal publication (message.updated →
- * session.idle) reports the proven completion of that same work unit.
- *
- * A new physical input (a resume) would admit a DIFFERENT work unit under a
- * different root — that proves a new obligation, not this one.
- */
-export const deliverIntoOpenWork = async (hooks, runtime, child, run, prose, material, role = 'engineer') => {
-  const physical = physicalUserMessageOf(runtime, child)
-  const assistant = {
-    info: {
-      id: run,
-      role: 'assistant',
-      sessionID: child,
-      parentID: physical.id,
-      agent: role,
-      providerID: 'provider',
-      modelID: 'engineer-model',
-      time: { created: 4 },
-    },
-    parts: [{ type: 'text', text: prose }],
-  }
-  runtime.pushHostMessage(child, assistant)
-  await hooks.tool[`todowrite-for-${role}`].execute(
-    {
-      program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
-          prefixUntil: 0,
-          carry: []
-        },
-    { sessionID: child, agent: role, callID: `call-${run}`, messageID: run },
-  )
-  assistant.info.time.completed = 5
-  assistant.info.finish = 'stop'
-  await hooks.event({ event: { type: 'message.updated', properties: { info: assistant.info } } })
-  await hooks.event({ event: { type: 'session.idle', properties: { sessionID: child } } })
-}
+let callSequence = 0
 
 /** `this.fork` through the real plugin surface. */
-export const forkCall = (hooks, owner, name, charge, callID = 'call-fork') =>
+export const forkCall = (hooks, owner, name, charge, callID = 'call-fork-' + (++callSequence)) =>
   hooks.tool['todowrite-for-manager'].execute(
     {
       program: `class Js extends JsProgram { async run() { return await this.fork({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)} }, []); } }`,
-          prefixUntil: 0,
-          carry: []
+          name: callID,
+          planB: 'Wait for this delegation receipt within the single admitted request window.'
         },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
 
 /** `this.resume` through the real plugin surface. */
-export const resumeCall = (hooks, owner, name, charge, callID = 'call-resume', attach) =>
+export const resumeCall = (hooks, owner, name, charge, callID = 'call-resume-' + (++callSequence), attach) =>
   hooks.tool['todowrite-for-manager'].execute(
     {
       program: `class Js extends JsProgram { async run() { return await this.resume({ name: ${JSON.stringify(name)}, charge: ${JSON.stringify(charge)}${attach === undefined ? '' : `, attach: ${JSON.stringify(attach)}`} }, []); } }`,
-          prefixUntil: 0,
-          carry: []
+          name: callID,
+          planB: 'Wait for this delegation receipt within the single admitted request window.'
         },
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
 
-/** `this.join` through the real plugin surface. */
-export const joinCall = (hooks, owner, callID = 'call-join') =>
-  hooks.tool['todowrite-for-manager'].execute(
-    { program: 'class Js extends JsProgram { async run() { return await this.join(); } }',
-          prefixUntil: 0,
-          carry: []
-        },
+/** The independent zero-argument join tool uses its existing work ownership. */
+export const joinCall = (hooks, owner, callID = 'call-join-' + (++callSequence)) =>
+  hooks.tool.join.execute(
+    {},
     { sessionID: owner, agent: 'manager', callID, messageID: `msg-${callID}` },
   )
 
@@ -214,13 +174,6 @@ export const withRealFork = async (owner, body) =>
     await openIncumbency(runtime, owner)
     return body({ hooks, directory, createdIds, runtime })
   })
-
-/** The join records block carries each work result and its returned material once. */
-export const joinRecordsOf = (result) => {
-  const start = result.indexOf('[[data.records]]')
-  assert.notEqual(start, -1, 'the join result must carry its records block')
-  return result.slice(start)
-}
 
 /**
  * The work units of one owner, read back from a **cold** journal: a second

@@ -10,9 +10,7 @@ Strongly recommended:
 - Write complex JavaScript in one {{toolName}} program rather than many legacy RPCs.
 {{parallelLine}}
 
-Call tools in parallel whenever needed. Parallel reads, parallel edits, same-file
-and cross-file calls are all absolutely safe. The Host serializes one assistant
-message's tool calls in deterministic order; each call is its own transaction.
+Different named programs can run concurrently; waiting does not hold the whole provider run. Each mutation remains atomic. A changed read version fails with FILE_CHANGED, so arbitrary concurrent writes to the same file are not guaranteed to succeed.
 
 Write complex JavaScript in one program. Every write lands immediately (as-is):
 there is no rollback of earlier writes, so validate before each write you cannot

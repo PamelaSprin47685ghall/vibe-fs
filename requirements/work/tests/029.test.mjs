@@ -98,12 +98,12 @@ test('WHAT[work-029] shared Plan interface reads the ordinary draft path and rej
     const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, directory, sessionID, 0n)
     assert.equal(opened.ok, true, opened.error)
 
+    let programSequence = 0
     const run = body => hooks.tool['todowrite-for-plan'].execute(
-      { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'plan-read',
-          prefixUntil: 0,
-          carry: []
+      { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'plan-read-' + (++programSequence),
+          planB: 'Wait for this plan file operation while preserving the same request deadline.'
         },
-      { sessionID, agent: 'plan', callID: 'call-work-029', messageID: 'run-work-029', providerRunID: 'run-work-029' },
+      { sessionID, agent: 'plan', callID: 'call-work-029-' + programSequence, messageID: 'run-work-029', providerRunID: 'run-work-029' },
     )
 
     // The draft lives at the live surface's derived plan path (.Herdchestra/wanxiangshu/plan/<sessionID>/plan.md).

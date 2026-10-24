@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Process
 
 /// Bounded stdout/stderr collection for one run. The memory bound, the switch to
-/// a complete spool file and its failures belong to `wanxiangli/spool`; this module
+/// a complete spool file and its failures belong to `wanxiangli/runtime`; this module
 /// chooses the bound from the estimate and maps the library result to an outcome.
 module ProcessOutput =
     type OutputCollector

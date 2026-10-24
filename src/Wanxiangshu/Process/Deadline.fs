@@ -4,14 +4,14 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// 实现唯一来源：wanxiangli/time（CUT-21）。Deadline 保持不透明 DU，
+/// 实现唯一来源：wanxiangli/runtime（CUT-21）。Deadline 保持不透明 DU，
 /// 内部持有库的不透明 deadline 值；主仓签名与语义不变。
 type Deadline = private Deadline of libraryValue: obj
 
 module Deadline =
 
-    // wanxiangli/time 的具名 Time 容器。
-    [<Import("Time", "wanxiangli/time")>]
+    // wanxiangli/runtime 的具名 Time 容器。
+    [<Import("Time", "wanxiangli/runtime")>]
     let private library: obj = jsNative
 
     let private isoOf (value: DateTimeOffset) : string = value.ToString("O")

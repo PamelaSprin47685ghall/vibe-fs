@@ -62,11 +62,11 @@ test('WHAT[repository-programming-022] JS_description_is_action_first_then_teach
   const lessonText = coder.description.replace(/\s+/g, ' ')
 
   assert.equal(
-    lessonText.startsWith('TOOL CALL CONTRACT (REQUIRED):'),
+    lessonText.startsWith('Submit exactly three required string arguments:'),
     true,
     'the first screen must identify the required argument before the long editing discipline',
   )
-  assert.match(lessonText.slice(0, 500), /only.*program: string.*Every call must supply.*program/)
+  assert.match(lessonText.slice(0, 500), /name.*program.*planB/i)
   assert.match(lessonText.slice(0, 1000), /WARNING: You may be about to turn a bounded filesystem task into a self-inflicted repair job\./,
     'the paid-failure warning remains immediately after the short tool-call contract')
 
@@ -114,11 +114,11 @@ test('WHAT[repository-programming-022] JS_description_is_action_first_then_teach
   ).description.replace(/\s+/g, ' ')
 
   assert.equal(
-    zh.startsWith('工具调用合同（必填）：'),
+    zh.startsWith('提交且只提交三个必填字符串参数：'),
     true,
-    '中文第一屏先交代唯一必填 program 参数',
+    '中文第一屏先交代三个必填参数',
   )
-  assert.match(zh.slice(0, 380), /唯一.*program: string.*每次调用.*program/)
+  assert.match(zh.slice(0, 380), /name.*program.*planB/)
   assert.match(zh.slice(0, 750), /警告：你正准备把一个本来有边界保护的文件任务，亲手变成一场返工事故。/,
     '原有边界警告紧接在简短调用合同后仍保留')
 

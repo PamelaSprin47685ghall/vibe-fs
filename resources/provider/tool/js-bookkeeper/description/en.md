@@ -1,3 +1,5 @@
+Required tool arguments: name, program and planB, all strings. The top-level planB sets one admission deadline (UTF-8 bytes × 50 ms) for the whole program; members cannot renew it.
+
 Program the next form of the staged Case with one atomic JavaScript transformation.
 
 The Case is already frozen for this transaction. question(matches = []) and answer(matches = []) return immutable text views with ordered anchors. view.text(from = "^", to = "$") slices exact text; anchor names may use clipped +N/-N shifts (N is a JS string index delta, not a line number).

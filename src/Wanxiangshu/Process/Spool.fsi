@@ -2,7 +2,7 @@ namespace Wanxiangshu.Process
 
 open System.Threading.Tasks
 
-/// Host binding to `wanxiangli/spool`. The library owns memory bounds, the spool
+/// Host binding to `wanxiangli/runtime`. The library owns memory bounds, the spool
 /// file and its write failures; this module only adapts its messages to F#.
 module Spool =
 

@@ -10,7 +10,7 @@
 - 把复杂 JavaScript 写进一个 {{toolName}} program，而不是多次遗留 RPC。
 {{parallelLine}}
 
-需要时并行调用工具。并行读取、并行编辑、同文件与跨文件调用都绝对安全。Host 按确定顺序串行化同一条 assistant message 中的 tool call；每一次调用都是自己的 transaction。
+不同命名程序可以并行，等待不占住整个 provider run。每笔修改仍原子提交；读取版本变化时报 FILE_CHANGED，不保证任意同文件并发修改都成功。
 
 把复杂 JavaScript 写进一个 program。每笔写立即落盘（as-is）：早先的写不会回滚，
 所以对不能留下的写，先校验再落笔。

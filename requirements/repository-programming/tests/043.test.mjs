@@ -27,12 +27,12 @@ const resourcePath = (name) => ({
 const placeholders = (text) => [...text.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort()
 
 // 生命周期成员：park 随每个生成面携带，不按 capability 投影（deliver 已废除）。
-const LIFECYCLE_MEMBERS = ['park']
+const LIFECYCLE_MEMBERS = ['park', 'unpark', 'abandon']
 
 // capability 成员的 canonical 序（WHAT[repository-programming-002]）。
 const CANONICAL_MEMBERS = [
-  'write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call',
-  'fork', 'resume', 'commission', 'devops', 'dag', 'join', 'fission', 'horizon', 'advisor', 'ask', 'review',
+  'write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call', 'signal', 'send',
+  'fork', 'resume', 'commission', 'devops', 'fission', 'horizon', 'advisor', 'ask', 'review',
 ]
 
 test('WHAT[repository-programming-043] rm and mv ship paired bilingual resources with identical placeholder sets and no unreplaced residue', () => {
@@ -122,29 +122,13 @@ test('WHAT[repository-programming-043] the member registry holds the delegation 
   )
 })
 
-test('WHAT[repository-programming-043] ToolsBindings binds the rm/mv members behind Remove/Move capabilities and delegates the effects to MutationFs primitives', () => {
-  const bindings = read(join(SOURCE_ROOT, 'Repository/Programming/Js/ToolsBindings.fs'))
-
-  // 成员绑定存在。
-  assert.match(bindings, /let private makeRmMember/)
-  assert.match(bindings, /"rm"\s*\n\s*==> fun \(path: string\) ->/)
-  assert.match(bindings, /let private makeMvMember/)
-  assert.match(bindings, /"mv"\s*\n\s*==> fun \(fromPath: string\) \(toPath: string\) ->/)
-
-  // capability 门禁挂载：运行时按库成员目录（wanxiangli/programming membersFor，
-  // Remove → rm、Move → mv）挂载成员，与公开/运行时基类读同一份目录。
+test('WHAT[repository-programming-043] rm and mv use the public runtime file owner under the canonical capability gates', () => {
+  const bindings=read(join(SOURCE_ROOT,'Repository/Programming/Js/ToolsBindings.fs'))
+  assert.match(bindings, /Import\("FileSession", "wanxiangli\/runtime"\)/)
   assert.match(bindings, /let directory = JsCapability\.memberNamesFor capabilities ""/)
-  assert.match(bindings, /if present "rm" then\s*\n\s*makeRmMember root staging readSnapshots ledger/)
-  assert.match(bindings, /if present "mv" then\s*\n\s*makeMvMember root staging readSnapshots ledger/)
-
-  // 底层文件系统效果归 MutationFs 原语，成员绑定不二次定义原语本身。
-  assert.match(bindings, /JsMutationFs\.removePath full/)
-  assert.match(bindings, /JsMutationFs\.movePath fromFull toFull/)
-  assert.doesNotMatch(
-    bindings,
-    /let\s+(private\s+)?(removePath|movePath|removeSync|renameSync)\b/,
-    'the member bindings must not define the filesystem primitives',
-  )
+  assert.match(bindings, /if present "rm" then\s+"rm" ==> file\?rm/)
+  assert.match(bindings, /if present "mv" then\s+"mv" ==> file\?mv/)
+  assert.doesNotMatch(bindings, /removeSync|renameSync|let private makeRmMember|let private makeMvMember/)
 })
 
 test('WHAT[repository-programming-043] Description declares the rm/mv resource paths and mounts them as capability-conditioned rule blocks', () => {

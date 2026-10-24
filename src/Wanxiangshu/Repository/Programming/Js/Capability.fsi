@@ -16,7 +16,6 @@ type JsCapability =
     | Resume
     | Commission
     | DevOps
-    | Join
     | Fission
     | Horizon
     | Advisor
@@ -59,12 +58,12 @@ module JsFragmentRegistry =
     val whereAll: JsCapabilityFragment
     val where: JsCapabilityFragment
     val call: JsCapabilityFragment
+    val signal: JsCapabilityFragment
+    val send: JsCapabilityFragment
     val fork: JsCapabilityFragment
     val resume: JsCapabilityFragment
     val commission: JsCapabilityFragment
     val devops: JsCapabilityFragment
-    val join: JsCapabilityFragment
-    val dag: JsCapabilityFragment
     val fission: JsCapabilityFragment
     val horizon: JsCapabilityFragment
     val advisor: JsCapabilityFragment

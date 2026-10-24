@@ -45,8 +45,8 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
 
   assert.deepEqual(
     surface.capabilities.sort(),
-    ['Advisor', 'Fork', 'Glob', 'Grep', 'Horizon', 'Join', 'Read', 'Resume', 'Review'],
-    'Manager capabilities must be {Read, Glob, Grep} plus the delegation primitives {Fork, Resume, Join, Horizon, Advisor} and the review member',
+    ['Advisor', 'Fork', 'Glob', 'Grep', 'Horizon', 'Read', 'Resume', 'Review'],
+    'Manager capabilities must be {Read, Glob, Grep} plus the delegation primitives {Fork, Resume, Horizon, Advisor} and the review member',
   )
 
   // 四层同构第 1 层：生成的 JsProgram 基类中不声明任何写方法
@@ -59,7 +59,7 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   assert.equal(surface.baseClassSource.includes('this._api.fork(spec)'), true, 'BaseClass fork forwards spec')
   assert.equal(surface.baseClassSource.includes('this._api.resume(spec)'), true, 'BaseClass resume forwards spec')
   assert.equal(surface.baseClassSource.includes('this._api.advisor(intent)'), true, 'BaseClass advisor forwards intent')
-  assert.equal(surface.baseClassSource.includes('this._api.join()'), true, 'BaseClass must declare join without carry')
+  assert.equal(surface.baseClassSource.includes('this._api.join()'), false, 'Join is a separate zero-argument host tool')
 
   // 四层同构第 2 层：描述文档不包含写入/修改暗示
   assert.doesNotMatch(surface.description, /edit\(path|rewrite\(path|write\(path,\s*content\)/, 'Description must not advertise write methods')
@@ -88,7 +88,7 @@ test('WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mu
     assert.equal(typeof binding.where, 'function', 'where must be constructed')
     assert.equal(typeof binding.fork, 'function', 'fork must be constructed')
     assert.equal(typeof binding.resume, 'function', 'resume must be constructed')
-    assert.equal(typeof binding.join, 'function', 'join must be constructed')
+    assert.equal(typeof binding.join, 'undefined', 'program bindings must not recreate the independent join tool')
 
     // 已退役的 file/read/glob/grep/edit/rewrite 与未授予的写/执行 API 在 api 中直接不存在（undefined）
     assert.equal('file' in binding, false, 'retired file property must not exist')
@@ -106,7 +106,7 @@ test('WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mu
     assert.equal(binding.write, undefined)
     assert.deepEqual(
       Object.keys(binding).sort(),
-      ['advisor', 'cat', 'fork', 'horizon', 'join', 'ls', 'resume', 'rg', 'stat', 'where', 'whereAll'],
+      ['advisor', 'cat', 'fork', 'horizon', 'ls', 'resume', 'rg', 'stat', 'where', 'whereAll'],
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -175,7 +175,7 @@ test('WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_
   assert.equal(devopsSurface.capabilities.includes('Edit'), false, 'JsCapability.Edit is retired from generated role surfaces')
   assert.ok(devopsSurface.capabilities.includes('Write'))
   assert.ok(devopsSurface.capabilities.includes('Exec'))
-  assert.ok(devopsSurface.capabilities.includes('Join'))
+  assert.equal(devopsSurface.capabilities.includes('Join'), false)
 
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j05-'))
   try {
@@ -455,10 +455,6 @@ test('WHAT[capability-enforcement-025] J13_delegation_members_forward_cleanly_wi
         return { ok: true, name: 'child-1', agentId: 'agent-1', outcome: 'created' }
       },
       async () => {
-        observed.push({ member: 'join' })
-        return { ok: true, records: [] }
-      },
-      async () => {
         observed.push({ member: 'fission' })
         return { ok: true, groupId: 'group-1' }
       },
@@ -477,12 +473,12 @@ test('WHAT[capability-enforcement-025] J13_delegation_members_forward_cleanly_wi
         const defaulted = await this.fork('index the parser module');
         const resumed = await this.resume({ name: 'audit-road', charge: 'continue the audit' });
         const advised = await this.advisor('review this delta');
-        const joined = await this.join();
-        return { defaulted, resumed, advised, joined, continued: true };
+        const joinType = typeof this.join;
+        return { defaulted, resumed, advised, joinType, continued: true };
       }
     }`
 
-    const outcome = await execute(dir, 'manager', 'en', sessionId, { program }, 3000, Date.now() + 60_000, 1 << 20, null)
+    const outcome = await execute(dir, 'manager', 'en', sessionId, { name: 'delegation', program, planB: 'Wait for the delegation business receipts without changing this request deadline.' }, 3000, Date.now() + 60_000, 1 << 20, null)
     assert.equal(caseName(outcome), 'Succeeded', 'invalid carry is returned as data without failing the program')
 
     const doc = render(outcome)
@@ -490,12 +486,12 @@ test('WHAT[capability-enforcement-025] J13_delegation_members_forward_cleanly_wi
     // 缺省调用以空数组抵达宿主；非法形状被挡住，其余 carry 按原顺序传递。
     assert.deepEqual(
       observed.map(entry => entry.member),
-      ['fork', 'resume', 'advisor', 'join'],
+      ['fork', 'resume', 'advisor'],
     )
     assert.equal(observed[0].member, 'fork')
     assert.equal(observed[1].member, 'resume')
     assert.equal(observed[2].member, 'advisor')
-    assert.equal(observed[3].member, 'join')
+    assert.match(doc, /joinType = "undefined"/)
   } finally {
     runtime.clearDelegationHost(sessionId)
     rmSync(dir, { recursive: true, force: true })

@@ -1,3 +1,4 @@
+import { closePrograms } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 import test from 'node:test'
 
 {
@@ -144,6 +145,7 @@ test('WHAT[repository-programming-018] JS085_workflow_file_missing_fails_the_pro
     assert.equal(failed.code, 'FILE_NOT_FOUND')
     assert.equal(failed.reason.includes('missing.txt'), true)
   } finally {
+    await closePrograms()
     cleanup()
   }
 })
@@ -158,12 +160,13 @@ test('WHAT[repository-programming-018] JS019_missing_anchor_uses_stable_code', a
     return { ok: true };
   }
 }`
-    const outcome = await execute(dir, 'Coder', 'en', 'sess-018', { program }, 2000, Date.now() + 60_000, 1 << 20, null)
+    const outcome = await execute(dir, 'Coder', 'en', 'sess-018', { name: "missing-anchor-018", program, planB: "Wait for the anchor lookup and preserve its original pause." }, 2000, Date.now() + 60_000, 1 << 20, null)
     assert.equal(caseName(outcome), 'Parked')
-    const payload = parkedPayload(outcome)
+    const payload = parkedPayload(outcome).payload
     assert.equal(payload.needle, '## JS-007 FileView.text()')
     assert.deepEqual(payload.candidates, [])
   } finally {
+    await closePrograms()
     cleanup()
   }
 })

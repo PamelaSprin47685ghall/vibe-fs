@@ -5,11 +5,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { createRegistered, execute, argumentNames, argumentSchema } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
-import { handlesForSession, clearAll } from '../../../dist/Repository/Programming/Js/ParkedSites.js'
+import { pendingNames, closeAll } from '../../../dist/Repository/Programming/Js/Programs.js'
 import * as language from '../../../dist/Participant/Provider/LanguageSurface.js'
 
-// The public Host tool has exactly one required source argument. The private
-// workflow's parked-state transport must never leak into the LLM tool schema.
+// The physical Host ToolSpec validates the same three-field contract as execution.
 const schemaOf = (state) => ({
   ...state,
   optional: () => schemaOf({ ...state, optional: true }),
@@ -34,107 +33,81 @@ const toolModule = () => {
   return { tool }
 }
 
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-064-program-only-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
+const WAIT = 'Give this named program enough time to reach the requested operation and return its actual result.'
+const program = body => `class Js extends JsProgram { async run() { ${body} } }`
+const parkProgram = program("return await this.park({ stage: 'host-schema' });")
+const writeProgram = program("await this.write('probe.txt', 'ran'); return { wrote: true };")
+const input = (name, source = writeProgram, planB = WAIT) => ({ name, program: source, planB })
 const register = dir => createRegistered(toolModule(), 'Engineer', 'en', dir, null)
-
-const parkProgram = `class Js extends JsProgram {
-  async run() {
-    const decision = await this.park({ stage: 'single-program-host-tool' });
-    return { decided: decision };
-  }
-}`
-
-const writeProgram = `class Js extends JsProgram {
-  async run() {
-    await this.write('program-only-probe.txt', 'the program ran');
-    return { wrote: true };
-  }
-}`
-
-const PROBE = 'program-only-probe.txt'
+function fixture(t) {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-064-contract-'))
+  t.after(async () => { await closeAll(); rmSync(dir, { recursive: true, force: true }) })
+  return { dir, registered: register(dir) }
+}
 let previousLanguage
-
-test.beforeEach(() => {
+test.beforeEach(async () => {
   previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   language.refreshGlobalLanguage()
-  clearAll()
+  await closeAll()
 })
-
-test.afterEach(() => {
+test.afterEach(async () => {
+  await closeAll()
   if (previousLanguage === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
   else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
   language.refreshGlobalLanguage()
-  clearAll()
 })
-
-const parkOnce = async (registered, session) => {
-  const result = await execute(registered, { program: parkProgram }, { sessionID: session })
-  assert.equal(result.startsWith('# parked'), true, `expected real parked result, got: ${result}`)
-  const payload = parseToml(result)
-  assert.equal(typeof payload.handle, 'string')
-  assert.ok(payload.handle.length)
-  return payload.handle
-}
-
-test('WHAT[repository-programming-064] the physical Host ToolSpec declares program only and required', () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const registered = register(dir)
-    assert.deepEqual(argumentNames(registered), ['program'])
-    const schema = argumentSchema(registered, 'program')
+test('WHAT[repository-programming-064] the physical Host ToolSpec requires exactly name, program and planB', t => {
+  const { registered } = fixture(t)
+  assert.deepEqual(argumentNames(registered), ['name', 'program', 'planB'])
+  for (const key of ['name', 'program', 'planB']) {
+    const schema = argumentSchema(registered, key)
     assert.equal(schema.type, 'string')
     assert.notEqual(schema.optional, true)
-    for (const former of ['name', 'planB', 'unpark', 'abandon'])
-      assert.equal(argumentSchema(registered, former), null, former + ' is not an argument')
-  } finally {
-    cleanup()
   }
+  for (const former of ['unpark', 'abandon', 'prefixUntil', 'carry'])
+    assert.equal(argumentSchema(registered, former), null)
 })
-
-test('WHAT[repository-programming-064] the only accepted public state, program, executes with no name supplied', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const result = await execute(register(dir), { program: writeProgram }, { sessionID: 'ses-064-program' })
-    assert.equal(result.startsWith('# ok'), true, result)
-    assert.equal(parseToml(result).data.wrote, true)
-    assert.equal(existsSync(join(dir, PROBE)), true)
-  } finally {
-    cleanup()
-  }
+test('WHAT[repository-programming-064] three top-level fields execute at the actual Host ToolSpec entry', async t => {
+  const { dir, registered } = fixture(t)
+  const result = await execute(registered, input('write'), { sessionID: 'ses-064-write' })
+  assert.equal(result.startsWith('# ok'), true, result)
+  assert.equal(parseToml(result).data.wrote, true)
+  assert.equal(existsSync(join(dir, 'probe.txt')), true)
 })
-
-test('WHAT[repository-programming-064] empty arguments cannot execute a program', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const result = await execute(register(dir), {}, { sessionID: 'ses-064-missing' })
-    assert.match(result, /missing 'program' argument/)
-    assert.equal(existsSync(join(dir, PROBE)), false)
-  } finally {
-    cleanup()
-  }
-})
-
-for (const [former, input] of [
-  ['unpark', handle => ({ unpark: { handle, value: 'forged' } })],
-  ['abandon', handle => ({ abandon: { handle } })],
+for (const [label, args] of [
+  ['empty', {}],
+  ['source only', { program: writeProgram }],
+  ['no planB', { name: 'bad', program: writeProgram }],
+  ['empty planB', input('bad', writeProgram, '')],
+  ['numeric planB', input('bad', writeProgram, 48000)],
+  ['blank name', input(' ')],
+  ['legacy unpark', { unpark: { handle: 'forged' } }],
+  ['extra control', { ...input('bad'), abandon: { name: 'target' } }],
 ]) {
-  test(`WHAT[repository-programming-064] retired top-level ${former} is not a substitute for program and cannot consume a handle`, async () => {
-    const { dir, cleanup } = sandbox()
-    const session = 'ses-064-old-' + former
-    try {
-      const registered = register(dir)
-      const handle = await parkOnce(registered, session)
-      const result = await execute(registered, input(handle), { sessionID: session })
-      assert.match(result, /missing 'program' argument/)
-      assert.deepEqual(Array.from(handlesForSession(session)), [handle])
-      assert.equal(existsSync(join(dir, PROBE)), false)
-    } finally {
-      cleanup()
-    }
+  test(`WHAT[repository-programming-064] ${label} is rejected before side effects even when schema parsing is bypassed`, async t => {
+    const { dir, registered } = fixture(t)
+    const result = await execute(registered, args, { sessionID: 'ses-064-invalid' })
+    assert.ok(result.startsWith('# failed') || typeof parseToml(result).error === 'string', result)
+    assert.equal(existsSync(join(dir, 'probe.txt')), false)
+    assert.deepEqual(Array.from(pendingNames('ses-064-invalid')), [])
   })
 }
+test('WHAT[repository-programming-064] only a new program controls a retained target name; legacy fields cannot consume it', async t => {
+  const { registered } = fixture(t)
+  const context = { sessionID: 'ses-064-park' }
+  const parked = await execute(registered, input('target', parkProgram), context)
+  assert.equal(parked.startsWith('# parked'), true, parked)
+  const data = parseToml(parked)
+  assert.equal(data.name, 'target')
+  assert.equal(data.handle, undefined)
+  assert.deepEqual(Array.from(pendingNames(context.sessionID)), ['target'])
+  const invalid = await execute(registered, { ...input('invalid'), unpark: { name: 'target', value: 'forged' } }, context)
+  assert.equal(invalid.startsWith('# failed'), true, invalid)
+  assert.deepEqual(Array.from(pendingNames(context.sessionID)), ['target'])
+  const resumed = await execute(registered, input('controller', program("return await this.unpark('target', 'accepted');")), context)
+  assert.equal(resumed.startsWith('# ok'), true, resumed)
+  assert.equal(parseToml(resumed).data.state, 'completed')
+  assert.equal(parseToml(resumed).data.value, 'accepted')
+  assert.deepEqual(Array.from(pendingNames(context.sessionID)), [])
+})

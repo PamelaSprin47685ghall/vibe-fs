@@ -9,7 +9,9 @@ import {
   renderString,
   renderStringByteCountPrefix,
 } from '../../../dist/Foundation/SyntheticTomlSurface.js'
-import { clearParkedSites, parkedHandle, execute } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import { readFileSync } from 'node:fs'
+import { closeSession } from '../../../dist/Repository/Programming/Js/Programs.js'
+import { failureCode } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 // Host-native `run` tool is retired; `this.call` supersedes it (repository-programming [050]-[052]).
 
@@ -68,67 +70,48 @@ test('WHAT[process-execution-014] truncated_output_preserves_program_facts_witho
     const outcome = await runProgram(
       dir,
       `    const r = await this.call(${JSON.stringify(cmd)});
-    return { exitCode: r.exitCode, truncated: r.truncated, bytes: r.bytes, stdoutLength: r.stdout.length, stderr: r.stderr, endsWithExitCodeZeroText: r.stdout.endsWith(${JSON.stringify(forgedExit)}) };`,
+    return { exitCode: r.exitCode, truncated: r.truncated, bytes: r.bytes, outputFiles: r.outputFiles, stdoutLength: r.stdout.length, stderr: r.stderr, endsWithExitCodeZeroText: r.stdout.endsWith(${JSON.stringify(forgedExit)}) };`,
+      undefined, undefined, 262144,
     )
     assert.equal(caseName(outcome), 'Succeeded')
     const parsed = parseData(outcome)
     assert.equal(parsed.exitCode, 7, 'exit code must be 7 from process exit event, never inferred from stdout')
     assert.equal(parsed.truncated, true, 'must declare truncation when output exceeds 256 KiB bound')
-    assert.ok(parsed.bytes > 262144)
-    assert.equal(parsed.stdoutLength, 300000 + forgedExit.length)
+    assert.ok(parsed.bytes.stdout > 262144)
+    assert.ok(parsed.stdoutLength <= 262144)
+    assert.equal(readFileSync(parsed.outputFiles.stdout, 'utf8'), 'x'.repeat(200000) + 'y'.repeat(100000) + forgedExit)
     assert.equal(parsed.stderr, stderr)
-    assert.equal(parsed.bytes, parsed.stdoutLength + Buffer.byteLength(parsed.stderr), 'reported bytes match the actual ASCII stdout and UTF-8 stderr')
+    assert.equal(parsed.bytes.stdout, 300000 + forgedExit.length)
+    assert.equal(parsed.bytes.stderr, Buffer.byteLength(stderr))
     assert.equal(parsed.endsWithExitCodeZeroText, true)
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[process-execution-014] command with long note vs empty note vs no note behaves identically without text pricing', async () => {
-  const { dir, cleanup } = sandbox('wxs-proc-014-notes-')
+test('WHAT[process-execution-014] member arguments cannot manufacture or replace the admitted request budget', async () => {
+  const {dir,cleanup}=sandbox('wxs-proc-014-notes-')
   try {
-    const cmd = nodeCommand(`process.stdout.write('identical-test')`)
-    const outcomeNoNote = await runProgram(dir, `    return await this.call(${JSON.stringify(cmd)});`)
-    const outcomeEmptyNote = await runProgram(dir, `    return await this.call(${JSON.stringify(cmd)}, "");`)
-    const outcomeLongNote = await runProgram(dir, `    return await this.call(${JSON.stringify(cmd)}, "x".repeat(50000));`)
-
-    assert.equal(caseName(outcomeNoNote), 'Succeeded')
-    assert.equal(caseName(outcomeEmptyNote), 'Succeeded')
-    assert.equal(caseName(outcomeLongNote), 'Succeeded')
-
-    const dataNoNote = parseData(outcomeNoNote)
-    const dataEmptyNote = parseData(outcomeEmptyNote)
-    const dataLongNote = parseData(outcomeLongNote)
-
-    assert.equal(dataNoNote.stdout, 'identical-test')
-    assert.equal(dataEmptyNote.stdout, 'identical-test')
-    assert.equal(dataLongNote.stdout, 'identical-test')
-    assert.equal(dataNoNote.exitCode, 0)
-    assert.equal(dataEmptyNote.exitCode, 0)
-    assert.equal(dataLongNote.exitCode, 0)
-  } finally {
-    cleanup()
-  }
+    const cmd=nodeCommand("process.stdout.write('identical-test')")
+    const ordinary=await runProgram(dir, 'return await this.call('+JSON.stringify(cmd)+');')
+    assert.equal(caseName(ordinary),'Succeeded')
+    assert.equal(parseData(ordinary).stdout,'identical-test')
+    for(const extra of ['""', '"x".repeat(48000)', '{timeoutMs:80}']) {
+      const rejected=await runProgram(dir,'return await this.call('+JSON.stringify(cmd)+','+extra+');')
+      assert.equal(caseName(rejected),'Failed')
+      assert.equal(failureCode(rejected),'INVALID_ARGUMENT')
+    }
+  } finally { cleanup() }
 })
 
-test('WHAT[process-execution-014] real timeout reports timed_out, never a business failure', async () => {
-  const { dir, cleanup } = sandbox('wxs-proc-014-timeout-')
-  let outcome = null
+test('WHAT[process-execution-014] an expired top-level request parks instead of inventing a command failure', async () => {
+  const {dir,cleanup}=sandbox('wxs-proc-014-timeout-')
+  const session='ses-process-timeout-'+Date.now()
   try {
-    const cmd = nodeCommand(`setTimeout(() => process.exit(0), 400)`)
-    outcome = await runProgram(
-      dir,
-      `    return await this.call(${JSON.stringify(cmd)}, { timeoutMs: 80 });`,
-    )
-    assert.equal(caseName(outcome), 'Parked', 'timed out command parks as yield instead of throwing a business failure')
-  } finally {
-    const handle = outcome && parkedHandle(outcome)
-    if (handle) {
-      await execute(dir, 'DevOps', 'en', 'ses-process-contract', { abandon: { handle } }, 2000, Date.now() + 60_000, 1 << 20, null)
-    }
-    clearParkedSites()
-    cleanup()
-  }
+    const cmd=nodeCommand('setTimeout(()=>process.exit(0),400)')
+    const outcome=await runProgram(dir,'return await this.call('+JSON.stringify(cmd)+');',session,'xx')
+    assert.equal(caseName(outcome),'Parked')
+  } finally { await closeSession(session); cleanup() }
 })
 
 test('WHAT[process-execution-014] multiline TOML stays readable without adding a final newline', () => {

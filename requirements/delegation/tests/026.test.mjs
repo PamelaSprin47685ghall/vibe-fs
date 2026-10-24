@@ -1,4 +1,5 @@
 import test from 'node:test'
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 import {
   agentIdOf,
   childTurn,
@@ -100,7 +101,7 @@ test('WHAT[delegation-026] RESUME_synchronous_admission_with_async_work_and_join
 
       // 3. Join sees nothing to join: the unconfirmed dispatch installed no pending run.
       const joinResult = await joinCall(hooks, owner, 'call-join-unconfirmed')
-      assert.match(joinResult, /code = "nothing-to-join"/)
+      assert.match(joinResult, /There is nothing away to receive/)
 
       // 4. A confirmed resume is accepted and places new work on the same child.
       const second = await resumeCall(hooks, owner, 'Ada', 'CONFIRMED-CHARGE', 'call-resume-confirmed')
@@ -282,17 +283,13 @@ test('WHAT[delegation-026] RESTART_PENDING_CHILD_WORK_is_voided_at_load_and_join
       assert.equal(voidedRow.status, 'voided')
 
       // 2. Join reports the void once — it must resolve, never hang.
-      const joinPromise = forkTool.executeJoinReceipt(restarted, owner)
+      const joinPromise = forkTool.executeJoin(restarted, owner)
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 15000))
       const joinResult = await Promise.race([joinPromise, timeout])
-      assert.equal(joinResult.ok, true)
+      assert.match(joinResult, /Ada/)
+      assert.match(joinResult, /was voided|已作废|已撤销/)
+      assert.doesNotMatch(joinResult, /\[\[data\.records\]\]/)
 
-      const adaRecord = joinResult.records.find((record) => record.name === 'Ada')
-      assert.ok(adaRecord, 'join reports the voided work by its Byname')
-      assert.equal(adaRecord.status, 'voided')
-      assert.notEqual(adaRecord.status, 'completed')
-      assert.notEqual(adaRecord.status, 'undelivered')
-      assert.equal(joinResult.byName.Ada.status, 'voided')
 
       // 3. The second join has nothing left to receive: the report happened once.
       const secondJoinPromise = forkTool.executeJoin(restarted, owner)

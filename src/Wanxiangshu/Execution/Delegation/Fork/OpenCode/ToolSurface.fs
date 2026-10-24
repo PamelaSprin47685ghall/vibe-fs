@@ -535,8 +535,7 @@ module ForkToolSurface =
 
             let snapshotPort =
                 { new ISessionSnapshotPort with
-                    member _.GetMessages(_sessionId: SessionId) =
-                        Task.FromResult(Ok []) }
+                    member _.GetMessages(_sessionId: SessionId) = Task.FromResult(Ok []) }
 
             let viewForSession sessionId =
                 task {
@@ -1033,36 +1032,6 @@ module ForkToolSurface =
         let harness = unbox<ForkHarness> value
         let spec = JoinTool.spec harness.Scope
         spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
-
-    let executeJoinReceipt (value: obj) (owner: string) : Task<obj> =
-        task {
-            let harness = unbox<ForkHarness> value
-            let! receipt = JoinTool.executeReceipt harness.Scope (managerContext harness owner)
-
-            return
-                match receipt with
-                | Error code -> box {| ok = false; code = code |}
-                | Ok records ->
-                    let toObj (record: JoinTool.JoinRecord) =
-                        createObj
-                            [ "name" ==> record.Name
-                              "agentId" ==> record.AgentId
-                              "role" ==> record.Role
-                              "status" ==> record.Status
-                              "body" ==> (record.Body |> String.concat "\n")
-                              "returned"
-                              ==> (record.Returned
-                                   |> List.map (fun text -> createObj [ "text" ==> text ])
-                                   |> Array.ofList) ]
-
-                    let byName =
-                        records |> List.map (fun r -> r.Name ==> toObj r) |> createObj
-
-                    createObj
-                        [ "ok" ==> true
-                          "records" ==> (records |> List.map toObj |> Array.ofList)
-                          "byName" ==> byName ]
-        }
 
     let recordDeliveredValue (sessionId: string) (deliveredValue: obj) : unit =
         Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordView

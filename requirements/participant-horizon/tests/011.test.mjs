@@ -74,16 +74,13 @@ test('WHAT[participant-horizon-011] a restarted process voids the previous proce
     assert.ok(voidedRow, 'the voided work keeps a row in the horizon roster')
     assert.equal(voidedRow.status, 'voided', 'the voided work is reported as voided, not as still away')
 
-    const joinPromise = forkTool.executeJoinReceipt(restarted, owner)
+    const joinPromise = forkTool.executeJoin(restarted, owner)
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
     const joinResult = await Promise.race([joinPromise, timeout])
-    assert.equal(joinResult.ok, true)
-    const adaRecord = joinResult.records.find((record) => record.name === 'Ada')
-    assert.ok(adaRecord, 'join reports the voided work by its Byname')
-    assert.equal(adaRecord.status, 'voided')
-    assert.notEqual(adaRecord.status, 'completed')
-    assert.notEqual(adaRecord.status, 'undelivered')
-    assert.equal(joinResult.byName.Ada.status, 'voided')
+    assert.match(joinResult, /Ada/)
+    assert.match(joinResult, /was voided|已作废|已撤销/)
+    assert.doesNotMatch(joinResult, /\[\[data\.records\]\]/)
+
 
     // Reported once: the work leaves the roster and the handle retires.
     assert.doesNotMatch(await forkTool.executeHorizon(restarted, owner), /Ada/)

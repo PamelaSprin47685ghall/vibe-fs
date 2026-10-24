@@ -429,5 +429,5 @@ Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择�
 
 ## [050] js.ask：Plan 编程面的提问成员
 
-Plan 的编程面（`todowrite-for-plan`）携带 `js.ask(question)`：程序内调用即登记 durable 问题并通知用户，然后经统一 park 通道挂起，工具返回 parked 载荷；程序不继续执行，直到恢复。阶段门禁与 [049] 相同：只有 S1 阶段的 Plan 可以提问，其他阶段以 `ASK_REFUSED` 拒绝；拒绝以失败哨兵进入程序，程序可捕获或让其失败。恢复沿用同一工具的三态入参：`{ unpark: { handle, value } }` 让 await 取到注入值，`{ abandon: { handle } }` 展开为 ABANDONED；等待期间的新调用受等待门禁拒绝，只有真实用户输入解锁。parked 载荷携带完整程序与执行点 source 标记（与生成面同规）。
+Plan 的编程面（`todowrite-for-plan`）携带 `js.ask(question)`：程序内调用即登记 durable 问题并通知用户，然后经统一 park 通道挂起，工具返回 parked 载荷；程序不继续执行，直到恢复。阶段门禁与 [049] 相同：只有 S1 阶段的 Plan 可以提问，其他阶段以 `ASK_REFUSED` 拒绝；拒绝以失败哨兵进入程序，程序可捕获或让其失败。等待期间的新调用受既有等待门禁拒绝，只有真实用户输入解锁。真实用户输入按既有 S1／Ask 门禁解除等待后，提交新名字的控制程序，在工具顶层提供必填 planB，在程序内调用 `unpark(name, value?)` 继续原现场；恢复使用控制请求准入时确定的剩余期限，不重跑原程序，恢复控制者不隐式再次唤醒目标。放弃通过新控制程序的 `abandon(name)`。parked 载荷携带完整程序与执行点 source 标记（与生成面同规）。
 

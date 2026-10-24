@@ -9,11 +9,11 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.AsyncSupport
 
 /// JS-host process adapter. Non-PTY child-process execution delegates to
-/// wanxiangli/process (ProcessSession). Output spooling belongs to
-/// wanxiangli/spool through Spool.fs.
+/// wanxiangli/runtime (ProcessSession). Output spooling belongs to
+/// wanxiangli/runtime through Spool.fs.
 module NodeProcessHost =
 
-    [<Import("ProcessSession", "wanxiangli/process")>]
+    [<Import("ProcessSession", "wanxiangli/runtime")>]
     let private ProcessSessionCtor: obj = jsNative
 
     [<Import("join", "node:path")>]

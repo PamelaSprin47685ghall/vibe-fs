@@ -73,7 +73,6 @@ module ForkToolSurface =
     val detachToolRuntime: value: obj -> Task
     val durableLifecycleByname: value: obj -> owner: string -> byname: string -> obj
     val executeJoin: value: obj -> owner: string -> Task<string>
-    val executeJoinReceipt: value: obj -> owner: string -> Task<obj>
     val executeHorizon: value: obj -> owner: string -> Task<string>
     val executeHorizonReceipt: value: obj -> owner: string -> Task<obj>
     val recordDeliveredValue: sessionId: string -> deliveredValue: obj -> unit

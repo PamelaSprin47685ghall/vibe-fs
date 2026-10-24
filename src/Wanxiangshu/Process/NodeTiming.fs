@@ -8,9 +8,9 @@ open Wanxiangshu.Foundation
 
 module NodeTiming =
 
-    // 实现唯一来源：wanxiangli/time（CUT-21）。此模块只做类型桥——
+    // 实现唯一来源：wanxiangli/runtime（CUT-21）。此模块只做类型桥——
     // 主仓 ITimerPort / IDeadlineHandle / IClockPort 契约不变，调用方零改动。
-    [<Import("Time", "wanxiangli/time")>]
+    [<Import("Time", "wanxiangli/runtime")>]
     let private library: obj = jsNative
 
     let private call (name: string) (args: obj) : obj =

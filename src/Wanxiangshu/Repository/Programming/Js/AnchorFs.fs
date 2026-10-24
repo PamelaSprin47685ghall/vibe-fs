@@ -4,13 +4,13 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Ordered anchor matching and host grep, bridged to `wanxiangli/fs`
+/// Ordered anchor matching and host grep, bridged to `wanxiangli/runtime`
 /// (CUT-24). The matching algorithm lives in the library; this module keeps
 /// the main-repo signature (AnchorSpec DU, JsGrepHit/JsGrepListing records)
 /// stable for existing consumers.
 module JsAnchorFs =
 
-    [<Import("Filesystem", "wanxiangli/fs")>]
+    [<Import("Filesystem", "wanxiangli/runtime")>]
     let private Filesystem: obj = jsNative
 
     [<Emit("$0({ root: $1 })")>]

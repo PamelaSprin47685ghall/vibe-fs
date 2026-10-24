@@ -63,5 +63,8 @@ type PluginSessionScope =
     /// the lifecycle may be declared drained.
     member ClearSession: sessionId: string -> Task
 
+    /// Awaits confirmed program cleanup for sessions owned by this plugin instance.
+    member ClosePrograms: unit -> Task
+
     /// Plugin dispose releases companions and instance-owned model leases.
     member Dispose: unit -> unit

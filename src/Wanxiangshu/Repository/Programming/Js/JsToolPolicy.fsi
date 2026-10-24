@@ -24,19 +24,14 @@ module JsToolPolicy =
 
     /// Manager cannot read by default.
     val defaultReadCheck:
-        roleName: string ->
-        readCheck: ('context -> Task<bool>) option ->
-            ('context -> Task<bool>) option
+        roleName: string -> readCheck: ('context -> Task<bool>) option -> ('context -> Task<bool>) option
 
-    /// Default invocation name when not specified.
-    val defaultInvocationName:
-        toolCallId: ToolCallId option ->
-        providerRunId: ProviderRunIdentity option ->
-        sessionId: string ->
-            string
+    /// Required name of this program invocation.
+    val argNameProse: unit -> string
 
-    /// The localized prose of the `program` argument.
     val argProgramProse: unit -> string
+
+    val argPlanBProse: unit -> string
 
     /// The localized prose of the refusal of a call that carries no state.
     val missingProgramProse: unit -> string

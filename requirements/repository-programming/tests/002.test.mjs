@@ -33,7 +33,7 @@ const memberNames = (s) => s.members.map((fragment) => fragment.memberName)
 
 // park and deliver are lifecycle members: every generated surface carries them
 // in its base class, but they are not the projection of a ToolPermission.
-const LIFECYCLE_MEMBERS = ['deliver', 'park']
+const LIFECYCLE_MEMBERS = ['park', 'unpark', 'abandon']
 
 const projectedMembers = (s) => memberNames(s).filter((name) => !LIFECYCLE_MEMBERS.includes(name))
 
@@ -51,11 +51,10 @@ const MEMBERS_BY_PERMISSION = {
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
-  Exec: ['call'],
+  Exec: ['call', 'signal', 'send'],
   Fork: ['fork'],
   Resume: ['resume'],
   DevOpsConsultation: ['devops'],
-  Join: ['join'],
   Fission: ['fission'],
   Horizon: ['horizon'],
   Advisor: ['advisor'],
@@ -76,12 +75,12 @@ const BINDING_BY_MEMBER = {
   whereAll: 'whereAll',
   where: 'where',
   call: 'call',
+  signal: 'signal',
+  send: 'send',
   fork: 'fork',
   resume: 'resume',
   commission: 'commission',
   devops: 'devops',
-  dag: 'dag',
-  join: 'join',
   fission: 'fission',
   horizon: 'horizon',
   advisor: 'advisor',
@@ -94,9 +93,9 @@ const BINDING_BY_MEMBER = {
 const MEMBER_ORDER = [
   'write', 'rm', 'mv',
   'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where',
-  'call',
+  'call', 'signal', 'send',
   'fork', 'resume', 'commission', 'devops', 'dag',
-  'join', 'fission', 'horizon', 'advisor', 'ask',
+  'fission', 'horizon', 'advisor', 'ask',
   'review',
 ]
 
@@ -106,16 +105,16 @@ const MEMBER_ORDER = [
 // tool of its own.
 const EXPECTED_MEMBERS = {
   engineer: ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'fission', 'advisor'],
-  devops: ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call', 'join', 'horizon', 'advisor'],
-  manager: ['reviewOnly.cat', 'reviewOnly.ls', 'reviewOnly.rg', 'reviewOnly.stat', 'whereAll', 'where', 'fork', 'resume', 'dag', 'join', 'horizon', 'advisor', 'review'],
-  orchestrator: ['commission', 'join', 'horizon', 'advisor'],
+  devops: ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call', 'signal', 'send', 'horizon', 'advisor'],
+  manager: ['reviewOnly.cat', 'reviewOnly.ls', 'reviewOnly.rg', 'reviewOnly.stat', 'whereAll', 'where', 'fork', 'resume', 'horizon', 'advisor', 'review'],
+  orchestrator: ['commission', 'horizon', 'advisor'],
   plan: ['write', 'cat', 'stat', 'mkdir', 'whereAll', 'where', 'devops', 'ask', 'review'],
 }
 
 // Sugar members are compiled inside the base class itself instead of
 // delegating to `_api` (dag builds fork waves plus one join), so their base-class
 // layer is the public method they declare.
-const SUGAR_MEMBERS = ['dag', 'commission', 'resume', 'devops']
+const SUGAR_MEMBERS = ['commission', 'resume', 'devops']
 
 const layersOf = (s) =>
   Object.fromEntries(
@@ -171,7 +170,7 @@ ${body}
 }`
 
 const runProgram = (dir, role, sessionId, body) =>
-  execute(dir, role, 'en', sessionId, { name: 'repository-programming-002', program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
+  execute(dir, role, 'en', sessionId, { name: 'repository-programming-002', program: program(body), planB: 'Wait for these business receipts under one unchanged request deadline.' }, 3000, Date.now() + 60_000, 1 << 20, null)
 
 // A recording delegation host: every dispatch member travels the single
 // `(name, payload, carry)` entry, so the payload the host receives is
@@ -192,7 +191,7 @@ const recordingHost = () => {
 }
 
 const install = (sessionId, host) =>
-  installDelegationHost(sessionId, host.delegate, host.join, host.fission, host.horizon, host.advisor)
+  installDelegationHost(sessionId, host.delegate, host.fission, host.horizon, host.advisor)
 
 test('WHAT[repository-programming-002] registered_js_tools_match_js_tool_generator_output', () => {
   for (const role of allRoleLabels) {
@@ -435,9 +434,9 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
   }
 
   // The permission is the sole source of the member: Fork/Join without Advisor
-  // project fork/dag/join but never advisor.
+  // project fork but neither advisor nor the independent join tool.
   const delegationOnly = surface('Engineer', caps('Fork', 'Join'))
-  assert.deepEqual(memberNames(delegationOnly), ['fork', 'dag', 'join'])
+  assert.deepEqual(memberNames(delegationOnly), ['fork'])
   assert.equal(memberBinding('Engineer', caps('Fork', 'Join'), 'advisor'), undefined)
   assert.deepEqual(memberNames(surface('Engineer', caps('Advisor'))), ['advisor'])
 
@@ -460,7 +459,7 @@ test('WHAT[repository-programming-002] dispatch members accept no carry paramete
   assert.equal(isSome(manager), true)
 
   // Dispatch members: context travels via full post-scope view, not carry.
-  for (const member of ['fork', 'resume', 'dag', 'advisor']) {
+  for (const member of ['fork', 'resume', 'advisor']) {
     assert.match(
       manager.baseClassSource,
       new RegExp(`async ${member}\\(`),
@@ -468,7 +467,7 @@ test('WHAT[repository-programming-002] dispatch members accept no carry paramete
     )
   }
   // Pull members collect completed work without a history selection.
-  for (const member of ['join', 'horizon']) {
+  for (const member of ['horizon']) {
     assert.match(
       manager.baseClassSource,
       new RegExp(`async ${member}\\(\\)`),
@@ -486,25 +485,16 @@ test('WHAT[repository-programming-002] dispatch members accept no carry paramete
   assert.equal(/carry/.test(fissionProse), false, 'fission documents no carry parameter')
 })
 
-test('WHAT[repository-programming-002] dag is emitted only when Fork and Join both exist, and its body calls no missing member', () => {
-  const forkOnly = surface('Engineer', caps('Fork'))
-  assert.equal(isSome(forkOnly), true)
-  assert.deepEqual(memberNames(forkOnly), ['fork'], 'Fork alone carries fork, never dag')
-  assert.equal(forkOnly.baseClassSource.includes('async dag('), false, 'dag needs Join as well')
-
-  const forkAndJoin = surface('Engineer', caps('Fork', 'Join'))
-  assert.deepEqual(memberNames(forkAndJoin), ['fork', 'dag', 'join'])
-
-  const body = methodBody(forkAndJoin.baseClassSource, 'dag')
-  assert.ok(body, 'the dag method exists in the base class')
-  const called = [...body.matchAll(/this\.([A-Za-z0-9_]+)\s*\(/g)].map((match) => match[1])
-  assert.ok(called.includes('fork'), 'dag forks its nodes')
-  assert.ok(called.includes('join'), 'dag joins the wave')
-  for (const member of called) {
-    assert.ok(
-      memberNames(forkAndJoin).includes(member) || member === 'park',
-      `dag must not call the missing member ${member}`,
-    )
+test('WHAT[repository-programming-002] join and dag are absent from every programming layer', () => {
+  for (const permissions of [['Join'], ['Fork','Join'], ['Read','Fork','Join']]) {
+    const generated=surface('Engineer',permissions)
+    if(permissions.length===1) { assert.equal(generated,null); continue }
+    for(const name of ['join','dag']) {
+      assert.equal(memberNames(generated).includes(name),false)
+      assert.equal(memberBinding('Engineer',permissions,name),undefined)
+      assert.doesNotMatch(generated.baseClassSource,new RegExp('async '+name+'\\('))
+      assert.doesNotMatch(generated.description,new RegExp('this\\.'+name+'\\('))
+    }
   }
 })
 

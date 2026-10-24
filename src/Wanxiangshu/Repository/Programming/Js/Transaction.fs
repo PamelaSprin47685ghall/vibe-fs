@@ -42,7 +42,7 @@ module JsStagedMutation =
         | JsStagedMutation.Move(fromPath, _) -> fromPath
 
 /// DSL-class: Decision — JS-012/013/014: the pure transaction rules,
-/// bridged to `wanxiangli/fs` (CUT-24). The decision algorithm lives in the
+/// bridged to `wanxiangli/runtime` (CUT-24). The decision algorithm lives in the
 /// library; this module keeps the main-repo signature stable. The
 /// filesystem facts (existence, current content) are injected as functions
 /// here and materialized into plain data at the boundary, so the decision
@@ -50,7 +50,7 @@ module JsStagedMutation =
 /// job, never this module's.
 module JsTransaction =
 
-    [<Import("Filesystem", "wanxiangli/fs")>]
+    [<Import("Filesystem", "wanxiangli/runtime")>]
     let private Filesystem: obj = jsNative
 
     [<Emit("$0({ root: '' })")>]

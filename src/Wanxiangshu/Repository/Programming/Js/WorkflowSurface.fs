@@ -9,8 +9,6 @@ open Fable.Core.JsInterop
 [<RequireQualifiedAccess>]
 module JsWorkflowSurface =
 
-    let mutable private harnessNameSeq = 0
-
     type private JsWorkflowOutcomeHandle(outcome: JsToolWorkflow.JsToolOutcome) =
         member _.Value = outcome
 
@@ -98,10 +96,8 @@ module JsWorkflowSurface =
         : Task<obj> =
         runWithObservation workspaceRoot role language program deadlineMs deadlineEpochMs outputBoundBytes store None
 
-    /// Execute under the three-state input protocol (PLAN S2 step 5).
-    /// `input` is one of `{ program } | { unpark: { handle, value } } |
-    /// { abandon: { handle } }`. The program state is passed as the input
-    /// object; `sessionId` tags newly created parked sites.
+    /// Execute the exact named-program input { name, program, planB }.
+    /// Lifecycle control uses members inside another named program.
     let execute
         (workspaceRoot: string)
         (role: string)
@@ -128,20 +124,6 @@ module JsWorkflowSurface =
                         None
                     else
                         Some(JsTransactionSurface.lifecyclePersistenceOf store)
-
-                let input =
-                    if
-                        not (isNull input)
-                        && not (isNull input?program)
-                        && (isNull input?name || string input?name = "")
-                    then
-                        harnessNameSeq <- harnessNameSeq + 1
-
-                        createObj
-                            [ "program" ==> input?program
-                              "name" ==> ("test-" + sessionId + "-" + string harnessNameSeq) ]
-                    else
-                        input
 
                 let! outcome =
                     JsToolWorkflow.execute
@@ -195,7 +177,7 @@ module JsWorkflowSurface =
         | JsToolWorkflow.JsToolOutcome.Failed _ -> "Failed"
         | JsToolWorkflow.JsToolOutcome.Parked _ -> "Parked"
 
-    let parkedHandle (value: obj) : obj =
+    let parkedName (value: obj) : obj =
         match outcomeOf value with
         | JsToolWorkflow.JsToolOutcome.Parked(handle, _, _) -> box handle
         | _ -> null
@@ -258,8 +240,7 @@ module JsWorkflowSurface =
             JsTransactionSurface.persistenceFailureToJs failure
         | _ -> null
 
-    /// Test hook: clear the process-live parked-site table so tests do not
-    /// leak sites across cases (the table is module-level and process-live).
-    let clearParkedSites () : unit = JsParkedSites.clearAll ()
+    /// Close test programs through resource-confirmed session cleanup.
+    let closePrograms () : Task<unit> = JsPrograms.closeAll ()
 
     let render (value: obj) : string = JsToolsResult.render (outcomeOf value)

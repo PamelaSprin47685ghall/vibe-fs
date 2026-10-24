@@ -60,10 +60,11 @@ test('WHAT[work-024] the Plan devops member requires bound lifecycle work and ne
     const sessionID = 'ses-work-024-devops'
     await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
 
+    let programSequence = 0
     const runPlan = async (body) =>
       String(
         await hooks.tool['todowrite-for-plan'].execute(
-          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-plan' },
+          { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-plan-' + (++programSequence), planB: 'Wait for this planning operation without renewing the request deadline.' },
           { sessionID, agent: 'plan' },
         ),
       )
@@ -101,8 +102,7 @@ test('WHAT[work-024] an unreviewed tenure may read the draft but cannot write it
         return { ok: true, hasReviewOnly: typeof this.reviewOnly !== 'undefined' };
       }
     }`, name: 'read-draft',
-          prefixUntil: 0,
-          carry: []
+          planB: 'Read the current planning capability under the admitted deadline.'
         },
       { sessionID, agent: 'plan', callID: 'call-work-024', messageID: 'run-work-024', providerRunID: 'run-work-024' },
     )

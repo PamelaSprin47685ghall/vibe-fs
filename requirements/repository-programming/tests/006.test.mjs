@@ -97,17 +97,13 @@ test('WHAT[repository-programming-006] JS054_1_sync_infinite_loop_is_killed_by_v
   assert.equal(result.ok, false)
   assert.equal(failureCode(result), 'PROGRAM_TIMEOUT')
 })
-test('WHAT[repository-programming-006] JS054_1_async_deadline_proxy_aborts_api_calls_after_deadline', async () => {
-  // deadline in the past → first api call throws __PROGRAM_TIMEOUT__ → wrapper
-  // classifies it as a program failure carrying the timeout marker.
-  const program = `class Js extends JsProgram {
-  async run() { await this.cat('a.txt'); return { ok: true }; }
-}`
-  const api = { cat: async () => ({ text: 'x' }) }
-  const result = await runWrapped(program, api, { deadlineEpochMs: Date.now() - 1000 })
-  assert.equal(result.ok, false)
-  assert.equal(failureCode(result), 'PROGRAM_TIMEOUT')
+test('WHAT[repository-programming-006] retired absolute API deadlines cannot override the admitted request window', async () => {
+  const result = await runWrapped('class Js extends JsProgram { async run(){ return await this.cat("a.txt"); } }',
+    { cat: async () => ({ text: 'x' }) }, { deadlineEpochMs: Date.now() - 1000 })
+  assert.equal(result.ok, true)
+  assert.deepEqual(JSON.parse(result.value), { text: 'x' })
 })
+
 test('WHAT[repository-programming-006] JS054_2_output_bound_rejects_oversized_results', async () => {
   const big = `class Js extends JsProgram {
   async run() { return { data: 'x'.repeat(1000) }; }
@@ -131,19 +127,8 @@ test('WHAT[repository-programming-006] output budget measures UTF-8 bytes and ac
 })
 }
 
-// post-await budget: covered in 006-cut25-escapes.test.mjs (CUT-25 membrane + afterEvaluate driver)
-// Root cause of the old "memory exhaustion" todo: `JsSandbox` runs the
-// program IN-PROCESS through `node:vm`
-// (src/Wanxiangshu/Process/JsSandbox.fs -> wanxiangli/src/sandbox/Sandbox.fs).
-// There is no separate worker thread, child process or isolate, so V8
-// `resourceLimits` (`maxOldSpaceSize`) never applies and no memory-only fence
-// can exist. `FailureCatalog` still declares `PROGRAM_RESOURCE_LIMIT`
-// (JsFailure.ProgramResourceLimit), but no production code constructs it:
-// the only in-process bounds are the vm `timeout` for the synchronous segment
-// and the injected deadline proxy (`deadlineEpochMs`) checked on every api
-// member call. A steady allocating loop is therefore contained by the
-// DEADLINE fence, not by a memory bound - and the Host process must survive
-// that containment and stay functional for the programs that follow.
+// Real child-process execution contains computation; host replies cross as data.
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
@@ -168,13 +153,11 @@ test('WHAT[repository-programming-006] JS054_3_steady_allocation_loop_is_contain
     while (true) {
       chunks.push('x'.repeat(1024));
       if (chunks.length > 64) chunks.shift();
-      await this.cat('a.txt');
     }
   }
 }`
-  // The steady loop keeps allocating; the only fence that can fire is the
-  // deadline checked by the api proxy on each call.
-  const contained = await runWrapped(allocating, api, { deadlineEpochMs: Date.now() + 50 })
+  // A bounded working set isolates execution-budget containment from host memory.
+  const contained = await runWrapped(allocating, api, { deadlineMs: 200 })
   assert.equal(contained.ok, false)
   assert.equal(failureCode(contained), 'PROGRAM_TIMEOUT')
 
@@ -225,7 +208,7 @@ test('WHAT[repository-programming-006] CUT25_escape_via_globalThis_constructor_i
   const program = `class Js extends JsProgram { async run() { ${reach(`globalThis.constructor.constructor('return process')()`)} } }`
   const result = await runWrapped(program, { ls: async () => [] })
   assert.equal(result.ok, false)
-  assert.match(String(result.reason || ''), /process is not defined/i)
+  assert.match(String(result.reason || ''), /process is not defined|Code generation from strings disallowed/i)
 })
 
 test('WHAT[repository-programming-006] CUT25_escape_via_returned_array_constructor_is_denied', async () => {
@@ -237,7 +220,7 @@ test('WHAT[repository-programming-006] CUT25_escape_via_returned_array_construct
 }`
   const result = await runWrapped(program, { ls: async () => ['a.txt'] })
   assert.equal(result.ok, false)
-  assert.match(String(result.reason || ''), /process is not defined/i)
+  assert.match(String(result.reason || ''), /process is not defined|Code generation from strings disallowed/i)
 })
 
 test('WHAT[repository-programming-006] CUT25_escape_cannot_write_outside_workspace', async () => {
@@ -263,8 +246,7 @@ test('WHAT[repository-programming-006] CUT25_escape_cannot_write_outside_workspa
 })
 
 test('WHAT[repository-programming-006] pending async work and post-await computation terminate within the execution budget', async () => {
-  // afterEvaluate microtask drains interact badly with node:test async_hooks when the
-  // timeout path fires in-process; run the probe in a child so the parent harness stays clean.
+  // An outer process also bounds the test if the execution protection regresses.
   const { spawnSync } = await import('node:child_process')
   const script = `
     import { run } from ${JSON.stringify(new URL('../../../dist/Repository/Programming/Js/RuntimeSurface.js', import.meta.url).pathname)};

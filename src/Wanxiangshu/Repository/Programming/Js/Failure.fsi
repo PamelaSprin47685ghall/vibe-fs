@@ -25,6 +25,7 @@ type JsTransactionAppendFailure =
 type JsFailure =
     | InvalidProgram
     | ProgramFailed of string
+    | RuntimeFailure of code: string * reason: string
     | ProgramTimeout
     | ProgramResourceLimit
     | PermissionDenied of string

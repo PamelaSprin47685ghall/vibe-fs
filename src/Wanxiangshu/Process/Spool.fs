@@ -5,14 +5,14 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Host binding to `wanxiangli/spool`. The library owns memory bounds, the spool
+/// Host binding to `wanxiangli/runtime`. The library owns memory bounds, the spool
 /// file and its write failures; this module only adapts its messages to F#.
 module Spool =
 
     [<Literal>]
     let ChunkSizeBytes: int = 204800
 
-    [<Import("OutputSpool", "wanxiangli/spool")>]
+    [<Import("OutputSpool", "wanxiangli/runtime")>]
     let private OutputSpoolCtor: obj = jsNative
 
     [<Import("tmpdir", "node:os")>]
@@ -36,7 +36,7 @@ module Spool =
     [<Emit("((chunks) => { let size = 0; for (const c of chunks) size += c.length; const out = new Uint8Array(size); let at = 0; for (const c of chunks) { out.set(c, at); at += c.length; } return out; })($0)")>]
     let private concat (_parts: byte array array) : byte array = jsNative
 
-    /// DSL-class: PhysicalHandle — one library OutputSpool; owner wanxiangli/spool, law process-execution-009, proof process-execution-009.
+    /// DSL-class: PhysicalHandle — one library OutputSpool; owner wanxiangli/runtime, law process-execution-009, proof process-execution-009.
     [<Sealed>]
     type OutputSpool(instance: obj) =
         member _.Instance = instance

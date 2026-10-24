@@ -19,68 +19,29 @@ test('WHAT[process-execution-011] RUN_host_context_codec_exposes_plain_snapshot'
   })
 })
 
-test('WHAT[process-execution-011] this.call rejects incomplete Runnable specs before spawning', async () => {
-  const { dir, cleanup } = sandbox('wxs-proc-011a-')
-  try {
-    const marker = join(dir, 'spawned')
-    const cmd = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`)
-    const incompleteSpecs = [
-      `class { next() { return ${JSON.stringify(cmd)}; } check() { return true; } }`,
-      `class { maxDuration = 0; next() { return ${JSON.stringify(cmd)}; } check() { return true; } }`,
-      `class { maxDuration = Infinity; next() { return ${JSON.stringify(cmd)}; } check() { return true; } }`,
-      `class { maxDuration = 1000; check() { return true; } }`,
-      `class { maxDuration = 1000; next() { return ${JSON.stringify(cmd)}; } }`,
-    ]
-    for (const spec of incompleteSpecs) {
-      const outcome = await runProgram(dir, `    return await this.call(${spec});`)
-      assert.equal(caseName(outcome), 'Failed')
-      assert.match(render(outcome), /CALLABLE_SPEC_INCOMPLETE/)
-      assert.equal(existsSync(marker), false, 'incomplete Runnable spec must not spawn the command')
-    }
-  } finally {
-    cleanup()
+test('WHAT[process-execution-011] command descriptors and retired Callable classes cannot spawn commands',async t=>{
+  const {fixture,failureCode}=await import('../../repository-programming/tests/support/named-program.fixture.mjs')
+  const h=fixture(t,'proc011','DevOps')
+  for(const [name,body]of [
+    ['descriptor','return await this.call({command:"touch spawned"});'],
+    ['legacy','return await this.call(class {next(){return "touch spawned";}});'],
+  ]) {
+    const result=await h.run(name,body)
+    assert.equal(caseName(result),'Failed')
+    assert.equal(failureCode(result),'CALL_COMMAND_UNSUPPORTED')
+    assert.equal(existsSync(h.file('spawned')),false)
   }
+  const shape=await h.run('no-callable','return {retired:typeof this.Callable};')
+  assert.match(render(shape),/retired = "undefined"/)
 })
 
-test('WHAT[process-execution-011] this.call rejects unsupported command descriptors with CALL_COMMAND_UNSUPPORTED', async () => {
-  const { dir, cleanup } = sandbox('wxs-proc-011b-')
-  try {
-    const outcome = await runProgram(
-      dir,
-      `    return await this.call(class extends this.Callable {
-      maxDuration = 2000;
-      next(ctx) { return ctx.step === 0 ? { unsupported: true } : null; }
-      check() { return true; }
-      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
-      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
-    });`,
-    )
-    assert.equal(caseName(outcome), 'Failed')
-    assert.match(render(outcome), /CALL_COMMAND_UNSUPPORTED/)
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[process-execution-011] this.call maxDuration overrun terminates the foreground command and reports timeout', async () => {
-  const { dir, cleanup } = sandbox('wxs-proc-011c-')
-  try {
-    const marker = join(dir, 'late-marker')
-    const outcome = await runProgram(
-      dir,
-      `    return await this.call(class extends this.Callable {
-      maxDuration = 150;
-      interval = 30;
-      next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late-marker" : null; }
-      check() { return true; }
-      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
-      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
-    });`,
-    )
-    assert.equal(caseName(outcome), 'Succeeded')
-    assert.match(render(outcome), /status = "timeout"/)
-    assert.equal(existsSync(marker), false)
-  } finally {
-    cleanup()
-  }
+test('WHAT[process-execution-011] deadline parks without terminating the active command; explicit abandon confirms cleanup',{timeout:12000},async t=>{
+  const {fixture,data,barrier,stopped,until}=await import('../../repository-programming/tests/support/command-program.fixture.mjs')
+  const h=fixture(t,'proc011-expiry','DevOps'),cmd=barrier(h,'held')
+  const output=await h.run('held','return await this.call('+JSON.stringify(cmd)+');',{planB:'w'.repeat(20)})
+  assert.equal(caseName(output),'Parked')
+  await until(()=>existsSync(h.file('held.pid')))
+  const closed=data(await h.abandon('held'))
+  assert.equal(closed.state,'abandoned')
+  await stopped(h,'held')
 })

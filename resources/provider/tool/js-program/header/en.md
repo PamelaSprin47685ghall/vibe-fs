@@ -1,7 +1,8 @@
-TOOL CALL CONTRACT (REQUIRED): the **only** tool-call argument is `program: string`.
-Every call must supply `program`, containing a complete JavaScript class defining `class Js extends JsProgram` with `async run()`. Use the full working program in the Ultra Example later in this description; don't send an empty argument object.
-Do not call this tool with `{}`. Do not send top-level `name`, `planB`, `unpark`, or `abandon` fields.
-Parked results do not introduce any additional tool arguments; any lifecycle recovery is separate from this Host tool input.
+Submit exactly three required string arguments: `name`, `program`, and `planB`. Choose a new, non-blank name in this session. `planB` must be non-empty. Define `class Js extends JsProgram` with `async run()`.
+
+At admission, `UTF8Bytes(planB) × 50ms` sets one deadline for the entire request. All operations and all targets resumed by this request share its remaining time. Use `call(command)` and `unpark(name, value?)`; program code cannot create or renew a budget.
+
+Use a new named program to control an existing one. At expiry the controller and its active targets pause; resuming the controller alone does not resume its targets again. The same physical tool call replays its original receipt; a new call with an occupied name fails with NAME_TAKEN. Ordinary return does not deliver business work.
 
 WARNING: You may be about to turn a bounded filesystem task into a self-inflicted repair job.
 

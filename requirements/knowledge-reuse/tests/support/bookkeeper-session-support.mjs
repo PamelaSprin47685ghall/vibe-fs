@@ -5,6 +5,13 @@ import * as bookkeeper from '../../../../dist/Repository/Knowledge/Casebook/Book
 import * as bookkeeperRefresh from '../../../../dist/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.js'
 import * as lifecycle from '../../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
 
+let programSequence = 0
+const bookkeeperRequest = program => ({
+  name: 'bookkeeper-scripted-' + (++programSequence),
+  program,
+  planB: 'Complete the bound Bookkeeper transaction and retain an explicit result if execution cannot finish.',
+})
+
 export const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 import { CANONICAL_Q, CANONICAL_A } from './canonical.mjs'
 export { CANONICAL_Q, CANONICAL_A }
@@ -37,7 +44,7 @@ export const scriptedBookkeeperPort = () => {
       assert.notEqual(tx, '', 'SendPrompt must run against a bound Bookkeeper tx')
       const out = await bookkeeperTool.runProgram(
         sid,
-        `class Js extends JsProgram { async run() { this.setQuestion(${JSON.stringify(CANONICAL_Q)}); this.setAnswer(${JSON.stringify(CANONICAL_A)}); return { changed: true }; } }`,
+        bookkeeperRequest(`class Js extends JsProgram { async run() { this.setQuestion(${JSON.stringify(CANONICAL_Q)}); this.setAnswer(${JSON.stringify(CANONICAL_A)}); return { changed: true }; } }`),
       )
       assert.equal(String(out).includes('changed = true'), true, out)
       programCalls.push(tx)

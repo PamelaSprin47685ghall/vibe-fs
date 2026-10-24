@@ -1,0 +1,42 @@
+namespace Wanxiangshu.Repository.Programming.Js
+
+open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
+
+/// Host composition only. The library owns every name, run and continuation.
+module JsPrograms =
+    [<Import("Program", "wanxiangli/program")>]
+    let private create: unit -> obj = jsNative
+
+    let private owner = create ()
+
+    let forSession (sessionId: string) : obj = owner?session (sessionId)
+
+    let pendingNames (sessionId: string) : string list =
+        let session = forSession sessionId
+        unbox<string array> (session?pendingNames ()) |> Array.toList
+
+    let deliveryBlockersWithChoicesForSession sessionId =
+        pendingNames sessionId
+        |> List.map (fun name -> name, "unpark(name, value?) or abandon(name)")
+
+    let closeSession (sessionId: string) : Task<string list> =
+        task {
+            let names = pendingNames sessionId
+            let! result = unbox<Task<obj>> (owner?close (sessionId))
+
+            if string result?state <> "closed" then
+                return failwith ("program cleanup is incomplete: " + JS.JSON.stringify result)
+            else
+                return names
+        }
+
+    let closeAll () : Task<unit> =
+        task {
+            let sessions: obj array = unbox (owner?inspect ())
+
+            for session in sessions do
+                let! _ = closeSession (string session?sessionId)
+                ()
+        }

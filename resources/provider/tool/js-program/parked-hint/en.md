@@ -1,3 +1,6 @@
-The programming surface still has unresolved parked sites: {{handles}}
+Paused programs:
+{{handles}}
 
-These parked sites do not disappear on their own. Resolve each one: `unpark` (resume execution) or `abandon` (give up). While any parked site remains unresolved, the deliver tool stays blocked by the leak guard gate.
+Use these program names to decide what continues. Submit a new request with a fresh name, program and top-level planB. Inside it, call unpark(name, value?) or abandon(name). Only explicit park, including a where ambiguity, receives value; call receives its original command result.
+
+All targets resumed by this request share its admission deadline. At expiry, the controller and its still-active targets pause. Resuming the controller alone does not resume its targets again; explicitly unpark each target you intend to continue. Command exit and signal/send do not resume a paused program.

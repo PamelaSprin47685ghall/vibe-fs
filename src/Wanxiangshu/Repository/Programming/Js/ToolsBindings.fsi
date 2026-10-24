@@ -2,66 +2,20 @@ namespace Wanxiangshu.Repository.Programming.Js
 
 open System.Threading.Tasks
 
-/// JS-010/JS-016: the api object injected into the sandbox — the only
-/// authority a model program sees. Every member returns a JSON-compatible
-/// object; failures carry `{ ok: false, code, reason }` with stable codes
-/// (JS-019). Mutations write as-is: each edit/write is atomically persisted
-/// through MutationFs at call time; the staging buffer records what was
-/// actually written (JS-012).
 module JsToolsBindings =
-    /// The host loop behind `call`, injected by the workflow.
-    type JsCallHost =
-        { Start: obj -> obj
-          Wait: obj -> Task<obj>
-          SignalParked: obj -> Task<obj>
-          SendParked: obj -> Task<obj>
-          TakeDelta: unit -> obj
-          Dispose: unit -> Task<unit> }
-
     val createLedger: persistence: IJsTransactionPersistence option -> JsAsIsLedger
-
-    /// `advisor(intent, carry)`: validate the carry array, then return the
-    /// installed host's data envelope. A missing host is unavailable.
     val makeAdvisorMember: host: JsDelegationHost option -> (string * obj)
-
-    /// `review(findings)`: submit this tenure's stage review through the
-    /// installed host closure; returns the host's data envelope. A missing
-    /// host is unavailable.
     val makeReviewMember: host: JsDelegationHost option -> (string * obj)
 
     val createApi:
         capabilities: Set<JsCapability> ->
         root: string ->
         staging: ResizeArray<JsStagedMutation> ->
-        readSnapshots: ResizeArray<JsReadSnapshot> ->
         explicitReads: ResizeArray<JsExplicitFileRead> ->
         ledger: JsAsIsLedger ->
-        callHost: JsCallHost option ->
         delegationHost: JsDelegationHost option ->
         askInvoke: (string -> Task<Result<unit, string>>) option ->
             obj
-
-    /// Build the api object for one sandbox run that carries a park lifecycle
-    /// state. `parkState` is the mutable object shared with the sandbox wrapper;
-    /// the generated `this.park` member suspends through it (PLAN S2 step 4).
-    val createApiWithPark:
-        capabilities: Set<JsCapability> ->
-        root: string ->
-        staging: ResizeArray<JsStagedMutation> ->
-        readSnapshots: ResizeArray<JsReadSnapshot> ->
-        explicitReads: ResizeArray<JsExplicitFileRead> ->
-        ledger: JsAsIsLedger ->
-        parkState: Wanxiangshu.Process.JsSandbox.ParkState ->
-        callHost: JsCallHost option ->
-        delegationHost: JsDelegationHost option ->
-        askInvoke: (string -> Task<Result<unit, string>>) option ->
-            obj
-
-    /// Kill named children left by `call` on this api. A missing host is a no-op.
-    val disposeCallHost: api: obj -> Task<unit>
-
-    /// Unread stdout/stderr since the previous drain. Yield parks carry this; there is no this.delta member.
-    val readStashedDelta: api: obj -> obj
 
 module JsReviewOnly =
     val scopeManagerReviewOnly: check: (unit -> Task<bool>) -> api: obj -> obj

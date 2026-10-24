@@ -19,13 +19,11 @@ type JsCapability =
     | Remove
     /// Host-owned long-running command engineering (`this.call`).
     | Exec
-    /// Delegation primitives: create a child work (`fork`) and wait for the
-    /// caller's children (`join`).
+    /// Delegation primitive: create a child work (`fork`).
     | Fork
     | Resume
     | Commission
     | DevOps
-    | Join
     /// Same-identity multi-lane execution (`this.fission`).
     | Fission
     /// Who remains at the horizon (`this.horizon`): a data-only roster of the
@@ -45,7 +43,7 @@ type JsCapability =
 
 module JsCapability =
 
-    /// Stateless `wanxiangli/programming` surface (CUT-25). Office→JS projection,
+    /// Stateless `wanxiangli/program` surface (CUT-25). Office→JS projection,
     /// JsPlan expansion and admitsSurface live in the library; this module maps
     /// labels onto the host `JsCapability` DU for Description/ToolsBindings.
     type private ProgrammingLibrary =
@@ -56,7 +54,7 @@ module JsCapability =
         abstract membersFor: jsCapabilities: string array * roleName: string -> string array
         abstract projectRole: role: string * officePermissions: string array -> obj
 
-    [<Import("Programming", "wanxiangli/programming")>]
+    [<Import("ProgramCatalog", "wanxiangli/program")>]
     let private programmingFactory: unit -> ProgrammingLibrary = jsNative
 
     let private law: ProgrammingLibrary = programmingFactory ()
@@ -75,7 +73,6 @@ module JsCapability =
         | "Resume" -> Some JsCapability.Resume
         | "Commission" -> Some JsCapability.Commission
         | "DevOps" -> Some JsCapability.DevOps
-        | "Join" -> Some JsCapability.Join
         | "Fission" -> Some JsCapability.Fission
         | "Horizon" -> Some JsCapability.Horizon
         | "Advisor" -> Some JsCapability.Advisor
@@ -97,7 +94,6 @@ module JsCapability =
         | JsCapability.Resume -> "Resume"
         | JsCapability.Commission -> "Commission"
         | JsCapability.DevOps -> "DevOps"
-        | JsCapability.Join -> "Join"
         | JsCapability.Fission -> "Fission"
         | JsCapability.Horizon -> "Horizon"
         | JsCapability.Advisor -> "Advisor"
@@ -219,6 +215,14 @@ module JsFragmentRegistry =
         { Capability = JsCapability.Exec
           MemberName = "call" }
 
+    let signal: JsCapabilityFragment =
+        { Capability = JsCapability.Exec
+          MemberName = "signal" }
+
+    let send: JsCapabilityFragment =
+        { Capability = JsCapability.Exec
+          MemberName = "send" }
+
     let fork: JsCapabilityFragment =
         { Capability = JsCapability.Fork
           MemberName = "fork" }
@@ -234,21 +238,6 @@ module JsFragmentRegistry =
     let devops: JsCapabilityFragment =
         { Capability = JsCapability.DevOps
           MemberName = "devops" }
-
-    let dag: JsCapabilityFragment =
-        { Capability = JsCapability.Fork
-          MemberName = "dag" }
-
-    /// The capabilities a member needs beyond its own. `dag` is pure sugar
-    /// over fork waves plus one join, so it needs Join as well as Fork: a
-    /// surface without Join has no join to compile the waves into, and a
-    /// member listed without a method body is a lie.
-    let additionalCapabilities (fragment: JsCapabilityFragment) : JsCapability list =
-        if fragment = dag then [ JsCapability.Join ] else []
-
-    let join: JsCapabilityFragment =
-        { Capability = JsCapability.Join
-          MemberName = "join" }
 
     let fission: JsCapabilityFragment =
         { Capability = JsCapability.Fission
@@ -292,12 +281,12 @@ module JsFragmentRegistry =
           whereAll
           where
           call
+          signal
+          send
           fork
           resume
           commission
           devops
-          dag
-          join
           fission
           horizon
           advisor

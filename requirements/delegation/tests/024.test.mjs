@@ -4,7 +4,6 @@ import {
   childTurn,
   forkCall,
   joinCall,
-  joinRecordsOf,
   observeTerminals,
   physicalUserMessageOf,
   resumeCall,
@@ -38,11 +37,9 @@ test('WHAT[delegation-024] pre-join resume preserves both public join delivered 
       const result = await joinCall(hooks, owner)
       assert.match(result, /DELIVERED-A/)
       assert.match(result, /DELIVERED-B/)
-      const records = joinRecordsOf(result)
-      assert.match(records, /DELIVERED-A/)
-      assert.match(records, /DELIVERED-B/)
-      assert.match(records, /WORK REPORT A/)
-      assert.match(records, /WORK REPORT B/)
+      assert.match(result, /# WORK REPORT A/)
+      assert.match(result, /# WORK REPORT B/)
+      assert.doesNotMatch(result, /\[\[data\.records\]\]/, 'join has no retired program-result wrapper')
     } finally {
       terminals.dispose()
     }

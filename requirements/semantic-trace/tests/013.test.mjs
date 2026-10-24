@@ -3,7 +3,7 @@
 // 取证面全部是已注册的公开 Surface，没有自写模型，也没有对内部表示
 // （union case 标签 / 字段下标）的断言：
 //   * 真实交付：withExecutablePlugin + 真实插件 + 真实 journal，驱动一次
-//     真正的 `this.deliver(...)`，让 settle 侧写下 durable 见证；
+//     子工作完成由真实 provider 终态接线裁决，不以程序 return 建立交付见证；
 //   * 见证读回：dist/Persistence/EventStore/Surface.js（已注册）——把 durable
 //     事实读成普通 JSON（payload.Fact），不构造任何 F# union；
 //   * 终态：dist/Context/Trace/SemanticTraceSurface.js（已注册）的
@@ -46,8 +46,8 @@ import {
 const SESSION = 'ses_delivery_013'
 const RUN = 'run_013_a'
 
-// 一个真实插件会话：真插件、真 journal、真交付。见证只由真实交付提交产生。
-const withRealDelivery = async (body, { callId = 'call_013_a', view = 'materialized view body' } = {}) => {
+// 一个真实插件与 journal 的散文场景；没有交付动作，不应产生交付见证。
+const withRealProse = async (body) => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     const rootId = `root-${SESSION}`
     await acceptAuthorityRoot(runtime, SESSION, 'engineer')
@@ -68,17 +68,8 @@ const withRealDelivery = async (body, { callId = 'call_013_a', view = 'materiali
       parts: [{ type: 'text', text: 'the assistant prose of this turn' }],
     })
 
-    const deliver = async (material) =>
-      hooks.tool['todowrite-for-engineer'].execute(
-        {
-          program: `class Js extends JsProgram { async run() { await this.deliver([${JSON.stringify(material)}]); } }`,
-          prefixUntil: 0,
-          carry: []
-        },
-        { sessionID: SESSION, agent: 'engineer', callID: callId, messageID: RUN },
-      )
 
-    await body({ hooks, directory, runtime, deliver, view })
+    await body({ hooks, directory, runtime })
   })
 }
 
@@ -199,7 +190,7 @@ test('WHAT[semantic-trace-013] replaying the same witness under the same fence i
       const firstJoin = await joinCall(hooks, owner, 'join-call-1')
       assert.match(firstJoin, /material-idemp/)
       const secondJoin = await joinCall(hooks, owner, 'join-call-2')
-      assert.match(secondJoin, /nothing-to-join/)
+      assert.match(secondJoin, /There is nothing away to receive|目前没有在外可接收的工作/)
     } finally {
       terminals.dispose()
     }
@@ -249,7 +240,7 @@ test('WHAT[semantic-trace-013] prose, view declaration text and a provider stop 
 })
 
 test('WHAT[semantic-trace-013] a missing witness is not back-filled by later narration and the terminal stays undelivered', async () => {
-  await withRealDelivery(async ({ directory, runtime, deliver }) => {
+  await withRealProse(async ({ directory, runtime }) => {
     // 散文与 provider stop 都已落地。
     const captured = await trace.captureTerminalText(runtime.journal, SESSION, 'completed', RUN)
     assert.equal(captured.terminalCaptured, true)

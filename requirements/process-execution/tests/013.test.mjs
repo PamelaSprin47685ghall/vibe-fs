@@ -5,74 +5,35 @@ import * as toolResultBound from '../../../dist/Host/Contract/ToolResultBound.js
 
 // Host-native `run` tool is retired; `this.call` supersedes it (repository-programming [050]-[052]).
 
-test('WHAT[process-execution-013] this.call bounds large output deterministically to head+tail without model distillation', async () => {
-  const { dir, cleanup } = sandbox('wxs-proc-013a-')
+test('WHAT[process-execution-013] bounded raw tail preserves UTF-8 while complete output remains retrievable',async()=>{
+  const {readFileSync}=await import('node:fs')
+  const {dir,cleanup}=sandbox('wxs-proc013-tail-')
   try {
-    const cmd1 = nodeCommand(`process.stdout.write('HEAD-MARK-' + 'a'.repeat(200000))`)
-    const cmd2 = nodeCommand(`process.stdout.write('b'.repeat(200000) + '-TAIL-MARK')`)
-    const outcome = await runProgram(
-      dir,
-      `    const r = await this.call(class extends this.Callable {
-      maxDuration = 10000;
-      interval = 100;
-      next(ctx) {
-        if (ctx.step === 0) return ${JSON.stringify(cmd1)};
-        if (ctx.step === 1) return ${JSON.stringify(cmd2)};
-        return null;
-      }
-      check() { return true; }
-      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
-      sanity() { return { nextDone: () => [{ root: '/', step: 2 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
-    });
-    return {
-      exitCode: r.exitCode,
-      truncated: r.truncated,
-      bytes: r.bytes,
-      keptLength: r.stdout.length,
-      startsWithHead: r.stdout.startsWith("HEAD-MARK-"),
-      endsWithTail: r.stdout.endsWith("-TAIL-MARK"),
-    };`,
-    )
-    assert.equal(caseName(outcome), 'Succeeded')
-    const parsed = parseData(outcome)
-    assert.equal(parsed.exitCode, 0)
-    assert.equal(parsed.truncated, true)
-    assert.equal(parsed.bytes, 10 + 200000 + 200000 + 10)
-    assert.equal(parsed.keptLength, 262144)
-    assert.equal(parsed.startsWithHead, true)
-    assert.equal(parsed.endsWithTail, true)
-  } finally {
-    cleanup()
-  }
+    const raw='HEAD-'+'中文🔥'.repeat(1000)+'-TAIL'
+    const cmd=nodeCommand('process.stdout.write('+JSON.stringify(raw)+');process.stderr.write("warning")')
+    const output=await runProgram(dir,'const r=await this.call('+JSON.stringify(cmd)+');return {exitCode:r.exitCode,stdoutTail:r.stdout.slice(-50),stdoutLength:r.stdout.length,validUtf8:!r.stdout.includes("\\uFFFD"),stderr:r.stderr,bytes:r.bytes,truncated:r.truncated,truncatedBytes:r.truncatedBytes,outputFiles:r.outputFiles};',undefined,undefined,2048)
+    assert.equal(caseName(output),'Succeeded')
+    const result=parseData(output)
+    assert.equal(result.exitCode,0);assert.equal(result.truncated,true)
+    assert.equal(result.validUtf8,true)
+    assert.ok(raw.endsWith(result.stdoutTail))
+    const actualTailBytes=Buffer.byteLength(raw.slice(-result.stdoutLength))
+    assert.ok(actualTailBytes<=2048)
+    assert.equal(result.bytes.stdout,Buffer.byteLength(raw))
+    assert.equal(result.truncatedBytes.stdout,Buffer.byteLength(raw)-actualTailBytes)
+    assert.equal(result.stderr,'warning')
+    assert.equal(readFileSync(result.outputFiles.stdout,'utf8'),raw)
+  } finally {cleanup()}
 })
 
-test('WHAT[process-execution-013] small output preserves separate stdout and stderr in onExit without truncation', async () => {
-  const { dir, cleanup } = sandbox('wxs-proc-013b-')
+test('WHAT[process-execution-013] small raw outputs preserve separate streams without truncation',async()=>{
+  const {dir,cleanup}=sandbox('wxs-proc013-small-')
   try {
-    const cmd = nodeCommand("process.stdout.write('hello'); process.stderr.write('warning')")
-    const outcome = await runProgram(
-      dir,
-      `    let exited = null;
-    const r = await this.call(class extends this.Callable {
-      maxDuration = 5000;
-      interval = 50;
-      next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
-      check() { return true; }
-      onExit(res) { exited = { stdout: res.stdout, stderr: res.stderr }; }
-      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
-      sanity() { return { nextDone: () => [{ root: '/', step: 2 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
-    });
-    return { exitCode: r.exitCode, truncated: r.truncated, stdout: exited.stdout, stderr: exited.stderr };`,
-    )
-    assert.equal(caseName(outcome), 'Succeeded')
-    const parsed = parseData(outcome)
-    assert.equal(parsed.exitCode, 0)
-    assert.equal(parsed.truncated, false)
-    assert.equal(parsed.stdout, 'hello')
-    assert.equal(parsed.stderr, 'warning')
-  } finally {
-    cleanup()
-  }
+    const output=await runProgram(dir,'return await this.call("printf hello; printf warning >&2");')
+    assert.equal(caseName(output),'Succeeded')
+    const result=parseData(output)
+    assert.equal(result.truncated,false);assert.equal(result.stdout,'hello');assert.equal(result.stderr,'warning')
+  } finally {cleanup()}
 })
 
 test('WHAT[process-execution-013] ToolResultBound keeps deterministic raw tail when output exceeds host window', () => {

@@ -80,7 +80,7 @@ test('WHAT[managed-session-lifecycle-008] concurrent exact consumers deliver a w
         joinCall(hooks, owner, 'call-join-one'),
         joinCall(hooks, owner, 'call-join-two'),
       ])
-      const delivered = outcomes.filter((outcome) => /ok = true/.test(outcome))
+      const delivered = outcomes.filter((outcome) => /FIRST-ANSWER/.test(outcome))
       assert.equal(delivered.length, 1, 'exactly one consumer may deliver the work')
       assert.match(delivered[0], /FIRST-ANSWER/)
       assert.equal(workOf(await coldWorkSnapshot(directory, owner), root).lifecycle, 'Retired')

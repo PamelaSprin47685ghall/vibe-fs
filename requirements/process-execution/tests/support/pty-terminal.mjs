@@ -1,7 +1,7 @@
-// The physical terminal belongs to wanxiangli/pty (real-PTY proofs live in its own tests,
+// The physical terminal belongs to wanxiangli/runtime (real-PTY proofs live in its own tests,
 // which run bun-pty under Bun). Host tests here exercise only the routing around it, so they
 // open a genuine library Terminal over a scripted driver handle with bun-pty's shape.
-import { Terminal } from 'wanxiangli/pty'
+import { Terminal } from 'wanxiangli/runtime'
 
 export function driverHandle(pid = 4242) {
   const handle = {

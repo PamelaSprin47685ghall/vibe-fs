@@ -1,6 +1,5 @@
 // The programming-surface base class. Access the listed members and namespaces through this; no module import is needed.
 // This file is pseudocode — a method body only states what the host does; the host owns the real implementation.
-{{baseClassCallable}}
 
 class JsProgram {
 {{baseClassRead}}
@@ -11,11 +10,9 @@ class JsProgram {
 {{baseClassMove}}
 {{baseClassExec}}
 {{baseClassFork}}
-{{baseClassDag}}
 {{baseClassResume}}
 {{baseClassCommission}}
 {{baseClassDevOps}}
-{{baseClassJoin}}
 {{baseClassFission}}
 {{baseClassHorizon}}
 {{baseClassAdvisor}}

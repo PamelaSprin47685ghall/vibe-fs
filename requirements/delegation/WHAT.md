@@ -98,7 +98,7 @@ fork 首 prompt typed 渲染的正文**只有本次 Assignment 指令**，不再
 
 委派成员全部走编程面：`this.fork(payload)`、`this.resume(payload)`、`this.commission(payload)`、`this.devops(intent)`；不再有独立的 Host 工具注册，语义不因工具名变化而改变（[020]）。委派调用不得包含局部背景数组参数。
 
-`this.fission(payload)` 是同身份换道，无条件继承本对话衣钵。`this.join()` 与 `this.horizon()` 是拉取动作。
+`this.fission(payload)` 是同身份换道，无条件继承本对话衣钵。独立 `join()`（无参数）与程序内 `this.horizon()` 是拉取动作；编程内 join/dag 已退出，依赖顺序由模型显式安排。
 
 同步调用等待自己完成，返回被委托方末轮的 assistant 散文（渲染为 `# ...` 注释）。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该材料。完成结果只经 join/horizon 拉取。子到父的返回只来自子代理自然停机那一轮的 assistant 散文，不再捕获其 post-scope 视图。子代理（Engineer/DevOps）已彻底移除 `this.deliver` 成员；无未决调用的自然停机即作为证明的终态（proven terminal，见 [025]）完成该 work unit。
 

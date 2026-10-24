@@ -45,7 +45,7 @@ module JsWorkflowSurface =
             Task<obj>
 
     val caseName: value: obj -> string
-    val parkedHandle: value: obj -> obj
+    val parkedName: value: obj -> obj
     val parkedPayload: value: obj -> obj
     val parkedSource: value: obj -> obj
     val rewritten: value: obj -> string array
@@ -58,4 +58,4 @@ module JsWorkflowSurface =
     val render: value: obj -> string
 
     /// Test hook: clear the process-live parked-site table.
-    val clearParkedSites: unit -> unit
+    val closePrograms: unit -> Task<unit>

@@ -66,42 +66,73 @@ module JsBookkeeperTool =
             | Ok result -> result
             | Error rendered -> rendered
 
-    let private runBookkeeperSandbox
-        (language: ProviderLanguage)
-        (txId: string)
-        (program: string)
-        (question: string)
-        (answer: string)
-        : Task<string> =
+    let private runBookkeeperProgram language sessionId name planB callId txId program question answer : Task<string> =
         task {
             let staged = BookkeeperPolicy.newStaged ()
             let api = BookkeeperPolicy.createApi language question answer staged
 
-            let! handle =
-                JsSandbox.runSurface
-                    BookkeeperPolicy.runtimeBaseClass
-                    program
-                    api
-                    10000
-                    (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L)
+            let settle (receipt: obj) : Task<obj> =
+                task {
+                    if string receipt?state = "completed" then
+                        let rendered =
+                            finishBookkeeper language txId staged (JS.JSON.stringify receipt?value)
 
-            let! sandboxResult = JsSandbox.awaitResult handle (1 <<< 20)
+                        return emitJsExpr (receipt, rendered) "Object.assign({}, $0, {value:$1})"
+                    else
+                        return receipt
+                }
 
-            match sandboxResult with
-            | Error failure ->
-                let reason = JsFailure.reason failure
-                return BookkeeperPolicy.failed language reason
-            | Ok json -> return finishBookkeeper language txId staged json
+            let options =
+                createObj
+                    [ "name" ==> name
+                      "program" ==> program
+                      "planB" ==> planB
+                      "callId" ==> callId
+                      "baseClass" ==> BookkeeperPolicy.runtimeBaseClass
+                      "api" ==> api
+                      "capabilities" ==> [||]
+                      "root" ==> "."
+                      "executionBudgetMs" ==> 10000
+                      "outputBoundBytes" ==> (1 <<< 20)
+                      "syncMembers"
+                      ==> [| "bookkeeper.question"
+                             "bookkeeper.answer"
+                             "bookkeeper.setQuestion"
+                             "bookkeeper.setAnswer" |]
+                      "settle" ==> settle ]
+
+            let session = JsPrograms.forSession sessionId
+            let! result = unbox<Task<obj>> (session?execute (options))
+
+            if string result?state = "completed" then
+                return string result?value
+            else
+                return BookkeeperPolicy.failed language (string result?code + ": " + string result?reason)
         }
 
-    /// One call. The session is the only fact the tool needs from its caller:
-    /// the staged transaction is bound to it.
-    let execute (args: HostToolArguments) (sessionId: SessionId) =
-        let language = BookkeeperPolicy.callLanguage ()
-
+    let private executeStaged language (args: HostToolArguments) sessionId callId =
         match stageRequest language args sessionId with
         | Error err -> Task.FromResult(BookkeeperPolicy.failed language err)
-        | Ok(txId, program, question, answer) -> runBookkeeperSandbox language txId program question answer
+        | Ok(txId, program, question, answer) ->
+            runBookkeeperProgram
+                language
+                (SessionId.value sessionId)
+                (args.Text "name")
+                (args.Text "planB")
+                callId
+                txId
+                program
+                question
+                answer
+
+    let private executeCore (args: HostToolArguments) (sessionId: SessionId) callId =
+        let language = BookkeeperPolicy.callLanguage ()
+
+        match JsToolWorkflow.conflictingInputReason args.Raw with
+        | Some reason -> Task.FromResult(BookkeeperPolicy.failed language reason)
+        | None -> executeStaged language args sessionId callId
+
+    let execute (args: HostToolArguments) (sessionId: SessionId) = executeCore args sessionId ""
 
     let spec (factory: HostToolFactory) : ToolSpec =
         let language = BookkeeperPolicy.descriptionLanguage ()
@@ -109,5 +140,14 @@ module JsBookkeeperTool =
         { Name = "todowrite-for-bookkeeper"
           Description = BookkeeperPolicy.assembleDescription language
           Arguments =
-            [ "program", ToolHostCodec.stringSchemaDescribed (prose language BookkeeperPolicy.Path.ArgProgram) factory ]
-          Execute = fun args ctx -> execute args (SessionId.create ctx.SessionId) }
+            [ "name", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argNameProse ()) factory
+              "program", ToolHostCodec.stringSchemaDescribed (prose language BookkeeperPolicy.Path.ArgProgram) factory
+              "planB", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argPlanBProse ()) factory ]
+          Execute =
+            fun args ctx ->
+                let callId =
+                    match ctx.ProviderRunId, ctx.ToolCallId with
+                    | Some run, Some call -> ProviderRunIdentity.value run + ":" + ToolCallId.value call
+                    | _ -> ""
+
+                executeCore args (SessionId.create ctx.SessionId) callId }

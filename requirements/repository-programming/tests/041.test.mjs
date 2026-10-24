@@ -51,10 +51,9 @@ test('WHAT[repository-programming-041] JsToolSpec.execute call site passes the l
 
 test('WHAT[repository-programming-041] the workflow records Parked, Unparked and Abandoned audit events on the execute chain', () => {
   const workflow = read(join(SOURCE_ROOT, 'Repository/Programming/Js/ToolWorkflow.fs'))
-
-  assert.match(workflow, /recordLifecycle lifecyclePersistence JsLifecycleEventType\.Parked site\.Handle site\.SessionId/)
-  assert.match(workflow, /recordLifecycle lifecyclePersistence JsLifecycleEventType\.Unparked handle sessionId/)
-  assert.match(workflow, /recordLifecycle lifecyclePersistence JsLifecycleEventType\.Abandoned handle sessionId/)
+  for (const event of ['Parked','Unparked','Abandoned']) assert.match(workflow, new RegExp('Some JsLifecycleEventType\\.' + event))
+  assert.match(workflow, /"lifecycle" ==> lifecycle lifecyclePersistence sessionId/)
+  assert.match(workflow, /Handle = string receipt\?name/)
 })
 
 test('WHAT[repository-programming-041] host-side ToolHostSurface and WorkflowSurface build lifecycle persistence from their single store', () => {
@@ -101,11 +100,12 @@ test('WHAT[repository-programming-041] PluginSessionScope carries the lifecycle 
 
 test('WHAT[repository-programming-041] ClearSession records a Reaped audit event per reaped handle with close-isolated failure handling', () => {
   const scope = read(join(SOURCE_ROOT, 'OpenCode/Host/PluginSessionScope.fs'))
-  const parkedSites = read(join(SOURCE_ROOT, 'Repository/Programming/Js/ParkedSites.fs'))
+  const parkedSites = read(join(SOURCE_ROOT, 'Repository/Programming/Js/Programs.fs'))
 
-  // The handles are enumerated before reapSession consumes the sites.
-  assert.match(scope, /let reapedHandles = JsParkedSites\.handlesForSession sessionId/)
-  assert.match(scope, /do! attempt \(fun \(\) -> JsParkedSites\.reapSession sessionId\)/)
+  // Only names whose resources closed are audited by the host.
+  assert.match(scope, /let! names = JsPrograms\.closeSession sessionId/)
+  assert.match(scope, /this\.RecordProgramsReaped\(durable, sessionId, names\)/)
+  assert.match(scope, /do! attempt \(fun \(\) -> this\.CloseProgramsForSession sessionId\)/)
   assert.match(scope, /JsLifecycleEventType\.Reaped/)
   assert.match(scope, /durable\.AppendLifecycleEvent event/)
   assert.doesNotMatch(
@@ -126,7 +126,7 @@ test('WHAT[repository-programming-041] ClearSession records a Reaped audit event
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
-import { execute, caseName, parkedHandle } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import { execute, caseName, parkedName, closePrograms, render } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
 
 const walkFiles = (directory, found = []) => {
@@ -145,32 +145,34 @@ test('WHAT[repository-programming-041] park, unpark and abandon through the wire
     const program = `class Js extends JsProgram {
   async run() {
     const decision = await this.park({ stage: 'durable-041' });
-    return { decided: decision.value };
+    return { decided: decision };
   }
 }`
+    let nextName = 0
+    const WAIT = 'Wait for the named audit operation and preserve real lifecycle receipts.'
     const call = (args) =>
-      execute(workspace, 'Coder', 'en', 'durable-park-041', args, 2000, Date.now() + 60_000, 1 << 20, store)
+      execute(workspace, 'Coder', 'en', 'durable-park-041', { name: 'audit-' + (++nextName), planB: WAIT, ...args }, 2000, Date.now() + 60_000, 1 << 20, store)
 
     const parked = await call({ program })
     assert.equal(caseName(parked), 'Parked')
-    const handle = parkedHandle(parked)
+    const handle = parkedName(parked)
     assert.ok(typeof handle === 'string' && handle.length > 0)
 
-    const resumed = await call({ unpark: { handle, value: { go: 'ahead' } } })
+    const resumed = await call({ program: 'class Js extends JsProgram { async run() { return await this.unpark(' + JSON.stringify(handle) + ', { go: "ahead" }); } }' })
     assert.equal(caseName(resumed), 'Succeeded', 'unpark must resume the parked program')
 
     // 第二次 park 以 abandon 终结：Parked/Unparked/Abandoned 三类事件同住
     // 同一审计流，全部经真实 execute 调用链写入同一个 store。
     const parked2 = await call({ program })
     assert.equal(caseName(parked2), 'Parked')
-    const secondHandle = parkedHandle(parked2)
-    const abandoned = await call({ abandon: { handle: secondHandle } })
-    assert.equal(caseName(abandoned), 'Failed', 'abandon ends with a Failed outcome (Abandoned, no value)')
+    const secondHandle = parkedName(parked2)
+    const abandoned = await call({ program: 'class Js extends JsProgram { async run() { return await this.abandon(' + JSON.stringify(secondHandle) + '); } }' })
+    assert.equal(caseName(abandoned), 'Succeeded')
+    assert.match(render(abandoned), /state = "abandoned"/)
 
     // 恢复路径不得依赖同一进程内存：每条记录都必须已写进 store 目录的字节。
-    // lifecycle append 是 best-effort 异步任务（recordLifecycle 不阻塞工具
-    // 返回），沿用 5 秒轮询、50ms 步进；超时仍未落盘则失败并列出缺失项，
-    // 断言强度不变。TransactionSurface 依 durable-events-015 不暴露历史读取，
+    // 工具回执等待 lifecycle append；下面从物理字节独立验证。保留有界读取，
+    // 超时仍未落盘则失败并列出缺失项。TransactionSurface 依 durable-events-015 不暴露历史读取，
     // 所以证据面是存储的物理字节（.ndjson 明文），不是另一份 API。
     const needles = [handle, secondHandle, 'JsLifecycleParked', 'JsLifecycleUnparked', 'JsLifecycleAbandoned']
     const deadline = Date.now() + 5000
@@ -184,6 +186,7 @@ test('WHAT[repository-programming-041] park, unpark and abandon through the wire
       await new Promise((resolve) => setTimeout(resolve, 50))
     }
   } finally {
+    await closePrograms()
     disposeEventStore(store)
     rmSync(storeDir, { recursive: true, force: true })
     rmSync(workspace, { recursive: true, force: true })

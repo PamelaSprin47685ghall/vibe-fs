@@ -1,6 +1,14 @@
 import * as bookkeeperTool from '../../../dist/Repository/Knowledge/Casebook/OpenCode/BookkeeperToolSurface.js' // CUT-40: tool-binding entries split from BookkeeperSurface
 import test from 'node:test'
 
+let programSequence = 0
+const bookkeeperRequest = program => ({
+  name: 'bookkeeper-010-' + (++programSequence),
+  program,
+  planB: 'Complete the bound Bookkeeper transaction and retain an explicit result if execution cannot finish.',
+})
+
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
@@ -45,7 +53,7 @@ const scriptedBookkeeperPort = () => {
       assert.notEqual(tx, '', 'SendPrompt must run against a bound Bookkeeper tx')
       const out = await bookkeeperTool.runProgram(
         sid,
-        `class Js extends JsProgram { async run() { this.setQuestion(${JSON.stringify(CANONICAL_Q)}); this.setAnswer(${JSON.stringify(CANONICAL_A)}); return { changed: true }; } }`,
+        bookkeeperRequest(`class Js extends JsProgram { async run() { this.setQuestion(${JSON.stringify(CANONICAL_Q)}); this.setAnswer(${JSON.stringify(CANONICAL_A)}); return { changed: true }; } }`),
       )
       assert.equal(String(out).includes('changed = true'), true, out)
       programCalls.push(tx)
@@ -367,6 +375,8 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
         'en',
         delegateId,
         {
+          name: `engineer-turn-${i + 1}`,
+          planB: 'Observe this program result before separately recording the explicit archived material.',
           program: `class Js extends JsProgram { async run() { return { ok: true }; } }`,
         },
         3000,
@@ -375,10 +385,8 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
         null,
       )
       assert.equal(jsWorkflow.caseName(delivered), 'Succeeded', jsWorkflow.render(delivered))
-      // The program above delivered through the real programming surface, but
-      // the sync reader settles on the fenced cell, not on the raw view: the
-      // delivery is registered with the fence of this exact assistant run so
-      // `tryTakeRenderedFor` can consume it.
+      // Program completion does not create a work delivery. This archive fixture
+      // explicitly records the material for the exact assistant run below.
       runtimeSurface.recordFencedDeliveredView(
         delegateId,
         `asst_q${i + 1}`,

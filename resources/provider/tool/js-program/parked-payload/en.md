@@ -1,7 +1,3 @@
-The tool call returned a parked payload because the program suspended at `await this.park(payload)`.
+The parked receipt carries name/state, pause reason, payload, full source and command facts. SDK drain explicitly shows the command has not started. Delta is new output, separate from the final result. Source lines use ` | `; `>| ` is used only when the pause location is reliable.
 
-- `handle` identifies the parked site. A lifecycle resume or abandon consumes it once. These are not top-level `todowrite-for-*` arguments: that tool requires exactly `program: string`.
-- `payload` is the value the program passed to park. It is the program's own data, not a host verdict.
-- A parked site is process-live: it dies with the process. While it is unresolved, delivery stays blocked by the leak guard gate.
-
-Resuming injects `value` as the awaited result of park and lets the program continue. Abandoning rejects the program with the ABANDONED marker so its native `try/finally` cleanup runs; the outcome is Abandoned with no value.
+Submit another { name, program, planB } request to unpark or abandon the target by name. signal/send require Exec and do not resume it. unpark(name,value?) shares the new request's existing deadline.

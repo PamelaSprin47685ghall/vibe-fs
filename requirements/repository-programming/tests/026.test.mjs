@@ -75,7 +75,7 @@ test('WHAT[repository-programming-026] case capture records mutations only after
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'implicit-only.fs'), 'original\n', 'utf8')
-    let failedObservationCalled = false
+    const failedEffects = []
     const failedOutcome = await runObserved(
       dir,
       'Engineer',
@@ -90,12 +90,12 @@ test('WHAT[repository-programming-026] case capture records mutations only after
       Date.now() + 60_000,
       1 << 20,
       null,
-      () => {
-        failedObservationCalled = true
+      (_reads, effects) => {
+        failedEffects.push(...effects)
       },
     )
     assert.equal(caseName(failedOutcome), 'Failed')
-    assert.equal(failedObservationCalled, false, 'failed program must not report committed substantive access')
+    assert.deepEqual(failedEffects, ['implicit-only.fs'], 'physically committed writes remain observed after a later failure')
 
     const committedReads = []
     const committedEffects = []

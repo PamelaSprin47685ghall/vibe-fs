@@ -346,6 +346,7 @@ module PairProgrammingThoughtTransform =
             |> List.collect (fun text -> [ text; systemBlock text ])
             |> List.distinct
             |> List.toArray
+
         Surface.stripKnownHints rawMsg variants
 
     type private CursorPresentation =
@@ -536,7 +537,11 @@ module PairProgrammingThoughtTransform =
 
     let private appendCursorGuidanceToTerminalToolResult (markerTexts: string list) (rawMsg: obj) : obj option =
         let rewritten = Surface.writeToolResultHint rawMsg (List.toArray markerTexts)
-        if obj.ReferenceEquals(rawMsg, rewritten) then None else Some rewritten
+
+        if obj.ReferenceEquals(rawMsg, rewritten) then
+            None
+        else
+            Some rewritten
 
     let private gapPresent (addressSet: Set<string>) (gap: TranscriptGap) =
         match gap with
@@ -929,13 +934,13 @@ module PairProgrammingThoughtTransform =
             // unresolved parked handles, so the AI is pressed to take a
             // position (unpark/abandon) without being forced to resume. The
             // parked site table and its per-session read-only query are owned
-            // by lane-a-core (JsParkedSites.handlesForSession); a hint must
+            // by lane-a-core (JsPrograms.pendingNames); a hint must
             // only mention handles parked by this session, never another
             // session's. A carrier-less round never reaches this point
             // (decideCurrentPlacement).
             let parkedHandles =
                 match projectionSessionIdOpt with
-                | Some sessionId -> JsParkedSites.handlesForSession sessionId
+                | Some sessionId -> JsPrograms.pendingNames sessionId
                 | None -> []
 
             let resolveLanguage =
@@ -1002,8 +1007,7 @@ module PairProgrammingThoughtTransform =
                     let callId = tryUnboxString part?callID |> Option.defaultValue (string index)
                     messageId + ":tool:" + callId))
 
-    let applyAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
-        messages, None
+    let applyAnchorView (sessionId: string) (messages: obj list) : obj list * string option = messages, None
 
     let private markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored =
         // crash-reconciliation-018: the restart guidance is delivered
@@ -1067,12 +1071,17 @@ module PairProgrammingThoughtTransform =
             let messages, anchorBlock = messages, None
 
             let initial = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
+
             let guideline =
-                if projectionSessionIdOpt |> Option.exists Wanxiangshu.Context.Scope.Surface.negotiationRequired then
+                if
+                    projectionSessionIdOpt
+                    |> Option.exists Wanxiangshu.Context.Scope.Surface.negotiationRequired
+                then
                     initial.Split('\n')
                     |> Array.filter (fun line -> not (line.Contains("Then call resetScope immediately")))
                     |> String.concat "\n"
-                else initial
+                else
+                    initial
 
             let elapsedMilliseconds =
                 sessionStartedAt

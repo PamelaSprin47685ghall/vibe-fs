@@ -19,7 +19,7 @@ module JsRuntimeSurface =
     /// The delegate callback takes `(name, payload, carry)`; every
     /// other callback returns a data envelope object (never prose).
     val installDelegationHost:
-        sessionId: string -> delegation: obj -> join: obj -> fission: obj -> horizon: obj -> advisor: obj -> unit
+        sessionId: string -> delegation: obj -> fission: obj -> horizon: obj -> advisor: obj -> unit
 
     val clearDelegationHost: sessionId: string -> unit
     /// Test hook: the raw value handed over through delivery.
@@ -47,20 +47,6 @@ module JsRuntimeSurface =
     val readPaths: handle: obj -> string array
 
     val run:
-        baseClassSource: string ->
-        modelSource: string ->
-        apiValue: obj ->
-        deadlineMs: int ->
-        deadlineEpochMs: int64 ->
-        outputBoundBytes: int ->
-            Task<obj>
-
-    /// Start a sandbox program without awaiting it to completion, exposing the
-    /// in-flight result promise and a mutable deadline reset. Returns
-    /// `{ promise, resetDeadline }`: `promise` resolves to the same
-    /// `{ ok, value | code, reason }` shape as `run`; `resetDeadline(epochMs)`
-    /// re-arms the async deadline of the in-flight program.
-    val start:
         baseClassSource: string ->
         modelSource: string ->
         apiValue: obj ->

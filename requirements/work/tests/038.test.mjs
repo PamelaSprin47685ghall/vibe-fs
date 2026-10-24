@@ -255,9 +255,7 @@ test('WHAT[work-038] a Manager program invokes this.review and updates the durab
         {
           name: `Manager review ${callID}`,
           planB: 'The review is a durable write; wait for its receipt before assessing.',
-          program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }`,
-          prefixUntil: 0,
-          carry: []
+          program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(findings)}); } }`
         },
         { sessionID, agent: 'manager', callID, messageID },
       )

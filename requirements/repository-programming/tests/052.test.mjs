@@ -1,227 +1,53 @@
-import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { createServer } from 'node:net'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import {
-  execute,
-  caseName,
-  parkedHandle,
-  parkedPayload,
-  render,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import {performance} from 'node:perf_hooks'
+import {execute} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import {fixture,assert,data,caseName,failureCode,parkedPayload,render,source,barrier,stopped,until,delay,existsSync,readFileSync,writeFileSync} from './support/command-program.fixture.mjs'
 
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-run-wget-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-const freePort = () =>
-  new Promise((resolve) => {
-    const probe = createServer()
-    probe.listen(0, '127.0.0.1', () => {
-      const { port } = probe.address()
-      probe.close(() => resolve(port))
-    })
-  })
-
-const program = (body) => `class Js extends JsProgram {
-  async run() {
-${body}
+test('WHAT[repository-programming-052] top-level planB validates before effects and computed member budgets are rejected',async t=>{
+  const h=fixture(t,'052-entry','DevOps')
+  for(const planB of [undefined,'',null,42]) {
+    const output=await execute(h.root,'DevOps','en',h.session,{name:'bad',program:source('this.write("bad","ran");return 1;'),planB},2000,Date.now()+60000,1<<20,null)
+    assert.equal(caseName(output),'Failed');assert.equal(failureCode(output),'INVALID_ARGUMENT')
+    assert.equal(existsSync(h.file('bad')),false)
   }
-}`
-
-const runProgram = (dir, body, sessionId) =>
-  execute(dir, 'DevOps', 'en', sessionId, { program: program(body) }, 30_000, Date.now() + 180_000, 1 << 20, null)
-
-// A throttled range-capable server so wget -c can really resume and watch can
-// observe mid-download growth. The payload is deterministic and self-checking.
-const serveScript = () => `const http = require('node:http')
-const fs = require('node:fs')
-const path = require('node:path')
-const root = process.argv[2]
-const port = Number(process.argv[3])
-http.createServer((req, res) => {
-  const name = decodeURIComponent(req.url.split('?')[0]).replace(/^\\//, '')
-  const file = path.join(root, name)
-  if (!fs.existsSync(file)) { res.writeHead(404); res.end('missing'); return }
-  const size = fs.statSync(file).size
-  const range = /bytes=(\\d+)-/.exec(req.headers.range || '')
-  const start = range ? Number(range[1]) : 0
-  res.writeHead(range ? 206 : 200, {
-    'Accept-Ranges': 'bytes',
-    'Content-Length': size - start,
-    ...(range ? { 'Content-Range': 'bytes ' + start + '-' + (size - 1) + '/' + size } : {}),
-  })
-  const stream = fs.createReadStream(file, { start })
-  stream.on('data', (chunk) => {
-    res.write(chunk)
-    stream.pause()
-    setTimeout(() => stream.resume(), 25)
-  })
-  stream.on('end', () => res.end())
-}).listen(port, '127.0.0.1')
-`
-
-const sizeOf = (file) => (existsSync(file) ? statSync(file).size : -1)
-
-test('WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const port = await freePort()
-    const first = Buffer.alloc(400 * 1024, 7)
-    const payloadTwo = Buffer.alloc(300 * 1024, 9)
-    writeFileSync(join(dir, 'big1.bin'), first)
-    writeFileSync(join(dir, 'big2.bin'), payloadTwo)
-    writeFileSync(join(dir, 'serve.cjs'), serveScript(), 'utf8')
-
-    const aborted = await runProgram(
-      dir,
-      `    const host = this;
-    return await this.call(class extends this.Callable {
-      maxDuration = 20000;
-      interval = 20;
-      next(ctx) {
-        if (ctx.step === 0) return { spawn: "node serve.cjs . ${port}", name: "srv" };
-        if (ctx.step === 1) return { waitFor: { port: ${port}, timeoutMs: 5000 } };
-        if (ctx.step === 2) return "wget -c -q -O out1.bin http://127.0.0.1:${port}/big1.bin";
-        return null;
-      }
-      async watch(ctx) {
-        if (ctx.exited && ctx.exitCode !== 0) return { abort: "wget failed" };
-        const s = await host.stat("out1.bin");
-        return s.exists && s.size > 100000 ? { abort: "halfway" } : true;
-      }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 3 }],
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
-    });`,
-      'sess-052a',
-    )
-    assert.equal(caseName(aborted), 'Succeeded')
-    assert.match(render(aborted), /status = "aborted"/)
-    const partial = sizeOf(join(dir, 'out1.bin'))
-    assert.ok(partial > 0 && partial < first.length, `partial download expected, got ${partial}`)
-
-    const resumed = await runProgram(
-      dir,
-      `    const host = this;
-    return await this.call(class extends this.Callable {
-      maxDuration = 30000;
-      interval = 20;
-      next(ctx) {
-        if (ctx.step === 0) return { spawn: "node serve.cjs . ${port}", name: "srv" };
-        if (ctx.step === 1) return { waitFor: { port: ${port}, timeoutMs: 5000 } };
-        if (ctx.step === 2) return "wget -c -q -O out1.bin http://127.0.0.1:${port}/big1.bin";
-        if (ctx.step === 3) return "wget -c -q -O out2.bin http://127.0.0.1:${port}/big2.bin";
-        if (ctx.step === 4) return "sleep 0.4";
-        return null;
-      }
-      async watch(ctx) {
-        if (ctx.exited && ctx.exitCode !== 0) return { abort: "wget failed" };
-        const one = await host.stat("out1.bin");
-        const two = await host.stat("out2.bin");
-        if (one.exists && one.size === ${first.length} && !this.sawOne) {
-          this.sawOne = true;
-          return { park: { file: "out1.bin", size: one.size } };
-        }
-        if (two.exists && two.size === ${payloadTwo.length} && !this.sawTwo) {
-          this.sawTwo = true;
-          return { park: { file: "out2.bin", size: two.size } };
-        }
-        return true;
-      }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 5 }],
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
-    });`,
-      'sess-052b',
-    )
-    assert.equal(caseName(resumed), 'Parked')
-    assert.deepEqual(parkedPayload(resumed), { file: 'out1.bin', size: first.length })
-
-    const second = await execute(
-      dir,
-      'DevOps',
-      'en',
-      'sess-052b',
-      { unpark: { handle: parkedHandle(resumed), value: 'continue' } },
-      30_000,
-      Date.now() + 180_000,
-      1 << 20,
-      null,
-    )
-    assert.equal(caseName(second), 'Parked')
-    assert.deepEqual(parkedPayload(second), { file: 'out2.bin', size: payloadTwo.length })
-
-    const finished = await execute(
-      dir,
-      'DevOps',
-      'en',
-      'sess-052b',
-      { unpark: { handle: parkedHandle(second), value: 'continue' } },
-      30_000,
-      Date.now() + 180_000,
-      1 << 20,
-      null,
-    )
-    assert.equal(caseName(finished), 'Succeeded')
-    assert.match(render(finished), /status = "completed"/)
-    assert.equal(sizeOf(join(dir, 'out1.bin')), first.length)
-    assert.equal(sizeOf(join(dir, 'out2.bin')), payloadTwo.length)
-  } finally {
-    cleanup()
-  }
+  const output=await h.run('bypass','const planB="x".repeat(48000);return await this.call("touch bypass",planB);')
+  assert.equal(caseName(output),'Failed');assert.equal(failureCode(output),'INVALID_ARGUMENT')
+  assert.equal(existsSync(h.file('bypass')),false)
 })
 
-test('WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const port = await freePort()
-    writeFileSync(join(dir, 'big1.bin'), Buffer.alloc(1024, 1))
-    writeFileSync(join(dir, 'serve.cjs'), serveScript(), 'utf8')
+test('WHAT[repository-programming-052] consecutive calls spend the same admission window', {timeout:15000},async t=>{
+  const h=fixture(t,'052-sequence','DevOps'),first=barrier(h,'first'),second=barrier(h,'second')
+  const started=performance.now()
+  const pending=h.run('target','await this.call('+JSON.stringify(first)+');this.write("first.after","done");await this.call('+JSON.stringify(second)+');this.write("second.after","done");return "done";',{planB:'s'.repeat(40)})
+  await until(()=>existsSync(h.file('first.pid')))
+  await delay(Math.max(0,started+1000-performance.now()))
+  writeFileSync(h.file('first.release'),'release')
+  await until(()=>existsSync(h.file('second.pid')))
+  const secondAt=performance.now(),receipt=await pending,ended=performance.now()
+  assert.equal(caseName(receipt),'Parked',render(receipt))
+  assert.equal(readFileSync(h.file('first.after'),'utf8'),'done')
+  assert.equal(existsSync(h.file('second.after')),false)
+  assert.ok(ended-started>=1930);assert.ok(ended-started<2600)
+  assert.ok(ended-secondAt<1500,'second call renewed the budget')
+  writeFileSync(h.file('second.release'),'release');await stopped(h,'second')
+  assert.equal(existsSync(h.file('second.after')),false)
+  assert.equal(data(await h.unpark('target')).state,'completed')
+  for(const name of ['first','second']) assert.equal(readFileSync(h.file(name+'.starts'),'utf8'),'start\n')
+})
 
-    const outcome = await runProgram(
-      dir,
-      `    const dispatched = [];
-    const result = await this.call(class extends this.Callable {
-      maxDuration = 15000;
-      interval = 50;
-      next(ctx) {
-        if (ctx.step === 0) return { spawn: "node serve.cjs . ${port}", name: "srv" };
-        if (ctx.step === 1) return { waitFor: { port: ${port}, timeoutMs: 5000 } };
-        if (ctx.step === 2) return "wget -q -O out3.bin http://127.0.0.1:${port}/missing.bin";
-        return null;
-      }
-      watch(ctx) {
-        const srv = ctx.backgrounds.find((b) => b.name === "srv");
-        if (srv && srv.exited) return { abort: "server died" };
-        return true;
-      }
-      onExit(r) { dispatched.push(r.exitCode); }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 3 }],
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
-    });
-    return { result, dispatched };`,
-      'sess-052c',
-    )
-    assert.equal(caseName(outcome), 'Succeeded')
-    const doc = render(outcome)
-    assert.match(doc, /status = "completed"/)
-    assert.match(doc, /dispatched = \[8\]/)
-    assert.ok(sizeOf(join(dir, 'out3.bin')) <= 0, 'a failed wget leaves no content behind')
-  } finally {
-    cleanup()
-  }
+test('WHAT[repository-programming-052] controller and target share expiry; controller recovery replays its cached target pause', {timeout:15000},async t=>{
+  const h=fixture(t,'052-control','DevOps'),cmd=barrier(h,'target')
+  assert.equal(caseName(await h.run('target','await this.park("ready");await this.call('+JSON.stringify(cmd)+');this.write("target.after","done");return "done";')),'Parked')
+  const started=performance.now()
+  const controller=await h.run('controller','const r=await this.unpark("target");this.write("controller.after",r.state);return r;',{planB:'界'.repeat(8)})
+  assert.equal(caseName(controller),'Parked',render(controller))
+  assert.ok(performance.now()-started>=1130,'UTF-8 byte budget was not used')
+  writeFileSync(h.file('target.release'),'release');await stopped(h,'target')
+  const done=data(await h.unpark('controller'))
+  assert.equal(done.state,'completed');assert.equal(done.value.name,'target');assert.equal(done.value.state,'parked')
+  assert.equal(existsSync(h.file('target.after')),false)
+  assert.equal(readFileSync(h.file('controller.after'),'utf8'),'parked')
+  assert.equal(data(await h.unpark('target')).state,'completed')
+  assert.deepEqual(data(await h.unpark('controller')),done)
+  assert.equal(readFileSync(h.file('target.starts'),'utf8'),'start\n')
 })

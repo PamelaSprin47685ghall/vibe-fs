@@ -1,1 +1,1 @@
-missing 'program' argument
+Invalid tool arguments. Provide exactly three required strings: name, program and planB. name and program must not be blank; planB must not be empty. program defines class Js extends JsProgram with async run().

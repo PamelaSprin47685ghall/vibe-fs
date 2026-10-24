@@ -28,15 +28,8 @@ test('WHAT[process-execution-015] the complete visible result bounded by ToolRes
     const cmd = nodeCommand("process.stdout.write(('中文🔥line\\n').repeat(3000))")
     const outcome = await runProgram(
       dir,
-      `    return await this.call(class extends this.Callable {
-      maxDuration = 5000;
-      interval = 50;
-      next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
-      check() { return true; }
-      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
-      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
-    });`,
-    )
+      `return await this.call(${JSON.stringify(cmd)});`,
+   )
     assert.equal(caseName(outcome), 'Succeeded')
     const wire = toolResultBound.bound(render(outcome))
     assert.ok(Buffer.byteLength(wire, 'utf8') <= toolResultBound.HostMaxBytes())

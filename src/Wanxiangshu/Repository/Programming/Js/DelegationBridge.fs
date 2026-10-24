@@ -5,7 +5,6 @@ open System.Threading.Tasks
 
 type JsDelegationHost =
     { Delegate: string -> obj -> Task<obj>
-      Join: unit -> Task<obj>
       Fission: obj -> Task<obj>
       Horizon: unit -> Task<obj>
       Advisor: obj -> Task<obj>

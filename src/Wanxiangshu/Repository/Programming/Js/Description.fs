@@ -115,9 +115,6 @@ module JsCanonicalDescription =
         let BaseClass = "tool/js-program/base-class"
 
         [<Literal>]
-        let BaseClassCallable = "tool/js-program/base-class-callable"
-
-        [<Literal>]
         let BaseClassRead = "tool/js-program/base-class-read"
 
         [<Literal>]
@@ -144,12 +141,6 @@ module JsCanonicalDescription =
         [<Literal>]
         let BaseClassFork = "tool/js-program/base-class-fork"
 
-        /// `dag` is pure sugar over fork waves plus one join, so it needs the
-        /// Join capability as well as Fork; it carries its own resource so the
-        /// public base class can project the two members independently.
-        [<Literal>]
-        let BaseClassDag = "tool/js-program/base-class-dag"
-
         [<Literal>]
         let BaseClassResume = "tool/js-program/base-class-resume"
 
@@ -158,9 +149,6 @@ module JsCanonicalDescription =
 
         [<Literal>]
         let BaseClassDevOps = "tool/js-program/base-class-devops"
-
-        [<Literal>]
-        let BaseClassJoin = "tool/js-program/base-class-join"
 
         [<Literal>]
         let BaseClassFission = "tool/js-program/base-class-fission"
@@ -223,7 +211,6 @@ module JsCanonicalDescription =
           Park: string
           ParkedPayload: string
           BaseClass: string
-          BaseClassCallable: string
           BaseClassRead: string
           BaseClassAnchors: string
           BaseClassGlob: string
@@ -233,11 +220,9 @@ module JsCanonicalDescription =
           BaseClassMove: string
           BaseClassExec: string
           BaseClassFork: string
-          BaseClassDag: string
           BaseClassResume: string
           BaseClassCommission: string
           BaseClassDevOps: string
-          BaseClassJoin: string
           BaseClassFission: string
           BaseClassHorizon: string
           BaseClassAdvisor: string
@@ -266,11 +251,11 @@ module JsCanonicalDescription =
 
     let has (capabilities: Set<JsCapability>) (capability: JsCapability) = Set.contains capability capabilities
 
-    /// Whether the library member directory (wanxiangli/programming
+    /// Whether the library member directory (wanxiangli/program
     /// `membersFor`) projects `memberName` for this capability set. The public
     /// and runtime base classes gate every member on this one directory, so the
     /// shown tutorial, the executed class and the schema member list cannot
-    /// disagree about which members exist (dag = Fork + Join lives only there).
+    /// disagree about which members exist.
     let private present (capabilities: Set<JsCapability>) (memberName: string) =
         Array.contains memberName (JsCapability.memberNamesFor capabilities "")
 
@@ -289,8 +274,7 @@ class JsProgram {"""
     let publicBaseClass (prose: Prose) (capabilities: Set<JsCapability>) : string =
         fill
             prose.BaseClass
-            [ "baseClassCallable", (if present capabilities "call" then "" else "")
-              "baseClassRead",
+            [ "baseClassRead",
               if present capabilities "cat" then
                   prose.BaseClassRead + "\n" + prose.BaseClassAnchors
               else
@@ -330,14 +314,6 @@ class JsProgram {"""
                   prose.BaseClassFork
               else
                   ""
-              // dag is sugar over fork waves plus one join: without Join it
-              // has no join to compile into, so it is projected only when both
-              // capabilities are present.
-              "baseClassDag",
-              if present capabilities "dag" then
-                  prose.BaseClassDag
-              else
-                  ""
               "baseClassResume",
               if present capabilities "resume" then
                   prose.BaseClassResume
@@ -351,11 +327,6 @@ class JsProgram {"""
               "baseClassDevOps",
               if present capabilities "devops" then
                   prose.BaseClassDevOps
-              else
-                  ""
-              "baseClassJoin",
-              if present capabilities "join" then
-                  prose.BaseClassJoin
               else
                   ""
               "baseClassFission",
@@ -560,17 +531,20 @@ class JsProgram {"""
                       [ "rethrow_host", rethrowHost ]
               if present capabilities "call" then
                   fill
-                      """  async call(command, planB) {
-    return await this._api.call(command, planB);
+                      """  async call(command) {
+    if (arguments.length !== 1) throw Object.assign(new Error("call requires one command; planB belongs to the tool request."), { code: "INVALID_ARGUMENT" });
+    return await this._api.call(command);
   }"""
                       []
               if has capabilities JsCapability.Exec then
-                  """  async signal(signal) {
-    return await this._api.signal(signal);
+                  """  async signal(name, signal) {
+    if (arguments.length !== 2) throw Object.assign(new Error("signal requires name and signal."), { code: "INVALID_ARGUMENT" });
+    return await this._api.signal(name, signal);
   }"""
 
-                  """  async send(input) {
-    return await this._api.send(input);
+                  """  async send(name, input) {
+    if (arguments.length !== 2) throw Object.assign(new Error("send requires name and input."), { code: "INVALID_ARGUMENT" });
+    return await this._api.send(name, input);
   }"""
               if present capabilities "ask" then
                   fill
@@ -610,12 +584,6 @@ class JsProgram {"""
     return await this._api.devops(intent);
   }"""
                       []
-              if present capabilities "join" then
-                  fill
-                      """  async join() {
-    return await this._api.join();
-  }"""
-                      []
               if present capabilities "horizon" then
                   fill
                       """  async horizon() {
@@ -640,119 +608,6 @@ class JsProgram {"""
     return await this._api.fission(payload);
   }"""
                       []
-              // dag is sugar over fork waves plus one join: the body calls
-              // this.join(), so it is emitted only when Join is projected too.
-              if present capabilities "dag" then
-                  fill
-                      """  async dag(spec) {
-    const nodes = (spec && spec.nodes) || [];
-    if (nodes.length === 0) return { ok: true, results: {}, skipped: [] };
-    const byId = {};
-    for (const node of nodes) byId[node.id] = node;
-    const results = {};
-    const skipped = [];
-    let pending = nodes.map((node) => node.id);
-    const agentToNode = {};
-    const material = (node) => {
-      const items = [];
-      for (const dep of node.deps || []) {
-        const record = results[dep];
-        if (record && Array.isArray(record.returned) && record.returned.length > 0) {
-          items.push("Dependency " + dep + ":");
-          for (const entry of record.returned) items.push(entry.text);
-        }
-      }
-      return items;
-    };
-    const decide = async (node, code, extra) => {
-      const park = Object.assign({ dag: spec, node: node, code: code, deps: node.deps || [], done: Object.keys(results), pending: pending.slice() }, extra || {});
-      return await this.park(park);
-    };
-    const abortWith = (code, reason) => {
-      const err = new Error(reason);
-      err.__jsFailure = { code: code, reason: reason };
-      throw err;
-    };
-    while (pending.length > 0) {
-      const ready = nodes.filter((node) => pending.indexOf(node.id) >= 0 && (node.deps || []).every((dep) => dep in results || skipped.indexOf(dep) >= 0));
-      if (ready.length === 0) {
-        abortWith("DAG_CYCLE", "dag has a cycle or an unknown dependency");
-      }
-      const receipts = await Promise.all(ready.map((node) => this.fork({ charge: node.charge, name: node.id }, material(node))));
-      let waveRetry = false;
-      for (let index = 0; index < ready.length; index += 1) {
-        const node = ready[index];
-        const receipt = receipts[index];
-        if (receipt && receipt.ok === true) {
-          agentToNode[receipt.agentId] = node.id;
-        } else {
-          const decision = await decide(node, (receipt && receipt.code) || "fork-failed");
-          if (decision === "retry") {
-            waveRetry = true;
-            break;
-          } else if (decision === "skip") {
-            results[node.id] = null;
-            skipped.push(node.id);
-            pending = pending.filter((id) => id !== node.id);
-          } else if (decision && typeof decision === "object" && decision.abort) {
-            abortWith("DAG_ABORTED", String(decision.abort));
-          } else {
-            results[node.id] = decision;
-            pending = pending.filter((id) => id !== node.id);
-          }
-        }
-      }
-      if (waveRetry) continue;
-      const joined = await this.join();
-      if (!joined || joined.ok !== true) {
-        const decision = await decide(ready[0], (joined && joined.code) || "join-failed");
-        if (decision === "retry") continue;
-        if (decision === "skip") {
-          for (const node of ready) {
-            if (pending.indexOf(node.id) >= 0) {
-              results[node.id] = null;
-              skipped.push(node.id);
-              pending = pending.filter((id) => id !== node.id);
-            }
-          }
-          continue;
-        }
-        abortWith("DAG_JOIN_REFUSED", String((joined && joined.code) || "unknown"));
-      }
-      let recordRetry = false;
-      for (const record of joined.records || []) {
-        const id = agentToNode[record.agentId];
-        if (id === undefined || pending.indexOf(id) < 0) continue;
-        if (record.status === "completed") {
-          results[id] = record;
-          pending = pending.filter((entry) => entry !== id);
-        } else {
-          const decision = await decide(byId[id], "node-" + record.status, { record: record });
-          if (decision === "retry") {
-            recordRetry = true;
-            break;
-          } else if (decision === "skip") {
-            results[id] = null;
-            skipped.push(id);
-            pending = pending.filter((entry) => entry !== id);
-          } else if (decision && typeof decision === "object" && decision.abort) {
-            abortWith("DAG_ABORTED", String(decision.abort));
-          } else {
-            results[id] = decision;
-            pending = pending.filter((entry) => entry !== id);
-          }
-        }
-      }
-      if (recordRetry) continue;
-      for (const id of ready.map((node) => node.id)) {
-        if (pending.indexOf(id) >= 0 && !(id in results) && skipped.indexOf(id) < 0) {
-          abortWith("DAG_RECORD_MISSING", "the child of node " + id + " returned no record");
-        }
-      }
-    }
-    return { ok: true, results: results, skipped: skipped };
-  }"""
-                      []
               // resume/review/fetch/devops before park.
               // park is a lifecycle capability every js-* surface carries; it
               // is not a filesystem permission projection, so it is always
@@ -760,6 +615,13 @@ class JsProgram {"""
               fill
                   """  async park(payload) {
     return await this._api.park(payload);
+  }
+  async unpark(name, value) {
+    if (arguments.length < 1 || arguments.length > 2) throw Object.assign(new Error("unpark requires name and optional value."), { code: "INVALID_ARGUMENT" });
+    return await this._api.unpark(name, value);
+  }
+  async abandon(name) {
+    return await this._api.abandon(name);
   }"""
                   []
               runStub prose ] in
@@ -799,7 +661,7 @@ class JsProgram {"""
               if has capabilities JsCapability.Write then
                   yield! [ prose.VerbCreate; "mkdir" ]
               if has capabilities JsCapability.Exec then
-                  yield! [ "call"; "signal"; "send"; "delta" ] ]
+                  yield! [ "call"; "signal"; "send" ] ]
             |> String.concat ", "
 
         let parallelTemplate =
@@ -827,7 +689,7 @@ class JsProgram {"""
               prose.Mv
           if has capabilities JsCapability.Exec then
               prose.RunRules
-          if has capabilities JsCapability.Fork || has capabilities JsCapability.Join then
+          if has capabilities JsCapability.Fork || has capabilities JsCapability.Commission then
               prose.DelegationRules
           if has capabilities JsCapability.Write then
               prose.MutationRules ]
@@ -859,7 +721,6 @@ class JsProgram {"""
                           JsCapability.Grep
                           JsCapability.Fork
                           JsCapability.Resume
-                          JsCapability.Join
                           JsCapability.Horizon
                           JsCapability.Advisor
                           JsCapability.Review ])

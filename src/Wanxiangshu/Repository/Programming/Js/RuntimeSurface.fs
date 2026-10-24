@@ -13,16 +13,16 @@ open Wanxiangshu.Foundation.Identity
 module JsRuntimeSurface =
 
     type private JsBindingsHandle
-        (api: obj, staging: ResizeArray<JsStagedMutation>, readSnapshots: ResizeArray<JsReadSnapshot>) =
+        (api: obj, staging: ResizeArray<JsStagedMutation>, reads: ResizeArray<JsExplicitFileRead>) =
 
         member _.Api = api
         member _.Staging = staging
-        member _.ReadSnapshots = readSnapshots
+        member _.Reads = reads
 
     let createApi (root: string) : obj =
         // DSL-MUTABLE: resource — JS mutation staging buffer handed off in handle
         let staging = ResizeArray<JsStagedMutation>()
-        let readSnapshots = ResizeArray<JsReadSnapshot>()
+        let reads = ResizeArray<JsExplicitFileRead>()
 
         let allCapabilities =
             set
@@ -37,47 +37,28 @@ module JsRuntimeSurface =
                   JsCapability.Resume
                   JsCapability.Commission
                   JsCapability.DevOps
-                  JsCapability.Join
                   JsCapability.Fission
                   JsCapability.Horizon
                   JsCapability.Advisor
                   JsCapability.Park ]
 
         let api =
-            JsToolsBindings.createApi
-                allCapabilities
-                root
-                staging
-                readSnapshots
-                (ResizeArray<JsExplicitFileRead>())
-                (JsToolsBindings.createLedger None)
-                None
-                None
-                None
+            JsToolsBindings.createApi allCapabilities root staging reads (JsToolsBindings.createLedger None) None None
 
-        box (JsBindingsHandle(api, staging, readSnapshots))
+        box (JsBindingsHandle(api, staging, reads))
 
     let createApiFor (root: string) (permissionLabels: string array) : obj =
         // DSL-MUTABLE: resource — JS mutation staging buffer handed off in handle
         let staging = ResizeArray<JsStagedMutation>()
-        let readSnapshots = ResizeArray<JsReadSnapshot>()
+        let reads = ResizeArray<JsExplicitFileRead>()
 
         let capabilities =
             permissionLabels |> Array.choose JsCapability.ofLabel |> Set.ofArray
 
         let api =
-            JsToolsBindings.createApi
-                capabilities
-                root
-                staging
-                readSnapshots
-                (ResizeArray<JsExplicitFileRead>())
-                (JsToolsBindings.createLedger None)
-                None
-                None
-                None
+            JsToolsBindings.createApi capabilities root staging reads (JsToolsBindings.createLedger None) None None
 
-        box (JsBindingsHandle(api, staging, readSnapshots))
+        box (JsBindingsHandle(api, staging, reads))
 
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api
 
@@ -86,17 +67,13 @@ module JsRuntimeSurface =
     let installDelegationHost
         (sessionId: string)
         (delegation: obj)
-        (join: obj)
         (fission: obj)
         (horizon: obj)
         (advisor: obj)
         : unit =
         JsDelegationBridge.install
             sessionId
-            { Delegate =
-                fun name payload ->
-                    unbox<Task<obj>> (emitJsExpr (delegation, name, payload) "$0($1,$2)")
-              Join = fun () -> unbox<Task<obj>> (emitJsExpr join "$0()")
+            { Delegate = fun name payload -> unbox<Task<obj>> (emitJsExpr (delegation, name, payload) "$0($1,$2)")
               Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)")
               Horizon = fun () -> unbox<Task<obj>> (emitJsExpr horizon "$0()")
               Advisor = fun intent -> unbox<Task<obj>> (emitJsExpr (advisor, intent) "$0($1)")
@@ -206,7 +183,7 @@ module JsRuntimeSurface =
         |> Seq.toArray
 
     let readPaths (handle: obj) : string array =
-        (unbox<JsBindingsHandle> handle).ReadSnapshots
+        (unbox<JsBindingsHandle> handle).Reads
         |> Seq.map _.Path
         |> Seq.distinct
         |> Seq.toArray
@@ -217,7 +194,7 @@ module JsRuntimeSurface =
                code = JsFailure.code failure
                reason = JsFailure.reason failure |}
 
-    /// Run one model program with a supplied JS-native API object.
+    /// Isolated physical execution for semantic verification of a generated surface.
     let run
         (baseClassSource: string)
         (modelSource: string)
@@ -227,47 +204,34 @@ module JsRuntimeSurface =
         (outputBoundBytes: int)
         : Task<obj> =
         task {
-            let! handle =
-                Wanxiangshu.Process.JsSandbox.runSurface baseClassSource modelSource apiValue deadlineMs deadlineEpochMs
+            let sessionId = "surface-" + System.Guid.NewGuid().ToString("N")
 
-            let! result = Wanxiangshu.Process.JsSandbox.awaitResult handle outputBoundBytes
-
-            return
-                match result with
-                | Ok value -> box {| ok = true; value = value |}
-                | Error failure -> failureResult failure
-        }
-
-    /// Start a sandbox program without awaiting it to completion, exposing the
-    /// in-flight result promise and a mutable deadline reset (JS-054.1). The
-    /// promise resolves to the same `{ ok, value | code, reason }` shape as
-    /// `run`; `resetDeadline(epochMs)` re-arms the async deadline so a caller
-    /// may keep an in-flight program alive across calls.
-    let start
-        (baseClassSource: string)
-        (modelSource: string)
-        (apiValue: obj)
-        (deadlineMs: int)
-        (deadlineEpochMs: int64)
-        (outputBoundBytes: int)
-        : Task<obj> =
-        task {
-            let! handle =
-                Wanxiangshu.Process.JsSandbox.runSurface baseClassSource modelSource apiValue deadlineMs deadlineEpochMs
-
-            let resultTask =
-                task {
-                    let! result = Wanxiangshu.Process.JsSandbox.awaitResult handle outputBoundBytes
-
-                    return
-                        match result with
-                        | Ok value -> box {| ok = true; value = value |}
-                        | Error failure -> failureResult failure
-                }
-
-            return
+            let options =
                 createObj
-                    [ "promise" ==> resultTask
-                      "resetDeadline"
-                      ==> fun (epochMs: int64) -> Wanxiangshu.Process.JsSandbox.resetDeadline handle epochMs ]
+                    [ "name" ==> "run"
+                      "program" ==> modelSource
+                      "baseClass" ==> baseClassSource
+                      "planB"
+                      ==> "Wait for this isolated verification program to finish and preserve its real result."
+                      "api" ==> apiValue
+                      "capabilities" ==> [| "Read"; "Write"; "Exec" |]
+                      "root" ==> "."
+                      "executionBudgetMs" ==> max 1 deadlineMs
+                      "outputBoundBytes" ==> outputBoundBytes ]
+
+            let session = JsPrograms.forSession sessionId
+            let! result = unbox<Task<obj>> (session?execute (options))
+
+            if string result?state = "completed" then
+                return createObj [ "ok" ==> true; "value" ==> JS.JSON.stringify result?value ]
+            else
+                let code = string result?code
+
+                let failure =
+                    match code with
+                    | "PROGRAM_RESULT_NOT_SERIALIZABLE" -> JsFailure.InvalidReturnValue
+                    | "PROGRAM_EXECUTION_LIMIT" -> JsFailure.ProgramTimeout
+                    | _ -> JsFailure.ofWire code (string result?reason)
+
+                return failureResult failure
         }

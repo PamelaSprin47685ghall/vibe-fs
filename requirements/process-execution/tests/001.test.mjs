@@ -415,7 +415,7 @@ test('WHAT[process-execution-001] SUPERVISOR_spawnSync_invokes_sh_lc_with_fixed_
     return driverHandle(4242)
   })
   const term = await supervisorSpawn(supervisor, 'echo hi', tmpdir())
-  assert.equal(term.inspect().pid, 4242, 'a wanxiangli/pty Terminal wraps the driver handle')
+  assert.equal(term.inspect().pid, 4242, 'a wanxiangli/runtime Terminal wraps the driver handle')
   assert.equal(seen[0], 'sh')
   assert.deepEqual(seen[1], ['-lc', 'echo hi'])
   assert.equal(seen[2].name, 'xterm-256color')
@@ -633,59 +633,17 @@ test('WHAT[process-execution-001] PTY_TYPES_read_plans_cover_unknown_in_progress
 }
 
 {
-  // The four PTY host tools (`open-terminal`, `send-terminal`, `read-terminal`,
-  // `signal-terminal`) are retired; interactive execution is superseded by `this.call`
-  // (`{ spawn, name }`, `check(ctx)`, `{ send: { name, input } }`, `{ signal, name }`,
-  // repository-programming [050]-[052]).
-  const { default: assert } = await import('node:assert/strict')
-  const { default: test } = await import('node:test')
-  const { sandbox, runProgram, caseName, render } = await import('./support/executor.mjs')
-
-  test('WHAT[process-execution-001] this.call interactive actions spawn, send, observe incremental output in check, and signal background child', async () => {
-    const { dir, cleanup } = sandbox('wxs-proc-001-')
-    try {
-      const outcome = await runProgram(
-        dir,
-        `    const chunks = [];
-    const result = await this.call(class extends this.Callable {
-      maxDuration = 8000;
-      interval = 30;
-      next(ctx) {
-        if (ctx.step === 0) {
-          return {
-            spawn: "node -e \\"process.stdin.setEncoding('utf8'); process.stdin.on('data', d => process.stdout.write('ACK:' + d.trim()));\\"",
-            name: "repl",
-          };
-        }
-        if (ctx.step === 1) return { send: { name: "repl", input: "hello-interactive" } };
-        if (ctx.step === 2) return "sleep 0.2";
-        if (ctx.step === 3) return { signal: "SIGTERM", name: "repl" };
-        return null;
-      }
-      check(ctx) {
-        if (ctx.stdout) chunks.push(ctx.stdout);
-        return true;
-      }
-      watch(ctx) {
-        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
-        return this.check(ctx);
-      }
-      sanity() {
-        return {
-          nextDone: () => [{ root: "/", step: 4 }],
-          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [{ name: "repl", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
-        };
-      }
-    });
-    return { status: result.status, observed: chunks.join("") };`,
-        'ses-001-interactive',
-      )
-      assert.equal(caseName(outcome), 'Succeeded')
-      const doc = render(outcome)
-      assert.match(doc, /status = "completed"/)
-      assert.match(doc, /ACK:hello-interactive/)
-    } finally {
-      cleanup()
-    }
+  const {fixture,assert,data,caseName,command,until,existsSync,readFileSync} = await import('../../repository-programming/tests/support/command-program.fixture.mjs')
+  test('WHAT[process-execution-001] named command input and signal preserve the parked continuation', {timeout:12000}, async t=>{
+    const h=fixture(t,'proc001','DevOps')
+    const cmd=command(h,'interactive',"process.stdin.setEncoding('utf8');process.stdin.on('data',text=>{fs.writeFileSync(file('input'),text);process.stdout.write('ACK:'+text);});setInterval(()=>{},1000);")
+    assert.equal(caseName(await h.run('repl','return await this.call('+JSON.stringify(cmd)+');',{planB:'w'.repeat(20)})),'Parked')
+    assert.equal(data(await h.run('send','return await this.send("repl","hello-interactive");')).sent,true)
+    await until(()=>existsSync(h.file('input')))
+    assert.equal(readFileSync(h.file('input'),'utf8'),'hello-interactive\n')
+    assert.equal(data(await h.run('stop','return await this.signal("repl","SIGTERM");')).sent,true)
+    const result=data(await h.unpark('repl'))
+    assert.equal(result.state,'completed')
+    assert.equal(result.value.stdout,'ACK:hello-interactive\n')
   })
 }

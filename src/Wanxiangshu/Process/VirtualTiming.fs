@@ -16,11 +16,11 @@ type VirtualClockPort =
       AdvanceMs: int -> unit
       Set: DateTimeOffset -> unit }
 
-/// 实现唯一来源：wanxiangli/time 的虚拟时基（CUT-21，验证专用）。
+/// 实现唯一来源：wanxiangli/runtime 的虚拟时基（CUT-21，验证专用）。
 /// 此模块把库 JS 面包装回主仓 ITimerPort / IClockPort 契约，签名不变。
 module VirtualTiming =
 
-    [<Import("Time", "wanxiangli/time")>]
+    [<Import("Time", "wanxiangli/runtime")>]
     let private library: obj = jsNative
 
     let private timerPortOf (port: obj) : ITimerPort =

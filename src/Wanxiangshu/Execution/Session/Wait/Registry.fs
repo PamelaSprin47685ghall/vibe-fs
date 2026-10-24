@@ -4,7 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// 实现唯一来源：wanxiangli/wait 的注册表与诊断运行时（CUT-21）。
+/// 实现唯一来源：wanxiangli/program 的注册表与诊断运行时（CUT-21）。
 /// 此文件是类型桥：主仓 CausalWaitRuntime / IWaitObserver / IWaitSnapshotReader /
 /// IWaitDiagnosticSink 契约不变，调用方零改动；F# 词汇与库 JS 描述符在此双向转换。
 module private WaitCodec =
@@ -150,10 +150,10 @@ module private WaitCodec =
               "history", box (snapshot.History |> List.map transitionObject |> Array.ofList)
               "sequence", box snapshot.Sequence ]
 
-/// 库容器绑定：wanxiangli/wait 的具名 Wait 导出。
+/// 库容器绑定：wanxiangli/program 的具名 Wait 导出。
 module private WaitLibrary =
 
-    [<Import("Wait", "wanxiangli/wait")>]
+    [<Import("Wait", "wanxiangli/program")>]
     let library: obj = jsNative
 
 type CausalWaitRegistry private (libraryRegistry: obj) =

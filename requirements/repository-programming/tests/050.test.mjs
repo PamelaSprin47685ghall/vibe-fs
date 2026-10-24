@@ -1,152 +1,30 @@
-import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import {
-  execute,
-  caseName,
-  parkedHandle,
-  parkedPayload,
-  render,
-  clearParkedSites,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import {fixture,assert,data,caseName,parkedPayload,render,barrier,stopped,existsSync,readFileSync,writeFileSync} from './support/command-program.fixture.mjs'
 
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-run-050-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-const program = (body) => `class Js extends JsProgram {
-  async run() {
-${body}
-  }
-}`
-
-let runCount = 0
-const runProgram = (dir, body, sessionId = 'sess-050') => {
-  runCount += 1
-  return execute(dir, 'DevOps', 'en', sessionId, { name: `run-050-${runCount}`, program: program(body) }, 5000, Date.now() + 60_000, 1 << 20, null)
-}
-
-const runText = async (dir, body) => render(await runProgram(dir, body))
-
-test('WHAT[repository-programming-050] a class command is refused with CALL_COMMAND_UNSUPPORTED', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const doc = await runText(
-      dir,
-      `    return await this.call(class { maxDuration = 1000; next() { return null; } });`,
-    )
-    assert.match(doc, /# failed/)
-    assert.match(doc, /CALL_COMMAND_UNSUPPORTED/)
-  } finally {
-    cleanup()
-  }
+test('WHAT[repository-programming-050] a missing await cannot cross call or rerun its command', {timeout:12000}, async t=>{
+  const h=fixture(t,'050-blocking','DevOps'),cmd=barrier(h,'blocking')
+  const first=await h.run('target','this.call('+JSON.stringify(cmd)+');this.write("after","continued");return "done";',{planB:'w'.repeat(20)})
+  assert.equal(caseName(first),'Parked',render(first))
+  assert.equal(existsSync(h.file('after')),false)
+  writeFileSync(h.file('blocking.release'),'release')
+  await stopped(h,'blocking')
+  assert.equal(existsSync(h.file('after')),false)
+  const done=data(await h.unpark('target'))
+  assert.equal(done.state,'completed');assert.equal(done.value,'done')
+  assert.equal(readFileSync(h.file('after'),'utf8'),'continued')
+  assert.deepEqual(data(await h.unpark('target')),done)
+  assert.equal(readFileSync(h.file('blocking.starts'),'utf8'),'start\n')
 })
 
-test('WHAT[repository-programming-050] a function command is refused with CALL_COMMAND_UNSUPPORTED', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const doc = await runText(
-      dir,
-      `    return await this.call(function() { return "echo hi"; });`,
-    )
-    assert.match(doc, /# failed/)
-    assert.match(doc, /CALL_COMMAND_UNSUPPORTED/)
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] an invalid non-string command is refused with CALL_COMMAND_UNSUPPORTED', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const doc = await runText(
-      dir,
-      `    return await this.call(12345);`,
-    )
-    assert.match(doc, /# failed/)
-    assert.match(doc, /CALL_COMMAND_UNSUPPORTED/)
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] the host runs one foreground command and reports structured outcome', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const doc = await runText(
-      dir,
-      `    return await this.call("echo hello", "read the file directly");`,
-    )
-    assert.match(doc, /# ok/)
-    assert.match(doc, /status = "completed"/)
-    assert.match(doc, /hello/)
-    assert.match(doc, /exitCode = 0/)
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] non-zero exit code is reported as data without throwing', async () => {
-  const { dir, cleanup } = sandbox()
-  try {
-    const doc = await runText(
-      dir,
-      `    return await this.call("exit 4", "read the file directly");`,
-    )
-    assert.match(doc, /# ok/)
-    assert.match(doc, /exitCode = 4/)
-    assert.match(doc, /status = "completed"/)
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] planB text bytes price the automatic yield window', async () => {
-  const { dir, cleanup } = sandbox()
-  let outcome = null
-  try {
-    outcome = await runProgram(
-      dir,
-      `    return await this.call("sleep 5", "ab");`,
-    )
-    assert.equal(caseName(outcome), 'Parked')
-    const payload = parkedPayload(outcome)
-    assert.equal(payload.__jsYield, true)
-    assert.equal(payload.planB, 'ab')
-    assert.equal(payload.budgetMs, 2 * 50)
-    assert.ok(payload.delta, 'yield payload must carry delta')
-  } finally {
-    const handle = outcome && parkedHandle(outcome)
-    if (handle) {
-      await execute(dir, 'DevOps', 'en', 'sess-050', { abandon: { handle } }, 2000, Date.now() + 60_000, 1 << 20, null)
-    }
-    clearParkedSites()
-    cleanup()
-  }
-})
-
-test('WHAT[repository-programming-050] a missing planB is refused and planB byte length prices the budget', async () => {
-  const { dir, cleanup } = sandbox()
-  let outcome = null
-  try {
-    const missing = await runText(dir, `    return await this.call("printf identical");`)
-    assert.match(missing, /CALL_COMMAND_UNSUPPORTED/)
-
-    outcome = await runProgram(dir, `    return await this.call("sleep 5", "abcdef");`)
-    assert.equal(caseName(outcome), 'Parked')
-    const payload = parkedPayload(outcome)
-    assert.equal(payload.__jsYield, true)
-    assert.equal(payload.planB, 'abcdef')
-    assert.equal(payload.budgetMs, 6 * 50)
-  } finally {
-    const handle = outcome && parkedHandle(outcome)
-    if (handle) {
-      await execute(dir, 'DevOps', 'en', 'sess-050', { abandon: { handle } }, 2000, Date.now() + 60_000, 1 << 20, null)
-    }
-    clearParkedSites()
-    cleanup()
-  }
+test('WHAT[repository-programming-050] delta and a forged unpark value cannot replace the real final call result', {timeout:12000}, async t=>{
+  const h=fixture(t,'050-result','DevOps')
+  const cmd=barrier(h,'result',"process.stdout.write('FIRST');process.stderr.write('ERROR');process.exitCode=23;")
+  const first=await h.run('target','const r=await this.call('+JSON.stringify(cmd)+');return {exitCode:r.exitCode,stdout:r.stdout,stderr:r.stderr,signal:String(r.signal)};',{planB:'w'.repeat(20)})
+  assert.equal(caseName(first),'Parked',render(first))
+  assert.equal(parkedPayload(first).delta.stdout,'FIRST')
+  writeFileSync(h.file('result.release'),'release');await stopped(h,'result')
+  const done=data(await h.unpark('target',{exitCode:0,stdout:'forged'}))
+  assert.equal(done.state,'completed')
+  assert.deepEqual(done.value,{exitCode:23,stdout:'FIRST',stderr:'ERROR',signal:'null'})
+  assert.equal(readFileSync(h.file('result.starts'),'utf8'),'start\n')
 })

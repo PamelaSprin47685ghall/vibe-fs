@@ -35,11 +35,11 @@ const storeOf = async (target) => workspaceEvents.acquire(await journalSurface.J
 
 // 编程面成员的唯一入口：Manager 的 `todowrite-for-manager` 工具执行一段程序，
 // 程序内调用 `this.resume`。
+let programSequence = 0
 const runManagerProgram = async (hooks, sessionID, body) =>
   await hooks.tool['todowrite-for-manager'].execute(
-    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-dispatch-test',
-          prefixUntil: 0,
-          carry: []
+    { program: `class Js extends JsProgram { async run() { ${body} } }`, name: 'devops-dispatch-test-' + (++programSequence),
+          planB: 'Wait for the actual manager dispatch receipt without extending the request window.'
         },
     { sessionID, agent: 'manager' },
   )

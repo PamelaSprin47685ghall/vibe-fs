@@ -108,7 +108,7 @@
 
 - **单向接入原则**：
   - `wanxiangshu` 仅通过 npm 包形式消费 `wanxiangli`（通过子模块 `file:wanxiangli` 安装），严禁在主仓源码中反向引用 `wanxiangli` 内部源码文件。
-  - 宿主消费 `wanxiangli` 的公开入口（如 `wanxiangli/work`, `wanxiangli/durable-work`, `wanxiangli/process`, `wanxiangli/trace`, `wanxiangli/ownership`, `wanxiangli/convergence`, `wanxiangli/retention`, `wanxiangli/segments` 等）。
+  - 宿主消费 `wanxiangli` 的公开入口（如 `wanxiangli/work`, `wanxiangli/durable-work`, `wanxiangli/program`, `wanxiangli/runtime`, `wanxiangli/trace`, `wanxiangli/ownership`, `wanxiangli/convergence`, `wanxiangli/retention`, `wanxiangli/segments` 等）。
   - 两仓协同开发时，必须在各自仓库独立完成 commit，子模块指针更新需显式提交。
 
 ---
@@ -573,6 +573,21 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **回答送达走真实的父→子指导通道，不走 provider transform。** BTW 孙会话的出站 transform 只负责借用父 system/messages/model 前缀，答案一产生就交给 `HostForkBusyNudge.sendObserved` 的 `PromptDispatcher` Detached continuation；空闲接收方经同一 Dispatcher 建立新 AgentOwnerRoot。可见回答须进入 Host 子会话历史并带 PromptKey，让用户知道已发出；Dispatcher 返回“已排队”不是已送达，只有 `PhysicalAccepted` 与协商回执身份匹配才解除第一次 `resetScope` 门禁。不再由 `session.promptAsync` 手工发送、猜 busy/noReply、轮询消息，也不接受 transform 中伪造的 part.metadata 来确认答复。离线测试须分别覆盖真实可见落地与仅有投递回执、尚未落地两种情况。
 - **测实际连接而不只测 helper。** 库内 `src/pair-hint/tests/008.test.mjs` 验证协商代际和首次/后续状态；主仓 `requirements/host-boundary/tests/scope-hni-physical.test.mjs` 应经实际注册的 OpenCode hooks 检查父前缀热替换、工具前置拒绝、重试、物理 steer 和首轮 reset 激活；Fork/Advisor 的真实物理 prompt 还须断言不携带父历史。离线字节相等不自动证明提供商真实缓存率，临时会话是否 UI 不可见也不能仅凭 parentID 推断。
 
+
+### 6.8 命名程序、物理运行时与顶层 planB（2026-10-24）
+
+本节记录 `proposals/todowrite-program-runtime-clean-break-2026-10-24.md` 的实现边界；正式行为以 repository-programming 与 process-execution 的 WHAT 为准。构建、行为回归、干净安装与部署分别验收。
+
+- **预算由工具准入决定。** `todowrite-for-ROLE` 必须且只能接收三个字符串 `name/program/planB`，Bookkeeper 入口也遵守同一形状。按真实顶层 `planB` 的 UTF-8 字节数乘 50ms 建立一个绝对期限；程序内计算出的字符串不能改变预算。所有 call、SDK 排空、unpark 及本次唤醒的目标共用剩余时间。成员形状为 `call(command)`、`unpark(name,value?)`，不存在成员级续期参数。
+- **状态和执行各有 owner。** `wanxiangli/program` 的 ProgramSession/Run 拥有名字、物理调用重放、暂停代际、控制关系及单次结算；`wanxiangli/runtime` 拥有独立执行进程、受控通信、文件版本、命令、终端与输出。program 通过公开入口单向依赖 runtime；旧 programming/sandbox/fs/process/pty/spool/time/wait 八入口退出，不保留转发别名。宿主只组合业务能力、准入和持久化端口。
+- **真实阻塞需要物理执行边界。** call 在独立执行单元的调用点阻塞，先排空此前 SDK 操作；漏写 await 或 Promise.all 不能并发启动同一程序的第二条命令。SDK 排空用完请求期限时，原操作继续结清，后续命令仍不得自行启动。命令后来退出只保存结果，恢复必须显式进行；纯 JS 执行预算在命令等待期间停表，请求期限仍推进。
+- **暂停、退出和业务完成分别成立。** 程序 return 不代替 Work 的完成事实，编程内 join/dag 已删除，独立 join 沿原归属规则收拢。请求到期保留原命令；信号已发送、shell close、进程组已退出和清理确认不能混为一谈。终态保留真实输出、退出码或信号及已落盘 effects，强杀不保证 finally 执行，也不回滚已写文件。
+- **插件销毁也必须关闭程序。** 曾出现所有问答断言通过却遗留暂停子进程，以及新插件复用会话时命中旧调用重放。插件停止准入并排空既有工作后，只关闭本实例拥有的会话程序；程序收尾先于执行端口与 Journal 释放。会话删除与插件退出共用确认关闭和 Reaped 审计，独立失败继续收尾并最终上报，不能以全局 closeAll 误关其他插件。真实命令退出、finally 文件、跨实例隔离和新实例重用名字分别有物理反例。
+- **安装验收必须消费产包。** 包含 worker 的实际 tarball 在空目录安装后，用 Node、Bun 和 TypeScript 验证两个新入口；旧入口确实不可导入。Node 和 Bun 对未导出子路径可使用不同的模块错误码，应断言各自真实拒绝，不把包缺失或运行失败混作拒绝成功。
+- **localspace-js 只回移同一请求窗口理念。** 它的 js 顶层接收 `planB`，预算为 `min(UTF8Bytes(planB) × 50ms, 30000ms)`，call/unpark 不再追加预算。保留该工具原有后台 worker 与客户端断开后继续运行的合同；本地计算和直接文件 API 的后台行为，不得描述成 wanxiangli 的完整程序暂停。
+- **基线红态如实保留。** 库全量验收中的 assembly `Missing field: updates` 已在原始库提交的隔离构建上复现为同样 16 项失败。额外消费者回归保留 work-011 的既有温度断言失败：未修改的 PluginHooks 把 ChatParamsHook 返回的柯里化函数按两个参数直接调用，实际未进入第二层，独立用例与编译产物均已确认。主仓全量格式和静态检查仍可被未修改的既有代码阻断；本包精确文件门禁、测试通过数、跳过、TODO 与这些基线分别记录在提案，不用扩大豁免或修改其他任务来制造全绿。
+
+
 ---
 
 ## 7. 迁移来源文件全量清单与保留/删除边界
@@ -624,3 +639,4 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **主仓现有配置与独立任务文档**：
   - 本文件的既有协作规则；迁移合同已直接合入本文件，不再安排独立指南替换。
   - 其他任务的交接材料与无关产品提案，不因名称包含“迁移”而删除。
+- **本次精确落点。** wanxiangli `b5187fc07d3da16ed14ad097c5bd0c01ecde822d` 已推送 main，宿主 gitlink 固定此提交；localspace-js 共享期限实现 `42da3a896f1ac322dd7622cf00ffe07779563b99` 与参数文档 `03991b87882e3d0974fc95927601eba2ce531a21` 已在 main。主仓及库回归是在保留初始并发改动的实际工作树上运行；原有修改未被本任务暂存，不宣称为干净 checkout 全仓通过。

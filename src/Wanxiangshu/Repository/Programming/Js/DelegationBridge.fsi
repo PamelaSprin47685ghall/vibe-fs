@@ -8,7 +8,6 @@ open System.Threading.Tasks
 /// structured envelope object — data, never rendered prose.
 type JsDelegationHost =
     { Delegate: string -> obj -> Task<obj>
-      Join: unit -> Task<obj>
       Fission: obj -> Task<obj>
       Horizon: unit -> Task<obj>
       Advisor: obj -> Task<obj>

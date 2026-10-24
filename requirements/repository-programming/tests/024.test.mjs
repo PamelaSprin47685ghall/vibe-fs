@@ -8,7 +8,7 @@ import {
   execute as executeWorkflow,
   failureCode,
   failureReason,
-  parkedPayload,
+  parkedPayload as fullParkedPayload,
   rewritten,
   run,
   runObserved,
@@ -22,6 +22,11 @@ import {
   stagedCount,
   stagedKinds,
 } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+
+import { closeAll } from '../../../dist/Repository/Programming/Js/Programs.js'
+test.after(async () => { await closeAll() })
+
+const parkedPayload = outcome => fullParkedPayload(outcome).payload
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-edit-'))
@@ -39,7 +44,7 @@ const execute = (dir, body, language = 'en') =>
   run(dir, 'Coder', language, program(body), 2000, Date.now() + 60_000, 1 << 20, null)
 
 const executeWithPark = (dir, body, sessionId = 'sess-024', language = 'en') =>
-  executeWorkflow(dir, 'Coder', language, sessionId, { program: program(body) }, 2000, Date.now() + 60_000, 1 << 20, null)
+  executeWorkflow(dir, 'Coder', language, sessionId, { name: 'anchor-' + sessionId, program: program(body), planB: 'Wait for this anchor operation and preserve ambiguity for explicit recovery.' }, 2000, Date.now() + 60_000, 1 << 20, null)
 
 test('WHAT[repository-programming-024] JS_EDIT_near_match_is_copy_ready_diagnostic_but_never_write_authority', async () => {
   const { dir, cleanup } = sandbox()

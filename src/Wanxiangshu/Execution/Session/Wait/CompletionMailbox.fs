@@ -7,12 +7,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
 
-/// 实现唯一来源：wanxiangli/wait 的泛化 CompletionMailbox（CUT-21）。
+/// 实现唯一来源：wanxiangli/program 的泛化 CompletionMailbox（CUT-21）。
 /// 此文件是主仓特化桥：AgentHandleId / PtyJoinItem 原样经库往返
 /// （F# 值即 JS 对象），唤醒原因在此转回主仓 MailboxWakeReason 词汇。
 module private MailboxLibrary =
 
-    [<Import("Wait", "wanxiangli/wait")>]
+    [<Import("Wait", "wanxiangli/program")>]
     let library: obj = jsNative
 
 type CompletionMailbox(gate: obj) =

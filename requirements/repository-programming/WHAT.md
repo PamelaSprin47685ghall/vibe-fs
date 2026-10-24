@@ -2,14 +2,12 @@
 
 ## [001] Capability 投影面与单一权限源
 
-每次请求的 `todowrite-for-ROLE` 工具只从该 Attempt 的唯一权威能力集生成，不另算 role→JS 权限。没有文件系统 primitive capability 时不生成 `todowrite-for-*` 工具。
+每次请求的 `todowrite-for-ROLE` 只从当前 Attempt 的唯一权威能力集生成，公开成员与运行时准入使用同一投影，不另算角色权限。有实际可生成的编程成员才提供编程工具；Join 只授权独立 `join()`，不单独产生编程面。旧 Attempt、目标程序原有权限和合法工具名不能代替本次授权。文件、评审、Ask 和委派继续受既有业务门禁约束。
 
 ## [002] 四层同构应用
 
-每项文件系统 capability 在公开基类、工具描述、canonical examples 与运行时门禁中一致投影；缺失能力在四层均不可用，伪造调用也须拒绝。一项能力可生成固定顺序的同权成员族，不产生第二份授权。
+能力在公开基类、工具描述、canonical examples 与运行时门禁中一致投影。Read → `cat/stat/whereAll/where`，Glob → `ls`，Grep → `rg`，Write → `write/mkdir`，Move → `mv`，Remove → `rm`，Exec → `call/signal/send`，Fork → `fork`，Resume → `resume`，Commission → `commission`，DevOps → `devops`，Fission → `fission`，Horizon → `horizon`，Advisor → `advisor`，Ask → `ask`，Review → `review`。canonical 成员序为 `write, rm, mv, cat, ls, rg, stat, mkdir, whereAll, where, call, signal, send, fork, resume, commission, devops, fission, horizon, advisor, ask, review`，仅列实际授权成员。`park/unpark/abandon` 是普遍生命周期成员，不进入能力列表，仍受会话及权限边界约束。Manager 的 reviewOnly、Plan 写前评审与 PLAN_PATH、Ask 业务门禁保持不变。编程内 join/dag 的投影、实现、类型和教学全部退出；委派 resume 不是程序恢复，resetScope 与业务 deliver 不成为程序成员。
 
-主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Grep → `rg`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `call`，Fork → `fork`/`dag`，Resume → `resume`，Commission → `commission`，DevOps → `devops`，Join → `join`，Fission → `fission`，Horizon → `horizon`，Advisor → `advisor`；canonical 成员序为 `write, rm, mv, cat, ls, rg, stat, mkdir, whereAll, where, call, fork, resume, commission, devops, dag, join, fission, horizon, advisor`（生命周期成员 `park` 在基类与运行时绑定中携带，不进入 `members` 列表）。`dag` 是 `fork` 波次加一次 `join` 的纯糖，因此只在 Fork 与 Join 同时投影时才出现：公开基类、运行时基类与 `members` 列表同一条规则，成员列表里不会出现没有方法体的 `dag`。委派成员 `fork`/`resume`/`commission`/`devops`/`dag`/`join`/`fission`/`horizon`/`advisor` 一律走编程面 `this.xxx`，宿主不为 `fork`/`resume`/`commission`/`devops` 注册独立工具。`ToolPermission.Edit` 不再投影任何 `JsCapability`；旧成员 `glob` 与 `file`/`edit`/`rewrite` 均已从仓库生成编程面彻底退役。Plan 使用共享成员和 `PLAN_PATH` 单文件闸门。`grep(needle, pattern)` 已退役，Grep 现在只投影 `rg(argv)`。
-注意：`resetScope` 是核心宿主工具（context-compression [033]），不属于编程面成员；子代理已废除 `deliver` 成员。
 ## [003] 确定性生成
 
 同一角色与能力集生成字节相同的工具名称、Schema、描述、基类及示例。执行档位不进入名称，也不改变同角色的编程面。
@@ -22,9 +20,9 @@
 
 公开基类、描述和示例只包含当前可执行成员，不暴露宿主私有接口或注入键。（原直连宿主文件工具的说明钩子 `BuiltinToolDescriptionHook` 已随直连工具整体退役，现行契约归生成的 js 编程面。）
 
-## [006] 沙箱隔离与无 Ambient OS 权限
+## [006] 独立执行进程与无 Ambient OS 权限
 
-用户程序只获得显式纯数据与受控原语，不直接获得文件系统、网络、进程或环境变量。`todowrite-for-*` 不设整次调用的总时限，`join` 等待及恢复后的程序不因等待时间长而失败。同步执行片段仍有硬性超时，输出仍有上限；`rg`、`call` 等具体操作可以有各自的限制，不得把这些限制提升为整次程序的总时限。结果只由 `run()` 的结构化返回值决定，stdout/stderr 不作为编辑产物。
+每个命名程序由独立执行进程承载，只获得显式纯数据和获授权原语，不直接获得宿主对象、文件系统、网络、进程或环境变量。纯 JS 计算有硬性执行预算；SDK 排空与命令等待期间暂停扣减，恢复计算后续用余量，不保留跨越等待的 VM wall-clock timeout。请求期限按 [052] 独立计量，等待不使其停表。阻塞桥接只停住所属程序；宿主、既有 SDK 操作、命令输出和其他程序继续响应。普通 Promise、忙标志或必须 await 的文字不能代替真实阻塞。`run()` 的结构化返回值才是程序结果，stdout/stderr 不作为返回值或编辑产物。
 
 ## [007] 不可变快照与 Anchor 代数
 
@@ -80,9 +78,9 @@ CAS 还原（rollbackPlan：restore 与 removeCreated，逆序）保留为实现
 
 成败由顶级结构区分，不另用 `status = "ok"` 等歧义字段；编码与组合遵守 provider-projection。
 
-## [017] 并行调用安全与确定性串行提交
+## [017] 并行程序与逐笔提交
 
-同一助理消息的多个工具调用由宿主按确定顺序逐个执行，各为独立事务，后者读取前者提交后的状态。同文件修改顺序叠加，不丢更新；不同文件仍各自原子提交。
+不同名字的程序可并行执行，命令等待与暂停不得占住整个 provider run 或会话的执行锁；仅保留准入、调用身份及单笔原子提交所需顺序。同一程序一次只执行一条 call，命令并行通过不同命名程序表达。文件变更仍逐笔原子落盘，读取快照参与写前 FILE_CHANGED 校验；不承诺并发改写同一文件都成功，不自动重读、重定位或重跑。另一程序失败不回滚本程序已落盘效果。
 
 ## [018] 稳定失败代数
 
@@ -138,63 +136,53 @@ ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联
 
 Manager 的 `todowrite-for-manager` 程序入口始终按角色准入；仓库访问仅经 `this.reviewOnly.cat/stat/ls/rg`，由 Host 逐次检查当前 Review 窗口，无顶层别名。`where/whereAll` 为纯文本操作，保持顶层；委托及生命周期成员各守权限。生成描述、示例、成员目录与真实 API 同步命名空间，规则遵循 capability-enforcement-025；不因此取得修改或执行权。
 
-## [028] programPromise 暴露与 deadline 可重置
+## [028] 程序结果与业务义务
 
-沙箱启动与结果等待解耦：`runSurface` 返回一个持有 `ProgramPromise`（async IIFE 的未 settle promise）与可变 `DeadlineRef` 的句柄，调用方可跨调用持有该 promise 而不在启动处 await 到底；vm context 由 promise 未 settle 时的闭包链自然持有，不显式提升。异步 deadline 从生成代码内联常量改为 api 闭包捕获的可变引用，`resetDeadline` 可在不重包、不重跑程序的前提下改变后续 api 调用的超时窗口。哨兵识别、错误分类与结果反序列化保持不变。
+普通 return 只结束当前程序；命令退出、程序终结、工具响应结束和业务交付是四种事实。成功返回、自动暂停、显式 park、恢复和放弃均不能绕过 Work、评审、Ask、Ownership 或 deliver 门禁。错误、计算预算耗尽和现场丢失按真实失败或中断报告；暂停不能伪装成终结。已有读观察、文件效果和资源义务随原对象保留，恢复继续原状态，不重新创建运行。
 
-## [029] As-Is 逐笔落盘的失败与成功形态
+## [029] 单次终态结算与真实 effects
 
-每次 `write`（含覆盖既有文件与创建新文件）调用即原子落盘，跨笔不回滚。程序后续失败、终止或挂起（throw、超时、输出超限、返回值非法）时，已落盘的改动保持为事实分界线并如实上报：
+每个程序只结算自己实际发生的效果，终态通过原程序 settle 一次并保留结果；调用重放、重复控制和终态查询不得重复记账或重发效果。结算等待该程序应结清的 SDK、文件观察和账本操作，真实失败沿既有契约报告。成功、失败和放弃均保留已落盘 effects；暂停观察不替代终态结算。控制程序取得目标回执时，目标结果和 effects 保留在目标回执中，不并入控制程序自身 fs 清单，不以外层成功 return 改写目标状态。
 
-- 成功返回 `# ok`，`[fs]` 声明 rewritten/created。
-- 失败返回 `# failed`，根级给 code/reason，并附本次调用已真实落盘的改动清单（`[fs]` 的 rewritten/created）；无已落盘改动时失败不附 fs 节。
-- 写前冲突校验（目标当前内容与写者所见不一致）以 `FILE_CHANGED` 失败，该笔不落盘，此前已落盘的改动保留。
+## [030] park 的真实暂停
 
-「如实上报」的清单只由携带 staging 的程序终局（Done/Failed/Abandoned 的结果渲染）从 staging 派出。parked 载荷本身、unpark 恢复调用与 abandon 调用都不携带 fs 已发生清单：编排层调用只返回继续或放弃的结果，挂起期间已落盘的改动由程序最终结局一次性上报。
+`this.park(payload)` 把当前程序停在原表达式，恢复前不执行后续模型代码；where 歧义沿同一通道，保留 [046] 字面匹配和 UTF-16 span 语义。请求期限耗尽也真实暂停续体，不把 running 对象作为 call 结果。既有 SDK 操作结清、命令退出只保存事实，不能自行解除暂停。回执按名字报告状态、原因和载荷。
 
-## [030] park 与 Parked 结果
+## [031] 未结清现场与业务交付
 
-程序调用 `await this.park(payload)` 后执行结果变为 Parked：顶级 parked 载荷携带非空 handle 与程序传入的 payload；渲染文档以 `# parked` 开头并包含 handle。未调用 park 的程序正常完成（Succeeded，无 handle）。park 是 async 成员，在 await 点挂起程序并让本次调用返回该 parked 载荷；首个 park 赢得竞争，第二次 park 要等第一次恢复后才到达。
+deliver 门禁按所属会话的程序名字及真实状态查询；暂停程序须先恢复或放弃，拒绝与提醒列名字，不要求抄写内部 handle。程序 return、parked 回执和命令 exit 不解除业务义务。会话关闭向程序设施发送关闭消息，复用 abandon 收尾；资源未确认结清不得先删登记或报告完成。提醒沿既有 Pair Hint 路径组织，不回写旧工具结果及已呈现历史字节。
 
-## [031] 泄漏兜底三件套的调用接线
+## [032] 按名字恢复原现场
 
-交付硬门禁接在 deliverSpec 执行链（plan/manager 分派之前）：存在未处理 parked handle 时拒绝交付，拒绝内容列出全部 handle，资源路径 `tool/js-program/parked-deliver-blocked`。每回合提醒经由 PairHint 的 composeMarkerDocument 并入：查询全部未表态 handle，非空时渲染 `tool/js-program/parked-hint` 提醒并追加为 marker 文档指令；无载体回合不走到 composeMarkerDocument，不凭空注入。会话终结在 ClearSession 清理链中强制 reap 该 session 名下全部 parked 现场，durable 记 Reaped。reap 是 fire-and-forget 兜底：abandon 后即从现场表移除现场，不等待 finalizer 展开窗口；已发生写盘的正确性由 as-is 即时落盘保证，不依赖窗口完成。两个资源均为 zh-CN.md/en.md 成对双语文件、占位符集合一致且含 `{{handles}}`。三个调用点只调用 JsParkedSites，不定义现场表类型或 reap 接口本身。
+唯一公开恢复入口是新命名控制程序内的 `this.unpark(name, value?)`。预算只来自控制请求顶层 planB 在准入时确定的期限。恢复直接定位原对象，继续 SDK 排空、原命令等待或显式 park，不重新编译、重建沙箱、扫描工作区或重发操作。只有显式 park（含 where）接收 value，call 取得原命令真实结果。目标及继续唤醒的目标共用控制请求期限；到期仍活动的控制者和目标均暂停。后续恢复控制者只推进其自身、领取已有回执，不隐式再次唤醒目标。终态返回原回执，未知现场明确报告，权限拒绝不消费现场；目标 name/state/effects 不被外层 return 覆盖。
 
-## [032] unpark 恢复
+## [033] 调用重放与迟到消息
 
-内部 `JsToolWorkflow` 的挂起现场可由生命周期恢复通道注入 `{ handle, value }` 继续原程序，完成后得到 Succeeded；挂起点的 await 表达式求值为注入值。未知 handle 报 `HANDLE_UNKNOWN`，恢复后的程序再次 park 返回新的 parked 载荷及 handle。**生命周期动作不是 `todowrite-for-*` 的 Host 工具参数**，该工具面向模型的唯一必填参数仍是 `program`（见 [049]、[064]）。
+登记键为所属会话 + name，一名一次运行。同一物理工具调用重试重放已有回执，不再启动程序；新调用占已有名字报 NAME_TAKEN。调用围栏、暂停和命令代际、恢复关系由程序设施私有维护。重复或迟到 unpark 不消费后来暂停，迟到 signal/send 不误击后续命令，旧窗口不干扰新请求。重启不恢复丢失 JS 栈；只恢复实际持久化归属及已确认终态，丢失现场报告中断或未知，不自动重跑源码。
 
-## [033] handle 恰好消费一次
+## [034] abandon 与确认收尾
 
-一个 handle 只被消费一次：第一次 unpark 恢复程序，第二次对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。abandon 同样消费 handle：abandon 之后对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。对未知 handle 的 abandon 也报 `HANDLE_UNKNOWN`。生命周期通道的非法恢复或权限拒绝都不消费对应 handle；现场仍由拥有者管理。公开 Host schema 的约束另见 [064]。
+`this.abandon(name)` 取消并清理整个程序拥有的执行资源，确认结清后才报告 abandoned；尚未结清、清理失败或强制结束按事实报告。发送信号、删除名字和工具响应结束不是资源终态证据。正常展开时运行原生 finally，其中合法操作遵守既有权限与 as-is 规则；强制结束不假称 finally 已运行。捕获取消不撤销取消，之后 return 不成为成功。排空中、命令中、park 后及会话关闭共用收尾，effects 按 [029] 结算一次。
 
-## [034] abandon 与程序侧 finalizer
+## [035] 放弃期间禁止再次暂停
 
-abandon 以拒绝 parked await 的方式终结程序：原生 try/finally 作为 finalizer 照常运行，finalizer 内的 rm/write 按 as-is 落盘。abandon 清理窗口内 api 仍可照常使用。程序捕获放弃并继续执行时，其返回值被丢弃，结果仍为 Abandoned（Failed，无值）。
+abandoning 后不接受新的 park，显式 park 返回 CANNOT_PARK_WHILE_ABANDONING，不能以新暂停延长现场。原先获授权且正常清理需要的操作继续遵守自身合同，不额外禁止 finally 内合法清理命令。最终以资源是否真实结清为准。
 
-## [035] abandon 清理窗口内禁止再 park
+## [036] 名称登记与会话边界
 
-清理窗口内的 park 被拒绝，程序侧得到 `{ ok: false, code: 'CANNOT_PARK_WHILE_ABANDONING' }` 结果；程序可通过 as-is 写盘记录该拒绝。
+名称登记归 wanxiangli/program 的 Session 所有，不建跨会话全局名字表；不同会话可用相同名字，控制不得越过会话与权限。每个名字保留一次运行的现场、暂停点、输出和终态，完成、失败或放弃后也不释放给新调用覆盖，保留到所属会话清理。旧进程级 parked-site 表与默认八现场上限退出，不以删登记代替资源收尾。
 
-## [036] parked-site 表并发上限
+## [037] parked 载荷、源码与输出事实
 
-parked-site 表有进程级并发上限（默认 8）：上限内 park 成功；超出后下一个 park 以 Failed 与 `CONCURRENCY_LIMIT` 拒绝，无排队。一个现场被 abandon 释放后，新 park 可入。
+parked 回执沿既有 Synthetic TOML 和宿主渲染边界呈现 name、state、原因、完整 source、原 payload 及适用命令状态与新增 delta；排空超时明确命令未启动，不暴露模型操作 handle。可靠定位时以 `>| ` 标记暂停行，其余行 ` | `；不能定位时全部降级 ` | `，不误标、不使暂停失败，完整源码不进入每回合提醒。delta 不消费最终 CallResult；真实退出码、信号和最终输出仍可取得。截断明确且原始输出可取回，信号退出缺失退出码不补成成功。输出文件保留，关闭不夹带自动保留期 GC。
 
-## [037] Parked 载荷渲染
+## [038] 生命周期成员的生成面
 
-parked 结果渲染为顶级 parked 载荷文档：handle 字段、source 字段与程序 payload 的字段平铺进文档顶层，可按 Synthetic TOML 解析。载荷就是程序传入的数据，原样呈现，不是宿主裁决。
+每个基类都有 park(payload)、unpark(name,value?)、abandon(name)，只读角色同样能管理本会话程序，但不扩权或绕过业务门禁；它们不进入能力列表。Exec 投影 call(command)、signal(name,signal)、send(name,input)。预算仅由工具顶层必填 planB 声明，成员不能动态续期。教学采用新命名控制程序、目标名字、共享期限及显式恢复；委派 resume 不是生命周期别名。
 
-`source` 是完整程序源码：挂起行以 `>| ` 前缀标记，其余行以 ` | ` 前缀标记，行号由 vm 栈换算到模型源码坐标。栈无法解析时降级为全部 ` | `，仍携带完整源码，不使 park 失败。source 只进入 parked 载荷，不进入每回合提醒。
+## [039] 状态所有权与两包边界
 
-## [038] park 的编程面投影
-
-park 是生命周期能力：任何 js-* 生成面无条件携带。生成基类含 `async park(payload)`；只读面（如 Manager）同样携带。描述与示例教授 park/unpark/abandon 三态契约。park 不是文件系统权限投影，不进入 members 列表，保持文件系统原语成员序列为 `write, rm, mv, cat, ls, stat, mkdir, whereAll, where`。
-
-## [039] 现场表归属与进程内存活
-
-park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.fs，并发上限 8），唯一归属、不散落：工具编排层 ToolWorkflow 与 session 回收层 PluginSessionScope 共享引用；调用方（ToolRegistry、PairProgrammingThoughtTransform、PluginSessionScope）不重定义表模块。parked 现场携带 session owner，会话终结可据此 reap。parked 程序进程内存活：同进程内后续调用仍见其挂起，handle 可解析；每次 park 得到不同 handle。
-
-挂起现场与工具绑定共享 `TransactionStore` 声明的 `JsAsIsLedger`，恢复时继续使用原程序的账本；现场表不依赖后编译的 `ToolsBindings` 实现，也不以 `obj` 转换绕过账本类型。事务协议先于现场表编译，owner project 与 canonical compile-order 保持一致。
+wanxiangli/program 拥有 Session 名称登记、Run 程序状态、计算预算规则、请求准入期限、恢复关系、私有代际、控制及收尾，以及独立 join 的等待接线。Work、权限、评审、Ownership、Journal 各自拥有业务事实。wanxiangli/runtime 拥有独立进程、隔离、文件与锚点、原子写和版本检查、命令、终端、输入输出、信号、输出外存及物理时钟；不解释 planB、不拥有程序生命周期、不认识角色或 deliver。program → runtime 是明确的单向公开依赖。旧 programming/sandbox/fs/process/pty/spool/time/wait 的真实消费者全部切换，旧入口、owner、计时路径及兼容别名退出；两包不是转发壳，主仓不继续拥有程序状态。
 
 ## [040] rm/mv：Move/Remove 编程面与 as-is 落盘
 
@@ -206,11 +194,9 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 - 每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影；渲染结果报 `removed = [...]` 与 `moved = ["from -> to"]`。
 - 稳定失败码 `DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INVALID_ARGUMENT` 登记在冻结失败目录；EXDEV 依靠 renameSync 原子语义保证源与目标都不残留中间态。
 
-## [041] Lifecycle 审计的生产接线与会话收束
+## [041] Lifecycle 审计与会话收束
 
-Parked/Unparked/Abandoned 的 lifecycle 审计沿生产组装路径接线：PluginHostInterop 从 workspace 的统一 WorkspaceEventStore 同源构造 `IJsLifecyclePersistence`（与 jsTransactionPersistence 共用同一 store），经 ToolRegistry.create 贯通到每个生成的 JsToolSpec；JsToolSpec.execute 调用点传入该 persistence，不留硬编码 None。JsToolWorkflow 在执行链上记录 Parked、Unparked、Abandoned 三类事件。宿主侧 ToolHostSurface 与 WorkflowSurface 同样从各自的 store 构造 lifecycle persistence 并传入调用。
-
-四种 lifecycle 事件类型（Parked、Unparked、Abandoned、Reaped）同住 TransactionStore 的单一审计流（createLifecyclePersistence 与 appendLifecycleEvent）。会话关闭链沿 PluginBoot → PluginRuntimeScope → PluginSessionScope 贯通 jsLifecyclePersistence；ClearSession 先以 JsParkedSites.handlesForSession 枚举现场，reapSession 之后逐 handle 记录 Reaped 审计事件（durable.AppendLifecycleEvent）。ParkedSites 现场表保持进程内存活、不触碰 durable：Reaped 审计归调用方，现场表自身不含 appendLifecycleEvent。
+程序设施产生真实 Parked、Unparked、Abandoned、Reaped 事实，经既有 lifecycle persistence 接统一审计流，不另建业务账本。生产工具及会话关闭均接线，不能以缺省 persistence 冒充持久化。关闭复用收尾，真实资源结清后才报告回收。既有 durable 流名和机器词汇按 [060] 保留，不因名字接口任意改写历史字段。进程内事实与 durable 提交分别报告，审计失败如实记录，不重跑原效果或伪造资源终态。
 
 ## [042] rm/mv 落盘后程序失败的清单形态
 
@@ -238,43 +224,33 @@ rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INV
 
 ## [047] 原语组合与教学资源
 
-原语只提供动词，不提供编辑 DSL：find/replace = `cat → where → 拼接 → write`；批量替换 = 一次 `whereAll` 加反向拼接；append = `cat + write`；锚点切片 = 两次 `where`（第二次带 `from`）；**枚举与内容搜索 = `rg(argv)`**（等价于 `rg --json` 加上这一个 argv，返回 JSON 对象；写法见双语资源 `tool/js-program/recipes`）。`cat`/`ls`/`rg`/`stat`/`write`/`mkdir`/`where`/`whereAll` 与 rm/mv 共享统一路径解析语义（支持跨越工作区访问合法路径，由操作系统文件权限约束）与 as-is 纪律。
+编辑由 cat、字面 where/whereAll、slice 和一次 write 组合，枚举与内容搜索用 rg(argv)，保持既有路径、权限、读版本和 as-is 语义，不改变 [007]–[027] 普通文件及错误合同。header、成员说明、示例、配方、生命周期资源 en/zh-CN 成对且语义一致；先声明必填 name/program/planB，再教授授权原语及名字控制。清除自动名字、单 program 顶层、成员预算、单参 signal/send、handle、编程内 join/dag 和 all-or-nothing 过期教学；保留 WARNING 与精确锚点纪律。
 
-教学资源 `tool/js-program/header` 与 `tool/js-program/park` 双语成对，首先声明 Host 工具唯一必填的 `program`，再介绍主原语、组合模式、where 歧义与内部生命周期契约；`tool/js-program/contract` 不再声称 all-or-nothing 提交，失败经验与 as-is 语义一致。
+## [048] 暂停源码与恢复值分离
 
-## [048] parked source 与 unpark 自由值
+显式 park、where 歧义和请求期限暂停保留原现场；再次暂停更新同一程序的私有代际及 source，不生成模型 handle。source 标记对应模型源码实际暂停点，不把包装器或 eval 位置当模型行号；不能可靠定位按 [037] 降级。unpark(name,value?) 的 value 只交给显式 park/where，不是预算或 call 结果。目标回执、CallResult 和恢复值分别保存，不因恢复控制者重发原恢复动作。
 
-parked 载荷的 `source` 字段携带完整程序与执行点标记（[037]）。直接 `park` 与 `where` 歧义都经同一挂起路径产生 source；恢复后再次 park 产生新的 handle 与新的 source。source 行标记按 vm 栈换算，解析失败时降级而不是失败。
+## [049] 三项必填的工具入口
 
-标记位置由沙箱栈换算到程序脚本行：沙箱以 `new Function` 求值程序，V8 把程序帧渲染为 `at Js.run (eval at <runner> (evalmachine.<anonymous>:226:19), <anonymous>:150:33)`，尾随的 `<anonymous>` 位置才是程序内的行，前缀里的 `evalmachine.<anonymous>` 位置是 runner 自身源码的行、不是程序的行。
+所有公开 todowrite-for-* ToolSpec 参数恰好为必填字符串 name、program、planB，JSON Schema required 仅含这三项。缺项、非字符串、空白 name/program、空字符串 planB 或未知顶层字段在程序启动前拒绝。名字由模型填写，不按 provider-run/tool-call 自动补名。没有顶层 unpark/abandon/handle。program 为 class Js extends JsProgram 与 async run()，说明首先展示三项参数与完整模板，角色不改变输入形状。
 
-只有程序帧参与换算：经 `eval` 求值字符串的帧其尾随位置是该字符串自身的行号，与程序行号可能数值相同，按数值范围判定会误标到无关的程序行上；这类帧不参与，标记落在程序自身的调用点上。栈缺失、栈不可读、栈中无程序帧时降级为整篇 ` | `，不误标、不让 park 失败。
+## [050] call：先排空，再独占本程序
 
-## [049] 生成编程工具的 program 参数是唯一必填参数
+this.call(command) 只接受一条 shell 字符串，先检查参数及权限，再使用入口期限；不接受成员预算。此前已发起 SDK 操作须先结清，不以 PENDING_OPERATIONS 拒绝、不重发、不取消。失败沿原契约，落盘效果保留。排空与命令等待共用剩余时间，排空结束不重新计时；排空超时实际暂停且命令未启动，操作后来结清也不自行启动。同步桥接保证漏 await 或 Promise.all 两个 call 都不能越过首个调用点，不设第二命令隐式队列。期限到不杀命令，park 后退出只保存结果，恢复不重启。最终结果保留真实退出码或信号、完整留存输出、截断、字节数、时长，不被 delta 消费。
 
-所有公开 `todowrite-for-*` Host ToolSpec 的参数列表**恰好**为 `["program"]`，其 schema 是非 optional 的 string；模型提供的 JSON Schema 中 `required` 必须包含 `program`，`{}` 不能通过验证。工具名与角色不同不改变这一点。`name` 由 Host 的实际 provider-run/tool-call 身份推导，`planB`、`unpark`、`abandon` 均不再作为工具参数暴露；挂起恢复属于 JS 程序内的生命周期接口与其私有执行通道，不应要求模型构造第二种顶层工具入参。工具描述最前面必须明确唯一参数、必填性与完整的 JsProgram 类模板。
+## [051] 按名字 signal 与 send
 
-## [050] js.call：一条命令
+this.signal(name,signal)、this.send(name,input) 是与 call 平级的 Exec 成员，从新命名程序作用于目标当前唯一活动命令。没有活动命令（包括 SDK 排空）明确报告，不猜最近进程、不缓存输入给未来命令；send 为缺行尾换行的输入补一个。两者不解除 park，信号发出不代表退出，输入提交不代表处理成功。退出后仍显式恢复领取结果；重复、迟到、跨会话按授权、身份和私有命令代际隔离。
 
-Exec capability 投影 `this.call(command, planB)`。`command` 是一条 shell 字符串。`planB` 必填，是不跑这条命令时的替代方案，UTF-8 字节数 × 50ms 是这次 call 的自动 yield 时限。缺 planB、空字符串、函数或类参数以 `CALL_COMMAND_UNSUPPORTED` 失败。工具参数不带 planB。
+## [052] 准入期限、执行预算与物理时长
 
-成功结局是 `{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }`。`stdout` 与 `stderr` 是上一次自动 park 的 `delta` 之后的新输出。等待就是 `await this.call(command)`。宿主未注入时以 `CALL_HOST_UNAVAILABLE` 失败。
+参数及权限准入时一次计算 budgetMs = UTF8Bytes(planB) * 50、deadline = admissionTime + budgetMs。按 UTF-8 字节，不截短合法预算、不加秘密短上限。所有操作、SDK 排空、命令等待及本次唤醒目标共用该绝对期限；连续 call、unpark 和嵌套控制不能重置、叠加或续期。到期仍活动控制者与目标均暂停，恢复控制者不隐式再恢复目标。新工具请求可以取得新期限，原操作不重跑。执行预算只约束模型计算，等待停表，计算续用余量；命令时长只观察。期限、恢复和代际由 program 唯一拥有，runtime 只物理计量与唤醒，旧回调不影响新窗口。
 
-工具 schema 带 `name`，描述写明每次调用都填。这次调用造成的任何 park 都以这个 name 登记。缺 name、空名字或同名已挂起以 `INVALID_ARGUMENT` 拒绝，程序不执行。
+## [055] SDK 并行与 call 屏障
 
-## [051] signal / send 作用在让本次 park 的那条 call 上
+独立 SDK 操作可用 Promise.all/Promise.allSettled，各自按合同结清，兄弟失败不回滚落地效果。进入 call 后先结清全部既有操作，续体停在调用点，排空消耗入口剩余期限。call 不参与同程序命令并行：漏 await 或 Promise.all 两个 call，第二表达式只能在首个 call 真实结果放行后求值。宿主和其他程序保持响应；同文件竞态靠原子写与 FILE_CHANGED 处理，不靠整程序互斥掩盖。
 
-`this.signal(signal)` 与 `this.send(input)` 各自只收一个参数。谁让这次程序 park，它们就作用在谁身上。那条命令已经结束时是 `CALL_CHILD_UNKNOWN`。`send` 缺行尾换行时补一个。自动 park 的 `delta` 带 `stdout` 与 `stderr`。
-
-## [052] js.call 教学与验证形态
-
-双语资源 `tool/js-program/base-class-exec` 陈述 `this.call(command)`、`this.signal(signal)`、`this.send(input)`。等待是 `call` 返回的 promise。
-
-## [055] vm 并行边界
-
-同一程序内 `Promise.all` / `Promise.allSettled` 直接表达 IO 并行，不需要新原语：vm 单线程事件循环天然把每次 api 调用串行化，宿主不加锁、不排队、不互斥。独立分支的效果各自 as-is 落盘；一个分支失败不清除兄弟分支已落地的改动。同一文件的写竞态由程序作者自负（Unix 哲学），宿主只保单笔写原子与写前校验。
-
-## [056] 委托原语：fork / resume / commission / devops / dag / join / fission / horizon / advisor
+## [056] 委托原语：fork / resume / commission / devops / fission / horizon / advisor
 
 **所有 js.* 成员的返回值都是数据，绝不返回渲染后的 prose**（宿主在工具结果与 parked 载荷边界统一把值渲染给模型）。委托成员统一用信封：
 
@@ -286,17 +262,16 @@ Exec capability 投影 `this.call(command, planB)`。`command` 是一条 shell �
 - `resume(payload)`：续做既有道路，`payload` 必带 `name` 并携带本次 `charge`；复用该 participant 的完整历史与 binding，不重选绑定；目标正忙时 charge 作为忙碌提示追加到既有工作，不新建任务（`outcome` 为 `nudged`）。传 `calling` 一律拒绝。拒绝码：`name-required`/`charge-required`/`calling-not-allowed`/`warm-start-unavailable`/`context-unavailable`/`assessment-pending-for-devops`/`dispatch-closed`/`placement-failed`/`dispatch-uncertain`。
 - `commission(payload)`：委任既有角色的道路，`payload` 与 fork 同形（`{ charge, name?, calling? }`）；`calling` 省略时按角色推导，显式给出与推导不一致即拒绝。成功返回 `{ ok, name, agentId, outcome }`。拒绝码：`name-required`/`charge-required`/`unknown-calling`/`name-already-belongs`/`context-unavailable`/`placement-failed`/`dispatch-uncertain`。
 - `devops(intent)`：请求本调用 session 绑定的固定 DevOps 席位做一次工作；`intent` 是本次交给 DevOps 的意图文本（不像 fork/resume 那样承载 charge）。返回 `{ ok, kind, status, returned: [{ text }] }`；材料条目最终随结果统一渲染为 TOML。DevOps 绑定未就绪或已关闭时以 `assessment-pending-for-devops` 拒绝。
-- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, returned: [{ text }] }] }`，不重复输出 `byName` 索引；子智能体（Engineer/DevOps）以无未决调用的自然停机作为 proven terminal，其末轮 assistant 散文随 join 记录以 `# ...` 注释交回，`returned` 不再承载子智能体的完整视图；`status ∈ completed | failed | abandoned | voided`。执行已不可能（abort、cancel 或重启加载结算）的成员以 `voided` 进入 join 记录，`returned` 为空数组：作废结清该成员的未解除义务，join 关闭，报告一次后该成员退役。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
+- 独立宿主工具 `join()`（无参数，无 name/program/planB，不创建临时 JS 程序）：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, returned: [{ text }] }] }`，不重复输出 `byName` 索引；子智能体（Engineer/DevOps）以无未决调用的自然停机作为 proven terminal，其末轮 assistant 散文随 join 记录以 `# ...` 注释交回，`returned` 不再承载子智能体的完整视图；`status ∈ completed | failed | abandoned | voided`。执行已不可能（abort、cancel 或重启加载结算）的成员以 `voided` 进入 join 记录，`returned` 为空数组：作废结清该成员的未解除义务，join 关闭，报告一次后该成员退役。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
 - `fission({ charge, lanes })`：同身份多 lane 的任务分片执行（宿主负责 lane 绑定与收拢），返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组 lane。拒绝码：`fission-unavailable`/`lane-start-failed`/`not-ready`/`context-unavailable`/`invalid-prompt`。
-- `dag(spec)`：`spec` 是 `{ nodes: [{ id, charge, deps?, lanes? }] }`；纯声明糖，由基类编译成波次 `fork` + 一次 `join`；只在 Fork 与 Join 同时投影时才生成（缺 Join 就没有可编译进去的 join，成员列表里也不出现没有方法体的 `dag`）；全量 post-scope 背景发给所有节点；下游节点的 prompt 带上依赖记录。成功返回 `{ ok, results: { [id]: record }, skipped: [id...] }`。**节点失败 → `park`**（与 `where` 同一条恢复通道），payload 为 `{ dag, node, code, deps, done, pending }`；注入值语义：`"retry"` 重跑、`"skip"` 跳过（下游看到 null）、其他值直接作为该节点结果、`{ abort: reason }` 使程序失败。
 - `horizon()`：返回在场名册的数据信封 `{ ok, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`；`status ∈ returned | still-away | did-not-return | voided`（`voided` 表示该成员已无法交付、已以作废结清而非完成，在 join 报告一次之前它仍显示为 `voided`），`workState ∈ latest | none | unavailable`，`record` 是最新帧正文原文（无则为 `""`）；四个校准数 `turnsUsed`/`turnsLeft`/`timeUsedMs`/`timeLeftMs` 只在委任者 estimate 与子会话起点两者都可读时给出，否则全为 `0`，不猜测。拒绝码：`horizon-unavailable`。
 - `advisor(intent)`：请求本调用 session 自己的顾问专席；intent 散文作为 `# ...` 注释头，连同调用方当前完整的 post-scope 视图（TOML `[[context]]` 表）作为单一请求文档投递给顾问。返回数据信封 `{ ok: true, advice }` 或 `{ ok: false, code: "advisor-unavailable", reason }`，其中 `advice` 为顾问自然停机时的末轮 assistant 散文。每次 consult 均把调用方当前最新 post-scope 视图作为背景送出。拒绝码：`advisor-unavailable`。
 
-派遣成员 `fork`、`resume`、`commission`、`devops`、`dag`、`advisor` 均不携带任何背景数组参数。任务只由 `charge` 或 `intent` 表达一次，背景材料由发送方当前的完整 post-scope 消息视图承载并在最终边界统一渲染为 TOML。
+派遣成员 `fork`、`resume`、`commission`、`devops`、`advisor` 均不携带任何背景数组参数。任务只由 `charge` 或 `intent` 表达一次，背景材料由发送方当前的完整 post-scope 消息视图承载并在最终边界统一渲染为 TOML。
 
 实现边界：delegation shard 提供结构化入口（`ForkTool.executeReceipt`/`JoinTool.executeReceipt`/`FissionTool.executeReceipt`，返回数据与上述稳定码；宿主 `join`/`horizon`/`fission` 工具的 prose 输出保持不变，`fork`/`resume`/`commission`/`devops` 已无宿主工具注册，一律经编程面成员调用）；接线层在每次编程调用期间安装进程内委托宿主驱动这些入口，调用结束清除；未安装宿主时成员以 `{ ok:false, code:"DELEGATION_UNAVAILABLE" }` 拒绝，不静默降级。
 
-委托面按能力投影：Manager 持有 Fork/Resume/Join/Horizon/Advisor 权限，因而获得 `fork`/`dag`/`resume`/`join`/`horizon`/`advisor` 成员；Plan 的 DevOpsConsultation 权限投影出 `devops` 成员；Orchestrator 没有文件权限，其 Fork 权限投影为 `commission`（同一委派执行入口），因而是纯委派编程面。`hasFsCapability`/`jsToolSpec.admissionFor` 同步把 Fork/Resume/DevOps/Join/Fission 计入编程面授权，四层一致。
+委托面按能力投影：Manager 持有 Fork/Resume/Join/Horizon/Advisor 权限，因而获得 `fork`/`resume`/`horizon`/`advisor` 成员，以及独立 `join()` 工具；Plan 的 DevOpsConsultation 权限投影出 `devops` 成员；Orchestrator 没有文件权限，其 Fork 权限投影为 `commission`（同一委派执行入口），因而是纯委派编程面。`hasFsCapability`/`jsToolSpec.admissionFor` 同步把 Fork/Resume/DevOps/Fission 计入编程面授权，Join 只授权独立工具，四层一致。
 
 ## [057] ls 的 ignore 语义与搜索面
 
@@ -304,24 +279,21 @@ Exec capability 投影 `this.call(command, planB)`。`command` 是一条 shell �
 
 旧 `glob` js 成员已退役。旧 `grep(needle, pattern)` 成员已退役，其能力现在只投影 `rg(argv)`。旧 `file`/`edit`/`rewrite` 成员仍从仓库生成编程面退役（包括 Plan；Plan 的文件参数受 `PLAN_PATH` 闸门限制）。
 
-## [058] 交互成员与唯一执行面
+编程内 join/dag 全部删除。模型显式安排程序派工、独立 join() 收拢、下一命名程序。join 的现有资格、批次、结果身份去重、终态及拒绝码不变；用户输入、取消或宿主中断可结束本次等待，不顺手取消子工作，不以隐藏轮询或超时伪造完成。
 
-Host 原生 `run` 与 pty 工具已退役。交互是 `this.send(input)` 与 `this.signal(signal)`。自动 park 载荷带 `delta: { stdout, stderr }`，相对上一次增量。`call` 收一条命令字符串。
+## [058] 交互与唯一命令执行面
+
+Host 原生 run 与 pty 工具继续退役。命令走 call(command)，交互走 send(name,input)、signal(name,signal)，恢复和放弃走 unpark(name,value?)、abandon(name)。控制由新命名程序及顶层 planB 准入，成员不能创建预算；无独立恢复工具、顶层恢复参数或命令 handle。delta 不消费最终结果；控制效果、命令退出不自行恢复续体，未知效果不变成重发许可。
 
 ## [060] "js" 机器词汇的终局
 
 模型视野之外的名字一律保留 `js` 前缀，不做改名：durable 流名（`js-tools/transactions`、`js-tools/lifecycle-audit`）、资源目录（`js-program`、`js-plan`、`js-bookkeeper`）、`RuntimeBindingKey`（`js.cat`、`js.where`、`js.park` …）与包装器内部哨兵（`__jsParked`/`__jsAbandoned`/`__jsFailure`）。理由：这些名字是 durable 身份与机器对机器契约（流名改名等于数据迁移，哨兵改名等于重放保真风险），而模型看到的是 `todowrite-for-ROLE` 工具名与成员名——模型面与机器面本就应当分离。此裁决与第 28 轮改名（门面级命名即教学）不冲突：改的是模型面，不动机器面。
 
-## [064] 单一 Host 编程入参：必填 program
+## [064] 实际 schema 与唯一公开生命周期路径
 
-模型调用 `todowrite-for-ROLE` 时只能使用 `{ program: string }`，不得发送 `{}`，也不得提供 `name`、`planB`、`unpark`、`abandon` 顶层字段。真实注册的 Zod 单字段 schema 以及经过 JSON Schema 转换后的 `required = ["program"]` 都必须符合该约束。代码字符串里恰好定义一个 `class Js extends JsProgram` 并实现 `async run()`；不应让工具说明的长篇工作纪律抢在调用格式之前。
+实际注册的 ToolSpec 及其 JSON Schema 转换结果严格为必填 { name:string, program:string, planB:string }，不能仅靠描述证明。绕过 schema 直调执行器也在启动前同样校验，无效输入没有程序或命令效果。源码为 class Js extends JsProgram 与 async run()。公开恢复/放弃只经成员；会话关闭复用内部收尾，不成为第二公开入口。真实宿主测试检查注册后工具与直接执行器。
 
-即使绕开模型 schema 直接调用执行器，缺少 `program` 也必须以稳定的 `missing 'program' argument` 拒绝且无效果。原有 `ToolWorkflow` park 现场及回执仍是内部能力，不可再让 Host 工具对模型暴露三态入口；测试以真实注册 ToolSpec 检查，不能只检查一个文本片段。
+## [065] 宿主并行派发与调用身份
 
-## [065] 宿主对同一助理消息内多个工具调用的确定性串行派发
-
-同一助理消息（同一个 provider run）包含多个工具调用时，宿主按确定顺序逐个执行，各为独立事务，后者读取前者提交后的状态。两个并发派发的工具调用不交错执行文件读写，不触发并发冲突；同文件修改顺序叠加，不丢更新。
-
-此条款验证的是宿主层真实调度承诺，区别于 [017] 单纯的连续事务快照隔离。
-
+同一助理消息或 provider run 的不同命名程序可并行执行，旧 todowrite 整段串行临界区不得让等待阻塞其他程序、控制或独立 join。保留准入、物理调用围栏、同次重放与单笔提交的确定性；新调用同名拒绝，同次重试重放回执，不重复副作用。后发程序不承诺读到未发生的写，同文件并发按原子写和 FILE_CHANGED 处理，不丢弃冲突或隐式重跑。窗口只约束实际参与程序，不是会话或全局锁。
 

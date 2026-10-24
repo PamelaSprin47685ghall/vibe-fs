@@ -1,60 +1,24 @@
 import test from 'node:test'
 
 {
-// Host-native `run` tool is retired; `this.call` supersedes it (repository-programming [050]-[052]).
-const { default: assert } = await import('node:assert/strict')
-const { default: test } = await import('node:test')
-const { sandbox, runProgram, caseName, parseData } = await import('./support/executor.mjs')
-
-test('WHAT[process-execution-010] this.call completed command reports exit code and streams via onExit and outcome', async () => {
-  const { dir, cleanup } = sandbox('wxs-proc-010a-')
-  try {
-    const outcome = await runProgram(
-      dir,
-      `    let exitedWith = null;
-    const result = await this.call(class extends this.Callable {
-      maxDuration = 5000;
-      interval = 50;
-      next(ctx) { return ctx.step === 0 ? "printf 'hello-stdout'; printf 'hello-stderr' >&2" : null; }
-      check() { return true; }
-      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
-      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
-      onExit(r) { exitedWith = { exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr }; }
-    });
-    return { exitCode: result.exitCode, onExitStdout: exitedWith.stdout, onExitStderr: exitedWith.stderr };`,
-    )
-    assert.equal(caseName(outcome), 'Succeeded')
-    const parsed = parseData(outcome)
-    assert.equal(parsed.exitCode, 0)
-    assert.equal(parsed.onExitStdout, 'hello-stdout')
-    assert.equal(parsed.onExitStderr, 'hello-stderr')
-  } finally {
-    cleanup()
-  }
-})
-
-test('WHAT[process-execution-010] this.call nonzero exit is reported as data rather than thrown', async () => {
-  const { dir, cleanup } = sandbox('wxs-proc-010b-')
-  try {
-    const outcome = await runProgram(
-      dir,
-      `    return await this.call(class extends this.Callable {
-      maxDuration = 5000;
-      interval = 50;
-      next(ctx) { return ctx.step === 0 ? "exit 3" : null; }
-      check() { return true; }
-      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0 && ctx.exitCode !== 3) return { abort: "command failed" }; return true; }
-      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
-    });`,
-    )
-    assert.equal(caseName(outcome), 'Succeeded')
-    const parsed = parseData(outcome)
-    assert.equal(parsed.status, 'completed')
-    assert.equal(parsed.exitCode, 3)
-  } finally {
-    cleanup()
-  }
-})
+  const {default:assert}=await import('node:assert/strict')
+  const {sandbox,runProgram,caseName,parseData}=await import('./support/executor.mjs')
+  test('WHAT[process-execution-010] a completed call reports separate raw streams and actual exit code',async()=>{
+    const {dir,cleanup}=sandbox('wxs-proc010-')
+    try {
+      const outcome=await runProgram(dir,"return await this.call(\"printf 'hello-stdout'; printf 'hello-stderr' >&2\");")
+      assert.equal(caseName(outcome),'Succeeded')
+      const result=parseData(outcome)
+      assert.equal(result.exitCode,0);assert.equal(result.stdout,'hello-stdout');assert.equal(result.stderr,'hello-stderr')
+    } finally { cleanup() }
+  })
+  test('WHAT[process-execution-010] nonzero shell exit remains command data',async()=>{
+    const {dir,cleanup}=sandbox('wxs-proc010-nonzero-')
+    try {
+      const result=await runProgram(dir,'return await this.call("exit 3");')
+      assert.equal(caseName(result),'Succeeded');assert.equal(parseData(result).exitCode,3)
+    } finally { cleanup() }
+  })
 }
 
 {
@@ -128,10 +92,10 @@ const {
   run,
 } = await import('../../../dist/Process/Surface.js')
 
-test('WHAT[process-execution-010] CUT_02_non_pty_host_wires_wanxiangli_process_session_and_retires_direct_child_process_spawn', async () => {
+test('WHAT[process-execution-010] CUT_02_non_pty_host_wires_runtime_process_session_and_retires_direct_child_process_spawn', async () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const hostSrc = readFileSync(join(root, 'src/Wanxiangshu/Process/NodeProcessHost.fs'), 'utf8')
-  assert.match(hostSrc, /Import\("ProcessSession",\s*"wanxiangli\/process"\)/)
+  assert.match(hostSrc, /Import\("ProcessSession",\s*"wanxiangli\/runtime"\)/)
   assert.doesNotMatch(hostSrc, /node:child_process/)
 
   const outcome = await run(

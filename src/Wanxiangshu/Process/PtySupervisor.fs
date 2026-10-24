@@ -73,9 +73,9 @@ module PtySupervisor =
         | PtySignal.User1 -> "SIGUSR1"
         | PtySignal.User2 -> "SIGUSR2"
 
-    /// The physical terminal is wanxiangli/pty: real tty, first-byte reads, process-group
+    /// The physical terminal is wanxiangli/runtime: real tty, first-byte reads, process-group
     /// signals and close-with-sweep. This module only routes commands and results.
-    [<Import("Terminal", "wanxiangli/pty")>]
+    [<Import("Terminal", "wanxiangli/runtime")>]
     let private terminalApi: obj = jsNative
 
     [<Emit("$0.open($1)")>]
@@ -97,7 +97,7 @@ module PtySupervisor =
 
     let private errorText (result: obj) : string = string result?error?message
 
-    /// Library signal names (TERM, KILL, ...) for wanxiangli/pty.
+    /// Library signal names (TERM, KILL, ...) for wanxiangli/runtime.
     let private terminalSignal (signal: PtySignal) : string =
         match signal with
         | PtySignal.Terminate -> PtySignal.TermName
@@ -220,7 +220,7 @@ module PtySupervisor =
             port.ReadResult(id, string result?output, unbox<bool> result?closed)
 
     let private readBackend (port: PtyPort) (id: PtyId) (session: PtySession) =
-        // PTY-READ-FIRST-BYTE: wanxiangli/pty answers a read on an empty open terminal with the
+        // PTY-READ-FIRST-BYTE: wanxiangli/runtime answers a read on an empty open terminal with the
         // first byte that arrives, or "" after this bound; the answer reaches the parked port read.
         whenDone (readTerminal session.Backend PtyReadFirstByteMs) (deliverRead port id)
         Task.FromResult(Ok())

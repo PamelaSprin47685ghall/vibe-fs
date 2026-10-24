@@ -30,6 +30,7 @@ type JsTransactionAppendFailure =
 type JsFailure =
     | InvalidProgram
     | ProgramFailed of string
+    | RuntimeFailure of code: string * reason: string
     | ProgramTimeout
     | ProgramResourceLimit
     | PermissionDenied of string
@@ -104,6 +105,7 @@ module JsFailure =
         match failure with
         | JsFailure.InvalidProgram -> "INVALID_PROGRAM"
         | JsFailure.ProgramFailed _ -> "PROGRAM_FAILED"
+        | JsFailure.RuntimeFailure(code, _) -> code
         | JsFailure.ProgramTimeout -> "PROGRAM_TIMEOUT"
         | JsFailure.ProgramResourceLimit -> "PROGRAM_RESOURCE_LIMIT"
         | JsFailure.PermissionDenied _ -> "PERMISSION_DENIED"
@@ -166,6 +168,7 @@ module JsFailure =
         match failure with
         | JsFailure.InvalidProgram -> "program source is invalid JavaScript"
         | JsFailure.ProgramFailed message -> reasonWithMessage "program threw" "program threw: " message
+        | JsFailure.RuntimeFailure(_, reason) -> reason
         | JsFailure.ProgramTimeout -> "program exceeded its deadline"
         | JsFailure.ProgramResourceLimit -> "program exceeded a resource bound"
         | JsFailure.PermissionDenied capability -> "capability not present in this attempt: " + capability
@@ -210,7 +213,7 @@ module JsFailure =
         | JsFailure.ConcurrencyLimit -> "parked-site concurrency limit reached; no queue is formed"
         | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
         | JsFailure.CannotParkWhileAbandoning -> "park is refused while the site is in its abandon cleanup window"
-        | JsFailure.Abandoned -> "the parked program was abandoned; its finalizer has run"
+        | JsFailure.Abandoned -> "the program was abandoned; consult its cleanup receipt"
         | JsFailure.CallableSpecIncomplete detail -> reasonWithMessage "Runnable spec is incomplete" "" detail
         | JsFailure.CallCommandUnsupported detail ->
             reasonWithMessage "next() returned an unsupported command" "" detail
@@ -219,7 +222,7 @@ module JsFailure =
         | JsFailure.CallParkUnsupported -> "park verdict requires the orchestrated execution path"
         | JsFailure.CallHostUnavailable -> "this.call has no host loop in this execution path"
         | JsFailure.AskRefused detail -> reasonWithMessage "ask was refused" "" detail
-        | JsFailure.DelegationUnavailable -> "fork/join is not wired in this execution path"
+        | JsFailure.DelegationUnavailable -> "delegation is not wired in this execution path"
         | JsFailure.DeliveryNotEstablished detail ->
             reasonWithMessage "delivery was not established" "delivery was not established: " detail
 
@@ -294,4 +297,4 @@ module JsFailure =
         | "ASK_REFUSED" -> JsFailure.AskRefused text
         | "DELEGATION_UNAVAILABLE" -> JsFailure.DelegationUnavailable
         | "DELIVERY_NOT_ESTABLISHED" -> JsFailure.DeliveryNotEstablished(after "delivery was not established: ")
-        | _ -> JsFailure.ProgramFailed text
+        | _ -> JsFailure.RuntimeFailure(code, text)

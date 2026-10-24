@@ -1,316 +1,167 @@
-# todowrite：命名程序、单 call 与两包 clean-break
+# todowrite：命名程序、顶层 planB 与 program/runtime clean-break
 
-> 状态：**已批准，待实现**。
-> 日期：2026-10-24。
-> 批准依据：本轮对话第三稿，加上使用者最后的修正——进入 `call` 时，先等待本程序此前发起的 SDK 操作结清，**不要因它们尚未结清而拒绝**。
-> 本次只写提案和入口索引；不修改实现、公开 schema、正式 WHAT、依赖或测试。本文的验收项均待施工，不是通过记录。
+> 日期：2026-10-24。状态：实现与范围内验收已完成；精确版本与未通过项见第 10 节。
+> 本文记录已批准方案及实施期间的修订：planB 从程序成员移到工具顶层；一次请求只建立一个期限，约束其全部 call、unpark 和恢复目标。
+> 构建、测试、干净安装、提交与运行部署分别记账，不互相代替。
 
-## 1. 范围与依据
+## 1. 公开入口
 
-本提案把 `todowrite-for-ROLE` 的执行、等待、暂停与恢复收成两份完整设施：`wanxiangli/program`（程序设施）与 `wanxiangli/runtime`（物理设施）。名字是模型使用的程序身份，每个命名程序有独立执行进程；同一程序一次只执行一个 `call`，宿主及其他程序保持响应。
-
-设计依据是使用者已批准的第三稿，以及仓库上一级的 [经验教训.md](../../经验教训.md) 第 3–6 节（等待预算、唯一计时所有者、恢复的内外层等待）、第 2、7–10 节（进行中观测、直接查找、真实协议与构建验证）。这份经验文件位于仓库之外；本文只引用有关经验，不把 LocalSpace 的具体部署参数或默认值复制为本仓的新合同。
-
-继续遵守根 [AGENTS.md](../AGENTS.md)、[wanxiangli/AGENTS.md](../wanxiangli/AGENTS.md) 和 [wanxiangli/src/AGENTS.md](../wanxiangli/src/AGENTS.md)：状态与行为归自治对象，真实物理能力独立成立，合作由明确组合者组织；不建设通用 Actor 运行时，不保留双重权威或兼容转发壳。
-
-实施时须同步修订 [repository-programming/WHAT.md](../requirements/repository-programming/WHAT.md) 的旧入口、call、交互、并行、生命周期和 DAG 条款，并核对 [work/WHAT.md](../requirements/work/WHAT.md) 的既有工作约束。本文记录已批准的新契约，不宣称当前实现已经遵守，也不充当另一张全仓迁移看板。
-
-### 1.1 最后修正：等结清，不拒绝
-
-> 使用者：进入 `call` 时，如果本程序此前发起的 SDK 操作尚未结清，就停等，不要拒绝。
-
-第三稿中“尚未结清就拒绝启动，报告未结清操作”的规定被本节替换。等待既有 SDK 操作结清是 `call` 的正常进入阶段，不是错误，不要求模型补一次 await 后重新发起命令，也不允许用 `PENDING_OPERATIONS` 把这类合法调用拒之门外。
-
-其余已批准裁决保持不变：`call` 和 `unpark` 都必须带 `planB`；长度决定本次等待时间；超时就 park；`signal/send` 是平级成员；`join()` 独立且无参数；`this.dag` 整个删除；只保留程序设施与物理设施两个相关包。
-
-## 2. 模型可见入口
-
-### 2.1 工具参数
+`todowrite-for-ROLE` 恰好接收三个必填字符串：
 
 ```ts
 {
   name: string;
   program: string;
+  planB: string;
 }
 ```
 
-`todowrite-for-ROLE` 的顶层参数恰好为必填的 `name`、`program`。名字必须由模型填写，不由宿主悄悄生成。缺项、空白或非法形状在启动程序前拒绝。顶层没有 `planB`、`unpark`、`abandon` 或 handle。
+name 与 program 不得为空白，planB 不得为空字符串。模型为每个新运行明确取名；宿主不按物理调用身份偷偷生成名字。程序保持 `class Js extends JsProgram` 和 `async run()`。旧顶层 unpark、abandon、handle、prefixUntil、carry 不构成另一条兼容入口。
 
-保留程序形式 `class Js extends JsProgram` 与 `async run()`，不夹带另一套源码语法。普通 `return` 只结束该命名程序，不代替业务 `deliver`。
-
-### 2.2 成员合同
-
-下表是接口设计，不是已经发布的类型声明。
-
-| 成员 | 含义 |
+| 成员 | 合同 |
 | --- | --- |
-| `this.call(command, planB)` | 先停等既有 SDK 操作，再启动一条命令；阻塞本程序，窗口到期则 park。 |
-| `this.park(payload)` | 显式暂停本程序，等待恢复值。 |
-| `this.unpark(name, planB, value?)` | 用新的等待预算恢复指定程序；恢复值仅属于显式 park。 |
-| `this.abandon(name)` | 放弃指定程序，进入统一收尾流程。 |
-| `this.signal(name, signal)` | 向指定程序当前唯一的命令发送信号，不恢复程序代码。 |
-| `this.send(name, input)` | 向指定程序当前唯一的命令写入输入，不恢复程序代码。 |
+| `this.call(command)` | 排空此前 SDK 操作，然后启动一条 shell 命令，阻塞所属程序。 |
+| `this.park(payload)` | 显式暂停，恢复值成为该表达式的结果。 |
+| `this.unpark(name, value?)` | 恢复同会话内的原程序，或返回其保留终态。 |
+| `this.abandon(name)` | 请求取消并确认资源收尾，不是删除登记。 |
+| `this.signal(name, signal)` | 控制目标当前唯一命令，不恢复程序。 |
+| `this.send(name, input)` | 向目标当前唯一命令提交一行输入，不恢复程序。 |
 
-`signal`、`send` 和 `call` 平级，不改成命令对象方法或独立工具。目标直接用程序 `name`，没有第二个模型可见的命令选择器。
+call 只能传一个参数；unpark 最多两个，第二个仅是显式 park 的恢复值。成员不能接收或创造预算。`const planB = 'x'.repeat(48000)` 只是程序局部变量；将它作为 call 的第二参数或 unpark 的第三参数会在副作用前被拒绝。
 
-文件读取、锚点定位、文件变更、委派、评审等继续按角色能力投影；Plan 的写前评审、Ask 的既有业务准入、Manager 的 reviewOnly 等不因本次重构扩大权限。`this.resume(payload)` 仍表示续做受委托道路，不是程序恢复的别名。
+文件、委派、评审与其他成员仍按唯一角色能力来源投影。Manager reviewOnly、Plan 写前评审和 PLAN_PATH、Ask 的既有业务准入保持。委派 `resume(payload)` 不等于程序恢复；普通 return 不等于业务 deliver。
 
-独立工作收拢工具的合同是 **`join()`，无参数**。删除 `this.join`、整个 `this.dag` 及其说明、示例、别名和隐藏实现。
+## 2. 一次准入，一条绝对期限
 
-## 3. 名字与运行归属
-
-名称登记以“所属会话 + name”为键，归程序设施的 Session 所有，不建跨所有会话的全局名字表。每个名字对应一次运行，包括它的执行现场、暂停点、输出及终态；终态回执保留到所属会话清理。另一次运行用新名字，不覆盖旧现场。
-
-同一次宿主工具调用重试，重放已有回执，不再启动程序。另一条新调用占用已有名字，报告 `NAME_TAKEN`。恢复按名字直接找到现有对象，不重新编译程序、重建沙箱、扫描工作区或启动原命令。
-
-调用围栏、暂停代际、命令代际仍可私有存在，以处理重复及迟到消息；它们不暴露为模型需要抄写的 handle。一条迟到 unpark 只能处理它曾观察到的暂停点，不能消费程序后来发生的另一次 park。迟到 signal/send 也不能误击同名程序后来启动的下一条命令。
-
-进程重启后不得假装恢复了 JS 栈。名字归属与已确认终态可按实际持久化能力恢复；丢失的执行现场明确报告中断或未知，不按名字自动重跑可能已经产生效果的源码。
-
-## 4. call：先排空既有 SDK 操作，再独占本程序
-
-### 4.1 进入顺序
-
-`command` 是一条 shell 字符串；`planB` 是必填的非空字符串。先完成参数及权限检查，再建立该次 call 的等待阶段。
-
-进入等待阶段后，程序停在原调用点，不执行后续模型代码。程序设施记住此前已经发起、尚未结清的 SDK 操作；物理设施和这些操作的既有 owner 继续接收完成或失败结果。**等待它们结清，不拒绝、不重发、不取消它们。**
-
-既有操作结清后，才允许启动该 call 的命令。不能在排空期间先跑命令，也不能让被阻塞的模型代码继续制造另一批操作。结清是各操作自身得到真实终态，不要求模型从另一个程序替它补 await。
-
-SDK 操作的真实失败沿既有错误契约呈现，不吞掉、不伪造成成功；“仍在途”本身不是失败。此前已落盘的效果仍按 as-is 保留。
-
-### 4.2 排空等待也受 planB 约束
-
-`planB` 表达这次工具请求愿意等待多久，因此停等既有 SDK 操作也属于本次等待，不能成为没有窗口保护的空档。该阶段与后面的命令等待使用同一个窗口，不在排空完成时悄悄重新计满一份预算。
-
-如果排空尚未完成而窗口先到期，程序 park，回执明确“命令尚未启动，正在等待既有 SDK 操作结清”。既有操作可以继续结清，但程序代码不前进，也不能在 park 后自动启动命令。后续 `this.unpark` 在原现场接着等待；若操作已经结清，才继续原来的命令启动步骤。
-
-“先结清、再执行”和“超时就 park”共同适用于这一阶段。不得以恢复之名把原 SDK 操作或原命令执行两次。
-
-### 4.3 不依赖 await 的单 call 保证
-
-```js
-class Js extends JsProgram {
-  async run() {
-    const result = await this.call(
-      "node scripts/build.mjs",
-      "若构建仍未结束，就保留原命令与程序现场，交回已有输出，之后继续等待。"
-    );
-    return result;
-  }
-}
-```
-
-即使漏写 `await`，或把两个 call 放进 `Promise.all`，也不能同时启动两条命令。求第一个 call 表达式时，程序的独立执行单元已经停在该调用点，第二个表达式尚未执行。禁止以一个普通 Promise 加“请记得 await”的文字代替此保证。
-
-命令并行通过两个不同名字的程序表达，不建立“第二个 call”的隐式后台队列，也不返回供程序绕过阻塞继续使用的后台命令对象。call 内 shell 自己组织子任务，不靠解析命令文本审查；单 call 约束针对本编程接口实际启动和管理的调用。
-
-### 4.4 独立执行进程
-
-每个命名程序有独立执行进程。阻塞式 call 桥接只停住这个执行单元；宿主通过异步通信继续处理输出、其他程序和控制请求。命令输出的排空与请求窗口的计时不能依赖被阻塞的程序事件循环。
-
-独立进程不等于扩权。模型代码仍只能使用角色投影出的接口，不能借新进程直接得到宿主对象或绕过原来的文件和执行权限。
-
-不能用全局锁或整段 todowrite 等待期的长锁，把其他程序也排在同一个 call 后面。当前按 provider run 串行派发整个 todowrite 的临界区须随切换重新裁定：保留必要的单笔原子性和身份顺序，不把命令等待扩大为全局停机。同文件冲突仍按真实原子写和读版本校验处理，不承诺任意并发改写都安全。
-
-## 5. 三种时间与唯一窗口所有者
-
-等待预算保持：
+工具完成参数及权限准入时一次计算：
 
 ```text
-budgetMs = UTF8Bytes(planB) * 50
+budgetMs = UTF8Bytes(planB) × 50
+deadline = admissionTime + budgetMs
 ```
 
-每 20 字节对应 1 秒；按 UTF-8 字节，不按字符。不能截短合法预算、另加秘密短上限，不能把 planB 当待执行脚本。
+按 UTF-8 字节数计价，每 20 字节为 1 秒。planB 是工具参数中的文字，不作为代码执行。wanxiangli 不截短合法预算，不另加隐藏短上限。
 
-| 计量 | call 的停等／命令等待期间 |
+本次所有操作、SDK 排空、连续命令及 unpark 唤醒的目标共享同一个 RequestWindow。目标继续唤醒其他目标时仍使用该窗口。任何 call、命令退出或嵌套恢复都不能刷新、叠加或延长期限。
+
+| 计量 | 等待期间的行为 |
 | --- | --- |
-| 本程序的执行预算 | 暂停扣减；回到模型代码计算时从剩余额度继续，不重置一份新预算。 |
-| 本次工具请求等待窗口 | 持续计时，包括排空既有 SDK 操作；到期必须返回 parked。 |
-| 命令已运行多久 | 可观测，但不是隐含命令寿命；planB 到期不杀命令。 |
+| 程序计算预算 | 等待时停表，恢复计算后使用剩余量，不重新发满。 |
+| 请求期限 | 持续推进；到期暂停活动程序并返回真实暂停回执。 |
+| 命令运行时长 | 可观察；不是由 planB 暗中设定的命令寿命。 |
 
-不能保留一条跨越整个 call 的旧 VM wall-clock timeout，一边宣称停表，一边在等待中耗尽预算。纯 JS 计算的执行保护与请求窗口分别负责不同后果；前者的故障局限于该程序，后者只决定本次等待何时交回。
+底层 ProcessSession 的显式物理有界执行合同继续存在。它的运行硬顶与模型请求期限不同，不能因迁移而取消。
 
-响应窗口的规则与代际归程序设施，物理设施只提供时钟与唤醒。call、unpark、命令退出监听器不再各自决定工具何时返回。完成、显式 park、失败、取消撤销或转换当前窗口；旧回调只能作用于自己的请求代际。
+## 3. call：先等真实结清，再启动唯一命令
 
-唯一所有者不是全系统唯一一只钟。不同工具请求可以独立等待，但一个等待关系不能由几套互不知情的计时器竞争；不得因为 call 正在执行就不安装请求窗口。
+进入 call 时先检查形状和权限，再等待本程序此前已经发起的 SDK 操作取得真实终态。仍在途不是错误，不报 PENDING_OPERATIONS，不要求模型补 await 后重发，也不取消原操作。
 
-## 6. call 窗口内外的状态
+真实 SDK 异常沿原错误合同呈现，已落盘效果保留；业务成员返回的 `{ ok: false, ... }` 仍是该成员的业务数据，不伪造成执行器异常。排空完成后才启动命令；排空与命令等待使用同一剩余期限。
 
-| 事实 | 程序续体 | 命令 | 本次响应 |
-| --- | --- | --- | --- |
-| 既有 SDK 尚未结清，窗口未到 | 停在 call 入口 | 尚未启动 | 等待 |
-| 排空阶段窗口先到 | parked 在 call 入口 | 尚未启动 | 报告 parked 及尚未启动的事实 |
-| 命令在窗口内结束 | 获得真实结果，继续执行 | 已结束 | 正常继续，直到程序返回或再次暂停 |
-| 命令尚未结束，窗口先到 | parked 在原 call 点 | 可以继续运行 | 报告 parked 与当前增量 |
-| 命令在 park 后结束 | 仍 parked，不执行后续代码 | 保存真实结果 | 等待后续 unpark |
-| unpark 重新开放等待 | 等原命令，或领取已保存结果再继续 | 不重启 | 返回本次恢复结果或新的 parked 回执 |
+每个命名程序拥有独立执行进程。同步桥接在 call 表达式求值处停住执行单元，漏写 await 或写入 Promise.all 都不能越过首个 call 启动第二条命令。宿主、其他程序、既有 SDK 与输出处理继续响应。普通 Promise、忙标志、隐式命令队列或整段工具调用的全局锁不能替代这一保证。
 
-自动 park 是实际暂停程序续体，不是让 call 返回一个 running 对象后任由后续代码写文件。命令退出也不是自行解除 park 的许可。
+并行命令通过不同名字的程序表达。shell 自己组织的子任务遵守真实 shell 语义，不靠审查命令内容实施单 call。
 
-响应中可用 name、state、暂停原因、命令是否已经启动、命令状态及 delta 表达事实；这些是语义数据，不授权重做既有 NUL+BOM、TOML 或宿主渲染格式。
-
-## 7. unpark：新的预算，原来的现场
-
-```js
-class Js extends JsProgram {
-  async run() {
-    return await this.unpark(
-      "build",
-      "继续等待原构建；若窗口再次耗尽，保留同一个现场并交回新增输出。"
-    );
-  }
+```json
+{
+  "name": "build",
+  "planB": "等待本次构建；窗口到期时保留原命令与程序现场，之后继续领取结果。",
+  "program": "class Js extends JsProgram { async run() { return await this.call('node scripts/build.mjs'); } }"
 }
 ```
 
-这段源码可由顶层名字 `continue-build` 的新控制程序提交；它操作的目标仍是 `build`。控制程序和目标程序是两个明确名字，不引入匿名 handle。
+## 4. 暂停与恢复
 
-### 7.1 按暂停原因恢复
-
-call 排空阶段暂停时，恢复原来的 SDK 等待，不能跳过未结清操作。call 命令等待阶段暂停时，继续等待原命令，或交回已经保存的真实 CallResult。两种情形都不能把可选 value 作为 call 返回值。
-
-只有显式 `this.park(payload)`（含 where 歧义）的 value 成为该 park 表达式的返回值。call 的结果、park 的恢复值和工具回执是三种数据，严禁混用。
-
-目标再次 park，就报告新的暂停现场；目标已经 completed、failed 或 abandoned，就返回已有终态，不重新执行。找不到名字或已丢失现场，按事实报告，不猜测恢复。
-
-### 7.2 内外等待一致
-
-unpark 的 planB 必填，换算和 call 相同。外层控制程序所在的工具请求也必须使用这次预算，不能仍由默认短窗口先行结束；目标与外层接入同一条等待关系，由唯一窗口所有者安排返回。
-
-unpark 的 planB 是本次恢复观察的上界。目标在恢复中进入新的 call 时，新 call 仍须给出自己的 planB；它可以要求更早 park，但不能凭较长预算越过外层已给定的恢复上界。实际期限取明确期限中较早者，不另加固定切片上限。
-
-unpark 返回的是目标本次恢复的回执：完成、失败或再次 parked。控制程序收到回执后结束，不等于目标结束；name、state 必须保留目标事实，不能被外层成功返回覆盖。
-
-### 7.3 唯一公开路径
-
-公开恢复和放弃只能通过 `this.unpark`、`this.abandon`。不注册独立工具，不恢复顶层三态参数，不把委派 `this.resume` 当别名。宿主会话关闭通过内部生命周期消息复用同一收尾实现，不另建一套恢复算法。
-
-## 8. signal、send 与 abandon
-
-```js
-class Js extends JsProgram {
-  async run() {
-    return await this.signal("build", "SIGINT");
-  }
-}
-```
-
-```js
-class Js extends JsProgram {
-  async run() {
-    await this.send("server", "status");
-    return await this.unpark(
-      "server",
-      "等待原服务命令的后续结果；窗口到期则继续保留现场。"
-    );
-  }
-}
-```
-
-控制来自另一个命名程序，作用于目标当前唯一的活动命令。没有活动命令（包括仍在排空 SDK、尚未启动命令）就明确报告目标状态；不猜最近的进程，也不把输入缓存给未来下一条命令。
-
-signal/send 不解除 park。命令收到输入产生输出或收到信号退出，都不使目标程序自动执行后续代码；它仍等待 unpark。发送信号不代表退出，提交输入不代表对方已成功处理。跨会话和权限边界不因按名字控制而放开。
-
-`this.abandon(name)` 处理整个程序拥有的执行资源，而不是删掉登记项。先请求取消并执行清理；需要强制结束时如实记录。只有确认资源结清才报告 abandoned；收尾未完成则报告 abandoning 或确切故障。原生 finally 应在可正常清理的路径执行，强制结束不能伪称 finally 已跑完。
-
-排空中放弃、命令运行中放弃、park 后放弃、会话关闭复用同一套资源收尾行为。已经落盘的写不回滚；未知结果不转换成自动重发原操作的许可。
-
-## 9. join() 与 DAG 删除
-
-独立工具合同为 `join()`，无参数、无 name、无 program、无 planB；不包装成一个临时 JS 程序。它等待当前调用者按既有工作归属可收拢的结果，不证明某个 JS 程序或全部子任务都成功。
-
-保留原有结果批次、准入、终态和中断规则。用户输入或取消可以结束这次 join 等待，但不能顺手取消子工作。宿主传输结束或中断只能报告对应事实，不能用超时伪造完成，也不能偷换成隐藏的定时轮询。
-
-完整删除 this.join 与 this.dag，包括 capability 投影、runtime 成员、生成基类、示例、资源、类型、内部隐藏调用及过期测试。不保留 DAG 兼容别名，不另建后台 DAG 调度器；依赖安排由模型显式进行：程序派工，独立 join() 收拢，再提交下一程序。
-
-## 10. 两包职责与旧入口撤销
-
-### 10.1 程序设施：wanxiangli/program
-
-拥有命名程序、状态转换、执行预算、响应窗口、park/unpark/abandon、控制消息与成员投影。Session 拥有名称登记和协作，Program 拥有自身状态与暂停点；窗口是它们的内部职责，不另发 scheduler、broker、park-store 或通用 Actor 框架包。
-
-它与既有 Work、权限、评审、Ownership、Journal owner 显式协作，不复制业务账本。独立 join 工具的接线和等待控制归入这份设施，收拢资格与结果事实仍向既有 owner 取得。
-
-### 10.2 物理设施：wanxiangli/runtime
-
-拥有独立执行进程及隔离、文件读写与锚点、原子写与版本检查、命令启动、stdin/stdout/stderr、信号、终端、输出外存和物理时钟。它不知道 Plan、Manager、评审阶段或业务交付。
-
-独立程序进程里的 call 桥接负责停住该执行单元；宿主侧异步接收 SDK 完成、命令输出和退出事实。排空既有操作不依赖阻塞点之后的模型代码继续执行；这项物理可行性必须用真实执行单元验收。
-
-对外只交付两个相关入口。内部完整个体可以各自拥有必要状态，不为每个定时器、缓冲区和方法制造额外包。两个包不是旧包的转发聚合器。
-
-### 10.3 旧入口与所有消费者一并切换
-
-| 撤销的旧入口 | 新归属 |
+| 窗口到期时的事实 | 程序与命令的后果 |
 | --- | --- |
-| `wanxiangli/programming` | program 的成员投影与目录 |
-| `wanxiangli/sandbox` | runtime 的执行隔离；生命周期进入 program |
-| `wanxiangli/fs` | runtime 的文件与锚点能力 |
-| `wanxiangli/process`、`wanxiangli/pty`、`wanxiangli/spool` | runtime 的命令、终端和输出设施 |
-| `wanxiangli/time` | runtime 的物理时钟；预算规则归 program |
-| `wanxiangli/wait` | program 的程序／join 等待控制；物理唤醒归 runtime |
+| SDK 尚未结清 | 程序停在排空点，命令未启动。SDK 后来结清也不自行启动命令。 |
+| 命令仍运行 | 程序停在原 call 点，命令可以继续，输出继续采集。 |
+| 暂停后命令退出 | 保存真实 CallResult，续体仍暂停。 |
+| 新请求显式 unpark | 原现场加入新请求窗口，接着排空、等待或领取已保存结果。 |
 
-范围包括这些入口在 todowrite 之外的真实消费者，不能只换一处 import 后保留另一条执行路径。切换完删除旧 exports、状态表、计时路径、实现、工程条目、别名和过期说明；不保留 facade、shim 或双轨权威。
+新控制程序在顶层提供自己的 planB：
 
-业务 Work、Journal、权限和其他独立领域包不因“两个设施包”而被无差别合并。wanxiangshu 当前的工具注册和宿主物理编码由 HNI 接线承接，不把 OpenCode/OMP SDK 对象传入程序设施；暂留的组合接线不构成主仓永久保留状态的豁免。
+```json
+{
+  "name": "continue-build",
+  "planB": "继续等待原构建；如果本次期限用尽，保留相同现场和新增输出。",
+  "program": "class Js extends JsProgram { async run() { return await this.unpark('build'); } }"
+}
+```
 
-## 11. 输出、证据与运行中可观测性
+控制者及本次唤醒的目标共享新窗口，到期时仍活动的各方实际暂停。先恢复控制者，只能推进控制者自身；它此前收到的目标暂停回执保留原样，不会隐式再次唤醒目标。继续目标必须另有显式 unpark。
 
-一次工具响应结束、一个程序结束、一条命令退出、一个 work 完成，是四种事实。程序 return、命令 exit 和 parked 回执都不能冒充业务 deliver。进程的真实退出码和信号必须保存，不能把信号退出的缺失退出码变成成功。
+只有显式 park（包括 where 歧义）接收 value。call 必须取得原命令真实退出、信号和输出，恢复参数不能冒充 CallResult。控制程序的成功不覆盖目标 name、state、effects 或失败事实。
 
-parked.delta 表示新观察材料，不是终态 CallResult。物理设施保留命令输出与真实终态，观察不能消费掉最终结果；正文可有界，但截断要明确且原始输出可取回。不能因为此前返回过 delta，就在最终返回时丢掉结果或用恢复参数替代它。
+## 5. 名称、身份与重放
 
-开始请求、进入 SDK 排空、进入命令、窗口到期、park、unpark、命令退出和程序结清均可观察。记录来自实际运行对象，不另设会失配的健康账本。查询至少能说明哪个名字在等待什么、命令是否已启动或仍存活、请求还在等待多久、是否已有退出回执。默认诊断不记录完整敏感命令、用户原文和 stdout。
+ProgramSession 按所属会话登记名字，一个名字对应一次运行。相同物理工具调用及相同参数重放原回执，不执行第二次；另一新调用占用已有名字报 NAME_TAKEN。终态保留到会话清理，新运行使用新名字。
 
-状态以新工具回执或诊断呈现，不回写旧工具结果，不改写历史 Pair Hint 字节；本方案不得再次破坏已呈现 prefix 的稳定性。保持既有代理散文与结构材料的渲染边界。
+恢复直接定位运行对象，不重新编译、不重建沙箱、不扫描工作区、不重发命令。暂停代际、命令代际及调用围栏私有维护，重复或迟到消息不能消费下一代现场。
 
-## 12. 先用反例验收
+进程重启不恢复丢失的 JS 栈。恢复只使用实际持久化的归属与终态；没有现场时报告中断或未知，不能以名字存在为由自动重跑已可能产生效果的源码。
 
-以下是待实施的验收要求，全部标为 TODO，不是已运行测试。测试实现就近放入新两包；真实宿主、公开 ToolSpec 和安装包测试按既有门禁归位，不为取绿扩大豁免。
+## 6. 控制、清理、输出与结算
 
-| 组 | 反例与正控 | 必须观察到的事实 | 状态 |
-| --- | --- | --- | --- |
-| A：停等与单 call | 先发起延迟 SDK 操作，未 await 即进入 call | 不拒绝；命令启动晚于既有操作结清；停等期间无后续模型代码副作用 | TODO |
-| A：停等超时 | SDK 操作仍未结清，planB 已到期；随后操作结清 | 回执 parked 且命令启动次数为零；结清不自动启动；unpark 后只启动一次 | TODO |
-| A：既有失败 | SDK 操作真实失败后结清 | 保留真实失败及已落盘效果；不把在途当失败，也不假造成功 | TODO |
-| A：不依赖 await | 漏写 await，或 Promise.all 中放两个 call | 第二个 call 不会并发启动，后续写不能越过第一个阻塞点 | TODO |
-| B：预算与隔离 | A 长命令等待，B 继续读写；A 还有计算预算 | A 执行预算停表，请求窗口有效，宿主和 B 响应；真实独立进程证明 | TODO |
-| B：park 后退出 | 窗口先到，命令后来才退出 | 命令结果保存，程序续体保持暂停直到 unpark | TODO |
-| B：恢复窗口 | 恢复仍在运行的命令，内外请求带新的 planB | UTF-8 字节计价在外层同样生效；无漏装、旧计时器抢跑或重启命令 | TODO |
-| B：恢复值分离 | 对 call yield 和显式 park 分别 unpark | 只有显式 park 接收 value；call 始终收到真实结果 | TODO |
-| C：控制与重复 | signal/send、重复 unpark、旧控制消息迟到 | 名字找唯一活动命令；不解除 park；不消费下一代暂停或命令 | TODO |
-| C：放弃与关闭 | 排空中、call 中、park 后 abandon 或会话关闭 | 确认收尾后才报终态；信号和删除登记不冒充资源结束 | TODO |
-| C：输出与重启 | 多次 delta、响应丢失、执行现场失去 | 结果可取回，截断明确；不因同名恢复而重跑未知副作用 | TODO |
-| D：join | join() 等待中出现用户输入或宿主中断 | 本次等待按事实结束，子任务未被取消，不伪造完成 | TODO |
-| D：clean-break | 干净安装、公开 schema 与全部消费者搜索 | 仅两个新相关入口，name/program 必填，this.join/this.dag 和旧入口无活路径 | TODO |
+signal/send 只作用于同会话目标当前唯一活动命令。没有活动命令，包括仍在排空时，明确报告事实，不猜最近进程、不把输入留给未来命令。控制不解除 park；发送信号不等于物理退出，输入提交不等于对方已处理成功。
 
-Node 与 Bun 的真实能力分别验收，不能因为一种运行时通过，就在另一种上退回普通 Promise 加忙标志，仍声称契约相同。先做能推翻阻塞、排空和宿主响应的少量真实反例，不以测试数量或新框架代替证明。
+abandon、会话关闭与所属插件退出复用收尾。插件只关闭本实例拥有的会话，程序收尾先于执行端口和 Journal 释放，不使用全局 closeAll。先取消并清理，确认执行进程、shell 与受管进程组结清后才报告终态；无法确认时保留收尾状态和错误，不释放旧资源再启动第二份。正常展开可运行原生 finally，强杀不保证 finally，已落盘效果不回滚。
 
-## 13. 实施边界与切换顺序
+每个 Run 终态的 effects 经 settle 一次结算并保留，重复控制不重结。目标 effects 留在目标回执，不冒充控制者新产生的文件效果。持久错误保留身份和原因；生命周期审计按序等待，失败以 lifecycleError 进入回执，不抹去真实暂停或已发生效果。
 
-本轮批准的是设计。本次文档提交不启动实施；下列是后续落实这份批准设计时的闭环次序。
+parked.delta 是新增观察，不消费最终 CallResult。退出码、信号、完整输出文件、字节数及截断分别保留；信号退出的 null 退出码不得补为零。原始输出文件在程序和会话关闭后保留，没有按保留期自动 GC。
 
-1. 盘点全部旧入口和消费者，固定名称、等待、恢复、join 及 SDK 排空合同；同步修订正式 WHAT、成员说明、schema 和双语资源的计划。保留旧承诺的取舍依据，不凭现有代码定义新语义。
-2. 在 runtime 中先做真实独立执行单元：阻塞本程序、异步结清既有 SDK、命令输出与控制、宿主继续响应。用组 A/B 的反例证明，不先建立接口空壳。
-3. 在 program 中落实自治名称登记、状态、唯一窗口和恢复代际，显式组合 runtime 与既有权限／持久化 owner；不把决策和状态留在主仓。
-4. 同时接回两个宿主的真实工具 schema 和成员路径；保留独立 join()，删除 this.join/this.dag，迁移所有设施消费者；真实效果禁止新旧双执行。
-5. 新包独立构建、干净安装和宿主回归后，删除被替代入口、旧 owner 与过期材料。两仓分别提交、固定精确 gitlink，验证运行进程确实加载对应构建；不以构建、推送成功冒充已部署。
+源码沿既有渲染边界完整呈现；能可靠定位时标记实际暂停行，不能定位时降级。新状态以新回执呈现，不回写旧工具结果或历史 Pair Hint 字节，不另造会失配的健康账本。
 
-候选旧实现核对入口（不是允许机械搬迁的清单）：
+## 7. 独立 join 与 DAG 退出
 
-- `src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs`：现有公开 ToolSpec 与调用身份。
-- `src/Wanxiangshu/Repository/Programming/Js/ToolWorkflow.fs`、`ParkedSites.fs`：原程序、park 和计时状态。
-- `src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs`、`Description.fs`、`Capability.fs`：原成员绑定、生成说明、call 计时与 dag/join 投影。
-- `src/Wanxiangshu/Process/JsCallLoop.fs`、`JsSandbox.fs`：原命令与执行隔离；相关 Process/PTY/输出消费者须完整盘点。
-- `src/Wanxiangshu/Execution/Tool/ExecuteGate.fs`：现有 todowrite 串行等待范围。
-- `src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs` 与 `OpenCode/Tools/ToolRegistry.fs`：独立 join、工作归属与 JS Join 成员接线。
-- `resources/provider/tool/js-program/`、旧包公开声明和测试：不得让模型仍被教授退役入口。
+独立 `join()` 无参数、无 name/program/planB，不建立临时 JS 程序。它沿既有工作归属、结果批次、准入与中断规则收拢，不证明全部子工作成功。用户输入或宿主中断只结束这次等待，不顺手取消子工作，不把超时呈现为完成。
 
-## 14. 当前交付状态
+编程内 join/dag 的能力投影、生成基类、绑定、资源、示例与专用隐藏执行路径退出。依赖由模型显式安排：程序派工，独立 join 收拢，再提交下一程序。独立工具保持原有散文与结构材料边界，不保留已退役的程序结果包装。
 
-- 设计：已由使用者批准，第三稿的未结清 SDK 拒绝规则已改为停等。
-- 本轮交付：本提案及 proposals 入口索引。
-- 正式 WHAT、模型资源、schema、代码、两包产物：尚未按本提案修改。
-- 构建、行为测试、真实宿主验证与部署：尚未为本提案实施或运行。
+## 8. 两包的实际所有权
 
-批准设计、写入文档、实现通过、两仓发布与真实部署是不同状态，后续逐项记录，不互相代替。
+| 入口 | 所有者与职责 |
+| --- | --- |
+| `wanxiangli/program` | Program() 登记入口；ProgramSession 会话内名称、重放与协作；私有 Run 单次运行、窗口、恢复代际和结算；ProgramCatalog 成员投影；Wait 等待控制。 |
+| `wanxiangli/runtime` | Runtime 独立进程、隔离与通信；RuntimeTools 原语和字面锚点；FileSession 读快照与版本；Filesystem、ProcessSession、Terminal、OutputSpool、Time 各自物理资源。 |
+
+program → runtime 是明确的永久单向基础依赖，仅消费公开产物。runtime 不解释 planB，不认识角色、评审或业务 deliver。两包不声明彼此独立，不跨源码编译，不保留转发聚合壳；库根规则已明确这一适用边界。
+
+| 撤销入口 | 当前实现归属 |
+| --- | --- |
+| programming | program/Catalog |
+| sandbox | runtime 独立执行；生命周期归 program，旧 sandbox 删除 |
+| fs | runtime/files 与 FileSession、RuntimeTools |
+| process / pty / spool | runtime/process、pty、spool |
+| time | runtime/time；预算语义归 program |
+| wait | program/wait |
+
+全部八个旧 exports、旧工程与被替代 owner 退出，包构建清理过时 dist 目录，干净安装不包含旧八目录或 F# 源码。Work、Journal、权限等其他独立领域保持各自归属。宿主只经 npm 公开入口消费；HNI/OpenCode/OMP 的物理编码与业务准入不进入程序设施。
+
+## 9. localspace-js backport
+
+相同思想已回移至 localspace-js：`js({ workspaceId?, program, planB })`，`call(command)`，`unpark(handle,value?)`；planB 只在请求准入时计算，同请求的命令、恢复与嵌套目标共享期限。
+
+localspace-js 当前公开上限为 `min(UTF8Bytes(planB) × 50ms, 30000ms)`。这是该仓已有并发改动确定的等待合同，不回灌成 wanxiangli 的隐藏上限。断开连接保持 detach 语义，不续期、不杀原命令；仅显式新请求可恢复。
+
+这次 backport 约束 broker 的 call/unpark 准入与回复交付，保留 localspace-js 原有后台 worker 语义：直接在 worker 内执行的计算和文件 API 不因等待到期而被整体冻结。不能把它写成“期限到达后所有代码和文件副作用都停止”。
+
+## 10. 当前验证与交付边界
+
+| 层级 | 已取得的证据 |
+| --- | --- |
+| 程序与运行时行为 | 当前 64 项测试分别在 Node 26.12.0 和 Bun 1.4.2 通过；覆盖真实 SDK 排空、未 await 阻塞、共享到期、控制、收尾、输出和隔离。 |
+| 宿主核心回归 | repository-programming、process-execution、capability-enforcement 共 641 项：622 通过、0 失败、12 跳过、7 TODO；包含新增的真实命令退出、finally 落盘和跨插件隔离反例。跳过和 TODO 不计作通过。 |
+| 干净安装 | program/runtime 新包的 Node、Bun 实际消费及严格 TypeScript 检查通过；旧入口不可导入。 |
+| 库全量基线 | 最终全量 947 项：931 通过、16 失败；全部失败标题与原提交 f553f3ed07c4c0c6d5042d2d8561e66483a1b600 隔离构建的 16 项 Assembly `Missing field: updates` 逐项一致，没有新增失败。 |
+| localspace-js | 最新 npm test、typecheck 与临时目录构建通过；包含 8 项共享预算回归，保留同时存在的 30 秒上限与断连 detach 行为。 |
+| 其他消费者 | 工作、委派、问答、完整 managed-session-lifecycle、Bookkeeper 等共 614 项：564 通过、1 项既有失败、5 跳过、44 TODO。剩余 work-011 温度断言来自未修改的 PluginHooks/ChatParamsHook：两参数调用没有进入柯里化函数的第二层；独立用例和实际编译产物均已确认。 |
+| 构建与源码门禁 | 项目规定的 Fable 构建通过；本任务 88 个 F# 文件格式检查通过，JavaScript 语法检查通过。全仓格式仍有 53 个未修改文件不满足格式，静态检查剩余 25 项位于未修改的 Host/FissionPort、OMP、SecondHost、PluginTransforms。 |
+| 提交 | wanxiangli `b5187fc07d3da16ed14ad097c5bd0c01ecde822d` 已推送 main，宿主本提交以 gitlink 固定该版本；localspace-js 的共享窗口实现为 `42da3a896f1ac322dd7622cf00ffe07779563b99`，参数文档补全为 `03991b87882e3d0974fc95927601eba2ce531a21`，均已在 main。宿主自身 SHA 以 Git 记录为准。 |
+
+上述宿主和库回归对应本次实际工作树，其中保留了开始任务前已有的并发修改；这些修改没有纳入本任务提交。干净安装仅证明表中列明的公开包消费范围，不能将工作树结果改称为提交在干净 checkout 中的全仓验证。
+
+本记录不宣称整个仓库所有历史缺口已闭合，不据 Linux 的 Node/Bun 结果宣称 Windows、macOS 或真实模型宿主通过。此次没有主动重启、部署运行服务；源码提交与正在运行进程加载哪个版本分别核对。
+
+正式合同见 repository-programming/WHAT.md、process-execution/WHAT.md 与各业务 WHAT。实际所有权、两仓提交、最终门禁及剩余边界统一登记在根 AGENTS.md 的迁移章节。

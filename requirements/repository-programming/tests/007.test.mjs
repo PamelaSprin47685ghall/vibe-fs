@@ -1,3 +1,4 @@
+import { closePrograms } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 import test from 'node:test'
 
 test('WHAT[repository-programming-007] an acquired view remains unchanged after rewrite and commit', async () => {
@@ -183,13 +184,14 @@ test('WHAT[repository-programming-007] JS006_missing_anchor_reason_names_declara
     return { ok: true };
   }
 }`
-    const outcome = await execute(dir, 'Coder', 'en', 'sess-007', { program }, 2000, Date.now() + 60_000, 1 << 20, null)
+    const outcome = await execute(dir, 'Coder', 'en', 'sess-007', { name: "missing-anchor-007", program, planB: "Wait for the anchor lookup and preserve its original pause." }, 2000, Date.now() + 60_000, 1 << 20, null)
     assert.equal(caseName(outcome), 'Parked')
-    const payload = parkedPayload(outcome)
+    const payload = parkedPayload(outcome).payload
     assert.equal(payload.needle, '## JS-007 FileView.text()')
     assert.deepEqual(payload.candidates, [])
     assert.equal(payload.nearest.text, 'hello world')
   } finally {
+    await closePrograms()
     cleanup()
   }
 })
@@ -219,6 +221,7 @@ test('WHAT[repository-programming-007] JS005_offset_anchor_clips_to_closed_file_
     assert.equal(doc.data.clippedStart, '')
     assert.equal(doc.data.eof, 0)
   } finally {
+    await closePrograms()
     cleanup()
   }
 })
@@ -243,6 +246,7 @@ test('WHAT[repository-programming-007] JS005_offset_N_is_string_index_not_line_n
     assert.equal(doc.data.threeLen, 3)
     assert.equal(doc.data.cdBegin, 3)
   } finally {
+    await closePrograms()
     cleanup()
   }
 })

@@ -3,13 +3,13 @@ namespace Wanxiangshu.Repository.Programming.Js
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Strict UTF-8 read, bridged to `wanxiangli/fs` (CUT-24). ENOENT →
+/// Strict UTF-8 read, bridged to `wanxiangli/runtime` (CUT-24). ENOENT →
 /// FILE_NOT_FOUND, fatal decode or NUL bytes → INVALID_UTF8; the
 /// algorithm lives in the library, failures map back through
 /// JsFailure.ofWire.
 module JsUtf8Fs =
 
-    [<Import("Filesystem", "wanxiangli/fs")>]
+    [<Import("Filesystem", "wanxiangli/runtime")>]
     let private Filesystem: obj = jsNative
 
     [<Emit("$0({ root: '' })")>]

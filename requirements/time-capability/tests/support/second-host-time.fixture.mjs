@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Time as TimeTesting } from 'wanxiangli/time'
+import { Time as TimeTesting } from 'wanxiangli/runtime'
 
 export const terminalEntry = (text) => ({
   type: 'message',

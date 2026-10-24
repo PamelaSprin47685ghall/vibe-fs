@@ -41,10 +41,7 @@ export const withReview = async (body, {ownerId, session = 'review-manager'} = {
       }
     }`
     const result = await hooks.tool['todowrite-for-manager'].execute(
-      { name: 'review-member', program,
-          prefixUntil: 0,
-          carry: []
-        },
+      { name: 'review-' + call, program, planB: 'Wait for this review to settle and preserve its original result.' },
       { sessionID: session, callID: call, messageID: run, agent: 'manager' },
     )
     // The review run is finished once its tool returns. A later provider request

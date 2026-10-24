@@ -7,7 +7,7 @@
 //     （WorktreeCreated）；dist/Change/Surface.js 把这些事实折回效果账
 //     （Requested 意图 / Created 物理确认）；
 //   * 真实交付：withExecutablePlugin + 真实插件 + 真实 journal，驱动一次真正的
-//     `this.deliver(...)`，让 settle 侧写下 durable 见证；
+//     子工作完成由真实 provider 终态接线裁决，不以程序 return 建立交付见证；
 //   * 见证读回：dist/Persistence/EventStore/Surface.js —— durable 事实读成普通
 //     JSON（payload.Fact），不构造任何 F# union；
 //   * 交付格：dist/Repository/Programming/Js/RuntimeSurface.js —— 进程内的带围栏
@@ -57,7 +57,7 @@ const SESSION = 'sess-effect-013'
 const RUN = 'run-effect-013'
 const WORKTREE = 'manager/job-effect-013'
 
-// 一个真实插件会话：真插件、真 journal、真交付。真交付只由真实 settle 产生。
+// 一个真实插件与 journal 的散文场景；没有交付动作，不应产生交付见证。
 // 交付格是进程内按 session 分区的，所以每个用例用属于自己的 session。
 const withRealPlugin = async (body, session = SESSION) => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
@@ -86,17 +86,8 @@ const withRealPlugin = async (body, session = SESSION) => {
       parts: [{ type: 'text', text: 'the assistant prose of this turn' }],
     })
 
-    const deliver = async (material, callId = 'call-effect-013') =>
-      hooks.tool['todowrite-for-engineer'].execute(
-        {
-          program: `class Js extends JsProgram { async run() { return await this.deliver([${JSON.stringify(material)}]); } }`,
-          prefixUntil: 0,
-          carry: []
-        },
-        { sessionID: session, agent: 'engineer', callID: callId, messageID: run },
-      )
 
-    await body({ hooks, directory, runtime, deliver, session, run })
+    await body({ hooks, directory, runtime, session, run })
   })
 }
 

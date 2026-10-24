@@ -119,8 +119,7 @@ test('WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retain
     // 即为无效评审（standalone `review` 宿主工具已随编程面迁移退役）。
     const reviewResult = await hooks.tool['todowrite-for-manager'].execute(
       { name: 'manager-review', program: "class Js extends JsProgram { async run() { return await this.review('invalid-findings-malformed'); } }",
-          prefixUntil: 0,
-          carry: []
+          planB: 'Wait for the review validation receipt without renewing this deadline.'
         },
       { sessionID, agent: 'manager', callID: 'call-p03-review', messageID: 'msg-p03-review' },
     )
@@ -214,9 +213,14 @@ test('WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_i
   assert.match(en, /do not start new work/)
 })
 
-const execute = async (hooks, sessionID, body, callID = 'call-review') => parseToml(String(
+let programSequence = 0
+const execute = async (hooks, sessionID, body, callID = 'call-review-' + (++programSequence)) => parseToml(String(
   await hooks.tool['todowrite-for-manager'].execute(
-    typeof body === 'string' ? { program: 'class Js extends JsProgram { async run() { ' + body + ' } }', name: 'manager-exec' } : { name: 'manager-exec', ...body },
+    {
+      name: callID,
+      program: 'class Js extends JsProgram { async run() { ' + body + ' } }',
+      planB: 'Wait for this manager operation and preserve its real outcome at the shared deadline.',
+    },
     { sessionID, agent: 'manager', callID, messageID: 'msg-' + callID },
   ),
 ))
@@ -287,11 +291,17 @@ test('WHAT[capability-enforcement-025] P14_saved object, method and raw binding 
       'const raw = this._api.reviewOnly.cat; const read = async () => { const result = await raw("evidence.txt"); if (!result.ok) return result.code; return result.text; };',
     ].entries()) {
       const paused = await execute(hooks, sessionID, saved + ' await this.park({ ready: true }); return await read();', 'park-' + index)
-      assert.ok(paused.handle)
+      assert.ok(paused.name)
       if (index === 0) await injectAcceptedAssessment(runtime, sessionID)
-      const result = await execute(hooks, sessionID, { unpark: { handle: paused.handle, value: null } }, 'resume-' + index)
-      if (index === 2) assert.equal(result.data, 'REVIEW_ONLY')
-      else assert.equal(result.code, 'REVIEW_ONLY')
+      const result = await execute(hooks, sessionID, 'return await this.unpark(' + JSON.stringify(paused.name) + ', null);', 'resume-' + index)
+      assert.equal(result.data.name, paused.name)
+      if (index === 2) {
+        assert.equal(result.data.state, 'completed')
+        assert.equal(result.data.value, 'REVIEW_ONLY')
+      } else {
+        assert.equal(result.data.state, 'failed')
+        assert.equal(result.data.code, 'REVIEW_ONLY')
+      }
     }
   })
 })
@@ -309,8 +319,11 @@ test('WHAT[capability-enforcement-025] P15_access denied before path validation,
       "return await this.reviewOnly.rg(['--invalid-option', 'missing']);",
     ]) assert.equal((await execute(hooks, sessionID, body)).code, 'REVIEW_ONLY')
     const paused = await execute(hooks, sessionID, 'await this.park({ done: true }); return 9;')
-    assert.ok(paused.handle)
-    assert.equal((await execute(hooks, sessionID, { unpark: { handle: paused.handle, value: null } })).data, 9)
+    assert.ok(paused.name)
+    const resumed = await execute(hooks, sessionID, 'return await this.unpark(' + JSON.stringify(paused.name) + ', null);')
+    assert.equal(resumed.data.name, paused.name)
+    assert.equal(resumed.data.state, 'completed')
+    assert.equal(resumed.data.value, 9)
   })
 })
 
@@ -324,8 +337,7 @@ test('WHAT[capability-enforcement-025] identity and cross-role denial remain ind
     assert.equal(Object.hasOwn(unknown, 'data'), false)
     const wrongRole = await hooks.tool['todowrite-for-devops'].execute(
       { program: 'class Js extends JsProgram { async run() { return 7; } }', name: 'devops-wrong',
-          prefixUntil: 0,
-          carry: []
+          planB: 'Observe the cross-role refusal before any program effect.'
         },
       { sessionID: 'ses-no-life', agent: 'manager' },
     )

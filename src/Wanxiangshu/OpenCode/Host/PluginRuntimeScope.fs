@@ -450,6 +450,9 @@ type PluginRuntimeScope
             let! backgroundFailure = ownedWorkDrain
             remember backgroundFailure
 
+            let! programFailure = captureTaskFailure (sessions.ClosePrograms())
+            remember programFailure
+
             let! runtimeFailure = captureTaskFailure (disposeRuntimeOwner (this.TakeRuntimeOwner()))
             remember runtimeFailure
 

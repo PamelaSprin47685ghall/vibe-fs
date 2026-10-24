@@ -1,12 +1,16 @@
-  async call(command, planB) {
-    // 返回 { ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }。command 是一条 shell 字符串。planB 必填，是不跑这条命令时的替代方案；它的 UTF-8 字节数 × 50ms 是自动 yield 的时限。缺 planB 以 CALL_COMMAND_UNSUPPORTED 失败。stdout/stderr 是上一次自动 park 所带增量之后的新输出。
-    // 例如: const outcome = await this.call("printf ok", "直接读文件");
+async call(command) {
+    // 先等本程序既有 SDK 操作结清，再启动一条 shell 命令。
+    // 漏写 await 也停住本程序。排空、等待及后续 call
+    // 共用顶层 planB 窗口的剩余时间；到期不杀原命令。
+    // 最终结果保留 stdout/stderr、真实 exitCode 或 signal、字节数、
+    // durationMs、明确截断和原始 outputFiles；delta 不消费最终结果。
   }
 
-  async signal(signal) {
-    // 向让本次程序 park 的那条 call 发信号。那条命令已经结束时是 CALL_CHILD_UNKNOWN。
+  async signal(name, signal) {
+    // 向指定程序当前命令发信号，不恢复其代码。
   }
 
-  async send(input) {
-    // 把键盘输入写进让本次程序 park 的那条 call。缺行尾换行时补一个。那条命令已经结束时是 CALL_CHILD_UNKNOWN。
+  async send(name, input) {
+    // 向指定程序当前命令写输入，缺换行时补上，不恢复目标。
+    // 接受输入不证明命令已处理。
   }
