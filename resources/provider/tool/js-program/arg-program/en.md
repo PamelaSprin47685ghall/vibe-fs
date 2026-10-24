@@ -1,1 +1,1 @@
-Exactly one class named Js that extends the generated JsProgram in this tool description and implements async run(). The same call also carries name.
+REQUIRED. This is the sole tool argument. Supply a complete JavaScript source string defining exactly one class named Js extending the generated JsProgram class and implementing async run(). Every todowrite-for-* call must contain program; never send an empty argument object. name, planB, unpark and abandon are not tool parameters.

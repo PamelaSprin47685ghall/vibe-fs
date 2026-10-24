@@ -15,11 +15,6 @@ open Wanxiangshu.Repository.Programming.Js
 /// commit) and the result renders through JsToolsResult (JS-016).
 module JsToolSpec =
 
-    /// A Host argument is present when its key holds a value; null and
-    /// undefined are absences.
-    [<Emit("$0 !== null && $0 !== undefined")>]
-    let private isPresent (value: obj) : bool = jsNative
-
     /// Build a ToolSpec for one generated surface.
     ///
     /// `workspaceRoot` is where the tool executes; `persistence` enables the
@@ -40,75 +35,15 @@ module JsToolSpec =
         : ToolSpec =
         let readCheck = JsToolPolicy.defaultReadCheck surface.RoleName readCheck
 
-        let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
-
-        /// Build the three-state input object from the Host arguments:
-        /// `{ program } | { unpark: { handle, value } } | { abandon: { handle } }`.
-        ///
-        /// Every present state is copied into the input object: a call that
-        /// carries two of them is a contradiction the workflow refuses
-        /// visibly, never a state this builder silently drops.
-        let inputOf (args: HostToolArguments) : obj =
-            let program = readProgram args
-
-            let unpark =
-                if isPresent (args.Raw?unpark) then
-                    Some(args.Raw?unpark)
-                else
-                    None
-
-            let abandon =
-                if isPresent (args.Raw?abandon) then
-                    Some(args.Raw?abandon)
-                else
-                    None
-
-            let programEntry =
-                match program with
-                | Some source -> Some("program" ==> box source)
-                | None -> None
-
-            let nameEntry =
-                match args.OptionalText "name" with
-                | Some name -> Some("name" ==> box name)
-                | None -> None
-
-            let unparkEntry =
-                match unpark with
-                | Some unparkValue ->
-                    Some(
-                        "unpark"
-                        ==> createObj [ "handle" ==> string (unparkValue?handle); "value" ==> unparkValue?value ]
-                    )
-                | None -> None
-
-            let abandonEntry =
-                match abandon with
-                | Some abandonValue -> Some("abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ])
-                | None -> None
-
-            let planBEntry =
-                match args.OptionalText "planB" with
-                | Some planB -> Some("planB" ==> box planB)
-                | None -> None
-
-            [ programEntry; nameEntry; planBEntry; unparkEntry; abandonEntry ]
-            |> List.choose id
-            |> createObj
-
-        // The unpark/abandon arguments are nested objects; the Host schema
-        // describes them as plain objects with string handle fields. The value
-        // field of unpark is free-form (the injected resume value). Both are
-        // optional: a call carries exactly one of program / unpark / abandon,
-        // so no single one of them may be required by the schema.
-        let unparkSchema =
-            ToolHostCodec.optionalObjectSchema
-                [ "handle", ToolHostCodec.stringSchema factory
-                  "value", ToolHostCodec.anySchema factory ]
-                factory
-
-        let abandonSchema =
-            ToolHostCodec.optionalObjectSchema [ "handle", ToolHostCodec.stringSchema factory ] factory
+        /// The Host exposes one mandatory source argument. A physical tool-call
+        /// fence supplies the runtime name; no recovery state is modeled as a
+        /// top-level tool argument.
+        let inputOf (args: HostToolArguments) (ctx: HostToolContext) : obj option =
+            args.OptionalText "program"
+            |> Option.map (fun source ->
+                createObj
+                    [ "program" ==> box source
+                      "name" ==> box (JsToolPolicy.defaultInvocationName ctx.ToolCallId ctx.ProviderRunId ctx.SessionId) ])
 
         let callFenceOf (ctx: HostToolContext) =
             match ctx.ProviderRunId, ctx.ToolCallId with
@@ -169,60 +104,15 @@ module JsToolSpec =
                 return JsToolPolicy.renderCommitted ctx.SessionId callIdentity declaration outcome
             }
 
-        let admitProgramCall (_args: HostToolArguments) (ctx: HostToolContext) (input: obj) =
-            let hasProgram = isPresent (input?program)
-
-            let noState =
-                not hasProgram
-                && not (isPresent (input?unpark))
-                && not (isPresent (input?abandon))
-
-            if noState then
-                Task.FromResult(JsToolPolicy.missingProgramResult ())
-            else
-                runProgramCall ctx input null
-
         { Name = surface.ToolName
           Description = surface.Description
           Arguments =
-            [ "program", ToolHostCodec.optionalStringSchemaDescribed (JsToolPolicy.argProgramProse ()) factory
-              "name", ToolHostCodec.optionalStringSchemaDescribed (JsToolPolicy.argNameProse ()) factory
-              "planB", ToolHostCodec.optionalStringSchema factory
-              "unpark", unparkSchema
-              "abandon", abandonSchema ]
+            [ "program", ToolHostCodec.stringSchemaDescribed (JsToolPolicy.argProgramProse ()) factory ]
           Execute =
             fun args ctx ->
-                task {
-                    let input =
-                        let raw = inputOf args
-
-                        if
-                            not (isNull raw)
-                            && not (isNull raw?program)
-                            && (isNull raw?name || string raw?name = "")
-                        then
-                            let defaultName = JsToolPolicy.defaultInvocationName ctx.ToolCallId ctx.ProviderRunId ctx.SessionId
-
-                            createObj
-                                [ "program" ==> raw?program
-                                  "name" ==> defaultName
-                                  if isPresent raw?planB then
-                                      "planB" ==> raw?planB ]
-                        else
-                            raw
-
-                    // The three states are mutually exclusive: a call carries
-                    // exactly one of program / unpark / abandon. A conflicting
-                    // call is refused before the view declaration is captured
-                    // and before anything runs.
-                    match JsToolWorkflow.conflictingInputReason input with
-                    | Some reason ->
-                        return
-                            JsToolsResult.render (
-                                JsToolWorkflow.JsToolOutcome.Failed(JsFailure.InvalidArgument reason, [], [], [], [])
-                            )
-                    | None -> return! admitProgramCall args ctx input
-                } }
+                match inputOf args ctx with
+                | Some input -> runProgramCall ctx input null
+                | None -> Task.FromResult(JsToolPolicy.missingProgramResult ()) }
 
     let create
         factory

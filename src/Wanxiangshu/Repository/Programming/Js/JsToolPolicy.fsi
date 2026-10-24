@@ -38,13 +38,10 @@ module JsToolPolicy =
     /// The localized prose of the `program` argument.
     val argProgramProse: unit -> string
 
-    /// The localized prose of the required `name` argument.
-    val argNameProse: unit -> string
-
     /// The localized prose of the refusal of a call that carries no state.
     val missingProgramProse: unit -> string
 
-    /// The refusal tool result when no program/unpark/abandon state was provided.
+    /// The refusal tool result when the required Host program argument is absent.
     val missingProgramResult: unit -> string
 
     /// The rendered result of a settled call, with the view declaration

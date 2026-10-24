@@ -1,6 +1,6 @@
 本次工具调用返回 parked 载荷，因为程序在 `await this.park(payload)` 处挂起了。
 
-- `handle` 标识挂起现场。它只消费一次：用 `{ unpark: { handle, value } }` 恢复，或用 `{ abandon: { handle } }` 放弃。
+- `handle` 标识挂起现场，专用生命周期恢复或放弃会恰好消费一次。它们不是 `todowrite-for-*` 的顶层参数；该工具的唯一必填参数是 `program: string`。
 - `payload` 是程序传给 park 的值，是程序自己的数据，不是宿主的裁决。
 - 挂起现场是进程内活物：随进程死亡。只要它还没被表态，交付就会被泄漏兜底门禁拦截。
 

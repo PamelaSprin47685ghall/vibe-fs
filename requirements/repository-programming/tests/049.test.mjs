@@ -11,54 +11,61 @@ import {
   argumentSchema,
 } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
 
-const withTool = (check) => {
+const withTool = (check, role = 'Coder') => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-049-schema-'))
-  const tool = (definition) => definition
+  const tool = definition => definition
   tool.schema = z
   try {
-    check(createRegistered({ tool }, 'Coder', 'en', dir, null))
+    check(createRegistered({ tool }, role, 'en', dir, null))
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 }
 
+const sample = 'class Js extends JsProgram { async run() { return { ok: true }; } }'
 
-test('WHAT[repository-programming-049] program, unpark and abandon can each be sent alone', () => {
-  withTool((registered) => {
-    for (const name of ['program', 'unpark', 'abandon']) {
-      assert.equal(argumentSchema(registered, name).safeParse(undefined).success, true)
+test('WHAT[repository-programming-049] the only todowrite Host argument is required program:string', () => {
+  for (const role of ['Coder', 'Engineer', 'Manager', 'DevOps', 'Plan', 'Orchestrator']) {
+    withTool(handle => {
+      assert.deepEqual(argumentNames(handle), ['program'], `${role} must expose exactly one Host parameter`)
+      const program = argumentSchema(handle, 'program')
+      assert.equal(program.safeParse(undefined).success, false, 'program is required')
+      assert.equal(program.safeParse(null).success, false)
+      assert.equal(program.safeParse(42).success, false)
+      assert.equal(program.safeParse(sample).success, true)
+      assert.match(program.description, /program|JsProgram/)
+      const modelSchema = z.object({ program })
+      assert.deepEqual(z.toJSONSchema(modelSchema).required, ['program'])
+      assert.equal(modelSchema.safeParse({}).success, false, 'an empty tool call must be schema-invalid')
+      for (const retired of ['name', 'planB', 'unpark', 'abandon']) {
+        assert.equal(argumentSchema(handle, retired), null, retired + ' is not a Host tool argument')
+      }
+    }, role)
+  }
+})
+
+test('WHAT[repository-programming-049] tool description leads with the single required program shape', () => {
+  withTool(handle => {
+    const text = description(handle)
+    assert.match(text.slice(0,420), /program.*required|required.*program/i)
+    assert.match(text.slice(0,520), /class Js extends JsProgram/)
+    assert.match(text, /async run\(\)/)
+    assert.doesNotMatch(text.slice(0,520), /optional.*program/i)
+  })
+})
+
+test('WHAT[repository-programming-049] the actual OpenCode plugin exposes only required program to the LLM', async () => {
+  const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  await withExecutablePlugin(async hooks => {
+    for (const role of ['manager', 'engineer', 'devops', 'plan', 'orchestrator']) {
+      const registered = hooks.tool[`todowrite-for-${role}`]
+      assert.ok(registered, role + ' must expose a generated tool')
+      assert.deepEqual(Object.keys(registered.args), ['program'])
+      const schema = z.toJSONSchema(z.object(registered.args))
+      assert.deepEqual(schema.required, ['program'], role + ' must require program')
+      assert.equal(schema.properties.program.type, 'string')
+      assert.equal(z.object(registered.args).safeParse({}).success, false)
+      assert.match(registered.description.slice(0,520), /program.*required|required.*program|唯一.*program|program.*必填/i)
     }
-    const program = argumentSchema(registered, 'program')
-    assert.equal(program.safeParse('return 1').success, true)
-    assert.ok(program.description.length > 0)
-    assert.equal(argumentSchema(registered, 'unpark').safeParse({ handle: 'handle-1' }).success, true)
-    assert.equal(argumentSchema(registered, 'abandon').safeParse({ handle: 'handle-1' }).success, true)
   })
 })
-
-test('WHAT[repository-programming-049] unpark.value accepts an optional JSON value', () => {
-  withTool((registered) => {
-    const schema = argumentSchema(registered, 'unpark')
-    const input = { handle: 'handle-1', value: { selected: [1, 'two', null] } }
-    assert.deepEqual(schema.parse(input), input)
-    assert.deepEqual(schema.parse({ handle: 'handle-1' }), { handle: 'handle-1' })
-  })
-})
-
-test('WHAT[repository-programming-049] abandon declares only the handle', () => {
-  withTool((registered) => {
-    const schema = argumentSchema(registered, 'abandon').unwrap()
-    assert.deepEqual(Object.keys(schema.shape), ['handle'])
-    assert.equal(schema.shape.handle.safeParse(1).success, false)
-  })
-})
-
-
-test('WHAT[repository-programming-049] the description states who owns injected JSON', () => {
-  withTool((registered) => {
-    const text = description(registered)
-    assert.match(text, /arbitrary JSON/)
-    assert.match(text, /does not pre-validate/)
-  })
-})
-

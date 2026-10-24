@@ -1,5 +1,5 @@
   async park(payload) {
-    // 挂起本程序，把控制权交回编排层；工具调用返回 { handle, payload }，调用方用 { unpark: { handle, value } } 续接，或用 { abandon: { handle } } 放弃。
+    // 在此 await 点挂起并交回 { handle, payload }。公开工具入参始终只有 { program: string }；恢复／放弃走专用生命周期接口，不是 Host 工具参数。
     // 例如: const decision = await this.park({ stage: "review" });
   }
 

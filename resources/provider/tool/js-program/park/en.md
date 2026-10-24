@@ -1,4 +1,4 @@
-park(payload) — suspend this program at this await point and hand control back to the orchestrator. The tool call returns a top-level parked payload `{ handle, payload }`; the caller resumes with `{ unpark: { handle, value } }` or gives up with `{ abandon: { handle } }`.
+park(payload) — suspend this program at this await point and hand control back to the orchestrator. The result carries `{ handle, payload }` as a parked outcome, not as another tool-input shape. `todowrite-for-*` accepts only the required `program` string; resolve a parked site through the dedicated program lifecycle interface, never by sending top-level `unpark` or `abandon` tool arguments.
 
 The program sees park as an ordinary await of an external input: the resumed value is whatever the caller injects through unpark. The site stays alive in the host until it is resumed or abandoned; a parked program is not finished and its already-applied writes remain on disk (as-is).
 

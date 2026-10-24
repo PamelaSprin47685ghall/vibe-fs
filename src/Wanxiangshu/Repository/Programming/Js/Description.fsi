@@ -92,9 +92,6 @@ module JsCanonicalDescription =
         val ArgProgram: string = "tool/js-program/arg-program"
 
         [<Literal>]
-        val ArgName: string = "tool/js-program/arg-name"
-
-        [<Literal>]
         val MissingProgram: string = "tool/js-program/missing-program"
 
         [<Literal>]

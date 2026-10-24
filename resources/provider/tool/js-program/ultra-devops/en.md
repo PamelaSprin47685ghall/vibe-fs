@@ -5,7 +5,7 @@ class Js extends JsProgram {
     // in the index, once as the body section heading. The where call below
     // parks the program right there with { needle, candidates, nearest }.
     // Read the parked payload, pick the body heading's span, and resume with
-    // { unpark: { handle, value: [begin, end] } }: the await evaluates to the
+    // After lifecycle resume with selected [begin, end], the await evaluates to the
     // injected span and the program continues from that exact line. This is
     // the everyday park — the diagnosis points at the fix, one unpark call is
     // the whole repair; no rewrite, no abandon.

@@ -1,3 +1,8 @@
+TOOL CALL CONTRACT (REQUIRED): the **only** tool-call argument is `program: string`.
+Every call must supply `program`, containing a complete JavaScript class defining `class Js extends JsProgram` with `async run()`. Use the full working program in the Ultra Example later in this description; don't send an empty argument object.
+Do not call this tool with `{}`. Do not send top-level `name`, `planB`, `unpark`, or `abandon` fields.
+Parked results do not introduce any additional tool arguments; any lifecycle recovery is separate from this Host tool input.
+
 WARNING: You may be about to turn a bounded filesystem task into a self-inflicted repair job.
 
 The Host already owns this boundary. That is not a style preference; it is the execution contract.

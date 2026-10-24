@@ -1,5 +1,5 @@
   async park(payload) {
-    // Suspends this program at this await point and hands control back to the orchestrator; the tool call returns { handle, payload }, and the caller resumes with { unpark: { handle, value } } or gives up with { abandon: { handle } }.
+    // Suspends this program at this await point and returns { handle, payload }. The public tool input remains exactly { program: string }; resume/abandon belong to the separate lifecycle interface, not to Host tool arguments.
     // Example: const decision = await this.park({ stage: "review" });
   }
 

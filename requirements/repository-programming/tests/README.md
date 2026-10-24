@@ -16,18 +16,17 @@
 - 041 是生产接线的源码静态断言：lifecycle persistence 沿 PluginHostInterop → ToolRegistry.create → JsToolSpec/execute 与 PluginBoot → PluginRuntimeScope → ClearSession 贯通，执行链不留硬编码 None，四类事件同住单一审计流，ParkedSites 表不触碰 durable。它证明接线存在，不证明运行期审计真实落盘。
 - 045—047 真实运行主原语面：cat/ls/stat/mkdir 的成功与稳定失败形态、write 覆盖与读快照冲突、whereAll 规范化匹配与 from、where 唯一/零/多三态与 park 注入、组合模式（find/replace、批量替换、append、锚点切片、grep/glob 组合）。长程异步与内存隔离仍沿 006 的 TODO，不在本批外推。
 - 048 真实运行 parked source：完整程序回传、挂起行 `>| ` 标记、where 调用点标记与渲染字面块；栈解析失败的降级路径未单独造桩。执行点换算同属本条款：经 `eval` 求值字符串的 park 落在程序自身的 `await eval(...)` 调用行，不落到被求值字符串自己的行号上（该行号与程序行号数值可相同，按数值范围判定会误标）；parked handle 以显式 abandon 收尾。
-- 049 以真实 ToolSpec 装配检查 unpark.value 的 host schema 为可选任意值，并核对描述中的自由注入责任文案。
 - 050 真实运行 js.call 单进程循环：规格拒绝、前台命令与结构化结局、onExit 退出码派发、check abort 杀死命令、check park 挂起与 unpark 继续、maxDuration 超时。
 - 051 真实运行多进程代数：spawn 后台、waitFor 端口就绪、signal 收割、waitFor 超时与未知后台稳定码、后台崩溃经 backgrounds 观察并 abort。
 - 052 以本地限速 Range 服务器真实驱动 `wget -c`：中断后断点续传、部分文件保留、逐文件 park 汇报、404 退出码 8 分派给 onExit。wget 缺失或网络不可达的环境不适用。
-- 049 核对生成工具的调用面（program/unpark/abandon 仍互斥，unpark.value 自由）。
+- 049 从真实注册的 Host 工具逐角色验证参数列表恰好为 `program`、非 optional、JSON Schema `required = ["program"]`；描述最前面交代唯一必填参数与完整 JsProgram 类模板。
 - 054 （原 deliver 成员测试已随条款废除；子智能体改为自然停机）。
 - 055 真实运行 vm 并行边界：Promise.all 并行读写、allSettled 兄弟失败不撤销已落盘写、十六路 cat 批处理。
 - 056 委托原语端到端：fork/join/fission 返回数据信封（缺名派生、拒绝信封不抛、无宿主 DELEGATION_UNAVAILABLE）、`dag` 波次推进与依赖记录传递、节点失败 park 后注入 `"skip"` 收尾。056 另见证作废分支：一个已作废的子工作在 join 记录里以 `status = "voided"` 出现（`returned` 为空数组，既非 `completed` 也非 `undelivered`），并让 `dag` 以 `code = "node-voided"` 挂起——作废结清了这份义务，父方据此自行决定重试、跳过或替换。
 - 057 真实运行 ls 的 ignore 语义（逐级 `.gitignore`、否定模式、嵌套规则、根 `.git/info/exclude`）与 glob/grep 退役后的组合写法（walk + `cat` + `whereAll`）。
 - 059 （原 this.deliver 材料记录与去重测试已随条款废除）。
 - 063 （原顶层视图声明捕获测试已随协议废除）。
-- 064 真实运行调用面三态互斥：同时给出两个状态以 `INVALID_ARGUMENT` 拒绝且原因点名冲突字段，程序不跑、不消费被点名的 handle、不留待下一请求消费的视图声明；单状态调用（program / unpark / abandon）各自照常生效，无状态调用报缺少 program。
+- 064 真实运行公开 Host 单入参合同：仅 `program` 必填、无需模型提供 `name`；缺少 `program` 时无副作用，旧顶层 `unpark`/`abandon` 参数无法替代程序、不能消费挂起现场。底层 workflow 的私有恢复与持久化审计仍由 030—041 等用例独立覆盖。
 
 2026-10-18 交付验证：`node scripts/build.mjs` 构建成功（169 surfaces、813 模块链接闭合），本包 001-059 全套 278 例 0 败 0 跳 7 todo（045-058 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema、js.call 单进程/多进程循环、wget 断点续传剧本、view 声明捕获、deliver 显式终值、vm 并行边界、委托原语信封与 dag park、ls 的 ignore 语义与 walk/search 组合、file/edit/rewrite 退役后的组合替代，以及 js.call 的交互 send 形态）。直连文件工具已整体退役（GAP-235）：005/007/010/016 的旧实现回归删除，020 改走 js `mv`/`rm` 成员，026 改走 `runObserved`。全量 unit 套件同版本 **865 文件 5113 例 0 败**（GAP-231 ~ GAP-237 CLOSED）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护相关 TODO 随退役收窄；未闭合范围见 GAP-088。
 

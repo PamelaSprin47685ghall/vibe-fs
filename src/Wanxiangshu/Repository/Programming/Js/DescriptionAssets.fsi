@@ -8,6 +8,5 @@ open Wanxiangshu.Participant.Provider
 module JsDescriptionAssets =
     val load: lang: ProviderLanguage -> JsCanonicalDescription.Prose
     val argProgram: lang: ProviderLanguage -> string
-    val argName: lang: ProviderLanguage -> string
     val missingProgram: lang: ProviderLanguage -> string
     val viewDeclarationExtra: lang: ProviderLanguage -> string

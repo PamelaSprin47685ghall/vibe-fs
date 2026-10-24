@@ -1,3 +1,8 @@
+工具调用合同（必填）：唯一的工具参数是 **`program: string`**。
+每次调用都必须携带完整的 JavaScript `program`，定义 `class Js extends JsProgram` 并实现 `async run()`。程序写法见下文唯一的 Ultra Example，不得发送空参数。
+不可发送空参数 `{}`；不可在工具顶层填写 `name`、`planB`、`unpark` 或 `abandon`。
+程序挂起后的生命周期恢复不属于本工具的 JSON 入参，工具参数始终只有 program。
+
 警告：你正准备把一个本来有边界保护的文件任务，亲手变成一场返工事故。
 
 Host 已经拥有这层边界。这不是风格偏好，而是执行合同。

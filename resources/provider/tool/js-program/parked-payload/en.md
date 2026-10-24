@@ -1,6 +1,6 @@
 The tool call returned a parked payload because the program suspended at `await this.park(payload)`.
 
-- `handle` identifies the parked site. It is consumed exactly once: resume with `{ unpark: { handle, value } }` or give up with `{ abandon: { handle } }`.
+- `handle` identifies the parked site. A lifecycle resume or abandon consumes it once. These are not top-level `todowrite-for-*` arguments: that tool requires exactly `program: string`.
 - `payload` is the value the program passed to park. It is the program's own data, not a host verdict.
 - A parked site is process-live: it dies with the process. While it is unresolved, delivery stays blocked by the leak guard gate.
 

@@ -4,7 +4,7 @@ class Js extends JsProgram {
     // "dataset-3" 在清单里出现两次——索引里一次、正文小节标题一次。下面这行
     // where 会把程序就地 park，载荷是 { needle, candidates, nearest }。
     // 读 parked 载荷，选中正文标题那个 span，用
-    // { unpark: { handle, value: [begin, end] } } 恢复：await 求值为注入的
+    // 由生命周期接口注入选定的 [begin, end] 后：await 求值为注入的
     // span，程序从原行继续。这就是日常的 park——诊断直接指出修复位置，
     // 一次 unpark 就是全部修理；不用重写、不用 abandon。
     const manifest = await this.cat("downloads/manifest.md");

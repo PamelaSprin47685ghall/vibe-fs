@@ -162,11 +162,11 @@ Manager 的 `todowrite-for-manager` 程序入口始终按角色准入；仓库�
 
 ## [032] unpark 恢复
 
-以 `{ unpark: { handle, value } }` 调用恢复挂起程序：恢复后的程序继续运行到完成，返回继续结果（Succeeded，无 handle）；挂起点的 await 表达式求值为注入值。未知 handle 报 `HANDLE_UNKNOWN`。恢复后的程序再次 park 时返回新的 parked 载荷与新 handle。调用面一次只携带 program/unpark/abandon 之一，同时给出两个及以上按 `INVALID_ARGUMENT` 拒绝（见 [064]）。
+内部 `JsToolWorkflow` 的挂起现场可由生命周期恢复通道注入 `{ handle, value }` 继续原程序，完成后得到 Succeeded；挂起点的 await 表达式求值为注入值。未知 handle 报 `HANDLE_UNKNOWN`，恢复后的程序再次 park 返回新的 parked 载荷及 handle。**生命周期动作不是 `todowrite-for-*` 的 Host 工具参数**，该工具面向模型的唯一必填参数仍是 `program`（见 [049]、[064]）。
 
 ## [033] handle 恰好消费一次
 
-一个 handle 只被消费一次：第一次 unpark 恢复程序，第二次对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。abandon 同样消费 handle：abandon 之后对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。对未知 handle 的 abandon 也报 `HANDLE_UNKNOWN`。被状态冲突拒绝的调用不消费 handle：现场原样留在现场表里（见 [064]）。
+一个 handle 只被消费一次：第一次 unpark 恢复程序，第二次对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。abandon 同样消费 handle：abandon 之后对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。对未知 handle 的 abandon 也报 `HANDLE_UNKNOWN`。生命周期通道的非法恢复或权限拒绝都不消费对应 handle；现场仍由拥有者管理。公开 Host schema 的约束另见 [064]。
 
 ## [034] abandon 与程序侧 finalizer
 
@@ -240,7 +240,7 @@ rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INV
 
 原语只提供动词，不提供编辑 DSL：find/replace = `cat → where → 拼接 → write`；批量替换 = 一次 `whereAll` 加反向拼接；append = `cat + write`；锚点切片 = 两次 `where`（第二次带 `from`）；**枚举与内容搜索 = `rg(argv)`**（等价于 `rg --json` 加上这一个 argv，返回 JSON 对象；写法见双语资源 `tool/js-program/recipes`）。`cat`/`ls`/`rg`/`stat`/`write`/`mkdir`/`where`/`whereAll` 与 rm/mv 共享统一路径解析语义（支持跨越工作区访问合法路径，由操作系统文件权限约束）与 as-is 纪律。
 
-教学资源 `tool/js-program/header` 与 `tool/js-program/park` 双语成对，声明主原语、组合模式、where 歧义契约与 unpark 自由值契约；`tool/js-program/contract` 不再声称 all-or-nothing 提交，失败经验与 as-is 语义一致。
+教学资源 `tool/js-program/header` 与 `tool/js-program/park` 双语成对，首先声明 Host 工具唯一必填的 `program`，再介绍主原语、组合模式、where 歧义与内部生命周期契约；`tool/js-program/contract` 不再声称 all-or-nothing 提交，失败经验与 as-is 语义一致。
 
 ## [048] parked source 与 unpark 自由值
 
@@ -250,9 +250,9 @@ parked 载荷的 `source` 字段携带完整程序与执行点标记（[037]）�
 
 只有程序帧参与换算：经 `eval` 求值字符串的帧其尾随位置是该字符串自身的行号，与程序行号可能数值相同，按数值范围判定会误标到无关的程序行上；这类帧不参与，标记落在程序自身的调用点上。栈缺失、栈不可读、栈中无程序帧时降级为整篇 ` | `，不误标、不让 park 失败。
 
-## [049] unpark.value 自由值
+## [049] 生成编程工具的 program 参数是唯一必填参数
 
-`unpark.value` 的 host schema 是任意 JSON 值（可选），执行端零校验；注入值的语义由 park 点定义，错误注入由下游自然失败。工具描述与 `tool/js-program/park` 资源明确这一责任边界。
+所有公开 `todowrite-for-*` Host ToolSpec 的参数列表**恰好**为 `["program"]`，其 schema 是非 optional 的 string；模型提供的 JSON Schema 中 `required` 必须包含 `program`，`{}` 不能通过验证。工具名与角色不同不改变这一点。`name` 由 Host 的实际 provider-run/tool-call 身份推导，`planB`、`unpark`、`abandon` 均不再作为工具参数暴露；挂起恢复属于 JS 程序内的生命周期接口与其私有执行通道，不应要求模型构造第二种顶层工具入参。工具描述最前面必须明确唯一参数、必填性与完整的 JsProgram 类模板。
 
 ## [050] js.call：一条命令
 
@@ -312,13 +312,11 @@ Host 原生 `run` 与 pty 工具已退役。交互是 `this.send(input)` 与 `th
 
 模型视野之外的名字一律保留 `js` 前缀，不做改名：durable 流名（`js-tools/transactions`、`js-tools/lifecycle-audit`）、资源目录（`js-program`、`js-plan`、`js-bookkeeper`）、`RuntimeBindingKey`（`js.cat`、`js.where`、`js.park` …）与包装器内部哨兵（`__jsParked`/`__jsAbandoned`/`__jsFailure`）。理由：这些名字是 durable 身份与机器对机器契约（流名改名等于数据迁移，哨兵改名等于重放保真风险），而模型看到的是 `todowrite-for-ROLE` 工具名与成员名——模型面与机器面本就应当分离。此裁决与第 28 轮改名（门面级命名即教学）不冲突：改的是模型面，不动机器面。
 
-## [064] 调用面三态互斥：program / unpark / abandon
+## [064] 单一 Host 编程入参：必填 program
 
-一次编程调用只携带一个状态：`{ program }`、`{ unpark: { handle, value } }`、`{ abandon: { handle } }` 三者互斥。三个参数在调用面上都是可选的，模型只发其中之一（[049]）。
+模型调用 `todowrite-for-ROLE` 时只能使用 `{ program: string }`，不得发送 `{}`，也不得提供 `name`、`planB`、`unpark`、`abandon` 顶层字段。真实注册的 Zod 单字段 schema 以及经过 JSON Schema 转换后的 `required = ["program"]` 都必须符合该约束。代码字符串里恰好定义一个 `class Js extends JsProgram` 并实现 `async run()`；不应让工具说明的长篇工作纪律抢在调用格式之前。
 
-同时给出两个及以上（例如 `{ program, abandon }`）按 `INVALID_ARGUMENT` 拒绝，reason 点名冲突的字段名。拒绝是零效果：程序不执行、不恢复、不放弃，不产生任何文件效果，也不留待下一请求消费的视图声明；被点名的 handle 不被消费——现场原样留在现场表里，等模型用单状态调用处置（[030]、[032]、[033]、[039]）。
-
-一个状态都不给是缺状态，不是状态冲突：报缺少 program 的错误（`missing 'program' argument`），不执行任何程序。
+即使绕开模型 schema 直接调用执行器，缺少 `program` 也必须以稳定的 `missing 'program' argument` 拒绝且无效果。原有 `ToolWorkflow` park 现场及回执仍是内部能力，不可再让 Host 工具对模型暴露三态入口；测试以真实注册 ToolSpec 检查，不能只检查一个文本片段。
 
 ## [065] 宿主对同一助理消息内多个工具调用的确定性串行派发
 

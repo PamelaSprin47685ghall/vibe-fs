@@ -1,8 +1,6 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
 open System.Threading.Tasks
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
@@ -18,12 +16,6 @@ open Wanxiangshu.Participant.Provider
 /// asks this module for the decisions.
 [<RequireQualifiedAccess>]
 module JsToolPolicy =
-
-    [<Emit("$0 !== null && $0 !== undefined && Object.prototype.hasOwnProperty.call($0, $1)")>]
-    let private hasProperty (value: obj) (name: string) : bool = jsNative
-
-    [<Emit("$0 !== null && $0 !== undefined")>]
-    let private isPresent (value: obj) : bool = jsNative
 
     /// The directory one session's js-* surface executes in.
     ///
@@ -76,15 +68,11 @@ module JsToolPolicy =
     let argProgramProse () : string =
         JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ())
 
-    /// The prose of the required `name` argument.
-    let argNameProse () : string =
-        JsDescriptionAssets.argName (ProviderLanguageBinding.readGlobalPreference ())
-
     /// The prose of the refusal of a call that carries no state at all.
     let missingProgramProse () : string =
         JsDescriptionAssets.missingProgram (ProviderLanguageBinding.readGlobalPreference ())
 
-    /// The refusal tool result when no program/unpark/abandon state was provided.
+    /// The refusal tool result when the required Host program argument is absent.
     let missingProgramResult () : string =
         ToolResultText.tomlObject [ "error", ToolResultText.TString(missingProgramProse ()) ]
 

@@ -1,4 +1,4 @@
-park(payload) —— 在这个 await 点挂起程序，把控制权交还编排层。工具调用返回顶级 parked 载荷 `{ handle, payload }`；调用方以 `{ unpark: { handle, value } }` 恢复，或以 `{ abandon: { handle } }` 放弃。
+park(payload) —— 在这个 await 点挂起程序，把控制权交还编排层。返回的 `{ handle, payload }` 是挂起结果，不是另一种工具入参。`todowrite-for-*` 只接收必填 `program` 字符串；恢复或放弃挂起现场应经程序生命周期的专用接口，不得把 `unpark` 或 `abandon` 放入工具顶层参数。
 
 程序视角里 park 只是一次对外部输入的普通 await：恢复值就是调用方经 unpark 注入的东西。现场在宿主中保持存活，直到被恢复或放弃；挂起的程序不算结束，已落盘的写保持原样（as-is）。
 

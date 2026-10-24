@@ -73,8 +73,10 @@ test('WHAT[repository-programming-005] JS002_description_embeds_spec_base_class_
 test('WHAT[repository-programming-005] JS010_description_never_dilutes_the_ultra_example', () => {
   for (const role of ['Engineer', 'DevOps']) {
     const result = surface(role, rolePermissions(role.toLowerCase()))
-    const classes = result.description.match(/class Js extends JsProgram/g) ?? []
-    assert.ok(classes.length <= 1, `${role} description must not dilute the Ultra Example with toy examples`)
+    // The short, non-executable tool-call contract also names the required
+    // class signature. Count *actual JS code blocks*, not prose mentions.
+    const examples = result.description.match(/```js\s*\n\s*class Js extends JsProgram/g) ?? []
+    assert.ok(examples.length <= 1, `${role} must have just one executable Ultra Example, not toy programs`)
     assert.match(result.description, /Semantic branches belong between programs/)
   }
 })
