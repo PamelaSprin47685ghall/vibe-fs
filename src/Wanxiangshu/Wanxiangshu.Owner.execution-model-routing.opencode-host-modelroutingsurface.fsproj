@@ -15,7 +15,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-fissionhostsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionexecutionbinding.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.context-compression.opencode-host-declaredcontextlimit.fsproj"/>
     <Compile Include="OpenCode/Host/ModelRoutingSurface.fsi"/>
     <Compile Include="OpenCode/Host/ModelRoutingSurface.fs"/>
     <Compile Include="OpenCode/Host/ChatParamsHook.fsi"/>

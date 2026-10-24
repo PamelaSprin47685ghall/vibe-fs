@@ -33,6 +33,9 @@ open Wanxiangshu.Participant.Provider.Projection
 /// 不再新增。同 epoch 内前次 provider wire 必须是后次 wire 的字节前缀（ARCH-004）。
 module PairProgrammingThoughtTransform =
 
+    [<Import("ProviderCalibration", "wanxiangli/provider-calibration")>]
+    let private calibration: obj = jsNative
+
     [<RequireQualifiedAccess>]
     type CursorPresentationOwner = | PairGuidance
 
@@ -1077,13 +1080,18 @@ module PairProgrammingThoughtTransform =
 
             let tokenEconomy =
                 projectionSessionIdOpt
-                |> Option.bind ProviderTokenUse.tryFind
-                |> Option.map (fun usage ->
-                    PairProgrammingCalibration.renderTokenEconomy language usage.Cached usage.Uncached)
+                |> Option.bind (fun sessionId ->
+                    let observed = calibration?usage(sessionId)
+                    if isNull observed then None
+                    else Some(unbox<int> observed?cached, unbox<int> observed?uncached))
+                |> Option.map (fun (cached, uncached) ->
+                    PairProgrammingCalibration.renderTokenEconomy language cached uncached)
 
             let contextLimit =
                 projectionSessionIdOpt
-                |> Option.bind DeclaredContextLimit.tryFind
+                |> Option.bind (fun sessionId ->
+                    let observed = calibration?limit(sessionId)
+                    if isNull observed then None else Some(unbox<int> observed))
                 |> Option.map (PairProgrammingCalibration.renderContextLimit language)
 
             let messages, anchorBlock = messages, None

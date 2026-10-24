@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open Wanxiangshu.Execution.Routing
 
 open System
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
@@ -14,6 +15,9 @@ open Wanxiangshu.Persistence.Journal
 /// established the lease and projected model+variant before the provider reaches this hook;
 /// the hook reads the exact committed lease and only fails closed when a managed run has none.
 module ChatParamsHook =
+
+    [<Import("ProviderCalibration", "wanxiangli/provider-calibration")>]
+    let private calibration: obj = jsNative
 
     let private normalizeText text =
         if String.IsNullOrWhiteSpace text then
@@ -151,7 +155,7 @@ module ChatParamsHook =
 
     let private recordDeclaredLimit (input: obj) =
         match trySessionId input, declaredContextLimit input with
-        | Some sessionId, Some limit -> DeclaredContextLimit.record (SessionId.value sessionId) limit
+        | Some sessionId, Some limit -> calibration?recordLimit(SessionId.value sessionId, limit) |> ignore
         | _ -> ()
 
     /// Managed-ness is durable evidence: only a message this plugin durably

@@ -590,6 +590,15 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **本次精确落点。** wanxiangli `b5187fc07d3da16ed14ad097c5bd0c01ecde822d` 已推送 main，宿主 gitlink 固定此提交；localspace-js 共享期限实现 `42da3a896f1ac322dd7622cf00ffe07779563b99`、参数文档 `03991b87882e3d0974fc95927601eba2ce531a21` 及测试导入修复 `78e83c4073c0950a7b1b091e360c673f1fd7a9ee` 已在 main；后者完整 npm test、typecheck 与独立生产构建均重新通过。宿主实现提交 `5e22533250926d82dee34470913ebf18156b2801` 已推送 master。主仓及库回归是在保留初始并发改动的实际工作树上运行；原有修改未被本任务暂存，不宣称为干净 checkout 全仓通过。
 
 
+
+### 6.9 Provider Calibration 状态抽取（2026-10-24）
+
+- **一份状态，一个 owner。** 原宿主 ProviderTokenUse 和 DeclaredContextLimit 各自保存可变会话字典。现在由 wanxiangli/provider-calibration 的 ProviderCalibration 进程内自治对象统一持有最新 provider 缓存/非缓存 token 数与模型声明上下文上限；两条观测分别更新，未知数据不猜。宿主只在真实 message.updated 和 chat.params 物理接口提取值，Pair Hint 直接读取库对象。
+- **旧 owner 彻底退出。** 删除四个旧 .fs/.fsi 文件、原 owner 编译 shard 和两处 ProjectReference，清理 compile-order.txt。真实 session.deleted 使库 owner 同时清除两种观测。没有宿主内第二份字典、兼容转发 facade 或假造的 model-capacity authority。
+- **逐层验证。** 独立 Fable 编译 provider-calibration 通过；状态隔离及 12,000 次伪随机交错参考模型测试通过；npm exports/files 门禁通过；实际 tarball 在隔离目录安装后的 Node 与 Bun ESM 消费都通过。宿主 node scripts/build.mjs 成功（最终 generation 139，782 个 emitted modules linked）；context-compression-001 注册 OpenCode chat.params / message.updated / session.deleted 的物理测试通过；相关 47 项测试中 46 pass、1 TODO。
+- **未闭合边界。** context-compression-001 的 GAP-104（模型容量权威独立审计）仍为 TODO。尚未进行真实 provider 会话 canary，不宣称运行中的 OpenCode 实例已热更新。本次 node scripts/check.mjs 仍有既有 25 项红态：Host/FissionPort.fs namespace-tier 1 项及并行改动涉及的 control-pyramid 24 项，不把它们算成本包通过。
+
+
 ---
 
 ## 7. 迁移来源文件全量清单与保留/删除边界

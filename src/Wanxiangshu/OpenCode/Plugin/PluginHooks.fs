@@ -71,6 +71,9 @@ open PluginHostInterop
 
 module PluginHooks =
 
+    [<Import("ProviderCalibration", "wanxiangli/provider-calibration")>]
+    let private calibration: obj = jsNative
+
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
@@ -956,7 +959,7 @@ module PluginHooks =
 
                 observation
                 |> Option.iter (fun (sessionId, (cached, uncached)) ->
-                    ProviderTokenUse.record (SessionId.value sessionId) cached uncached)
+                    calibration?recordUsage(SessionId.value sessionId, cached, uncached) |> ignore)
 
             let closeScopeOnSessionDeleted (rawInput: obj) =
                 let raw = HostEventEnvelope.unwrap rawInput
@@ -964,6 +967,7 @@ module PluginHooks =
                     HostEventEnvelope.trySessionId raw
                     |> Option.iter (fun sessionId ->
                         Surface.clearSessionState (SessionId.value sessionId)
+                        calibration?clearSession(SessionId.value sessionId) |> ignore
                         PluginTransforms.negotiationForgetSession (SessionId.value sessionId))
 
             let observeEvent raw =
