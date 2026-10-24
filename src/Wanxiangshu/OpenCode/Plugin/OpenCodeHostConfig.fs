@@ -12,6 +12,7 @@ open Wanxiangshu.Host.Ports
 /// sees the live object, never a stale snapshot.
 type LiveHostConfig(config: obj) =
 
+    // DSL-MUTABLE: resource — 宿主在 config 钩子里交付的活配置对象，用原地替换而非重建端口。
     let mutable current = config
 
     let writeLeaf (node: obj) (leaf: string) (value: HostSettingValue) : unit =

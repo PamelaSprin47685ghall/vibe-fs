@@ -676,9 +676,16 @@ module Reducer =
                 target
 
         let settle (target: InquiryState) =
+            let accumulated =
+                (target.SettledUsage, usage.Resources)
+                ||> Map.fold (fun acc resource amount ->
+                    let existing = acc |> Map.tryFind resource |> Option.defaultValue 0.0
+                    Map.add resource (existing + amount) acc)
+
             Ok
                 { target with
-                    SettledUsage = usage.Resources }
+                    SettledUsage = accumulated
+                    SettledMoneyMinor = target.SettledMoneyMinor + (usage.MoneyMinor |> Option.defaultValue 0L) }
 
         // An audit with no outstanding reservation is still bookable.
         let bookAudit (target: InquiryState) = settle (recordOverrun target)

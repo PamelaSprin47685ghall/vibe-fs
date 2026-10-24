@@ -19,7 +19,8 @@ module Events =
         task {
             try
                 do! listener signal
-            with _ -> ()
+            with _ ->
+                ()
         }
 
     /// HNI P-07: host-neutral signal source for OpenCode host events.
@@ -29,8 +30,8 @@ module Events =
 
         member _.Publish(signal: HostSignal) : Task =
             task {
-                let snapshot =
-                    lock syncRoot (fun () -> listeners.ToArray())
+                let snapshot = lock syncRoot (fun () -> listeners.ToArray())
+
                 for listener in snapshot do
                     do! notifyOne listener signal
             }
@@ -38,6 +39,7 @@ module Events =
         interface ISignalSource with
             member _.Subscribe(listener: HostSignal -> Task) : IDisposable =
                 lock syncRoot (fun () -> listeners.Add listener)
+
                 { new IDisposable with
                     member _.Dispose() =
                         lock syncRoot (fun () -> listeners.Remove listener |> ignore) }

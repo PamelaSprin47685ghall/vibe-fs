@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Mission.Work
 
-open Wanxiangshu.Execution.Tool
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Participant.Provider

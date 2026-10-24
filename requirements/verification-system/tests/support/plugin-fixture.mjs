@@ -251,7 +251,7 @@ export const awaitPrompted = (sessionId) => {
  * returns the already-registered entries rather than booting second owners.
  */
 export const withExecutablePlugin = async (body, options = {}, createHooks = initSpikePlugin) => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-exec-'))
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), 'wxs-plugin-exec-')))
   const previousHome = process.env.HOME
   const previousUserProfile = process.env.USERPROFILE
   const routingHome = setupRoutingHome(directory)

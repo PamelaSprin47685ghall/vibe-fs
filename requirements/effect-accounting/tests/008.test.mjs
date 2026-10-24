@@ -3,9 +3,23 @@ import assert from 'node:assert/strict'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { countFactCase } from '../../verification-system/tests/e2e/support/journal-observer.js'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+
+const countCheckpointFacts = (directory) => {
+  const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
+  let count = 0
+  for (const file of readdirSync(eventsDir).filter((file) => file.endsWith('.ndjson'))) {
+    const content = readFileSync(join(eventsDir, file), 'utf8')
+    const events = content.split('\n').filter(Boolean).map((line) => JSON.parse(line))
+    count += countFactCase(events, 'ViewCheckpointCommitted')
+  }
+  return count
+}
 
 integrationTest('WHAT[effect-accounting-008] programming surface with view commits its compression checkpoint only after execution succeeds', async () => {
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'effect-008-todowrite'
     const callID = 'effect-008-todo-1'
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
@@ -13,25 +27,28 @@ integrationTest('WHAT[effect-accounting-008] programming surface with view commi
     const beforeOutput = {
       args: {
         program: 'class Js extends JsProgram { async run() { return {}; } }',
-        prefixUntil: 0,
-        carry: [],
       },
     }
 
     await hooks['tool.execute.before']({ tool: 'todowrite-for-engineer', sessionID, callID }, beforeOutput)
+    assert.deepEqual(
+      beforeOutput.args,
+      { program: 'class Js extends JsProgram { async run() { return {}; } }' },
+      'plugin must not rewrite raw provider arguments on todowrite-for-*',
+    )
 
     const beforeSnapshot = journalSurface.JournalSurface_snapshot(runtime.journal)
-    assert.deepEqual(beforeSnapshot.viewCheckpoints, [], 'before admission must not commit a checkpoint')
+    assert.equal(beforeSnapshot.viewCheckpoints, undefined, 'before admission must not commit a checkpoint')
 
     await hooks['tool.execute.after'](
       { tool: 'todowrite-for-engineer', sessionID, callID, args: beforeOutput.args },
       { title: 'todowrite-for-engineer', output: 'ok', metadata: {} },
     )
 
-    assert.deepEqual(
+    assert.equal(
       journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
-      [],
-      'after runs while the Host tool part is still running',
+      undefined,
+      'after must not commit a checkpoint',
     )
 
     await hooks.event({
@@ -47,8 +64,6 @@ integrationTest('WHAT[effect-accounting-008] programming surface with view commi
               status: 'completed',
               input: {
                 program: 'class Js extends JsProgram { async run() { return {}; } }',
-                prefixUntil: 0,
-                carry: [],
               },
             },
           },
@@ -57,17 +72,13 @@ integrationTest('WHAT[effect-accounting-008] programming surface with view commi
     })
 
     const afterSnapshot = journalSurface.JournalSurface_snapshot(runtime.journal)
-    assert.deepEqual(afterSnapshot.viewCheckpoints, [
-      {
-        sessionId: sessionID,
-        checkpoints: [{ callId: callID }],
-      },
-    ])
+    assert.equal(afterSnapshot.viewCheckpoints, undefined, 'completed programming surface call commits no checkpoint')
+    assert.equal(countCheckpointFacts(directory), 0, 'no ViewCheckpointCommitted fact is emitted')
   })
 })
 
 integrationTest('WHAT[effect-accounting-008] programming surface failure does not commit a compression checkpoint', async () => {
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'effect-008-todowrite-failed'
     const callID = 'effect-008-todo-failed-1'
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
@@ -75,8 +86,6 @@ integrationTest('WHAT[effect-accounting-008] programming surface failure does no
     const beforeOutput = {
       args: {
         program: 'class Js extends JsProgram { async run() { return {}; } }',
-        prefixUntil: 0,
-        carry: [],
       },
     }
 
@@ -100,8 +109,6 @@ integrationTest('WHAT[effect-accounting-008] programming surface failure does no
               status: 'error',
               input: {
                 program: 'class Js extends JsProgram { async run() { return {}; } }',
-                prefixUntil: 0,
-                carry: [],
               },
             },
           },
@@ -109,7 +116,8 @@ integrationTest('WHAT[effect-accounting-008] programming surface failure does no
       },
     })
 
-    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, [])
+    assert.equal(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, undefined)
+    assert.equal(countCheckpointFacts(directory), 0)
   })
 })
 

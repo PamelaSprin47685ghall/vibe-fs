@@ -36,11 +36,7 @@ module AdvisorSeat =
     /// from an older provider run — a sticky replayed terminal or the view prompt finishing first —
     /// never settles the consult, and the recorded fence advances so a later consult cannot accept
     /// an earlier consult's answer either.
-    val consult:
-        deps: AdvisorSeatDeps ->
-        callerSessionId: string ->
-        intent: string ->
-                Task<Result<string, string>>
+    val consult: deps: AdvisorSeatDeps -> callerSessionId: string -> intent: string -> Task<Result<string, string>>
 
     /// Drop one caller session's seat (tests + session close). The advisor child itself is left to
     /// the Host's own session teardown: the seat owns no durable link to close.

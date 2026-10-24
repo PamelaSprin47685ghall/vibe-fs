@@ -111,7 +111,7 @@ module AgentJournalPortAdapter =
                     authority.PendingClaims
                     |> Map.exists (fun _ claim ->
                         claim.Origin = PromptAuthority.PromptOrigin.Continuation
-                                           PromptAuthority.ContinuationKind.JoinGuard
+                            PromptAuthority.ContinuationKind.JoinGuard
                         && claim.PayloadDigest = payloadDigest))
                 |> Option.defaultValue false }
 
@@ -137,8 +137,7 @@ module AgentJournalPortAdapter =
                     sessionProj
                     |> Option.map (fun s ->
                         { XTrace = s.XTrace
-                          PrefixEpoch = s.PrefixEpoch
-                        })
+                          PrefixEpoch = s.PrefixEpoch })
 
                 { State = wireState
                   IsCompanion = isComp

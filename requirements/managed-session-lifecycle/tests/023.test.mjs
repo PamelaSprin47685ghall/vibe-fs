@@ -3,7 +3,6 @@ import test from 'node:test'
 import * as identity from '../../../dist/Participant/Persona/Surface.js'
 import * as capability from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
-
 test('WHAT[managed-session-lifecycle-023] production identity resolution rejects legacy names without promoting them', () => {
   for (const name of identity.legacyNames) {
     const result = identity.resolveParticipantIdentityAtRoot(name)

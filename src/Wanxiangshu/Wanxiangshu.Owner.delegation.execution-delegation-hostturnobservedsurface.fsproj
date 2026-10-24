@@ -56,6 +56,8 @@
     <Compile Include="Host/Domain/CommandDeclaration.fs"/>
     <Compile Include="Host/Domain/DelegationCommand.fsi"/>
     <Compile Include="Host/Domain/DelegationCommand.fs"/>
+    <Compile Include="Host/Domain/NegotiationTransport.fsi"/>
+    <Compile Include="Host/Domain/NegotiationTransport.fs"/>
     <Compile Include="Execution/Delegation/Fork/DelegationEnvironment.fsi"/>
     <Compile Include="Execution/Delegation/Fork/DelegationEnvironment.fs"/>
     <Compile Include="Execution/Delegation/Fork/Command.fsi"/>

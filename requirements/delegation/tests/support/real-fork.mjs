@@ -88,18 +88,12 @@ export const childTurn = async (hooks, runtime, child, run, prose, material, awa
     ],
   }
   runtime.pushHostMessage(child, assistant)
-  const user = {
-    info: {
-      id: physical.id,
-      role: 'user',
-      sessionID: child,
-      agent: role,
-      model: { providerID: 'provider', modelID: 'engineer-model' },
-      time: { created: 1 },
-    },
-    parts: physical.parts ?? [],
-  }
-  await hooks['experimental.chat.messages.transform']({ sessionID: child }, { messages: [user] })
+  const history = await runtime.client.session.messages({ path: { id: child } })
+  const messages = history.data.map(message => ({
+    ...message,
+    info: { ...(message.info ?? message), sessionID: child },
+  }))
+  await hooks['experimental.chat.messages.transform']({ sessionID: child }, { messages })
   if (material !== null && material !== undefined) {
     const result = await hooks.tool[`todowrite-for-${role}`].execute(
       {

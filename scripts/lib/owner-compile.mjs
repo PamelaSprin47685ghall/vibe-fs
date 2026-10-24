@@ -1776,6 +1776,7 @@ function removeUnemittedOutputs(outputDir, stagingOutputDir, sourceDirectory, co
  */
 export async function compileIncremental({
   changedPaths,
+  isClean = false,
   root = REPO_ROOT,
   projectDirectory,
   aggregatePath = null,
@@ -1874,7 +1875,9 @@ export async function compileIncremental({
       // Do not wipe the output tree. A deleted source's JavaScript is removed
       // by the caller that knows which file left the shard; wiping every
       // sibling is a full rebuild under another name.
-      if (!fs.existsSync(resolvedOutputDir)) {
+      if (isClean) {
+        resetOutputDirectory(resolvedOutputDir)
+      } else if (!fs.existsSync(resolvedOutputDir)) {
         fs.mkdirSync(resolvedOutputDir, { recursive: true })
       }
 

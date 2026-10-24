@@ -75,7 +75,8 @@ module HostForkJoin =
                 HandleProjection.tryFind record.Handle projection |> Option.defaultValue record
             | None -> record
 
-        let voided = summaryRecord.Lifecycle = HandleLifecycle.Abandoned HandleAbandonReason.Voided
+        let voided =
+            summaryRecord.Lifecycle = HandleLifecycle.Abandoned HandleAbandonReason.Voided
 
         let owned =
             HandleId.tryAgent record.Handle

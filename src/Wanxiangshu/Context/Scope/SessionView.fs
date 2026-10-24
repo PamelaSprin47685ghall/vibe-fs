@@ -51,8 +51,7 @@ module SessionView =
         let blocks = messages |> List.collect (renderWireMessageBlocks tableName)
         LlmFacing.empty |> LlmFacing.withData blocks |> LlmFacing.render
 
-    let render (messages: WireMessage list) : string =
-        renderWithTable "context" messages
+    let render (messages: WireMessage list) : string = renderWithTable "context" messages
 
     [<Emit("Array.isArray($0)")>]
     let private isArray (_value: obj) : bool = jsNative
@@ -64,13 +63,18 @@ module SessionView =
     let private jsGet (target: obj) (key: string) : obj = jsNative
 
     let private stringOrCanonicalJson (v: obj) : string =
-        if isString v then unbox<string> v
-        else Wanxiangshu.Host.CanonicalJson.canonicalJson v
+        if isString v then
+            unbox<string> v
+        else
+            Wanxiangshu.Host.CanonicalJson.canonicalJson v
 
     let private pickJsStringOrJson (primary: obj) (fallback: obj) (defaultVal: string) : string =
-        if not (isNull primary) then stringOrCanonicalJson primary
-        elif not (isNull fallback) then stringOrCanonicalJson fallback
-        else defaultVal
+        if not (isNull primary) then
+            stringOrCanonicalJson primary
+        elif not (isNull fallback) then
+            stringOrCanonicalJson fallback
+        else
+            defaultVal
 
     let private pickJsResultStringOrJson (resObj: obj) (outObj: obj) (cObj: obj) : string =
         if not (isNull resObj) then stringOrCanonicalJson resObj
@@ -87,13 +91,17 @@ module SessionView =
 
     let private renderJsToolCallBlock (tableName: string) (item: obj) : LlmFacing.DataBlock =
         let nameObj = jsGet item "name"
+
         let name =
-            if not (isNull nameObj) then string nameObj
+            if not (isNull nameObj) then
+                string nameObj
             else
                 let tObj = jsGet item "tool"
                 if not (isNull tObj) then string tObj else ""
+
         let args = pickJsStringOrJson (jsGet item "arguments") (jsGet item "input") "{}"
         let callId = pickJsCallId item [ "id"; "callID"; "callId" ]
+
         LlmFacing.Data.tableArray
             tableName
             [ LlmFacing.Data.stringMember "role" "assistant"
@@ -102,8 +110,11 @@ module SessionView =
               LlmFacing.Data.stringMember "callId" callId ]
 
     let private renderJsToolResultBlock (tableName: string) (item: obj) : LlmFacing.DataBlock =
-        let res = pickJsResultStringOrJson (jsGet item "result") (jsGet item "output") (jsGet item "content")
+        let res =
+            pickJsResultStringOrJson (jsGet item "result") (jsGet item "output") (jsGet item "content")
+
         let callId = pickJsCallId item [ "toolCallId"; "callID"; "callId"; "id" ]
+
         LlmFacing.Data.tableArray
             tableName
             [ LlmFacing.Data.stringMember "role" "toolResult"
@@ -113,6 +124,7 @@ module SessionView =
     let private renderJsTextBlock (tableName: string) (role: string) (item: obj) : LlmFacing.DataBlock =
         let tObj = jsGet item "text"
         let text = if not (isNull tObj) then string tObj else ""
+
         LlmFacing.Data.tableArray
             tableName
             [ LlmFacing.Data.stringMember "role" role
@@ -120,10 +132,21 @@ module SessionView =
 
     let private renderTypedJsItem (tableName: string) (role: string) (item: obj) : LlmFacing.DataBlock =
         let itemTypeObj = jsGet item "type"
-        let itemType = if not (isNull itemTypeObj) then string itemTypeObj else "text"
+
+        let itemType =
+            if not (isNull itemTypeObj) then
+                string itemTypeObj
+            else
+                "text"
+
         match itemType with
-        | "toolCall" | "tool-call" | "tool_call" | "tool" -> renderJsToolCallBlock tableName item
-        | "toolResult" | "tool-result" | "tool_result" -> renderJsToolResultBlock tableName item
+        | "toolCall"
+        | "tool-call"
+        | "tool_call"
+        | "tool" -> renderJsToolCallBlock tableName item
+        | "toolResult"
+        | "tool-result"
+        | "tool_result" -> renderJsToolResultBlock tableName item
         | _ -> renderJsTextBlock tableName role item
 
     let private renderJsItemBlock (tableName: string) (role: string) (item: obj) : LlmFacing.DataBlock =
@@ -132,41 +155,52 @@ module SessionView =
         else
             renderTypedJsItem tableName role item
 
-    let private renderJsMessageBlocks (tableName: string) (msg: obj) : LlmFacing.DataBlock list =
-        if isNull msg then []
-        else
-            let roleObj = jsGet msg "role"
-            let role = if not (isNull roleObj) then string roleObj else "user"
-            let content = jsGet msg "content"
-            let parts = jsGet msg "parts"
-            let items =
-                if isArray content then unbox<obj array> content
-                elif isArray parts then unbox<obj array> parts
-                else [||]
+    let private renderJsMessageText (tableName: string) (role: string) (msg: obj) (content: obj) =
+        let fallback = jsGet msg "text"
 
-            if items.Length = 0 then
-                let text =
-                    if isString content then unbox<string> content
-                    else
-                        let t = jsGet msg "text"
-                        if isString t then unbox<string> t else ""
-                [ LlmFacing.Data.tableArray
-                      tableName
-                      [ LlmFacing.Data.stringMember "role" role
-                        LlmFacing.Data.stringMember "text" text ] ]
-            else
-                items |> Array.toList |> List.map (renderJsItemBlock tableName role)
+        let text =
+            if isString content then unbox<string> content
+            elif isString fallback then unbox<string> fallback
+            else ""
+
+        [ LlmFacing.Data.tableArray
+              tableName
+              [ LlmFacing.Data.stringMember "role" role
+                LlmFacing.Data.stringMember "text" text ] ]
+
+    let private renderPresentJsMessage (tableName: string) (msg: obj) =
+        let roleObj = jsGet msg "role"
+        let role = if not (isNull roleObj) then string roleObj else "user"
+        let content = jsGet msg "content"
+        let parts = jsGet msg "parts"
+
+        let items =
+            if isArray content then unbox<obj array> content
+            elif isArray parts then unbox<obj array> parts
+            else [||]
+
+        if items.Length = 0 then
+            renderJsMessageText tableName role msg content
+        else
+            items |> Array.toList |> List.map (renderJsItemBlock tableName role)
+
+    let private renderJsMessageBlocks (tableName: string) (msg: obj) : LlmFacing.DataBlock list =
+        if isNull msg then
+            []
+        else
+            renderPresentJsMessage tableName msg
 
     let blocksJsWithTable (tableName: string) (messages: obj array) : LlmFacing.DataBlock list =
-        if isNull messages || messages.Length = 0 then []
-        else messages |> Array.toList |> List.collect (renderJsMessageBlocks tableName)
+        if isNull messages || messages.Length = 0 then
+            []
+        else
+            messages |> Array.toList |> List.collect (renderJsMessageBlocks tableName)
 
     let renderJsWithTable (tableName: string) (messages: obj array) : string =
         blocksJsWithTable tableName messages
         |> fun blocks -> LlmFacing.empty |> LlmFacing.withData blocks |> LlmFacing.render
 
-    let blocksJs (messages: obj array) : LlmFacing.DataBlock list =
-        blocksJsWithTable "context" messages
+    let blocksJs (messages: obj array) : LlmFacing.DataBlock list = blocksJsWithTable "context" messages
 
     let private partToJs (part: MessagePart) : obj =
         match part with
@@ -187,8 +221,7 @@ module SessionView =
                   "callId" ==> callId
                   "toolCallId" ==> callId
                   "result" ==> resultCanonical ]
-        | MessagePart.Activity kind ->
-            createObj [ "type" ==> "text"; "text" ==> sprintf "[activity: %s]" kind ]
+        | MessagePart.Activity kind -> createObj [ "type" ==> "text"; "text" ==> sprintf "[activity: %s]" kind ]
 
     let private toolResultToJs (part: SessionToolPart) : obj option =
         match part.State with
@@ -223,5 +256,4 @@ module SessionView =
             createObj [ "id" ==> message.Id; "role" ==> message.Role; "parts" ==> parts ])
         |> List.toArray
 
-    let renderJs (messages: obj array) : string =
-        renderJsWithTable "context" messages
+    let renderJs (messages: obj array) : string = renderJsWithTable "context" messages

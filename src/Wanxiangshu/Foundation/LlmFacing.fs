@@ -31,8 +31,7 @@ module LlmFacing =
     let instruction (text: string) : Document = instructions [ text ]
 
     /// Delegation clean-break: keep every current instruction and discard all reference-plane history.
-    let instructionsOnly (document: Document) : Document =
-        { document with Data = [] }
+    let instructionsOnly (document: Document) : Document = { document with Data = [] }
 
     let withInstructions (texts: string list) (document: Document) : Document =
         { document with

@@ -19,6 +19,7 @@ module Diagnostic =
     /// records through the neutral `IDiagnosticSink` port.
     type Sink = string -> (string * string) list -> unit
 
+    // DSL-MUTABLE: resource — HNI P-12 的全局诊断汇注册位；宿主在组合期装入自身 sink。
     let mutable private activeSink: Sink option = None
 
     let installSink (sink: Sink) : unit = activeSink <- Some sink

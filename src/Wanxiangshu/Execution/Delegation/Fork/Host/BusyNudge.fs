@@ -113,7 +113,8 @@ module HostForkBusyNudge =
         (observer: ContinuationAcceptanceObserver)
         : Task<Result<unit, string>> =
         match journal with
-        | None -> Task.FromResult(Error "Busy nudge requires AgentJournal; negotiation steer cannot bypass prompt authority")
+        | None ->
+            Task.FromResult(Error "Busy nudge requires AgentJournal; negotiation steer cannot bypass prompt authority")
         | Some j -> sendWithProfile sessions j childId profile directory prompt (Some observer)
 
     let sender sessions journal (directoryOf: string -> string option) =

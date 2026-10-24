@@ -265,8 +265,8 @@ export function sealDecision({ previousWire, body, boundary, stripAdmitted = fal
   // Both sides of every comparison below are the occurrence-normalized wires: retiring a
   // guidance occurrence is intended plugin drift (see `withoutGuidanceOccurrences`), while
   // every other byte of the prefix still has to match.
-  const previous = withoutGuidanceOccurrences(previousWire);
-  const nextWire = withoutGuidanceOccurrences(wireOf(body));
+  const previous = withoutHostModelBanner(withoutGuidanceOccurrences(previousWire));
+  const nextWire = withoutHostModelBanner(withoutGuidanceOccurrences(wireOf(body)));
   const held = isAppendOnlyPrefix(previous, nextWire);
 
   if (boundary === null || boundary === undefined) {

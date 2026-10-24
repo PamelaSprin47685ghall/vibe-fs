@@ -18,7 +18,8 @@ export function managerReviewStage(body) {
     const message = messages[index];
     if (message.role !== 'user') continue;
     if (typeof message.content !== 'string') return null;
-    const content = message.content.replace(/^\[ANCHOR: \d+; prefixCount: \d+\]\u0000\ufeff/, '');
+    // 标记在 7bf520242 简化为只含锚点编号；保留旧格式兼容，避免解析停在 null。
+    const content = message.content.replace(/^\[ANCHOR: \d+(?:; prefixCount: \d+)?\]\u0000\ufeff/, '');
     const prompt = content.split('\u0000')[0];
     const stages = prompts.get(prompt);
     if (!stages) return null;

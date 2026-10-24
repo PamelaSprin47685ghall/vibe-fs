@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation.HostSession
 
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Persistence.Journal
 
@@ -17,13 +18,17 @@ module ChatParamsSurface =
             let model = value?model
             if isNull model then null else model?modelID
 
+    /// The hook is a native two-argument JS callable (JS arity 2, not a curried
+    /// arrow); invoke it positionally via Emit so Fable cannot curry the call.
+    [<Emit("$0($1, $2)")>]
+    let private invokeHook (hook: obj) (input: obj) (output: obj) : unit = jsNative
+
     let applyWith (journal: JournalHandle option) (input: obj) (output: obj) : obj =
         let hook =
             ChatParamsHook.createWith (journal |> Option.map (fun handle -> handle.Journal))
-            |> unbox<obj -> obj -> unit>
 
         try
-            hook input output
+            invokeHook hook input output
 
             box
                 {| ok = true

@@ -3,6 +3,8 @@ namespace Wanxiangshu.Mission.Work
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.HostSession

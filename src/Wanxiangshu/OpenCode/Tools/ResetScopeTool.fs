@@ -22,7 +22,11 @@ module ResetScopeTool =
             |> Option.map (fun num -> max 0 (int num))
             |> Option.defaultValue 0
 
-    let private executeCommitted (journalOpt: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+    let private executeCommitted
+        (journalOpt: AgentJournal option)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        : Task<string> =
         task {
             let objective = args.Text "newScopeObjective"
             let budget = resolveBudget args
@@ -33,8 +37,7 @@ module ResetScopeTool =
             let callId =
                 match ctx.ToolCallId with
                 | Some id -> id
-                | None ->
-                    failwith "resetScope requires an exact tool call id in host context (HOST-011)"
+                | None -> failwith "resetScope requires an exact tool call id in host context (HOST-011)"
 
             let journal =
                 match journalOpt with
@@ -44,12 +47,14 @@ module ResetScopeTool =
 
             let sessionId = SessionId.create ctx.SessionId
             let snapshot = AgentJournal.snapshot journal
+
             let epoch =
                 match AgentProjection.tryFind sessionId snapshot.AgentProjections with
                 | None -> PrefixEpochProjection.empty
                 | Some session -> session.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
             let nextEpoch = PrefixEpochId.next epoch.EpochId
+
             let fact =
                 ContextFact.ScopeReanchored
                     {| SessionId = sessionId
@@ -58,6 +63,7 @@ module ResetScopeTool =
                        CallId = callId |}
 
             let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) ctx.ProviderRunId fact journal
+
             match appended with
             | Ok _ -> ()
             | Error failure -> raise (JournalAppendException failure)
@@ -68,9 +74,15 @@ module ResetScopeTool =
             return $"Scope reset. Objective: %s{objective}"
         }
 
-    let private execute (journalOpt: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+    let private execute
+        (journalOpt: AgentJournal option)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        : Task<string> =
         if Surface.negotiationRequired ctx.SessionId then
-            Task.FromResult("resetScope is unavailable until the first negotiate(questions) reply has arrived as a user steer. Ask the delegator clarifying questions now, and continue while the reply is pending.")
+            Task.FromResult(
+                "resetScope is unavailable until the first negotiate(questions) reply has arrived as a user steer. Ask the delegator clarifying questions now, and continue while the reply is pending."
+            )
         else
             executeCommitted journalOpt args ctx
 

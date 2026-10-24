@@ -194,11 +194,15 @@ module ProviderSystemTransform =
                 system.[index] <- chooseRolePrompt expectedEn expectedZh expectedCur expectedInstalled nextPrompt text)
 
     let private replaceScopeHeader (scopeProtocol: string) (text: string) : string =
-        if text.Contains("## Scope & Context Management") then scopeProtocol else text
+        if text.Contains("## Scope & Context Management") then
+            scopeProtocol
+        else
+            text
 
     let private injectScopeProtocol (system: string array) (scopeProtocol: string) (output: obj) =
         let replaced = system |> Array.map (replaceScopeHeader scopeProtocol)
         let anyReplaced = Array.exists2 (<>) system replaced
+
         if anyReplaced then
             Array.blit replaced 0 system 0 system.Length
         else
@@ -207,17 +211,25 @@ module ProviderSystemTransform =
     let private applySystemOutput (output: obj) (system: string array) (transformed: string list) =
         let arr = Array.ofList transformed
         let changed = arr.Length <> system.Length || Array.exists2 (<>) arr system
+
         match changed with
         | true -> output?system <- box arr
         | false -> ()
 
-    let private applyTurnSystem (turn: ITurnTransform) (sid: SessionId) (role: SessionId -> Role option) (system: string array) (output: obj) =
+    let private applyTurnSystem
+        (turn: ITurnTransform)
+        (sid: SessionId)
+        (role: SessionId -> Role option)
+        (system: string array)
+        (output: obj)
+        =
         task {
             let turnCtx: TurnContext =
                 { Session = sid
                   Role = role sid |> Option.map (fun r -> AgentRole(Roles.roleLabel r))
                   Route = None
                   Workspace = None }
+
             let! transformed = turn.SystemPrompt(turnCtx, Array.toList system)
             applySystemOutput output system transformed
         }
@@ -248,6 +260,7 @@ module ProviderSystemTransform =
             | None -> ()
 
             let scopeProtocol = ProviderProse.render lang "host/scope-protocol" Map.empty
+
             let hasScopeSection =
                 system
                 |> Array.exists (fun (text: string) -> text.Contains("## Scope & Context Management (`resetScope`)"))

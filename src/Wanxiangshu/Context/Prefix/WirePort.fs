@@ -9,10 +9,8 @@ open Wanxiangshu.Participant.Provider.Projection
 
 /// Domain-owned state view for one session needed by Wire.
 type WireSessionState =
-    {
-        XTrace: XTraceProjectionState option
-        PrefixEpoch: ActivePrefixEpoch option
-    }
+    { XTrace: XTraceProjectionState option
+      PrefixEpoch: ActivePrefixEpoch option }
 
 /// Single-snapshot view required by Wire for one call.
 /// Derived from exactly one Journal Snapshot read per call.

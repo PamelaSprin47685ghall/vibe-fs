@@ -8,7 +8,7 @@ import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-sy
 // actual schema that accepts or rejects a calling is the `this.commission`
 // member behind the real `todowrite-for-orchestrator` tool, not a host tool.
 const commissionProgram = (payload) =>
-  `class Js extends JsProgram { async run() { return await this.commission(${JSON.stringify(payload)}, {}); } }`
+  `class Js extends JsProgram { async run() { return await this.commission(${JSON.stringify(payload)}, []); } }`
 
 integrationTest('WHAT[action-affordance-009] commission descriptions do not advertise the retired Coordinator / Lead choice rejected by the actual schema', async () => {
   await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {

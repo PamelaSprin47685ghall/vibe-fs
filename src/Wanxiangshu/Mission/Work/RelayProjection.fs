@@ -57,7 +57,7 @@ module RelayProjection =
         (messages: RelayMessageFact list)
         : RelayRetirementRequest option =
         work.Retirements
-        |> List.tryFind (fun retirement -> retirement.ProjectionCut && retirement.Outcome = "Relayed")
+        |> List.tryFindBack (fun retirement -> retirement.ProjectionCut && retirement.Outcome = "Relayed")
         |> Option.map (fun retirement ->
             let projections = (AgentJournal.snapshot journal).AgentProjections
             let sessionProjection = AgentProjection.tryFind sessionId projections

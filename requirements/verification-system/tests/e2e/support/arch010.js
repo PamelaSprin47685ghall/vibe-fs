@@ -2,8 +2,8 @@
  * arch010.js — validate a rendered payload against ARCH-010's document rules.
  *
  * The clause's gate section lists what can be checked from bytes alone: instruction not encoded as a
- * field, instruction always first, no top-level comment once the data body begins, no `"""`, the
- * closing delimiter alone on its line, and the whole thing parseable. Whether a comment is semantically
+ * field, instruction always first, no top-level comment once the data body begins, the closing
+ * delimiter alone on its line, and the whole thing parseable. Whether a comment is semantically
  * instruction or data is not recoverable from text; that classification is enforced before rendering
  * by the typed LlmFacing boundary and producer proofs.
  *
@@ -63,6 +63,7 @@ export function splitDocument(document) {
   const content = [];
   const misplaced = [];
   let inLiteral = false;
+  let inBasic = false;
 
   document.split('\n').forEach((text, index) => {
     const line = { text, line: index + 1 };
@@ -85,6 +86,14 @@ export function splitDocument(document) {
       return;
     }
 
+    if (inBasic) {
+      if (text === '"""') {
+        inBasic = false;
+      }
+      content.push(line);
+      return;
+    }
+
     // Instruction-plane text is opaque. It may quote TOML notation verbatim — `x = 1`, `[[table]]`,
     // or even `'''` — without opening or closing a data literal. The receiver semantics were decided
     // before rendering; a validator must not try to reverse-infer them from words inside a comment.
@@ -99,10 +108,16 @@ export function splitDocument(document) {
       return;
     }
 
+    if (/=\s*"""$/.test(text)) {
+      inBasic = true;
+      syntax.push(line);
+      return;
+    }
+
     syntax.push(line);
   });
 
-  return { syntax, content, misplaced, unterminated: inLiteral };
+  return { syntax, content, misplaced, unterminated: inLiteral || inBasic };
 }
 
 /**
@@ -187,17 +202,11 @@ export function auditPayload(document, { origin = 'payload' } = {}) {
 
   // ── the delimiter rules ─────────────────────────────────────────────────
   //
-  // Both scans read the line with its single-line string VALUES blanked out. Measured: an injected
+  // The scan reads the line with its single-line string VALUES blanked out. Measured: an injected
   // payload containing `'''` makes `renderString` fall back to a single-line basic string, so the
   // document legitimately holds `assignment = "… text = ''' …"` on one line. Reading that as a stray
   // delimiter reported three violations against a payload that was exactly right, and the tempting
   // "fix" would have been to drop the rule rather than teach it what a value is.
-
-  for (const line of syntax) {
-    if (withoutStringValues(line.text).includes('"""')) {
-      at(line.line, 'uses a """ multi-line string; ARCH-010 permits only \'\'\' (basic strings process escapes)');
-    }
-  }
 
   for (const line of syntax) {
     // A closing delimiter must be alone. `x = '''` opening a block is the only other legal position,

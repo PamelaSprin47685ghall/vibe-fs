@@ -138,8 +138,12 @@ type ToolRuntimeScope
     // fails closed: a silent no-op success would advance the loop without
     // authority.
     // Host-only BTW transport. The scope/negotiation actor retains all protocol state.
-    let mutable askDelegator: (string -> string -> string -> Task<Result<string, string>>) option = None
-    let mutable steerRecipient: (string -> string -> string -> Task<Result<unit, string>>) option = None
+    // DSL-MUTABLE: resource — attached negotiation transport for delegated questions
+    let mutable askDelegator: (string -> string -> string -> Task<Result<string, string>>) option =
+        None
+
+    let mutable steerRecipient: (string -> string -> string -> Task<Result<unit, string>>) option =
+        None
 
     let continueManagerLoop =
         defaultArg continueManagerLoop (fun _ _ ->
@@ -898,8 +902,11 @@ type ToolRuntimeScope
         (steer: string -> string -> string -> Task<Result<unit, string>>)
         : Task<unit> =
         task {
-            let prepared = Wanxiangshu.Context.Scope.Surface.prepareNegotiationReply receipt answer
+            let prepared =
+                Wanxiangshu.Context.Scope.Surface.prepareNegotiationReply receipt answer
+
             let admitted = not (isNull prepared?ok) && unbox<bool> prepared?ok
+
             if admitted then
                 // Only the real Host PhysicalAccepted observer may unlock the
                 // first scope. A detached queue receipt is not a landed steer.
@@ -910,20 +917,26 @@ type ToolRuntimeScope
     let settleNegotiationAnswer
         (receipt: string)
         (steer: string -> string -> string -> Task<Result<unit, string>>)
-        (result: Result<string, string>) : Task<unit> =
+        (result: Result<string, string>)
+        : Task<unit> =
         match result with
         | Ok answer -> deliverNegotiationReply receipt answer steer
         | Error _ -> Task.FromResult()
 
     let dispatchNegotiation
-        (delegator: string) (recipient: string) (questions: string) (receipt: string)
+        (delegator: string)
+        (recipient: string)
+        (questions: string)
+        (receipt: string)
         (ask: string -> string -> string -> Task<Result<string, string>>)
-        (steer: string -> string -> string -> Task<Result<unit, string>>) : Task<unit> =
+        (steer: string -> string -> string -> Task<Result<unit, string>>)
+        : Task<unit> =
         task {
             try
                 let! result = ask delegator recipient questions
                 do! settleNegotiationAnswer receipt steer result
-            with _ -> ()
+            with _ ->
+                ()
         }
 
     let tryDispatchNegotiation (delegator: string) (recipient: string) (questions: string) (receipt: string) =
@@ -936,6 +949,7 @@ type ToolRuntimeScope
     let privateNegotiationObserver (recipient: string) (receipt: string) : ContinuationAcceptanceObserver =
         let observerGate = obj ()
         let subscriptions = ResizeArray<IDisposable>()
+        // DSL-MUTABLE: resource — 记录本次观察器是否已经确认并释放订阅。
         let mutable confirmed = false
 
         let release () =
@@ -943,39 +957,47 @@ type ToolRuntimeScope
                 lock observerGate (fun () ->
                     confirmed <- true
                     subscriptions.ToArray())
+
             for registration in captured do
                 registration.Dispose()
 
-        { Notify = fun _ ->
-              try
-                  Wanxiangshu.Context.Scope.Surface.confirmNegotiationSteer receipt recipient |> ignore
-              finally
-                  release ()
-          AttachDisposable = fun registration ->
-              let alreadyAccepted =
-                  lock observerGate (fun () ->
-                      if confirmed then true
-                      else
-                          subscriptions.Add registration
-                          false)
-              if alreadyAccepted then registration.Dispose() }
+        { Notify =
+            fun _ ->
+                try
+                    Wanxiangshu.Context.Scope.Surface.confirmNegotiationSteer receipt recipient
+                    |> ignore
+                finally
+                    release ()
+          AttachDisposable =
+            fun registration ->
+                let alreadyAccepted =
+                    lock observerGate (fun () ->
+                        if confirmed then
+                            true
+                        else
+                            subscriptions.Add registration
+                            false)
+
+                if alreadyAccepted then
+                    registration.Dispose() }
 
     let sendNegotiationSteer (recipient: string) (answer: string) (receipt: string) : Task<Result<unit, string>> =
         let target = SessionId.create recipient
         let directory = directoryFor recipient |> Option.orElse workspaceDirectory
         let observer = privateNegotiationObserver recipient receipt
+
         let active =
             journal
             |> Option.bind (fun durable ->
-                PromptAuthorityProjectionQueries.activeProfile
-                    target
-                    (AgentJournal.snapshot durable).AgentProjections)
+                PromptAuthorityProjectionQueries.activeProfile target (AgentJournal.snapshot durable).AgentProjections)
+
         let last =
             journal
             |> Option.bind (fun durable ->
                 PromptAuthorityProjectionQueries.lastAuthorityProfile
                     target
                     (AgentJournal.snapshot durable).AgentProjections)
+
         match journal, active, last with
         | None, _, _ -> Task.FromResult(Error "No AgentJournal: cannot enqueue visible negotiation guidance")
         | Some _, Some current, _ ->
@@ -984,6 +1006,7 @@ type ToolRuntimeScope
             // A completed child needs a new owned logical run, not a
             // continuation of a closed run. Both paths share Dispatcher.
             let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+
             dispatcher.SendAgentOwnerRoot
                 (DispatchSessionPort.ofSessionPort sessions)
                 target
@@ -993,8 +1016,7 @@ type ToolRuntimeScope
                 PromptDispatcher.AwaitMode.Detached
                 (Some observer)
             |> TaskValue.map (Result.map ignore)
-        | Some _, None, None ->
-            Task.FromResult(Error "Negotiation recipient has no previous managed authority profile")
+        | Some _, None, None -> Task.FromResult(Error "Negotiation recipient has no previous managed authority profile")
 
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
@@ -1004,22 +1026,30 @@ type ToolRuntimeScope
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
     member _.ActiveProfileFor(sessionId: SessionId) = activeProfileFor sessionId
+
     member _.SendNegotiationSteer(recipient: string, answer: string, receipt: string) =
         sendNegotiationSteer recipient answer receipt
 
     member _.AttachNegotiationTransport
-        (ask: string -> string -> string -> Task<Result<string, string>>, steer: string -> string -> string -> Task<Result<unit, string>>) =
+        (
+            ask: string -> string -> string -> Task<Result<string, string>>,
+            steer: string -> string -> string -> Task<Result<unit, string>>
+        ) =
         askDelegator <- Some ask
         steerRecipient <- Some steer
 
     member _.Negotiate(recipient: string, questions: string) : string =
         let admitted = Wanxiangshu.Context.Scope.Surface.askNegotiation recipient questions
         let accepted = not (isNull admitted?ok) && unbox<bool> admitted?ok
-        if not accepted then
-            if isNull admitted?reason then "negotiate refused" else "negotiate refused: " + string admitted?reason
+
+        if not accepted && isNull admitted?reason then
+            "negotiate refused"
+        elif not accepted then
+            "negotiate refused: " + string admitted?reason
         elif tryDispatchNegotiation (string admitted?delegator) recipient questions (string admitted?receipt) then
             "Questions accepted for delivery to delegator. Continue working; their answer will arrive as a steer."
-        else "negotiate transport unavailable; question has not been sent"
+        else
+            "negotiate transport unavailable; question has not been sent"
 
     member _.AttachQuestionNotifier(notify: string -> Task<Result<unit, string>>) = questionNotifier <- Some notify
 
@@ -1195,9 +1225,8 @@ type ToolRuntimeScope
                 question.ToolCallId = callId
                 && question.ProviderRunId = providerRun
                 && currentPhysicalUserMessage (SessionId.value sessionId) = Some(
-                                                                                PhysicalUserMessageId.value
-                                                                                    question.PhysicalUserMessageId
-                                                                            )
+                    PhysicalUserMessageId.value question.PhysicalUserMessageId
+                )
                 && questionInterrupts.Add(sessionId, question.ProviderRunId, callId)
                 ->
                 return! this.RunQuestionInterrupt(sessionId, question, (sessionId, question.ProviderRunId, callId))
@@ -1507,7 +1536,7 @@ type ToolRuntimeScope
             let durableBlockers =
                 let commonDir =
                     workspaceDirectory
-                    |> Option.bind (fun ws -> Wanxiangshu.Persistence.Journal.RuntimePath.forStateRoot ws |> Some)
+                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRootSync
 
                 commonDir
                 |> Option.map (fun commonDir ->

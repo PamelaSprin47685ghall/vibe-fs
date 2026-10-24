@@ -84,6 +84,22 @@ module DurableWorkHost =
             let sqlite = requireModule require "node:sqlite"
             createNew sqlite?DatabaseSync path
 
+    [<Emit("$0 != null && (($0.code === 'SQLITE_BUSY' || $0.code === 'SQLITE_BUSY_SNAPSHOT') || (typeof $0.message === 'string' && $0.message.indexOf('database is locked') >= 0))")>]
+    let private isDatabaseBusy (_error: exn) : bool = jsNative
+
+    let private waitForDatabase () : unit =
+        emitJsExpr () "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)"
+
+    let private retryBusy (action: unit -> 'a) : 'a =
+        let rec attempt remaining =
+            try
+                action ()
+            with error when isDatabaseBusy error && remaining > 0 ->
+                waitForDatabase ()
+                attempt (remaining - 1)
+
+        attempt 25
+
     [<Emit("$0 != null && typeof $0 === 'object'")>]
     let private isRecord (_value: obj) : bool = jsNative
 
@@ -173,23 +189,47 @@ module DurableWorkHost =
         | Some opened -> opened?close ()
         | None -> closeConnection connection
 
-    /// 一个操作持有一个连接，构造失败时也关闭连接。
+    /// 一个操作持有一个连接，构造失败时也关闭连接。偶发忙碌时短等后重试。
+    let private useConnection (openConnection: unit -> obj) (body: obj -> 'a) : 'a =
+        retryBusy (fun () ->
+            let connection = openConnection ()
+            // DSL-MUTABLE: resource — the journal this call opened, closed exactly once in finally
+            let mutable journal: obj option = None
+
+            try
+                let opened: obj = createNew SqliteJournal connection
+                journal <- Some opened
+                body opened
+            finally
+                closeJournal journal connection)
+
+    let private useJournalWith (openConnection: string -> obj) (gitCommonDir: string) (body: obj -> 'a) : 'a =
+        let path = journalPath gitCommonDir
+        useConnection (fun () -> openConnection path) body
+
     let private useJournal (gitCommonDir: string) (body: obj -> 'a) : 'a =
         let path = journalPath gitCommonDir
-        ensureDir (parentOf path)
-        let connection = openDatabase path
-        // DSL-MUTABLE: resource — the journal this call opened, closed exactly once in finally
-        let mutable journal: obj option = None
 
+        if pathExists path then
+            useJournalWith openDatabase gitCommonDir body
+        else
+            // 库尚未建立时没有可观察的工作。空内存库会被读成「未交付」，
+            // 从而在交付之后继续催促。缺库就是没有工作，由调用方按 None 处理。
+            failwith "lifecycle journal does not exist"
+
+    let private useReadableJournal (gitCommonDir: string) (body: obj -> 'a) : 'a option =
         try
-            let opened: obj = createNew SqliteJournal connection
-            journal <- Some opened
-            body opened
-        finally
-            closeJournal journal connection
+            Some(useJournal gitCommonDir body)
+        with error when error.Message = "lifecycle journal does not exist" ->
+            None
+
+    let private useWritableJournal (gitCommonDir: string) (body: obj -> 'a) : 'a =
+        let path = journalPath gitCommonDir
+        ensureDir (parentOf path)
+        useJournalWith openDatabase gitCommonDir body
 
     let useWork (gitCommonDir: string) (workId: string) (body: obj -> 'a) : 'a =
-        useJournal gitCommonDir (fun journal -> body (createNew DurableWork (workId, journal)))
+        useWritableJournal gitCommonDir (fun journal -> body (createNew DurableWork (workId, journal)))
 
     let private appendSeed (journal: obj) (workId: string) (revision: float) (record: string) : float =
         let frame: obj = emitJsExpr record "JSON.parse($0)"
@@ -475,7 +515,8 @@ module DurableWorkHost =
         if String.IsNullOrEmpty workId then
             None
         else
-            useJournal gitCommonDir (fun journal -> inspectedFromJournal journal workId)
+            useReadableJournal gitCommonDir (fun journal -> inspectedFromJournal journal workId)
+            |> Option.defaultValue None
 
     let private tryInspectWorkFromJournal (journal: obj) (workId: string) : Result<InspectedWork option, string> =
         try
@@ -494,9 +535,10 @@ module DurableWorkHost =
         if Array.isEmpty workIds then
             [||]
         else
-            useJournal gitCommonDir (fun journal ->
+            useReadableJournal gitCommonDir (fun journal ->
                 workIds
                 |> Array.map (fun workId -> workId, safeInspectFromJournal journal workId))
+            |> Option.defaultValue (workIds |> Array.map (fun workId -> workId, Ok None))
 
     let private openingFailure (receipt: HostReceipt) =
         if receipt.Reason = "" then
@@ -668,19 +710,7 @@ module DurableWorkHost =
 
     let private ownershipStream (registryId: string) : string = "ownership:" + registryId
 
-    let private useOwnershipJournal (gitCommonDir: string) (body: obj -> 'a) : 'a =
-        let path = journalPath gitCommonDir
-        ensureDir (parentOf path)
-        let connection = openDatabase path
-        // DSL-MUTABLE: resource — the journal this call opened, closed exactly once in finally
-        let mutable journal: obj option = None
-
-        try
-            let opened: obj = createNew SqliteJournal connection
-            journal <- Some opened
-            body opened
-        finally
-            closeJournal journal connection
+    let private useOwnershipJournal (gitCommonDir: string) (body: obj -> 'a) : 'a = useWritableJournal gitCommonDir body
 
     let private revisionOrDefault (fallback: float) (value: obj) : float =
         if isNull value then fallback else unbox<float> value
@@ -809,7 +839,8 @@ module DurableWorkHost =
         else
             let stream = ownershipStream registryId
 
-            useOwnershipJournal gitCommonDir (fun journal ->
+            useReadableJournal gitCommonDir (fun journal ->
                 let records: string array = unbox (journal?read stream)
                 let candidate = createOwnership registryId records
                 ownershipBlockersInMemory candidate scopeId)
+            |> Option.defaultValue []

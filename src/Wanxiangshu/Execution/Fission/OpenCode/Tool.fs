@@ -71,11 +71,17 @@ module FissionTool =
             | Error _ -> return None
             | Ok messages ->
                 let filtered = Wanxiangshu.Context.Scope.SnapshotScope.filterSnapshot messages
-                let toml = Wanxiangshu.Context.Scope.SessionView.renderJsWithTable "context" filtered
+
+                let toml =
+                    Wanxiangshu.Context.Scope.SessionView.renderJsWithTable "context" filtered
+
                 return Some toml
         }
 
-    let private captureOwnerView (snapshotOpt: ISessionSnapshotPort option) (sessionId: SessionId) : Task<string option> =
+    let private captureOwnerView
+        (snapshotOpt: ISessionSnapshotPort option)
+        (sessionId: SessionId)
+        : Task<string option> =
         match snapshotOpt with
         | None -> Task.FromResult None
         | Some snapshot -> readOwnerView snapshot sessionId

@@ -152,5 +152,4 @@ module PrefixSurface =
         PrefixEpochProjection.isReanchored (ProviderRunIdentity.create (text run)) (stateOfJs state)
 
 
-    let appendCheckpoint (callId: string) (window: obj array) : obj array =
-        if isNull window then [||] else window
+    let appendCheckpoint (callId: string) (window: obj array) : obj array = if isNull window then [||] else window

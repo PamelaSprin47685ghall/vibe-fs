@@ -26,6 +26,7 @@
  */
 
 import { parse as parseToml } from 'smol-toml';
+import { parse as parseJavaScript } from 'acorn';
 import { retiredFieldProblems } from './legacy-fields.js';
 import { turnFragments } from './runtime-key.js';
 import { validateFault } from './delivery-plan.js';
@@ -444,6 +445,36 @@ const resolveReference = (entries, reference) => {
  * This is the one check that requires the static whole. It is also the one most
  * likely to be too strict; package K8 converts the real scenarios and will say.
  */
+const programCharges = (program) => {
+  if (typeof program !== 'string') return [];
+  let tree;
+  try {
+    tree = parseJavaScript(program, { ecmaVersion: 'latest' });
+  } catch {
+    return [];
+  }
+  const charges = [];
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression'
+      && node.callee.object.type === 'ThisExpression' && !node.callee.computed
+      && ['commission', 'fork', 'resume'].includes(node.callee.property.name)) {
+      const payload = node.arguments[0];
+      const charge = payload?.type === 'ObjectExpression'
+        ? payload.properties.find((property) => property.type === 'Property' && !property.computed
+          && (property.key.name ?? property.key.value) === 'charge')?.value
+        : payload;
+      if (charge?.type === 'Literal' && typeof charge.value === 'string') charges.push(charge.value);
+    }
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === 'object') visit(value);
+    }
+  };
+  visit(tree);
+  return charges;
+};
+
 export function reachableTurnIds(turns, entries, { flow, prompt, setup } = {}) {
   // Reached by a scenario prompt, or by a reachable step's tool-call prompt. Fixpoint,
   // not one pass, because forks chain: Manager → Coder → the Coder's own children.
@@ -491,7 +522,8 @@ export function reachableTurnIds(turns, entries, { flow, prompt, setup } = {}) {
 
     const toolPrompts = entries
       .filter((entry) => [...reachableTurns].some((turn) => turn.id === entry.turnId))
-      .flatMap((entry) => [entry.respond?.args?.charge, entry.respond?.args?.prompt])
+      .flatMap((entry) => [entry.respond?.args?.charge, entry.respond?.args?.prompt,
+        ...programCharges(entry.respond?.args?.program)])
       .filter((text) => typeof text === 'string');
 
     for (const turn of turns) {

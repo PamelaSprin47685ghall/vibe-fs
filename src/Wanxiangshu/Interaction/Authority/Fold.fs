@@ -121,12 +121,38 @@ module PromptFactFold =
         let currentAuthority =
             authorityOf payload.SessionId |> Option.defaultValue PromptAuthorityLedger.empty
 
-        PromptAuthorityRun.replayLogicalRunClosed
-            payload.LogicalRunId
-            payload.AuthorityRootUserMessageId
-            payload.RootKind
-            payload.ClosureWitness
-            currentAuthority
+        let sourceCheck =
+            match Map.tryFind payload.LogicalRunId currentAuthority.AcceptedRootClosures with
+            | Some contract when
+                contract.ExpectedClosureKind <> "HumanRootManagerLife"
+                && not (Map.containsKey payload.LogicalRunId currentAuthority.ClosedRuns)
+                ->
+                let sources =
+                    currentAuthority.TerminalSources
+                    |> Map.tryFind payload.LogicalRunId
+                    |> Option.defaultValue Map.empty
+                    |> Map.toList
+                    |> List.map snd
+
+                match
+                    PromptAuthorityRun.closureWitnessOfSource
+                        contract.ExpectedClosureKind
+                        sources
+                        contract.OwnerLogicalRunId
+                        (LogicalRunId.value payload.LogicalRunId)
+                with
+                | Some witness when witness = payload.ClosureWitness -> Ok()
+                | _ -> Error "AuthorityLogicalRunClosed must cite the exact durable terminal source"
+            | _ -> Ok()
+
+        sourceCheck
+        |> Result.bind (fun () ->
+            PromptAuthorityRun.replayLogicalRunClosed
+                payload.LogicalRunId
+                payload.AuthorityRootUserMessageId
+                payload.RootKind
+                payload.ClosureWitness
+                currentAuthority)
         |> Result.map (function
             | Some closed -> [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, closed) ]
             | None ->

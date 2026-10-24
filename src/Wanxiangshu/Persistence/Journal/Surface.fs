@@ -476,12 +476,9 @@ module JournalSurface =
                     with _ ->
                         return RuntimePath.forStateRoot commonDir
                 }
+
             let! acquired =
-                SharedAgentJournal.acquire
-                    runtimeDir
-                    0
-                    (DateTimeOffset.Parse "1970-01-01T00:00:00Z")
-                    refuseMissingEntry
+                SharedAgentJournal.acquire runtimeDir 0 (DateTimeOffset.Parse "1970-01-01T00:00:00Z") refuseMissingEntry
 
             match acquired with
             | Error error -> return failwith ("authority closure refused: " + error.Fact + ": " + error.Reason)

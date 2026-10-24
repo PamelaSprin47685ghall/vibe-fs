@@ -73,6 +73,7 @@ module LoadRecoverySurface =
                     Some record
                 else
                     None)
+            |> Option.bind (fun record -> HandleProjection.tryFind record.Handle handles)
             |> Option.map (fun record ->
                 match record.Lifecycle with
                 | HandleLifecycle.Active -> "Active"
