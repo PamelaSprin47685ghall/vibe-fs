@@ -399,3 +399,43 @@ test('WHAT[delegation-negotiation-005] Advisor Host permissions expose only nego
   assert.equal(rolePredicate('negotiate', 'advisor'), true)
   assert.equal(rolePredicate('resetScope', 'advisor'), true)
 })
+
+test('WHAT[delegation-negotiation-006] user-facing root hides negotiate while a real managed child keeps it', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _ids, runtime) => {
+    const root = 'ses-user-facing-negotiate-006'
+    const message = {
+      id: 'user-root-negotiate-006', sessionID: root, role: 'user', agent: 'manager',
+      model: { providerID: 'provider', modelID: 'manager-model' },
+      tools: { fetch: true },
+    }
+    const parts = [{ type: 'text', text: 'User instruction, no delegator above this session' }]
+    runtime.pushHostMessage(root, { info: message, parts })
+    await hooks['chat.message']({ sessionID: root, messageID: message.id, agent: 'manager' }, { message, parts })
+    assert.equal(message.tools.negotiate, false, 'the root provider request MUST NOT expose negotiate')
+    assert.equal(message.tools.fetch, true, 'unrelated tools remain unchanged')
+    await assert.rejects(
+      hooks['tool.execute.before']({ sessionID: root, tool: 'negotiate', callID: 'n-root-006' }, { args: { questions: 'Bad root attempt' } }),
+      /user-facing sessions/,
+      'even forged tool calls must be stopped before execution',
+    )
+  })
+
+  const { withRealFork, forkCall } = await import('../../delegation/tests/support/real-fork.mjs')
+  await withRealFork('ses-parent-negotiate-006', async ({ hooks, createdIds }) => {
+    const receipt = await forkCall(hooks, 'ses-parent-negotiate-006', 'Ada', 'Current instruction only')
+    assert.match(receipt, /Ada/)
+    assert.equal(createdIds.length, 1)
+    const child = createdIds[0]
+    const message = {
+      id: 'user-managed-negotiate-006', sessionID: child, role: 'user', agent: 'engineer',
+      model: { providerID: 'provider', modelID: 'engineer-model' },
+    }
+    const parts = [{ type: 'text', text: 'Current instruction only' }]
+    await hooks['chat.message']({ sessionID: child, messageID: message.id, agent: 'engineer' }, { message, parts })
+    assert.notEqual(message.tools?.negotiate, false, 'a managed child must not lose first negotiation')
+    await hooks['tool.execute.before'](
+      { sessionID: child, tool: 'negotiate', callID: 'n-child-006' },
+      { args: { questions: 'Which parser should I use?' } },
+    )
+  })
+})

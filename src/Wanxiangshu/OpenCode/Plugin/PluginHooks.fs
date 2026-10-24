@@ -804,6 +804,8 @@ module PluginHooks =
                     if PluginTransforms.negotiationIsTemporary sessionId then
                         PluginTransforms.negotiationRecordToolViolation sessionId
                         invalidOp "Ephemeral negotiation is read-only: do not use tools. Reply in plain text to the delegation questions immediately."
+                    if toolName = "negotiate" && (String.IsNullOrWhiteSpace sessionId || not (sessionPort.IsManagedChild(SessionId.create sessionId))) then
+                        invalidOp "negotiate is only available in delegated child or Advisor sessions, not user-facing sessions."
 
                     // capability-enforcement-002/007: a Host-declared external
                     // (MCP) tool holds no office capability, so it is advertised
@@ -867,8 +869,38 @@ module PluginHooks =
                     afterStageCasebookObservation toolInput toolOutput
                 }
 
+            /// User-facing Host roots must not present negotiate to the LLM.
+            /// A managed child (including Advisor) keeps its protocol tool even
+            /// when it has the same office role as a user-facing root. The SDK
+            /// user message owns the per-request tools map; role AgentConfig is
+            /// not a sufficient session identity discriminator.
+            let originalChatMessage = curriedHook wired.ChatMessageHook
+
+            let requireUserMessageTools (message: obj) : obj =
+                let tools = message?tools
+                if isNull tools then
+                    let created = createObj []
+                    message?tools <- created
+                    created
+                else tools
+
+            let chatMessageWithNegotiationPolicy (input: obj) (output: obj) : Task<unit> =
+                task {
+                    let pending: Task<unit> =
+                        emitJsExpr (originalChatMessage, input, output) "$0($1, $2)"
+                    do! pending
+                    let rawSession = if isNull input then null else input?sessionID
+                    let managedChild =
+                        not (isNull rawSession)
+                        && not (String.IsNullOrWhiteSpace(string rawSession))
+                        && sessionPort.IsManagedChild(SessionId.create (string rawSession))
+                    if not managedChild && not (isNull output) && not (isNull output?message) then
+                        let tools = requireUserMessageTools output?message
+                        tools?negotiate <- box false
+                }
+
             let chatMessage =
-                registeredHook HookKey.ChatMessage (curriedHook wired.ChatMessageHook)
+                registeredHook HookKey.ChatMessage (curriedHook (box chatMessageWithNegotiationPolicy))
 
             let rememberModelParams (input: obj) (output: obj) =
                 emitJsExpr (chatParams, input, output) "$0($1, $2)" |> ignore
