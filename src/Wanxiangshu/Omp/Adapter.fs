@@ -1911,17 +1911,21 @@ module Adapter =
                         "promptText", box promptText
                         "conversationKey", box conversationKey
                     ] @ histEntries)
-                let target =
-                    if hasMethod delegatorCtx "runEphemeralTurn" then
-                        Some delegatorCtx
-                    else
-                        let sess = fieldValue delegatorCtx "session"
-                        if hasMethod sess "runEphemeralTurn" then Some sess else None
-                match target with
-                | None -> return Error "Neither delegatorCtx nor delegatorCtx.session exposes runEphemeralTurn"
+                let targetOpt =
+                    [
+                        fun () -> if hasMethod delegatorCtx "runEphemeralTurn" then Some delegatorCtx else None
+                        fun () ->
+                            let sess = fieldValue delegatorCtx "session"
+                            if hasMethod sess "runEphemeralTurn" then Some sess else None
+                    ]
+                    |> List.tryPick (fun f -> f ())
+
+                match targetOpt with
+                | None ->
+                    return Error "Neither delegatorCtx nor delegatorCtx.session exposes runEphemeralTurn"
                 | Some t ->
-                    let! result = awaitObj (callMethod t "runEphemeralTurn" options)
-                    return Ok result
+                    let! r = awaitObj (callMethod t "runEphemeralTurn" options)
+                    return Ok r
             with ex ->
                 return Error ex.Message
         }
