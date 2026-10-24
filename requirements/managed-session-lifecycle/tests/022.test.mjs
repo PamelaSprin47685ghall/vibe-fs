@@ -266,7 +266,7 @@ test('WHAT[managed-session-lifecycle-022] finalize prerequisite uses the origina
     assert.equal(draft.turns.length, 1)
     assert.equal(draft.turns[0].question, charge)
     assert.match(draft.turns[0].answer, new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-    assert.match(draft.turns[0].answer, /\[\[session\]\]/)
+    assert.doesNotMatch(draft.turns[0].answer, /\[\[session\]\]/)
     assert.equal(pluginLifecycle.takeEngineerDraft(originalRuntime, manager), null)
   })
 })

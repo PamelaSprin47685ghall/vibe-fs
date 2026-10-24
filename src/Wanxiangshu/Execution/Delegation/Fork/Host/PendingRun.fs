@@ -32,7 +32,7 @@ type PendingHostRun =
       Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
       mutable Finished: bool
-      Snapshot: ISessionSnapshotPort option }
+      }
 
 module HostPendingRun =
     let completionSource () =

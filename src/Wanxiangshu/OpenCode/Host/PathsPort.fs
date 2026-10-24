@@ -91,7 +91,7 @@ module PathsPort =
     /// The durable-state root thunk. `StateRoot` is a plain property (the port
     /// is not async), so the async `RuntimePath.stateRoot` resolution happens
     /// in the composition root and is handed in as a memoized function.
-    type HostPaths(stateRoot: unit -> string, projectRoot: string, projectId: string) =
+    type HostPaths(stateRoot: (unit -> string), projectRoot: string, projectId: string) =
         interface IHostPaths with
             member _.StateRoot = WorkspacePath(stateRoot ())
             member _.ProjectRoot = WorkspacePath projectRoot

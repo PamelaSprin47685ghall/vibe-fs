@@ -38,7 +38,7 @@
 
 ## [009] Grep Capability 投影
 
-`rg(argv)` 只由 Grep capability 授权；Read+Glob 不代替它。参数只有一个 argv，是字符串数组。搜索固定加上 `--json` 后原样传给 `rg`，调用方不再传 `--json`；没有路径时不替它补工作区。成员不追加 `--no-ignore`；要搜索被忽略的路径，由调用方写进 argv。`--files`、`--files-with-matches`、`-l`、`--files-without-match`、`--count`、`-c`、`--count-matches`、`--quiet`、`-q`、`--vimgrep`、`--type-list` 与 `--json` 互斥，所以这些模式不加 `--json`，原样传给 `rg`。返回值都是 JSON 对象，不是文本：内容搜索是 `{ exitCode, messages }`，`messages` 是解析后的 JSON Lines；上述模式是 `{ exitCode, paths }`。`exitCode` 为 `0` 表示有结果，为 `1` 表示成功但没有结果，二者都是数据。argv 不是字符串数组时为 `INVALID_ARGUMENT`；路径越出工作区为 `PATH_DENIED`；其余 `rg` 失败为 `RG_FAILED`。
+`rg(argv)` 只由 Grep capability 授权；Read+Glob 不代替它。参数只有一个 argv，是字符串数组。搜索固定加上 `--json` 后原样传给 `rg`，调用方不再传 `--json`；没有路径时不替它补工作区。成员不追加 `--no-ignore`；要搜索被忽略的路径，由调用方写进 argv。`--files`、`--files-with-matches`、`-l`、`--files-without-match`、`--count`、`-c`、`--count-matches`、`--quiet`、`-q`、`--vimgrep`、`--type-list` 与 `--json` 互斥，所以这些模式不加 `--json`，原样传给 `rg`。返回值都是 JSON 对象，不是文本：内容搜索是 `{ exitCode, messages }`，`messages` 是解析后的 JSON Lines；上述模式是 `{ exitCode, paths }`。`exitCode` 为 `0` 表示有结果，为 `1` 表示成功但没有结果，二者都是数据。argv 不是字符串数组时为 `INVALID_ARGUMENT`；路径解析支持工作区内及区外合法路径；其余 `rg` 失败为 `RG_FAILED`。
 
 ## [010] Rewrite、Write 与 Mkdir 的落盘语义
 
@@ -120,7 +120,7 @@ CAS 还原（rollbackPlan：restore 与 removeCreated，逆序）保留为实现
 
 - 未命中时 parked 载荷携带 `needle`、空 `candidates` 与最近邻单行诊断 `nearest: { span, text, distance }`；近似只作诊断，绝不自动获得写权限。
 - 多义匹配时 parked 载荷携带至多 8 项 `candidates: [{ span, context }]`，每项 `context` 窗口独立于文件大小有界截取。
-- 越界路径在触碰磁盘前以稳定码 `PATH_DENIED` 拒绝且零暂存、不污染显式读记录；冻结失败目录仍保留 `INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIGUOUS`、`EDIT_OVERLAP` 供 Plan 任期面与目录契约使用。
+- 支持工作区内外合法路径解析，以操作系统文件权限为准；缺失目标报 `FILE_NOT_FOUND`；冻结失败目录仍保留 `INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIGUOUS`、`EDIT_OVERLAP` 供 Plan 任期面与目录契约使用。
 
 ## [025] 事务致命失败先结算再熔断
 
@@ -202,7 +202,7 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 - `rm` 删除文件或空目录；非空目录报 `DIRECTORY_NOT_EMPTY`，缺失目标报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, removed: path }`。
 - `mv` 按 POSIX 语义移动或重命名文件及目录，支持覆盖；源缺失报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, moved: from, destination: to }`。
-- 越界拒绝：rm 的目标、mv 的源与目标都在能力边界内校验，越界报 `PATH_DENIED` 且源存活。继承 [014] 的写前冲突校验：`cat()` 取得的快照仍新鲜时，目标可照常被 rm 删除落盘。
+- 路径放行：rm 的目标、mv 的源与目标均支持工作区内外合法路径，由操作系统文件权限保证安全，源缺失报 `FILE_NOT_FOUND`。继承 [014] 的写前冲突校验：`cat()` 取得的快照仍新鲜时，目标可照常被 rm 删除落盘。
 - 每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影；渲染结果报 `removed = [...]` 与 `moved = ["from -> to"]`。
 - 稳定失败码 `DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INVALID_ARGUMENT` 登记在冻结失败目录；EXDEV 依靠 renameSync 原子语义保证源与目标都不残留中间态。
 
@@ -222,7 +222,7 @@ rm/mv 的成员文案是 zh-CN.md/en.md 成对双语资源（`tool/js-program/rm
 
 ## [044] rm/mv 失败码的 reason 稳定与成对上报
 
-rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INVALID_ARGUMENT`、`FILE_NOT_FOUND`、`FILE_CHANGED`、`FILE_READ_FAILED`）在冻结失败目录中携带可读且稳定的 reason 文案。运行期失败结果的 code 与 reason 成对出现，reason 携带涉事路径（如 `directory is not empty: <path>`、`path outside capability boundary: <path>`、`target file does not exist: <path>`）；PATH_DENIED 时源存活（[040]）。
+rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INVALID_ARGUMENT`、`FILE_NOT_FOUND`、`FILE_CHANGED`、`FILE_READ_FAILED`）在冻结失败目录中携带可读且稳定的 reason 文案。运行期失败结果的 code 与 reason 成对出现，reason 携带涉事路径（如 `directory is not empty: <path>`、`target file does not exist: <path>`）。
 
 ## [045] 文件原语：cat/ls/stat/write/mkdir
 
@@ -238,7 +238,7 @@ rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INV
 
 ## [047] 原语组合与教学资源
 
-原语只提供动词，不提供编辑 DSL：find/replace = `cat → where → 拼接 → write`；批量替换 = 一次 `whereAll` 加反向拼接；append = `cat + write`；锚点切片 = 两次 `where`（第二次带 `from`）；**枚举与内容搜索 = `rg(argv)`**（等价于 `rg --json` 加上这一个 argv，返回 JSON 对象；写法见双语资源 `tool/js-program/recipes`）。`cat`/`ls`/`rg`/`stat`/`write`/`mkdir`/`where`/`whereAll` 与 rm/mv 共享同一路径边界与 as-is 纪律。
+原语只提供动词，不提供编辑 DSL：find/replace = `cat → where → 拼接 → write`；批量替换 = 一次 `whereAll` 加反向拼接；append = `cat + write`；锚点切片 = 两次 `where`（第二次带 `from`）；**枚举与内容搜索 = `rg(argv)`**（等价于 `rg --json` 加上这一个 argv，返回 JSON 对象；写法见双语资源 `tool/js-program/recipes`）。`cat`/`ls`/`rg`/`stat`/`write`/`mkdir`/`where`/`whereAll` 与 rm/mv 共享统一路径解析语义（支持跨越工作区访问合法路径，由操作系统文件权限约束）与 as-is 纪律。
 
 教学资源 `tool/js-program/header` 与 `tool/js-program/park` 双语成对，声明主原语、组合模式、where 歧义契约与 unpark 自由值契约；`tool/js-program/contract` 不再声称 all-or-nothing 提交，失败经验与 as-is 语义一致。
 
@@ -286,11 +286,11 @@ Exec capability 投影 `this.call(command, planB)`。`command` 是一条 shell �
 - `resume(payload)`：续做既有道路，`payload` 必带 `name` 并携带本次 `charge`；复用该 participant 的完整历史与 binding，不重选绑定；目标正忙时 charge 作为忙碌提示追加到既有工作，不新建任务（`outcome` 为 `nudged`）。传 `calling` 一律拒绝。拒绝码：`name-required`/`charge-required`/`calling-not-allowed`/`warm-start-unavailable`/`context-unavailable`/`assessment-pending-for-devops`/`dispatch-closed`/`placement-failed`/`dispatch-uncertain`。
 - `commission(payload)`：委任既有角色的道路，`payload` 与 fork 同形（`{ charge, name?, calling? }`）；`calling` 省略时按角色推导，显式给出与推导不一致即拒绝。成功返回 `{ ok, name, agentId, outcome }`。拒绝码：`name-required`/`charge-required`/`unknown-calling`/`name-already-belongs`/`context-unavailable`/`placement-failed`/`dispatch-uncertain`。
 - `devops(intent)`：请求本调用 session 绑定的固定 DevOps 席位做一次工作；`intent` 是本次交给 DevOps 的意图文本（不像 fork/resume 那样承载 charge）。返回 `{ ok, kind, status, returned: [{ text }] }`；材料条目最终随结果统一渲染为 TOML。DevOps 绑定未就绪或已关闭时以 `assessment-pending-for-devops` 拒绝。
-- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, returned: [{ text }] }] }`，不重复输出 `byName` 索引；子智能体（Engineer/DevOps）以无未决调用的自然停机作为 proven terminal，其完整 post-scope 视图捕获为 TOML 记录在 `returned` 中；`status ∈ completed | failed | abandoned | voided`。执行已不可能（abort、cancel 或重启加载结算）的成员以 `voided` 进入 join 记录，`returned` 为空数组：作废结清该成员的未解除义务，join 关闭，报告一次后该成员退役。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
+- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, returned: [{ text }] }] }`，不重复输出 `byName` 索引；子智能体（Engineer/DevOps）以无未决调用的自然停机作为 proven terminal，其末轮 assistant 散文随 join 记录以 `# ...` 注释交回，`returned` 不再承载子智能体的完整视图；`status ∈ completed | failed | abandoned | voided`。执行已不可能（abort、cancel 或重启加载结算）的成员以 `voided` 进入 join 记录，`returned` 为空数组：作废结清该成员的未解除义务，join 关闭，报告一次后该成员退役。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
 - `fission({ charge, lanes })`：同身份多 lane 的任务分片执行（宿主负责 lane 绑定与收拢），返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组 lane。拒绝码：`fission-unavailable`/`lane-start-failed`/`not-ready`/`context-unavailable`/`invalid-prompt`。
 - `dag(spec)`：`spec` 是 `{ nodes: [{ id, charge, deps?, lanes? }] }`；纯声明糖，由基类编译成波次 `fork` + 一次 `join`；只在 Fork 与 Join 同时投影时才生成（缺 Join 就没有可编译进去的 join，成员列表里也不出现没有方法体的 `dag`）；全量 post-scope 背景发给所有节点；下游节点的 prompt 带上依赖记录。成功返回 `{ ok, results: { [id]: record }, skipped: [id...] }`。**节点失败 → `park`**（与 `where` 同一条恢复通道），payload 为 `{ dag, node, code, deps, done, pending }`；注入值语义：`"retry"` 重跑、`"skip"` 跳过（下游看到 null）、其他值直接作为该节点结果、`{ abort: reason }` 使程序失败。
 - `horizon()`：返回在场名册的数据信封 `{ ok, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`；`status ∈ returned | still-away | did-not-return | voided`（`voided` 表示该成员已无法交付、已以作废结清而非完成，在 join 报告一次之前它仍显示为 `voided`），`workState ∈ latest | none | unavailable`，`record` 是最新帧正文原文（无则为 `""`）；四个校准数 `turnsUsed`/`turnsLeft`/`timeUsedMs`/`timeLeftMs` 只在委任者 estimate 与子会话起点两者都可读时给出，否则全为 `0`，不猜测。拒绝码：`horizon-unavailable`。
-- `advisor(intent)`：请求本调用 session 自己的顾问专席；intent 散文作为 `# ...` 注释头，连同调用方当前完整的 post-scope 视图（TOML `[[context]]` 表）作为单一请求文档投递给顾问。返回数据信封 `{ ok: true, context }` 或 `{ ok: false, code: "advisor-unavailable", reason }`，其中 `context` 为顾问自然停机捕获的完整 post-scope TOML 视图。每次 consult 均提供当前最新 post-scope 视图。拒绝码：`advisor-unavailable`。
+- `advisor(intent)`：请求本调用 session 自己的顾问专席；intent 散文作为 `# ...` 注释头，连同调用方当前完整的 post-scope 视图（TOML `[[context]]` 表）作为单一请求文档投递给顾问。返回数据信封 `{ ok: true, advice }` 或 `{ ok: false, code: "advisor-unavailable", reason }`，其中 `advice` 为顾问自然停机时的末轮 assistant 散文。每次 consult 均把调用方当前最新 post-scope 视图作为背景送出。拒绝码：`advisor-unavailable`。
 
 派遣成员 `fork`、`resume`、`commission`、`devops`、`dag`、`advisor` 均不携带任何背景数组参数。任务只由 `charge` 或 `intent` 表达一次，背景材料由发送方当前的完整 post-scope 消息视图承载并在最终边界统一渲染为 TOML。
 

@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Resources
@@ -203,7 +204,26 @@ module ProviderSystemTransform =
         else
             output?system <- Array.append system [| scopeProtocol |]
 
-    let private transformSystem
+    let private applySystemOutput (output: obj) (system: string array) (transformed: string list) =
+        let arr = Array.ofList transformed
+        let changed = arr.Length <> system.Length || Array.exists2 (<>) arr system
+        match changed with
+        | true -> output?system <- box arr
+        | false -> ()
+
+    let private applyTurnSystem (turn: ITurnTransform) (sid: SessionId) (role: SessionId -> Role option) (system: string array) (output: obj) =
+        task {
+            let turnCtx: TurnContext =
+                { Session = sid
+                  Role = role sid |> Option.map (fun r -> AgentRole(Roles.roleLabel r))
+                  Route = None
+                  Workspace = None }
+            let! transformed = turn.SystemPrompt(turnCtx, Array.toList system)
+            applySystemOutput output system transformed
+        }
+
+    let private transformSystemWithTurn
+        (turnOpt: ITurnTransform option)
         (role: SessionId -> Role option)
         (planStage: SessionId -> Task<(string * string) option>)
         sessionText
@@ -223,6 +243,10 @@ module ProviderSystemTransform =
             | Some(stagePath, draftPath) -> applyPlanStageGuidance lang system stagePath draftPath
             | None -> ()
 
+            match turnOpt with
+            | Some turn -> do! applyTurnSystem turn sid role system output
+            | None -> ()
+
             let scopeProtocol = ProviderProse.render lang "host/scope-protocol" Map.empty
             let hasScopeSection =
                 system
@@ -232,13 +256,21 @@ module ProviderSystemTransform =
                 injectScopeProtocol system scopeProtocol output
         }
 
-    let createWith
+    let createWithTurn
         (role: SessionId -> Role option)
         (planStage: SessionId -> Task<(string * string) option>)
+        (turnOpt: ITurnTransform option)
         : obj -> obj -> Task<unit> =
         fun input output ->
             task {
                 match sessionTransformInput input output with
                 | None -> ()
-                | Some(sessionText, system) -> do! transformSystem role planStage sessionText system output
+                | Some(sessionText, system) ->
+                    do! transformSystemWithTurn turnOpt role planStage sessionText system output
             }
+
+    let createWith
+        (role: SessionId -> Role option)
+        (planStage: SessionId -> Task<(string * string) option>)
+        : obj -> obj -> Task<unit> =
+        createWithTurn role planStage None

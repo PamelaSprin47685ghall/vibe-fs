@@ -10,10 +10,12 @@ import {
 
 const prose = 'DELIVERED PROSE'
 
-test('WHAT[delegation-033] clean natural stop settles a journal-less run with full session payload', { timeout: 3000 }, async () => {
+test('WHAT[delegation-033] clean natural stop settles a journal-less run with the final assistant prose', { timeout: 3000 }, async () => {
   const result = await joinProbeDeliver(createJoinProbe(), [], 'current report')
   assert.equal(result.status, 'completed')
   assert.equal(result.body, 'current report')
+  assert.doesNotMatch(result.body, /\[\[session\]\]/, 'the natural-stop return is prose, never a session payload')
+  assert.deepEqual(result.returned, [], 'a natural stop carries no structured return material')
 })
 
 test('WHAT[delegation-033] clean natural stop settles the child run without requiring a deliver member', async () => {

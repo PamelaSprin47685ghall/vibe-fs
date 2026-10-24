@@ -15,6 +15,18 @@ module JsGlobFs =
     [<Emit("$0({ root: $1 })")>]
     let private createFilesystem (factory: obj) (root: string) : obj = jsNative
 
+    [<Import("resolve", "node:path")>]
+    let private pathResolve (path: string) : string = jsNative
+
+    [<Import("relative", "node:path")>]
+    let private pathRelative (from: string) (toPath: string) : string = jsNative
+
+    [<Import("join", "node:path")>]
+    let private pathJoin (a: string) (b: string) : string = jsNative
+
+    [<Import("isAbsolute", "node:path")>]
+    let private pathIsAbsolute (path: string) : bool = jsNative
+
     type JsGlobListing = { Paths: string list }
 
     let private ofResult (result: obj) : Result<JsGlobListing, JsFailure> =
@@ -48,12 +60,24 @@ module JsGlobFs =
 
     type JsVisibleEntry = { Name: string; IsDir: bool }
 
-    /// JS-007 / [057]: one-directory listing with the library's gitignore
-    /// semantics. The library resolves the path inside the root and refuses
-    /// boundary escapes itself.
+    /// JS-007 / [057]: one-directory listing with gitignore semantics.
+    /// Supports listing paths inside or outside the workspace root.
     let visibleEntries (root: string) (path: string) : Result<JsVisibleEntry list, JsFailure> =
-        let api = createFilesystem Filesystem root
-        let result: obj = api?visibleEntries (path)
+        let full =
+            if System.String.IsNullOrEmpty path then pathResolve root
+            elif pathIsAbsolute path then pathResolve path
+            else pathResolve (pathJoin root path)
+
+        let rel = pathRelative root full
+
+        let (dirRoot, dirPath) =
+            if rel = "" || (not (rel.StartsWith "..") && not (pathIsAbsolute rel)) then
+                (root, rel)
+            else
+                (full, "")
+
+        let api = createFilesystem Filesystem dirRoot
+        let result: obj = api?visibleEntries (dirPath)
 
         if unbox<bool> (result?ok) then
             let entries = unbox<obj array> (result?entries)

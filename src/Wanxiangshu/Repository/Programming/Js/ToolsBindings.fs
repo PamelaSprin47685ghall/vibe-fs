@@ -74,21 +74,15 @@ module JsToolsBindings =
         | Error failure -> failureObj failure
         | Ok value -> value
 
-    /// Path boundary: a path is legal iff its resolved form stays inside root.
-    /// Absolute paths are allowed when they resolve inside root; anything else
-    /// is PATH_DENIED (JS-007 capability boundary).
+    /// Path resolution: relative paths join root, absolute paths resolve as-is.
+    /// Access is governed by operating system permissions rather than workspace root restrictions.
     let private resolveInside (root: string) (path: string) : Result<string, JsFailure> =
         let full =
             if System.String.IsNullOrEmpty path then pathResolve root
             elif pathIsAbsolute path then pathResolve path
             else pathResolve (pathJoin root path)
 
-        let rel = pathRelative root full
-
-        if rel = "" || (not (rel.StartsWith "..") && not (pathIsAbsolute rel)) then
-            Ok full
-        else
-            Error(JsFailure.PathDenied path)
+        Ok full
 
     let private readPathResolutionFailure path (error: obj) =
         if string error?code = "ENOENT" then
@@ -102,20 +96,11 @@ module JsToolsBindings =
         with error ->
             Error(readPathResolutionFailure path error)
 
-    /// Symlink-escape check for an existing path: resolve both ends and
-    /// require the target to stay inside the capability boundary.
-    let private ensureRealPathInside (root: string) (callerPath: string) (full: string) =
-        result {
-            let! readPath = resolveReadPath full
-            let! readRoot = resolveReadPath root
-            let relative = (pathRelative readRoot readPath).Replace("\\", "/")
-
-            do!
-                if relative = ".." || relative.StartsWith("../") || pathIsAbsolute relative then
-                    Error(JsFailure.PathDenied callerPath)
-                else
-                    Ok()
-        }
+    let private ensureRealPathInside (_root: string) (_callerPath: string) (full: string) =
+        if JsMutationFs.existsPath full then
+            resolveReadPath full |> Result.map ignore
+        else
+            Ok()
 
 
     let createLedger (persistence: IJsTransactionPersistence option) : JsAsIsLedger =
@@ -304,15 +289,6 @@ module JsToolsBindings =
             result {
                 let! full = resolveInside root path
                 let! readPath = resolveReadPath full
-                let! readRoot = resolveReadPath root
-                let relative = (pathRelative readRoot readPath).Replace("\\", "/")
-
-                do!
-                    if relative = ".." || relative.StartsWith("../") || pathIsAbsolute relative then
-                        Error(JsFailure.PathDenied path)
-                    else
-                        Ok()
-
                 let! text = JsUtf8Fs.readUtf8Classified readPath
                 readSnapshots.Add { Path = path; Text = text }
                 explicitReads.Add { Path = readPath; ResultBytes = text }

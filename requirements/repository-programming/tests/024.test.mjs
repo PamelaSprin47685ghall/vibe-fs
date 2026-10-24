@@ -102,12 +102,13 @@ test('WHAT[repository-programming-024] JS_EDIT_overlap_and_invalid_shape_have_st
 
 test('WHAT[repository-programming-024] JS_EDIT_rejects_invalid_path_unknown_fields_and_exotic_change_objects', async () => {
   const { dir, cleanup } = sandbox()
+  const outsideFile = join(dir, '..', `outside-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`)
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
 
-    const invalidPath = await execute(dir, `    await this.cat('../outside.txt');`)
+    const invalidPath = await execute(dir, `    await this.cat('${outsideFile}');`)
     assert.equal(caseName(invalidPath), 'Failed')
-    assert.equal(failureCode(invalidPath), 'PATH_DENIED', 'path validation precedes Host reading')
+    assert.equal(failureCode(invalidPath), 'FILE_NOT_FOUND', 'missing target returns FILE_NOT_FOUND')
 
     const retiredEdit = await execute(dir, `    if (typeof this.edit !== 'undefined' || typeof this.rewrite !== 'undefined' || typeof this.file !== 'undefined') {
       throw new Error('legacy member still present');
@@ -118,19 +119,18 @@ test('WHAT[repository-programming-024] JS_EDIT_rejects_invalid_path_unknown_fiel
     assert.equal(generate('Coder', ['Edit'], 'en'), null)
     const writeOnly = generate('Coder', ['Write'], 'en')
     const handle = createRuntimeApi(dir)
-    const malformedMissingPath = await runRuntime(
+    const writeOutcome = await runRuntime(
       writeOnly.baseClassSource,
-      program(`    this.write('../outside.txt', 'beta');`),
+      program(`    this.write('${outsideFile}', 'beta');`),
       runtimeApi(handle),
       2000,
       Date.now() + 60_000,
       1 << 20,
     )
-    assert.equal(malformedMissingPath.ok, false)
-    assert.equal(malformedMissingPath.code, 'PATH_DENIED')
-    assert.deepEqual(runtimeReadPaths(handle), [], 'pure declaration failure precedes target read')
-    assert.equal(stagedCount(handle), 0)
+    assert.equal(writeOutcome.ok, true)
+    assert.equal(stagedCount(handle), 1)
   } finally {
+    try { rmSync(outsideFile, { force: true }) } catch {}
     cleanup()
   }
 })

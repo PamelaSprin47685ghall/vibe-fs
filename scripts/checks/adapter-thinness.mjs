@@ -18,9 +18,7 @@
 //     P-16 pair guidance) live in src/Wanxiangshu/Host/Domain/, NOT under Host/Ports/. They are tier B —
 //     a lane's own seam, never mirrored to the TypeScript port surface — so they are deliberately
 //     outside the strict purity scope; the gate does not pretend they are neutral ports.
-//   * Host/FissionPort.fs(i) already declares the safe `Wanxiangshu.Host.Ports` namespace but still
-//     sits directly under Host/ instead of Host/Ports/; its location is tracked on HNI-14 and is the
-//     one exemption of gate ⑬'s location rule.
+//   * P-17 FissionPort converged into Execution/Fission/FissionEnvironment.fs(i); no location exemption remains.
 //   * src/Wanxiangshu/Host/** outside Host/Ports/ is product/neutral-host code, not adapter code; it is not
 //     counted as "adapter" either, so a neutral-host adapter folder convention is not yet covered here.
 //
@@ -234,14 +232,8 @@ export const DOMAIN_ROOT = `${PRODUCTION_ROOT}/Host/Domain`
 export const PORT_NAMESPACE = 'Wanxiangshu.Host.Ports'
 export const DOMAIN_NAMESPACE = 'Wanxiangshu.Host.Domain'
 
-// Host/FissionPort.fs(i) is the one known exception: it already declares the safe
-// `Wanxiangshu.Host.Ports` namespace but sits directly under Host/ instead of Host/Ports/.
-// Its location is tracked on HNI-14; until that lane moves it, the gate records the debt instead
-// of failing the tree. Nothing else is exempt.
-export const DOMAIN_SEAM_LOCATION_EXEMPT = [
-  `${HOST_ROOT}/FissionPort.fs`,
-  `${HOST_ROOT}/FissionPort.fsi`,
-]
+// P-17 converged into Execution/Fission/FissionEnvironment.fs(i); no file is exempt.
+export const DOMAIN_SEAM_LOCATION_EXEMPT = []
 
 const declaresNamespace = (text) => {
   const decl = /^(?:namespace|module)\s+(?:rec\s+)?([\w.]+)/m.exec(text)

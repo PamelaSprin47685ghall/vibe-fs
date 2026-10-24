@@ -1,6 +1,9 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open System.Threading.Tasks
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 
 /// HNI-09: the product decisions of one generated js-* tool. The OpenCode
 /// binding (`JsToolSpec`) keeps the host-wire plumbing and asks this module
@@ -19,6 +22,19 @@ module JsToolPolicy =
     /// Whether the office role may call the generated tool of that role name.
     val admitsRole: roleName: string -> role: Role -> bool
 
+    /// Manager cannot read by default.
+    val defaultReadCheck:
+        roleName: string ->
+        readCheck: ('context -> Task<bool>) option ->
+            ('context -> Task<bool>) option
+
+    /// Default invocation name when not specified.
+    val defaultInvocationName:
+        toolCallId: ToolCallId option ->
+        providerRunId: ProviderRunIdentity option ->
+        sessionId: string ->
+            string
+
     /// The localized prose of the `program` argument.
     val argProgramProse: unit -> string
 
@@ -27,6 +43,9 @@ module JsToolPolicy =
 
     /// The localized prose of the refusal of a call that carries no state.
     val missingProgramProse: unit -> string
+
+    /// The refusal tool result when no program/unpark/abandon state was provided.
+    val missingProgramResult: unit -> string
 
     /// The rendered result of a settled call, with the view declaration
     /// committed when the program settled.

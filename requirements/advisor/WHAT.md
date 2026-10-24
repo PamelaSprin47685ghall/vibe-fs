@@ -15,15 +15,15 @@
 
 调用面是 `this.advisor(intent)`，单一参数。调用方不得传入第二参数。调用方的完整 post-scope 视图自动作为背景提供给顾问，不进行局部历史筛选，也不隐式继承未重置的旧过程。意图与材料是分离的提示输入：intent 自成一条 user prompt，材料单独渲染为 TOML 数据平面，不合并成一段，也不把已渲染的 TOML 再嵌入字符串字段。
 
-## [003] follow-up 追加新请求文档，自然停机返回 full view
+## [003] follow-up 追加新请求文档，自然停机返回末轮散文
 
 后续调用追加包含新 intent 与调用方当前最新完整 post-scope 视图的单一请求文档。每次调用均发送调用方最新的完整 post-scope 视图。LLM 不需要维护或传入已交付集合。
 
-顾问会话与普通子智能体一致，在无未决工具调用的干净终态处自然停机；宿主在其自然停机后，捕获顾问会话当前的完整 post-scope LLM 可见视图并渲染为 TOML 返回给调用方，而非仅提取纯散文文本。咨询不改变调用方的 scope 状态。
+顾问会话与普通子智能体一致，在无未决工具调用的干净终态处自然停机；宿主在其自然停机后，把顾问该终态轮次的 assistant 散文返回给调用方，绝不捕获或渲染顾问会话的完整 post-scope 视图。咨询不改变调用方的 scope 状态。
 
-## [004] 无工具、全量上下文返回
+## [004] 无工具、末轮散文返回
 
-顾问 office 不携带任何 `ToolPermission`（`OfficeCapability.permissions Role.Advisor = Set.empty`）。顾问的回答是其在返回上下文中包含的终态 assistant 散文；空回答或无实质内容的回答按失败处理，不伪造建议。调用者拿到的是包含该建议的完整 TOML 上下文，而不是裸散文字符串，亦非机器工具回执。
+顾问 office 不携带任何 `ToolPermission`（`OfficeCapability.permissions Role.Advisor = Set.empty`）。顾问的回答就是其终态 assistant 散文；空回答或无实质内容的回答按失败处理，不伪造建议。调用者拿到的就是这份散文本身，不是顾问的完整上下文视图，亦非机器工具回执。
 
 ## [005] 无授权副作用
 
@@ -31,5 +31,5 @@
 
 ## [006] `this.advisor` 是编程面成员
 
-调用面是 `this.advisor(intent)`：与其他基类成员一致，返回数据信封 `{ ok: true, context: string }`，其中 `context` 是顾问自然停机后的完整 post-scope TOML 视图；拒绝时返回 `{ ok: false, code: string, reason: string }`（如席位无法作答 `advisor-unavailable`、宿主缺席 `DELEGATION_UNAVAILABLE` 等）。渲染只在工具结果边界发生。advisor 不另设独立 Host 工具注册，宿主经成员闭包 `JsDelegationHost.Advisor` 承接调用。`this.horizon` 同样以成员身份返回名册数据（含每个子智能体的四数校准）。
+调用面是 `this.advisor(intent)`：与其他基类成员一致，返回数据信封 `{ ok: true, advice: string }`，其中 `advice` 是顾问自然停机时的末轮 assistant 散文；拒绝时返回 `{ ok: false, code: string, reason: string }`（如席位无法作答 `advisor-unavailable`、宿主缺席 `DELEGATION_UNAVAILABLE` 等）。渲染只在工具结果边界发生。advisor 不另设独立 Host 工具注册，宿主经成员闭包 `JsDelegationHost.Advisor` 承接调用。`this.horizon` 同样以成员身份返回名册数据（含每个子智能体的四数校准）。
 

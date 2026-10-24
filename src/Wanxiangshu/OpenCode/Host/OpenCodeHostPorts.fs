@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host.Ports
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Participant.ManagedAgents
 
 module OpenCodeHostPorts =
 
@@ -100,28 +101,41 @@ module OpenCodeHostPorts =
             member this.Apply(_session: SessionId, _route: ModelRoute) : HostResult<unit> =
                 Task.FromResult(Error(HostError.Unsupported HostCapability.ModelCatalog))
 
-    /// The neutral signal subscription is not wired on OpenCode yet, and the
-    /// capability is not claimed. Returning a no-op handle would tell the
-    /// product "subscribed" while dropping every signal, so the port refuses
-    /// explicitly instead of faking a successful subscription.
-    type private UnsupportedSignalSource() =
-        interface ISignalSource with
-            member this.Subscribe(_listener: HostSignal -> Task) : IDisposable =
-                raise (
-                    NotSupportedException(
-                        "ISignalSource.Subscribe: neutral signal subscription is not wired on OpenCode yet (HostCapability.SignalSubscription is not claimed)"
-                    )
-                )
+    let private sharedSignalSource = Events.HostSignalSource()
+
+    /// Broadcast a neutral host signal to all active subscribers.
+    let publishSignal (signal: HostSignal) : Task =
+        sharedSignalSource.Publish signal
 
     type private UnsupportedToolRegistrar() =
         interface IToolRegistrar with
             member this.Register(_tools: ToolSpec list) : Result<unit, HostError> =
                 Error(HostError.Unsupported HostCapability.ToolRegistration)
 
-    type private UnsupportedAgentCatalog() =
+    type private OpenCodeAgentCatalog(input: obj) =
         interface IAgentCatalog with
             member this.Roles() : HostResult<AgentRoleSpec list> =
-                Task.FromResult(Error(HostError.Unsupported HostCapability.AgentCatalog))
+                task {
+                    let configAgents =
+                        if isNull input || isNull input?config || isNull input?config?agent then
+                            null
+                        else
+                            input?config?agent
+
+                    let specs =
+                        ManagedAgent.requiredNames
+                        |> List.map (fun name ->
+                            let desc =
+                                if not (isNull configAgents) && not (isNull configAgents?(name)) && not (isNull configAgents?(name)?description) then
+                                    Some (string configAgents?(name)?description)
+                                else
+                                    None
+                            { Role = AgentRole name
+                              Description = desc
+                              Route = None
+                              ToolPolicy = None })
+                    return Ok specs
+                }
 
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (liveConfig: LiveHostConfig) : Task<HostPorts> =
         task {
@@ -171,9 +185,9 @@ module OpenCodeHostPorts =
                 modelsOpt
                 |> Option.defaultWith (fun () -> UnsupportedModelCatalog() :> IModelCatalog)
 
-            let signalsPort = UnsupportedSignalSource() :> ISignalSource
+            let signalsPort = sharedSignalSource :> ISignalSource
             let toolsPort = UnsupportedToolRegistrar() :> IToolRegistrar
-            let agentsPort = UnsupportedAgentCatalog() :> IAgentCatalog
+            let agentsPort = OpenCodeAgentCatalog(boot.Input) :> IAgentCatalog
 
             let capabilities: HostCapabilities =
                 { HostName = "OpenCode"
@@ -181,7 +195,10 @@ module OpenCodeHostPorts =
                     set (
                         [ HostCapability.ChildSessions
                           HostCapability.SessionDiscovery
-                          HostCapability.Interrupt ]
+                          HostCapability.Interrupt
+                          HostCapability.SignalSubscription
+                          HostCapability.AgentCatalog
+                          HostCapability.ToolDefinitionEdit ]
                         // The catalog capability is claimed only when the
                         // catalog is really wired; an unclaimed capability
                         // must answer `HostError.Unsupported`.

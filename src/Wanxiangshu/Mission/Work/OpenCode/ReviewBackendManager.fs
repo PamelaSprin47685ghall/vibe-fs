@@ -4,12 +4,10 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Git
 open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Mission.Work.Review
@@ -209,14 +207,14 @@ module ReviewBackendManager =
     let private lifecycleWorkOf
         (directory: string)
         (sessionId: string)
-        : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+        : Task<DurableWorkHost.InspectedWork option> =
         task {
             let! commonDir = RuntimePath.stateRoot directory
 
             if String.IsNullOrWhiteSpace commonDir then
                 return None
             else
-                return Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
+                return DurableWorkHost.inspected commonDir sessionId
         }
 
     type private BoundReviewInvocation =
@@ -299,12 +297,12 @@ module ReviewBackendManager =
                 return Error BindingUnavailable
         }
 
-    let private acceptedResult (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) =
+    let private acceptedResult (receipt: DurableWorkHost.HostReceipt) =
         let outcome =
-            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "outcome"
+            DurableWorkHost.resultText receipt "outcome"
 
         let firstReview =
-            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "firstReview"
+            DurableWorkHost.resultText receipt "firstReview"
 
         let instructionPath = if outcome = "Promoted" then Path.Finish else Path.Work
 
@@ -317,7 +315,7 @@ module ReviewBackendManager =
     /// The write receipt decides the result. Multiple reviews per tenure are
     /// legal; a committed or replayed write is accepted.
     let private reviewOutcome
-        (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
+        (receipt: DurableWorkHost.HostReceipt)
         : Result<string, ReviewFailure> =
         if receipt.Status = "Committed" || receipt.Status = "Replayed" then
             Ok(acceptedResult receipt)
@@ -346,11 +344,11 @@ module ReviewBackendManager =
 
     /// The review member's success envelope: outcome, firstReview and the
     /// remaining keyed obligation ledger, all read from the durable receipt.
-    let private memberAccepted (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) : obj =
+    let private memberAccepted (receipt: DurableWorkHost.HostReceipt) : obj =
         createObj
             [ "ok" ==> true
               "outcome"
-              ==> Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "outcome"
+              ==> DurableWorkHost.resultText receipt "outcome"
               "firstReview" ==> boolField receipt.Result "firstReview"
               "obligations" ==> obligationsField receipt.Result ]
 
@@ -358,7 +356,7 @@ module ReviewBackendManager =
     /// a null into a removal); an empty string is NOT a deletion alias.
     let private updatesOf (findings: ReviewFindings) : obj =
         findings
-        |> Wanxiangshu.Mission.Work.ReviewFindings.values
+        |> ReviewFindings.values
         |> List.map (fun finding ->
             createObj
                 [ "key", box finding.Key
@@ -374,7 +372,7 @@ module ReviewBackendManager =
             match! lifecycleWorkOf prepared.Bound.Directory context.SessionId with
             | None -> return Error RecordFailed
             | Some _ ->
-                let! gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot prepared.Bound.Directory
+                let! gitCommonDir = RuntimePath.stateRoot prepared.Bound.Directory
 
                 // The request identity is the exact invocation fence, not the
                 // incumbency alone and not a content hash: two distinct calls
@@ -387,7 +385,7 @@ module ReviewBackendManager =
 
                 let updates =
                     prepared.Bound.Findings
-                    |> Wanxiangshu.Mission.Work.ReviewFindings.values
+                    |> ReviewFindings.values
                     |> List.map (fun finding ->
                         createObj
                             [ "key", box finding.Key
@@ -396,14 +394,14 @@ module ReviewBackendManager =
                     |> box
 
                 let command =
-                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    DurableWorkHost.command
                         "Review"
                         [ "incumbencyId", box prepared.IncumbencyId
                           "reviewerId", box ReviewerId
                           "updates", updates ]
 
                 let receipt =
-                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
+                    DurableWorkHost.execute
                         gitCommonDir
                         context.SessionId
                         requestId
@@ -453,7 +451,7 @@ module ReviewBackendManager =
             return renderExecution outcome
         }
 
-    let private receiptMemberOutcome (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) : obj =
+    let private receiptMemberOutcome (receipt: DurableWorkHost.HostReceipt) : obj =
         if receipt.Status = "Committed" || receipt.Status = "Replayed" then
             memberAccepted receipt
         else
@@ -467,20 +465,20 @@ module ReviewBackendManager =
         (findings: ReviewFindings)
         : Task<obj> =
         task {
-            let! gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot directory
+            let! gitCommonDir = RuntimePath.stateRoot directory
 
             if String.IsNullOrWhiteSpace gitCommonDir then
                 return memberFailure RecordFailed
             else
                 let command =
-                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    DurableWorkHost.command
                         "Review"
                         [ "incumbencyId", box incumbencyId
                           "reviewerId", box ReviewerId
                           "updates", updatesOf findings ]
 
                 let receipt =
-                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir sessionId requestId command
+                    DurableWorkHost.execute gitCommonDir sessionId requestId command
 
                 return receiptMemberOutcome receipt
         }
@@ -515,6 +513,7 @@ module ReviewBackendManager =
         : Task<obj> =
         match context.ToolCallId, context.ProviderRunId, scope.WorkspaceDirectory with
         | Some toolCallId, Some providerRun, Some directory ->
+            let (Ports.WorkspacePath _ws) = Ports.WorkspacePath directory
             executeInDirectory directory context.SessionId providerRun toolCallId findings
         | _ -> Task.FromResult(memberFailure BindingUnavailable)
 

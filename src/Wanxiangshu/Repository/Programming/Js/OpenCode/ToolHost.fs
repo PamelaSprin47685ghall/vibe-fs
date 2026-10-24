@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Repository.Programming.Js
 
@@ -37,10 +38,7 @@ module JsToolSpec =
         (rootOf: string -> string)
         (settlementOf: HostToolContext -> Task<DeliverySettlement option>)
         : ToolSpec =
-        let readCheck =
-            match readCheck with
-            | None when surface.RoleName.Trim().ToLowerInvariant() = "manager" -> Some(fun _ -> Task.FromResult false)
-            | configured -> configured
+        let readCheck = JsToolPolicy.defaultReadCheck surface.RoleName readCheck
 
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 
@@ -131,7 +129,8 @@ module JsToolSpec =
                 // The session's own directory wins over the plugin workspace:
                 // a road's deliverable belongs in the worktree that session was
                 // created in, not in the target's checkout.
-                let root = rootOf ctx.SessionId
+                let (Ports.WorkspacePath rootPath) = Ports.WorkspacePath (rootOf ctx.SessionId)
+                let root = rootPath
                 let fence = callFenceOf ctx
 
                 let callIdentity =
@@ -179,9 +178,7 @@ module JsToolSpec =
                 && not (isPresent (input?abandon))
 
             if noState then
-                Task.FromResult(
-                    ToolResultText.tomlObject [ "error", ToolResultText.TString(JsToolPolicy.missingProgramProse ()) ]
-                )
+                Task.FromResult(JsToolPolicy.missingProgramResult ())
             else
                 runProgramCall ctx input null
 
@@ -204,12 +201,7 @@ module JsToolSpec =
                             && not (isNull raw?program)
                             && (isNull raw?name || string raw?name = "")
                         then
-                            let defaultName =
-                                ctx.ToolCallId
-                                |> Option.map ToolCallId.value
-                                |> Option.orElseWith (fun () ->
-                                    ctx.ProviderRunId |> Option.map ProviderRunIdentity.value)
-                                |> Option.defaultValue ("call-" + ctx.SessionId)
+                            let defaultName = JsToolPolicy.defaultInvocationName ctx.ToolCallId ctx.ProviderRunId ctx.SessionId
 
                             createObj
                                 [ "program" ==> raw?program

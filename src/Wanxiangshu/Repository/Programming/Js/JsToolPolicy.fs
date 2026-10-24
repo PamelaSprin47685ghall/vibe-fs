@@ -1,8 +1,11 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider
 
 /// HNI-09: the product decisions of one generated js-* tool.
@@ -51,6 +54,24 @@ module JsToolPolicy =
         (string role).ToLowerInvariant() = roleName.ToLowerInvariant()
         && JsCapability.admitsProgrammingSurface (OfficeCapability.permissions role)
 
+    /// Manager cannot read by default.
+    let defaultReadCheck (roleName: string) (readCheck: ('context -> Task<bool>) option) : ('context -> Task<bool>) option =
+        match readCheck with
+        | None when roleName.Trim().ToLowerInvariant() = "manager" -> Some(fun _ -> Task.FromResult false)
+        | configured -> configured
+
+    /// Default invocation name when not specified.
+    let defaultInvocationName
+        (toolCallId: ToolCallId option)
+        (providerRunId: ProviderRunIdentity option)
+        (sessionId: string)
+        : string =
+        toolCallId
+        |> Option.map ToolCallId.value
+        |> Option.orElseWith (fun () ->
+            providerRunId |> Option.map ProviderRunIdentity.value)
+        |> Option.defaultValue ("call-" + sessionId)
+
     /// The prose of the `program` argument, already localized for the host.
     let argProgramProse () : string =
         JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ())
@@ -62,6 +83,10 @@ module JsToolPolicy =
     /// The prose of the refusal of a call that carries no state at all.
     let missingProgramProse () : string =
         JsDescriptionAssets.missingProgram (ProviderLanguageBinding.readGlobalPreference ())
+
+    /// The refusal tool result when no program/unpark/abandon state was provided.
+    let missingProgramResult () : string =
+        ToolResultText.tomlObject [ "error", ToolResultText.TString(missingProgramProse ()) ]
 
     let renderCommitted (sessionId: string) (callIdentity: (string * string) option) (declaration: obj) outcome : string =
         JsToolsResult.render outcome

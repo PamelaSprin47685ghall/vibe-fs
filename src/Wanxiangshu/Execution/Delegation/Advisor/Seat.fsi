@@ -23,13 +23,13 @@ type AdvisorSeatDeps =
 [<RequireQualifiedAccess>]
 module AdvisorSeat =
 
-    /// advisor-[002]/[003]: append this request's view and intent to the caller session's advisor
-    /// as two separate prompts, then return the advisor's prose.
+    /// advisor-[002]/[003]: send this request's single document (intent as `# ` comments plus the
+    /// caller's `[[context]]`) to the caller session's advisor, then return the advisor's final prose.
     ///
-    /// The first consult creates the seat's advisor child; every later consult reuses it. The view
-    /// prompt and the intent are never concatenated. `Ok` carries prose the advisor actually
-    /// produced, and a missing terminal, a failed/aborted terminal, or an empty read-back is
-    /// `Error "advisor did not answer"` (advisor-[004]).
+    /// The first consult creates the seat's advisor child; every later consult reuses it. `Ok`
+    /// carries the terminal assistant prose the advisor actually produced — never its full
+    /// post-scope view — and a missing terminal, a failed/aborted terminal, or an empty terminal
+    /// is `Error "advisor did not answer"` (advisor-[004]).
     ///
     /// advisor-[030]: each consult is fenced to the terminal of its own intent prompt. A Completed
     /// from an older provider run — a sticky replayed terminal or the view prompt finishing first —

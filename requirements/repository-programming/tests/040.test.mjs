@@ -138,32 +138,41 @@ test('WHAT[repository-programming-040] mv moves a directory', async () => {
   }
 })
 
-test('WHAT[repository-programming-040] rm and mv reject paths outside the capability boundary', async () => {
+test('WHAT[repository-programming-040] rm and mv allow paths outside root and report FILE_NOT_FOUND for missing target', async () => {
   const { dir, cleanup } = sandbox()
+  const escapePath = join(dir, '..', `escape-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`)
   try {
-    const rmOutcome = await execute(dir, `    this.rm('../escape.tmp');`)
+    const rmOutcome = await execute(dir, `    this.rm('${escapePath}');`)
     assert.equal(caseName(rmOutcome), 'Failed')
-    assert.equal(failureCode(rmOutcome), 'PATH_DENIED')
+    assert.equal(failureCode(rmOutcome), 'FILE_NOT_FOUND')
 
     writeFileSync(join(dir, 'a.txt'), 'a', 'utf8')
-    const mvOutcome = await execute(dir, `    this.mv('a.txt', '../escape.txt');`)
-    assert.equal(caseName(mvOutcome), 'Failed')
-    assert.equal(failureCode(mvOutcome), 'PATH_DENIED')
-    assert.equal(existsSync(join(dir, 'a.txt')), true, 'source must survive a refused move')
+    const mvOutcome = await execute(dir, `    this.mv('a.txt', '${escapePath}');`)
+    assert.equal(caseName(mvOutcome), 'Succeeded')
+    assert.equal(existsSync(join(dir, 'a.txt')), false, 'source was moved')
+    assert.equal(existsSync(escapePath), true, 'destination was created')
+
+    const rmSuccess = await execute(dir, `    this.rm('${escapePath}');`)
+    assert.equal(caseName(rmSuccess), 'Succeeded')
+    assert.equal(existsSync(escapePath), false, 'target was deleted')
   } finally {
+    try { rmSync(escapePath, { force: true }) } catch {}
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-040] mv rejects a destination outside the boundary even when the source is valid', async () => {
+test('WHAT[repository-programming-040] mv supports a destination outside root with relative path traversal', async () => {
   const { dir, cleanup } = sandbox()
+  const escapeRel = `sub/../../escape-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`
+  const escapeFull = join(dir, escapeRel)
   try {
     writeFileSync(join(dir, 'a.txt'), 'a', 'utf8')
-    const outcome = await execute(dir, `    this.mv('a.txt', 'sub/../../escape.txt');`)
-    assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'PATH_DENIED')
-    assert.equal(existsSync(join(dir, 'a.txt')), true, 'source must survive a refused move')
+    const outcome = await execute(dir, `    this.mv('a.txt', '${escapeRel}');`)
+    assert.equal(caseName(outcome), 'Succeeded')
+    assert.equal(existsSync(join(dir, 'a.txt')), false, 'source must be moved')
+    assert.equal(existsSync(escapeFull), true, 'destination must exist')
   } finally {
+    try { rmSync(escapeFull, { force: true }) } catch {}
     cleanup()
   }
 })

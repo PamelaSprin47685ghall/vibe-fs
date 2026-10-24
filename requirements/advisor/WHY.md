@@ -6,11 +6,11 @@
 
 请求由顾问独立的 law（角色资源，由 Host agent 配置与 system transform 投影）以及一份单一的 user 请求文档组成（与 fork 载荷形式一致）：意图散文作为 `# ...` 注释头承载问题，调用方当前的完整 post-scope 消息视图作为 TOML `[[context]]` 表承载背景数据。顾问据此分清哪一段是它必须遵守的 law、哪一段只是待评审的材料、哪一段是它要回答的问题——role law 也据此把背景明确标成材料而非指令。
 
-每次咨询均发送调用方当前最新完整的 post-scope 视图；顾问自然停机后，将其完整的 post-scope TOML 视图作为完成结果交回。
+每次咨询均发送调用方当前最新完整的 post-scope 视图；顾问自然停机后，交回的完成结果是其末轮 assistant 散文，而不是它自己的完整视图。
 
-顾问不产生任何授权副作用：它读不到仓库、跑不了命令、改不了任何东西，也不介入调用者的授权——请求顾问不改变调用者的 capability、不创建 Interaction Authority Root、不写调用者的会话历史。顾问在返回的完整上下文中的终态散文作为意见；空回答按失败处理，不伪造建议，"advisor did not answer" 是拒绝而不是一份意见。
+顾问不产生任何授权副作用：它读不到仓库、跑不了命令、改不了任何东西，也不介入调用者的授权——请求顾问不改变调用者的 capability、不创建 Interaction Authority Root、不写调用者的会话历史。顾问的末轮 assistant 散文就是意见；空回答按失败处理，不伪造建议，"advisor did not answer" 是拒绝而不是一份意见。
 
-调用面是 `this.advisor(intent)`：与其他 `js.*` 成员一致返回数据（`{ ok: true, context }`，或 `{ ok: false, code, reason }` 的拒绝信封），返回的 `context` 为顾问自然停机后的完整 post-scope TOML 视图。渲染只在工具结果边界发生，成员本身不产出 provider 词汇。没有该能力的表面不携带这个成员；能力缺失时以显式拒绝收场，而不是静默降级成"没有建议"。
+调用面是 `this.advisor(intent)`：与其他 `js.*` 成员一致返回数据（`{ ok: true, advice }`，或 `{ ok: false, code, reason }` 的拒绝信封），返回的 `advice` 为顾问自然停机时的末轮 assistant 散文——顾问的完整上下文是它自己的过程，不是调用者需要的东西。渲染只在工具结果边界发生，成员本身不产出 provider 词汇。没有该能力的表面不携带这个成员；能力缺失时以显式拒绝收场，而不是静默降级成"没有建议"。
 
 ## 边界与复用
 

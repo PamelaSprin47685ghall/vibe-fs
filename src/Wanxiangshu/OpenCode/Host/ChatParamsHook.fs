@@ -6,6 +6,7 @@ open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Persistence.Journal
 
 /// PROMPT-006 / execution-model-routing-009: chat.params is an observation barrier, not a routing
@@ -195,7 +196,40 @@ module ChatParamsHook =
         recordDeclaredLimit input
         applyManagedPolicy journal input output
 
+    let private handleVerdict (verdict: ParamsVerdict) =
+        match verdict with
+        | ParamsVerdict.Accept -> ()
+        | ParamsVerdict.Adjust _ -> ()
+        | ParamsVerdict.Refuse reason -> invalidOp reason
+
+    let private executeTurnParams (turn: ITurnTransform) (key: ChatExecutionKey) (input: obj) =
+        let turnContext: TurnContext =
+            { Session = key.SessionId
+              Role = tryAgent input |> Option.map AgentRole
+              Route = None
+              Workspace = None }
+        let providerParams: ProviderParams =
+            { Temperature = None
+              TopP = None
+              MaxOutputTokens = declaredContextLimit input
+              Reasoning = None
+              Extra = None }
+        let verdict = (turn.ProviderParams(turnContext, providerParams)).GetAwaiter().GetResult()
+        handleVerdict verdict
+
+    let private applyTurnParams (turnOpt: ITurnTransform option) (input: obj) (_output: obj) =
+        match turnOpt, tryExecutionKey input with
+        | Some turn, Some key -> executeTurnParams turn key input
+        | _ -> ()
+
+    let private handleInputWithTurn (turnOpt: ITurnTransform option) (journal: AgentJournal option) (input: obj) (output: obj) =
+        applyTurnParams turnOpt input output
+        handleInput journal input output
+
+    let createWithTurn (journal: AgentJournal option) (turnOpt: ITurnTransform option) : obj =
+        box (fun (input: obj) (output: obj) -> handleInputWithTurn turnOpt journal input output)
+
     let createWith (journal: AgentJournal option) : obj =
-        box (fun (input: obj) (output: obj) -> handleInput journal input output)
+        createWithTurn journal None
 
     let create () : obj = createWith None

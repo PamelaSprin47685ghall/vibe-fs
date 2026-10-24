@@ -92,10 +92,10 @@ const { agents, ptys } = await this.horizon();
 ## advisor
 
 ```js
-const { ok, context } = await this.advisor("缓存淘汰策略是否合理？");
+const { ok, advice } = await this.advisor("缓存淘汰策略是否合理？");
 ```
 
 - 请教本会话的专属顾问；顾问没有工具，以散文作答。`intent` 单独写问题。
-- 单次请求发送 intent 与调用方当前 scope 上下文；顾问自然停下后返回其完整 scope session TOML。
-- 结果：`{ ok: true, context }` 或 `{ ok: false, code: "advisor-unavailable", reason }`。
+- 单次请求发送 intent 与调用方当前 scope 上下文；顾问自然停下后只交回其末轮 assistant 散文。
+- 结果：`{ ok: true, advice }` 或 `{ ok: false, code: "advisor-unavailable", reason }`。
 - 把回答作为后续判断的依据；本次请教不会自行改写你的会话记录。

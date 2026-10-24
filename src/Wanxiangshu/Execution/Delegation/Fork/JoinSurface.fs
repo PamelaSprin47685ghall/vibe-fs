@@ -413,8 +413,7 @@ module JoinSurface =
                   Source =
                     TaskCompletionSource<AgentCompletionOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
                   Subscription = None
-                  Finished = false
-                  Snapshot = None }
+                  Finished = false }
 
             let pending = Dictionary<string, PendingHostRun>()
             pending.Add(run.AgentId, run)

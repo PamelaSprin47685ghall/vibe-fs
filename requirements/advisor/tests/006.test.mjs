@@ -24,7 +24,7 @@ test('WHAT[advisor-006] advisor is capability-gated and documents the intent par
   assert.doesNotMatch(withoutAdvisor.baseClassSource, /this\._api\.advisor/)
 })
 
-test('WHAT[advisor-006] advisor invocation forwards intent and returns ok and context', async () => {
+test('WHAT[advisor-006] advisor invocation forwards intent and returns ok and advice', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-advisor-intent-'))
   const session = 'advisor-intent-member'
   const observed = []
@@ -32,11 +32,12 @@ test('WHAT[advisor-006] advisor invocation forwards intent and returns ok and co
   try {
     installDelegationHost(session, unused, unused, unused, unused, async (intent) => {
       observed.push(intent)
-      return { ok: true, context: '[[session]]\nrole = "assistant"\ntext = "advice"' }
+      return { ok: true, advice: 'ADVICE: keep the fence, ship behind a flag' }
     })
     const outcome = await managerRun(dir, 'return await this.advisor("review evidence");', session)
     assert.equal(caseName(outcome), 'Succeeded')
-    assert.match(render(outcome), /context = /)
+    assert.match(render(outcome), /advice = /)
+    assert.doesNotMatch(render(outcome), /\[\[session\]\]/, 'the consult return carries no session payload')
     assert.deepEqual(observed, ['review evidence'])
   } finally {
     clearDelegationHost(session)

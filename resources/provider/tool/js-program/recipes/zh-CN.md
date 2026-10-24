@@ -14,6 +14,6 @@ const listed = await this.rg(["--files", "src", "-g", "*.fs"]);
 const paths = listed.paths;
 ```
 
-argv 里的路径必须留在工作区内。`..`、工作区外的绝对路径，或会读到区外的选项，都是 `PATH_DENIED`。
+argv 里的路径支持工作区内及区外合法路径。
 
 `where` / `whereAll` 仍是编辑定位器。它们返回一份快照上的 UTF-16 span；`rg` 不返回 span。

@@ -150,8 +150,8 @@
 | 25 | `durable-events` | 28 | durable-events-001 ~ 028 |
 | 26 | `effect-accounting` | 11 | effect-accounting-001 ~ 008、010、012、013（交付成功不是效果） |
 | 27 | `durable-convergence` | 11 | durable-convergence-001 ~ 011 |
-| 28 | `delegation` | 31 | delegation-001 ~ 015、017、019 ~ 033（021 只读背景由完整 post-scope 视图承载；033 子智能体自然停机完成与结算，无 deliver/nudge） |
-| 58 | `advisor` | 6 | advisor-001 ~ 006（专席归属与家族根父级、002 单一请求文档与 post-scope 全视图、003 自然停机返回顾问全视图 TOML、004 无工具、005 无授权副作用、006 this.advisor(intent) 编程面成员返回 { ok, context }） |
+| 28 | `delegation` | 31 | delegation-001 ~ 015、017、019 ~ 033（021 只读背景由完整 post-scope 视图承载；033 子智能体自然停机完成与结算，末轮散文以 `#` 注释交回，无 deliver/nudge） |
+| 58 | `advisor` | 6 | advisor-001 ~ 006（专席归属与家族根父级、002 单一请求文档与 post-scope 全视图、003 自然停机返回顾问末轮散文、004 无工具、005 无授权副作用、006 this.advisor(intent) 编程面成员返回 { ok, advice }） |
 | 29 | `intra-participant-parallelism` | 17 | intra-participant-parallelism-001 ~ 015、017 ~ 018 |
 | 30 | `process-execution` | 17 | process-execution-001 ~ 017；通用工具结果边界归 host-boundary |
 | 31 | `change-integration` | 14 | change-integration-001 ~ 009、011、013 ~ 015、017 |
@@ -175,7 +175,7 @@
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |
 | 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |
 | 56 | `distribution` | 11 | distribution-001 ~ 011（010 打包资源与活动注册同步、011 安装产物闭包在场） |
-| 57 | `advisor` | 6 | advisor-001 ~ 006（001 专席归属与「孙子变儿子」、002 单一请求文档与 post-scope 全视图、003 自然停机返回顾问全视图 TOML、004 无工具、005 无授权副作用、006 this.advisor(intent) 编程面成员返回 { ok, context }） |
+| 57 | `advisor` | 6 | advisor-001 ~ 006（001 专席归属与「孙子变儿子」、002 单一请求文档与 post-scope 全视图、003 自然停机返回顾问末轮散文、004 无工具、005 无授权副作用、006 this.advisor(intent) 编程面成员返回 { ok, advice }） |
 
 # 依赖骨架
 

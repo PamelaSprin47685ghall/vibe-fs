@@ -179,9 +179,9 @@ module JoinResultRenderer =
         let name =
             byname lang resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
 
-        // The byname line rides the `# ` comment header. The child's full post-scope
-        // view is returned as structured session data, rendered into [[session]] tables
-        // by ReturnedMaterial.carryData (with body prose for legacy Manager/Plan paths).
+        // The byname line and the child's final-turn prose ride the `# ` comment header
+        // (body prose, empty carry). A lifecycle `deliver` may still attach structured
+        // carry material, which lands in the `[[returned]]` data plane.
         LlmFacing.instructions ([ bynameLine lang Path.AgentReturned name ] @ ReturnedMaterial.body payload.View)
         |> LlmFacing.withData (ReturnedMaterial.carryData payload.View)
 

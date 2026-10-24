@@ -3,9 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-
-/// HOST-026 / PROMPT-017: project the session-bound ProviderLanguage onto the
-/// Wanxiangshu-owned system-prompt segment without disturbing Host/AGENTS text.
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Participant.Provider
 
 module ProviderSystemTransform =
@@ -16,5 +14,11 @@ module ProviderSystemTransform =
     val createWith:
         role: (SessionId -> Role option) ->
         planStage: (SessionId -> Task<(string * string) option>) ->
+            (obj -> obj -> Task<unit>)
 
+    /// HNI P-06: provider system transform integrated with ITurnTransform.
+    val createWithTurn:
+        role: (SessionId -> Role option) ->
+        planStage: (SessionId -> Task<(string * string) option>) ->
+        turnOpt: ITurnTransform option ->
             (obj -> obj -> Task<unit>)

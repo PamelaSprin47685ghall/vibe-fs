@@ -94,10 +94,10 @@ const { agents, ptys } = await this.horizon();
 ## advisor
 
 ```js
-const { ok, context } = await this.advisor("Is the cache eviction policy sound?");
+const { ok, advice } = await this.advisor("Is the cache eviction policy sound?");
 ```
 
 - Consult this session's dedicated advisor. The advisor has no tools and answers in prose. State the question in `intent`.
-- Sends a single request with intent and the caller's post-scope context; on natural stop, the advisor returns its full post-scope session TOML.
-- Result: `{ ok: true, context }` or `{ ok: false, code: "advisor-unavailable", reason }`.
+- Sends a single request with intent and the caller's post-scope context; on natural stop, the advisor returns only its final assistant prose.
+- Result: `{ ok: true, advice }` or `{ ok: false, code: "advisor-unavailable", reason }`.
 - Use the answer to inform the next decision. The consultation does not itself rewrite your transcript.

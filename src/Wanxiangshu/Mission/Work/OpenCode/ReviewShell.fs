@@ -3,10 +3,13 @@ namespace Wanxiangshu.Mission.Work.OpenCode
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Host
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Mission.Work.Review
+open Wanxiangshu.Mission.Lifecycle
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Mission.Planning
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
@@ -81,7 +84,7 @@ module ReviewShell =
         | None -> Error ReviewBackendManager.Path.BindingUnavailable
 
     let private resolveActiveIncumbency (gitCommonDir: string) (workId: string) : Result<string, string> =
-        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
+        DurableWorkHost.inspected gitCommonDir workId
         |> Option.bind (fun work -> work.ActiveId)
         |> activeIncumbencyId
 
@@ -136,9 +139,10 @@ module ReviewShell =
 
         let dispatch args context : Task<string> =
             task {
+                let (Ports.WorkspacePath _ws) = Ports.WorkspacePath (scope.WorkspaceDirectory |> Option.defaultValue ".")
                 let! gitCommonDir =
                     match scope.WorkspaceDirectory with
-                    | Some ws -> Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
+                    | Some ws -> RuntimePath.stateRoot ws
                     | None -> Task.FromResult ""
 
                 if scope.IsRole(context, Role.Plan) then

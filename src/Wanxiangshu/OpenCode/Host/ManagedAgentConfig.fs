@@ -1,32 +1,17 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Foundation.HostSession
-
-open Wanxiangshu.Participant.ManagedAgents
-
 open System
 open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Ablation
 open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Foundation.HostSession
+open Wanxiangshu.Host.Ports
+open Wanxiangshu.Participant.ManagedAgents
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Resources
-open Wanxiangshu.Foundation
-open Wanxiangshu.Ablation
 
 /// Managed agent Host-config gate. This owns catalog projection and Wanxiangshu-owned
 /// non-model fields. Physical model routing is exclusively owned by ModelRouting.
@@ -250,3 +235,14 @@ module ManagedAgentConfig =
         | Ok inventory ->
             applyOwnedFields config inventory
             Ok inventory
+
+
+    /// HNI P-11: project the managed agent catalog into neutral AgentRoleSpec list.
+    let roleSpecs (inventory: ManagedAgentInventory) : AgentRoleSpec list =
+        ManagedAgentCatalog.allRoles
+        |> List.map (fun role ->
+            let name = Roles.roleLabel role
+            { Role = AgentRole name
+              Description = None
+              Route = None
+              ToolPolicy = None })

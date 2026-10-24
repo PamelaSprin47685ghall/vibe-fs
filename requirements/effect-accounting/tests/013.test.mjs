@@ -274,7 +274,7 @@ test('WHAT[effect-accounting-013] a committed delivery is not an effect confirma
       await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'the delivered material', terminals.awaitRun)
       const joined = await joinCall(hooks, owner)
       assert.match(joined, /the delivered material/)
-      assert.match(joined, /\[\[session\]\]/)
+      assert.doesNotMatch(joined, /\[\[session\]\]/)
 
       // 子代理自然停机完成不改变效果账：它没有把任何效果变成已确认。
       const factsAfter = durableFacts(join(directory, '.Herdchestra'))
@@ -318,7 +318,7 @@ test('WHAT[effect-accounting-013] a committed-but-unpresented delivery and an un
       assert.equal(works[0].lifecycle, 'CompletedAwaitingJoin', 'the child run settled and is awaiting join')
       const joined = await joinCall(hooks, owner)
       assert.match(joined, /the delivered material/)
-      assert.match(joined, /\[\[session\]\]/)
+      assert.doesNotMatch(joined, /\[\[session\]\]/)
     } finally {
       terminals.dispose()
     }
@@ -338,7 +338,7 @@ test('WHAT[effect-accounting-013] a committed delivery survives a later failed d
 
       const joined = await joinCall(hooks, owner)
       assert.match(joined, /the delivered material/)
-      assert.match(joined, /\[\[session\]\]/)
+      assert.doesNotMatch(joined, /\[\[session\]\]/)
     } finally {
       terminals.dispose()
     }
@@ -383,7 +383,7 @@ test('WHAT[effect-accounting-013] a refused delivery commit registers nothing, a
       assert.equal(works[0].lifecycle, 'CompletedAwaitingJoin')
       const joined = await joinCall(hooks, owner)
       assert.match(joined, /material-A/)
-      assert.match(joined, /\[\[session\]\]/)
+      assert.doesNotMatch(joined, /\[\[session\]\]/)
     } finally {
       terminals.dispose()
     }

@@ -1,7 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation.HostSession
-
+open Wanxiangshu.Host.Ports
 open Wanxiangshu.Participant.ManagedAgents
 
 /// Managed agent Host-config gate. This owns catalog projection and Wanxiangshu-owned
@@ -24,3 +24,6 @@ module ManagedAgentConfig =
     val validate: config: obj -> Result<ManagedAgentInventory, string>
 
     val configureFromHostConfig: config: obj -> Result<ManagedAgentInventory, string>
+
+    /// HNI P-11: project the managed agent catalog into neutral AgentRoleSpec list.
+    val roleSpecs: inventory: ManagedAgentInventory -> AgentRoleSpec list

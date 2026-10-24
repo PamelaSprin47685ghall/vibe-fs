@@ -120,8 +120,8 @@ module ToolRegistry =
             let! answered = AdvisorSeat.consult deps sessionId intentText callerContextToml
 
             match answered with
-            | Ok toml ->
-                return createObj [ "ok" ==> true; "context" ==> toml ]
+            | Ok advice ->
+                return createObj [ "ok" ==> true; "advice" ==> advice ]
             | Error reason -> return advisorRefusal "advisor-unavailable" reason
         }
 

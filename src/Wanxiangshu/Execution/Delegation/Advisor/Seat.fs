@@ -44,9 +44,10 @@ type AdvisorSeatDeps =
 /// of this contract.
 ///
 /// A consult sends a single managed prompt containing `# intent` followed by caller `[[context]]`,
-/// waits for the child's natural terminal, and captures the child session TOML view. A terminal that
-/// never arrives, a terminal that is not a completed run, or an unreadable session refuses with
-/// "advisor did not answer": the seat never fabricates advice (advisor-[004]).
+/// waits for the child's natural terminal, and returns that terminal's assistant prose — never the
+/// child's full session view. A terminal that never arrives, a terminal that is not a completed
+/// run, or an empty terminal refuses with "advisor did not answer": the seat never fabricates
+/// advice (advisor-[004]).
 [<RequireQualifiedAccess>]
 module AdvisorSeat =
 
@@ -271,20 +272,6 @@ module AdvisorSeat =
                     |> Result.mapError (fun failure -> sprintf "advisor consult could not close its run: %A" failure)
         }
 
-    let private readChildSessionToml
-        (snapshotOpt: ISessionSnapshotPort option)
-        (childId: SessionId)
-        : Task<Result<string, string>> =
-        taskResult {
-            let! snapshot = snapshotOpt |> Result.requireSome "Snapshot port is unavailable for advisor child"
-            let! messages = snapshot.GetMessages childId |> TaskResult.mapError (sprintf "snapshot read failed: %s")
-            let js = Wanxiangshu.Context.Scope.SessionView.ofSnapshotMessages messages
-            let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box js)
-            let toml = Wanxiangshu.Context.Scope.SessionView.renderJsWithTable "session" filtered
-            do! Result.requireFalse DidNotAnswer (String.IsNullOrWhiteSpace toml)
-            return toml
-        }
-
     let private buildConsultPrompt (intent: string) (viewPrompt: string) : string =
         let header = LlmFacing.instruction intent |> LlmFacing.render
         if String.IsNullOrWhiteSpace viewPrompt then
@@ -293,11 +280,9 @@ module AdvisorSeat =
             header + "\n\n" + viewPrompt
 
     let private executeConsult
-        (deps: AdvisorSeatDeps)
-        (childId: SessionId)
         (sendPrompt: string -> Task<Result<PromptKey, string>>)
         (acceptIntent: PromptKey -> unit)
-        (completion: TaskCompletionSource<Result<unit, string>>)
+        (completion: TaskCompletionSource<Result<string, string>>)
         (fullPrompt: string)
         : Task<Result<string, string>> =
         taskResult {
@@ -305,8 +290,11 @@ module AdvisorSeat =
             acceptIntent key
             let! arrived = NodeTiming.raceExit (completion.Task :> Task) ConsultTimeoutMs |> TaskResultCE.ofTask
             do! Result.requireTrue DidNotAnswer arrived
-            let! () = completion.Task
-            return! readChildSessionToml deps.Snapshot childId
+            // advisor-[003]: the consult result is the advisor's final assistant prose,
+            // not its post-scope context. An empty terminal is "did not answer".
+            let! prose = completion.Task
+            do! Result.requireFalse DidNotAnswer (String.IsNullOrWhiteSpace prose)
+            return prose
         }
 
     let private runConsult
@@ -328,7 +316,7 @@ module AdvisorSeat =
                     deps.Participant
 
             let completion =
-                TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+                TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
 
             let fence =
@@ -351,7 +339,7 @@ module AdvisorSeat =
 
                     if
                         answersIntent key attributed afterIntent
-                        && AsyncSupport.trySetResult completion (Ok())
+                        && AsyncSupport.trySetResult completion (Ok result.TerminalText)
                     then
                         recordSettled childId result.ProviderRun
                 }
@@ -437,7 +425,7 @@ module AdvisorSeat =
             let fullPrompt = buildConsultPrompt intent viewPrompt
 
             try
-                return! executeConsult deps childId sendPrompt acceptIntent completion fullPrompt
+                return! executeConsult sendPrompt acceptIntent completion fullPrompt
             finally
                 disposeAcceptance ()
         }

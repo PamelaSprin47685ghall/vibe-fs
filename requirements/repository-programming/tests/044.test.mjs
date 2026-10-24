@@ -37,12 +37,10 @@ test('WHAT[repository-programming-044] runtime rm/mv failures report code and re
     assert.equal(failureCode(missing), 'FILE_NOT_FOUND')
     assert.ok(failureReason(missing).includes('absent.tmp'), 'the failure identifies the missing target')
 
-    writeFileSync(join(dir, 'src.tmp'), 's', 'utf8')
-    const outside = await execute(dir, `    this.mv('src.tmp', '../escape.txt');`)
-    assert.equal(caseName(outside), 'Failed')
-    assert.equal(failureCode(outside), 'PATH_DENIED')
-    // WHAT[040]: on PATH_DENIED the source survives.
-    assert.equal(existsSync(join(dir, 'src.tmp')), true)
+    const missingMv = await execute(dir, `    this.mv('missing.tmp', 'dst.tmp');`)
+    assert.equal(caseName(missingMv), 'Failed')
+    assert.equal(failureCode(missingMv), 'FILE_NOT_FOUND')
+    assert.ok(failureReason(missingMv).includes('missing.tmp'), 'the failure identifies the missing source')
   } finally {
     cleanup()
   }

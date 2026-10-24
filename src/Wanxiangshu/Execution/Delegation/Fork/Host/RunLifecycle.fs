@@ -716,45 +716,6 @@ module HostForkRunLifecycle =
         | Some resolution -> resolution ()
         | None -> Task.FromResult None
 
-    /// Capture the child's full provider-facing session view as canonical
-    /// returned material. Reads the Host snapshot, applies the scope barrier
-    /// (filterScopeMessages), and appends the terminal assistant text only when
-    /// the snapshot does not already carry it. Stores structured messages, never
-    /// pre-rendered TOML. Errors (no port, unreadable) fail closed.
-    let private hasTerminalMessage (terminal: string) (messages: SessionMessage list) =
-        let assistantText (m: SessionMessage) =
-            m.Role = "assistant"
-            && (m.Parts
-                |> Array.exists (function
-                    | MessagePart.Text text -> text.Trim() = terminal
-                    | _ -> false))
-        System.String.IsNullOrWhiteSpace terminal || List.exists assistantText messages
-
-    let private appendTerminalIfMissing (messages: SessionMessage list) (js: obj array) (terminal: string) =
-        if hasTerminalMessage terminal messages then
-            js
-        else
-            let assistant =
-                createObj
-                    [ "role" ==> "assistant"
-                      "parts" ==> [| createObj [ "type" ==> "text"; "text" ==> terminal ] |] ]
-            Array.append js [| assistant |]
-
-    let private captureChildSessionView
-        (snapshotOpt: ISessionSnapshotPort option)
-        (childId: SessionId)
-        (terminalText: string)
-        : Task<Result<string, string>> =
-        taskResult {
-            let! snapshot = snapshotOpt |> Result.requireSome "no session snapshot port is wired for the child"
-            let! messages = snapshot.GetMessages childId |> TaskResult.mapError (sprintf "snapshot read failed: %s")
-            let js = Wanxiangshu.Context.Scope.SessionView.ofSnapshotMessages messages
-            let terminal = terminalText.Trim()
-            let withTerminal = appendTerminalIfMissing messages js terminal
-            let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box withTerminal)
-            return ReturnedMaterial.encodeSession [] filtered
-        }
-
     /// Journal-less harness: only this child's own provider run's cell may be taken.
     let private takeOwnRunCell (run: PendingHostRun) (result: AgentRunResult) (prose: string option) =
         match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
@@ -842,23 +803,27 @@ module HostForkRunLifecycle =
                     (Some completedView)
         }
 
+    /// context-compression [037]: a natural stop is the delivery. The returned
+    /// material is the completed turn's assistant prose — `encode [prose] []`,
+    /// body prose with empty carry, which the join boundary renders as `# `
+    /// comments. The child's full post-scope view is never captured here, so no
+    /// snapshot port is required and nothing is withheld for a missing read.
+    /// The journal-less harness still prefers this run's process-live cell.
     let private settleUnwitnessedRun
         gate pendingRuns journal parentId run childId runId handle result view
         =
         task {
-            match! captureChildSessionView run.Snapshot childId result.TerminalText with
-            | Ok sessionEncoded ->
-                return!
-                    settleCompletedView
-                        gate pendingRuns journal parentId run childId runId handle result None (Some sessionEncoded)
-            | Error reason when journal.IsNone ->
-                let! resolved = resolveView view
-                let fallback = defaultArg resolved (ReturnedMaterial.encode [] [])
-                return!
-                    settleCompletedView gate pendingRuns journal parentId run childId runId handle result None (Some fallback)
-            | Error reason ->
-                logError "FORK-SETTLE" (sprintf "run %s child session view unavailable: %s" run.AgentId reason)
-                return ()
+            let proseView = ReturnedMaterial.encode (terminalProse result |> Option.toList) []
+
+            let! resolved = resolveView view
+
+            let fallback =
+                match journal with
+                | Some _ -> proseView
+                | None -> defaultArg resolved proseView
+
+            return!
+                settleCompletedView gate pendingRuns journal parentId run childId runId handle result None (Some fallback)
         }
 
     let private completeProvenResult
@@ -1008,7 +973,6 @@ module HostForkRunLifecycle =
         (childId: SessionId)
         (role: Role)
         (authorityRoot: AuthorityRootUserMessageId)
-        (snapshot: ISessionSnapshotPort option)
         =
         JsDeliveredValues.clear (SessionId.value childId)
 
@@ -1028,8 +992,7 @@ module HostForkRunLifecycle =
               Work = Some work
               Source = HostPendingRun.completionSource ()
               Subscription = None
-              Finished = false
-              Snapshot = snapshot }
+              Finished = false }
 
         lock gate (fun () -> pendingRuns.[agentId] <- run)
 

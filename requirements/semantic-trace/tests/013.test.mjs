@@ -160,7 +160,7 @@ test('WHAT[semantic-trace-013] a real delivery commit writes a durable witness c
       const joined = await joinCall(hooks, owner)
       assert.match(joined, /materialized view body/)
       assert.match(joined, /the assistant prose of this turn/)
-      assert.match(joined, /\[\[session\]\]/)
+      assert.doesNotMatch(joined, /\[\[session\]\]/)
     } finally {
       terminals.dispose()
     }
@@ -181,7 +181,7 @@ test('WHAT[semantic-trace-013] a different fence is a different witness: each st
       const joined = await joinCall(hooks, owner)
       assert.match(joined, /MATERIAL-A/)
       assert.match(joined, /MATERIAL-B/)
-      assert.match(joined, /\[\[session\]\]/)
+      assert.doesNotMatch(joined, /\[\[session\]\]/)
     } finally {
       terminals.dispose()
     }
@@ -241,7 +241,7 @@ test('WHAT[semantic-trace-013] prose, view declaration text and a provider stop 
       await childTurn(hooks, runtime, child, `run-${child}-1`, 'PROSE', 'materialized view body', terminals.awaitRun)
       const joined = await joinCall(hooks, owner)
       assert.match(joined, /materialized view body/)
-      assert.match(joined, /\[\[session\]\]/)
+      assert.doesNotMatch(joined, /\[\[session\]\]/)
     } finally {
       terminals.dispose()
     }

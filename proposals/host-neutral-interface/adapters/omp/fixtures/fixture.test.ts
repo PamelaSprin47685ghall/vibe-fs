@@ -120,6 +120,11 @@ expect("product tool registered", tools.map((t) => t.name), ["wxs_echo"]);
 expect("tool execute encodes ToolOutcome", await tools[0].execute("call-1", { a: 1 }, undefined, undefined, ctx),
   { content: [{ type: "text", text: 'echo {"a":1}' }], isError: false });
 expect("SessionCreated is delivered for the first session", signals[0], { tag: "SessionCreated", info: { Id: "root" } });
+// HNI P-19 Config port: honest refusal because omp has no config mutation surface
+expect("Config.Read honestly refuses", portsSeen!.Config.Read(["test"]),
+  { ok: false, error: { tag: "Refused", reason: "omp exposes no configuration surface to an extension" } });
+expect("Config.Apply honestly refuses", portsSeen!.Config.Apply([{ Path: ["test"], Value: { tag: "Bool", value: false } }]),
+  { ok: false, error: { tag: "Refused", reason: "omp exposes no configuration surface to an extension" } });
 expect("before_subagent_spawn is registered even without a product Spawn hook",
   [handlers.has("before_subagent_spawn"), await fire("before_subagent_spawn", { type: "before_subagent_spawn", agent: "coder", spawnKey: "sk-1", patterns: [] })],
   [true, undefined]);

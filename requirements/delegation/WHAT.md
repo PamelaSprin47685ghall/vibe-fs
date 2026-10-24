@@ -18,7 +18,7 @@
 
 ## [005] 委托面不暴露机器拓扑
 
-参数和返回结果不得包含 SessionId、AgentId、ManagerJobId、worktree、reused 等物理拓扑标识。跨 horizon 只传语义后果与子代理自然停机捕获的完整 post-scope 视图（渲染为 TOML）。
+参数和返回结果不得包含 SessionId、AgentId、ManagerJobId、worktree、reused 等物理拓扑标识。跨 horizon 只传语义后果与子代理末轮 assistant 散文（渲染为 `# ...` 注释），不传子代理的完整 post-scope 视图。
 
 ## [006] 承接后果与绑定连续性
 
@@ -44,7 +44,7 @@ fork 成功只表示该 Byname 已承接 charge。续做按 Byname 找到既有 
 
 ## [011] 普通完成结束同步批次
 
-不设独立 return 工具或双重 await。被委托方的普通 Assistant completion（自然停机，无未决工具调用）结束批次，由宿主交回该次自然停机捕获的完整 post-scope 视图（渲染为 TOML）。
+不设独立 return 工具或双重 await。被委托方的普通 Assistant completion（自然停机，无未决工具调用）结束批次，由宿主交回该终态轮次的 assistant 散文（渲染为 `# ...` 注释），不捕获被委托方的完整 post-scope 视图。
 
 ## [012] Canonical 正文与 sibling 引用
 
@@ -52,7 +52,7 @@ fork 成功只表示该 Byname 已承接 charge。续做按 Byname 找到既有 
 
 ## [013] Join 有界消费
 
-Join 只消费当前 owner 可用的 completion，批次受全局上限约束，稳定排序并逐项 CAS 消费。每个完成项呈现为该次自然停机捕获的完整 post-scope 视图（渲染为 TOML），不以字段式 DTO 包装。
+Join 只消费当前 owner 可用的 completion，批次受全局上限约束，稳定排序并逐项 CAS 消费。每个完成项呈现为该子代理末轮的 assistant 散文（渲染为 `# ...` 注释），不以字段式 DTO 包装，也不承载子代理的完整 post-scope 视图。
 
 ## [014] Commission Join
 
@@ -72,7 +72,7 @@ Join 只在新输入已由 Host 保存、且属于该 owner 的已接纳物理�
 
 ## [019] Typed 首提示词
 
-fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与只读背景。父到子背景由调用方当前的完整 post-scope LLM 可见视图承载，保持结构化条目直到 pretty print 成 TOML 的 `[[context]]` 表；不得把拼好的 TOML 再包进字符串字段，亦不得接受局部材料过滤数组。子到父完成项则包含子方自然停机时的完整 post-scope 消息视图（渲染为 TOML），不得混淆方向。
+fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与只读背景。父到子背景由调用方当前的完整 post-scope LLM 可见视图承载，保持结构化条目直到 pretty print 成 TOML 的 `[[context]]` 表；不得把拼好的 TOML 再包进字符串字段，亦不得接受局部材料过滤数组。子到父完成项则是子代理末轮的 assistant 散文（渲染为 `# ...` 注释），不返回子方的完整 post-scope 消息视图，不得混淆方向。
 
 ## [020] 语义不依赖物理工具名
 
@@ -102,7 +102,7 @@ charge 只承载任务本身（以 `# ...` 注释头呈现）。背景只作背�
 
 `this.fission(payload)` 是同身份换道，无条件继承本对话衣钵。`this.join()` 与 `this.horizon()` 是拉取动作。
 
-同步调用等待自己完成，返回被委托方自然停机交回的完整 post-scope view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自子代理自然停机捕获的 post-scope 视图（渲染为 TOML）。子代理（Engineer/DevOps）已彻底移除 `this.deliver` 成员；无未决调用的自然停机即作为证明的终态（proven terminal，见 [025]）完成该 work unit。
+同步调用等待自己完成，返回被委托方末轮的 assistant 散文（渲染为 `# ...` 注释）。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该材料。完成结果只经 join/horizon 拉取。子到父的返回只来自子代理自然停机那一轮的 assistant 散文，不再捕获其 post-scope 视图。子代理（Engineer/DevOps）已彻底移除 `this.deliver` 成员；无未决调用的自然停机即作为证明的终态（proven terminal，见 [025]）完成该 work unit。
 
 当 abort、cancel 或重启加载结算已经使完成不再可能（无存活执行可以继续运行），系统**必须**追加 `ChildWorkVoided` 作废该工作，不得让父方继续等待一个不会到来的完成。作废**不是完成**：它不产生完成交付（既不写完成正文，也不把已有视图当作完成凭据），`status` 不是 `completed`。但作废**结清父方的未解除义务**：join 以 `voided` 状态把它报告一次（join 状态只有 `completed | failed | abandoned | voided`），报告之后该工作从名册退役（durable），重启不重复报告。作废在报告之前仍是可见的在场后果，父方据此得知该子工作已被结清，而不是任其消失。已被 abort 的子工作绝不写成 `completed`。S1/S2/S3/S4 接力不再主动清除上下文。
 
@@ -150,7 +150,7 @@ sync invariant 违例由委托 owner 构造 typed incident；先保留已发生 
 
 ## [031] Checkpoint 保留已完成事实
 
-child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交回其自然停机的完整 post-scope 视图，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
+child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交回其末轮 assistant 散文，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
 
 ## [032] Engineer 与 DevOps 不相互差遣
 
@@ -158,9 +158,9 @@ Engineer 完成工作或到达需 Manager 决定的边界即返回，不自行�
 
 ## [033] 自然停机终态与完成结算
 
-子代理（Engineer、DevOps）无 `this.deliver` 成员，以无未决工具调用的自然停机作为完成依据。当子代理自然停机时，宿主捕获其完整 post-scope LLM 可见视图并渲染为 TOML，原子结算为 `completed` 终态并发布给父会话的 `join`。
+子代理（Engineer、DevOps）无 `this.deliver` 成员，以无未决工具调用的自然停机作为完成依据。当子代理自然停机时，宿主把该终态轮次的 assistant 散文（正文散文、空 carry）原子结算为 `completed` 终态并发布给父会话的 `join`，在 join 边界渲染为 `# ...` 注释；不捕获子代理完整的 post-scope LLM 可见视图，也不返回 `[[session]]` 表。
 
-- 允许后果：子代理正常结束输出时，终态为 `completed`，join 记录里的 `returned` 为该子代理完整 post-scope 视图的 Synthetic TOML 渲染；
+- 允许后果：子代理正常结束输出时，终态为 `completed`，父方收到的完成材料就是该子代理的末轮 assistant 散文，以 `# ...` 注释呈现，不承载子代理的完整视图；
 - 禁止后果：严禁要求子代理调用交付工具；不得向已停止输出的子代理发送完成催促（nudge）；不得因子代理没有特定的交付调用而扣留完成或报告未完成；
 - 边界：Manager / Plan 的生命周期 deliver（见 work [025]–[026]）没有父 join，本条只约束有 handle 链接的子会话。
 

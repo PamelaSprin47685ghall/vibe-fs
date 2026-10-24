@@ -16,6 +16,6 @@ const listed = await this.rg(["--files", "src", "-g", "*.fs"]);
 const paths = listed.paths;
 ```
 
-A path in the argv stays inside the workspace. `..`, an absolute path outside it, or an option that reads outside it, is `PATH_DENIED`.
+Paths in argv support valid locations inside or outside the workspace.
 
 `where` / `whereAll` stay the edit locators. They return UTF-16 spans of one snapshot; `rg` does not.

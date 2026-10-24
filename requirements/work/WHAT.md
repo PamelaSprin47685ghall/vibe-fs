@@ -237,7 +237,7 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 ## [027] 长程任务禁止静默停止
 
-Manager、Orchestrator 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾散文或进度小结均不证明目标完成；Manager 与 Plan 严禁静默停止。作为对等收敛规则，子代理角色（Engineer、DevOps）豁免催促（nudge）并允许自然停机（context-compression [037]），其自然停机交回完整 post-scope 视图。
+Manager、Orchestrator 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾散文或进度小结均不证明目标完成；Manager 与 Plan 严禁静默停止。作为对等收敛规则，子代理角色（Engineer、DevOps）豁免催促（nudge）并允许自然停机（context-compression [037]），其自然停机只交回末轮 assistant 散文（渲染为 `# ...` 注释）。
 
 - 允许后果：对非豁免角色（Manager、Orchestrator、Plan），没有有效交接/完成事实，也没有 [049] 的用户等待时，新的自然停机必须在真实 idle 许可上得到同运行 nudge：提示指出尚未解除的任务义务与下一步；Manager 保留当前评审/工作/收尾提示，并说明 `join` 可以临时等待后台工作；Orchestrator 保留委任与接续职责；Plan 提醒 `devops`、`review`、`deliver` 的职责，以及 `ask` 是唯一自主暂停等用户的入口。Engineer 与 DevOps 彻底免除 nudge 催促，允许在工作完成后自然停机并交回成果。internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛，不承担公开 deliver 义务。
 - 禁止后果：不得先发布 Completed 或关闭逻辑运行，再尝试催促；不得以无后台句柄、有正式文本或缺工作投影当作目标已完成。相同终态重复通知幂等，后续新的偷停仍须提醒，不因之前已经 nudge 过一次而永久静默。无 idle 许可时等待真实闲置，不抢占正在运行的工具。严禁对 Engineer 或 DevOps 发送完成催促 nudge。
@@ -247,7 +247,7 @@ Manager、Orchestrator 与 Plan 的目标义务独立于物理回合：空 stop�
 
 当 Plan 跑者经编程面成员 `this.devops(intent)` 调用时，系统把调查意图同步委派给本 work 绑定的固定 DevOps；原工具名 `ask` 不再是本能力的别名。
 
-- 允许后果：系统查询本规划任务绑定的唯一固定 DevOps 实例；若未绑定则由运行时 single-flight 创建并持久化 `DevOpsBound` 绑定事实。将 `intent` 散文作为 `# ...` 注释头，连同 Planner 当前完整的 post-scope LLM 可见消息视图（渲染为 TOML 数据平面），一并投递给该 DevOps 做只读调查（含真实 bash 执行，只读约束由 office 提示词承担，不做运行时门）。等待该 DevOps 自然停机完成，确认收敛后把 DevOps 自然停机捕获的完整 post-scope TOML 视图完整交回 Planner。
+- 允许后果：系统查询本规划任务绑定的唯一固定 DevOps 实例；若未绑定则由运行时 single-flight 创建并持久化 `DevOpsBound` 绑定事实。将 `intent` 散文作为 `# ...` 注释头，连同 Planner 当前完整的 post-scope LLM 可见消息视图（渲染为 TOML 数据平面），一并投递给该 DevOps 做只读调查（含真实 bash 执行，只读约束由 office 提示词承担，不做运行时门）。等待该 DevOps 自然停机完成，确认收敛后把 DevOps 末轮 assistant 散文作为 `# ...` 注释完整交回 Planner，不返回 DevOps 的完整 post-scope 视图。
 - 禁止后果：模型只传调查问题 `intent`，不得传递背景数组或底层拓扑标识。系统严禁对 DevOps 的返回结果做二次模型摘要，必须完整交付。同一规划任务同时至多运行一个未决 devops 委派；已有未决委派时再次调用必须返回强类型拒绝。返回材料不得携带底层 id（SessionId/AgentId/PtyId）。
 - 失败后果：若固定 DevOps 处于忙碌状态或响应失败，返回强类型错误，不静默丢弃，不新建替代操作员。
 
@@ -290,7 +290,7 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
 
 Plan 的阶段与任期机制不得污染其他角色；[027] 明确规定的长程连续性与豁免除外。
 
-- 允许后果：Orchestrator 的既有角色合同不变。Engineer 与 DevOps 彻底免除完成 nudge 并在工作完成后自然停机（context-compression [037]），不再拥有 `this.deliver` 成员；Manager 与 Plan 保持长程连续性，严禁静默停止，并保留宿主生命周期 `deliver` 工具以驱动 S1–S4 晋级、接力与最终交付（[025]–[026]）。internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛。Manager 禁用 `ask`，`review` 的业务判断不变。
+- 允许后果：Orchestrator 的既有角色合同不变。Engineer 与 DevOps 彻底免除完成 nudge 并在工作完成后自然停机（context-compression [037]），以末轮 assistant 散文作为交回材料，不再拥有 `this.deliver` 成员；Manager 与 Plan 保持长程连续性，严禁静默停止，并保留宿主生命周期 `deliver` 工具以驱动 S1–S4 晋级、接力与最终交付（[025]–[026]）。internal 末梢 Advisor/Bookkeeper 沿专用提交事实收敛。Manager 禁用 `ask`，`review` 的业务判断不变。
 - 禁止后果：非 Plan 角色严禁获取 `todowrite-for-plan` 或 `ask`；宿主注册工具面已无 `devops` 这一名称，DevOps 调查只以编程面成员 `this.devops(intent)` 形态承载，不构成任何角色的宿主工具面。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 

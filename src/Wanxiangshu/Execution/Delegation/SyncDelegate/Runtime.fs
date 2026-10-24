@@ -204,23 +204,15 @@ module internal SyncDelegateInternals =
             Some record
         | _ -> None
 
+    let private naturalStopBody (prose: string) : string list =
+        if System.String.IsNullOrWhiteSpace prose then [] else [ prose ]
+
     /// EXEC-031 / delegation-024: the delivered view is the settlement. A turn
     /// that completed without a fenced delivery has not discharged the
     /// obligation: the call keeps its live seat in the store and its wait stays
     /// open, so the delegate stays active, the unresolved obligation stays
     /// visible, and the parent can keep waiting instead of receiving a
     /// terminal that never happened. An undelivered completion is never a
-
-    let private messagePartToObj (p: MessagePart) : obj =
-        match p with
-        | MessagePart.Text t -> createObj [ "type" ==> "text"; "text" ==> t ]
-        | MessagePart.Reasoning t -> createObj [ "type" ==> "reasoning"; "text" ==> t ]
-        | MessagePart.ToolCall(callId, name, args) ->
-            createObj [ "type" ==> "toolCall"; "id" ==> callId; "name" ==> name; "arguments" ==> args ]
-        | MessagePart.ToolResult(callId, res) ->
-            createObj [ "type" ==> "toolResult"; "id" ==> callId; "result" ==> res ]
-        | MessagePart.Activity kind ->
-            createObj [ "type" ==> "text"; "text" ==> sprintf "[activity: %s]" kind ]
 
     /// (LC-004) is settled here as "still owed".
     let settleCompletedFromParts
@@ -234,11 +226,12 @@ module internal SyncDelegateInternals =
         | Some _ -> true
         | None when Array.isEmpty turn.Parts -> false
         | None ->
-            let parts: obj array = turn.Parts |> Array.map messagePartToObj
-            let role = SyncDelegate.roleLabel call.Role
-            let jsMsg = createObj [ "id" ==> ("turn-" + Guid.NewGuid().ToString("N")); "role" ==> role; "parts" ==> parts ]
-            let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box [| jsMsg |])
-            let record = ReturnedMaterial.encodeSession [] filtered
+            // context-compression [037]: a natural stop returns the completed turn's
+            // assistant prose as body material — no snapshot messages, no session table.
+            let prose = CompletedTurnClassifier.partsSessionText turn.Parts
+
+            let record = ReturnedMaterial.encode (naturalStopBody prose) []
+
             settleExactCall noteDelegateIfRole store call turn record
             true
 

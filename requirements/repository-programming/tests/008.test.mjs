@@ -3,7 +3,7 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { mkdtempSync, writeFileSync, rmSync, mkdirSync } = await import("node:fs");
+const { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { createApi, api: apiOf, stagedCount, stagedKinds, run } = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
@@ -15,17 +15,24 @@ const sandbox = () => {
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 
-test('WHAT[repository-programming-008] JS007_bindings_path_boundary_denies_escape', () => {
+test('WHAT[repository-programming-008] JS007_bindings_path_supports_navigation_outside_root', () => {
   const { dir, cleanup } = sandbox()
+  const outsideFile = join(dir, '..', `outside-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`)
   try {
     const binding = createApi(dir)
-    const denied = apiOf(binding).cat('../outside.txt')
-    assert.equal(denied.ok, false)
-    assert.equal(denied.code, 'PATH_DENIED')
-    const deniedWrite = apiOf(binding).write('../outside.txt', 'x')
-    assert.equal(deniedWrite.ok, false)
-    assert.equal(deniedWrite.code, 'PATH_DENIED')
+    const missing = apiOf(binding).cat(outsideFile)
+    assert.equal(missing.ok, false)
+    assert.equal(missing.code, 'FILE_NOT_FOUND')
+
+    const written = apiOf(binding).write(outsideFile, 'x')
+    assert.equal(written.ok, true)
+    assert.equal(readFileSync(outsideFile, 'utf8'), 'x')
+
+    const read = apiOf(binding).cat(outsideFile)
+    assert.equal(read.ok, true)
+    assert.equal(read.text, 'x')
   } finally {
+    try { rmSync(outsideFile, { force: true }) } catch {}
     cleanup()
   }
 })
