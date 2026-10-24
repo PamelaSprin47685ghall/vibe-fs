@@ -1902,32 +1902,37 @@ module Adapter =
             unbox<obj array> content |> Array.exists isToolCallBlock
         else false
 
+    let private invokeEphemeralTurn (target: obj) (options: obj) : Task<Result<obj, string>> =
+        task {
+            try
+                let! r = awaitObj (callMethod target "runEphemeralTurn" options)
+                return Ok r
+            with ex ->
+                return Error ex.Message
+        }
+
     let private executeEphemeralTurn (delegatorCtx: obj) (promptText: string) (conversationKey: string) (historyOpt: obj option) =
         task {
             let histEntries = historyEntries historyOpt
-            try
-                let options =
-                    createObj ([
-                        "promptText", box promptText
-                        "conversationKey", box conversationKey
-                    ] @ histEntries)
-                let targetOpt =
-                    [
-                        fun () -> if hasMethod delegatorCtx "runEphemeralTurn" then Some delegatorCtx else None
-                        fun () ->
-                            let sess = fieldValue delegatorCtx "session"
-                            if hasMethod sess "runEphemeralTurn" then Some sess else None
-                    ]
-                    |> List.tryPick (fun f -> f ())
+            let options =
+                createObj ([
+                    "promptText", box promptText
+                    "conversationKey", box conversationKey
+                ] @ histEntries)
+            let targetOpt =
+                [
+                    fun () -> if hasMethod delegatorCtx "runEphemeralTurn" then Some delegatorCtx else None
+                    fun () ->
+                        let sess = fieldValue delegatorCtx "session"
+                        if hasMethod sess "runEphemeralTurn" then Some sess else None
+                ]
+                |> List.tryPick (fun f -> f ())
 
-                match targetOpt with
-                | None ->
-                    return Error "Neither delegatorCtx nor delegatorCtx.session exposes runEphemeralTurn"
-                | Some t ->
-                    let! r = awaitObj (callMethod t "runEphemeralTurn" options)
-                    return Ok r
-            with ex ->
-                return Error ex.Message
+            match targetOpt with
+            | None ->
+                return Error "Neither delegatorCtx nor delegatorCtx.session exposes runEphemeralTurn"
+            | Some t ->
+                return! invokeEphemeralTurn t options
         }
 
     let private processTurnResult
