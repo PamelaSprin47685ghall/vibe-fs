@@ -30,6 +30,7 @@ module ToolAdmissionTable =
           "deliver", ToolAdmissions.deliver
           "bash-honeypot", ToolAdmissions.bashHoneypot
           "assume", ToolAdmissions.assume
+          "resetScope", ToolAdmissions.resetScope
           "fetch", ToolAdmissions.fetch
           "fork", ToolAdmissions.fork
           "resume", ToolAdmissions.resume

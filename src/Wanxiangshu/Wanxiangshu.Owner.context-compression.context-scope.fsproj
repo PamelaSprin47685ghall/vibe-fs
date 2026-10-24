@@ -13,13 +13,11 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-wire.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-snapshot-contract.fsproj"/>
-    <Compile Include="Context/Scope/Model.fsi"/>
-    <Compile Include="Context/Scope/Model.fs"/>
-    <Compile Include="Context/Scope/Protocol.fsi"/>
-    <Compile Include="Context/Scope/Protocol.fs"/>
     <Compile Include="Context/Scope/SessionView.fsi"/>
     <Compile Include="Context/Scope/SessionView.fs"/>
     <Compile Include="Context/Scope/Surface.fsi"/>
     <Compile Include="Context/Scope/Surface.fs"/>
+    <Compile Include="Context/Scope/SnapshotScope.fsi"/>
+    <Compile Include="Context/Scope/SnapshotScope.fs"/>
   </ItemGroup>
 </Project>

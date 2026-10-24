@@ -15,7 +15,7 @@ type PairGuidanceTranscript =
         /// Gaps around the newest real message when the host can render
         /// guidance on it; `Ok None` when that message carries no guidance;
         /// `Error` when the carrier has no transcript address.
-        Carrier: Result<(TranscriptGap * TranscriptGap) option, string>
+        Carrier: Result<(TranscriptGap * TranscriptGap) option, unit>
         /// Call ids of the synthetic guidance messages found on the transcript.
         SyntheticCallIds: string list
         /// Some message on the transcript is authored by an internal role.

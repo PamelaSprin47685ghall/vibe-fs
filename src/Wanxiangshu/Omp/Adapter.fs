@@ -1065,7 +1065,7 @@ module Adapter =
                   "loadMode", box "essential"
                   "approval", box "read"
                   "description",
-                  box "Execution barrier and context garbage collector. Deletes everything between the previous resetScope call (or session start) and this call, keeping only user messages and prior resetScope pairs; everything after this call is the new scope. Also sets the turnBudget for the new scope."
+                  box "Execution barrier and context garbage collector. Removes everything between the previous resetScope call (or session start) and this call from subsequent model requests, except user messages and prior resetScope call/result pairs. Everything after this call belongs to the new scope. Sets turnBudget for the new scope."
                   "parameters",
                   box (
                       createObj
@@ -1078,20 +1078,20 @@ module Adapter =
                                           createObj
                                               [ "type", box [| "string"; "null" |]
                                                 "description",
-                                                box "Verbose experience and findings from the closing scope: everything between the previous resetScope call (or session start) and this call. Null/omitted if there is no prior work. If any exact text (function signatures, error stack traces, exact line numbers) is needed in the next scope, it MUST be copied VERBATIM here." ]
+                                                box "Write out your experience and findings from the closing scope, verbosely: everything between the previous resetScope call (or session start) and this call. Any exact text needed in the next scope (such as function signatures, error stack traces, or exact line numbers) MUST be copied VERBATIM here. Null or omitted if there is no prior work." ]
                                       )
                                       "newScopeObjective",
                                       box (
                                           createObj
                                               [ "type", box "string"
-                                                "description", box "The state closed-loop (状态闭环) objective for the new scope." ]
+                                                "description", box "The objective for the new scope. The scope must form a self-contained state closed-loop (状态闭环)." ]
                                       )
                                       "newScopeTurnBudget",
                                       box (
                                           createObj
                                               [ "type", box "integer"
                                                 "minimum", box 0
-                                                "description", box "Estimated LLM turns (1 LLM request = 1 turn) for the new scope." ]
+                                                "description", box "Estimated number of LLM turns needed for the new scope (1 LLM request = 1 turn)." ]
                                       ) ]
                             )
                             "required", box [| "newScopeObjective"; "newScopeTurnBudget" |] ]
@@ -1114,8 +1114,7 @@ module Adapter =
                                   Some(stringOf arguments?oldScopeVerboseVerbatimExperience)
                               else None
 
-                          // 1. Update in-memory session state
-                          Surface.resetScopeState sid budget
+                          // The budget changes only after the durable reanchor commits.
 
                           // 2. Append durable ScopeReanchored fact using real journal and toolCallId
                           let toolCallIdStr = stringOf callId
@@ -1150,10 +1149,10 @@ module Adapter =
                               | Ok _ -> ()
                               | Error failure -> raise (JournalAppendException failure)
 
+                              Surface.resetScopeState sid budget
+
                               let content =
-                                  Surface.appendBudgetReminder
-                                      (box [| createObj [ "type", box "text"; "text", box $"Scope reset. Objective: %s{objective}" ] |])
-                                      budget
+                                  box [| createObj [ "type", box "text"; "text", box $"Scope reset. Objective: %s{objective}" ] |]
                               let details =
                                   createObj
                                       [ "objective", box objective
@@ -1607,23 +1606,112 @@ module Adapter =
         else
             system @ [ scopeProtocol ]
 
-    let private ompPromptTimestamp (prompt: obj) : float option =
-        if not (isNull prompt?timestamp) && emitJsExpr prompt?timestamp "Number.isFinite($0)" then
-            Some(unbox<float> prompt?timestamp)
+    // HNI projection for scope planning: the library sees no omp field names.
+    let private ompScopeKind (message: obj) =
+        match optionalString (fieldValue message "role") with
+        | Some "user" -> "user"
+        | Some "assistant" -> "assistant"
+        | Some "toolResult" | Some "tool" | Some "tool-result" | Some "tool_result" -> "result"
+        | Some "custom" -> "custom"
+        | _ -> "other"
+
+    let private ompScopeParts (message: obj) : obj array =
+        let content = fieldValue message "content"
+        if isArray content then unbox<obj array> content else [||]
+
+    let private ompScopeText (message: obj) =
+        let content = fieldValue message "content"
+        if isString content then stringOf content
         else
-            None
+            ompScopeParts message
+            |> Array.filter (fun part -> stringOf (fieldValue part "type") = "text")
+            |> Array.map (fun part -> stringOf (fieldValue part "text"))
+            |> String.concat "\n"
 
-    let private recordOmpPromptAt (sid: string) (filtered: obj array) (boundary: int) =
-        if boundary <> -1 then
-            let prompt = filtered.[boundary]
-            let key = Surface.promptKey prompt
-            let ts = ompPromptTimestamp prompt
-            let hasReset = Surface.hasResetSinceLastPrompt filtered
-            Surface.onNewPrompt sid key ts hasReset
-            if hasReset then Surface.markScopeInitialized sid true
+    let private ompNeutralPart (part: obj) : obj =
+        match optionalString (fieldValue part "type") with
+        | Some "toolCall" | Some "tool-call" | Some "tool_call" ->
+            createObj [ "id", fieldValue part "id"; "tool", fieldValue part "name" ]
+        | Some "toolResult" | Some "tool-result" | Some "tool_result" ->
+            createObj [ "resultFor", fieldValue part "id" ]
+        | _ -> createObj []
 
-    let private recordOmpPrompt (sid: string) (filtered: obj array) =
-        recordOmpPromptAt sid filtered (Surface.lastPromptIndex filtered)
+    let private ompNeutralMessage (message: obj) : obj =
+        let kind = ompScopeKind message
+        let attribution = stringOf (fieldValue message "attribution")
+        let operator = (kind = "user" && attribution <> "agent") || (kind = "custom" && attribution = "user")
+        let side = kind = "user" && not operator && not (isTrue (fieldValue message "steering"))
+        let ts = fieldValue message "timestamp"
+        let key = (if isNull ts then "" else stringOf ts) + ":" + ompScopeText message
+        let resultFor =
+            let id = fieldValue message "toolCallId"
+            if isNull id then "" else stringOf id
+        createObj
+            [ "kind", box kind
+              "operator", box operator
+              "sideRequest", box side
+              "key", box key
+              "timestamp", ts
+              "parts", box (ompScopeParts message |> Array.map ompNeutralPart)
+              "resultFor", box resultFor
+              "resultField", box (if kind = "result" then "content" else "") ]
+
+    let private copyScopeObject (value: obj) = emitJsExpr value "Object.assign({}, $0)"
+
+    let private ompWritePlannedTail (message: obj) (suffix: string) : obj =
+        let content = fieldValue message "content"
+        let updated = Surface.appendTailOnce content suffix
+        if obj.ReferenceEquals(content, updated) then message
+        else
+            let replacement = copyScopeObject message
+            replacement?content <- updated
+            replacement
+
+    let private ompApplyHint (messages: obj array) (hint: obj) =
+        let index = unbox<int> hint?index
+        let current = messages.[index]
+        let updated =
+            if stringOf hint?kind = "user" then
+                Surface.writeUserHint current [| stringOf hint?tail |]
+            else
+                ompWritePlannedTail current (stringOf hint?tail)
+        messages.[index] <- updated
+
+    let private ompApplySlot (messages: obj array) (slot: obj) : obj =
+        let index = unbox<int> slot?index
+        let item = messages.[index]
+        let kept = fieldValue slot "parts"
+        if isNull kept then item
+        else
+            let parts = ompScopeParts item
+            let selected = unbox<int array> kept |> Array.map (fun i -> parts.[i])
+            let updated = copyScopeObject item
+            updated?content <- box selected
+            emitJsExpr updated "delete $0.providerPayload; delete $0.responseId" |> ignore
+            updated
+
+    let private ompWeakSteer (messages: obj array) (prose: string) : obj array =
+        let lastStamp =
+            messages
+            |> Array.tryLast
+            |> Option.map (fun message -> fieldValue message "timestamp")
+            |> Option.defaultValue null
+        let fields =
+            [ "role", box "user"
+              "content", box [| createObj [ "type", box "text"; "text", box prose ] |]
+              "steering", box true
+              "attribution", box "agent" ]
+        let withTime = if isNull lastStamp then fields else fields @ [ "timestamp", lastStamp ]
+        Array.append messages [| createObj withTime |]
+
+    let private ompScopeRequest (sessionId: string) (rawMessages: obj) : obj array =
+        let original = Surface.toObjArray rawMessages
+        let neutral = original |> Array.map ompNeutralMessage
+        let plan = Surface.planRequest sessionId (box neutral)
+        let staged = Array.copy original
+        unbox<obj array> plan?hints |> Array.iter (ompApplyHint staged)
+        let scoped = unbox<obj array> plan?slots |> Array.map (ompApplySlot staged)
+        if isNull plan?weak then scoped else ompWeakSteer scoped (stringOf plan?weak)
 
     let private contextMessagesReply (rawList: obj) (withSteer: obj array) : obj =
         if Surface.isUnchanged withSteer (Surface.toObjArray rawList) then
@@ -1641,25 +1729,12 @@ module Adapter =
         | ContextEdit.Keep -> contextMessagesReply rawList withSteer
         | ContextEdit.Replace replacements -> applyContextReplacements rawList withSteer replacements
 
-    let private suffixOmpToolContent (sid: string) (toolName: string) (content: obj) : obj =
-        if not (Surface.isScopeInitialized sid) && toolName <> "resetScope" then
-            Surface.appendUserReminder content
-        else
-            Surface.appendBudgetReminder content (Surface.turnBudget sid)
-
-    let private toolContentReply (content: obj) (newContent: obj) : obj =
-        if not (obj.ReferenceEquals(content, newContent)) then
-            createObj [ "content", newContent ]
-        else
-            jsUndefined
-
-    let private applyToolResultEdit (sid: string) (toolName: string) (content: obj) (newContent: obj) (edit: ToolResultEdit) : obj =
+    let private applyToolResultEdit (edit: ToolResultEdit) : obj =
         match edit with
-        | ToolResultEdit.Keep -> toolContentReply content newContent
+        | ToolResultEdit.Keep -> jsUndefined
         | ToolResultEdit.Replace result ->
-            let suffixed = suffixOmpToolContent sid toolName (box result.Text)
             createObj
-                [ "content", box [| createObj [ "type", box "text"; "text", suffixed ] |]
+                [ "content", box [| createObj [ "type", box "text"; "text", box result.Text ] |]
                   "isError", box result.IsError ]
 
     /// Register the product hooks on the omp event bus and return the
@@ -1734,25 +1809,14 @@ module Adapter =
             task {
                 let sid = ctxSessionId ctx
                 let rawList = fieldValue event "messages"
-                let isSideRequest = Surface.endsWithSideRequest rawList
-
-                let filtered = Surface.stripContradictoryBudgetSuffixes (Surface.filterScopeMessages rawList)
-                if not isSideRequest then
-                    recordOmpPrompt sid filtered
-
-                let withReminders = Surface.addUserReminders filtered
-                let withSteer =
-                    if not isSideRequest && Surface.isScopeInitialized sid && Surface.turnBudget sid = 0 then
-                        Surface.addBudgetExhaustedSteer withReminders
-                    else
-                        withReminders
+                let scoped = ompScopeRequest sid rawList
 
                 match hooks.Turn with
-                | None -> return contextMessagesReply rawList withSteer
+                | None -> return contextMessagesReply rawList scoped
                 | Some turn ->
-                    let messages = withSteer |> Array.choose contextMessageView |> Array.toList
+                    let messages = scoped |> Array.choose contextMessageView |> Array.toList
                     let! edit = turn.ContextMessages(turnContext ctx, messages)
-                    return applyContextEdit rawList withSteer edit
+                    return applyContextEdit rawList scoped edit
             }
             |> unbox<obj>)
 
@@ -1777,13 +1841,8 @@ module Adapter =
 
         registerEvent pi "tool_result" (fun (event: obj) (ctx: obj) ->
             task {
-                let sid = ctxSessionId ctx
-                let toolName = if isNull (fieldValue event "toolName") then "" else stringOf (fieldValue event "toolName")
-                let content = fieldValue event "content"
-                let newContent = suffixOmpToolContent sid toolName content
-
                 match hooks.ToolGate with
-                | None -> return toolContentReply content newContent
+                | None -> return jsUndefined
                 | Some gate ->
                     let text = resultText event
                     let isError = isTrue (fieldValue event "isError")
@@ -1798,7 +1857,7 @@ module Adapter =
                             callView,
                             { Text = text; Truncated = false; IsError = isError; Details = None }
                         )
-                    return applyToolResultEdit sid toolName content newContent edit
+                    return applyToolResultEdit edit
             }
             |> unbox<obj>)
 

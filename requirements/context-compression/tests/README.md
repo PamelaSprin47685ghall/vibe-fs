@@ -19,6 +19,10 @@ WHAT 拥有输入、提交与生命周期边界；本文只说明现有测试如
 | 034 | （待实现）turnBudget 递减、`\0\uFEFF` 后缀追加、用户消息尾巴提醒与零预算弱提醒。 |
 | 035 | （待实现）ScopeReanchored 事实提交、epoch 推进与前缀缓存幂等清空。 |
 | 036 | （待实现）跨会话 full post-scope view 的 Synthetic TOML 渲染与传递。 |
-| 037 | （待实现）子智能体自然停机完成、无 nudge 及 post-scope 视图交回父会话。 |
+| 037 | （待实现）子智能体自然停机完成、无 nudge，及末轮 assistant 散文以 `#` 注释交回父会话（无 `[[session]]` 表）。 |
+
+| 038 | HNI 中立 scope 计划；用户线／工具结果线的返回位置、重置后预算与新 prompt 的作废。 |
+| 039、040 | 实体 Host physical canary：OpenCode provider 请求数组的原地更新、旧历史不变，以及 SessionMessage 同批调用/结果配对（`requirements/host-boundary/tests/scope-hni-physical.test.mjs`）。 |
+| 041 | 物理会话删除事件清理对应 ScopeSession，不牵连其他会话（同一 Host physical canary）。 |
 
 完成节点后先正式构建，再通过 `requirements/verification-system/tests/run.mjs` 与 `TESTS_MJS_FILES` 运行本目录及受影响所有者。TODO 不计通过，GAP-104/105记录未闭合状态；旧发布清单的DONE不作当前证据。未执行真实 provider 或人工验收。

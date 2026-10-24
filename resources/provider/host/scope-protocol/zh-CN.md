@@ -1,9 +1,10 @@
 ## Scope & Context Management (`resetScope`)
 
-- **Turn & Budget**：1 次 LLM 请求 = 1 turn。工具结果末尾拼接剩余 `turnBudget`；在最新用户消息之后尚未调用 `resetScope` 之前，工具结果末尾拼接初始化提醒。请在 `turnBudget` 归零前调用 `resetScope`。
-- **Exhausted Budget**：预算归零（0 remaining）时，若处于空闲状态，弱提醒可能建议调用 `resetScope` 换取新预算。该提醒是可选的——切勿为此中断、暂停或放弃进行中的工作；在自然边界方便时调用即可。
-- **Context Deletion**：调用 `resetScope` 会删除上一个 `resetScope` 调用（或会话起点）到本次调用之间的全部上下文。该窗口内仅用户消息与先前的 `resetScope` 调用/结果对得以保留；本次调用之后的全部内容属于新 scope。
-- **User Messages Are Not Barriers**：用户 prompt 与 mid-run steer 永不删除。每条新的用户消息都会使 `turnBudget` 作废，并要求立即调用 `resetScope` 归档上一 `resetScope` 与本次调用之间的 scope；随后仅该用户消息留在两次 `resetScope` 调用之间。
-- **Concurrency Barrier**：`resetScope` 充当执行 Barrier。在单回合并发工具调用中，`resetScope` 之前的工具先执行且其上下文被 `resetScope` 清除；`resetScope` 之后的工具在 barrier 之后执行并保留在新 scope 上下文中。
-- **State Closed-Loop (状态闭环)**：每个 Scope 必须是一个独立自洽的状态闭环（例如：“纯探索定位文件并了解内涵”是一个闭环；“读取文件并修改代码”是另一个闭环）。
-- **Verbatim Retention**：由于旧 scope 的原始上下文将被删除，如果某些关键原文（如函数签名、报错堆栈、报错行号、或精确行号）在下一个 Scope 仍需逐字使用，必须将其原样抄写至 `oldScopeVerboseVerbatimExperience`。
+- **Turn & Budget**：1 次 LLM 请求 = 1 个 turn。仅在发往 LLM 的请求副本里，已完成的工具结果末尾显示剩余 `turnBudget`；在最新操作员撰写（operator-authored）的用户消息之后尚未出现 `resetScope` 调用之前，非 `resetScope` 结果改为显示初始化提醒。真实工具结果和持久化历史不改写。请在 `turnBudget` 归零之前调用 `resetScope`。
+- **Exhausted Budget**：余额为 0 时，一个弱制的、可选的 steer 可能建议调用 `resetScope`——前提是你并不繁忙且处于自然边界。切勿为这条提醒中断、暂停或放弃正在进行的工作；在方便时调用即可。
+- **Context Deletion**：调用 `resetScope` 会把旧 scope 的原始上下文从后续模型请求中移除。从上一个 `resetScope` 调用（或会话起点）到本次调用之间的窗口内，只有用户消息与先前的 `resetScope` 调用/结果对得以保留；本次调用之后的全部内容都属于新 scope。
+- **User Messages Are Not Barriers**：用户 prompt 与 mid-run steer 永不删除。每一条新的操作员撰写的用户消息都会使 `turnBudget` 作废，并要求立即调用 `resetScope`，以归档从上一个 `resetScope` 调用（或会话起点）到本次调用之间的 scope；该窗口内的所有用户消息按原顺序保留，且不会把窗口切分。
+- **Concurrency Barrier**：`resetScope` 是一道执行 barrier。在同一个 turn 内，先行的工具调用先完成，`resetScope` 才开始；后行的调用必须等它返回。barrier 之前那些非 `resetScope` 的调用及其结果会被从上下文中移除；barrier 之后的调用保留在新 scope 中。
+- **State Closed-Loop (状态闭环)**：每个 scope 都必须是一个自洽的状态闭环。例如，“纯探索以定位文件并理解其逻辑”是一个闭环；“读取文件并修改代码”是另一个闭环。
+- **Verbatim Retention**：旧 scope 的原始上下文将被删除。任何在下一个 scope 中需要逐字使用的文本（例如函数签名、报错堆栈或精确行号）都必须原样抄写进 `oldScopeVerboseVerbatimExperience`。
+- **Initialization Reminder**：每一份模型请求里，操作员撰写的用户消息末尾都会追加：[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.] 这条提醒是一道明确指令：先为新 scope 估算预算，并在做任何其他工作之前立刻调用 `resetScope`。

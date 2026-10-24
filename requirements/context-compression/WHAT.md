@@ -79,17 +79,17 @@ resetScope(
 
 关键原文逐字保留义务：由于旧 scope 的原始工具输出与过程文本在清理后被彻底删除，如果函数签名、报错堆栈、精确行号或关键事实在下一个 scope 仍须逐字使用，模型必须将其原样抄写进 `oldScopeVerboseVerbatimExperience`。
 
-工具执行成功后返回 `Scope reset. Objective: <newScopeObjective>`，且工具结果在返回时即拼接新预算的倒计时后缀（见 [034]）。
+工具执行成功后原样返回 `Scope reset. Objective: <newScopeObjective>`；只在发往模型的请求副本中给结果追加新预算倒计时（见 [034]）。
 
 ## [034] turnBudget 递减、后缀与提醒
 
 1 次 LLM 请求计为 1 turn。会话状态机在 `turn_start` 时将当前活跃 `turnBudget` 减 1，下限为 0。
 
-1. **结果后缀**：每条非 `resetScope` 工具结果末尾均使用 `\0\uFEFF` 分隔拼接 `[Remaining turnBudget: N]`；已带预算后缀时不重复拼接。`resetScope` 工具结果自身返回时即携带新设置的预算后缀。
+1. **结果后缀**：每次向 LLM 发起请求时，宿主在本次请求副本内给保留的已完成工具结果追加 `\0\uFEFF[Remaining turnBudget: N]`；`resetScope` 的结果也只在请求副本内带上新预算。真实工具结果、持久化记录与用户原始消息绝不写入这种后缀。已带相同后缀时不重复追加。
 2. **用户消息尾巴与预算作废**：当新的 operator 用户消息（干净 prompt 或 steer）到达时，旧预算立即作废（归零）。在发往模型的请求副本中，每条 operator 用户消息末尾均拼接提醒：
-   `[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop), and call resetScope immediately before doing anything else.]`
+   `[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]`
    持久化存储中的原始用户消息不被改写。
-3. **未初始化提醒**：当最新 operator 用户消息之后尚未发生 `resetScope` 调用时，所有非 `resetScope` 工具结果末尾均重复上述初始化提醒，而不显示预算后缀，直到模型完成一次 `resetScope`。
+3. **未初始化提醒**：当最新 operator 用户消息之后尚未发生 `resetScope` 调用时，所有非 `resetScope` 工具结果在下一次请求副本中携带上述初始化提醒，而不显示预算后缀，直到模型完成一次 `resetScope`。
 4. **零预算弱提示**：当 scope 已初始化且 `turnBudget` 降至 0 时，若当前请求不是 side-request 快照，宿主可在请求副本末尾追加一条弱提醒用户消息（`steering: true`，不持久化），建议模型在当前任务状态闭环的自然边界调用 `resetScope` 开启新闭环并换取新预算。该弱提醒绝对不得强行中断、暂停或阻断正在进行的工具工作。
 
 ## [035] ScopeReanchored 冷前缀边界
@@ -105,14 +105,34 @@ resetScope(
 所有跨会话上下文传递统一遵循 AXIOM 7（prose 属于指令与主报告，骑乘 `# ...` 注释头；材料属于结构化参考数据，骑乘 TOML 数据平面表格）：
 
 1. **父到子委派（`fork` / `resume` / `commission` / `devops` / `dag`）**：调用方传入的 charge / intent 散文按原样渲染为 `# ...` 注释头；调用方当前的完整 post-scope LLM 可见消息视图（经最新 `resetScope` 清理后的全部保留消息）作为只读背景材料渲染为合法的 Synthetic TOML（如 `[[context]]` 表）。子会话不隐式继承父会话的物理工具调用，也不接受局部材料过滤选择。
-2. **顾问咨询（`advisor`）**：与 fork 载荷形式一致，由单一请求文档承载：咨询意图作为 `# ...` 注释头，调用方当前的完整 post-scope 消息视图渲染为 TOML 数据平面（如 `[[context]]` 表）；顾问自然停机后捕获其完整 post-scope TOML 视图作为 `context` 返回。
+2. **顾问咨询（`advisor`）**：与 fork 载荷形式一致，由单一请求文档承载：咨询意图作为 `# ...` 注释头，调用方当前的完整 post-scope 消息视图渲染为 TOML 数据平面（如 `[[context]]` 表）；顾问自然停机后交回的是其末轮 assistant 散文，作为 `# ...` 注释呈现，不返回顾问的完整 post-scope 视图。
 3. 传递的数据在最终边界统一 pretty print 为合法 TOML，禁止将拼好的 TOML 作为转义字符串嵌套在字段中。
 
 ## [037] 子会话自然停机终态与 deliver 工具分立
 
 子代理会话与生命周期管理实行完成机制与工具分立：
 
-1. **子代理自然停机完成**：Engineer 与 DevOps 角色彻底移除子代理 `this.deliver` 成员与相关工具。子代理完成工作后自然停止输出（无未决工具调用的干净终态）；宿主在观察到子代理自然停机后，确定性捕获其当前完整的 post-scope LLM 可见消息视图并渲染为 TOML（如 `[[session]]`），作为完成材料交回给父会话的 `join`。
+1. **子代理自然停机完成**：Engineer 与 DevOps 角色彻底移除子代理 `this.deliver` 成员与相关工具。子代理完成工作后自然停止输出（无未决工具调用的干净终态）；宿主在观察到子代理自然停机后，把该终态轮次的 assistant 散文（正文散文、空 carry）作为完成材料交回给父会话的 `join`，并在父方边界渲染为 `# ...` 注释。宿主不捕获子代理完整的 post-scope LLM 可见消息视图，返回材料里也绝不出现 `[[session]]` 表。
 2. **免除子代理催促**：Engineer 与 DevOps 免除任何完成催促（nudge），允许自然停机。仓内所有教导子代理如何调用 deliver 返回、如何撰写特定交付语法的提示词全部删除。
 3. **Manager 与 Plan 的生命周期 deliver 保持**：宿主保留供 Plan（S1–S3 晋级与接力）及 Manager（S4 交付执行）使用的宿主生命周期工具 `deliver`（见 `work` [025]–[026]）。该工具仅用于驱动任期接力与阶段推进事实，不挂接任何上下文或材料选择数组。
 
+
+## [038] Scope 与 Pair Hint 的独立所有权
+
+`wanxiangli/pair-hint` 是 scope 过滤、提示拼接和预算状态的唯一程序所有者。每个会话独立维护当前 prompt 身份、初始化状态与 `turnBudget`；宿主只能将真实 turn、prompt、`resetScope` 和会话结束事件交给该对象，不再自建第二份预算表或重复实现 filter/suffix 决策。
+
+模型消息处理只有一个执行时机：**即将发往 LLM 时**。`wanxiangli/pair-hint` 的自治 ScopeSession 接受每轮请求的中立消息视图（kind、operator、prompt key、调用/结果身份与分段位置），输出保留位置、写入目标和后缀内容。OMP 与 OpenCode 两个 Host adapter 只解码自己的真实 envelope，并把这个 plan 应用到本次请求副本；领域对象既不认识 `role/content`，也不认识 `info/parts/state.output`。用户消息尾巴与工具结果尾巴是两种可独立呈现的注入，统统不修改真实工具执行结果、`tool_result`/`tool.execute.after` 回调、用户原文或持久化历史。
+
+`Pair Hint` 原有的持久落点与 synthetic skill 消息仍由 Host 原生机制提供，不能与用户消息、普通工具输出的两条注入线混为一谈；宿主只负责物理消息呈现与日志定位，不再负责 scope 的领域判断。对无法观测的宿主行为不得声称执行屏障已经成立，必须由实际宿主测试证实。
+
+## [039] OpenCode 发往模型前的热修正
+
+OpenCode provider messages transform 必须在宿主持有的原消息数组绑定上替换**本次请求副本**里的元素，不能仅通过赋值 `outObj.messages` 指向新数组。对用户文本注入强提醒，对已完成或失败的工具结果字段显示预算或强提醒；原始 Host 消息对象、工具回调结果与 durable history 保持原样。对已删除旧 scope 的结果不得重新插入。物理断言由 `host-boundary/tests/scope-hni-physical.test.mjs` 承担。
+
+## [040] 同消息工具调用／结果配对
+
+从 `ISessionSnapshotPort` 获取的会话视图可能把多个调用和结果装在同一条 assistant 消息的不同 parts 里。中立过滤必须按 `toolCallId` 同时保留历史 resetScope 调用和同消息内的结果，并按最新 reset 在同批工具块中的位置裁剪；先行非 reset 工具的结果仍应删除。跨会话 Fork、Fission、Advisor 等上下文取材均使用相同的中立过滤计划，不另设 raw-message 判定。
+
+## [041] ScopeSession 退场
+
+OpenCode 的 `session.deleted` 事件到达时，仅清除该物理会话 ID 在 wanxiangli 中的 scope state（prompt 身份、初始化、turnBudget），不得影响同时存在的其他会话。OMP 的 `session_start`、`session_switch`、`session_branch` 继续清理其明确的会话状态。清理不写日志、不替换真实工具结果、不触碰工作历史。

@@ -30,8 +30,7 @@ module ForkTool =
         taskResult {
             let! port = snapshotOpt |> Result.requireSome "Snapshot port is unavailable: cannot capture context messages"
             let! messages = port.GetMessages sessionId |> TaskResult.mapError (sprintf "Snapshot read failed: %s")
-            let js = Wanxiangshu.Context.Scope.SessionView.ofSnapshotMessages messages
-            return Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box js)
+            return Wanxiangshu.Context.Scope.SnapshotScope.filterSnapshot messages
         }
 
     let private environment (scope: ToolRuntimeScope) (context: HostToolContext) : DelegationEnvironment =

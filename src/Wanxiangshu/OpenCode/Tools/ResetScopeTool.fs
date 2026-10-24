@@ -29,10 +29,7 @@ module ResetScopeTool =
 
             let _oldExperience = args.OptionalText "oldScopeVerboseVerbatimExperience"
 
-            // 1. Update in-memory session state
-            Surface.resetScopeState ctx.SessionId budget
-
-            // 2. Append durable ScopeReanchored fact if journal is present
+            // The durable reanchor must commit before the new budget becomes visible.
             let callId =
                 match ctx.ToolCallId with
                 | Some id -> id
@@ -65,27 +62,27 @@ module ResetScopeTool =
             | Ok _ -> ()
             | Error failure -> raise (JournalAppendException failure)
 
-            // 3. Return tool result carrying the new budget suffix
-            let responseText = $"Scope reset. Objective: %s{objective}"
-            let suffixed = Protocol.appendText (box responseText) (Protocol.budgetSuffix budget)
-            return unbox<string> suffixed
+            Surface.resetScopeState ctx.SessionId budget
+
+            // Tool results stay raw; the provider-request view receives its budget suffix.
+            return $"Scope reset. Objective: %s{objective}"
         }
 
     let spec (factory: HostToolFactory) (journal: AgentJournal option) : ToolSpec =
-        { Name = Protocol.ResetScopeTool
+        { Name = Surface.ResetScopeTool
           Description =
-            "Execution barrier and context garbage collector. Deletes everything between the previous resetScope call (or session start) and this call, keeping only user messages and prior resetScope pairs; everything after this call is the new scope. Also sets the turnBudget for the new scope."
+            "Execution barrier and context garbage collector. Removes everything between the previous resetScope call (or session start) and this call from subsequent model requests, except user messages and prior resetScope call/result pairs. Everything after this call belongs to the new scope. Sets turnBudget for the new scope."
           Arguments =
             [ "oldScopeVerboseVerbatimExperience",
               ToolHostCodec.optionalStringSchemaDescribed
-                  "Verbose experience and findings from the closing scope: everything between the previous resetScope call (or session start) and this call. Null/omitted if there is no prior work. If any exact text (function signatures, error stack traces, exact line numbers) is needed in the next scope, it MUST be copied VERBATIM here."
+                  "Write out your experience and findings from the closing scope, verbosely: everything between the previous resetScope call (or session start) and this call. Any exact text needed in the next scope (such as function signatures, error stack traces, or exact line numbers) MUST be copied VERBATIM here. Null or omitted if there is no prior work."
                   factory
               "newScopeObjective",
               ToolHostCodec.stringSchemaDescribed
-                  "The state closed-loop (状态闭环) objective for the new scope."
+                  "The objective for the new scope. The scope must form a self-contained state closed-loop (状态闭环)."
                   factory
               "newScopeTurnBudget",
               ToolHostCodec.nonNegativeIntegerSchemaDescribed
-                  "Estimated LLM turns (1 LLM request = 1 turn) for the new scope."
+                  "Estimated number of LLM turns needed for the new scope (1 LLM request = 1 turn)."
                   factory ]
           Execute = execute journal }

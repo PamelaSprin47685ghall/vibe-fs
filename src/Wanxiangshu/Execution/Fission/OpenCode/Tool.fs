@@ -70,8 +70,7 @@ module FissionTool =
             match! snapshot.GetMessages sessionId with
             | Error _ -> return None
             | Ok messages ->
-                let js = Wanxiangshu.Context.Scope.SessionView.ofSnapshotMessages messages
-                let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box js)
+                let filtered = Wanxiangshu.Context.Scope.SnapshotScope.filterSnapshot messages
                 let toml = Wanxiangshu.Context.Scope.SessionView.renderJsWithTable "context" filtered
                 return Some toml
         }

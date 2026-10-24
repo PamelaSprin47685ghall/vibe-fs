@@ -11,6 +11,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Context.Scope
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
@@ -751,8 +752,15 @@ module PluginHooks =
                 |> Option.iter (fun (sessionId, (cached, uncached)) ->
                     ProviderTokenUse.record (SessionId.value sessionId) cached uncached)
 
+            let closeScopeOnSessionDeleted (rawInput: obj) =
+                let raw = HostEventEnvelope.unwrap rawInput
+                if HostEventEnvelope.eventTypeOf raw = "session.deleted" then
+                    HostEventEnvelope.trySessionId raw
+                    |> Option.iter (fun sessionId -> Surface.clearSessionState (SessionId.value sessionId))
+
             let observeEvent raw =
                 task {
+                    closeScopeOnSessionDeleted raw
                     recordProviderTokenUse raw
                     do! settleUserQuestion raw
                     do! settlePostS3Deliver raw

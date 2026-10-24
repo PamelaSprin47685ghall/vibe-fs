@@ -61,6 +61,8 @@ export const HOST_PHYSICAL_CANARY_FILES = new Set([
   'requirements/host-boundary/tests/magic-todo-host-canaries.test.mjs',
   'requirements/host-boundary/tests/session-snapshot-locality.test.mjs',
   'requirements/host-boundary/tests/omp-scope-seam.test.mjs',
+  // Scope HNI physical canary: Fable SessionMessage unions and actual OpenCode provider-request mutation.
+  'requirements/host-boundary/tests/scope-hni-physical.test.mjs',
   // Physical-exit canary: the child must reach the real Diagnostic.fatal and
   // FatalProcess.trip links — a wire-level invariant, not a test seam.
   'requirements/host-boundary/tests/fixtures/fatal-process-child.fixture.mjs',

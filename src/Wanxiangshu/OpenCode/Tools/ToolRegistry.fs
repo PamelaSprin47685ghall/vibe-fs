@@ -77,8 +77,7 @@ module ToolRegistry =
         taskResult {
             let! snapshot = snapshotOpt |> Result.requireSome "Snapshot port is unavailable: cannot capture context blocks"
             let! messages = snapshot.GetMessages sessionId |> TaskResult.mapError (sprintf "Snapshot read failed: %s")
-            let js = Wanxiangshu.Context.Scope.SessionView.ofSnapshotMessages messages
-            let filtered = Wanxiangshu.Context.Scope.Surface.filterScopeMessages (box js)
+            let filtered = Wanxiangshu.Context.Scope.SnapshotScope.filterSnapshot messages
             return Wanxiangshu.Context.Scope.SessionView.blocksJsWithTable "context" filtered
         }
 

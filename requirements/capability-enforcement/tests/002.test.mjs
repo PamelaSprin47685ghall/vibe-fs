@@ -240,7 +240,7 @@ test('WHAT[capability-enforcement-002] P7_SURFACE_public_internal_partition_and_
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { rolePredicate } = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
+const { rolePredicate, admissionAuthority } = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
 const { generateRole } = await import("../../../dist/Repository/Programming/Js/GeneratorSurface.js");
 
 
@@ -314,5 +314,14 @@ test('WHAT[capability-enforcement-002] TOOLSPEC_plugin_owned_cognitive_utility_t
     assert.equal(rolePredicate(tool, 'blogger'), false, `${tool} should fail closed for retired blogger`)
     assert.equal(rolePredicate(tool, 'predictor'), false, `${tool} should fail closed for retired predictor`)
   }
+})
+test('WHAT[capability-enforcement-002] TOOLSPEC_resetScope_admission_admits_active_roles_and_denies_advisor', () => {
+  assert.equal(admissionAuthority('resetScope'), 'office', 'resetScope must have an office-role admission')
+
+  for (const role of ['manager', 'orchestrator', 'engineer', 'devops', 'plan']) {
+    assert.equal(rolePredicate('resetScope', role), true, `resetScope must be admitted for ${role}`)
+  }
+  assert.equal(rolePredicate('resetScope', 'advisor'), false, 'resetScope must be denied for advisor')
+  assert.equal(rolePredicate('resetScope', 'unknown'), false, 'resetScope must fail closed for unknown role')
 })
 }

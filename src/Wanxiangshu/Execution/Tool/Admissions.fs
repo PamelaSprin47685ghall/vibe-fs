@@ -52,6 +52,11 @@ module ToolAdmissions =
     let assume: ToolAdmission =
         officeRole (fun role -> OfficeCapability.admitsUtility role "assume")
 
+    /// resetScope is the context-protocol tool: every role that holds the
+    /// ResetScope office capability may archive its own scope.
+    let resetScope: ToolAdmission =
+        officeRole (fun r -> OfficeCapability.isAllowed r ToolPermission.ResetScope)
+
     let fetch: ToolAdmission =
         officeRole (fun r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
 

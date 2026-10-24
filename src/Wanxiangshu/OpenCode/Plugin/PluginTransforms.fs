@@ -23,6 +23,9 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
@@ -38,40 +41,10 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
-open Wanxiangshu.Host
-open Wanxiangshu.Change
-open Wanxiangshu.Change.Host
-open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
-open Wanxiangshu.Execution.Fission.OpenCode
-open Wanxiangshu.Execution.Session.OpenCode
-open Wanxiangshu.Git
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Resources
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Resources
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Participant.Provider.Projection
+open Wanxiangshu.Persistence.Journal
 open PluginHostInterop
 
 module PluginTransforms =
@@ -1063,97 +1036,198 @@ module PluginTransforms =
 
         { RegisterOwned = wired.RegisterOwned }
 
-    let private promptTimestamp (prompt: obj) : float option =
-        if not (isNull prompt?timestamp) && emitJsExpr prompt?timestamp "Number.isFinite($0)" then
-            Some(unbox<float> prompt?timestamp)
-        else
-            None
-
-    let private recordPromptOnIndex (sessionId: string) (rawMessages: obj array) (lastOpIdx: int) =
-        if lastOpIdx <> -1 then
-            let prompt = rawMessages.[lastOpIdx]
-            let key = Surface.promptKey prompt
-            let ts = promptTimestamp prompt
-            let hasReset = Surface.hasResetSinceLastPrompt rawMessages
-            Surface.onNewPrompt sessionId key ts hasReset
-
-    let private recordOperatorTurn (sessionId: string) (rawMessages: obj array) (isSideRequest: bool) =
-        if not isSideRequest then
-            Surface.onTurnStart sessionId
-            recordPromptOnIndex sessionId rawMessages (Surface.lastPromptIndex rawMessages)
-
-    let private isToolResultPartType (pType: string) =
-        pType = "toolResult" || pType = "tool-result" || pType = "tool_result"
-
-    let private suffixToolPart (initialized: bool) (budget: int) (part: obj) : obj =
-        if isNull part then part
-        else
-            let pType = if isNull part?``type`` then "" else string part?``type``
-            if not (isToolResultPartType pType) then part
-            else
-                let text = if not (isNull part?text) then string part?text else ""
-                let suffixed =
-                    if not initialized then Surface.appendUserReminder (box text)
-                    else Surface.appendBudgetReminder (box text) budget
-                let str = unbox<string> suffixed
-                if str <> text then
-                    let cloned = emitJsExpr part "Object.assign({}, $0)"
-                    cloned?text <- str
-                    cloned
-                else
-                    part
-
-    let private suffixToolResultMsg (initialized: bool) (budget: int) (msg: obj) : obj =
-        if isNull msg then msg
-        elif string msg?role = "toolResult" || string msg?role = "tool" then
-            let content = msg?content
-            let suffixed =
-                if not initialized then Surface.appendUserReminder content
-                else Surface.appendBudgetReminder content budget
-            if not (obj.ReferenceEquals(content, suffixed)) then
-                let cloned = emitJsExpr msg "Object.assign({}, $0)"
-                cloned?content <- suffixed
-                cloned
-            else
-                msg
-        elif not (isNull msg?parts) then
-            let parts = unbox<obj array> msg?parts
-            let nextParts = parts |> Array.map (suffixToolPart initialized budget)
-            let changed = Array.exists2 (fun a b -> not (obj.ReferenceEquals(a, b))) parts nextParts
-            if changed then
-                let clonedMsg = emitJsExpr msg "Object.assign({}, $0)"
-                clonedMsg?parts <- nextParts
-                clonedMsg
-            else
-                msg
-        else
-            msg
-
-    let private buildScopeMessages (sessionId: string) (rawMessages: obj array) (isSideRequest: bool) : obj array =
-        let filtered = Surface.stripContradictoryBudgetSuffixes (Surface.filterScopeMessages rawMessages)
-        if not isSideRequest && Surface.hasResetSinceLastPrompt filtered then
-            Surface.markScopeInitialized sessionId true
-        let withReminders = Surface.addUserReminders filtered
-        let withSteer =
-            if not isSideRequest && Surface.isScopeInitialized sessionId && Surface.turnBudget sessionId = 0 then
-                Surface.addBudgetExhaustedSteer withReminders
-            else
-                withReminders
-        let budget = Surface.turnBudget sessionId
-        let initialized = Surface.isScopeInitialized sessionId
-        withSteer |> Array.map (suffixToolResultMsg initialized budget)
-
     let private tryGetOutMessages (outObj: obj) : obj array option =
         if not (isNull outObj) && not (isNull outObj?messages) then
             Some(unbox<obj array> outObj?messages)
         else
             None
 
+    // Host shape is decoded once. Scope policy only sees the neutral view.
+    let private scopeField (value: obj) (name: string) : obj =
+        if isNull value then null else emitJsExpr (value, name) "$0[$1]"
+
+    let private scopeText (value: obj) =
+        if isNull value then "" else string value
+
+    let private scopeRole (message: obj) =
+        let direct = scopeField message "role"
+        let info = scopeField message "info"
+        let roleValue = if isNull direct then scopeField info "role" else direct
+        match scopeText roleValue with
+        | "user" -> "user"
+        | "assistant" -> "assistant"
+        | "toolResult" | "tool" | "tool-result" | "tool_result" -> "result"
+        | "custom" -> "custom"
+        | _ -> "other"
+
+    let private scopeParts (message: obj) : obj array =
+        let parts = scopeField message "parts"
+        if not (isNull parts) && emitJsExpr parts "Array.isArray($0)" then unbox<obj array> parts
+        else
+            let content = scopeField message "content"
+            if not (isNull content) && emitJsExpr content "Array.isArray($0)" then unbox<obj array> content
+            else [||]
+
+    let private scopeTextContent (message: obj) =
+        let content = scopeField message "content"
+        if not (isNull content) && emitJsExpr content "typeof $0 === 'string'" then scopeText content
+        else
+            scopeParts message
+            |> Array.filter (fun part -> scopeText (scopeField part "type") = "text")
+            |> Array.map (fun part -> scopeText (scopeField part "text"))
+            |> String.concat "\n"
+
+    let private scopeTimestamp (message: obj) =
+        let time = scopeField message "timestamp"
+        let info = scopeField message "info"
+        let infoTimestamp = scopeField info "timestamp"
+        let created = scopeField (scopeField info "time") "created"
+        if not (isNull time) then time
+        elif not (isNull infoTimestamp) then infoTimestamp
+        else created
+
+    let private scopeToolId (part: obj) =
+        let own = scopeField part "callID"
+        let direct = if isNull own then scopeField part "id" else own
+        if isNull direct then scopeField part "toolCallId" else direct
+
+    let private scopeTerminalField (state: obj) : string =
+        let status = scopeText (scopeField state "status")
+        let output = scopeField state "output"
+        let error = scopeField state "error"
+        let errorText = scopeField state "errorText"
+        let isText v = not (isNull v) && emitJsExpr v "typeof $0 === 'string'"
+        match status with
+        | "completed" when isText output -> "output"
+        | "error" when isText error -> "error"
+        | "error" when isText output -> "output"
+        | "error" when isText errorText -> "errorText"
+        | _ -> ""
+
+    let private neutralPart (part: obj) : obj =
+        let kind = scopeText (scopeField part "type")
+        if kind = "tool" || kind = "toolCall" || kind = "tool-call" || kind = "tool_call" then
+            let tool = scopeField part "tool"
+            let name = if isNull tool then scopeField part "name" else tool
+            let resultField = scopeTerminalField (scopeField part "state")
+            createObj [ "id", scopeToolId part; "tool", name; "terminalField", box resultField ]
+        elif kind = "toolResult" || kind = "tool-result" || kind = "tool_result" then
+            createObj [ "resultFor", scopeToolId part ]
+        else createObj []
+
+    let private neutralScopeMessage (message: obj) =
+        let kind = scopeRole message
+        let info = scopeField message "info"
+        let attribution = scopeField message "attribution"
+        let authored = if isNull attribution then scopeField info "attribution" else attribution
+        let operator = (kind = "user" && scopeText authored <> "agent") || (kind = "custom" && scopeText authored = "user")
+        let steering = scopeField message "steering"
+        let steering = if isNull steering then scopeField info "steering" else steering
+        let side = kind = "user" && not operator && not (steering = box true)
+        let stamp = scopeTimestamp message
+        let key = (if isNull stamp then "" else scopeText stamp) + ":" + scopeTextContent message
+        let resultId =
+            let direct = scopeField message "toolCallId"
+            if not (isNull direct) then direct else scopeField message "callID"
+        createObj
+            [ "kind", box kind
+              "operator", box operator
+              "sideRequest", box side
+              "key", box key
+              "timestamp", stamp
+              "parts", box (scopeParts message |> Array.map neutralPart)
+              "resultFor", box (scopeText resultId)
+              "resultField", box (if kind = "result" then "content" else "") ]
+
+    let private copyScope (source: obj) = emitJsExpr source "Object.assign({}, $0)"
+
+    let private appendScopeResultTail (message: obj) (hint: obj) : obj =
+        let partIndex = unbox<int> hint?part
+        let fieldName = scopeText hint?field
+        let suffix = scopeText hint?tail
+        if partIndex < 0 then
+            let content = scopeField message "content"
+            let updated = Surface.appendTailOnce content suffix
+            if obj.ReferenceEquals(content, updated) then message
+            else
+                let rewritten = copyScope message
+                rewritten?content <- updated
+                rewritten
+        else
+            let parts = scopeParts message
+            let part = parts.[partIndex]
+            let state = scopeField part "state"
+            let current = scopeField state fieldName
+            let changed = Surface.appendTailOnce current suffix
+            if obj.ReferenceEquals(current, changed) then message
+            else
+                let nextState = copyScope state
+                emitJsExpr (nextState, fieldName, changed) "$0[$1] = $2" |> ignore
+                let nextPart = copyScope part
+                nextPart?state <- nextState
+                let nextParts = Array.copy parts
+                nextParts.[partIndex] <- nextPart
+                let nextMessage = copyScope message
+                if not (isNull (scopeField message "parts")) then nextMessage?parts <- box nextParts
+                else nextMessage?content <- box nextParts
+                nextMessage
+
+    let private applyNeutralHint (messages: obj array) (hint: obj) : unit =
+        let index = unbox<int> hint?index
+        let value = messages.[index]
+        messages.[index] <-
+            if scopeText hint?kind = "user" then
+                Surface.writeUserHint value [| scopeText hint?tail |]
+            else
+                appendScopeResultTail value hint
+
+    let private applyNeutralSlot (messages: obj array) (slot: obj) : obj =
+        let index = unbox<int> slot?index
+        let message = messages.[index]
+        let selected = scopeField slot "parts"
+        if isNull selected then message
+        else
+            let parts = scopeParts message
+            let kept = unbox<int array> selected |> Array.map (fun j -> parts.[j])
+            let rewritten = copyScope message
+            if not (isNull (scopeField message "parts")) then rewritten?parts <- box kept
+            else rewritten?content <- box kept
+            emitJsExpr rewritten "delete $0.providerPayload; delete $0.responseId" |> ignore
+            rewritten
+
+    let private openCodeWeakSteer (messages: obj array) (prose: string) : obj array =
+        let last = messages |> Array.tryLast |> Option.defaultValue null
+        let originalInfo = scopeField last "info"
+        let sessionId = scopeField originalInfo "sessionID"
+        let info = createObj [ "role", box "user"; "sessionID", sessionId ]
+        let steer =
+            createObj
+                [ "info", box info
+                  "parts", box [| createObj [ "type", box "text"; "text", box prose ] |]
+                  "steering", box true
+                  "attribution", box "agent" ]
+        Array.append messages [| steer |]
+
+    let private prepareNeutralScope (sessionId: string) (raw: obj array) : obj array =
+        let normal = raw |> Array.map neutralScopeMessage
+        let plan = Surface.planRequest sessionId (box normal)
+        let staged = Array.copy raw
+        unbox<obj array> plan?hints |> Array.iter (applyNeutralHint staged)
+        let selected = unbox<obj array> plan?slots |> Array.map (applyNeutralSlot staged)
+        if isNull plan?weak then selected else openCodeWeakSteer selected (scopeText plan?weak)
+
     let private purgeAndSuffixSession (sessionId: string) (rawMessages: obj array) (outObj: obj) : unit =
-        let isSideRequest = Surface.endsWithSideRequest rawMessages
-        recordOperatorTurn sessionId rawMessages isSideRequest
-        let finalMessages = buildScopeMessages sessionId rawMessages isSideRequest
-        HostMessageProjection.replaceMessagesInPlace outObj (Array.toList finalMessages)
+        let sideRequest =
+            rawMessages
+            |> Array.tryLast
+            |> Option.map (fun message -> neutralScopeMessage message |> fun neutral -> scopeField neutral "sideRequest")
+            |> Option.exists (fun value -> not (isNull value) && unbox<bool> value)
+        if not sideRequest then
+            Surface.onTurnStart sessionId
+
+        let prepared = prepareNeutralScope sessionId rawMessages
+        if not (Surface.isUnchanged prepared rawMessages) then
+            HostMessageProjection.replaceMessagesInPlace outObj (Array.toList prepared)
 
     let private applyScopePurgeAndSuffix (sessionIdOpt: string option) (outObj: obj) : unit =
         match sessionIdOpt, tryGetOutMessages outObj with

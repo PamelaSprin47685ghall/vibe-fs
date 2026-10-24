@@ -51,7 +51,7 @@ module PairProgrammingThoughtTransform =
         errorMsg: string ->
             Result<TranscriptGap * TranscriptGap, string>
 
-    val decideCurrentPlacement: realMessages: obj list -> Result<(TranscriptGap * TranscriptGap) option, string>
+    val decideCurrentPlacement: realMessages: obj list -> Result<(TranscriptGap * TranscriptGap) option, unit>
 
     val applyAnchorView: sessionId: string -> messages: obj list -> obj list * string option
 

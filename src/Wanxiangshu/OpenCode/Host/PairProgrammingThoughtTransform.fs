@@ -18,6 +18,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.PairGuidance
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Context.Scope
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Participant.Provider.Projection
 
@@ -295,7 +296,7 @@ module PairProgrammingThoughtTransform =
     ///
     /// Anchor 不在当前真实消息里的 historical pair **不重放、不报错**。
     /// Durable fact 仍保留；完整 transcript 回来时 anchor 在场即可再 replay。
-    let cursorGuidanceSeparator = "\u0000\uFEFF"
+    let cursorGuidanceSeparator = Surface.SuffixSeparator
 
     let private systemBlockPrefix = "<system>"
     let private systemBlockSuffix = "</system>"
@@ -322,43 +323,6 @@ module PairProgrammingThoughtTransform =
         | true, Some "error", Some state when isString state?output -> Some index
         | _ -> None
 
-    let private applyGuidanceSuffix (suffix: string) (originalPart: obj) (clonedState: obj) =
-        let originalState = originalPart?state
-
-        match partStatus originalPart with
-        | Some "completed" -> clonedState?output <- box ((unbox<string> originalState?output) + suffix)
-        | Some "error" when isString originalState?error ->
-            clonedState?error <- box ((unbox<string> originalState?error) + suffix)
-        | Some "error" -> clonedState?output <- box ((unbox<string> originalState?output) + suffix)
-        | _ -> ()
-
-    let appendCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj option =
-        let parts = rawParts rawMsg
-        let indices = parts |> Array.mapi terminalGuidanceIndex |> Array.choose id
-
-        if Array.isEmpty indices then
-            None
-        else
-            let suffix =
-                suffixTexts
-                |> List.map (fun text -> cursorGuidanceSeparator + text)
-                |> String.concat ""
-
-            let clonedParts = Array.copy parts
-
-            indices
-            |> Array.iter (fun index ->
-                let originalPart = parts.[index]
-                let clonedState = emitJsExpr originalPart?state "Object.assign({}, $0)"
-                applyGuidanceSuffix suffix originalPart clonedState
-                let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
-                clonedPart?state <- clonedState
-                clonedParts.[index] <- clonedPart)
-
-            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
-            clonedMessage?parts <- box clonedParts
-            Some clonedMessage
-
     let private mapTerminalResultText (mapText: string -> string) (originalPart: obj) : obj =
         let originalState = originalPart?state
         let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
@@ -376,128 +340,13 @@ module PairProgrammingThoughtTransform =
         clonedPart?state <- clonedState
         clonedPart
 
-    let private stripKnownCursorSuffixes (suffixTexts: string list) (originalPart: obj) : obj =
-        let stripKnown (value: string) =
-            (value, suffixTexts)
-            ||> List.fold (fun current text ->
-                current
-                    .Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal)
-                    .Replace(cursorGuidanceSeparator + systemBlock text, "", StringComparison.Ordinal))
-
-        mapTerminalResultText stripKnown originalPart
-
-    let private terminalTextPartIndex (parts: obj array) : int option =
-        parts
-        |> Array.mapi (fun index part ->
-            if isNull part then
-                None
-            elif
-                isString part?text
-                && (isNull part?``type`` || unbox<string> part?``type`` = "text")
-            then
-                Some index
-            elif isString part then
-                Some index
-            else
-                None)
-        |> Array.choose id
-        |> Array.tryLast
-
-    let private appendFallbackUserText (suffix: string) (rawMsg: obj) (parts: obj array) : obj option =
-        if isString rawMsg?content then
-            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
-            clonedMessage?content <- box ((unbox<string> rawMsg?content) + suffix)
-            Some clonedMessage
-        elif isString rawMsg?text then
-            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
-            clonedMessage?text <- box ((unbox<string> rawMsg?text) + suffix)
-            Some clonedMessage
-        else
-            let textPart = createObj [ "type", box "text"; "text", box suffix ]
-            let clonedParts = Array.append parts [| textPart |]
-            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
-            clonedMessage?parts <- box clonedParts
-            Some clonedMessage
-
-    let private partText (part: obj) : string =
-        if isString part?text then unbox<string> part?text
-        elif isString part then unbox<string> part
-        else ""
-
-    let private appendCursorGuidanceToUserMessage (markerTexts: string list) (rawMsg: obj) : obj option =
-        let parts = rawParts rawMsg
-
-        let suffix =
-            markerTexts
-            |> List.map (fun text -> cursorGuidanceSeparator + systemBlock text)
-            |> String.concat ""
-
-        match terminalTextPartIndex parts with
-        | Some index ->
-            let originalPart = parts.[index]
-            let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
-            let originalText = partText originalPart
-
-            clonedPart?text <- box (originalText + suffix)
-            let clonedParts = Array.copy parts
-            clonedParts.[index] <- clonedPart
-            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
-            clonedMessage?parts <- box clonedParts
-            Some clonedMessage
-        | None -> appendFallbackUserText suffix rawMsg parts
-
-    let private stripFallbackUserText (stripKnown: string -> string) (rawMsg: obj) : obj =
-        if isString rawMsg?content then
-            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
-            clonedMessage?content <- box (stripKnown (unbox<string> rawMsg?content))
-            clonedMessage
-        elif isString rawMsg?text then
-            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
-            clonedMessage?text <- box (stripKnown (unbox<string> rawMsg?text))
-            clonedMessage
-        else
-            rawMsg
-
-    let private stripUserMessageCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj =
-        let parts = rawParts rawMsg
-
-        let stripKnown (value: string) =
-            (value, suffixTexts)
-            ||> List.fold (fun current text ->
-                current
-                    .Replace(cursorGuidanceSeparator + systemBlock text, "", StringComparison.Ordinal)
-                    .Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal))
-
-        match terminalTextPartIndex parts with
-        | Some index ->
-            let originalPart = parts.[index]
-            let originalText = partText originalPart
-            let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
-            clonedPart?text <- box (stripKnown originalText)
-            let clonedParts = Array.copy parts
-            clonedParts.[index] <- clonedPart
-            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
-            clonedMessage?parts <- box clonedParts
-            clonedMessage
-        | None -> stripFallbackUserText stripKnown rawMsg
-
     let stripCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj =
-        let parts = rawParts rawMsg
-        let indices = parts |> Array.mapi terminalGuidanceIndex |> Array.choose id
-
-        if not (Array.isEmpty indices) then
-            let clonedParts = Array.copy parts
-
-            indices
-            |> Array.iter (fun index -> clonedParts.[index] <- stripKnownCursorSuffixes suffixTexts parts.[index])
-
-            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
-            clonedMessage?parts <- box clonedParts
-            clonedMessage
-        elif messageRole rawMsg = "user" then
-            stripUserMessageCursorSuffixes suffixTexts rawMsg
-        else
-            rawMsg
+        let variants =
+            suffixTexts
+            |> List.collect (fun text -> [ text; systemBlock text ])
+            |> List.distinct
+            |> List.toArray
+        Surface.stripKnownHints rawMsg variants
 
     type private CursorPresentation =
         { GuidanceBytes: string
@@ -686,7 +535,8 @@ module PairProgrammingThoughtTransform =
         }
 
     let private appendCursorGuidanceToTerminalToolResult (markerTexts: string list) (rawMsg: obj) : obj option =
-        appendCursorSuffixes markerTexts rawMsg
+        let rewritten = Surface.writeToolResultHint rawMsg (List.toArray markerTexts)
+        if obj.ReferenceEquals(rawMsg, rewritten) then None else Some rewritten
 
     let private gapPresent (addressSet: Set<string>) (gap: TranscriptGap) =
         match gap with
@@ -795,8 +645,8 @@ module PairProgrammingThoughtTransform =
 
     let private projectGuidanceToMessage captures (markerTexts: string list) (message: obj) : obj =
         if messageRole message = "user" then
-            appendCursorGuidanceToUserMessage markerTexts message
-            |> Option.defaultValue message
+            let instructions = markerTexts |> List.map systemBlock |> List.toArray
+            Surface.writeUserHint message instructions
         else
             projectCapturedGuidance captures markerTexts message
             |> Option.orElseWith (fun () -> appendCursorGuidanceToTerminalToolResult markerTexts message)
@@ -819,11 +669,9 @@ module PairProgrammingThoughtTransform =
 
     let private messageCarriesGuidance (rawMsg: obj) : bool =
         if messageRole rawMsg = "user" then
-            terminalTextPartIndex (rawParts rawMsg) |> Option.isSome
+            Surface.userCanCarryHint rawMsg
         else
-            rawParts rawMsg
-            |> Array.mapi terminalGuidanceIndex
-            |> Array.exists Option.isSome
+            Surface.toolCanCarryHint rawMsg
 
     let private replayAddressed
         captures
@@ -931,12 +779,13 @@ module PairProgrammingThoughtTransform =
     ///
     /// 空 transcript 无 placement；最新消息不是载体（例如末尾是纯 assistant
     /// 文本）本轮不生成 occurrence，等下一次出现载体的请求再追加。
-    let decideCurrentPlacement (realMessages: obj list) : Result<(TranscriptGap * TranscriptGap) option, string> =
+    let decideCurrentPlacement (realMessages: obj list) : Result<(TranscriptGap * TranscriptGap) option, unit> =
         match List.rev realMessages with
         | [] -> Ok None
         | last :: _ when messageCarriesGuidance last ->
             gapsAroundAddress TranscriptGap.After last "guidance carrier without transcript address (HOST-013)"
             |> Result.map Some
+            |> Result.mapError ignore
         | _ -> Ok None
 
     let private messageRoleIsInternal (msg: obj) : bool =

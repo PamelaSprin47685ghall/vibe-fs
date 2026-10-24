@@ -9,6 +9,6 @@ namespace Wanxiangshu.Host.Domain
 open Wanxiangshu.Foundation.Identity
 
 type PairGuidanceTranscript =
-    { Carrier: Result<(TranscriptGap * TranscriptGap) option, string>
+    { Carrier: Result<(TranscriptGap * TranscriptGap) option, unit>
       SyntheticCallIds: string list
       InternalAuthor: bool }
