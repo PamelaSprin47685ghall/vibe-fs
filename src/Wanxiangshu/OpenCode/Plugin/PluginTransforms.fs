@@ -1383,20 +1383,7 @@ module PluginTransforms =
                   "attribution", box "agent" ]
         Array.append messages [| steer |]
 
-    /// The answer becomes a real scope boundary only after its exact receipt
-    /// appears in a Host-persisted user message participating in this request.
-    let private observeNegotiationSteers (sessionId: string) (messages: obj array) : unit =
-        messages
-        |> Array.filter (fun message -> scopeRole message = "user")
-        |> Array.collect scopeParts
-        |> Array.iter (fun part ->
-            let metadata = scopeField part "metadata"
-            let receipt = scopeField metadata "wanxiangshu_negotiation_receipt"
-            if not (isNull receipt) then
-                Surface.confirmNegotiationSteer (scopeText receipt) sessionId |> ignore)
-
     let private prepareNeutralScope (sessionId: string) (raw: obj array) : obj array =
-        observeNegotiationSteers sessionId raw
         let normal = raw |> Array.map neutralScopeMessage
         let plan = Surface.planRequest sessionId (box normal)
         let staged = Array.copy raw

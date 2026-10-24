@@ -20,6 +20,16 @@ module HostForkBusyNudge =
         prompt: string ->
             Task<Result<unit, string>>
 
+    val sendObserved:
+        sessions: ISessionHostPort ->
+        journal: AgentJournal option ->
+        childId: SessionId ->
+        profile: PromptAuthority.AuthorityExecutionProfile ->
+        directory: string option ->
+        prompt: string ->
+        observer: ContinuationAcceptanceObserver ->
+            Task<Result<unit, string>>
+
     val sender:
         sessions: ISessionHostPort ->
         journal: AgentJournal option ->

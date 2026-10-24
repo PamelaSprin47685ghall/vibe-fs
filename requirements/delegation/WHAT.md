@@ -169,6 +169,8 @@ Engineer 完成工作或到达需 Manager 决定的边界即返回，不自行�
 
 受委托的新工作先接收**当前指令**，接收方必须首次调用单参数 `negotiate(questions: string)`，鼓励把相关的多个问题集中问出；工具调用立刻返回「已接受发送」的回执，不等待委托者回答。问题在委托者上下文上的临时、不开副作用的模型回合里解答，答复可能迟到数轮；只有作为真实 user steer 被接收方会话接受后，才开始要求尽快调用 `resetScope`。在此之前，`resetScope` 初始化提示暂不激活，也不得提交 `ScopeReanchored`。首轮真实答复之后可随时再次 `negotiate`，但不会抑制或重启已激活的 `resetScope`。
 
-OpenCode 暂时建立一个作为接收方子会话的临时孙会话，Host 中仅有本次协商问题；在发往 LLM 的 provider transform 把这条消息扩展为委托者最后一次出站请求的只读 system、messages 与已观察的模型身份，工具定义不因临时任务而改写。临时会话任何工具调用都必须在 `tool.execute.before` 阶段无条件拒绝；一旦确实尝试工具或没有普通文本回复，应在临时回合重新提示、直到正常文本回答，而不能执行工具或伪造答复。实际回答由 SDK 作为带不可见协商回执身份的 user steer 发送给接收方；只有在物理消息证实并且协商代际身份匹配后才能解锁首轮 scope。该机制是对历史传输的 clean-break，不得把「工具已发送」或临时会话已创建等同于答复已送达。
+OpenCode 暂时建立一个作为接收方子会话的临时孙会话，Host 中仅有本次协商问题；在发往 LLM 的 provider transform 把这条消息扩展为委托者最后一次出站请求的只读 system、messages 与已观察的模型身份，工具定义不因临时任务而改写。临时会话任何工具调用都必须在 `tool.execute.before` 阶段无条件拒绝；一旦确实尝试工具或没有普通文本回复，应在临时回合重新提示、直到正常文本回答，而不能执行工具或伪造答复。实际回答**必须复用父→子追加指导的真实发送接口**：忙碌子会话走 `HostForkBusyNudge → PromptDispatcher.SendContinuation(BusyAgentNudge, Detached)`；已经关闭当前 Logical Run 的接收方则经同一 PromptDispatcher 建立新的受控 AgentOwnerRoot。文本成为宿主拥有的可见 user 消息，带持久 PromptKey，并排队供之后的 LLM 请求自然消费。严禁私自调用 SDK `session.promptAsync`、猜测 busy/noReply、轮询 `session.messages` 伪造回复到达，更严禁通过 provider transform 偷偷注入协商答案。
+
+`Detached` 回执仅证明本次调用已提交持久发送，**不等于真实回答已抵达子会话**；只有 Dispatcher 的 `PhysicalAccepted` 观察者在真实物理用户消息被接纳后，按接收方、回执、委派代际确认，才可以解锁首次 `resetScope`。伪造的 part.metadata 或出站 provider 文本绝不能解锁。该机制是对历史传输的 clean-break，不得把「工具已发送」或临时会话已创建等同于答复已送达。
 
 **user-facing session 不提供协商工具。** 在 OpenCode 的 `chat.message` 钩子里，凡 `IsManagedChild = false` 的根会话，其真实 `UserMessage.tools.negotiate` 必须显式为 `false`，因此工具不进入该次 LLM 请求可用列表；`tool.execute.before` 仍必须对根会话伪造的协商调用硬拒绝。受委托子会话和 Advisor 必须保留工具。本判定按真实物理会话父子身份，**不能按 Manager / Engineer 等角色统一禁用**，以免误杀同角色子代理的首次协商。

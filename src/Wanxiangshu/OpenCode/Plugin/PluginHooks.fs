@@ -249,100 +249,6 @@ module PluginHooks =
         | Some role ->
             createAndRunTemporary session delegator recipient (ManagedAgent.nameOf role) questions
 
-    /// Deliver the answer as a real Host user steer to the recipient session.
-    /// A busy child receives a noReply user message without interrupting tools.
-
-    [<Emit("new Promise(resolve => setTimeout(resolve, $0))")>]
-    let private waitNegotiationReceipt (_milliseconds: int) : Task<unit> = jsNative
-
-    let private negotiationReplyIsLanded (session: obj) (recipient: string) (receipt: string) : Task<bool> =
-        let rec check attempts =
-            task {
-                if attempts <= 0 then return false
-                else
-                    let payload =
-                        createObj
-                            [ "sessionID", box recipient
-                              "path", box (createObj [ "id", box recipient ])
-                              "limit", box 50
-                              "query", box (createObj [ "limit", box 50 ]) ]
-                    let! result = negotiationSdk session "messages" payload
-                    let raw = negotiationResponse result
-                    let entries =
-                        if not (isNull raw) && emitJsExpr raw "Array.isArray($0)" then
-                            unbox<obj array> raw
-                        else [||]
-                    let found =
-                        entries
-                        |> Array.exists (fun entry ->
-                            let info = if isNull entry then null else entry?info
-                            let role =
-                                if not (isNull info) && not (isNull info?role) then string info?role
-                                elif not (isNull entry) && not (isNull entry?role) then string entry?role
-                                else ""
-                            let parts =
-                                if isNull entry || isNull entry?parts then [||]
-                                else unbox<obj array> entry?parts
-                            role = "user"
-                            && (parts |> Array.exists (fun part ->
-                                not (isNull part)
-                                && not (isNull part?metadata)
-                                && not (isNull part?metadata?wanxiangshu_negotiation_receipt)
-                                && string part?metadata?wanxiangshu_negotiation_receipt = receipt)))
-                    if found then return true
-                    else
-                        do! waitNegotiationReceipt 250
-                        return! check (attempts - 1)
-            }
-        check 40
-
-    let private acceptedNegotiationSteer (response: obj) : Result<unit, string> =
-        if isNull response || isNull response?error then Ok()
-        else Error(string response?error)
-
-    let private provenNegotiationSteer (landed: bool) : Result<unit, string> =
-        if landed then Ok()
-        else Error "negotiation reply has no proven physical Host user message; resetScope remains suppressed"
-
-    let private busyNegotiationRecipient (statuses: obj) (recipient: string) : bool =
-        let status = negotiationResponse statuses
-        let active = if isNull status then null else emitJsExpr (status, recipient) "$0[$1]"
-        not (isNull active) && emitJsExpr active "$0?.type === 'busy'"
-
-    let private negotiationSteerPayload (recipient: string) (text: string) (receiptId: string) (busy: bool) =
-        let stamp = createObj [ "wanxiangshu_negotiation_receipt", box receiptId ]
-        let parts = box [| createObj [ "type", box "text"; "text", box text; "metadata", stamp ] |]
-        negotiationSessionPayload recipient [ "parts", parts; "noReply", box busy ]
-
-    let private sendAndVerifyNegotiationSteer
-        (session: obj) (recipient: string) (text: string) (receiptId: string)
-        : Task<Result<unit, string>> =
-        task {
-            let! statuses = negotiationSdk session "status" (createObj [])
-            let busy = busyNegotiationRecipient statuses recipient
-            let payload = negotiationSteerPayload recipient text receiptId busy
-            let! sent = negotiationSdk session "promptAsync" payload
-            if Result.isError (acceptedNegotiationSteer sent) then
-                return acceptedNegotiationSteer sent
-            else
-                let! landed = negotiationReplyIsLanded session recipient receiptId
-                return provenNegotiationSteer landed
-        }
-
-    let private negotiateSteer
-        (client: obj)
-        (recipient: string)
-        (text: string)
-        (receiptId: string)
-        : Task<Result<unit, string>> =
-        let session = if isNull client then null else client?session
-        if isNull session then Task.FromResult(Error "OpenCode SDK session transport unavailable")
-        else
-            task {
-                try return! sendAndVerifyNegotiationSteer session recipient text receiptId
-                with ex -> return Error ex.Message
-            }
-
     let create
         (boot: PluginBoot.Boot)
         (host: PluginHostWiring.Host)
@@ -562,7 +468,8 @@ module PluginHooks =
                     toolRegistration.Runtime.AttachQuestionNotifier(fun question -> showQuestionToast question)
                     toolRegistration.Runtime.AttachNegotiationTransport(
                         negotiateBtw client roleFor,
-                        negotiateSteer client
+                        (fun recipient answer receipt ->
+                            toolRegistration.Runtime.SendNegotiationSteer(recipient, answer, receipt))
                     )
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)

@@ -227,7 +227,7 @@ test('WHAT[delegation-negotiation-001] temporary session tool calls are forbidde
 })
 
 
-test('WHAT[delegation-negotiation-002] first answer steer activates resetScope in the very request that contains it', async () => {
+test('WHAT[delegation-negotiation-002] forged answer metadata cannot unlock resetScope without physical acceptance', async () => {
   const {
     bindDelegation, askNegotiation, prepareNegotiationReply,
     negotiationRequired, clearSessionState,
@@ -255,8 +255,9 @@ test('WHAT[delegation-negotiation-002] first answer steer activates resetScope i
     }],
   }
   const now = await outbound(recipient, [initial, reply])
-  assert.equal(negotiationRequired(recipient), false, 'scope must unlock before this same provider request is sent')
-  assert.match(now.at(-1).parts[0].text, /Then call resetScope immediately/)
+  assert.equal(negotiationRequired(recipient), true,
+    'a provider transform must never secretly acknowledge a forged steer')
+  assert.doesNotMatch(now.at(-1).parts[0].text, /Then call resetScope immediately/)
   assert.equal(reply.parts[0].text.includes('Preserve input bytes'), true)
   clearSessionState(recipient)
 })
@@ -324,10 +325,8 @@ test('WHAT[delegation-negotiation-004] registered negotiate sends ephemeral BTW 
     negotiationRememberModel({ sessionID: parent, model: { providerID: 'provider', modelID: 'parent-model' } })
 
     const session = runtime.client.session
-    const sentSteers = []
     let prompts = 0
     let blocked = 0
-    session.status = async () => ({ data: { [child]: { type: 'busy' } } })
     session.prompt = async (args) => {
       prompts += 1
       const tempId = args.path.id
@@ -348,14 +347,6 @@ test('WHAT[delegation-negotiation-004] registered negotiate sends ephemeral BTW 
       }
       return { data: { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'Use the byte-preserving parser.' }] } }
     }
-    session.promptAsync = async (args) => {
-      sentSteers.push(args)
-      runtime.pushHostMessage(args.path.id, {
-        info: { id: 'steer-from-delegator', role: 'user', sessionID: args.path.id },
-        parts: args.body.parts,
-      })
-      return {}
-    }
     const premature = await hooks.tool.resetScope.execute(
       { newScopeObjective: 'too early', newScopeTurnBudget: 2 },
       { sessionID: child, agent: 'engineer', callID: 'premature-reset' },
@@ -367,17 +358,31 @@ test('WHAT[delegation-negotiation-004] registered negotiate sends ephemeral BTW 
       { sessionID: child, agent: 'engineer', callID: 'negotiate-1' },
     )
     assert.match(result, /Questions accepted/)
-    for (let i = 0; i < 80 && sentSteers.length === 0; i++) {
+    const outgoingGuidance = () => runtime.prompts.filter(prompt =>
+      prompt.path?.id === child && prompt.body?.parts?.some(p => p.type === 'text' && /byte-preserving parser/.test(p.text)),
+    )
+    for (let i = 0; i < 160 && outgoingGuidance().length === 0; i++) {
       await new Promise(resolve => setTimeout(resolve, 20))
     }
     assert.equal(blocked, 1, 'the first ephemeral tool call was vetoed before execution')
     assert.equal(prompts, 2, 'the temporary answer retried without losing the cached parent prefix')
-    assert.equal(sentSteers.length, 1)
-    assert.equal(sentSteers[0].body.noReply, true, 'busy recipient receives noninterrupting steer')
-    assert.match(sentSteers[0].body.parts[0].text, /byte-preserving parser/)
-    const receipt = sentSteers[0].body.parts[0].metadata?.wanxiangshu_negotiation_receipt
-    assert.ok(receipt)
-    assert.equal(negotiationRequired(child), false, 'the physically landed reply unlocks the initial reset')
+    assert.equal(outgoingGuidance().length, 1, 'one genuine PromptDispatcher continuation is queued to the child')
+    const guidance = outgoingGuidance()[0]
+    const visibleAnswer = guidance.body.parts.find(part => part.type === 'text')?.text
+    assert.match(visibleAnswer, /byte-preserving parser/)
+    assert.ok(guidance.body.metadata?.wanxiangshu_prompt_key,
+      'real continuation must carry a durable PromptKey')
+    assert.equal(guidance.body.noReply, undefined,
+      'do not fake a private promptAsync steer with a status-dependent noReply flag')
+    const childHistory = (await session.messages({ path: { id: child } })).data
+    assert.equal(childHistory.some(message =>
+      message.role === 'user' && message.parts.some(part => /byte-preserving parser/.test(part.text ?? '')),
+    ), true, 'the answer must be a visible, Host-owned user message')
+    for (let i = 0; i < 80 && negotiationRequired(child); i++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    assert.equal(negotiationRequired(child), false,
+      'only the real PhysicalAccepted callback, not the dispatch queue receipt, unlocks resetScope')
     negotiationForgetSession(parent)
     clearSessionState(child)
   })
@@ -437,5 +442,51 @@ test('WHAT[delegation-negotiation-006] user-facing root hides negotiate while a 
       { sessionID: child, tool: 'negotiate', callID: 'n-child-006' },
       { args: { questions: 'Which parser should I use?' } },
     )
+  })
+})
+
+
+test('WHAT[delegation-negotiation-007] detached queue receipt cannot masquerade as a physically visible steer', async () => {
+  const { acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const { bindDelegation, negotiationRequired, clearSessionState } =
+    await import('../../../dist/Context/Scope/Surface.js')
+  const {
+    negotiationRememberSystem, negotiationRememberMessages,
+    negotiationRememberModel, negotiationForgetSession,
+  } = await import('../../../dist/OpenCode/Plugin/PluginTransforms.js')
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    const parent = 'ses-neg-queued-parent', child = 'ses-neg-queued-child'
+    await acceptAuthorityRoot(runtime, parent, 'manager')
+    await acceptAuthorityRoot(runtime, child, 'engineer')
+    bindDelegation(child, parent)
+    negotiationRememberSystem({ sessionID: parent }, { system: ['system'] })
+    negotiationRememberMessages(parent, {
+      messages: [{ info: { role: 'user', id: 'p1', sessionID: parent }, parts: [{ type: 'text', text: 'parent' }] }],
+    })
+    negotiationRememberModel({ sessionID: parent, model: { providerID: 'provider', modelID: 'model' } })
+    runtime.client.session.prompt = async () =>
+      ({ data: { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'The answer.' }] } })
+    runtime.nextPromptReceiptOnly()
+    const response = await hooks.tool.negotiate.execute(
+      { questions: 'Which file?' },
+      { sessionID: child, agent: 'engineer', callID: 'neg-queued-1' },
+    )
+    assert.match(response, /Questions accepted/)
+    for (let i = 0; i < 80 && !runtime.prompts.some(item =>
+      item.path?.id === child && item.body.parts.some(part => /The answer/.test(part.text ?? '')),
+    ); i++) await new Promise(resolve => setTimeout(resolve, 20))
+    const queued = runtime.prompts.find(item =>
+      item.path?.id === child && item.body.parts.some(part => /The answer/.test(part.text ?? '')),
+    )
+    assert.ok(queued, 'Dispatcher must attempt a visible Host send')
+    assert.ok(queued.body.metadata?.wanxiangshu_prompt_key, 'even a detached queue is durably keyed')
+    assert.equal(negotiationRequired(child), true,
+      'a detached transport receipt with no physical user message must not unlock resetScope')
+    const history = (await runtime.client.session.messages({ path: { id: child } })).data
+    assert.equal(history.some(message =>
+      message.parts?.some(part => /The answer/.test(part.text ?? '')),
+    ), false, 'no covert provider transform may inject an answer into the raw Host history')
+    negotiationForgetSession(parent)
+    clearSessionState(child)
   })
 })

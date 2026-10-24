@@ -570,6 +570,7 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **第一次必须问，后续随时可问。** 受委托方的首次 `negotiate` 是强制步骤，发问即得到投递受理回执，不同步等待。只有带精确回执、代际、接收方身份的真实回答 steer 进入接收方请求，才解除首轮 `resetScope` 抑制；以后 `negotiate` 可选且绝不暂停正常 `resetScope`。同一对委托／受委托会话复用不重置首轮协商，换委托者或删除会话必须废弃旧回执。
 - **缓存前缀复用应发生在 provider 物理边界。** 从委托者最后一次实际出站请求扣留 system、messages、model（包括已观察的 variant）**只读副本**；临时孙会话在 OpenCode 层只存一个协商问题，发 LLM 前在两种 transform 中把父 system、messages 原位热替换，并把唯一问题追加在末尾。保持原数组身份、既有字节和父会话历史不变；任一快照缺失必须拒绝复用，不能临时猜另一模型或重新渲染旧材料。父子层级本身不等于 provider cache 命中，最终命中仍要读真实 provider 数据。
 - **工具定义不为临时 BTW 改动，执行绝不越界。** 临时会话使用父方实际模型/agent 配置，不通过 `tools: {}` 破坏前缀；但 `tool.execute.before` 对该会话任意工具调用必定在副作用前拒绝。记录拒绝事实，再用提示让临时回合重新尝试文本回答；任何原始工具体都不得跑。SDK 报错、无答案、迟到问答与用户消息落地必须分别验收；不能以发问受理回执冒充 answer steer。
+- **回答送达走真实的父→子指导通道，不走 provider transform。** BTW 孙会话的出站 transform 只负责借用父 system/messages/model 前缀，答案一产生就交给 `HostForkBusyNudge.sendObserved` 的 `PromptDispatcher` Detached continuation；空闲接收方经同一 Dispatcher 建立新 AgentOwnerRoot。可见回答须进入 Host 子会话历史并带 PromptKey，让用户知道已发出；Dispatcher 返回“已排队”不是已送达，只有 `PhysicalAccepted` 与协商回执身份匹配才解除第一次 `resetScope` 门禁。不再由 `session.promptAsync` 手工发送、猜 busy/noReply、轮询消息，也不接受 transform 中伪造的 part.metadata 来确认答复。离线测试须分别覆盖真实可见落地与仅有投递回执、尚未落地两种情况。
 - **测实际连接而不只测 helper。** 库内 `src/pair-hint/tests/008.test.mjs` 验证协商代际和首次/后续状态；主仓 `requirements/host-boundary/tests/scope-hni-physical.test.mjs` 应经实际注册的 OpenCode hooks 检查父前缀热替换、工具前置拒绝、重试、物理 steer 和首轮 reset 激活；Fork/Advisor 的真实物理 prompt 还须断言不携带父历史。离线字节相等不自动证明提供商真实缓存率，临时会话是否 UI 不可见也不能仅凭 parentID 推断。
 
 ---

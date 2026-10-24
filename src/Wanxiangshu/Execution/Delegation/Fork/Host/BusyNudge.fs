@@ -66,6 +66,7 @@ module HostForkBusyNudge =
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (directory: string option)
         (prompt: string)
+        (observer: ContinuationAcceptanceObserver option)
         =
         task {
             let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create j)
@@ -80,7 +81,7 @@ module HostForkBusyNudge =
                     profile
                     directory
                     PromptDispatcher.AwaitMode.Detached
-                    None
+                    observer
 
             return sendResult sent
         }
@@ -97,8 +98,23 @@ module HostForkBusyNudge =
             match journal with
             | None ->
                 return Error "Busy nudge requires an AgentJournal: PROMPT-005 admits no sender outside the Dispatcher"
-            | Some j -> return! sendWithProfile sessions j childId profile directory prompt
+            | Some j -> return! sendWithProfile sessions j childId profile directory prompt None
         }
+
+    /// Same durable busy-guidance send, with the Host PhysicalAccepted callback.
+    /// A queued Detached receipt is not a user-visible landing; only Notify is.
+    let sendObserved
+        (sessions: ISessionHostPort)
+        (journal: AgentJournal option)
+        (childId: SessionId)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (directory: string option)
+        (prompt: string)
+        (observer: ContinuationAcceptanceObserver)
+        : Task<Result<unit, string>> =
+        match journal with
+        | None -> Task.FromResult(Error "Busy nudge requires AgentJournal; negotiation steer cannot bypass prompt authority")
+        | Some j -> sendWithProfile sessions j childId profile directory prompt (Some observer)
 
     let sender sessions journal (directoryOf: string -> string option) =
         fun (agentId: string) childId profile prompt ->

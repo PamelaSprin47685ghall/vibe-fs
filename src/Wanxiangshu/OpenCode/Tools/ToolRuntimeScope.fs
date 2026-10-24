@@ -892,11 +892,6 @@ type ToolRuntimeScope
             let key = SessionId.value parentSessionId
             obtainWorkDevOpsTask parentSessionId key
 
-    let settleNegotiationReceipt (receipt: string) (result: Result<unit, string>) : unit =
-        match result with
-        | Ok() -> Wanxiangshu.Context.Scope.Surface.completeNegotiationReply receipt |> ignore
-        | Error _ -> ()
-
     let deliverNegotiationReply
         (receipt: string)
         (answer: string)
@@ -906,8 +901,10 @@ type ToolRuntimeScope
             let prepared = Wanxiangshu.Context.Scope.Surface.prepareNegotiationReply receipt answer
             let admitted = not (isNull prepared?ok) && unbox<bool> prepared?ok
             if admitted then
-                let! result = steer (string prepared?recipient) (string prepared?steer) receipt
-                settleNegotiationReceipt receipt result
+                // Only the real Host PhysicalAccepted observer may unlock the
+                // first scope. A detached queue receipt is not a landed steer.
+                let! _ = steer (string prepared?recipient) (string prepared?steer) receipt
+                return ()
         }
 
     let settleNegotiationAnswer
@@ -936,6 +933,69 @@ type ToolRuntimeScope
             true
         | _ -> false
 
+    let privateNegotiationObserver (recipient: string) (receipt: string) : ContinuationAcceptanceObserver =
+        let observerGate = obj ()
+        let subscriptions = ResizeArray<IDisposable>()
+        let mutable confirmed = false
+
+        let release () =
+            let captured =
+                lock observerGate (fun () ->
+                    confirmed <- true
+                    subscriptions.ToArray())
+            for registration in captured do
+                registration.Dispose()
+
+        { Notify = fun _ ->
+              try
+                  Wanxiangshu.Context.Scope.Surface.confirmNegotiationSteer receipt recipient |> ignore
+              finally
+                  release ()
+          AttachDisposable = fun registration ->
+              let alreadyAccepted =
+                  lock observerGate (fun () ->
+                      if confirmed then true
+                      else
+                          subscriptions.Add registration
+                          false)
+              if alreadyAccepted then registration.Dispose() }
+
+    let sendNegotiationSteer (recipient: string) (answer: string) (receipt: string) : Task<Result<unit, string>> =
+        let target = SessionId.create recipient
+        let directory = directoryFor recipient |> Option.orElse workspaceDirectory
+        let observer = privateNegotiationObserver recipient receipt
+        let active =
+            journal
+            |> Option.bind (fun durable ->
+                PromptAuthorityProjectionQueries.activeProfile
+                    target
+                    (AgentJournal.snapshot durable).AgentProjections)
+        let last =
+            journal
+            |> Option.bind (fun durable ->
+                PromptAuthorityProjectionQueries.lastAuthorityProfile
+                    target
+                    (AgentJournal.snapshot durable).AgentProjections)
+        match journal, active, last with
+        | None, _, _ -> Task.FromResult(Error "No AgentJournal: cannot enqueue visible negotiation guidance")
+        | Some _, Some current, _ ->
+            HostForkBusyNudge.sendObserved sessions journal target current directory answer observer
+        | Some durable, None, Some closed ->
+            // A completed child needs a new owned logical run, not a
+            // continuation of a closed run. Both paths share Dispatcher.
+            let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+            dispatcher.SendAgentOwnerRoot
+                (DispatchSessionPort.ofSessionPort sessions)
+                target
+                (LlmFacing.renderInstruction answer)
+                closed.IdentitySeed
+                directory
+                PromptDispatcher.AwaitMode.Detached
+                (Some observer)
+            |> TaskValue.map (Result.map ignore)
+        | Some _, None, None ->
+            Task.FromResult(Error "Negotiation recipient has no previous managed authority profile")
+
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
     member _.RootWorkspace = rootWorkspace
@@ -944,6 +1004,8 @@ type ToolRuntimeScope
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
     member _.ActiveProfileFor(sessionId: SessionId) = activeProfileFor sessionId
+    member _.SendNegotiationSteer(recipient: string, answer: string, receipt: string) =
+        sendNegotiationSteer recipient answer receipt
 
     member _.AttachNegotiationTransport
         (ask: string -> string -> string -> Task<Result<string, string>>, steer: string -> string -> string -> Task<Result<unit, string>>) =
