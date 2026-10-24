@@ -586,6 +586,7 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **安装验收必须消费产包。** 包含 worker 的实际 tarball 在空目录安装后，用 Node、Bun 和 TypeScript 验证两个新入口；旧入口确实不可导入。Node 和 Bun 对未导出子路径可使用不同的模块错误码，应断言各自真实拒绝，不把包缺失或运行失败混作拒绝成功。
 - **localspace-js 只回移同一请求窗口理念。** 它的 js 顶层接收 `planB`，预算为 `min(UTF8Bytes(planB) × 50ms, 30000ms)`，call/unpark 不再追加预算。保留该工具原有后台 worker 与客户端断开后继续运行的合同；本地计算和直接文件 API 的后台行为，不得描述成 wanxiangli 的完整程序暂停。
 - **基线红态如实保留。** 库全量验收中的 assembly `Missing field: updates` 已在原始库提交的隔离构建上复现为同样 16 项失败。额外消费者回归保留 work-011 的既有温度断言失败：未修改的 PluginHooks 把 ChatParamsHook 返回的柯里化函数按两个参数直接调用，实际未进入第二层，独立用例与编译产物均已确认。主仓全量格式和静态检查仍可被未修改的既有代码阻断；本包精确文件门禁、测试通过数、跳过、TODO 与这些基线分别记录在提案，不用扩大豁免或修改其他任务来制造全绿。
+- **本次精确落点。** wanxiangli `b5187fc07d3da16ed14ad097c5bd0c01ecde822d` 已推送 main，宿主 gitlink 固定此提交；localspace-js 共享期限实现 `42da3a896f1ac322dd7622cf00ffe07779563b99`、参数文档 `03991b87882e3d0974fc95927601eba2ce531a21` 及测试导入修复 `78e83c4073c0950a7b1b091e360c673f1fd7a9ee` 已在 main；后者完整 npm test、typecheck 与独立生产构建均重新通过。宿主实现提交 `5e22533250926d82dee34470913ebf18156b2801` 已推送 master。主仓及库回归是在保留初始并发改动的实际工作树上运行；原有修改未被本任务暂存，不宣称为干净 checkout 全仓通过。
 
 
 ---
@@ -639,4 +640,3 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **主仓现有配置与独立任务文档**：
   - 本文件的既有协作规则；迁移合同已直接合入本文件，不再安排独立指南替换。
   - 其他任务的交接材料与无关产品提案，不因名称包含“迁移”而删除。
-- **本次精确落点。** wanxiangli `b5187fc07d3da16ed14ad097c5bd0c01ecde822d` 已推送 main，宿主 gitlink 固定此提交；localspace-js 共享期限实现 `42da3a896f1ac322dd7622cf00ffe07779563b99` 与参数文档 `03991b87882e3d0974fc95927601eba2ce531a21` 已在 main。主仓及库回归是在保留初始并发改动的实际工作树上运行；原有修改未被本任务暂存，不宣称为干净 checkout 全仓通过。

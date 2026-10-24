@@ -155,10 +155,10 @@ localspace-js 当前公开上限为 `min(UTF8Bytes(planB) × 50ms, 30000ms)`。�
 | 宿主核心回归 | repository-programming、process-execution、capability-enforcement 共 641 项：622 通过、0 失败、12 跳过、7 TODO；包含新增的真实命令退出、finally 落盘和跨插件隔离反例。跳过和 TODO 不计作通过。 |
 | 干净安装 | program/runtime 新包的 Node、Bun 实际消费及严格 TypeScript 检查通过；旧入口不可导入。 |
 | 库全量基线 | 最终全量 947 项：931 通过、16 失败；全部失败标题与原提交 f553f3ed07c4c0c6d5042d2d8561e66483a1b600 隔离构建的 16 项 Assembly `Missing field: updates` 逐项一致，没有新增失败。 |
-| localspace-js | 最新 npm test、typecheck 与临时目录构建通过；包含 8 项共享预算回归，保留同时存在的 30 秒上限与断连 detach 行为。 |
+| localspace-js | 最终源码重新执行完整 npm test、typecheck 与临时目录生产构建，全部退出成功；收尾复核发现并修复的重复 RequestWindow 测试导入已提交为 `78e83c4`。包含 8 项共享预算回归，保留 30 秒上限与断连 detach 行为。 |
 | 其他消费者 | 工作、委派、问答、完整 managed-session-lifecycle、Bookkeeper 等共 614 项：564 通过、1 项既有失败、5 跳过、44 TODO。剩余 work-011 温度断言来自未修改的 PluginHooks/ChatParamsHook：两参数调用没有进入柯里化函数的第二层；独立用例和实际编译产物均已确认。 |
 | 构建与源码门禁 | 项目规定的 Fable 构建通过；本任务 88 个 F# 文件格式检查通过，JavaScript 语法检查通过。全仓格式仍有 53 个未修改文件不满足格式，静态检查剩余 25 项位于未修改的 Host/FissionPort、OMP、SecondHost、PluginTransforms。 |
-| 提交 | wanxiangli `b5187fc07d3da16ed14ad097c5bd0c01ecde822d` 已推送 main，宿主本提交以 gitlink 固定该版本；localspace-js 的共享窗口实现为 `42da3a896f1ac322dd7622cf00ffe07779563b99`，参数文档补全为 `03991b87882e3d0974fc95927601eba2ce531a21`，均已在 main。宿主自身 SHA 以 Git 记录为准。 |
+| 提交 | wanxiangli `b5187fc07d3da16ed14ad097c5bd0c01ecde822d` 已推送 main，宿主本提交以 gitlink 固定该版本；localspace-js 的共享窗口实现为 `42da3a896f1ac322dd7622cf00ffe07779563b99`，参数文档补全为 `03991b87882e3d0974fc95927601eba2ce531a21`，测试导入修复为 `78e83c4073c0950a7b1b091e360c673f1fd7a9ee`，均已在 main。宿主实现 `5e22533250926d82dee34470913ebf18156b2801` 已推送 master，后续验收记录提交不改变运行语义。 |
 
 上述宿主和库回归对应本次实际工作树，其中保留了开始任务前已有的并发修改；这些修改没有纳入本任务提交。干净安装仅证明表中列明的公开包消费范围，不能将工作树结果改称为提交在干净 checkout 中的全仓验证。
 
