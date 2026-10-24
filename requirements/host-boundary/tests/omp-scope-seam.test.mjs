@@ -830,6 +830,11 @@ test('WHAT[delegation-034] End-to-end negotiate: immediate ack before answer, na
   await new Promise((r) => setTimeout(r, 50))
   assert.equal(steerCalls.length, 1, 'steer was sent to child')
   assert.match(steerCalls[0], /Use the fast JSON parser with zero copy/)
+  assert.equal(negotiationRequired(childId), false, 'first-reset gate is released after physical steer landing')
+
+  // 4. resetScope is now admitted
+  resetScopeState(childId, 3)
+  assert.equal(isScopeInitialized(childId), true, 'resetScope state initialized after negotiation gate released')
 
   clearSessionState(childId)
   clearSessionState(parentId)
