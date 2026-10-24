@@ -85,11 +85,11 @@ resetScope(
 
 1 次 LLM 请求计为 1 turn。会话状态机在 `turn_start` 时将当前活跃 `turnBudget` 减 1，下限为 0。
 
-1. **结果后缀**：每次向 LLM 发起请求时，宿主在本次请求副本内给保留的已完成工具结果追加 `\0\uFEFF[Remaining turnBudget: N]`；`resetScope` 的结果也只在请求副本内带上新预算。真实工具结果、持久化记录与用户原始消息绝不写入这种后缀。已带相同后缀时不重复追加。
+1. **结果后缀**：每条已完成工具结果首次进入当前 prefix epoch 的 LLM 请求副本时，记录当时的 `turnBudget`，在结果末尾呈现 `\0\uFEFF[Remaining turnBudget: N]`。**同一 epoch 后续请求必须逐字重放该结果首次呈现的后缀**，不可用最新剩余预算批量改写历史结果；新结果首次呈现时仍显示当时的当前预算。`resetScope` 结果同理；仅提交的 `ScopeReanchored` 允许在新 epoch 重新建立尾巴。真实工具结果、持久化记录与用户原始消息绝不写入该后缀。再次热修正不可重复追加。
 2. **用户消息尾巴与预算作废**：当新的 operator 用户消息（干净 prompt 或 steer）到达时，旧预算立即作废（归零）。在发往模型的请求副本中，每条 operator 用户消息末尾均拼接提醒：
    `[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]`
    持久化存储中的原始用户消息不被改写。
-3. **未初始化提醒**：当最新 operator 用户消息之后尚未发生 `resetScope` 调用时，所有非 `resetScope` 工具结果在下一次请求副本中携带上述初始化提醒，而不显示预算后缀，直到模型完成一次 `resetScope`。
+3. **未初始化提醒**：当最新 operator 用户消息之后尚未发生 `resetScope` 调用时，**新首次呈现**的非 `resetScope` 工具结果在请求副本中携带上述初始化提醒，而不显示预算后缀，直到模型完成一次 `resetScope`。之前已呈现的结果不可因新用户 steer 或预算作废而改变尾巴；普通 steer 不是冷 prefix 边界。
 4. **零预算弱提示**：当 scope 已初始化且 `turnBudget` 降至 0 时，若当前请求不是 side-request 快照，宿主可在请求副本末尾追加一条弱提醒用户消息（`steering: true`，不持久化），建议模型在当前任务状态闭环的自然边界调用 `resetScope` 开启新闭环并换取新预算。该弱提醒绝对不得强行中断、暂停或阻断正在进行的工具工作。
 
 ## [035] ScopeReanchored 冷前缀边界

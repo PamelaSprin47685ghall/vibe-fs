@@ -13,5 +13,6 @@ WHAT 定义 byte identity、冷边界与呈现协议，本文只界定测试证�
 - 013 验证 provider/model/variant/system/tools 改变不算追加，不替系统授权新的 epoch 来源。
 - 014 将 guidance fact 的局部投影隔离与消息摄入分开。真实注入后直接 capture 的后缀泄漏反例作为失败 TODO 保存，需核对真实 Host 的输入回流边界，见 GAP-108；不能靠关键字剥离普通业务引用。
 - 015 检查实际 SealRoot、synthetic memory identity 对持久化输入的稳定性与区分性，并保留 snapshot 中既有 ID 的复用及真实 guidance 重入。
+- 016 检查 scope 工具结果在同一 epoch 冻结提示尾巴：两次模型请求中的旧结果字节相同、新结果携带新预算，普通 steer 不回写旧尾巴；另以 Host physical canary 验证 OMP/OpenCode 两种真实消息形状。
 
 完成节点后先构建，再通过正式 runner 与 `TESTS_MJS_FILES` 执行本目录及相关模块。TODO 不计通过；发布节点已改为待闭合。没有执行真实 provider 或人工验收。

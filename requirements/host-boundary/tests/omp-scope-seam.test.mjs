@@ -9,6 +9,7 @@ import { ContextEdit } from '../../../dist/Host/Ports/TurnTransforms.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
 import {
   resetScopeState,
+  onTurnStart,
   turnBudget,
   isScopeInitialized,
   clearSessionState,
@@ -532,3 +533,40 @@ test('WHAT[context-compression-034] OMP side-request snapshots do not decrement/
 
   clearSessionState(sid)
 })
+
+
+test('WHAT[prefix-stability-016] OMP context hook preserves the old reset result suffix when a later turn arrives', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  const sid = 'ses_omp_prefix_016'
+  const ctx = await activateSession(env, sid)
+  env.setTurnMode('keep')
+  const context = env.eventHandlers.get('context')
+  const operator = { role: 'user', timestamp: 1000, content: 'task' }
+  await context({ messages: [operator] }, ctx)
+  resetScopeState(sid, 6)
+
+  const original = [
+    operator,
+    { role: 'assistant', content: [{ type: 'toolCall', id: 'r-016', name: 'resetScope', args: {} }] },
+    { role: 'toolResult', toolCallId: 'r-016', content: 'Scope reset.' },
+  ]
+  const first = await context({ messages: original }, ctx)
+  assert.ok(first?.messages)
+  const originalSuffix = first.messages.find(x => x.toolCallId === 'r-016').content
+  assert.equal(originalSuffix, 'Scope reset.' + SEP + '[Remaining turnBudget: 6]')
+  onTurnStart(sid)
+
+  const later = [
+    ...original,
+    { role: 'assistant', content: [{ type: 'toolCall', id: 'read-016', name: 'read', args: {} }] },
+    { role: 'toolResult', toolCallId: 'read-016', content: 'data' },
+  ]
+  const next = await context({ messages: later }, ctx)
+  assert.ok(next?.messages)
+  assert.equal(next.messages.find(x => x.toolCallId === 'r-016').content, originalSuffix,
+    'an earlier tool result is part of the immutable provider prefix')
+  assert.equal(next.messages.find(x => x.toolCallId === 'read-016').content,
+    'data' + SEP + '[Remaining turnBudget: 5]')
+  assert.equal(later[2].content, 'Scope reset.', 'actual tool history is not mutated')
+});

@@ -127,3 +127,26 @@ test('WHAT[context-compression-041] OpenCode session.deleted releases only its o
     clearSessionState(active)
   })
 })
+
+
+test('WHAT[prefix-stability-016] OpenCode provider transform preserves old completed output bytes after turnBudget decreases', async () => {
+  const sid = 'ses_scope_016_cache'
+  clearSessionState(sid)
+  const operator = user('user-016', 'do the work', 100)
+  await outbound(sid, [operator])
+  resetScopeState(sid, 7)
+  const reset = assistant('asst-reset-016', tool('reset-016', 'resetScope', 'Scope reset'))
+  const rawResetText = reset.parts[0].state.output
+  const first = await outbound(sid, [operator, reset])
+  const firstRendered = JSON.stringify(first[1])
+  assert.match(first[1].parts[0].state.output, /Remaining turnBudget: 6/)
+
+  const read = assistant('asst-read-016', tool('read-016', 'read', 'new data'))
+  const second = await outbound(sid, [operator, reset, read])
+  assert.equal(JSON.stringify(second[1]), firstRendered,
+    'the historical reset result must remain a verbatim prefix, including its old budget suffix')
+  assert.match(second[2].parts[0].state.output, /Remaining turnBudget: 5/)
+  assert.equal(reset.parts[0].state.output, rawResetText,
+    'raw Host history must remain untouched even though the outgoing array changed')
+  clearSessionState(sid)
+})

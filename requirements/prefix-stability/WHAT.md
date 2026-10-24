@@ -39,7 +39,7 @@ Plan tenure 交接通过 `TenureReanchored` 收容：epoch 加一、清除旧快
 
 所有 provider 共用统一呈现注入，不生成 synthetic skill 消息。
 
-1. **工具结果倒计时后缀**：附于每个 terminal 工具结果（completed/error）的末尾，使用 `\0\uFEFF` 分隔拼接 `[Remaining turnBudget: N]`（context-compression [034]）。同一消息内的多工具返回各自承载同一后缀；已带预算后缀时不重复拼接。
+1. **工具结果倒计时后缀**：附于每个 terminal 工具结果（completed/error）的末尾，使用 `\0\uFEFF` 分隔拼接 `[Remaining turnBudget: N]`（context-compression [034]）。每条结果在同一 epoch 的首次请求呈现时**锁定自身的后缀字节**，不因后续请求的剩余预算变动而改变；同次首次呈现的多结果使用同一当时预算，不同时首次呈现的结果可不同。已呈现结果的后缀必须原样重放，不能重复拼接。
 2. **用户消息尾巴提醒**：发往模型的请求副本中，每条 operator 用户消息末尾均拼接 scope 初始化提醒（`[System: Estimate the turnBudget...]`），同一消息已带该尾巴时不重复，持久化用户消息不改写。最新 operator 用户消息后尚未发生 reset 时，非 reset 工具结果重复该初始化提醒。
 3. **零预算弱提醒**：在活跃 scope 内且预算为 0 时追加弱提醒用户消息（`steering: true`，仅存在于请求副本，不持久化）。
 
@@ -63,3 +63,9 @@ Plan tenure 交接通过 `TenureReanchored` 收容：epoch 加一、清除旧快
 
 工具结果倒计时后缀（`[Remaining turnBudget: N]`）与辅助提示标记后缀只参与 provider 请求呈现，不进入业务消息快照、TOML 视图渲染或 compaction 输入。仅其 durable occurrence 投影参与恢复。
 
+
+## [016] Scope 后缀不能随剩余预算回写历史前缀
+
+同一 `ActivePrefixEpoch` 内，工具结果首次进入 provider 请求副本时确定的提示后缀必须以工具调用身份（无 ID 时以同 epoch 中稳定的消息／part 位置）固定并逐字重放。后续 `turnBudget` 递减、新 operator steer、重复 provider transform、甚至同一输出之后新增工具结果，均不得重新计算已呈现结果的字节。新结果首次呈现时才使用当次剩余预算；agent side-request 不能提前冻结正常请求尚未呈现的结果。
+
+只有确已提交的 `ScopeReanchored` 允许在新 epoch 重新生成保留的历史 reset 调用／结果后缀。不能因需要新预算而把单一历史工具结果从 `N` 改为 `N-1`：这会让前缀缓存从那条结果起失效，违反 [001]，不是合法的追加。此条保证请求热修正的重复呈现字节稳定，不声称独立进程重启后的冻结状态恢复已获证明，也不替代真实 provider 命中率观察。
