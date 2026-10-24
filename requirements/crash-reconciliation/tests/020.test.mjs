@@ -46,7 +46,7 @@ test('WHAT[crash-reconciliation-020] production load decision voids active child
     assert.equal(JSON.parse(settlements[0])[1][1][0], 'ChildWorkVoided')
     fold(state, settlements[0])
     assert.deepEqual(recovery.childView(state, 'parent', 'child'), {
-      activeRun: '', lifecycle: 'Active', joinable: 0, horizonVisible: 1,
+      activeRun: '', lifecycle: 'Abandoned', joinable: 0, horizonVisible: 1,
     })
     assert.deepEqual(recovery.childSettlements(state), [])
     assert.equal(recovery.lookupChild(state, 'parent', 'work', false).session, 'child')
@@ -134,7 +134,8 @@ const withDurableChildRuns = async (body) => {
       profiles.set(agent, accepted.profile)
     }
     // Reopen the actual writer before settlement; this does not simulate plugin activation or an OS crash.
-    await body({ handle: await reopen(), directory, reopen, dispatch, profiles, sends: () => sends })
+    const initialSends = sends
+    await body({ handle: await reopen(), directory, reopen, dispatch, profiles, initialSends, sends: () => sends })
   } finally {
     if (handle !== undefined) journal.JournalSurface_dispose(handle)
     rmSync(directory, { recursive: true, force: true })
@@ -163,8 +164,8 @@ const durableEvents = async (directory) => {
 // Abandoned(Voided), the child no longer holds an active logical run, and a
 // later settlement appends nothing.
 integrationTest('WHAT[crash-reconciliation-020] actual child settlement voids the orphaned scoped child work exactly once and never re-dispatches', async () => {
-  await withDurableChildRuns(async ({ handle, directory, reopen, dispatch, profiles, sends }) => {
-    const unwrap = value => (Array.isArray(value) ? value[value.length - 1] : value)
+  await withDurableChildRuns(async ({ handle, directory, reopen, dispatch, profiles, initialSends, sends }) => {
+    const unwrap = value => (Array.isArray(value) ? unwrap(value[value.length - 1]) : value)
     const before = await durableEvents(directory)
     for (const child of ['engineer', 'devops']) {
       assert.deepEqual(dispatch.projectionObservation(handle, child).activeLogicalRun, profiles.get(child),
@@ -185,11 +186,11 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement voids th
       const payload = fact[1][1][1]
       assert.equal(unwrap(payload.ParentSessionId), 'parent')
       assert.ok(unwrap(payload.Work.Handle) === 'work-engineer' || unwrap(payload.Work.Handle) === 'work-devops',
-        'the void names the exact orphaned work')
+        `作废必须指向确切的遗留工作：${JSON.stringify(payload.Work)}`)
     }
     assert.equal(added.filter(fact => JSON.stringify(fact).includes('HandleCompleted')).length, 0,
       'a void is not a completion: no completion fact is written')
-    assert.equal(sends(), 1, 'a void never re-dispatches the child work')
+    assert.equal(sends(), initialSends, 'a void never re-dispatches the child work')
     const reopened = await reopen()
     for (const child of ['engineer', 'devops']) {
       assert.ok(!dispatch.projectionObservation(reopened, child).activeLogicalRun,
@@ -198,12 +199,12 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement voids th
     const settled = await durableEvents(directory)
     await recovery.settleChildRuns(reopened)
     assert.deepEqual(await durableEvents(directory), settled, 'repeated settlement produces no durable fact')
-    assert.equal(sends(), 1, 'repeated settlement never re-dispatches')
+    assert.equal(sends(), initialSends, 'repeated settlement never re-dispatches')
   })
 })
 
 integrationTest('WHAT[crash-reconciliation-020] a broken writer makes child settlement fail loudly and the runs stay open until a healthy writer can void them', async () => {
-  await withDurableChildRuns(async ({ handle, directory, reopen, dispatch, profiles, sends }) => {
+  await withDurableChildRuns(async ({ handle, directory, reopen, dispatch, profiles, initialSends, sends }) => {
     const { renameSync, mkdirSync, readdirSync, rmSync } = await import('node:fs')
     const { join } = await import('node:path')
     const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
@@ -233,16 +234,16 @@ integrationTest('WHAT[crash-reconciliation-020] a broken writer makes child sett
       rmSync(saved, { recursive: true, force: true })
     }
     assert.deepEqual(await durableEvents(directory), before, 'the failed settlement publishes no durable fact')
-    // The writer was never touched, so it is not poisoned: a real append still lands.
     const probe = await dispatch.acceptHumanRootSelection(handle, 'probe-manager', 'root-probe-manager', managerRootSelection)
-    assert.equal(probe.ok, true, `writer must remain healthy after settlement: ${JSON.stringify(probe.error)}`)
-    assert.ok((await durableEvents(directory)).length > before.length, 'the healthy writer publishes the probe fact')
+    assert.equal(probe.ok, false, '追加结果未知后，同一写者必须拒绝后续追加')
+    assert.match(JSON.stringify(probe.error), /writer poisoned by prior failure/)
+    assert.deepEqual(await durableEvents(directory), before, '被拒绝的追加不得发布事实')
     const reopened = await reopen()
     await recovery.settleChildRuns(reopened)
     for (const child of ['engineer', 'devops']) {
       assert.ok(!active(reopened, child), `${child} is voided once a healthy writer can append the void`)
     }
-    assert.equal(sends(), 1, 'settlement never re-dispatches the child work')
+    assert.equal(sends(), initialSends, 'settlement never re-dispatches the child work')
   })
 })
 

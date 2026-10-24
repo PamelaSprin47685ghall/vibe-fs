@@ -52,4 +52,3 @@ module SessionSnapshot =
 
     val locateToolCall:
         toolCallId: ToolCallId -> messages: SessionMessage list -> Result<ToolCallLocation, ToolCallLocationError>
-

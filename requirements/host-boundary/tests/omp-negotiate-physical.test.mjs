@@ -14,7 +14,7 @@
 // 8. Negative checks: unmatched/stale steer does NOT unlock gate.
 // 9. Cleanup all sessions in finally.
 
-import { test } from 'bun:test'
+import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import http from 'node:http'
 import fs from 'node:fs'

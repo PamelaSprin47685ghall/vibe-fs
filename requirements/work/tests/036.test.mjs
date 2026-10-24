@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -222,7 +222,7 @@ test('WHAT[work-036] manager opening fails closed when the same session id alrea
 })
 
 test('WHAT[work-036] the first plan prompt opens work at the git worktree root, not the state directory', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-plan-open-root-'))
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), 'wxs-plan-open-root-')))
   try {
     execFileSync('git', ['init', '--quiet', directory])
     const planSession = 'ses-plan-first-prompt-root'

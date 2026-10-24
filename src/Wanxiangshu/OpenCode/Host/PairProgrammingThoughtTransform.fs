@@ -1081,16 +1081,19 @@ module PairProgrammingThoughtTransform =
             let tokenEconomy =
                 projectionSessionIdOpt
                 |> Option.bind (fun sessionId ->
-                    let observed = calibration?usage(sessionId)
-                    if isNull observed then None
-                    else Some(unbox<int> observed?cached, unbox<int> observed?uncached))
+                    let observed = calibration?usage (sessionId)
+
+                    if isNull observed then
+                        None
+                    else
+                        Some(unbox<int> observed?cached, unbox<int> observed?uncached))
                 |> Option.map (fun (cached, uncached) ->
                     PairProgrammingCalibration.renderTokenEconomy language cached uncached)
 
             let contextLimit =
                 projectionSessionIdOpt
                 |> Option.bind (fun sessionId ->
-                    let observed = calibration?limit(sessionId)
+                    let observed = calibration?limit (sessionId)
                     if isNull observed then None else Some(unbox<int> observed))
                 |> Option.map (PairProgrammingCalibration.renderContextLimit language)
 

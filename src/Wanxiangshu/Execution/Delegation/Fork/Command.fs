@@ -236,8 +236,7 @@ module ForkCommand =
     let private successInstruction (text: string) = DelegationReply.Placed text
 
     let private commissionCharge (request: Request) =
-        LlmFacing.instruction request.Charge
-        |> LlmFacing.render
+        LlmFacing.instruction request.Charge |> LlmFacing.render
 
     let private personaBinding (role: Role) =
         PersonaCatalog.persona role, ManagedAgent.make role
@@ -275,10 +274,7 @@ module ForkCommand =
         (request: Request)
         : Task<Result<string, string>> =
         let prompt =
-            ForkChildPayload.relayDocument
-                (forkInstructions runtime.ParentId)
-                request.Charge
-                []
+            ForkChildPayload.relayDocument (forkInstructions runtime.ParentId) request.Charge []
             |> LlmFacing.render
 
         Task.FromResult(Ok prompt)
@@ -304,6 +300,7 @@ module ForkCommand =
             match request.Attach with
             | None -> Ok None
             | Some name -> resolveAttachmentRecord handles name |> Result.map (fun _ -> None)
+
         Task.FromResult outcome
 
     let private appendFissionAffinity durable (host: DelegationEnvironment) (lane: FissionLaneBinding) handleId =
@@ -362,8 +359,7 @@ module ForkCommand =
         (managed: ManagedAgent)
         =
         taskResult {
-            let! rendered =
-                prepareForkPromptWithRecord runtime request
+            let! rendered = prepareForkPromptWithRecord runtime request
 
             let! result =
                 runtime.Fork(
@@ -390,8 +386,7 @@ module ForkCommand =
         agentId
         =
         taskResult {
-            let! rendered =
-                prepareForkPromptWithRecord runtime request
+            let! rendered = prepareForkPromptWithRecord runtime request
 
             return!
                 runtime.Reuse(
@@ -490,10 +485,18 @@ module ForkCommand =
             task {
                 let outcome =
                     taskResult {
-                        let! attachment = resolveAttachment host handles request |> TaskResult.mapError (fun path -> consequence (prose language path))
-                        let! rendered = prepareForkPromptWithRecord runtime request |> TaskResult.mapError (fun _ -> consequence (prose language Path.Fork.ChargeContextUnavailable))
+                        let! attachment =
+                            resolveAttachment host handles request
+                            |> TaskResult.mapError (fun path -> consequence (prose language path))
+
+                        let! rendered =
+                            prepareForkPromptWithRecord runtime request
+                            |> TaskResult.mapError (fun _ ->
+                                consequence (prose language Path.Fork.ChargeContextUnavailable))
+
                         return rendered
                     }
+
                 match! outcome with
                 | Error early -> return early
                 | Ok rendered -> return! appendBusyGuidance runtime request language agentId profile rendered

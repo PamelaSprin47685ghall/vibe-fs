@@ -30,6 +30,7 @@ module JournalSurface =
     /// The store this handle's writer owns, or null when it has none.
     val eventStore: handle: JournalHandle -> obj
     val appendAgent: handle: JournalHandle -> stream: obj -> run: obj -> fact: obj -> Task<obj>
+    val appendAuthorityTerminalSource: handle: JournalHandle -> sessionId: string -> fact: obj -> Task<obj>
     val appendManagerLifecycle: handle: JournalHandle -> stream: obj -> factObj: obj -> Task<obj>
     val writePayload: handle: JournalHandle -> content: string -> Task<obj>
     val readPayload: handle: JournalHandle -> reference: string -> Task<obj>

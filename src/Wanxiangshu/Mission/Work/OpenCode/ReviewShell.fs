@@ -139,7 +139,9 @@ module ReviewShell =
 
         let dispatch args context : Task<string> =
             task {
-                let (Ports.WorkspacePath _ws) = Ports.WorkspacePath (scope.WorkspaceDirectory |> Option.defaultValue ".")
+                let (Ports.WorkspacePath _ws) =
+                    Ports.WorkspacePath(scope.WorkspaceDirectory |> Option.defaultValue ".")
+
                 let! gitCommonDir =
                     match scope.WorkspaceDirectory with
                     | Some ws -> RuntimePath.stateRoot ws

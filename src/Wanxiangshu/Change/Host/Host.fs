@@ -263,7 +263,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (record: ManagerJobProjection)
         : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
         let directory = WorktreePath.value record.WorktreePath
-        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.forStateRoot directory
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRootSync directory
         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value record.ManagerSessionId)
 
     let loopSignalOfWork = DurableLoopSignal.ofWork
@@ -346,7 +346,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let! retirement = requireCommittedRetirement work
 
             let commonDir =
-                Wanxiangshu.Persistence.Journal.RuntimePath.forStateRoot (WorktreePath.value record.WorktreePath)
+                Wanxiangshu.Persistence.Journal.RuntimePath.stateRootSync (WorktreePath.value record.WorktreePath)
 
             let requestId =
                 "hand-off:" + ManagerJobId.value jobId + ":" + retirement.RetirementId
@@ -621,7 +621,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         : Task<Result<string, string>> =
         task {
             let directory = WorktreePath.value record.WorktreePath
-            let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot directory
+            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRootSync directory
 
             if String.IsNullOrWhiteSpace commonDir then
                 return Error "lifecycle store is unavailable"

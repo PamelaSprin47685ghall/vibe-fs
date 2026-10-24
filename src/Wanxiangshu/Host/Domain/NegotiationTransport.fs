@@ -5,20 +5,16 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Ports
 
 type EphemeralTurnRequest =
-    {
-        DelegatorSessionId: string
-        Receipt: string
-        PromptText: string
-        RetryPromptText: string
-    }
+    { DelegatorSessionId: string
+      Receipt: string
+      PromptText: string
+      RetryPromptText: string }
 
 type SteerDeliveryRequest =
-    {
-        RecipientSessionId: string
-        Receipt: string
-        SteerText: string
-        CorrelationKey: PromptKey
-    }
+    { RecipientSessionId: string
+      Receipt: string
+      SteerText: string
+      CorrelationKey: PromptKey }
 
 type INegotiationTransport =
     abstract member CanNegotiate: delegatorSessionId: string -> bool

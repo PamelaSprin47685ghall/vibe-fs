@@ -13,7 +13,8 @@ module SnapshotScope =
     [<Emit("Array.isArray($0)")>]
     let private isArray (_value: obj) : bool = jsNative
 
-    let private text (value: obj) = if isNull value then "" else string value
+    let private text (value: obj) =
+        if isNull value then "" else string value
 
     let private parts (message: obj) : obj array =
         let value = field message "parts"
@@ -21,38 +22,54 @@ module SnapshotScope =
 
     let private neutralPart (item: obj) =
         match text (field item "type") with
-        | "toolCall" | "tool-call" | "tool_call" | "tool" ->
+        | "toolCall"
+        | "tool-call"
+        | "tool_call"
+        | "tool" ->
             let name = field item "name"
             let tool = if isNull name then field item "tool" else name
             let id = field item "id"
             createObj [ "id" ==> id; "tool" ==> tool ]
-        | "toolResult" | "tool-result" | "tool_result" ->
-            createObj [ "resultFor" ==> field item "id" ]
+        | "toolResult"
+        | "tool-result"
+        | "tool_result" -> createObj [ "resultFor" ==> field item "id" ]
         | _ -> createObj []
+
+    let private resultPartId (part: obj) =
+        match text (field part "type") with
+        | "toolResult"
+        | "tool-result"
+        | "tool_result" ->
+            let value = field part "id"
+            if isNull value then None else Some(text value)
+        | _ -> None
 
     let private neutralResultId (message: obj) =
         let direct = field message "toolCallId"
-        if not (isNull direct) then text direct
+
+        if not (isNull direct) then
+            text direct
         else
-            parts message
-            |> Array.tryPick (fun part ->
-                match text (field part "type") with
-                | "toolResult" | "tool-result" | "tool_result" ->
-                    let v = field part "id"
-                    if isNull v then None else Some(text v)
-                | _ -> None)
-            |> Option.defaultValue ""
+            parts message |> Array.tryPick resultPartId |> Option.defaultValue ""
 
     let private neutralMessage (message: obj) =
         let role = text (field message "role")
+
         let kind =
             match role with
             | "user" -> "user"
             | "assistant" -> "assistant"
-            | "tool" | "toolResult" | "tool-result" | "tool_result" -> "result"
+            | "tool"
+            | "toolResult"
+            | "tool-result"
+            | "tool_result" -> "result"
             | "custom" -> "custom"
             | _ -> "other"
-        let isOperator = kind = "user" || (kind = "custom" && text (field message "attribution") = "user")
+
+        let isOperator =
+            kind = "user"
+            || (kind = "custom" && text (field message "attribution") = "user")
+
         createObj
             [ "kind" ==> kind
               "operator" ==> isOperator
@@ -70,7 +87,9 @@ module SnapshotScope =
         let index = unbox<int> (field slot "index")
         let message = original.[index]
         let selection = field slot "parts"
-        if isNull selection then message
+
+        if isNull selection then
+            message
         else
             let source = parts message
             let indices = unbox<int array> selection

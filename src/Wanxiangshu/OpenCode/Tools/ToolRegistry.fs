@@ -244,6 +244,7 @@ module ToolRegistry =
                     | Some runtime -> return! invokeRuntime runtime intent
                 }
 
+        // DSL-MUTABLE: resource — workspace state-root memo for this tool registry
         let mutable cachedGitCommonDir: string option = None
 
         let populateStateRoot (ws: string) : Task<unit> =

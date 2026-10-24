@@ -16,5 +16,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
     <Compile Include="Execution/Session/RecoveryClosureProjection.fsi"/>
     <Compile Include="Execution/Session/RecoveryClosureProjection.fs"/>
+    <Compile Include="Execution/Session/RecoveryClosureSurface.fsi"/>
+    <Compile Include="Execution/Session/RecoveryClosureSurface.fs"/>
   </ItemGroup>
 </Project>

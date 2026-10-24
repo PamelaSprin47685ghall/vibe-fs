@@ -325,6 +325,9 @@ test('WHAT[participant-identity-008] current v2 durable identity recovers exact 
     LogicalRunId: profile.logicalRun,
     AuthorityRootUserMessageId: profile.authorityRoot,
     AuthorityKind: profile.authorityKind,
+    ExpectedClosureKind: 'AgentOwnerChildWork',
+    OwnerLogicalRunId: undefined,
+    AgentOwnerLife: 'Child',
     IdentitySeed: profile.identitySeed,
   })
 
@@ -352,6 +355,9 @@ test('WHAT[participant-identity-008] supported legacy HumanRoot deterministicall
     LogicalRunId: profile.logicalRun,
     AuthorityRootUserMessageId: profile.authorityRoot,
     AuthorityKind: profile.authorityKind,
+    ExpectedClosureKind: 'HumanRootManagedRun',
+    OwnerLogicalRunId: undefined,
+    AgentOwnerLife: undefined,
     IdentitySeed: rootSeed,
   })
   assert.equal(JSON.stringify(first.payload).includes('PeerAgent'), false)

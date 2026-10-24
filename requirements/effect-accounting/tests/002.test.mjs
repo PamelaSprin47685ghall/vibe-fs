@@ -29,7 +29,6 @@ import * as handleJournal from '../../../dist/Execution/Delegation/Handle/Journa
 import {
   agentIdOf,
   childTurn,
-  deliverIntoOpenWork,
   forkCall,
   joinCall,
   observeTerminals,
@@ -215,7 +214,7 @@ test('WHAT[effect-accounting-002] EXEC_join_interaction_repair_exhausted_settles
       assert.ok(settled.completionRef)
 
       const joinReceipt = await joinCall(hooks, owner, 'call-join-repair')
-      assert.match(joinReceipt, /status = "failed"/)
+      assert.match(joinReceipt, /^# Ada could not complete the charge\.$/m)
       assert.match(joinReceipt, /INTERACTION_REPAIR_EXHAUSTED/)
     } finally {
       terminals.dispose()
@@ -254,7 +253,7 @@ test('WHAT[effect-accounting-002] EXEC_join_real_Failed_still_claims_run', async
       assert.ok(settled.completionRef)
 
       const joinReceipt = await joinCall(hooks, owner, 'call-join-real-failed')
-      assert.match(joinReceipt, /status = "failed"/)
+      assert.match(joinReceipt, /^# Ada could not complete the charge\.$/m)
       assert.match(joinReceipt, /provider timeout/)
     } finally {
       terminals.dispose()
@@ -292,9 +291,8 @@ test('WHAT[effect-accounting-002] EXEC_join_first_proven_terminal_is_single_assi
       assert.equal(settled.lifecycleKind, 'SendFailure')
       assert.ok(settled.completionDigest, 'the failure records its own identity')
 
-      // A later proven delivery into the SAME work unit must not take the cell
-      // a second time: the first proven terminal keeps the single assignment.
-      await deliverIntoOpenWork(hooks, runtime, child, `run-${child}-2`, 'LATE REPORT', 'LATE-RECORD with files = 9')
+      // 同一子会话的迟到轮次不能覆盖已结算的失败，也不能发布第二次终态。
+      await childTurn(hooks, runtime, child, `run-${child}-2`, 'LATE REPORT: LATE-RECORD with files = 9', null)
 
       const after = recordOf(runtime, failedOwner, agentId, child, root)
       assert.equal(after.lifecycle, 'CompletedAwaitingJoin', 'the first proven terminal keeps the cell')
@@ -307,7 +305,7 @@ test('WHAT[effect-accounting-002] EXEC_join_first_proven_terminal_is_single_assi
       assert.equal(childTerminals[0].outcome?.kind, 'Failed')
 
       const joinReceipt = await joinCall(hooks, failedOwner, 'call-join-failed-first')
-      assert.match(joinReceipt, /status = "failed"/)
+      assert.match(joinReceipt, /^# Ada could not complete the charge\.$/m)
       assert.match(joinReceipt, /providers exhausted/)
       assert.doesNotMatch(joinReceipt, /LATE-RECORD/)
     } finally {

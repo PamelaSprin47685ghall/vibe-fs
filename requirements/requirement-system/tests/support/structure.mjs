@@ -55,9 +55,16 @@ export function testOwnershipProblems(source, owner) {
 }
 
 export function testFileProblems(files, liveClauses) {
-  const knownTransitionFiles = new Set(['requirements/delegation/tests/034.test.mjs', 'requirements/repository-programming/tests/054.test.mjs'])
+  const knownTransitionFiles = new Set([
+    'requirements/delegation/tests/034.test.mjs',
+    'requirements/repository-programming/tests/054.test.mjs',
+  ])
+
+  // 物理 canary：检查 Fable union 表征与真实宿主 provider 请求改写，不属于某个编号包语义。
+  const isPhysicalCanary = (file) => file.endsWith('-physical.test.mjs')
+
   return files.flatMap((file) => {
-    if (file.endsWith('-seam.test.mjs') || knownTransitionFiles.has(file)) return []
+    if (file.endsWith('-seam.test.mjs') || isPhysicalCanary(file) || knownTransitionFiles.has(file)) return []
     const number = /^(\d{3})\.test\.mjs$/.exec(basename(file))?.[1]
     const problems = []
     if (!number) return [`${file}: expected NNN.test.mjs`]

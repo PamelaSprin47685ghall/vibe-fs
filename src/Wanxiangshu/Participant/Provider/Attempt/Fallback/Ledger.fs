@@ -211,6 +211,13 @@ module ProviderFailureLedger =
         : Task<Result<unit, string>> =
         task {
             match port.CurrentState sessionId with
-            | None -> return Error "NoActiveRun: no provider failure state for session"
+            // No budget for this session means nothing to clear. A Fission lane
+            // continues its owner's logical run and owns no budget of its own,
+            // so its confirmed success has no streak to reset — the same
+            // NoActiveRun verdict the failure side already gives such a
+            // session. The success path must not turn that into a fault: the
+            // caller settles a provider attempt, and a session without a
+            // budget has nothing to settle.
+            | None -> return Ok()
             | Some current -> return! recordSuccessForCurrent port sessionId providerRun current
         }

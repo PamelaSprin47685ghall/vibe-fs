@@ -39,7 +39,13 @@ module HostMessageProjection =
 
     let private readParts (raw: obj) : obj array =
         let parts = readField raw "parts"
-        if isNull parts then [||] else unbox<obj array> parts
+
+        if isNull parts then
+            [||]
+        elif emitJsExpr parts "Array.isArray($0)" then
+            unbox<obj array> parts
+        else
+            [||]
 
     let private partKind (p: obj) : string =
         let typeVal = if isNull p then null else readField p "type"

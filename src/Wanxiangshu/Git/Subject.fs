@@ -15,6 +15,9 @@ module GitSubject =
     [<Import("execFile", "node:child_process")>]
     let private execFileJs (fileName: string) (arguments: string array) (options: obj) (callback: obj) : unit = jsNative
 
+    [<Import("execFileSync", "node:child_process")>]
+    let private execFileSyncJs (fileName: string) (arguments: string array) (options: obj) : string = jsNative
+
     [<Emit("""new Promise(function(resolve, reject) { $0($1, $2, $3, function(error, stdout) { if (error) reject(error); else resolve(stdout); }); })""")>]
     let private execFileAsync (exec: obj) (fileName: string) (arguments: string array) (options: obj) : Task<string> =
         jsNative
@@ -27,6 +30,10 @@ module GitSubject =
     /// Run git with `-C directory` then `arguments`.
     let execIn (directory: string) (arguments: string array) : Task<string> =
         execFileAsync execFileJs Executable (Array.append [| "-C"; directory |] arguments) utf8
+
+    /// Same command as `execIn`. Stderr stays quiet so a missing repository does not print.
+    let execInSync (directory: string) (arguments: string array) : string =
+        execFileSyncJs Executable (Array.append [| "-C"; directory |] arguments) quietUtf8
 
     // --- worktree root ---
 

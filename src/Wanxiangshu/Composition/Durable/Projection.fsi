@@ -26,16 +26,14 @@ type SessionAgentProjection =
       DelegatedToolEstimate: DelegatedToolEstimateProjectionState option }
 
 type AgentProjectionSet =
-    {
-        Sessions: Map<SessionId, SessionAgentProjection>
-        Associations: Map<SessionId, SessionAssociation>
-        Orchestrator: OrchestratorProjection
-        HandleByChildSession: Map<SessionId, HandleRecord>
-        Fission: FissionProjectionState
-        ChatExecutions: ChatExecutionProjectionState
-        Deliveries: Map<SessionId * ProviderRunIdentity * ToolCallId, Wanxiangshu.Host.TaskDeliveryWitness>
-        RuntimeStartCount: int
-    }
+    { Sessions: Map<SessionId, SessionAgentProjection>
+      Associations: Map<SessionId, SessionAssociation>
+      Orchestrator: OrchestratorProjection
+      HandleByChildSession: Map<SessionId, HandleRecord>
+      Fission: FissionProjectionState
+      ChatExecutions: ChatExecutionProjectionState
+      Deliveries: Map<SessionId * ProviderRunIdentity * ToolCallId, Wanxiangshu.Host.TaskDeliveryWitness>
+      RuntimeStartCount: int }
 
 module AgentProjection =
     val emptySession: SessionAgentProjection

@@ -17,35 +17,54 @@ module ForkChildPayloadSurface =
 
     let private proseOf (lang: string) : ForkChildInstructions =
         let l = languageOf lang
+
         { Base = ProviderProse.instructionLines l ForkChildPayload.BasePath Map.empty
           Requirements = ProviderProse.render l ForkChildPayload.RequirementsPath Map.empty }
 
-    let instructions (lang: string) : {| Base: string array; Requirements: string |} =
+    let instructions
+        (lang: string)
+        : {| Base: string array
+             Requirements: string |}
+        =
         let p = proseOf lang
+
         {| Base = List.toArray p.Base
            Requirements = p.Requirements |}
 
     let unavailableCalling (lang: string) (orchestrator: bool) : string =
         let language = languageOf lang
+
         let path =
-            if orchestrator then "tool/commission/unknown-calling"
-            else "tool/fork/unknown-calling"
+            if orchestrator then
+                "tool/commission/unknown-calling"
+            else
+                "tool/fork/unknown-calling"
+
         ProviderProse.render language path Map.empty
 
     /// No legacy record/context/attachment fields are accepted at this boundary.
     let render
         (lang: string)
-        (input: {| Assignment: string; RootRequirements: string array |})
+        (input:
+            {| Assignment: string
+               RootRequirements: string array |})
         : string =
         let assignment =
-            if isNull input.Assignment || isUndefined input.Assignment then ""
-            else input.Assignment
+            if isNull input.Assignment || isUndefined input.Assignment then
+                ""
+            else
+                input.Assignment
+
         let requirements =
-            if isNull input.RootRequirements || isUndefined input.RootRequirements then []
-            else List.ofArray input.RootRequirements
+            if isNull input.RootRequirements || isUndefined input.RootRequirements then
+                []
+            else
+                List.ofArray input.RootRequirements
+
         ForkChildPayload.render
             (proseOf lang)
-            { Assignment = assignment; RootRequirements = requirements }
+            { Assignment = assignment
+              RootRequirements = requirements }
 
     let private nonEmpty value =
         if String.IsNullOrWhiteSpace value then

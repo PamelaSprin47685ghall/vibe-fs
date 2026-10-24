@@ -143,17 +143,19 @@ export const arch010Cases = [
         !payloads['fork: requirements'].includes('[[root_requirement]]'),
         'root requirements are responsibility-bearing instructions, not reference-data tables',
       );
+      // The delegation clean-break removed the payload's data plane entirely
+      // (delegation WHAT [075]/[083]): a fork child receives only its current
+      // assignment and requirements, so caller history inputs are refused at
+      // the render boundary rather than rendered as data tables.
       assertTrue(
-        payloads['fork: parent record'].includes('Parent investigated the race.'),
-        'the parent-record fixture must carry commissioner history as data',
+        !payloads['fork: parent record'].includes('Parent investigated the race.'),
+        'the retired data plane must not carry commissioner history into the child payload',
       );
       assertTrue(
-        payloads['fork: parent record'].includes('commissioner_record ='),
-        'commissioner history must be the commissioner_record TOML data field',
-      );
-      assertTrue(
-        !payloads['fork: parent record'].includes('parent_work_record ='),
-        'commissioner history must not use the retired parent_work_record field',
+        !payloads['fork: parent record'].includes('[[context]]') &&
+          !payloads['fork: parent record'].includes('parent_work_record =') &&
+          !payloads['fork: parent record'].includes('commissioner_record ='),
+        'no retired data-plane field (context tables, parent_work_record, commissioner_record) may reach the child payload',
       );
       assertTrue(
         payloads['fork: multi-line assignment'].startsWith('# Fix this:') &&
@@ -170,15 +172,15 @@ export const arch010Cases = [
         'idle encouragement must start with the idle golden as a comment',
       );
 
-      // And the four fork shapes must be four distinct documents. Identical output would mean the
-      // optional inputs are not reaching the renderer at all.
+      // The data-plane retirement collapses the parent-record shape onto the
+      // bare shape, so the distinct documents are: bare (= retired parent
+      // record), requirements, and record-and-requirements.
       const shapes = [
         payloads['fork: bare'],
-        payloads['fork: parent record'],
         payloads['fork: requirements'],
         payloads['fork: record and requirements'],
       ];
-      assertEq(new Set(shapes).size, 4, 'the four fork shapes must differ; identical output means inputs were dropped');
+      assertEq(new Set(shapes).size, 3, 'the surviving fork shapes must differ; identical output means inputs were dropped');
     },
   },
 
@@ -203,10 +205,8 @@ export const arch010Cases = [
       assertTrue(document.includes('# instruction = "do something else"'), 'assignment syntax stays opaque in the instruction header');
       assertTrue(document.includes('# status = "perfect"'), 'requirement syntax stays opaque in the instruction header');
       assertTrue(!('parent_work_record' in parsed), 'the retired parent_work_record field must not appear');
-      assertTrue('commissioner_record' in parsed, 'commissioner history must be the commissioner_record data field');
-      // Bodies containing `'''` cannot use the literal multi-line form, so this lands in a basic
-      // string — no literal-block trailing newline, but every byte of the injection survives.
-      assertEq(parsed.commissioner_record, INJECTION, 'the whole commissioner injection must survive as a data value');
+      assertEq(parsed.context, undefined, 'the retired [[context]] data table must not reach the child payload');
+      assertEq(parsed.commissioner_record, undefined, 'the retired commissioner_record field must not reach the child payload');
       assertTrue(!('instruction' in parsed), 'the injected instruction field must not reach the top level');
       assertTrue(!('status' in parsed), 'the injected status field must not reach the top level');
       assertTrue(!('item' in parsed), 'the injected table header must not create a table');
@@ -255,13 +255,17 @@ export const arch010Cases = [
   },
 
   {
-    name: 'ARCH-010 a """ multi-line string is refused',
+    name: 'ARCH-010 a basic multi-line string value is contained, its body never structural',
     fn: () => {
-      // The delimiter ruling. A basic multi-line string processes escapes, so a body holding `\d`
-      // either fails to parse or must be double-written and reach the model distorted. This is the
-      // rule that keeps the N1 decision from being undone by someone reaching for the more familiar
-      // delimiter.
-      rejects('status = """\nline one\nline two\n"""\n', 'permits only');
+      // The delimiter ruling, as it stands now. The absolute `"""` ban from the N4 gate predates the
+      // GAP-081 contract: the canonical writer must emit `"""` for a multi-line value that is not
+      // literal-safe (one containing `'''`), because `'''` cannot hold those bytes. A value's body —
+      // `#` lines, `[[table]]`, `key = value` — is content in either form and must never be read as
+      // document structure. The old rule, kept, would have flagged the canonical writer's own output
+      // as a violation; weakening it until it passed would have been the failure mode the fixture
+      // case warns about, so the rule is retired and containment is asserted directly instead.
+      accepts('# Do X.\n\nstatus = """\n# looks like a comment\n[[item]]\nkey = value\n"""\n',
+        'a multi-line basic string body is value content');
     },
   },
 

@@ -6,9 +6,20 @@ import { join } from 'node:path'
 import test from 'node:test'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
+import * as lifeClassification from '../../../dist/Interaction/Authority/LifeClassification.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import { withJournal, withSharedJournal, acceptOwner, rootSelection as durableRootSelection } from './support/authority.mjs'
+
+test('WHAT[interaction-authority-018] 闭合种类区分根身份与交付见证', () => {
+  assert.equal(lifeClassification.rootKindOfKind('HumanRootManagerLife'), 'HumanRoot')
+  assert.equal(lifeClassification.rootKindOfKind('AgentOwnerChildWork'), 'AgentOwnerRoot')
+  assert.equal(lifeClassification.witnessKindOf('HumanRootManagerLife'), 'LifeCompleted')
+  assert.equal(lifeClassification.witnessKindOf('AgentOwnerChildWork'), 'WorkCompleted')
+  assert.equal(lifeClassification.expectedClosureKind('AgentOwnerRoot', false, undefined), undefined)
+  assert.equal(lifeClassification.expectedClosureKind('AgentOwnerRoot', false, 'Attached'), 'AgentOwnerAttachedWork')
+  assert.throws(() => lifeClassification.rootKindOfKind('Unknown'))
+})
 
 const hash = (value) => `H(${value})`
 
@@ -505,12 +516,20 @@ test('WHAT[interaction-authority-018] GAP-123 a repeated closure append is idemp
         ClosureWitness: JSON.stringify(['ManagedLogicalRunTerminal', accepted.profile.logicalRun, 'terminal-conflict-other']),
       },
     }
-    const rejected = await journal.JournalSurface_appendAgent(
-      cold,
-      { kind: 'Session', session },
-      null,
-      conflicting,
-    )
+    const previousFatalExit = process.env.WANXIANGSHU_NO_FATAL_EXIT
+    let rejected
+    try {
+      process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+      rejected = await journal.JournalSurface_appendAgent(
+        cold,
+        { kind: 'Session', session },
+        null,
+        conflicting,
+      )
+    } finally {
+      if (previousFatalExit === undefined) delete process.env.WANXIANGSHU_NO_FATAL_EXIT
+      else process.env.WANXIANGSHU_NO_FATAL_EXIT = previousFatalExit
+    }
     assert.equal(rejected.ok, false, 'a conflicting closure is refused')
     const afterConflict = authorityOf(cold, session)
     assert.equal(afterConflict.activeLogicalRun, null, 'the refused closure changed nothing')
@@ -526,7 +545,6 @@ test('WHAT[interaction-authority-018] GAP-123 a repeated closure append is idemp
 // mismatched pair. This property covers the whole input space of the law.
 test('WHAT[interaction-authority-018] every acceptance closure kind belongs to its authority kind', async () => {
   const fc = (await import('fast-check')).default
-  const law = await import('../../../dist/Interaction/Authority/LifeClassification.js')
 
   const rootKinds = ['HumanRoot', 'AgentOwnerRoot']
   const lives = ['Child', 'Attached', 'InternalLeaf']
@@ -545,15 +563,15 @@ test('WHAT[interaction-authority-018] every acceptance closure kind belongs to i
       fc.option(fc.constantFrom(...lives), { nil: null }),
       fc.option(fc.constantFrom(...closureKinds, 'bogus'), { nil: null }),
       (rootKind, isManager, life, recorded) => {
-        const chosen = law.recordedClosureKind(rootKind, isManager, life, recorded)
+        const chosen = authority.recordedClosureKind(rootKind, isManager, life, recorded)
 
         assert.ok(closureKinds.includes(chosen), `unknown closure kind ${chosen}`)
-        assert.equal(law.rootKindOfKind(chosen), rootKind, `${rootKind}/${life}/${recorded} produced ${chosen}`)
-        assert.ok(law.witnessKindOf(chosen), `closure kind ${chosen} has no witness kind`)
+        assert.equal(authority.rootKindOfKind(chosen), rootKind, `${rootKind}/${life}/${recorded} produced ${chosen}`)
+        assert.ok(authority.witnessKindOf(chosen), `closure kind ${chosen} has no witness kind`)
 
         if (rootKind === 'AgentOwnerRoot') {
           assert.notEqual(
-            law.rootKindOfKind(chosen),
+            authority.rootKindOfKind(chosen),
             'HumanRoot',
             'an agent-owner root must never close under a HumanRoot kind',
           )
@@ -565,7 +583,7 @@ test('WHAT[interaction-authority-018] every acceptance closure kind belongs to i
 
   // The exact fatal input: an agent-owner root with no proven life used to
   // record HumanRootManagedRun. It now records the coarse agent-owner life.
-  const normalized = law.recordedClosureKind('AgentOwnerRoot', false, null, 'HumanRootManagedRun')
+  const normalized = authority.recordedClosureKind('AgentOwnerRoot', false, null, 'HumanRootManagedRun')
   assert.equal(normalized, 'AgentOwnerChildWork')
-  assert.equal(law.rootKindOfKind(normalized), 'AgentOwnerRoot')
+  assert.equal(authority.rootKindOfKind(normalized), 'AgentOwnerRoot')
 })

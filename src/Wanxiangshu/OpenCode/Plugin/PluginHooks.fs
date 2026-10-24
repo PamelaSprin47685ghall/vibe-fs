@@ -102,19 +102,32 @@ module PluginHooks =
 
     let private negotiationSdk (session: obj) (methodName: string) (payload: obj) : Task<obj> =
         let action = emitJsExpr (session, methodName) "$0[$1]"
-        if isNull action then failwith ("session." + methodName + " unavailable")
-        else emitJsExpr (session, action, payload) "$1.call($0, $2)" |> unbox<Task<obj>>
+
+        if isNull action then
+            failwith ("session." + methodName + " unavailable")
+        else
+            emitJsExpr (session, action, payload) "$1.call($0, $2)" |> unbox<Task<obj>>
 
     let private negotiationResponse (reply: obj) =
-        if isNull reply then null elif isNull reply?data then reply else reply?data
+        if isNull reply then null
+        elif isNull reply?data then reply
+        else reply?data
 
     let private negotiationSessionPayload (sessionId: string) (body: (string * obj) list) =
-        let fields = [ "sessionID", box sessionId; "path", box (createObj [ "id", box sessionId ]) ]
+        let fields =
+            [ "sessionID", box sessionId; "path", box (createObj [ "id", box sessionId ]) ]
+
         createObj (fields @ [ "body", box (createObj body) ] @ body)
 
     let private negotiationResultText (response: obj) =
         let body = negotiationResponse response
-        let parts = if isNull body || isNull body?parts then [||] else unbox<obj array> body?parts
+
+        let parts =
+            if isNull body || isNull body?parts then
+                [||]
+            else
+                unbox<obj array> body?parts
+
         parts
         |> Array.filter (fun p -> not (isNull p) && emitJsExpr p "$0?.type === 'text'")
         |> Array.map (fun part -> if isNull part?text then "" else string part?text)
@@ -122,7 +135,8 @@ module PluginHooks =
 
     let private negotiationPromptText (questions: string) =
         "<btw>Ephemeral clarification on a delegate's current assignment. Answer the questions from this conversation context. Do not call ANY tools. Do not ask follow-up questions. Reply in plain text immediately.\nQuestions:\n"
-        + questions + "\n</btw>"
+        + questions
+        + "\n</btw>"
 
     [<RequireQualifiedAccess>]
     type private TemporaryAnswer =
@@ -131,28 +145,41 @@ module PluginHooks =
         | Failed of string
 
     let private classifyTemporaryAnswer (text: string) (blocked: bool) =
-        if blocked || String.IsNullOrWhiteSpace text then TemporaryAnswer.Retry
-        else TemporaryAnswer.Replied text
+        if blocked || String.IsNullOrWhiteSpace text then
+            TemporaryAnswer.Retry
+        else
+            TemporaryAnswer.Replied text
 
     let private classifyTemporaryFailure (ex: exn) (blocked: bool) =
-        if blocked then TemporaryAnswer.Retry
-        else TemporaryAnswer.Failed ex.Message
+        if blocked then
+            TemporaryAnswer.Retry
+        else
+            TemporaryAnswer.Failed ex.Message
 
     let private temporaryPromptPayload (tempId: string) (agentName: string) (model: obj) (prose: string) =
         let parts = box [| createObj [ "type", box "text"; "text", box prose ] |]
         let body = [ "agent", box agentName; "parts", parts ]
+
         let physicalModel =
-            if isNull model then null
-            else createObj [ "providerID", model?providerID; "modelID", model?modelID ]
+            if isNull model then
+                null
+            else
+                createObj [ "providerID", model?providerID; "modelID", model?modelID ]
+
         let request =
-            if isNull model then body
-            elif isNull model?variant then body @ [ "model", physicalModel ]
-            else body @ [ "model", physicalModel; "variant", model?variant ]
+            if isNull model then
+                body
+            elif isNull model?variant then
+                body @ [ "model", physicalModel ]
+            else
+                body @ [ "model", physicalModel; "variant", model?variant ]
+
         negotiationSessionPayload tempId request
 
     let private tryTemporaryAnswer (session: obj) (tempId: string) (payload: obj) : Task<TemporaryAnswer> =
         task {
             let before = PluginTransforms.negotiationToolViolationCount tempId
+
             try
                 let! result = negotiationSdk session "prompt" payload
                 let text = negotiationResultText result
@@ -172,34 +199,46 @@ module PluginHooks =
         : Task<Result<string, string>> =
         let retryText =
             "The preceding ephemeral response attempted a forbidden tool or lacked a plain-text answer. Do NOT use any tools; answer the delegated questions from your existing context immediately."
+
         let rec run prose =
             if not (PluginTransforms.negotiationIsTemporary tempId) then
                 Task.FromResult(Error "temporary negotiation was cancelled")
-            else runCandidate prose
+            else
+                runCandidate prose
+
         and runCandidate prose =
             task {
                 let payload = temporaryPromptPayload tempId agentName model prose
                 let! result = tryTemporaryAnswer session tempId payload
+
                 match result with
                 | TemporaryAnswer.Replied text -> return Ok text
                 | TemporaryAnswer.Retry -> return! run retryText
                 | TemporaryAnswer.Failed error -> return Error error
             }
+
         run (negotiationPromptText questions)
 
     let private temporarySessionId (created: obj) : Result<string, string> =
         let data = negotiationResponse created
         let value = if isNull data || isNull data?id then "" else string data?id
-        if String.IsNullOrWhiteSpace value then Error "temporary session create yielded no identity"
-        else Ok value
+
+        if String.IsNullOrWhiteSpace value then
+            Error "temporary session create yielded no identity"
+        else
+            Ok value
 
     let private createTemporarySession (session: obj) (recipient: string) : Task<Result<string, string>> =
         task {
             let options = createObj [ "parentID", box recipient; "title", box "negotiation" ]
+
             try
-                let! created = negotiationSdk session "create" (createObj [ "body", options; "parentID", box recipient ])
+                let! created =
+                    negotiationSdk session "create" (createObj [ "body", options; "parentID", box recipient ])
+
                 return temporarySessionId created
-            with ex -> return Error ex.Message
+            with ex ->
+                return Error ex.Message
         }
 
     let private deleteTemporarySession (session: obj) (tempId: string) : Task<unit> =
@@ -207,30 +246,42 @@ module PluginHooks =
             try
                 let! _ = negotiationSdk session "delete" (negotiationSessionPayload tempId [])
                 return ()
-            with _ -> return ()
+            with _ ->
+                return ()
         }
 
     let private runLinkedTemporary
-        (session: obj) (delegator: string) (tempId: string) (agentName: string) (questions: string)
+        (session: obj)
+        (delegator: string)
+        (tempId: string)
+        (agentName: string)
+        (questions: string)
         : Task<Result<string, string>> =
         task {
             let linked = PluginTransforms.negotiationStartTemporary tempId delegator
+
             let! answer =
                 match linked with
                 | Error reason -> Task.FromResult(Error reason)
                 | Ok() ->
                     let model = PluginTransforms.negotiationModelFor delegator
                     runTemporaryQuestion session tempId agentName model questions
+
             PluginTransforms.negotiationFinishTemporary tempId
             do! deleteTemporarySession session tempId
             return answer
         }
 
     let private createAndRunTemporary
-        (session: obj) (delegator: string) (recipient: string) (agentName: string) (questions: string)
+        (session: obj)
+        (delegator: string)
+        (recipient: string)
+        (agentName: string)
+        (questions: string)
         : Task<Result<string, string>> =
         task {
             let! created = createTemporarySession session recipient
+
             match created with
             | Error reason -> return Error reason
             | Ok tempId -> return! runLinkedTemporary session delegator tempId agentName questions
@@ -246,11 +297,11 @@ module PluginHooks =
         (questions: string)
         : Task<Result<string, string>> =
         let session = if isNull client then null else client?session
+
         match roleFor (SessionId.create delegator) with
         | None -> Task.FromResult(Error "delegator has no verified model agent identity")
         | Some _ when isNull session -> Task.FromResult(Error "OpenCode SDK session transport unavailable")
-        | Some role ->
-            createAndRunTemporary session delegator recipient (ManagedAgent.nameOf role) questions
+        | Some role -> createAndRunTemporary session delegator recipient (ManagedAgent.nameOf role) questions
 
     let create
         (boot: PluginBoot.Boot)
@@ -318,7 +369,9 @@ module PluginHooks =
                     | _ -> return None
                 }
 
-            let transformOrdinarySystem = ProviderSystemTransform.createWith roleFor planStageFor
+            let transformOrdinarySystem =
+                ProviderSystemTransform.createWith roleFor planStageFor
+
             let systemTransform (input: obj) (output: obj) : Task<unit> =
                 task {
                     if PluginTransforms.negotiationProjectSystem input output then
@@ -469,6 +522,7 @@ module PluginHooks =
                             userNotify
 
                     toolRegistration.Runtime.AttachQuestionNotifier(fun question -> showQuestionToast question)
+
                     toolRegistration.Runtime.AttachNegotiationTransport(
                         negotiateBtw client roleFor,
                         (fun recipient answer receipt ->
@@ -616,6 +670,7 @@ module PluginHooks =
                             [ "session_id", sessionId; "result", "unbound" ]
                     | _ -> ()
                 }
+
             let firstFieldText = firstFieldText
 
             let checkManagerReviewPermissions toolName toolInput =
@@ -711,11 +766,20 @@ module PluginHooks =
                 task {
                     let sessionId = toolField toolInput "sessionID"
                     let toolName = toolField toolInput "tool"
+
                     if PluginTransforms.negotiationIsTemporary sessionId then
                         PluginTransforms.negotiationRecordToolViolation sessionId
-                        invalidOp "Ephemeral negotiation is read-only: do not use tools. Reply in plain text to the delegation questions immediately."
-                    if toolName = "negotiate" && (String.IsNullOrWhiteSpace sessionId || not (sessionPort.IsManagedChild(SessionId.create sessionId))) then
-                        invalidOp "negotiate is only available in delegated child or Advisor sessions, not user-facing sessions."
+
+                        invalidOp
+                            "Ephemeral negotiation is read-only: do not use tools. Reply in plain text to the delegation questions immediately."
+
+                    if
+                        toolName = "negotiate"
+                        && (String.IsNullOrWhiteSpace sessionId
+                            || not (sessionPort.IsManagedChild(SessionId.create sessionId)))
+                    then
+                        invalidOp
+                            "negotiate is only available in delegated child or Advisor sessions, not user-facing sessions."
 
                     // capability-enforcement-002/007: a Host-declared external
                     // (MCP) tool holds no office capability, so it is advertised
@@ -788,22 +852,27 @@ module PluginHooks =
 
             let requireUserMessageTools (message: obj) : obj =
                 let tools = message?tools
+
                 if isNull tools then
                     let created = createObj []
                     message?tools <- created
                     created
-                else tools
+                else
+                    tools
 
             let chatMessageWithNegotiationPolicy (input: obj) (output: obj) : Task<unit> =
                 task {
                     let pending: Task<unit> =
                         emitJsExpr (originalChatMessage, input, output) "$0($1, $2)"
+
                     do! pending
                     let rawSession = if isNull input then null else input?sessionID
+
                     let managedChild =
                         not (isNull rawSession)
                         && not (String.IsNullOrWhiteSpace(string rawSession))
                         && sessionPort.IsManagedChild(SessionId.create (string rawSession))
+
                     if not managedChild && not (isNull output) && not (isNull output?message) then
                         let tools = requireUserMessageTools output?message
                         tools?negotiate <- box false
@@ -959,15 +1028,16 @@ module PluginHooks =
 
                 observation
                 |> Option.iter (fun (sessionId, (cached, uncached)) ->
-                    calibration?recordUsage(SessionId.value sessionId, cached, uncached) |> ignore)
+                    calibration?recordUsage (SessionId.value sessionId, cached, uncached) |> ignore)
 
             let closeScopeOnSessionDeleted (rawInput: obj) =
                 let raw = HostEventEnvelope.unwrap rawInput
+
                 if HostEventEnvelope.eventTypeOf raw = "session.deleted" then
                     HostEventEnvelope.trySessionId raw
                     |> Option.iter (fun sessionId ->
                         Surface.clearSessionState (SessionId.value sessionId)
-                        calibration?clearSession(SessionId.value sessionId) |> ignore
+                        calibration?clearSession (SessionId.value sessionId) |> ignore
                         PluginTransforms.negotiationForgetSession (SessionId.value sessionId))
 
             let observeEvent raw =

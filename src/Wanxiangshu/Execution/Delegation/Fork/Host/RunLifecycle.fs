@@ -809,9 +809,7 @@ module HostForkRunLifecycle =
     /// comments. The child's full post-scope view is never captured here, so no
     /// snapshot port is required and nothing is withheld for a missing read.
     /// The journal-less harness still prefers this run's process-live cell.
-    let private settleUnwitnessedRun
-        gate pendingRuns journal parentId run childId runId handle result view
-        =
+    let private settleUnwitnessedRun gate pendingRuns journal parentId run childId runId handle result view =
         task {
             let proseView = ReturnedMaterial.encode (terminalProse result |> Option.toList) []
 
@@ -823,7 +821,18 @@ module HostForkRunLifecycle =
                 | None -> defaultArg resolved proseView
 
             return!
-                settleCompletedView gate pendingRuns journal parentId run childId runId handle result None (Some fallback)
+                settleCompletedView
+                    gate
+                    pendingRuns
+                    journal
+                    parentId
+                    run
+                    childId
+                    runId
+                    handle
+                    result
+                    None
+                    (Some fallback)
         }
 
     let private completeProvenResult

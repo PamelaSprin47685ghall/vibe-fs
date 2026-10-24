@@ -3,6 +3,7 @@ namespace Wanxiangshu.Context.Scope
 module Surface =
     [<Literal>]
     val ResetScopeTool: string = "resetScope"
+
     [<Literal>]
     val SuffixSeparator: string = "\u0000\uFEFF"
 
@@ -38,5 +39,5 @@ module Surface =
     val recordToolViolation: tempId: string -> unit
     val toolViolationCount: tempId: string -> int
     val forgetSession: sessionId: string -> unit
-    val projectSystem: tempId: string -> current: string array -> string array option
-    val projectMessages: tempId: string -> question: obj -> obj array option
+    val projectSystem: tempId: string -> string array
+    val projectMessages: tempId: string -> question: obj -> obj array

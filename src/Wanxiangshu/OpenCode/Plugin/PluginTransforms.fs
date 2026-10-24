@@ -54,105 +54,142 @@ module PluginTransforms =
     // process-live view is what the model receives instead, reusing the last
     // complete delegator wire as an immutable prefix. No mutation of Host history.
     let private negotiationMessages (outObj: obj) : obj array =
-        if isNull outObj || isNull outObj?messages then [||]
-        else unbox<obj array> outObj?messages
-
-    let private negotiationSessionId (input: obj) : string option =
-        if isNull input then None
+        if isNull outObj || isNull outObj?messages then
+            [||]
         else
-            let session = if isNull input?sessionID then input?sessionId else input?sessionID
-            if isNull session then None
-            else
-                let id = string session
-                if String.IsNullOrWhiteSpace id then None else Some id
+            unbox<obj array> outObj?messages
 
-    let negotiationToolViolationCount (sessionId: string) : int =
-        Surface.toolViolationCount sessionId
+    let private sessionIdOf (input: obj) : string option =
+        let session =
+            if isNull input then null
+            elif isNull input?sessionID then input?sessionId
+            else input?sessionID
 
-    let negotiationRecordToolViolation (sessionId: string) : unit =
-        Surface.recordToolViolation sessionId
+        let id = if isNull session then "" else string session
+        if String.IsNullOrWhiteSpace id then None else Some id
 
-    let negotiationIsTemporary (sessionId: string) : bool =
-        Surface.isTemporary sessionId
+    let private negotiationSessionId (input: obj) : string option = sessionIdOf input
+
+    let negotiationToolViolationCount (sessionId: string) : int = Surface.toolViolationCount sessionId
+
+    let negotiationRecordToolViolation (sessionId: string) : unit = Surface.recordToolViolation sessionId
+
+    let negotiationIsTemporary (sessionId: string) : bool = Surface.isTemporary sessionId
+
+    let private modelOptions (provider: obj) (identifier: obj) (variant: obj) : obj =
+        let fields = [ "providerID", provider; "modelID", identifier ]
+
+        if isNull variant then
+            createObj fields
+        else
+            createObj (fields @ [ "variant", variant ])
 
     let private modelIdentity (input: obj) : obj option =
         let model = if isNull input then null else input?model
         let provider = if isNull model then null else model?providerID
-        let identifier = if isNull model then null elif isNull model?modelID then model?id else model?modelID
+
+        let identifier =
+            if isNull model then null
+            elif isNull model?modelID then model?id
+            else model?modelID
+
         let message = if isNull input then null else input?message
         let messageModel = if isNull message then null else message?model
+
         let variant =
-            if not (isNull messageModel) && not (isNull messageModel?variant) then messageModel?variant
-            elif not (isNull model) then model?variant
-            else null
-        if isNull provider || isNull identifier then None
+            if not (isNull messageModel) && not (isNull messageModel?variant) then
+                messageModel?variant
+            elif not (isNull model) then
+                model?variant
+            else
+                null
+
+        if isNull provider || isNull identifier then
+            None
         else
-            let fields = [ "providerID", provider; "modelID", identifier ]
-            let options = if isNull variant then fields else fields @ [ "variant", variant ]
-            Some(createObj options)
+            Some(modelOptions provider identifier variant)
 
     let negotiationRememberModel (input: obj) : unit =
         match negotiationSessionId input, modelIdentity input with
         | Some sessionId, Some model -> Surface.rememberModel sessionId model
         | _ -> ()
 
-    let negotiationModelFor (sessionId: string) : obj =
-        Surface.modelFor sessionId
+    let negotiationModelFor (sessionId: string) : obj = Surface.modelFor sessionId
 
     let negotiationRememberSystem (input: obj) (output: obj) : unit =
         let observed = if isNull output then null else output?system
+
         match negotiationSessionId input with
-        | Some sessionId when not (isNull observed) ->
-            Surface.rememberSystem sessionId (unbox<string array> observed)
+        | Some sessionId when not (isNull observed) -> Surface.rememberSystem sessionId (unbox<string array> observed)
         | _ -> ()
 
     let negotiationRememberMessages (sessionId: string) (outObj: obj) : unit =
         let messages = negotiationMessages outObj
-        if messages.Length > 0 then Surface.rememberMessages sessionId messages
+
+        if messages.Length > 0 then
+            Surface.rememberMessages sessionId messages
+
+    let private temporaryFailure (r: obj) : string =
+        if isNull r?reason then
+            "startTemporary failed"
+        else
+            string r?reason
 
     let negotiationStartTemporary (tempId: string) (delegatorId: string) : Result<unit, string> =
         let r = Surface.startTemporary tempId delegatorId
-        if not (isNull r?ok) && unbox<bool> r?ok then Ok()
+
+        if not (isNull r?ok) && unbox<bool> r?ok then
+            Ok()
         else
-            Error (if isNull r?reason then "startTemporary failed" else string r?reason)
+            Error(temporaryFailure r)
 
-    let negotiationFinishTemporary (tempId: string) : unit =
-        Surface.finishTemporary tempId
+    let negotiationFinishTemporary (tempId: string) : unit = Surface.finishTemporary tempId
 
-    let negotiationForgetSession (sessionId: string) : unit =
-        Surface.forgetSession sessionId
+    let negotiationForgetSession (sessionId: string) : unit = Surface.forgetSession sessionId
 
     let negotiationProjectSystem (input: obj) (output: obj) : bool =
         negotiationSessionId input
         |> Option.bind (fun sid ->
-            Surface.projectSystem sid (if isNull output || isNull output?system then [||] else unbox<string array> output?system))
+            if Surface.isTemporary sid then
+                Some(Surface.projectSystem sid)
+            else
+                None)
         |> Option.map (fun system ->
             let existing = if isNull output then null else output?system
+
             if not (isNull existing) && emitJsExpr existing "Array.isArray($0)" then
                 emitJsStatement (existing, system) "$0.length = 0; $0.push(...$1)"
-            else output?system <- system
+            else
+                output?system <- system
+
             true)
         |> Option.defaultValue false
 
     let private latestTemporaryQuestion (outObj: obj) : obj option =
         negotiationMessages outObj
         |> Array.tryFindBack (fun message ->
-            if isNull message then false
+            if isNull message then
+                false
             else
                 let info = message?info
-                not (isNull info)
-                && not (isNull info?role)
-                && string info?role = "user")
+                not (isNull info) && not (isNull info?role) && string info?role = "user")
 
     let private applyTemporaryQuestion (outObj: obj) (projected: obj array) : bool =
         HostMessageProjection.replaceMessagesInPlace
             outObj
             (HostMessageProjection.sanitizeMessages (Array.toList projected))
+
         true
 
     let negotiationProjectMessages (sessionId: string) (outObj: obj) : bool =
-        let questionOpt = latestTemporaryQuestion outObj
-        let projectedOpt = questionOpt |> Option.bind (fun q -> Surface.projectMessages sessionId q)
+        let projectedOpt =
+            latestTemporaryQuestion outObj
+            |> Option.bind (fun question ->
+                if Surface.isTemporary sessionId then
+                    Some(Surface.projectMessages sessionId question)
+                else
+                    None)
+
         match projectedOpt with
         | Some projected -> applyTemporaryQuestion outObj projected
         | None -> false
@@ -1152,7 +1189,10 @@ module PluginTransforms =
 
     // Host shape is decoded once. Scope policy only sees the neutral view.
     let private scopeField (value: obj) (name: string) : obj =
-        if isNull value then null else emitJsExpr (value, name) "$0[$1]"
+        if isNull value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
     let private scopeText (value: obj) =
         if isNull value then "" else string value
@@ -1161,24 +1201,33 @@ module PluginTransforms =
         let direct = scopeField message "role"
         let info = scopeField message "info"
         let roleValue = if isNull direct then scopeField info "role" else direct
+
         match scopeText roleValue with
         | "user" -> "user"
         | "assistant" -> "assistant"
-        | "toolResult" | "tool" | "tool-result" | "tool_result" -> "result"
+        | "toolResult"
+        | "tool"
+        | "tool-result"
+        | "tool_result" -> "result"
         | "custom" -> "custom"
         | _ -> "other"
 
-    let private scopeParts (message: obj) : obj array =
-        let parts = scopeField message "parts"
-        if not (isNull parts) && emitJsExpr parts "Array.isArray($0)" then unbox<obj array> parts
+    let private asPartArray (value: obj) : obj array option =
+        if not (isNull value) && emitJsExpr value "Array.isArray($0)" then
+            Some(unbox<obj array> value)
         else
-            let content = scopeField message "content"
-            if not (isNull content) && emitJsExpr content "Array.isArray($0)" then unbox<obj array> content
-            else [||]
+            None
+
+    let private scopeParts (message: obj) : obj array =
+        match asPartArray (scopeField message "parts") with
+        | Some parts -> parts
+        | None -> asPartArray (scopeField message "content") |> Option.defaultValue [||]
 
     let private scopeTextContent (message: obj) =
         let content = scopeField message "content"
-        if not (isNull content) && emitJsExpr content "typeof $0 === 'string'" then scopeText content
+
+        if not (isNull content) && emitJsExpr content "typeof $0 === 'string'" then
+            scopeText content
         else
             scopeParts message
             |> Array.filter (fun part -> scopeText (scopeField part "type") = "text")
@@ -1190,6 +1239,7 @@ module PluginTransforms =
         let info = scopeField message "info"
         let infoTimestamp = scopeField info "timestamp"
         let created = scopeField (scopeField info "time") "created"
+
         if not (isNull time) then time
         elif not (isNull infoTimestamp) then infoTimestamp
         else created
@@ -1197,14 +1247,21 @@ module PluginTransforms =
     let private scopeToolId (part: obj) =
         let own = scopeField part "callID"
         let direct = if isNull own then scopeField part "id" else own
-        if isNull direct then scopeField part "toolCallId" else direct
+
+        if isNull direct then
+            scopeField part "toolCallId"
+        else
+            direct
 
     let private scopeTerminalField (state: obj) : string =
         let status = scopeText (scopeField state "status")
         let output = scopeField state "output"
         let error = scopeField state "error"
         let errorText = scopeField state "errorText"
-        let isText v = not (isNull v) && emitJsExpr v "typeof $0 === 'string'"
+
+        let isText v =
+            not (isNull v) && emitJsExpr v "typeof $0 === 'string'"
+
         match status with
         | "completed" when isText output -> "output"
         | "error" when isText error -> "error"
@@ -1214,6 +1271,7 @@ module PluginTransforms =
 
     let private neutralPart (part: obj) : obj =
         let kind = scopeText (scopeField part "type")
+
         if kind = "tool" || kind = "toolCall" || kind = "tool-call" || kind = "tool_call" then
             let tool = scopeField part "tool"
             let name = if isNull tool then scopeField part "name" else tool
@@ -1221,22 +1279,46 @@ module PluginTransforms =
             createObj [ "id", scopeToolId part; "tool", name; "terminalField", box resultField ]
         elif kind = "toolResult" || kind = "tool-result" || kind = "tool_result" then
             createObj [ "resultFor", scopeToolId part ]
-        else createObj []
+        else
+            createObj []
 
     let private neutralScopeMessage (message: obj) =
         let kind = scopeRole message
         let info = scopeField message "info"
         let attribution = scopeField message "attribution"
-        let authored = if isNull attribution then scopeField info "attribution" else attribution
-        let operator = (kind = "user" && scopeText authored <> "agent") || (kind = "custom" && scopeText authored = "user")
+
+        let authored =
+            if isNull attribution then
+                scopeField info "attribution"
+            else
+                attribution
+
+        let operator =
+            (kind = "user" && scopeText authored <> "agent")
+            || (kind = "custom" && scopeText authored = "user")
+
         let steering = scopeField message "steering"
-        let steering = if isNull steering then scopeField info "steering" else steering
+
+        let steering =
+            if isNull steering then
+                scopeField info "steering"
+            else
+                steering
+
         let side = kind = "user" && not operator && not (steering = box true)
         let stamp = scopeTimestamp message
-        let key = (if isNull stamp then "" else scopeText stamp) + ":" + scopeTextContent message
+
+        let key =
+            (if isNull stamp then "" else scopeText stamp) + ":" + scopeTextContent message
+
         let resultId =
             let direct = scopeField message "toolCallId"
-            if not (isNull direct) then direct else scopeField message "callID"
+
+            if not (isNull direct) then
+                direct
+            else
+                scopeField message "callID"
+
         createObj
             [ "kind", box kind
               "operator", box operator
@@ -1247,42 +1329,67 @@ module PluginTransforms =
               "resultFor", box (scopeText resultId)
               "resultField", box (if kind = "result" then "content" else "") ]
 
-    let private copyScope (source: obj) = emitJsExpr source "Object.assign({}, $0)"
+    let private copyScope (source: obj) =
+        emitJsExpr source "Object.assign({}, $0)"
+
+    let private replaceScopeParts (message: obj) (parts: obj array) : obj =
+        let rewritten = copyScope message
+
+        if isNull (scopeField message "parts") then
+            rewritten?content <- box parts
+        else
+            rewritten?parts <- box parts
+
+        rewritten
+
+    let private rewriteContent (message: obj) (content: obj) : obj =
+        let rewritten = copyScope message
+        rewritten?content <- content
+        rewritten
+
+    let private rewritePartState (message: obj) (part: obj) (partIndex: int) (state: obj) : obj =
+        let nextPart = copyScope part
+        nextPart?state <- state
+        let nextParts = Array.copy (scopeParts message)
+        nextParts.[partIndex] <- nextPart
+        replaceScopeParts message nextParts
+
+    let private appendMessageTail (message: obj) (suffix: string) : obj =
+        let content = scopeField message "content"
+        let updated = Surface.appendTailOnce content suffix
+
+        if obj.ReferenceEquals(content, updated) then
+            message
+        else
+            rewriteContent message updated
+
+    let private appendPartTail (message: obj) (partIndex: int) (fieldName: string) (suffix: string) : obj =
+        let part = (scopeParts message).[partIndex]
+        let state = scopeField part "state"
+        let current = scopeField state fieldName
+        let changed = Surface.appendTailOnce current suffix
+
+        if obj.ReferenceEquals(current, changed) then
+            message
+        else
+            let nextState = copyScope state
+            emitJsExpr (nextState, fieldName, changed) "$0[$1] = $2" |> ignore
+            rewritePartState message part partIndex nextState
 
     let private appendScopeResultTail (message: obj) (hint: obj) : obj =
         let partIndex = unbox<int> hint?part
         let fieldName = scopeText hint?field
         let suffix = scopeText hint?tail
+
         if partIndex < 0 then
-            let content = scopeField message "content"
-            let updated = Surface.appendTailOnce content suffix
-            if obj.ReferenceEquals(content, updated) then message
-            else
-                let rewritten = copyScope message
-                rewritten?content <- updated
-                rewritten
+            appendMessageTail message suffix
         else
-            let parts = scopeParts message
-            let part = parts.[partIndex]
-            let state = scopeField part "state"
-            let current = scopeField state fieldName
-            let changed = Surface.appendTailOnce current suffix
-            if obj.ReferenceEquals(current, changed) then message
-            else
-                let nextState = copyScope state
-                emitJsExpr (nextState, fieldName, changed) "$0[$1] = $2" |> ignore
-                let nextPart = copyScope part
-                nextPart?state <- nextState
-                let nextParts = Array.copy parts
-                nextParts.[partIndex] <- nextPart
-                let nextMessage = copyScope message
-                if not (isNull (scopeField message "parts")) then nextMessage?parts <- box nextParts
-                else nextMessage?content <- box nextParts
-                nextMessage
+            appendPartTail message partIndex fieldName suffix
 
     let private applyNeutralHint (messages: obj array) (hint: obj) : unit =
         let index = unbox<int> hint?index
         let value = messages.[index]
+
         messages.[index] <-
             if scopeText hint?kind = "user" then
                 Surface.writeUserHint value [| scopeText hint?tail |]
@@ -1293,13 +1400,14 @@ module PluginTransforms =
         let index = unbox<int> slot?index
         let message = messages.[index]
         let selected = scopeField slot "parts"
-        if isNull selected then message
+
+        if isNull selected then
+            message
         else
-            let parts = scopeParts message
-            let kept = unbox<int array> selected |> Array.map (fun j -> parts.[j])
-            let rewritten = copyScope message
-            if not (isNull (scopeField message "parts")) then rewritten?parts <- box kept
-            else rewritten?content <- box kept
+            let kept =
+                unbox<int array> selected |> Array.map (fun j -> (scopeParts message).[j])
+
+            let rewritten = replaceScopeParts message kept
             emitJsExpr rewritten "delete $0.providerPayload; delete $0.responseId" |> ignore
             rewritten
 
@@ -1308,12 +1416,14 @@ module PluginTransforms =
         let originalInfo = scopeField last "info"
         let sessionId = scopeField originalInfo "sessionID"
         let info = createObj [ "role", box "user"; "sessionID", sessionId ]
+
         let steer =
             createObj
                 [ "info", box info
                   "parts", box [| createObj [ "type", box "text"; "text", box prose ] |]
                   "steering", box true
                   "attribution", box "agent" ]
+
         Array.append messages [| steer |]
 
     let private prepareNeutralScope (sessionId: string) (raw: obj array) : obj array =
@@ -1322,18 +1432,25 @@ module PluginTransforms =
         let staged = Array.copy raw
         unbox<obj array> plan?hints |> Array.iter (applyNeutralHint staged)
         let selected = unbox<obj array> plan?slots |> Array.map (applyNeutralSlot staged)
-        if isNull plan?weak then selected else openCodeWeakSteer selected (scopeText plan?weak)
+
+        if isNull plan?weak then
+            selected
+        else
+            openCodeWeakSteer selected (scopeText plan?weak)
 
     let private purgeAndSuffixSession (sessionId: string) (rawMessages: obj array) (outObj: obj) : unit =
         let sideRequest =
             rawMessages
             |> Array.tryLast
-            |> Option.map (fun message -> neutralScopeMessage message |> fun neutral -> scopeField neutral "sideRequest")
+            |> Option.map (fun message ->
+                neutralScopeMessage message |> fun neutral -> scopeField neutral "sideRequest")
             |> Option.exists (fun value -> not (isNull value) && unbox<bool> value)
+
         if not sideRequest then
             Surface.onTurnStart sessionId
 
         let prepared = prepareNeutralScope sessionId rawMessages
+
         if not (Surface.isUnchanged prepared rawMessages) then
             HostMessageProjection.replaceMessagesInPlace outObj (Array.toList prepared)
 
@@ -1540,7 +1657,9 @@ module PluginTransforms =
                   TracedXTrace = None }
 
             do! runOrdinaryStages stages frame
-            projectionSessionIdOpt |> Option.iter (fun sid -> negotiationRememberMessages sid outObj)
+
+            projectionSessionIdOpt
+            |> Option.iter (fun sid -> negotiationRememberMessages sid outObj)
 
         }
 

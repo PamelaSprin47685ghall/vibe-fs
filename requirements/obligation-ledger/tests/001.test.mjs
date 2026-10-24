@@ -22,7 +22,7 @@ test('WHAT[obligation-ledger-001] native todowrite is retired from StaticTools, 
   assert.equal('todowrite' in (toolMap.tools ?? {}), false, 'ablation tool-map must not contain native todowrite')
 })
 
-integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a valid flat declaration commit ViewCheckpointCommitted', async () => {
+integrationTest('WHAT[obligation-ledger-001] todowrite-for-* calls never commit compression checkpoints or inject compression fields', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'obligation-view-gate'
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
@@ -43,14 +43,17 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a v
       },
     })
 
-    // 2. todowrite-for-engineer without a declaration, or with an incomplete or
-    // invalid flat declaration, commits nothing.
+    // 2. todowrite-for-engineer calls never commit any checkpoint and do not inject compression fields.
     for (const [callID, input] of [
       ['call-no-declaration', { program: 'class Js extends JsProgram { async run() { return 1; } }' }],
       ['call-prefix-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixUntil: 0 }],
       ['call-carry-only', { program: 'class Js extends JsProgram { async run() { return 1; } }', carry: [] }],
-      ['call-invalid-carry', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixUntil: 0, carry: [null] }],
+      ['call-valid-view', { program: 'class Js extends JsProgram { async run() { return 1; } }', prefixUntil: 0, carry: ['keep the verified context'] }],
     ]) {
+      const beforeOutput = { args: { program: 'class Js extends JsProgram { async run() { return 1; } }' } }
+      await hooks['tool.execute.before']({ tool: 'todowrite-for-engineer', sessionID, callID }, beforeOutput)
+      assert.equal('prefixUntil' in beforeOutput.args, false, 'must not inject prefixUntil')
+      assert.equal('carry' in beforeOutput.args, false, 'must not inject carry')
       await hooks.event({
         event: {
           type: 'message.part.updated',
@@ -67,39 +70,10 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a v
       })
     }
 
-    assert.deepEqual(
+    assert.equal(
       journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
-      [],
-      'neither retired todowrite nor declaration-less/invalid programming calls commit a checkpoint',
-    )
-
-    // 3. todowrite-for-engineer with a valid flat declaration commits the checkpoint.
-    await hooks.event({
-      event: {
-        type: 'message.part.updated',
-        properties: {
-          sessionID,
-          part: {
-            type: 'tool',
-            tool: 'todowrite-for-engineer',
-            callID: 'call-valid-view',
-            state: {
-              status: 'completed',
-              input: {
-                program: 'class Js extends JsProgram { async run() { return 1; } }',
-                prefixUntil: 0,
-                carry: ['keep the verified context'],
-              },
-            },
-          },
-        },
-      },
-    })
-
-    assert.deepEqual(
-      journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
-      [{ sessionId: sessionID, checkpoints: [{ callId: 'call-valid-view' }] }],
-      'a completed todowrite-for-* call with a valid flat declaration commits ViewCheckpointCommitted',
+      undefined,
+      'neither retired todowrite nor todowrite-for-* programming calls commit a checkpoint',
     )
   })
 })

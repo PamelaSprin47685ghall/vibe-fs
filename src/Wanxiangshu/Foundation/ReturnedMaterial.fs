@@ -70,14 +70,17 @@ module ReturnedMaterial =
 
     let validate (encoded: string) : Result<unit, string> =
         let isStringArray (b: obj) =
-            if isNull b then true
-            elif not (isArray b) then false
+            if isNull b then
+                true
+            elif not (isArray b) then
+                false
             else
                 let arr: obj array = unbox b
                 Array.forall (fun item -> not (isNull item) && valueType item = "string") arr
 
         let isCarryArray (c: obj) =
-            if isNull c || not (isArray c) then false
+            if isNull c || not (isArray c) then
+                false
             else
                 let arr: obj array = unbox c
                 Array.forall (fun item -> not (isNull item) && valueType item = "string") arr
@@ -88,15 +91,18 @@ module ReturnedMaterial =
             with _ ->
                 None
 
-        let canonical =
-            match parsedOpt with
-            | None -> None
-            | Some value ->
-                let b = getProperty value "body"
-                let c = getProperty value "carry"
-                if not (isStringArray b) then None
-                elif isCarryArray c then Some(encode (body encoded) (carry encoded))
-                else None
+        let canonicalValue value =
+            let b = getProperty value "body"
+            let c = getProperty value "carry"
+
+            if not (isStringArray b) then
+                None
+            elif isCarryArray c then
+                Some(encode (body encoded) (carry encoded))
+            else
+                None
+
+        let canonical = parsedOpt |> Option.bind canonicalValue
 
         match canonical with
         | Some value when value = encoded -> Ok()

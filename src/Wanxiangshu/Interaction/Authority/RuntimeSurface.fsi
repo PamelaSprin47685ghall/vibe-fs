@@ -49,6 +49,20 @@ module RuntimeSurface =
 
     val closeAuthority: logicalRun: string -> authorityRoot: string -> projection: obj -> obj
     val closeCompletedAgentOwnerChildWork: logicalRun: string -> authorityRoot: string -> projection: obj -> obj
+
+    val terminalSourceFact:
+        sha256: (string -> string) ->
+        kind: string ->
+        session: string ->
+        logicalRun: string ->
+        authorityRoot: string ->
+        ownerLogicalRunId: string ->
+        attachmentKind: string ->
+        associationGeneration: string ->
+        decisionOrTransactionId: string ->
+        outcome: string ->
+            obj
+
     val resolveKnownOrigin: physical: string -> promptKey: string -> hostCompaction: bool -> projection: obj -> string
     val stableLogicalRunId: hash: (string -> string) -> runtime: string -> session: string -> physical: string -> string
     val originForContinuation: kind: string -> obj
@@ -89,3 +103,9 @@ module RuntimeSurface =
         decisionOrTransactionId: string ->
         outcome: string ->
             obj
+
+    val recordedClosureKind: rootKindLabel: string -> isManager: bool -> agentOwnerLife: obj -> recorded: obj -> string
+
+    val rootKindOfKind: closureKind: string -> string
+
+    val witnessKindOf: closureKind: string -> obj

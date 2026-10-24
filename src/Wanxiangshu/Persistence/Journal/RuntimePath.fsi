@@ -7,4 +7,6 @@ module RuntimePath =
     val stateRoot: workspace: string -> Task<string>
     val initializeStateRoot: workspace: string -> Task<string>
     val forWorkspace: workspace: string -> Task<string>
+    /// 已有工作区的本机状态根。不把工作区目录本身当成状态根。
+    val stateRootSync: workspace: string -> string
     val forStateRoot: stateDirectory: string -> string

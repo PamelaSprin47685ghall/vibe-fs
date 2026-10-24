@@ -62,7 +62,12 @@ type ToolRuntimeScope =
     member EventPort: IEventObservationPort option
     member WorkspaceDirectory: string option
     member ActiveProfileFor: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
-    member AttachNegotiationTransport: ask: (string -> string -> string -> Task<Result<string,string>>) * steer: (string -> string -> string -> Task<Result<unit,string>>) -> unit
+
+    member AttachNegotiationTransport:
+        ask: (string -> string -> string -> Task<Result<string, string>>) *
+        steer: (string -> string -> string -> Task<Result<unit, string>>) ->
+            unit
+
     member Negotiate: recipient: string * questions: string -> string
     member SendNegotiationSteer: recipient: string * answer: string * receipt: string -> Task<Result<unit, string>>
     member AttachQuestionNotifier: notify: (string -> Task<Result<unit, string>>) -> unit
@@ -89,6 +94,10 @@ type ToolRuntimeScope =
     member RecordDeliveryPresented: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit
 
     member HasEstablishedDelivery: sessionId: string -> bool
+
+    /// The tool call id of the latest established delivery of this session on this
+    /// physical input, or None when nothing is established there. The delivery
+    /// adjudication reads the same ledger with the same reading.
     static member EstablishedDeliveryCallId: sessionId: string * physicalUserMessageId: string -> string option
 
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
