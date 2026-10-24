@@ -93,32 +93,22 @@ module RecoveryClosureProjection =
         then
             add (RecoveryNode.WorkSession sessionId)
 
-    /// Discover durable recovery dependency closure for a parent session.
-    let discover (root: SessionId) (projection: AgentProjectionSet) (journalSequence: int64) : RecoveryClosure =
-        // DSL-MUTABLE: algorithm-scratch — recovery node accumulator
-        let nodes = ResizeArray<RecoveryNode>()
-        // DSL-MUTABLE: algorithm-scratch — local walk visited set
+    /// Collect the discovered candidates into one closure: dedupe by node identity
+    /// (`RecoveryNode.token`), order dependents before ancestors, then digest.
+    /// One manager session can be both a linked child and an orchestration job, so the
+    /// dedupe key must carry the node kind — a session-id key would drop one of them.
+    let closureOf (root: SessionId) (candidates: RecoveryNode list) (journalSequence: int64) : RecoveryClosure =
+        // DSL-MUTABLE: algorithm-scratch — dedupe accumulator
         let seen = System.Collections.Generic.HashSet<string>()
-        // DSL-MUTABLE: algorithm-scratch — local walk linked child id accumulator
-        let linkedChildIds = System.Collections.Generic.HashSet<string>()
+        // DSL-MUTABLE: algorithm-scratch — kept nodes in discovery order
+        let nodes = ResizeArray<RecoveryNode>()
 
         let add (node: RecoveryNode) =
-            let key = sortKey node
-
-            if seen.Add key then
+            if seen.Add(RecoveryNode.token node) then
                 nodes.Add node
 
-        add (RecoveryNode.WorkSession root)
-
-        for record in HandleProjection.linkedChildren (rootHandles root projection) do
-            addLinkedChild root projection add linkedChildIds record
-
-
-        for job in AgentProjection.activeOrchestratorJobPairs projection do
-            addManagerJob root projection add linkedChildIds job
-
-        for sessionId, session in Map.toList projection.Sessions do
-            addPendingSession root projection add linkedChildIds sessionId session
+        for node in candidates do
+            add node
 
         let rank =
             function
@@ -134,3 +124,26 @@ module RecoveryClosureProjection =
           Nodes = ordered
           Digest = digestOf root ordered
           JournalSequence = journalSequence }
+
+    /// Discover durable recovery dependency closure for a parent session.
+    let discover (root: SessionId) (projection: AgentProjectionSet) (journalSequence: int64) : RecoveryClosure =
+        // DSL-MUTABLE: algorithm-scratch — recovery node candidates
+        let candidates = ResizeArray<RecoveryNode>()
+        // DSL-MUTABLE: algorithm-scratch — local walk linked child id accumulator
+        let linkedChildIds = System.Collections.Generic.HashSet<string>()
+
+        let add (node: RecoveryNode) = candidates.Add node
+
+        add (RecoveryNode.WorkSession root)
+
+        for record in HandleProjection.linkedChildren (rootHandles root projection) do
+            addLinkedChild root projection add linkedChildIds record
+
+
+        for job in AgentProjection.activeOrchestratorJobPairs projection do
+            addManagerJob root projection add linkedChildIds job
+
+        for sessionId, session in Map.toList projection.Sessions do
+            addPendingSession root projection add linkedChildIds sessionId session
+
+        closureOf root (List.ofSeq candidates) journalSequence

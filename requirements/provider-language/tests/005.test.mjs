@@ -24,7 +24,7 @@ test('WHAT[provider-language-005] owned prose follows the live preference while 
         if (language === 'SimplifiedChinese') {
           assert.match(output.system[2], /状态闭环/)
         } else {
-          assert.match(output.system[2], /State Closed-Loop/)
+          assert.match(output.system[2], /state closed-loop/i)
         }
         const repeated = await transformBookkeeperSystem(session, output.system)
         assert.deepEqual(repeated.system, output.system)

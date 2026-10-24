@@ -78,7 +78,7 @@ test('WHAT[verification-system-016] the actual verification run binds its eviden
     fs.rmSync(tmpLogs, { recursive: true, force: true })
   }
 })
-import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
+import { collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
 import { verify } from '../../../scripts/verify.mjs'
 
 function setupFixtureRepo(objectFormat = 'sha1') {
@@ -586,7 +586,7 @@ test('WHAT[verification-system-016] dependency preparation fully consumes compre
   }
 })
 
-test('WHAT[verification-system-016] a selected Git tree preserves complete raw source bytes and its own corpus inventory despite later workspace and index edits', async () => {
+test('WHAT[verification-system-016] a selected Git tree preserves complete raw source bytes despite later workspace and index edits', async () => {
   const fixture = setupFixtureRepo()
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'source-candidate-parent-'))
   let candidate
@@ -614,7 +614,6 @@ test('WHAT[verification-system-016] a selected Git tree preserves complete raw s
     assert.equal(fs.existsSync(path.join(candidate.sourceRoot, 'untracked.md')), false)
     assert.equal(fs.statSync(path.join(candidate.sourceRoot, 'scripts/x.mjs')).mode & 0o111, 0o111)
     assert.equal(fixtureGit(candidate.sourceRoot, 'write-tree'), treeId)
-    assert.ok(collectGeneratedInputs(candidate.sourceRoot).some(entry => entry.path === specialPath))
     assert.equal(fs.existsSync(path.join(candidate.sourceRoot, '.git/objects/info/alternates')), false)
     assert.ok(candidate.entries.some(entry => entry.path === specialPath && entry.size === binary.length))
     assert.match(candidate.sourceDigest, /^[0-9a-f]{64}$/)
@@ -812,30 +811,35 @@ test('WHAT[verification-system-016] output directory names do not exclude ordina
   }
 })
 
-for (const [linkDirectory, dangling] of [[false, false], [true, false], [false, true], [true, true]]) {
-  test(`WHAT[verification-system-016] tracked corpus rejects a ${dangling ? 'dangling ' : ''}symbolic ${linkDirectory ? 'ancestor' : 'file'} outside ordinary input roots`, () => {
+for (const dangling of [false, true]) {
+  test(`WHAT[verification-system-016] a ${dangling ? 'dangling ' : ''}root-level symbolic directory outside ordinary input roots is rejected`, () => {
     const fixture = setupFixtureRepo()
     const external = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-external-corpus-'))
     try {
       fs.writeFileSync(path.join(external, 'decision.md'), '# External\n')
-      if (linkDirectory) {
-        fs.symlinkSync(dangling ? path.join(external, 'missing') : external, path.join(fixture, 'proposals'), 'dir')
-        execFileSync('git', ['-C', fixture, 'update-index', '--add', '--cacheinfo',
-          `100644,${execFileSync('git', ['-C', fixture, 'hash-object', '-w', path.join(external, 'decision.md')]).toString().trim()},proposals/decision.md`])
-      } else {
-        fs.mkdirSync(path.join(fixture, 'proposals'))
-        fs.symlinkSync(path.join(external, dangling ? 'missing.md' : 'decision.md'), path.join(fixture, 'proposals/decision.md'))
-        execFileSync('git', ['-C', fixture, 'add', 'proposals/decision.md'])
-      }
-      for (const collect of [collectGeneratedInputs, collectVerificationInputs]) {
-        assert.throws(() => collect(fixture), error => error.code === 'verification-inputs-symbolic-link')
-      }
+      fs.symlinkSync(dangling ? path.join(external, 'missing') : external, path.join(fixture, 'proposals'), 'dir')
+      assert.throws(() => collectVerificationInputs(fixture), error => error.code === 'verification-inputs-symbolic-link')
     } finally {
       fs.rmSync(fixture, { recursive: true, force: true })
       fs.rmSync(external, { recursive: true, force: true })
     }
   })
 }
+
+test('WHAT[verification-system-016] a symlink inside a directory outside ordinary input roots is not an input and is not rejected', () => {
+  const fixture = setupFixtureRepo()
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-external-corpus-'))
+  try {
+    fs.writeFileSync(path.join(external, 'decision.md'), '# External\n')
+    fs.mkdirSync(path.join(fixture, 'proposals'))
+    fs.symlinkSync(path.join(external, 'decision.md'), path.join(fixture, 'proposals/decision.md'))
+    const inputs = collectVerificationInputs(fixture)
+    assert.equal(inputs.some(entry => entry.path.startsWith('proposals/')), false)
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(external, { recursive: true, force: true })
+  }
+})
 
 test('WHAT[verification-system-016] tracked corpus proposals contribute their actual content to verification inputs', () => {
   const fixture = setupFixtureRepo()
@@ -846,62 +850,49 @@ test('WHAT[verification-system-016] tracked corpus proposals contribute their ac
     execFileSync('git', ['-C', fixture, 'add', 'proposals/decision.md'])
 
     const before = collectVerificationInputs(fixture)
-    assert.ok(before.some(entry => entry.path === 'proposals/decision.md'))
-    assert.ok(collectGeneratedInputs(fixture).some(entry => entry.path === 'proposals/decision.md'))
+    assert.equal(before.some(entry => entry.path === 'proposals/decision.md'), false)
     fs.writeFileSync(proposal, '# Changed\n')
     const after = collectVerificationInputs(fixture)
 
-    assert.deepEqual(diffVerificationInputs(before, after), {
-      equal: false,
-      reason: 'content-changed:proposals/decision.md',
-    })
-    assert.notEqual(computeDigest(before), computeDigest(after))
+    assert.deepEqual(diffVerificationInputs(before, after), { equal: true })
+    assert.equal(computeDigest(before), computeDigest(after))
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true })
   }
 })
 
-for (const initiallyTracked of [false, true]) {
-  test(`WHAT[verification-system-016] corpus tracking ${initiallyTracked ? 'removal' : 'addition'} changes verification identity without changing file bytes`, () => {
-    const fixture = setupFixtureRepo()
-    try {
+test('WHAT[verification-system-016] verification identity ignores Git tracking state and depends only on file bytes', () => {
+  const fixture = setupFixtureRepo()
+  try {
+    for (const initiallyTracked of [false, true]) {
       if (initiallyTracked) execFileSync('git', ['-C', fixture, 'add', 'src/Foo.fs'])
       const original = fs.readFileSync(path.join(fixture, 'src/Foo.fs'))
       const before = collectVerificationInputs(fixture)
-      const generatedBefore = collectGeneratedInputs(fixture)
 
       execFileSync('git', ['-C', fixture, ...(initiallyTracked ? ['rm', '--cached', 'src/Foo.fs'] : ['add', 'src/Foo.fs'])])
       const after = collectVerificationInputs(fixture)
-      const generatedAfter = collectGeneratedInputs(fixture)
 
       assert.deepEqual(fs.readFileSync(path.join(fixture, 'src/Foo.fs')), original)
       assert.deepEqual(before.map(entry => entry.path), after.map(entry => entry.path))
-      assert.notDeepEqual(generatedBefore.map(entry => entry.path), generatedAfter.map(entry => entry.path))
-      assert.equal(diffVerificationInputs(before, after).equal, false)
-      assert.notEqual(computeDigest(before), computeDigest(after))
-    } finally {
-      fs.rmSync(fixture, { recursive: true, force: true })
+      assert.deepEqual(diffVerificationInputs(before, after), { equal: true })
+      assert.equal(computeDigest(before), computeDigest(after))
     }
-  })
-}
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+  }
+})
 
-for (const collect of [collectGeneratedInputs, collectVerificationInputs]) {
-  test(`WHAT[verification-system-016] ${collect.name} rejects failed Git corpus inventory`, () => {
-    const fixture = setupFixtureRepo()
-    try {
-      fs.writeFileSync(path.join(fixture, '.git', 'index'), 'invalid index')
-      assert.throws(() => collect(fixture), error => {
-        assert.equal(error.status, 128)
-        assert.match(String(error.stderr), /index/)
-        return true
-      })
-    } finally {
-      fs.rmSync(fixture, { recursive: true, force: true })
-    }
-  })
-}
+test('WHAT[verification-system-016] verification inputs do not depend on the Git index at all', () => {
+  const fixture = setupFixtureRepo()
+  try {
+    fs.writeFileSync(path.join(fixture, '.git', 'index'), 'invalid index')
+    assert.doesNotThrow(() => collectVerificationInputs(fixture))
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+  }
+})
 
-test('WHAT[verification-system-016] failed Git corpus inventory stops verification before any stage starts', async () => {
+test('WHAT[verification-system-016] verification runs even when the Git index is unreadable', async () => {
   const fixture = setupFixtureRepo()
   const stages = []
   try {
@@ -914,11 +905,9 @@ test('WHAT[verification-system-016] failed Git corpus inventory stops verificati
         return { label, ok: true, exitCode: 0 }
       },
     })
-    assert.equal(result.exitCode, 1)
-    assert.equal(result.outcome, 'fail')
-    assert.match(result.failureReason, /^input-collection-failed:.*git/s)
-    assert.deepEqual(stages, [])
-    assert.ok(result.steps.every(step => step.status === 'not-run'))
+    assert.equal(result.exitCode, 0)
+    assert.equal(result.outcome, 'pass')
+    assert.deepEqual(stages, ['format:check', 'check', 'build', 'unit', 'integration'])
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true })
   }

@@ -226,7 +226,7 @@
   ```bash
   # 验证 TypeScript 端口镜像与 F# 签名严格逐字节一致
   node proposals/host-neutral-interface/adapters/omp/mirror-check.mjs
-  
+
   # 执行离线 fixture 测试（无需启动 omp 进程、无需模型配额）
   bun test proposals/host-neutral-interface/adapters/omp/fixtures/fixture.test.ts
   ```

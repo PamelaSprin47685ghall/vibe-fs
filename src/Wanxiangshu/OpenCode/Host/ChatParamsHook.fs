@@ -155,7 +155,7 @@ module ChatParamsHook =
 
     let private recordDeclaredLimit (input: obj) =
         match trySessionId input, declaredContextLimit input with
-        | Some sessionId, Some limit -> calibration?recordLimit(SessionId.value sessionId, limit) |> ignore
+        | Some sessionId, Some limit -> calibration?recordLimit (SessionId.value sessionId, limit) |> ignore
         | _ -> ()
 
     /// Managed-ness is durable evidence: only a message this plugin durably
@@ -212,13 +212,17 @@ module ChatParamsHook =
               Role = tryAgent input |> Option.map AgentRole
               Route = None
               Workspace = None }
+
         let providerParams: ProviderParams =
             { Temperature = None
               TopP = None
               MaxOutputTokens = declaredContextLimit input
               Reasoning = None
               Extra = None }
-        let verdict = (turn.ProviderParams(turnContext, providerParams)).GetAwaiter().GetResult()
+
+        let verdict =
+            (turn.ProviderParams(turnContext, providerParams)).GetAwaiter().GetResult()
+
         handleVerdict verdict
 
     let private applyTurnParams (turnOpt: ITurnTransform option) (input: obj) (_output: obj) =
@@ -226,14 +230,24 @@ module ChatParamsHook =
         | Some turn, Some key -> executeTurnParams turn key input
         | _ -> ()
 
-    let private handleInputWithTurn (turnOpt: ITurnTransform option) (journal: AgentJournal option) (input: obj) (output: obj) =
+    let private handleInputWithTurn
+        (turnOpt: ITurnTransform option)
+        (journal: AgentJournal option)
+        (input: obj)
+        (output: obj)
+        =
         applyTurnParams turnOpt input output
         handleInput journal input output
 
-    let createWithTurn (journal: AgentJournal option) (turnOpt: ITurnTransform option) : obj =
-        box (fun (input: obj) (output: obj) -> handleInputWithTurn turnOpt journal input output)
+    /// Host invokes chat.params as a native two-argument JS function. The boxed
+    /// F# lambda is emitted as a two-arity arrow, so re-expose it through an Emit
+    /// wrapper invoked with both arguments (no curried second stage exists).
+    [<Emit("(input, output) => $0(input, output)")>]
+    let private asBinaryJsFunction (fn: obj) : obj = jsNative
 
-    let createWith (journal: AgentJournal option) : obj =
-        createWithTurn journal None
+    let createWithTurn (journal: AgentJournal option) (turnOpt: ITurnTransform option) : obj =
+        asBinaryJsFunction (box (fun (input: obj) (output: obj) -> handleInputWithTurn turnOpt journal input output))
+
+    let createWith (journal: AgentJournal option) : obj = createWithTurn journal None
 
     let create () : obj = createWith None

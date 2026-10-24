@@ -52,6 +52,8 @@ test('WHAT[intra-participant-parallelism-010] an interrupted Fission group is se
     // `this.fork(payload, extra = [])`。
     const forked = await hooks1.tool['todowrite-for-manager'].execute(
       {
+        name: 'restart-fork',
+        planB: '等待本次派工回执，超时后保留原派工状态。',
         program:
           'class Js extends JsProgram { async run() { return await this.fork({ name: "ruling-materials", charge: "collect seven materials" }); } }',
       },

@@ -204,10 +204,7 @@ module ReviewBackendManager =
 
     /// The one lifecycle work this session owns. It is independent of the
     /// workspace EventStore; only the git common directory selects its journal.
-    let private lifecycleWorkOf
-        (directory: string)
-        (sessionId: string)
-        : Task<DurableWorkHost.InspectedWork option> =
+    let private lifecycleWorkOf (directory: string) (sessionId: string) : Task<DurableWorkHost.InspectedWork option> =
         task {
             let! commonDir = RuntimePath.stateRoot directory
 
@@ -298,11 +295,9 @@ module ReviewBackendManager =
         }
 
     let private acceptedResult (receipt: DurableWorkHost.HostReceipt) =
-        let outcome =
-            DurableWorkHost.resultText receipt "outcome"
+        let outcome = DurableWorkHost.resultText receipt "outcome"
 
-        let firstReview =
-            DurableWorkHost.resultText receipt "firstReview"
+        let firstReview = DurableWorkHost.resultText receipt "firstReview"
 
         let instructionPath = if outcome = "Promoted" then Path.Finish else Path.Work
 
@@ -314,9 +309,7 @@ module ReviewBackendManager =
 
     /// The write receipt decides the result. Multiple reviews per tenure are
     /// legal; a committed or replayed write is accepted.
-    let private reviewOutcome
-        (receipt: DurableWorkHost.HostReceipt)
-        : Result<string, ReviewFailure> =
+    let private reviewOutcome (receipt: DurableWorkHost.HostReceipt) : Result<string, ReviewFailure> =
         if receipt.Status = "Committed" || receipt.Status = "Replayed" then
             Ok(acceptedResult receipt)
         else
@@ -347,8 +340,7 @@ module ReviewBackendManager =
     let private memberAccepted (receipt: DurableWorkHost.HostReceipt) : obj =
         createObj
             [ "ok" ==> true
-              "outcome"
-              ==> DurableWorkHost.resultText receipt "outcome"
+              "outcome" ==> DurableWorkHost.resultText receipt "outcome"
               "firstReview" ==> boolField receipt.Result "firstReview"
               "obligations" ==> obligationsField receipt.Result ]
 
@@ -401,11 +393,7 @@ module ReviewBackendManager =
                           "updates", updates ]
 
                 let receipt =
-                    DurableWorkHost.execute
-                        gitCommonDir
-                        context.SessionId
-                        requestId
-                        command
+                    DurableWorkHost.execute gitCommonDir context.SessionId requestId command
 
                 return reviewOutcome receipt
         }
@@ -488,8 +476,7 @@ module ReviewBackendManager =
                           "reviewerId", box ReviewerId
                           "updates", updatesOf findings ]
 
-                let receipt =
-                    DurableWorkHost.execute gitCommonDir sessionId requestId command
+                let receipt = DurableWorkHost.execute gitCommonDir sessionId requestId command
 
                 return receiptMemberOutcome receipt
         }

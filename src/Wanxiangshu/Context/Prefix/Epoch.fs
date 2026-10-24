@@ -72,8 +72,10 @@ module PrefixEpochProjection =
                   "compactionRuns"
                   ==> (state.ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value)
                   "tenures" ==> (state.ReanchoredTenures |> Set.toArray) ]
+
         if not (Set.isEmpty state.ReanchoredScopes) then
             baseObj?scopes <- (state.ReanchoredScopes |> Set.toArray)
+
         baseObj
 
     let private stateOf (view: obj) : ActivePrefixEpoch =

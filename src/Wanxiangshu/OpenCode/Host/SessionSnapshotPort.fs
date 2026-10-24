@@ -485,7 +485,7 @@ module SessionSnapshotPort =
 
         if isNull error then
             None
-        elif not (isNull error?data?message) then
+        elif not (isNull error?data) && not (isNull error?data?message) then
             readString error?data?message
         else
             readString error?message

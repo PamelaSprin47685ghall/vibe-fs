@@ -479,6 +479,8 @@ Composition/Durable/Projection.fsi
 Composition/Durable/Projection.fs
 Execution/Session/RecoveryClosureProjection.fsi
 Execution/Session/RecoveryClosureProjection.fs
+Execution/Session/RecoveryClosureSurface.fsi
+Execution/Session/RecoveryClosureSurface.fs
 Interaction/Authority/Ledger.fsi
 Interaction/Authority/Ledger.fs
 Interaction/Authority/ProjectionQueries.fsi
@@ -735,6 +737,8 @@ Execution/Routing/ModelCapacity/Surface.fsi
 Execution/Routing/ModelCapacity/Surface.fs
 Execution/Routing/ModelRouting.fsi
 Execution/Routing/ModelRouting.fs
+OpenCode/Host/ExternalToolNamespace.fsi
+OpenCode/Host/ExternalToolNamespace.fs
 OpenCode/Host/ManagedAgentConfig.fsi
 OpenCode/Host/ManagedAgentConfig.fs
 OpenCode/Host/ManagedAgentConfigSurface.fsi
@@ -847,8 +851,8 @@ OpenCode/Host/ModelRoutingSurface.fsi
 OpenCode/Host/ModelRoutingSurface.fs
 Foundation/HostSessionPort.fsi
 Foundation/HostSessionPort.fs
-Host/FissionPort.fsi
-Host/FissionPort.fs
+Host/Ports/FissionPort.fsi
+Host/Ports/FissionPort.fs
 Execution/Session/Attachment/CompanionLeaseRuntime.fsi
 Execution/Session/Attachment/CompanionLeaseRuntime.fs
 Execution/Session/Attachment/AttachmentSurface.fsi

@@ -38,7 +38,6 @@ test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone
     installDelegationHost(
       engineerSession,
       notExercised,
-      notExercised,
       async (...args) => {
         calls.push(args)
         return { ok: true, groupId: 'group-fission-member' }
@@ -49,7 +48,7 @@ test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone
     installDelegationHost(managerSession, async (...args) => {
       forkCalls.push(args)
       return { ok: true, name: 'fork-child', agentId: 'fork-agent', outcome: 'created' }
-    }, notExercised, notExercised, notExercised, notExercised)
+    }, notExercised, notExercised, notExercised)
 
     const engineerOutcome = await execute(
       dir,
@@ -57,6 +56,8 @@ test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone
       'en',
       engineerSession,
       {
+        name: 'fission-payload',
+        planB: '等待裂变回执，保留原请求状态。',
         program: program(
           `    const arity = String(this.fission.length);
     const receipt = await this.fission({ charge: "explore three designs", lanes: 2 });
@@ -86,7 +87,7 @@ test('WHAT[intra-participant-parallelism-018] fission forwards the payload alone
       'Manager',
       'en',
       managerSession,
-      { program: program(`    await this.fork("first call");
+      { name: 'fork-payload', planB: '等待两次派工回执，保留已发出的请求。', program: program(`    await this.fork("first call");
     await this.fork("second call");
     return { forkArity: String(this.fork.length) };`) },
       3000,

@@ -77,7 +77,7 @@ export const forkPayload = ({
   payload,
 }) => ForkModule.render('en', {
   Assignment: assignment,
-  CommissionerRecord: commissionerRecord ?? parentRecord ?? null,
+  CommissionerRecord: [commissionerRecord ?? parentRecord].filter(value => value != null),
   Attachment: attachment ?? null,
   RootRequirements: originalUserRequirements,
   Payload: payload ?? null,
@@ -86,7 +86,7 @@ export const forkPayload = ({
 export const forkRelay = (assignment, commissionerRecord, requirements = [], payload) =>
   ForkModule.render('en', {
     Assignment: assignment,
-    CommissionerRecord: commissionerRecord ?? null,
+    CommissionerRecord: [commissionerRecord].filter(value => value != null),
     Attachment: null,
     RootRequirements: requirements,
     Payload: payload ?? null,

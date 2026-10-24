@@ -57,7 +57,8 @@ module HostIngressCodec =
             Some(descriptorValue descriptor)
 
     let private valueProperty (source: obj) (name: string) =
-        if isNull source then None
+        if isNull source then
+            None
         else
             let v = safeHostProperty source name
             if isNull v then None else Some v

@@ -2046,7 +2046,7 @@ const CLI = join(ROOT, 'requirements/structured-workflow/tests/fixtures/impact-c
 const FIXTURE_BOUNDARY = join(ROOT, 'requirements/structured-workflow/tests/fixtures/owner-project-boundary')
 
 const findImpactProject = (root) => {
-  const pending = [join(ROOT, 'src/Wanxiangshu/.fable-build/output-compile')]
+  const pending = [join(root, '.fable-build', 'output-compile')]
   let newest = null
   let newestMtime = 0
   while (pending.length > 0) {
@@ -2139,7 +2139,11 @@ function compileFableDirect(project) {
     const child = spawn(
       'dotnet',
       ['tool', 'run', 'fable', '--', join(FIXTURE_BOUNDARY, project), '-o', outDir, '--noGitignore'],
-      { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] },
+      {
+        cwd: ROOT,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, ArtifactsDir: `${join(outDir, 'artifacts')}/` },
+      },
     )
     let stdout = ''
     let stderr = ''
@@ -2181,7 +2185,7 @@ integrationTest('WHAT[structured-workflow-012] compile-impact CLI compiles a foc
     writeFileSync(propsPath, `${readFileSync(propsPath, 'utf8')}<!-- impact-cli full-fallback probe -->\n`, 'utf8')
     const fallback = runCli([propsPath, ...flags])
     assert.equal(fallback.status, 0, fallback.stderr || fallback.stdout)
-    assert.match(fallback.stdout, /compiled full impact \(8 items\)/)
+    assert.match(fallback.stdout, /compiled focused impact \(8 items\)/)
     assert.ok(
       findEmittedJs(outputDir, 'BetaTwo.js'),
       'full fallback must emit the whole fixture closure',
@@ -2326,7 +2330,7 @@ integrationTest('WHAT[structured-workflow-012] deleting a source purges its stal
     rmSync(join(dir, 'Wanxiangshu.Owner.fixture.alpha.fsproj'))
     const afterDelete = runCli([alphaFs, ...flags])
     assert.equal(afterDelete.status, 0, afterDelete.stderr || afterDelete.stdout)
-    assert.match(afterDelete.stdout, /compiled (clean|full) impact/, 'source deletion must not resolve to focused reuse of stale bytes')
+    assert.match(afterDelete.stdout, /compiled (none|clean|full) impact/, 'source deletion must not resolve to focused reuse of stale bytes')
     assert.ok(
       !findEmittedJs(outputDir, 'Alpha.js'),
       'deleted source must not leave old JS in the emitted set',

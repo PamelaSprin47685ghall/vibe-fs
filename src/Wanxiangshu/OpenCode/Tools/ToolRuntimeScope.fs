@@ -140,8 +140,11 @@ type ToolRuntimeScope
     // fails closed: a silent no-op success would advance the loop without
     // authority.
     // Host-only BTW transport. The scope/negotiation actor retains all protocol state.
+    // DSL-MUTABLE: resource — attached negotiation transport for delegated questions
     let mutable askDelegator: (string -> string -> string -> Task<Result<string, string>>) option = None
+    // DSL-MUTABLE: resource — attached steer transport for negotiation answers
     let mutable steerRecipient: (string -> string -> string -> Task<Result<unit, string>>) option = None
+    // DSL-MUTABLE: resource — attached consultation transport for archived scopes
     let mutable askArchivedScope: (string -> obj -> string -> Task<Result<string, string>>) option = None
 
     let continueManagerLoop =
@@ -939,6 +942,7 @@ type ToolRuntimeScope
     let privateConsultationObserver (recipient: string) (receipt: string) (confirm: string -> string -> bool) : ContinuationAcceptanceObserver =
         let observerGate = obj ()
         let subscriptions = ResizeArray<IDisposable>()
+        // DSL-MUTABLE: resource — 记录本次观察器是否已经确认并释放订阅。
         let mutable confirmed = false
 
         let release () =
@@ -1749,7 +1753,7 @@ type ToolRuntimeScope
             let durableBlockers =
                 let commonDir =
                     workspaceDirectory
-                    |> Option.bind (fun ws -> Wanxiangshu.Persistence.Journal.RuntimePath.forStateRoot ws |> Some)
+                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRootSync
 
                 commonDir
                 |> Option.map (fun commonDir ->

@@ -86,11 +86,11 @@ const provider = await startHttpServer(async (request, response) => {
       return
     }
     if (text.includes('OL002_A_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 0, carry: ['OL002_A_VIEW'] }))
+      sendSSE(response, jsViewCall('ol002-a-view', undefined))
       return
     }
     if (text.includes('OL002_B_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-b-view', { prefixUntil: 0, carry: ['OL002_B_VIEW'] }))
+      sendSSE(response, jsViewCall('ol002-b-view', undefined))
       return
     }
     sendJSON(response, 500, { error: `unexpected prompt text: ${text.slice(0, 200)}` })

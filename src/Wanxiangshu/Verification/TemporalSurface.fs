@@ -1014,33 +1014,56 @@ module TemporalSurface =
             let logicalRunId = logicalRunOf (fact?payload?LogicalRunId)
             let authorityRoot = authorityRootOf (fact?payload?AuthorityRootUserMessageId)
 
-            let source: PromptFactCases =
-                PromptFactCases.AuthorityManagedRunTerminal
-                    { SessionId = sessionId
-                      LogicalRunId = logicalRunId
-                      AuthorityRootUserMessageId = authorityRoot
-                      FactId = sprintf "terminal-%s" (LogicalRunId.value logicalRunId) }
+            let expectedKind =
+                match factOfJs fact with
+                | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted accepted)) ->
+                    accepted.ExpectedClosureKind
+                | _ -> failwith "需要 AuthorityRootAccepted 事实"
 
-            let closure: PromptFactCases =
-                PromptFactCases.AuthorityLogicalRunClosed
-                    { SessionId = sessionId
-                      LogicalRunId = logicalRunId
-                      AuthorityRootUserMessageId = authorityRoot
-                      RootKind = "HumanRoot"
-                      ClosureWitness =
-                        sprintf
-                            "[\"ManagedLogicalRunTerminal\",\"%s\",\"terminal-%s\"]"
-                            (LogicalRunId.value logicalRunId)
-                            (LogicalRunId.value logicalRunId) }
+            if expectedKind = "HumanRootManagerLife" then
+                let closure: PromptFactCases =
+                    PromptFactCases.AuthorityLogicalRunClosed
+                        { SessionId = sessionId
+                          LogicalRunId = logicalRunId
+                          AuthorityRootUserMessageId = authorityRoot
+                          RootKind = "HumanRoot"
+                          ClosureWitness =
+                            JS.JSON.stringify
+                                [| "LifeCompleted"
+                                   SessionId.value sessionId
+                                   "retirement-" + LogicalRunId.value logicalRunId |] }
 
-            let afterSource = Fold.foldFact current (Fact.Agent(AgentFact.Prompt source))
-
-            match afterSource with
-            | Error _ -> current
-            | Ok withSource ->
-                match Fold.foldFact withSource (Fact.Agent(AgentFact.Prompt closure)) with
+                match Fold.foldFact current (Fact.Agent(AgentFact.Prompt closure)) with
                 | Ok closed -> closed
-                | Error _ -> withSource
+                | Error error -> failwithf "身份复用场景闭合失败：%A" error
+            else
+                let source: PromptFactCases =
+                    PromptFactCases.AuthorityManagedRunTerminal
+                        { SessionId = sessionId
+                          LogicalRunId = logicalRunId
+                          AuthorityRootUserMessageId = authorityRoot
+                          FactId = sprintf "terminal-%s" (LogicalRunId.value logicalRunId) }
+
+                let closure: PromptFactCases =
+                    PromptFactCases.AuthorityLogicalRunClosed
+                        { SessionId = sessionId
+                          LogicalRunId = logicalRunId
+                          AuthorityRootUserMessageId = authorityRoot
+                          RootKind = "HumanRoot"
+                          ClosureWitness =
+                            sprintf
+                                "[\"ManagedLogicalRunTerminal\",\"%s\",\"terminal-%s\"]"
+                                (LogicalRunId.value logicalRunId)
+                                (LogicalRunId.value logicalRunId) }
+
+                let afterSource = Fold.foldFact current (Fact.Agent(AgentFact.Prompt source))
+
+                match afterSource with
+                | Error _ -> current
+                | Ok withSource ->
+                    match Fold.foldFact withSource (Fact.Agent(AgentFact.Prompt closure)) with
+                    | Ok closed -> closed
+                    | Error _ -> withSource
 
         let refused reason =
             box

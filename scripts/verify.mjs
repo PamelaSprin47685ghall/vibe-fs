@@ -54,6 +54,7 @@ export function verificationSteps({ root = ROOT, release = false, verbose = fals
       label: 'unit',
       cmd: process.execPath,
       argv: [path.join(root, 'requirements/verification-system/tests/run.mjs')],
+      timeoutMs: Number(hostEnv.SUITE_BACKSTOP_MS) > 0 ? Number(hostEnv.SUITE_BACKSTOP_MS) : (release ? 1_200_000 : 600_000),
       env: getTestEnv({
         verbose,
         hostEnv,

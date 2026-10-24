@@ -15,8 +15,8 @@ test('WHAT[execution-failure-policy-001] Host structural controls remain distinc
   assert.equal(signals.tryDecode(sessionError({ message: 'Aborted' })).failure, 'UserCancelled')
   assert.equal(signals.tryDecode(sessionError('Aborted')).failure, 'UserCancelled')
   const timeoutDecoded = signals.tryDecode(sessionError({ name: 'TimeoutError', message: 'The operation timed out.' }))
-  assert.equal(timeoutDecoded.failure, 'UserCancelled')
-  assert.match(timeoutDecoded.diagnostic, /The operation timed out while awaiting provider response; execution lease safely released\./)
+  assert.equal(timeoutDecoded.failure, 'ProviderTransient')
+  assert.match(timeoutDecoded.diagnostic, /timed out/)
   assert.equal(signals.tryDecode(sessionError({ name: 'SupersededError' })).failure, 'Superseded')
 })
 

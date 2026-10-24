@@ -92,18 +92,23 @@ module JsDeliveredValues =
         { Key = "material:" + JS.JSON.stringify text
           Text = text }
 
+    let private historyEntryPiece (entry: obj) =
+        let text =
+            if isNull entry then ""
+            elif valueType entry = "string" then unbox<string> entry
+            else string entry?text
+
+        historyPiece text
+
     /// Only selected history enters a transfer. Current prose is added separately.
     let select (sessionId: string) (view: obj option) (already: Set<string>) : ReturnedPiece list =
         match view with
         | Some raw when not (isNull raw) ->
-            let items: obj array =
-                if isArray raw then unbox<obj array> raw
-                else [||]
+            let items: obj array = if isArray raw then unbox<obj array> raw else [||]
+
             items
             |> Array.toList
-            |> List.map (fun entry ->
-                let text = if isNull entry then "" elif valueType entry = "string" then unbox<string> entry else string entry?text
-                historyPiece text)
+            |> List.map historyEntryPiece
             |> List.filter (fun piece -> not (Set.contains piece.Key already))
         | _ -> []
 

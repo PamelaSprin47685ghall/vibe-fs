@@ -451,6 +451,7 @@ module JsToolWorkflow =
             let staging = ResizeArray<JsStagedMutation>()
             let reads = ResizeArray<JsExplicitFileRead>()
             let ledger = JsToolsBindings.createLedger persistence
+            // DSL-MUTABLE: resource — 保存本次结算失败，供回执映射保留原始原因。
             let mutable settlementFailure: JsFailure option = None
 
             let api =

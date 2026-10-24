@@ -104,8 +104,7 @@ module OpenCodeHostPorts =
     let private sharedSignalSource = Events.HostSignalSource()
 
     /// Broadcast a neutral host signal to all active subscribers.
-    let publishSignal (signal: HostSignal) : Task =
-        sharedSignalSource.Publish signal
+    let publishSignal (signal: HostSignal) : Task = sharedSignalSource.Publish signal
 
     type private UnsupportedToolRegistrar() =
         interface IToolRegistrar with
@@ -126,14 +125,20 @@ module OpenCodeHostPorts =
                         ManagedAgent.requiredNames
                         |> List.map (fun name ->
                             let desc =
-                                if not (isNull configAgents) && not (isNull configAgents?(name)) && not (isNull configAgents?(name)?description) then
-                                    Some (string configAgents?(name)?description)
+                                if
+                                    not (isNull configAgents)
+                                    && not (isNull configAgents?(name))
+                                    && not (isNull configAgents?(name)?description)
+                                then
+                                    Some(string configAgents?(name)?description)
                                 else
                                     None
+
                             { Role = AgentRole name
                               Description = desc
                               Route = None
                               ToolPolicy = None })
+
                     return Ok specs
                 }
 

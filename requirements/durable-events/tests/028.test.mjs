@@ -9,6 +9,8 @@ import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as store from '../../../dist/Persistence/EventStore/Surface.js'
 import * as retention from '../../../dist/Persistence/EventStore/RetentionSurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as hostSurface from '../../../dist/Change/Host/Surface.js'
+import * as workspaceSurface from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 
 function git(directory, ...args) {
   return execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', '-C', directory, ...args], {
@@ -106,4 +108,22 @@ test('WHAT[durable-events-028] symlink state and ignore files cannot redirect pe
   await assert.rejects(() => initializeStateRoot(repo), /regular file/)
   await assert.rejects(() => journal.JournalSurface_initializeStateRoot(repo), /regular file/)
   assert.deepEqual(readFileSync(exclude), before)
+})
+
+test('WHAT[durable-events-028] a missing manager worktree still reads work from the primary state root', async t => {
+  const { base, repo } = fixture(t)
+  const stateRoot = await journal.JournalSurface_initializeStateRoot(repo)
+  const store = workspaceSurface.acquire(stateRoot)
+  const workId = 'ses-missing-worktree'
+  try {
+    const opened = await lifecycle.seedOpen(store, 'S4', workId, stateRoot, 0n)
+    assert.equal(opened.ok, true, opened.error)
+    const missingWorktree = path.join(repo, 'not-created-yet')
+    const signal = await hostSurface.loopSignalOf(missingWorktree, workId)
+    assert.equal(signal.kind, 'None')
+    assert.equal(existsSync(path.join(repo, 'wanxiangshu')), false)
+    assert.equal(git(repo, 'status', '--porcelain'), '')
+  } finally {
+    workspaceSurface.release(stateRoot)
+  }
 })

@@ -562,7 +562,6 @@ export class StrictMockProvider {
         console.error(`[MSG-ROLES] ${roles}`);
         const recentToolResults = msgs
           .filter((message) => message?.role === 'tool' || message?.role === 'toolResult')
-          .slice(-4)
           .map((message) => String(message?.content ?? message?.text ?? '').slice(0, 300));
         console.error(`[MSG-TOOL-RESULTS] ${JSON.stringify(recentToolResults)}`);
       } catch {}

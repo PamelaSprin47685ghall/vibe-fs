@@ -257,6 +257,7 @@ module ManagedAgentConfig =
         ManagedAgentCatalog.allRoles
         |> List.map (fun role ->
             let name = Roles.roleLabel role
+
             { Role = AgentRole name
               Description = None
               Route = None

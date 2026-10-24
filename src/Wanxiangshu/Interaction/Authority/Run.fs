@@ -665,8 +665,11 @@ module PromptAuthorityRun =
             projection.TerminalSources
             |> Map.tryFind logicalRunId
             |> Option.exists (fun sources -> Map.containsKey factId sources)
-        if hasSource then Ok()
-        else Error(sprintf "closure witness cites absent source %s" factId)
+
+        if hasSource then
+            Ok()
+        else
+            Error(sprintf "closure witness cites absent source %s" factId)
 
     let private verifyClosureContract
         (contract: PromptAuthority.AcceptedRootClosure)
@@ -798,8 +801,7 @@ module PromptAuthorityRun =
         match sourceKind, ownerLogicalRunId, source.OwnerLogicalRunId with
         | "HumanRootManagedRun", _, _ -> Ok("", source)
         | _, Some owner, Some matched when owner = matched -> Ok(owner, source)
-        | _ ->
-            Error(sprintf "the %s source terminal of run %s names no owner logical run" sourceKind childLogicalRunId)
+        | _ -> Error(sprintf "the %s source terminal of run %s names no owner logical run" sourceKind childLogicalRunId)
 
     let uniqueTerminalSource
         (sources: PromptAuthority.AuthorityTerminalSource list)

@@ -86,6 +86,16 @@ test('WHAT[host-boundary-011] HOST_016_alternating_messages_remain_untouched_wit
   assert.equal(result[1].parts[0].text, 'A1')
   assert.equal(result[2].parts[0].text, 'U2')
 })
+test('WHAT[host-boundary-011] HOST_030_non_array_parts_projects_safely_to_empty_without_throwing', () => {
+  const stringParts = sanitizeMessage({ info: { role: 'assistant' }, parts: 'not-an-array' })
+  assert.deepEqual(Array.from(stringParts.parts), [{ type: 'text', text: '...' }])
+
+  const objectParts = sanitizeMessage({ info: { role: 'assistant' }, parts: { type: 'text', text: 'x' } })
+  assert.deepEqual(Array.from(objectParts.parts), [{ type: 'text', text: '...' }])
+
+  const userStringParts = sanitizeMessage({ info: { role: 'user' }, parts: 'not-an-array' })
+  assert.deepEqual(Array.from(userStringParts.parts), [{ type: 'text', text: '#' }])
+})
 }
 
 {

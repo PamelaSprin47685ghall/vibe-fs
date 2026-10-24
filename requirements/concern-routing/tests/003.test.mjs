@@ -34,7 +34,7 @@ test('WHAT[concern-routing-003] publish is retired from ToolRegistry and provide
   assert.equal(existsSync(resolve(root, 'resources/provider/tool/js-program/deliver')), false, 'retired js-program/deliver resource must be absent')
   assert.match(read('resources/provider/tool/deliver/en.md'), /\bdeliver\b/i, 'lifecycle deliver contract is present')
   const delegationEn = read('resources/provider/tool/js-program/delegation-rules/en.md')
-  assert.match(delegationEn, /\b(?:js|this)\.fork\(/)
-  assert.match(delegationEn, /\b(?:js|this)\.join\(/)
+  assert.match(delegationEn, /\b(?:js\.|this\.)?fork\(/)
+  assert.match(delegationEn, /\b(?:js\.|this\.)?join\(/)
 })
 

@@ -10,19 +10,19 @@ import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-sy
 const here = path.dirname(fileURLToPath(import.meta.url))
 const installedTodoCanaryRunner = path.join(here, 'support/run-native-todo-replacement-canary.mjs')
 
-integrationTest('WHAT[obligation-ledger-002] programming-surface view declarations accumulate in the durable checkpoint window across todowrite-for-* roles', async () => {
+integrationTest('WHAT[obligation-ledger-002] programming-surface calls commit no checkpoint window or second todo projection across todowrite-for-* roles', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'obligation-view-window'
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
 
     const calls = [
-      { callID: 'view-cp-1', tool: 'todowrite-for-engineer', prefixUntil: 0, carry: [] },
-      { callID: 'view-cp-2', tool: 'todowrite-for-devops', prefixUntil: 0, carry: [] },
-      { callID: 'view-cp-3', tool: 'todowrite-for-manager', prefixUntil: 0, carry: [] },
-      { callID: 'view-cp-4', tool: 'todowrite-for-plan', prefixUntil: 0, carry: [] },
+      { callID: 'view-cp-1', tool: 'todowrite-for-engineer' },
+      { callID: 'view-cp-2', tool: 'todowrite-for-devops' },
+      { callID: 'view-cp-3', tool: 'todowrite-for-manager' },
+      { callID: 'view-cp-4', tool: 'todowrite-for-plan' },
     ]
 
-    for (const { callID, tool, prefixUntil, carry } of calls) {
+    for (const { callID, tool } of calls) {
       await hooks.event({
         event: {
           type: 'message.part.updated',
@@ -34,7 +34,7 @@ integrationTest('WHAT[obligation-ledger-002] programming-surface view declaratio
               callID,
               state: {
                 status: 'completed',
-                input: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixUntil, carry },
+                input: { program: 'class Js extends JsProgram { async run() { return {}; } }' },
               },
             },
           },
@@ -43,11 +43,15 @@ integrationTest('WHAT[obligation-ledger-002] programming-surface view declaratio
     }
 
     const snapshot = journalSurface.JournalSurface_snapshot(runtime.journal)
-    const window = snapshot.viewCheckpoints.find((entry) => entry.sessionId === sessionID)
-    assert.deepEqual(
-      window?.checkpoints,
-      calls.map((c) => ({ callId: c.callID })),
-      'all four completed view declarations are recorded in order',
+    assert.equal(
+      snapshot.viewCheckpoints,
+      undefined,
+      'no checkpoint window is recorded for any todowrite-for-* role',
+    )
+    assert.equal(
+      snapshot.sessionProjections[sessionID]?.todos,
+      undefined,
+      'no second todo projection is maintained for the session',
     )
   })
 })
@@ -61,7 +65,7 @@ const runInstalledTodoCanary = () => {
   return JSON.parse(launched.stdout)
 }
 
-integrationTest('WHAT[obligation-ledger-002] installed OpenCode Host runs todowrite-for-engineer with view and commits ViewCheckpointCommitted per session', () => {
+integrationTest('WHAT[obligation-ledger-002] installed OpenCode Host runs todowrite-for-engineer without native todowrite or checkpoint facts', () => {
   const evidence = runInstalledTodoCanary()
 
   assert.equal(evidence.versions.opencode, '1.18.29', `OpenCode version drifted: ${evidence.versions.opencode}`)
@@ -69,13 +73,8 @@ integrationTest('WHAT[obligation-ledger-002] installed OpenCode Host runs todowr
   assert.equal(evidence.observed.todowriteAdvertised, false, 'native todowrite must not be advertised on the Engineer provider wire')
   assert.equal(evidence.observed.programmingToolAdvertised, true, 'todowrite-for-engineer must be advertised on the Engineer provider wire')
   assert.deepEqual(
-    evidence.observed.checkpointsBySession[evidence.sessions.sessionA],
-    ['ol002-a-view'],
-    'session A records only the call that declared compression',
-  )
-  assert.deepEqual(
-    evidence.observed.checkpointsBySession[evidence.sessions.sessionB],
-    ['ol002-b-view'],
-    'session B records its own view checkpoint without touching session A',
+    evidence.observed.checkpointsBySession,
+    {},
+    'programming-surface calls emit no ViewCheckpointCommitted facts on any session',
   )
 })
