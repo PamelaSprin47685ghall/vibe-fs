@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ⑩/⑪/⑫/⑬ host-neutral interface gates (HNI-04, HNI-11, AGENTS_MIGRATION.md).
+// ⑩/⑪/⑫/⑬ host-neutral interface gates (HNI-04, HNI-11, root AGENTS.md).
 //
 // ⑪ port-purity (strict): every file under src/Wanxiangshu/Host/Ports/** (.fs and .fsi) references no adapter
 //   namespace and no product domain — only Foundation, Wanxiangshu.Host and System. The scope is discovered
@@ -13,7 +13,7 @@
 //   declares exactly `Wanxiangshu.Host.Domain`; a file directly under Host/ declares neither. The
 //   The scope is discovered from the sources.
 //
-// Honest scope notes (see AGENTS_MIGRATION.md, HNI gates):
+// Honest scope notes (see root AGENTS.md, HNI gates):
 //   * The domain seams (P-13 command declaration / P-14 delegation-caller / P-15 delegation-command /
 //     P-16 pair guidance) live in src/Wanxiangshu/Host/Domain/, NOT under Host/Ports/. They are tier B —
 //     a lane's own seam, never mirrored to the TypeScript port surface — so they are deliberately

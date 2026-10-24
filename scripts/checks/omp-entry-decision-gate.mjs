@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Gate ⑬ (O-3): the omp entry module must hold no product decision.
 //
-// Rule O-3 (`AGENTS_MIGRATION.md`,
+// Rule O-3 (root `AGENTS.md`,
 // "Decided rules") fixes the omp entry module:
 //
 //   "The omp entry module is hand-written and product-free, and the Fable-built

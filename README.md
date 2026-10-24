@@ -188,7 +188,7 @@ artifacts/     中间产物与本地发布产物，不提交
 - 生产 F# 唯一根：`src/Wanxiangshu/`
 - 规范导航 [requirements/README.md](requirements/README.md)；历史 Clause 与变更工作流已归档（2026-08-14 cutover；git 历史可回溯）
 - 施工与提案导航 [proposals/README.md](proposals/README.md)；旧计划与已结束批次见[归档索引](proposals/archive/README.md)
-- `wanxiangshu → wanxiangli` 抽取与 HNI 迁移统一从 [AGENTS_MIGRATION.md](AGENTS_MIGRATION.md)认领和验收；库就绪、实际接线和旧职责退出分别举证。
+- `wanxiangshu → wanxiangli` 抽取与 HNI 迁移统一从根 [AGENTS.md](AGENTS.md) 的迁移章节认领和验收；库就绪、实际接线和旧职责退出分别举证。
 - 测试全部包自有：`requirements/<package>/tests/`；共享 harness 在 `requirements/verification-system/tests/`（含 `support/`、unit runner、integration orchestrator、Long Stroke e2e）
 - 脚本：`scripts/build.mjs`、`scripts/check.mjs`、`scripts/checks/*`、`scripts/lib/walk.mjs`
 

@@ -14,4 +14,4 @@
 
 `plan`/游标的用例只证明纯规划与进程内游标：它们不证明单一请求文档真的到达顾问，也不证明完整 post-scope 视图真的从真实 terminal 读回——这两件事归 001/004 的缺口。002 覆盖 en 与 zh-CN 的实际记录渲染；资源成对性仍由 language parity 门禁与 provider-language 承担。
 
-纯规则本身（材料身份、增量、账本、读回）另由 wanxiangli `src/advisor/tests/001.test.mjs` 证明。本包 002/003 经主仓 dist 走的是同一个库实现（CUT-39 接线变异证据与限制见 [迁移指南](../../../AGENTS_MIGRATION.md)）。
+纯规则本身（材料身份、增量、账本、读回）另由 wanxiangli `src/advisor/tests/001.test.mjs` 证明。本包 002/003 经主仓 dist 走的是同一个库实现（CUT-39 接线变异证据与限制见根 [AGENTS.md](../../../AGENTS.md) 的迁移章节）。

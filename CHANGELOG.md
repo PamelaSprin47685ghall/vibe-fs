@@ -2,7 +2,7 @@
 
 ## Unreleased — 迁移文档统一入口
 
-- `wanxiangshu → wanxiangli` 抽取、Lifecycle cutover 与 HNI 的迁移契约、施工状态、遗留项和历史验收边界统一收敛到根目录 `AGENTS_MIGRATION.md`；删除原分散迁移文档并更新入口。该文件未来替换 `AGENTS.md`，本次不替换现有协作规则。
+- `wanxiangshu → wanxiangli` 抽取、Lifecycle cutover 与 HNI 的迁移契约、施工状态、遗留项和历史验收边界统一合入根目录 `AGENTS.md`，保留既有协作规则；删除原分散迁移文档及独立迁移指南并更新入口。每包迁走部分程序状态及其行为，最终全部迁走，`wanxiangshu = empty`。
 - 正式 WHAT/GAP、非迁移产品计划、库 API 参考和可执行适配器/夹具保留；历史验收不冒充本轮运行结果。
 
 ## Unreleased — resetScope 协议与自然停机返回
@@ -42,7 +42,7 @@
   - 干净基线对照（HEAD `70e9e1732` + gitlink `c2afb1af`，临时 worktree 构建后运行）：repository-programming 245/344（99 fail）、process-execution 166/182（13 fail）、host-boundary 228/246（13 fail）。当前 repository-programming 333/350（17 fail）、process-execution 172/186（11 fail），残余失败均为基线失败子集；本轮修复的 `repository-programming-005` 是唯一新增后又被解决的一项。
   - `node scripts/check.mjs`：仅剩 12 条既有 `js-boundary-gate` 问题（context-compression 031、delegation 033、interaction-authority 018），均来自其他并行未提交工作。
 - **未解与未测**：17 条 `repository-programming` 失败、11 条 `process-execution` 失败与 `host-boundary-013` 属基线既有欠账，本轮未修；12 条 js-boundary 问题同样不属本轮文件。Sphinx 的物理 provider 适配仍未接线：闭环为 start → 计划 → 持久派发意图 → worker 提交结果 → answer，未声称已调用外部模型。未运行真实 provider、真实远端 Git 发布、部署与 Long Stroke e2e。两仓工作树仍有与本轮无关的未提交改动（子模块 13 项、宿主 177 项），未纳入提交。
-- **文档归位（历史）**：根目录《保姆级交接与展望》的会话端口残留清单曾移入 HNI 证据文档，现统一收录于 `AGENTS_MIGRATION.md`；其余历史快照随该工作稿退役。
+- **文档归位（历史）**：根目录《保姆级交接与展望》的会话端口残留清单曾移入 HNI 证据文档，现统一收录于根 `AGENTS.md` 的迁移章节；其余历史快照随该工作稿退役。
 
 ## Unreleased — HandleWorkConsumed 不再因过期 cell 触发 journal semantic cut
 
@@ -97,7 +97,7 @@
 ## Unreleased — 2026-10-22 文档收口批次（Ledger lane）
 
 - **GAP 台账（`requirements/GAP.md`）**：17 行列形状归一（表 1 GAP-025/038；表 2 GAP-210/077；表 3 GAP-225…GAP-237），0 行形状不一致；203 行 GAP 行一行未删、无重复 id；状态词未改（PARTIAL 113 / CLOSED 53 / ARCHIVED 18 / OPEN 10 / RETIRED 9）。文字实际变化 9 行（GAP-025 转义 `\|`、GAP-038/210/077 并格、GAP-231…237 前缀中性化 + 并格）；GAP-005/GAP-050 维持 `OPEN`（当前合同下无 faithful mechanical oracle，需人工审阅）。本批 register 的 GAP 证据更新：GAP-075、GAP-088、GAP-123 各追加 lane checkpoint 证据注记，**状态维持 PARTIAL**（GapBehavior 为设计态无生产改动；Authority 6 项编译修复已落地但终态生产者未接线）；无 GAP 在本批被标记 CLOSED。
-- **HNI 端口登记（现归 `AGENTS_MIGRATION.md`）**：HNI-12 逐行审证追加（A1 `SessionInfo.Workspace` 已落地、A2 产品侧订阅、P-04 `ProviderRun`/`ToolAdmission`、P-14/P-15 `DelegationEnvironment`）；next free port id 仍为 **P-20**（A1 仅增字段，未分配新家族）。OpenCode 侧 P-04/P-05/P-06/P-07 仍无 WIRED-OC（`Unsupported*` 或 omp-only），不标 RETAINED。
+- **HNI 端口登记（现归根 `AGENTS.md` 迁移章节）**：HNI-12 逐行审证追加（A1 `SessionInfo.Workspace` 已落地、A2 产品侧订阅、P-04 `ProviderRun`/`ToolAdmission`、P-14/P-15 `DelegationEnvironment`）；next free port id 仍为 **P-20**（A1 仅增字段，未分配新家族）。OpenCode 侧 P-04/P-05/P-06/P-07 仍无 WIRED-OC（`Unsupported*` 或 omp-only），不标 RETAINED。
 - **BOARD / CUT-36**：CUT-36 维持 `DOING`（`.Herdchestra/takeover/secondhost.md` checkpoint 缺失，无 lane-verified smoke；阻塞原因已写入 card §12）。
 - **交接文（`保姆级交接与展望.md`）**：顶部新增权威段（目标、十一条并行线、已核实事实、本机证据不随 Git 分发）；清除 11 处旧额度/停电/内存紧张措辞（最终扫描 0 命中），历史事实与验证失败保留。
 - **证据来源**：`.Herdchestra/takeover/{authority,tools,hni,domains,gap-behavior,integration-cases,verification}.md`；`fork.md` 与 `secondhost.md` 不存在，已登记为缺失。
@@ -162,11 +162,11 @@
   - **不能说「失败全是启动」**：ownership/diagnostic-marker 与 `caught.json` 两类是同一预算耗尽的**下游后果**（叶子根本没跑到写 marker 那一步）；另有若干条在 **teardown** 里失败（`ps` 自己超时，见上一条），这是与启动竞态不同的症状，不能并入「只是启动」。
   - **对照跑只作诊断，不是通过验收**：同一 fixture 在 30000 ms 放宽窗口下 exit 0、8/8 通过并给出完整 `runner:summary`（`/home/hermes/tmp/vs-006/repro/runs/z1/out.txt`）；`run-inner.mjs` 单跑 8 passed / 0 failed。**在这两组对照跑（直接内层跑 + 放宽窗口跑）里没有丢失任何真实裁决**——该结论**仅限这两组对照跑，并未在未插桩的失败跑上全局证明**（在未插桩的跑里，fixture 是在裁决可被观测之前就被杀掉的）。红因是预算/次序问题；但 **30000 ms 是诊断仪器，绝不构成验收口径**，未改配置下套件仍然红。
   - 红是**负载相关**的：本机当时 loadavg 21.6/32.4/36.4（4 CPU），裸 `node -e 0` 需 361–748 ms；空闲机器上同 fixture 通过。
-  - 迁移相关根因与接手边界现见 `AGENTS_MIGRATION.md`。**本条未改任何断言、预算或产品看门狗**，红例仍然敞开。
+  - 迁移相关根因与接手边界现见根 `AGENTS.md` 迁移章节。**本条未改任何断言、预算或产品看门狗**，红例仍然敞开。
 
 ## Unreleased — GAP-075 / GAP-088 残余清单转真实 oracle（gap-075-088 切片）
 
-- **范围**：把 [迁移指南](AGENTS_MIGRATION.md) CUT-41 登记在两条台账行的残余工作落成独立、可单独变红的测试，
+- **范围**：把根 [AGENTS.md](AGENTS.md) 迁移章节 CUT-41 登记在两条台账行的残余工作落成独立、可单独变红的测试，
   并在每条测试旁写清**根因**。**未改任何生产代码**（`src/` 与子模块 `wanxiangli` 均未动）。
 - **GAP-075（`capability-enforcement`）**
   - `requirements/capability-enforcement/tests/025.test.mjs:422`
@@ -199,7 +199,7 @@
   `node scripts/checks/architecture.mjs` → `architecture: OK`。
   故 **GAP-075 与 GAP-088 均保持 PARTIAL**，不改记 CLOSED。
 - **台账与文档同步**：`requirements/GAP.md`（GAP-075 / GAP-088 两行改写为「已落地 oracle + 根因 + 静态验证边界」）、
-  原 GAP-audit 与 CUT-41 看板/职责卡（迁移结论现统一见 `AGENTS_MIGRATION.md`）、
+  原 GAP-audit 与 CUT-41 看板/职责卡（迁移结论现统一见根 `AGENTS.md` 迁移章节）、
   `保姆级交接与展望.md`（2026-10-22 新段）。
 
 ## Unreleased — red-unit 测试线收编：027/006/prefix-stability/065/host-boundary-034

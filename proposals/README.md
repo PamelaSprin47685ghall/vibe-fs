@@ -2,7 +2,7 @@
 
 ## 抽取与 HNI 迁移的唯一入口
 
-`wanxiangshu → wanxiangli` 抽取、Lifecycle cutover 与 HNI 的边界、状态、未闭合项和验收统一见 [AGENTS_MIGRATION.md](../AGENTS_MIGRATION.md)。原分散施工指南、看板、职责卡和迁移证据说明已合并，不再维护第二套迁移文档。
+`wanxiangshu → wanxiangli` 抽取、Lifecycle cutover 与 HNI 的边界、状态、未闭合项和验收统一见根 [AGENTS.md](../AGENTS.md) 的迁移章节。原分散施工指南、看板、职责卡和迁移证据说明已合并，不再维护第二套迁移文档。
 
 下方旧队列和各 T/WP/GAP 保留非迁移产品工作的原始证据与证明义务，不作为第二张迁移排班表。已有 owner 的相同工作先交接、合并认领，不重复施工；迁移指南不增减正式 WHAT。
 
