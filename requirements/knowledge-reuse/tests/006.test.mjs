@@ -656,3 +656,69 @@ test('WHAT[knowledge-reuse-006] duplicate answer setter rolls back both staged f
     assert.deepEqual(bookkeeper.snapshot(tx).value, ['Q', 'A'])
   } finally { bookkeeper.abort(tx); bookkeeper.resetRuntime() }
 })
+
+test('WHAT[knowledge-reuse-006] awaitCompletion unwritten provider aborts staged transaction and take retains untouched slot', async () => {
+  const { bookkeeperStaging } = await import('wanxiangli/casebook')
+  // 1. 验证库语义：未 touched 的 take 被拒绝，但 slot 依然保持
+  const staging = bookkeeperStaging
+  const txUntouched = 'tx-test-untouched-retained'
+  staging.beginTransaction(txUntouched, 'Q-keep', 'A-keep')
+  assert.equal(staging.touched(txUntouched), false)
+  const takeRes = staging.take(txUntouched)
+  assert.equal(takeRes.tag, 1) // Error
+  assert.match(takeRes.fields[0], /not written/)
+  // 验证 slot 仍然保留在 staging 中
+  const snapRes = staging.snapshot(txUntouched)
+  assert.equal(snapRes.tag, 0) // Ok
+  assert.deepEqual(snapRes.fields[0], ['Q-keep', 'A-keep'])
+  staging.abort(txUntouched)
+
+  // 2. 验证宿主 awaitCompletion：未写入（Ok() 但 touched=false）时，错误返回且 slot 被 abort 清除
+  const { dir, handle, cleanup } = sandbox()
+  const txCaptured = []
+  const terminals = new Set()
+  let seq = 0
+  const unwrittenPort = {
+    CreateChildSession: async () => { throw new Error('not used') },
+    CreateSiblingSession: async (_ownerSessionId, physicalParentId) => {
+      seq += 1
+      const child = 'bk-unwritten-' + seq
+      return bookkeeper.acceptedSession(child)
+    },
+    AbortSession: async () => bookkeeper.aborted(),
+    SubscribeTerminal: (_childId, callback) => {
+      terminals.add(callback)
+      return { Dispose: () => terminals.delete(callback) }
+    },
+    SendPrompt: async (childSession, _text) => {
+      const sid = bookkeeper.sessionValue(childSession)
+      const tx = bookkeeper.txIdFor(sid)
+      txCaptured.push(tx)
+      // 运行一个合法程序，但不调用 setQuestion/setAnswer（未写入）
+      await bookkeeperTool.runProgram(
+        sid,
+        bookkeeperRequest('class Js extends JsProgram { async run() { return { changed: false }; } }')
+      )
+      for (const callback of terminals) callback(bookkeeper.sessionId(sid), bookkeeper.completed(sid))
+      return bookkeeper.acceptedPrompt()
+    }
+  }
+
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'initial', 'utf8')
+    assert.equal((await archiveWithBaseline(handle, dir, record('s-unwritten', 'Q0', 'A0', [fileRead('a.txt', casebook.contentHash('initial'))]))).ok, true)
+    writeFileSync(join(dir, 'a.txt'), 'changed-unwritten', 'utf8')
+    await installBookkeeperRuntime(unwrittenPort, ['s-unwritten'])
+    const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-unwritten')
+    assert.equal(refreshed.ok, false)
+    assert.match(String(refreshed.error), /did not write the staged case/)
+    assert.equal(txCaptured.length, 1)
+    const tx = txCaptured[0]
+    // 关键断言：slot 已被 abort 清除！
+    const snapAfterAbort = staging.snapshot(tx)
+    assert.equal(snapAfterAbort.tag, 1, 'did not write 分支必须已调用 abort(txId) 清除槽位')
+  } finally {
+    bookkeeper.resetRuntime()
+    cleanup()
+  }
+})

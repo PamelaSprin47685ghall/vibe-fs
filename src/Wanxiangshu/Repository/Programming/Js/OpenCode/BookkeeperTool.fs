@@ -9,7 +9,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Process
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
 

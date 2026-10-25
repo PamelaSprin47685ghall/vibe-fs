@@ -2,8 +2,8 @@ namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
 
-/// JS-native owner boundary for the Bookkeeper runtime and its staged provider
-/// transaction.
+/// JS-native surface for the Bookkeeper runtime delegating staged case
+/// transaction state to wanxiangli/casebook.
 module CasebookBookkeeperSurface =
 
     val createRefreshPrompt: input: obj -> string

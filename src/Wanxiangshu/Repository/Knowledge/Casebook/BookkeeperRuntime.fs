@@ -266,6 +266,7 @@ module BookkeeperRuntime =
                     do! retire sessions childId
                     return taken
                 | Ok() ->
+                    staging?abort (txId) |> ignore
                     do! retire sessions childId
                     return Error "bookkeeper program did not write the staged case"
             }

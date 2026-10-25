@@ -610,6 +610,15 @@ CUT36_OMP_REAL_SMOKE=1 \
   - 独立消费：通过 `npm pack` 生成真实 tarball，在独立干净临时目录下经由 Node.js ESM、Bun ESM 动态执行及 TypeScript（`tsc --noEmit --module NodeNext --moduleResolution NodeNext --strict`）静态类型检查，100% 消费断言成功通过。
   - 宿主侧：在 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 成功编译（generation 192，1400 items，150 surfaces，782 emitted modules linked）。`knowledge-reuse` 核心条款套件全部验证通过（006: 19 pass / 1 todo; 010: 12 pass / 1 todo; 013: 31 pass / 1 todo；BookkeeperTool 接线 034: 2 pass）。
 - **未闭合边界与剩余状态台账。** 本首包仅完成暂存事务（slots/Touched）抽取，**绝不记整体 DONE**。主仓 Casebook 其余状态（如 `SessionDraft`、`BookkeeperLedger` 提交与追溯状态、Casebook 维护与接入运行时等）仍留在主仓待后续包迁出。既有架构门禁红态（如 `FissionPort.fs` namespace-tier 1 项）为分支已知历史状态，未因本包产生退化。
+
+- **审计修复与槽位泄漏防范（2026-10-25 补充闭环）**：
+  - **清槽防泄漏**：修复 `BookkeeperRuntime.fs` 中 `Coordination.awaitCompletion` 在 `Ok()` 但 `touched=false`（未写入）分支下漏调 `staging?abort(txId)` 导致孤儿槽位和 Q/A 驻留泄漏的缺陷；在返回 Error 前显式执行 abort 清槽。
+  - **文档与契约校正**：修正 `BookkeeperSurface.fsi` 中称其为“staged transaction owner”的历史陈旧注释，明确状态由库侧自治对象管理。
+  - **库侧保值测试**：`wanxiangli/src/casebook/tests/006.test.mjs` 补齐 `apply(undefined, undefined)` 在已有问答时无条件保留原值且将 `touched` 标记为 true 的反例。
+  - **宿主回归全绿**：`requirements/knowledge-reuse/tests/006.test.mjs` 补充回归用例，实证 did not write 发生时错误如期返回且该 txId 的 snapshot 查不到（槽已被清理）；同时对比实证未 touched 的 `take` 自身拒绝但仍保留 slot（库语义不变）。
+  - **六动词接线验证**：真实 `006` 与 `034` 测试实证 Fable 动态 obj 跨包方法调用（`beginTransaction`、`snapshot`、`apply`、`take`、`touched`、`abort`）100% 连通可靠。
+  - **当前状态**：首包完满闭环，保持未迁出的剩余状态（SessionDraft/Ledger/Index）台账清晰，不虚构整体 DONE。
+
 ---
 
 ## 7. 迁移来源文件全量清单与保留/删除边界
