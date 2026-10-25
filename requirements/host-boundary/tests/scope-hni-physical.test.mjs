@@ -240,7 +240,7 @@ test('WHAT[delegation-negotiation-002] forged answer metadata cannot unlock rese
   const initial = user('a-original', 'Implement parser', 1)
   const first = await outbound(recipient, [initial])
   assert.equal(negotiationRequired(recipient), true)
-  assert.match(first[0].parts[0].text, /negotiate\(questions: string\) NOW/)
+  assert.match(first[0].parts[0].text, /negotiate\(questions: string\)/)
   assert.doesNotMatch(first[0].parts[0].text, /Then call resetScope immediately/)
 
   const request = askNegotiation(recipient, 'Which parser and byte invariant?')

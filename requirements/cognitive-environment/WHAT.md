@@ -85,3 +85,14 @@ Pair Hint 不承载 `assume`、`defer`、`publish`、`todowrite` 等微原语的
 **例外边界：** 是否值得等待、哪项事实不足、工作是否达标、哪个假设应继续调查等实质问题由模型按真实资料判断，不能因为句子含「如果/当」就移到宿主。模型决定内容，系统决定已知状态与权限。
 
 证明：tests/013.test.mjs、tests/017.test.mjs；host-boundary/tests/omp-scope-seam.test.mjs、scope-hni-physical.test.mjs 的真实 Fable/Host 正反物理断言；前缀冻结与委派回复门禁由原有 prefix-stability-010、delegation-negotiation WHAT 继续验证。
+
+
+## [018] 动态 Scope 提醒以宿主实见语言呈现
+
+唯一 `wanxiangli/pair-hint` ScopeSession owner 负责判断初始化、首次 `negotiate` 尚未真实送达、已初始化的零预算弱提醒与历史结果尾巴冻结，**不把任何一个已知状态条件写回永久 Provider 角色或系统提示**。其模型可见动态文字必须取自宿主当前真实的全局 ProviderLanguage（`en` 或 `zh-CN`），不因 Fable 默认值或先前英文会话而在简体中文请求中泄漏 `[System: ...]`、英文协商前缀或英文条件句。
+
+`planRequest` 和 `prepareNegotiationReply` 从唯一 HNI 绑定获取本次语言；领域判断和结果字段仍只有一个 owner。语言偏好改变只影响之后新生成的提示；同 prefix epoch 已呈现并按身份冻结的工具结果必须逐字重放，禁止二次本地化或改写持久工具结果。`[Remaining turnBudget: N]` 是既有 provider wire 精确协议标记，不是英语行为命令，不在此次改动中变形。未知语言值必须明确拒绝，不能静默按英文投射给中文会话。
+
+中文初始化指令、委派首次问答、协商回执 steer 前缀及零预算弱提醒分别验收；首次协商尚未答复时，非 reset 工具结果不推送 reset 初始化提醒。模型负责判断任务状态闭环何时真正完成，库只报告已用尽预算，不让模型自己猜该次是否已耗尽。host-boundary 的真实 OMP / OpenCode 请求副本不得修改历史或继承错误语言。
+
+证明：`wanxiangli/src/pair-hint/tests/009.test.mjs`（中英文、无效 locale、重复/冻结反例），`tests/018.test.mjs`（真实 Host HNI 语言偏好和跨轮字节冻结），原 `context-compression` [034][038]、prefix-stability [010] 与 host-boundary 物理测试保持通过。

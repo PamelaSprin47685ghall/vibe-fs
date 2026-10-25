@@ -27,6 +27,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 open Wanxiangshu.OpenCode.Host
@@ -1013,13 +1014,25 @@ type ToolRuntimeScope
         steerRecipient <- Some steer
 
     member _.Negotiate(recipient: string, questions: string) : string =
+        let language = ProviderLanguageBinding.forSessionText recipient
+        let chinese = language = ProviderLanguage.SimplifiedChinese
         let admitted = Wanxiangshu.Context.Scope.Surface.askNegotiation recipient questions
         let accepted = not (isNull admitted?ok) && unbox<bool> admitted?ok
-        if not accepted then
-            if isNull admitted?reason then "negotiate refused" else "negotiate refused: " + string admitted?reason
-        elif tryDispatchNegotiation (string admitted?delegator) recipient questions (string admitted?receipt) then
-            "Questions accepted for delivery to delegator. Continue working; their answer will arrive as a steer."
-        else "negotiate transport unavailable; question has not been sent"
+        let refusalLabel = if chinese then "协商被拒绝" else "negotiate refused"
+        let refusalSeparator = if chinese then "：" else ": "
+        let acceptedText =
+            if chinese then "问题已受理并发送给委托者。继续工作，答复将随后作为 steer 到达。"
+            else "Questions accepted for delivery to delegator. Continue working; their answer will arrive as a steer."
+        let unavailableText =
+            if chinese then "协商传输不可用，问题尚未发送。"
+            else "negotiate transport unavailable; question has not been sent"
+        let refusedText =
+            if isNull admitted?reason then refusalLabel
+            else refusalLabel + refusalSeparator + string admitted?reason
+
+        if not accepted then refusedText
+        elif tryDispatchNegotiation (string admitted?delegator) recipient questions (string admitted?receipt) then acceptedText
+        else unavailableText
 
     member _.AttachQuestionNotifier(notify: string -> Task<Result<unit, string>>) = questionNotifier <- Some notify
 

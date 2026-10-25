@@ -2,6 +2,7 @@ namespace Wanxiangshu.Context.Scope
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Participant.Provider
 
 /// Host-neutral scope owner binding; all state and decisions belong to wanxiangli.
 module Surface =
@@ -28,10 +29,16 @@ module Surface =
     let onTurnStart (sessionId: string) : unit = owner?startTurn(sessionId)
     let resetScopeState (sessionId: string) (budget: int) : unit = owner?resetSession(sessionId, budget)
     let clearSessionState (sessionId: string) : unit = owner?clearSession(sessionId)
-    let planRequest (sessionId: string) (messages: obj) : obj = owner?planRequest(sessionId, messages)
+    let planRequest (sessionId: string) (messages: obj) : obj =
+        let language = ProviderLanguageBinding.forSessionText sessionId |> ProviderLanguage.label
+        owner?planRequest(sessionId, messages, language)
     let bindDelegation (recipient: string) (delegator: string) : unit = owner?bindDelegation(recipient, delegator)
-    let askNegotiation (recipient: string) (questions: string) : obj = owner?askNegotiation(recipient, questions)
-    let prepareNegotiationReply (receipt: string) (answer: string) : obj = owner?prepareNegotiationReply(receipt, answer)
+    let askNegotiation (recipient: string) (questions: string) : obj =
+        let language = ProviderLanguageBinding.forSessionText recipient |> ProviderLanguage.label
+        owner?askNegotiation(recipient, questions, language)
+    let prepareNegotiationReply (receipt: string) (answer: string) : obj =
+        let language = GlobalProviderLanguage.current () |> ProviderLanguage.label
+        owner?prepareNegotiationReply(receipt, answer, language)
     let completeNegotiationReply (receipt: string) : bool = owner?completeNegotiationReply(receipt)
     let confirmNegotiationSteer (receipt: string) (recipient: string) : bool =
         owner?confirmNegotiationSteer(receipt, recipient)
