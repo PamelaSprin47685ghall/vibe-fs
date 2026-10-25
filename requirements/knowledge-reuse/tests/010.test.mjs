@@ -732,3 +732,60 @@ test('WHAT[knowledge-reuse-010] G6_G_cancel_session_cleanup_no_publication', asy
 
 test.todo('WHAT[knowledge-reuse-010] GAP-160: actual Engineer resume boundaries and Fission takeover each archive exactly one distinct logical invocation, rejecting lane, late and duplicate terminal events')
 
+test('WHAT[knowledge-reuse-010] 宿主真实链回归：PluginLifecycleSurface.takeEngineerDraft 消费单例草稿并返回原生快照数组', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { sessionDraftStore } = await import('wanxiangli/casebook')
+  const PluginLifecycleSurface = await import('../../../dist/OpenCode/Plugin/PluginLifecycleSurface.js')
+  const { SessionIdModule_create } = await import('../../../dist/Foundation/Identity.js')
+  
+  const ownerSessionId = 'test-owner-' + Math.random().toString(36).slice(2)
+  const delegateSessionId = 'test-delegate-' + Math.random().toString(36).slice(2)
+  
+  sessionDraftStore.setQ(delegateSessionId, '宿主测试问题')
+  sessionDraftStore.setA(delegateSessionId, '宿主测试回答')
+  
+  const dummyRuntime = {
+    Scope: {
+      syncDelegateRuntime: {
+        attached: {
+          TryFind: () => SessionIdModule_create(delegateSessionId)
+        }
+      }
+    }
+  }
+  
+  const taken = PluginLifecycleSurface.takeEngineerDraft(dummyRuntime, ownerSessionId)
+  assert.ok(taken, 'takeEngineerDraft 成功取出草稿')
+  assert.equal(taken.turns.length, 1)
+  assert.equal(taken.turns[0].question, '宿主测试问题')
+  assert.equal(taken.turns[0].answer, '宿主测试回答')
+  
+  const secondTaken = PluginLifecycleSurface.takeEngineerDraft(dummyRuntime, ownerSessionId)
+  assert.equal(secondTaken, null, '已消费草稿再次调用必须返回 null (Fable None)')
+})
+
+test('WHAT[knowledge-reuse-010] 宿主真实链回归：Lifecycle.tryFinalizeDraft 与 cleanupDraft 真实消费同一单例', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { sessionDraftStore } = await import('wanxiangli/casebook')
+  const Lifecycle = await import('../../../dist/Repository/Knowledge/Casebook/Lifecycle.js')
+  
+  const testSessionId = 'test-finalize-' + Math.random().toString(36).slice(2)
+  sessionDraftStore.setQ(testSessionId, '最终定稿问题')
+  sessionDraftStore.setA(testSessionId, '最终定稿回答')
+  
+  const draft = sessionDraftStore.tryTake(testSessionId)
+  assert.ok(draft, '成功取出快照')
+  assert.equal(sessionDraftStore.lastQuestion(draft), '最终定稿问题')
+  assert.equal(sessionDraftStore.lastAnswer(draft), '最终定稿回答')
+  
+  sessionDraftStore.setQ(testSessionId, '临时问题')
+  Lifecycle.cleanupDraft(testSessionId)
+  const emptyDraft = sessionDraftStore.tryTake(testSessionId)
+  assert.equal(emptyDraft, undefined, 'cleanupDraft 成功清除会话草稿')
+  
+  const dummyStore = {
+    append: async () => ({ ok: true })
+  }
+  const res = await Lifecycle.tryFinalizeDraft('/tmp/dummy-workspace', dummyStore, testSessionId)
+  assert.ok(res !== undefined, '无草稿时 tryFinalizeDraft 安全返回 settlement')
+})

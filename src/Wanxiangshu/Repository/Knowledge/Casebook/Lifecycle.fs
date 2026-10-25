@@ -1,12 +1,17 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.EventStore
 
 /// CASE-003/010 / KR-010: process-local Casebook session wiring.
 module CasebookLifecycle =
+
+    [<Import("sessionDraftStore", "wanxiangli/casebook")>]
+    let private sessionDraftStore: obj = jsNative
 
     let collector = CasebookObservationCollector()
 
@@ -25,13 +30,13 @@ module CasebookLifecycle =
         lock stateGate (fun () -> enabledWorkspace.IsSome)
 
     let notePrompt (delegateSessionId: string) (q: string) : unit =
-        CasebookDraftStore.setQ delegateSessionId q
+        sessionDraftStore?setQ(delegateSessionId, q)
 
     let noteAnswer (delegateSessionId: string) (a: string) : unit =
-        CasebookDraftStore.setA delegateSessionId a
+        sessionDraftStore?setA(delegateSessionId, a)
 
     let cleanupDraft (delegateSessionId: string) : unit =
-        CasebookDraftStore.clear delegateSessionId
+        sessionDraftStore?clear(delegateSessionId)
         collector.Drain delegateSessionId |> ignore
 
     let private probeExistingScope
@@ -154,19 +159,14 @@ module CasebookLifecycle =
         (store: IEventStore)
         (workspaceRoot: string)
         (delegateSessionId: string)
-        (draft: CasebookDraft)
+        (draft: obj)
         (a: string)
         : Task<CaseFinalizeSettlement> =
         task {
             let observations = collector.Drain delegateSessionId
 
-            let lastQ =
-                draft.Turns
-                |> List.tryLast
-                |> Option.map (fun turn -> turn.Q)
-                |> Option.defaultValue ""
-
-            let transcript = CasebookDraftStore.transcript draft.Turns
+            let lastQ: string = sessionDraftStore?lastQuestion(draft)
+            let transcript: string = sessionDraftStore?transcript(draft)
 
             let! existing = probeExistingScope store delegateSessionId
 
@@ -179,7 +179,7 @@ module CasebookLifecycle =
         (store: IEventStore)
         (workspaceRoot: string)
         (delegateSessionId: string)
-        (draft: CasebookDraft)
+        (draft: obj)
         (a: string)
         : Task<CaseFinalizeSettlement> =
         task {
@@ -195,7 +195,7 @@ module CasebookLifecycle =
         (store: IEventStore)
         (workspaceRoot: string)
         (delegateSessionId: string)
-        (draft: CasebookDraft)
+        (draft: obj)
         (a: string)
         : Task<CaseFinalizeSettlement> =
         dispatchFinalize store workspaceRoot delegateSessionId draft a
@@ -204,7 +204,7 @@ module CasebookLifecycle =
         (store: IEventStore)
         (workspaceRoot: string)
         (delegateSessionId: string)
-        (draft: CasebookDraft)
+        (draft: obj)
         (lastAnswer: string option)
         : Task<CaseFinalizeSettlement> =
         task {
@@ -221,12 +221,13 @@ module CasebookLifecycle =
         (delegateSessionId: string)
         : Task<CaseFinalizeSettlement> =
         task {
-            match CasebookDraftStore.tryTake delegateSessionId with
+            let draftOpt: obj option = sessionDraftStore?tryTake(delegateSessionId)
+            match draftOpt with
             | None ->
                 collector.Drain delegateSessionId |> ignore
                 return CaseFinalizeSettlement.nothingToFinalize delegateSessionId
             | Some draft ->
-                let lastAnswer = draft.Turns |> List.rev |> List.tryPick (fun turn -> turn.A)
+                let lastAnswer: string option = sessionDraftStore?lastAnswer(draft)
                 return! finalizeWithDraft store workspaceRoot delegateSessionId draft lastAnswer
         }
 

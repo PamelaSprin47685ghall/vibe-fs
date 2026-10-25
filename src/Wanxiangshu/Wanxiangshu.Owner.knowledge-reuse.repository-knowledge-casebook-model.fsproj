@@ -34,8 +34,6 @@
     <Compile Include="Repository/Knowledge/Casebook/Store.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Replay.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Replay.fs"/>
-    <Compile Include="Repository/Knowledge/Casebook/SessionDraft.fsi"/>
-    <Compile Include="Repository/Knowledge/Casebook/SessionDraft.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperPolicy.fsi"/>

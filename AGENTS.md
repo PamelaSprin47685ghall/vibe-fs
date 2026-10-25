@@ -638,6 +638,21 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **状态台账与前向推进。** 本包两仓分别提交并推送远端（库端 main，主仓 master）。本包完成终端去重与共享总线抽取，继续保持 clean-break 推进过程台账清晰。
 
 
+### 6.12 SessionDraft 状态抽取（2026-10-25）
+- **一份状态，一个自治 owner。** 原主仓 `SessionDraft.fs/.fsi`（进程内委托会话草稿暂存字典 `drafts`）状态与全部领域行为已彻底迁入 `wanxiangli/casebook` 的自治对象 `SessionDraftStore`（并导出全局单例 `sessionDraftStore`）。草稿问答轮次演进（未答覆写 Q、已答追加新轮、覆写末轮 A、空草稿补空 Q 轮次）、原子取出消费（`tryTake` 取出即删，返回只读原生数组快照防泄露）、会话隔离清理（`clear` 幂等）以及案例定稿字段计算（`lastQuestion`、`lastAnswer`、`transcript` 逐字格式化）完全由库侧对象维护，主仓不再维护私有草稿字典与类型。
+- **旧 owner 彻底退出。** 主仓物理删除两项旧实现与签名文件（`SessionDraft.fs` 与 `SessionDraft.fsi`），从 `compile-order.txt` 及 `Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj` 编译条目中彻底移除；同步清理 `scripts/checks/owner-impact-corpus.json` 中指涉该已退出文件的 8 处条目。宿主全部消费者（`Lifecycle.fs` 与 `PluginLifecycleSurface.fs`）统一改接 `wanxiangli/casebook` 的公开单例 `sessionDraftStore`，全仓不保留任何旧 facade、类型别名或兼容 shim。
+- **契约与反例设计事实。** 库侧在 `Wanxiangli.Casebook.fsproj` 中将 `SessionDraftStore.fs` 插入 `CasebookIndexLaw.fs` 之前（保持后者为最终编译项以固定 bundle 入口），导出类与单例；在 `index.d.ts` 中导出原生数组快照类型（`CasebookDraftTurn`、`CasebookDraftSnapshot`）与完整 TS 签名；在 `wanxiangli/src/casebook/tests/010.test.mjs` 中构建了独立实例隔离、Q 覆写/追加、A 覆写/空补、tryTake 原子消费与再次取出为 undefined、clear 幂等与隔离、lastQ/lastA 选择及 transcript 逐字格式化等完整边界反例。
+- **逐层验证事实。**
+  - 库侧：Fable 编译全绿；单测 `wanxiangli/src/casebook/tests/*.test.mjs` 22 项全绿（006: 7 pass, 008: 2 pass, 010: 9 pass, 012: 4 pass，全量实测 22 passed / 0 failed；010 包含空字符串答案 `Some ""` 算已答且 `lastAnswer` 必须返回 `""`、快照原生数组外改隔离等完整反例）；`exports.test.mjs` SPEC[build-008] 3 项全绿。casebook 家族全部 3 包总计 31 passed / 0 failed。
+  - 独立产包消费：`npm pack` 生成真实 tarball（`wanxiangli-0.67.0.tgz`），在独立干净临时目录下经 Node.js ESM、Bun ESM 动态执行及 TypeScript strict（`tsc --noEmit`）静态类型检查，100% 成功通过，临时脚手架与产包彻底清理。
+  - 宿主构建与核心回归：在 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 编译全绿（generation 197，1396 items in 44567ms，150 surfaces, 780 emitted modules linked，0 error）。核心回归套件实跑全绿：
+    - `knowledge-reuse/010`：14 passed, 0 failed, 1 todo (GAP-160)（包含两处宿主真实链回归：`PluginLifecycleSurface.takeEngineerDraft` 消费单例草稿并返回原生快照数组、再次消费返回 undefined；`Lifecycle.tryFinalizeDraft` 与 `cleanupDraft` 真实消费同一单例）；
+    - `knowledge-reuse/013`：31 passed, 0 failed, 1 todo (GAP-160)；
+    - `knowledge-reuse/006`：20 passed, 0 failed, 1 todo (GAP-160)；
+    - `repository-programming/034*`（BookkeeperTool 接线）：2 passed, 0 failed。
+  - 静态门禁：`fsharp-control-pyramid.mjs` 0 nested decisions 全绿；`architecture.mjs` 与 `adapter-thinness.mjs` 仅含既有基线已知红态 `Host/FissionPort.fs(.fsi)` namespace-tier 违例，无任何新增违例。
+- **状态台账与前向推进。** 本包完成 `SessionDraft` 状态抽取，两仓分别提交并推送远端（库端 main，主仓 master）。本包仅完成草稿暂存职责迁出，Casebook 其余状态（如 `BookkeeperLedger` 提交追溯状态、Casebook 维护与接入运行时、Index 存储等）仍保留在主仓，继续保持 clean-break 推进过程台账清晰，绝不虚构整体 DONE。
+
 ## 7. 迁移来源文件全量清单与保留/删除边界
 
 迁移指南已合入本文件，保留既有协作规则，不再维护独立指南；正式需求仍按各自合同维护。
