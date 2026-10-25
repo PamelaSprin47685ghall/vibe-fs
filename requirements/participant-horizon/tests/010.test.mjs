@@ -22,7 +22,7 @@ test('WHAT[participant-horizon-010] actual Manager horizon includes the runtime-
 // actual schema is the member call behind the real role surfaces, and the
 // Host registry no longer carries either verb.
 const memberProgram = (verb, payload) =>
-  `class Js extends JsProgram { async run() { return await this.${verb}(${JSON.stringify(payload)}, {}); } }`
+  `class Js extends JsProgram { async run() { return await this.${verb}(${JSON.stringify(payload)}, []); } }`
 
 integrationTest('WHAT[participant-horizon-010] actual fork and commission schemas expose only their legal new-participant identities', async () => {
   await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {

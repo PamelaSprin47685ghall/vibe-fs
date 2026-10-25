@@ -148,7 +148,7 @@ test('WHAT[repository-programming-023] JS_EDIT_preserves_sticky_regexp_as_write_
   }
 })
 
-test('WHAT[repository-programming-023] JS_EDIT_preserves_a_consistent_CRLF_file_when_callers_author_LF', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_preserves_a_consistent_CRLF_file_when_the_needle_is_written_as_is', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\r\nbeta\r\n', 'utf8')

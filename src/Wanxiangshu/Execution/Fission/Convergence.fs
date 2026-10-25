@@ -10,7 +10,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Foundation
-open Wanxiangshu.Host.Ports
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority

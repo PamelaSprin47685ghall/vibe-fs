@@ -24,6 +24,6 @@ test('WHAT[crash-reconciliation-004] actual explicit recovery re-enters ordinary
 
   const after = recovery.childView(state, 'parent', 'child')
   assert.equal(after.activeRun, '', 'interrupted run is voided; no program counter or tool continuation replayed')
-  assert.equal(after.lifecycle, 'Active', 'handle remains active for ordinary reuse')
+  assert.equal(after.lifecycle, 'Abandoned', '作废工作等待报告 voided 后退役，不再保持活跃')
   assert.equal(after.joinable, 0, 'no fake completion created')
 })

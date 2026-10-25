@@ -16,13 +16,7 @@ module ForkChildPayload =
     val RequirementsPath: string
     val document: prose: ForkChildInstructions -> input: ForkChildAssignment -> LlmFacing.Document
     val render: prose: ForkChildInstructions -> input: ForkChildAssignment -> string
-    val relay:
-        prose: ForkChildInstructions ->
-        assignment: string ->
-        requirements: string list ->
-            string
+    val relay: prose: ForkChildInstructions -> assignment: string -> requirements: string list -> string
+
     val relayDocument:
-        prose: ForkChildInstructions ->
-        assignment: string ->
-        requirements: string list ->
-            LlmFacing.Document
+        prose: ForkChildInstructions -> assignment: string -> requirements: string list -> LlmFacing.Document

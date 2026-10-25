@@ -61,8 +61,13 @@ export const HOST_PHYSICAL_CANARY_FILES = new Set([
   'requirements/host-boundary/tests/magic-todo-host-canaries.test.mjs',
   'requirements/host-boundary/tests/session-snapshot-locality.test.mjs',
   'requirements/host-boundary/tests/omp-scope-seam.test.mjs',
+  'requirements/host-boundary/tests/omp-negotiate-physical.test.mjs',
   // Scope HNI physical canary: Fable SessionMessage unions and actual OpenCode provider-request mutation.
   'requirements/host-boundary/tests/scope-hni-physical.test.mjs',
+  'requirements/context-compression/tests/039.test.mjs',
+  'requirements/context-compression/tests/040.test.mjs',
+  'requirements/context-compression/tests/041.test.mjs',
+  'requirements/prefix-stability/tests/016.test.mjs',
   // Physical-exit canary: the child must reach the real Diagnostic.fatal and
   // FatalProcess.trip links — a wire-level invariant, not a test seam.
   'requirements/host-boundary/tests/fixtures/fatal-process-child.fixture.mjs',
@@ -239,6 +244,14 @@ export const SURFACE_MANIFEST = [
     owner: 'crash-reconciliation',
     laws: ['CRASH-005', 'CRASH-010', 'CRASH-013', 'CRASH-014'],
     source: 'src/Wanxiangshu/Execution/Session/Recovery/Surface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Execution/Session/RecoveryClosureSurface.js',
+    owner: 'managed-session-lifecycle',
+    laws: ['MANAGED-SESSION-003'],
+    source: 'src/Wanxiangshu/Execution/Session/RecoveryClosureSurface.fs',
     representation: 'json',
     kind: 'pure',
   },

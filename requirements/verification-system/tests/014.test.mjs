@@ -41,6 +41,7 @@ import {
   CUSTOMS,
   HUMANROOT_MANAGER_LOOP_CANARY_PROMPT,
   assertHumanRootManagerLoop,
+  assertManagerLoopAuthorityPreserved,
 } from './e2e/support/long-stroke-oracles.mjs'
 import { WAIT_FACT_WINDOW_MS } from './e2e/support/time-budget.js'
 import {
@@ -70,19 +71,35 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   const result = compileScenario(source, { name: 'long-stroke.toml' })
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'))
   const byId = new Map(result.scenario.entries.map((entry) => [entry.id, entry]))
+  assert.deepEqual(byId.get('orch.0')?.tools, ['todowrite-for-orchestrator', 'join'])
+  assert.equal(byId.get('orch.0')?.respond?.tool, 'todowrite-for-orchestrator')
+  assert.equal(byId.get('orch.3')?.respond?.tool, 'todowrite-for-orchestrator')
+  const undelegated = source.replace('this.commission(', 'other.commission(')
+  const unreachable = compileScenario(undelegated, { name: 'undelegated.toml' })
+  assert.equal(unreachable.ok, false, '其他对象的方法不得被当作真实委派入口')
+  assert.ok(unreachable.problems.some((problem) => problem.includes("turn 'manager-loop'")))
   const ordinary = byId.get('manager-loop.2')
   assert.deepEqual({ optional: ordinary?.optional, lane: ordinary?.lane, step: ordinary?.step },
     { optional: false, lane: 'manager', step: 2 })
   assert.deepEqual(result.scenario.faults.filter((fault) => fault.kind === 'provider-error' && fault.status === 400)
     .map((fault) => fault.entryId), ['manager-loop.2', 'continue.0'])
 
-  const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'deliver']
-  const managerTools = ['fork', 'resume', 'join', 'horizon', 'assume', 'deliver']
+  const loopTools = ['todowrite-for-manager', 'join', 'horizon', 'deliver']
+  const managerTools = ['todowrite-for-manager', 'join', 'horizon', 'assume', 'deliver']
   const request = (turn, step, tools) => ({
     messages: [{ role: 'user', content: turn },
       ...Array.from({ length: step }, (_, index) => ({ role: 'assistant', content: `reply-${index}` }))],
     tools: tools.map((name) => ({ name })),
   })
+  const humanrootPrompt = 'HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager assessment check.'
+  assert.equal(resolveEntry(request(`[ANCHOR: 1]\u0000\uFEFF${humanrootPrompt}`, 0, loopTools), result.scenario.entries,
+    new Map([['humanroot-manager', 'ses_humanroot']]), { sessionId: 'ses_humanroot' }).matched?.id,
+    'humanroot-loop.0', '真实锚点前缀不得阻止已声明的用户回合匹配')
+  for (const prefix of ['[ANCHOR: 1]', '[ANCHOR: 0]\u0000\uFEFF', '其他前缀\u0000\uFEFF']) {
+    assert.equal(resolveEntry(request(`${prefix}${humanrootPrompt}`, 0, loopTools), result.scenario.entries,
+      new Map([['humanroot-manager', 'ses_humanroot']]), { sessionId: 'ses_humanroot' }).matched, undefined,
+      '非契约锚点前缀不得被静默删除')
+  }
   const bindings = new Map([['manager', 'ses_manager']])
   const context = { sessionId: 'ses_manager' }
   assert.equal(resolveEntry(request('# Delegated work you sent out has not come back yet. Continue the work.', 1, managerTools), result.scenario.entries, bindings, context).matched?.id,
@@ -94,7 +111,7 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
     '# rather than trusting any inherited claim.\n' +
     '#\n' +
     "# During assessment, you may directly use the review-only read tool todowrite-for-manager, or entrust read-only work to Engineer to establish facts about the predecessor's work"
-  for (const [step, tool] of [[0, 'review'], [1, 'deliver']]) {
+  for (const [step, tool] of [[0, 'todowrite-for-manager'], [1, 'deliver']]) {
     const id = `manager-reopened-loop.${step}`
     const entry = byId.get(id)
     assert.deepEqual({ step: entry?.step, optional: entry?.optional, internal: entry?.internal, tool: entry?.respond?.tool },
@@ -112,13 +129,22 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   const currentActions = result.scenario.entries.filter((entry) => entry.turnId === 'manager-current-action')
   // The Manager idle-nudge cursor is bounded only by the run (work/manager-continue),
   // so the reusable ladder keeps one declared close attempt per bounded cursor.
-  assert.deepEqual(currentActions.map((entry) => entry.step), Array.from({ length: 24 }, (_, index) => index))
+  assert.deepEqual(currentActions.map((entry) => entry.step), Array.from({ length: 26 }, (_, index) => index))
   assert.ok(currentActions.every((entry) => entry.optional === true))
   assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-current-action.')))
   assert.ok(!result.scenario.entries.some((entry) => entry.id.startsWith('manager-repair-resume.')))
   assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-join-guard.')))
   assert.deepEqual({ journal: result.scenario.setup.maxJournalEvents, sse: result.scenario.setup.maxSseEvents },
     { journal: 699, sse: 3351 }, 'the measured scenario ceilings stay fixed during migration')
+})
+
+test('WHAT[verification-system-014] 继任任期的权威检查识别真实锚点呈现', () => {
+  const sessionID = 'ses_anchor_authority'
+  const original = { role: 'user', content: '[ANCHOR: 1]\u0000\uFEFF原始用户委托' }
+  assertManagerLoopAuthorityPreserved({ provider: { requests: [
+    { sessionID, messages: [original, { role: 'user', content: '[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]' }] },
+    { sessionID, messages: [original, { role: 'user', content: '[ANCHOR: 2]\u0000\uFEFF# You are the 2 Manager taking over this mission.' }, { role: 'user', content: '[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]' }] },
+  ] } }, sessionID)
 })
 
 const preFlowCanaries = async (scenario) => {

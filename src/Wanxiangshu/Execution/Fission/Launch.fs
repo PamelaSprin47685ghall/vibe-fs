@@ -6,7 +6,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Host.Ports
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

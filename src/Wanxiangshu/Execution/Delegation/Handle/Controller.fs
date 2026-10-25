@@ -342,9 +342,17 @@ module HandleController =
             do! journal.RefreshProjection() |> Result.mapError AppendFailed
             let projection = journal.HandleProjection parentId
             let! durable = requireDurableWork projection work
-            let! cell = consumptionExpected durable.Lifecycle |> Result.requireSome (NotJoinable NotCompleted)
+
+            let! cell =
+                consumptionExpected durable.Lifecycle
+                |> Result.requireSome (NotJoinable NotCompleted)
+
             let consumptionId = System.Guid.NewGuid().ToString("N")
-            let! _ = HandleProjection.consumeWork work consumptionId cell projection |> Result.mapError refuseConsume
+
+            let! _ =
+                HandleProjection.consumeWork work consumptionId cell projection
+                |> Result.mapError refuseConsume
+
             return (cell, consumptionId)
         }
 

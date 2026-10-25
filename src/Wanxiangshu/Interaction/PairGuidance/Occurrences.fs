@@ -238,7 +238,10 @@ module PairGuidanceOccurrences =
             commitNewOccurrence render ledger candidate
 
     /// Internal transcripts never carry a new occurrence, whatever the host decoded.
-    let private placementOf (internalTranscript: bool) (transcript: PairGuidanceTranscript) : Result<(TranscriptGap * TranscriptGap) option, string> =
+    let private placementOf
+        (internalTranscript: bool)
+        (transcript: PairGuidanceTranscript)
+        : Result<(TranscriptGap * TranscriptGap) option, string> =
         if internalTranscript then
             Ok None
         else

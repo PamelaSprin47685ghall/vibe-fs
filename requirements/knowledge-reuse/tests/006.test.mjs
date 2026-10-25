@@ -688,13 +688,13 @@ test('WHAT[knowledge-reuse-006] awaitCompletion unwritten provider aborts staged
   const txUntouched = 'tx-test-untouched-retained'
   staging.beginTransaction(txUntouched, 'Q-keep', 'A-keep')
   assert.equal(staging.touched(txUntouched), false)
-  const takeRes = staging.take(txUntouched)
-  assert.equal(takeRes.tag, 1) // Error
-  assert.match(takeRes.fields[0], /not written/)
+  const takeRes = bookkeeper.take(txUntouched)
+  assert.equal(takeRes.ok, false)
+  assert.match(takeRes.error, /not written/)
   // 验证 slot 仍然保留在 staging 中
-  const snapRes = staging.snapshot(txUntouched)
-  assert.equal(snapRes.tag, 0) // Ok
-  assert.deepEqual(snapRes.fields[0], ['Q-keep', 'A-keep'])
+  const snapRes = bookkeeper.snapshot(txUntouched)
+  assert.equal(snapRes.ok, true)
+  assert.deepEqual(snapRes.value, ['Q-keep', 'A-keep'])
   staging.abort(txUntouched)
 
   // 2. 验证宿主 awaitCompletion：未写入（Ok() 但 touched=false）时，错误返回且 slot 被 abort 清除
@@ -730,14 +730,13 @@ test('WHAT[knowledge-reuse-006] awaitCompletion unwritten provider aborts staged
     writeFileSync(join(dir, 'a.txt'), 'changed-unwritten', 'utf8')
     await installBookkeeperRuntime(unwrittenPort, ['s-unwritten'])
     const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-unwritten')
-    console.error('REFRESHED_DEBUG:', JSON.stringify(refreshed))
     assert.equal(refreshed.ok, false)
     assert.match(String(refreshed.error), /did not write the staged case/)
     assert.equal(txCaptured.length, 1)
     const tx = txCaptured[0]
     // 关键断言：slot 已被 abort 清除！
-    const snapAfterAbort = staging.snapshot(tx)
-    assert.equal(snapAfterAbort.tag, 1, 'did not write 分支必须已调用 abort(txId) 清除槽位')
+    const snapAfterAbort = bookkeeper.snapshot(tx)
+    assert.equal(snapAfterAbort.ok, false, 'did not write 分支必须已调用 abort(txId) 清除槽位')
   } finally {
     bookkeeper.resetRuntime()
     cleanup()

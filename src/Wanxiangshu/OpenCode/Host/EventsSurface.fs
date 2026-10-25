@@ -143,7 +143,4 @@ module EventsSurface =
         }
 
     let releaseSharedForWorkspace (workspace: string) (port: obj) : Task<unit> =
-        task {
-            let! key = RuntimePath.forWorkspace workspace
-            TerminalWiring.release (Some key) (Some(port :?> ISessionTerminalSource))
-        }
+        task { TerminalWiring.release (Some workspace) (Some(port :?> ISessionTerminalSource)) }

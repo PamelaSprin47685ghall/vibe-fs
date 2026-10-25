@@ -62,9 +62,14 @@ type ToolRuntimeScope =
     member EventPort: IEventObservationPort option
     member WorkspaceDirectory: string option
     member ActiveProfileFor: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
-    member AttachPreviousScopeTransport: ask: (string -> obj -> string -> Task<Result<string,string>>) -> unit
+    member AttachPreviousScopeTransport: ask: (string -> obj -> string -> Task<Result<string, string>>) -> unit
     member AskPreviousScope: ctx: HostToolContext * questions: string -> Task<string>
-    member AttachNegotiationTransport: ask: (string -> string -> string -> Task<Result<string,string>>) * steer: (string -> string -> string -> Task<Result<unit,string>>) -> unit
+
+    member AttachNegotiationTransport:
+        ask: (string -> string -> string -> Task<Result<string, string>>) *
+        steer: (string -> string -> string -> Task<Result<unit, string>>) ->
+            unit
+
     member Negotiate: recipient: string * questions: string -> string
     member SendNegotiationSteer: recipient: string * answer: string * receipt: string -> Task<Result<unit, string>>
     member AttachQuestionNotifier: notify: (string -> Task<Result<unit, string>>) -> unit

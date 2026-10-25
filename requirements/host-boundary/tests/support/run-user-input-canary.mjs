@@ -36,6 +36,9 @@ assert.ok([...phases, 'GUIDANCE', 'GUIDANCE_STOP'].includes(phase))
 const guidanceMode = phase === 'GUIDANCE' || phase === 'GUIDANCE_STOP'
 const childStops = phase === 'GUIDANCE_STOP'
 const observations = []
+// Compression views accept prefixUntil below 2^31-1; this is the largest legal
+// cutoff, which keeps every history segment visible to the next request.
+const KEEP_ALL_HISTORY = 2147483646
 const waiters = new Set()
 const releases = new Map()
 const released = new Set()
@@ -139,7 +142,9 @@ const handleProvider = async (request, response) => {
           response.write(`data: ${JSON.stringify({ ...prefix, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`)
         } else {
           for (const chunk of buildToolCallChunks('child-tool', 'todowrite-for-engineer', JSON.stringify({
-            program: 'class Js extends JsProgram { async run() { return "CHILD_TOOL_RESULT"; } }', estimated_readonly_rounds: 0,
+            name: 'child-tool-result',
+            planB: '等待子程序结果，保留当前子会话工作。',
+            program: 'class Js extends JsProgram { async run() { return "CHILD_TOOL_RESULT"; } }',
           }), 1)) response.write(`data: ${JSON.stringify(chunk)}\n\n`)
         }
         childFinished = true
@@ -175,7 +180,9 @@ const handleProvider = async (request, response) => {
       // The delegation verbs are programming-surface members now: the
       // Manager places the child through `this.fork` inside its own program.
       sendSSE(response, buildToolCallChunks('fork-child', 'todowrite-for-manager', JSON.stringify({
-        program: 'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "USER_INPUT_CHILD_WORK" }, {}); } }',
+        name: 'fork-child',
+        planB: '等待派工回执，保留已经发出的子工作。',
+        program: 'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "USER_INPUT_CHILD_WORK" }); } }',
       }), 1))
     } else sendSSE(response, buildToolCallChunks('join-child', 'join', '{}', 1))
     return
@@ -187,7 +194,9 @@ const handleProvider = async (request, response) => {
       // `this.resume` is a programming-surface member too: the guidance
       // travels through the Manager's program, not a host-registered tool.
       sendSSE(response, buildToolCallChunks('guide-child', 'todowrite-for-manager', JSON.stringify({
-        program: 'class Js extends JsProgram { async run() { return await this.resume({ name: "Ada", charge: "USER_INPUT_GUIDANCE_ONLY" }, {}); } }',
+        name: 'guide-child',
+        planB: '等待指导投递回执，保留原子工作。',
+        program: 'class Js extends JsProgram { async run() { return await this.resume({ name: "Ada", charge: "USER_INPUT_GUIDANCE_ONLY" }); } }',
       }), 1))
     } else if (step === 1) sendSSE(response, buildToolCallChunks('join-guided-child', 'join', '{}', 1))
     else {
@@ -204,6 +213,8 @@ const handleProvider = async (request, response) => {
   } else if (messageID === rootID) {
     if (phase === 'TOOL') {
       sendSSE(response, buildToolCallChunks('held-tool', 'todowrite-for-manager', JSON.stringify({
+        name: 'held-user-input',
+        planB: '等待当前工具步骤完成，再处理新用户消息。',
         program: 'class Js extends JsProgram { async run() { return "USER_INPUT_HELD_TOOL"; } }',
       }), 1))
     } else {
@@ -329,8 +340,10 @@ export default function route(role, running) {
     assert.equal(completed.info.error, undefined)
     assert.ok(completed.parts.some(part => part.type === 'text' && part.text === 'CHILD_WORK_DONE'))
     assert.equal(activeResponseClosedEarly, false)
-    assert.equal(observations.some(({ kind, value }) =>
-      kind === 'host.abort' && [sessionID, childSessionID].includes(value.sessionID)), false)
+    const guidedProviderIndex = observations.indexOf(followed)
+    assert.equal(observations.some(({ kind, value }, index) =>
+      kind === 'host.abort' && (value.sessionID === sessionID
+        || (value.sessionID === childSessionID && index < guidedProviderIndex))), false)
     const works = await coldWorkSnapshot(path.join(workspace, '.Herdchestra'), sessionID)
     assert.equal(works.length, 1, 'guidance must not create another logical work unit')
     const originalRoot = observations.find(({ kind, value }) => kind === 'message.accepted' && value.sessionID === childSessionID && value.origin === 'AgentOwnerRoot')

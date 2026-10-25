@@ -83,8 +83,7 @@ module ForkTool =
                             )
 
                     return Result.mapError (fun reason -> HostError.Refused reason) result
-                })
-        }
+                }) }
 
     let private schema factory (argument: CommandArgument) =
         let describe =

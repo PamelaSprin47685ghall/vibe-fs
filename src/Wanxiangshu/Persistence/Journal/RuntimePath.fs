@@ -20,6 +20,12 @@ module RuntimePath =
     [<Import("lstatSync", "node:fs")>]
     let private lstat (path: string) (options: obj) : obj = jsNative
 
+    [<Import("existsSync", "node:fs")>]
+    let private pathExists (path: string) : bool = jsNative
+
+    [<Import("dirname", "node:path")>]
+    let private directoryOf (path: string) : string = jsNative
+
     [<Import("mkdirSync", "node:fs")>]
     let private mkdir (path: string) (options: obj) : unit = jsNative
 
@@ -66,19 +72,48 @@ module RuntimePath =
         | Error "bare" -> invalidArg "workspace" "Runtime persistence requires a working tree, not a bare repository"
         | Error _ -> invalidOp "Git did not identify the primary working tree"
 
+    [<Import("accessSync", "node:fs")>]
+    let private accessPath (path: string) (mode: int) : unit = jsNative
+
+    [<Emit("0")>]
+    let private fileVisible: int = jsNative
+
+    let private canRead (path: string) =
+        try
+            accessPath path fileVisible
+            true
+        with _ ->
+            false
+
+    let rec private existingGitAnchor (boundary: string) (current: string) =
+        let parent = directoryOf current
+
+        if pathExists (joinPath current ".git") && canRead current then
+            current
+        elif current <> boundary && parent <> current && pathExists parent then
+            existingGitAnchor boundary parent
+        else
+            current
+
     let private primaryWorktree (workspace: string) : Task<string> =
         task {
+            let anchor =
+                if pathExists workspace then
+                    workspace
+                else
+                    existingGitAnchor (directoryOf workspace) workspace
+
             let! listing =
                 task {
                     try
-                        let! text = GitSubject.execIn workspace [| "worktree"; "list"; "--porcelain"; "-z" |]
+                        let! text = GitSubject.execIn anchor [| "worktree"; "list"; "--porcelain"; "-z" |]
                         return Some text
                     with _ ->
                         return None
                 }
 
             match listing with
-            | None -> return workspace
+            | None -> return anchor
             | Some text -> return parsePrimaryWorktree text
         }
 
@@ -89,7 +124,7 @@ module RuntimePath =
             if String.IsNullOrWhiteSpace workspace then
                 invalidArg "workspace" "A workspace directory is required"
 
-            let key = workspace |> canonicalPath |> outsideGit
+            let key = workspace |> resolvePath |> outsideGit
 
             let primaryTask =
                 match roots.TryGetValue key with
@@ -149,6 +184,32 @@ module RuntimePath =
             let! target = stateRoot workspace
             return runtimeDirectory target
         }
+
+    /// 同步解析只给没有异步边界的读取使用。已有目录走主工作树；缺失目录只在父目录内找仓库。
+    let stateRootSync (workspace: string) =
+        if String.IsNullOrWhiteSpace workspace then
+            invalidArg "workspace" "A workspace directory is required"
+
+        let key =
+            if pathExists workspace then
+                workspace |> canonicalPath |> outsideGit
+            else
+                workspace |> resolvePath |> outsideGit
+
+        let anchor =
+            if pathExists key then
+                key
+            else
+                existingGitAnchor (directoryOf key) key
+
+        let primary =
+            try
+                GitSubject.execInSync anchor [| "worktree"; "list"; "--porcelain"; "-z" |]
+                |> parsePrimaryWorktree
+            with _ ->
+                anchor
+
+        joinPath primary ".Herdchestra"
 
     let forStateRoot (stateDirectory: string) =
         stateDirectory |> canonicalPath |> outsideGit |> runtimeDirectory

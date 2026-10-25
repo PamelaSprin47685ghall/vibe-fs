@@ -9,7 +9,7 @@ import { installDelegationHost, clearDelegationHost } from '../../../dist/Reposi
 
 const program = (body) => 'class Js extends JsProgram { async run() { ' + body + ' } }'
 const managerRun = (dir, body, sessionId) =>
-  execute(dir, 'Manager', 'en', sessionId, { name: 'advisor contract probe', program: program(body) }, 3000, Date.now() + 60_000, 1 << 20, null)
+  execute(dir, 'Manager', 'en', sessionId, { name: 'advisor contract probe', program: program(body), planB: 'Observe the advisor receipt before the request window ends.' }, 3000, Date.now() + 60_000, 1 << 20, null)
 
 test('WHAT[advisor-006] advisor is capability-gated and documents the intent parameter', () => {
   const surface = generateRole('manager', 'en')
@@ -30,7 +30,7 @@ test('WHAT[advisor-006] advisor invocation forwards intent and returns ok and ad
   const observed = []
   const unused = async () => { throw new Error('unrelated member called') }
   try {
-    installDelegationHost(session, unused, unused, unused, unused, async (intent) => {
+    installDelegationHost(session, unused, unused, unused, async (intent) => {
       observed.push(intent)
       return { ok: true, advice: 'ADVICE: keep the fence, ship behind a flag' }
     })

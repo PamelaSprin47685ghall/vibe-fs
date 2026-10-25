@@ -199,17 +199,14 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
     assert.equal(lifecycle.active, true, 'the lifecycle work carries an active incumbency')
     assert.ok(beforeSlices.xTrace?.latestTerminalPresent, 'the pre-state carries a captured terminal')
 
-    // The checkpoint: the same exact completed-terminal evidence 005 proved.
+    // Completed terminal of todowrite-for-engineer emits no checkpoint window and leaves all slices untouched.
     await todoCall(hooks, sessionID, callID)
     await hooks.event(terminalEvent(sessionID, callID, 'completed'))
 
     const after = journalSurface.JournalSurface_snapshot(runtime.journal)
 
-    // Only the checkpoint window changed for the session.
-    const beforeWindow = before.viewCheckpoints.find((entry) => entry.sessionId === sessionID)
-    const afterWindow = after.viewCheckpoints.find((entry) => entry.sessionId === sessionID)
-    assert.equal(beforeWindow, undefined, 'no checkpoint window existed before the completed terminal')
-    assert.deepEqual(afterWindow?.checkpoints, [{ callId: callID }], 'the completed terminal commits the checkpoint')
+    assert.equal(before.viewCheckpoints, undefined, 'no checkpoint window existed before the completed terminal')
+    assert.equal(after.viewCheckpoints, undefined, 'completed terminal emits no checkpoint window')
 
     // Every forwarded non-checkpoint slice keeps its exact value; slices with
     // no pre-state keep their empty shape too.

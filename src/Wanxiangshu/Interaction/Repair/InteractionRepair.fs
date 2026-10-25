@@ -235,7 +235,7 @@ module InteractionRepairWorkflow =
             match observation with
             | Some port ->
                 port.TryContinuationKind turn.SessionId turn.PhysicalUserMessageId = Some
-                                                                                         PromptContinuationKind.ProviderRetryAttempt
+                    PromptContinuationKind.ProviderRetryAttempt
             | None -> continuationKindOf journal turn = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt
 
         let hasDurableTerminal =
@@ -281,10 +281,15 @@ module InteractionRepairWorkflow =
 
         let exemptRole =
             match context.Turn.Role with
-            | Some Role.Engineer | Some Role.DevOps -> true
+            | Some Role.Engineer
+            | Some Role.DevOps -> true
             | _ -> false
 
-        if exemptRole || fissionReplaced || retryAttemptSuppressesRepair journal observation context.Turn then
+        if
+            exemptRole
+            || fissionReplaced
+            || retryAttemptSuppressesRepair journal observation context.Turn
+        then
             AsyncSupport.completedTask ()
         else
             repairDefect

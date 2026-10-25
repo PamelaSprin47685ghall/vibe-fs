@@ -36,7 +36,9 @@ const provider = await startHttpServer(async (request, response) => {
   if (names.includes('todowrite-for-manager')) {
     managerRequests++
     if (managerRequests === 1) return call('todowrite-for-manager', {
-      program: 'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Worker", charge: "Do not modify files. Return one short report." }, {}); } }',
+      name: 'pre-provider-fork',
+      planB: '等待派工回执，保留预请求阶段的拒绝事实。',
+      program: 'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Worker", charge: "Do not modify files. Return one short report." }, []); } }',
     })
     if (managerRequests === 2) return call('join', {})
     joinResult = (body.messages ?? []).findLast(message => message.role === 'tool')

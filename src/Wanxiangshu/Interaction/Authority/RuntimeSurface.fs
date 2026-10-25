@@ -968,3 +968,17 @@ module RuntimeSurface =
             match profileResult ownerProfile with
             | Ok _ -> true
             | Error _ -> false
+
+    let recordedClosureKind (rootKindLabel: string) (isManager: bool) (agentOwnerLife: obj) (recorded: obj) : string =
+        let opt value =
+            if isNull value then None else Some(string value)
+
+        AuthorityLifeClassification.recordedClosureKind rootKindLabel isManager (opt agentOwnerLife) (opt recorded)
+
+    let rootKindOfKind (closureKind: string) : string =
+        AuthorityLifeClassification.rootKindOfKind closureKind
+
+    let witnessKindOf (closureKind: string) : obj =
+        match AuthorityLifeClassification.witnessKindOf closureKind with
+        | Some kind -> box kind
+        | None -> null

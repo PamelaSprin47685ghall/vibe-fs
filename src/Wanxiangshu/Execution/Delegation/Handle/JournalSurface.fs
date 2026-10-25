@@ -68,7 +68,11 @@ module JournalSurface =
         | null -> None
         | _ ->
             let text = string value
-            if System.String.IsNullOrWhiteSpace text then None else Some(create text)
+
+            if System.String.IsNullOrWhiteSpace text then
+                None
+            else
+                Some(create text)
 
     /// Append one exact work completion. Used by property tests to plant the
     /// durable cell that consume must retire against.
@@ -241,3 +245,78 @@ module JournalSurface =
                     HandleProjection.joinable projection
                     |> List.map (fun record -> HandleId.describe record.Handle)
                     |> List.toArray |} |}
+
+    let commitChildDeliveryWitness
+        (journalHandle: JournalHandle)
+        (sessionId: string)
+        (logicalRunId: string)
+        (authorityRoot: string)
+        (physicalUserMessageId: string)
+        (providerRun: string)
+        (toolCallId: string)
+        (handle: string)
+        (formalText: string)
+        (viewDeclaration: string)
+        (view: string)
+        : Task<obj> =
+        task {
+            let witness: Wanxiangshu.Host.TaskDeliveryWitness =
+                { Fence =
+                    { SessionId = SessionId.create sessionId
+                      LogicalRunId = LogicalRunId.create logicalRunId
+                      AuthorityRoot = AuthorityRootUserMessageId.create authorityRoot
+                      PhysicalUserMessageId = PhysicalUserMessageId.create physicalUserMessageId
+                      ProviderRun = ProviderRunIdentity.create providerRun
+                      ToolCallId = ToolCallId.create toolCallId
+                      Task = Wanxiangshu.Host.TaskDeliveryTask.ChildWork handle }
+                  FormalText = formalText
+                  ViewDeclaration = viewDeclaration
+                  View = view
+                  MaterialDigest = Wanxiangshu.Host.HostDigest.sha256Hex view
+                  RetirementId = None }
+
+            let! committed = TaskDeliveryJournal.commit journalHandle.Journal witness
+
+            return
+                match committed with
+                | TaskDeliveryJournal.TaskDeliveryCommitResult.Committed -> box {| committed = true; reason = "" |}
+                | TaskDeliveryJournal.TaskDeliveryCommitResult.NotCommitted reason
+                | TaskDeliveryJournal.TaskDeliveryCommitResult.Unknown reason ->
+                    box {| committed = false; reason = reason |}
+        }
+
+    let findDeliveryWitnessByFence
+        (journalHandle: JournalHandle)
+        (sessionId: string)
+        (providerRun: string)
+        (toolCallId: string)
+        : obj =
+        TaskDeliveryJournal.tryFindByFenceFields
+            journalHandle.Journal
+            (SessionId.create sessionId)
+            (ProviderRunIdentity.create providerRun)
+            (Some(ToolCallId.create toolCallId))
+            None
+            None
+            None
+            None
+        |> Option.map (fun witness ->
+            box
+                {| formalText = witness.FormalText
+                   viewDeclaration = witness.ViewDeclaration
+                   view = witness.View |})
+        |> Option.defaultValue null
+
+    let publishDeliveredReturn
+        (journalHandle: JournalHandle)
+        (port: obj)
+        (sessionId: string)
+        (providerRun: string)
+        (toolCallId: string)
+        : unit =
+        Wanxiangshu.Execution.Delegation.Fork.Host.HostForkRunLifecycle.publishDeliveredReturn
+            journalHandle.Journal
+            (port :?> Wanxiangshu.Foundation.TerminalSignal.IEventObservationPort)
+            (SessionId.create sessionId)
+            (ProviderRunIdentity.create providerRun)
+            (ToolCallId.create toolCallId)

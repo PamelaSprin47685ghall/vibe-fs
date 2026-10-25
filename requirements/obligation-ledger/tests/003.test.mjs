@@ -22,7 +22,7 @@ test('WHAT[obligation-ledger-003] plugin keeps no second desired/applied todo pr
 })
 
 integrationTest(
-  'WHAT[obligation-ledger-003] the durable checkpoint projection keeps only the tool call identity, never todo rows or view bodies',
+  'WHAT[obligation-ledger-003] the durable projection keeps no todo rows, view bodies, or checkpoint windows',
   async () => {
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
       const sessionID = 'obligation-no-second-projection'
@@ -41,8 +41,6 @@ integrationTest(
                 status: 'completed',
                 input: {
                   program: 'class Js extends JsProgram { async run() { return {}; } }',
-                  prefixUntil: 0,
-                  carry: ['prose that must not be persisted'],
                 },
               },
             },
@@ -51,12 +49,11 @@ integrationTest(
       })
 
       const snapshot = journalSurface.JournalSurface_snapshot(runtime.journal)
-      const window = snapshot.viewCheckpoints.find((entry) => entry.sessionId === sessionID)
-      assert.deepEqual(
-        window?.checkpoints,
-        [{ callId: 'view-cp-shape' }],
-        'the projection entry is exactly the checkpoint identity: no todo rows, no view body, no replay queue',
-      )
+      assert.equal(snapshot.viewCheckpoints, undefined, 'no checkpoint window is persisted')
+      const sessionProjection = snapshot.sessionProjections[sessionID]
+      assert.equal(sessionProjection?.todos, undefined, 'no todo rows are persisted in session projection')
+      assert.equal(sessionProjection?.desiredTodos, undefined, 'no desired todo snapshot is persisted')
+      assert.equal(sessionProjection?.appliedTodos, undefined, 'no applied todo snapshot is persisted')
     })
   },
 )

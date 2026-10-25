@@ -204,7 +204,10 @@ module internal SyncDelegateInternals =
         | _ -> None
 
     let private naturalStopBody (prose: string) : string list =
-        if System.String.IsNullOrWhiteSpace prose then [] else [ prose ]
+        if System.String.IsNullOrWhiteSpace prose then
+            []
+        else
+            [ prose ]
 
     /// EXEC-031 / delegation-024: the delivered view is the settlement. A turn
     /// that completed without a fenced delivery has not discharged the
@@ -212,7 +215,6 @@ module internal SyncDelegateInternals =
     /// open, so the delegate stays active, the unresolved obligation stays
     /// visible, and the parent can keep waiting instead of receiving a
     /// terminal that never happened. An undelivered completion is never a
-
     /// (LC-004) is settled here as "still owed".
     let settleCompletedFromParts
         (journal: AgentJournal option)
@@ -490,8 +492,12 @@ type SyncDelegateRuntime
             for inv in call.Invocations do
                 inv.StartCursor <- Some startCursor
 
-            Wanxiangshu.Context.Scope.Surface.bindDelegation (SessionId.value call.Delegate) (SessionId.value call.Owner)
-            let providerPrompt = request.ProviderPrompt |> LlmFacing.instructionsOnly |> LlmFacing.render
+            Wanxiangshu.Context.Scope.Surface.bindDelegation
+                (SessionId.value call.Delegate)
+                (SessionId.value call.Owner)
+
+            let providerPrompt =
+                request.ProviderPrompt |> LlmFacing.instructionsOnly |> LlmFacing.render
 
             let! identitySeed = issueCurrentOwnerIdentitySeed call.Owner call.Agent
             do! requireLiveCall ()

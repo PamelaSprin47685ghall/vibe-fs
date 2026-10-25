@@ -446,11 +446,17 @@ module JoinDrain =
         (completedAt: DateTimeOffset)
         (accept: HandleRecord -> bool)
         : Task<Result<RunCompletion list, ForkError>> =
+        // The admission predicate reads a handle's effective state, not its raw
+        // binding. A voided child work lives on the admitted work cell while the
+        // handle binding stays Active, so filtering on the raw binding would drop
+        // the very record join has to report.
         let filtered () =
             let projection = durable.HandleProjection parentId
 
             { projection with
-                Handles = projection.Handles |> Map.filter (fun _ record -> accept record) }
+                Handles =
+                    projection.Handles
+                    |> Map.filter (fun handle _ -> HandleProjection.tryFind handle projection |> Option.forall accept) }
 
         task {
             let! reconcileResult = reconcileFalseAborts durable parentId

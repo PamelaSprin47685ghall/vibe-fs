@@ -384,8 +384,7 @@ export class StrictMockProvider {
         }
         if (!this._quiet) {
           console.error(`[SEAL-DIAG] session=${sessionId} reason=${selection.sealBroken.reason} prev=[${fmt(prev)}] next=[${fmt(next)}]`);
-          console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);
-        }
+          console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);        }
       } catch (diagErr) {
         console.error(`[SEAL-DIAG-ERR] ${diagErr?.message}`);
       }
@@ -562,7 +561,6 @@ export class StrictMockProvider {
         console.error(`[MSG-ROLES] ${roles}`);
         const recentToolResults = msgs
           .filter((message) => message?.role === 'tool' || message?.role === 'toolResult')
-          .slice(-4)
           .map((message) => String(message?.content ?? message?.text ?? '').slice(0, 300));
         console.error(`[MSG-TOOL-RESULTS] ${JSON.stringify(recentToolResults)}`);
       } catch {}

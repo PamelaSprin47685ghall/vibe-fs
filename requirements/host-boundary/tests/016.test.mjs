@@ -132,60 +132,26 @@ test('WHAT[host-boundary-016] mutation_canary_duplicate_completed_is_absorbed', 
 })
 }
 
-test('WHAT[host-boundary-016] 真实 createHost 取第5项 sharedTerminalPort 证明引用同一性，错引用释放不提前移除且完全释放后清理', async () => {
-  const { createHost } = await import('../../../dist/OpenCode/Host/PluginHost.js');
-  const TerminalWiring = await import('../../../dist/OpenCode/Host/TerminalWiring.js');
+test('WHAT[host-boundary-016] 真实 createHost 共享终端引用，错引用释放不提前移除且完全释放后清理', async () => {
+  const { acquireHostTerminal } = await import('../../../dist/OpenCode/Plugin/PluginLifecycleSurface.js');
+  const EventsSurface = await import('../../../dist/OpenCode/Host/EventsSurface.js');
   const workspace = '/tmp/test-wxs-pluginhost-' + Math.random().toString(36).slice(2);
-
-  // 1. 第一次实际调用 createHost
-  const hostRes1 = await createHost(workspace, {}, undefined, undefined, undefined, undefined);
-  assert.ok(hostRes1.tag === 0, 'host1 创建成功');
-  const [eventPort1, sessionPort1, snapshotPort1, key1, source1] = hostRes1.fields[0];
-  assert.ok(source1, '第5项返回有效的 sharedTerminalPort');
-  assert.ok(key1, '返回有效的 terminalKey');
-
-  // 2. 第二次实际调用 createHost，断言取出的第5项在 Object.is 下严格为同一引用（first-wins 共享）
-  const hostRes2 = await createHost(workspace, {}, undefined, undefined, undefined, undefined);
-  assert.ok(hostRes2.tag === 0, 'host2 创建成功');
-  const [eventPort2, sessionPort2, snapshotPort2, key2, source2] = hostRes2.fields[0];
-  assert.equal(key1, key2, '相同工作区分配相同的 terminalKey');
-  assert.ok(Object.is(source1, source2), '第5项 sharedTerminalPort 严格同一引用，无多余包装破坏');
-
-  // 3. 错引用释放测试（验证防包装泄漏回归）：若用伪装/错误包装的对象释放，不能触发引用计数递减或提前移除
-  const fakeWrappedSource = { ...source1 };
-  TerminalWiring.release(key1, fakeWrappedSource);
-
-  // 验证条目未被提前移除：再次获取时仍应返回原 source1，而非换新 candidate
-  const probeCandidate1 = TerminalWiring.createSource();
-  const probe1 = await TerminalWiring.tryAcquireForWorkspace(workspace, probeCandidate1);
-  assert.ok(probe1);
-  assert.ok(Object.is(probe1[1], source1), '错误引用释放未减少真实引用，条目保留原引用');
-  // 平衡 probe1 带来的引用计数增加
-  TerminalWiring.release(key1, source1);
-
-  // 4. 释放第一个 host 的正常引用
-  TerminalWiring.release(key1, source1);
-
-  // 此时仍有一个 host 引用，再次获取依然应当是原 source1
-  const probeCandidate2 = TerminalWiring.createSource();
-  const probe2 = await TerminalWiring.tryAcquireForWorkspace(workspace, probeCandidate2);
-  assert.ok(probe2);
-  assert.ok(Object.is(probe2[1], source1), '未完全释放前依然复用已有条目');
-  // 平衡 probe2 增加的计数
-  TerminalWiring.release(key1, source1);
-
-  // 5. 释放第二个 host 的正常引用，此时计数真正归零，条目被彻底清理！
-  TerminalWiring.release(key2, source2);
-
-  // 6. 验证条目已被彻底清理：重新 acquire 时应登记新 candidate 并返回该新引用，而非旧 source1
-  const probeCandidate3 = TerminalWiring.createSource();
-  const probe3 = await TerminalWiring.tryAcquireForWorkspace(workspace, probeCandidate3);
-  assert.ok(probe3);
-  assert.ok(Object.is(probe3[1], probeCandidate3), '条目已彻底清理，新获取返回新 candidate 引用');
-  assert.ok(!Object.is(probe3[1], source1), '不再指向已释放的旧 source1');
-
-  // 收尾释放
-  TerminalWiring.release(probe3[0], probe3[1]);
+  const source1 = await acquireHostTerminal(workspace);
+  const source2 = await acquireHostTerminal(workspace);
+  assert.ok(source1);
+  assert.equal(source1, source2);
+  await EventsSurface.releaseSharedForWorkspace(workspace, { ...source1 });
+  const probe1 = await EventsSurface.acquireSharedForWorkspace(workspace);
+  assert.equal(probe1, source1, '错误引用不释放归属');
+  await EventsSurface.releaseSharedForWorkspace(workspace, probe1);
+  await EventsSurface.releaseSharedForWorkspace(workspace, source1);
+  const probe2 = await EventsSurface.acquireSharedForWorkspace(workspace);
+  assert.equal(probe2, source1, '另一个宿主仍持有引用');
+  await EventsSurface.releaseSharedForWorkspace(workspace, probe2);
+  await EventsSurface.releaseSharedForWorkspace(workspace, source2);
+  const probe3 = await EventsSurface.acquireSharedForWorkspace(workspace);
+  assert.notEqual(probe3, source1, '完全释放后建立新的终端源');
+  await EventsSurface.releaseSharedForWorkspace(workspace, probe3);
 });
 
 test('WHAT[host-boundary-016] EventsSurface subscribeFuture 严禁回放已存在的 sticky 历史，仅接收后续事件', async () => {

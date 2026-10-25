@@ -39,8 +39,11 @@ test('WHAT[host-boundary-032] canary does not advance on a delayed idle from a p
 test('WHAT[host-boundary-032] canary provider routes repeated requests by physical prompt and call history', () => {
   const body = { messages: [{ role: 'user', content: 'READ_SAMPLE' }] }
   assert.equal(managerReviewStage({ messages: [{ role: 'user', content: '[ANCHOR: 1; prefixCount: 1]\u0000\ufeffREAD_SAMPLE\u0000\ufeff<system>calibration</system>' }] }), 1)
+  assert.equal(managerReviewStage({ messages: [{ role: 'user', content: '[ANCHOR: 1]\u0000\ufeffREAD_SAMPLE\u0000\ufeff<system>calibration</system>' }] }), 1)
   assert.equal(managerReviewStage(body), 1)
+  body.messages.push({ role: 'user', content: '[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]' })
   assert.equal(managerReviewStage(body), 1)
+  body.messages.pop()
   body.messages.push({ role: 'assistant', tool_calls: [{ id: 'call_read_norm_1' }] })
   assert.equal(managerReviewStage(body), 2)
   body.messages.push({ role: 'user', content: 'TRIGGER_ERROR' })

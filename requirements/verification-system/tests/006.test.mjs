@@ -1407,7 +1407,10 @@ test('WHAT[verification-system-006] a supervised run reports the inner startup a
     const launcher = path.join(directory, 'supervise.mjs')
     const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
     fs.writeFileSync(fixture, `import test from 'node:test'
-test('never finishes', async () => { await new Promise(() => {}) })
+test('never finishes', async () => {
+  setInterval(() => {}, 10000)
+  await new Promise(() => {})
+})
 `)
     fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
 await superviseNodeTest({ files: [${JSON.stringify(fixture)}], label: 'runner-started', silenceMs: 1000 })
@@ -1463,7 +1466,10 @@ test('WHAT[verification-system-006] a supervised run without any lifecycle trans
     const launcher = path.join(directory, 'supervise.mjs')
     const moduleUrl = new URL('./e2e/support/supervise-node-test.mjs', import.meta.url).href
     fs.writeFileSync(fixture, `import test from 'node:test'
-test('never finishes', async () => { await new Promise(() => {}) })
+test('never finishes', async () => {
+  setInterval(() => {}, 10000)
+  await new Promise(() => {})
+})
 `)
     fs.writeFileSync(launcher, `import { superviseNodeTest } from ${JSON.stringify(moduleUrl)}
 await superviseNodeTest({ files: [${JSON.stringify(fixture)}], label: 'no-transition', silenceMs: 1000 })

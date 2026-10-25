@@ -72,8 +72,10 @@ module PrefixEpochProjection =
                   "compactionRuns"
                   ==> (state.ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value)
                   "tenures" ==> (state.ReanchoredTenures |> Set.toArray) ]
+
         if not (Set.isEmpty state.ReanchoredScopes) then
             baseObj?scopes <- (state.ReanchoredScopes |> Set.toArray)
+
         baseObj
 
     let private stateOf (view: obj) : ActivePrefixEpoch =
@@ -126,9 +128,10 @@ module PrefixEpochProjection =
         let result = prefixOwner?commit (stateView state, candidate)
 
         if unbox<bool> result?ok then
-            Ok { (stateOf result?state) with
-                     LastScopeArchive = state.LastScopeArchive
-                     ScopeQuestions = state.ScopeQuestions }
+            Ok
+                { (stateOf result?state) with
+                    LastScopeArchive = state.LastScopeArchive
+                    ScopeQuestions = state.ScopeQuestions }
         else
             Error(rejectionOf result)
 
@@ -149,30 +152,51 @@ module PrefixEpochProjection =
     let applyScopeReanchor previousEpoch nextEpoch (callId: string) state =
         commit previousEpoch nextEpoch (scope callId) state
 
-    let applyArchivedScopeReanchor previousEpoch nextEpoch (callId: string) (blob: BlobRef option) (digest: BlobDigest option) state =
+    let applyArchivedScopeReanchor
+        previousEpoch
+        nextEpoch
+        (callId: string)
+        (blob: BlobRef option)
+        (digest: BlobDigest option)
+        state
+        =
         applyScopeReanchor previousEpoch nextEpoch callId state
         |> Result.map (fun advanced ->
             let captured =
                 match blob, digest with
                 | Some actual, Some checksum ->
-                    Some { SourceEpochId = previousEpoch
-                           TargetEpochId = nextEpoch
-                           ResetCallId = callId
-                           ArchiveRef = actual
-                           ArchiveDigest = checksum }
+                    Some
+                        { SourceEpochId = previousEpoch
+                          TargetEpochId = nextEpoch
+                          ResetCallId = callId
+                          ArchiveRef = actual
+                          ArchiveDigest = checksum }
                 | _ -> None
-            { advanced with LastScopeArchive = captured; ScopeQuestions = Map.empty })
 
-    let scopeQuestionReceipt (callId: string) (state: ActivePrefixEpoch) =
-        Map.tryFind callId state.ScopeQuestions
+            { advanced with
+                LastScopeArchive = captured
+                ScopeQuestions = Map.empty })
 
-    let recordScopeQuestion (targetEpoch: PrefixEpochId) (callId: string) (digest: string) (state: ActivePrefixEpoch) : Result<ActivePrefixEpoch, string> =
-        let validArchive = state.LastScopeArchive |> Option.exists (fun prior -> prior.TargetEpochId = targetEpoch)
+    let scopeQuestionReceipt (callId: string) (state: ActivePrefixEpoch) = Map.tryFind callId state.ScopeQuestions
+
+    let recordScopeQuestion
+        (targetEpoch: PrefixEpochId)
+        (callId: string)
+        (digest: string)
+        (state: ActivePrefixEpoch)
+        : Result<ActivePrefixEpoch, string> =
+        let validArchive =
+            state.LastScopeArchive
+            |> Option.exists (fun prior -> prior.TargetEpochId = targetEpoch)
+
         match targetEpoch = state.EpochId && validArchive, scopeQuestionReceipt callId state with
         | false, _ -> Error "stale scope epoch or missing prior archive"
         | true, Some earlier when earlier <> digest -> Error "scope question receipt conflict"
         | true, Some _ -> Ok state
-        | true, None -> Ok { state with ScopeQuestions = Map.add callId digest state.ScopeQuestions }
+        | true, None ->
+            Ok
+                { state with
+                    ScopeQuestions = Map.add callId digest state.ScopeQuestions }
 
     let isScopeReanchored (callId: string) (state: ActivePrefixEpoch) : bool =
         unbox<bool> (prefixOwner?isReanchored (stateView state, scope callId))

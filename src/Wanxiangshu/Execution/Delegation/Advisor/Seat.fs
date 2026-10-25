@@ -274,7 +274,11 @@ module AdvisorSeat =
         taskResult {
             let! key = sendPrompt fullPrompt
             acceptIntent key
-            let! arrived = NodeTiming.raceExit (completion.Task :> Task) ConsultTimeoutMs |> TaskResultCE.ofTask
+
+            let! arrived =
+                NodeTiming.raceExit (completion.Task :> Task) ConsultTimeoutMs
+                |> TaskResultCE.ofTask
+
             do! Result.requireTrue DidNotAnswer arrived
             // advisor-[003]: the consult result is the advisor's final assistant prose,
             // not its post-scope context. An empty terminal is "did not answer".
@@ -343,8 +347,7 @@ module AdvisorSeat =
                 | Completed result when armed.Value && not (isStaleRun fence result) -> observeCompleted result
                 | Completed _ -> ()
                 | Aborted _
-                | Failed _ when armed.Value ->
-                    AsyncSupport.trySetResult completion (Error DidNotAnswer) |> ignore
+                | Failed _ when armed.Value -> AsyncSupport.trySetResult completion (Error DidNotAnswer) |> ignore
                 | _ -> ()
 
             use _subscription = deps.Sessions.SubscribeTerminal(childId, onTerminal)
@@ -480,11 +483,7 @@ module AdvisorSeat =
         }
 
 
-    let consult
-        (deps: AdvisorSeatDeps)
-        (callerSessionId: string)
-        (intent: string)
-        : Task<Result<string, string>> =
+    let consult (deps: AdvisorSeatDeps) (callerSessionId: string) (intent: string) : Task<Result<string, string>> =
         attempt (fun () -> consultCore deps callerSessionId intent)
 
     let clear (callerSessionId: string) : unit =

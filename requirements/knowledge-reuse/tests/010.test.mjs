@@ -736,7 +736,7 @@ test('WHAT[knowledge-reuse-010] 宿主真实链回归：PluginLifecycleSurface.t
   const assert = (await import('node:assert/strict')).default
   const { sessionDraftStore } = await import('wanxiangli/casebook')
   const PluginLifecycleSurface = await import('../../../dist/OpenCode/Plugin/PluginLifecycleSurface.js')
-  const { SessionIdModule_create } = await import('../../../dist/Foundation/Identity.js')
+  const { sessionId } = await import('../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js')
   
   const ownerSessionId = 'test-owner-' + Math.random().toString(36).slice(2)
   const delegateSessionId = 'test-delegate-' + Math.random().toString(36).slice(2)
@@ -748,7 +748,7 @@ test('WHAT[knowledge-reuse-010] 宿主真实链回归：PluginLifecycleSurface.t
     Scope: {
       syncDelegateRuntime: {
         attached: {
-          TryFind: () => SessionIdModule_create(delegateSessionId)
+          TryFind: () => sessionId(delegateSessionId)
         }
       }
     }
@@ -767,7 +767,7 @@ test('WHAT[knowledge-reuse-010] 宿主真实链回归：PluginLifecycleSurface.t
 test('WHAT[knowledge-reuse-010] 宿主真实链回归：Lifecycle.tryFinalizeDraft 与 cleanupDraft 真实消费同一单例', async () => {
   const assert = (await import('node:assert/strict')).default
   const { sessionDraftStore } = await import('wanxiangli/casebook')
-  const Lifecycle = await import('../../../dist/Repository/Knowledge/Casebook/Lifecycle.js')
+  const Lifecycle = await import('../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js')
   
   const testSessionId = 'test-finalize-' + Math.random().toString(36).slice(2)
   sessionDraftStore.setQ(testSessionId, '最终定稿问题')
@@ -779,13 +779,18 @@ test('WHAT[knowledge-reuse-010] 宿主真实链回归：Lifecycle.tryFinalizeDra
   assert.equal(sessionDraftStore.lastAnswer(draft), '最终定稿回答')
   
   sessionDraftStore.setQ(testSessionId, '临时问题')
-  Lifecycle.cleanupDraft(testSessionId)
+  Lifecycle.cleanup(testSessionId)
   const emptyDraft = sessionDraftStore.tryTake(testSessionId)
   assert.equal(emptyDraft, undefined, 'cleanupDraft 成功清除会话草稿')
   
-  const dummyStore = {
-    append: async () => ({ ok: true })
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const workspace = mkdtempSync(join(tmpdir(), 'casebook-finalize-'))
+  try {
+    const res = await Lifecycle.tryFinalize(workspace, testSessionId)
+    assert.equal(res.ok, true, '无草稿时安全返回真实结算结果')
+  } finally {
+    rmSync(workspace, { recursive: true, force: true })
   }
-  const res = await Lifecycle.tryFinalizeDraft('/tmp/dummy-workspace', dummyStore, testSessionId)
-  assert.ok(res !== undefined, '无草稿时 tryFinalizeDraft 安全返回 settlement')
 })

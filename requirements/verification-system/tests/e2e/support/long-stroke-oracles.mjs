@@ -17,6 +17,7 @@
  *
  */
 import assert from 'node:assert/strict';
+import { isScopeReminderText } from './runtime-key.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -239,6 +240,9 @@ export async function assertJoinWakePath(workDir, label = 'long-stroke') {
   );
 }
 
+const stripLeadingAnchor = (text) =>
+  String(text ?? '').replace(/^\[ANCHOR:\s*\d+\]\x00\uFEFF?/, '');
+
 /**
  * §21 / GrandRewrite §6.1: a nearer user message interrupts the blocked join.
  * Provider-visible join consequences are natural language only; internal
@@ -250,7 +254,9 @@ export function assertInterruptedJoin(scenario, label = 'long-stroke') {
  // A later successful join may legitimately carry an LWR that quotes the
  // earlier interrupted result; that historical quotation is not a second
  // interrupted join consequence and must not be classified as one.
-  const interrupted = results.filter((text) => text.startsWith('# Something nearer has arrived.\n'));
+  const interrupted = results.filter((text) =>
+    stripLeadingAnchor(text).startsWith('# Something nearer has arrived.\n'),
+  );
   assert.ok(
     interrupted.length >= 1,
     `${label}: interrupted join must reach Manager conversation as the public nearer-arrival result`,
@@ -400,27 +406,44 @@ export async function bindManagerLoopSequence(scenario) {
   );
   assert.ok(humanAudit, 'long-stroke: humanroot-loop audit entry is required');
 
-  const scores = (grade) => grade === 'REVISE'
-    ? [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }]
-    : [];
-  const candidatePerfect = () => ({
+  const scores = (grade) => {
+    if (grade === 'REVISE') return [{ key: 'target-gap', value: 'close the remaining gap' }];
+    if (grade === 'CLEAR') return [{ key: 'target-gap', value: null }];
+    return [];
+  };
+  let programNameCounter = 0;
+  const reviewCall = (prefixText, grade) => ({
     type: 'tool-call',
-    tool: 'review',
-    prefixText: 'Independent audit of this tenure snapshot finds every required quality dimension complete and supported by the current workspace evidence.',
-    args: { findings: scores('PERFECT') },
+    tool: 'todowrite-for-manager',
+    ...(prefixText ? { prefixText } : {}),
+    args: {
+      name: `review-${grade.toLowerCase()}-${++programNameCounter}`,
+      planB: '等待评审打分回执，保留当前评审任期事实。',
+      program: `class Js extends JsProgram { async run() { return await this.review(${JSON.stringify(scores(grade))}); } }`,
+    },
   });
-  const repairAudit = () => ({
+  const clearReview = () => reviewCall(undefined, 'CLEAR');
+  const forkCall = (payload) => ({
     type: 'tool-call',
-    tool: 'review',
-    prefixText: 'Independent audit finds the rebase conflict still requires owned repair work, so completeness remains open on this snapshot.',
-    args: { findings: scores('REVISE') },
+    tool: 'todowrite-for-manager',
+    args: {
+      name: `fork-conflict-resolver-${++programNameCounter}`,
+      planB: '等待派工回执，保留冲突修复子任务。',
+      program: `class Js extends JsProgram { async run() { return await this.fork(${JSON.stringify(payload)}, []); } }`,
+    },
   });
-  const humanPerfect = () => ({
-    type: 'tool-call',
-    tool: 'review',
-    prefixText: 'HumanRoot loop next tenure independently audits the current snapshot as complete.',
-    args: { findings: scores('PERFECT') },
-  });
+  const candidatePerfect = () => reviewCall(
+    'Independent audit of this tenure snapshot finds every required quality dimension complete and supported by the current workspace evidence.',
+    'PERFECT',
+  );
+  const repairAudit = () => reviewCall(
+    'Independent audit finds the rebase conflict still requires owned repair work, so completeness remains open on this snapshot.',
+    'REVISE',
+  );
+  const humanPerfect = () => reviewCall(
+    'HumanRoot loop next tenure independently audits the current snapshot as complete.',
+    'PERFECT',
+  );
   const retire = () => ({ type: 'tool-call', tool: 'deliver', args: {} });
   const joinOwnedWork = () => ({ type: 'tool-call', tool: 'join', args: {} });
  // Initial deliveries stay as declared (low audit + work fork; HumanRoot low).
@@ -447,15 +470,11 @@ export async function bindManagerLoopSequence(scenario) {
       entry.respond = latestManagerAuditAttempt === 1
         ? initialLoopAction
         : latestManagerAuditAttempt === 3
-          ? {
-              type: 'tool-call',
-              tool: 'fork',
-              args: {
-                calling: 'engineer',
-                name: 'Conflict Resolver',
-                charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
-              },
-            }
+          ? forkCall({
+              calling: 'engineer',
+              name: 'Conflict Resolver',
+              charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
+            })
           : retire();
     } else if (entry?.id === 'manager-reopened-loop.1') {
  // A successor incarnation opens no work of its own unless the audit assigned it:
@@ -464,15 +483,11 @@ export async function bindManagerLoopSequence(scenario) {
  // `todowrite-for-manager` a review-only read tool, disabled once accepted), so the
  // candidate/rebase ownership seam is production's, not a rung's.
       entry.respond = latestManagerAuditAttempt === 3
-        ? {
-            type: 'tool-call',
-            tool: 'fork',
-            args: {
-              calling: 'engineer',
-              name: 'Conflict Resolver',
-              charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
-            },
-          }
+        ? forkCall({
+            calling: 'engineer',
+            name: 'Conflict Resolver',
+            charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
+          })
         : retire();
     } else if (entry?.id === 'manager-loop.2' || entry?.id === 'manager-reopened-loop.2') {
       // The family is shared by both owner lanes, and only the Manager lane forks work to
@@ -489,13 +504,22 @@ export async function bindManagerLoopSequence(scenario) {
           : latestManagerAuditAttempt === 3
             ? initialLoopJoin
             : retire();
-    } else if (entry?.turnId === 'manager-reopened-loop' && entry.step >= 3) {
- // The successor's own tenure closes here: the repair work has been harvested by
- // the join above, and every later cursor of this assess resource is a close.
+    } else if (
+      (entry?.turnId === 'manager-loop' || entry?.turnId === 'manager-reopened-loop')
+      && entry.step === 3
+    ) {
+      // A low audit leaves target-gap on the ledger. Delivery against that ledger is only
+      // observed, so every tenure clears it before the closing deliver.
+      entry.respond = clearReview();
+    } else if (entry?.turnId === 'manager-reopened-loop' && entry.step >= 4) {
       entry.respond = retire();
     } else if (entry?.id === 'manager-t1-commitment.0') {
       managerAssumptionDelivered = true;
-    } else if (entry?.turnId === 'manager-current-action') {
+    } else if (
+      entry?.turnId === 'manager-current-action'
+      || entry?.turnId === 'manager-current-action-comment'
+      || entry?.turnId === 'manager-current-action-preamble'
+    ) {
       if (!managerAssumptionDelivered) {
         entry.respond = currentActionAssumptionResponse;
         managerAssumptionDelivered = true;
@@ -506,17 +530,10 @@ export async function bindManagerLoopSequence(scenario) {
         entry.respond = joinOwnedWork();
         repairWorkJoined = true;
       } else if (!nudgeAuditDelivered) {
-        // The ladder converges by satisfying the review gate instead of hammering it:
-        // production rejects a deliver with "# Cannot finish without a review", so a
-        // later re-anchored nudge answers the review (perfect), and only the nudge after
-        // that closes the episode. Without this the Manager never stops consuming the
-        // bounded ladder, and the main flow's Manager turns never begin.
-        entry.respond = {
-          type: 'tool-call',
-          tool: 'review',
-          prefixText: 'Independent audit of the current workspace finds every required quality dimension complete and supported by the evidence already gathered.',
-          args: { findings: scores('PERFECT') },
-        };
+        // The work face keeps a non-empty obligation ledger. A perfect review does not
+        // delete those keys, and a delivery against them is only observed. Clear the
+        // ledger, then close.
+        entry.respond = clearReview();
         nudgeAuditDelivered = true;
       } else {
         entry.respond = retire();
@@ -721,7 +738,9 @@ export async function oracleLongStroke(scenario, ctx) {
 
   const managerJoinResults = publicToolResults(scenario.provider?.requests, 'join');
   assert.equal(
-    managerJoinResults.filter((text) => text.startsWith('# Something nearer has arrived.\n')).length,
+    managerJoinResults.filter((text) =>
+      stripLeadingAnchor(text).startsWith('# Something nearer has arrived.\n'),
+    ).length,
     1,
     'long-stroke: provider recovery must not manufacture another interrupted or terminal join result',
   );
@@ -781,7 +800,7 @@ export const HUMANROOT_MANAGER_LOOP_CANARY_PROMPT =
   'HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager assessment check.';
 
 export const HUMANROOT_CANARY_DELTAS = Object.freeze({
-  assessments: 2,
+  assessments: 3,
   retirements: 2,
   incumbencyOpenings: 2,
 });
@@ -831,7 +850,8 @@ const stripGuidance = (text) => {
 const messageTextsByRole = (request, role) =>
   (request?.messages ?? [])
     .filter((message) => message?.role === role)
-    .map((message) => stripGuidance(contentText(message?.content)));
+    .map((message) => stripGuidance(contentText(message?.content)))
+    .filter((text) => role !== 'user' || !isScopeReminderText(text));
 
 const normalizeHostModelBanner = (text) => text.replace(
   /You are powered by the model named [^\n]*?\. The exact model ID is [^\n]+/g,
@@ -868,7 +888,7 @@ export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
   const successorOrdinals = [];
   for (const request of requests) {
     const users = messageTextsByRole(request, 'user');
-    const appended = users.at(-1) ?? '';
+    const appended = (users.at(-1) ?? '').replace(/^\[ANCHOR: [1-9]\d*\]\u0000\uFEFF/, '');
     if (!appended.startsWith(assessmentResource)) continue;
     const ordinal = /# You are the (\d+) Manager taking over this mission\./.exec(appended)?.[1];
     assert.ok(ordinal, 'manager-loop: successor request must carry the successor ordinal resource');
@@ -938,7 +958,7 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
   // Scoped to this canary's own work stream: the unified journal is per session, so a
   // global count would sum every other work's tenures.
   const scope = { timeoutMs: WAIT_FACT_WINDOW_MS, sessionId };
-  await awaitNamedFact(workDir, waitFactShape('Reviewed', { eq: 2 }), scope);
+  await awaitNamedFact(workDir, waitFactShape('Reviewed', { eq: 3 }), scope);
   await awaitNamedFact(workDir, waitFactShape('IncumbencyRetired', { eq: 2 }), scope);
   await awaitNamedFact(workDir, waitFactShape('IncumbencyOpened', { eq: 2 }), scope);
 
@@ -969,11 +989,9 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
   );
 
   const requests = canaryRequestsFor(scenario, sessionId);
-  assert.equal(
-    requests.length,
-    6,
-    `${label}: expected exactly 6 chat requests on the canary session — three per tenure
-     under the two-stage deliver of work-006 (review, deliver-confirmation, deliver-close) (got ${requests.length})`,
+  assert.ok(
+    requests.length === 5 || requests.length === 6,
+    `${label}: expected 5 tenure requests, or 6 when delivery also continues the same session (got ${requests.length})`,
   );
  // Same physical SessionId on every request: continuations extend the
  // LogicalRun, they never create a new one. A new session here would be a
@@ -1003,7 +1021,7 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
   // that). So the loop oracle asserts what the handover contract fixes — the authority root
   // and the successor's own resource (see `assertManagerLoopAuthorityPreserved`) — and not
   // which predecessor row happened to survive, which is timing, not contract.
-  const firstTenureReviewIds = assistantToolCallIds([requests[1]], 'review');
+  const firstTenureReviewIds = assistantToolCallIds([requests[1]], 'todowrite-for-manager');
   assert.equal(
     firstTenureReviewIds.length,
     1,

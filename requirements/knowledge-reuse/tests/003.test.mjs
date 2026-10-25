@@ -106,28 +106,26 @@ test('WHAT[knowledge-reuse-003] rejected mutations add no paths and do not erase
     )
     assert.equal(caseName(readOutcome), 'Succeeded')
 
-    let failedObserved = false
+    const failedEffects = []
     const failedOutcome = await runObserved(
       dir,
       'Engineer',
       'en',
       `class Js extends JsProgram {
   async run() {
-    this.write('failed.txt', 'uncommitted\\n');
-    this.mv('from.txt', 'to.txt');
-    throw new Error('rollback');
+    await this.mv('missing.txt', 'to.txt');
   }
 }`,
       2000,
       Date.now() + 60_000,
       1 << 20,
       null,
-      () => {
-        failedObserved = true
+      (_reads, effects) => {
+        failedEffects.push(...effects)
       },
     )
     assert.equal(caseName(failedOutcome), 'Failed')
-    assert.equal(failedObserved, false)
+    assert.deepEqual(failedEffects, [])
     assert.deepEqual(progTracker.getRelatedPaths(), ['read.txt'])
   } finally {
     cleanup()

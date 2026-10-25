@@ -304,9 +304,10 @@ test('WHAT[work-026] a new user input after the delivery is not stopped by that 
       'a new physical input is not stopped by the delivery bound to the previous input',
     )
     assert.equal(
-      request.messages.length,
+      request.messages.filter(message => !message.steering).length,
       2,
       'the new input request is not cleared by the previous delivery',
     )
+    assert.equal(request.messages.at(-1).strong, true, '新会话初始化提醒不属于旧交付停止')
   })
 })

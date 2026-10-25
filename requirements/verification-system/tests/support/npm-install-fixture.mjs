@@ -121,7 +121,7 @@ export async function createNpmInstallFixture() {
       server.listen(0, '127.0.0.1', resolve)
     })
     registry = `http://127.0.0.1:${server.address().port}`
-    fixturePhase('npm:registry-listening', { root, registry })
+    fixturePhase('npm:registry-listening', { root })
     const packageJson = { name: 'verification-install-fixture', version: '1.0.0', private: true, packageManager: `npm@${tools.expectedNpmVersion}`, dependencies: { [parentName]: '1.0.0' }, scripts: { postinstall: 'node -e "process.exit(71)"' } }
     const lockfile = {
       name: packageJson.name,

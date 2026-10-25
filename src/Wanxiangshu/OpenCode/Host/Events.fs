@@ -12,13 +12,14 @@ module Events =
     /// A fresh terminal source. The product owns the terminal facts; this is
     /// the only adapter-side place that names the product's implementation, and
     /// it names it only to obtain an instance — never to hold one.
-    let newTerminalSource () : ISessionTerminalSource = TerminalWiring.createSource()
+    let newTerminalSource () : ISessionTerminalSource = TerminalWiring.createSource ()
 
     let private notifyOne (listener: HostSignal -> Task) (signal: HostSignal) : Task =
         task {
             try
                 do! listener signal
-            with _ -> ()
+            with _ ->
+                ()
         }
 
     /// HNI P-07: host-neutral signal source for OpenCode host events.
@@ -28,8 +29,8 @@ module Events =
 
         member _.Publish(signal: HostSignal) : Task =
             task {
-                let snapshot =
-                    lock syncRoot (fun () -> listeners.ToArray())
+                let snapshot = lock syncRoot (fun () -> listeners.ToArray())
+
                 for listener in snapshot do
                     do! notifyOne listener signal
             }
@@ -37,6 +38,7 @@ module Events =
         interface ISignalSource with
             member _.Subscribe(listener: HostSignal -> Task) : IDisposable =
                 lock syncRoot (fun () -> listeners.Add listener)
+
                 { new IDisposable with
                     member _.Dispose() =
                         lock syncRoot (fun () -> listeners.Remove listener |> ignore) }

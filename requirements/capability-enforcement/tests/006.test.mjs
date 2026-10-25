@@ -237,8 +237,10 @@ test('WHAT[capability-enforcement-006] AUTOINJ_active_empty_skill_call_is_denied
     const real = transformed.messages.find((message) => message.info?.id === 'asst-real-skill')
     assert.ok(real)
     assert.deepEqual(real.parts[0].state.input, { name: 'pdfs' })
-    assert.match(real.parts[0].state.output, /^real skill output\u0000\uFEFF\[System:/,
-      'LLM request copy carries a Pair Hint, without modifying the real skill result')
+    assert.equal(real.parts[0].state.output, 'real skill output')
+    const steer = transformed.messages.find(message => message.steering && message.strong)
+    assert.ok(steer, '首次初始化通过独立强提醒呈现，不改写已有工具结果')
+    assert.match(steer.parts[0].text, /resetScope/)
     assert.equal(rawRealToolState.output, 'real skill output',
       'the original Host-owned completed tool state remains byte-identical')
   })

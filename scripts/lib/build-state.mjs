@@ -47,6 +47,7 @@ const SKIP_DIR_NAMES = new Set([
 ])
 
 function isIgnoredVerificationFile(fileName) {
+  if (fileName === '.DS_Store') return true
   if (fileName === '.env.example') return false
   if (fileName.startsWith('.env')) return true
   if (fileName.endsWith('.pem') || fileName.endsWith('.key') || fileName.endsWith('.tgz')) return true

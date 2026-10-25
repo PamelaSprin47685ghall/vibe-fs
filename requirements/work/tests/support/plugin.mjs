@@ -16,13 +16,27 @@ export const scores = findings
 // ModelRouting is a process singleton: a test that supersedes a physical
 // message keeps it superseded for later tests, so isolated callers pass their own session.
 export const withReview = async (body, {ownerId, session = 'review-manager'} = {}) => withExecutablePlugin(async (hooks, directory, created, runtime) => {
+  runtime.client.tui = runtime.client.tui ?? { showToast: async () => ({}) }
   await acceptAuthorityRoot(runtime, session, 'manager', 'user-root')
-  await hooks['chat.message']({sessionID: session, agent: 'manager'}, {
+  await hooks['chat.message']({sessionID: session, messageID: `user-kickoff-${directory}`, agent: 'manager'}, {
+    message: {id: `user-kickoff-${directory}`, role: 'user', agent: 'manager', model: {providerID: 'provider', modelID: 'manager-model'}},
+    parts: [{type: 'text', text: 'Initial request before clarification.'}],
+  })
+  await openIncumbency(runtime, session, `inc-${session}`, 'S4', ownerId)
+  await hooks.tool['todowrite-for-manager'].execute(
+    { name: 'kickoff-empty-review', program: 'class Js extends JsProgram { async run() { return await this.review([]); } }', planB: 'Wait for the initial ask receipt.' },
+    { sessionID: session, callID: 'kickoff-call', messageID: 'kickoff-run', agent: 'manager' },
+  )
+  await hooks['chat.message']({sessionID: session, messageID: 'user-root', agent: 'manager'}, {
     message: {id: 'user-root', role: 'user', agent: 'manager', model: {providerID: 'provider', modelID: 'manager-model'}},
     parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}],
   })
-  await openIncumbency(runtime, session, `inc-${session}`, 'S4', ownerId)
-  runtime.pushHostMessage(session, {info: {id: 'user-root', role: 'user', sessionID: session, time: {created: 1}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]})
+  const userRootMsg = {info: {id: 'user-root', role: 'user', sessionID: session, time: {created: 1}, model: {providerID: 'provider', modelID: 'manager-model'}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]}
+  runtime.pushHostMessage(session, userRootMsg)
+  const kickoffRun = {info: {id: 'kickoff-answered-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 1}}, parts: []}
+  runtime.pushHostMessage(session, kickoffRun)
+  await hooks['experimental.chat.messages.transform']({sessionID: session}, {messages: [userRootMsg]})
+  kickoffRun.info.time = { ...kickoffRun.info.time, completed: 1 }
   let createdAt = 1
   const execute = async (input, {call = 'review-call', run = 'review-run', before = 'I independently inspected the current workspace.', after = 'after review'} = {}) => {
     runtime.pushHostMessage(session, {

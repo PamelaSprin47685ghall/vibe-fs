@@ -1,4 +1,33 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { z } from 'zod'
+import { createRegistered, execute } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
+
+test('WHAT[repository-programming-006] todowrite can continue after waiting longer than ten seconds', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-006-long-wait-'))
+  const tool = definition => definition
+  tool.schema = z
+  try {
+    const registered = createRegistered({ tool }, 'DevOps', 'en', directory, null)
+    const result = await execute(registered, {
+      name: 'long-wait',
+      program: `class Js extends JsProgram {
+        async run() {
+          await this.call("node -e 'setTimeout(() => {}, 10500)'");
+          return { continued: true };
+        }
+      }`,
+      planB: 'wait for the running operation '.repeat(20),
+    }, { sessionID: 'ses-006-long-wait' })
+    assert.equal(result.startsWith('# ok'), true, result)
+    assert.match(result, /continued = true/)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 {
 const { default: assert } = await import("node:assert/strict");

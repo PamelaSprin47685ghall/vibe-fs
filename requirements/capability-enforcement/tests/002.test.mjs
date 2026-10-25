@@ -108,6 +108,7 @@ const ROLE_ALLOW = {
   Manager: [
     'negotiate',
     'resetScope',
+    'askPreviousScope',
     'fork',
     'resume',
     'join',
@@ -116,11 +117,12 @@ const ROLE_ALLOW = {
     'review',
     'todowrite-for-manager',
   ],
-  Orchestrator: ['negotiate', 'resetScope', 'commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
-  Engineer: ['negotiate', 'resetScope', 'bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
+  Orchestrator: ['negotiate', 'resetScope', 'askPreviousScope', 'commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
+  Engineer: ['negotiate', 'resetScope', 'askPreviousScope', 'bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
     'negotiate',
     'resetScope',
+    'askPreviousScope',
     'join',
     'horizon',
     'todowrite-for-devops',
@@ -152,6 +154,7 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
   const permissionOf = (toolName) =>
     ({
       resetScope: 'ResetScope',
+      askPreviousScope: 'ResetScope',
       fork: 'Fork',
       resume: 'Resume',
       commission: 'Fork',

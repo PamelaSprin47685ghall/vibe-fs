@@ -99,8 +99,7 @@ module HorizonTool =
           NewHandleId = None
           OpenManagerJob = (None: (ManagerJobId * string * string * string * int option -> HostResult<string>) option)
           ContinueManagerJob =
-            (None: (ManagerJobId * string * ProviderRunIdentity * ToolCallId * int option -> HostResult<string>) option)
-        }
+            (None: (ManagerJobId * string * ProviderRunIdentity * ToolCallId * int option -> HostResult<string>) option) }
 
     let private execute (runtimeCtx: HorizonRuntimeContext) (_args: HostToolArguments) context =
         task {
