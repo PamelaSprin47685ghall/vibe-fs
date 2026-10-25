@@ -1128,8 +1128,6 @@ Repository/Knowledge/Casebook/ObservationCollector.fsi
 Repository/Knowledge/Casebook/ObservationCollector.fs
 Repository/Knowledge/Casebook/SessionDraft.fsi
 Repository/Knowledge/Casebook/SessionDraft.fs
-Repository/Knowledge/Casebook/BookkeeperStaging.fsi
-Repository/Knowledge/Casebook/BookkeeperStaging.fs
 Repository/Knowledge/Casebook/BookkeeperRuntime.fsi
 Repository/Knowledge/Casebook/BookkeeperRuntime.fs
 Repository/Knowledge/Casebook/BookkeeperPolicy.fsi

@@ -21,6 +21,9 @@ open Wanxiangshu.Repository.Programming.Js
 /// shape.
 module JsBookkeeperTool =
 
+    [<Import("bookkeeperStaging", "wanxiangli/casebook")>]
+    let private staging: obj = jsNative
+
     let private prose language path = BookkeeperPolicy.prose language path
 
     /// Resolve the staged transaction and the program source; every refusal is
@@ -39,7 +42,7 @@ module JsBookkeeperTool =
                 args.OptionalText "program"
                 |> Result.requireSome (prose language BookkeeperPolicy.Path.ProgramRequired)
 
-            let! question, answer = BookkeeperStaging.snapshot txId
+            let! question, answer = unbox<Result<string * string, string>> (staging?snapshot (txId))
             return txId, program, question, answer
         }
 
@@ -57,7 +60,7 @@ module JsBookkeeperTool =
                 |> Result.mapError (fun failure -> BookkeeperPolicy.failed language (JsFailure.reason failure))
 
             do!
-                BookkeeperStaging.apply txId staged.Question staged.Answer
+                unbox<Result<unit, string>> (staging?apply (txId, staged.Question, staged.Answer))
                 |> Result.mapError (fun err -> BookkeeperPolicy.failed language err)
 
             return BookkeeperPolicy.succeeded language value

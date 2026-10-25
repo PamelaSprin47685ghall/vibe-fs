@@ -16,6 +16,9 @@ open Wanxiangshu.Participant.Provider
 
 module CasebookBookkeeperSurface =
 
+    [<Import("bookkeeperStaging", "wanxiangli/casebook")>]
+    let private staging: obj = jsNative
+
     [<Emit("$0 == null")>]
     let private isNullish (value: obj) : bool = jsNative
 
@@ -167,9 +170,9 @@ module CasebookBookkeeperSurface =
     let txIdFor (sessionId: string) : string = BookkeeperRuntime.txIdFor sessionId
 
     let beginTransaction (txId: string) (question: string) (answer: string) : unit =
-        BookkeeperStaging.beginTransaction txId question answer
+        staging?beginTransaction (txId, question, answer) |> ignore
 
-    let abort (txId: string) : unit = BookkeeperStaging.abort txId
+    let abort (txId: string) : unit = staging?abort (txId) |> ignore
 
     let private stagedToJs (result: Result<string * string, string>) : obj =
         match result with
@@ -180,10 +183,10 @@ module CasebookBookkeeperSurface =
         | Error message -> box {| ok = false; error = message |}
 
     let snapshot (txId: string) : obj =
-        BookkeeperStaging.snapshot txId |> stagedToJs
+        unbox<Result<string * string, string>> (staging?snapshot (txId)) |> stagedToJs
 
     let take (txId: string) : obj =
-        BookkeeperStaging.take txId |> stagedToJs
+        unbox<Result<string * string, string>> (staging?take (txId)) |> stagedToJs
 
     let sessionId (value: string) : obj = box (SessionId.create value)
 

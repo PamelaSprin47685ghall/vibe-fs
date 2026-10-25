@@ -599,6 +599,17 @@ CUT36_OMP_REAL_SMOKE=1 \
 - **未闭合边界。** context-compression-001 的 GAP-104（模型容量权威独立审计）仍为 TODO。尚未进行真实 provider 会话 canary，不宣称运行中的 OpenCode 实例已热更新。本次 node scripts/check.mjs 仍有既有 25 项红态：Host/FissionPort.fs namespace-tier 1 项及并行改动涉及的 control-pyramid 24 项，不把它们算成本包通过。
 
 
+
+
+### 6.10 Casebook BookkeeperStaging 状态抽取（2026-10-25）
+
+- **一份状态，一个自治 owner。** 原主仓 `BookkeeperStaging.fs` 与 `.fsi` 保存可变暂存事务槽位字典 `slots` 与变更标记 `Touched`。现已彻底迁入 `wanxiangli/casebook` 的进程内自治对象 `BookkeeperStaging`（提供类及全局唯一单例 `bookkeeperStaging`）。暂存槽位的生命周期（`beginTransaction`、`snapshot`、`apply`、`take`、`touched`、`abort`）由库侧对象独占拥有与维护；`apply(tx, None, None)` 无论字段是否变化均无条件标记 `touched=true`；未 touched 的 `take` 被拒且保留 slot，重入 `begin` 覆盖同一 tx 时重置 `touched=false`。宿主消费者（`BookkeeperRuntime.fs`、`BookkeeperSurface.fs`、`BookkeeperTool.fs`）统一导入并向该单例发送消息，主仓不再维护私有暂存副本。
+- **旧 owner 彻底退出。** 主仓物理删除 `BookkeeperStaging.fs` 与 `BookkeeperStaging.fsi`，从 `compile-order.txt` 及 `Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj` 编译条目中移除。同步清理 `scripts/checks/owner-impact-corpus.json` 中指涉该已退出 owner 文件的 8 行条目；`scripts/owner-impact-report.mjs` 确认无内嵌陈旧常量。
+- **逐层验证事实。**
+  - 库侧：Fable 编译与 casebook 家族 21 项单测全部通过（包含新增针对 slots/touched/take 契约边界的 `tests/006.test.mjs` 12 项断言全绿）。
+  - 独立消费：通过 `npm pack` 生成真实 tarball，在独立干净临时目录下经由 Node.js ESM、Bun ESM 动态执行及 TypeScript（`tsc --noEmit --module NodeNext --moduleResolution NodeNext --strict`）静态类型检查，100% 消费断言成功通过。
+  - 宿主侧：在 `/tmp/wxs-build.lock` 保护下 `node scripts/build.mjs` 成功编译（generation 192，1400 items，150 surfaces，782 emitted modules linked）。`knowledge-reuse` 核心条款套件全部验证通过（006: 19 pass / 1 todo; 010: 12 pass / 1 todo; 013: 31 pass / 1 todo；BookkeeperTool 接线 034: 2 pass）。
+- **未闭合边界与剩余状态台账。** 本首包仅完成暂存事务（slots/Touched）抽取，**绝不记整体 DONE**。主仓 Casebook 其余状态（如 `SessionDraft`、`BookkeeperLedger` 提交与追溯状态、Casebook 维护与接入运行时等）仍留在主仓待后续包迁出。既有架构门禁红态（如 `FissionPort.fs` namespace-tier 1 项）为分支已知历史状态，未因本包产生退化。
 ---
 
 ## 7. 迁移来源文件全量清单与保留/删除边界
