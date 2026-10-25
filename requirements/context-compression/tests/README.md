@@ -16,14 +16,15 @@ WHAT 拥有输入、提交与生命周期边界；本文只说明现有测试如
 | 031 | （条款已废止，编号永久空缺；原测试已删除） |
 | 032 | （条款已废止，编号永久空缺；原测试已删除） |
 | 033 | （待实现）resetScope 屏障执行、旧 scope 清理与操作员用户消息/成对 reset 结果保留。 |
-| 034 | （待实现）turnBudget 递减、`\0\uFEFF` 后缀追加、用户消息尾巴提醒与零预算弱提醒。 |
+| 034 | turnBudget 正常递减、`\0\uFEFF` 工具结果历史后缀冻结；首轮每请求独立强 agent steer；已初始化后的新真人／代理消息不重置预算；零预算弱 steer。 |
 | 035 | （待实现）ScopeReanchored 事实提交、epoch 推进与前缀缓存幂等清空。 |
 | 036 | （待实现）跨会话只传当前指令与结构化材料的 TOML 渲染与传递。 |
 | 037 | （待实现）子智能体自然停机完成、无 nudge，及末轮 assistant 散文以 `#` 注释交回父会话（无 `[[session]]` 表）。 |
 
-| 038 | HNI 中立 scope 计划；用户线／工具结果线的返回位置、重置后预算与新 prompt 的作废。 |
+| 038 | HNI 中立 Scope 计划：第一次 reset 前强 steer 与工具结果分离；成功 reset 后新 user 与 agent 回答保留预算／前缀，旧 raw 消息不变。 |
 | 039、040 | 实体 Host physical canary：OpenCode provider 请求数组的原地更新、旧历史不变，以及 SessionMessage 同批调用/结果配对（`requirements/host-boundary/tests/scope-hni-physical.test.mjs`）。 |
 | 041 | 物理会话删除事件清理对应 ScopeSession，不牵连其他会话（同一 Host physical canary）。 |
+| 050 | 真实 OpenCode 已注册 resetScope 工具双重锚 canary：第一 reset 不催 askPrevious，第二 reset 才要求；期间真人新消息预算继续、非 reset 工具输出不写 MUST；见 host-boundary/scope-hni-physical.test.mjs。 |
 | 047–049 | OpenCode 真实 reset→archive→read-only BTW→真实 steer、持久 receipt 重放与异问题冲突见 Host physical canary；OMP 工具注册、无档案拒绝、旧 native Provider system/messages/model/tools 冻结及真实 side-turn 回放见 `omp-scope-seam` [048][049]；真实 OMP SDK + 本地 SSE Provider 出站、代理消息及重放见 opt-in `omp-negotiate-physical.test.mjs`。商业 Provider cache 命中与崩溃 Unknown 尚未证。 |
 | 042 | （部分实施；见 [047]/[048] 未证范围）跨 Scope 回问接口（askPreviousScope）：紧邻上一 epoch 访问限制、首次 reset 前 NoPreviousScope、questions 非空形式校验、Host receipt 即解除 pending、回答作为 agent 来源 user steer 异步送达与 Stale/Unknown/重放幂等。 |
 | 043 | （部分实施；见 [047]/[048] 未证范围）resetScope 档案与首问义务原子绑定：不可变内容地址 blob 先行持久化、同一 durable 提交绑定 ScopeReanchored 与首问义务、提交确证先于内存状态更新、原始返回文本不变，及 session.deleted / 再次 reset 在途咨询清理与 Stale 判定。 |

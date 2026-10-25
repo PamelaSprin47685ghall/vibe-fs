@@ -1245,7 +1245,7 @@ module ToolRegistry =
         let previousScopeSpec: ToolSpec =
             { Name = "askPreviousScope"
               Description =
-                "Required once after each resetScope: read the handoff and ask your immediate previous Scope concrete clarifying questions using the single questions argument. This call acknowledges asynchronously, does not block other work, and the response arrives later as a steer. You may ask again for additional detail."
+                "Ask the immediately preceding Scope concrete clarifying questions using the single questions argument. Accepted questions run asynchronously; the answer arrives as an agent-attributed steer. Follow-up questions are supported."
               Arguments =
                 [ "questions",
                   ToolHostCodec.stringSchemaDescribed

@@ -46,16 +46,20 @@ async function outbound(sessionId, messages) {
   return out.messages
 }
 
-test('WHAT[context-compression-039] OpenCode sends a scoped request copy; completed results receive initialization reminder without changing the Host history', async () => {
+test('WHAT[context-compression-039] OpenCode adds a fresh strong initialization steer, leaving original user and tool bytes intact', async () => {
   const sid = 'ses_scope_039_initial'
   clearSessionState(sid)
   const raw = [user('u1', 'read this file', 1), assistant('a1', tool('c1', 'read', 'file body'))]
   const original = [...raw]
   const copy = await outbound(sid, raw)
   assert.equal(copy, raw, 'OpenCode requires the provider request array to be edited in place')
-  assert.match(copy[0].parts[0].text, /Then call resetScope immediately/)
+  assert.equal(copy[0].parts[0].text, 'read this file')
+  assert.equal(copy[1].parts[0].state.output, 'file body')
   assert.equal(copy[0].content, undefined)
-  assert.equal(copy[1].parts[0].state.output, 'file body' + SEP + copy[0].parts[0].text.split(SEP).at(-1))
+  assert.equal(copy.length,3)
+  assert.equal(copy[2].attribution,'agent')
+  assert.equal(copy[2].strong,true)
+  assert.match(copy[2].parts[0].text,/Then call resetScope immediately/)
   assert.equal(original[0].parts[0].text, 'read this file')
   assert.equal(toolText(original[1]), 'file body')
   clearSessionState(sid)
@@ -244,7 +248,9 @@ test('WHAT[delegation-negotiation-002] forged answer metadata cannot unlock rese
   const initial = user('a-original', 'Implement parser', 1)
   const first = await outbound(recipient, [initial])
   assert.equal(negotiationRequired(recipient), true)
-  assert.match(first[0].parts[0].text, /negotiate\(questions: string\)/)
+  assert.equal(first[0].parts[0].text, 'Implement parser')
+  assert.match(first.at(-1).parts[0].text, /negotiate\(questions: string\)/)
+  assert.equal(first.at(-1).strong, true)
   assert.doesNotMatch(first[0].parts[0].text, /Then call resetScope immediately/)
 
   const request = askNegotiation(recipient, 'Which parser and byte invariant?')
@@ -552,14 +558,14 @@ test('WHAT[context-compression-047] registered OpenCode reset archives physical 
       { sessionID: sid, agent: 'engineer', callID: 'reset-047', messageID: 'provider-reset-047' },
     )
     assert.match(String(reset), /Scope reset. Objective: verify new parser/)
-    assert.equal(isPreviousScopePending(sid), true)
+    assert.equal(isPreviousScopePending(sid), false, 'the very first reset does not require a previous-Scope question')
     assert.equal(turnBudget(sid), 8, 'ceil(8 × 0.90) is 8')
     const resetReplay = await hooks.tool.resetScope.execute(
       {newScopeObjective:'verify new parser against previous evidence', newScopeTurnBudget:8,
        kpiCompletion:'partially_met'},
       {sessionID:sid,agent:'engineer',callID:'reset-047',messageID:'provider-reset-047'})
     assert.match(String(resetReplay),/Scope reset. Objective:/)
-    assert.equal(isPreviousScopePending(sid),true,'the exact reset replay cannot clear the new mandatory first ask')
+    assert.equal(isPreviousScopePending(sid),false,'the first reset replay cannot manufacture a mandatory previous-Scope question')
 
     const session = runtime.client.session
     let providerAttempts = 0, toolVetoes = 0
@@ -652,5 +658,59 @@ test('WHAT[work-052] Delivered Manager work can durably Reopen as a distinct lat
     await manager052.ensureManagerWorkOpened(directory,20n,session)
     const replay=await lifecycleWorkView(runtime,session)
     assert.equal(lifecycle052.inspected(common,session)?.ActiveId,reopenedIncumbency,'same later head must not start a third tenure')
+  })
+})
+
+test('WHAT[context-compression-050] real OpenCode first reset has no previous-scope MUST, second reset does', async()=>{
+  await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
+    const sid='reset-first-versus-second-050'
+    clearSessionState(sid)
+    await acceptAuthorityRoot(runtime,sid,'engineer')
+    async function physicallyObserve(run) {
+      const first={system:['Observed real provider system for '+run]}
+      await hooks['experimental.chat.system.transform']({sessionID:sid},first)
+      await hooks['chat.params']({sessionID:sid,model:{providerID:'fixture',modelID:'old-model'}},{})
+      await normalTransform(safeCaps(),sid,{},{messages:[
+        {info:{id:'operator-'+run,role:'user',sessionID:sid,time:{created:run}},
+         parts:[{type:'text',text:'Provider task '+run}]},
+      ]})
+    }
+    const resetArgs=objective=>({
+      newScopeObjective:objective,
+      newScopeTurnBudget:6,
+      kpiCompletion:'met',
+      oldScopeVerboseVerbatimExperience:'Work from the preceding scope.',
+    })
+    const resetCtx=id=>({sessionID:sid,agent:'engineer',callID:id,messageID:'run-'+id})
+    await physicallyObserve(101)
+    const first=await hooks.tool.resetScope.execute(resetArgs('first initialized scope'),resetCtx('reset-one-050'))
+    assert.match(String(first),/Scope reset. Objective: first initialized scope/)
+    assert.equal(isPreviousScopePending(sid),false,'first ever reset does not require a predecessor consultation')
+    assert.equal(turnBudget(sid),6)
+    const resumed=await outbound(sid,[
+      user('original-050','original mission',101),
+      assistant('rst-one',tool('reset-one-050','resetScope','Scope reset. Objective: first initialized scope')),
+      user('later-050','new actual operator instruction',102),
+    ])
+    assert.equal(resumed.at(-1).parts[0].text,'new actual operator instruction')
+    assert.equal(resumed.some(x=>x.strong===true),false,'later genuine operator message does not restart initialization')
+    assert.equal(turnBudget(sid),5,'one additional real provider turn debits budget exactly once')
+    await physicallyObserve(102)
+    const second=await hooks.tool.resetScope.execute(resetArgs('second initialized scope'),resetCtx('reset-two-050'))
+    assert.match(String(second),/Scope reset. Objective: second initialized scope/)
+    assert.equal(isPreviousScopePending(sid),true,'second reset must request clarification of the preceding scope')
+    assert.equal(turnBudget(sid),6,'MUST ask freezes the second scope budget')
+    const pending=await outbound(sid,[
+      user('original-050','original mission',101),
+      assistant('rst-two',tool('reset-two-050','resetScope','Scope reset. Objective: second initialized scope')),
+      user('later-051','real third instruction',103),
+      assistant('normal-tool',tool('noop-050','read','ordinary result')),
+    ])
+    assert.match(pending.at(-1).parts[0].text,/askPreviousScope\(questions\)/)
+    assert.equal(pending.at(-1).strong,true)
+    assert.equal(pending.find(x=>x.info?.id==='later-051').parts[0].text,'real third instruction')
+    assert.equal(pending.find(x=>x.info?.id==='normal-tool').parts[0].state.output,'ordinary result')
+    assert.equal(turnBudget(sid),6,'pending means no budget decrement')
+    clearSessionState(sid)
   })
 })

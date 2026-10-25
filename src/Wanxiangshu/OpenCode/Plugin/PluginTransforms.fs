@@ -1311,7 +1311,7 @@ module PluginTransforms =
             emitJsExpr rewritten "delete $0.providerPayload; delete $0.responseId" |> ignore
             rewritten
 
-    let private openCodeWeakSteer (messages: obj array) (prose: string) : obj array =
+    let private openCodeScopeSteer (messages: obj array) (prose: string) (strong: bool) : obj array =
         let last = messages |> Array.tryLast |> Option.defaultValue null
         let originalInfo = scopeField last "info"
         let sessionId = scopeField originalInfo "sessionID"
@@ -1321,7 +1321,8 @@ module PluginTransforms =
                 [ "info", box info
                   "parts", box [| createObj [ "type", box "text"; "text", box prose ] |]
                   "steering", box true
-                  "attribution", box "agent" ]
+                  "attribution", box "agent"
+                  "strong", box strong ]
         Array.append messages [| steer |]
 
     let private prepareNeutralScope (sessionId: string) (raw: obj array) : obj array =
@@ -1330,7 +1331,9 @@ module PluginTransforms =
         let staged = Array.copy raw
         unbox<obj array> plan?hints |> Array.iter (applyNeutralHint staged)
         let selected = unbox<obj array> plan?slots |> Array.map (applyNeutralSlot staged)
-        if isNull plan?weak then selected else openCodeWeakSteer selected (scopeText plan?weak)
+        if not (isNull plan?strong) then openCodeScopeSteer selected (scopeText plan?strong) true
+        elif not (isNull plan?weak) then openCodeScopeSteer selected (scopeText plan?weak) false
+        else selected
 
     let private purgeAndSuffixSession (sessionId: string) (rawMessages: obj array) (outObj: obj) : unit =
         let sideRequest =

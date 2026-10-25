@@ -13,9 +13,8 @@ test('WHAT[cognitive-environment-018] the production HNI passes live Chinese pre
     await withPreference('zh-CN', async () => {
       refreshGlobalLanguage()
       const before = planRequest(session, [user('current'), assistant('read')])
-      const spoken = before.hints.find(h => h.kind === 'user').tail
-      const toolReminder = before.hints.find(h => h.kind === 'tool').tail
-      assert.equal(spoken, toolReminder)
+      const spoken = before.strong
+      assert.deepEqual(before.hints, [], 'initial mandatory hint only lives in a new strong steer')
       assert.match(spoken, /估计第一个细粒度任务/)
       assert.doesNotMatch(spoken, /\[System:|Then call resetScope immediately|Estimate the turnBudget/)
       resetScopeState(session, 1)
@@ -42,9 +41,9 @@ test('WHAT[cognitive-environment-018] Chinese delegated-first steer is actually 
       bindDelegation(session, 'genuine-delegator')
       const first = planRequest(session, [user('delegated-task'), assistant('read')])
       assert.equal(first.negotiationRequired, true)
-      assert.match(first.hints[0].tail, /先调用 negotiate/)
-      assert.doesNotMatch(first.hints[0].tail, /Ask the delegator|\[System:/)
-      assert.equal(first.hints.some(x => x.kind === 'tool'), false)
+      assert.match(first.strong, /先调用 negotiate/)
+      assert.doesNotMatch(first.strong, /Ask the delegator|\[System:/)
+      assert.deepEqual(first.hints, [])
 
       const asked = askNegotiation(session, '之前为什么决定放弃方案 B？')
       assert.equal(asked.ok, true)
@@ -56,7 +55,8 @@ test('WHAT[cognitive-environment-018] Chinese delegated-first steer is actually 
       assert.equal(confirmNegotiationSteer(asked.receipt, session), true)
       const subsequent = planRequest(session, [user('delegated-task'), user('answer', 2)])
       assert.equal(subsequent.negotiationRequired, false)
-      assert.match(subsequent.hints.at(-1).tail, /估计第一个细粒度任务/)
+      assert.match(subsequent.strong, /估计第一个细粒度任务/)
+      assert.deepEqual(subsequent.hints, [])
     })
   } finally {
     clearSessionState(session)

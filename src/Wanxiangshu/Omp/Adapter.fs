@@ -1108,7 +1108,8 @@ module Adapter =
 
             OutboundViewCapture.discardSealed sid
             Surface.resetScopeState sid budget
-            Surface.beginAskPreviousScope sid
+            if not (Set.isEmpty epoch.ReanchoredScopes) then
+                Surface.beginAskPreviousScope sid
             Surface.setHasPreviousScope sid true
 
             let content =
@@ -1294,7 +1295,7 @@ module Adapter =
                   "concurrency", box "exclusive"
                   "loadMode", box "essential"
                   "approval", box "read"
-                  "description", box "Ask the immediately previous Scope clarifying questions after resetScope. When the complete prior native provider request (including exact tools) and matching model were physically captured, the old-context readonly model turn runs asynchronously and answers arrive via an agent-attributed steer. If the old request or side-turn transport is unavailable, the receipt explicitly reports no old-model call; acceptance is never proof of an answer."
+                  "description", box "Ask concrete clarifying questions of the immediately preceding Scope. Valid old-context readonly model turns run asynchronously with an agent-attributed steer. The receipt separately reports if no old-model call was possible, and acceptance does not prove answer delivery."
                   "parameters", box schema
                   "execute",
                     box (Func<obj, obj, obj, obj, obj, obj>(
@@ -1951,7 +1952,7 @@ module Adapter =
             emitJsExpr updated "delete $0.providerPayload; delete $0.responseId" |> ignore
             updated
 
-    let private ompWeakSteer (messages: obj array) (prose: string) : obj array =
+    let private ompScopeSteer (messages: obj array) (prose: string) (strong: bool) : obj array =
         let lastStamp =
             messages
             |> Array.tryLast
@@ -1961,7 +1962,8 @@ module Adapter =
             [ "role", box "user"
               "content", box [| createObj [ "type", box "text"; "text", box prose ] |]
               "steering", box true
-              "attribution", box "agent" ]
+              "attribution", box "agent"
+              "strong", box strong ]
         let withTime = if isNull lastStamp then fields else fields @ [ "timestamp", lastStamp ]
         Array.append messages [| createObj withTime |]
 
@@ -1972,7 +1974,9 @@ module Adapter =
         let staged = Array.copy original
         unbox<obj array> plan?hints |> Array.iter (ompApplyHint staged)
         let scoped = unbox<obj array> plan?slots |> Array.map (ompApplySlot staged)
-        if isNull plan?weak then scoped else ompWeakSteer scoped (stringOf plan?weak)
+        if not (isNull plan?strong) then ompScopeSteer scoped (stringOf plan?strong) true
+        elif not (isNull plan?weak) then ompScopeSteer scoped (stringOf plan?weak) false
+        else scoped
 
     let private contextMessagesReply (rawList: obj) (withSteer: obj array) : obj =
         if Surface.isUnchanged withSteer (Surface.toObjArray rawList) then

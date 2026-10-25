@@ -7,16 +7,15 @@ const tool = (id, name, terminalField = '') => ({ id, tool: name, terminalField 
 const assistant = (...parts) => ({ kind: 'assistant', operator: false, parts })
 const result = (id) => ({ kind: 'result', operator: false, resultFor: id, resultField: 'content', parts: [] })
 
-test('WHAT[context-compression-038] HNI scope view plans the user reminder independently of physical message envelopes', () => {
+test('WHAT[context-compression-038] HNI scope view plans a fresh strong steer independently of message envelopes', () => {
   const session = 'ses_scope_038_user'
   clearSessionState(session)
   const messages = [user('100:do the task', 100)]
   const plan = planRequest(session, messages)
   assert.equal(plan.active, true)
   assert.deepEqual(plan.slots.map(x => x.index), [0])
-  assert.equal(plan.hints.length, 1)
-  assert.equal(plan.hints[0].kind, 'user')
-  assert.match(plan.hints[0].tail, /Then call resetScope immediately/)
+  assert.deepEqual(plan.hints, [])
+  assert.match(plan.strong, /Then call resetScope immediately/)
   assert.equal(turnBudget(session), 0)
   assert.equal(isScopeInitialized(session), false)
   assert.equal(messages[0].parts.length, 0, 'the plan cannot mutate raw Host messages')
