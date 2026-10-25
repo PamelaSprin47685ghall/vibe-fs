@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import test from 'node:test'
 
 {
@@ -132,7 +133,7 @@ test('WHAT[host-boundary-016] mutation_canary_duplicate_completed_is_absorbed', 
 }
 
 test('WHAT[host-boundary-016] PluginHost 共享总线引用计数在同一工作区复用且完全释放后归零（防包装泄漏回归）', async () => {
-  const { TerminalWiring } = await import('../../../dist/OpenCode/Host/TerminalWiring.js');
+  const TerminalWiring = await import('../../../dist/OpenCode/Host/TerminalWiring.js');
   const workspace = '/tmp/test-wxs-shared-terminal-' + Math.random().toString(36).slice(2);
 
   // 1. 首次获取

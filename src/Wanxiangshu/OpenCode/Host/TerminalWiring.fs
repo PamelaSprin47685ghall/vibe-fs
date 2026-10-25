@@ -4,96 +4,114 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.TerminalSignal
 
 [<RequireQualifiedAccess>]
 module TerminalWiring =
+
     [<Import("TerminalRegistry", "wanxiangli/terminal")>]
     let private terminalRegistryCtor: obj = jsNative
 
     [<Import("TerminalBus", "wanxiangli/terminal")>]
     let private terminalBusCtor: obj = jsNative
 
+    [<Import("TerminalOutcome", "wanxiangli/terminal")>]
+    let private terminalOutcomeCtor: obj = jsNative
 
-    let private writeStderr (msg: string) =
+    let private sharedTerminalBus: obj = createNew terminalBusCtor ()
+
+    let private writeStderr (msg: string) : unit =
         let proc = emitJsExpr<obj> () "process"
         let stderr = proc?stderr
-        if not (isNull (box stderr)) then
-            stderr?write (msg + "\n") |> ignore
+        if not (isNull stderr) then
+            stderr?write(msg + "\n") |> ignore
 
-    let private defaultReportFault (ex: exn) =
-        let msg = sprintf "[TerminalWiring] Listener fault: %s" ex.Message
-        writeStderr msg
+    let private defaultReportFault (err: obj) : unit =
+        let msg = if isNull err then "unknown error" else string err
+        writeStderr ("terminal registry dispatch fault: " + msg)
 
-    let fromNeutralOutcome (neutral: obj) : TerminalOutcome =
-        unbox<TerminalOutcome> neutral
+    let private createRegistry (reportFault: (obj -> unit) option) : obj =
+        let handler = defaultArg reportFault defaultReportFault
+        createNew terminalRegistryCtor handler
 
-    let createRegistry (reportFault: (exn -> unit) option) : obj =
-        let report = defaultArg reportFault defaultReportFault
-        let jsReport = Func<obj, unit>(fun err ->
-            match err with
-            | :? exn as e -> report e
-            | other -> report (Exception(string other)))
-        createNew terminalRegistryCtor (jsReport)
+    let private toNeutralOutcome (outcome: TerminalOutcome) : obj =
+        match outcome with
+        | TerminalOutcome.Completed result ->
+            let runId = ProviderRunIdentity.value result.ProviderRun
+            terminalOutcomeCtor?Completed(runId, box outcome)
+        | TerminalOutcome.Failed _ ->
+            terminalOutcomeCtor?Failed(box outcome)
+        | TerminalOutcome.Aborted _ ->
+            terminalOutcomeCtor?Aborted(box outcome)
 
-    let private globalBusInstance: obj =
-        createNew terminalBusCtor ()
+    let private fromNeutralOutcome (neutral: obj) : TerminalOutcome =
+        let p = neutral?Payload
+        if isNull p then
+            unbox<TerminalOutcome> neutral
+        else
+            unbox<TerminalOutcome> p
 
-    let wrapRegistry (registry: obj) : ISessionTerminalSource =
+    let private wrapRegistry (reg: obj) : ISessionTerminalSource =
         { new ISessionTerminalSource with
             member _.SubscribeTerminal(sessionId, listener) =
-                let jsListener = Action<obj>(fun o -> listener sessionId (fromNeutralOutcome o))
-                let sub = registry?SubscribeTerminal(string sessionId, jsListener)
+                let sid = SessionId.value sessionId
+                let rawUnsub = reg?SubscribeTerminal(sid, fun o -> listener sessionId (fromNeutralOutcome o))
                 { new IDisposable with
-                    member _.Dispose() = sub?Dispose() }
+                    member _.Dispose() = rawUnsub?dispose()
+                }
 
             member _.SubscribeFutureTerminal(sessionId, listener) =
-                let jsListener = Action<obj>(fun o -> listener sessionId (fromNeutralOutcome o))
-                let sub = registry?SubscribeFutureTerminal(string sessionId, jsListener)
+                let sid = SessionId.value sessionId
+                let rawUnsub = reg?SubscribeFutureTerminal(sid, fun o -> listener sessionId (fromNeutralOutcome o))
                 { new IDisposable with
-                    member _.Dispose() = sub?Dispose() }
+                    member _.Dispose() = rawUnsub?dispose()
+                }
 
             member _.SubscribeTerminalListener(listener) =
-                let jsListener = Action<obj>(fun o -> listener (SessionId.create "global") (fromNeutralOutcome o))
-                let sub = registry?SubscribeProcessTerminal(jsListener)
+                let rawUnsub = reg?SubscribeProcessTerminal(fun sid o -> listener (SessionId.create sid) (fromNeutralOutcome o))
                 { new IDisposable with
-                    member _.Dispose() = sub?Dispose() }
+                    member _.Dispose() = rawUnsub?dispose()
+                }
 
             member _.SubscribeFutureTerminalListener(listener) =
-                let jsListener = Action<obj>(fun o -> listener (SessionId.create "global") (fromNeutralOutcome o))
-                let sub = registry?SubscribeProcessTerminal(jsListener)
+                let rawUnsub = reg?SubscribeProcessTerminal(fun sid o -> listener (SessionId.create sid) (fromNeutralOutcome o))
                 { new IDisposable with
-                    member _.Dispose() = sub?Dispose() }
+                    member _.Dispose() = rawUnsub?dispose()
+                }
 
             member _.HasSubscriber(sessionId) =
-                registry?HasSubscriber(string sessionId) |> unbox<bool>
+                let sid = SessionId.value sessionId
+                unbox<bool> (reg?HasSubscriber(sid))
 
             member _.NotifyTerminal sessionId outcome =
-                registry?NotifyTerminal(string sessionId, box outcome) |> unbox<bool> }
+                let sid = SessionId.value sessionId
+                let neutral = toNeutralOutcome outcome
+                unbox<bool> (reg?NotifyTerminal(sid, neutral))
+        }
 
     let createSource () : ISessionTerminalSource =
-        let reg = createRegistry None
-        wrapRegistry reg
+        wrapRegistry (createRegistry None)
 
     let acquire (directory: string) (candidate: ISessionTerminalSource) : ISessionTerminalSource =
-        let shared = globalBusInstance?Acquire(directory, box candidate)
-        unbox<ISessionTerminalSource> shared
+        let acquired = sharedTerminalBus?Acquire(directory, candidate)
+        unbox<ISessionTerminalSource> acquired
 
     let release (directory: string option) (source: ISessionTerminalSource option) : unit =
         match directory, source with
-        | Some dir, Some src ->
-            globalBusInstance?Release(dir, box src) |> ignore
+        | Some d, Some s ->
+            sharedTerminalBus?Release(d, s) |> ignore
         | _ -> ()
 
     let tryAcquireForWorkspace
         (workspace: string option)
         (candidate: ISessionTerminalSource)
         : Task<(string * ISessionTerminalSource) option> =
-        match workspace with
-        | Some dir when not (String.IsNullOrWhiteSpace dir) ->
-            let src = acquire dir candidate
-            Task.FromResult(Some(dir, src))
-        | _ ->
-            Task.FromResult None
+        task {
+            match workspace with
+            | Some dir ->
+                let acquired = acquire dir candidate
+                return Some(dir, acquired)
+            | None ->
+                return None
+        }
