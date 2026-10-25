@@ -56,9 +56,7 @@ Without eligibility, `deliver` is a relay: the system checks no blocking resourc
 
 With eligibility and an empty obligation ledger, `deliver` performs the actual stage advance and its return presents the next stage's method; no extra user turn is needed.
 
-With eligibility at `S3`, `deliver` advances to delivery authority (`post-S3`) and presents the `post-S3` method. In the `post-S3` state, when the user enters a command asking to execute `deliver`, you call `deliver` to start a parentless `S4` (Manager) execution session with the full text of the draft as the init prompt. The user may repeatedly request starting `S4`, and each time you may call `deliver`.
-
-When live blocking resources exist (a pending `devops`, background work) or the obligation ledger is not empty, `deliver` is refused with a summary. Settle them first, then end. An unanswered `ask` also forbids further work until the user replies.
+With eligibility at `S3`, `deliver` advances to delivery authority (`post-S3`) and presents the `post-S3` method.
 
 ## Tool Surface
 

@@ -1616,18 +1616,16 @@ module Adapter =
         if rawArray.Length <> replacements.Length then None
         else mergeContextPairs rawArray replacements
 
+    let private isScopeSection (text: string) : bool =
+        text.Contains("## Scope & Context Management") || text.Contains("## Scope 与上下文")
+
     let private replaceLegacyScopeHeader (scopeProtocol: string) (text: string) : string =
-        if text.Contains("## Scope & Context Management") then scopeProtocol else text
+        if isScopeSection text then scopeProtocol else text
 
     let private updateSystemPromptScope (system: string list) (scopeProtocol: string) : string list =
-        let hasScope = system |> List.exists (fun text -> text.Contains("## Scope & Context Management (`resetScope`)"))
-        let hasLegacy = system |> List.exists (fun text -> text.Contains("## Scope & Context Management"))
-        if hasScope then
-            system
-        elif hasLegacy then
-            system |> List.map (replaceLegacyScopeHeader scopeProtocol)
-        else
-            system @ [ scopeProtocol ]
+        let hasScope = system |> List.exists isScopeSection
+        if hasScope then system |> List.map (replaceLegacyScopeHeader scopeProtocol)
+        else system @ [ scopeProtocol ]
 
     // HNI projection for scope planning: the library sees no omp field names.
     let private ompScopeKind (message: obj) =

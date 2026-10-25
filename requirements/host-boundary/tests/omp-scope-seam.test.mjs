@@ -196,7 +196,7 @@ test('WHAT[context-compression-034] resetScope registration carries the new prot
   )
 })
 
-test('WHAT[context-compression-034] injected scope protocol section states the imperative to call resetScope immediately', async () => {
+test('WHAT[context-compression-034] OMP system projection supplies protocol facts, not a conditional reset command', async () => {
   const env = createOmpTestEnvironment()
   await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
   const sessionCtx = await activateSession(env, 'ses_omp_scope_prompt')
@@ -205,24 +205,26 @@ test('WHAT[context-compression-034] injected scope protocol section states the i
     new URL('../../../resources/provider/host/scope-protocol/en.md', import.meta.url),
     'utf8',
   )
-  assert.ok(
-    en.includes('Then call resetScope immediately, before doing anything else.'),
-    'the English scope section text must carry the imperative',
-  )
+  assert.doesNotMatch(en, /\[System:|Then call resetScope immediately|single exception|If you are not busy/)
 
-  const result = await env.eventHandlers.get('before_agent_start')(
-    { systemPrompt: ['base prompt'] },
-    sessionCtx,
-  )
-  assert.ok(result && result.systemPrompt, 'scope section injected into the system prompt')
-  assert.ok(
-    result.systemPrompt.some((p) => p.includes('## Scope & Context Management (`resetScope`)')),
-    'section header present',
-  )
-  assert.ok(
-    result.systemPrompt.some((p) => p.includes('Then call resetScope immediately')),
-    'the injected section must tell the model to call resetScope immediately',
-  )
+  const handler = env.eventHandlers.get('before_agent_start')
+  const result = await handler({ systemPrompt: ['base prompt'] }, sessionCtx)
+  assert.ok(result?.systemPrompt)
+  const section = result.systemPrompt.find(p => p.includes('## Scope & Context Management'))
+  assert.ok(section, 'scope protocol is present')
+  assert.doesNotMatch(section, /\[System:|Then call resetScope immediately|If you are not busy/)
+  assert.match(section, /Calling \x60resetScope\x60 removes the old scope/)
+
+  const stale = '## Scope & Context Management (\x60resetScope\x60)\n[System: Then call resetScope immediately, before doing anything else.]'
+  const replaced = await handler({ systemPrompt: ['base prompt', stale] }, sessionCtx)
+  const updated = replaced.systemPrompt.filter(p => p.includes('## Scope & Context Management'))
+  assert.equal(updated.length, 1, 'old scope fragment is replaced, not duplicated')
+  assert.doesNotMatch(updated[0], /\[System:|Then call resetScope immediately/)
+  const oldChinese = '## Scope 与上下文\n[System: 由模型自己判断现在是否应重置]'
+  const repairedChinese = await handler({ systemPrompt: ['base prompt', oldChinese] }, sessionCtx)
+  const scopeLines = repairedChinese.systemPrompt.filter(p => p.includes('## Scope 与上下文') || p.includes('## Scope & Context Management'))
+  assert.equal(scopeLines.length, 1, 'Chinese stale scope segment is replaced, never duplicated')
+  assert.doesNotMatch(scopeLines[0], /由模型自己判断|\[System:/)
 })
 
 test('WHAT[context-compression-034] request copy appends the reminder to the operator prompt and every non-reset tool result until a reset lands', async () => {

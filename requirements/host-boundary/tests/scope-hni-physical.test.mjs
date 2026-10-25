@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createWith } from '../../../dist/OpenCode/Host/ProviderSystemTransform.js'
 import { normalTransform, DeliveryAdjudication } from '../../../dist/OpenCode/Plugin/PluginTransforms.js'
 import { resetScopeState, clearSessionState, turnBudget, isScopeInitialized } from '../../../dist/Context/Scope/Surface.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
@@ -489,4 +490,37 @@ test('WHAT[delegation-negotiation-007] detached queue receipt cannot masquerade 
     negotiationForgetSession(parent)
     clearSessionState(child)
   })
+})
+
+test('WHAT[context-compression-039] real OpenCode system transform upgrades stale owned scope sections without duplicate output', async () => {
+  const transform = createWith(() => undefined, async () => undefined)
+  const stale = '## Scope & Context Management (`resetScope`)\n[System: Then call resetScope immediately, before doing anything else.]'
+  const system = ['unrelated host prompt', stale]
+  const output = { system }
+  await transform({ sessionID: 'ce017-stale-scope' })(output)
+  assert.equal(output.system, system, 'reconcile an existing section in place')
+  assert.equal(system.length, 2)
+  assert.equal(system[0], 'unrelated host prompt')
+  assert.match(system[1], /Scope & Context Management|Scope 与上下文/)
+  assert.doesNotMatch(system[1], /\[System:|Then call resetScope immediately/)
+  const first = system[1]
+  await transform({ sessionID: 'ce017-stale-scope' })(output)
+  assert.equal(system.length, 2, 'repeated current section must not be duplicated')
+  assert.equal(system[1], first, 're-entry preserves identical current bytes')
+
+  const staleZh = '## Scope 与上下文\n[System: 先自行判定是否应重置]'
+  const zhSystem = ['another host prompt', staleZh]
+  const zhOutput = { system: zhSystem }
+  await transform({ sessionID: 'ce017-stale-chinese' })(zhOutput)
+  assert.equal(zhSystem.length, 2)
+  assert.doesNotMatch(zhSystem[1], /先自行判定|\[System:/)
+  await transform({ sessionID: 'ce017-stale-chinese' })(zhOutput)
+  assert.equal(zhSystem.length, 2, 'Chinese section must not duplicate on replay')
+
+  const fresh = { system: ['an independent system prompt'] }
+  await transform({ sessionID: 'ce017-fresh-scope' })(fresh)
+  assert.equal(fresh.system.length, 2)
+  assert.equal(fresh.system[0], 'an independent system prompt')
+  assert.match(fresh.system[1], /Scope & Context Management|Scope 与上下文/)
+  assert.doesNotMatch(fresh.system[1], /\[System:/)
 })

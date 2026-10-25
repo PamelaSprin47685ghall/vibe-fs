@@ -193,13 +193,17 @@ module ProviderSystemTransform =
             |> Array.iteri (fun index text ->
                 system.[index] <- chooseRolePrompt expectedEn expectedZh expectedCur expectedInstalled nextPrompt text)
 
+    let private isScopeSection (text: string) : bool =
+        text.Contains("## Scope & Context Management") || text.Contains("## Scope 与上下文")
+
     let private replaceScopeHeader (scopeProtocol: string) (text: string) : string =
-        if text.Contains("## Scope & Context Management") then scopeProtocol else text
+        if isScopeSection text then scopeProtocol else text
 
     let private injectScopeProtocol (system: string array) (scopeProtocol: string) (output: obj) =
         let replaced = system |> Array.map (replaceScopeHeader scopeProtocol)
-        let anyReplaced = Array.exists2 (<>) system replaced
-        if anyReplaced then
+        let hasScopeSection =
+            system |> Array.exists isScopeSection
+        if hasScopeSection then
             Array.blit replaced 0 system 0 system.Length
         else
             output?system <- Array.append system [| scopeProtocol |]
@@ -248,12 +252,7 @@ module ProviderSystemTransform =
             | None -> ()
 
             let scopeProtocol = ProviderProse.render lang "host/scope-protocol" Map.empty
-            let hasScopeSection =
-                system
-                |> Array.exists (fun (text: string) -> text.Contains("## Scope & Context Management (`resetScope`)"))
-
-            if not hasScopeSection then
-                injectScopeProtocol system scopeProtocol output
+            injectScopeProtocol system scopeProtocol output
         }
 
     let createWithTurn

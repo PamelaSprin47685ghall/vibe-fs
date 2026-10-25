@@ -10,9 +10,9 @@ const commonEn = read('../../../resources/provider/world/common-law/en.md')
 
 test('WHAT[cognitive-environment-013] Pair Hint carries the bound-language anchor, resetScope context boundary and Common Law mnemonic without 80/20 iron rule in both locales', () => {
   assert.match(zh, /简体中文/)
-  assert.match(zh, /「我」/)
+  assert.doesNotMatch(zh, /<think>|每一次思考链/)
   assert.match(en, /English/)
-  assert.match(en, /"I"/)
+  assert.doesNotMatch(en, /<think>|Every reasoning chain/)
   assert.doesNotMatch(zh, /80\/20|80%|20%|强制铁律|重构上下文/)
   assert.doesNotMatch(en, /80\/20|80%|20%|mandatory|iron rule|restructure the context/)
   assert.match(zh, /resetScope/)
@@ -23,13 +23,13 @@ test('WHAT[cognitive-environment-013] Pair Hint carries the bound-language ancho
   assert.match(en, /committed cause and effect/)
 })
 
-test('WHAT[cognitive-environment-013] both Pair Hints repeat the exact resetScope initialization order only for uninitialized user scopes', () => {
-  const reminder = '[System: Estimate the turnBudget for the first fine-grained task block (state closed-loop). Then call resetScope immediately, before doing anything else.]'
+test('WHAT[cognitive-environment-013] permanent Pair Hint carries no state-dependent initialization instruction in either locale', () => {
   for (const text of [en, zh]) {
-    assert.ok(text.includes(reminder), 'the full instruction must reach the Pair Hint unchanged')
+    assert.doesNotMatch(text, /\[System:|Then call resetScope immediately|每当出现新的操作员用户消息/)
+    assert.doesNotMatch(text, /<think>|<\/think>/)
   }
-  assert.match(en, /After each new operator-authored user message, until a \x60resetScope\x60 call follows it/)
-  assert.match(zh, /新的操作员用户消息.*尚未调用 \x60resetScope\x60/)
+  assert.match(en, /resetScope/)
+  assert.match(zh, /resetScope/)
 })
 
 test('WHAT[cognitive-environment-013] full work disciplines live in Common Law; Pair Hint keeps only the mnemonic', () => {
