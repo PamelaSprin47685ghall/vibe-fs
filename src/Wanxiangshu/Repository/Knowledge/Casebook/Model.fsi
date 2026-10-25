@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
+open Wanxiangshu.Persistence.EventStore
+
 /// DSL-class: DurableFact — CASE-003: one typed observation captured from the
 /// final execution layer (builtin read/glob/grep Host execution). Never
 /// inferred from transcript text; capture may be incomplete.

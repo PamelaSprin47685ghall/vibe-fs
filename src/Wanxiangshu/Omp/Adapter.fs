@@ -32,6 +32,12 @@ module Adapter =
     // JS interop helpers
     // ------------------------------------------------------------------
 
+    [<Import("outboundViewStore", "wanxiangli/pair-hint")>]
+    let private outboundViewStore: obj = jsNative
+
+    [<Emit("$0 == null")>]
+    let private isNullOrUndefined (x: obj) : bool = jsNative
+
     [<Import("pid", "node:process")>]
     let private processId: int = jsNative
 
@@ -1106,7 +1112,7 @@ module Adapter =
             | Ok _ -> ()
             | Error failure -> raise (JournalAppendException failure)
 
-            OutboundViewCapture.discardSealed sid
+            outboundViewStore?discardSealed(sid) |> ignore
             Surface.resetScopeState sid budget
             if not (Set.isEmpty epoch.ReanchoredScopes) then
                 Surface.beginAskPreviousScope sid
@@ -1132,10 +1138,10 @@ module Adapter =
         (budget: int)
         (objective: string)
         (experience: string option)
-        (previous: OutboundSnapshot)
+        (previous: obj)
         : Task<obj> =
         task {
-            let archiveJson = OutboundViewCapture.serializeSnapshot previous
+            let archiveJson = string (outboundViewStore?serializeSnapshot(previous))
             let! written = journal.WriteBlob archiveJson
             match written with
             | Error reason ->
@@ -1416,13 +1422,13 @@ module Adapter =
                               | Some session -> session.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
                           task {
-                              match OutboundViewCapture.tryGetSealed sid with
-                              | None ->
+                              let rawSnap: obj = outboundViewStore?tryGetSealed(sid)
+                              if isNullOrUndefined rawSnap then
                                   return
                                       ompScopeRefused
                                           "resetScope refused: the preceding real provider request has no complete archived system/messages/model observation"
-                              | Some previous ->
-                                  return! ompWriteArchivedScope journal sid sessionId epoch toolCallId budget objective experience previous
+                              else
+                                  return! ompWriteArchivedScope journal sid sessionId epoch toolCallId budget objective experience rawSnap
                           }
                           |> unbox<obj>)
                   ) ]
@@ -2471,8 +2477,8 @@ module Adapter =
                 match replayFrozenProvider sid submitted ctx with
                 | Some frozen -> return frozen
                 | None ->
-                    if not (isNull model) then OutboundViewCapture.recordModel sid model
-                    OutboundViewCapture.recordNativeRequest sid submitted model |> ignore
+                    if not (isNull model) then outboundViewStore?recordModel(sid, model) |> ignore
+                    outboundViewStore?recordNativeRequest(sid, submitted, model) |> ignore
                     if shouldFilter then return submitted else return jsUndefined
             } |> unbox<obj>)
 
@@ -2540,11 +2546,11 @@ module Adapter =
                 let updated = updateSystemPromptScope system scopeProtocol
                 match hooks.Turn with
                 | None ->
-                    OutboundViewCapture.recordSystem sid (box (List.toArray updated))
+                    outboundViewStore?recordSystem(sid, box (List.toArray updated)) |> ignore
                     return createObj [ "systemPrompt", box (List.toArray updated) ]
                 | Some turn ->
                     let! prompt = turn.SystemPrompt(turnContext ctx, updated)
-                    OutboundViewCapture.recordSystem sid (box (List.toArray prompt))
+                    outboundViewStore?recordSystem(sid, box (List.toArray prompt)) |> ignore
                     return createObj [ "systemPrompt", box (List.toArray prompt) ]
             } |> unbox<obj>)
 
@@ -2565,7 +2571,7 @@ module Adapter =
                             return applyContextEdit rawList scoped edit
                         }
                 let physical = if isNull finalResult then rawList else fieldValue finalResult "messages"
-                if not (isNull physical) then OutboundViewCapture.recordMessagesFor sid physical
+                if not (isNull physical) then outboundViewStore?recordMessagesFor(sid, physical) |> ignore
                 return finalResult
             }
             |> unbox<obj>)
@@ -2823,7 +2829,7 @@ module Adapter =
                 for kv in frozenProviderLeases do kv.Value.Cancelled <- true
                 frozenProviderLeases.Clear()
                 pendingPreviousSteers.Clear()
-                for sid in sessionContexts.Keys do OutboundViewCapture.clearSession sid
+                for sid in sessionContexts.Keys do outboundViewStore?clearSession(sid) |> ignore
                 sessionContexts.Clear()
                 match !liveHooks with
                 | None -> return jsUndefined

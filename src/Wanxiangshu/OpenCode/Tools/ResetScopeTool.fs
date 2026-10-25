@@ -11,8 +11,16 @@ open Wanxiangshu.Context.Scope
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Composition.Durable
+open Fable.Core
+open Fable.Core.JsInterop
 
 module ResetScopeTool =
+
+    [<Import("outboundViewStore", "wanxiangli/pair-hint")>]
+    let private outboundViewStore: obj = jsNative
+
+    [<Emit("$0 == null")>]
+    let private isNullOrUndefined (x: obj) : bool = jsNative
 
     let private resolveBudget (args: HostToolArguments) : int =
         match args.OptionalNonNegativeInteger "newScopeTurnBudget" with
@@ -30,11 +38,10 @@ module ResetScopeTool =
             let _oldExperience = args.OptionalText "oldScopeVerboseVerbatimExperience"
 
             // 1. 获取本会话 sealed 快照，若取不到则明确报错，不提交、不更新内存
-            let snapshotOpt = OutboundViewCapture.tryGetSealed ctx.SessionId
-            match snapshotOpt with
-            | None ->
+            let rawSnap: obj = outboundViewStore?tryGetSealed(ctx.SessionId)
+            if isNullOrUndefined rawSnap then
                 return "resetScope failed: no sealed outbound view snapshot captured for this session."
-            | Some snapshot ->
+            else
 
             // 2. 序列化为稳定 JSON，写入 journal blob
             let callId =
@@ -49,7 +56,7 @@ module ResetScopeTool =
                 | None ->
                     failwith "resetScope requires a durable agent journal for ScopeReanchored prefix epoch advance"
 
-            let archiveJson = OutboundViewCapture.serializeSnapshot snapshot
+            let archiveJson = string (outboundViewStore?serializeSnapshot(rawSnap))
             let! blobResult = journal.WriteBlob archiveJson
             match blobResult with
             | Error failure ->
@@ -79,7 +86,7 @@ module ResetScopeTool =
             | Error failure -> raise (JournalAppendException failure)
 
             // 3. append 成功后才更新内存：resetScopeState，并进入 askPreviousScope pending，且标记 hasPreviousScope
-            OutboundViewCapture.discardSealed ctx.SessionId
+            outboundViewStore?discardSealed(ctx.SessionId) |> ignore
             Surface.resetScopeState ctx.SessionId budget
             if not (Set.isEmpty epoch.ReanchoredScopes) then
                 Surface.beginAskPreviousScope ctx.SessionId

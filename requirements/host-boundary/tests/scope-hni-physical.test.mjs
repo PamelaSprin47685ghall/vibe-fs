@@ -1,3 +1,4 @@
+import { JournalHandle__get_Journal } from '../../../dist/Persistence/Journal/Surface.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createWith } from '../../../dist/OpenCode/Host/ProviderSystemTransform.js'
@@ -6,7 +7,10 @@ import { resetScopeState, clearSessionState, turnBudget, isScopeInitialized, isP
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
 import { SessionMessage, SessionToolPart, SnapshotToolPartState } from '../../../dist/Foundation/HostSessionSnapshot.js'
 import { MessagePart } from '../../../dist/Foundation/HostMessage.js'
-import { ToolCallIdModule_create, HostToolPartIdModule_create } from '../../../dist/Foundation/Identity.js'
+import { ToolCallIdModule_create, HostToolPartIdModule_create, SessionIdModule_create } from '../../../dist/Foundation/Identity.js'
+import { outboundViewStore } from 'wanxiangli/pair-hint'
+import { AgentJournalModule_snapshot } from '../../../dist/Persistence/Journal/AgentJournal.js'
+import { AgentProjection_tryFind } from '../../../dist/Composition/Durable/Projection.js'
 import { filterSnapshot } from '../../../dist/Context/Scope/SnapshotScope.js'
 import * as manager052 from '../../../dist/Mission/Manager/Workflow.js'
 import * as lifecycle052 from '../../../dist/Mission/Lifecycle/Surface.js'
@@ -739,4 +743,275 @@ test('WHAT[context-compression-051] a cold OpenCode request with historical rese
   assert.equal(known.some(msg=>msg.strong===true),false,'only a real new budget can suppress cold strong reminder')
   assert.ok(known.find(msg=>msg.info?.id==='a-read-051')?.parts[0].state.output.includes('[Remaining turnBudget: 3]'))
   clearSessionState(sid)
+})
+
+
+test('WHAT[context-compression-043] OpenCode resetScope strictly refused when no sealed outbound view snapshot exists', async () => {
+  await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
+    const sid = 'test-unarchived-refusal-043'
+    clearSessionState(sid)
+    outboundViewStore.clearSession(sid)
+    await acceptAuthorityRoot(runtime, sid, 'engineer')
+
+    assert.equal(isScopeInitialized(sid), false, 'precondition: scope uninitialized')
+    assert.equal(turnBudget(sid), 0, 'precondition: budget is 0')
+    assert.equal(outboundViewStore.tryGetSealed(sid), undefined, 'precondition: no sealed snapshot')
+
+    // Calling resetScope directly without any prior provider outbound observations
+    const outcome = await hooks.tool.resetScope.execute(
+      {
+        newScopeObjective: 'attempt reset without outbound observation',
+        newScopeTurnBudget: 7,
+        kpiCompletion: 'met',
+        oldScopeVerboseVerbatimExperience: 'None',
+      },
+      {
+        sessionID: sid,
+        agent: 'engineer',
+        callID: 'call-unarchived-refused-001',
+        messageID: 'msg-unarchived-001',
+      },
+    )
+
+    // 1. Strict refusal text - fail closed, no silent degradation
+    assert.equal(
+      String(outcome),
+      'resetScope failed: no sealed outbound view snapshot captured for this session.',
+      'must fail with exact missing sealed snapshot error text; no silent degradation',
+    )
+
+    // 2. Memory invariants untouched
+    assert.equal(isScopeInitialized(sid), false, 'scope must NOT become initialized on refusal')
+    assert.equal(turnBudget(sid), 0, 'budget must NOT be updated on refusal')
+    assert.equal(isPreviousScopePending(sid), false, 'no previous scope consultation pending')
+
+    // 3. Durable journal untouched: no ScopeReanchored fact committed
+    const state = AgentJournalModule_snapshot(JournalHandle__get_Journal(runtime.journal))
+    const sessionProj = AgentProjection_tryFind(SessionIdModule_create(sid), state.AgentProjections)
+    const epochOpt = sessionProj?.PrefixEpoch
+    assert.equal(epochOpt, undefined, 'no prefix epoch must be created in journal for failed reset')
+  })
+})
+
+test('WHAT[context-compression-043] OpenCode resetScope commits durable archive and discards sealed snapshot (single-drain)', async () => {
+  await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
+    const sid = 'test-archive-drain-043'
+    clearSessionState(sid)
+    outboundViewStore.clearSession(sid)
+    await acceptAuthorityRoot(runtime, sid, 'engineer')
+
+    // 1. Establish full outbound observation triad via actual host hooks
+    const system = { system: ['System instruction for scope verification 043'] }
+    await hooks['experimental.chat.system.transform']({ sessionID: sid }, system)
+    await hooks['chat.params']({ sessionID: sid, model: { providerID: 'anthropic', modelID: 'claude-3-5-sonnet' } }, {})
+
+    const outboundMessages = {
+      messages: [
+        {
+          info: { id: 'user-043-1', role: 'user', sessionID: sid, time: { created: 10 } },
+          parts: [{ type: 'text', text: 'Execute step 1 verified change' }],
+        },
+      ],
+    }
+    await normalTransform(safeCaps(), sid, {}, outboundMessages)
+
+    // Verify sealed snapshot was captured by the triad in the store
+    const captured = outboundViewStore.tryGetSealed(sid)
+    assert.ok(captured, 'sealed outbound snapshot must be created by host transforms')
+    assert.equal(captured.sessionId, sid)
+    assert.ok(captured.system.some((s) => s.includes('System instruction for scope verification 043')))
+    assert.equal(captured.model.providerID, 'anthropic')
+    assert.equal(captured.model.modelID, 'claude-3-5-sonnet')
+
+    // 2. Execute resetScope
+    const outcome1 = await hooks.tool.resetScope.execute(
+      {
+        newScopeObjective: 'first verified scope objective',
+        newScopeTurnBudget: 8,
+        kpiCompletion: 'met',
+        oldScopeVerboseVerbatimExperience: 'Observed evidence 43',
+      },
+      {
+        sessionID: sid,
+        agent: 'engineer',
+        callID: 'call-reset-success-043',
+        messageID: 'msg-reset-043-1',
+      },
+    )
+
+    assert.equal(String(outcome1), 'Scope reset. Objective: first verified scope objective')
+    assert.equal(isScopeInitialized(sid), true, 'scope is now initialized in memory')
+    assert.equal(turnBudget(sid), 8, 'budget is updated to 8')
+
+    // 3. Verify durable commit in Journal: blob written and ScopeReanchored fact committed
+    const snap1 = AgentJournalModule_snapshot(JournalHandle__get_Journal(runtime.journal))
+    const sessionProj1 = AgentProjection_tryFind(SessionIdModule_create(sid), snap1.AgentProjections)
+    const epoch1 = sessionProj1?.PrefixEpoch
+    assert.ok(epoch1, 'PrefixEpoch must exist in projection')
+    assert.equal(epoch1.EpochId?.fields?.[0] ?? epoch1.EpochId, 1n, 'first reset advances epoch to 1n')
+
+    // 4. Verify single-drain semantics: sealed snapshot must have been discarded from store
+    const drained = outboundViewStore.tryGetSealed(sid)
+    assert.equal(drained, undefined, 'outboundViewStore.discardSealed must have cleared the sealed snapshot')
+
+    // 5. Subsequent call with NEW callID and NO new outbound observation must be rejected (cannot reuse old snapshot)
+    const outcome2 = await hooks.tool.resetScope.execute(
+      {
+        newScopeObjective: 'second premature reset without new observation',
+        newScopeTurnBudget: 5,
+        kpiCompletion: 'met',
+      },
+      {
+        sessionID: sid,
+        agent: 'engineer',
+        callID: 'call-second-premature-043',
+        messageID: 'msg-reset-043-2',
+      },
+    )
+
+    assert.equal(
+      String(outcome2),
+      'resetScope failed: no sealed outbound view snapshot captured for this session.',
+      'subsequent resetScope without new outbound observation must fail; drained snapshot cannot be reused',
+    )
+    assert.equal(turnBudget(sid), 8, 'budget must remain 8; rejected reset does not overwrite memory')
+
+    // 6. Idempotent replay with SAME callID returns previous success without error or second epoch
+    const outcomeReplay = await hooks.tool.resetScope.execute(
+      {
+        newScopeObjective: 'first verified scope objective',
+        newScopeTurnBudget: 8,
+        kpiCompletion: 'met',
+      },
+      {
+        sessionID: sid,
+        agent: 'engineer',
+        callID: 'call-reset-success-043',
+        messageID: 'msg-reset-043-1',
+      },
+    )
+    assert.equal(String(outcomeReplay), 'Scope reset. Objective: first verified scope objective')
+    const snapReplay = AgentJournalModule_snapshot(JournalHandle__get_Journal(runtime.journal))
+    const sessionProjReplay = AgentProjection_tryFind(SessionIdModule_create(sid), snapReplay.AgentProjections)
+    assert.equal(sessionProjReplay?.PrefixEpoch?.EpochId?.fields?.[0] ?? sessionProjReplay?.PrefixEpoch?.EpochId, 1n, 'replay must not advance epoch')
+  })
+})
+
+test('WHAT[context-compression-043] OpenCode resetScope write blob failure leaves memory state and sealed snapshot intact', async () => {
+  await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
+    const sid = 'test-blob-failure-043'
+    clearSessionState(sid)
+    outboundViewStore.clearSession(sid)
+    await acceptAuthorityRoot(runtime, sid, 'engineer')
+
+    // Establish full observation
+    await hooks['experimental.chat.system.transform']({ sessionID: sid }, { system: ['System prompt'] })
+    await hooks['chat.params']({ sessionID: sid, model: { providerID: 'anthropic', modelID: 'claude-3-5-sonnet' } }, {})
+    await normalTransform(safeCaps(), sid, {}, {
+      messages: [{ info: { id: 'u1', role: 'user', sessionID: sid, time: { created: 1 } }, parts: [{ type: 'text', text: 'Task' }] }],
+    })
+
+    const sealedBefore = outboundViewStore.tryGetSealed(sid)
+    assert.ok(sealedBefore, 'sealed snapshot must exist before resetScope')
+
+    // Simulate WriteBlob failure at the journal boundary (tag 1 = FSharpResult Error)
+    const originalWriteBlob = JournalHandle__get_Journal(runtime.journal).writer.BlobWriter.Write.bind(JournalHandle__get_Journal(runtime.journal).writer.BlobWriter)
+    JournalHandle__get_Journal(runtime.journal).writer.BlobWriter.Write = async (_content) => {
+      return { tag: 1, fields: ['simulated blob disk write failure (ENOSPC)'] }
+    }
+
+    try {
+      const outcome = await hooks.tool.resetScope.execute(
+        {
+          newScopeObjective: 'should fail to write archive blob',
+          newScopeTurnBudget: 6,
+          kpiCompletion: 'met',
+        },
+        {
+          sessionID: sid,
+          agent: 'engineer',
+          callID: 'call-blob-fail-043',
+          messageID: 'msg-blob-fail-043',
+        },
+      )
+
+      assert.equal(
+        String(outcome),
+        'resetScope failed: failed to write archive blob: simulated blob disk write failure (ENOSPC)',
+        'must return explicit blob write failure message',
+      )
+
+      // Invariants: memory NOT updated
+      assert.equal(isScopeInitialized(sid), false, 'scope must NOT be initialized')
+      assert.equal(turnBudget(sid), 0, 'budget must NOT be updated')
+
+      // Invariant: sealed snapshot must NOT have been discarded (remains available for retry)
+      const sealedAfter = outboundViewStore.tryGetSealed(sid)
+      assert.ok(sealedAfter, 'sealed snapshot must NOT be discarded when blob write fails')
+
+      // Invariant: no ScopeReanchored in journal
+      const snap = AgentJournalModule_snapshot(JournalHandle__get_Journal(runtime.journal))
+      const proj = AgentProjection_tryFind(SessionIdModule_create(sid), snap.AgentProjections)
+      assert.equal(proj?.PrefixEpoch, undefined, 'journal must NOT contain prefix epoch')
+    } finally {
+      JournalHandle__get_Journal(runtime.journal).writer.BlobWriter.Write = originalWriteBlob
+    }
+  })
+})
+
+test('WHAT[context-compression-043] OpenCode resetScope appendAgent failure propagates exception without updating memory or draining snapshot', async () => {
+  await withExecutablePlugin(async (hooks, _dir, _created, runtime) => {
+    const sid = 'test-append-failure-043'
+    clearSessionState(sid)
+    outboundViewStore.clearSession(sid)
+    await acceptAuthorityRoot(runtime, sid, 'engineer')
+
+    // Establish full observation
+    await hooks['experimental.chat.system.transform']({ sessionID: sid }, { system: ['System prompt for append failure'] })
+    await hooks['chat.params']({ sessionID: sid, model: { providerID: 'anthropic', modelID: 'claude-3-5-sonnet' } }, {})
+    await normalTransform(safeCaps(), sid, {}, {
+      messages: [{ info: { id: 'u1', role: 'user', sessionID: sid, time: { created: 1 } }, parts: [{ type: 'text', text: 'Task' }] }],
+    })
+
+    const sealedBefore = outboundViewStore.tryGetSealed(sid)
+    assert.ok(sealedBefore, 'sealed snapshot must exist before resetScope')
+
+    // Simulate appendAgent failure at the journal writer boundary
+    const originalAppend = JournalHandle__get_Journal(runtime.journal).writer.Append.bind(runtime.journal.writer)
+    JournalHandle__get_Journal(runtime.journal).writer.Append = async (_runId, _fact, _cancellation) => {
+      return { tag: 1, fields: [{ tag: 0, fields: ['simulated durable stream append conflict'] }] }
+    }
+
+    try {
+      await assert.rejects(
+        hooks.tool.resetScope.execute(
+          {
+            newScopeObjective: 'should throw JournalAppendException',
+            newScopeTurnBudget: 6,
+            kpiCompletion: 'met',
+          },
+          {
+            sessionID: sid,
+            agent: 'engineer',
+            callID: 'call-append-fail-043',
+            messageID: 'msg-append-fail-043',
+          },
+        ),
+        (err) => {
+          return err != null && (err.name === 'JournalAppendException' || String(err).includes('JournalAppendException') || String(err).includes('append conflict'))
+        },
+        'must raise JournalAppendException on durable append rejection',
+      )
+
+      // Invariants: memory NOT updated
+      assert.equal(isScopeInitialized(sid), false, 'scope must NOT be initialized when append fails')
+      assert.equal(turnBudget(sid), 0, 'budget must NOT be updated when append fails')
+
+      // Invariant: sealed snapshot must NOT have been discarded (remains available for retry)
+      const sealedAfter = outboundViewStore.tryGetSealed(sid)
+      assert.ok(sealedAfter, 'sealed snapshot must NOT be discarded when durable append fails')
+    } finally {
+      JournalHandle__get_Journal(runtime.journal).writer.Append = originalAppend
+    }
+  })
 })

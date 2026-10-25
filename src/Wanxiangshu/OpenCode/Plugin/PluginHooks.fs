@@ -71,6 +71,9 @@ open PluginHostInterop
 
 module PluginHooks =
 
+    [<Import("outboundViewStore", "wanxiangli/pair-hint")>]
+    let private outboundViewStore: obj = jsNative
+
     [<Import("ProviderCalibration", "wanxiangli/provider-calibration")>]
     let private calibration: obj = jsNative
 
@@ -354,7 +357,7 @@ module PluginHooks =
                         PluginTransforms.negotiationRememberSystem input output
                     let sid = if isNull input?sessionID then "" else string input?sessionID
                     if not projected && not (String.IsNullOrEmpty sid) then
-                        OutboundViewCapture.recordSystem sid output?system
+                        outboundViewStore?recordSystem(sid, output?system) |> ignore
                 }
 
 
@@ -852,7 +855,7 @@ module PluginHooks =
                 PluginTransforms.negotiationRememberModel input
                 let modelSessionId = unbox<string> input?sessionID
                 if not (String.IsNullOrEmpty modelSessionId) then
-                    OutboundViewCapture.recordModel modelSessionId input?model
+                    outboundViewStore?recordModel(modelSessionId, input?model) |> ignore
 
             let chatParamsRegistration =
                 registeredHook HookKey.ChatParams (curriedHook (box rememberModelParams))
@@ -1007,7 +1010,7 @@ module PluginHooks =
                         Surface.clearSessionState (SessionId.value sessionId)
                         calibration?clearSession(SessionId.value sessionId) |> ignore
                         PluginTransforms.negotiationForgetSession (SessionId.value sessionId)
-                        OutboundViewCapture.clearSession (SessionId.value sessionId))
+                        outboundViewStore?clearSession(SessionId.value sessionId) |> ignore)
 
             let observeEvent raw =
                 task {
