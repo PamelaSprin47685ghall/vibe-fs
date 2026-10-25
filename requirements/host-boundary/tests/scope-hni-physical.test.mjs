@@ -714,3 +714,29 @@ test('WHAT[context-compression-050] real OpenCode first reset has no previous-sc
     clearSessionState(sid)
   })
 })
+
+test('WHAT[context-compression-051] a cold OpenCode request with historical reset but no budget strongly requests reinitialization instead of forging a zero-budget suffix', async () => {
+  const sid='scope-051-cold-budget'
+  clearSessionState(sid)
+  const source=[
+    user('u-cold-051','Continue work after process restart',1),
+    assistant('a-reset-051',tool('historical-reset-051','resetScope','historical reset output')),
+    user('u-later-051','Actual operator follow-up',2),
+    assistant('a-read-051',tool('ordinary-read-051','read','read data')),
+  ]
+  const before=structuredClone(source)
+  const cold=await outbound(sid,structuredClone(source))
+  assert.equal(cold.at(-1).attribution,'agent')
+  assert.equal(cold.at(-1).strong,true)
+  assert.match(cold.at(-1).parts[0].text,/resetScope/,'strong steer is present in the actual provider language, not hardcoded English')
+  assert.equal(cold.some(msg=>msg.weak===true),false)
+  assert.equal(cold.find(msg=>msg.info?.id==='a-read-051')?.parts[0].state.output,'read data',
+    'unknown budget cannot fake [Remaining turnBudget: 0]')
+  assert.deepEqual(source,before,'outbound request-copy must not modify the original provider history')
+  assert.equal(isScopeInitialized(sid),false)
+  resetScopeState(sid,4)
+  const known=await outbound(sid,structuredClone(before))
+  assert.equal(known.some(msg=>msg.strong===true),false,'only a real new budget can suppress cold strong reminder')
+  assert.ok(known.find(msg=>msg.info?.id==='a-read-051')?.parts[0].state.output.includes('[Remaining turnBudget: 3]'))
+  clearSessionState(sid)
+})

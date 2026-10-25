@@ -88,9 +88,9 @@ resetScope(
 1 次 LLM 请求计为 1 turn。会话状态机在 `turn_start` 时将当前活跃 `turnBudget` 减 1，下限为 0。
 
 1. **结果后缀**：每条已完成工具结果首次进入当前 prefix epoch 的 LLM 请求副本时，记录当时的 `turnBudget`，在结果末尾呈现 `\0\uFEFF[Remaining turnBudget: N]`。**同一 epoch 后续请求必须逐字重放该结果首次呈现的后缀**，不可用最新剩余预算批量改写历史结果；新结果首次呈现时仍显示当时的当前预算。`resetScope` 结果同理；仅提交的 `ScopeReanchored` 允许在新 epoch 重新建立尾巴。真实工具结果、持久化记录与用户原始消息绝不写入该后缀。再次热修正不可重复追加。
-2. **首次初始化强 Steer**：第一次成功 `resetScope` 之前，当前会话尚无预算，每一次普通 Provider 请求都由 `wanxiangli/pair-hint` 增加一条新的强提醒 user 载体 steer（`attribution: agent`, `steering: true`, `strong: true`），要求模型估算预算并首次调用 `resetScope`。强 steer 不是 operator 用户原文，禁止挂到任何用户消息或工具结果尾巴；工具原始输出、持久化历史与已经冻结的历史字节完全不变。首次 `negotiate` 尚未得到物理答复时，强 steer 改为要求先协商。每次请求重新生成当前有效的提醒，不按旧工具身份冻结。
-3. **后续用户／代理消息不作废预算**：第一次 `ScopeReanchored` 成功后，后来的真人用户消息、委托答复、旧我回答等 agent-attributed user 载体均沿用当前 Scope 与剩余预算；不会把预算设为零，不会重新进入初始化状态，也不单因消息到达鼓励 reset。正常回合继续递减预算，模型在实际工作闭环适合时自行决定重锚。第二次及以后重锚才有 `askPreviousScope` 首问义务，其 MUST 也在每次请求的单独强 steer 中呈现。side-request 不改变预算及强提醒状态。
-4. **零预算弱提示**：当 scope 已初始化且 `turnBudget` 降至 0 时，若当前请求不是 side-request 快照，宿主可在请求副本末尾追加一条弱提醒用户消息（`steering: true`，不持久化），建议模型在当前任务状态闭环的自然边界调用 `resetScope` 开启新闭环并换取新预算。该弱提醒绝对不得强行中断、暂停或阻断正在进行的工具工作。
+2. **没有已确认预算时的强 Steer**：第一次成功 `resetScope` 之前，或进程重启后历史虽含 `resetScope`、当前会话的预算状态却未能可靠恢复时，均没有可用预算；每一次普通 Provider 请求都由 `wanxiangli/pair-hint` 增加一条新的强提醒 user 载体 steer（`attribution: agent`, `steering: true`, `strong: true`），要求模型估算预算并首次调用 `resetScope`。强 steer 不是 operator 用户原文，禁止挂到任何用户消息或工具结果尾巴；工具原始输出、持久化历史与已经冻结的历史字节完全不变。首次 `negotiate` 尚未得到物理答复时，强 steer 改为要求先协商。每次请求重新生成当前有效的提醒，不按旧工具身份冻结。
+3. **后续用户／代理消息不作废已知预算**：当前进程已收到 `resetScope` 成功提交后的实际预算时，后来的真人用户消息、委托答复、旧我回答等 agent-attributed user 载体均沿用当前 Scope 与剩余预算；不会把预算设为零，不会重新进入初始化状态，也不单因消息到达鼓励 reset。正常回合继续递减预算，模型在实际工作闭环适合时自行决定重锚。第二次及以后重锚才有 `askPreviousScope` 首问义务，其 MUST 也在每次请求的单独强 steer 中呈现。side-request 不改变预算及强提醒状态。
+4. **零预算弱提示**：仅当 scope 已初始化、当前预算由真实 `resetScope` 成功受理且可确认，且 `turnBudget` 降至 0 时，若当前请求不是 side-request 快照，宿主可在请求副本末尾追加一条弱提醒用户消息（`steering: true`，不持久化），建议模型在当前任务状态闭环的自然边界调用 `resetScope` 开启新闭环并换取新预算。该弱提醒绝对不得强行中断、暂停或阻断正在进行的工具工作。
 
 ## [035] ScopeReanchored 冷前缀边界
 
@@ -224,3 +224,12 @@ OMP **已真实实现并在本地 OMP SDK + SSE 假 Provider 验证**原生旧�
 第一次成功 `resetScope` 只产生可工作 Scope 预算与旧请求归档，不需要 `askPreviousScope`。**从第二次成功 reset 起**，前一 Scope 的工作才构成必须主动回问的先决条件，新的 `askPreviousScope` pending 使用每请求强 steer 维持，普通工作工具仍不被硬阻断；有效真实首问 receipt 受理后继续当前预算。第一次 reset 后仍可选用回问工具，但宿主不主动催促。完整时序只由持久 PrefixEpoch 的已重锚计数和 `wanxiangli/pair-hint` 的唯一状态负责人协作确定，不按 user 角色字符串或消息次数猜。
 
 验收：`wanxiangli/src/pair-hint/tests/014.test.mjs`（首次无限重复 strong、无用户/工具后缀、真人和 agent 新消息连续预算、冷重放、首问两态）及 `requirements/host-boundary/tests/scope-hni-physical.test.mjs` 中 `WHAT[context-compression-050]`（实际一次与二次 durable `resetScope`，非工具催促、原文不变、预算冻结）。OpenCode/OMP 共用 PairHint，OMP 额外在 `omp-scope-seam.test.mjs` 的 `[049]` 实体双次重锚中验证首问触发点。
+
+
+## [051] 历史有 reset 但预算无法恢复时，持续强催重新建立预算
+
+预算不能以“未知”为可工作状态。重启／冷恢复后即使历史中包含一个或多个 `resetScope` 工具调用，若唯一 `wanxiangli/pair-hint` ScopeSession 没有确认本轮真实 `turnBudget`，不能因为历史有 reset 就把 `initialized` 设置为 true，也不能把内存默认 0 解释为“确实耗尽”，不得在历史结果显示伪造的 `[Remaining turnBudget: 0]`，更不能发零预算弱提醒。每次普通 Provider 请求都必须使用独立 agent-attributed 强 steer 要求立即 `resetScope`，直到该会话真正再次提交 reset 并获得有来源的预算。只有 budgetKnown=true 才允许正常递减、追加预算后缀和发真实零预算弱提醒。side-request 不制造强 steer、不改变 Scope 时序；用户追加任务及代理答复不会使已经确认的预算丢失。
+
+本规则是对 [034] 与 [050] 的恢复例外：已经确认预算的会话不因新消息催 reset；冷恢复中**缺少预算证据**才持续强催，并不是按照 operator 消息次数或其文字推断。此处预算有无证据只由库内同一 ScopeSession 判定；宿主不另维护一份可覆盖真相的表。真正的重启预算精确恢复仍需独立 durable 因果事实才能证明，在那之前宁愿要求 reset，也不虚报余额。
+
+证明：`wanxiangli/src/pair-hint/tests/015.test.mjs`（冷历史 reset／持续强提醒／无虚假 0 与已知预算自然递减）及 `requirements/host-boundary/tests/scope-hni-physical.test.mjs` 中 `WHAT[context-compression-051]`（真实 OpenCode Provider 请求副本、代理 strong steer、原始工具结果不变、重新建立预算后恢复正常后缀）。
