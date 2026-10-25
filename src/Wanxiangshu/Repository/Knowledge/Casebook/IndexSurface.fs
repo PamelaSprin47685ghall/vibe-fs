@@ -9,6 +9,9 @@ open Wanxiangshu.Persistence.EventStore
 /// and canonical question; durable session identity remains inside the owner.
 module CasebookIndexSurface =
 
+    [<Import("casebookIndex", "wanxiangli/casebook")>]
+    let private index: obj = jsNative
+
     let private storeOf (value: obj) : IEventStore = (unbox<EventStoreHandle> value).Store
 
     let private observationToJs (observation: Observation) : obj =
@@ -48,40 +51,37 @@ module CasebookIndexSurface =
                lastAccessOrder = case.AccessOrder
                observations = case.Observations |> List.map observationToJs |> List.toArray |}
 
-    let private entryToJs (entry: CasebookIndex.Entry) : obj =
-        box
-            {| shelfmark = entry.Shelfmark
-               question = entry.Question |}
+    let private casesInOrder (cases: Map<string, Case>) : Case array = cases |> Map.toArray |> Array.map snd
 
-    let private snapshotToJs (snapshot: CasebookIndex.Snapshot) : obj =
-        box
-            {| epoch = snapshot.Epoch
-               cases = snapshot.Cases |> List.map entryToJs |> List.toArray |}
+    let private indexCasesOf (cases: Case array) : obj array =
+        cases
+        |> Array.map (fun case -> createObj [ "sessionId" ==> case.Identity; "question" ==> case.Q ])
 
     /// Current frozen provider-visible snapshot, or `null` before first refresh.
     let tryGet () : obj =
-        match CasebookIndex.tryGet () with
-        | None -> null
-        | Some snapshot -> snapshotToJs snapshot
+        index?tryGet ()
 
     /// Mark the provider-visible index dirty for its next refresh.
-    let invalidate () : unit = CasebookIndex.invalidate ()
+    let invalidate () : unit =
+        index?invalidate ()
 
     /// Stable provider-visible shelfmark for a durable Case identity.
     let shelfmarkFor (sessionId: string) (canonicalQuestion: string) : string =
-        CasebookIndex.shelfmarkFor sessionId canonicalQuestion
+        unbox<string> (index?shelfmarkFor (sessionId, canonicalQuestion))
 
     /// Rebuild the provider-visible snapshot from unified EventStore Current.
     let refresh (store: obj) (capacity: int) : Task<obj> =
         task {
-            let! snapshot = CasebookIndex.refresh (storeOf store) capacity
-            return snapshotToJs snapshot
+            let cases = CasebookProjection.projectCases (storeOf store) capacity
+            let ordered = casesInOrder cases
+            let snapshot = index?freeze (indexCasesOf ordered)
+            return snapshot
         }
 
     /// Resolve a shelfmark without exposing internal index records.
     let resolve (store: obj) (capacity: int) (shelfmark: string) : Task<obj> =
         task {
-            match! CasebookIndex.resolve (storeOf store) capacity shelfmark with
+            match CasebookProjection.resolve (storeOf store) capacity shelfmark with
             | Error message -> return box {| ok = false; error = message |}
             | Ok None -> return box {| ok = true; value = null |}
             | Ok(Some case) -> return box {| ok = true; value = caseToJs case |}

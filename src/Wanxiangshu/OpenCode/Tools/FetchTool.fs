@@ -113,7 +113,7 @@ module FetchTool =
         (shelfmark: string)
         : System.Threading.Tasks.Task<string> =
         task {
-            match! CasebookIndex.resolve store 256 shelfmark with
+            match CasebookProjection.resolve store 256 shelfmark with
             | Error _ -> return unavailable language
             | Ok None -> return noCase language
             | Ok(Some case) -> return! handleResolvedCase owner language workspaceRoot store case

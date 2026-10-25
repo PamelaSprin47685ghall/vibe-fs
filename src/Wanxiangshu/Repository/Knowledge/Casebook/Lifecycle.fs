@@ -66,7 +66,7 @@ module CasebookLifecycle =
     let private refreshIndexThenSettle (store: IEventStore) (delegateSessionId: string) : Task<CaseFinalizeSettlement> =
         task {
             try
-                let! _ = CasebookIndex.refresh store 256
+                let! _ = CasebookIndexSurface.refresh (box {| Store = store |}) 256
                 return CaseFinalizeSettlement.finalized delegateSessionId
             with ex ->
                 return CaseFinalizeSettlement.unknown delegateSessionId ex.Message
@@ -89,7 +89,7 @@ module CasebookLifecycle =
             | Error error ->
                 return CaseFinalizeSettlement.notCommitted delegateSessionId (CasebookMutationError.describe error)
             | Ok() ->
-                CasebookIndex.invalidate ()
+                CasebookIndexSurface.invalidate ()
                 return! refreshIndexThenSettle store delegateSessionId
         }
 
@@ -275,8 +275,8 @@ module CasebookLifecycle =
         task {
             match touched with
             | Ok() ->
-                CasebookIndex.invalidate ()
-                let! _ = CasebookIndex.refresh store 256
+                CasebookIndexSurface.invalidate ()
+                let! _ = CasebookIndexSurface.refresh (box {| Store = store |}) 256
                 return Ok()
             | Error error -> return Error error
         }

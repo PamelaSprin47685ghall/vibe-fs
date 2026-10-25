@@ -464,7 +464,7 @@ module CasebookSurface =
             match! CasebookWorkflow.archiveCase internalStore case with
             | Ok() ->
                 try
-                    let! _ = CasebookIndex.refresh internalStore 256
+                    let! _ = CasebookIndexSurface.refresh (box {| Store = internalStore |}) 256
                     ()
                 with _ ->
                     ()

@@ -189,6 +189,24 @@ module CasebookProjection =
     /// Cases; the evicted session ids are returned so the caller can append
     /// Evicted facts (tombstones are events too). The victim choice is
     /// wanxiangli/casebook `evictionVictims` (CUT-27); this only removes them.
+    /// 从事件存储投影并应用 LRU 淘汰后的案例表（无状态薄读取）。
+    let projectCases (store: IEventStore) (capacity: int) : Map<string, Case> =
+        match store.TryCurrent "Casebook" with
+        | None -> Map.empty
+        | Some current ->
+            let state = unbox<State> current
+            evict capacity state.Cases |> fst
+
+    /// 解析公开 shelfmark 到内部 Case（直读最新存储投影，不暴露 session key）。
+    let resolve (store: IEventStore) (capacity: int) (shelfmark: string) : Result<Case option, string> =
+        let cases = projectCases store capacity
+        let ordered = cases |> Map.toArray |> Array.map snd
+        let indexCases =
+            ordered
+            |> Array.map (fun case -> createObj [ "sessionId" ==> case.Identity; "question" ==> case.Q ])
+        let position = unbox<int> (law?locate (indexCases, shelfmark))
+        Ok(if position < 0 then None else Some ordered.[position])
+
     let evict (capacity: int) (cases: Map<string, Case>) : Map<string, Case> * string list =
         let victims =
             cases
