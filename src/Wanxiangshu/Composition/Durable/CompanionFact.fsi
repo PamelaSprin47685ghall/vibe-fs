@@ -62,5 +62,15 @@ module ContextFact =
             {| SessionId: SessionId
                PreviousEpochId: PrefixEpochId
                NextEpochId: PrefixEpochId
-               CallId: ToolCallId |} ->
+               CallId: ToolCallId
+               ArchiveRef: BlobRef option
+               ArchiveDigest: BlobDigest option |} ->
+            AgentFact
+
+    val inline ScopeQuestionAsked:
+        payload:
+            {| SessionId: SessionId
+               TargetEpochId: PrefixEpochId
+               CallId: ToolCallId
+               QuestionsDigest: string |} ->
             AgentFact

@@ -813,6 +813,8 @@ Foundation/HostSessionSnapshot.fsi
 Foundation/HostSessionSnapshot.fs
 Context/Scope/SessionView.fsi
 Context/Scope/SessionView.fs
+Context/Scope/OutboundViewCapture.fsi
+Context/Scope/OutboundViewCapture.fs
 Context/Scope/Surface.fsi
 Context/Scope/Surface.fs
 Context/Scope/SnapshotScope.fsi

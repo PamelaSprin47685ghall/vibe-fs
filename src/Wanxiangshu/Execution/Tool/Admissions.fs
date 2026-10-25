@@ -60,6 +60,8 @@ module ToolAdmissions =
     /// Non-authorizing protocol: only bound delegates can submit questions.
     let negotiate: ToolAdmission = officeRole (fun _ -> true)
 
+    let askPreviousScope: ToolAdmission = resetScope
+
     let fetch: ToolAdmission =
         officeRole (fun r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
 

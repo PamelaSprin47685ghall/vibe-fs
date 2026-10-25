@@ -180,7 +180,7 @@ test('WHAT[context-compression-034] resetScope registration carries the new prot
   assert.ok(def, 'resetScope must be registered')
   assert.equal(
     def.description,
-    'Execution barrier and context garbage collector. Removes everything between the previous resetScope call (or session start) and this call from subsequent model requests, except user messages and prior resetScope call/result pairs. Everything after this call belongs to the new scope. Sets turnBudget for the new scope.',
+    'Execution barrier and context garbage collector. Preserves operator messages and the complete historical call/result pairs for resetScope, assume, negotiate, askPreviousScope, and advisor across later resets. Other old-scope working context is removed from subsequent model requests. Requires a KPI completion level; the Host scales the proposed new scope turnBudget using that tier.',
   )
   assert.equal(
     def.parameters.properties.newScopeObjective.description,
@@ -350,7 +350,8 @@ test('WHAT[context-compression-033] resetScope tool registration on OMP pi and e
   assert.ok(resetScopeDef.parameters.properties.oldScopeVerboseVerbatimExperience, 'has oldScopeVerboseVerbatimExperience')
   assert.ok(resetScopeDef.parameters.properties.newScopeObjective, 'has newScopeObjective')
   assert.ok(resetScopeDef.parameters.properties.newScopeTurnBudget, 'has newScopeTurnBudget')
-  assert.deepEqual(resetScopeDef.parameters.required, ['newScopeObjective', 'newScopeTurnBudget'])
+  assert.deepEqual(resetScopeDef.parameters.required, ['newScopeObjective', 'newScopeTurnBudget', 'kpiCompletion'])
+  assert.deepEqual(resetScopeDef.parameters.properties.kpiCompletion.enum, ['not_started', 'far_below', 'partially_met', 'met', 'exceeded', 'not_applicable'])
 
   const catalog = env.getObservedCatalog()
   assert.ok(catalog, 'Agents catalog port was bound')
@@ -879,4 +880,26 @@ test('WHAT[delegation-034] Stale or non-matching steer does not release gate; ph
 
 
   clearSessionState(childId)
+})
+
+test('WHAT[context-compression-048] OMP registers askPreviousScope and refuses to fake an old Scope answer without durable prior evidence', async () => {
+  const env = createOmpTestEnvironment()
+  await activateOnOmp(env.mockPi, env.mockPlugin, env.agentsList)
+  const sid = 'omp-prior-048'
+  const ctx = await activateSession(env, sid)
+  const tool = env.registeredTools.find(item => item.name === 'askPreviousScope')
+  assert.ok(tool, 'the mandatory first tool must exist in OMP as well as OpenCode')
+  assert.deepEqual(tool.parameters.required, ['questions'])
+  assert.equal(tool.parameters.properties.questions.type, 'string')
+  const catalog = await env.getObservedCatalog().Roles()
+  for (const agent of catalog.fields[0]) {
+    assert.equal(agent.ToolPolicy.get('askPreviousScope'), true,
+      'every role that receives the pending reminder must be able to call the corresponding tool')
+  }
+  const output = await tool.execute('exact-omp-call', { questions: 'Why was parser B rejected?' }, null, null, ctx)
+  const prose = contentText(output.content)
+  assert.match(prose, /NoPreviousScope|durable journal|previous Scope/i)
+  assert.equal(output.details.answerDelivered, false,
+    'never invent a provider reply without an archived old request')
+  clearSessionState(sid)
 })

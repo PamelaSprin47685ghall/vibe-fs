@@ -1063,6 +1063,205 @@ module Adapter =
         else
             tryAcquireOmpJournal stateRoot
 
+    let private ompScopeRefused (reason: string) : obj =
+        createObj
+            [ "content", box [| createObj [ "type", box "text"; "text", box reason ] |]
+              "details", createObj [ "refused", box true; "archived", box false ] ]
+
+    let private ompCommittedArchive
+        (journal: AgentJournal)
+        (sid: string)
+        (sessionId: SessionId)
+        (epoch: ActivePrefixEpoch)
+        (toolCallId: ToolCallId)
+        (budget: int)
+        (objective: string)
+        (experience: string option)
+        (archived: BlobWriteReceipt)
+        : Task<obj> =
+        task {
+            let fact =
+                ContextFact.ScopeReanchored
+                    {| SessionId = sessionId
+                       PreviousEpochId = epoch.EpochId
+                       NextEpochId = PrefixEpochId.next epoch.EpochId
+                       CallId = toolCallId
+                       ArchiveRef = Some archived.BlobRef
+                       ArchiveDigest = Some archived.BlobDigest |}
+            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal
+            match appended with
+            | Ok _ -> ()
+            | Error failure -> raise (JournalAppendException failure)
+
+            Surface.resetScopeState sid budget
+            Surface.beginAskPreviousScope sid
+            Surface.setHasPreviousScope sid true
+
+            let content =
+                box [| createObj [ "type", box "text"; "text", box $"Scope reset. Objective: %s{objective}" ] |]
+            let details =
+                createObj
+                    [ "objective", box objective
+                      "turnBudget", box budget
+                      "archived", box true
+                      "experience", box experience.IsSome ]
+            return createObj [ "content", content; "details", details ]
+        }
+
+    let private ompWriteArchivedScope
+        (journal: AgentJournal)
+        (sid: string)
+        (sessionId: SessionId)
+        (epoch: ActivePrefixEpoch)
+        (toolCallId: ToolCallId)
+        (budget: int)
+        (objective: string)
+        (experience: string option)
+        (previous: OutboundSnapshot)
+        : Task<obj> =
+        task {
+            let archiveJson = OutboundViewCapture.serializeSnapshot previous
+            let! written = journal.WriteBlob archiveJson
+            match written with
+            | Error reason ->
+                return ompScopeRefused ("resetScope refused: durable scope archive write failed: " + reason)
+            | Ok archived ->
+                return! ompCommittedArchive journal sid sessionId epoch toolCallId budget objective experience archived
+        }
+
+    let private ompScopeResetReplayed (journalOpt: AgentJournal option) (sessionText: string) (callId: string) =
+        match journalOpt with
+        | None -> false
+        | Some journal ->
+            AgentProjection.tryFind (SessionId.create sessionText) (AgentJournal.snapshot journal).AgentProjections
+            |> Option.bind (fun session -> session.PrefixEpoch)
+            |> Option.exists (PrefixEpochProjection.isScopeReanchored callId)
+
+    let private ompScopeSuccess (objective: string) =
+        createObj
+            [ "content", box [| createObj [ "type", box "text"; "text", box ("Scope reset. Objective: " + objective) ] |]
+              "details", createObj [ "replayed", box true; "archived", box true ] ]
+
+    let private ompPriorAnswer (accepted: bool) (message: string) : obj =
+        createObj
+            [ "content", box [| createObj [ "type", box "text"; "text", box message ] |]
+              "isError", box (not accepted)
+              "details", createObj [ "receiptRecorded", box accepted; "answerDelivered", box false ] ]
+
+    let private ompPriorArchive (journal: AgentJournal) (sid: string) =
+        let epoch =
+            AgentProjection.tryFind (SessionId.create sid) (AgentJournal.snapshot journal).AgentProjections
+            |> Option.bind (fun session -> session.PrefixEpoch)
+        match epoch |> Option.bind (fun current -> current.LastScopeArchive) with
+        | Some archive when epoch |> Option.exists (fun current -> current.EpochId = archive.TargetEpochId) ->
+            Ok(epoch.Value, archive)
+        | _ -> Error "NoPreviousScope"
+
+    let private ompPriorVerify (journal: AgentJournal) (archive: ArchivedScope) : Task<Result<unit, string>> =
+        task {
+            let! content = journal.Writer.BlobWriter.Read archive.ArchiveRef
+            return
+                content
+                |> Result.mapError (fun error -> "previous Scope blob read failed: " + error)
+                |> Result.bind (fun text ->
+                    if Wanxiangshu.Host.HostDigest.sha256Hex text = BlobDigest.value archive.ArchiveDigest then
+                        Ok()
+                    else Error "previous Scope digest mismatch")
+        }
+
+    let private ompPriorWriteReceipt
+        (journal: AgentJournal) (sid: string) (archive: ArchivedScope)
+        (epoch: ActivePrefixEpoch) (toolId: string) (questions: string)
+        : Task<Result<bool, string>> =
+        let digest = Wanxiangshu.Host.HostDigest.sha256Hex questions
+        match PrefixEpochProjection.scopeQuestionReceipt toolId epoch with
+        | Some existing when existing = digest -> Task.FromResult(Ok true)
+        | Some _ -> Task.FromResult(Error "ScopeQuestionAsked identity conflict")
+        | None ->
+            task {
+                let fact =
+                    ContextFact.ScopeQuestionAsked
+                        {| SessionId = SessionId.create sid
+                           TargetEpochId = archive.TargetEpochId
+                           CallId = ToolCallId.create toolId
+                           QuestionsDigest = digest |}
+                let! outcome = AgentJournal.appendAgent (StreamId.Session(SessionId.create sid)) None fact journal
+                return outcome |> Result.map (fun _ -> false) |> Result.mapError (sprintf "durable question record failed: %A")
+            }
+
+    let private ompPriorSettle
+        (journal: AgentJournal) (sid: string) (archive: ArchivedScope)
+        (epoch: ActivePrefixEpoch) (toolId: string) (questions: string) =
+        task {
+            let! saved = ompPriorWriteReceipt journal sid archive epoch toolId questions
+            let receipt = sid + ":scope:" + string (PrefixEpochId.value archive.TargetEpochId) + ":call:" + toolId
+            let format (replayed: bool) =
+                Surface.setHasPreviousScope sid true
+                let observed = Surface.askPreviousScope sid questions (Some receipt)
+                let admitted = not (isNull observed?ok) && unbox<bool> observed?ok
+                if not admitted then
+                    ompPriorAnswer false ("receipt is durable, but pending-state admission failed: " + string observed?reason)
+                else
+                    let label = if replayed then "already accepted" else "accepted"
+                    ompPriorAnswer true
+                        ("askPreviousScope " + label + ", receipt=" + receipt
+                         + ". OMP cannot reconstruct the exact previous provider request for a native side turn; no model answer or steer was sent.")
+            return
+                match saved with
+                | Error reason -> ompPriorAnswer false ("askPreviousScope rejected: " + reason)
+                | Ok replayed -> format replayed
+        }
+
+    let private ompPriorExecute
+        (journalOpt: AgentJournal option) (toolId: string) (args: obj) (ctx: obj) =
+        task {
+            let sid = ctxSessionId ctx
+            let raw = fieldValue args "questions"
+            let questions = if isNull raw then "" else stringOf raw
+            let requested =
+                match journalOpt with
+                | Some journal when not (String.IsNullOrWhiteSpace toolId)
+                                    && not (String.IsNullOrWhiteSpace questions) ->
+                    ompPriorArchive journal sid |> Result.map (fun (epoch, archive) -> journal, epoch, archive)
+                | _ -> Error "askPreviousScope requires actual callId, nonblank questions, and a durable journal"
+            let! proof =
+                match requested with
+                | Error reason -> Task.FromResult(Error reason)
+                | Ok(journal, _, archive) -> ompPriorVerify journal archive
+            return!
+                match requested, proof with
+                | Error reason, _ -> Task.FromResult(ompPriorAnswer false ("askPreviousScope refused: " + reason))
+                | _, Error reason -> Task.FromResult(ompPriorAnswer false ("askPreviousScope refused: " + reason))
+                | Ok _, Ok _ when Surface.negotiationRequired sid ->
+                    Task.FromResult(ompPriorAnswer false "askPreviousScope requires the first negotiate answer")
+                | Ok(journal, epoch, archive), Ok _ ->
+                    ompPriorSettle journal sid archive epoch toolId questions
+        }
+
+    let private registerAskPreviousScopeTool (pi: obj) (journalOpt: AgentJournal option) =
+        let schema =
+            createObj
+                [ "type", box "object"
+                  "properties", box (createObj
+                      [ "questions", box (createObj
+                          [ "type", box "string"
+                            "description", box "Clarifying questions to the previous Scope." ]) ])
+                  "required", box [| "questions" |] ]
+        let definition =
+            createObj
+                [ "name", box "askPreviousScope"
+                  "label", box "Ask Previous Scope"
+                  "concurrency", box "exclusive"
+                  "loadMode", box "essential"
+                  "approval", box "read"
+                  "description", box "Record questions for the immediate archived previous Scope. This OMP host cannot yet replay the exact frozen provider request for inference; receipt acceptance is not a promise of an answer."
+                  "parameters", box schema
+                  "execute",
+                    box (Func<obj, obj, obj, obj, obj, obj>(
+                        fun callId arguments _signal _onUpdate ctx ->
+                            ompPriorExecute journalOpt (stringOf callId) arguments ctx |> unbox<obj>)) ]
+        registerTool pi definition
+
     let private registerResetScopeTool (pi: obj) (journalOpt: AgentJournal option) : unit =
         let resetScopeDef =
             createObj
@@ -1072,7 +1271,7 @@ module Adapter =
                   "loadMode", box "essential"
                   "approval", box "read"
                   "description",
-                  box "Execution barrier and context garbage collector. Removes everything between the previous resetScope call (or session start) and this call from subsequent model requests, except user messages and prior resetScope call/result pairs. Everything after this call belongs to the new scope. Sets turnBudget for the new scope."
+                  box "Execution barrier and context garbage collector. Preserves operator messages and the complete historical call/result pairs for resetScope, assume, negotiate, askPreviousScope, and advisor across later resets. Other old-scope working context is removed from subsequent model requests. Requires a KPI completion level; the Host scales the proposed new scope turnBudget using that tier."
                   "parameters",
                   box (
                       createObj
@@ -1099,19 +1298,27 @@ module Adapter =
                                               [ "type", box "integer"
                                                 "minimum", box 0
                                                 "description", box "Estimated number of LLM turns needed for the new scope (1 LLM request = 1 turn)." ]
-                                      ) ]
+                                      )
+                                      "kpiCompletion",
+                                      box (createObj
+                                               [ "type", box "string"
+                                                 "enum", box [| "not_started"; "far_below"; "partially_met"; "met"; "exceeded"; "not_applicable" |]
+                                                 "description", box "Previous KPI achievement: not_started (0.50x), far_below (0.75x), partially_met (0.90x), met (1.00x), exceeded (1.25x), or not_applicable for first scope (1.00x). Host multiplies the proposed new budget, rounding upward." ]) ]
                             )
-                            "required", box [| "newScopeObjective"; "newScopeTurnBudget" |] ]
+                            "required", box [| "newScopeObjective"; "newScopeTurnBudget"; "kpiCompletion" |] ]
                   )
                   "execute",
                   box (
                       Func<obj, obj, obj, obj, obj, obj>(fun callId arguments signal onUpdate toolCtx ->
                           let ctx = orNull toolCtx
                           let sid = ctxSessionId ctx
-                          let budget =
+                          let estimate =
                               if not (isNull arguments) && not (isNull arguments?newScopeTurnBudget) then
-                                  max 0 (unbox<int> arguments?newScopeTurnBudget)
-                              else 0
+                                  unbox<int> arguments?newScopeTurnBudget
+                              else -1
+                          let completion =
+                              if isNull arguments || isNull arguments?kpiCompletion then ""
+                              else stringOf arguments?kpiCompletion
                           let objective =
                               if not (isNull arguments) && not (isNull arguments?newScopeObjective) then
                                   stringOf arguments?newScopeObjective
@@ -1122,9 +1329,17 @@ module Adapter =
                               else None
 
                           // The budget changes only after the durable reanchor commits.
-                          if Surface.negotiationRequired sid then
-                              let msg =
+                          let negotiationPending = Surface.negotiationRequired sid
+                          let previousPending = Surface.isPreviousScopePending sid
+                          let pendingMessage =
+                              if negotiationPending then
                                   "resetScope is unavailable until the first negotiate(questions) reply has arrived as a user steer. Ask the delegator clarifying questions now, and continue while the reply is pending."
+                              else
+                                  "resetScope is unavailable until askPreviousScope(questions) has been called by the new scope; ordinary tools remain available."
+                          if ompScopeResetReplayed journalOpt sid (stringOf callId) then
+                              task { return ompScopeSuccess objective } |> unbox<obj>
+                          elif negotiationPending || previousPending then
+                              let msg = pendingMessage
                               let content =
                                   box [| createObj [ "type", box "text"; "text", box msg ] |]
                               let details =
@@ -1139,6 +1354,7 @@ module Adapter =
                               |> unbox<obj>
                           else
 
+                          let budget = Surface.adjustBudgetForKpi estimate completion
                           // 2. Append durable ScopeReanchored fact using real journal and toolCallId
                           let toolCallIdStr = stringOf callId
                           if String.IsNullOrWhiteSpace toolCallIdStr then
@@ -1158,30 +1374,14 @@ module Adapter =
                               | None -> PrefixEpochProjection.empty
                               | Some session -> session.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
-                          let nextEpoch = PrefixEpochId.next epoch.EpochId
-                          let fact =
-                              ContextFact.ScopeReanchored
-                                  {| SessionId = sessionId
-                                     PreviousEpochId = epoch.EpochId
-                                     NextEpochId = nextEpoch
-                                     CallId = toolCallId |}
-
                           task {
-                              let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal
-                              match appended with
-                              | Ok _ -> ()
-                              | Error failure -> raise (JournalAppendException failure)
-
-                              Surface.resetScopeState sid budget
-
-                              let content =
-                                  box [| createObj [ "type", box "text"; "text", box $"Scope reset. Objective: %s{objective}" ] |]
-                              let details =
-                                  createObj
-                                      [ "objective", box objective
-                                        "turnBudget", box budget
-                                        "archived", box experience.IsSome ]
-                              return createObj [ "content", content; "details", details ]
+                              match OutboundViewCapture.tryGetSealed sid with
+                              | None ->
+                                  return
+                                      ompScopeRefused
+                                          "resetScope refused: the preceding real provider request has no complete archived system/messages/model observation"
+                              | Some previous ->
+                                  return! ompWriteArchivedScope journal sid sessionId epoch toolCallId budget objective experience previous
                           }
                           |> unbox<obj>)
                   ) ]
@@ -1307,8 +1507,8 @@ module Adapter =
             |> List.map (fun agent ->
                 let policy =
                     match agent.ToolPolicy with
-                    | None -> Map [ ("resetScope", true); ("negotiate", true) ]
-                    | Some m -> m |> Map.add "resetScope" true |> Map.add "negotiate" true
+                    | None -> Map [ ("resetScope", true); ("negotiate", true); ("askPreviousScope", true) ]
+                    | Some m -> m |> Map.add "resetScope" true |> Map.add "negotiate" true |> Map.add "askPreviousScope" true
                 { agent with ToolPolicy = Some policy })
 
         let catalog: IAgentCatalog =
@@ -2043,6 +2243,7 @@ module Adapter =
         : (HostSignal -> Task<unit>) =
 
         registerResetScopeTool pi journalOpt
+        registerAskPreviousScopeTool pi journalOpt
 
         let refreshSessionState (ctx: obj) =
             let sid = ctxSessionId ctx
@@ -2073,6 +2274,10 @@ module Adapter =
                 let sid = ctxSessionId ctx
                 let isManaged = liveChildren.ContainsKey sid
                 let payload = fieldValue event "payload"
+                let observedModel = fieldValue ctx "model"
+                let rawModel = if isNull payload then null else fieldValue payload "model"
+                let model = if isNull observedModel then rawModel else observedModel
+                if not (isNull model) then OutboundViewCapture.recordModel sid model
                 let tools = if isNull payload then null else fieldValue payload "tools"
                 let shouldFilter = not isManaged && not (isNull payload) && isArray tools
                 if shouldFilter then
@@ -2123,9 +2328,11 @@ module Adapter =
                 let updated = updateSystemPromptScope system scopeProtocol
                 match hooks.Turn with
                 | None ->
+                    OutboundViewCapture.recordSystem sid (box (List.toArray updated))
                     return createObj [ "systemPrompt", box (List.toArray updated) ]
                 | Some turn ->
                     let! prompt = turn.SystemPrompt(turnContext ctx, updated)
+                    OutboundViewCapture.recordSystem sid (box (List.toArray prompt))
                     return createObj [ "systemPrompt", box (List.toArray prompt) ]
             } |> unbox<obj>)
 
@@ -2136,12 +2343,18 @@ module Adapter =
                 sessionContexts.[sid] <- ctx
                 let rawList = fieldValue event "messages"
                 let scoped = ompScopeRequest sid rawList
-                match hooks.Turn with
-                | None -> return contextMessagesReply rawList scoped
-                | Some turn ->
-                    let messages = scoped |> Array.choose contextMessageView |> Array.toList
-                    let! edit = turn.ContextMessages(turnContext ctx, messages)
-                    return applyContextEdit rawList scoped edit
+                let! finalResult =
+                    match hooks.Turn with
+                    | None -> Task.FromResult(contextMessagesReply rawList scoped)
+                    | Some turn ->
+                        task {
+                            let messages = scoped |> Array.choose contextMessageView |> Array.toList
+                            let! edit = turn.ContextMessages(turnContext ctx, messages)
+                            return applyContextEdit rawList scoped edit
+                        }
+                let physical = if isNull finalResult then rawList else fieldValue finalResult "messages"
+                if not (isNull physical) then OutboundViewCapture.recordMessagesFor sid physical
+                return finalResult
             }
             |> unbox<obj>)
 

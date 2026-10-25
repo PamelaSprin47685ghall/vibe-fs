@@ -2,13 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createWith } from '../../../dist/OpenCode/Host/ProviderSystemTransform.js'
 import { normalTransform, DeliveryAdjudication } from '../../../dist/OpenCode/Plugin/PluginTransforms.js'
-import { resetScopeState, clearSessionState, turnBudget, isScopeInitialized } from '../../../dist/Context/Scope/Surface.js'
+import { resetScopeState, clearSessionState, turnBudget, isScopeInitialized, isPreviousScopePending } from '../../../dist/Context/Scope/Surface.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
 import { SessionMessage, SessionToolPart, SnapshotToolPartState } from '../../../dist/Foundation/HostSessionSnapshot.js'
 import { MessagePart } from '../../../dist/Foundation/HostMessage.js'
 import { ToolCallIdModule_create, HostToolPartIdModule_create } from '../../../dist/Foundation/Identity.js'
 import { filterSnapshot } from '../../../dist/Context/Scope/SnapshotScope.js'
-import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import * as manager052 from '../../../dist/Mission/Manager/Workflow.js'
+import * as lifecycle052 from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as journal052 from '../../../dist/Persistence/Journal/Surface.js'
+import * as workStore052 from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import { withExecutablePlugin, acceptAuthorityRoot, openIncumbency, lifecycleWorkView } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const SEP = '\0\uFEFF'
 const user = (id, text, created) => ({ info: { id, role: 'user', time: { created } }, parts: [{ type: 'text', text }] })
@@ -358,7 +362,7 @@ test('WHAT[delegation-negotiation-004] registered negotiate sends ephemeral BTW 
       { questions: 'Which parser? Preserve which invariant?' },
       { sessionID: child, agent: 'engineer', callID: 'negotiate-1' },
     )
-    assert.match(result, /Questions accepted/)
+    assert.match(result, /Questions accepted|问题已受理/)
     const outgoingGuidance = () => runtime.prompts.filter(prompt =>
       prompt.path?.id === child && prompt.body?.parts?.some(p => p.type === 'text' && /byte-preserving parser/.test(p.text)),
     )
@@ -390,13 +394,13 @@ test('WHAT[delegation-negotiation-004] registered negotiate sends ephemeral BTW 
 })
 
 
-test('WHAT[delegation-negotiation-005] Advisor Host permissions expose only negotiate and resetScope', async () => {
+test('WHAT[delegation-negotiation-005] Advisor Host permissions expose its clarification and scope protocol tools', async () => {
   const { advisorAgentConfig } = await import('../../../dist/OpenCode/Tools/StaticTools.js')
   const { rolePredicate } = await import('../../../dist/OpenCode/Tools/ToolRegistrySurface.js')
   const agent = advisorAgentConfig('Advisor role law')
   const permission = agent.permission
   const allowed = Object.entries(permission).filter(([, status]) => status === 'allow').map(([name]) => name).sort()
-  assert.deepEqual(allowed, ['negotiate', 'resetScope'])
+  assert.deepEqual(allowed, ['askPreviousScope', 'negotiate', 'resetScope'])
   assert.equal(permission.external_directory, 'deny', 'Advisor never receives broad external path permission')
   for (const name of ['skill', 'assume', 'fetch', 'bash-honeypot', 'todowrite-for-engineer']) {
     assert.equal(permission[name], 'deny', name + ' must be explicitly denied in Host agent config')
@@ -472,7 +476,7 @@ test('WHAT[delegation-negotiation-007] detached queue receipt cannot masquerade 
       { questions: 'Which file?' },
       { sessionID: child, agent: 'engineer', callID: 'neg-queued-1' },
     )
-    assert.match(response, /Questions accepted/)
+    assert.match(response, /Questions accepted|问题已受理/)
     for (let i = 0; i < 80 && !runtime.prompts.some(item =>
       item.path?.id === child && item.body.parts.some(part => /The answer/.test(part.text ?? '')),
     ); i++) await new Promise(resolve => setTimeout(resolve, 20))
@@ -523,4 +527,130 @@ test('WHAT[context-compression-039] real OpenCode system transform upgrades stal
   assert.equal(fresh.system[0], 'an independent system prompt')
   assert.match(fresh.system[1], /Scope & Context Management|Scope 与上下文/)
   assert.doesNotMatch(fresh.system[1], /\[System:/)
+})
+
+test('WHAT[context-compression-047] registered OpenCode reset archives physical previous wire and mandatory ask actually queries it through the readonly BTW pipeline', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _created, runtime) => {
+    const sid = 'previous-physical-047'
+    await acceptAuthorityRoot(runtime, sid, 'engineer')
+    clearSessionState(sid)
+    const prefix = [
+      { info: { id: 'prior-physical-user', role: 'user', sessionID: sid, time: { created: 1 } },
+        parts: [{ type: 'text', text: 'Do not use the replacement parser. Exact counterexample 37.' }] },
+    ]
+    const originalBytes = JSON.stringify(prefix)
+    const system = { system: ['Prior real provider system: preserve counterexample 37 verbatim'] }
+    await hooks['experimental.chat.system.transform']({ sessionID: sid }, system)
+    await hooks['chat.params']({ sessionID: sid, model: { providerID: 'fixture', modelID: 'old-model' } }, {})
+    const outbound = { messages: structuredClone(prefix) }
+    await normalTransform(safeCaps(), sid, {}, outbound)
+    assert.equal(JSON.stringify(prefix), originalBytes, 'real raw Host message is untouched')
+
+    const reset = await hooks.tool.resetScope.execute(
+      { newScopeObjective: 'verify new parser against previous evidence', newScopeTurnBudget: 8,
+        oldScopeVerboseVerbatimExperience: 'We chose parser A', kpiCompletion: 'partially_met' },
+      { sessionID: sid, agent: 'engineer', callID: 'reset-047', messageID: 'provider-reset-047' },
+    )
+    assert.match(String(reset), /Scope reset. Objective: verify new parser/)
+    assert.equal(isPreviousScopePending(sid), true)
+    assert.equal(turnBudget(sid), 8, 'ceil(8 × 0.90) is 8')
+    const resetReplay = await hooks.tool.resetScope.execute(
+      {newScopeObjective:'verify new parser against previous evidence', newScopeTurnBudget:8,
+       kpiCompletion:'partially_met'},
+      {sessionID:sid,agent:'engineer',callID:'reset-047',messageID:'provider-reset-047'})
+    assert.match(String(resetReplay),/Scope reset. Objective:/)
+    assert.equal(isPreviousScopePending(sid),true,'the exact reset replay cannot clear the new mandatory first ask')
+
+    const session = runtime.client.session
+    let providerAttempts = 0, toolVetoes = 0
+    session.prompt = async args => {
+      providerAttempts += 1
+      const tempId = args.path.id
+      assert.equal(args.body.model?.modelID, 'old-model', 'reuse the exact old model identity')
+      const sys = { system: ['Ephemeral empty system'] }
+      await hooks['experimental.chat.system.transform']({ sessionID: tempId }, sys)
+      assert.ok(sys.system.some(x => x.includes('counterexample 37')), 'old system was projected')
+      const request = {
+        messages: [{ info: { role: 'user', sessionID: tempId }, parts: args.body.parts }],
+      }
+      await hooks['experimental.chat.messages.transform']({ sessionID: tempId }, request)
+      const projected = JSON.stringify(request.messages)
+      assert.match(projected, /Exact counterexample 37/, 'frozen old history actually reaches the temp provider')
+      if (providerAttempts === 1) {
+        await assert.rejects(
+          hooks['tool.execute.before']({ sessionID: tempId, tool: 'write', callID: 'forbidden-previous' }, { args: {} }),
+          /Ephemeral negotiation is read-only/,
+        )
+        toolVetoes += 1
+        throw new Error('read-only veto before tool execution')
+      }
+      return {
+        data: {
+          info: { role: 'assistant' },
+          parts: [{ type: 'text', text: 'Previous evidence: counterexample 37 proves the replacement parser loses data.' }],
+        },
+      }
+    }
+
+    const ask = await hooks.tool.askPreviousScope.execute(
+      { questions: 'Which evidence disproved the replacement parser?' },
+      { sessionID: sid, agent: 'engineer', callID: 'previous-call-047', messageID: 'provider-ask-047' },
+    )
+    assert.match(String(ask), /accepted|受理/)
+    assert.equal(isPreviousScopePending(sid), false, 'actual first model tool call, not a background reset, clears pending')
+    const replay = await hooks.tool.askPreviousScope.execute(
+      { questions: 'Which evidence disproved the replacement parser?' },
+      { sessionID: sid, agent: 'engineer', callID: 'previous-call-047', messageID: 'provider-ask-047' },
+    )
+    assert.match(String(replay), /already accepted|previously accepted|受理/)
+    clearSessionState(sid)
+    const coldReplay = await hooks.tool.askPreviousScope.execute(
+      { questions: 'Which evidence disproved the replacement parser?' },
+      { sessionID: sid, agent: 'engineer', callID: 'previous-call-047', messageID: 'provider-ask-047' })
+    assert.match(String(coldReplay), /previously accepted/, 'the durable receipt survives loss of PairHint session cache')
+    const conflict = await hooks.tool.askPreviousScope.execute(
+      { questions: 'Different request with same toolCallId' },
+      { sessionID: sid, agent: 'engineer', callID: 'previous-call-047', messageID: 'provider-ask-047' })
+    assert.match(String(conflict), /conflict/, 'durable question digest forbids altered replay')
+    const outboundSteers = () => runtime.prompts.filter(p =>
+      p.path?.id === sid && p.body?.parts?.some(part => /counterexample 37 proves/.test(part.text ?? '')))
+    for (let i = 0; i < 100 && !outboundSteers().length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    assert.equal(providerAttempts, 2, 'one real old-model answer after bounded tool-veto retry, no replay duplicate')
+    assert.equal(toolVetoes, 1)
+    assert.equal(outboundSteers().length, 1, 'old answer delivered through one real PromptDispatcher continuation')
+    clearSessionState(sid)
+  })
+})
+
+test('WHAT[work-052] Delivered Manager work can durably Reopen as a distinct later relay tenure, never revive predecessor',async()=>{
+  await withExecutablePlugin(async (_hooks,directory,_ids,runtime)=>{
+    const session='manager-post-delivery-052'
+    await acceptAuthorityRoot(runtime,session,'manager')
+    await openIncumbency(runtime,session,undefined,'S4',session)
+    const common=await journal052.JournalSurface_initializeStateRoot(directory)
+    const store=workStore052.acquire(common)
+    const originally=await lifecycleWorkView(runtime,session)
+    const originalIncumbency=lifecycle052.inspected(common,session)?.ActiveId
+    assert.ok(originally.found && originalIncumbency)
+    const reviewed=await lifecycle052.seedReviewAs(store,session,'Promoted','independent-reviewer')
+    assert.equal(reviewed.ok,true,JSON.stringify(reviewed))
+    const closed=await lifecycle052.seedDeliver(store,session,'run-first-final','call-first-final',10n)
+    assert.equal(closed.ok,true,JSON.stringify(closed))
+    assert.equal(closed.decision,'delivered',JSON.stringify(closed))
+    const ended=await lifecycleWorkView(runtime,session)
+    assert.ok(!ended.active,'original Manager tenure must be retired')
+    assert.equal(ended.delivered,true)
+    await manager052.ensureManagerWorkOpened(directory,20n,session)
+    const reentered=await lifecycleWorkView(runtime,session)
+    const reopenedIncumbency=lifecycle052.inspected(common,session)?.ActiveId
+    assert.ok(reentered.active && reopenedIncumbency && reopenedIncumbency!==originalIncumbency,
+      'real durable reopen creates a distinct active Manager incumbency')
+    assert.equal(reentered.delivered,false)
+    assert.equal(lifecycle052.inspected(common,session)?.Stage,'S4')
+    await manager052.ensureManagerWorkOpened(directory,20n,session)
+    const replay=await lifecycleWorkView(runtime,session)
+    assert.equal(lifecycle052.inspected(common,session)?.ActiveId,reopenedIncumbency,'same later head must not start a third tenure')
+  })
 })

@@ -124,6 +124,10 @@ module PluginHooks =
         "<btw>Ephemeral clarification on a delegate's current assignment. Answer the questions from this conversation context. Do not call ANY tools. Do not ask follow-up questions. Reply in plain text immediately.\nQuestions:\n"
         + questions + "\n</btw>"
 
+    let private previousScopePromptText (questions: string) =
+        "<btw>Ephemeral consultation with the immediately preceding Scope, using its archived provider request. Answer only using what this archived context showed. Do not use ANY tools, do not ask follow-up questions. If unknown, say so. Reply in plain text immediately.\nQuestions:\n"
+        + questions + "\n</btw>"
+
     [<RequireQualifiedAccess>]
     type private TemporaryAnswer =
         | Replied of string
@@ -164,28 +168,27 @@ module PluginHooks =
         }
 
     let private runTemporaryQuestion
-        (session: obj)
-        (tempId: string)
-        (agentName: string)
-        (model: obj)
-        (questions: string)
+        (session: obj) (tempId: string) (agentName: string) (model: obj) (firstPrompt: string)
         : Task<Result<string, string>> =
         let retryText =
-            "The preceding ephemeral response attempted a forbidden tool or lacked a plain-text answer. Do NOT use any tools; answer the delegated questions from your existing context immediately."
-        let rec run prose =
+            "The preceding ephemeral response attempted a forbidden tool or lacked a plain-text answer. Do NOT use any tools; answer the questions from your existing context immediately."
+        let rec run attempt prose =
             if not (PluginTransforms.negotiationIsTemporary tempId) then
-                Task.FromResult(Error "temporary negotiation was cancelled")
-            else runCandidate prose
-        and runCandidate prose =
+                Task.FromResult(Error "temporary read-only consultation was cancelled")
+            elif attempt > 2 then
+                Task.FromResult(Error "read-only consultation exhausted two bounded retries after tool violations or empty answers")
+            else
+                runCandidate attempt prose
+        and runCandidate attempt prose =
             task {
                 let payload = temporaryPromptPayload tempId agentName model prose
                 let! result = tryTemporaryAnswer session tempId payload
                 match result with
                 | TemporaryAnswer.Replied text -> return Ok text
-                | TemporaryAnswer.Retry -> return! run retryText
+                | TemporaryAnswer.Retry -> return! run (attempt + 1) retryText
                 | TemporaryAnswer.Failed error -> return Error error
             }
-        run (negotiationPromptText questions)
+        run 0 firstPrompt
 
     let private temporarySessionId (created: obj) : Result<string, string> =
         let data = negotiationResponse created
@@ -210,30 +213,44 @@ module PluginHooks =
             with _ -> return ()
         }
 
+    [<RequireQualifiedAccess>]
+    type private ConsultationOrigin =
+        | Delegator of string
+        | Frozen of obj
+
     let private runLinkedTemporary
-        (session: obj) (delegator: string) (tempId: string) (agentName: string) (questions: string)
+        (session: obj) (origin: ConsultationOrigin) (tempId: string) (agentName: string) (promptText: string)
         : Task<Result<string, string>> =
         task {
-            let linked = PluginTransforms.negotiationStartTemporary tempId delegator
-            let! answer =
+            let linked, model =
+                match origin with
+                | ConsultationOrigin.Delegator delegator ->
+                    PluginTransforms.negotiationStartTemporary tempId delegator, PluginTransforms.negotiationModelFor delegator
+                | ConsultationOrigin.Frozen snapshot ->
+                    PluginTransforms.consultationStartFrozen tempId snapshot,
+                    (if isNull snapshot then null else snapshot?model)
+            let questionRun =
                 match linked with
                 | Error reason -> Task.FromResult(Error reason)
-                | Ok() ->
-                    let model = PluginTransforms.negotiationModelFor delegator
-                    runTemporaryQuestion session tempId agentName model questions
-            PluginTransforms.negotiationFinishTemporary tempId
-            do! deleteTemporarySession session tempId
-            return answer
+                | Ok () -> runTemporaryQuestion session tempId agentName model promptText
+            try
+                return! questionRun
+            finally
+                PluginTransforms.negotiationFinishTemporary tempId
+                // Physical session cleanup is deliberately performed after the runner by createAndRunTemporary.
         }
 
     let private createAndRunTemporary
-        (session: obj) (delegator: string) (recipient: string) (agentName: string) (questions: string)
+        (session: obj) (origin: ConsultationOrigin) (recipient: string) (agentName: string) (promptText: string)
         : Task<Result<string, string>> =
         task {
             let! created = createTemporarySession session recipient
             match created with
             | Error reason -> return Error reason
-            | Ok tempId -> return! runLinkedTemporary session delegator tempId agentName questions
+            | Ok tempId ->
+                let! result = runLinkedTemporary session origin tempId agentName promptText
+                do! deleteTemporarySession session tempId
+                return result
         }
 
     /// The Host temp session contains only the question. Provider transform
@@ -250,7 +267,17 @@ module PluginHooks =
         | None -> Task.FromResult(Error "delegator has no verified model agent identity")
         | Some _ when isNull session -> Task.FromResult(Error "OpenCode SDK session transport unavailable")
         | Some role ->
-            createAndRunTemporary session delegator recipient (ManagedAgent.nameOf role) questions
+            createAndRunTemporary session (ConsultationOrigin.Delegator delegator) recipient (ManagedAgent.nameOf role) (negotiationPromptText questions)
+
+    let private consultPreviousBtw
+        (client: obj) (roleFor: SessionId -> Role option) (recipient: string) (snapshot: obj) (questions: string)
+        : Task<Result<string, string>> =
+        let session = if isNull client then null else client?session
+        match roleFor (SessionId.create recipient) with
+        | None -> Task.FromResult(Error "previous Scope consultation has no verified model agent identity")
+        | Some _ when isNull session -> Task.FromResult(Error "OpenCode SDK session transport unavailable")
+        | Some role ->
+            createAndRunTemporary session (ConsultationOrigin.Frozen snapshot) recipient (ManagedAgent.nameOf role) (previousScopePromptText questions)
 
     let create
         (boot: PluginBoot.Boot)
@@ -321,11 +348,13 @@ module PluginHooks =
             let transformOrdinarySystem = ProviderSystemTransform.createWith roleFor planStageFor
             let systemTransform (input: obj) (output: obj) : Task<unit> =
                 task {
-                    if PluginTransforms.negotiationProjectSystem input output then
-                        ()
-                    else
+                    let projected = PluginTransforms.negotiationProjectSystem input output
+                    if not projected then
                         do! transformOrdinarySystem input output
                         PluginTransforms.negotiationRememberSystem input output
+                    let sid = if isNull input?sessionID then "" else string input?sessionID
+                    if not projected && not (String.IsNullOrEmpty sid) then
+                        OutboundViewCapture.recordSystem sid output?system
                 }
 
 
@@ -474,6 +503,7 @@ module PluginHooks =
                         (fun recipient answer receipt ->
                             toolRegistration.Runtime.SendNegotiationSteer(recipient, answer, receipt))
                     )
+                    toolRegistration.Runtime.AttachPreviousScopeTransport(consultPreviousBtw client roleFor)
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
 
@@ -578,6 +608,11 @@ module PluginHooks =
                         |> Option.orElseWith (fun () ->
                             toolTerminalObservation
                                 (Wanxiangshu.Repository.Programming.Js.JsToolGenerator.toolNameFor "plan")
+                                rawInput)
+                        |> Option.orElseWith (fun () -> toolTerminalObservation "review" rawInput)
+                        |> Option.orElseWith (fun () ->
+                            toolTerminalObservation
+                                (Wanxiangshu.Repository.Programming.Js.JsToolGenerator.toolNameFor "manager")
                                 rawInput)
 
                     match observation, toolRegistration with
@@ -815,6 +850,9 @@ module PluginHooks =
             let rememberModelParams (input: obj) (output: obj) =
                 emitJsExpr (chatParams, input, output) "$0($1, $2)" |> ignore
                 PluginTransforms.negotiationRememberModel input
+                let modelSessionId = unbox<string> input?sessionID
+                if not (String.IsNullOrEmpty modelSessionId) then
+                    OutboundViewCapture.recordModel modelSessionId input?model
 
             let chatParamsRegistration =
                 registeredHook HookKey.ChatParams (curriedHook (box rememberModelParams))
@@ -968,7 +1006,8 @@ module PluginHooks =
                     |> Option.iter (fun sessionId ->
                         Surface.clearSessionState (SessionId.value sessionId)
                         calibration?clearSession(SessionId.value sessionId) |> ignore
-                        PluginTransforms.negotiationForgetSession (SessionId.value sessionId))
+                        PluginTransforms.negotiationForgetSession (SessionId.value sessionId)
+                        OutboundViewCapture.clearSession (SessionId.value sessionId))
 
             let observeEvent raw =
                 task {

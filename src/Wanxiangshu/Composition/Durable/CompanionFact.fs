@@ -27,3 +27,6 @@ module ContextFact =
 
     let inline ScopeReanchored payload =
         AgentFact.Context(ContextFactCases.ScopeReanchored payload)
+
+    let inline ScopeQuestionAsked payload =
+        AgentFact.Context(ContextFactCases.ScopeQuestionAsked payload)

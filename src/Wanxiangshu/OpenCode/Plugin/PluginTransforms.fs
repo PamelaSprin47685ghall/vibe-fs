@@ -116,6 +116,14 @@ module PluginTransforms =
         else
             Error (if isNull r?reason then "startTemporary failed" else string r?reason)
 
+    let consultationStartFrozen (tempId: string) (snapshot: obj) : Result<unit, string> =
+        let response = Surface.startTemporaryFromFrozen tempId snapshot
+        if not (isNull response?ok) && unbox<bool> response?ok then Ok()
+        else Error(if isNull response?reason then "frozen consultation source unavailable" else string response?reason)
+
+    let consultationModelForTemporary (tempId: string) : obj =
+        Surface.modelForTemporary tempId
+
     let negotiationFinishTemporary (tempId: string) : unit =
         Surface.finishTemporary tempId
 
@@ -1541,6 +1549,7 @@ module PluginTransforms =
 
             do! runOrdinaryStages stages frame
             projectionSessionIdOpt |> Option.iter (fun sid -> negotiationRememberMessages sid outObj)
+            OutboundViewCapture.recordMessages outObj?messages
 
         }
 

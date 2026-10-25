@@ -18,6 +18,7 @@ e1合并的gen77官方510文件与完整36文件integration均0 fail。003实际
 | 002 | 生产权限投影及兼容 calling | 实际直接/包装/转发请求的全链权限；权限表不证明模型自行返回 |
 | 032 | 生产权限投影；另有真实 fork 入口断言：Manager 派发 `devops` 被拒，返回文案不宣告承接，且 `childCount`/`promptCount` 不再增长、无 durable handle（先以合法 engineer 派发证明计数器是活的） | 包装与转发请求形态上的同一拒绝；权限表不证明模型自行返回 |
 | 033 | 直接 seeding 的 durable 见证 + 已链接子 handle：`publishDeliveredReturn` 在中断前发布与该见证一致的 `Completed`（role/providerRun/材料来自见证与 handle），父方 `join` 因此有返回可收；无匹配见证的围栏不发布。另一条直接驱动 `js` 工作流：`UnattributedDelivery` 以 `DELIVERY_NOT_ESTABLISHED` 失败且不留进程内交付格 | installed Host 上的完整 fork→deliver→cut→join 链路：本机真实 fork 夹具在本次改动前即超时（整合树 `dist` 陈旧、链接不闭合），留给冻结后的正式验收 |
+| 034 | 生产首轮双向渲染与指令/数据分离（父到子仅传当前指令与 RootRequirements，无历史/context 字段；子到父 assistant 散文作为完成报告且不入数据字段）；（待补测试）negotiate pending 对称时序冻结（无预算后缀、不递减、弱提示关闭）、新工具结果与 assistant part 持续挂载 MUST 提醒（逐字重放）、普通工具不受阻且 resetScope 自身自拒，以及真实答复送达解除 pending。 | 真实物理回答送达后的时序恢复、跨进程闭环及 provider 缓存前缀命中仍待证。 |
 | 003、006、027 | fork/resume 工具接收、拒绝 calling、复用 Byname；忙碌 Engineer/固定 DevOps 追加指导，warm/cold work 与原完成回调不变；完成后无需 join 即新工作；027 的无 prepared handoff 旧 Root Failed/Aborted 拒绝断言保留 | 跨进程物理恢复绑定；同进程 canonical reopen 不是 OS crash |
 | 005、013、014 | 真实 renderer、独立 TOML 解析、handle fold；实际 Join 队列上限与完整剩余项消费；commission mailbox 的 FIFO、余项与空队列 | 全部参数/错误不泄漏拓扑、真实 agent completion 的 owner/CAS/恢复；commission 完整入口接线 |
 | 007 | 真实同步普通/批次入口拒绝已废止 Coder/Inspector，拒绝前不创建 child、不发 prompt；Engineer 正例 | Sphinx 受管入口、无环与 family-root 放置的整链约束；032 的标准权限投影不替代入口授权 |

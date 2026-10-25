@@ -417,7 +417,7 @@ Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择�
 
 ## [049] ask：向用户提问与显式暂停
 
-只有 S1 阶段的 Plan 可以经编程面成员 `this.ask`（[050]）请求继续目标所必需的用户输入；其他阶段与其他角色一律禁用（Manager 同样禁用）。`ask` 不注册独立宿主工具。它不调用 DevOps，不假装拿到了用户回答，也不完成工作。
+只有 S1 阶段的 Plan 可以经编程面成员 `this.ask`（[050]）请求继续目标所必需的用户输入；其他阶段与其他角色一律禁用；Manager 不具有通用 `this.ask`，仅 [051] 指定的首次空评审自动执行等价询问。`ask` 不注册独立宿主工具。它不调用 DevOps，不假装拿到了用户回答，也不完成工作。
 
 - 真实呈现询问并成功登记 `UserQuestionAsked` 后，返回“你的询问已经发出”一类占位回执。事实绑定 session、logical run、authority root、提问所依据的物理输入、provider run、tool call 与原问题。占位回执不是用户原文，也不是完成报告。
 - 在 Host 已确认同一个 ask 工具结果的 `message.part.updated/completed` 上，立即调用 `InterruptAttempt`，不靠延时器猜测完成顺序，不在返回结果前销毁工具。不得使用逻辑终止、关闭 authority 或递归取消子资源替代。重复终态不重复中断；别的 call、别的会话或已回答提问的迟到事件不许中断新执行。
@@ -431,3 +431,16 @@ Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择�
 
 Plan 的编程面（`todowrite-for-plan`）携带 `js.ask(question)`：程序内调用即登记 durable 问题并通知用户，然后经统一 park 通道挂起，工具返回 parked 载荷；程序不继续执行，直到恢复。阶段门禁与 [049] 相同：只有 S1 阶段的 Plan 可以提问，其他阶段以 `ASK_REFUSED` 拒绝；拒绝以失败哨兵进入程序，程序可捕获或让其失败。等待期间的新调用受既有等待门禁拒绝，只有真实用户输入解锁。真实用户输入按既有 S1／Ask 门禁解除等待后，提交新名字的控制程序，在工具顶层提供必填 planB，在程序内调用 `unpark(name, value?)` 继续原现场；恢复使用控制请求准入时确定的剩余期限，不重跑原程序，恢复控制者不隐式再次唤醒目标。放弃通过新控制程序的 `abandon(name)`。parked 载荷携带完整程序与执行点 source 标记（与生成面同规）。
 
+## [051] 首任 Manager 空账评审的真实问询
+
+S4 Work **第一任** Manager（`RoundCount = 0`、活跃任期且尚未 `Reviewed`）若首次调用 `review(findings = [])`，不得把空账当作目标明确或任务完成，不得立即写入 `Reviewed(Promoted)`：宿主必须按 [049] 的同一真实物理问询通道询问用户“本次具体目标、范围、验收标准”，成功通知并 durable 记录 `UserQuestionAsked`。登记仍绑定本次 ProviderRunId/ToolCallId、AuthorityRoot 与真实物理用户输入；工具只返回已受理、等待真实答复，只有工具完成事件可中断当前 attempt，同身份重放幂等；真实新用户消息以 `UserQuestionAnswered` 恢复同一任务。此后再评审照常更新账本；普通 `this.ask` 仍只准 Plan S1。问询失败时不得假装 `Reviewed` 或伪造用户答复。
+
+证明：`requirements/work/tests/051.test.mjs` 对注册编程面、Host 通知、真实完成事件仅中断一次、持久事实、无虚假 Reviewed、真实用户回复、恢复评审进行组合验证。
+
+## [052] Manager 交付之后的正常新循环与末任收尾
+
+S4 Manager 完成 `deliver`（实际 `IncumbencyRetired(Delivered)`）只关闭**本任**；同会话后续新的真实用户／Manager Provider 请求允许依历史 Delivered retirement 调用已有 durable `Reopen`，以 `Reopened` + `IncumbencyOpened` 打开不同的后继任期，旧退休任期不复活、原记录不删除，完全相同的入口重放不再造第三任。权限恢复取自新在任事实而非解除所有保护；无确证 Delivered、错误调用者或无法证明新任确实建立仍拒绝。
+
+任意 Manager 首次提交空账并取得 Promoted 终局资格之后，**资格不等于工作结束**：只要其任期真实活跃、没有实际资源阻塞，仍保留正常的 `Fork`（Engineer）、`Resume`（尤其固定 DevOps）、`Join`、后续 review 和实际收尾能力；不得用 `IsFinalIncumbent` 静态硬门禁阻断正常修复、编译、测试或验收。只有义务账为空且已核实资源结清才能 `deliver`。真实阻塞／已退休无任期仍按已有门禁拒绝。
+
+证明：`requirements/host-boundary/tests/scope-hni-physical.test.mjs` 的 `WHAT[work-052]` 对持久交付后新旧任期身份与幂等重放作物理断言；`requirements/capability-enforcement/tests/025.test.mjs` 对晋级后 `Fork`/`Resume` 与无任期、真实 blocker 反例作合同验证。

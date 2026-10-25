@@ -14,6 +14,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
@@ -141,6 +142,7 @@ type ToolRuntimeScope
     // Host-only BTW transport. The scope/negotiation actor retains all protocol state.
     let mutable askDelegator: (string -> string -> string -> Task<Result<string, string>>) option = None
     let mutable steerRecipient: (string -> string -> string -> Task<Result<unit, string>>) option = None
+    let mutable askArchivedScope: (string -> obj -> string -> Task<Result<string, string>>) option = None
 
     let continueManagerLoop =
         defaultArg continueManagerLoop (fun _ _ ->
@@ -934,7 +936,7 @@ type ToolRuntimeScope
             true
         | _ -> false
 
-    let privateNegotiationObserver (recipient: string) (receipt: string) : ContinuationAcceptanceObserver =
+    let privateConsultationObserver (recipient: string) (receipt: string) (confirm: string -> string -> bool) : ContinuationAcceptanceObserver =
         let observerGate = obj ()
         let subscriptions = ResizeArray<IDisposable>()
         let mutable confirmed = false
@@ -949,7 +951,7 @@ type ToolRuntimeScope
 
         { Notify = fun _ ->
               try
-                  Wanxiangshu.Context.Scope.Surface.confirmNegotiationSteer receipt recipient |> ignore
+                  confirm receipt recipient |> ignore
               finally
                   release ()
           AttachDisposable = fun registration ->
@@ -961,10 +963,10 @@ type ToolRuntimeScope
                           false)
               if alreadyAccepted then registration.Dispose() }
 
-    let sendNegotiationSteer (recipient: string) (answer: string) (receipt: string) : Task<Result<unit, string>> =
+    let sendConsultationSteer (recipient: string) (answer: string) (receipt: string) (confirm: string -> string -> bool) : Task<Result<unit, string>> =
         let target = SessionId.create recipient
         let directory = directoryFor recipient |> Option.orElse workspaceDirectory
-        let observer = privateNegotiationObserver recipient receipt
+        let observer = privateConsultationObserver recipient receipt confirm
         let active =
             journal
             |> Option.bind (fun durable ->
@@ -997,6 +999,171 @@ type ToolRuntimeScope
         | Some _, None, None ->
             Task.FromResult(Error "Negotiation recipient has no previous managed authority profile")
 
+    let sendNegotiationSteer (recipient: string) (answer: string) (receipt: string) =
+        sendConsultationSteer recipient answer receipt Wanxiangshu.Context.Scope.Surface.confirmNegotiationSteer
+
+    let scopeArchive (sessionText: string) : Result<Wanxiangshu.Context.Prefix.ArchivedScope, string> =
+        let current =
+            journal
+            |> Option.map AgentJournal.snapshot
+            |> Option.bind (fun snapshot ->
+                AgentProjection.tryFind (SessionId.create sessionText) snapshot.AgentProjections)
+            |> Option.bind (fun session -> session.PrefixEpoch)
+        match current |> Option.bind (fun epoch -> epoch.LastScopeArchive) with
+        | Some archive when current |> Option.exists (fun epoch -> epoch.EpochId = archive.TargetEpochId) ->
+            Ok archive
+        | _ -> Error "NoPreviousScope: immediate previous archived Scope is unavailable"
+
+    let sendPreviousScopeSteer (recipient: string) (answer: string) (receipt: string) =
+        let isCurrent () =
+            match scopeArchive recipient with
+            | Ok archive ->
+                let prefix = recipient + ":scope:" + string (PrefixEpochId.value archive.TargetEpochId) + ":call:"
+                receipt.StartsWith(prefix, StringComparison.Ordinal)
+            | Error _ -> false
+        if not (isCurrent ()) then
+            Task.FromResult(Error "stale previous Scope answer: target epoch is no longer current")
+        else
+            let confirm r owner =
+                if isCurrent () then Wanxiangshu.Context.Scope.Surface.confirmPreviousScopeSteer r owner else false
+            sendConsultationSteer recipient answer receipt confirm
+
+    let parseVerifiedScope (sessionText: string) (text: string) : Result<obj, string> =
+        let decoded: Result<obj, string> =
+            try Ok(emitJsExpr text "JSON.parse($0)")
+            with ex -> Error ("old Scope archive JSON cannot be read: " + ex.Message)
+        let verify (source: obj) =
+            let system: obj = if isNull source then null else source?system
+            let messages: obj = if isNull source then null else source?messages
+            let model: obj = if isNull source then null else source?model
+            let arrays: bool = emitJsExpr (system, messages) "Array.isArray($0) && Array.isArray($1)"
+            if not arrays || isNull model || string source?sessionId <> sessionText then
+                Error "old Scope archive contains no complete bound provider request"
+            else Ok source
+        decoded |> Result.bind verify
+
+    let readScopeArchive (sessionText: string) (archive: Wanxiangshu.Context.Prefix.ArchivedScope) : Task<Result<obj, string>> =
+        task {
+            let read =
+                journal
+                |> Option.map (fun durable -> durable.Writer.BlobWriter.Read archive.ArchiveRef)
+                |> Option.defaultValue (Task.FromResult(Error "previous Scope consultation requires a durable journal"))
+            let! content = read
+            let verify text =
+                if Wanxiangshu.Host.HostDigest.sha256Hex text <> BlobDigest.value archive.ArchiveDigest then
+                    Error "old Scope digest mismatch"
+                else parseVerifiedScope sessionText text
+            return content |> Result.mapError (fun reason -> "old Scope blob unavailable: " + reason) |> Result.bind verify
+        }
+
+    let deliverPreviousAnswer (recipient: string) (receipt: string) (target: PrefixEpochId) (result: Result<string, string>) : Task<unit> =
+        task {
+            let stillCurrent =
+                scopeArchive recipient
+                |> Result.map (fun archive -> archive.TargetEpochId = target)
+                |> Result.defaultValue false
+            let prepared =
+                match result with
+                | Ok answer when stillCurrent && not (String.IsNullOrWhiteSpace answer) ->
+                    Wanxiangshu.Context.Scope.Surface.preparePreviousScopeReply receipt recipient answer
+                | _ -> null
+            if not (isNull prepared) && not (isNull prepared?ok) && unbox<bool> prepared?ok then
+                let! _ = sendPreviousScopeSteer recipient (string prepared?steer) receipt
+                ()
+        }
+
+    let settlePreviousAnswer
+        (recipient: string) (questions: string) (receipt: string)
+        (target: PrefixEpochId) (frozen: obj)
+        (ask: string -> obj -> string -> Task<Result<string, string>>) : Task<unit> =
+        task {
+            try
+                let! result = ask recipient frozen questions
+                do! deliverPreviousAnswer recipient receipt target result
+            with _ -> ()
+        }
+
+    let recordNewPreviousScopeReceipt
+        (ctx: HostToolContext)
+        (archive: ArchivedScope)
+        (digest: string)
+        (durable: AgentJournal) : Task<Result<bool, string>> =
+        task {
+            let fact =
+                ContextFact.ScopeQuestionAsked
+                    {| SessionId = SessionId.create ctx.SessionId
+                       TargetEpochId = archive.TargetEpochId
+                       CallId = ctx.ToolCallId.Value
+                       QuestionsDigest = digest |}
+            let! recorded =
+                AgentJournal.appendAgent (StreamId.Session(SessionId.create ctx.SessionId)) ctx.ProviderRunId fact durable
+            return
+                match recorded with
+                | Ok _ -> Ok false
+                | Error failure -> Error(sprintf "durable question receipt refused: %A" failure)
+        }
+
+    let recordPreviousScopeReceipt
+        (ctx: HostToolContext)
+        (archive: ArchivedScope)
+        (questions: string) : Task<Result<bool, string>> =
+        let toolId = ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+        let digest = Wanxiangshu.Host.HostDigest.sha256Hex questions
+        let previouslyRecorded =
+            journal
+            |> Option.bind (fun durable ->
+                AgentProjection.tryFind (SessionId.create ctx.SessionId) (AgentJournal.snapshot durable).AgentProjections)
+            |> Option.bind (fun session -> session.PrefixEpoch)
+            |> Option.bind (PrefixEpochProjection.scopeQuestionReceipt toolId)
+        match previouslyRecorded, journal with
+        | Some earlier, _ when earlier = digest ->
+            Task.FromResult(Ok true)
+        | Some _, _ ->
+            Task.FromResult(Error "previous Scope question conflicts with recorded toolCallId")
+        | None, None ->
+            Task.FromResult(Error "previous Scope question requires durable AgentJournal")
+        | None, Some durable ->
+            recordNewPreviousScopeReceipt ctx archive digest durable
+
+    let acknowledgePreviousScopeQuestion
+        (ctx: HostToolContext) (questions: string)
+        (archive: ArchivedScope) (frozen: obj)
+        (ask: string -> obj -> string -> Task<Result<string, string>>)
+        (replayed: bool) : string =
+        let recipient = ctx.SessionId
+        let toolId = ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+        let receipt =
+            recipient + ":scope:" + string (PrefixEpochId.value archive.TargetEpochId) + ":call:" + toolId
+        Wanxiangshu.Context.Scope.Surface.setHasPreviousScope recipient true
+        let admitted = Wanxiangshu.Context.Scope.Surface.askPreviousScope recipient questions (Some receipt)
+        let accepted = not (isNull admitted?ok) && unbox<bool> admitted?ok
+        let already = replayed || (not (isNull admitted?replayed) && unbox<bool> admitted?replayed)
+        let language = ProviderLanguageBinding.forSessionText recipient
+        let acknowledged =
+            if language = ProviderLanguage.SimplifiedChinese then
+                "向上一 Scope 提出的澄清问题已经受理。可继续工作，答案随后以 steer 到达。receipt=" + receipt
+            else
+                "Previous Scope question accepted; continue working while its answer arrives as a steer. receipt=" + receipt
+        if not accepted then
+            "askPreviousScope receipt committed but local admission refused: " + string admitted?reason
+        elif already then
+            "askPreviousScope previously accepted: " + receipt
+        else
+            settlePreviousAnswer recipient questions receipt archive.TargetEpochId frozen ask |> ignore
+            acknowledged
+
+    let acceptPreviousScopeQuestion
+        (ctx: HostToolContext) (questions: string)
+        (archive: ArchivedScope) (frozen: obj)
+        (ask: string -> obj -> string -> Task<Result<string, string>>) : Task<string> =
+        task {
+            let! persisted = recordPreviousScopeReceipt ctx archive questions
+            return
+                match persisted with
+                | Error reason -> "askPreviousScope refused: " + reason
+                | Ok replayed -> acknowledgePreviousScopeQuestion ctx questions archive frozen ask replayed
+        }
+
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
     member _.RootWorkspace = rootWorkspace
@@ -1007,6 +1174,30 @@ type ToolRuntimeScope
     member _.ActiveProfileFor(sessionId: SessionId) = activeProfileFor sessionId
     member _.SendNegotiationSteer(recipient: string, answer: string, receipt: string) =
         sendNegotiationSteer recipient answer receipt
+
+    member _.AttachPreviousScopeTransport(ask: string -> obj -> string -> Task<Result<string, string>>) =
+        askArchivedScope <- Some ask
+
+    member _.AskPreviousScope(ctx: HostToolContext, questions: string) : Task<string> =
+        task {
+            let recipient = ctx.SessionId
+            let authenticated = ctx.ToolCallId.IsSome && ctx.ProviderRunId.IsSome && not (String.IsNullOrWhiteSpace questions)
+            let archive =
+                if authenticated then scopeArchive recipient
+                else Error "askPreviousScope requires the actual model toolCallId, providerRunId and nonempty questions"
+            let! source =
+                match archive with
+                | Error reason -> Task.FromResult(Error reason)
+                | Ok a -> readScopeArchive recipient a
+            match archive, source, askArchivedScope with
+            | Error reason, _, _ -> return "askPreviousScope unavailable: " + reason
+            | _, Error reason, _ -> return "askPreviousScope unavailable: " + reason
+            | _, _, None -> return "askPreviousScope unavailable: no real read-only consultation transport"
+            | Ok a, Ok frozen, Some ask when Wanxiangshu.Context.Scope.Surface.negotiationRequired recipient ->
+                return "askPreviousScope unavailable: first negotiate must be answered"
+            | Ok a, Ok frozen, Some ask ->
+                return! acceptPreviousScopeQuestion ctx questions a frozen ask
+        }
 
     member _.AttachNegotiationTransport
         (ask: string -> string -> string -> Task<Result<string, string>>, steer: string -> string -> string -> Task<Result<unit, string>>) =
@@ -1103,9 +1294,20 @@ type ToolRuntimeScope
                 )
             then
                 return Error "ask requires an unfinished work with an active incumbency"
-            elif not (work |> Option.exists (fun current -> current.Stage = "S1")) then
-                // 产品裁决：只有 S1 阶段的 Plan 可以向用户中断提问。
-                return Error "ask is allowed only in the S1 planning stage"
+            elif
+                not (
+                    work
+                    |> Option.exists (fun current ->
+                        current.Stage = "S1"
+                        || (current.Sequence = [ "S4" ]
+                            && current.Stage = "S4"
+                            && current.ActiveId.IsSome
+                            && not current.Reviewed
+                            && current.RoundCount = 0
+                            && (activeProfileFor sid |> Option.exists (fun profile -> profile.CanonicalRole = Role.Manager))))
+                )
+            then
+                return Error "ask is allowed only in the S1 planning stage (except S4 first-tenure Manager empty review)"
             elif not (questionRequests.Add sid) then
                 return Error "a question is already being sent for this session"
             else
@@ -1129,7 +1331,7 @@ type ToolRuntimeScope
         | None -> this.DispatchValidatedQuestion(durable, sid, sessionIdText, notify, request)
 
     /// 先确认提问已经呈现，再登记同一逻辑运行的等待。工具只交回占位回执。
-    member this.AskUser(ctx: HostToolContext, question: string) : Task<Result<unit, string>> =
+    member private this.AskUserAs(ctx: HostToolContext, question: string, allowedRole: Role) : Task<Result<unit, string>> =
         task {
             let sid = SessionId.create ctx.SessionId
 
@@ -1142,7 +1344,7 @@ type ToolRuntimeScope
                 questionNotifier
             with
             | Some durable, Some profile, Some run, Some call, Some physical, Some notify when
-                profile.CanonicalRole = Role.Plan && not (String.IsNullOrWhiteSpace question)
+                profile.CanonicalRole = allowedRole && not (String.IsNullOrWhiteSpace question)
                 ->
                 let request: UserQuestionAskedPayload =
                     { SessionId = sid
@@ -1156,7 +1358,34 @@ type ToolRuntimeScope
                 return! this.ResolveOrSendQuestion(durable, sid, ctx.SessionId, call, notify, request)
             | _ ->
                 return
-                    Error "ask requires active Plan authority, exact call evidence, a question, and user notification"
+                    Error "ask requires matching active office authority, exact call evidence, a question, and user notification"
+        }
+
+    member this.AskUser(ctx: HostToolContext, question: string) : Task<Result<unit, string>> =
+        this.AskUserAs(ctx, question, Role.Plan)
+
+    member private this.SubmitInitialManagerQuestion(ctx: HostToolContext, question: string) : Task<Result<bool, string>> =
+        task {
+            let sid = SessionId.create ctx.SessionId
+            let prior = journal |> Option.exists (fun durable -> UserQuestionJournal.hasAskedExact durable sid question)
+            if prior then
+                return Ok(this.IsWaitingForUser ctx.SessionId)
+            else
+                let! accepted = this.AskUserAs(ctx, question, Role.Manager)
+                return accepted |> Result.map (fun () -> true)
+        }
+
+    member this.TryAskForInitialEmptyManagerReview(ctx: HostToolContext, findingsEmpty: bool) : Task<Result<bool, string>> =
+        task {
+            let question = "请明确本次工作的具体目标、范围与验收标准。我会根据你的答复继续本任 Manager 工作。"
+            let! work = this.LifecycleWorkFor ctx.SessionId
+            let initialActive =
+                work
+                |> Option.exists (fun current ->
+                    current.Sequence = [ "S4" ] && current.ActiveId.IsSome && not current.Reviewed && current.RoundCount = 0)
+            let mustAsk = findingsEmpty && this.IsRole(ctx, Role.Manager) && initialActive
+            if mustAsk then return! this.SubmitInitialManagerQuestion(ctx, question)
+            else return Ok false
         }
 
     member private _.PruneFailedQuestionInterrupt

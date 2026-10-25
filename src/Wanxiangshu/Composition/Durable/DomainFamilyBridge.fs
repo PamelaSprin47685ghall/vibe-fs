@@ -143,7 +143,18 @@ module ContextProjectionBridge =
                 "ScopeReanchored"
                 projection
                 payload.SessionId
-                (PrefixEpochProjection.applyScopeReanchor
+                (PrefixEpochProjection.applyArchivedScopeReanchor
                     payload.PreviousEpochId
                     payload.NextEpochId
-                    (ToolCallId.value payload.CallId))
+                    (ToolCallId.value payload.CallId)
+                    payload.ArchiveRef
+                    payload.ArchiveDigest)
+        | ContextFactCases.ScopeQuestionAsked payload ->
+            ProjectionUpdate.tryUpdatePrefix
+                payload.SessionId
+                (PrefixEpochProjection.recordScopeQuestion
+                    payload.TargetEpochId
+                    (ToolCallId.value payload.CallId)
+                    payload.QuestionsDigest)
+                projection
+            |> Result.mapError (fun reason -> { Fact = "ScopeQuestionAsked"; Reason = reason })

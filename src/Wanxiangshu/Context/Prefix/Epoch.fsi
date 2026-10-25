@@ -3,11 +3,20 @@ namespace Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 
+type ArchivedScope =
+    { SourceEpochId: PrefixEpochId
+      TargetEpochId: PrefixEpochId
+      ResetCallId: string
+      ArchiveRef: BlobRef
+      ArchiveDigest: BlobDigest }
+
 type ActivePrefixEpoch =
     { EpochId: PrefixEpochId
       ReanchoredRuns: Set<ProviderRunIdentity>
       ReanchoredTenures: Set<string>
-      ReanchoredScopes: Set<string> }
+      ReanchoredScopes: Set<string>
+      LastScopeArchive: ArchivedScope option
+      ScopeQuestions: Map<string, string> }
 
 [<RequireQualifiedAccess>]
 type PrefixFoldRejection =
@@ -49,6 +58,14 @@ module PrefixEpochProjection =
         callId: string ->
         state: ActivePrefixEpoch ->
             Result<ActivePrefixEpoch, PrefixFoldRejection>
+
+    val applyArchivedScopeReanchor:
+        previousEpoch: PrefixEpochId -> nextEpoch: PrefixEpochId -> callId: string ->
+        blob: BlobRef option -> digest: BlobDigest option -> state: ActivePrefixEpoch ->
+        Result<ActivePrefixEpoch, PrefixFoldRejection>
+
+    val scopeQuestionReceipt: callId: string -> state: ActivePrefixEpoch -> string option
+    val recordScopeQuestion: targetEpoch: PrefixEpochId -> callId: string -> digest: string -> state: ActivePrefixEpoch -> Result<ActivePrefixEpoch, string>
 
     val isScopeReanchored: callId: string -> state: ActivePrefixEpoch -> bool
 

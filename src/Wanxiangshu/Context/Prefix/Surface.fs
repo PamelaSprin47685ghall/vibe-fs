@@ -47,7 +47,9 @@ module PrefixSurface =
         { EpochId = PrefixEpochId.create (int64Value value?epoch)
           ReanchoredRuns = runsOfJs value?reanchoredRuns
           ReanchoredTenures = tenuresOfJs value?reanchoredTenures
-          ReanchoredScopes = scopesOfJs value?reanchoredScopes }
+          ReanchoredScopes = scopesOfJs value?reanchoredScopes
+          LastScopeArchive = None
+          ScopeQuestions = Map.empty }
 
     let private stateToJs (state: ActivePrefixEpoch) : obj =
         box

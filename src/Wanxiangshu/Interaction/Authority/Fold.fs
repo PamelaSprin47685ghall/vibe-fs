@@ -217,17 +217,17 @@ module PromptFactFold =
         | Some active when
             active.LogicalRunId = payload.LogicalRunId
             && active.AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-            && active.CanonicalRole = Role.Plan
+            && (active.CanonicalRole = Role.Plan || active.CanonicalRole = Role.Manager)
             && System.String.IsNullOrWhiteSpace payload.Question
             ->
             reject "ask requires a nonempty question"
         | Some active when
             active.LogicalRunId = payload.LogicalRunId
             && active.AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-            && active.CanonicalRole = Role.Plan
+            && (active.CanonicalRole = Role.Plan || active.CanonicalRole = Role.Manager)
             ->
             appendQuestionAsked current payload
-        | _ -> reject "ask requires the exact active Plan authority"
+        | _ -> reject "ask requires the exact active Plan or Manager authority"
 
     let private foldUserQuestionAnswered authorityOf (payload: UserQuestionAnsweredPayload) =
         let current =

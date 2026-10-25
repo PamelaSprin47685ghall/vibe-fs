@@ -135,7 +135,17 @@ module ContextFoldSurface =
                     {| SessionId = sessionId (payload?SessionId)
                        PreviousEpochId = prefixEpoch (payload?PreviousEpochId)
                        NextEpochId = prefixEpoch (payload?NextEpochId)
-                       CallId = ToolCallId.create (text (payload?CallId)) |}
+                       CallId = ToolCallId.create (text (payload?CallId))
+                       ArchiveRef = optionalBlobRef (payload?ArchiveRef)
+                       ArchiveDigest = optionalBlobDigest (payload?ArchiveDigest) |}
+            )
+        | "ScopeQuestionAsked" ->
+            AgentFact.Context(
+                ContextFactCases.ScopeQuestionAsked
+                    {| SessionId = sessionId (payload?SessionId)
+                       TargetEpochId = prefixEpoch (payload?TargetEpochId)
+                       CallId = ToolCallId.create (text (payload?CallId))
+                       QuestionsDigest = text (payload?QuestionsDigest) |}
             )
         | other -> failwith $"ContextFoldSurface: unknown context fact '{other}'"
 

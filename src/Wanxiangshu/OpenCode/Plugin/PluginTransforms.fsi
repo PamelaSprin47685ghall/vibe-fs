@@ -17,6 +17,8 @@ module PluginTransforms =
     val negotiationRememberModel: input: obj -> unit
     val negotiationModelFor: sessionId: string -> obj
     val negotiationStartTemporary: tempId: string -> delegatorId: string -> Result<unit, string>
+    val consultationStartFrozen: tempId: string -> snapshot: obj -> Result<unit, string>
+    val consultationModelForTemporary: tempId: string -> obj
     val negotiationFinishTemporary: tempId: string -> unit
     val negotiationForgetSession: sessionId: string -> unit
     val negotiationProjectSystem: input: obj -> output: obj -> bool

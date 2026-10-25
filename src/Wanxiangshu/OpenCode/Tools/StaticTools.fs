@@ -77,7 +77,8 @@ module StaticTools =
           "todowrite-for-bookkeeper"
           "todowrite-for-plan"
           "resetScope"
-          "negotiate" ]
+          "negotiate"
+          "askPreviousScope" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     /// The office half comes from the one reverse lookup; utility tools read the
@@ -90,6 +91,7 @@ module StaticTools =
         |> List.map (fun name ->
             name,
             (name = "negotiate"
+             || (name = "askPreviousScope" && (role = Role.Advisor || Set.contains ToolPermission.ResetScope allowed))
              || (name = "resetScope" && role = Role.Advisor)
              || OfficeCapability.admitsUtility role name
              || (permissionOfToolName role name
@@ -126,6 +128,9 @@ module StaticTools =
         // host verb is `commission` (no office permission of its own).
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "negotiate", _ -> "allow"
+        | true, "askPreviousScope", Role.Advisor -> "allow"
+        | true, "askPreviousScope", role ->
+            if OfficeCapability.isAllowed role ToolPermission.ResetScope then "allow" else "deny"
         | true, "resetScope", Role.Advisor -> "allow"
         | true, "commission", Role.Orchestrator -> "allow"
         | true, name, role when List.contains name OfficeCapability.utilityToolNames -> utilityPermission role name

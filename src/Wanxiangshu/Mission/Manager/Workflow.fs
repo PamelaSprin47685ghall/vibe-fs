@@ -79,8 +79,6 @@ module ManagerWorkflow =
                 | Some work when work.Sequence <> [ "S4" ] -> None
                 | Some work when work.ActiveId.IsNone -> None
                 | Some work when not work.Reviewed -> Some assessPath
-                | Some work when work.ReviewOutcome = Some "Promoted" && Array.isEmpty work.Obligations ->
-                    Some finishPath
                 | Some _ -> Some workPath
         }
 
@@ -199,29 +197,56 @@ module ManagerWorkflow =
     /// One durable opening at an observed head. DurableWorkHost owns race
     /// reconciliation: a conflicting or unknown append is accepted only when
     /// a reread proves the same Manager work now exists.
+    /// A later Manager provider request after S4 Delivered opens a distinct
+    /// tenure in the same work; it cannot revive the retired authority term.
+    let private confirmManagerReopened (gitCommonDir: string) (sessionId: string) (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) =
+        let proven =
+            (receipt.Status = "Committed" || receipt.Status = "Replayed")
+            && receipt.Kind = "Reopened"
+        let active =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId
+            |> Option.exists (fun now -> now.ActiveId.IsSome && not now.Delivered)
+        if not proven && not active then
+            invalidOp ("Manager lifecycle reopen outcome is not proven: " + receipt.Status)
+
+    let private reopenDeliveredManager (gitCommonDir: string) (sessionId: string) (head: int64)
+        (prior: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+        match prior.Retirements |> List.tryLast with
+        | Some last when last.Outcome = "Delivered" ->
+            let identity = sessionId + ":reopen:" + last.RetirementId + ":" + string head
+            let command =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "Reopen"
+                    [ "retirementId", box last.RetirementId
+                      "ownerId", box sessionId
+                      "openingCursor", box (float head)
+                      "blockers", box ([||]: string array) ]
+            let receipt =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir sessionId identity command
+            confirmManagerReopened gitCommonDir sessionId receipt
+        | _ -> invalidOp "Delivered Manager has no exact retirement to reopen"
+
     let private openManagerWorkAtHead (sessionId: string) (directory: string) (head: int64) : Task<unit> =
         task {
-            // A plugin may enter from a subdirectory. The work belongs to the
-            // actual worktree root, not that entry directory or the common Git dir.
             let! root = Wanxiangshu.Git.GitSubject.revParseShowToplevel directory
-
             if System.String.IsNullOrWhiteSpace root then
                 invalidOp "Manager lifecycle opening failed: Git did not identify a worktree root"
 
             let! gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot root
-
-            match
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ensureOpened
-                    gitCommonDir
-                    sessionId
-                    (sessionId + ":open:" + string head)
-                    root
-                    (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executionSequence ())
-                    sessionId
-                    (float head)
-            with
-            | Ok _ -> ()
-            | Error reason -> invalidOp ("Manager lifecycle opening failed: " + reason)
+            let work = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId
+            match work with
+            | Some prior when prior.Sequence = [ "S4" ] && prior.Delivered && prior.ActiveId.IsNone ->
+                reopenDeliveredManager gitCommonDir sessionId head prior
+            | Some prior when prior.Sequence = [ "S4" ] && prior.ActiveId.IsSome -> ()
+            | _ ->
+                match
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ensureOpened
+                        gitCommonDir sessionId (sessionId + ":open:" + string head) root
+                        (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executionSequence ())
+                        sessionId (float head)
+                with
+                | Ok _ -> ()
+                | Error reason -> invalidOp ("Manager lifecycle opening failed: " + reason)
         }
 
     let ensureManagerWorkOpened

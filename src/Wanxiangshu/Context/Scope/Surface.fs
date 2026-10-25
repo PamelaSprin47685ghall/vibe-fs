@@ -24,6 +24,8 @@ module Surface =
 
     let isUnchanged (first: obj array) (second: obj array) : bool = owner?isUnchanged(first, second)
     let budgetSuffix (budget: int) : string = owner?budgetSuffix(budget)
+    let adjustBudgetForKpi (estimate: int) (completion: string) : int =
+        owner?adjustBudgetForKpi(estimate, completion)
     let turnBudget (sessionId: string) : int = owner?turnBudget(sessionId)
     let isScopeInitialized (sessionId: string) : bool = owner?isInitialized(sessionId)
     let onTurnStart (sessionId: string) : unit = owner?startTurn(sessionId)
@@ -65,6 +67,12 @@ module Surface =
     let startTemporary (tempId: string) (delegatorId: string) : obj =
         owner?startTemporary(tempId, delegatorId)
 
+    let startTemporaryFromFrozen (tempId: string) (snapshot: obj) : obj =
+        owner?startTemporaryFromFrozen(tempId, snapshot)
+
+    let modelForTemporary (tempId: string) : obj =
+        owner?modelForTemporary(tempId)
+
     let isTemporary (sessionId: string) : bool =
         owner?isTemporary(sessionId)
 
@@ -87,3 +95,30 @@ module Surface =
     let projectMessages (tempId: string) (question: obj) : obj array option =
         let r = owner?projectMessages(tempId, question)
         if isNull r then None else Some(unbox<obj array> r)
+
+    let pendingKind (sessionId: string) : string =
+        owner?pendingKind(sessionId)
+
+    let isPreviousScopePending (sessionId: string) : bool =
+        owner?isPreviousScopePending(sessionId)
+
+    let hasPreviousScope (sessionId: string) : bool =
+        owner?hasPreviousScope(sessionId)
+
+    let setHasPreviousScope (sessionId: string) (value: bool) : unit =
+        owner?setHasPreviousScope(sessionId, value)
+
+    let beginAskPreviousScope (sessionId: string) : unit =
+        owner?beginAskPreviousScope(sessionId)
+
+    let askPreviousScope (sessionId: string) (questions: string) (receipt: string option) : obj =
+        match receipt with
+        | Some r -> owner?askPreviousScope(sessionId, questions, r)
+        | None -> owner?askPreviousScope(sessionId, questions)
+
+    let preparePreviousScopeReply (receipt: string) (sessionId: string) (answer: string) : obj =
+        let language = ProviderLanguageBinding.forSessionText sessionId |> ProviderLanguage.label
+        owner?preparePreviousScopeReply(receipt, sessionId, answer, language)
+
+    let confirmPreviousScopeSteer (receipt: string) (sessionId: string) : bool =
+        owner?confirmPreviousScopeSteer(receipt, sessionId)

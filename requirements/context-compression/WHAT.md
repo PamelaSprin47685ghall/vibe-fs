@@ -57,7 +57,7 @@ Provider retry 的 correctness path 严禁读取 wall clock、构造 `TimeSpan`�
 
 `assume` 是短小但高价值的判断承诺点。在活跃 scope 内，承载 `assume` 调用的原始 Host 消息与对应 result 消息原封不动保留；不得把 assumption 文本抽出来重写、不得重新渲染参数。
 
-当调用 `resetScope` 进行上下文重置时，旧 scope 内的 `assume` 调用与其他非 resetScope 工具调用一并被清理；若模型在下一个 scope 仍需沿用关键假设或确切判断，必须由模型将其作为经验发现逐字原样抄写进 `oldScopeVerboseVerbatimExperience`。
+每次 `resetScope` 都必须**原样保留所有历史 `assume` 调用及其成对结果**；与 `negotiate`、`askPreviousScope`（含旧拼法 `askPrevious`）、`advisor` 一样，不因后续任何重置而删除。模型不必再靠交接材料重抄这些工具的输入与输出。普通非豁免工具与过程文本仍按最近一次 reset 清理。
 
 ## [033] resetScope 屏障与原文逐字保留
 
@@ -67,13 +67,15 @@ Provider retry 的 correctness path 严禁读取 wall clock、构造 `TimeSpan`�
 resetScope(
   oldScopeVerboseVerbatimExperience?: string | null,
   newScopeObjective: string,
-  newScopeTurnBudget: number
+  newScopeTurnBudget: number,
+  kpiCompletion: "not_started" | "far_below" | "partially_met" | "met" | "exceeded" | "not_applicable"
 )
 ```
 
 最新一次 `resetScope` 调用是**唯一**的上下文边界。在发往 provider 的每次请求副本中，清理上一次 `resetScope`（或 session 起点）到本次调用之间的全部上下文，但**必须且仅**保留：
 1. 所有 operator 编写的 `role: "user"` 消息（干净 prompt、steer，以及具有 user 归属的消息），按原始顺序夹在历次 `resetScope` 调用之间；
 2. 历次 `resetScope` 调用及其成对的工具结果（按 `tool_call_id` 成对保留，清除旧调用上的 thinking 块）。
+3. 历次 `assume`、`negotiate`、`askPreviousScope` / `askPrevious` 与 `advisor` 的原始调用 part（含完整参数）及按调用 ID 成对的原始结果 part；多次 reset 均不能排除，未配对的伪结果不得混入。
 
 并发屏障规则：包含最新 `resetScope` 的同批工具调用中，`resetScope` 作为执行 Barrier。排在它之前的工具调用先执行并随旧 scope 一并被清理，排在它之后的工具调用在其返回后执行并保留在新 scope 中。最新一次 `resetScope` 之后产生的活跃 scope 消息原样保留。
 
@@ -100,12 +102,12 @@ resetScope(
 
 `prefix-stability` 将重锚后的下一次请求视为全新 epoch 的起点，重新建立精确字节前缀，不把旧 scope 清理造成的历史字节缺失判定为前缀漂移或违反同 epoch 前缀追加律（prefix-stability [001]）。同一 `toolCallId` 严禁重复产生重锚事实。
 
-## [036] 跨会话传递 full post-scope view 的 TOML 承载
+## [036] 跨会话只传当前指令与结构化材料的 TOML 承载
 
 所有跨会话上下文传递统一遵循 AXIOM 7（prose 属于指令与主报告，骑乘 `# ...` 注释头；材料属于结构化参考数据，骑乘 TOML 数据平面表格）：
 
-1. **父到子委派（`fork` / `resume` / `commission` / `devops` / `dag`）**：调用方传入的 charge / intent 散文按原样渲染为 `# ...` 注释头；调用方当前的完整 post-scope LLM 可见消息视图（经最新 `resetScope` 清理后的全部保留消息）作为只读背景材料渲染为合法的 Synthetic TOML（如 `[[context]]` 表）。子会话不隐式继承父会话的物理工具调用，也不接受局部材料过滤选择。
-2. **顾问咨询（`advisor`）**：与 fork 载荷形式一致，由单一请求文档承载：咨询意图作为 `# ...` 注释头，调用方当前的完整 post-scope 消息视图渲染为 TOML 数据平面（如 `[[context]]` 表）；顾问自然停机后交回的是其末轮 assistant 散文，作为 `# ...` 注释呈现，不返回顾问的完整 post-scope 视图。
+1. **父到子委派（`fork` / `resume` / `commission` / `devops` / `dag`）**：调用方传入的 charge / intent 散文按原样渲染为 `# ...` 注释头；只传当前指令与任务选项，严禁传递调用方的历史、完整 post-scope LLM 可见消息视图、`[[context]]` 表、附件视图或历史摘要。若存在独立、确切的结构化参考数据，作为只读材料在 TOML 数据平面承载；子会话不隐式继承父会话的物理工具调用，也不接受局部材料过滤选择。缺少上下文时，被委托方必须通过 `negotiate` 主动协商（见 `delegation` [034]）。
+2. **顾问咨询（`advisor`）**：由单一请求文档承载，咨询意图按原样渲染为 `# ...` 注释头，只传当前咨询指令，严禁携带调用方的完整 post-scope 消息视图或历史上下文；若有明确结构化数据则在 TOML 数据平面承载。顾问自然停机后交回的是其末轮 assistant 散文，作为 `# ...` 注释呈现，不返回顾问的完整 post-scope 视图。
 3. 传递的数据在最终边界统一 pretty print 为合法 TOML，禁止将拼好的 TOML 作为转义字符串嵌套在字段中。
 
 ## [037] 子会话自然停机终态与 deliver 工具分立
@@ -119,7 +121,7 @@ resetScope(
 
 ## [038] Scope 与 Pair Hint 的独立所有权
 
-`wanxiangli/pair-hint` 是 scope 过滤、提示拼接和预算状态的唯一程序所有者。每个会话独立维护当前 prompt 身份、初始化状态与 `turnBudget`；宿主只能将真实 turn、prompt、`resetScope` 和会话结束事件交给该对象，不再自建第二份预算表或重复实现 filter/suffix 决策。
+`wanxiangli/pair-hint` 是 scope 过滤、提示拼接、首问 pending 状态与预算状态的唯一程序所有者。每个会话独立维护当前 prompt 身份、初始化状态、首问 pending 状态与 `turnBudget`；宿主只能将真实 turn、prompt、`resetScope`、`askPreviousScope` / `negotiate` 登记与会话结束事件交给该对象，不再自建第二份预算表、pending 状态机或重复实现 filter/suffix 决策。
 
 模型消息处理只有一个执行时机：**即将发往 LLM 时**。`wanxiangli/pair-hint` 的自治 ScopeSession 接受每轮请求的中立消息视图（kind、operator、prompt key、调用/结果身份与分段位置），输出保留位置、写入目标和后缀内容。OMP 与 OpenCode 两个 Host adapter 只解码自己的真实 envelope，并把这个 plan 应用到本次请求副本；领域对象既不认识 `role/content`，也不认识 `info/parts/state.output`。用户消息尾巴与工具结果尾巴是两种可独立呈现的注入，统统不修改真实工具执行结果、`tool_result`/`tool.execute.after` 回调、用户原文或持久化历史。
 
@@ -136,3 +138,85 @@ OpenCode provider messages transform 必须在宿主持有的原消息数组绑�
 ## [041] ScopeSession 退场
 
 OpenCode 的 `session.deleted` 事件到达时，仅清除该物理会话 ID 在 wanxiangli 中的 scope state（prompt 身份、初始化、turnBudget），不得影响同时存在的其他会话。OMP 的 `session_start`、`session_switch`、`session_branch` 继续清理其明确的会话状态。清理不写日志、不替换真实工具结果、不触碰工作历史。
+
+## [042] 跨 Scope 回问接口与首问协议
+
+`askPreviousScope` 是供模型在 `resetScope` 之后向紧邻上一 Scope 澄清疑问的宿主工具，其签名如下：
+
+```ts
+askPreviousScope(
+  questions: string
+)
+```
+
+1. **访问边界与首次调用**：第一版仅允许访问同会话（session）刚关闭的、紧邻上一 epoch 的已封存出站视图；来源身份由持久化 epoch 决定，不暴露任意跨会话查询，不接受模型指定外部档案引用。在会话首次发生 `resetScope` 之前调用本工具，宿主明确返回 `NoPreviousScope` 错误。
+2. **模型自主发问与形式校验**：`questions` 为非空字符串，疑问内容完全由重置后的新模型根据旧模型交接材料（`oldScopeVerboseVerbatimExperience`）与当前任务目标自主组织，允许将多个相关问题集中一次问出。宿主严禁为 `questions` 预填模板文本，严禁对问题内容进行语义审查或关键词过滤；宿主仅校验 `questions` 为非空字符串等形式合规性。
+3. **Receipt 即解除 pending**：当模型发起合法的首问调用时，宿主入口在核对会话、epoch 与调用身份后，持久登记该询问的 receipt，并立即向模型返回已接受受理的回执（或明确的形式拒绝），不同步等待旧模型回答。**宿主一旦成功登记首问 receipt，当前 epoch 的首问 pending 状态即告解除**，预算递减与初始化时序恢复正常推进。首问义务的解除绝对不以旧模型回答送达、排队成功或 `PhysicalAccepted` 为前置条件。
+4. **回答作为 User Steer 迟到送达**：旧模型在冻结的只读旧视图上完成单轮推理后，其回答经由 PromptDispatcher 路径以真实 Host 用户消息载体（`role: "user"`）注入接收方会话，但归属标记为 agent（`ScopeConsultation`）。该消息携带持久 PromptKey 并排队供后续 LLM 请求自然消费；严禁将回答伪装成 operator 用户消息，回答到达不得作废当前 `turnBudget`，亦不得触发未初始化提醒。
+5. **异常、Stale 与重放语义**：
+   - **Stale 废弃**：当回答送达时，若接收方会话已发生新的 `resetScope`（epoch 已推进）、会话已被删除（`session.deleted`）或操作员已取消，该在途回答判定为 `Stale` 并予以丢弃，严禁跨 epoch 注入后续上下文。
+   - **Unknown 处理**：调用向 Provider 发起旧模型推理若返回 Unknown 或超时，宿主保留持久 Pending 记录与原调用身份，严禁判定为伪造的成功或失败，严禁盲目发起二次计费重试。
+   - **调用重放幂等**：同一 `toolCallId` 的重复调用或重放必须返回原持久 receipt 或结算记录，严禁重复向旧模型派发推理请求。
+   - **后续普通追问**：首问义务解除后，模型可在当前 epoch 随时再次调用 `askPreviousScope` 发起主动追问；后续追问属于普通咨询，每次真实调用拥有独立 receipt，不阻断执行、不重新进入 pending 状态。
+
+## [043] resetScope 档案与首问义务的原子绑定
+
+`resetScope` 的执行必须与上一 epoch 的出站视图档案及新 epoch 的首问义务建立原子持久化绑定。
+
+1. **不可变档案存储与原子提交**：当执行合法的 `resetScope` 时，宿主必须依据导致该次调用发生的真实 Provider 出站请求，捕获完整的 system、messages、model/variant、工具目录及必要 run 身份，并首先将其作为不可变内容地址 blob 写入持久存储（`.Herdchestra/`）。随后，在同一笔原子 durable 提交中，将 `ScopeReanchored(epoch -> epoch + 1)`、该档案的内容地址引用（`archiveRef` / digest）以及新 epoch 的首问义务（`AwaitFirstPreviousScopeQuestion`）共同落盘。
+2. **提交确证先于内存状态更新**：内存中的活跃 scope 状态、当前 epoch 与新预算（`newScopeTurnBudget`）**只有在上述 durable 提交确证成功（Committed）之后**方可更新。提交完成前、提交失败或持久化结果 Unknown 时，严禁更新内存状态；若 Provider 出站视图不可捕获或档案 blob 写入失败，宿主必须直接报错，严禁伪造无档案的成功 reset。
+3. **调用重放与幂等边界**：同一 `resetScope` 的 `toolCallId` 重放时，必须识别为已提交的重锚，直接返回既有确证结果，严禁新开第二个 epoch，严禁重复产生新的首问义务或重复追加 `ScopeReanchored` 事实。
+4. **原始返回文本不变**：`resetScope` 工具在 Host 层面执行成功的原始返回值严格保持为 `"Scope reset. Objective: <newScopeObjective>"`。首问义务提示、预算倒计时与 MUST 提醒均仅在即将发往模型的请求副本中进行热修正呈现（见 [034] 与 [044]），严禁改写盘上工具原始执行结果或持久化历史。
+5. **在途咨询收尾与资源结清**：
+   - **再次 reset**：当模型在当前 epoch 再次成功执行 `resetScope` 时，前一 epoch 尚未完成的在途回问（in-flight consultation）立即结清并标记为 Stale，其临时执行资源被释放，迟到答案不得污染新 epoch。
+   - **会话退场**：当接收到 `session.deleted` 或会话销毁事件时，属于该会话的全部在途回问进程与临时会话资源必须立即排空并终止，未落地的回答一并作废。
+
+## [044] 跨 Scope 回问与首问协商的对称 pending 状态
+
+系统为委托首轮协商（`negotiate`，见 `delegation` [034]）与跨 Scope 首次回问（`askPreviousScope`，见 [042]）建立对称的 pending 机制。两者共用完全相同的 pending 状态生命周期与呈现路径，仅在咨询类型（kind）、提醒文案、目标来源及解除条件上保持必要区分。
+
+1. **唯一所有权归属**：`wanxiangli/pair-hint`（PairHint）中的 `ScopeSession` 是会话 pending 状态、预算时序与 scope 提示呈现的**唯一程序所有者**。宿主不设第二份状态机或并发权威；OpenCode 与 OMP 适配器仅消费 PairHint 计算出的中立计划并热修正请求副本。
+2. **提示词与时序驱动而非 Tool Gate**：首问义务通过提示词与时序约束强制执行，严禁设立全局工具拦截门禁（Tool Gate）。在 pending 期间，模型调用任何普通工作工具（如代码修改、文件读写、只读查询等）均正常执行并产生业务效果，宿主绝对不得在 `tool.execute.before` 因首问未完成而阻断普通工具执行。
+3. **请求副本中的持续 MUST 提醒**：
+   - 在 pending 期间，发往模型的请求副本中持续挂载对应的 MUST 提醒：首次呈现的 `resetScope` 结果附带 `MustAskPreviousScope` 提醒（negotiate 期间为 `NegotiateReminder`）；
+   - 其后**每一个新首次呈现的非 resetScope 工具结果**、**assistant tool part** 以及**操作员消息**，均在请求副本中携带对应的 MUST 提醒；
+   - 提醒文本按呈现身份（如 `prompt:+key` 或工具结果身份）冻结，**只写入一次并在同 epoch 后续请求中逐字重放**，严禁在后续请求中重复追加或更改内容；真实工具执行结果、原始操作员消息与持久化历史中绝不写入任何提醒。
+4. **时序与预算完全冻结**：在 pending 期间，会话时序严密冻结：
+   - 工具结果在请求副本中**绝对不呈现 `\0\uFEFF[Remaining turnBudget: N]` 预算倒计时后缀**；
+   - 物理回合不递减 `turnBudget`；
+   - 初始化时序不前进（`initialized` 保持为 `false`）；
+   - 零预算弱提示（weak reminder）保持关闭。
+5. **resetScope 自身执行自拒**：在 pending 未解除期间，模型若再次尝试调用 `resetScope`，该工具自身直接拒绝执行，返回说明文字提示模型必须先完成当前首问义务。该拒绝由工具自身返回，不产生任何 durable 提交或 `ScopeReanchored` 事实，且不影响其他普通工具的正常调用。
+6. **对称性与解除条件分立**：
+   - **结构对称**：`negotiate` 与 `askPreviousScope` 遵循相同的时序冻结（无预算后缀、不递减、弱提示关闭）、相同的新工具结果持续 MUST 提醒，以及相同的 `resetScope` 自拒行为。
+   - **解除条件分立**：
+     * **`askPreviousScope` 的解除条件**：宿主入口成功登记首问有效调用的 receipt 事实后，pending 状态立即解除，预算递减与初始化时序恢复正常；不等待旧模型推理完成，不等待回答送达；
+     * **`negotiate` 的解除条件**：必须等待委托者的首次真实答复作为实体 user steer 物理送达接收方会话（`PhysicalAccepted` 确认）后，方可解除 pending 状态并激活 `resetScope` 初始化（见 `delegation` [034]）。
+7. **周期重置与普通追问**：每次成功提交 `resetScope`（epoch 推进），均无条件建立新一轮首问 pending 状态与首问义务。首问 receipt 受理后，模型发起的后续追问属于普通咨询，不进入 pending 状态，不阻塞时序，不重复产生首问义务。
+
+
+## [045] KPI 枚举与下一 Scope 预算因子
+
+`resetScope` 必须携带当前 Scope 的 KPI 达成枚举 `kpiCompletion`：`not_started` 完全未做（0.50 倍）、`far_below` 明显不足（0.75 倍）、`partially_met` 部分完成（0.90 倍）、`met` 完成（1.00 倍）、`exceeded` 超额完成（1.25 倍）；首次没有先前 KPI 可用 `not_applicable`（1.00 倍）。`newScopeTurnBudget` 是模型估计的下一 Scope 原始预算，持久重置成功后实际预算为 `ceil(estimate × factor)`（非负且上限 32 位整数）。因子由 `wanxiangli/pair-hint` 的单一确定性函数计算，两个 Host 不得重复写倍率表。未知枚举、漏传字段、负预算在执行前拒绝，不写 archive 或 ScopeReanchored，不推进 epoch/预算；不审查 KPI 语义真实性。
+
+证明：`wanxiangli/src/pair-hint/tests/012.test.mjs` 与两个宿主真实 `resetScope` 的参数注册、有效调用、拒绝与最终预算测试。
+
+## [046] 跨 Scope 永存工具原始成对输入与输出
+
+`wanxiangli/pair-hint` 按工具调用身份保留 `assume`、`negotiate`、`askPreviousScope` / `askPrevious`、`advisor` 的调用及结果。无论位于最新 reset 前多少代、与普通调用共处一个 assistant 多 part 批次、或结果独立成消息，均精确保留。对其它工具仍严格裁剪；不保留无对应调用 ID 的伪结果或其相邻普通调用。OpenCode 与 OMP 只能投影该中立过滤计划，不能按英文工具名重复维护自己的历史保留清单。实际是 `this.advisor` 等程序内成员、而不是物理 `advisor` 工具时，必须先由生产调用归属给出确证身份，不能猜测脚本文本并误判。
+
+证明：`wanxiangli/src/pair-hint/tests/011.test.mjs`、Host 已注册请求副本与多次 reset 前缀稳定性反例。
+
+## [047] 已落地的跨 Scope 回问与真实可证范围
+
+OpenCode 物理实现已通过 Host `resetScope` 先写完整已捕获 system/messages/model/variant 的内容地址 blob、durable `ScopeReanchored` 与独立的 `ScopeQuestionAsked(session, targetEpoch, actualToolCallId, sha256(questions))` 事实。Host 接受首次 `askPreviousScope(questions)` 必须先确证已归档源且 digest 正确、目标 epoch 仍有效；同一事实身份重放（含清除内存缓存）不再重复旧模型调用，异问题复用 callId 拒绝。旧请求经与 `negotiate` 共用的短命只读 SDK session 重新呈现给 Provider，工具执行前阻断，回答沿同一有物理落地观察的 PromptDispatcher steer 路径送达。临时旧模型仅可提供当时上下文的新推理，不能复活隐藏思考。
+
+上述并不表示设计稿全部实施：现有 archive 仍明确 `toolsCaptured=false`，没有证明当次**完整** Provider 工具目录与真实 provider-run ID 均一并冻结；只有 system、messages、model/variant 物理观察可靠时才准成功 reset。进程异常时尚无独立的在途旧模型任务恢复与精确物理模型缓存命中率证据；重复 receipt 保证不再次推理，但也可能留下已受理而无实际回问的新结果，必须如实报告。`this.advisor` 是 JS 编程面内部成员时不可冒充为外部物理 `advisor` toolCall；[046] 的保留判定仅依据真正工具调用身份。
+
+OMP 的 `runEphemeralTurn` 不能以已冻结上一 Provider 请求代替当前真实上下文，因此不得声称执行了旧模型回问。OMP 必须真实注册 `askPreviousScope(questions)`，针对已有当前 epoch 的历史 archive 核验 digest 并 durable 登记受理事实，解除 PairHint 首次 MUST pending；回执明确标记 `answerDelivered=false` 且说明没有模型回答或 steer。缺档案、无有效 callId、空问题、旧 epoch、写入失败均不应伪造成功。完成 OMP 旧请求只读模型重播，需要后续能物理替换 system/messages/model/工具目录且允许工具拒绝的宿主端口。
+
+证明：`requirements/host-boundary/tests/scope-hni-physical.test.mjs` 的 `WHAT[context-compression-047]`，`requirements/host-boundary/tests/omp-scope-seam.test.mjs` 的 `WHAT[context-compression-048]`，以及 `wanxiangli/src/pair-hint/tests/{010,011,012,013}.test.mjs`。
+
+## [048] 未交付旧模型回复时的回执状态
+
+`ScopeQuestionAsked` 只证明模型主动提交的问题及 Host 对其接纳已持久，绝不等于旧 Provider 已收到、答复已生成、stale 判断已通过、steer 已排队或真实模型已消费。任何缺后续事实的受理回执必须报告为 pending/unknown，而不是 Answered。OpenCode 已能在生存期内观察真实 steer，OMP 尚未能冻结旧请求模型执行；两者都不能以假消息填补该缺口。

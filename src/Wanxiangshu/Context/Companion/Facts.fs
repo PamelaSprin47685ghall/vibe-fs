@@ -46,4 +46,11 @@ type ContextFactCases =
         {| SessionId: SessionId
            PreviousEpochId: PrefixEpochId
            NextEpochId: PrefixEpochId
-           CallId: ToolCallId |}
+           CallId: ToolCallId
+           ArchiveRef: BlobRef option
+           ArchiveDigest: BlobDigest option |}
+    | ScopeQuestionAsked of
+        {| SessionId: SessionId
+           TargetEpochId: PrefixEpochId
+           CallId: ToolCallId
+           QuestionsDigest: string |}

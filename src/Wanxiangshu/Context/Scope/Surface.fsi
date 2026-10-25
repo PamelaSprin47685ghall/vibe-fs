@@ -9,6 +9,7 @@ module Surface =
     val toObjArray: messages: obj -> obj array
     val isUnchanged: first: obj array -> second: obj array -> bool
     val budgetSuffix: budget: int -> string
+    val adjustBudgetForKpi: estimate: int -> completion: string -> int
     val turnBudget: sessionId: string -> int
     val isScopeInitialized: sessionId: string -> bool
     val onTurnStart: sessionId: string -> unit
@@ -33,6 +34,8 @@ module Surface =
     val rememberModel: sessionId: string -> model: obj -> unit
     val modelFor: sessionId: string -> obj
     val startTemporary: tempId: string -> delegatorId: string -> obj
+    val startTemporaryFromFrozen: tempId: string -> snapshot: obj -> obj
+    val modelForTemporary: tempId: string -> obj
     val isTemporary: sessionId: string -> bool
     val finishTemporary: tempId: string -> unit
     val recordToolViolation: tempId: string -> unit
@@ -40,3 +43,11 @@ module Surface =
     val forgetSession: sessionId: string -> unit
     val projectSystem: tempId: string -> current: string array -> string array option
     val projectMessages: tempId: string -> question: obj -> obj array option
+    val pendingKind: sessionId: string -> string
+    val isPreviousScopePending: sessionId: string -> bool
+    val hasPreviousScope: sessionId: string -> bool
+    val setHasPreviousScope: sessionId: string -> value: bool -> unit
+    val beginAskPreviousScope: sessionId: string -> unit
+    val askPreviousScope: sessionId: string -> questions: string -> receipt: string option -> obj
+    val preparePreviousScopeReply: receipt: string -> sessionId: string -> answer: string -> obj
+    val confirmPreviousScopeSteer: receipt: string -> sessionId: string -> bool

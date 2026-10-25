@@ -679,8 +679,6 @@ module ForkCommand =
     let private devopsDispatchRefusal (facts: ManagerCapabilityFacts) : string option =
         if not facts.HasAssessment then
             Some Path.Resume.AssessmentPendingForDevOps
-        elif facts.IsFinalIncumbent then
-            Some Path.Resume.DispatchClosed
         else
             None
 

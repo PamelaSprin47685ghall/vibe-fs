@@ -190,27 +190,24 @@ test('WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_an
   }
 })
 
-test('WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability', () => {
-  // 末任不得开新工作：委托与续做一律拒绝（review 仍允许用于修改义务账）。
+test('WHAT[capability-enforcement-025] final incumbent may still delegate Engineer and DevOps for substantive closure', () => {
   const facts = managerFacts(true, true, true, undefined)
-  for (const permission of ['Fork', 'Resume']) {
-    assert.equal(
-      isAllowedForManagerFacts(facts, permission),
-      false,
-      `final incumbent must lose new-work permission ${permission}`,
-    )
+  for (const permission of ['Fork', 'Resume', 'Advisor', 'ReviewAssessment', 'Finality']) {
+    assert.equal(isAllowedForManagerFacts(facts, permission), true, `final manager retains ${permission}`)
   }
+  assert.equal(isAllowedForManagerFacts(managerFacts(false, true, true, undefined), 'Resume'), false,
+    'a delivered work without active successor still has no authority')
 })
 
 test('WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_in_both_languages', () => {
   const zh = readFileSync(new URL('../../../resources/provider/runtime/manager-finish/zh-CN.md', import.meta.url), 'utf8')
   const en = readFileSync(new URL('../../../resources/provider/runtime/manager-finish/en.md', import.meta.url), 'utf8')
-  assert.match(zh, /最后一任/)
+  assert.match(zh, /终局交付资格/)
   assert.match(zh, /findings 为空集/)
-  assert.match(zh, /不得开新工作/)
-  assert.match(en, /final Manager/)
-  assert.match(en, /findings is empty/)
-  assert.match(en, /do not start new work/)
+  assert.match(zh, /派出 Engineer 和通过固定 DevOps 收尾/)
+  assert.match(en, /eligible to complete/)
+  assert.match(en, /empty findings/)
+  assert.match(en, /may continue delegating/)
 })
 
 let programSequence = 0

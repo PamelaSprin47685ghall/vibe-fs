@@ -1241,8 +1241,20 @@ module ToolRegistry =
                       factory ]
               Execute = fun args ctx -> Task.FromResult(runtime.Negotiate(ctx.SessionId, args.Text "questions")) }
 
+        let previousScopeSpec: ToolSpec =
+            { Name = "askPreviousScope"
+              Description =
+                "Required once after each resetScope: read the handoff and ask your immediate previous Scope concrete clarifying questions using the single questions argument. This call acknowledges asynchronously, does not block other work, and the response arrives later as a steer. You may ask again for additional detail."
+              Arguments =
+                [ "questions",
+                  ToolHostCodec.stringSchemaDescribed
+                      "Ask your previous Scope questions based on its handoff and the current objective. Group related questions in one call."
+                      factory ]
+              Execute = fun args ctx -> runtime.AskPreviousScope(ctx, args.Text "questions") }
+
         let baseSpecs =
             [ yield negotiateSpec
+              yield previousScopeSpec
               yield JoinTool.spec runtime
 
               let horizonContext: HorizonTool.HorizonRuntimeContext =

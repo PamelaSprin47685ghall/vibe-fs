@@ -32,6 +32,7 @@ module ToolAdmissionTable =
           "assume", ToolAdmissions.assume
           "resetScope", ToolAdmissions.resetScope
           "negotiate", ToolAdmissions.negotiate
+          "askPreviousScope", ToolAdmissions.askPreviousScope
           "fetch", ToolAdmissions.fetch
           "fork", ToolAdmissions.fork
           "resume", ToolAdmissions.resume

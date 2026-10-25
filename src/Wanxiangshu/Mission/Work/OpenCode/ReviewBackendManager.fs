@@ -414,6 +414,17 @@ module ReviewBackendManager =
     /// binding is still validated first (a rejected invocation writes nothing
     /// and consumes no slot), but its eight fields do
     /// not enter the event.
+    let private afterValidatedReviewBinding (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedAssessment) =
+        task {
+            let empty = ReviewFindings.isEmpty prepared.Bound.Findings
+            let! kickoff = scope.TryAskForInitialEmptyManagerReview(context, empty)
+            match kickoff with
+            | Error _ -> return Error RecordFailed
+            | Ok true ->
+                return Ok "已向用户询问具体任务与验收标准。询问已经登记；等待用户的真实答复后继续本次工作。"
+            | Ok false -> return! runRecorded context prepared
+        }
+
     let private runPrepared
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
@@ -431,7 +442,7 @@ module ReviewBackendManager =
 
             match binding with
             | Error failure -> return Error failure
-            | Ok _ -> return! runRecorded context prepared
+            | Ok _ -> return! afterValidatedReviewBinding scope context prepared
         }
 
     let private renderExecution =
@@ -521,6 +532,16 @@ module ReviewBackendManager =
     /// of `{ key: string, value: string | null }`; a null value deletes the
     /// key. Returns a data envelope (`{ ok, outcome, firstReview, obligations }`
     /// or `{ ok: false, code, reason }`), never rendered prose.
+    let private executeParsedMemberOrAsk (scope: ToolRuntimeScope) (context: HostToolContext) (findings: ReviewFindings) =
+        task {
+            let! kickoff = scope.TryAskForInitialEmptyManagerReview(context, ReviewFindings.isEmpty findings)
+            match kickoff with
+            | Error error -> return createObj [ "ok" ==> false; "code" ==> "review-question-failed"; "reason" ==> error ]
+            | Ok true ->
+                return createObj [ "ok" ==> true; "outcome" ==> "WaitingForUser"; "firstReview" ==> false; "awaitingUser" ==> true; "obligations" ==> box [||] ]
+            | Ok false -> return! executeParsedMember scope context findings
+        }
+
     let executeMember (scope: ToolRuntimeScope) (context: HostToolContext) (findings: obj) : Task<obj> =
         task {
             let parsed =
@@ -532,5 +553,5 @@ module ReviewBackendManager =
 
             match parsed with
             | Error failure -> return memberFailure failure
-            | Ok findings -> return! executeParsedMember scope context findings
+            | Ok findings -> return! executeParsedMemberOrAsk scope context findings
         }

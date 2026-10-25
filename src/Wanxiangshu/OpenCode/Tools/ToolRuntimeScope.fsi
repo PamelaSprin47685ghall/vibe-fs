@@ -62,6 +62,8 @@ type ToolRuntimeScope =
     member EventPort: IEventObservationPort option
     member WorkspaceDirectory: string option
     member ActiveProfileFor: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
+    member AttachPreviousScopeTransport: ask: (string -> obj -> string -> Task<Result<string,string>>) -> unit
+    member AskPreviousScope: ctx: HostToolContext * questions: string -> Task<string>
     member AttachNegotiationTransport: ask: (string -> string -> string -> Task<Result<string,string>>) * steer: (string -> string -> string -> Task<Result<unit,string>>) -> unit
     member Negotiate: recipient: string * questions: string -> string
     member SendNegotiationSteer: recipient: string * answer: string * receipt: string -> Task<Result<unit, string>>
@@ -70,6 +72,7 @@ type ToolRuntimeScope =
     /// LC-017: the pending question's exact fence for a waiting session.
     member WaitingQuestionFenceFor: sessionId: string -> (ProviderRunIdentity * ToolCallId) option
     member AskUser: ctx: HostToolContext * question: string -> Task<Result<unit, string>>
+    member TryAskForInitialEmptyManagerReview: ctx: HostToolContext * findingsEmpty: bool -> Task<Result<bool, string>>
 
     member InterruptForUserQuestion:
         sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> Task<Result<unit, string>>

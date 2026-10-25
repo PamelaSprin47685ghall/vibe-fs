@@ -19,6 +19,8 @@
     "todowrite-for-plan": "work",
     "deliver": "work",
     "resetScope": "context-compression",
-    "negotiate": "context-compression"
+    "negotiate": "context-compression",
+    "askPreviousScope": "context-compression",
+    "askPreviousScope": "context-compression"
   }
 }

@@ -110,7 +110,7 @@ DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, 
 
 `todowrite-for-manager` 对已确立身份的 Manager 固定可见，不因评审阶段、末任或清理窗口而整票拒绝。它仍遵守身份、取消、等待及存储等独立边界。仓库访问仅经 `this.reviewOnly.cat/stat/ls/rg` 暴露，无顶层别名；每次操作在 Host 访问仓库前核验当前任期仍活跃、评审尚未接纳、无清理阻塞且未冻结。末任不例外；保存对象或方法引用、挂起恢复与插件重开均不得复用过期授权。拒绝使用稳定机器码 `REVIEW_ONLY`，且不读取目标文件、不启动 rg。
 
-`where/whereAll` 只处理已有文本，保持顶层；普通计算、view 声明和生命周期成员不受 Review 阶段整票限制。委托、收拢、交付等操作仍各守自身权限。其他角色保持原有直接成员和既定权限，共用底层文件实现，不另设 Manager 文件引擎。基类、描述与示例使用同一命名空间，评审前后保持同一工具定义。
+`where/whereAll` 只处理已有文本，保持顶层；普通计算、view 声明和生命周期成员不受 Review 阶段整票限制。委托、收拢、交付等操作仍各守自身权限。空账首评审或 `Promoted` 只表示具备最终交付资格，不是任务已经完成；活跃的末任 Manager 仍持有 `Fork` 派 Engineer、`Resume` 续派固定 DevOps、`Join`、ReviewAssessment 与 Finality 权能。不得凭 `IsFinalIncumbent` 或空 findings 静态拒绝上述实际收尾。无活跃任期、尚未通过 Review 的 DevOps 请求、资源 blocker 与用户问询等待依旧按既有独立门禁拒绝。其他角色保持原有直接成员和既定权限，共用底层文件实现，不另设 Manager 文件引擎。基类、描述与示例使用同一命名空间，评审前后保持同一工具定义。
 
 已退役的直接文件工具不进入 Host 目录；Manager 不得借用 `todowrite-for-engineer/devops` 绕过能力边界。
 
