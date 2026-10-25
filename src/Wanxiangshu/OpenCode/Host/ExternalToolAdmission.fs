@@ -5,6 +5,8 @@ open Wanxiangshu.Foundation.HostSession
 
 open System
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Participant.Provider
 
 /// Runtime admission for Host-declared external tools (capability-enforcement-007).
@@ -22,6 +24,9 @@ open Wanxiangshu.Participant.Provider
 [<RequireQualifiedAccess>]
 module ExternalToolAdmission =
 
+    [<Import("ExternalNamespaces", "wanxiangli/external-namespaces")>]
+    let private declaredExternal: obj = jsNative
+
     /// The authority of an external tool call is the session's canonical office
     /// role and nothing else (capability-enforcement-004). A call carries no
     /// provider-run or review identity, and this gate must never resolve one.
@@ -38,7 +43,7 @@ module ExternalToolAdmission =
         task {
             if
                 not (String.IsNullOrWhiteSpace sessionId)
-                && ExternalToolNamespace.matches toolName
+                && (declaredExternal?matches(toolName) |> unbox<bool>)
             then
                 match runtime.RoleFor(admissionContext sessionId) with
                 | Some _ ->

@@ -19,6 +19,21 @@ open Wanxiangshu.Resources
 /// the inventory, and Host agent.model is never routing truth.
 module ManagedAgentConfig =
 
+    [<Import("ExternalNamespaces", "wanxiangli/external-namespaces")>]
+    let private declaredExternal: obj = jsNative
+
+    /// 物理 MCP 配置解码只在宿主边界进行。
+    let private hostNamespaceNames (config: obj) : string array =
+        let mcp = if isNull config then null else config?mcp
+
+        if isNull mcp then
+            [||]
+        else
+            emitJsExpr
+                mcp
+                "Object.keys($0).filter(function (name) { var entry = $0[name]; return entry == null || entry.enabled !== false }).sort()"
+
+
     type ManagedAgentBinding = { Agent: ManagedAgent }
 
     type ManagedAgentInventory =
@@ -204,10 +219,10 @@ module ManagedAgentConfig =
         // admission gate keeps every namespace this process has ever declared
         // (`declare` is monotone) so a live session's map can never outlive the
         // gate that closes its execution (capability-enforcement-002).
-        let namespaces = ExternalToolNamespace.resolve config
-        let patterns = ExternalToolNamespace.patternsOf namespaces
+        let namespaces = hostNamespaceNames config
+        let patterns = declaredExternal?patterns(namespaces) |> unbox<string array> |> Array.toList
 
-        ExternalToolNamespace.declare namespaces
+        declaredExternal?declare(namespaces) |> ignore
 
         for name in ManagedAgent.requiredNames do
             applyNamedOwnedFields agents inventory patterns name
